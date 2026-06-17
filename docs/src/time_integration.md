@@ -1,6 +1,23 @@
 # [Time integration](@id leapfrog)
 
-SpeedyWeather.jl is based on the [Leapfrog time integration](https://en.wikipedia.org/wiki/Leapfrog_integration),
+SpeedyWeather.jl supports several time integration schemes, selected by passing a
+`time_stepping` component to the model constructor:
+
+- [`Leapfrog`](@ref leapfrog), a 2-step leapfrog scheme with a Robert-Asselin and Williams filter
+  (the default for `ShallowWaterModel`, `PrimitiveDryModel` and `PrimitiveWetModel`), described below.
+- [`NCycleLorenz`](@ref ncycle), a family of semi-implicit Lorenz N-cycle schemes
+  (Hotta et al. 2016[^Hotta2016]; the default for `BarotropicModel`).
+
+All schemes share a common framework (see [Time steppers and variable steps](@ref steps)) in which
+the time stepper decides, for every model component, which stored *step* of each variable to read
+or write. This decouples the dynamical core and parameterizations from the time-stepping
+bookkeeping: e.g. leapfrog stores two steps of the prognostic variables, while the Lorenz N-cycle
+stores only one but keeps a second tendency for its weighted accumulation.
+
+## Leapfrog
+
+SpeedyWeather.jl's default time integration is the
+[Leapfrog time integration](https://en.wikipedia.org/wiki/Leapfrog_integration),
 which, for relative vorticity ``\zeta``, is
 in its simplest form
 ```math
@@ -104,7 +121,7 @@ component and passing it on to the model constructor
 ```@example leapfrog
 using SpeedyWeather
 spectral_grid = SpectralGrid()
-time_stepping = Leapfrog(spectral_grid, start_with_euler=true)
+time_stepping = Leapfrog(spectral_grid)
 ```
 
 and with `?Leapfrog` you see a summary of the fields, only manually change those marked `[OPTION]`.
@@ -150,20 +167,19 @@ See that section for more information.
 
 ## Restart with Leapfrog
 
-As a 2-step scheme, leapfrog time stepping has to be initialised with another scheme (e.g. Euler forward)
-to have information for the 2nd step if not otherwise known, see [Leapfrog initialisation](@ref).
-This is done by default as `time_stepping.start_with_euler` is `true`. If you `StartFromFile`
-as initial conditions then you may want to switch this to false.
+As a 2-step scheme, leapfrog time stepping has to be initialised with an Euler forward step to have
+information for the 2nd step, see [Leapfrog initialisation](@ref). This Euler spin-up step
+(`spin_up_steps(::AbstractLeapfrog) == 1`) is taken at the start of every integration and does not
+count towards the clock or the output frequency.
 
-SpeedyWeather also allows the user to use several `run!(simulation)` calls after another to continue
-a simulation, possibly after some modification by the user. These subsequent `run!` calls use
-leapfrog to continue the time integration (as the 2nd step is available) by default,
-but this is determined by `time_stepping.continue_with_leapfrog` and can be deactivated.
+SpeedyWeather also allows the user to issue several `run!(simulation)` calls one after another to
+continue a simulation, possibly after some modification by the user. Each `run!` re-initialises the
+clock (its step counter is reset to 0), so every `run!` -- including continued ones -- begins again
+with the Euler spin-up step; the integration is restarted from the currently available state rather
+than relying on a stored 2nd step.
 
-Internally, `time_stepping.first_step_euler` will switch from `true` to `false` during an integration
-if `continue_with_leapfrog==true` to store the information that this simulation was already run
-previously. Don't change `first_step_euler` directly, hence it's marked as `[DERIVED]` in the
-docstring.
+For time steppers that need no such initialisation `spin_up_steps` is `0`, e.g. the
+[Lorenz N-cycle](@ref ncycle).
 
 ## Passing `time_stepping` to the model constructor
 
@@ -176,7 +192,101 @@ nothing # hide
 ```
 
 where `;` matches the `time_stepping` keyword argument by name. If you name `leapfrog = Leapfrog(spectral_grid)` then you
-would need to change this to `time_stepping=leapfrog` in the function call arguments.
+would need to change this to `time_stepping=leapfrog` in the function call arguments. The same
+keyword takes any time stepper, e.g. `time_stepping = NCycleLorenz(spectral_grid)` for the
+[Lorenz N-cycle](@ref ncycle).
+
+## [Time steppers and variable steps](@id steps)
+
+Different time integration schemes need to store a different number of past states of the
+prognostic variables and/or tendencies. Leapfrog needs the two spectral steps ``i-1`` and ``i``;
+the Lorenz N-cycle needs only one prognostic step but a second tendency to accumulate weighted
+tendencies. SpeedyWeather handles this generically: prognostic variables and tendencies carry an
+extra [Step dimension](@ref) (the last dimension of their underlying array), and the time stepper
+decides how many steps to allocate and which step each model component should read or write.
+
+The number of steps is requested by the time stepper through `prognostic_steps` and
+`tendency_steps` (with `prognostic_grid_steps`, `prognostic_spectral_steps`,
+`tendency_grid_steps`, `tendency_spectral_steps` to distinguish grid/spectral and dispatch over
+the model). For example leapfrog requests two spectral prognostic steps but, in the
+primitive-equation models, also two grid steps (because the parameterizations are evaluated at the
+previous grid state):
+
+```julia
+prognostic_spectral_steps(::AbstractLeapfrog) = 2
+prognostic_grid_steps(::AbstractLeapfrog, ::PrimitiveEquation) = 2
+tendency_steps(::AbstractLeapfrog) = 1
+```
+
+Throughout the dynamical core and parameterizations a variable is then accessed with
+`get_prognostic_step` / `get_tendency_step`, which return a view of the appropriate step:
+
+```julia
+# in a model component, e.g. the spectral→grid transform or a tendency term
+vor  = get_prognostic_step(vars.prognostic.vorticity, time_stepping, component)
+ζtend = get_tendency_step(vars.tendencies.vorticity,  time_stepping, component)
+```
+
+Which step is returned is decided by the time stepper via `which_prognostic_step` /
+`which_tendency_step`, dispatched on the variable, the time stepper, the *component* and
+(optionally) the model — so a scheme can choose a different step per process. The fallback is step
+1, and leapfrog for instance overrides it to read the current (2nd) step for transforms and the
+nonlinear dynamical core, but the previous (1st) step for the linear terms and horizontal
+diffusion:
+
+```julia
+which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSpectralTransform)       = 2  # current
+which_prognostic_step(var, ::AbstractLeapfrog, ::LinearDynamicalCore)             = 1  # previous
+which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion)     = 1  # previous
+```
+
+`get_step(var, i)` is the low-level accessor used by all of the above; for a variable with a step
+dimension it returns a view of step `i`.
+
+````@docs; canonical=false
+get_step
+````
+
+When writing a new time stepper you implement the `*_steps` methods (how many steps to store), the
+`which_*_step` methods (which step each component reads/writes) and an `update_prognostic!` method
+(how a tendency advances the state); the rest of the model is agnostic to the scheme.
+
+## [Lorenz N-cycle](@id ncycle)
+
+The Lorenz N-cycle [`NCycleLorenz`](@ref) is a semi-implicit time integration following
+Hotta et al. (2016)[^Hotta2016]. Over a cycle of ``N`` substeps it advances the state ``x``,
+per substep, as
+
+```math
+\begin{aligned}
+G &= w\,F_E(x) + (1-w)\,G \\
+dx &= (I - \alpha\,\Delta t\,L_I)^{-1} (G + L_I x) \\
+x &= x + \Delta t\,dx
+\end{aligned}
+```
+
+where ``F_E`` are the explicit tendencies, ``L_I`` the linear (gravity-wave) terms treated
+implicitly, and ``w`` a substep-dependent weight coefficient. Only one prognostic step is stored
+(the state is updated in place), but two tendencies are kept: ``F`` (the current tendency) and
+``G`` (the weighted accumulation that carries memory across substeps), hence
+`tendency_spectral_steps(::NCycleLorenz) = 2`.
+
+Four weight variants are available, following the naming in Hotta et al. (2016):
+`NCycleLorenzA` (default), `NCycleLorenzB`, `NCycleLorenzAB` (alternating A and B), and
+`NCycleLorenzABBA` (an A-B-B-A sequence that is 4th-order accurate for ``N=4``). The cycle length
+``N`` is set with `steps` (3 or 4 recommended, 4 is more stable).
+
+```@example ncycle
+using SpeedyWeather
+spectral_grid = SpectralGrid()
+time_stepping = NCycleLorenz(spectral_grid, steps=4, variant=NCycleLorenzAB())
+model = PrimitiveWetModel(spectral_grid; time_stepping)
+nothing # hide
+```
+
+````@docs; canonical=false
+NCycleLorenz
+````
 
 ## References
 
@@ -185,3 +295,4 @@ would need to change this to `time_stepping=leapfrog` in the function call argum
 [^Williams2009]: Williams, P. D., 2009: A Proposed Modification to the Robert-Asselin Time Filter. Mon. Wea. Rev., 137, 2538-2546, [10.1175/2009MWR2724.1](https://doi.org/10.1175/2009MWR2724.1).
 [^Amezcua2011]: Amezcua, J., E. Kalnay, and P. D. Williams, 2011: The Effects of the RAW Filter on the Climatology and Forecast Skill of the SPEEDY Model. Mon. Wea. Rev., 139, 608-619, doi:[10.1175/2010MWR3530.1](https://doi.org/10.1175/2010MWR3530.1).
 [^Williams2011]: Williams, P. D., 2011: The RAW Filter: An Improvement to the Robert-Asselin Filter in Semi-Implicit Integrations. Mon. Wea. Rev., 139, 1996-2007, doi:[10.1175/2010MWR3601.1](https://doi.org/10.1175/2010MWR3601.1).
+[^Hotta2016]: Hotta, D., E. Kalnay, and P. Ullrich, 2016: A Semi-Implicit Modification to the Lorenz N-Cycle Scheme and Its Application for Integration of Meteorological Equations. Mon. Wea. Rev., 144, 2215-2233, doi:[10.1175/MWR-D-15-0330.1](https://doi.org/10.1175/MWR-D-15-0330.1).

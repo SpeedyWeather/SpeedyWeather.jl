@@ -211,7 +211,7 @@ end
 function SpeedyWeather.timestep!(
         vars::Variables,
         land::AbstractTerrariumLandModel,
-        ::PrimitiveWetModel,
+        model::PrimitiveWetModel,
     )
     state = vars.prognostic.land.terrarium
     tmodel = land.model
@@ -222,9 +222,12 @@ function SpeedyWeather.timestep!(
     mask = land_mask(land)
 
     # Atmospheric forcings on the lowest model level / surface
-    Tair = vars.grid.temperature[mask, end]
-    humid = vars.grid.humidity[mask, end]
-    pres = vars.grid.pressure[mask]                          # log surface pressure
+    # choose step dimension depending on atmospheric time stepper
+    # and read like parameterization via DummyParameterization
+    l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
+    Tair = vars.grid.temperature[mask, end, l]
+    humid = vars.grid.humidity[mask, end, l]
+    pres = vars.parameterizations.surface_pressure[mask]
     wind = vars.parameterizations.surface_wind_speed[mask]
     rain = vars.parameterizations.rain_rate[mask]
     snow = vars.parameterizations.snow_rate[mask]
@@ -236,7 +239,6 @@ function SpeedyWeather.timestep!(
     Terrarium.set!(inputs.air_temperature, Tair)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
     Terrarium.set!(inputs.air_pressure, pres)
-    Terrarium.set!(inputs.air_pressure, exp(inputs.air_pressure))                  # log(Pa) -> Pa
     Terrarium.set!(inputs.specific_humidity, humid)
     Terrarium.set!(inputs.rainfall, rain)
     Terrarium.set!(inputs.snowfall, snow)
@@ -296,7 +298,7 @@ end
 function SpeedyWeather.timestep!(
         vars::Variables,
         land::TerrariumLand,
-        ::PrimitiveDryModel,
+        model::PrimitiveDryModel,
     )
     state = vars.prognostic.land.terrarium
     land_model = land.model
@@ -304,7 +306,10 @@ function SpeedyWeather.timestep!(
     mask = land_mask(land)
 
     # Only air temperature is needed; convert K -> °C
-    Tair = vars.grid.temperature[mask, end]
+    # choose step dimension depending on atmospheric time stepper
+    # and read like parameterization via DummyParameterization
+    l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
+    Tair = vars.grid.temperature[mask, end, l]
     inputs = state.inputs
     Terrarium.set!(inputs.air_temperature, Tair)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))

@@ -21,8 +21,8 @@ end
 
 @testset "Callbacks interface" begin
 
-    Base.@kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
-        timestep_counter::Int = 0
+    @kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
+        step_counter::Int = 0
         maximum_surface_wind_speed::Vector{NF} = Float64[]
     end
 
@@ -35,18 +35,18 @@ end
             model::AbstractModel,
         )
         # allocate recorder: number of time steps (incl initial conditions) in simulation
-        callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_timesteps + 1)
+        callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_steps + 1)
 
         # where surface (=lowermost model layer) u, v on the grid are stored
         nlayers = model.geometry.nlayers
-        u_grid = vars.grid.u[:, nlayers]
-        v_grid = vars.grid.v[:, nlayers]
+        u_grid = vars.grid.u[:, nlayers, 1]     # pick 1 in step dimension
+        v_grid = vars.grid.v[:, nlayers, 1]
 
         # maximum wind speed of initial conditions
         callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
 
         # (re)set counter to 1
-        callback.timestep_counter = 1
+        callback.step_counter = 1
     end
 
     function max_2norm(u::AbstractArray{T}, v::AbstractArray{T}) where {T}
@@ -65,13 +65,13 @@ end
         )
 
         # increase counter
-        callback.timestep_counter += 1
-        i = callback.timestep_counter
+        callback.step_counter += 1
+        i = callback.step_counter
 
         # where surface (=lowermost model layer) u, v on the grid are stored
         nlayers = model.geometry.nlayers
-        u_grid = vars.grid.u[:, nlayers]
-        v_grid = vars.grid.v[:, nlayers]
+        u_grid = vars.grid.u[:, nlayers, 1]
+        v_grid = vars.grid.v[:, nlayers, 1]
 
         # maximum wind speed at current time step
         callback.maximum_surface_wind_speed[i] = max_2norm(u_grid, v_grid)
@@ -82,6 +82,7 @@ end
     spectral_grid = SpectralGrid()
     callbacks = CallbackDict(NoCallback())
     model = PrimitiveWetModel(spectral_grid; callbacks)
+    model.feedback.verbose = false
 
     storm_chaser = StormChaser(spectral_grid)
     key = :storm_chaser

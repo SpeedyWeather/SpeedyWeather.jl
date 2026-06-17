@@ -1,117 +1,10 @@
-# model.implicit=nothing (for BarotropicModel)
-initialize!(::Nothing, dt::Real, ::Variables, ::AbstractModel) = nothing
-implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
-
-# SHALLOW WATER MODEL
-export ImplicitShallowWater
-
-"""Struct that holds various precomputed arrays for the semi-implicit correction to
-prevent gravity waves from amplifying in the shallow water model. The implicit time step
-between i-1 and i+1 is controlled by the parameter `α` in the range [0, 1]
-
-    α = 0   means the gravity wave terms are evaluated at i-1 (forward)
-    α = 0.5 evaluates at i+1 and i-1 (centered implicit)
-    α = 1   evaluates at i+1 (backward implicit)
-    α ∈ [0.5, 1] are also possible which controls the strength of the gravity wave dampening.
-    α = 0.5 slows gravity waves and prevents them from amplifying
-    α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
-
-Fields are
-$(TYPEDFIELDS)"""
-@kwdef mutable struct ImplicitShallowWater{NF} <: AbstractImplicit
-    "[OPTION] coefficient for semi-implicit computations to filter gravity waves, 0.5 <= α <= 1"
-    α::NF = 1
-
-    "Time step [s], = αdt = 2αΔt (for leapfrog)"
-    time_step::NF = 0
-end
-
-"""
-$(TYPEDSIGNATURES)
-Generator using the resolution from `spectral_grid`."""
-ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(; kwargs...)
-
-"""
-$(TYPEDSIGNATURES)
-Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
-function initialize!(implicit::ImplicitShallowWater, dt::Real, args...)
-    implicit.time_step = implicit.α * dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
-    return implicit
-end
-
-# implicit shallow water has no precomputed arrays, so implicit.initialized is not defined
-set_initialized!(implicit::ImplicitShallowWater) = nothing
-set_initialized!(implicit::Nothing) = nothing
-
-"""
-$(TYPEDSIGNATURES)
-Apply correction to the tendencies in `diagn` to prevent the gravity waves from amplifying.
-The correction is implicitly evaluated using the parameter `implicit.α` to switch between
-forward, centered implicit or backward evaluation of the gravity wave terms."""
-function implicit_correction!(
-        vars::Variables,
-        implicit::ImplicitShallowWater,
-        model::ShallowWater
-    )
-
-    div_tend = vars.tendencies.divergence                      # tendency of divergence and interface displacement η
-    η_tend = vars.tendencies.η                          # tendency of divergence and interface displacement η
-    div_old, div_new = get_steps(vars.prognostic.divergence)   # divergence at t, t+dt
-    η_old, η_new = get_steps(vars.prognostic.η)         # η at t, t+dt
-
-    H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
-    g = model.planet.gravity                    # gravitational acceleration [m/s²]
-    ξ = implicit.time_step                      # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
-
-    # Get precomputed l_indices from the spectrum
-    l_indices = div_tend.spectrum.l_indices
-
-    # GPU kernel launch
-    arch = architecture(div_tend)
-    launch!(
-        arch, SpectralWorkOrder, size(div_tend), implicit_shallow_water_kernel!,
-        div_tend, η_tend, div_old, div_new, η_old, η_new, l_indices, H, g, ξ
-    )
-
-    zero_last_degree!(div_tend)
-    zero_last_degree!(η_tend)
-    return nothing
-end
-
-@kernel inbounds = true function implicit_shallow_water_kernel!(
-        div_tend, η_tend, div_old, div_new, η_old, η_new, l_indices,
-        H, g, ξ,
-    )
-    I = @index(Global, Cartesian)
-    lm = I[1]  # single index lm corresponding to harmonic l, m
-    k = I[2]   # layer index
-
-    # Use precomputed l index from spectrum
-    l = l_indices[lm]
-
-    # eigenvalue, with without 1/radius², 1-based -l*(l+1) → -l*(l-1)
-    ∇² = -l * (l - 1)
-
-    # Calculate the G = N(Vⁱ) + NI(Vⁱ⁻¹ - Vⁱ) term.
-    # Vⁱ is a prognostic variable at time step i
-    # N is the right hand side of ∂V\∂t = N(V)
-    # NI is the part of N that's calculated semi-implicitily: N = NE + NI
-    G_div = div_tend[lm, k] - g * ∇² * (η_old[lm] - η_new[lm])
-    G_η = η_tend[lm] - H * (div_old[lm, k] - div_new[lm, k])
-
-    # Using the Gs correct the tendencies for semi-implicit time stepping
-    S⁻¹ = inv(1 - ξ^2 * H * g * ∇²)  # operator to invert
-    div_tend[lm, k] = S⁻¹ * (G_div - ξ * g * ∇² * G_η)
-    η_tend[lm] = G_η - ξ * H * div_tend[lm, k]
-end
-
 export ImplicitPrimitiveEquation
 
 """
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the primitive equation model.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ImplicitPrimitiveEquation{
+@kwdef struct ImplicitPrimitiveEquation{
         NF,             # number format
         VectorType,
         MatrixType,
@@ -120,60 +13,54 @@ $(TYPEDFIELDS)"""
     } <: AbstractImplicit
 
     # DIMENSIONS
-    "Spectral resolution"
+    "[DERIVED] Spectral resolution"
     trunc::IntType
 
-    "Number of vertical layers"
+    "[DERIVED] Number of vertical layers"
     nlayers::IntType
 
     # PARAMETERS
-    "Time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
-    α::NF = 1
+    "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
+    centering::NF = 1.0
 
-    "Reinitialize at restart when initialized=true"
-    reinitialize::Bool = true
-
-    "Flag automatically set to true when initialize! has been called"
-    initialized::Bool = false
+    "[DERIVED] (Scaled) time step used to initialize. Used to check whether time step has changed and reinitialization is needed."
+    Δt::Base.RefValue{NF} = Ref(zero(NF))
 
     # PRECOMPUTED ARRAYS, to be initialized with initialize!
-    "vertical temperature profile, obtained from diagn on first time step"
+    "[DERIVED] vertical temperature profile, obtained from diagn on first time step"
     temp_profile::VectorType = zeros(NF, nlayers)
 
-    "time step 2α*Δt packed in RefValue for mutability"
-    ξ::Base.RefValue{NF} = Ref{NF}(0)
-
-    "divergence: operator for the geopotential calculation"
+    "[DERIVED] divergence: operator for the geopotential calculation"
     R::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
+    "[DERIVED] divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
     U::VectorType = zeros(NF, nlayers)
 
-    "temperature: operator for the TₖD + κTₖD(ln pₛ)/Dt term"
+    "[DERIVED] temperature: operator for the TₖD + κTₖD(ln pₛ)/Dt term"
     L::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "pressure: vertical averaging of the -D̄ term in the log surface pres equation"
+    "[DERIVED] pressure: vertical averaging of the -D̄ term in the log surface pressure equation"
     W::VectorType = zeros(NF, nlayers)
 
-    "components to construct L, 1/ 2Δσ"
+    "[DERIVED] components to construct L, 1/ 2Δσ"
     L0::VectorType = zeros(NF, nlayers)
 
-    "vert advection term in the temperature equation (below+above)"
+    "[DERIVED] vert advection term in the temperature equation (below+above)"
     L1::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of the `div_sum_above` term"
+    "[DERIVED] factor in front of the `div_sum_above` term"
     L2::VectorType = zeros(NF, nlayers)
 
-    "`_sum_above` operator itself"
+    "[DERIVED] `_sum_above` operator itself"
     L3::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of div term in Dlnpₛ/Dt"
+    "[DERIVED] factor in front of div term in Dlnpₛ/Dt"
     L4::VectorType = zeros(NF, nlayers)
 
-    "for every l the matrix to be inverted"
+    "[DERIVED] for every l the matrix to be inverted"
     S::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "combined inverted operator: S = 1 - ξ²(RL + UW)"
+    "[DERIVED] combined inverted operator: S = 1 - ξ²(RL + UW)"
     S⁻¹::TensorType = zeros(NF, trunc + 2, nlayers, nlayers)
 end
 
@@ -188,20 +75,21 @@ end
 
 function variables(implicit::ImplicitPrimitiveEquation)
     return (
-        GridVariable(:temp_average, VectorDim(implicit.nlayers), desc = "Average vertical temperature profile", units = "K"),
+        DynamicsVariable(:average_temperature_profile, VectorDim(implicit.nlayers), desc = "Average vertical temperature profile", units = "K"),
     )
 end
 
-# function barrier to unpack the constants struct for primitive eq models
-function initialize!(
-        I::ImplicitPrimitiveEquation,
-        dt::Real,
-        vars::Variables,
+# function barrier to decide whether to initialize or not based on time step
+function reinitialize!(
+        implicit::ImplicitPrimitiveEquation,
         model::PrimitiveEquation,
+        vars::Variables,
     )
-    model.dynamics || return nothing    # escape immediately if no dynamics
-    (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    initialize!(I, dt, vars.grid.temp_average, geometry, geopotential, atmosphere, adiabatic_conversion)
+    (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
+    Δt = time_step(time_stepping, vars.prognostic.clock) 
+    implicit.Δt[] == Δt && return nothing                   # if time step has not changed no need to reinitialize
+    Tₖ = vars.dynamics.average_temperature_profile
+    initialize!(implicit, Δt, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end
 
@@ -209,7 +97,7 @@ end
 Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
         implicit::ImplicitPrimitiveEquation,
-        dt::Real,                                           # the scaled time step radius*dt
+        Δt::Real,                                           # the scaled time step radius*dt
         temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
         geometry::AbstractGeometry,
         geopotential::AbstractGeopotential,
@@ -219,10 +107,7 @@ function initialize!(
 
     NF = eltype(temp_average)
 
-    # option to skip reinitialization at restart
-    (implicit.initialized && !implicit.reinitialize) && return nothing
-
-    (; trunc, nlayers, α) = implicit
+    (; trunc, nlayers) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
@@ -270,8 +155,9 @@ function initialize!(
     # R, U, L, W are linear operators that are therefore defined here and inverted
     # to obtain δD first, and then δT and δlnps through substitution
 
-    ξ = α * dt                          # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    implicit.ξ[] = ξ                    # also store in Implicit struct
+    @assert 0.5 <= implicit.centering <= 1 "Centering coefficient must be between 0.5 (centred implicit) and 1 (backward implicit)"
+    ξ = implicit.centering * Δt                 # 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
+    implicit.Δt[] = Δt                          # store the time step used for initialization to check for changes later
 
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
     @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
@@ -346,25 +232,27 @@ function initialize!(
     return nothing
 end
 
-set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = true)
-
 """$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
 function implicit_correction!(
         vars::Variables,
         implicit::ImplicitPrimitiveEquation,
+        time_stepping::AbstractLeapfrog,
         model::PrimitiveEquation,
     )
 
     # escape immediately if explicit
-    implicit.α == 0 && return nothing
+    implicit.centering == 0 && return nothing
 
     (; S⁻¹, R, U, L, W, nlayers) = implicit
-    ξ = implicit.ξ[]
+    
+    # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
+    Δt = time_step(time_stepping, vars.prognostic.clock)       
+    ξ = implicit.centering * Δt
 
-    temp_tend = vars.tendencies.temperature
-    pres_tend = vars.tendencies.pressure
-    div_tend = vars.tendencies.divergence
+    temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, implicit)
+    pres_tend = get_tendency_step(vars.tendencies.pressure, time_stepping, implicit)
+    div_tend = get_tendency_step(vars.tendencies.divergence, time_stepping, implicit)
     div_old, div_new = get_steps(vars.prognostic.divergence)
     G = vars.scratch.a                  # reuse work arrays, used for combined tendency G
     geopotential = vars.scratch.b       # used for geopotential
@@ -378,22 +266,16 @@ function implicit_correction!(
     # Single kernel: All implicit correction steps for each spectral mode
     launch!(
         arch, LinearWorkOrder, (size(pres_tend, 1),),
-        implicit_primitive_single_kernel!,
+        implicit_primitive_leapfrog_kernel!,
         temp_tend, pres_tend, div_tend, G, geopotential,
         div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers
     )
-
-    zero_last_degree!(div_tend)
-    zero_last_degree!(pres_tend)
-    zero_last_degree!(temp_tend)
-
-    pres_tend.data[1:1] .= 0    # mass conservation
 
     return nothing
 end
 
 # Single kernel that does all steps for one spectral mode
-@kernel inbounds = true function implicit_primitive_single_kernel!(
+@kernel inbounds = true function implicit_primitive_leapfrog_kernel!(
         temp_tend, pres_tend, div_tend, G, geopotential,
         div_old, div_new, S⁻¹, R, U, L, W, l_indices,
         ξ, nlayers

@@ -30,6 +30,7 @@ end
             vertical_advection = VerticalAdvection(spectral_grid),
             dynamics_only = true
         )
+        model.feedback.verbose = false
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
         @test simulation.model.feedback.nans_detected == false

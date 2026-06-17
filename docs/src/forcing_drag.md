@@ -196,25 +196,22 @@ then this will be called automatically with multiple dispatch.
 function SpeedyWeather.forcing!(
     vars::Variables,
     forcing::StochasticStirring,
-    lf::Integer,
     model::AbstractModel,
 )
     # function barrier only
-    forcing!(vars, forcing, model.spectral_transform)
+    forcing!(vars, forcing, model.spectral_transform, model.time_stepping)
 end
 ```
 
 The function signature (types and number of its arguments) has to be as outlined above.
 The first argument has to be of type `Variables` as it contains the tendencies you will
-want to change as well as the current model state. But all state fields should be
+want to change as well as the current prognostic variables. But all those should be
 considered read-only when applying a forcing.
 `vars.tendencies` contains the tendencies (in grid and spectral space) and
 `vars.prognostic` contains the prognostic variables in spectral space, including
 `vars.prognostic.clock.time` the current time for time-dependent forcing.
 The second argument has to be of the type of our new custom forcing, here `StochasticStirring`,
-so that multiple dispatch calls the correct method of `forcing!`. The third argument is the leapfrog index `lf` which after the first time step will
-be `lf=2` to denote that tendencies are evaluated at the current time not at the previous time (how leapfrogging works). Unless you want to read the prognostic variables, for which
-you need to know whether to read `lf=1` or `lf=2`, you can ignore this (but need to include it as argument). The forth argument is of type
+so that multiple dispatch calls the correct method of `forcing!`. The third argument is of type
 `AbstractModel`, so that the forcing can also make use of anything inside `model`, e.g.
 `model.geometry` or `model.planet` etc. But you can be more restrictive to define a forcing only
 for the `BarotropicModel` for example, use `model::Barotropic` in that case.
@@ -235,7 +232,8 @@ So we define the actual `forcing!` function that's then called as follows
 function forcing!(
     vars::Variables,
     forcing::StochasticStirring{NF},
-    spectral_transform::SpectralTransform
+    spectral_transform::SpectralTransform,
+    time_stepping,
 ) where NF
 
     # noise and auto-regressive factors
@@ -256,8 +254,9 @@ function forcing!(
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
 
-    # back to spectral space
-    vor_tend = vars.tendencies.vorticity
+    # back to spectral space; tendencies may hold several steps (e.g. to accumulate
+    # weighted tendencies), get_tendency_step returns the one to write into
+    vor_tend = SpeedyWeather.get_tendency_step(vars.tendencies.vorticity, time_stepping, forcing)
     transform!(vor_tend, S_grid, spectral_transform)
 
     return nothing
@@ -354,7 +353,7 @@ run!(simulation)
 
 # visualisation
 using CairoMakie
-vor = simulation.variables.grid.vorticity[:, 1]
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]
 heatmap(vor, title="Stochastically stirred vorticity")
 save("stochastic_stirring.png", ans) # hide
 nothing # hide
@@ -417,3 +416,7 @@ these need to correspond to ``\partial_t \ln p_s`` so not in units of Pa/s but
 including the logarithm! In the shallow water model, the pressure-equivalent variable
 is called `η` instead as it's the interface displacement in meters (and not actually pressure),
 so this should have the normal units of m/s instead.
+
+Each of these tendencies will have an additional [Step dimension](@ref) and so
+you will need to view the right step with `get_tendency_step(tend, time_stepping, forcing)`
+which lets the time stepper decide.
