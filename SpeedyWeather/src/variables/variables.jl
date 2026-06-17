@@ -291,6 +291,20 @@ Base.eltype(::Type{<:FusedParent{P}}) where {P} = eltype(P)
 Base.summary(io::IO, fp::FusedParent) = Base.summary(io, fp.parent)
 Base.summary(fp::FusedParent) = Base.summary(fp.parent)
 
+function Base.show(io::IO, fp::FusedParent)
+    nslots = length(fp.slot_map)
+    fpsize = prettymemory(_pretty_size(fp))
+    print(io, styled"{warning:FusedParent}", " ", Base.summary(fp.parent),
+          styled"{note: ($nslots slots, $fpsize)}")
+    names = keys(fp.slot_map)
+    for (i, name) in enumerate(names)
+        s = i == length(names) ? "└" : "├"                  # choose ending └ for last slot
+        range = getfield(fp.slot_map, name)
+        print(io, "\n$s ", styled"{magenta:$name}", ": ", range)
+    end
+    return nothing
+end
+
 Architectures.architecture(fp::FusedParent) = architecture(fp.parent)
 Architectures.on_architecture(arch::AbstractArchitecture, fp::FusedParent) =
     FusedParent(on_architecture(arch, fp.parent), fp.slot_map)
