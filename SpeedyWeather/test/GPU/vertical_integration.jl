@@ -41,8 +41,8 @@
     vars_gpu.prognostic.divergence .= on_architecture(arch_gpu, vars_cpu.prognostic.divergence)
 
     # Run vertical integration on both CPU and GPU
-    SpeedyWeather.vertical_integration!(vars_cpu, 1, model_cpu.geometry)
-    SpeedyWeather.vertical_integration!(vars_gpu, 1, model_gpu.geometry)
+    SpeedyWeather.vertical_integration!(vars_cpu, model_cpu.geometry, model_cpu.time_stepping)
+    SpeedyWeather.vertical_integration!(vars_gpu, model_gpu.geometry, model_gpu.time_stepping)
 
     # Check that results are identical
     @test on_architecture(arch_cpu, vars_gpu.dynamics.u_mean_grid) ≈ vars_cpu.dynamics.u_mean_grid

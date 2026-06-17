@@ -16,13 +16,10 @@ using SpeedyWeather, Enzyme, FiniteDifferences, Test
     run!(simulation, period = Hour(6))
 
     (; variables, model) = simulation
-    (; Δt, Δt_millisec) = model.time_stepping
-    dt = 2Δt
-    lf1 = 1
-    lf2 = 2
 
     vars = variables
     dvars = make_zero(vars)
+    dmodel = make_zero(model)
 
     # set a seeed for the prognostic variables
     dvars.prognostic.vorticity .= 1 + im
@@ -31,9 +28,15 @@ using SpeedyWeather, Enzyme, FiniteDifferences, Test
     dvars.prognostic.temperature .= 1 + im
     dvars.prognostic.pressure .= 1 + im
 
-    # this is currently failing in v1.12
-    autodiff(set_runtime_activity(Reverse), SpeedyWeather.timestep!, Const, Duplicated(vars, dvars), Const(dt), Duplicated(model, make_zero(model)), Const(lf1), Const(lf2))
+    # differentiate time_step!(vars, time_stepping, model), the inner time step
+    # without clock/output/feedback; pass the time_stepping of model (and its shadow)
+    # explicitly to keep the aliasing with the model (and its shadow) consistent
+    autodiff(
+        set_runtime_activity(Reverse), SpeedyWeather.time_step!, Const,
+        Duplicated(vars, dvars),
+        Duplicated(model.time_stepping, dmodel.time_stepping),
+        Duplicated(model, dmodel),
+    )
 
-    #autodiff(set_runtime_activity(Reverse), SpeedyWeather.timestep!, Const, Duplicated(vars, dvars), Const(dt), Const(model), Const(lf1), Const(lf2))
     @test sum(to_vec(dvars)[1]) != 0
 end

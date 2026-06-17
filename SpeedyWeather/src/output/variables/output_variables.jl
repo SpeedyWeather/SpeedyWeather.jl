@@ -29,6 +29,10 @@ get_indices(i, x::Val{true}, y::Val{true}, z::Val{true}, t::Val{false}) = (:, :,
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{true}) = (:, :, i)     # 2D + time
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{false}) = (:, :)       # 2D
 
+is2D(variable::AbstractOutputVariable) = ~variable.dims_xyzt[3]
 is3D(variable::AbstractOutputVariable) = variable.dims_xyzt[3]
 is_land(variable::AbstractOutputVariable) = hasproperty(variable, :is_land) ? variable.is_land : false
 hastime(variable::AbstractOutputVariable) = variable.dims_xyzt[4]
+
+"""$(TYPEDSIGNATURES) Like `path` but returns `nothing` instead of throwing an error if the variable is not defined in the simulation."""
+path_or_nothing(variable::AbstractOutputVariable, simulation) = try path(variable, simulation) catch FieldError; nothing end

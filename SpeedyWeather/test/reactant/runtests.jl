@@ -13,7 +13,7 @@ using LinearAlgebra
 using CUDA
 using Statistics: mean
 using Enzyme
-import SpeedyWeather: ReactantDevice, first_timesteps!, later_timestep!, @maybe_jit
+import SpeedyWeather: ReactantDevice, time_step!, time_stepping!, @maybe_jit
 
 const SpeedyWeatherReactantExt = Base.get_extension(SpeedyWeather, :SpeedyWeatherReactantExt)
 
