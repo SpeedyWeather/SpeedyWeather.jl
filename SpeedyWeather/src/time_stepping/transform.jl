@@ -139,11 +139,6 @@ function SpeedyTransforms.transform!(
     # if not initial step do before transforms i.e before that step is overwritten
     initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
 
-    if model isa PrimitiveWet
-        humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
-        hole_filling!(humid_grid, model.hole_filling, model)  # clamp negative humidity to zero
-    end
-
     # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
@@ -163,6 +158,7 @@ function SpeedyTransforms.transform!(
     transform!(get_prognostic_step(grid_parent, time_stepping, S), get_prognostic_step(prog_parent, time_stepping, S), scratch_memory, S)
 
     if model isa PrimitiveWet
+        humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
         hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
     end
 
