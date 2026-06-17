@@ -8,12 +8,13 @@ initialize!(clouds::NoClouds, ::AbstractModel) = nothing
 @propagate_inbounds function clouds!(
         ij,
         vars,
-        ::NoClouds,
+        clouds::NoClouds,
         model,
     )
-    NF = eltype(vars.grid.temperature_prev)
+    temp = get_prognostic_step(vars.grid.temperature, model.time_stepping, clouds)
+    NF = eltype(temp)
     cloud_cover = zero(NF)           # no cloud cover
-    cloud_top = size(vars.grid.temperature_prev, 2) + 1    # below surface
+    cloud_top = size(temp, 2) + 1    # below surface
 
     return (    # NamedTuple
         cloud_cover = cloud_cover,
@@ -89,13 +90,13 @@ Core cloud diagnosis algorithm shared by DiagnosticClouds and SpectralDiagnostic
 Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
 @propagate_inbounds function diagnose_cloud_properties(ij, vars, clouds::DiagnosticClouds, model)
 
-    temp = vars.grid.temperature_prev
-    humid = vars.grid.humidity_prev
-    geopotential = vars.grid.geopotential
+    temp = get_prognostic_step(vars.grid.temperature, model.time_stepping, clouds)
+    humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, clouds)
+    geopotential = vars.dynamics.geopotential
     NF = eltype(temp)
     nlayers = size(temp, 2)
 
-    pₛ = vars.grid.pressure_prev[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
     sigma_levels = model.geometry.σ_levels_full
     land_fraction = model.land_sea_mask.mask[ij]
     cₚ = model.atmosphere.heat_capacity

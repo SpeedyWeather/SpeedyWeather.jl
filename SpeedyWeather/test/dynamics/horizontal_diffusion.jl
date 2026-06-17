@@ -10,7 +10,7 @@
             (; variables) = simulation
             (; expl, impl) = model.horizontal_diffusion
             vor = get_step(variables.prognostic.vorticity, 1)
-            vor_tend = variables.tendencies.vorticity
+            vor_tend = get_step(variables.tendencies.vorticity, 1)
 
             # apply diffusion
             SpeedyWeather.horizontal_diffusion!(vor_tend, vor, expl, impl)
@@ -28,7 +28,7 @@
             end
 
             vor2 = get_step(variables.prognostic.vorticity, 2)
-            SpeedyWeather.leapfrog!(vor, vor2, vor_tend, model.time_stepping.Δt, 1, model.time_stepping)
+            SpeedyWeather.update_prognostic!(variables, model)
 
             @test any(vor .!= vor2)    # check that at least some coefficients are different
             @test any(vor .== vor2)    # check that at least some coefficients are identical

@@ -49,15 +49,15 @@ both periodic and events can be scheduled simultaneously. But execution will
 happen only once if they coincide on a given time step."""
 function initialize!(scheduler::Schedule, clock::Clock)
     clock.Δt == Millisecond(0) && error("Clock needs to be initialized with a non-zero time step before initializing schedule.")
-    schedule = falses(clock.n_timesteps)    # initialize schedule as BitVector
+    schedule = falses(clock.n_time_steps)    # initialize schedule as BitVector
 
     # PERIODIC SCHEDULE, always AFTER scheduler.every time period has passed
     if scheduler.every.value < typemax(Int)
-        every_n_timesteps = max(1, round(Int, scheduler.every / clock.Δt))
-        schedule[every_n_timesteps:every_n_timesteps:end] .= true
+        every_n_time_steps = max(1, round(Int, scheduler.every / clock.Δt))
+        schedule[every_n_time_steps:every_n_time_steps:end] .= true
 
         prev_every = readable_secs(scheduler.every.value)
-        scheduler.every = Second(second(every_n_timesteps * clock.Δt))
+        scheduler.every = Second(second(every_n_time_steps * clock.Δt))
         now_every = readable_secs(scheduler.every.value)
         s = "Scheduler adjusted from every $prev_every to every $now_every to match timestep."
         now_every != prev_every && @info s
@@ -67,7 +67,7 @@ function initialize!(scheduler::Schedule, clock::Clock)
     # event on clock.start will not be executed, ()
     for event in scheduler.times
         i = ceil(Int, (event - clock.start) / clock.Δt)   #
-        if 0 < i <= clock.n_timesteps   # event needs to take place in (start, end]
+        if 0 < i <= clock.n_time_steps  # event needs to take place in (start, end]
             schedule[i] = true          # add to schedule,
         end
     end
@@ -89,7 +89,8 @@ Evaluate whether (e.g. a callback) should be scheduled at the timestep given
 in clock. Returns true for scheduled executions, false for no execution on
 this time step."""
 function isscheduled(S::Schedule, clock::Clock)
-    is_scheduled = S.schedule[clock.timestep_counter]
+    clock.time_step_counter == 0 && return false
+    is_scheduled = S.schedule[clock.time_step_counter]
     S.counter += is_scheduled
     return is_scheduled
 end

@@ -3,7 +3,7 @@ export set!
 """
 $(TYPEDSIGNATURES)
 Sets new values for variables defined through keyword matching the keys in a NamedTuple.
-Spectral variables can be set at timestep index `lf`. If `add==true` they are added to the 
+Spectral variables can be set at timestep index `step`. If `add==true` they are added to the 
 current value instead. If a `AbstractSpectralTransform` S is provided, it is used when needed to set 
 the variable, otherwise it is recomputed. In case `u` and `v` are provied, actually the divergence
 and vorticity are set and `coslat_scaling_included` specficies whether or not the 1/cos(lat) 
@@ -27,7 +27,7 @@ Specify the namespace as a symbol in case the `vars::NamedTuple` contains them, 
 function set!(
         vars::NamedTuple,
         geometry::Geometry;
-        lf::Integer = 1,
+        step::Integer = 1,
         add::Bool = false,
         spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing,
         coslat_scaling_included::Bool = false,
@@ -39,7 +39,7 @@ function set!(
     if :u in keys(kwargs) && :v in keys(kwargs)
         (; vorticity, divergence) = vars
         set_vordiv!(
-            get_step(vorticity, lf), get_step(divergence, lf), kwargs[:u], kwargs[:v],
+            get_step(vorticity, step), get_step(divergence, step), kwargs[:u], kwargs[:v],
             geometry, spectral_transform; add, coslat_scaling_included, static_func
         )
     elseif :u in keys(kwargs) || :v in keys(kwargs)
@@ -51,12 +51,12 @@ function set!(
         if varname in (:u, :v)  # already handled in special case above
             nothing
         elseif varname in keys(vars)
-            var = vars[varname] isa LowerTriangularArray ? get_step(vars[varname], lf) : vars[varname]
+            var = vars[varname] isa LowerTriangularArray ? get_step(vars[varname], step) : vars[varname]
             set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
         elseif namespace in keys(vars)
             if varname in keys(vars[namespace])
                 var = vars[namespace][varname] isa LowerTriangularArray ?
-                    get_step(vars[namespace][varname], lf) : vars[namespace][varname]
+                    get_step(vars[namespace][varname], step) : vars[namespace][varname]
                 set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
             else
                 # throw error if varname can't be found and print existing variables

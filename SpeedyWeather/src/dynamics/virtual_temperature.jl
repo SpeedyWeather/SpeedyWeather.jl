@@ -5,12 +5,17 @@ arrays from `temp` to `temp_virt` at timestep `lf` in spectral space
 as humidity is zero in this `model`."""
 function linear_virtual_temperature!(
         vars::Variables,
-        lf::Integer,
         model::PrimitiveDry,
     )
     Tᵥ = vars.dynamics.virtual_temperature
-    T = get_step(vars.prognostic.temperature, lf)
-    return copyto!(Tᵥ, T)
+
+    # For Leapfrog this term has to be evaluted on the previous time step
+    # as the implicit corrections will move it to the current as done for 
+    # all linear gravity-wave related terms, just denote this with `LinearDynamicalCore`
+    # here, the time stepper then decides which step to return
+    T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, LinearDynamicalCore())
+    Tᵥ .= T
+    return nothing
 end
 
 """
@@ -27,14 +32,18 @@ specific humidity q and
 in spectral space."""
 function linear_virtual_temperature!(
         vars::Variables,
-        lf::Integer,
         model::PrimitiveEquation,
     )
     Tᵥ = vars.dynamics.virtual_temperature
     μ = model.atmosphere.μ_virt_temp
-    Tₖ = vars.grid.temp_average
-    T = get_step(vars.prognostic.temperature, lf)
-    q = get_step(vars.prognostic.humidity, lf)
+    Tₖ = vars.dynamics.average_temperature_profile
+
+    # For Leapfrog this term has to be evaluted on the previous time step
+    # as the implicit corrections will move it to the current as done for 
+    # all linear gravity-wave related terms, just denote this with `LinearDynamicalCore`
+    # here, the time stepper then decides which step to return
+    T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, LinearDynamicalCore())
+    q = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, LinearDynamicalCore())
 
     # TODO check that doing a non-linear virtual temperature in grid-point space
     # but a linear virtual temperature in spectral space to avoid another transform
@@ -43,7 +52,8 @@ function linear_virtual_temperature!(
 
     # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict
     # (Tₖ and q are different dimensions and array types)
-    return @. Tᵥ.data = T.data + (Tₖ' * μ) * q.data
+    @. Tᵥ.data = T.data + (Tₖ' * μ) * q.data
+    return nothing
 end
 
 @inline virtual_temperature(T, q, A::AbstractWetAtmosphere) = virtual_temperature(T, q, A.μ_virt_temp)
