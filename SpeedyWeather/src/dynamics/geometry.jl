@@ -82,7 +82,7 @@ $(TYPEDFIELDS)
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     "σ at half levels, σ_k+1/2"
-    σ_levels_half::VectorType = default_sigma_coordinates(nlayers)
+    σ_levels_half::VectorType
 
     "σ at full levels, σₖ"
     σ_levels_full::VectorType = 0.5 * (σ_levels_half[2:end] + σ_levels_half[1:(end - 1)])
@@ -96,7 +96,7 @@ Adapt.@adapt_structure Geometry
 """
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
-function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG.nlayers))
+function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG))
 
     (; nlayers) = SG
     error_message = "nlayers=$(SG.nlayers) does not match length nlayers=" *

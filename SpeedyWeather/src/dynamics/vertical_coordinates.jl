@@ -2,26 +2,25 @@ abstract type AbstractVerticalCoordinate <: AbstractModelComponent end
 
 export SigmaCoordinates
 
-"""Sigma coordinates for the vertical coordinates, defined by their half layers.
-Sigma coordinates are currently hardcoded in Geometry.
+"""Sigma, i.e. fraction of surface pressure, vertical coordinates defined by their half layers.
+First half layer has to be 0 (top of the atmosphere), last has to be 1 (surface).
 $(TYPEDFIELDS)"""
-struct SigmaCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
-    nlayers::Int
+struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinate
+    nlayers::IntType
     σ_half::VectorType
 
-    SigmaCoordinates{T, V}(nlayers::Integer, σ_half::AbstractVector) where {T, V} = sigma_okay(nlayers, σ_half) ?
+    SigmaCoordinates{T, V}(nlayers, σ_half) where {T, V} = sigma_okay(nlayers, σ_half) ?
         new{T, V}(nlayers, σ_half) : error("σ_half = $σ_half cannot be used for $nlayers-level SigmaCoordinates")
 end
 
-# constructor using default sigma coordinates if only nlayers provided, also collect to allow for AbstractRange
-SigmaCoordinates(nlayers::Integer, σ_half::AbstractVector = default_sigma_coordinates(nlayers)) =
-    SigmaCoordinates{eltype(σ_half), typeof(collect(σ_half))}(nlayers, collect(σ_half))
+function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector = sigma_half_spacing(SG.nlayers))
+    σ_half = on_architecture(SG.architecture, σ_half)
+    return SigmaCoordinates{typeof(SG.nlayers), typeof(σ_half)}(SG.nlayers, σ_half)
+end
 
-# constructor obtaining nlayers from σ_half
-SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(length(σ_half) - 1, σ_half)
-
-# constructor using default nlayers if nothing provided
-SigmaCoordinates() = SigmaCoordinates(DEFAULT_NLAYERS)
+# other constructors for convenience
+SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(SpectralGrid(nlayers = length(σ_half) - 1), σ_half)
+SigmaCoordinates() = SigmaCoordinates(SpectralGrid())
 
 function Base.show(io::IO, σ::SigmaCoordinates)
     println(io, "$(σ.nlayers)-layer $(typeof(σ))")
@@ -40,27 +39,32 @@ end
 Vertical sigma coordinates defined by their nlayers+1 half levels `σ_levels_half`. Sigma coordinates are
 fraction of surface pressure (p/p0) and are sorted from top (stratosphere) to bottom (surface).
 The first half level is at 0 the last at 1. Default levels are equally spaced from 0 to 1 (including)."""
-function default_sigma_coordinates(nlayers::Integer, profile = z -> z)
-
-    # equi-distant in σ
-    σ_half = collect(range(0, 1, nlayers + 1))
-
-    # Frierson 2006 spacing, higher resolution in surface boundary layer and in stratosphere
-    # z = collect(range(1, 0, nlayers+1))
-    # σ_half = @. exp(-5*(0.05*z + 0.95*z^3))
-    # σ_half[1] = 0
+function sigma_half_spacing(nlayers::Integer, profile = z -> z)
+    σ_half = profile.(collect(range(0, 1, nlayers + 1)))
+    σ_half[1] = 0
     return σ_half
 end
 
 """$(TYPEDSIGNATURES)
 Check that nlayers and σ_half match."""
 function sigma_okay(nlayers::Integer, σ_half::AbstractVector)
-    @assert σ_half[1] >= 0 "First manually specified σ_half has to be >0"
-    @assert σ_half[end] == 1 "Last manually specified σ_half has to be 1."
-    @assert nlayers == (length(σ_half) - 1) "nlayers has to be length of σ_half - 1"
+    @assert σ_half[1] >= 0 "First specified σ_half has to be >=0, $(σ_half[1]) given."
+    @assert σ_half[end] == 1 "Last specified σ_half has to be 1, $(σ_half[end]) given."
+    @assert nlayers == (length(σ_half) - 1) "nlayers has to be length of σ_half - 1, $nlayers vs $(length(σ_half) - 1) given."
     @assert Utils.isincreasing(σ_half) "Vertical sigma coordinates are not increasing."
     return true
 end
+
+export FriersonSigmaCoordinates
+
+"""$(TYPEDSIGNATURES)
+Frierson 2006 spacing, higher resolution in surface boundary layer and in stratosphere.
+Following exp(-5 * (0.05 * (1 - σ) + 0.95 * (1 - σ)^3)), σ being equi-spaced.
+Originally without the 1 - σ, but then vertical ordering is reversed."""
+FriersonSigmaCoordinates(SG::SpectralGrid) =
+    SigmaCoordinates(SG, sigma_half_spacing(SG.nlayers, frierson_profile))
+
+frierson_profile(σ) = exp(-5 * (0.05 * (1 - σ) + 0.95 * (1 - σ)^3))
 
 export SigmaPressureCoordinates
 struct SigmaPressureCoordinates{NF, IntType, VectorType, F} <: AbstractVerticalCoordinate
@@ -72,11 +76,11 @@ struct SigmaPressureCoordinates{NF, IntType, VectorType, F} <: AbstractVerticalC
 end
 
 function SigmaPressureCoordinates(
-    spectral_grid::SpectralGrid;
-    reference_pressure = 1e5,
-    σ_half = range(0, 1, length=spectral_grid.nlayers+1),
-    transition = σ -> σ
-)
+        spectral_grid::SpectralGrid;
+        reference_pressure = 1.0e5,
+        σ_half = range(0, 1, length = spectral_grid.nlayers + 1),
+        transition = σ -> σ
+    )
     # sigma coordinates
     σ_half = on_architecture(spectral_grid.architecture, σ_half)
     σ_full = 0.5 * (σ_half[2:end] + σ_half[1:(end - 1)])
@@ -91,20 +95,16 @@ function SigmaPressureCoordinates(
     return SigmaPressureCoordinates(p_ref, A_half, B_half, A_full, B_full)
 end
 
-# function SigmaPressureCoordinateA(σ, SP::SigmaPressureCoordinates)
-#     γ = SP.transition
-#     return σ * (1 - γ(σ)) * SP.reference_pressure + σ
-
-function pressure(surface_pressure::Number, k::Integer, coordinate::SigmaPressureCoordinates)
+function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
     A = coordinate.A_full
     B = coordinate.B_full
     p_ref = coordinate.reference_pressure
-    return A[k]*p_ref + B[k]*surface_pressure
+    return A[k] * p_ref + B[k] * surface_pressure
 end
 
 function pressure_thickness(surface_pressure::Number, k::Integer, coordinate::SigmaPressureCoordinates)
     A = coordinate.A_half
     B = coordinate.B_half
     p_ref = coordinate.reference_pressure
-    return (A[k+1] - A[k])*p_ref + (B[k+1] - B[k])*surface_pressure
+    return (A[k + 1] - A[k]) * p_ref + (B[k + 1] - B[k]) * surface_pressure
 end
