@@ -144,10 +144,6 @@ function SpeedyTransforms.transform!(
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
 
-    # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
-    # only do after transforms to avoid copying uninitialized zeros
-    initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
-
     # include humidity effect into temp for everything stability-related
     temperature_average!(vars, temp, S)
 
@@ -169,6 +165,10 @@ function SpeedyTransforms.transform!(
     transform!(get_prognostic_step(parent(vars.fused.uv_grid), time_stepping, S),
                parent(vars.fused.spectral_scratch), scratch_memory, S;
                unscale_coslat = true)
+
+    # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
+    # only do after transforms to avoid copying uninitialized zeros
+    initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
 
     geopotential!(vars, model)                  # calculate geopotential
 
