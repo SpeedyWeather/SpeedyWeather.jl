@@ -158,7 +158,7 @@ function SpeedyTransforms.transform!(
     # Batched spec→grid for the velocities: the general-purpose `:spectral_scratch` fuse packs
     # `(:a, :b)` (here holding U, V) into one Spectral3D parent, and `:uv_grid` packs `(:u, :v)`
     # TODO: theoretically we could merge this with the other big transform and then unscale coslat
-    # seperately, but the dimensions don't quite aling, shall we still do that in a hacky way?    
+    # seperately, but the dimensions don't quite align, shall we still do that in a hacky way?    
     transform!(get_prognostic_step(parent(vars.fused.uv_grid), time_stepping, S),
                parent(vars.fused.spectral_scratch), scratch_memory, S;
                unscale_coslat = true)
