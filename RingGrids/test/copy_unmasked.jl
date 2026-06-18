@@ -12,42 +12,46 @@
             mask = rand(Bool, grid)
             indices = unmasked_indices(mask)
             n_unmasked = length(indices)
+            @test n_unmasked == length(mask) - sum(mask)
 
             # check unmasked_indices returns exactly the positions where mask is false
             @test issorted(indices)
-            @test indices == sort(findall(.~mask.data))
+            @test indices == sort(findall(.~mask))
 
             # 2D (single-layer) round-trip
-            src2d = rand(NF, grid)
-            src2d_copy = copy(src2d)
+            field2d = rand(NF, grid)
+            field2d_copy = copy(field2d)
             array2d = zeros(NF, n_unmasked)
-            copy_unmasked!(array2d, src2d, indices)
-
-            @test all(array2d[i] == src2d[indices[i]] for i in 1:n_unmasked)
+            copy_unmasked!(array2d, field2d, indices)
+            @test array2d == field2d[.~mask]
 
             # overwrite the unmasked positions in src, then copy back and check restoration
-            src2d .= zero(NF)
-            copy_unmasked!(src2d, array2d, indices)
-
-            @test all(src2d[indices[i]] ≈ src2d_copy[indices[i]] for i in 1:n_unmasked)
+            field2d .= zero(NF)
+            copy_unmasked!(field2d, array2d, indices)
+            
+            # agreement in non-masked elements
+            @test field2d[.~mask] == field2d_copy[.~mask]
+            
             # masked positions were not touched (still zero)
-            masked_ij = findall(mask.data)
-            @test all(src2d[ij] == zero(NF) for ij in masked_ij)
+            @test all(field2d[mask] .== 0)
 
             # 3D (multi-layer) round-trip
             nlayers = 5
-            src3d = rand(NF, grid, nlayers)
-            src3d_copy = copy(src3d)
+            field3d = rand(NF, grid, nlayers)
+            field3d_copy = copy(field3d)
             array3d = zeros(NF, n_unmasked, nlayers)
-            copy_unmasked!(array3d, src3d, indices)
+            copy_unmasked!(array3d, field3d, indices)
+            @test array3d == field3d[.~mask, :]
 
-            @test all(array3d[i, k] == src3d[indices[i], k] for i in 1:n_unmasked, k in 1:nlayers)
+            # copy back
+            field3d .= zero(NF)
+            copy_unmasked!(field3d, array3d, indices)
 
-            src3d .= zero(NF)
-            copy_unmasked!(src3d, array3d, indices)
-
-            @test all(src3d[indices[i], k] ≈ src3d_copy[indices[i], k] for i in 1:n_unmasked, k in 1:nlayers)
-            @test all(src3d[ij, k] == zero(NF) for ij in masked_ij, k in 1:nlayers)
+            # agreement in non-masked elements
+            @test field3d[.~mask, :] == field3d_copy[.~mask, :]
+            
+            # masked positions were not touched (still zero)
+            @test all(field3d[mask, :] .== 0)
         end
     end
 end

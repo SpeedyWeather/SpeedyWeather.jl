@@ -500,9 +500,12 @@ Now we can copy the unmasked elements of the field to the smaller plain array (g
 field = rand(Float32, grid)
 ```
 
+The array must be of length `n` equal to the zero (=unmasked) elements in the mask
+
 ```@example ringgrids
-array = zeros(Float32, sum(mask))
-copy_unmasked!(array2D, field2D, indices)
+n = length(mask) - sum(mask)
+array = zeros(Float32, n)
+copy_unmasked!(array, field, indices)
 array
 ```
 
@@ -518,7 +521,7 @@ Same works for 3D or higher dimensions, but the mask is always 2D
 ```@example ringgrids
 nlayers = 3
 field3D = rand(Float32, grid, nlayers)
-array3D = zeros(Float32, sum(mask), nlayers)
+array3D = zeros(Float32, n, nlayers)
 copy_unmasked!(array3D, field3D, indices)
 ```
 

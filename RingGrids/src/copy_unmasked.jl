@@ -22,6 +22,7 @@ remaining dimensions are treated as vertical layers and are copied verbatim.
 function copy_unmasked!(dst::AbstractArray, src::AbstractField, indices)
     arch = architecture(dst)
     @boundscheck size(indices, 1) == size(dst, 1) || throw(BoundsError(indices, dst))
+    # @boundscheck maximum(indices) <= size(src, 1) || throw(BoundsError(indices, src))
 
     launch!(arch, ArrayWorkOrder, size(dst), copy_unmasked_kernel!, dst, src, indices)
     return dst
@@ -39,7 +40,9 @@ the ring-grid `Field` `dst` at the positions given by `indices`. Grid points not
 by `indices` are left unchanged. `indices` is typically produced by [`unmasked_indices`](@ref)."""
 function copy_unmasked!(dst::AbstractField, src::AbstractArray, indices)
     arch = architecture(src)
+    
     @boundscheck size(indices, 1) == size(src, 1) || throw(BoundsError(indices, dst))
+    # @boundscheck maximum(indices) <= size(dst, 1) || throw(BoundsError(indices, src))
 
     launch!(arch, ArrayWorkOrder, size(src), copy_unmasked_kernel!, dst, src, indices)
     return dst
