@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Adds a basic `NCycleLorenz` functionality tetst o the GPU CI [#1132](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1132)
 - Adjust benchmarking to new timestepping logic [#1128](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1128)
 - Relax Enzyme compatability again to allow recent Enzyme versions [#1126](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1126)
 - reinitialize! logic to allow for model.implicit to be reinitialized [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
