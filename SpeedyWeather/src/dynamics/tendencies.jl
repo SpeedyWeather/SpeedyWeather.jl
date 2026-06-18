@@ -1,15 +1,15 @@
 """$(TYPEDSIGNATURES)
 Calculate tendencies in grid space for the Barotropic model."""
 function grid_tendencies!(vars::Variables, model::Barotropic)
-    vorticity_flux_grid_tendencies!(vars, model.coriolis, model.geometry)
+    vorticity_flux_grid_tendencies!(vars, model)
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Calculate tendencies in grid space for the ShallowWater model."""
 function grid_tendencies!(vars::Variables, model::ShallowWater)
-    vorticity_flux_grid_tendencies!(vars, model.coriolis, model.geometry)
-    bernoulli_grid_potential!(vars, model)   # kinetic_energy_grid = ½(u²+v²)+Φ
+    vorticity_flux_grid_tendencies!(vars, model)
+    bernoulli_grid_potential!(vars, model, model.time_stepping)   # kinetic_energy_grid = ½(u²+v²)+Φ
     return nothing
 end
 
@@ -19,7 +19,7 @@ function grid_tendencies!(vars::Variables, model::PrimitiveEquation)
     vordiv_grid_tendencies!(vars, model)             # u_tend_grid, v_tend_grid
     temperature_grid_tendency!(vars, model)          # temp_tend_grid + uT_anomaly_grid, vT_anomaly_grid
     humidity_grid_tendency!(vars, model)             # humid_tend_grid + uq_grid, vq_grid (no-op for dry)
-    bernoulli_grid_potential!(vars, model)           # kinetic_energy_grid = ½(u²+v²)
+    bernoulli_grid_potential!(vars, model, model.time_stepping)           # kinetic_energy_grid = ½(u²+v²)
     surface_pressure_grid_tendency!(vars, model)     # pres_tend_grid += (ū,v̄)·∇lnpₛ
     return nothing
 end
@@ -27,14 +27,14 @@ end
 """$(TYPEDSIGNATURES)
 Reads transformed spectral tendencies and accumulates the final spectral tendencies for the BarotropicModel."""
 function spectral_tendencies!(vars::Variables, model::Barotropic)
-    vorticity_flux_spectral_tendencies!(vars, model.spectral_transform; div = false, add = true)
+    vorticity_flux_spectral_tendencies!(vars, model.spectral_transform, model.time_stepping; div = false, add = true)
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Reads transformed spectral tendencies and accumulates the final spectral tendencies for the ShallowWaterModel."""
 function spectral_tendencies!(vars::Variables, model::ShallowWater)
-    vorticity_flux_spectral_tendencies!(vars, model.spectral_transform; div = true, add = true)
+    vorticity_flux_spectral_tendencies!(vars, model.spectral_transform, model.time_stepping; div = true, add = true)
     bernoulli_spectral_potential!(vars, model)
     return nothing
 end
@@ -58,8 +58,8 @@ function dynamics_tendencies!(
     )
     (; time_stepping) = model
 
-    forcing!(vars, lf, model)           # = (Fᵤ, Fᵥ) forcing for u, v
-    drag!(vars, lf, model)              # drag term for u, v
+    forcing!(vars, model)               # = (Fᵤ, Fᵥ) forcing for u, v
+    drag!(vars, model)                  # drag term for u, v
 
     # compute tendencies in grid space: u, v
     grid_tendencies!(vars, model)
@@ -390,7 +390,7 @@ function surface_pressure_tendency!(
         S::AbstractSpectralTransform,
         time_stepping::AbstractTimeStepper,
     )
-    surface_pressure_grid_tendency!(vars)
+    surface_pressure_grid_tendency!(vars, time_stepping)
 
     pres_tend = get_tendency_step(vars.tendencies.pressure, time_stepping, DynamicalCore())
     pres_tend_grid = get_tendency_step(vars.tendencies.grid.pressure, time_stepping, DynamicalCore())
@@ -413,15 +413,15 @@ of the logarithm of surface pressure ln(pₛ) and D̄ the vertically averaged di
 Here, computes the grid tendency contribuation of the logarithm of surface pressure by:
 * ∇ln(pₛ)/px,py is previously computed in grid space in `pressure_gradient_flux!``, 
 * Multiply ū, v̄ with ∇ln(pₛ) in grid-point space."""
-function surface_pressure_grid_tendency!(vars::Variables)
+function surface_pressure_grid_tendency!(vars::Variables, time_stepping::AbstractTimeStepper)
     pres_tend_grid = get_tendency_step(vars.tendencies.grid.pressure, time_stepping, DynamicalCore())
     (; dpres_dx, dpres_dy, u_mean_grid, v_mean_grid) = vars.dynamics
     @. pres_tend_grid += u_mean_grid * dpres_dx + v_mean_grid * dpres_dy
     return nothing
 end
 
-surface_pressure_grid_tendency!(vars::Variables, ::PrimitiveEquation) =
-    surface_pressure_grid_tendency!(vars)
+surface_pressure_grid_tendency!(vars::Variables, model::PrimitiveEquation) =
+    surface_pressure_grid_tendency!(vars, model.time_stepping)
 
 """$(TYPEDSIGNATURES)
 
@@ -653,7 +653,7 @@ function vordiv_spectral_tendencies!(vars::Variables, time_stepping::AbstractTim
 end
 
 vordiv_spectral_tendencies!(vars::Variables, model::PrimitiveEquation) =
-    vordiv_spectral_tendencies!(vars, model.spectral_transform)
+    vordiv_spectral_tendencies!(vars, model.time_stepping, model.spectral_transform)
 
 @kernel inbounds = true function _vordiv_tendencies_kernel!(
         u_tend_grid,            # Input/Output: zonal wind tendency
@@ -742,20 +742,41 @@ Compute the temperature tendency.
 temperature used in the adiabatic term κTᵥ*Dlnp/Dt."""
 function temperature_tendency!(
         vars::Variables,
-        model::PrimitiveEquation)
+        model::PrimitiveEquation,
+    )
+    (; spectral_transform, time_stepping) = model
 
-    (; adiabatic_conversion, atmosphere, implicit, spectral_transform, time_stepping) = model
+    temperature_grid_tendency!(vars, model)
 
-    temperature_grid_tendency!(vars, adiabatic_conversion, atmosphere, implicit, G)
+    temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, DynamicalCore())
+    temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, DynamicalCore())
+    uT_grid = vars.dynamics.grid.uT_anomaly
+    vT_grid = vars.dynamics.grid.vT_anomaly
+    uT_spec = vars.dynamics.uT_anomaly
+    vT_spec = vars.dynamics.vT_anomaly
+    scratch_memory = vars.scratch.transform_memory
+    transform!(temp_tend, temp_tend_grid, scratch_memory, spectral_transform)
+    transform!(uT_spec, uT_grid, scratch_memory, spectral_transform)
+    transform!(vT_spec, vT_grid, scratch_memory, spectral_transform)
 
-    temp_tend = vars.tendencies.temperature
-    temp_tend_grid = vars.tendencies.grid.temperature
-    div_grid = vars.grid.divergence
-    temp = vars.grid.temperature
+    temperature_spectral_tendency!(vars, spectral_transform)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+
+Compute the gridded contribution to the temperature tendency:
+* adds the adiabatic + T'D terms to `temp_tend_grid` via `_temperature_tendency_kernel!`
+* writes `(uT_anomaly_grid, vT_anomaly_grid) = (u·T', v·T')` for the flux divergence."""
+function temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation)
+    (; adiabatic_conversion, atmosphere, implicit, time_stepping) = model
+    temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, DynamicalCore())
+    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
+    temp = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
 
     # use scratch array with zeros in case humidity doesn't exist
     humid = haskey(vars.grid, :humidity) ?
-        get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) : 
+        get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) :
         fill!(vars.scratch.grid.a, 0)
 
     (; pres_flux, pres_flux_sum_above, div_sum_above) = vars.dynamics
@@ -774,12 +795,9 @@ function temperature_tendency!(
     )
 
     # write uT_anomaly_grid, vT_anomaly_grid (= u·T', v·T') for the flux divergence
-    flux_grid_divergence!(vars.dynamics.grid.uT_anomaly, vars.dynamics.grid.vT_anomaly, temp, vars, G)
+    flux_grid_divergence!(vars.dynamics.grid.uT_anomaly, vars.dynamics.grid.vT_anomaly, temp, vars, model)
     return nothing
 end
-
-temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation) =
-    temperature_grid_tendency!(vars, model.adiabatic_conversion, model.atmosphere, model.implicit, model.geometry)
 
 """$(TYPEDSIGNATURES)
 
@@ -873,10 +891,10 @@ Computes the gridded contributation to the humidity tendency `humid_tend_grid` v
 Grid half of `humidity_tendency!`. Adds the `+q·div` advection term to `humid_tend_grid` and
 writes the `(uq, vq)` flux intermediates to the grid-side named slots — no transform."""
 function humidity_grid_tendency!(vars::Variables, model::PrimitiveWet)
-    G = model.geometry
-    humid_tend_grid = vars.tendencies.grid.humidity
-    humid_grid = vars.grid.humidity
-    horizontal_grid_advection!(humid_tend_grid, humid_grid, vars, G; add = true,
+    (; time_stepping) = model
+    humid_tend_grid = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, DynamicalCore())
+    humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore())
+    horizontal_grid_advection!(humid_tend_grid, humid_grid, vars, model; add = true,
                                uA_grid = vars.dynamics.grid.uq,
                                vA_grid = vars.dynamics.grid.vq)
     return nothing
@@ -933,9 +951,9 @@ function horizontal_advection!(
         uA_grid = vars.scratch.grid.a,
         vA_grid = vars.scratch.grid.b,
     )
-    (; spectral_transform, time_stepping, geometry) = model
+    (; spectral_transform) = model
 
-    horizontal_grid_advection!(A_tend_grid, A_grid, vars, geometry; add, uA_grid, vA_grid)
+    horizontal_grid_advection!(A_tend_grid, A_grid, vars, model; add, uA_grid, vA_grid)
 
     scratch_memory = vars.scratch.transform_memory
     transform!(A_tend, A_tend_grid, scratch_memory, spectral_transform)  # for +A*div in spectral space
@@ -956,16 +974,15 @@ function horizontal_grid_advection!(
         A_tend_grid::AbstractField,         # Input/Output: A_tend on grid, accumulates +A*div term
         A_grid::AbstractField,              # Input: grid field to be advected
         vars::Variables,
-        G::Geometry;
+        model::AbstractModel;
         add::Bool = true,                   # use muladd (true) or overwrite (false) for the +A*div term
         uA_grid = vars.dynamics.grid.uT_anomaly,   # caller picks the correct named slot
         vA_grid = vars.dynamics.grid.vT_anomaly,
     )
-    
 
     # barotropic model doesn't have divergence, the +A*div term is then zero
     if haskey(vars.grid, :divergence)
-        div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore(), model)
+        div_grid = get_prognostic_step(vars.grid.divergence, model.time_stepping, DynamicalCore(), model)
 
         kernel_func = add ? muladd : @inline (a, b, c) -> a * b
 
@@ -978,7 +995,7 @@ function horizontal_grid_advection!(
     end
 
     # write u*A and v*A on grid
-    flux_grid_divergence!(uA_grid, vA_grid, A_grid, vars, G)
+    flux_grid_divergence!(uA_grid, vA_grid, A_grid, vars, model)
     return nothing
 end
 
@@ -1039,9 +1056,10 @@ function flux_divergence!(
         uA_grid = vars.scratch.grid.a,  # = u*A on grid
         vA_grid = vars.scratch.grid.b,  # = v*A on grid
     )
-    flux_grid_divergence!(uA_grid, vA_grid, A_grid, vars, G)
+    flux_grid_divergence!(uA_grid, vA_grid, A_grid, vars, model)
 
     scratch_memory = vars.scratch.transform_memory
+    S = model.spectral_transform
     transform!(uA, uA_grid, scratch_memory, S)
     transform!(vA, vA_grid, scratch_memory, S)
 
@@ -1057,10 +1075,11 @@ function flux_grid_divergence!(
         vA_grid::AbstractField,         # Output: v*A on grid
         A_grid::AbstractField,          # Input: grid field to be advected
         vars::Variables,
-        G::Geometry,
+        model::AbstractModel,
     )
-    (; u, v) = vars.grid
-    (; coslat⁻¹) = G
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, DynamicalCore(), model)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, DynamicalCore(), model)
+    (; coslat⁻¹) = model.geometry
     (; whichring) = A_grid.grid
     arch = architecture(A_grid)
     launch!(
@@ -1123,24 +1142,23 @@ set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
 require the divergence tendency."""
 function vorticity_flux_curldiv!(
         vars::Variables,
-        coriolis::AbstractCoriolis,
-        geometry::Geometry,
-        S::AbstractSpectralTransform,
-        time_stepper::AbstractTimeStepper;
+        model::AbstractModel;
         div::Bool = true,     # also calculate div of vor flux?
-        add::Bool = false
-    )    # accumulate in vor/div tendencies?
-    vorticity_flux_grid_tendencies!(vars, coriolis, geometry, time_stepper)
+        add::Bool = false,    # accumulate in vor/div tendencies?
+    )
+    vorticity_flux_grid_tendencies!(vars, model)
 
-    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, time_stepper, DynamicalCore())
-    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, time_stepper, DynamicalCore())
-    u_tend = get_tendency_step(vars.tendencies.vorticity, time_stepper, DynamicalCore())
-    v_tend = get_tendency_step(vars.dynamics.v_tendency, time_stepper, DynamicalCore())
+    time_stepping = model.time_stepping
+    S = model.spectral_transform
+    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, time_stepping, DynamicalCore())
+    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, time_stepping, DynamicalCore())
+    u_tend = get_tendency_step(vars.dynamics.u_tendency, time_stepping, DynamicalCore())
+    v_tend = get_tendency_step(vars.dynamics.v_tendency, time_stepping, DynamicalCore())
     scratch_memory = vars.scratch.transform_memory
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
 
-    vorticity_flux_spectral_tendencies!(vars, S, time_stepper; div, add)
+    vorticity_flux_spectral_tendencies!(vars, S, time_stepping; div, add)
     return nothing
 end
 
@@ -1164,23 +1182,22 @@ Here, we only compute the gridded contriubation `u_tend_grid``, `v_tend_grid`` o
 the forcing already accumulated therein."""
 function vorticity_flux_grid_tendencies!(
         vars::Variables,
-        coriolis::AbstractCoriolis,
-        geometry::Geometry,
-        time_stepper::AbstractTimeStepper,
+        model::AbstractModel,
     )
-    (; f) = coriolis
-    (; coslat⁻¹) = geometry
-    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, time_stepper, DynamicalCore())         # already contains forcing
-    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, time_stepper, DynamicalCore())         # already contains forcing
-    u = get_prognostic_step(vars.grid.u, model.time_stepping, DynamicalCore(), model)
-    v = get_prognostic_step(vars.grid.v, model.time_stepping, DynamicalCore(), model)
-    vor = get_prognostic_step(vars.grid.vorticity, model.time_stepping, DynamicalCore(), model)
+    (; f) = model.coriolis
+    (; coslat⁻¹) = model.geometry
+    time_stepping = model.time_stepping
+    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, time_stepping, DynamicalCore())         # already contains forcing
+    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, time_stepping, DynamicalCore())         # already contains forcing
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore(), model)
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore(), model)
+    vor = get_prognostic_step(vars.grid.vorticity, time_stepping, DynamicalCore(), model)
 
-    (; whichring) = u.grid
+    (; whichring) = u_tend_grid.grid
 
     arch = architecture(u_tend_grid)
     launch!(
-        architecture(u), RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
+        arch, RingGridWorkOrder, size(u_tend_grid), _vorticity_flux_kernel!,
         u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring
     )
     return nothing
@@ -1206,19 +1223,20 @@ Here, only final spectral contributions `∂ζ/∂t`, `∂D/∂tare computed giv
 `u_tend`, `v_tend`."""
 function vorticity_flux_spectral_tendencies!(
         vars::Variables,
-        S::AbstractSpectralTransform;
+        S::AbstractSpectralTransform,
+        time_stepper::AbstractTimeStepper;
         div::Bool = true,
         add::Bool = false,
     )
-    vor_tend = vars.tendencies.vorticity
-    u_tend = vars.dynamics.u_tendency
-    v_tend = vars.dynamics.v_tendency
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, time_stepper, DynamicalCore())
+    u_tend = get_tendency_step(vars.dynamics.u_tendency, time_stepper, DynamicalCore())
+    v_tend = get_tendency_step(vars.dynamics.v_tendency, time_stepper, DynamicalCore())
 
     curl!(vor_tend, u_tend, v_tend, S; add)                   # ∂ζ/∂t = ∇×(u_tend, v_tend)
 
-    if div                                                  # not needed/availble in barotropic model
-        div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, DynamicalCore())
-        divergence!(div_tend, u_tend, v_tend, S; add)       # ∂D/∂t = ∇⋅(u_tend, v_tend)
+    if div                                                   # not needed/available in barotropic model
+        div_tend = get_tendency_step(vars.tendencies.divergence, time_stepper, DynamicalCore())
+        divergence!(div_tend, u_tend, v_tend, S; add)        # ∂D/∂t = ∇⋅(u_tend, v_tend)
     end
     return nothing
 end
@@ -1332,8 +1350,9 @@ end
 """$(TYPEDSIGNATURES)
 Gridded contribution of `bernoulli_potential!` for ShallowWater: writes `kinetic_energy_grid = ½(u²+v²)+Φ`
 (geopotential Φ is included because in ShallowWater geopotential lives only on the grid)."""
-function bernoulli_grid_potential!(vars::Variables, ::ShallowWater, ::AbstractTimeStepper)
-    (; u, v) = vars.grid
+function bernoulli_grid_potential!(vars::Variables, model::ShallowWater, time_stepping::AbstractTimeStepper)
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore(), model)
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore(), model)
     Φ = vars.grid.geopotential
     bernoulli_grid = vars.dynamics.grid.kinetic_energy
     half = convert(eltype(bernoulli_grid), 0.5)
@@ -1343,8 +1362,9 @@ end
 
 """$(TYPEDSIGNATURES)
 Gridded contribution of `bernoulli_potential!` for PrimitiveEquation: writes `kinetic_energy_grid = ½(u²+v²)`."""
-function bernoulli_grid_potential!(vars::Variables, ::Union{PrimitiveEquation, AbstractSpectralTransform}, ::AbstractTimeStepper)
-    (; u, v) = vars.grid
+function bernoulli_grid_potential!(vars::Variables, ::Union{PrimitiveEquation, AbstractSpectralTransform}, time_stepping::AbstractTimeStepper)
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     bernoulli_grid = vars.dynamics.grid.kinetic_energy
     half = convert(eltype(bernoulli_grid), 0.5)
     @. bernoulli_grid = half * (u^2 + v^2)
