@@ -161,13 +161,13 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         GridVariable(:pressure, Grid3D(pg), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse=:grid),
         ParameterizationVariable(:surface_pressure, Grid2D(), desc = "Surface pressure", units = "Pa"),
 
-        DynamicsVariable(:uT_anomaly, Grid3D(), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:vT_anomaly, Grid3D(), desc = "v*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:uT_anomaly, Spectral3D(), desc = "u*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
-        DynamicsVariable(:vT_anomaly, Spectral3D(), desc = "v*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:uT_anomaly, Grid4D(tg), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vT_anomaly, Grid4D(tg), desc = "v*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:uT_anomaly, Spectral4D(ts), desc = "u*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vT_anomaly, Spectral4D(ts), desc = "v*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
 
-        DynamicsVariable(:kinetic_energy, Grid3D(), desc = "Kinetic energy intermediate, ½(u²+v²)", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:kinetic_energy, Spectral3D(), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:kinetic_energy, Grid4D(tg), desc = "Kinetic energy intermediate, ½(u²+v²)", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:kinetic_energy, Spectral4D(ts), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
 
         DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure", fuse = :dpres_grad),
         DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure", fuse = :dpres_grad),

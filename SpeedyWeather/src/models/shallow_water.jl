@@ -81,8 +81,8 @@ function variables(model::ShallowWater)
         GridVariable(:η, Grid3D(pg), desc = "Interface displacement", units = "m", fuse = :grid),
         DynamicsVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m²/s²"),
 
-        DynamicsVariable(:kinetic_energy, Grid3D(), desc = "Kinetic energy intermediate, ½(u²+v²)+Φ", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:kinetic_energy, Spectral3D(), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:kinetic_energy, Grid4D(tg), desc = "Kinetic energy intermediate, ½(u²+v²)+Φ", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:kinetic_energy, Spectral4D(ts), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
 
         ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
         ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
