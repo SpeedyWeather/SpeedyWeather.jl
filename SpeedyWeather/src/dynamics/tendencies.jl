@@ -950,7 +950,7 @@ function bernoulli_potential!(
     # pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
     # RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
 
-    bernoulli_grid .= 1 // 2 .* (u .^ 2 + v .^ 2)               # = ½(u² + v²) on grid
+    bernoulli_grid .= 1 // 2 .* (u .^ 2 .+ v .^ 2)              # = ½(u² + v²) on grid, fused (.+) to avoid temporaries
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)    # to spectral space
     bernoulli .+= Φ                                             # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)    # add -∇²(½(u² + v²) + ϕ)
