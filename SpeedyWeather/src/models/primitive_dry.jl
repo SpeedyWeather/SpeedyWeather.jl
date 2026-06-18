@@ -135,34 +135,31 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-function variables(model::PrimitiveDry)
-    nsteps = get_prognostic_steps(model.time_stepping)
-    return variables(typeof(model), nsteps)
-end
+variables(model::PrimitiveDry) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
 """($TYPEDSIGNATURES) All variables needed for the primitive dry model itself (components excluded)."""
-function variables(::Type{<:PrimitiveDry}, nsteps)
+function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s", fuse = :prognostic),
-        PrognosticVariable(:temperature, Spectral4D(nsteps), desc = "Temperature", units = "K", fuse = :prognostic),
-        PrognosticVariable(:pressure, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :prognostic),
+        PrognosticVariable(:divergence, Spectral4D(ps), desc = "Divergence", units = "1/s", fuse = :prognostic),
+        PrognosticVariable(:temperature, Spectral4D(ps), desc = "Temperature", units = "K", fuse = :prognostic),
+        PrognosticVariable(:pressure, Spectral3D(ps), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :prognostic),
 
-        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s", fuse = :grid),
-        GridVariable(:temperature, Grid3D(), desc = "Temperature", units = "K", fuse = :grid),
-        GridVariable(:pressure, Grid2D(), desc = "Logarithm of surface pressure", units = "", fuse = :grid),
-        GridVariable(:divergence_prev, Grid3D(), desc = "Divergence at previous time step", units = "1/s"),
-        GridVariable(:u_prev, Grid3D(), desc = "Zonal wind at previous time step", units = "m/s", fuse = :grid_prev),
-        GridVariable(:v_prev, Grid3D(), desc = "Meridional wind at previous time step", units = "m/s", fuse = :grid_prev),
-        GridVariable(:temperature_prev, Grid3D(), desc = "Temperature at previous time step", units = "K", fuse = :grid_prev),
-        GridVariable(:pressure_prev, Grid2D(), desc = "Logarithm of surface pressure at previous time step", units = "", fuse = :grid_prev),
-
-        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"), # not fused because computed directly by divergence op
-        TendencyVariable(:temperature, Spectral3D(), desc = "Tendency of temperature", units = "K/s", fuse = :spectral_tendencies),
-        TendencyVariable(:pressure, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s", fuse = :spectral_tendencies),
-        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
-        TendencyVariable(:temperature, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :grid_tendencies),
-        TendencyVariable(:pressure, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :grid_tendencies),
+        TendencyVariable(:divergence, Spectral4D(ts), desc = "Tendency of divergence", units = "1/s²"), # not fused because computed directly by divergence op
+        TendencyVariable(:temperature, Spectral4D(ts), desc = "Tendency of temperature", units = "K/s", fuse = :spectral_tendencies),
+        TendencyVariable(:pressure, Spectral3D(ts), desc = "Tendency of surface pressure", units = "log(Pa)/s", fuse = :spectral_tendencies),
+        TendencyVariable(:divergence, Grid4D(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:temperature, Grid4D(tg), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :grid_tendencies),
+        TendencyVariable(:pressure, Grid3D(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :grid_tendencies),
+        
+        GridVariable(:divergence, Grid4D(pg), desc = "Divergence", units = "1/s", fuse=:grid),
+        GridVariable(:temperature, Grid4D(pg), desc = "Temperature", units = "K", fuse=:grid),
+        GridVariable(:pressure, Grid3D(pg), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse=:grid),
+        ParameterizationVariable(:surface_pressure, Grid2D(), desc = "Surface pressure", units = "Pa"),
 
         DynamicsVariable(:uT_anomaly, Grid3D(), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
         DynamicsVariable(:vT_anomaly, Grid3D(), desc = "v*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
@@ -247,6 +244,11 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(variables, model)
 
     return Simulation(variables, model)
+end
+
+function reinitialize!(model::PrimitiveDryModel, vars::AbstractVariables)
+    reinitialize!(model.implicit, model, vars)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

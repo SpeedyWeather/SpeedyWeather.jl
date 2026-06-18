@@ -12,6 +12,7 @@
 
     @testset for Model in (BarotropicModel, ShallowWaterModel)
         model = Model(spectral_grid; initial_conditions, forcing, drag, random_process, output)
+        model.feedback.verbose = false
         simulation = initialize!(model)
 
         run!(simulation, period = Day(15), output = true)
@@ -33,6 +34,7 @@ end
 
     @testset for Model in (PrimitiveDryModel, PrimitiveWetModel)
         model = Model(spectral_grid; initial_conditions, forcing, drag, random_process, output)
+        model.feedback.verbose = false
         simulation = initialize!(model)
 
         run!(simulation, period = Day(15), output = true)

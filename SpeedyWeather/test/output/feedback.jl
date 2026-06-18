@@ -3,6 +3,7 @@
 
     spectral_grid = SpectralGrid(nlayers = 1)
     model = BarotropicModel(spectral_grid)
+    model.feedback.verbose = false
     simulation = initialize!(model)
 
     add!(model, ProgressTxt(path = tmp_output_path, write_only_with_output = true))

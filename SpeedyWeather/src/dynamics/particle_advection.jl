@@ -37,7 +37,7 @@ export ParticleAdvection2D
     nparticles::IntType = 10
 
     "[OPTION] Execute particle advection every n timesteps"
-    every_n_timesteps::IntType = 6
+    every_n_time_steps::IntType = 6
 
     "[OPTION] Advect with velocities from this vertical layer index"
     layer::IntType = 1
@@ -74,10 +74,10 @@ function initialize!(
     (; layer) = particle_advection
     nlayers < layer && @warn "Particle advection on layer $layer on spectral grid with nlayers=$nlayers."
 
-    (; every_n_timesteps) = particle_advection
+    (; every_n_time_steps) = particle_advection
     # Δt [˚*s/m] is scaled by radius to convert more easily from velocity [m/s]
     # to [˚/s] for particle locations in degree
-    particle_advection.Δt[] = every_n_timesteps * model.time_stepping.Δt
+    particle_advection.Δt[] = every_n_time_steps * model.time_stepping.Δt
     particle_advection.Δt[] *= (360 / 2π)
     return particle_advection
 end
@@ -97,9 +97,6 @@ function initialize!(
     return particles
 end
 
-# Fallback for no particle advection
-initialize!(::Nothing, ::Variables, ::AbstractModel) = nothing
-
 """$(TYPEDSIGNATURES)
 Initialize particle advection time integration: Store u,v interpolated initial conditions
 in `diagn.particles.u` and `.v`  to be used when particle advection actually executed for first time."""
@@ -114,14 +111,18 @@ function initialize!(
     length(particles) == 0 && return nothing
 
     k = particle_advection.layer
-    u_grid = field_view(vars.grid.u, :, k)
-    v_grid = field_view(vars.grid.v, :, k)
+    (; time_stepping) = model
+
+    # index the step dimension according to time stepper 
+    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
+    u_grid = field_view(vars.grid.u, :, k, l)
+    v_grid = field_view(vars.grid.v, :, k, l)
     (; locator) = vars.particles
     (; geometry) = particle_advection
 
     # interpolate initial velocity on initial locations
-    lats = vars.particles.u    # reuse u,v arrays as only used for u, v
-    lons = vars.particles.v    # after update_locator!
+    lons = vars.particles.u    # reuse u,v arrays as only used for u, v
+    lats = vars.particles.v    # after update_locator!
     σ = Vector(model.geometry.σ_levels_full)[k] # explicitly on CPU
 
     # modulo particles and extract their coordinates
@@ -151,27 +152,24 @@ end
     lats[i] = particles[i].lat
 end
 
-# function barrier, unpack what's needed
-function particle_advection!(vars, adv::ParticleAdvection2D, model::AbstractModel)
-    return particle_advection!(vars.prognostic.particles, vars, vars.prognostic.clock, adv)
-end
-
 function particle_advection!(
-        particles::AbstractVector{P},
         vars::Variables,
-        clock::Clock,
         particle_advection::ParticleAdvection2D,
-    ) where {P <: Particle}
+        model::AbstractModel,
+    )
+
+    (; particles, clock) = vars.prognostic
 
     # escape immediately for no particles
     length(particles) == 0 && return nothing
 
     (; locator) = vars.particles
     (; geometry) = particle_advection
+    (; time_stepping) = model
 
     # decide whether to execute on this time step:
     # execute always on last time step *before* time step is divisible by
-    # `particle_advection.every_n_timesteps`, e.g. 7, 15, 23, ... for n=8 which
+    # `particle_advection.every_n_time_steps`, e.g. 7, 15, 23, ... for n=8 which
     # already contains u, v at i=8, 16, 24, etc as executed after `transform!`
     # even though the clock hasn't be step forward yet, this means time = time + Δt here
 
@@ -179,15 +177,15 @@ function particle_advection!(
     # with a lf2 == 2 check before this function is called
 
     # escape immediately if advection not on this timestep
-    n = particle_advection.every_n_timesteps
-    clock.timestep_counter % n == (n - 1) || return nothing
+    n = particle_advection.every_n_time_steps
+    clock.time_step_counter % n == (n - 1) || return nothing
 
     # HEUN: PREDICTOR STEP, use u, v at previous time step and location
     Δt = particle_advection.Δt[]        # time step [s*˚/m]
-    Δt_half = Δt / 2                      # /2 because Heun is average of Euler+corrected step
+    Δt_half = Δt / 2                    # /2 because Heun is average of Euler+corrected step
 
-    u_old = vars.particles.u           # from previous time step and location
-    v_old = vars.particles.v           # from previous time step and location
+    u_old = vars.particles.u            # from previous time step and location
+    v_old = vars.particles.v            # from previous time step and location
 
     # HACK: reuse u, v arrays (old velocity) on the fly for interpolation
     # as they're not needed anymore after new (predicted) location is found
@@ -204,8 +202,9 @@ function particle_advection!(
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
-    u_grid = field_view(vars.grid.u, :, k)
-    v_grid = field_view(vars.grid.v, :, k)
+    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
+    u_grid = field_view(vars.grid.u, :, k, l)
+    v_grid = field_view(vars.grid.v, :, k, l)
     RingGrids.update_locator!(locator, geometry, lons, lats)
 
     # interpolate new velocity on predicted new locations
@@ -229,15 +228,15 @@ function particle_advection!(
 end
 
 @inline function advect_2D(
-        particle::Particle{NF},         # particle to advect
-        u::NF,                          # zonal velocity [m/s]
-        v::NF,                          # meridional velocity [m/s]
-        dt::NF,                         # scaled time step [s*˚/m]
+        particle::Particle{NF},                 # particle to advect
+        u::NF,                                  # zonal velocity [m/s]
+        v::NF,                                  # meridional velocity [m/s]
+        dt::NF,                                 # scaled time step [s*˚/m]
     ) where {NF}
 
     dlat = v * dt                               # increment in latitude [˚N]
     coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
-    dlon = u * dt / coslat                        # increment in longitude [˚E]
+    dlon = u * dt / coslat                      # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
 end
 

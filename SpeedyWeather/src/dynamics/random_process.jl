@@ -6,7 +6,6 @@ Takes the spectral `random_pattern` in the prognostic variables
 and transforms it to spectral space in `diagn.grid.random_pattern`."""
 function SpeedyTransforms.transform!(
         vars::Variables,
-        lf::Integer,
         random_process::AbstractRandomProcess,
         spectral_transform::AbstractSpectralTransform,
     )
@@ -25,15 +24,7 @@ end
 """$(TYPEDSIGNATURES)
 `random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
-function SpeedyTransforms.transform!(
-        vars::Variables,
-        lf::Integer,
-        random_process::Nothing,
-        spectral_transform::AbstractSpectralTransform,
-    )
-    return nothing
-end
-
+SpeedyTransforms.transform!(::Variables, ::Nothing, ::AbstractSpectralTransform) = nothing
 random_process!(::Variables, process::Nothing) = nothing
 
 export SpectralAR1Process

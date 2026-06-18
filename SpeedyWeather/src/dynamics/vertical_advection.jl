@@ -1,4 +1,4 @@
-abstract type AbstractVerticalAdvection end
+abstract type AbstractVerticalAdvection <: AbstractModelComponent end
 abstract type VerticalAdvection{NF, B} <: AbstractVerticalAdvection end
 
 # Dispersive and diffusive advection schemes `NF` is the type, `B` the half-stencil size
@@ -14,12 +14,6 @@ CenteredVerticalAdvection(spectral_grid; order = 2) = CenteredVerticalAdvection{
 UpwindVerticalAdvection(spectral_grid; order = 5) = UpwindVerticalAdvection{spectral_grid.NF, (order + 1) ÷ 2}()
 WENOVerticalAdvection(spectral_grid) = WENOVerticalAdvection{spectral_grid.NF}()
 
-@inline retrieve_previous_time_step(variables, var) = getproperty(variables, Symbol(var, :_prev))
-@inline retrieve_current_time_step(variables, var) = getproperty(variables, var)
-
-@inline retrieve_time_step(::DiffusiveVerticalAdvection, variables, var) = retrieve_previous_time_step(variables, var)
-@inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = retrieve_current_time_step(variables, var)
-
 @inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, B}) where {NF, B}
     # creates allocation-free tuples for k-B:k+B but clamped into (1, nlayers)
     # e.g. (1, 1, 2), (1, 2, 3), (2, 3, 4) ... (for k=1, 2, 3; B=1)
@@ -32,22 +26,30 @@ function vertical_advection!(vars::Variables, model)
     advection_scheme = model.vertical_advection
     (; w) = vars.dynamics
 
-    for var in (:u, :v, :temperature, :humidity)
-        if haskey(vars.tendencies.grid, var)
-            ξ_tend = vars.tendencies.grid[var]
-            ξ = retrieve_time_step(advection_scheme, vars.grid, var)
-            _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
-        end
-    end
+    # unrolled over compile-time variable names (instead of a loop over runtime symbols)
+    # to avoid Union-typed variables which Enzyme cannot differentiate
+    vertical_advection!(Val(:u), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:v), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model)
 
     for (name, tracer) in model.tracers
         if tracer.active
-            ξ_tend = vars.tendencies.tracers[Symbol(name, :_grid)]
-            ξ = retrieve_time_step(advection_scheme, vars.grid.tracers, name)
+            ξ_tend = get_tendency_step(vars.tendencies.grid_tracers[name], model.time_stepping, advection_scheme)
+            ξ = get_prognostic_step(vars.grid.tracers[name], model.time_stepping, advection_scheme, model)
             _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
         end
     end
     return nothing
+end
+
+# var is a compile-time constant so that haskey and getproperty constant-fold to
+# concrete variables (type-stable, required for Enzyme differentiability)
+@inline function vertical_advection!(::Val{var}, vars::Variables, w, Δσ, advection_scheme, model) where {var}
+    haskey(vars.tendencies.grid, var) || return nothing
+    ξ_tend = get_tendency_step(vars.tendencies.grid[var], model.time_stepping, advection_scheme)
+    ξ = get_prognostic_step(vars.grid[var], model.time_stepping, advection_scheme)
+    return _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
 end
 
 function _vertical_advection!(
@@ -86,8 +88,9 @@ end
     w⁻ = w[ij, k⁻]
     w⁺ = w[ij, k⁺]
 
-    ξᶠ⁺ = reconstructed_at_face(ξ, ij, k_stencil[2:end], w⁺, adv)
-    ξᶠ⁻ = reconstructed_at_face(ξ, ij, k_stencil[1:(end - 1)], w⁻, adv)
+    # tail/front instead of [2:end]/[1:end-1] as tuple-range indexing is not type-stable
+    ξᶠ⁺ = reconstructed_at_face(ξ, ij, Base.tail(k_stencil), w⁺, adv)
+    ξᶠ⁻ = reconstructed_at_face(ξ, ij, Base.front(k_stencil), w⁻, adv)
 
     # -= as the tendencies already contain the parameterizations
     ξ_tend[ij, k] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k] * (w⁺ - w⁻))
@@ -131,9 +134,9 @@ const d₂ = 1 // 10
 @inline weight_β₁(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (S[1] - S[3])^2
 @inline weight_β₂(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (S[1] - 4S[2] + 3S[3])^2
 
-@inline p₀(S) = (2S[1] + 5S[2] - S[3]) * 1 // 6 # downind stencil
-@inline p₁(S) = (-S[1] + 5S[2] + 2S[3]) * 1 // 6 # upwind stencil
-@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) * 1 // 6 # extrapolating stencil
+@inline p₀(S) = (2S[1] + 5S[2] - S[3]) * 1 // 6     # downind stencil
+@inline p₁(S) = (-S[1] + 5S[2] + 2S[3]) * 1 // 6    # upwind stencil
+@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) * 1 // 6   # extrapolating stencil
 
 @inline τ₅(β₀, β₁, β₂) = abs(β₂ - β₀)
 

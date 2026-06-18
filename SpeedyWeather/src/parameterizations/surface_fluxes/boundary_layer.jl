@@ -80,7 +80,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, vars, drag, model.atmosphere, model.planet, model.orography)
+    boundary_layer_drag!(ij, vars, drag, model.atmosphere, model.planet, model.orography, model.time_stepping)
 
 @propagate_inbounds function boundary_layer_drag!(
         ij,
@@ -89,12 +89,13 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
         atmosphere,
         planet,
         orography,
+        time_stepping,
     )
 
     # Height z [m] of lowermost layer above ground
-    surface = size(vars.grid.geopotential, 2)    # surface index = nlayers
+    surface = size(vars.dynamics.geopotential, 2)    # surface index = nlayers
     (; gravity) = planet
-    z = vars.grid.geopotential[ij, surface] / gravity - orography.orography[ij]
+    z = vars.dynamics.geopotential[ij, surface] / gravity - orography.orography[ij]
 
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
@@ -103,15 +104,15 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # Get surface roughness length (computed by the surface_roughness parameterization)
     z₀ = vars.parameterizations.surface_roughness[ij]
 
-    # should be z > z₀, z=z₀ means an infinitely high drag
+    # should be z > z₀, z=z₀ means an infinitely high drag, choose one order higher than roughness length at least
     # 0 < z < z₀ doesn't make sense so cap here
-    z = max(z, z₀)
+    z = max(z, 10z₀)
     drag_max = (κ / log(z / z₀))^2
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
-    ΔΦ₀ = gravity * z     # geopotential high relative to surface
-    Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere)
+    ΔΦ₀ = gravity * z     # geopotential height relative to surface
+    Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
     Ri_c = drag.critical_Richardson
     (; drag_min) = drag
 
@@ -128,14 +129,15 @@ end
 $(TYPEDSIGNATURES)
 Calculate the bulk Richardson number following Frierson, 2006.
 For vertical stability in the boundary layer."""
-@propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere)
+@propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
     cₚ = atmosphere.heat_capacity
-    NF = eltype(vars.grid.temperature_prev)
-    surface = size(vars.grid.temperature_prev, 2)     # surface index = nlayers
+    temp = get_prognostic_step(vars.grid.temperature, time_stepping, drag)
+    NF = eltype(temp)
+    surface = size(temp, 2)     # surface index = nlayers
 
     Vₛ = vars.parameterizations.surface_wind_speed[ij]
-    T = vars.grid.temperature_prev[ij, surface]
-    q = haskey(vars.grid, :humidity_prev) ? vars.grid.humidity_prev[ij, surface] : zero(NF)
+    T = temp[ij, surface]
+    q = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, drag)[ij, surface] : zero(NF)
     Tᵥ = virtual_temperature(T, q, atmosphere)
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)

@@ -73,12 +73,13 @@ end
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, vars, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential)
+    vertical_diffusion!(ij, vars, diffusion, model.time_stepping, model.atmosphere, model.planet, model.orography, model.geopotential)
 
 @propagate_inbounds function vertical_diffusion!(
         ij,
         vars,
         diffusion::BulkRichardsonDiffusion,
+        time_stepping,
         atmosphere,
         planet,
         orography,
@@ -90,22 +91,21 @@ end
     # escape immediately if all diffusions disabled
     any((diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
 
-    K, kₕ = get_diffusion_coefficients!(ij, vars, diffusion, atmosphere, planet, orography, geopot)
+    K, kₕ = get_diffusion_coefficients!(ij, vars, diffusion, time_stepping, atmosphere, planet, orography, geopot)
 
-    u_tend = vars.tendencies.grid.u
-    v_tend = vars.tendencies.grid.v
-    temp_tend = vars.tendencies.grid.temperature
+    u_tend = get_tendency_step(vars.tendencies.grid.u, time_stepping, diffusion)
+    v_tend = get_tendency_step(vars.tendencies.grid.v, time_stepping, diffusion)
+    temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, diffusion)
 
-    # TODO previous time step?
-    u = vars.grid.u
-    v = vars.grid.v
+    u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
+    v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
 
     diffuse_momentum && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
     diffuse_momentum && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
 
     if atmosphere isa AbstractWetAtmosphere && diffuse_humidity
-        humid_tend = vars.tendencies.grid.humidity
-        humid = vars.grid.humidity
+        humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, diffusion)
+        humid = get_prognostic_step(vars.grid.humidity, time_stepping, diffusion)
         _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
     end
 
@@ -113,8 +113,8 @@ end
         # compute dry static energy on the fly
         dry_static_energy = vars.scratch.grid.a
         cₚ = atmosphere.heat_capacity
-        T = vars.grid.temperature
-        Φ = vars.grid.geopotential
+        T = get_prognostic_step(vars.grid.temperature, time_stepping, diffusion)
+        Φ = vars.dynamics.geopotential
 
         for k in 1:size(T, 2)
             dry_static_energy[ij, k] = cₚ * T[ij, k] + Φ[ij, k]
@@ -130,6 +130,7 @@ end
         ij,
         vars,
         diffusion::BulkRichardsonDiffusion,
+        time_stepping::AbstractTimeStepper,
         atmosphere::AbstractAtmosphere,
         planet::AbstractPlanet,
         orog,
@@ -154,14 +155,14 @@ end
     Z = T₀ * Δp_geopot_full[nlayers] / gravity
     logZ_z₀ = log(Z / z₀)
 
-    u = vars.grid.u
-    v = vars.grid.v
-    geopotential = vars.grid.geopotential
+    u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
+    v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
+    geopotential = vars.dynamics.geopotential
     (; orography) = orog
 
     # Boundary layer depth is highest layer for which Ri < Ri_c (the "critical" threshold)
     # as well as all layers below
-    Ri = bulk_richardson!(ij, vars, atmosphere)
+    Ri = bulk_richardson!(ij, vars, diffusion, time_stepping, atmosphere)
     kₕ::Int = nlayers
     while kₕ > 0 && Ri[ij, kₕ] < Ri_c
         kₕ -= 1
@@ -258,6 +259,8 @@ For vertical stability in the boundary layer."""
 @propagate_inbounds function bulk_richardson!(
         ij,
         vars,
+        diffusion::BulkRichardsonDiffusion,
+        time_stepping::AbstractTimeStepper,
         atmosphere::AbstractAtmosphere,
     )
     # reuse work array
@@ -266,16 +269,18 @@ For vertical stability in the boundary layer."""
     surface = nlayers       # surface index
     cₚ = atmosphere.heat_capacity
 
-    u = vars.grid.u_prev
-    v = vars.grid.v_prev
-    Φ = vars.grid.geopotential
-    T = vars.grid.temperature_prev
+    u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
+    v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
+    Φ = vars.dynamics.geopotential
+    T = get_prognostic_step(vars.grid.temperature, time_stepping, diffusion)
 
     # for dry models, use scratch array to bypass access to non-existing humidity variable
     for k in 1:nlayers
         vars.scratch.grid.b[ij, k] = 0
     end   # reset to zero humidity
-    q = haskey(vars.grid, :humidity_prev) ? vars.grid.humidity_prev : vars.scratch.grid.b
+    q = haskey(vars.grid, :humidity) ?
+        get_prognostic_step(vars.grid.humidity, time_stepping, diffusion) :
+        vars.scratch.grid.b
 
     # surface layer
     V² = u[ij, surface]^2 + v[ij, surface]^2

@@ -106,7 +106,7 @@ matrix_size(field::AbstractField) = (matrix_size(field.grid)..., size(field)[2:e
 # needed for unalias
 @inline Base.dataids(field::AbstractField) = Base.dataids(field.data)
 
-## INDEXING
+# INDEXING
 # simply propagate all indices forward
 Base.@propagate_inbounds Base.getindex(field::AbstractField, ijk...) = getindex(field.data, ijk...)
 Base.@propagate_inbounds Base.setindex!(field::AbstractField, x, ijk...) = setindex!(field.data, x, ijk...)
@@ -116,7 +116,6 @@ Base.fill!(field::AbstractField, x) = fill!(field.data, x)
 @inline Base.getindex(field::AbstractField, col::Colon, k...) = Field(field.data[col, k...], field.grid)
 
 # ITERATORS
-
 """$(TYPEDSIGNATURES)
 Return an iterator over the rings of a field. These are precomputed ranges like [1:20, 21:44, ...] stored
 in `field.grid.rings`. Every element are the unravellend indices `ij` of all 2D grid points that lie on that ring.
@@ -159,6 +158,7 @@ end
 #TODO: This is a bit of a stop-gap solution here while we work on the GPU column parametrization. This might be removed again
 @inline eachlayer(array_field::AbstractArray{T, 2}) where {T} = 1:size(array_field, 2)
 @inline eachlayer(array_field::AbstractArray{T, 2}, array_fields::AbstractArray{T, 2}...) where {T} = 1:size(array_field, 2)
+@inline eachlayer(array_field::AbstractArray{T, 3}) where {T} = CartesianIndices((size(array_field, 2), size(array_field, 3)))
 
 """$(TYPEDSIGNATURES)
 Iterator over all 2D grid points of a field (or fields), i.e. the horizontal dimension only.
@@ -177,8 +177,7 @@ end
 
 eachgridpoint(field::AbstractField) = eachgridpoint(field.grid)
 
-## CONSTRUCTORS
-
+# CONSTRUCTORS
 # from data array
 # pass keyword `input_as` on to positional argument for dispatch
 (::Type{F})(data::AbstractArray; input_as = Vector) where {F <: AbstractField} = F(data, input_as)
@@ -402,6 +401,13 @@ function Base.convert(
     return F(field.data, field.grid)
 end
 
+# to allow one_field .= another_field; return the destination field (copyto! convention),
+# not its underlying data, so copy/copymutable/similar-based fallbacks preserve the Field type
+function Base.copyto!(field_a::AbstractField, field_b::AbstractField)
+    copyto!(field_a.data, field_b.data)
+    return field_a
+end
+
 # equality and comparison, somehow needed as not covered by broadcasting
 Base.:(==)(F1::AbstractField, F2::AbstractField) = fields_match(F1, F2) && F1.data == F2.data
 Base.all(F::AbstractField) = all(F.data)
@@ -492,7 +498,7 @@ FieldStyle{1, Grid}(::Val{0}) where {Grid} = FieldStyle{1, Grid}()
 FieldStyle{2, Grid}(::Val{3}) where {Grid} = FieldStyle{3, Grid}()
 FieldStyle{3, Grid}(::Val{4}) where {Grid} = FieldStyle{4, Grid}()
 
-## GPU (same but <: GPUArrays.AbstractGPUArrayStyle)
+# GPU (same but <: GPUArrays.AbstractGPUArrayStyle)
 struct FieldGPUStyle{N, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
 # same as for FieldStyle but for constrain to ArrayType<:GPUArrays

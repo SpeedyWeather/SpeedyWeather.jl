@@ -298,6 +298,20 @@ Base.eltype(::Type{<:FusedParent{P}}) where {P} = eltype(P)
 Base.summary(io::IO, fp::FusedParent) = Base.summary(io, fp.parent)
 Base.summary(fp::FusedParent) = Base.summary(fp.parent)
 
+function Base.show(io::IO, fp::FusedParent)
+    nslots = length(fp.slot_map)
+    fpsize = prettymemory(_pretty_size(fp))
+    print(io, styled"{warning:FusedParent}", " ", Base.summary(fp.parent),
+          styled"{note: ($nslots slots, $fpsize)}")
+    names = keys(fp.slot_map)
+    for (i, name) in enumerate(names)
+        s = i == length(names) ? "└" : "├"                  # choose ending └ for last slot
+        range = getfield(fp.slot_map, name)
+        print(io, "\n$s ", styled"{magenta:$name}", ": ", range)
+    end
+    return nothing
+end
+
 Architectures.architecture(fp::FusedParent) = architecture(fp.parent)
 Architectures.on_architecture(arch::AbstractArchitecture, fp::FusedParent) =
     FusedParent(on_architecture(arch, fp.parent), fp.slot_map)
@@ -613,28 +627,45 @@ function warn_undefvar(vars::Variables, key::Symbol, group::Symbol = :prognostic
     return true # return true to allow for short-circuiting with && return nothing to skip exit the following code early
 end
 
-# TODO move get_step, get_steps to LowerTriangularArrays?
-
-function get_steps(coeffs::LowerTriangularArray{T, 2}) where {T}
-    nsteps = size(coeffs, 2)
-    return ntuple(i -> lta_view(coeffs, :, i), nsteps)
+"""$(TYPEDSIGNATURES)
+Names (Tuple of Symbols) of the tendencies in `::Variables`. Used to define which (atmopsheric) variables are time stepped.
+Ignores any other names spaces."""
+@generated function tendency_names(::Variables{Po, G, T}) where {Po, G, T}
+    names = Symbol[k for (i, k) in enumerate(fieldnames(T)) if !(fieldtype(T, i) <: NamedTuple)]
+    return Expr(:tuple, QuoteNode.(names)...)
 end
 
-function get_steps(coeffs::LowerTriangularArray{T, 3}) where {T}
-    nsteps = size(coeffs, 3)
-    return ntuple(i -> lta_view(coeffs, :, :, i), nsteps)
+"""$(TYPEDSIGNATURES)
+Like `tendency_names`, but adds `:u` and `:v` if `:vorticity` is present."""
+@generated function tendency_and_uv_names(::Variables{Po, G, T}) where {Po, G, T}
+    names = Symbol[k for (i, k) in enumerate(fieldnames(T)) if !(fieldtype(T, i) <: NamedTuple)]
+    names = :vorticity in names ? vcat(names, [:u, :v]) : names
+    return Expr(:tuple, QuoteNode.(names)...)
 end
 
-export get_step
+"""$(TYPEDSIGNATURES)
+Names (Tuple of Symbols) of the land tendencies in `::Variables`. Used to define which land variables are time stepped.
+Ignores any other names spaces."""
+@generated function land_tendency_names(::Variables{Po, G, T}) where {Po, G, T}
+    :land in fieldnames(T) || return :(())
+    names = collect(fieldnames(fieldtype(T, :land)))
+    return Expr(:tuple, QuoteNode.(names)...)
+end
 
 """$(TYPEDSIGNATURES)
-Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
-This method is for a 2D spectral variable (horizontal only) with steps in the 3rd dimension."""
-get_step(coeffs::LowerTriangularArray{T, 2}, i) where {T} = lta_view(coeffs, :, i)
+Names (Tuple of Symbols) of the ocean tendencies in `::Variables`. Used to define which ocean variables are time stepped.
+Ignores any other names spaces."""
+@generated function ocean_tendency_names(::Variables{Po, G, T}) where {Po, G, T}
+    :ocean in fieldnames(T) || return :(())
+    names = collect(fieldnames(fieldtype(T, :ocean)))
+    return Expr(:tuple, QuoteNode.(names)...)
+end
 
 """$(TYPEDSIGNATURES)
-Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
-This method is for a 3D spectral variable (horizontal+vertical) with steps in the 4rd dimension."""
-get_step(coeffs::LowerTriangularArray{T, 3}, i) where {T} = lta_view(coeffs, :, :, i)
+Names (Tuple of Symbols) of the ocean tendencies in `::Variables`. Used to define which ocean variables are time stepped.
+Ignores any other names spaces."""
+@generated function tracer_tendency_names(::Variables{Po, G, T}) where {Po, G, T}
+    :tracers in fieldnames(T) || return :(())
+    names = collect(fieldnames(fieldtype(T, :tracers)))
+    return Expr(:tuple, QuoteNode.(names)...)
+end

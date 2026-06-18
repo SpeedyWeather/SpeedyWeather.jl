@@ -63,7 +63,7 @@ nothing #hide
 ```
 
 The constructor and option fields mirror [`NetCDFOutput`](@ref): `path`, `id`, `overwrite`,
-`output_dt`, `variables`, `write_restart`, `write_parameters_txt`, `write_progress_txt` all
+`interval`, `variables`, `write_restart`, `write_parameters_txt`, `write_progress_txt` all
 behave the same way, the run folder layout (`run_<id>_NNNN/`) is identical, and the same
 `AbstractOutputVariable` types are used to declare which variables are written.
 The on-disk layout differs:
@@ -85,7 +85,7 @@ using SpeedyWeather, Zarr
 
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 output = ZarrOutput(spectral_grid, PrimitiveWet;
-    output_dt = Hour(1),
+    interval = Hour(1),
     time_chunk = 24,                        # bundle one day per chunk on the time axis
     compressor = Zarr.BloscCompressor(clevel=5),
 )
