@@ -45,7 +45,7 @@ struct DiagonalWorkOrder <: AbstractWorkOrder end
 """
 Work order for kernels over a regular 3D array.
 """
-struct Array3DWorkOrder <: AbstractWorkOrder end
+struct ArrayWorkOrder <: AbstractWorkOrder end
 
 """
 Work order for kernels over linear/eachindex iteration.
@@ -91,16 +91,16 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Returns the `workgroup` and `worksize` for launching a kernel over a regular 3D array.
+Returns the `workgroup` and `worksize` for launching a kernel over all indices of a regular array preserving dimensionality.
 """
-function work_layout(::Type{Array3DWorkOrder}, worksize::NTuple{N, Int}) where {N}
+function work_layout(::Type{ArrayWorkOrder}, worksize::NTuple{N, Int}) where {N}
     return heuristic_workgroup(worksize...), worksize
 end
 
 """
 $(TYPEDSIGNATURES)
-Returns the `workgroup` and `worksize` for launching a kernel with linear iteration.
-"""
+Returns the `workgroup` and `worksize` for launching a kernel with linear iteration,
+unravelling all indices into one linear index."""
 function work_layout(::Type{LinearWorkOrder}, worksize::NTuple{N, Int}) where {N}
     return heuristic_workgroup(prod(worksize)), (prod(worksize),)
 end

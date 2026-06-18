@@ -254,7 +254,7 @@ Six types encode what iteration space a kernel covers:
 | `SpectralInnerWorkOrder` | as above, but skip `lm=1` |
 | `DiagonalWorkOrder` | diagonal elements of a `LowerTriangularArray` |
 | `RingGridWorkOrder` | all grid points `ij` × vertical layers |
-| `Array3DWorkOrder` | regular 3D arrays |
+| `ArrayWorkOrder` | regular 3D arrays |
 | `LinearWorkOrder` | flattened 1D (eachindex) |
 
 ### Launching a kernel

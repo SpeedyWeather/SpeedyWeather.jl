@@ -107,7 +107,7 @@ function initialize!(
     arch = architecture(∇²ⁿ)
     worksize = (trunc + 2, nlayers)
     launch!(
-        arch, Array3DWorkOrder, worksize, _initialize_hyperdiffusion_kernel!,
+        arch, ArrayWorkOrder, worksize, _initialize_hyperdiffusion_kernel!,
         ∇²ⁿ, ∇²ⁿ_implicit, ∇²ⁿ_div, ∇²ⁿ_div_implicit, σ_levels_full,
         trunc, power, power_stratosphere, tapering_σ,
         time_scale, time_scale_div, Δt, largest_eigenvalue
