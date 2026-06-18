@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced firsti in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
+- Adjust benchmarking to new timestepping logic [#1128](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1128)
 - Relax Enzyme compatability again to allow recent Enzyme versions [#1126](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1126)
 - reinitialize! logic to allow for model.implicit to be reinitialized [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
 - get_prognostic_step, get_tendency_step in dycore and parameterizations [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
