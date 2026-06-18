@@ -472,6 +472,66 @@ nothing # hide
 ![Nested OctaHEALPix](octahealpix_nested.png)
 
 
+## Copying unmasked grid points
+
+`unmasked_indices` and `copy_unmasked!` let you extract the unmasked subset of a
+ring-grid field into a (smaller) subset array, work on it, and scatter results back.
+
+**Convention:** `mask` is a `Bool` field where `true` = masked (excluded), `false` = unmasked (included).
+
+Start with a mask on a grid
+
+```@example ringgrids
+grid = HEALPixGrid(2)
+mask = rand(Bool, grid)                   # or use your own Bool field
+```
+
+Precompute the indices to copy between field and array
+
+```@example ringgrids
+indices = unmasked_indices(mask)          # Vector of grid-point indices where mask == false
+```
+
+`indices` lives on the same device as `mask` (CPU or GPU) and is sorted.
+
+Now we can copy the unmasked elements of the field to the smaller plain array (gather):
+
+```@example ringgrids
+field = rand(Float32, grid)
+```
+
+```@example ringgrids
+array = zeros(Float32, sum(mask))
+copy_unmasked!(array2D, field2D, indices)
+array
+```
+
+Such that `array` is a subset of the elements in `field`.
+The unmasked values are identical
+
+```@example ringgrids
+array == field[.~mask]
+```
+
+Same works for 3D or higher dimensions, but the mask is always 2D
+
+```@example ringgrids
+nlayers = 3
+field3D = rand(Float32, grid, nlayers)
+array3D = zeros(Float32, sum(mask), nlayers)
+copy_unmasked!(array3D, field3D, indices)
+```
+
+And copy back, plain array → field (scatter):
+
+```julia
+other_field3D = zeros(Float32, grid, nlayers)
+copy_unmasked!(other_field3D, array3D, indices)
+field3D[.~mask, :] == other_field3D[.~mask, :]
+```
+
+Grid points not referenced by `indices` (the masked ones) are **left unchanged**.
+
 ## Function index
 
 ```@autodocs
