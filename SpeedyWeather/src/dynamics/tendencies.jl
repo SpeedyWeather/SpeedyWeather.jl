@@ -363,7 +363,9 @@ function vertical_velocity!(
     Δσₖ = view(σ_levels_thick, 1:(nlayers - 1))'
     σₖ_half = view(σ_levels_half, 2:nlayers)'
     # TODO: broadcast issue here, that's why the .data are neeeded
-    w.data[:, 1:(nlayers - 1)] .= σₖ_half .* (div_mean_grid.data .+ ūv̄∇lnp.data) .-
+    # @views so the RHS `[:, 1:nlayers-1]` slices are views, not materialized copies,
+    # letting the whole dotted expression fuse into one allocation-free broadcast
+    @views w.data[:, 1:(nlayers - 1)] .= σₖ_half .* (div_mean_grid.data .+ ūv̄∇lnp.data) .-
         (div_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* div_grid.data[:, 1:(nlayers - 1)]) .-
         (pres_flux_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* pres_flux.data[:, 1:(nlayers - 1)])
 
