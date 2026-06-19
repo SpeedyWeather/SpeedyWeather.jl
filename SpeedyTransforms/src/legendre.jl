@@ -192,7 +192,7 @@ function unscale_coslat!(
     )
 
     launch!(
-        architecture, Array3DWorkOrder, size(g_north), unscale_coslat_kernel!,
+        architecture, ArrayWorkOrder, size(g_north), unscale_coslat_kernel!,
         g_north, g_south, coslat⁻¹
     )
     return nothing
