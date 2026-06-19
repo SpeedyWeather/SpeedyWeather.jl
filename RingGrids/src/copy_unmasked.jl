@@ -22,13 +22,17 @@ remaining dimensions are treated as vertical layers and are copied verbatim.
 function copy_unmasked!(dst::AbstractArray, src::AbstractField, indices)
     arch = architecture(dst)
     @boundscheck size(indices, 1) == size(dst, 1) || throw(BoundsError(indices, dst))
-    # @boundscheck maximum(indices) <= size(src, 1) || throw(BoundsError(indices, src))
+    @boundscheck size(dst, 1) <= size(src, 1) || throw(BoundsError(indices, dst))
 
-    launch!(arch, ArrayWorkOrder, size(dst), copy_unmasked_kernel!, dst, src, indices)
+    # technically without this check the kernel is unsafe but `maximum` requires reading in the array ...
+    # @boundscheck 1 <= maximum(indices) <= size(src, 1) || throw(BoundsError(indices, src))
+
+    # call the gather kernel as dst is expected to be smaller as elements in src are masked
+    launch!(arch, ArrayWorkOrder, size(dst), copy_unmasked_gather_kernel!, dst, src, indices)
     return dst
 end
 
-@kernel inbounds = true function copy_unmasked_kernel!(dst::AbstractArray, src::AbstractField, indices::AbstractVector{<:Integer})
+@kernel inbounds = true function copy_unmasked_gather_kernel!(dst, src, indices)
     I = @index(Global, NTuple)
     ij = indices[I[1]]
     dst[I...] = src[ij, I[2:end]...]
@@ -42,13 +46,17 @@ function copy_unmasked!(dst::AbstractField, src::AbstractArray, indices)
     arch = architecture(src)
     
     @boundscheck size(indices, 1) == size(src, 1) || throw(BoundsError(indices, dst))
+    @boundscheck size(src, 1) <= size(dst, 1) || throw(BoundsError(indices, dst))
+
+    # technically without this check the kernel is unsafe but `maximum` requires reading in the array ...
     # @boundscheck maximum(indices) <= size(dst, 1) || throw(BoundsError(indices, src))
 
-    launch!(arch, ArrayWorkOrder, size(src), copy_unmasked_kernel!, dst, src, indices)
+    # call scatter kernel as dst is larger than src which only contains the unmasked elements in dst
+    launch!(arch, ArrayWorkOrder, size(src), copy_unmasked_scatter_kernel!, dst, src, indices)
     return dst
 end
 
-@kernel inbounds = true function copy_unmasked_kernel!(dst::AbstractField, src::AbstractArray, indices::AbstractVector{<:Integer})
+@kernel inbounds = true function copy_unmasked_scatter_kernel!(dst, src, indices)
     I = @index(Global, NTuple)
     ij = indices[I[1]]
     dst[ij, I[2:end]...] = src[I...]
