@@ -98,7 +98,7 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
 
     pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
     sigma_levels = model.geometry.σ_levels_full
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     cₚ = model.atmosphere.heat_capacity
 
     # rename for brevity

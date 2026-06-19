@@ -27,7 +27,7 @@ variables(::AbstractSurfaceRoughness) = (
 )
 
 @propagate_inbounds function surface_roughness!(ij, vars, scheme::ConstantSurfaceRoughness, land_sea_mask)
-    land_fraction = land_sea_mask.mask[ij]
+    land_fraction = land_sea_mask.land_fraction[ij]
     z₀_land = scheme.roughness_length_land
     z₀_ocean = scheme.roughness_length_ocean
     (; land, ocean) = vars.parameterizations
