@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix vertical advection performance regression by indexing the contiguous time step directly in the stencil kernel instead of a `get_*_step` view [#1131](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1131)
 - Reduce allocations in some broadcasted operations [#1133](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1133)
 - Add a warm to the benchmark to not measure pre-compile [#1129](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1129)
 - Adjust benchmarking to new timestepping logic [#1128](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1128)
