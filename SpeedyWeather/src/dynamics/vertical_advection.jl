@@ -55,9 +55,9 @@ end
     # (the step folds into the index).
     ξ_tend = vars.tendencies.grid[var]
     ξ = vars.grid[var]
-    tend_step = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
-    prog_step = which_prognostic_step(ξ, model.time_stepping, advection_scheme)
-    return _vertical_advection!(ξ_tend, tend_step, w, ξ, prog_step, Δσ, advection_scheme)
+    s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
+    s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme)
+    return _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
 end
 
 function _vertical_advection!(
@@ -107,7 +107,7 @@ end
     ξᶠ⁻ = reconstructed_at_face(ξ, ij, s_prog, Base.front(k_stencil), w⁻, adv)
 
     # -= as the tendencies already contain the parameterizations
-    ξ_tend[ij, k,s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, prog_step] * (w⁺ - w⁻))
+    ξ_tend[ij, k,s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, s_prog] * (w⁺ - w⁻))
 end
 
 # reconstructed_at_face indexes ξ[ij, k[i], s]: `k` is the vertical stencil (tuple of
