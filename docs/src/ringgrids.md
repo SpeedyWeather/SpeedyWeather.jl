@@ -474,8 +474,14 @@ nothing # hide
 
 ## Copying unmasked grid points
 
-`unmasked_indices` and `copy_unmasked!` let you extract the unmasked subset of a
-ring-grid field into a (smaller) subset array, work on it, and scatter results back.
+Having a `field` and a `mask` on the same grid one can extract masked/unmasked elements (return as array)
+with `field[mask]` or `field[.~mask]`, however, this operation allocates memory and it is not
+immediately possible to write the results of these operations allocation-free into existing arrays.
+
+Hence, RingGrids provides `unmasked_indices` and `copy_unmasked!` that let you extract the unmasked subset of a
+ring-grid field into a (smaller) subset array, work on it, and scatter results back -- allocation free on
+both CPU and GPU. Only a reusable `indices` vector has to be precomputed that maps the indices between
+the unmasked elements of the field to the contiguous elements in the array.
 
 **Convention:** `mask` is a `Bool` field where `true` = masked (excluded), `false` = unmasked (included).
 
@@ -527,7 +533,7 @@ copy_unmasked!(array3D, field3D, indices)
 
 And copy back, plain array → field (scatter):
 
-```julia
+```@example ringgrids
 other_field3D = zeros(Float32, grid, nlayers)
 copy_unmasked!(other_field3D, array3D, indices)
 field3D[.~mask, :] == other_field3D[.~mask, :]
