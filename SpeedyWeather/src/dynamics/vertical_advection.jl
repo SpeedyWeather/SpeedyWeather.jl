@@ -37,9 +37,9 @@ function vertical_advection!(vars::Variables, model)
         if tracer.active
             ξ_tend = vars.tendencies.grid_tracers[name]
             ξ = vars.grid.tracers[name]
-            tend_step = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
-            prog_step = which_prognostic_step(ξ, model.time_stepping, advection_scheme, model)
-            _vertical_advection!(ξ_tend, tend_step, w, ξ, prog_step, Δσ, advection_scheme)
+            s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
+            s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme, model)
+            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
         end
     end
     return nothing
@@ -62,10 +62,10 @@ end
 
 function _vertical_advection!(
         ξ_tend::AbstractField,      # tendency of quantity ξ (full, with step dimension)
-        tend_step::Integer,         # step of ξ_tend to write into
+        s_tend::Integer,            # step of ξ_tend to write into
         w::AbstractField,           # vertical velocity at k+1/2
         ξ::AbstractField,           # ξ (full, with step dimension)
-        prog_step::Integer,         # step of ξ to advect
+        s_prog::Integer,            # step of ξ to advect
         Δσ,                         # layer thickness on σ levels
         adv::VerticalAdvection      # vertical advection scheme of order B
     )
@@ -78,13 +78,13 @@ function _vertical_advection!(
     launch!(
         arch, RingGridWorkOrder, (size(ξ_tend, 1), size(ξ_tend, 2)),
         vertical_advection_kernel!,
-        ξ_tend, tend_step, w, ξ, prog_step, Δσ, nlayers, adv
+        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
     )
     return nothing
 end
 
 @kernel inbounds = true function vertical_advection_kernel!(
-        ξ_tend, tend_step, w, ξ, prog_step, Δσ, nlayers, adv
+        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
     )
     ij, k = @index(Global, NTuple)
 
@@ -99,48 +99,48 @@ end
     w⁻ = w[ij, k⁻]
     w⁺ = w[ij, k⁺]
 
-    # `prog_step` selects which time step of the step-dimensioned ξ to advect; indexing the
-    # full array as ξ[ij, k, prog_step] keeps the contiguous parent (the constant step folds
+    # `s_prog` selects which time step of the step-dimensioned ξ to advect; indexing the
+    # full array as ξ[ij, k, s_prog] keeps the contiguous parent (the constant step folds
     # into the index), which is ~2x faster here than a `get_*_step` SubArray view would be.
     # tail/front instead of [2:end]/[1:end-1] as tuple-range indexing is not type-stable
-    ξᶠ⁺ = reconstructed_at_face(ξ, ij, prog_step, Base.tail(k_stencil), w⁺, adv)
-    ξᶠ⁻ = reconstructed_at_face(ξ, ij, prog_step, Base.front(k_stencil), w⁻, adv)
+    ξᶠ⁺ = reconstructed_at_face(ξ, ij, s_prog, Base.tail(k_stencil), w⁺, adv)
+    ξᶠ⁻ = reconstructed_at_face(ξ, ij, s_prog, Base.front(k_stencil), w⁻, adv)
 
     # -= as the tendencies already contain the parameterizations
-    ξ_tend[ij, k, tend_step] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, prog_step] * (w⁺ - w⁻))
+    ξ_tend[ij, k,s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, prog_step] * (w⁺ - w⁻))
 end
 
-# reconstructed_at_face indexes ξ[ij, k[i], step]: `k` is the vertical stencil (tuple of
-# layer indices) and `step` selects the time step of the step-dimensioned field.
+# reconstructed_at_face indexes ξ[ij, k[i], s]: `k` is the vertical stencil (tuple of
+# layer indices) and `s` selects the time step of the s-dimensioned field.
 
 # 1st order upwind
-@inline reconstructed_at_face(ξ, ij, step, k, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
     ifelse(
-    u > 0, ξ[ij, k[1], step],
-    ξ[ij, k[2], step]
+    u > 0, ξ[ij, k[1], s],
+    ξ[ij, k[2], s]
 )
 
 # 3rd order upwind
-@inline reconstructed_at_face(ξ, ij, step, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1], step] + 5ξ[ij, k[2], step] - ξ[ij, k[3], step]) * 1 // 6,
-    (2ξ[ij, k[4], step] + 5ξ[ij, k[3], step] - ξ[ij, k[2], step]) * 1 // 6
+    u > 0, (2ξ[ij, k[1], s] + 5ξ[ij, k[2], s] - ξ[ij, k[3], s]) * 1 // 6,
+    (2ξ[ij, k[4], s] + 5ξ[ij, k[3], s] - ξ[ij, k[2], s]) * 1 // 6
 )
 
 # 5th order upwind
-@inline reconstructed_at_face(ξ, ij, step, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1], step] - 13ξ[ij, k[2], step] + 47ξ[ij, k[3], step] + 27ξ[ij, k[4], step] - 3ξ[ij, k[5], step]) * 1 // 60,
-    (2ξ[ij, k[6], step] - 13ξ[ij, k[5], step] + 47ξ[ij, k[4], step] + 27ξ[ij, k[3], step] - 3ξ[ij, k[2], step]) * 1 // 60
+    u > 0, (2ξ[ij, k[1], s] - 13ξ[ij, k[2], s] + 47ξ[ij, k[3], s] + 27ξ[ij, k[4], s] - 3ξ[ij, k[5], s]) * 1 // 60,
+    (2ξ[ij, k[6], s] - 13ξ[ij, k[5], s] + 47ξ[ij, k[4], s] + 27ξ[ij, k[3], s] - 3ξ[ij, k[2], s]) * 1 // 60
 )
 
 # 2nd order centered
-@inline reconstructed_at_face(ξ, ij, step, k, u, ::CenteredVerticalAdvection{NF, 1}) where {NF} =
-    (ξ[ij, k[1], step] + ξ[ij, k[2], step]) * 1 // 2
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::CenteredVerticalAdvection{NF, 1}) where {NF} =
+    (ξ[ij, k[1], s] + ξ[ij, k[2], s]) * 1 // 2
 
 # 4th order centered
-@inline reconstructed_at_face(ξ, ij, step, k, u, ::CenteredVerticalAdvection{NF, 2}) where {NF} =
-    (-ξ[ij, k[1], step] + 7ξ[ij, k[2], step] + 7ξ[ij, k[3], step] - ξ[ij, k[4], step]) * 1 // 12
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::CenteredVerticalAdvection{NF, 2}) where {NF} =
+    (-ξ[ij, k[1], s] + 7ξ[ij, k[2], s] + 7ξ[ij, k[3], s] - ξ[ij, k[4], s]) * 1 // 12
 
 const ε = 1 // 1_000_000    # = 1e-6 but number format flexible
 const d₀ = 3 // 10
@@ -171,15 +171,15 @@ const d₂ = 1 // 10
     return p₀(S₀) * w₀ + p₁(S₁) * w₁ + p₂(S₂) * w₂
 end
 
-@inline function reconstructed_at_face(ξ, ij, step, k, u, ::WENOVerticalAdvection)
+@inline function reconstructed_at_face(ξ, ij, s, k, u, ::WENOVerticalAdvection)
     if u > 0
-        S₀ = (ξ[ij, k[3], step], ξ[ij, k[4], step], ξ[ij, k[5], step])
-        S₁ = (ξ[ij, k[2], step], ξ[ij, k[3], step], ξ[ij, k[4], step])
-        S₂ = (ξ[ij, k[1], step], ξ[ij, k[2], step], ξ[ij, k[3], step])
+        S₀ = (ξ[ij, k[3], s], ξ[ij, k[4], s], ξ[ij, k[5], s])
+        S₁ = (ξ[ij, k[2], s], ξ[ij, k[3], s], ξ[ij, k[4], s])
+        S₂ = (ξ[ij, k[1], s], ξ[ij, k[2], s], ξ[ij, k[3], s])
     else
-        S₀ = (ξ[ij, k[4], step], ξ[ij, k[3], step], ξ[ij, k[2], step])
-        S₁ = (ξ[ij, k[5], step], ξ[ij, k[4], step], ξ[ij, k[3], step])
-        S₂ = (ξ[ij, k[6], step], ξ[ij, k[5], step], ξ[ij, k[4], step])
+        S₀ = (ξ[ij, k[4], s], ξ[ij, k[3], s], ξ[ij, k[2], s])
+        S₁ = (ξ[ij, k[5], s], ξ[ij, k[4], s], ξ[ij, k[3], s])
+        S₂ = (ξ[ij, k[6], s], ξ[ij, k[5], s], ξ[ij, k[4], s])
     end
     return weno_reconstruction(S₀, S₁, S₂)
 end
