@@ -81,7 +81,7 @@ variables(::SurfaceOceanHeatFlux) = (
     # TODO actually implement skin temperature?
     SST = vars.prognostic.ocean.sea_surface_temperature[ij]
     T = vars.parameterizations.surface_air_temperature[ij]
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
 
     # drag coefficient
@@ -147,7 +147,7 @@ variables(::SurfaceLandHeatFlux) = (
     # TODO actually implement skin temperature?
     T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]      # uppermost land layer with index 1
     T = vars.parameterizations.surface_air_temperature[ij]
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     snow_depth = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(T)
 
     # drag coefficient
@@ -192,7 +192,7 @@ variables(::PrescribedOceanHeatFlux) = (
 )
 
 @propagate_inbounds function surface_heat_flux!(ij, vars, heat_flux::PrescribedOceanHeatFlux, model)
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
     surface = model.geometry.nlayers
@@ -232,7 +232,7 @@ variables(::PrescribedLandHeatFlux) = (
 )
 
 @propagate_inbounds function surface_heat_flux!(ij, vars, heat_flux::PrescribedLandHeatFlux, model)
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
     surface = model.geometry.nlayers                    # indexing top to bottom

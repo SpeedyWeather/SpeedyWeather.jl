@@ -82,7 +82,7 @@ variables(::SurfaceOceanHumidityFlux) = (
 
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     surface_humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, humidity_flux)[ij, surface]
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(SST)
@@ -145,7 +145,7 @@ variables(::SurfaceLandHumidityFlux) = (
 
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     surface = model.geometry.nlayers                    # indexing top to bottom
     surface_humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, humidity_flux)[ij, surface]
 
@@ -187,7 +187,7 @@ variables(::PrescribedOceanHumidityFlux) = (
 )
 
 @propagate_inbounds function surface_humidity_flux!(ij, vars, humidity_flux::PrescribedOceanHumidityFlux, model)
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
     surface = model.geometry.nlayers
 
@@ -221,7 +221,7 @@ variables(::PrescribedLandHumidityFlux) = (
 )
 
 @propagate_inbounds function surface_humidity_flux!(ij, vars, humidity_flux::PrescribedLandHumidityFlux, model)
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]
     surface = model.geometry.nlayers
 

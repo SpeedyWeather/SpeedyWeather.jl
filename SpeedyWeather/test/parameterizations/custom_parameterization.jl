@@ -21,7 +21,7 @@
         (; sea_ice_concentration) = vars.prognostic.ocean
         (; land_albedo, seaice_albedo, ocean_albedo) = albedo
 
-        if land_sea_mask.mask[ij] > 0.95 # if mostly land
+        if land_sea_mask.land_fraction[ij] > 0.95 # if mostly land
             vars.parameterizations.my_albedo[ij] = land_albedo
         else # if ocean
             vars.parameterizations.my_albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)

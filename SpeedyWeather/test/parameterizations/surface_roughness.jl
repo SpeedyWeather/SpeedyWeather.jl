@@ -44,10 +44,10 @@
         sr = vars.parameterizations.surface_roughness
         lsr = vars.parameterizations.land.surface_roughness
         osr = vars.parameterizations.ocean.surface_roughness
-        mask = model.land_sea_mask.mask
+        land_fraction = model.land_sea_mask.land_fraction
 
         # the combined roughness is the area-weighted blend of land and ocean roughness
-        @test sr ≈ @. mask * lsr + (1 - mask) * osr
+        @test sr ≈ @. land_fraction * lsr + (1 - land_fraction) * osr
 
         # all roughness lengths are finite and the blend stays strictly positive
         @test all(isfinite, sr)

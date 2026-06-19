@@ -7,7 +7,11 @@ SpeedyWeather uses a _fractional_ land-sea mask, i.e. for every grid-point
 - 0 indicates ocean
 - a value in between indicates a grid-cell partially covered by ocean and land
 
-Setting the land-sea mask to ocean therefore will disable any fluxes that
+For clarity, while we talk conceptually about "land-sea mask" we will define
+the mask through an array called `land_fraction` that matches the definition
+from above without the ambiguity of what is masked and what not.
+
+Setting the land-sea mask to ocean (the land fraction to 0) therefore will disable any fluxes that
 may come from land, and vice versa. However, with an ocean-everywhere land-sea mask
 you must also define sea surface temperatures everywhere, otherwise the fluxes
 in those regions will be zero.
@@ -35,14 +39,14 @@ land_sea_mask = LandSeaMask(spectral_grid)
 
 which will automatically interpolate the land-sea mask onto grid and resolution
 as defined in `spectral_grid` at initialization. The actual mask is in
-`land_sea_mask.mask` and you can visualise it with
+`land_sea_mask.land_fraction` and you can visualise it with
 
 ```@example landseamask
 model = PrimitiveWetModel(spectral_grid; land_sea_mask)
 simulation = initialize!(model)     # triggers also initialization of model.land_sea_mask
 
 using CairoMakie
-heatmap(land_sea_mask.mask, title="Land-sea mask at T31 resolution")
+heatmap(land_sea_mask.land_fraction, title="Land-sea mask at T31 resolution")
 save("land-sea_mask.png", ans) # hide
 nothing # hide
 ```
@@ -68,7 +72,7 @@ initialize!(model.land_sea_mask, model)         # back to Earth's mask
 set!(model, land_sea_mask=(λ, φ) -> φ > 0 ? -1 : 0, add=true)
 
 # visualise
-heatmap(land_sea_mask.mask, title="Land-sea mask with Northern Hemisphere ocean")
+heatmap(land_sea_mask.land_fraction, title="Land-sea mask with Northern Hemisphere ocean")
 save("nh_ocean.png", ans) # hide
 nothing # hide
 ```
@@ -90,7 +94,7 @@ Predefined is also the [`AquaPlanetMask`](@ref) which can be created as
 land_sea_mask = AquaPlanetMask(spectral_grid)
 ```
 and is equivalent to using [`EarthLandSeaMask`](@ref) but setting
-the entire mask to zero afterwards `land_sea_mask.mask .= 0`.
+the entire mask to zero afterwards `land_sea_mask.land_fraction .= 0`.
 
 ## Custom land-sea mask
 
@@ -101,7 +105,7 @@ A custom land-sea mask has to be defined as a new type (`struct` or `mutable str
 CustomMask{NF, GridVariable2D} <: AbstractLandSeaMask
 ```
 
-and needs to have at least a field called `mask::GridVariable2D` that uses a `GridVariable2D`
+and needs to have at least a field called `land_fraction::GridVariable2D` that uses a `GridVariable2D`
 as defined by the `SpectralGrid` object, so of correct size and with the number format `NF`.
 All `AbstractLandSeaMask` have a convenient generator function to be used like
 `mask = CustomMask(spectral_grid, option=argument)`, but you may add your own or customize by
@@ -113,7 +117,7 @@ Then the initialize function has to be extended for that new mask
 initialize!(mask::CustomMask, model::PrimitiveEquation)
 ```
 
-which generally is used to tweak the mask.mask grid as you like, using
+which generally is used to tweak the mask.land_fraction grid as you like, using
 any other options you have included in `CustomMask` as fields or anything else.
 `model` should be preferably read-only, because this is only to initialize the land-sea mask, nothing else from `model`.
 You can for example read something from file, set some values manually, or use coordinates from `model.geometry`.
@@ -121,7 +125,7 @@ You can for example read something from file, set some values manually, or use c
 ## Time-dependent land-sea mask
 
 It is possible to define [Intrusive callbacks](@ref) to change the
-land-sea mask during integration. The grid in `model.land_sea_mask.mask`
+land-sea mask during integration. The grid in `model.land_sea_mask.land_fraction`
 is mutable, meaning you can change the values of grid points in-place but not replace
 the entire mask or change its size. If that mask is changed, this will be reflected
 in all relevant model components. For example, we can define a callback that
@@ -150,7 +154,7 @@ function SpeedyWeather.callback!(
     isscheduled(callback.schedule, vars.prognostic.clock) || return nothing
 
     # otherwise set the entire land-sea mask to ocean
-    model.land_sea_mask.mask .= 0
+    model.land_sea_mask.land_fraction .= 0
     @info "Everything flooded on $(vars.prognostic.clock.time)"
 end
 
@@ -170,7 +174,7 @@ add!(model, MilleniumFlood())   # or MilleniumFlood(::DateTime) for any non-defa
 
 simulation = initialize!(model, time=DateTime(1999,12,29))
 run!(simulation, period=Day(5))
-heatmap(model.land_sea_mask.mask, title="Land-sea mask after MilleniumFlood callback")
+heatmap(model.land_sea_mask.land_fraction, title="Land fraction after MilleniumFlood callback")
 save("land-sea_mask2.png", ans) # hide
 nothing # hide
 ```

@@ -106,7 +106,7 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     cₚ = model.atmosphere.heat_capacity
     Tₜ = longwave.temp_tropopause
 
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     sst = vars.prognostic.ocean.sea_surface_temperature[ij]
     lst = vars.prognostic.land.soil_temperature[ij, 1]  # TODO use skin temperature?
 
@@ -236,7 +236,7 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     σ = model.atmosphere.stefan_boltzmann
     cₚ = model.atmosphere.heat_capacity
 
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     sst = vars.prognostic.ocean.sea_surface_temperature[ij]
     lst = vars.prognostic.land.soil_temperature[ij, 1]                  # TODO use skin temperature?
 
