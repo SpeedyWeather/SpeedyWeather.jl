@@ -23,6 +23,8 @@ import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 # SPEEDYWEATHER SUBMODULES
 import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
+export CPU, GPU, on_architecture, architecture                # export device functions
+export SpeedyWeatherInternals, Architectures, KernelLaunching
 
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.KernelLaunching
