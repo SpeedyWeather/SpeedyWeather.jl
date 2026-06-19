@@ -363,7 +363,9 @@ function vertical_velocity!(
     Δσₖ = view(σ_levels_thick, 1:(nlayers - 1))'
     σₖ_half = view(σ_levels_half, 2:nlayers)'
     # TODO: broadcast issue here, that's why the .data are neeeded
-    w.data[:, 1:(nlayers - 1)] .= σₖ_half .* (div_mean_grid.data .+ ūv̄∇lnp.data) .-
+    # @views so the RHS `[:, 1:nlayers-1]` slices are views, not materialized copies,
+    # letting the whole dotted expression fuse into one allocation-free broadcast
+    @views w.data[:, 1:(nlayers - 1)] .= σₖ_half .* (div_mean_grid.data .+ ūv̄∇lnp.data) .-
         (div_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* div_grid.data[:, 1:(nlayers - 1)]) .-
         (pres_flux_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* pres_flux.data[:, 1:(nlayers - 1)])
 
@@ -950,7 +952,7 @@ function bernoulli_potential!(
     # pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
     # RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
 
-    bernoulli_grid .= 1 // 2 .* (u .^ 2 + v .^ 2)               # = ½(u² + v²) on grid
+    bernoulli_grid .= 1 // 2 .* (u .^ 2 .+ v .^ 2)              # = ½(u² + v²) on grid, fused (.+) to avoid temporaries
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)    # to spectral space
     bernoulli .+= Φ                                             # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)    # add -∇²(½(u² + v²) + ϕ)
