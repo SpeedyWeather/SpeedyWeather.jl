@@ -5,40 +5,49 @@ export SigmaCoordinates
 """Sigma, i.e. fraction of surface pressure, vertical coordinates defined by their half layers.
 First half layer has to be 0 (top of the atmosphere), last has to be 1 (surface).
 $(TYPEDFIELDS)"""
-struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinate
+@kwdef struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinate
     nlayers::IntType
     σ_half::VectorType
+    σ_full::VectorType
+    σ_thickness::VectorType
 
-    SigmaCoordinates{T, V}(nlayers, σ_half) where {T, V} = sigma_okay(nlayers, σ_half) ?
-        new{T, V}(nlayers, σ_half) : error("σ_half = $σ_half cannot be used for $nlayers-level SigmaCoordinates")
+    SigmaCoordinates{T, V}(nlayers, σh, σf, Δσ) where {T, V} = sigma_okay(nlayers, σh) ?
+        new{T, V}(nlayers, σh, σf, Δσ) : error("σ_half = $σh cannot be used for $nlayers-level SigmaCoordinates")
 end
 
 function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector = sigma_half_spacing(SG.nlayers))
-    σ_half = on_architecture(SG.architecture, σ_half)
-    return SigmaCoordinates{typeof(SG.nlayers), typeof(σ_half)}(SG.nlayers, σ_half)
+    (; nlayers) = SG
+    σ_half = on_architecture(SG.architecture, convert.(SG.NF, σ_half))
+    σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
+    σ_thickness = σ_half[2:end] - σ_half[1:(end - 1)]
+    return SigmaCoordinates{typeof(nlayers), typeof(σ_half)}(; nlayers, σ_half, σ_full, σ_thickness)
 end
 
 # other constructors for convenience
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(SpectralGrid(nlayers = length(σ_half) - 1), σ_half)
 SigmaCoordinates() = SigmaCoordinates(SpectralGrid())
 
+get_nlayers(σ::SigmaCoordinates) = σ.nlayers
+get_σ_half(σ::SigmaCoordinates) = σ.σ_half
+
 function Base.show(io::IO, σ::SigmaCoordinates)
     println(io, "$(σ.nlayers)-layer $(typeof(σ))")
     nchars = length(string(σ.nlayers))
     σ_half = on_architecture(CPU(), σ.σ_half)
+    σ_full = on_architecture(CPU(), σ.σ_full)
     format = Printf.Format("%$(nchars)d")
     for k in 1:σ.nlayers
         println(io, "├─ ", @sprintf("%1.4f", σ_half[k]), "  k = ", Printf.format(format, k - 1), ".5")
-        σk = (σ_half[k] + σ_half[k + 1]) / 2
-        println(io, "│× ", @sprintf("%1.4f", σk), "  k = ", Printf.format(format, k))
+        println(io, "│× ", @sprintf("%1.4f", σ_full[k]), "  k = ", Printf.format(format, k))
     end
-    return print(io, "└─ ", @sprintf("%1.4f", σ_half[end]), "  k = ", Printf.format(format, σ.nlayers), ".5")
+    print(io, "└─ ", @sprintf("%1.4f", σ_half[end]), "  k = ", Printf.format(format, σ.nlayers), ".5")
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
-Vertical sigma coordinates defined by their nlayers+1 half levels `σ_levels_half`. Sigma coordinates are
+Vertical sigma coordinates defined by their half levels. Sigma coordinates are
 fraction of surface pressure (p/p0) and are sorted from top (stratosphere) to bottom (surface).
-The first half level is at 0 the last at 1. Default levels are equally spaced from 0 to 1 (including)."""
+The first half level is at 0 the last at 1. Default `profile` is equally spaced from 0 to 1 (including)."""
 function sigma_half_spacing(nlayers::Integer, profile = z -> z)
     σ_half = profile.(collect(range(0, 1, nlayers + 1)))
     σ_half[1] = 0
@@ -55,6 +64,16 @@ function sigma_okay(nlayers::Integer, σ_half::AbstractVector)
     return true
 end
 
+@inline function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
+    σ = coordinate.σ_full
+    return σ[k] * surface_pressure
+end
+
+@inline function pressure_thickness(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
+    Δσ = coordinate.σ_thickness
+    return Δσ[k] * surface_pressure
+end
+
 export FriersonSigmaCoordinates
 
 """$(TYPEDSIGNATURES)
@@ -67,23 +86,25 @@ FriersonSigmaCoordinates(SG::SpectralGrid) =
 frierson_profile(σ) = exp(-5 * (0.05 * (1 - σ) + 0.95 * (1 - σ)^3))
 
 export SigmaPressureCoordinates
-struct SigmaPressureCoordinates{NF, IntType, VectorType, F} <: AbstractVerticalCoordinate
+struct SigmaPressureCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
     reference_pressure::NF
     A_half::VectorType
     B_half::VectorType
     A_full::VectorType
     B_full::VectorType
+    A_thickness::VectorType
+    B_thickness::VectorType
 end
 
 function SigmaPressureCoordinates(
         spectral_grid::SpectralGrid;
         reference_pressure = 1.0e5,
-        σ_half = range(0, 1, length = spectral_grid.nlayers + 1),
+        σ_half = sigma_half_spacing(spectral_grid.nlayers),
         transition = σ -> σ
     )
     # sigma coordinates
-    σ_half = on_architecture(spectral_grid.architecture, σ_half)
-    σ_full = 0.5 * (σ_half[2:end] + σ_half[1:(end - 1)])
+    σ_half = on_architecture(spectral_grid.architecture, convert.(spectral_grid.NF, σ_half))
+    σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
 
     # hybrid coordinates
     A_half = @. σ_half * (1 - transition(σ_half))
@@ -91,20 +112,26 @@ function SigmaPressureCoordinates(
     A_full = @. σ_full * (1 - transition(σ_full))
     B_full = @. σ_full * transition(σ_full)
 
+    ΔA = A_half[2:end] + A_half[1:(end - 1)]
+    ΔB = B_half[2:end] + B_half[1:(end - 1)]
+
     p_ref = convert(spectral_grid.NF, reference_pressure)
-    return SigmaPressureCoordinates(p_ref, A_half, B_half, A_full, B_full)
+    return SigmaPressureCoordinates(p_ref, A_half, B_half, A_full, B_full, ΔA, ΔB)
 end
 
-function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
+get_nlayers(S::SigmaPressureCoordinates) = length(S.B_full)
+get_σ_half(σ::SigmaPressureCoordinates) = σ.B_half
+
+@inline function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
     A = coordinate.A_full
     B = coordinate.B_full
     p_ref = coordinate.reference_pressure
     return A[k] * p_ref + B[k] * surface_pressure
 end
 
-function pressure_thickness(surface_pressure::Number, k::Integer, coordinate::SigmaPressureCoordinates)
-    A = coordinate.A_half
-    B = coordinate.B_half
+@inline function pressure_thickness(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
+    ΔA = coordinate.A_thickness
+    ΔB = coordinate.B_thickness
     p_ref = coordinate.reference_pressure
-    return (A[k + 1] - A[k]) * p_ref + (B[k + 1] - B[k]) * surface_pressure
+    return ΔA[k] * p_ref + ΔB[k] * surface_pressure
 end

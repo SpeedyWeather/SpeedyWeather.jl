@@ -8,11 +8,12 @@ and the vertical levels. Pass on `SpectralGrid` to calculate the following field
 $(TYPEDFIELDS)
 """
 @kwdef struct Geometry{
-        SpectralGridType,   # <:Union{SpectralGrid, Nothing}, the latter only matter inside GPU kernels
-        RefValueNF,         # <:Union{Base.RefValue{NF}, CUDA.RefValue{NF}}
+        SpectralGridType,   # <: Union{SpectralGrid, Nothing}, the latter only matter inside GPU kernels
+        IntType,            # <: Integer
+        RefValueNF,         # <: Union{Base.RefValue{NF}, CUDA.RefValue{NF}}
         VectorIntType,
         VectorType,
-        IntType,            # <: Integer
+        VC,
     } <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
@@ -80,12 +81,15 @@ $(TYPEDFIELDS)
     "= 1/cos²(lat)"
     coslat⁻²::VectorType = 1 ./ coslat²
 
+    "Vertical coordinates used"
+    vertical_coordinates::VC
+
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     "σ at half levels, σ_k+1/2"
     σ_levels_half::VectorType
 
     "σ at full levels, σₖ"
-    σ_levels_full::VectorType = 0.5 * (σ_levels_half[2:end] + σ_levels_half[1:(end - 1)])
+    σ_levels_full::VectorType = (σ_levels_half[2:end] + σ_levels_half[1:(end - 1)]) / 2
 
     "σ level thicknesses, σₖ₊₁ - σₖ"
     σ_levels_thick::VectorType = σ_levels_half[2:end] - σ_levels_half[1:(end - 1)]
@@ -100,16 +104,27 @@ function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG))
 
     (; nlayers) = SG
     error_message = "nlayers=$(SG.nlayers) does not match length nlayers=" *
-        "$(vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
-    @assert nlayers == vertical_coordinates.nlayers error_message
+        "$(get_nlayers(vertical_coordinates)) in spectral_grid.vertical_coordinates."
+    @assert nlayers == get_nlayers(vertical_coordinates) error_message
 
     (; NF, VectorIntType, VectorType) = SG
-    (; σ_half) = vertical_coordinates
-    return Geometry{typeof(SG), Base.RefValue{NF}, VectorIntType, VectorType, typeof(nlayers)}(; spectral_grid = SG, σ_levels_half = σ_half)
+    σ_half = get_σ_half(vertical_coordinates)
+    return Geometry{typeof(SG), typeof(nlayers), Base.RefValue{NF}, VectorIntType, VectorType, typeof(vertical_coordinates)}(;
+        spectral_grid = SG,
+        vertical_coordinates,
+        σ_levels_half = σ_half,
+    )
 end
 
 function Base.show(io::IO, G::Geometry)
-    return print(io, "Geometry for $(G.spectral_grid)")
+    (; grid, nlat, npoints, nlayers) = G.spectral_grid
+    Grid = nonparametric_type(grid)
+
+    params = "{Spectrum{...}, $Grid{...}}"
+    println(io, styled"{warning:Geometry} for SpectralGrid{note:$params}")
+    println(io, styled"├ {info:Grid}: $nlat-ring $Grid, $npoints grid points")
+    print(io, styled"└ {info:Vertical}: $nlayers-layer $(typeof(G.vertical_coordinates))")
+    return nothing
 end
 
 # take over radius from model.planet
@@ -117,3 +132,9 @@ function initialize!(geometry::Geometry, model::AbstractModel)
     geometry.radius[] = model.planet.radius
     return geometry
 end
+
+@inline pressure(k::Integer, surface_pressure::Number, geometry::Geometry) = 
+    pressure(k, surface_pressure, geometry.vertical_coordinate)
+
+@inline pressure_thickness(k::Integer, surface_pressure::Number, geometry::Geometry) = 
+    pressure_thickness(k, surface_pressure, geometry.vertical_coordinate)
