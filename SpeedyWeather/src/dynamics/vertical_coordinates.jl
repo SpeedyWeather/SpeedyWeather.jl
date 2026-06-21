@@ -15,6 +15,8 @@ $(TYPEDFIELDS)"""
         new{T, V}(nlayers, σh, σf, Δσ) : error("σ_half = $σh cannot be used for $nlayers-level SigmaCoordinates")
 end
 
+Adapt.@adapt_structure SigmaCoordinates
+
 function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector = sigma_half_spacing(SG.nlayers))
     (; nlayers) = SG
     σ_half = on_architecture(SG.architecture, convert.(SG.NF, σ_half))
@@ -95,6 +97,8 @@ struct SigmaPressureCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
     A_thickness::VectorType
     B_thickness::VectorType
 end
+
+Adapt.@adapt_structure SigmaPressureCoordinates
 
 function SigmaPressureCoordinates(
         spectral_grid::SpectralGrid;
