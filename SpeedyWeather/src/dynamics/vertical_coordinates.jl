@@ -66,15 +66,23 @@ function sigma_okay(nlayers::Integer, σ_half::AbstractVector)
     return true
 end
 
+"""$(TYPEDSIGNATURES)
+Pressure [Pa] at full level `k` given `surface_pressure` [Pa] and sigma `coordinate`."""
 @inline function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
     σ = coordinate.σ_full
     return σ[k] * surface_pressure
 end
 
+"""$(TYPEDSIGNATURES)
+Pressure thickness [Pa] of full level `k` given `surface_pressure` [Pa] and sigma `coordinate`."""
 @inline function pressure_thickness(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
     Δσ = coordinate.σ_thickness
     return Δσ[k] * surface_pressure
 end
+
+"""$(TYPEDSIGNATURES)
+Sigma coordinate (fraction of surface pressure) at full level `k` for sigma `coordinate`."""
+@inline sigma(k::Integer, coordinate::SigmaCoordinates) = coordinate.σ_full[k]
 
 export FriersonSigmaCoordinates
 
@@ -126,6 +134,10 @@ end
 get_nlayers(S::SigmaPressureCoordinates) = length(S.B_full)
 get_σ_half(σ::SigmaPressureCoordinates) = σ.B_half
 
+"""$(TYPEDSIGNATURES)
+Pressure [Pa] at full level `k` given `surface_pressure` [Pa] and hybrid sigma-pressure `coordinate`.
+Computed as `A[k] * p_ref + B[k] * surface_pressure`, where A and B are the pressure and sigma
+coefficients of the hybrid coordinate."""
 @inline function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
     A = coordinate.A_full
     B = coordinate.B_full
@@ -133,9 +145,18 @@ get_σ_half(σ::SigmaPressureCoordinates) = σ.B_half
     return A[k] * p_ref + B[k] * surface_pressure
 end
 
+"""$(TYPEDSIGNATURES)
+Pressure thickness [Pa] of full level `k` given `surface_pressure` [Pa] and hybrid sigma-pressure
+`coordinate`. Computed as `ΔA[k] * p_ref + ΔB[k] * surface_pressure`."""
 @inline function pressure_thickness(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
     ΔA = coordinate.A_thickness
     ΔB = coordinate.B_thickness
     p_ref = coordinate.reference_pressure
     return ΔA[k] * p_ref + ΔB[k] * surface_pressure
 end
+
+"""$(TYPEDSIGNATURES)
+Sigma coordinate (fraction of surface pressure) at full level `k` for hybrid sigma-pressure
+`coordinate`. Returns `A[k] + B[k]`, which equals the nominal sigma level regardless of the
+pressure-sigma transition, and is independent of surface pressure."""
+@inline sigma(k::Integer, coordinate::SigmaPressureCoordinates) = coordinate.A_full[k] + coordinate.B_full[k]

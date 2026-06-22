@@ -105,6 +105,40 @@ end
     end
 end
 
+@testset "sigma function" begin
+
+    nlayers = 4
+    σ_half_vals = Float32[0, 0.2, 0.5, 0.8, 1.0]
+    spectral_grid = SpectralGrid(nlayers = nlayers)
+
+    σ = SigmaCoordinates(spectral_grid, σ_half_vals)
+
+    # sigma returns σ_full for SigmaCoordinates
+    for k in 1:nlayers
+        @test SpeedyWeather.sigma(k, σ) ≈ σ.σ_full[k]
+    end
+
+    # sigma is surface-pressure independent (unlike pressure)
+    S_default = SigmaPressureCoordinates(spectral_grid; σ_half = σ_half_vals)
+    for k in 1:nlayers
+        @test SpeedyWeather.sigma(k, S_default) ≈ S_default.A_full[k] + S_default.B_full[k]
+    end
+
+    # sigma agrees between SigmaCoordinates and SigmaPressureCoordinates for all transitions:
+    # A + B = σ always, so sigma is the same nominal level regardless of how it is split
+    for transition in (_ -> 0.0, _ -> 0.5, _ -> 1.0, σ -> σ)
+        S = SigmaPressureCoordinates(spectral_grid; σ_half = σ_half_vals, transition)
+        for k in 1:nlayers
+            @test SpeedyWeather.sigma(k, σ) ≈ SpeedyWeather.sigma(k, S)
+        end
+    end
+
+    # sigma lies in (0, 1] for all interior and surface layers
+    for k in 1:nlayers
+        @test 0 < SpeedyWeather.sigma(k, σ) <= 1
+    end
+end
+
 @testset "SigmaPressureCoordinates" begin
 
     # default construction
