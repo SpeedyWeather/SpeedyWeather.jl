@@ -33,16 +33,17 @@ get_nlayers(σ::SigmaCoordinates) = σ.nlayers
 get_σ_half(σ::SigmaCoordinates) = σ.σ_half
 
 function Base.show(io::IO, σ::SigmaCoordinates)
-    println(io, "$(σ.nlayers)-layer $(typeof(σ))")
+    params = "{$(typeof(σ.nlayers)), $(typeof(σ.σ_half))}"
+    println(io, "$(σ.nlayers)-layer ", styled"{warning:SigmaCoordinates}", styled"{note:$params}")
     nchars = length(string(σ.nlayers))
     σ_half = on_architecture(CPU(), σ.σ_half)
     σ_full = on_architecture(CPU(), σ.σ_full)
     format = Printf.Format("%$(nchars)d")
     for k in 1:σ.nlayers
-        println(io, "├─ ", @sprintf("%1.4f", σ_half[k]), "  k = ", Printf.format(format, k - 1), ".5")
-        println(io, "│× ", @sprintf("%1.4f", σ_full[k]), "  k = ", Printf.format(format, k))
+        println(io, "├─ ", @sprintf("%1.4f", σ_half[k]), "  ", "k = ", Printf.format(format, k - 1), ".5")
+        println(io, "│× ", @sprintf("%1.4f", σ_full[k]), "  ", "k = ", Printf.format(format, k))
     end
-    print(io, "└─ ", @sprintf("%1.4f", σ_half[end]), "  k = ", Printf.format(format, σ.nlayers), ".5")
+    print(io, "└─ ", @sprintf("%1.4f", σ_half[end]), "  ", "k = ", Printf.format(format, σ.nlayers), ".5")
     return nothing
 end
 
@@ -131,6 +132,36 @@ function SigmaPressureCoordinates(
     return SigmaPressureCoordinates(p_ref, A_half, B_half, A_full, B_full, ΔA, ΔB)
 end
 
+SigmaPressureCoordinates() = SigmaPressureCoordinates(SpectralGrid())
+
+function Base.show(io::IO, S::SigmaPressureCoordinates)
+    nlayers = get_nlayers(S)
+    params = "{$(typeof(S.reference_pressure)), $(typeof(S.A_half))}"
+    println(io, "$nlayers-layer ", styled"{warning:SigmaPressureCoordinates}", styled"{note:$params}")
+    println(io, "   ", styled"{info:p_ref}", " = $(S.reference_pressure) Pa   ░ pressure │ sigma █")
+    nchars = length(string(nlayers))
+    A_half = on_architecture(CPU(), S.A_half)
+    B_half = on_architecture(CPU(), S.B_half)
+    A_full = on_architecture(CPU(), S.A_full)
+    B_full = on_architecture(CPU(), S.B_full)
+    format = Printf.Format("%$(nchars)d")
+    for k in 1:nlayers
+        σ_half_k = A_half[k] + B_half[k]
+        println(io, "├─ ", @sprintf("%1.4f", σ_half_k), "  ", "k = ", Printf.format(format, k - 1), ".5")
+        σ_full_k = A_full[k] + B_full[k]
+        sigma_frac = σ_full_k > 0 ? B_full[k] / σ_full_k : 0.0
+        nsigma = round(Int, 10 * sigma_frac)
+        bar = "█"^nsigma * "░"^(10 - nsigma)
+        println(
+            io, "│× ", @sprintf("%1.4f", σ_full_k), "  ", "k = ", Printf.format(format, k),
+            "   ", bar, "  ", styled"{note:A=}", @sprintf("%1.4f", A_full[k]), "  ", styled"{note:B=}", @sprintf("%1.4f", B_full[k])
+        )
+    end
+    σ_half_end = A_half[end] + B_half[end]
+    print(io, "└─ ", @sprintf("%1.4f", σ_half_end), "  ", "k = ", Printf.format(format, nlayers), ".5")
+    return nothing
+end
+
 get_nlayers(S::SigmaPressureCoordinates) = length(S.B_full)
 get_σ_half(σ::SigmaPressureCoordinates) = σ.B_half
 
@@ -160,3 +191,27 @@ Sigma coordinate (fraction of surface pressure) at full level `k` for hybrid sig
 `coordinate`. Returns `A[k] + B[k]`, which equals the nominal sigma level regardless of the
 pressure-sigma transition, and is independent of surface pressure."""
 @inline sigma(k::Integer, coordinate::SigmaPressureCoordinates) = coordinate.A_full[k] + coordinate.B_full[k]
+
+export CubicSigmaPressureCoordinates
+
+"""$(TYPEDSIGNATURES)
+Transition function for `CubicSigmaPressureCoordinates`. Returns 0 (pure pressure) for
+σ ≤ `σ_low`, 1 (pure sigma) for σ ≥ `σ_high`, and a cubic smoothstep in between, giving C¹
+continuity at both thresholds. The smoothstep coefficients 3 and 2 are fixed by the C¹
+boundary conditions on the normalised variable t ∈ [0, 1] and do not depend on the thresholds."""
+function cubic_transition(σ; σ_low = 0.2, σ_high = 0.8)
+    σ_low = oftype(σ, σ_low)
+    σ_high = oftype(σ, σ_high)
+    σ <= σ_low && return zero(σ)
+    σ >= σ_high && return one(σ)
+    t = (σ - σ_low) / (σ_high - σ_low)
+    return t * t * (3 - 2t)   # smoothstep: 3, 2 fixed by f(0)=0, f(1)=1, f'(0)=0, f'(1)=0 on t ∈ [0,1]
+end
+
+"""$(TYPEDSIGNATURES)
+Sigma-pressure coordinate with a cubic smoothstep transition: pure pressure levels near the
+top of the atmosphere (σ ≤ `σ_low`), pure sigma levels near the surface (σ ≥ `σ_high`), and
+a cubic smoothstep transition in between. The thresholds and transition shape are a pragmatic
+choice and do not follow any specific operational model's formulation."""
+CubicSigmaPressureCoordinates(SG::SpectralGrid; σ_low = 0.2, σ_high = 0.8, kwargs...) =
+    SigmaPressureCoordinates(SG; transition = σ -> cubic_transition(σ; σ_low, σ_high), kwargs...)
