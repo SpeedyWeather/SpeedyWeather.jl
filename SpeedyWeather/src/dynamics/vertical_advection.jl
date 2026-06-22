@@ -35,9 +35,11 @@ function vertical_advection!(vars::Variables, model)
 
     for (name, tracer) in model.tracers
         if tracer.active
-            ξ_tend = get_tendency_step(vars.tendencies.grid_tracers[name], model.time_stepping, advection_scheme)
-            ξ = get_prognostic_step(vars.grid.tracers[name], model.time_stepping, advection_scheme, model)
-            _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
+            ξ_tend = vars.tendencies.grid_tracers[name]
+            ξ = vars.grid.tracers[name]
+            s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
+            s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme, model)
+            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
         end
     end
     return nothing
@@ -47,15 +49,23 @@ end
 # concrete variables (type-stable, required for Enzyme differentiability)
 @inline function vertical_advection!(::Val{var}, vars::Variables, w, Δσ, advection_scheme, model) where {var}
     haskey(vars.tendencies.grid, var) || return nothing
-    ξ_tend = get_tendency_step(vars.tendencies.grid[var], model.time_stepping, advection_scheme)
-    ξ = get_prognostic_step(vars.grid[var], model.time_stepping, advection_scheme)
-    return _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
+    # Pass the full step-dimensioned fields plus the step index, rather than a `get_*_step`
+    # view. The stencil kernel reads ξ at many vertical offsets per point, and indexing a
+    # (`SubArray`-backed) view there is ~2x slower than indexing the contiguous parent array
+    # (the step folds into the index).
+    ξ_tend = vars.tendencies.grid[var]
+    ξ = vars.grid[var]
+    s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
+    s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme)
+    return _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
 end
 
 function _vertical_advection!(
-        ξ_tend::AbstractField,      # tendency of quantity ξ
+        ξ_tend::AbstractField,      # tendency of quantity ξ (full, with step dimension)
+        s_tend::Integer,            # step of ξ_tend to write into
         w::AbstractField,           # vertical velocity at k+1/2
-        ξ::AbstractField,           # ξ
+        ξ::AbstractField,           # ξ (full, with step dimension)
+        s_prog::Integer,            # step of ξ to advect
         Δσ,                         # layer thickness on σ levels
         adv::VerticalAdvection      # vertical advection scheme of order B
     )
@@ -64,16 +74,17 @@ function _vertical_advection!(
     nlayers = size(ξ, 2)
     arch = architecture(ξ_tend)
 
+    # worksize is the horizontal × vertical iteration space (skip the step dimension)
     launch!(
-        arch, RingGridWorkOrder, size(ξ_tend),
+        arch, RingGridWorkOrder, (size(ξ_tend, 1), size(ξ_tend, 2)),
         vertical_advection_kernel!,
-        ξ_tend, w, ξ, Δσ, nlayers, adv
+        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
     )
     return nothing
 end
 
 @kernel inbounds = true function vertical_advection_kernel!(
-        ξ_tend, w, ξ, Δσ, nlayers, adv
+        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
     )
     ij, k = @index(Global, NTuple)
 
@@ -88,42 +99,48 @@ end
     w⁻ = w[ij, k⁻]
     w⁺ = w[ij, k⁺]
 
+    # `s_prog` selects which time step of the step-dimensioned ξ to advect; indexing the
+    # full array as ξ[ij, k, s_prog] keeps the contiguous parent (the constant step folds
+    # into the index), which is ~2x faster here than a `get_*_step` SubArray view would be.
     # tail/front instead of [2:end]/[1:end-1] as tuple-range indexing is not type-stable
-    ξᶠ⁺ = reconstructed_at_face(ξ, ij, Base.tail(k_stencil), w⁺, adv)
-    ξᶠ⁻ = reconstructed_at_face(ξ, ij, Base.front(k_stencil), w⁻, adv)
+    ξᶠ⁺ = reconstructed_at_face(ξ, ij, s_prog, Base.tail(k_stencil), w⁺, adv)
+    ξᶠ⁻ = reconstructed_at_face(ξ, ij, s_prog, Base.front(k_stencil), w⁻, adv)
 
     # -= as the tendencies already contain the parameterizations
-    ξ_tend[ij, k] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k] * (w⁺ - w⁻))
+    ξ_tend[ij, k,s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, s_prog] * (w⁺ - w⁻))
 end
 
+# reconstructed_at_face indexes ξ[ij, k[i], s]: `k` is the vertical stencil (tuple of
+# layer indices) and `s` selects the time step of the s-dimensioned field.
+
 # 1st order upwind
-@inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
     ifelse(
-    u > 0, ξ[ij, k[1]],
-    ξ[ij, k[2]]
+    u > 0, ξ[ij, k[1], s],
+    ξ[ij, k[2], s]
 )
 
 # 3rd order upwind
-@inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1]] + 5ξ[ij, k[2]] - ξ[ij, k[3]]) * 1 // 6,
-    (2ξ[ij, k[4]] + 5ξ[ij, k[3]] - ξ[ij, k[2]]) * 1 // 6
+    u > 0, (2ξ[ij, k[1], s] + 5ξ[ij, k[2], s] - ξ[ij, k[3], s]) * 1 // 6,
+    (2ξ[ij, k[4], s] + 5ξ[ij, k[3], s] - ξ[ij, k[2], s]) * 1 // 6
 )
 
 # 5th order upwind
-@inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1]] - 13ξ[ij, k[2]] + 47ξ[ij, k[3]] + 27ξ[ij, k[4]] - 3ξ[ij, k[5]]) * 1 // 60,
-    (2ξ[ij, k[6]] - 13ξ[ij, k[5]] + 47ξ[ij, k[4]] + 27ξ[ij, k[3]] - 3ξ[ij, k[2]]) * 1 // 60
+    u > 0, (2ξ[ij, k[1], s] - 13ξ[ij, k[2], s] + 47ξ[ij, k[3], s] + 27ξ[ij, k[4], s] - 3ξ[ij, k[5], s]) * 1 // 60,
+    (2ξ[ij, k[6], s] - 13ξ[ij, k[5], s] + 47ξ[ij, k[4], s] + 27ξ[ij, k[3], s] - 3ξ[ij, k[2], s]) * 1 // 60
 )
 
 # 2nd order centered
-@inline reconstructed_at_face(ξ, ij, k, u, ::CenteredVerticalAdvection{NF, 1}) where {NF} =
-    (ξ[ij, k[1]] + ξ[ij, k[2]]) * 1 // 2
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::CenteredVerticalAdvection{NF, 1}) where {NF} =
+    (ξ[ij, k[1], s] + ξ[ij, k[2], s]) * 1 // 2
 
 # 4th order centered
-@inline reconstructed_at_face(ξ, ij, k, u, ::CenteredVerticalAdvection{NF, 2}) where {NF} =
-    (-ξ[ij, k[1]] + 7ξ[ij, k[2]] + 7ξ[ij, k[3]] - ξ[ij, k[4]]) * 1 // 12
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::CenteredVerticalAdvection{NF, 2}) where {NF} =
+    (-ξ[ij, k[1], s] + 7ξ[ij, k[2], s] + 7ξ[ij, k[3], s] - ξ[ij, k[4], s]) * 1 // 12
 
 const ε = 1 // 1_000_000    # = 1e-6 but number format flexible
 const d₀ = 3 // 10
@@ -154,15 +171,15 @@ const d₂ = 1 // 10
     return p₀(S₀) * w₀ + p₁(S₁) * w₁ + p₂(S₂) * w₂
 end
 
-@inline function reconstructed_at_face(ξ, ij, k, u, ::WENOVerticalAdvection)
+@inline function reconstructed_at_face(ξ, ij, s, k, u, ::WENOVerticalAdvection)
     if u > 0
-        S₀ = (ξ[ij, k[3]], ξ[ij, k[4]], ξ[ij, k[5]])
-        S₁ = (ξ[ij, k[2]], ξ[ij, k[3]], ξ[ij, k[4]])
-        S₂ = (ξ[ij, k[1]], ξ[ij, k[2]], ξ[ij, k[3]])
+        S₀ = (ξ[ij, k[3], s], ξ[ij, k[4], s], ξ[ij, k[5], s])
+        S₁ = (ξ[ij, k[2], s], ξ[ij, k[3], s], ξ[ij, k[4], s])
+        S₂ = (ξ[ij, k[1], s], ξ[ij, k[2], s], ξ[ij, k[3], s])
     else
-        S₀ = (ξ[ij, k[4]], ξ[ij, k[3]], ξ[ij, k[2]])
-        S₁ = (ξ[ij, k[5]], ξ[ij, k[4]], ξ[ij, k[3]])
-        S₂ = (ξ[ij, k[6]], ξ[ij, k[5]], ξ[ij, k[4]])
+        S₀ = (ξ[ij, k[4], s], ξ[ij, k[3], s], ξ[ij, k[2], s])
+        S₁ = (ξ[ij, k[5], s], ξ[ij, k[4], s], ξ[ij, k[3], s])
+        S₂ = (ξ[ij, k[6], s], ξ[ij, k[5], s], ξ[ij, k[4], s])
     end
     return weno_reconstruction(S₀, S₁, S₂)
 end

@@ -143,7 +143,7 @@ function geopotential!(
 
     # BOTTOM FULL LAYER
     # TODO: broadcasting with LTA issue here
-    Φ.data[:, nlayers] .= Φₛ.data .+ Tᵥ.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
+    @views Φ.data[:, nlayers] .= Φₛ.data .+ Tᵥ.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     arch = architecture(Φ)

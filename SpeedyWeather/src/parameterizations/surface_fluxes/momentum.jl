@@ -43,7 +43,7 @@ end
 @propagate_inbounds function surface_wind_stress!(ij, vars, momentum_flux::SurfaceMomentumFlux, model)
 
     (; drag_land, drag_ocean) = momentum_flux
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     surface = model.geometry.nlayers
 
     # drag coefficient either from SurfaceMomentumFlux or from a central drag coefficient
