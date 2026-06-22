@@ -130,6 +130,16 @@ end
 # take over radius from model.planet
 function initialize!(geometry::Geometry, model::AbstractModel)
     geometry.radius[] = model.planet.radius
+
+    if hasproperty(geometry.vertical_coordinates, :reference_pressure)
+        p_ref_coord = geometry.vertical_coordinates.reference_pressure
+        p_ref_atmos = model.atmosphere.reference_pressure
+
+        p_ref_coord != p_ref_atmos &&
+            @warn "Reference pressure of vertical coordinates and atmosphere differ. "*
+                "$p_ref_coord Pa vs $p_ref_atmos Pa"
+    end
+
     return geometry
 end
 
