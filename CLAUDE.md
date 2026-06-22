@@ -208,6 +208,9 @@ field = rand(Float32, spectral_grid.grid)
   unit tests have been added and run successfully.
 
 ```bash
+# Single test file (fast — load Test manually, avoid full Pkg.test overhead)
+julia --project=SpeedyWeather --check-bounds=yes -e 'using Test, SpeedyWeather; include("SpeedyWeather/test/dynamics/vertical_coordinates.jl")'
+
 # Main model tests
 julia --project=SpeedyWeather --check-bounds=yes -e 'using Pkg; Pkg.test("SpeedyWeather")'
 

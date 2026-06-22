@@ -5,7 +5,7 @@ export SigmaCoordinates
 """Sigma, i.e. fraction of surface pressure, vertical coordinates defined by their half layers.
 First half layer has to be 0 (top of the atmosphere), last has to be 1 (surface).
 $(TYPEDFIELDS)"""
-@kwdef struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinate
+struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinate
     nlayers::IntType
     σ_half::VectorType
     σ_full::VectorType
@@ -22,7 +22,7 @@ function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector = sigma_half
     σ_half = on_architecture(SG.architecture, convert.(SG.NF, σ_half))
     σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
     σ_thickness = σ_half[2:end] - σ_half[1:(end - 1)]
-    return SigmaCoordinates{typeof(nlayers), typeof(σ_half)}(; nlayers, σ_half, σ_full, σ_thickness)
+    return SigmaCoordinates{typeof(nlayers), typeof(σ_half)}(nlayers, σ_half, σ_full, σ_thickness)
 end
 
 # other constructors for convenience
@@ -116,8 +116,8 @@ function SigmaPressureCoordinates(
     A_full = @. σ_full * (1 - transition(σ_full))
     B_full = @. σ_full * transition(σ_full)
 
-    ΔA = A_half[2:end] + A_half[1:(end - 1)]
-    ΔB = B_half[2:end] + B_half[1:(end - 1)]
+    ΔA = A_half[2:end] - A_half[1:(end - 1)]
+    ΔB = B_half[2:end] - B_half[1:(end - 1)]
 
     p_ref = convert(spectral_grid.NF, reference_pressure)
     return SigmaPressureCoordinates(p_ref, A_half, B_half, A_full, B_full, ΔA, ΔB)
