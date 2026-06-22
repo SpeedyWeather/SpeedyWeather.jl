@@ -196,22 +196,22 @@ export CubicSigmaPressureCoordinates
 
 """$(TYPEDSIGNATURES)
 Transition function for `CubicSigmaPressureCoordinates`. Returns 0 (pure pressure) for
-σ ≤ `σ_low`, 1 (pure sigma) for σ ≥ `σ_high`, and a cubic smoothstep in between, giving C¹
+σ ≤ `pressure_only_above`, 1 (pure sigma) for σ ≥ `σ_only_below`, and a cubic smoothstep in between, giving C¹
 continuity at both thresholds. The smoothstep coefficients 3 and 2 are fixed by the C¹
 boundary conditions on the normalised variable t ∈ [0, 1] and do not depend on the thresholds."""
-function cubic_transition(σ; σ_low = 0.2, σ_high = 0.8)
-    σ_low = oftype(σ, σ_low)
-    σ_high = oftype(σ, σ_high)
-    σ <= σ_low && return zero(σ)
-    σ >= σ_high && return one(σ)
-    t = (σ - σ_low) / (σ_high - σ_low)
+function cubic_transition(σ; pressure_only_above = 0.2, σ_only_below = 0.8)
+    pressure_only_above = oftype(σ, pressure_only_above)
+    σ_only_below = oftype(σ, σ_only_below)
+    σ <= pressure_only_above && return zero(σ)
+    σ >= σ_only_below && return one(σ)
+    t = (σ - pressure_only_above) / (σ_only_below - pressure_only_above)
     return t * t * (3 - 2t)   # smoothstep: 3, 2 fixed by f(0)=0, f(1)=1, f'(0)=0, f'(1)=0 on t ∈ [0,1]
 end
 
 """$(TYPEDSIGNATURES)
 Sigma-pressure coordinate with a cubic smoothstep transition: pure pressure levels near the
-top of the atmosphere (σ ≤ `σ_low`), pure sigma levels near the surface (σ ≥ `σ_high`), and
+top of the atmosphere (σ ≤ `pressure_only_above`), pure sigma levels near the surface (σ ≥ `σ_only_below`), and
 a cubic smoothstep transition in between. The thresholds and transition shape are a pragmatic
 choice and do not follow any specific operational model's formulation."""
-CubicSigmaPressureCoordinates(SG::SpectralGrid; σ_low = 0.2, σ_high = 0.8, kwargs...) =
-    SigmaPressureCoordinates(SG; transition = σ -> cubic_transition(σ; σ_low, σ_high), kwargs...)
+CubicSigmaPressureCoordinates(SG::SpectralGrid; pressure_only_above = 0.2, σ_only_below = 0.8, kwargs...) =
+    SigmaPressureCoordinates(SG; transition = σ -> cubic_transition(σ; pressure_only_above, σ_only_below), kwargs...)

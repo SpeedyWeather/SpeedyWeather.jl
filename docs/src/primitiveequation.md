@@ -155,14 +155,9 @@ A flow field on such a level is therefore not continuous and one would need to d
 boundaries. Especially with spherical harmonics we need a terrain-following vertical
 coordinate to transform between continuous fields in grid-point space and spectral space.
 
-SpeedyWeather.jl currently uses so-called sigma coordinates for the vertical.
-This coordinate system uses fraction of surface pressure in the vertical, i.e.
-```math
-\sigma = \frac{p}{p_s}
-```
-with ``\sigma = [0, 1]`` and ``\sigma = 0`` being the top (zero pressure) and ``\sigma = 1``
-the surface (at surface pressure). As a consequence the vertical dimension is also
-indexed from top to surface.
+SpeedyWeather.jl supports pure sigma coordinates (`SigmaCoordinates`) and hybrid
+sigma-pressure coordinates (`SigmaPressureCoordinates`). For the full Julia interface,
+available constructors, and practical usage see [Vertical coordinates](@ref vertical_coordinates_page).
 
 !!! info "Vertical indexing"
     Pressure, sigma, or hybrid coordinates in the vertical range from lowest values at the top
@@ -170,26 +165,36 @@ indexed from top to surface.
     surface. This means that ``k=1`` is the top-most layer, and ``k=N_{lev}`` (or similar)
     is the layer that sits directly above the surface.
 
-Sigma coordinates are therefore terrain-following, as ``\sigma = 1`` is always at surface pressure
-and so this level bends itself around every mountain, although the actual pressure on this
-level can vary. For a visualisation see [#329](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/329).
+Sigma coordinates use the fraction of surface pressure as the vertical coordinate
+```math
+\sigma = \frac{p}{p_s}
+```
+with ``\sigma \in [0, 1]``, ``\sigma = 0`` at the top and ``\sigma = 1`` at the surface.
+Sigma coordinates are terrain-following: ``\sigma = 1`` is always at surface pressure,
+bending around every mountain. For a visualisation see
+[#329](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/329).
 
-One chooses ``\sigma`` levels associated with the ``k``-th layer and the pressure
-can be reobtained from the surface pressure ``p_s``
+One chooses ``\sigma`` levels associated with the ``k``-th layer; pressure is recovered as
 ```math
-p_k = \sigma_kp_s
+p_k = \sigma_k p_s, \qquad
+\Delta p_k = \Delta\sigma_k p_s
 ```
-The layer thickness in terms of pressure is
-```math
-\Delta p_k = p_{k+\tfrac{1}{2}} - p_{k-\tfrac{1}{2}} =
-\left( \sigma_{k+\tfrac{1}{2}} - \sigma_{k-\tfrac{1}{2}} \right) p_s = \Delta \sigma_k p_s
-```
-which can also be expressed with the layer thickness in sigma coordinates ``\Delta \sigma_k``
-times the surface pressure. In SpeedyWeather.jl one chooses the half levels
-``\sigma_{k+\tfrac{1}{2}}`` first and then obtains the full levels through averaging
+Half levels ``\sigma_{k+\tfrac{1}{2}}`` are specified first and full levels obtained as
 ```math
 \sigma_k = \frac{\sigma_{k+\tfrac{1}{2}} + \sigma_{k-\tfrac{1}{2}}}{2}
 ```
+
+### Hybrid sigma-pressure coordinates
+
+Hybrid sigma-pressure coordinates blend constant-pressure surfaces near the model top
+with terrain-following sigma surfaces near the surface. The pressure at layer ``k`` is
+```math
+p_k = A_k \, p_{\mathrm{ref}} + B_k \, p_s
+```
+with coefficients ``A_k = \sigma_k(1 - f(\sigma_k))``, ``B_k = \sigma_k f(\sigma_k)``
+for a transition function ``f \in [0,1]``, so ``A_k + B_k = \sigma_k`` always holds.
+The layer thickness is ``\Delta p_k = \Delta A_k p_{\mathrm{ref}} + \Delta B_k p_s``.
+See [Vertical coordinates](@ref vertical_coordinates_page) for details and the Julia interface.
 
 ## Geopotential
 
@@ -251,7 +256,8 @@ at the top to ``N`` at the surface layer this can be written as
 \frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \nabla \cdot (\mathbf{u}_k \Delta p_k)
 ```
 which can be thought of as a vertical integration of the pressure thickness-weighted divergence.
-In ``\sigma``-coordinates with ``\Delta p_k = \Delta \sigma_k p_s`` (see [Vertical coordinates](@ref))
+In pure ``\sigma``-coordinates with ``\Delta p_k = \Delta \sigma_k p_s``
+(see [Sigma coordinates](@ref); for hybrid coordinates ``\Delta p_k = \Delta A_k p_{\mathrm{ref}} + \Delta B_k p_s``)
 this becomes
 ```math
 \frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \Delta \sigma_k \nabla \cdot (\mathbf{u}_k p_s)
@@ -319,6 +325,13 @@ Starting from this equation in pressure layer $k$, we can derive the advective f
 ```
 
 In sigma coordinates, the vertical mass flux can be expressed as ``M = \dot{\sigma} p_s``, where ``\dot{\sigma}`` is the vertical velocity in sigma coordinates and ``p_s`` is the surface pressure. Assuming ``p_s`` is constant in time within the layer, and switching to sigma coordinates, we rewrite the equation as:
+
+!!! note "Sigma coordinate assumption"
+    The advection equation below uses ``\Delta \sigma_k`` as the layer thickness and
+    ``\dot{\sigma}`` as the vertical velocity. This is the pure sigma formulation. For
+    [hybrid sigma-pressure coordinates](@ref Hybrid-sigma-pressure-coordinates) the layer
+    thickness becomes ``\Delta p_k / p_s`` and the vertical velocity equation changes
+    accordingly.
 
 ```math
 \frac{\partial T_k}{\partial t} = -\nabla \cdot (\mathbf{u}_k T_k) - \frac{1}{\Delta \sigma_k} \left( \dot{\sigma}_{k+\frac{1}{2}} T_{k+\frac{1}{2}} - \dot{\sigma}_{k-\frac{1}{2}} T_{k-\frac{1}{2}} \right)
@@ -595,7 +608,9 @@ with
 ```math
 \alpha_k = 1 - \frac{p_{k-\tfrac{1}{2}}}{\Delta p_k} \ln \frac{p_{k+\tfrac{1}{2}}}{p_{k-\tfrac{1}{2}}}
 ```
-In sigma coordinates this simplifies to, following similar steps as in [Surface pressure tendency](@ref)
+In pure sigma coordinates this simplifies to (for hybrid coordinates the ``\ln p`` ratios
+become ``\ln(A_k p_{\mathrm{ref}} + B_k p_s)`` and the simplification does not hold),
+following similar steps as in [Surface pressure tendency](@ref)
 ```math
 \begin{aligned}
 \left(\frac{D \ln p}{D t}\right)_k &= \mathbf{u}_k \cdot \nabla \ln p_s \\

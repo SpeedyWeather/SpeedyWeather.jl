@@ -198,7 +198,7 @@ end
     @test H isa SigmaPressureCoordinates
     @test SpeedyWeather.get_nlayers(H) == 8
 
-    # cubic_transition: pure pressure at top (σ ≤ σ_low = 0.2) and pure sigma at bottom (σ ≥ σ_high = 0.8)
+    # cubic_transition: pure pressure at top (σ ≤ pressure_only_above = 0.2) and pure sigma at bottom (σ ≥ σ_only_below = 0.8)
     @test SpeedyWeather.cubic_transition(0.0f0) == 0.0f0
     @test SpeedyWeather.cubic_transition(0.2f0) == 0.0f0
     @test SpeedyWeather.cubic_transition(0.8f0) == 1.0f0
@@ -219,11 +219,11 @@ end
     B_half = Array(H.B_half)
     A_half = Array(H.A_half)
     σ_half = A_half + B_half
-    @test all(B_half[σ_half .<= 0.2] .≈ 0)   # pure pressure above σ_low
-    @test all(A_half[σ_half .>= 0.8] .≈ 0)   # pure sigma below σ_high
+    @test all(B_half[σ_half .<= 0.2] .≈ 0)   # pure pressure above pressure_only_above
+    @test all(A_half[σ_half .>= 0.8] .≈ 0)   # pure sigma below σ_only_below
 
     # custom thresholds are forwarded correctly
-    H2 = CubicSigmaPressureCoordinates(spectral_grid; σ_low = 0.1, σ_high = 0.9)
+    H2 = CubicSigmaPressureCoordinates(spectral_grid; pressure_only_above = 0.1, σ_only_below = 0.9)
     B2 = Array(H2.B_half)
     A2 = Array(H2.A_half)
     σ2 = A2 + B2
@@ -231,8 +231,8 @@ end
     @test all(A2[σ2 .>= 0.9] .≈ 0)
 
     # smoothstep coefficients are independent of thresholds: midpoint of transition always = 0.5
-    @test SpeedyWeather.cubic_transition(0.5f0; σ_low = 0.0f0, σ_high = 1.0f0) ≈ 0.5f0
-    @test SpeedyWeather.cubic_transition(0.5f0; σ_low = 0.3f0, σ_high = 0.7f0) ≈ 0.5f0
+    @test SpeedyWeather.cubic_transition(0.5f0; pressure_only_above = 0.0f0, σ_only_below = 1.0f0) ≈ 0.5f0
+    @test SpeedyWeather.cubic_transition(0.5f0; pressure_only_above = 0.3f0, σ_only_below = 0.7f0) ≈ 0.5f0
 
     # works inside Geometry
     G = Geometry(spectral_grid, vertical_coordinates = H)
