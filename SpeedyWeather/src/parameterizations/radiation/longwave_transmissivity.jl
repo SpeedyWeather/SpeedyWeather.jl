@@ -14,6 +14,8 @@ initialize!(::ConstantLongwaveTransmissivity, ::AbstractModel) = nothing
     t = vars.scratch.grid.a
     nlayers = size(t, 2)
 
+    # TODO: same as shortwave — optical depth distributed proportional to Δσ.
+    # See shortwave_transmissivity.jl for discussion.
     τ = -log(CLT.transmissivity)            # total optical depth of the atmosphere
     dσ = model.geometry.σ_levels_thick      # divide optical depth wrt to pressure thickness of each layer
     for k in 1:nlayers
@@ -49,6 +51,9 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     (; τ₀_equator, τ₀_pole, fₗ) = transmissivity
 
     # coordinates
+    # TODO: σ_levels_half used as a vertical coordinate for the Frierson longwave profile.
+    # Could use sigma(k, coord) at half levels, but the Frierson formula is inherently
+    # sigma-based and would need reconsidering for hybrid coordinates.
     σ = model.geometry.σ_levels_half
     θ = model.geometry.latds[ij]
 

@@ -24,6 +24,9 @@ initialize!(::ConstantShortwaveTransmissivity, ::AbstractModel) = nothing
     t = vars.scratch.grid.a
     nlayers = size(t, 2)
 
+    # TODO: optical depth is distributed proportional to Δσ (sigma-coordinate layer thickness).
+    # With hybrid coordinates, pressure_thickness(k, pₛ, coord) / pₛ gives the equivalent
+    # fractional thickness, but would require knowing surface pressure at this point.
     τ = -log(CST.transmissivity)            # total optical depth of the atmosphere
     dσ = model.geometry.σ_levels_thick      # divide optical depth wrt to pressure thickness of each layer
     for k in 1:nlayers
@@ -94,6 +97,9 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     nlayers = size(t, 2)
 
+    # TODO: σ_levels_half and σ_levels_full used as pressure proxies for aerosol/cloud profiles.
+    # Generalising to hybrid coordinates would require using sigma(k, coord) or
+    # pressure(k, pₛ, coord) / pₛ depending on whether the profile is height- or pressure-based.
     sigma_levels = model.geometry.σ_levels_half
     sigma_levels_full = model.geometry.σ_levels_full
     pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]

@@ -71,6 +71,8 @@ large-scale precipitation vertically for output."""
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])           
     pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
     (; Δt_sec) = time_stepping                          # time step [s]
+    # TODO: σ and Δσ are used to convert condensed water to precipitation depth via Δp = Δσ * pₛ.
+    # This could use pressure_thickness(k, pₛ, coord) to generalise across coordinates.
     σ = geometry.σ_levels_full                          # vertical sigma coordinate [1]
     Δσ = geometry.σ_levels_thick                        # layer thickness in sigma coordinates
     ρ = atmosphere.water_density                        # air density [kg/m³]

@@ -42,6 +42,10 @@ Same formula but `k → k-1/2`."""
 function initialize!(G::Geopotential, model::PrimitiveEquation)
     (; Δp_geopot_half, Δp_geopot_full) = G
     (; R_dry) = model.atmosphere
+    # TODO: the geopotential integration coefficients use log(σ_full/σ_half) which assumes
+    # pressure is proportional to σ (i.e. p = σ * pₛ). Generalising to hybrid coordinates
+    # requires replacing these ratios with log(p_full/p_half) evaluated at a reference
+    # surface pressure, making the coefficients depend on pₛ and thus non-constant.
     (; σ_levels_full, σ_levels_half) = model.geometry
     nlayers = length(σ_levels_full)
 

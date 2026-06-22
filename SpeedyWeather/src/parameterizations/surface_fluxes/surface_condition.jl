@@ -55,10 +55,13 @@ end
     temperature = get_prognostic_step(vars.grid.temperature, model.time_stepping, surface_condition)
     pₛ = vars.parameterizations.surface_pressure[ij] # surface pressure [Pa]
     (; R_dry, κ) = model.atmosphere
+    # TODO: σ^(-κ) extrapolates temperature to the surface assuming a dry adiabatic lapse
+    # rate and p ∝ σ. With hybrid coordinates the pressure ratio (p_lowest / pₛ) differs
+    # from σ, so this should use pressure(nlayers, pₛ, coord) / pₛ instead of σ.
     σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
     T = temperature[ij, nlayers]                    # virtual temperature at lowest model level [K]
     q = haskey(vars.grid, :humidity) ?              # specific humidity at lowest model level [kg/kg]
-        get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)  
+        get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)
     Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
     σ⁻ᵏ = σ^(-κ)                                    # precalculate
     Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate

@@ -154,6 +154,10 @@ function vertical_integration!(
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
     )
+    # TODO: σ_levels_thick is used here as the sigma-coordinate layer thickness Δσₖ for the
+    # Δσ-weighted vertical integrals (Simmons & Burridge 1981, eq. 3.12). Generalising to
+    # hybrid coordinates requires replacing Δσₖ with the actual pressure thickness divided
+    # by surface pressure, which varies in space and time.
     (; σ_levels_thick, nlayers) = geometry
     (; dpres_dx, dpres_dy) = vars.dynamics      # zonal, meridional grad of log surface pressure
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
@@ -203,6 +207,7 @@ function vertical_integration!(
         time_stepping::AbstractTimeStepper,
     )
 
+    # TODO: same as CPU version — Δσₖ weights baked into sigma-coordinate continuity equation.
     (; σ_levels_thick, nlayers) = geometry
     (; dpres_dx, dpres_dy) = vars.dynamics    # zonal, meridional grad of log surface pressure
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
@@ -341,6 +346,9 @@ function vertical_velocity!(
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
     )
+    # TODO: σ_levels_thick and σ_levels_half are used here to compute the sigma-coordinate
+    # vertical velocity σ̇ (Hoskins & Simmons 1975, eq. before 6). Generalising to hybrid
+    # coordinates requires a reformulation of the vertical velocity equation.
     (; σ_levels_thick, σ_levels_half, nlayers) = geometry
 
     # sum of Δσ-weighted div, uv∇lnp from 1:k-1

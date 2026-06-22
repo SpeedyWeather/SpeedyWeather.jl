@@ -96,15 +96,18 @@ end
 """$(TYPEDSIGNATURES)
 Flux `flux` into surface layer with surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]
 converted to tendency [?/s]."""
-@propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
-    flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[end])
+@propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) = 
+    flux_to_tendency(flux, pₛ, model.geometry.nlayers, model)
 
 """$(TYPEDSIGNATURES)
 Flux `flux` into layer `k` of thickness `Δσ`  converted to tendency [?/s].
 Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
 @propagate_inbounds flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g / (pₛ * Δσ_k) * flux
-@propagate_inbounds flux_to_tendency(flux::Real, pₛ::Real, k::Int, model) =
-    flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[k])
+@propagate_inbounds function flux_to_tendency(flux::Real, pₛ::Real, k::Integer, model)
+    Δp = pressure_thickness(k, pₛ, model.geometry.vertical_coordinates)
+    g = model.planet.gravity
+    return g * flux / Δp
+end
 
 # hacky, temporary placement, and also modularize this?
 function reset_variables!(vars::Variables)
