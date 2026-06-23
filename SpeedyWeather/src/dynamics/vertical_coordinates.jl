@@ -202,10 +202,10 @@ boundary conditions on the normalised variable t ∈ [0, 1] and do not depend on
 function cubic_transition(σ; pressure_only_above = 0.2, σ_only_below = 0.8)
     pressure_only_above = oftype(σ, pressure_only_above)
     σ_only_below = oftype(σ, σ_only_below)
-    σ <= pressure_only_above && return zero(σ)
-    σ >= σ_only_below && return one(σ)
-    t = (σ - pressure_only_above) / (σ_only_below - pressure_only_above)
-    return t * t * (3 - 2t)   # smoothstep: 3, 2 fixed by f(0)=0, f(1)=1, f'(0)=0, f'(1)=0 on t ∈ [0,1]
+    # the actual cubic transition
+    # values 3, 2 are fixed by f(0)=0, f(1)=1, f'(0)=0, f'(1)=0 on t ∈ [0,1]
+    t = min(one(σ), max(zero(σ), (σ - pressure_only_above) / (σ_only_below - pressure_only_above)))
+    return t * t * (3 - 2t)   
 end
 
 """$(TYPEDSIGNATURES)
