@@ -2,7 +2,7 @@
 
 SpeedyWeather.jl supports two families of terrain-following vertical coordinates.
 Both are implemented as subtypes of `AbstractVerticalCoordinate` and are interchangeable
-in the model constructor. For the mathematical background on coordinate transformations
+in the model constructor. For more mathematical background on coordinate transformations
 see [Vertical coordinates](@ref) in the Primitive equation model documentation.
 
 ## [Sigma coordinates](@id sigma_coordinates_usage)
@@ -123,8 +123,9 @@ SigmaPressureCoordinates(spectral_grid; transition = _ -> 1.0)
 ```
 
 A ready-made `CubicSigmaPressureCoordinates` uses a cubic smoothstep transition:
-pure pressure for ``\sigma \le \sigma_{\mathrm{low}}``, pure sigma for
-``\sigma \ge \sigma_{\mathrm{high}}``, and a smooth cubic interpolation in between.
+pure pressure above (in the vertical sense) a given sigma value called `pressure_only_above`,
+typically in the upper atmosphere, pure sigma below `sigma_only_below` typically between the 
+boundary layer and the mid-troposphere, and a smooth cubic interpolation in between.
 The bar on each full level shows the A/B split (█ = sigma fraction, ░ = pressure fraction):
 
 ```@example vertical_coordinates
@@ -135,6 +136,14 @@ Custom thresholds can be set:
 
 ```@example vertical_coordinates
 CubicSigmaPressureCoordinates(spectral_grid; pressure_only_above = 0.1, σ_only_below = 0.9)
+```
+
+Or custom sigma spacing too, to have, regardless sigma or sigma-pressure coordinates
+more layers near the surface and the top of the atmosphere:
+
+```@example vertical_coordinates
+(; σ_half) = FriersonSigmaCoordinates(spectral_grid)
+CubicSigmaPressureCoordinates(spectral_grid;  σ_half)
 ```
 
 ### Using hybrid coordinates in a model

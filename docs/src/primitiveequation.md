@@ -193,6 +193,10 @@ p_k = A_k \, p_{\mathrm{ref}} + B_k \, p_s
 ```
 with coefficients ``A_k = \sigma_k(1 - f(\sigma_k))``, ``B_k = \sigma_k f(\sigma_k)``
 for a transition function ``f \in [0,1]``, so ``A_k + B_k = \sigma_k`` always holds.
+The transition function should be 1 at the surface
+(to have terrain-following sigma coordinates near the planetary boundary)
+and 0 at the top with some smooth transition in between, see
+[Creating hybrid sigma-pressure coordinates](@ref) for examples.
 The layer thickness is ``\Delta p_k = \Delta A_k p_{\mathrm{ref}} + \Delta B_k p_s``.
 See [Vertical coordinates](@ref vertical_coordinates_page) for details and the Julia interface.
 
