@@ -117,13 +117,18 @@ function SigmaPressureCoordinates(
     )
     # sigma coordinates
     σ_half = on_architecture(spectral_grid.architecture, convert.(spectral_grid.NF, σ_half))
-    σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
+    # σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
 
-    # hybrid coordinates
-    A_half = @. σ_half * (1 - transition(σ_half))
+    # hybrid coordinates defined via half layers
     B_half = @. σ_half * transition(σ_half)
-    A_full = @. σ_full * (1 - transition(σ_full))
-    B_full = @. σ_full * transition(σ_full)
+    B_full = (B_half[2:end] + B_half[1:(end - 1)]) / 2
+    
+    # do not reevalute the (possibly nonlinear) transition for full layers
+    # average instead to have layer centres always at mid-pressure too
+    A_half = @. σ_half * (1 - transition(σ_half))
+    A_full = (A_half[2:end] + A_half[1:(end - 1)]) / 2
+    # A_full = maximum.(0, σ_full - B_full)     # to avoid -0
+    # A_half = maximum.(0, σ_half - B_half)
 
     ΔA = A_half[2:end] - A_half[1:(end - 1)]
     ΔB = B_half[2:end] - B_half[1:(end - 1)]
