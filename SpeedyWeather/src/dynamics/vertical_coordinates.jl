@@ -1,11 +1,23 @@
-abstract type AbstractVerticalCoordinate <: AbstractModelComponent end
+abstract type AbstractVerticalCoordinates <: AbstractModelComponent end
+
+"""$(TYPEDSIGNATURES)
+Pressure [Pa] at the lower interface of full level `k` (half level k+½), given `surface_pressure` [Pa].
+Equivalent to `pressure_half(k+1, surface_pressure, coordinate)`."""
+@inline pressure_below(k::Integer, surface_pressure::Number, coordinate::AbstractVerticalCoordinates) =
+    pressure_half(k+1, surface_pressure, coordinate)
+
+"""$(TYPEDSIGNATURES)
+Pressure [Pa] at the upper interface of full level `k` (half level k-½), given `surface_pressure` [Pa].
+Equivalent to `pressure_half(k, surface_pressure, coordinate)`."""
+@inline pressure_above(k::Integer, surface_pressure::Number, coordinate::AbstractVerticalCoordinates) =
+    pressure_half(k, surface_pressure, coordinate)
 
 export SigmaCoordinates
 
 """Sigma, i.e. fraction of surface pressure, vertical coordinates defined by their half layers.
 First half layer has to be 0 (top of the atmosphere), last has to be 1 (surface).
 $(TYPEDFIELDS)"""
-struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinate
+struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinates
     nlayers::IntType
     σ_half::VectorType
     σ_full::VectorType
@@ -75,6 +87,14 @@ Pressure [Pa] at full level `k` given `surface_pressure` [Pa] and sigma `coordin
 end
 
 """$(TYPEDSIGNATURES)
+Pressure [Pa] at half level `k` given `surface_pressure` [Pa] and sigma `coordinate`.
+Half levels are indexed 1 (top of atmosphere, σ = 0) to nlayers+1 (surface, σ = 1)."""
+@inline function pressure_half(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
+    σ = coordinate.σ_half
+    return σ[k] * surface_pressure
+end
+
+"""$(TYPEDSIGNATURES)
 Pressure thickness [Pa] of full level `k` given `surface_pressure` [Pa] and sigma `coordinate`."""
 @inline function pressure_thickness(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
     Δσ = coordinate.σ_thickness
@@ -97,7 +117,7 @@ FriersonSigmaCoordinates(SG::SpectralGrid) =
 frierson_profile(σ) = exp(-5 * (0.05 * (1 - σ) + 0.95 * (1 - σ)^3))
 
 export SigmaPressureCoordinates
-struct SigmaPressureCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
+struct SigmaPressureCoordinates{NF, VectorType} <: AbstractVerticalCoordinates
     reference_pressure::NF
     A_half::VectorType
     B_half::VectorType
@@ -177,6 +197,17 @@ coefficients of the hybrid coordinate."""
 @inline function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
     A = coordinate.A_full
     B = coordinate.B_full
+    p_ref = coordinate.reference_pressure
+    return A[k] * p_ref + B[k] * surface_pressure
+end
+    
+"""$(TYPEDSIGNATURES)
+Pressure [Pa] at half level `k` given `surface_pressure` [Pa] and hybrid sigma-pressure `coordinate`.
+Half levels are indexed 1 (top of atmosphere) to nlayers+1 (surface).
+Computed as `A_half[k] * p_ref + B_half[k] * surface_pressure`."""
+@inline function pressure_half(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
+    A = coordinate.A_half
+    B = coordinate.B_half
     p_ref = coordinate.reference_pressure
     return A[k] * p_ref + B[k] * surface_pressure
 end

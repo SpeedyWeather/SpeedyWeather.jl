@@ -240,6 +240,42 @@ end
     @test length(G.σ_levels_half) == 9
 end
 
+@testset "pressure_half, pressure_above, pressure_below" begin
+
+    nlayers = 4
+    spectral_grid = SpectralGrid(nlayers = nlayers)
+    p_surf = 1.0f5
+
+    for coord in (SigmaCoordinates(spectral_grid), SigmaPressureCoordinates(spectral_grid))
+
+        # pressure_half: nlayers+1 interfaces, increasing from top (0 Pa) to surface
+        p_half = [SpeedyWeather.pressure_half(k, p_surf, coord) for k in 1:(nlayers + 1)]
+        @test p_half[1] == 0                   # top of atmosphere
+        @test p_half[end] ≈ p_surf             # surface
+        @test all(diff(p_half) .> 0)           # strictly increasing downward
+
+        for k in 1:nlayers
+            # pressure_above / pressure_below bracket the full level
+            p_above = SpeedyWeather.pressure_above(k, p_surf, coord)
+            p_full  = SpeedyWeather.pressure(k, p_surf, coord)
+            p_below = SpeedyWeather.pressure_below(k, p_surf, coord)
+            @test p_above <= p_full <= p_below
+
+            # pressure_thickness equals the difference between the two interfaces
+            Δp = SpeedyWeather.pressure_thickness(k, p_surf, coord)
+            @test Δp ≈ p_below - p_above
+
+            # pressure_above and pressure_below are consistent with pressure_half
+            @test p_above ≈ SpeedyWeather.pressure_half(k,     p_surf, coord)
+            @test p_below ≈ SpeedyWeather.pressure_half(k + 1, p_surf, coord)
+        end
+
+        # thicknesses sum to surface pressure
+        Δp_sum = sum(SpeedyWeather.pressure_thickness(k, p_surf, coord) for k in 1:nlayers)
+        @test Δp_sum ≈ p_surf
+    end
+end
+
 @testset "Reference pressure mismatch warning" begin
     spectral_grid = SpectralGrid(nlayers = 4)
 

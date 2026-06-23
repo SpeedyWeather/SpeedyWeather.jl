@@ -1,7 +1,7 @@
 # [Vertical coordinates](@id vertical_coordinates_page)
 
 SpeedyWeather.jl supports two families of terrain-following vertical coordinates.
-Both are implemented as subtypes of `AbstractVerticalCoordinate` and are interchangeable
+Both are implemented as subtypes of `AbstractVerticalCoordinates` and are interchangeable
 in the model constructor. For more mathematical background on coordinate transformations
 see [Vertical coordinates](@ref) in the Primitive equation model documentation.
 
