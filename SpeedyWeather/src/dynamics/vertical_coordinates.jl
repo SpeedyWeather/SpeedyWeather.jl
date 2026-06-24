@@ -1,5 +1,8 @@
 abstract type AbstractVerticalCoordinates <: AbstractModelComponent end
 
+# extend for broadcasting like pressure.(k, field, vertical_coordinate)
+Base.broadcastable(VC::AbstractVerticalCoordinates) = Ref(VC)
+
 """$(TYPEDSIGNATURES)
 Pressure [Pa] at the lower interface of full level `k` (half level k+½), given `surface_pressure` [Pa].
 Equivalent to `pressure_half(k+1, surface_pressure, coordinate)`."""

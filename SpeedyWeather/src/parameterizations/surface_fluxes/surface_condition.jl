@@ -37,7 +37,8 @@ end
 @propagate_inbounds function surface_condition!(ij, vars, surface_condition::SurfaceCondition, model)
 
     (; wind_slowdown, gust_speed) = surface_condition
-    nlayers = model.geometry.nlayers
+    (; nlayers) = model.geometry
+    coord = model.geometry.vertical_coordinates
     (; atmosphere) = model
 
     # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
@@ -55,10 +56,8 @@ end
     temperature = get_prognostic_step(vars.grid.temperature, model.time_stepping, surface_condition)
     pₛ = vars.parameterizations.surface_pressure[ij] # surface pressure [Pa]
     (; R_dry, κ) = model.atmosphere
-    # TODO: σ^(-κ) extrapolates temperature to the surface assuming a dry adiabatic lapse
-    # rate and p ∝ σ. With hybrid coordinates the pressure ratio (p_lowest / pₛ) differs
-    # from σ, so this should use pressure(nlayers, pₛ, coord) / pₛ instead of σ.
-    σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
+
+    σ = pressure(nlayers, pₛ, coord) / pₛ           # σ vertical coordinate at lowest model level
     T = temperature[ij, nlayers]                    # virtual temperature at lowest model level [K]
     q = haskey(vars.grid, :humidity) ?              # specific humidity at lowest model level [kg/kg]
         get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)

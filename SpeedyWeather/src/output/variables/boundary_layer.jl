@@ -59,6 +59,9 @@ function output!(
     z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
     T = get_prognostic_step(simulation.variables.grid.temperature, simulation.model.time_stepping, output) 
     T_bottom = field_view(T, :, nlayers)
+    # TODO: Δp_geopot_full[end] = R*log(σ_half/σ_full) at the bottom layer is a precomputed
+    # sigma-only constant. Generalising to hybrid coordinates requires computing R*log(p_half/p_full)
+    # at each grid point using the surface pressure field.
     Δp_geopot = simulation.model.geopotential.Δp_geopot_full[end]
 
     # accumulate the second term in
@@ -111,6 +114,7 @@ function output!(
 
     # reuse scratch array to avoid allocations
     Ts = simulation.variables.scratch.grid.a_2D
+    pN = simulation.variables.scratch.grid.b_2D
 
     # Retrieve T_bottom
     var = path_or_nothing(variable, simulation)
@@ -121,11 +125,13 @@ function output!(
 
     # Other parameters
     κ = simulation.model.atmosphere.κ
-    σ_bottom = simulation.model.geometry.σ_levels_full[end]
+    coord = simulation.model.geometry.vertical_coordinates
+    pₛ = simulation.variables.parameterizations.surface_pressure
+    pN .= pressure.(nlayers, pₛ, coord)
 
-    # Compute Ts assuming dry adiabatic profile
+    # Compute Ts assuming dry adiabatic profile: T_surf = T_bottom * (pₛ / p_bottom)^κ
     (; transform) = variable
-    @. Ts = transform(T_bottom * σ_bottom^(-κ))   # Convert to °C
+    @. Ts = transform(T_bottom * (pₛ / pN)^κ)   # Convert to °C
 
     # interpolate 2D/3D variables
     Ts_output = output.field2D
