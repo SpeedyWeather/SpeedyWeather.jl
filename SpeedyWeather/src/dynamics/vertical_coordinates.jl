@@ -38,11 +38,14 @@ function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector = sigma_half
 end
 
 # other constructors for convenience
+SigmaCoordinates(SG::SpectralGrid, profile::Function) = SigmaCoordinates(SG, sigma_half_spacing(SG.nlayers, profile))
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(SpectralGrid(nlayers = length(σ_half) - 1), σ_half)
 SigmaCoordinates() = SigmaCoordinates(SpectralGrid())
 
 get_nlayers(σ::SigmaCoordinates) = σ.nlayers
 get_σ_half(σ::SigmaCoordinates) = σ.σ_half
+get_σ_full(σ::SigmaCoordinates) = σ.σ_full
+get_σ_thickness(σ::SigmaCoordinates) = σ.σ_thickness
 
 function Base.show(io::IO, σ::SigmaCoordinates)
     params = "{$(typeof(σ.nlayers)), $(typeof(σ.σ_half))}"
@@ -114,6 +117,7 @@ Originally without the 1 - σ, but then vertical ordering is reversed."""
 FriersonSigmaCoordinates(SG::SpectralGrid) =
     SigmaCoordinates(SG, sigma_half_spacing(SG.nlayers, frierson_profile))
 
+FriersonSigmaCoordinates() = FriersonSigmaCoordinates(SpectralGrid())
 frierson_profile(σ) = exp(-5 * (0.05 * (1 - σ) + 0.95 * (1 - σ)^3))
 
 export SigmaPressureCoordinates
@@ -130,9 +134,9 @@ end
 Adapt.@adapt_structure SigmaPressureCoordinates
 
 function SigmaPressureCoordinates(
-        spectral_grid::SpectralGrid;
+        spectral_grid::SpectralGrid,
+        σ_half::AbstractVector = sigma_half_spacing(spectral_grid.nlayers);
         reference_pressure = 1.0e5,
-        σ_half = sigma_half_spacing(spectral_grid.nlayers),
         transition = σ -> σ
     )
     # sigma coordinates
@@ -155,6 +159,16 @@ function SigmaPressureCoordinates(
 
     p_ref = convert(spectral_grid.NF, reference_pressure)
     return SigmaPressureCoordinates(p_ref, A_half, B_half, A_full, B_full, ΔA, ΔB)
+end
+
+function SigmaPressureCoordinates(
+        spectral_grid::SpectralGrid,
+        σ_half::Function;
+        kwargs...
+    )   
+    # also allow for function to be passed on, evaluate here
+    σ_half_vector = sigma_half_spacing(spectral_grid.nlayers, σ_half)
+    return SigmaPressureCoordinates(spectral_grid, σ_half_vector; kwargs...)
 end
 
 SigmaPressureCoordinates() = SigmaPressureCoordinates(SpectralGrid())
@@ -189,6 +203,8 @@ end
 
 get_nlayers(S::SigmaPressureCoordinates) = length(S.B_full)
 get_σ_half(σ::SigmaPressureCoordinates) = σ.B_half
+get_σ_full(σ::SigmaPressureCoordinates) = σ.B_full
+get_σ_thickness(σ::SigmaPressureCoordinates) = σ.B_thickness
 
 """$(TYPEDSIGNATURES)
 Pressure [Pa] at full level `k` given `surface_pressure` [Pa] and hybrid sigma-pressure `coordinate`.
@@ -249,5 +265,7 @@ Sigma-pressure coordinate with a cubic smoothstep transition: pure pressure leve
 top of the atmosphere (σ ≤ `pressure_only_above`), pure sigma levels near the surface (σ ≥ `σ_only_below`), and
 a cubic smoothstep transition in between. The thresholds and transition shape are a pragmatic
 choice and do not follow any specific operational model's formulation."""
-CubicSigmaPressureCoordinates(SG::SpectralGrid; pressure_only_above = 0.2, σ_only_below = 0.8, kwargs...) =
-    SigmaPressureCoordinates(SG; transition = σ -> cubic_transition(σ; pressure_only_above, σ_only_below), kwargs...)
+CubicSigmaPressureCoordinates(SG::SpectralGrid, args...; pressure_only_above = 0.2, σ_only_below = 0.8, kwargs...) =
+    SigmaPressureCoordinates(SG, args...; transition = σ -> cubic_transition(σ; pressure_only_above, σ_only_below), kwargs...)
+
+CubicSigmaPressureCoordinates(args...; kwargs...) = CubicSigmaPressureCoordinates(SpectralGrid(), args...; kwargs...)
