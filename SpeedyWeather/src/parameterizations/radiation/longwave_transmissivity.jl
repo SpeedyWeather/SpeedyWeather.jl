@@ -63,10 +63,10 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 
     τ_above::NF = 0
     τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sind(θ)^2
-    for k in 2:(nlayers + 1)        # loop over half levels below
-        σₖ = pressure_half(k, pₛ, coord) / pₛ
+    for k in 1:nlayers              # loop over half levels below
+        σₖ = pressure_below(k, pₛ, coord) / pₛ
         τ_below = τ₀ * (fₗ * σₖ + (1 - fₗ) * σₖ^4)
-        t[ij, k - 1] = exp(-(τ_below - τ_above))
+        t[ij, k] = exp(-(τ_below - τ_above))
         τ_above = τ_below
     end
 
