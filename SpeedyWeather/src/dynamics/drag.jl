@@ -36,15 +36,13 @@ $(TYPEDSIGNATURES)
 Precomputes the drag coefficients for the `LinearDrag` scheme."""
 function initialize!(drag::LinearDrag, model::PrimitiveEquation)
 
-    # TODO: drag coefficient profile uses σ_levels_full directly as the vertical coordinate.
-    # With hybrid coordinates, sigma(k, coord) gives the nominal sigma level; replacing
-    # σ_levels_full with [sigma(k, coord) for k in 1:nlayers] would generalise this.
-    (; σ_levels_full) = model.geometry
     (; σb, time_scale, drag_coefs) = drag
+    (; nlayers) = model.geometry
+    coord = model.geometry.vertical_coordinates
     kf = 1 / Second(time_scale).value
 
     # drag only below σb, lin increasing to kf at σ=1
-    @. drag_coefs = kf * max(0, (σ_levels_full - σb) / (1 - σb))
+    @. drag_coefs = kf * max(0, (sigma.(1:nlayers, coord) - σb) / (1 - σb))
     return nothing
 end
 

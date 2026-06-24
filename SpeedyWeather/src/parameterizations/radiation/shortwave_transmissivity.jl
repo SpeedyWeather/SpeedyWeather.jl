@@ -24,13 +24,13 @@ initialize!(::ConstantShortwaveTransmissivity, ::AbstractModel) = nothing
     t = vars.scratch.grid.a
     nlayers = size(t, 2)
 
-    # TODO: optical depth is distributed proportional to Δσ (sigma-coordinate layer thickness).
-    # With hybrid coordinates, pressure_thickness(k, pₛ, coord) / pₛ gives the equivalent
-    # fractional thickness, but would require knowing surface pressure at this point.
     τ = -log(CST.transmissivity)            # total optical depth of the atmosphere
-    dσ = model.geometry.σ_levels_thick      # divide optical depth wrt to pressure thickness of each layer
+    coord = model.geometry.vertical_coordinates
+    pₛ = vars.parameterizations.surface_pressure[ij]
+
     for k in 1:nlayers
-        t[ij, k] = exp(-τ * dσ[k])          # transmissivity through layer k
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        t[ij, k] = exp(-τ * Δσₖ)            # transmissivity through layer k
     end
     return t
 end
@@ -97,11 +97,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     nlayers = size(t, 2)
 
-    # TODO: σ_levels_half and σ_levels_full used as pressure proxies for aerosol/cloud profiles.
-    # Generalising to hybrid coordinates would require using sigma(k, coord) or
-    # pressure(k, pₛ, coord) / pₛ depending on whether the profile is height- or pressure-based.
-    sigma_levels = model.geometry.σ_levels_half
-    sigma_levels_full = model.geometry.σ_levels_full
+    coord = model.geometry.vertical_coordinates
     pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
     normalized_surface_pressure = pₛ / 100000
 
@@ -120,11 +116,10 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     for k in 1:nlayers
         q = humid[ij, k]
 
-        # Aerosol factor: use mid-level sigma, squared
-        aerosol_factor = transmissivity.aerosols ? sigma_levels_full[k]^2 : zero(NF)
+        # Aerosol factor: use mid-level sigma, squared (aerosol loading increases toward surface)
+        aerosol_factor = transmissivity.aerosols ? sigma(k, coord)^2 : zero(NF)
 
         # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
-        # Aerosol loading increases toward surface (proportional to σ²).
         layer_absorptivity = (
             absorptivity_dry_air +
                 absorptivity_aerosol * aerosol_factor +
@@ -138,8 +133,8 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
 
         # Compute differential optical depth with zenith correction
         # Normalize pressure to 1e5 Pa since absorptivities are per 1e5 Pa
-        delta_sigma = sigma_levels[k + 1] - sigma_levels[k]
-        optical_depth = layer_absorptivity * delta_sigma * normalized_surface_pressure * zenith_factor
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        optical_depth = layer_absorptivity * Δσₖ * normalized_surface_pressure * zenith_factor
 
         # Transmissivity through layer k
         t[ij, k] = exp(-optical_depth)

@@ -173,7 +173,7 @@ Adapt.@adapt_structure SigmaPressureCoordinates
 # main constructor
 function SigmaPressureCoordinates(
         spectral_grid::SpectralGrid,
-        σ_half::AbstractVector = sigma_half_spacing(spectral_grid.nlayers);
+        σ_half::AbstractVector;
         reference_pressure = 1.0e5,
         transition = σ -> σ
     )
