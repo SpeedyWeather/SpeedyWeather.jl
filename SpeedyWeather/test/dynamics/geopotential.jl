@@ -78,7 +78,7 @@ end
         spectral_grid = SpectralGrid(; NF, nlayers)
 
         coords = (
-            SigmaCoordinates(spectral_grid, σ_half),
+            SigmaCoordinates(spectral_grid; σ_half),
             SigmaPressureCoordinates(spectral_grid; σ_half, transition = _ -> 1.0),
         )
 

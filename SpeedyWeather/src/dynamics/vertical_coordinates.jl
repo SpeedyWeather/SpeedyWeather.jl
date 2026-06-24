@@ -1,3 +1,6 @@
+"""Abstract supertype for vertical coordinate systems. Subtypes define how model levels
+are mapped to pressure given a surface pressure. Must implement `pressure`,
+`pressure_half`, `pressure_thickness`, and `sigma` (see each for their signatures)."""
 abstract type AbstractVerticalCoordinates <: AbstractModelComponent end
 
 # extend for broadcasting like pressure.(k, field, vertical_coordinate)
@@ -17,13 +20,22 @@ Equivalent to `pressure_half(k, surface_pressure, coordinate)`."""
 
 export SigmaCoordinates
 
-"""Sigma, i.e. fraction of surface pressure, vertical coordinates defined by their half layers.
-First half layer has to be 0 (top of the atmosphere), last has to be 1 (surface).
+"""Terrain-following sigma vertical coordinates. Pressure at full level `k` is
+`p_k = σ_k * surface_pressure`, where `σ ∈ (0, 1]` is the fraction of surface pressure.
+Levels are defined by `σ_half` (half levels at layer interfaces, including `σ = 0` at
+the top and `σ = 1` at the surface); full levels sit at the midpoints.
 $(TYPEDFIELDS)"""
 struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinates
+    "[DERIVED] Number of vertical layers"
     nlayers::IntType
+
+    "[DERIVED] σ at half levels (interfaces); k = 1 is top of atmosphere (σ = 0), k = nlayers+1 is surface (σ = 1)"
     σ_half::VectorType
+
+    "[DERIVED] σ at full levels (layer midpoints); σ_full[k] = (σ_half[k] + σ_half[k+1]) / 2"
     σ_full::VectorType
+
+    "[DERIVED] Layer thickness in sigma; σ_thickness[k] = σ_half[k+1] - σ_half[k], sums to 1"
     σ_thickness::VectorType
 
     SigmaCoordinates{T, V}(nlayers, σh, σf, Δσ) where {T, V} = sigma_okay(nlayers, σh) ?
@@ -32,7 +44,7 @@ end
 
 Adapt.@adapt_structure SigmaCoordinates
 
-function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector = sigma_half_spacing(SG.nlayers))
+function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector)
     (; nlayers) = SG
     σ_half = on_architecture(SG.architecture, convert.(SG.NF, σ_half))
     σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
@@ -42,6 +54,7 @@ end
 
 # other constructors for convenience
 SigmaCoordinates(SG::SpectralGrid, profile::Function) = SigmaCoordinates(SG, sigma_half_spacing(SG.nlayers, profile))
+SigmaCoordinates(SG::SpectralGrid; σ_half = sigma_half_spacing(SG.nlayers)) = SigmaCoordinates(SG, σ_half)
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(SpectralGrid(nlayers = length(σ_half) - 1), σ_half)
 SigmaCoordinates() = SigmaCoordinates(SpectralGrid())
 
@@ -118,24 +131,46 @@ Frierson 2006 spacing, higher resolution in surface boundary layer and in strato
 Following exp(-5 * (0.05 * (1 - σ) + 0.95 * (1 - σ)^3)), σ being equi-spaced.
 Originally without the 1 - σ, but then vertical ordering is reversed."""
 FriersonSigmaCoordinates(SG::SpectralGrid) =
-    SigmaCoordinates(SG, sigma_half_spacing(SG.nlayers, frierson_profile))
+    SigmaCoordinates(SG, frierson_profile)
 
 FriersonSigmaCoordinates() = FriersonSigmaCoordinates(SpectralGrid())
 frierson_profile(σ) = exp(-5 * (0.05 * (1 - σ) + 0.95 * (1 - σ)^3))
 
 export SigmaPressureCoordinates
+
+"""Hybrid sigma-pressure vertical coordinates. Pressure at full level `k` is
+`p_k = A_k * reference_pressure + B_k * surface_pressure`, where `A_k + B_k = σ_k`
+(the nominal sigma level). The A/B split is controlled by a `transition` function:
+`transition(σ) = 0` gives pure pressure levels (terrain-independent, fixed in space),
+`transition(σ) = 1` gives pure sigma levels (terrain-following). See
+`CubicSigmaPressureCoordinates` for a ready-to-use constructor with a smooth transition.
+$(TYPEDFIELDS)"""
 struct SigmaPressureCoordinates{NF, VectorType} <: AbstractVerticalCoordinates
+    "[DERIVED] Reference pressure for the pressure component [Pa]"
     reference_pressure::NF
+
+    "[DERIVED] Pressure component coefficient at half levels (k = 1 top, nlayers+1 surface)"
     A_half::VectorType
+
+    "[DERIVED] Sigma component coefficient at half levels"
     B_half::VectorType
+
+    "[DERIVED] Pressure component coefficient at full levels"
     A_full::VectorType
+
+    "[DERIVED] Sigma component coefficient at full levels"
     B_full::VectorType
+
+    "[DERIVED] Pressure component of layer thickness (ΔA = A_half[k+1] - A_half[k])"
     A_thickness::VectorType
+
+    "[DERIVED] Sigma component of layer thickness (ΔB = B_half[k+1] - B_half[k])"
     B_thickness::VectorType
 end
 
 Adapt.@adapt_structure SigmaPressureCoordinates
 
+# main constructor
 function SigmaPressureCoordinates(
         spectral_grid::SpectralGrid,
         σ_half::AbstractVector = sigma_half_spacing(spectral_grid.nlayers);
@@ -164,17 +199,20 @@ function SigmaPressureCoordinates(
     return SigmaPressureCoordinates(p_ref, A_half, B_half, A_full, B_full, ΔA, ΔB)
 end
 
+# constructor that first evaluates the profile function to create a sigma half vector
 function SigmaPressureCoordinates(
         spectral_grid::SpectralGrid,
-        σ_half::Function;
+        profile::Function;
         kwargs...
     )   
     # also allow for function to be passed on, evaluate here
-    σ_half_vector = sigma_half_spacing(spectral_grid.nlayers, σ_half)
+    σ_half_vector = sigma_half_spacing(spectral_grid.nlayers, profile)
     return SigmaPressureCoordinates(spectral_grid, σ_half_vector; kwargs...)
 end
 
 SigmaPressureCoordinates() = SigmaPressureCoordinates(SpectralGrid())
+SigmaPressureCoordinates(SG::SpectralGrid; σ_half = sigma_half_spacing(SG.nlayers), kwargs...) =
+    SigmaPressureCoordinates(SG, σ_half; kwargs...)
 
 function Base.show(io::IO, S::SigmaPressureCoordinates)
     nlayers = get_nlayers(S)
