@@ -123,7 +123,7 @@ function Base.show(io::IO, G::Geometry)
     params = "{Spectrum{...}, $Grid{...}}"
     println(io, styled"{warning:Geometry} for SpectralGrid{note:$params}")
     println(io, styled"├ {info:Grid}: $nlat-ring $Grid, $npoints grid points")
-    print(io, styled"└ {info:Vertical}: $nlayers-layer $(typeof(G.vertical_coordinates))")
+    print(io, styled"└ {info:Vertical}: $(G.vertical_coordinates)")
     return nothing
 end
 

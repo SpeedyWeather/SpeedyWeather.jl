@@ -55,10 +55,10 @@ function Base.show(io::IO, σ::SigmaCoordinates)
     σ_full = on_architecture(CPU(), σ.σ_full)
     format = Printf.Format("%$(nchars)d")
     for k in 1:σ.nlayers
-        println(io, "├─ ", @sprintf("%1.4f", σ_half[k]), "  ", "k = ", Printf.format(format, k - 1), ".5")
-        println(io, "│× ", @sprintf("%1.4f", σ_full[k]), "  ", "k = ", Printf.format(format, k))
+        println(io, " ├─ ", @sprintf("%1.4f", σ_half[k]), "  ", "k = ", Printf.format(format, k - 1), ".5")
+        println(io, " │× ", @sprintf("%1.4f", σ_full[k]), "  ", "k = ", Printf.format(format, k))
     end
-    print(io, "└─ ", @sprintf("%1.4f", σ_half[end]), "  ", "k = ", Printf.format(format, σ.nlayers), ".5")
+    print(io, " └─ ", @sprintf("%1.4f", σ_half[end]), "  ", "k = ", Printf.format(format, σ.nlayers), ".5")
     return nothing
 end
 
@@ -177,7 +177,7 @@ function Base.show(io::IO, S::SigmaPressureCoordinates)
     nlayers = get_nlayers(S)
     params = "{$(typeof(S.reference_pressure)), $(typeof(S.A_half))}"
     println(io, "$nlayers-layer ", styled"{warning:SigmaPressureCoordinates}", styled"{note:$params}")
-    println(io, "   ", styled"{info:p_ref}", " = $(S.reference_pressure) Pa   ░ pressure │ sigma █")
+    println(io, "    ", styled"{info:p_ref}", " = $(S.reference_pressure) Pa   ░ pressure │ sigma █")
     nchars = length(string(nlayers))
     A_half = on_architecture(CPU(), S.A_half)
     B_half = on_architecture(CPU(), S.B_half)
@@ -186,18 +186,18 @@ function Base.show(io::IO, S::SigmaPressureCoordinates)
     format = Printf.Format("%$(nchars)d")
     for k in 1:nlayers
         σ_half_k = A_half[k] + B_half[k]
-        println(io, "├─ ", @sprintf("%1.4f", σ_half_k), "  ", "k = ", Printf.format(format, k - 1), ".5")
+        println(io, " ├─ ", @sprintf("%1.4f", σ_half_k), "  ", "k = ", Printf.format(format, k - 1), ".5")
         σ_full_k = A_full[k] + B_full[k]
         sigma_frac = σ_full_k > 0 ? B_full[k] / σ_full_k : 0.0
         nsigma = round(Int, 10 * sigma_frac)
         bar = "█"^nsigma * "░"^(10 - nsigma)
         println(
-            io, "│× ", @sprintf("%1.4f", σ_full_k), "  ", "k = ", Printf.format(format, k),
+            io, " │× ", @sprintf("%1.4f", σ_full_k), "  ", "k = ", Printf.format(format, k),
             "   ", bar, "  ", styled"{note:A=}", @sprintf("%1.4f", A_full[k]), "  ", styled"{note:B=}", @sprintf("%1.4f", B_full[k])
         )
     end
     σ_half_end = A_half[end] + B_half[end]
-    print(io, "└─ ", @sprintf("%1.4f", σ_half_end), "  ", "k = ", Printf.format(format, nlayers), ".5")
+    print(io, " └─ ", @sprintf("%1.4f", σ_half_end), "  ", "k = ", Printf.format(format, nlayers), ".5")
     return nothing
 end
 
