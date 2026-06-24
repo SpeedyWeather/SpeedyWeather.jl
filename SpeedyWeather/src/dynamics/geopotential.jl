@@ -176,8 +176,7 @@ function geopotential!(
     # for PrimitiveDry virtual temperature = absolute temperature here
     # note these are not anomalies here as they are only in grid-point fields
 
-    # BOTTOM FULL LAYER
-    # TODO: broadcasting with LTA issue here
+    # BOTTOM FULL LAYER, broadcasting across LTA/Array so use .data here
     @views Φ.data[:, nlayers] .= Φₛ.data .+ Tᵥ.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
