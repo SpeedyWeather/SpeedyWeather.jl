@@ -52,7 +52,7 @@ function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::P
     sst = vars.prognostic.ocean.sea_surface_temperature
 
     Δt = model.time_stepping.Δt_sec
-    (; mask) = model.land_sea_mask
+    (; land_fraction) = model.land_sea_mask
 
     m = sea_ice_model.melt_rate             # melt rate [m²/m²/s/K]
     f = sea_ice_model.freeze_rate           # freeze rate [m²/m²/K]
@@ -61,15 +61,15 @@ function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::P
 
     launch!(
         architecture(ℵ), LinearWorkOrder, size(ℵ), sea_ice_kernel!,
-        ℵ, sst, mask, parameters
+        ℵ, sst, land_fraction, parameters
     )
     return nothing
 end
 
-@kernel inbounds = true function sea_ice_kernel!(ℵ, sst, mask, parameters)
+@kernel inbounds = true function sea_ice_kernel!(ℵ, sst, land_fraction, parameters)
     ij = @index(Global, Linear)    # every grid point ij
 
-    if mask[ij] < 1 && isfinite(sst[ij])        # at least partially ocean, SST not NaN (=masked)
+    if land_fraction[ij] < 1 && isfinite(sst[ij])   # at least partially ocean, SST not NaN (=masked)
 
         (; m, f, temp_freeze, Δt) = parameters
 
