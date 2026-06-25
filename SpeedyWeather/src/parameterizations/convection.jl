@@ -37,7 +37,7 @@ and relaxes current vertical profiles to the adjusted references."""
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
     nlayers = length(σ)
-    Δt = time_stepping.Δt_sec
+    (; Δt) = model.time_stepping                            # time step in [s]
 
     # use previous time step for more stable calculations
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, convection)
@@ -45,7 +45,7 @@ and relaxes current vertical profiles to the adjusted references."""
     geopotential = vars.dynamics.geopotential
     temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, convection)
     humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, convection)
-    pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]        # surface pressure [Pa]
     NF = eltype(temp)
 
     # thermodynamics

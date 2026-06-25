@@ -215,9 +215,8 @@ end
                 spectral_grid = SpectralGrid(; trunc)
                 time_stepping = TS(spectral_grid)
                 set!(time_stepping, Δt=Δt)
-                @test time_stepping.Δt_sec == Minute(Δt).value * 60
-                @test time_stepping.Δt ≈ time_stepping.Δt_sec / SpeedyWeather.DEFAULT_RADIUS
-                @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt_sec))
+                @test time_stepping.Δt == Second(Δt).value
+                @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt))
                 @test time_stepping.Δt_at_T31 == Second(Second(Δt).value / ((trunc + 1) / (SpeedyWeather.DEFAULT_TRUNC + 1)))
             end
         end

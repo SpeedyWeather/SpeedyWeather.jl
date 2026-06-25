@@ -43,14 +43,14 @@ function timestep!(
         model::PrimitiveEquation,
     )
 
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping                            # time step [s]
     (; snow_depth) = vars.prognostic.land                   # in equivalent liquid water height [m]
     (; soil_temperature) = vars.prognostic.land
     (; land_fraction) = model.land_sea_mask
 
     # Some thermodynamics needed by snow
     ρ_water = model.atmosphere.water_density                # water density [kg/m³]
-    Lᵢ = model.atmosphere.latent_heat_fusion                  # latent heat of fusion
+    Lᵢ = model.atmosphere.latent_heat_fusion                # latent heat of fusion
     cₛ = model.land.thermodynamics.heat_capacity_dry_soil
     z₁ = model.land.geometry.layer_thickness[1]
     (; melting_threshold, snow_depth_cap) = snow

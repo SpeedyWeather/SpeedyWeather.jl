@@ -85,7 +85,7 @@ function initialize!(
     (; radius) = model.planet
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
-    # times 1/radius because time step Δt is scaled with 1/radius
+    # divide by radius because the equations are in the radius-scaled form (see Radius scaling)
     time_scale = Second(diffusion.time_scale).value / radius * (32 / (trunc + 1))^resolution_scaling
     time_scale_div = Second(diffusion.time_scale_div).value / radius * (32 / (trunc + 1))^resolution_scaling
 
@@ -413,7 +413,7 @@ function initialize!(
     Δt = default_time_step(model.time_stepping)
     (; radius) = model.planet
 
-    # times 1/radius because time step Δt is scaled with 1/radius
+    # divide by radius because the equations are in the radius-scaled form (see Radius scaling)
     time_scale = Second(diffusion.time_scale).value / radius * (32 / (trunc + 1))^resolution_scaling
     time_scale_div = Second(diffusion.time_scale_div).value / radius * (32 / (trunc + 1))^resolution_scaling
 

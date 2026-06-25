@@ -55,22 +55,20 @@ and disables adjustment to output frequency.
 `set!` can be used before or after `initialize!(model)`."""
 function set!(
         L::AbstractTimeStepper,
-        Δt::Period;                         # unscaled time step in Second, Minute, ...
-        radius = L.Δt_sec/L.Δt              # get radius from scaled time step
+        Δt::Period,
     )
     # if set! is used before `initialize!(model)` then the recalculation of
     # Δt_at_T31 will make sure the desired time step is used when initialize!(model.time_stepping, ...) happens
     # if set! is used after `initialize!(model)` then all fields are set consistently
 
     # get truncation/resolution factor implicitly from Δt at this resolution vs default T31 resolution
-    resolution_factor = L.Δt_sec / Second(L.Δt_at_T31).value
+    resolution_factor = L.Δt / Second(L.Δt_at_T31).value
 
     L.Δt_millisec = Millisecond(Δt)         # recalculate all Δt fields
-    L.Δt_sec = Millisecond(L.Δt_millisec).value / 1000
-    L.Δt = L.Δt_sec / radius
+    L.Δt = Millisecond(L.Δt_millisec).value / 1000
 
     # recalculate the default time step at resolution T31 to be consistent
-    L.Δt_at_T31 = Second(round(Int, L.Δt_sec * resolution_factor))
+    L.Δt_at_T31 = Second(round(Int, L.Δt * resolution_factor))
 
     # given Δt was manually set disallow adjustment to output frequency
     L.adjust_with_output = false
@@ -78,7 +76,7 @@ function set!(
 end
 
 # also allow for keyword arguments
-set!(L::AbstractTimeStepper; Δt::Period, kwargs...) = set!(L, Δt; kwargs...)
+set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 
 function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
     (; trunc) = model.spectral_grid
@@ -87,8 +85,7 @@ function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
 
     # take radius from planet and recalculate time step and possibly adjust with output dt
     L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, trunc, radius, L.adjust_with_output, interval)
-    L.Δt_sec = L.Δt_millisec.value / 1000
-    L.Δt = L.Δt_sec / radius
+    L.Δt = L.Δt_millisec.value / 1000
 
     # check how time steps from time integration and output align
     if L.adjust_with_output

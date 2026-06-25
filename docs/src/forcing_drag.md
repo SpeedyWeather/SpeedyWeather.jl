@@ -143,7 +143,7 @@ function SpeedyWeather.initialize!( forcing::StochasticStirring,
     A = radius^2 * forcing.strength
 
     # precompute noise and auto-regressive factor, packed in RefValue for mutability
-    dt = model.time_stepping.Δt_sec
+    dt = model.time_stepping.Δt                 # in seconds
     τ = forcing.decorrelation_time.value        # in seconds
     forcing.a[] = A*sqrt(1 - exp(-2dt/τ))
     forcing.b[] = exp(-dt/τ)

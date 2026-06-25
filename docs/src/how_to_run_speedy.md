@@ -119,13 +119,10 @@ depends on a `SpectralGrid` as first argument.
 spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(15))
 ```
-The actual time step at the given resolution (here T63) is then `Δt_sec`, there's
-also `Δt` which is a scaled time step used internally, because SpeedyWeather.jl
-[scales the equations](@ref scaled_swm) with the radius of the Earth,
-but this is largely hidden (except here) from the user. With this new 
-`Leapfrog` time stepper constructed we can create a model by passing
+The actual time step at the given resolution (here T63) is then `Δt`.
+With this new `Leapfrog` time stepper constructed we can create a model by passing
 on the components (they are keyword arguments so either use `; time_stepping`
-for which the naming must match, or `time_stepping=my_time_stepping` with
+for which the naming must match, or `time_stepping = my_time_stepping` with
 any name)
 ```@example howto
 model = ShallowWaterModel(spectral_grid; time_stepping)
