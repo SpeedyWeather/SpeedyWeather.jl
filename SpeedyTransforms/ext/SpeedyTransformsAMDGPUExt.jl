@@ -30,10 +30,11 @@ import SpeedyWeatherInternals.Architectures: architecture
 #  2. Few graph nodes. A single KernelAbstractions gather/scatter kernel moves ALL rings
 #     between the strided grid/scratch layout and the packed buffer in one launch.
 #
-# The HIP graph API (AMDGPU.HIP) mirrors the CUDA graph API closely:
-#   capture(f; throw_error)  →  HIPGraph or nothing
-#   instantiate(graph)        →  HIPGraphExec
-#   launch(exec)              →  replay on AMDGPU.stream()
+# The high-level HIP graph wrappers (HIPGraphExec, capture, instantiate, launch) were
+# added to AMDGPU.jl in a later version. We probe for them at module load time and
+# gracefully degrade when they are absent: the allocation-free fused loop still runs
+# (saving per-ring allocation overhead), but without graph capture/replay. Set
+# _HIP_GRAPHS_AVAILABLE below to check which path is active at runtime.
 # =====================================================================================
 
 """Maximum number of cached graphs per direction per `SpectralTransform`. Prevents
@@ -42,10 +43,12 @@ of freshly-allocated `field` buffers (e.g. the allocating `transform(field, S)`)
 this many distinct buffers the allocation-free loop is run directly without capturing."""
 const MAX_GRAPHS = 64
 
-# AMDGPU.HIP exports are not re-exported from the top-level AMDGPU module, so we
-# cannot import them with `import AMDGPU.HIP: ...`. Use a const alias for the type
-# (needed in the struct and isa check) and qualify the three function calls directly.
-const HIPGraphExec = AMDGPU.HIP.HIPGraphExec
+# Probe for the high-level HIP graph API. AMDGPU.HIP exports these in newer versions;
+# on older installs only the raw C bindings (hipGraph_t, hipGraphExec_t, …) are present.
+const _HIP_GRAPHS_AVAILABLE =
+    isdefined(AMDGPU, :HIP) &&
+    isdefined(AMDGPU.HIP, :HIPGraphExec) &&
+    isdefined(AMDGPU.HIP, :capture)
 
 # =====================================================================================
 # Fused gather/scatter kernels — move all rings at once between the strided grid/scratch
@@ -99,9 +102,10 @@ end
 """$(TYPEDSIGNATURES)
 Cache (one per transform SIZE, i.e. per FFT plan) holding the pre-allocated packed
 work buffers, the per-ring reshaped views and FFT plans used by the transforms, the device
-gather/scatter index metadata, and the instantiated HIP graphs (one per distinct `field`
-buffer and direction). A graph value of `nothing` marks a buffer for which capture failed
-(fall back to direct loop)."""
+gather/scatter index metadata, and (when the HIP graph API is available) instantiated HIP
+graphs keyed by field buffer. A graph value of `nothing` marks a buffer for which capture
+failed (fall back to direct loop). Uses `Dict{UInt, Any}` for the exec dicts so the struct
+is well-defined regardless of whether the HIPGraphExec type exists."""
 struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
     packed_real::PR             # ROCArray{NF}          — all rings' dense real blocks
     packed_complex::PC          # ROCArray{Complex{NF}} — all rings' dense complex blocks
@@ -123,8 +127,8 @@ struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
     has_equator::Bool           # whether the grid has a ring on the equator that needs special handling
     j_equator::Int              # latitude index of the equator ring (if any)
     arch::A                     # SpeedyWeather GPU architecture (for launch!)
-    forward_execs::Dict{UInt, Union{Nothing, HIPGraphExec}} # forward graphs
-    inverse_execs::Dict{UInt, Union{Nothing, HIPGraphExec}} # inverse graphs
+    forward_execs::Dict{UInt, Any}  # values: missing | nothing | HIPGraphExec
+    inverse_execs::Dict{UInt, Any}  # values: missing | nothing | HIPGraphExec
 end
 
 # One cache per (SpectralTransform, transform size), keyed by the *forward FFT plan set*
@@ -168,8 +172,8 @@ function build_cache(S::SpectralTransform, nlayers::Integer)
         dev(istart_n), dev(istart_s), dev(nlons_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, j_equator,
         architecture(packed_real),
-        Dict{UInt, Union{Nothing, HIPGraphExec}}(),
-        Dict{UInt, Union{Nothing, HIPGraphExec}}(),
+        Dict{UInt, Any}(),
+        Dict{UInt, Any}(),
     )
 end
 
@@ -187,7 +191,7 @@ Mainly useful for tests/benchmarks."""
 clear_fourier_graph_cache!() = (empty!(GRAPH_CACHES); nothing)
 
 # =====================================================================================
-# Allocation-free fused loops (capturable).
+# Allocation-free fused loops (capturable when _HIP_GRAPHS_AVAILABLE).
 # =====================================================================================
 
 """$(TYPEDSIGNATURES)
@@ -262,11 +266,19 @@ end
 """$(TYPEDSIGNATURES)
 Run `loop!` (a `() -> ...` closure over the allocation-free batched FFT) either by
 replaying a cached HIP graph keyed by `key`, or — on first use — by warming up, capturing,
-instantiating and caching a graph. Falls back to running `loop!` directly if capture fails
-or the per-direction cache is full."""
+instantiating and caching a graph. Falls back to running `loop!` directly if the HIP graph
+API is unavailable (older AMDGPU.jl), if capture fails, or if the per-direction cache is
+full. Even without graph capture the allocation-free fused loop avoids per-ring allocations."""
 function run_graph!(execs::AbstractDict, key, loop!::F) where {F}
+    if !_HIP_GRAPHS_AVAILABLE
+        loop!()                              # no graph API: run the fused loop directly
+        return nothing
+    end
+
+    HIPGraphExecT = AMDGPU.HIP.HIPGraphExec  # only evaluated when _HIP_GRAPHS_AVAILABLE
+
     exec = get(execs, key, missing)
-    if exec isa HIPGraphExec
+    if exec isa HIPGraphExecT
         AMDGPU.HIP.launch(exec)              # hot path: pure replay on AMDGPU.stream()
         return nothing
     elseif exec === nothing                  # fallback: capture previously failed
@@ -315,7 +327,8 @@ end
 
 """$(TYPEDSIGNATURES)
 HIP-graphs accelerated forward (grid → spectral) batched Fourier transform.
-Replays a cached HIP graph of the fused gather + per-ring rocFFTs + scatter; see
+Replays a cached HIP graph of the fused gather + per-ring rocFFTs + scatter when the HIP
+graph API is available; otherwise runs the allocation-free fused loop directly. See
 [`run_graph!`](@ref)."""
 function _fourier_batched!(
         f_north::ROCArray{<:Complex, 3},
@@ -337,7 +350,8 @@ end
 
 """$(TYPEDSIGNATURES)
 HIP-graphs accelerated inverse (spectral → grid) batched Fourier transform.
-Replays a cached HIP graph of the fused gather + per-ring inverse rocFFTs + scatter; see
+Replays a cached HIP graph of the fused gather + per-ring inverse rocFFTs + scatter when
+the HIP graph API is available; otherwise runs the allocation-free fused loop directly. See
 [`run_graph!`](@ref)."""
 function _fourier_batched!(
         field::AbstractField,
