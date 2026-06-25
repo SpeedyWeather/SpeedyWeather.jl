@@ -32,7 +32,7 @@
 
             # Some SSTs may contain NaNs
             # @test all(0 .<= simulation.variables.prognostic.ocean.sea_surface_temperature .<= 330)
-            sst = simulation.variables.prognostic.ocean.sea_surface_temperature
+            sst = get_step(simulation.variables.prognostic.ocean.sea_surface_temperature, 1)
             for ij in eachindex(sst)
                 if !isnan(sst[ij])
                     @test 0 <= sst[ij] <= 330

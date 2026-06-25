@@ -138,7 +138,7 @@ function timestep!(
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
     (; monthly_temperature) = ocean
-    (; sea_surface_temperature) = vars.prognostic.ocean
+    sea_surface_temperature = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, ocean)
     NF = eltype(sea_surface_temperature)
     weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
 
@@ -290,9 +290,13 @@ end
 # generator function
 SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 
-function variables(::SlabOcean)
+function variables(::SlabOcean, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    tg = nsteps.tendency_grid
     return (
-        PrognosticVariable(:sea_surface_temperature, Grid2D(), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
+        PrognosticVariable(:sea_surface_temperature, Grid3D(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
+        TendencyVariable(:sea_surface_temperature, Grid3D(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),
 
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m^2"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
@@ -327,14 +331,12 @@ function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEq
 end
 
 function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEquation)
-    sst = vars.prognostic.ocean.sea_surface_temperature
+    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, model.time_stepping, ocean_model)
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
-    C₀ = ocean_model.heat_capacity_mixed_layer
-    Δt = model.time_stepping.Δt_sec
-    Δt_C₀ = Δt / C₀
-
+    C₀⁻¹ = inv(ocean_model.heat_capacity_mixed_layer)
     (; land_fraction) = model.land_sea_mask
+    params = (; C₀⁻¹, Lᵥ)                                       # pack into NamedTuple for kernel
 
     # Frierson et al. 2006, eq (1), all W/m² except humidity flux in kg/m²/s
     Rsd = vars.parameterizations.surface_shortwave_down         # before albedo
@@ -344,19 +346,17 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
 
-    params = (; Δt_C₀, Lᵥ)                              # pack into NamedTuple for kernel
-
     launch!(
-        architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!,
-        sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params
+        architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,
+        dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params
     )
     return nothing
 end
 
-@kernel inbounds = true function slab_ocean_kernel!(sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params)
+@kernel inbounds = true function slab_ocean_kernel!(dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params)
     ij = @index(Global, Linear)         # every grid point ij
     if land_fraction[ij] < 1            # at least partially ocean
-        (; Δt_C₀, Lᵥ) = params
-        sst[ij] += Δt_C₀ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij])
+        (; C₀⁻¹, Lᵥ) = params
+        dsst[ij] = C₀⁻¹ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij])
     end
 end
