@@ -66,6 +66,9 @@ elseif gpu_backend === :AMDGPU
 
     include("AMDGPU/architecture.jl")
 
+    # HIP-GRAPHS ACCELERATED FOURIER TRANSFORM (AMDGPU-only feature)
+    include("hip_graphs.jl")
+
 elseif gpu_backend === :Metal
     include("MetalGPU/metal.jl")
 end

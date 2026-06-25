@@ -76,11 +76,11 @@ struct SpectralTransform{
 
     gradients::GradientType                     # precomputed gradient and integration matrices
 
-    # CUDA GRAPHS
-    # toggle for the CUDA-Graphs accelerated batched Fourier transform
-    # Set to `false` to fall back to the generic (allocating) per-ring GPU
-    # Meaningless for non-CUDA architectures.
-    cuda_graphs::B
+    # GPU GRAPHS (CUDA graphs / HIP graphs)
+    # toggle for the GPU-graphs accelerated batched Fourier transform
+    # Set to `false` to fall back to the generic (allocating) per-ring GPU path.
+    # Only effective when a CUDA or AMDGPU extension is loaded; ignored on CPU.
+    gpu_graphs::B
 end
 
 # eltype of a transform is the number format used within
@@ -100,7 +100,7 @@ function SpectralTransform(
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
         nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
-        cuda_graphs::Bool = true,                                            # use CUDA-Graphs accelerated Fourier path (CUDA only)
+        gpu_graphs::Bool = true,                                             # use GPU-graphs accelerated Fourier path (CUDA / AMDGPU only)
     )
     (; lmax, mmax, architecture) = spectrum                       # 1-based spectral truncation order and degree
 
@@ -200,7 +200,7 @@ function SpectralTransform(
         typeof(scratch_memory),
         typeof(gradients),
         typeof(nlayers),
-        typeof(cuda_graphs),
+        typeof(gpu_graphs),
     }(
         architecture,
         spectrum, nfreq_max,
@@ -215,7 +215,7 @@ function SpectralTransform(
         jm_index_size, kjm_indices,
         solid_angles,
         gradients,
-        cuda_graphs,
+        gpu_graphs,
     )
 end
 

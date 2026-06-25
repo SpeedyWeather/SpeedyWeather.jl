@@ -353,7 +353,7 @@ function _fourier_batched!(
         S::SpectralTransform,
     )
     @assert eltype(field) == eltype(S) "Number format of grid $(eltype(field)) and SpectralTransform $(eltype(S)) need to match."
-    if !S.cuda_graphs
+    if !S.gpu_graphs
         return Base.@invoke _fourier_batched!(
             f_north::AbstractArray{<:Complex, 3}, f_south::AbstractArray{<:Complex, 3},
             field::AbstractField, S::SpectralTransform,
@@ -376,7 +376,7 @@ function _fourier_batched!(
         g_south::CuArray{<:Complex, 3},
         S::SpectralTransform,
     )
-    if !S.cuda_graphs
+    if !S.gpu_graphs
         return Base.@invoke _fourier_batched!(
             field::AbstractField, g_north::AbstractArray{<:Complex, 3},
             g_south::AbstractArray{<:Complex, 3}, S::SpectralTransform,

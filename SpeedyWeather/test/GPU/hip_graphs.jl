@@ -1,11 +1,9 @@
-# Tests for the CUDA-Graphs accelerated batched Fourier transform (SpeedyTransformsCUDAExt).
-# Runs a GPU model and checks the graph cache stays bounded: the time loop reuses the same
-# variable buffers every step, so each (size, field) pair is captured once and replayed —
-# the per-direction exec dicts must stay well under MAX_GRAPHS and not grow with more steps.
-# Only executes when the CUDA extension is actually loaded.
+# Tests for the HIP-graphs accelerated batched Fourier transform (SpeedyTransformsAMDGPUExt).
+# Mirrors cuda_graphs.jl; see that file for a full explanation of what is being tested.
+# Only executes when the AMDGPU extension is actually loaded.
 
-@testset "CUDA Graphs: bounded graph cache over a GPU model run" begin
-    ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
+@testset "HIP Graphs: bounded graph cache over a GPU model run" begin
+    ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt)
     if ext !== nothing
         # GPU-graphs path is on by default (SpectralTransform's gpu_graphs = true)
         spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = GPU())
@@ -15,7 +13,6 @@
         # isolate the time loop: drop any graphs captured during initialize!
         ext.clear_fourier_graph_cache!()
 
-        # (max graphs in any one exec dict, total graphs, capture failures) across all caches
         function cache_stats()
             maxlen = total = failed = 0
             for c in values(ext.GRAPH_CACHES), execs in (c.forward_execs, c.inverse_execs)
@@ -41,21 +38,13 @@
     end
 end
 
-# Focused regression test for the graph-cache keying. The time stepping fetches each transform's
-# grid field via a per-step view (`get_prognostic_step`/`get_tendency_step` → `get_step` →
-# `field_view`). On GPU every such view is a FRESH `CuArray` wrapper aliasing the same device
-# memory, so the cache must key on the stable device pointer — not the churning wrapper identity —
-# or it captures a new graph every step and grows without bound (the failure caught by the
-# full-model test above, isolated here without a model run).
-@testset "CUDA Graphs: per-step views of one buffer reuse a single graph" begin
-    ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
+@testset "HIP Graphs: per-step views of one buffer reuse a single graph" begin
+    ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt)
     if ext !== nothing
         spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = GPU())
         S = SpectralTransform(spectral_grid)
         nlayers = spectral_grid.nlayers
 
-        # grid field WITH a leapfrog-style step dimension (npoints, nlayers, nsteps), like the new
-        # time stepping's prognostic grid variables; each get_step is a fresh view of step 2
         gridded = rand(Float32, spectral_grid.grid, nlayers, 2)
         specs = rand(ComplexF32, spectral_grid.spectrum, nlayers)
 

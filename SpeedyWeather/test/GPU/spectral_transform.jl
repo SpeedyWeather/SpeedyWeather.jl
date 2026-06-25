@@ -199,11 +199,11 @@ end
 
             # reference: generic (allocating) GPU path, graphs disabled on this transform
             ext.clear_fourier_graph_cache!()
-            S_off = SpectralTransform(spectral_grid; cuda_graphs = false)
+            S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
             spec_off = transform(field, S_off)      # grid -> spectral
             grid_off = transform(coeffs, S_off)      # spectral -> grid
 
-            # CUDA-Graphs path (default, cuda_graphs = true)
+            # GPU-graphs path (default, gpu_graphs = true)
             ext.clear_fourier_graph_cache!()
             S_on = SpectralTransform(spectral_grid)
             spec_on = transform(field, S_on)
