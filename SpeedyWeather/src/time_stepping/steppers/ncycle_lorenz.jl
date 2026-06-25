@@ -146,12 +146,14 @@ function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
         clock::Clock,
-        scale::Number,
+        scale::Real,
         time_stepping::NCycleLorenz,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
     )
-    Δt = time_stepping.Δt / scale       # scale on the fly
+    (; Δt) = time_stepping
+    Δt /= oftype(Δt, scale)     # scale on the fly
+    
     w = weight_coefficient(time_stepping, clock)
 
     # with an implicit solver the tendency_average_kernel! has to be computed

@@ -207,12 +207,13 @@ function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
         clock::Clock,
-        scale::Number,
+        scale::Real,
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
     )
-    Δt = time_step(time_stepping, clock) / scale    # scale time step on the fly *1/radius for atmospheric variables
+    Δt = time_step(time_stepping, clock)
+    Δt /= oftype(Δt, scale)                         # scale time step on the fly *1/radius for atmospheric variables
     lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index
     var_old, var_new = get_steps(var)
     var_lf = get_step(var, lf)                      # view on either t or t+dt to dis/enable Williams filter
