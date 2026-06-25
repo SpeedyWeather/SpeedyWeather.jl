@@ -1,7 +1,6 @@
 module SpeedyTransformsAMDGPUExt
 
 import AMDGPU: AMDGPU, ROCArray, ROCBackend
-import AMDGPU.HIP: HIPGraphExec, capture, instantiate, launch
 import AbstractFFTs
 import LinearAlgebra
 import LinearAlgebra: mul!
@@ -42,6 +41,11 @@ unbounded growth (and host-side capture cost) when the transform is called with 
 of freshly-allocated `field` buffers (e.g. the allocating `transform(field, S)`). Beyond
 this many distinct buffers the allocation-free loop is run directly without capturing."""
 const MAX_GRAPHS = 64
+
+# AMDGPU.HIP exports are not re-exported from the top-level AMDGPU module, so we
+# cannot import them with `import AMDGPU.HIP: ...`. Use a const alias for the type
+# (needed in the struct and isa check) and qualify the three function calls directly.
+const HIPGraphExec = AMDGPU.HIP.HIPGraphExec
 
 # =====================================================================================
 # Fused gather/scatter kernels — move all rings at once between the strided grid/scratch
@@ -263,7 +267,7 @@ or the per-direction cache is full."""
 function run_graph!(execs::AbstractDict, key, loop!::F) where {F}
     exec = get(execs, key, missing)
     if exec isa HIPGraphExec
-        launch(exec)                         # hot path: pure replay on AMDGPU.stream()
+        AMDGPU.HIP.launch(exec)              # hot path: pure replay on AMDGPU.stream()
         return nothing
     elseif exec === nothing                  # fallback: capture previously failed
         loop!()
@@ -282,7 +286,7 @@ function run_graph!(execs::AbstractDict, key, loop!::F) where {F}
     KernelAbstractions.synchronize(ROCBackend())
 
     # do the capture
-    graph = capture(throw_error = false) do
+    graph = AMDGPU.HIP.capture(throw_error = false) do
         loop!()
     end
 
@@ -292,10 +296,10 @@ function run_graph!(execs::AbstractDict, key, loop!::F) where {F}
         return nothing
     end
 
-    exec = instantiate(graph)
+    exec = AMDGPU.HIP.instantiate(graph)
     execs[key] = exec
 
-    launch(exec)                             # produce the result via the graph
+    AMDGPU.HIP.launch(exec)                 # produce the result via the graph
     return nothing
 end
 
