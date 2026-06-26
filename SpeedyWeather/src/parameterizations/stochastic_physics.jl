@@ -29,7 +29,9 @@ variables(::AbstractStochasticPhysics) = ()
 
 # precompute the taper
 function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, model::PrimitiveEquation)
-    sppt.taper .= sppt.tapering.(model.geometry.σ_levels_full)
+    coord = model.geometry.vertical_coordinates
+    nlayers = get_nlayers(coord)
+    sppt.taper .= [sppt.tapering(sigma(k, coord)) for k in 1:nlayers]
     return nothing
 end
 

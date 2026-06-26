@@ -119,8 +119,8 @@ include("parameterizations/parameterizations.jl")
 include("time_stepping/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
-include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
+include("dynamics/vertical_coordinates.jl")
 include("dynamics/geometry.jl")
 include("dynamics/coriolis.jl")
 include("dynamics/planet.jl")
