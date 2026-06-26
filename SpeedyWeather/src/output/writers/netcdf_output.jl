@@ -183,7 +183,7 @@ function initialize!(
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib = Dict("units" => "degrees_north", "long_name" => "latitude"))
-    defVar(dataset, "layer", σ, ("layer",), attrib = Dict("units" => "1", "long_name" => "sigma layer"))
+    defVar(dataset, "layer", Float32.(σ), ("layer",), attrib = Dict("units" => "1", "long_name" => "sigma layer"))
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
