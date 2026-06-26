@@ -146,10 +146,10 @@ function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
         clock::Clock,
-        scale::Real,
         time_stepping::NCycleLorenz,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
+        scale::Real = 1,
     )
     (; Δt) = time_stepping
     Δt /= oftype(Δt, scale)     # scale on the fly

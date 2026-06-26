@@ -83,6 +83,7 @@ function initialize!(
     (; resolution_scaling, power, power_stratosphere, tapering_σ) = diffusion
     Δt = default_time_step(model.time_stepping)
     (; radius) = model.planet
+    Δt /= radius
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
     # divide by radius because the equations are in the radius-scaled form (see Radius scaling)

@@ -207,10 +207,10 @@ function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
         clock::Clock,
-        scale::Real,
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
+        scale::Real = 1,
     )
     Δt = time_step(time_stepping, clock)
     Δt /= oftype(Δt, scale)                         # scale time step on the fly *1/radius for atmospheric variables
