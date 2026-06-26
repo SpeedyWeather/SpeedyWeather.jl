@@ -74,8 +74,8 @@ Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
 the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument. In case a 
 non-default number of soil layers is used, it also needs the respective `nlayers_soil` to allocate those outputs.
 The output grid is optionally determined by keyword arguments `output_Grid` (its type, full grid required),
-`nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
-equivalent of the grid and resolution used in `SpectralGrid` `S`."""
+`nlat_half` (resolution) and `output_NF` (number format, only used for variables not coordinates).
+By default, uses the full grid equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
         SG::SpectralGrid,
         Model::Type{<:AbstractModel} = Barotropic;
@@ -175,29 +175,29 @@ function initialize!(
     output!(output, vars.prognostic.clock.time)   # write initial time
 
     # DEFINE NETCDF DIMENSIONS SPACE
-    # explictly move to CPU to avoid issues with Reactant and on GPU
+    # explictly move to CPU and convert to common format as determined by RingGrids.get_lond (Float64 default)
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
+    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
     soil_indices = collect(1:get_soil_layers(model))
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib = Dict("units" => "degrees_north", "long_name" => "latitude"))
-    defVar(dataset, "layer", Float32.(σ), ("layer",), attrib = Dict("units" => "1", "long_name" => "sigma layer"))
+    defVar(dataset, "layer", σ, ("layer",), attrib = Dict("units" => "1", "long_name" => "sigma layer"))
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
-    # VARIABLES, define every output variable in the netCDF file and write initial conditions
+    # VARIABLES, remove output variables not existent in simulation.variables
     simulation = Simulation(vars, model)
     nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
     if !isempty(nonexisting_vars)
         @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
     end
     delete!(output, nonexisting_vars...)
+
+    # then define every output variable in the netCDF file and write initial conditions
     for (key, var) in output.variables
-        if ~isnothing(path_or_nothing(var, simulation))
-            define_variable!(dataset, var, eltype(output.field2D))
-            output!(output, var, simulation)
-        end
+        define_variable!(dataset, var, eltype(output.field2D))
+        output!(output, var, simulation)
     end
 
     return nothing
