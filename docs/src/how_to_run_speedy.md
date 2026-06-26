@@ -78,12 +78,10 @@ which have to be discretized in ``[0, 1]``
 ```@example howto
 vertical_coordinates = SigmaCoordinates(0:0.2:1)
 ```
-These are regularly spaced [Sigma coordinates](@ref), defined through their half levels.
-The cell centers or called full levels are marked with an ×.
-You have to provide this as an argument to `Geometry`,
-i.e. `Geometry(spectral_grid, vertical_coordinates=σ)` and pass this on to the
-model constructor if you want to use custom sigma coordinates. At the moment,
-other vertical coordinates are not supported.
+These are regularly spaced [Sigma coordinates](@ref sigma_coordinates_usage), defined through
+their half levels. The cell centers or full levels are marked with an ×. SpeedyWeather.jl also
+supports hybrid sigma-pressure coordinates — see [Vertical coordinates](@ref vertical_coordinates_page)
+for details and all available constructors.
 
 ## [Creating model components](@id create_model_components)
 
