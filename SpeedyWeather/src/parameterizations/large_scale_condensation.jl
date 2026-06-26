@@ -71,10 +71,9 @@ large-scale precipitation vertically for output."""
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])           
     pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
     (; Δt_sec) = time_stepping                          # time step [s]
-    σ = geometry.σ_levels_full                          # vertical sigma coordinate [1]
-    Δσ = geometry.σ_levels_thick                        # layer thickness in sigma coordinates
+    coord = geometry.vertical_coordinates
     ρ = atmosphere.water_density                        # air density [kg/m³]
-    pₛ_gρ = pₛ / (planet.gravity * ρ)                   # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
+    gρ = planet.gravity * ρ                             # [m/s² * kg/m³]
 
     # thermodynamics
     Lᵥ = atmosphere.latent_heat_condensation            # latent heat of vaporization
@@ -94,14 +93,16 @@ large-scale precipitation vertically for output."""
 
         # Condensation from humidity in this layer (for a negative humidity tendency)
         # relative to threshold that can be <100%, e.g. 95%
-        sat_humid_k = saturation_humidity(temp[ij, k], σ[k] * pₛ, atmosphere)
+        pₖ = pressure(k, pₛ, coord)
+        sat_humid_k = saturation_humidity(temp[ij, k], pₖ, atmosphere)
         δq_cond = sat_humid_k * relative_humidity_threshold - humid[ij, k]
 
         # skip if no condensation has occurred yet in this layer or above
         if δq_cond < 0 || snow_flux_down > 0 || rain_flux_down > 0
 
             # 0. convert between humidity tendency [kg/kg/s] and precipitation amount [m] or rate [m/s]
-            Δp_gρ = Δσ[k] * pₛ_gρ                           # pressure thickness of layer Δp times 1/g/ρ [m]
+            Δp = pressure_thickness(k, pₛ, coord)           # pressure thickness of layer Δp times 1/g/ρ [m]
+            Δp_gρ = Δp / gρ
             Δp_Δtgρ = Δp_gρ / Δt_sec                        # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
             Δtgρ_Δp = inv(Δp_Δtgρ)                          # [s/m]
 
