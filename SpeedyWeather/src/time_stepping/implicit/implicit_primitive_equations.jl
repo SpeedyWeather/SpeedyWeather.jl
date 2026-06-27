@@ -248,8 +248,9 @@ function implicit_correction!(
     (; S⁻¹, R, U, L, W, nlayers) = implicit
     
     # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
+    # dynamical core uses scaled time step, scale on the fly
     Δt = time_step(time_stepping, vars.prognostic.clock)       
-    ξ = implicit.centering * Δt
+    ξ = implicit.centering * Δt / vars.prognostic.scale[]
 
     temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, implicit)
     pres_tend = get_tendency_step(vars.tendencies.pressure, time_stepping, implicit)
