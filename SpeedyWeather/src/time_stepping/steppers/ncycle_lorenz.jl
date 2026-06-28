@@ -153,14 +153,9 @@ function update_prognostic!(
     )
     (; Δt) = time_stepping
     Δt /= oftype(Δt, scale)     # scale on the fly
-    
     w = weight_coefficient(time_stepping, clock)
 
-    # with an implicit solver the tendency_average_kernel! has to be computed
-    # before the implicit solver, so the responsibility is left therein
-    # and execute the prognostic update here only, dispatched over the type of implicit
-    # without an implicit solver we compute both tendency average and update
-    # here in one kernel, notation following largely Hotta et al. 2016
+    # notation following largely Hotta et al. 2016
     F = get_step(tendency, 1)   # tendency of current time step (or weighted + implicitly corrected tendency)
     G = get_step(tendency, 2)   # accumulated weighted tendencies
 

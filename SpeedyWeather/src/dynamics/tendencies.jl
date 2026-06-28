@@ -6,29 +6,26 @@ function dynamics_tendencies!(
     )
     forcing!(vars, model)               # = (Fᵤ, Fᵥ) forcing for u, v
     drag!(vars, model)                  # drag term for u, v
+    scale_tendencies!(vars, model)      # dynamical core uses a scaled time step, Δt/radius
     vorticity_flux!(vars, model)        # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
     tracer_advection!(vars, model)
     return nothing
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Calculate all tendencies for the ShallowWaterModel."""
 function dynamics_tendencies!(
         vars::Variables,
         model::ShallowWater,
     )
-    (; planet, atmosphere, orography) = model
-    (; spectral_transform, geometry) = model
-
     forcing!(vars, model)               # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
     drag!(vars, model)                  # drag term for u, v
+    scale_tendencies!(vars, model)      # dynamical core uses a scaled time step, Δt/radius
 
     # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for vorticity
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence
     vorticity_flux!(vars, model)
-
-    geopotential!(vars, planet)         # geopotential Φ = gη in shallow water
+    geopotential!(vars, model)          # geopotential Φ = gη in shallow water
     bernoulli_potential!(vars, model)   # = -∇²(E+Φ), tendency for divergence
 
     # = -∇⋅(uh, vh), tendency for interface displacement η
@@ -48,6 +45,7 @@ function dynamics_tendencies!(
     )
     forcing!(vars, model)
     drag!(vars, model)
+    scale_tendencies!(vars, model)
 
     (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit, time_stepping) = model
 
