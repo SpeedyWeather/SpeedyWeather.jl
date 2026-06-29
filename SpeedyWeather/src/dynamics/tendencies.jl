@@ -454,6 +454,7 @@ function vordiv_tendencies!(
         time_stepping::AbstractTimeStepper,
     )
     (; f) = coriolis                            # coriolis parameter
+    scale = vars.prognostic.scale[]             # scale Coriolis on the fly as is vorticity
     Tₖ = implicit.temp_profile                  # reference temperature profile
     (; coslat⁻¹) = geometry
 
@@ -464,11 +465,11 @@ function vordiv_tendencies!(
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     vor = get_prognostic_step(vars.grid.vorticity, time_stepping, DynamicalCore())
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
-    
+
     # if no humidity, pass a zero scratch array to the kernel
     humid = haskey(vars.grid, :humidity) ?
         get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) :
-        fill!(vars.scratch.grid.a, 0)                   
+        fill!(vars.scratch.grid.a, 0)
 
     (; dpres_dx, dpres_dy) = vars.dynamics              # zonal/meridional gradient of logarithm of surface pressure
     scratch_memory = vars.scratch.transform_memory
@@ -479,7 +480,7 @@ function vordiv_tendencies!(
     launch!(
         arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
         u_tend_grid, v_tend_grid, u, v, vor, temp, humid,
-        dpres_dx, dpres_dy, Tₖ, f, coslat⁻¹, whichring, atmosphere,
+        dpres_dx, dpres_dy, Tₖ, f, scale, coslat⁻¹, whichring, atmosphere,
     )
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     vor_tend = get_tendency_step(vars.tendencies.vorticity, time_stepping, DynamicalCore())
@@ -503,19 +504,19 @@ end
         vor_grid,               # Input: relative vorticity
         temp_grid,              # Input: temperature anomaly
         humid_grid,             # Input: humidity
-        dpres_dx,                 # Input: zonal gradient of log surface pressure
-        dpres_dy,                 # Input: meridional gradient of log surface pressure
+        dpres_dx,               # Input: zonal gradient of log surface pressure
+        dpres_dy,               # Input: meridional gradient of log surface pressure
         Tₖ,                     # Input: reference temperature profile
-        f,              # Input: coriolis parameter
-        coslat⁻¹,       # Input: 1/cos(latitude) for scaling
-        whichring,      # Input: mapping from grid point to latitude ring
+        f,                      # Input: coriolis parameter
+        scale,                  # Input: Scaling of vorticity, apply to Coriolis on the fly too
+        coslat⁻¹,               # Input: 1/cos(latitude) for scaling
+        whichring,              # Input: mapping from grid point to latitude ring
         atmosphere,             # Input: atmosphere for R_dry and μ_virt_temp
     )
     ij, k = @index(Global, NTuple)
     j = whichring[ij]           # latitude ring index for this grid point
     coslat⁻¹j = coslat⁻¹[j]     # get coslat⁻¹ for this latitude
-    f_j = f[j]                  # coriolis parameter for this latitude
-
+    f_j = f[j] * scale          # coriolis parameter for this latitude, scaled
     ω = vor_grid[ij, k] + f_j   # absolute vorticity
 
     # compute virtual temperature on the fly, temp_grid is anomaly
@@ -591,7 +592,7 @@ function temperature_tendency!(
 
     # use scratch array with zeros in case humidity doesn't exist
     humid = haskey(vars.grid, :humidity) ?
-        get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) : 
+        get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) :
         fill!(vars.scratch.grid.a, 0)
 
     (; pres_flux, pres_flux_sum_above, div_sum_above) = vars.dynamics
@@ -818,6 +819,7 @@ function vorticity_flux_curldiv!(
     )
 
     (; f) = model.coriolis
+    scale = vars.prognostic.scale[]     # used to scale Coriolis f on the fly, as it's being added to a scaled vorticity
     (; coslat⁻¹) = model.geometry
 
     u_tend_grid = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, DynamicalCore(), model)
@@ -831,7 +833,7 @@ function vorticity_flux_curldiv!(
 
     launch!(
         architecture(u), RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
-        u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring
+        u_tend_grid, v_tend_grid, u, v, vor, f, scale, coslat⁻¹, whichring
     )
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
@@ -853,17 +855,17 @@ function vorticity_flux_curldiv!(
 end
 
 @kernel inbounds = true function _vorticity_flux_kernel!(
-        u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring
+        u_tend_grid, v_tend_grid, u, v, vor, f, scale, coslat⁻¹, whichring
     )
     # Get indices
     ij, k = @index(Global, NTuple)
     j = whichring[ij]
 
     # Get the coriolis parameter and cosine latitude factor for this latitude
-    f_j = f[j]
+    f_j = f[j] * scale              # scaled as is vorticity
     coslat⁻¹j = coslat⁻¹[j]
 
-    # Calculate absolute vorticity
+    # Calculate absolute vorticity, scale f as is vorticity too on the fly
     ω = vor[ij, k] + f_j
 
     # Update tendencies
