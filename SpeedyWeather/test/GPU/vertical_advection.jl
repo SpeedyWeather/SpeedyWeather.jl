@@ -1,6 +1,6 @@
 # `_vertical_advection!(::GPU, ...)` dispatches between two kernels depending on npoints
 # (vertical_advection_kernel!, one thread per (ij,k); vertical_advection_column_kernel!, one
-# thread per ij looping over k) -- proved bit-identical by the face-consistency test, but
+# thread per ij looping over k) 
 # checked here directly against real GPU data for every scheme, bypassing the npoints
 # threshold so both kernels are exercised regardless of this test grid's resolution.
 @testset "Vertical advection GPU kernels" begin
