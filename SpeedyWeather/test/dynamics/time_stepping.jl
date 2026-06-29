@@ -8,7 +8,6 @@ F(x, ω) = im * ω * x
     Δt = 2π / 192       # time step
     n_rotations = 1     # times around the circle
     n_time_steps = round(Int, 2π * n_rotations / (ω * Δt))
-    scale = 1
 
     # loop over different precisions
     @testset for NF in (Float32, Float64)
@@ -36,7 +35,7 @@ F(x, ω) = im * ω * x
             # leapfrog forward
             for i in 1:n_time_steps-1
                 dX.data .= F.(X[:, 2], NF(ω))
-                SpeedyWeather.update_prognostic!(X, dX, clock, scale, L, nothing, model)
+                SpeedyWeather.update_prognostic!(X, dX, clock, L, nothing, model)
             end
 
             # absolute error to exact result 1+0i
@@ -48,7 +47,7 @@ F(x, ω) = im * ω * x
             # long term stability
             for i in 1:10*n_time_steps
                 dX.data .= F.(X[:, 2], NF(ω))
-                SpeedyWeather.update_prognostic!(X, dX, clock, scale, L, nothing, model)
+                SpeedyWeather.update_prognostic!(X, dX, clock, L, nothing, model)
             end
 
             @test all(abs.(X) .<= 1)         # still stable?
@@ -69,7 +68,6 @@ end
 
     Δt = 1
     time_stepping.Δt = Δt
-    scale = 1
 
     # initial conditions in step 1, 0 in step 2
     X  = simulation.variables.prognostic.vorticity
@@ -92,7 +90,7 @@ end
     dX = rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
     dX .= real.(dX)             # make them real only to better tell them apart
     dX1 = get_step(dX, 1)
-    SpeedyWeather.update_prognostic!(X, dX, clock, scale, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Euler step does not count as time step but as step
@@ -108,7 +106,7 @@ end
     # new time step, new random tendencies
     dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
     dX .= im*imag.(dX)          # make them imaginary only to better tell them apart
-    SpeedyWeather.update_prognostic!(X, dX, clock, scale, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Leapfrog step does count!
@@ -123,7 +121,7 @@ end
 
     # new time step, new random tendencies
     dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
-    SpeedyWeather.update_prognostic!(X, dX, clock, scale, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Leapfrog step does count!
@@ -139,7 +137,7 @@ end
 
     # new time step, new random tendencies
     dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
-    SpeedyWeather.update_prognostic!(X, dX, clock, scale, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Leapfrog step does count!
@@ -180,7 +178,7 @@ end
 
                 for i in 1:n_time_steps
                     dX[:, 1] .= F.(X, NF(ω))        # tendency in the first step (second is multistep averaged tendency)
-                    SpeedyWeather.update_prognostic!(X, dX, clock, scale, L, nothing, model)
+                    SpeedyWeather.update_prognostic!(X, dX, clock, L, nothing, model)
                     SpeedyWeather.time_step!(clock, L)
                 end
 
