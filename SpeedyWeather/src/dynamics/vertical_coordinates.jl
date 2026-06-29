@@ -91,10 +91,16 @@ end
 """$(TYPEDSIGNATURES)
 Check that nlayers and σ_half match."""
 function sigma_okay(nlayers::Integer, σ_half::AbstractVector)
-    @assert σ_half[1] >= 0 "First specified σ_half has to be >=0, $(σ_half[1]) given."
-    @assert σ_half[end] == 1 "Last specified σ_half has to be 1, $(σ_half[end]) given."
+    # @allowscalar permits the few boundary reads on GPU arrays without a host transfer,
+    # this is a one-time construction-time check
+    @allowscalar begin
+        @assert σ_half[1] >= 0 "First specified σ_half has to be >=0, $(σ_half[1]) given."
+        @assert σ_half[end] == 1 "Last specified σ_half has to be 1, $(σ_half[end]) given."
+    end
+
     @assert nlayers == (length(σ_half) - 1) "nlayers has to be length of σ_half - 1, $nlayers vs $(length(σ_half) - 1) given."
     @assert Utils.isincreasing(σ_half) "Vertical sigma coordinates are not increasing."
+    
     return true
 end
 
