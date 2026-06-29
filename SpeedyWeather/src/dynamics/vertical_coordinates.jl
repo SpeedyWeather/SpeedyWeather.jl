@@ -37,15 +37,13 @@ struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinates
 
     "[DERIVED] Layer thickness in sigma; σ_thickness[k] = σ_half[k+1] - σ_half[k], sums to 1"
     σ_thickness::VectorType
-
-    SigmaCoordinates{T, V}(nlayers, σh, σf, Δσ) where {T, V} = sigma_okay(nlayers, σh) ?
-        new{T, V}(nlayers, σh, σf, Δσ) : error("σ_half = $σh cannot be used for $nlayers-level SigmaCoordinates")
 end
 
 Adapt.@adapt_structure SigmaCoordinates
 
 function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector)
     (; nlayers) = SG
+    sigma_okay(nlayers, σ_half)     # validate user input on the host before moving to the device
     σ_half = on_architecture(SG.architecture, convert.(SG.NF, σ_half))
     σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
     σ_thickness = σ_half[2:end] - σ_half[1:(end - 1)]
