@@ -111,7 +111,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::LandSeaMaskOutput, simulation) =
-    simulation.model.land_sea_mask.mask
+    simulation.model.land_sea_mask.land_fraction
 
 LandOutput() = (
     SoilTemperatureOutput(),

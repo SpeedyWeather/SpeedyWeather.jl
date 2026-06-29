@@ -19,7 +19,7 @@ function Base.show(io::IO, grid::AbstractGrid)
     return nothing
 end
 
-## TYPES
+# TYPES
 grid_type(::Type{Grid}) where {Grid <: AbstractGrid} = nonparametric_type(Grid)
 full_grid_type(grid::AbstractGrid) = full_grid_type(typeof(grid))
 
@@ -94,7 +94,7 @@ function (::Type{Grid})(
     return Field(data_flat, grid)
 end
 
-## COORDINATES
+# COORDINATES
 
 """$(TYPEDSIGNATURES) Longitudes (degrees, 0-360˚E), latitudes (degrees, 90˚N to -90˚N) for
 every (horizontal) grid point in `grid` in ring order (0-360˚E then north to south)."""
@@ -159,8 +159,7 @@ end
 
 get_solid_angles(grid::AbstractGrid) = get_solid_angles(typeof(grid), grid.nlat_half)
 
-## ITERATOR
-
+# ITERATORS
 """$(TYPEDSIGNATURES)
 Vector{UnitRange} `rings` to loop over every ring of `grid`
 and then each grid point per ring. To be used like

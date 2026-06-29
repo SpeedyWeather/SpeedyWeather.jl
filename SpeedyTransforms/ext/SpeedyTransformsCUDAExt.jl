@@ -14,7 +14,7 @@ using SpeedyTransforms.LowerTriangularArrays
 import SpeedyTransforms: SpectralTransform, _fourier_batched!
 import SpeedyTransforms.RingGrids: AbstractField
 
-import SpeedyWeatherInternals.KernelLaunching: launch!, Array3DWorkOrder
+import SpeedyWeatherInternals.KernelLaunching: launch!, ArrayWorkOrder
 import SpeedyWeatherInternals.Architectures: architecture
 
 # =====================================================================================
@@ -222,14 +222,14 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     complex_size = (nfreq_max, nlat_half, nlayers)
 
     # northern rings, 
-    launch!(arch, Array3DWorkOrder, real_size, gather_real_kernel!, packed_real, field.data, real_offset, nlons, istart_n)
+    launch!(arch, ArrayWorkOrder, real_size, gather_real_kernel!, packed_real, field.data, real_offset, nlons, istart_n)
     @inbounds for j in 1:nlat_half
         mul!(complex_view[j], rfft_plans[j], real_view[j])
     end
-    launch!(arch, Array3DWorkOrder, complex_size, scatter_complex_kernel!, f_north, packed_complex, complex_offset, nfreqs)
+    launch!(arch, ArrayWorkOrder, complex_size, scatter_complex_kernel!, f_north, packed_complex, complex_offset, nfreqs)
 
     # southern rings (the equator ring, if any, is zeroed rather than transformed)
-    launch!(arch, Array3DWorkOrder, real_size, gather_real_kernel!, packed_real, field.data, real_offset, nlons, istart_s)
+    launch!(arch, ArrayWorkOrder, real_size, gather_real_kernel!, packed_real, field.data, real_offset, nlons, istart_s)
     @inbounds for j in 1:nlat_half
         if cache.has_equator && j == j_equator
             fill!(complex_view[j], 0)
@@ -237,7 +237,7 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
             mul!(complex_view[j], rfft_plans[j], real_view[j])
         end
     end
-    launch!(arch, Array3DWorkOrder, complex_size, scatter_complex_kernel!, f_south, packed_complex, complex_offset, nfreqs)
+    launch!(arch, ArrayWorkOrder, complex_size, scatter_complex_kernel!, f_south, packed_complex, complex_offset, nfreqs)
     return nothing
 end
 
@@ -256,19 +256,19 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     complex_size = (nfreq_max, nlat_half, nlayers)
 
     # northern rings
-    launch!(arch, Array3DWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_north, complex_offset, nfreqs)
+    launch!(arch, ArrayWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_north, complex_offset, nfreqs)
     @inbounds for j in 1:nlat_half
         mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
-    launch!(arch, Array3DWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons, istart_n)
+    launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons, istart_n)
 
     # southern rings (the equator ring, if any, is skipped: north already wrote those rows)
-    launch!(arch, Array3DWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_south, complex_offset, nfreqs)
+    launch!(arch, ArrayWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_south, complex_offset, nfreqs)
     @inbounds for j in 1:nlat_half
         (cache.has_equator && j == j_equator) && continue
         mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
-    launch!(arch, Array3DWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons_s, istart_s)
+    launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons_s, istart_s)
     return nothing
 end
 

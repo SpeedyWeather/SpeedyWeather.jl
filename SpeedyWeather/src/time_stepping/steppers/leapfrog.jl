@@ -50,10 +50,10 @@ tendency_steps(::AbstractLeapfrog) = 1
 
 # in Leapfrog use the current (=2nd) in the dynamical core
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractGeopotential) = 2
 
 # the linear terms in the dynamical core have to be evaluated at the previous time step
 # they are then moved forward within the implicit corrections
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractGeopotential) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::LinearDynamicalCore) = 1
 
 # but in Barotropc/ShallowWater models the 2nd one doesn't exist on the grid and the 1st is considered to be the current step

@@ -166,16 +166,16 @@ function SpeedyTransforms.transform!(
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
     # only do after transforms to avoid copying uninitialized zeros
     initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
-    
-    # include humidity effect into temp for everything stability-related
-    temperature_average!(vars, temp, S)
-    geopotential!(vars, model)                  # calculate geopotential
 
     # convert the logarithm of surface pressure to actual surface pressure in Pascal for parameterizations
     # dispatch over DummyParameterization (= any parameterization) to let time steppers decide the step
     log_pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, DummyParameterization())    # log Pa
     vars.parameterizations.surface_pressure .= exp.(log_pₛ)                                     # in Pa
 
+    # include humidity effect into temp for everything stability-related
+    temperature_average!(vars, temp, S)
+    geopotential!(vars, model)                  # calculate geopotential
+        
     for (name, tracer) in model.tracers
         tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
         tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)

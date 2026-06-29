@@ -97,8 +97,8 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     nlayers = size(temp, 2)
 
     pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
-    sigma_levels = model.geometry.σ_levels_full
-    land_fraction = model.land_sea_mask.mask[ij]
+    (; vertical_coordinates) = model.geometry
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     cₚ = model.atmosphere.heat_capacity
 
     # rename for brevity
@@ -117,14 +117,16 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     precip_term = min(precip_max, (86400 * rain_rate) / 1000)   # convert to mm/day
     P = precip_weight * sqrt(precip_term)
 
-    cloud_top_precipitation = vars.parameterizations.cloud_top[ij]       # from convection or large-scale condensation
+    # from convection or large-scale condensation
+    cloud_top_precipitation = vars.parameterizations.cloud_top[ij]       
     humidity_term_cloud_top::NF = 0
     cloud_top_humidity = nlayers + 1
 
     # Find cloud top from RH threshold
     for k in 1:(nlayers - 1)
         humidity_k = humid[ij, k]
-        qsat = saturation_humidity(temp[ij, k], sigma_levels[k] * pₛ, model.atmosphere)
+        pₖ = pressure(k, pₛ, vertical_coordinates)
+        qsat = saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
         if humidity_k > q_min && qsat > 0
             relative_humidity_k = humidity_k / qsat
 
@@ -154,7 +156,8 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
         static_stability = clamp((G - stab_min) / (stab_max - stab_min), 0, 1)
 
         stratocumulus_cover_ocean = static_stability * max(cover_max - cloud_factor * cloud_cover, 0)
-        qsat_surface = saturation_humidity(temp[ij, surface], sigma_levels[surface] * pₛ, model.atmosphere)
+        pN = pressure(surface, pₛ, vertical_coordinates)
+        qsat_surface = saturation_humidity(temp[ij, surface], pN, model.atmosphere)
         rh_surface = humid[ij, surface] / qsat_surface      # relative humidity at surface
         stratocumulus_cover_land = stratocumulus_cover_ocean * rh_surface
 

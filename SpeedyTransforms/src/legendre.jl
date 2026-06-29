@@ -92,8 +92,8 @@ function _legendre!(
         end
 
         if unscale_coslat
-            g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
-            g_south[:, nlayers, j] .*= coslat⁻¹[j]
+            @views g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
+            @views g_south[:, nlayers, j] .*= coslat⁻¹[j]
         end
     end
 end
@@ -198,7 +198,7 @@ function unscale_coslat!(
     )
 
     launch!(
-        architecture, Array3DWorkOrder, size(g_north), unscale_coslat_kernel!,
+        architecture, ArrayWorkOrder, size(g_north), unscale_coslat_kernel!,
         g_north, g_south, coslat⁻¹
     )
     return nothing

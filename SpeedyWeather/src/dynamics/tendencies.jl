@@ -154,6 +154,10 @@ function vertical_integration!(
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
     )
+    # TODO: σ_levels_thick is used here as the sigma-coordinate layer thickness Δσₖ for the
+    # Δσ-weighted vertical integrals (Simmons & Burridge 1981, eq. 3.12). Generalising to
+    # hybrid coordinates requires replacing Δσₖ with the actual pressure thickness divided
+    # by surface pressure, which varies in space and time.
     (; σ_levels_thick, nlayers) = geometry
     (; dpres_dx, dpres_dy) = vars.dynamics      # zonal, meridional grad of log surface pressure
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
@@ -203,6 +207,7 @@ function vertical_integration!(
         time_stepping::AbstractTimeStepper,
     )
 
+    # TODO: same as CPU version — Δσₖ weights baked into sigma-coordinate continuity equation.
     (; σ_levels_thick, nlayers) = geometry
     (; dpres_dx, dpres_dy) = vars.dynamics    # zonal, meridional grad of log surface pressure
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
@@ -341,6 +346,9 @@ function vertical_velocity!(
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
     )
+    # TODO: σ_levels_thick and σ_levels_half are used here to compute the sigma-coordinate
+    # vertical velocity σ̇ (Hoskins & Simmons 1975, eq. before 6). Generalising to hybrid
+    # coordinates requires a reformulation of the vertical velocity equation.
     (; σ_levels_thick, σ_levels_half, nlayers) = geometry
 
     # sum of Δσ-weighted div, uv∇lnp from 1:k-1
@@ -363,7 +371,9 @@ function vertical_velocity!(
     Δσₖ = view(σ_levels_thick, 1:(nlayers - 1))'
     σₖ_half = view(σ_levels_half, 2:nlayers)'
     # TODO: broadcast issue here, that's why the .data are neeeded
-    w.data[:, 1:(nlayers - 1)] .= σₖ_half .* (div_mean_grid.data .+ ūv̄∇lnp.data) .-
+    # @views so the RHS `[:, 1:nlayers-1]` slices are views, not materialized copies,
+    # letting the whole dotted expression fuse into one allocation-free broadcast
+    @views w.data[:, 1:(nlayers - 1)] .= σₖ_half .* (div_mean_grid.data .+ ūv̄∇lnp.data) .-
         (div_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* div_grid.data[:, 1:(nlayers - 1)]) .-
         (pres_flux_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* pres_flux.data[:, 1:(nlayers - 1)])
 
@@ -950,7 +960,7 @@ function bernoulli_potential!(
     # pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
     # RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
 
-    bernoulli_grid .= 1 // 2 .* (u .^ 2 + v .^ 2)               # = ½(u² + v²) on grid
+    bernoulli_grid .= 1 // 2 .* (u .^ 2 .+ v .^ 2)              # = ½(u² + v²) on grid, fused (.+) to avoid temporaries
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)    # to spectral space
     bernoulli .+= Φ                                             # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)    # add -∇²(½(u² + v²) + ϕ)

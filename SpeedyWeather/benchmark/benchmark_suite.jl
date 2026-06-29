@@ -102,6 +102,21 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
 
         nsteps = n_timesteps(trunc, nlayers)
         period = Second(round(Int, model.time_stepping.Δt_sec * (nsteps + 1)))
+
+        # Warm up before timing: run a few steps so JIT compilation of the time
+        # loop happens here rather than inside the timed run below. The timed run
+        # is short (≈nsteps steps, only a few seconds), so without this its
+        # wallclock is dominated by one-off compilation, which massively
+        # understates SYPD and can even invert the ordering between models
+        # (e.g. the model compiled first appears slower than a later one that
+        # reuses the compiled code). A handful of steps covers the Euler spin-up
+        # plus regular steps. We then re-initialize so the timed run starts from
+        # the same initial state as before.
+        warmup_period = Second(round(Int, model.time_stepping.Δt_sec * 3))
+        run!(simulation; period = warmup_period)
+        synchronize(architecture)
+
+        simulation = initialize!(model)
         run!(simulation; period)
         synchronize(architecture)
 

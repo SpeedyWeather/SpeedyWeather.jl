@@ -3,6 +3,15 @@
 ## Unreleased
 
 - Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced firsti in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
+- Fix scalar indexing error constructing `SigmaCoordinates`/`Geometry` on GPU [#1142](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1142)
+- Sigma-pressure coordinates, part 1 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137)
+- NetCDF output coordinates always in Float64 as determined by RingGrids.get_lond [#1141](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1141)
+- ArrayWorkOrder instead of Array3DWorkOrder as both preserve dimensions [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
+- Allocation-free masked copy between RingGrids Field and subset array via mask [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
+- Rename land-sea mask array land_fraction [#1219](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1134)
+- Fix vertical advection performance regression by indexing the contiguous time step directly in the stencil kernel instead of a `get_*_step` view [#1131](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1131)
+- Reduce allocations in some broadcasted operations [#1133](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1133)
+- Add a warm to the benchmark to not measure pre-compile [#1129](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1129)
 - Adjust benchmarking to new timestepping logic [#1128](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1128)
 - Relax Enzyme compatability again to allow recent Enzyme versions [#1126](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1126)
 - reinitialize! logic to allow for model.implicit to be reinitialized [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
