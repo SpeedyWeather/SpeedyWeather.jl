@@ -103,44 +103,52 @@ end
     # full array as ξ[ij, k, s_prog] keeps the contiguous parent (the constant step folds
     # into the index), which is ~2x faster here than a `get_*_step` SubArray view would be.
     # tail/front instead of [2:end]/[1:end-1] as tuple-range indexing is not type-stable
-    ξᶠ⁺ = reconstructed_at_face(ξ, ij, s_prog, Base.tail(k_stencil), w⁺, adv)
-    ξᶠ⁻ = reconstructed_at_face(ξ, ij, s_prog, Base.front(k_stencil), w⁻, adv)
+    S⁺ = gather_stencil_values(ξ, ij, s_prog, Base.tail(k_stencil))
+    S⁻ = gather_stencil_values(ξ, ij, s_prog, Base.front(k_stencil))
+
+    ξᶠ⁺ = reconstruct_face(S⁺, w⁺, adv)
+    ξᶠ⁻ = reconstruct_face(S⁻, w⁻, adv)
 
     # -= as the tendencies already contain the parameterizations
     ξ_tend[ij, k,s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, s_prog] * (w⁺ - w⁻))
 end
 
-# reconstructed_at_face indexes ξ[ij, k[i], s]: `k` is the vertical stencil (tuple of
-# layer indices) and `s` selects the time step of the s-dimensioned field.
+# gathers the stencil values ξ[ij, k[i], s] into a register tuple, once, so that
+# `reconstruct_face` below operates purely on values: this lets the same reconstruction
+# code be reused by memory-access patterns other than per-(ij,k) array indexing (e.g. a
+# CPU column loop keeping a sliding window, or a GPU per-column kernel).
+@inline function gather_stencil_values(ξ, ij, s, k::NTuple{N, Integer}) where {N}
+    return ntuple(i -> ξ[ij, k[i], s], N)
+end
+
+# reconstruct_face operates on `S`, the gathered stencil values (one half of `k_stencil`,
+# in the same index order as before): `S[1] == ξ[ij, k[1], s]` etc.
 
 # 1st order upwind
-@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
-    ifelse(
-    u > 0, ξ[ij, k[1], s],
-    ξ[ij, k[2], s]
-)
+@inline reconstruct_face(S, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
+    ifelse(u > 0, S[1], S[2])
 
 # 3rd order upwind
-@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
+@inline reconstruct_face(S, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1], s] + 5ξ[ij, k[2], s] - ξ[ij, k[3], s]) * 1 // 6,
-    (2ξ[ij, k[4], s] + 5ξ[ij, k[3], s] - ξ[ij, k[2], s]) * 1 // 6
+    u > 0, (2S[1] + 5S[2] - S[3]) * 1 // 6,
+    (2S[4] + 5S[3] - S[2]) * 1 // 6
 )
 
 # 5th order upwind
-@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
+@inline reconstruct_face(S, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1], s] - 13ξ[ij, k[2], s] + 47ξ[ij, k[3], s] + 27ξ[ij, k[4], s] - 3ξ[ij, k[5], s]) * 1 // 60,
-    (2ξ[ij, k[6], s] - 13ξ[ij, k[5], s] + 47ξ[ij, k[4], s] + 27ξ[ij, k[3], s] - 3ξ[ij, k[2], s]) * 1 // 60
+    u > 0, (2S[1] - 13S[2] + 47S[3] + 27S[4] - 3S[5]) * 1 // 60,
+    (2S[6] - 13S[5] + 47S[4] + 27S[3] - 3S[2]) * 1 // 60
 )
 
 # 2nd order centered
-@inline reconstructed_at_face(ξ, ij, s, k, u, ::CenteredVerticalAdvection{NF, 1}) where {NF} =
-    (ξ[ij, k[1], s] + ξ[ij, k[2], s]) * 1 // 2
+@inline reconstruct_face(S, u, ::CenteredVerticalAdvection{NF, 1}) where {NF} =
+    (S[1] + S[2]) * 1 // 2
 
 # 4th order centered
-@inline reconstructed_at_face(ξ, ij, s, k, u, ::CenteredVerticalAdvection{NF, 2}) where {NF} =
-    (-ξ[ij, k[1], s] + 7ξ[ij, k[2], s] + 7ξ[ij, k[3], s] - ξ[ij, k[4], s]) * 1 // 12
+@inline reconstruct_face(S, u, ::CenteredVerticalAdvection{NF, 2}) where {NF} =
+    (-S[1] + 7S[2] + 7S[3] - S[4]) * 1 // 12
 
 const ε = 1 // 1_000_000    # = 1e-6 but number format flexible
 const d₀ = 3 // 10
@@ -171,15 +179,15 @@ const d₂ = 1 // 10
     return p₀(S₀) * w₀ + p₁(S₁) * w₁ + p₂(S₂) * w₂
 end
 
-@inline function reconstructed_at_face(ξ, ij, s, k, u, ::WENOVerticalAdvection)
+@inline function reconstruct_face(S, u, ::WENOVerticalAdvection)
     if u > 0
-        S₀ = (ξ[ij, k[3], s], ξ[ij, k[4], s], ξ[ij, k[5], s])
-        S₁ = (ξ[ij, k[2], s], ξ[ij, k[3], s], ξ[ij, k[4], s])
-        S₂ = (ξ[ij, k[1], s], ξ[ij, k[2], s], ξ[ij, k[3], s])
+        S₀ = (S[3], S[4], S[5])
+        S₁ = (S[2], S[3], S[4])
+        S₂ = (S[1], S[2], S[3])
     else
-        S₀ = (ξ[ij, k[4], s], ξ[ij, k[3], s], ξ[ij, k[2], s])
-        S₁ = (ξ[ij, k[5], s], ξ[ij, k[4], s], ξ[ij, k[3], s])
-        S₂ = (ξ[ij, k[6], s], ξ[ij, k[5], s], ξ[ij, k[4], s])
+        S₀ = (S[4], S[3], S[2])
+        S₁ = (S[5], S[4], S[3])
+        S₂ = (S[6], S[5], S[4])
     end
     return weno_reconstruction(S₀, S₁, S₂)
 end
