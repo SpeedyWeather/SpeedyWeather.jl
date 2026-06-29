@@ -113,13 +113,31 @@ function _vertical_advection!(::CPU, ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlaye
     return nothing
 end
 
+# Below ~30-40k grid points the per-(ij,k) kernel's extra parallelism (npoints*nlayers
+# threads) keeps the GPU better fed than the per-column kernel's npoints threads can; above
+# that, npoints threads alone are enough to saturate the device and the per-column kernel's
+# halved compute (one face reconstruction per interior face instead of two) wins instead.
+# Measured on an A40 (single-variable kernel launch, min of 100 samples): at npoints=28480
+# the column kernel is 8-11% slower (all 3 schemes); at npoints=40320 it is 0-28% faster.
+# 35_000 sits in that measured crossover band.
+const VERTICAL_ADVECTION_GPU_COLUMN_THRESHOLD = 35_000
+
 function _vertical_advection!(arch::GPU, ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv, face::AbstractField)
-    # worksize is the horizontal × vertical iteration space (skip the step dimension)
-    launch!(
-        arch, RingGridWorkOrder, (size(ξ_tend, 1), size(ξ_tend, 2)),
-        vertical_advection_kernel!,
-        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
-    )
+    npoints = size(ξ_tend, 1)
+    if npoints >= VERTICAL_ADVECTION_GPU_COLUMN_THRESHOLD
+        launch!(
+            arch, LinearWorkOrder, (npoints,),
+            vertical_advection_column_kernel!,
+            ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
+        )
+    else
+        # worksize is the horizontal × vertical iteration space (skip the step dimension)
+        launch!(
+            arch, RingGridWorkOrder, (npoints, size(ξ_tend, 2)),
+            vertical_advection_kernel!,
+            ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
+        )
+    end
     return nothing
 end
 
@@ -151,6 +169,33 @@ end
 
     # -= as the tendencies already contain the parameterizations
     ξ_tend[ij, k,s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, s_prog] * (w⁺ - w⁻))
+end
+
+# per-column GPU kernel: one thread per horizontal point ij, looping over all k. Carries
+# the shared interior face in a thread-local register (no scratch array needed, unlike the
+# CPU loop, since each thread already owns its whole column) — same flux-form idea as the
+# CPU path in `_vertical_advection!(::CPU, ...)`, bit-identical to `vertical_advection_kernel!`.
+@kernel inbounds = true function vertical_advection_column_kernel!(
+        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
+    )
+    ij = @index(Global, Linear)
+
+    k_stencil₁ = retrieve_stencil(1, nlayers, adv)
+    ξᶠ⁻ = reconstruct_face(gather_stencil_values(ξ, ij, s_prog, Base.front(k_stencil₁)), w[ij, 1], adv)
+
+    for k in 1:nlayers
+        k_stencil = retrieve_stencil(k, nlayers, adv)
+        Δσₖ⁻¹ = inv(Δσ[k])
+
+        w⁺ = w[ij, k]
+        w⁻ = w[ij, max(1, k - 1)]
+        ξᶠ⁺ = reconstruct_face(gather_stencil_values(ξ, ij, s_prog, Base.tail(k_stencil)), w⁺, adv)
+
+        # -= as the tendencies already contain the parameterizations
+        ξ_tend[ij, k, s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, s_prog] * (w⁺ - w⁻))
+
+        ξᶠ⁻ = ξᶠ⁺
+    end
 end
 
 # gathers the stencil values ξ[ij, k[i], s] into a register tuple, once, so that
