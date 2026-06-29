@@ -15,6 +15,30 @@
     @test (6, 7, 8, 8, 8) == SpeedyWeather.retrieve_stencil(8, 8, SpeedyWeather.CenteredVerticalAdvection{Float32, 2}())
 end
 
+@testset "Vertical advection face consistency" begin
+    # the flux-form rewrite of the vertical advection kernel relies on the "+" face of
+    # layer k (tail of its stencil) being bit-identical to the "-" face of layer k+1
+    # (front of its stencil), for every k including the clamped boundaries, so that each
+    # interior face can be reconstructed once and shared between neighbouring layers.
+    NF = Float32
+    advection_schemes = (
+        SpeedyWeather.CenteredVerticalAdvection{NF, 1}(),
+        SpeedyWeather.CenteredVerticalAdvection{NF, 2}(),
+        SpeedyWeather.UpwindVerticalAdvection{NF, 1}(),
+        SpeedyWeather.UpwindVerticalAdvection{NF, 2}(),
+        SpeedyWeather.UpwindVerticalAdvection{NF, 3}(),
+        SpeedyWeather.WENOVerticalAdvection{NF}(),
+    )
+
+    for adv in advection_schemes, nlayers in (2, 3, 5, 8, 24)
+        for k in 1:(nlayers - 1)
+            stencil_k = SpeedyWeather.retrieve_stencil(k, nlayers, adv)
+            stencil_kp1 = SpeedyWeather.retrieve_stencil(k + 1, nlayers, adv)
+            @test Base.tail(stencil_k) == Base.front(stencil_kp1)
+        end
+    end
+end
+
 @testset "Vertical advection runs" begin
     spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
 
