@@ -46,8 +46,8 @@ $(TYPEDFIELDS)."""
     "[OPTION] Zenith correction exponent (SPEEDY nzen)"
     @param zenith_exponent::NF = 2 (bounds = Nonnegative,)
 
-    "[OPTION] Absorptivity of dry air [per 10^5 Pa]"
     # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absdry, fband weights)
+    "[OPTION] Absorptivity of dry air [per 10^5 Pa]"
     @param absorptivity_dry_air::NF = 0.03135 (bounds = Nonnegative,)
 
     "[OPTION] Constant aerosol concentration?"
@@ -66,8 +66,8 @@ $(TYPEDFIELDS)."""
     "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
     @param absorptivity_cloud_base::NF = 10 (bounds = Nonnegative,)
 
-    "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
     # Weighted one-band scaling: 0.95*0.15 = 0.1425 → rounded to 0.14 (SPEEDY abscl2)
+    "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
     @param absorptivity_cloud_limit::NF = 0.14 (bounds = Nonnegative,)
 end
 

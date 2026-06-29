@@ -21,13 +21,10 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
     Δt_millisec::MS
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt_sec::NF
-
-    "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
 end
 
-Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt))
+Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt))
 
 # HOW MANY STEPS DO VARIABLES NEED?
 # leapfrogging always needs 2 steps in spectral
@@ -115,14 +112,9 @@ function move_prognostic_grid_variables_back!(
         var_old, var_new = get_steps(getfield(grid.tracers, varname))
         var_old .= var_new
     end
-    for varname in ocean_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(grid.ocean, varname))
-        var_old .= var_new
-    end
-    for varname in land_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(grid.land, varname))
-        var_old .= var_new
-    end
+    # does not have to be done for ocean/land as they don't have spectral variables
+    # the grid variables are already in prognostic and the time stepper takes care
+    # of moving them back during the update
     return nothing
 end
 
@@ -140,9 +132,6 @@ struct LeapfrogCore{NF, MS} <: AbstractLeapfrog
     Δt_millisec::MS
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt_sec::NF
-
-    "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
 end
 
@@ -157,17 +146,15 @@ function Leapfrog(
         adjust_with_output = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
-        radius = DEFAULT_RADIUS,
     )
     (; NF, trunc) = spectral_grid
 
     # compute time step
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
-    Δt_sec::NF = Δt_millisec.value / 1000
-    Δt::NF = Δt_sec / radius
+    Δt::NF = Δt_millisec.value / 1000
 
     return Leapfrog(
-        Second(Δt_at_T31), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt_sec, Δt,
+        Second(Δt_at_T31), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
     )
 end
 
@@ -223,11 +210,13 @@ function update_prognostic!(
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
+        scale::Real = 1,
     )
     Δt = time_step(time_stepping, clock)
-    lf = prognostic_step(time_stepping, clock)  # leapfrog prognostic step index
+    Δt /= oftype(Δt, scale)                         # scale time step on the fly *1/radius for atmospheric variables
+    lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index
     var_old, var_new = get_steps(var)
-    var_lf = get_step(var, lf)                  # view on either t or t+dt to dis/enable Williams filter
+    var_lf = get_step(var, lf)                      # view on either t or t+dt to dis/enable Williams filter
     var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
 
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())

@@ -101,7 +101,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         suite.memory[i] = Base.summarysize(simulation)
 
         nsteps = n_timesteps(trunc, nlayers)
-        period = Second(round(Int, model.time_stepping.Δt_sec * (nsteps + 1)))
+        period = Second(round(Int, model.time_stepping.Δt * (nsteps + 1)))
 
         # Warm up before timing: run a few steps so JIT compilation of the time
         # loop happens here rather than inside the timed run below. The timed run
@@ -112,7 +112,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         # reuses the compiled code). A handful of steps covers the Euler spin-up
         # plus regular steps. We then re-initialize so the timed run starts from
         # the same initial state as before.
-        warmup_period = Second(round(Int, model.time_stepping.Δt_sec * 3))
+        warmup_period = Second(round(Int, model.time_stepping.Δt * 3))
         run!(simulation; period = warmup_period)
         synchronize(architecture)
 
@@ -121,9 +121,9 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         synchronize(architecture)
 
         time_elapsed = model.feedback.progress_meter.tlast - model.feedback.progress_meter.tinit
-        sypd = model.time_stepping.Δt_sec * nsteps / (time_elapsed * 365.25)
+        sypd = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
 
-        suite.Δt[i] = model.time_stepping.Δt_sec
+        suite.Δt[i] = model.time_stepping.Δt
         suite.SYPD[i] = sypd
     end
     return

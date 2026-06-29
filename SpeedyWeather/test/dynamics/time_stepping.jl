@@ -155,6 +155,7 @@ end
     Δt = 2π / 192        # time step, choose 120 as both 3 and 4 are divisors
     n_rotations = 1     # times around the circle
     n_time_steps = round(Int, 2π * n_rotations / (ω * Δt))
+    scale = 1
 
     # loop over different precisions
     @testset for NF in (Float32, Float64)
@@ -215,9 +216,8 @@ end
                 spectral_grid = SpectralGrid(; trunc)
                 time_stepping = TS(spectral_grid)
                 set!(time_stepping, Δt=Δt)
-                @test time_stepping.Δt_sec == Minute(Δt).value * 60
-                @test time_stepping.Δt ≈ time_stepping.Δt_sec / SpeedyWeather.DEFAULT_RADIUS
-                @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt_sec))
+                @test time_stepping.Δt == Second(Δt).value
+                @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt))
                 @test time_stepping.Δt_at_T31 == Second(Second(Δt).value / ((trunc + 1) / (SpeedyWeather.DEFAULT_TRUNC + 1)))
             end
         end
