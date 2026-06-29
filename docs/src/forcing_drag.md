@@ -138,9 +138,8 @@ actually do
 function SpeedyWeather.initialize!( forcing::StochasticStirring,
                                     model::AbstractModel)
 
-    # precompute forcing strength, scale with radius^2 as is the vorticity equation
-    (; radius) = model.planet
-    A = radius^2 * forcing.strength
+    # precompute forcing strength, scale with radius as is the vorticity equation
+    A = forcing.strength * model.planet.radius
 
     # precompute noise and auto-regressive factor, packed in RefValue for mutability
     dt = model.time_stepping.Δt                 # in seconds
@@ -181,8 +180,11 @@ initialize or generally alter several model components in one, but that is not a
 and can easily lead to unexpected behaviour because of multiple dispatch.
 
 As a last note on `initialize!`, you can see that we scale the amplitude/strength `A`
-with the radius squared, this is because the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
-are scaled that way, so we have to scale `S` too.
+with the radius, this is because the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
+is scaled that way, so we have to scale `S` too. The scaling applied to the dynamical core
+is mostly hidden from the user but adding a forcing not proportional to vorticity is
+one of the few exceptions where we do need to apply the scaling manually.
+For more details see [Forcing scaling](@ref).
 
 ## Custom forcing: forcing! function
 
@@ -420,3 +422,54 @@ so this should have the normal units of m/s instead.
 Each of these tendencies will have an additional [Step dimension](@ref) and so
 you will need to view the right step with `get_tendency_step(tend, time_stepping, forcing)`
 which lets the time stepper decide.
+
+## Forcing scaling
+
+In SpeedyWeather all (atmospheric) prognostic equations are scaled with the radius ``R`` of the planet,
+see [Radius scaling](@ref scaling). We also use radius-scaled vorticity and divergence so these
+two equations are effectively scaled by ``R^2``. This scaling is mostly hidden from the user and
+is applied within the dynamical core such that as a user/developer you can mostly ignore this.
+The tendencies of parameterizations + forcing + drag are being scaled automatically within the dynamical core,
+so adding a custom term forcing the temperature you can simply write this to have units of Kelvin per second
+and do not worry about scaling.
+
+!!! info "Manual scaling only required for spectral forcing of vorticity or divergence"
+    Any tendency that's formulated as a parameterization, forcing or drag does not have to be scaled
+    unless you are forcing the vorticity or divergence equation directly (and not via ``u, v``).
+    The correct scaling is automatically applied within the dynamical core.
+    Only when forcing vorticity or divergence directly (and in spectral space) manual scaling may
+    apply, read on for the details.
+
+However, there is a few remaining situations where you do need to account for scaling which are discussed here.
+In brief, this only applies when you force the vorticity or divergence equation directly.
+And also then only when this forcing is not proportional to vorticity or divergence.
+To illustrate this compare two terms,
+
+```math
+\begin{aligned}
+\frac{\partial \zeta}{\partial t} &= F \qquad &(1)\\
+\frac{\partial \zeta}{\partial t} &= a\zeta \qquad &(2)
+\end{aligned}
+```
+
+now scale both equations with ``R^2`` one radius scaling is going into the time step ``t \to t/R = t^\star``,
+the other one into the variable itself ``\zeta \to \zeta R = \zeta^\star``, then we have
+
+```math
+\begin{aligned}
+\frac{\partial \zeta^\star}{\partial t^\star} &= R^2F = RF^\star \qquad &(1)\\
+\frac{\partial \zeta^\star}{\partial t^\star} &= (a\zeta^\star)^\star \qquad &(2)
+\end{aligned}
+```
+
+So the in the (1) case, one ``R`` is automatically applied when scaling the tendency (outside of the definition of that forcing)
+but the 2nd ``R`` is required to be applied within the formulation of the forcing itself.
+In the (2) case, one radius-scaling goes into the variable ``\zeta^\star`` (which is what the dynamical core uses), the 2nd radius-scaling
+is automatically applied when the tendencies enter the dynamical core. So a term of the form (2) can be written without worrying about scaling.
+The reason no radius scaling applies in (2) is that this term is linear/proportional to the vorticity (or divergence).
+Mathematically, this generalizes to
+
+- Forcing vorticity or divergence with a constant/non-linear term ``\propto \zeta^n`` where ``n \neq 1`` then manual scaling with ``R^{1-n}`` has to be applied
+
+Forcing vorticity with a constant (``n=0``) one has to scale that forcing with ``R`` manually (as shown above and for the `StochasticStirring`).
+If forcing with a quadratic term (``n=2``), manual scaling with ``1/R`` has to be applied, and for higher order terms similarly.
