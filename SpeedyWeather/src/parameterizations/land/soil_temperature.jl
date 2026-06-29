@@ -223,7 +223,7 @@ function timestep!(
     soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture : nothing
     Lᵥ = latent_heat_condensation(model.atmosphere)
     Lᵢ = latent_heat_sublimation(model.atmosphere)
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping                                # time step in [s]
 
     (; land_fraction) = model.land_sea_mask
     (; thermodynamics, geometry) = model.land

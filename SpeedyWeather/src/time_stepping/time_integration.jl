@@ -111,12 +111,13 @@ function update_prognostic!(
     )
     (; prognostic, tendencies) = vars
     (; clock) = prognostic
+    scale = prognostic.scale[]
 
     # atmospheric variables
     for varname in tendency_names(vars)
         var = getfield(prognostic, varname)
         tendency = getfield(tendencies, varname)
-        update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model)
+        update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model, scale)
     end
 
     # and time stepping for tracers if active
@@ -124,18 +125,18 @@ function update_prognostic!(
         if tracer.active
             var = prognostic.tracers[name]
             tendency = tendencies.tracers[name]
-            update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model)
+            update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model, scale)
         end
     end
 
-    # ocean variables
+    # ocean variables, use unscaled time step
     for varname in ocean_tendency_names(vars)
         var = getfield(prognostic.ocean, varname)
         tendency = getfield(tendencies.ocean, varname)
         update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model)
     end
 
-    # land variables
+    # land variables, use unscaled time step
     for varname in land_tendency_names(vars)
         var = getfield(prognostic.land, varname)
         tendency = getfield(tendencies.land, varname)
