@@ -26,12 +26,16 @@ function vertical_advection!(vars::Variables, model)
     advection_scheme = model.vertical_advection
     (; w) = vars.dynamics
 
+    # scratch buffer (npoints) for the CPU flux-form loop below; reused across u, v,
+    # temperature, humidity and tracers as it is write-before-read within each call
+    face = vars.scratch.grid.a_2D
+
     # unrolled over compile-time variable names (instead of a loop over runtime symbols)
     # to avoid Union-typed variables which Enzyme cannot differentiate
-    vertical_advection!(Val(:u), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:v), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:u), vars, w, Δσ, advection_scheme, model, face)
+    vertical_advection!(Val(:v), vars, w, Δσ, advection_scheme, model, face)
+    vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model, face)
+    vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model, face)
 
     for (name, tracer) in model.tracers
         if tracer.active
@@ -39,7 +43,7 @@ function vertical_advection!(vars::Variables, model)
             ξ = vars.grid.tracers[name]
             s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
             s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme, model)
-            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
+            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme, face)
         end
     end
     return nothing
@@ -47,7 +51,7 @@ end
 
 # var is a compile-time constant so that haskey and getproperty constant-fold to
 # concrete variables (type-stable, required for Enzyme differentiability)
-@inline function vertical_advection!(::Val{var}, vars::Variables, w, Δσ, advection_scheme, model) where {var}
+@inline function vertical_advection!(::Val{var}, vars::Variables, w, Δσ, advection_scheme, model, face) where {var}
     haskey(vars.tendencies.grid, var) || return nothing
     # Pass the full step-dimensioned fields plus the step index, rather than a `get_*_step`
     # view. The stencil kernel reads ξ at many vertical offsets per point, and indexing a
@@ -57,7 +61,7 @@ end
     ξ = vars.grid[var]
     s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
     s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme)
-    return _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
+    return _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme, face)
 end
 
 function _vertical_advection!(
@@ -67,13 +71,49 @@ function _vertical_advection!(
         ξ::AbstractField,           # ξ (full, with step dimension)
         s_prog::Integer,            # step of ξ to advect
         Δσ,                         # layer thickness on σ levels
-        adv::VerticalAdvection      # vertical advection scheme of order B
+        adv::VerticalAdvection,     # vertical advection scheme of order B
+        face::AbstractField,        # scratch buffer (npoints) for the CPU flux-form loop
     )
     grids_match(ξ_tend, w, ξ) || throw(DimensionMismatch(ξ_tend, w, ξ))
 
     nlayers = size(ξ, 2)
     arch = architecture(ξ_tend)
+    return _vertical_advection!(arch, ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv, face)
+end
 
+# launching a kernel for the per-(ij,k) iteration space is unreasonably slow on CPU (same
+# issue as vertical_integration!), so the CPU path instead loops over layers k (outer) and
+# points ij (inner). The "+" face of layer k (tail of its stencil) is bit-identical to the
+# "-" face of layer k+1 (front of its stencil) — proved by the face-consistency test — so
+# each interior face is reconstructed once and carried over in `face` instead of twice.
+function _vertical_advection!(::CPU, ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv, face::AbstractField)
+    npoints = size(ξ_tend, 1)
+
+    # boundary face at k=1/2 (no neighbouring layer to carry it over from)
+    k_stencil₁ = retrieve_stencil(1, nlayers, adv)
+    @inbounds for ij in 1:npoints
+        face[ij] = reconstruct_face(gather_stencil_values(ξ, ij, s_prog, Base.front(k_stencil₁)), w[ij, 1], adv)
+    end
+
+    for k in 1:nlayers
+        k_stencil = retrieve_stencil(k, nlayers, adv)
+        Δσₖ⁻¹ = inv(Δσ[k])
+        @inbounds for ij in 1:npoints
+            w⁺ = w[ij, k]
+            w⁻ = w[ij, max(1, k - 1)]
+            ξᶠ⁺ = reconstruct_face(gather_stencil_values(ξ, ij, s_prog, Base.tail(k_stencil)), w⁺, adv)
+            ξᶠ⁻ = face[ij]              # = "+" face of layer k-1, carried over
+
+            # -= as the tendencies already contain the parameterizations
+            ξ_tend[ij, k, s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, s_prog] * (w⁺ - w⁻))
+
+            face[ij] = ξᶠ⁺
+        end
+    end
+    return nothing
+end
+
+function _vertical_advection!(arch::GPU, ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv, face::AbstractField)
     # worksize is the horizontal × vertical iteration space (skip the step dimension)
     launch!(
         arch, RingGridWorkOrder, (size(ξ_tend, 1), size(ξ_tend, 2)),
