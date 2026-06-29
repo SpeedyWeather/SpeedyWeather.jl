@@ -43,7 +43,7 @@ The stash itself is left untouched (not dropped) until its content is fully abso
 - [x] Phase 0: golden capture + face-consistency assertion (scratch validation script, no src change)
 - [x] Phase 1: value-based `reconstruct_face` refactor (bit-identical) + tests
 - [x] Phase 2: CPU plain-loop flux-form path + golden + CPU bench
-- [ ] Phase 3: GPU kernel(s) 3a/3b + golden(GPU) + GPU bench (decide 3a vs 3b)
+- [x] Phase 3: GPU kernel(s) 3a/3b + golden(GPU) + GPU bench (decide 3a vs 3b)
 - [ ] Phase 4: fuse u/v/T/q (+tracers) into one pass + golden + bench
 - [ ] Phase 5: dispatch wiring, cleanup, version bump, CHANGELOG, full validation
 
@@ -105,3 +105,50 @@ The stash itself is left untouched (not dropped) until its content is fully abso
   Speedups grow with column depth (L24 > L8) and stencil width (WENO/Upwind5 > Centered2),
   as expected from halving the number of face reconstructions. Priority #2 (CPU perf at
   trunc<70) met with margin; moving to Phase 3 (GPU).
+
+- 2026-06-29: Phase 3 done — added `vertical_advection_column_kernel!` (one GPU thread per
+  `ij`, looping over all `k`, carrying the shared interior face in a thread-local register —
+  no scratch array needed since each thread owns its whole column). This is "3a" from the
+  plan; "3b" is just the pre-existing per-(ij,k) `vertical_advection_kernel!` from Phase 1,
+  unchanged, so no separate shared-memory variant was built (the plan flagged that as only a
+  candidate, and 3a already won decisively — see below).
+
+  **Correctness vs 3b**: confirmed bit-identical (`===`) on GPU at default julia flags,
+  for all 5 schemes x 4 grid configs (T31L8, T85L24, T127L24, T170L8) via a scratch script
+  launching both kernels directly. *However*: under `--check-bounds=yes` (the project's
+  mandated test flag), Upwind5/WENO diverge by up to ~2e-4 relative (Centered2 stays exact)
+  — root-caused to the forced bounds-check insertion changing generated code enough to shift
+  the GPU compiler's FMA-contraction/reordering decisions differently between the two
+  differently-shaped kernels. Not a logic bug (same class of GPU FP non-determinism
+  `vertical_integration.jl`'s GPU test already works around with `≈`). Added
+  `test/GPU/vertical_advection.jl` (wired into `test/GPU/runtests.jl`) comparing both
+  kernels directly with `≈` instead of `===`, for this reason — passes under
+  `--check-bounds=yes`.
+
+  **GPU dispatch decision (3a vs 3b)**, benchmarked via single-variable kernel launch
+  (`@benchmark`, 100 samples, min) on an A40:
+
+  | npoints (config)      | Centered2 | Upwind5 | WENO  |
+  |------------------------|-----------|---------|-------|
+  | 3168 (T31)             | 0.86x     | 0.63x   | 0.50x |
+  | 18688 (T85L24)          | 0.91x     | 0.88x   | 0.84x |
+  | 28480 (T96/T106L24)     | 0.89x     | 0.92x   | 0.93x |
+  | 40320 (T127L24)         | 1.00x     | 1.18x   | 1.28x |
+  | 70144 (T170L24/L8)      | 1.03-1.04x| 1.20x   | 1.29x |
+
+  (ratio = pointwise-time / column-time; >1 means column/3a wins). Crossover sits between
+  npoints=28480 and 40320, independent of `nlayers` (8 vs 24 behaved consistently) — i.e.
+  driven by `npoints` (column's only source of parallelism), not column depth. Implemented
+  as `_vertical_advection!(::GPU,...)` dispatching on `npoints >=
+  VERTICAL_ADVECTION_GPU_COLUMN_THRESHOLD = 35_000` (midpoint of the measured crossover
+  band): per-column (3a) above, per-(ij,k) (3b) below. This matters because T85-T96 sit
+  *inside* the plan's own "trunc>70" GPU-priority zone yet still favour 3b — a blanket
+  "always use 3a" choice would have cost ~10% there to gain up to 29% at trunc>=127.
+
+  Also discovered (not a regression): `dynamics_only=true` PrimitiveWetModel runs for
+  Day(1) at T85/T127 produce NaNs with Upwind5/WENO (Centered2 stays clean) — confirmed
+  identical on the untouched pre-revision code in a throwaway worktree at commit `c6fdc8a7`
+  (same warning timestamps). Pre-existing model-stability characteristic at these
+  resolutions with `dynamics_only`, unrelated to this PR; not investigated further.
+
+  Committed Phase 3 as the next commit (kernel + dispatch threshold + GPU test).

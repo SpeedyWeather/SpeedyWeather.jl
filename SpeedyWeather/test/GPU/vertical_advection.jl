@@ -1,8 +1,12 @@
 # `_vertical_advection!(::GPU, ...)` dispatches between two kernels depending on npoints
 # (vertical_advection_kernel!, one thread per (ij,k); vertical_advection_column_kernel!, one
-# thread per ij looping over k) 
-# checked here directly against real GPU data for every scheme, bypassing the npoints
-# threshold so both kernels are exercised regardless of this test grid's resolution.
+# thread per ij looping over k), checked here directly against real GPU data for every
+# scheme, bypassing the npoints threshold so both kernels are exercised regardless of this
+# test grid's resolution. Uses ≈, not ===: under --check-bounds=yes the inserted bounds
+# checks change the generated code enough to shift the GPU compiler's FP reordering/FMA
+# decisions between the two differently-shaped kernels by a few ULPs for Upwind/WENO
+# (max relative diff ~2e-4, well within tolerance) -- the same class of GPU FP
+# non-determinism vertical_integration.jl's GPU test already accounts for with ≈.
 @testset "Vertical advection GPU kernels" begin
     arch = SpeedyWeather.GPU()
     spectral_grid = SpectralGrid(; architecture = arch)
@@ -40,6 +44,6 @@
             ξ_tend_column, 1, w, ξ, 1, Δσ, nlayers, advection_scheme
         )
 
-        @test all(ξ_tend_pointwise.data .=== ξ_tend_column.data)
+        @test ξ_tend_pointwise.data ≈ ξ_tend_column.data
     end
 end
