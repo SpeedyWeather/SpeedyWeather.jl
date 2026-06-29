@@ -37,15 +37,13 @@ struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinates
 
     "[DERIVED] Layer thickness in sigma; σ_thickness[k] = σ_half[k+1] - σ_half[k], sums to 1"
     σ_thickness::VectorType
-
-    SigmaCoordinates{T, V}(nlayers, σh, σf, Δσ) where {T, V} = sigma_okay(nlayers, σh) ?
-        new{T, V}(nlayers, σh, σf, Δσ) : error("σ_half = $σh cannot be used for $nlayers-level SigmaCoordinates")
 end
 
 Adapt.@adapt_structure SigmaCoordinates
 
 function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector)
     (; nlayers) = SG
+    sigma_okay(nlayers, σ_half)     # validate user input on the host before moving to the device
     σ_half = on_architecture(SG.architecture, convert.(SG.NF, σ_half))
     σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
     σ_thickness = σ_half[2:end] - σ_half[1:(end - 1)]
@@ -91,10 +89,16 @@ end
 """$(TYPEDSIGNATURES)
 Check that nlayers and σ_half match."""
 function sigma_okay(nlayers::Integer, σ_half::AbstractVector)
-    @assert σ_half[1] >= 0 "First specified σ_half has to be >=0, $(σ_half[1]) given."
-    @assert σ_half[end] == 1 "Last specified σ_half has to be 1, $(σ_half[end]) given."
+    # @allowscalar permits the few boundary reads on GPU arrays without a host transfer,
+    # this is a one-time construction-time check
+    @allowscalar begin
+        @assert σ_half[1] >= 0 "First specified σ_half has to be >=0, $(σ_half[1]) given."
+        @assert σ_half[end] == 1 "Last specified σ_half has to be 1, $(σ_half[end]) given."
+    end
+
     @assert nlayers == (length(σ_half) - 1) "nlayers has to be length of σ_half - 1, $nlayers vs $(length(σ_half) - 1) given."
     @assert Utils.isincreasing(σ_half) "Vertical sigma coordinates are not increasing."
+    
     return true
 end
 
