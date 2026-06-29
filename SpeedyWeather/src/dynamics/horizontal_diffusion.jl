@@ -82,6 +82,8 @@ function initialize!(
     (; trunc, nlayers) = diffusion
     (; resolution_scaling, power, power_stratosphere, tapering_σ) = diffusion
     Δt = default_time_step(model.time_stepping)
+    
+    # radius scaling for the dynamical core as these are all precomputed arrays
     (; radius) = model.planet
     Δt /= radius
 
@@ -412,7 +414,10 @@ function initialize!(
     (; expl, impl, expl_div, impl_div) = diffusion
     (; scale, shift, power, power_div, resolution_scaling) = diffusion
     Δt = default_time_step(model.time_stepping)
+
+    # radius scaling for the dynamical core as these are all precomputed arrays
     (; radius) = model.planet
+    Δt /= radius
 
     # divide by radius because the equations are in the radius-scaled form (see Radius scaling)
     time_scale = Second(diffusion.time_scale).value / radius * (32 / (trunc + 1))^resolution_scaling
