@@ -46,6 +46,7 @@ include("set.jl")
 
 # VERTICAL, GPU SPECIFIC
 include("vertical_integration.jl")
+include("vertical_advection.jl")
 
 # FULL MODELS
 include("barotropic.jl")
