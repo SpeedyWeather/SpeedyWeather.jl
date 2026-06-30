@@ -114,7 +114,7 @@ end
 
 function EarthLandSeaMask(spectral_grid::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, grid) = spectral_grid
-    mask = zeros(GridVariable2D, grid)
+    land_fraction = zeros(GridVariable2D, grid)
     return EarthLandSeaMask{NF, GridVariable2D, Bool}(; land_fraction, kwargs...)
 end
 
