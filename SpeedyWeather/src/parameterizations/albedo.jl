@@ -249,7 +249,7 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
     end
 
     # 2. Add snow cover
-    if haskey(vars.prognostic.land, :snow_depth)
+    if haskey(vars.prognostic, :land) && haskey(vars.prognostic.land, :snow_depth)
         (; snow_depth) = vars.prognostic.land
         (; albedo_snow, snow_depth_scale) = scheme
 

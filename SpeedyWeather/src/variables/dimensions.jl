@@ -14,16 +14,22 @@ struct Grid2D <: AbstractVariableDim end
 allocate(::AbstractVariable{Grid2D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable2D, model.spectral_grid.grid)
 
 """Dimension for 3D grid variables on the horizontal grid with vertical levels."""
-struct Grid3D <: AbstractVariableDim end
-allocate(::AbstractVariable{Grid3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model))
+@kwdef struct Grid3D <: AbstractVariableDim
+    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
+end
+allocate(v::AbstractVariable{Grid3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model) : v.dims.n)
 
 """Dimension for 3D land surface variables."""
-struct Land3D <: AbstractVariableDim end
-allocate(::AbstractVariable{Land3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model.land))
+@kwdef struct Land3D <: AbstractVariableDim
+    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
+end
+allocate(v::AbstractVariable{Land3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model.land) : v.dims.n)
 
 """Dimension for 3D ocean variables."""
-struct Ocean3D <: AbstractVariableDim end
-allocate(::AbstractVariable{Ocean3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model.ocean))
+@kwdef struct Ocean3D <: AbstractVariableDim
+    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
+end
+allocate(v::AbstractVariable{Ocean3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model.ocean) : v.dims.n)
 
 """Dimension for 2D spectral variables."""
 struct Spectral2D <: AbstractVariableDim end
@@ -31,7 +37,7 @@ allocate(::AbstractVariable{Spectral2D}, model::AbstractModel) = zeros(model.spe
 
 """Dimension for 3D spectral variables with e.g. `n` vertical levels."""
 @kwdef struct Spectral3D <: AbstractVariableDim
-    n::Int = 0
+    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
 end
 allocate(v::AbstractVariable{Spectral3D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, v.dims.n == 0 ? get_nlayers(model) : v.dims.n)
 
@@ -47,13 +53,13 @@ allocate(::AbstractVariable{Vertical1D}, model::AbstractModel) = on_architecture
 @kwdef struct Grid4D <: AbstractVariableDim
     n::Int = 1                                                  # length of 4th dimension
 end
-allocate(v::AbstractVariable{Grid4D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model), v.dims.n)
+allocate(v::AbstractVariable{Grid4D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable4D, model.spectral_grid.grid, get_nlayers(model), v.dims.n)
 
 """Dimension for 4D spectral variables with customizable extra dimension."""
 @kwdef struct Spectral4D <: AbstractVariableDim
-    n::Int = 1
+    n::Int = 1                                                  # length of 4th dimension
 end
-allocate(v::AbstractVariable{Spectral4D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, get_nlayers(model), v.dims.n)
+allocate(v::AbstractVariable{Spectral4D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable4D, model.spectral_grid.spectrum, get_nlayers(model), v.dims.n)
 
 """Dimension for generic vector data of arbitrary length."""
 @kwdef struct VectorDim <: AbstractVariableDim

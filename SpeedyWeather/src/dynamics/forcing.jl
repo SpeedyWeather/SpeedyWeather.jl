@@ -1,13 +1,7 @@
 abstract type AbstractForcing <: AbstractModelComponent end
 
 # function barrier for all forcings to unpack model.forcing
-function forcing!(
-        vars::Variables,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(vars, model.forcing, lf, model)
-end
+forcing!(vars::Variables, model::AbstractModel) = forcing!(vars, model.forcing, model)
 
 # NO FORCING
 forcing!(vars, forcing::Nothing, args...) = nothing
@@ -59,14 +53,12 @@ function initialize!(
     )
 
     (; latitude, width, speed, time_scale, amplitude) = forcing
-    (; radius) = model.planet
 
     # Some constants similar to Galewsky 2004
     θ₀ = (latitude - width) / 360 * 2π          # southern boundary of jet [radians]
     θ₁ = (latitude + width) / 360 * 2π          # northern boundary of jet
     eₙ = exp(-4 / (θ₁ - θ₀)^2)                  # normalisation, so that speed is at max
     A₀ = speed / eₙ / time_scale.value          # amplitude [m/s²] without lat dependency
-    A₀ *= radius                                # scale by radius as are the momentum equations
 
     (; colat) = model.geometry
     # latitude in radians, abs for north/south symmetry
@@ -85,13 +77,8 @@ function initialize!(
 end
 
 # function barrier
-function forcing!(
-        vars::Variables,
-        forcing::JetStreamForcing,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(vars, forcing)
+function forcing!(vars::Variables, forcing::JetStreamForcing, model::AbstractModel)
+    return forcing!(vars, forcing, model.time_stepping)
 end
 
 """$(TYPEDSIGNATURES)
@@ -100,10 +87,11 @@ in the momentum equations following the JetStreamForcing.
 The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
 function forcing!(
         vars::Variables,
-        forcing::JetStreamForcing
+        forcing::JetStreamForcing,
+        time_stepping::AbstractTimeStepper,
     )
 
-    Fu = vars.tendencies.grid.u
+    Fu = get_tendency_step(vars.tendencies.grid.u, time_stepping, forcing)
 
     (; amplitude, tapering) = forcing
     (; whichring) = Fu.grid
@@ -170,20 +158,16 @@ function initialize!(
     return nothing
 end
 
-function forcing!(
-        vars::Variables,
-        forcing::StochasticStirring,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(vars, forcing, model.spectral_transform)
+function forcing!(vars::Variables, forcing::StochasticStirring, model::AbstractModel)
+    return forcing!(vars, forcing, model.spectral_transform, model.time_stepping)
 end
 
 
 function forcing!(
         vars::Variables,
         forcing::StochasticStirring,
-        spectral_transform::SpectralTransform
+        spectral_transform::SpectralTransform,
+        time_stepping::AbstractTimeStepper,
     )
     # get random values from random process
     S_grid = vars.scratch.grid.a_2D
@@ -196,11 +180,11 @@ function forcing!(
     S_masked = vars.scratch.a_2D
     transform!(S_masked, S_grid, vars.scratch.transform_memory, spectral_transform)
 
-    # scale by radius^2 as is the vorticity equation, and scale to forcing strength
-    S_masked .*= (vars.prognostic.scale[]^2 * forcing.strength)
+    # scale by radius as is vorticity, and scale to forcing strength
+    S_masked .*= (vars.prognostic.scale[] * forcing.strength)
 
     # force every layer
-    vor_tend = vars.tendencies.vorticity
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, time_stepping, forcing)
     arch = architecture(vor_tend)
     launch!(
         arch, SpectralWorkOrder, size(vor_tend), stochastic_stirring_kernel!,
@@ -242,15 +226,13 @@ initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 function forcing!(
         vars::Variables,
         forcing::KolmogorovFlow,
-        lf::Integer,
         model::AbstractModel,
     )
     (; latds) = model.geometry
-    # scale by radius as is the vorticity equation
-    s = forcing.strength * vars.prognostic.scale[]
+    s = forcing.strength
     k = forcing.wavenumber
 
-    Fu = vars.tendencies.grid.u
+    Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, forcing)
     launch!(
         architecture(Fu), RingGridWorkOrder, size(Fu), kolmogorov_flow_kernel!,
         Fu, s, k, latds
@@ -333,7 +315,6 @@ function initialize!(
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
     (; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     p₀ = model.atmosphere.reference_pressure
-    (; radius) = model.planet
 
     # slow relaxation everywhere, fast in the tropics
     kₐ = 1 / Second(relax_time_slow).value
@@ -344,7 +325,6 @@ function initialize!(
 
     # Held and Suarez equation 4
     temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(0, (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
-    temp_relax_freq .*= radius  # scale by radius as is the temperature equation
 
     # Held and Suarez equation 3, split into max(Tmin, (a + b*ln(p))*(p/p₀)^κ)
     # precompute a, b to simplify online calculation
@@ -358,12 +338,13 @@ Apply temperature relaxation following Held and Suarez 1996, BAMS."""
 function forcing!(
         vars::Variables,
         forcing::HeldSuarez,
-        lf::Integer,
         model::AbstractModel,
     )
-    temp = vars.grid.temperature
-    log_pₛ = vars.grid.pressure     # logarithm of surface pressure, precomputed in geopotential module as log(pₛ/p₀) to save memory and time in the kernel
-    temp_tend = vars.tendencies.grid.temperature
+    temp = get_prognostic_step(vars.grid.temperature, model.time_stepping, forcing)
+    temp_tend = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, forcing)
+    
+    # logarithm of surface pressure
+    log_pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, forcing)
 
     (; Tmin, log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     (; κ) = model.atmosphere
@@ -399,6 +380,6 @@ end
     p = exp(log_p)                      # pressure [Pa]
 
     # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
-    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p[ij]) * (p / p₀)^κ)
+    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p) * (p / p₀)^κ)
     temp_tend[ij, k] -= kₜ * (temp[ij, k] - Teq)  # Held and Suarez 1996, equation 2
 end

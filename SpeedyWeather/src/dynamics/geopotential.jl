@@ -24,10 +24,10 @@ Geopotential(SG::SpectralGrid) = Geopotential(
 
 function variables(::Geopotential)
     return (
-        GridVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m^2/s^2"),
+        DynamicsVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m^2/s^2"),
         # TODO only the grid should be necessary, remove this when adapting the geopotential calculation
         # in the dynamical core to only need grid geopotential
-        DynamicsVariable(:geopotential, Spectral3D(), desc = "Geopotential", units = "m^2/s^2"),
+        DynamicsVariable(:spectral_geopotential, Spectral3D(), desc = "Geopotential", units = "m^2/s^2"),
     )
 end
 
@@ -42,6 +42,10 @@ Same formula but `k → k-1/2`."""
 function initialize!(G::Geopotential, model::PrimitiveEquation)
     (; Δp_geopot_half, Δp_geopot_full) = G
     (; R_dry) = model.atmosphere
+    # TODO: the geopotential integration coefficients use log(σ_full/σ_half) which assumes
+    # pressure is proportional to σ (i.e. p = σ * pₛ). Generalising to hybrid coordinates
+    # requires replacing these ratios with log(p_full/p_half) evaluated at a reference
+    # surface pressure, making the coefficients depend on pₛ and thus non-constant.
     (; σ_levels_full, σ_levels_half) = model.geometry
     nlayers = length(σ_levels_full)
 
@@ -60,50 +64,57 @@ function geopotential!(
         vars::Variables,
         model::PrimitiveEquation,
     )
-    T = vars.grid.temperature
-    Φ = vars.grid.geopotential
+    TS = model.time_stepping
+    G = model.geopotential
+    T = get_prognostic_step(vars.grid.temperature, TS, G)
+    pₛ = vars.parameterizations.surface_pressure
+    Φ = vars.dynamics.geopotential
 
     # use zero scratch for humidity in dry models to not distinguish in kernels below
-    vars.scratch.grid.a .= 0
-    q = haskey(vars.grid, :humidity) ? vars.grid.humidity : vars.scratch.grid.a
+    q = haskey(vars.grid, :humidity) ?
+        get_prognostic_step(vars.grid.humidity, TS, G) :
+        fill!(vars.scratch.grid.a, 0)
 
-    (; orography) = model.orography
+    @boundscheck size(T) == size(Φ) == size(q) || throw(BoundsError)
+
     g = model.planet.gravity
-    G = model.geopotential
     (; orography) = model.orography
     (; atmosphere) = model
+    (; vertical_coordinates) = model.geometry
 
     arch = architecture(T)
     if typeof(arch) <: AbstractCPU
-        geopotential_cpu!(Φ, T, q, orography, g, G, atmosphere)
+        geopotential_grid_cpu!(Φ, T, q, orography, pₛ, g, G, atmosphere, vertical_coordinates)
     else
         launch!(arch, LinearWorkOrder, (size(T, 1),), geopotential_kernel!, Φ, T, q, orography, g, G, atmosphere)
     end
     return nothing
 end
 
-function geopotential_cpu!(Φ, T, q, orography, g, G, atmosphere)
+function geopotential_grid_cpu!(Φ, T, q, orography, pₛ, g, G, atmosphere, VC)
     nlayers = size(T, 2)
     @inbounds for ij in eachgridpoint(Φ)
-        geopotential_compute!(
-            ij, Φ, T, q, orography, g, G.Δp_geopot_half, G.Δp_geopot_full, nlayers, atmosphere
+        geopotential_grid!(
+            ij, Φ, T, q, orography, pₛ, g, G, nlayers, atmosphere, VC,
         )
     end
     return nothing
 end
 
-@kernel function geopotential_kernel!(Φ, T, q, orography, g, G, atmosphere)
+@kernel function geopotential_grid_kernel!(Φ, T, q, orography, pₛ, g, G, atmosphere, VC)
     ij = @index(Global, Linear)
     nlayers = size(T, 2)
-    @inbounds geopotential_compute!(
-        ij, Φ, T, q, orography, g, G.Δp_geopot_half, G.Δp_geopot_full, nlayers, atmosphere
+    @inbounds geopotential_grid!(
+        ij, Φ, T, q, orography, pₛ, g, G, nlayers, atmosphere, VC,
     )
 end
 
-@propagate_inbounds function geopotential_compute!(
-        ij, geopotential, temp, humid, orography,
-        gravity, Δp_geopot_half, Δp_geopot_full, nlayers, atmosphere
+@propagate_inbounds function geopotential_grid!(
+        ij, geopotential, temp, humid, orography, surface_pressure,
+        gravity, G, nlayers, atmosphere, vertical_coordinates::SigmaCoordinates,
     )
+    (; Δp_geopot_half, Δp_geopot_full) = G
+
     # bottom layer
     Tᵥ = virtual_temperature(temp[ij, nlayers], humid[ij, nlayers], atmosphere)
     geopotential[ij, nlayers] = gravity * orography[ij] + Tᵥ * Δp_geopot_full[nlayers]
@@ -113,6 +124,32 @@ end
         Tᵥ_below = Tᵥ
         Tᵥ = virtual_temperature(temp[ij, k], humid[ij, k], atmosphere)
         geopotential[ij, k] = geopotential[ij, k + 1] + Tᵥ_below * Δp_geopot_half[k + 1] + Tᵥ * Δp_geopot_full[k]
+    end
+    return nothing
+end
+
+@propagate_inbounds function geopotential_grid!(
+        ij, geopotential, temp, humid, orography, surface_pressure,
+        gravity, G, nlayers, atmosphere, vertical_coordinates::SigmaPressureCoordinates,
+    )
+    R = atmosphere.R_dry
+
+    # bottom layer
+    Tᵥ = virtual_temperature(temp[ij, nlayers], humid[ij, nlayers], atmosphere)
+    pₛ = surface_pressure[ij]
+    pₖ = pressure(nlayers, pₛ, vertical_coordinates)
+    geopotential[ij, nlayers] = gravity * orography[ij] + R * Tᵥ * log(pₛ / pₖ)
+
+    # OTHER FULL LAYERS, integrate two half-layers from bottom to top
+    for k in (nlayers - 1):-1:1
+        Tᵥ_below = Tᵥ
+        p_full_below = pₖ
+        p_half_below = pressure_below(k, pₛ, vertical_coordinates)
+        geopotential_half_below = geopotential[ij, k + 1] + R * Tᵥ_below * log(p_full_below / p_half_below)
+        
+        pₖ = pressure(k, pₛ, vertical_coordinates)
+        Tᵥ = virtual_temperature(temp[ij, k], humid[ij, k], atmosphere)
+        geopotential[ij, k] = geopotential_half_below + R * Tᵥ * log(p_half_below / pₖ)
     end
     return nothing
 end
@@ -127,7 +164,7 @@ function geopotential!(
         orography::AbstractOrography,
     )
     Tᵥ = vars.dynamics.virtual_temperature
-    Φ = vars.dynamics.geopotential              # spectral geopotential to fill
+    Φ = vars.dynamics.spectral_geopotential     # spectral geopotential to fill
     Φₛ = orography.surface_geopotential         # = orography*gravity
     (; Δp_geopot_half, Δp_geopot_full) = G      # = R*Δlnp either on half or full levels
     nlayers = size(Φ, 2)                        # number of vertical levels
@@ -137,9 +174,8 @@ function geopotential!(
     # for PrimitiveDry virtual temperature = absolute temperature here
     # note these are not anomalies here as they are only in grid-point fields
 
-    # BOTTOM FULL LAYER
-    # TODO: broadcasting with LTA issue here
-    Φ.data[:, nlayers] .= Φₛ.data .+ Tᵥ.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
+    # BOTTOM FULL LAYER, broadcasting across LTA/Array so use .data here
+    @views Φ.data[:, nlayers] .= Φₛ.data .+ Tᵥ.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     arch = architecture(Φ)
@@ -173,10 +209,9 @@ end
 $(TYPEDSIGNATURES)
 calculates the geopotential in the ShallowWaterModel as g*η,
 i.e. gravity times the interface displacement (field `pres`)"""
-function geopotential!(vars::Variables, planet::AbstractPlanet)
-    # note this only works in 2D models with nlayers=1 otherwise gepotential is actually 3D and not just 2D x 1
-    # one would need to use lta/field_view(gepotential, :, nlayers) to make it 2D again
-    (; geopotential, η) = vars.grid
-    geopotential .= planet.gravity .* η
-    return geopotential
+function geopotential!(vars::Variables, model::ShallowWater)
+    η = vars.grid.η                 # has a singleton step dimension for 2D models
+    Φ = vars.dynamics.geopotential  # has in 2D a singleton vertical dimension
+    Φ .= model.planet.gravity .* η
+    return Φ
 end

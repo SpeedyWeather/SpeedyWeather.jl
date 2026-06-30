@@ -208,9 +208,9 @@ function timestep!(
         model::PrimitiveEquation,
     )
     (; soil_moisture) = vars.prognostic.land
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping                            # time step in [s]
     ρ = model.atmosphere.water_density
-    (; mask) = model.land_sea_mask
+    (; land_fraction) = model.land_sea_mask
 
     P = vars.parameterizations.rain_rate                    # precipitation (rain only) in [m/s]
     S = vars.parameterizations.land.snow_melt_rate          # [kg/m²/s] includes snow runoff leakage water
@@ -233,18 +233,18 @@ function timestep!(
 
     launch!(
         architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R, params
+        land_bucket_soil_moisture_kernel!, soil_moisture, land_fraction, P, S, H, R, params
     )
     return nothing
 end
 
 @kernel inbounds = true function land_bucket_soil_moisture_kernel!(
-        soil_moisture, mask, P, S, H, R, params
+        soil_moisture, land_fraction, P, S, H, R, params
     )
 
     ij = @index(Global, Linear)             # every grid point ij
 
-    if mask[ij] > 0                         # at least partially land
+    if land_fraction[ij] > 0               # at least partially land
         (; ρ, Δt, f₁, f₂, p, τ⁻¹) = params
         # precipitation (rain only, convection + large-scale) minus evaporation (or condensation, = humidity flux)
         # river runoff via drain excess water below (that's just gone)

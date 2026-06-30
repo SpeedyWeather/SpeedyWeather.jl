@@ -8,6 +8,7 @@ using NCDatasets, Dates
         spectral_grid = SpectralGrid(nlayers = 1)
         output = NetCDFOutput(spectral_grid, path = tmp_output_path)
         model = BarotropicModel(spectral_grid; output)
+        model.feedback.verbose = false
         simulation = initialize!(model)
         run!(simulation, output = true; period)
         @test simulation.model.feedback.nans_detected == false
@@ -34,6 +35,7 @@ end
         spectral_grid = SpectralGrid(nlayers = 1)
         output = NetCDFOutput(spectral_grid, ShallowWater, path = tmp_output_path; output_NF)
         model = ShallowWaterModel(spectral_grid; output)
+        model.feedback.verbose = false
         simulation = initialize!(model)
         run!(simulation, output = true; period)
         @test simulation.model.feedback.nans_detected == false
@@ -80,8 +82,9 @@ end
     for nlat_half in (24, 32, 48, 64)
         spectral_grid = SpectralGrid(nlayers = 8)
         output_grid = RingGrids.full_grid_type(typeof(spectral_grid.grid))(nlat_half)
-        output = NetCDFOutput(spectral_grid, ShallowWater, path = tmp_output_path; output_grid)
+        output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path; output_grid)
         model = PrimitiveDryModel(spectral_grid; output)
+        model.feedback.verbose = false
         simulation = initialize!(model)
         run!(simulation, output = true; period)
         @test simulation.model.feedback.nans_detected == false
@@ -107,6 +110,7 @@ end
     for interval in (Hour(1), Minute(120), Hour(3), Hour(6), Day(1))
         output = NetCDFOutput(spectral_grid, PrimitiveWet, path = tmp_output_path; interval)
         model = PrimitiveWetModel(spectral_grid; output)
+        model.feedback.verbose = false
         simulation = initialize!(model)
         run!(simulation, output = true; period)
         @test simulation.model.feedback.nans_detected == false
@@ -125,6 +129,7 @@ end
     # test outputting other model defaults
     output = NetCDFOutput(spectral_grid, PrimitiveWet, path = tmp_output_path)
     model = PrimitiveWetModel(spectral_grid; output)
+    model.feedback.verbose = false
 
     # Add surface variables output for testing them
     add!(
@@ -135,6 +140,12 @@ end
         #         SpeedyWeather.MeanSeaLevelPressureOutput(),   # this should be default now
         #         SpeedyWeather.SurfacePressureOutput(),        # don't output surface pressure too
     )
+
+    # add tuples of output variables through various interfaces to model/output w/out splatting ...
+    add!(model, SpeedyWeather.PrecipitationOutput())            
+    add!(model, SpeedyWeather.PrecipitationOutput()...)
+    add!(model.output, SpeedyWeather.PrecipitationOutput())
+    add!(model.output, SpeedyWeather.PrecipitationOutput()...)
 
     simulation = initialize!(model)
     run!(simulation, output = true; period)
@@ -177,11 +188,13 @@ end
     spectral_grid = SpectralGrid()
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "restart-test")
     model = PrimitiveDryModel(spectral_grid; output)
+    model.feedback.verbose = false
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
 
     initial_conditions = StartFromFile(path = tmp_output_path, id = "restart-test")
     model_new = PrimitiveDryModel(spectral_grid; initial_conditions)
+    model_new.feedback.verbose = false
     simulation_new = initialize!(model_new)
 
     progn_old = simulation.variables.prognostic
@@ -199,6 +212,7 @@ end
 
     spectral_grid = SpectralGrid()
     model = PrimitiveDryModel(spectral_grid)
+    model.feedback.verbose = false
     simulation = initialize!(model)
     add!(model, :restart_file => WriteVariablesRestartFile(path = tmp_output_path, write_only_with_output = false, filename = "myrestart.jld2"))
     run!(simulation, period = Day(1))
@@ -219,9 +233,9 @@ end
 
 @testset "Time axis" begin
 
-    function manual_time_axis(startdate, dt, n_timesteps)
-        time_axis = zeros(typeof(startdate), n_timesteps + 1)
-        for i in 0:n_timesteps
+    function manual_time_axis(startdate, dt, n_time_steps)
+        time_axis = zeros(typeof(startdate), n_time_steps + 1)
+        for i in 0:n_time_steps
             time_axis[i + 1] = startdate + dt * i
         end
         time_axis
@@ -232,18 +246,20 @@ end
     spectral_grid = SpectralGrid()
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "dense-output-test", interval = Hour(0))
     model = PrimitiveDryModel(spectral_grid; output)
+    model.feedback.verbose = false
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
 
     progn = simulation.variables.prognostic
     tmp_read_path = joinpath(model.output.run_path, model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
-    @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
+    @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_time_steps)
 
     # do a simulation with the adjust_Δt_with_output turned on
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "adjust_dt_with_output-test", interval = Minute(70))
     time_stepping = Leapfrog(spectral_grid, adjust_with_output = true)
     model = PrimitiveDryModel(spectral_grid; output, time_stepping)
+    model.feedback.verbose = false
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
     t = SpeedyWeather.load_trajectory("time", model)
@@ -258,15 +274,14 @@ end
     time_stepping = Leapfrog(spectral_grid, Δt_at_T31 = Day(3650))
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "long-output-test", interval = Day(3650))
     model = PrimitiveDryModel(spectral_grid; output, time_stepping)
+    model.feedback.verbose = false
     simulation = initialize!(model)
-    model.implicit.initialized = true     # bypass implicit initialization with this insanely large timestep (threw SingularException)
-    model.implicit.reinitialize = false
     run!(simulation, output = true, period = Day(365000))
 
     progn = simulation.variables.prognostic
     tmp_read_path = joinpath(model.output.run_path, model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
-    @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
+    @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_time_steps)
     @test t == SpeedyWeather.load_trajectory("time", model)
 end
 
@@ -308,8 +323,7 @@ end
     @test Millisecond(model.output.interval).value == new_interval_ms
 
     # counters reset by re-initialization
-    @test model.output.core.timestep_counter == 0
-    @test model.output.core.output_counter == 0
+    @test model.output.core.output_counter == 1
 
     # change to a different multiple
     set!(model.output, model; interval = Millisecond(2 * Δt_ms))

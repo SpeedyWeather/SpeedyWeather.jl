@@ -113,14 +113,14 @@ export animate, globe
 function animate end
 
 # abstract types
-include("models/abstract_models.jl")
 include("variables/abstract_types.jl")
+include("models/abstract_models.jl")
 include("parameterizations/parameterizations.jl")
 include("time_stepping/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
-include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
+include("dynamics/vertical_coordinates.jl")
 include("dynamics/geometry.jl")
 include("dynamics/coriolis.jl")
 include("dynamics/planet.jl")
@@ -134,7 +134,7 @@ include("variables/dimensions.jl")
 include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
-include("dynamics/clock.jl")
+include("time_stepping/clock.jl")
 include("variables/set.jl")
 
 # MODEL COMPONENTS
@@ -153,10 +153,13 @@ include("dynamics/random_process.jl")
 
 # TIME STEPPING
 include("time_stepping/time_integration.jl")
-include("time_stepping/leapfrog.jl")
-include("time_stepping/lorenz_ncycle.jl")
+include("time_stepping/steps.jl")
+include("time_stepping/steppers/general.jl")
+include("time_stepping/steppers/leapfrog.jl")
+include("time_stepping/steppers/ncycle_lorenz.jl")
 include("time_stepping/transform.jl")
-include("time_stepping/implicit.jl")
+include("time_stepping/implicit/implicit_shallow_water.jl")
+include("time_stepping/implicit/implicit_primitive_equations.jl")
 
 # PARAMETERIZATIONS
 include("parameterizations/albedo.jl")

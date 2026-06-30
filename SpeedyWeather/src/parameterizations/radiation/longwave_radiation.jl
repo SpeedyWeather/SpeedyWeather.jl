@@ -33,8 +33,8 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, longwave::UniformCooling, model)
 
-    T = vars.grid.temperature_prev
-    dTdt = vars.tendencies.grid.temperature
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
     (; temp_min, temp_stratosphere) = longwave
     nlayers = size(T, 2)
 
@@ -92,9 +92,9 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, longwave::JeevanjeeRadiation, model)
 
-    T = vars.grid.temperature                                  # to match Seeley, 2023 notation
-    dTdt = vars.tendencies.grid.temperature
-    pₛ = vars.grid.pressure_prev[ij]                        # surface pressure [Pa]
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
+    pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
     nlayers = size(T, 2)
 
     (; α) = longwave
@@ -107,7 +107,7 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     cₚ = model.atmosphere.heat_capacity
     Tₜ = longwave.temp_tropopause
 
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     sst = vars.prognostic.ocean.sea_surface_temperature[ij]
     lst = vars.prognostic.land.soil_temperature[ij, 1]  # TODO use skin temperature?
 
@@ -254,10 +254,10 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
         longwave::OneBandLongwaveRadiativeTransfer,
         model,
     )
-    T = vars.grid.temperature_prev
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
     NF = eltype(T)
-    dTdt = vars.tendencies.grid.temperature
-    pₛ = vars.grid.pressure_prev[ij]                        # surface pressure [Pa]
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
+    pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     nlayers = size(T, 2)
     j = model.geometry.whichring[ij]                        # latitude ring index for transmissivity[k, j]
 
@@ -266,7 +266,7 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     σ = model.atmosphere.stefan_boltzmann
     cₚ = model.atmosphere.heat_capacity
 
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     sst = vars.prognostic.ocean.sea_surface_temperature[ij]
     lst = vars.prognostic.land.soil_temperature[ij, 1]                  # TODO use skin temperature?
 

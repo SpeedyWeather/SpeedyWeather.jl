@@ -77,13 +77,13 @@ variables(::SurfaceOceanHumidityFlux) = (
     SST = vars.prognostic.ocean.sea_surface_temperature[ij]
 
     # SATURATION HUMIDITY OVER OCEAN
-    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     sat_humid_ocean = saturation_humidity(SST, pₛ, model.atmosphere)
 
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
-    land_fraction = model.land_sea_mask.mask[ij]
-    surface_humid = vars.grid.humidity_prev[ij, surface]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    surface_humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, humidity_flux)[ij, surface]
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(SST)
 
@@ -106,7 +106,8 @@ variables(::SurfaceOceanHumidityFlux) = (
     vars.parameterizations.surface_humidity_flux[ij] = flux_ocean
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.humidity[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    dqdt = get_tendency_step(vars.tendencies.grid.humidity, model.time_stepping, humidity_flux)
+    dqdt[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -139,14 +140,14 @@ variables(::SurfaceLandHumidityFlux) = (
     α = vars.parameterizations.land.soil_moisture_availability[ij]
 
     # SATURATION HUMIDITY OVER LAND
-    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     sat_humid_land = saturation_humidity(T, pₛ, model.atmosphere)
 
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
-    land_fraction = model.land_sea_mask.mask[ij]
-    surface = model.geometry.nlayers            # indexing top to bottom
-    surface_humid = vars.grid.humidity_prev[ij, surface]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    surface = model.geometry.nlayers                    # indexing top to bottom
+    surface_humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, humidity_flux)[ij, surface]
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
@@ -167,7 +168,8 @@ variables(::SurfaceLandHumidityFlux) = (
     vars.parameterizations.surface_humidity_flux[ij] += flux_land
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.humidity[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    dqdt = get_tendency_step(vars.tendencies.grid.humidity, model.time_stepping, humidity_flux)
+    dqdt[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
 
@@ -184,9 +186,9 @@ variables(::PrescribedOceanHumidityFlux) = (
     ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Ocean surface humidity flux", units = "kg/m²/s", namespace = :ocean),
 )
 
-@propagate_inbounds function surface_humidity_flux!(ij, vars, ::PrescribedOceanHumidityFlux, model)
-    land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
+@propagate_inbounds function surface_humidity_flux!(ij, vars, humidity_flux::PrescribedOceanHumidityFlux, model)
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
     surface = model.geometry.nlayers
 
     # read in a prescribed flux
@@ -194,13 +196,14 @@ variables(::PrescribedOceanHumidityFlux) = (
 
     # store without weighting by land fraction for coupling
     vars.parameterizations.ocean.surface_humidity_flux[ij] = flux_ocean
-    flux_ocean *= (1 - land_fraction)             # weight by ocean fraction of land-sea mask
+    flux_ocean *= (1 - land_fraction)                   # weight by ocean fraction of land-sea mask
 
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
     vars.parameterizations.surface_humidity_flux[ij] = flux_ocean
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.humidity[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    dqdt = get_tendency_step(vars.tendencies.grid.humidity, model.time_stepping, humidity_flux)
+    dqdt[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -217,9 +220,9 @@ variables(::PrescribedLandHumidityFlux) = (
     ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Land surface humidity flux", units = "kg/m²/s", namespace = :land),
 )
 
-@propagate_inbounds function surface_humidity_flux!(ij, vars, ::PrescribedLandHumidityFlux, model)
-    land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
+@propagate_inbounds function surface_humidity_flux!(ij, vars, humidity_flux::PrescribedLandHumidityFlux, model)
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]
     surface = model.geometry.nlayers
 
     # read in a prescribed flux
@@ -233,6 +236,7 @@ variables(::PrescribedLandHumidityFlux) = (
     vars.parameterizations.surface_humidity_flux[ij] += flux_land
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.humidity[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    dqdt = get_tendency_step(vars.tendencies.grid.humidity, model.time_stepping, humidity_flux)
+    dqdt[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end

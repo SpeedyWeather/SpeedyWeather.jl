@@ -145,22 +145,22 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-function variables(model::PrimitiveWet)
-    nsteps = get_prognostic_steps(model.time_stepping)
-    return variables(typeof(model), nsteps)
-end
+variables(model::PrimitiveWet) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
 """($TYPEDSIGNATURES) All variables needed for the primitive wet model itself (components excluded)."""
-function variables(::Type{<:PrimitiveWet}, nsteps)
+function variables(::Type{<:PrimitiveWet}, nsteps = DEFAULT_NSTEPS)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
         variables(PrimitiveDry, nsteps)...,
 
         # Add humidity
-        PrognosticVariable(:humidity, Spectral4D(nsteps), desc = "Specific humidity", units = "kg/kg"),
-        GridVariable(:humidity, Grid3D(), desc = "Humidity", units = "kg/kg"),
-        GridVariable(:humidity_prev, Grid3D(), desc = "Specific humidity at previous time step", units = "kg/kg"),
-        TendencyVariable(:humidity, Spectral3D(), desc = "Tendency of specific humidity", units = "kg/kg/s"),
-        TendencyVariable(:humidity, Grid3D(), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s"),
+        PrognosticVariable(:humidity, Spectral4D(ps), desc = "Specific humidity", units = "kg/kg"),
+        GridVariable(:humidity, Grid4D(pg), desc = "Humidity", units = "kg/kg"),
+        TendencyVariable(:humidity, Spectral4D(ts), desc = "Tendency of specific humidity", units = "kg/kg/s"),
+        TendencyVariable(:humidity, Grid4D(ts), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s"),
     )
 end
 
@@ -219,6 +219,11 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(variables, model)
 
     return Simulation(variables, model)
+end
+
+function reinitialize!(model::PrimitiveWetModel, vars::AbstractVariables)
+    reinitialize!(model.implicit, model, vars)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

@@ -26,7 +26,7 @@ end
     Δz_min = 0.05
     # Terrarium needs a boolean land mask: a column is allocated wherever there is
     # any land. Derive it from the fractional SpeedyWeather land-sea mask.
-    land_mask = land_sea_mask.mask .> 0
+    land_mask = land_sea_mask.land_fraction .> 0
     column_grid = Terrarium.ColumnRingGrid(
         Terrarium.CPU(), Float32,
         Terrarium.ExponentialSpacing(; N = Nz, Δz_min),

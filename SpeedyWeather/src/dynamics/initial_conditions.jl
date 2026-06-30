@@ -147,7 +147,7 @@ function initialize!(
     )
 
     # Set the prognostic variable
-    return set!(vars, model; vorticity = ξ, lf = 1)
+    return set!(vars, model; vorticity = ξ)
 end
 
 @kernel function random_vorticity_kernel!(
@@ -244,7 +244,7 @@ function initialize!(
     ξks_data = similar(ξ.data, size(ξ.data, 1), nlayers)
     ξks_data .= ξ.data
     ξks = LowerTriangularArray(ξks_data, ξ.spectrum)
-    set!(vars, model; vorticity = ξks, lf = 1)
+    set!(vars, model; vorticity = ξks)
 
     return nothing
 end
@@ -460,7 +460,7 @@ function initialize!(
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
 
     # apply those to set the initial conditions for vor, div
-    set!(vars, model; vorticity = vor_ic, divergence = div_ic, lf = 1, static_func = true, scratch_field)
+    set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true, scratch_field)
     return nothing
 end
 
@@ -648,7 +648,7 @@ function initialize!(
     launch!(architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
         _jablonowski_temperature_kernel!, temp_grid, Tη, φ, σ_levels_full, η₀, u₀, R_dry, aΩ)
 
-    set!(vars, model; temperature = temp_grid, lf = 1)
+    set!(vars, model; temperature = temp_grid)
 
     return nothing
 end
@@ -772,7 +772,7 @@ function initialize!(
     RΓg⁻¹ = R_dry * Γ / gravity         # for convenience
     ΓT₀⁻¹ = Γ / T₀
     @. lnp_grid = lnp₀ + log(1 - ΓT₀⁻¹ * orography) / RΓg⁻¹
-    set!(vars, model; pressure = lnp_grid, lf = 1)
+    set!(vars, model; pressure = lnp_grid)
     return nothing
 end
 
@@ -829,7 +829,7 @@ function initialize!(
         _constant_relative_humidity_kernel!, humid_grid, temp_grid, lnpₛ_grid, σ_levels_full,
         relhumid_ref, atmosphere)
 
-    set!(vars, model; humidity = humid_grid, lf = 1)
+    set!(vars, model; humidity = humid_grid)
     return nothing
 end
 

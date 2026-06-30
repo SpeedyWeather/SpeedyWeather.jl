@@ -415,7 +415,9 @@ nothing # hide
 
 ## Terrarium coupling
 
-We can also use a [Terrarium](https://github.com/NumericalEarth/Terrarium.jl) model within SpeedyWeather! For a detailed introduction to Terrarium please consult its [own documentation](https://numericalearth.github.io/Terrarium.jl/dev/). Here, we will only demonstrate the coupling.
+We can also use a [Terrarium](https://github.com/NumericalEarth/Terrarium.jl) model within SpeedyWeather!
+For a detailed introduction to Terrarium please consult its [own documentation](https://numericalearth.github.io/Terrarium.jl/dev/).
+Here, we will only demonstrate the coupling.
 
 ### Example
 
@@ -439,7 +441,7 @@ column_grid = Terrarium.ColumnRingGrid(
     Terrarium.CPU(), Float32,
     Terrarium.ExponentialSpacing(; N = Nz, Δz_min),
     ring_grid,
-    land_sea_mask.mask .> 0
+    land_sea_mask.land_fraction .> 0
 )
 
 # Soil column + initial state, matching `LandModel: Soil, no vegetation`
@@ -471,7 +473,8 @@ model = PrimitiveWetModel(
 simulation = initialize!(model)
 ```
 
-Then the model can be run as any other `Simulation`. Terarrium's state variales are owned by SpeedyWeather's `Variables` and can be accessed via 
+Then the model can be run as any other `Simulation`.
+Terarrium's state variales are owned by SpeedyWeather's `Variables` and can be accessed via 
 
 ```@example terrarium
 simulation.variables.prognostic.land.terrarium

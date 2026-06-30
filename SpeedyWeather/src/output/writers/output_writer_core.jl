@@ -1,5 +1,9 @@
 export OutputWriterCore
 
+abstract type AbstractOutput <: AbstractModelComponent end
+abstract type AbstractOutputCore <: AbstractModelComponent end
+abstract type AbstractOutputVariable <: AbstractModelComponent end
+
 """Shared runtime state for output writers: derived file paths, output frequency,
 and step/output counters. Embed as `core::OutputWriterCore` in every output writer.
 Option fields (path, id, overwrite, interval, …) stay as flat fields on the writer itself.
@@ -8,7 +12,7 @@ Call `initialize!(core, output, model)` inside the writer's `initialize!` method
 populate all derived fields from the writer's option fields and the model time step.
 Call `output!(core, output)` each time step to check if output should be written.
 Fields are $(TYPEDFIELDS)"""
-@kwdef mutable struct OutputWriterCore{S, I}
+@kwdef mutable struct OutputWriterCore
     "[DERIVED] folder name where data is stored, determined at initialize!"
     run_folder::S = ""
 
@@ -16,10 +20,10 @@ Fields are $(TYPEDFIELDS)"""
     run_path::S = ""
 
     "[DERIVED] output frequency in time steps, computed at initialize!"
-    output_every_n_steps::I = 0
+    output_every_n_steps::Int = 0
 
     "[DERIVED] time step counter, incremented every time step"
-    timestep_counter::I = 0
+    timestep_counter::Int = 0
 
     "[DERIVED] output step counter, incremented every time output is written"
     output_counter::I = 0
@@ -48,8 +52,8 @@ end
 """$(TYPEDSIGNATURES)
 Initialize the `OutputWriterCore` from the option fields of `output` and `model`:
 determine the run folder (skipped for in-memory writers when `create_folder=false`),
-compute the output frequency from `model.time_stepping`, reset counters, and add
-standard callbacks (parameters txt, progress txt, restart file) if enabled.
+compute the output frequency from `model.time_stepping`, reset the output counter,
+and add standard callbacks (parameters txt, progress txt, restart file) if enabled.
 Returns `true` if output is active, `false` otherwise."""
 function initialize!(
         core::OutputWriterCore,
@@ -65,18 +69,13 @@ function initialize!(
         create_run_folder!(output)
     end
 
-    # OUTPUT FREQUENCY
-    core.output_every_n_steps = max(
-        1, round(
-            Int,
-            Millisecond(output.interval).value / model.time_stepping.Δt_millisec.value
-        )
-    )
-    output.interval = convert(typeof(output.interval), Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt_sec)))
+    # OUTPUT FREQUENCY, recalculate interval after rounding
+    f = round(Int, Millisecond(output.interval).value / model.time_stepping.Δt_millisec.value)
+    core.output_every_n_steps = max(1, f)
+    output.interval = convert(typeof(output.interval), Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt)))
 
     # RESET COUNTERS
-    core.timestep_counter = 0
-    core.output_counter = 0
+    core.output_counter = 1             # start at 1 for writing the initial conditions
 
     # CALLBACKS
     output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
@@ -89,16 +88,19 @@ end
 """$(TYPEDSIGNATURES)
 Increment the timestep counter and return `true` if output should be written on
 this step (i.e. `active` is true and the counter is a multiple of `output_every_n_steps`)."""
-function output!(core::OutputWriterCore, output::AbstractOutput)
-    core.timestep_counter += 1
-    output.active || return false
-    core.timestep_counter % core.output_every_n_steps == 0 || return false
-    return true
+function do_output!(core::OutputWriterCore, clock::Clock, output::AbstractOutput)
+    do_output =                         # boolean whether to output this time step
+        output.active &&                # output must be active
+        clock.time_step_counter > 0 &&  # don't store initial conditions again and skip spin up steps
+                                        # by using `time_step_counter` not `step_counter` (which counts those too)
+        clock.time_step_counter % core.output_every_n_steps == 0    # and multiple of output interval
+    core.output_counter += do_output    # increment output counter if output is written
+    return do_output
 end
 
 """$(TYPEDSIGNATURES)
-Reset the output frequency `interval` of `output` and re-initialize its `OutputWriterCore`
-so that the output frequency is recomputed from the model time step. If the requested 
+Reset the output `interval` of `output` and re-initialize its `OutputWriterCore`
+so that the output interval is recomputed from the model time step. If the requested 
 `interval` is not an integer multiple of the model time step, it is rounded to
 the nearest multiple."""
 function set!(output::AbstractOutput, model::AbstractModel; interval::Period)

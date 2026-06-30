@@ -472,6 +472,75 @@ nothing # hide
 ![Nested OctaHEALPix](octahealpix_nested.png)
 
 
+## Copying unmasked grid points
+
+Having a `field` and a `mask` on the same grid one can extract masked/unmasked elements (return as array)
+with `field[mask]` or `field[.~mask]`, however, this operation allocates memory and it is not
+immediately possible to write the results of these operations allocation-free into existing arrays.
+
+Hence, RingGrids provides `unmasked_indices` and `copy_unmasked!` that let you extract the unmasked subset of a
+ring-grid field into a (smaller) subset array, work on it, and scatter results back -- allocation free on
+both CPU and GPU. Only a reusable `indices` vector has to be precomputed that maps the indices between
+the unmasked elements of the field to the contiguous elements in the array.
+
+**Convention:** `mask` is a `Bool` field where `true` = masked (excluded), `false` = unmasked (included).
+
+Start with a mask on a grid
+
+```@example ringgrids
+grid = HEALPixGrid(2)
+mask = rand(Bool, grid)                   # or use your own Bool field
+```
+
+Precompute the indices to copy between field and array
+
+```@example ringgrids
+indices = unmasked_indices(mask)          # Vector of grid-point indices where mask == false
+```
+
+`indices` lives on the same device as `mask` (CPU or GPU) and is sorted.
+
+Now we can copy the unmasked elements of the field to the smaller plain array (gather):
+
+```@example ringgrids
+field = rand(Float32, grid)
+```
+
+The array must be of length `n` equal to the zero (=unmasked) elements in the mask
+
+```@example ringgrids
+n = length(mask) - sum(mask)
+array = zeros(Float32, n)
+copy_unmasked!(array, field, indices)
+array
+```
+
+Such that `array` is a subset of the elements in `field`.
+The unmasked values are identical
+
+```@example ringgrids
+array == field[.~mask]
+```
+
+Same works for 3D or higher dimensions, but the mask is always 2D
+
+```@example ringgrids
+nlayers = 3
+field3D = rand(Float32, grid, nlayers)
+array3D = zeros(Float32, n, nlayers)
+copy_unmasked!(array3D, field3D, indices)
+```
+
+And copy back, plain array → field (scatter):
+
+```@example ringgrids
+other_field3D = zeros(Float32, grid, nlayers)
+copy_unmasked!(other_field3D, array3D, indices)
+field3D[.~mask, :] == other_field3D[.~mask, :]
+```
+
+Grid points not referenced by `indices` (the masked ones) are **left unchanged**.
+
 ## Function index
 
 ```@autodocs

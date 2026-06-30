@@ -208,6 +208,9 @@ field = rand(Float32, spectral_grid.grid)
   unit tests have been added and run successfully.
 
 ```bash
+# Single test file (fast — load Test manually, avoid full Pkg.test overhead)
+julia --project=SpeedyWeather --check-bounds=yes -e 'using Test, SpeedyWeather; include("SpeedyWeather/test/dynamics/vertical_coordinates.jl")'
+
 # Main model tests
 julia --project=SpeedyWeather --check-bounds=yes -e 'using Pkg; Pkg.test("SpeedyWeather")'
 
@@ -254,7 +257,7 @@ Six types encode what iteration space a kernel covers:
 | `SpectralInnerWorkOrder` | as above, but skip `lm=1` |
 | `DiagonalWorkOrder` | diagonal elements of a `LowerTriangularArray` |
 | `RingGridWorkOrder` | all grid points `ij` × vertical layers |
-| `Array3DWorkOrder` | regular 3D arrays |
+| `ArrayWorkOrder` | regular arrays preserving dimensionality |
 | `LinearWorkOrder` | flattened 1D (eachindex) |
 
 ### Launching a kernel

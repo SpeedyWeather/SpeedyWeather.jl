@@ -42,6 +42,7 @@ makedocs(
         "Advanced" => [
             "Extensions" => "extensions.md",
             "Variable system" => "variable_system.md",
+            "Vertical coordinates" => "vertical_coordinates.md",
             "Forcing and drag" => "forcing_drag.md",
             "Parameterizations" => "parameterizations.md",
             "Input data" => "input_data.md",

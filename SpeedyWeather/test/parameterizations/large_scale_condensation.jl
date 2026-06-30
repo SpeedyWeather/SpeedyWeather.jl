@@ -8,12 +8,14 @@
                     relative_humidity_threshold = r, snow, reevaporation
                 )
                 model = PrimitiveWetModel(spectral_grid; large_scale_condensation)
+                model.feedback.verbose = false
                 simulation = initialize!(model)
                 run!(simulation, period = Day(1))
 
                 rain_fall = simulation.variables.parameterizations.rain_large_scale
                 snow_fall = simulation.variables.parameterizations.snow_large_scale
 
+                @test model.feedback.nans_detected == false
                 @test all(rain_fall .>= 0)      # precipitation should always be non-negative
 
                 if snow

@@ -229,7 +229,7 @@ end
     spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)          # define resolution
     model = BarotropicModel(; spectral_grid)   # construct model
     simulation = initialize_with_spinup!(model)
-    (; Δt, Δt_sec) = simulation.model.time_stepping
+    (; Δt) = simulation.model.time_stepping
     dt = Δt
     ps = parameters(model)
     pvec = vec(ps)

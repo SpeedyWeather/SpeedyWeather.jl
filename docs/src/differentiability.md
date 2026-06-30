@@ -133,7 +133,7 @@ We can use the resulting parameter vector to calculate sensitivities over a sing
 ```julia
 initialize!(simulation)
 run!(simulation, period=Day(10))
-(; Δt, Δt_sec) = simulation.model.time_stepping
+(; Δt) = simulation.model.time_stepping
 ps = parameters(model)
 pvec = vec(ps)
 dp = zero(pvec)

@@ -133,7 +133,7 @@ humidity
 ![speedyweather_pluto](https://github.com/user-attachments/assets/5d485015-8c28-4c44-9c2b-c3acdf335788)
 
 (Note that in SpeedyWeather v0.19 the variable paths have changed so the respective line
-now needs to be written as `q = simulation.variables.grid.humidity[:, end]`)
+now needs to be written as `q = get_step(simulation.variables.grid.humidity)[:, end]`)
 
 ## Gallery
 

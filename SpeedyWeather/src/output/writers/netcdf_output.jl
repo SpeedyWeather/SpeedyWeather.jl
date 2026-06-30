@@ -74,8 +74,8 @@ Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
 the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument. In case a 
 non-default number of soil layers is used, it also needs the respective `nlayers_soil` to allocate those outputs.
 The output grid is optionally determined by keyword arguments `output_Grid` (its type, full grid required),
-`nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
-equivalent of the grid and resolution used in `SpectralGrid` `S`."""
+`nlat_half` (resolution) and `output_NF` (number format, only used for variables not coordinates).
+By default, uses the full grid equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
         SG::SpectralGrid,
         Model::Type{<:AbstractModel} = Barotropic;
@@ -175,10 +175,10 @@ function initialize!(
     output!(output, vars.prognostic.clock.time)   # write initial time
 
     # DEFINE NETCDF DIMENSIONS SPACE
-    # explictly move to CPU to avoid issues with Reactant and on GPU
+    # explictly move to CPU and convert to common format as determined by RingGrids.get_lond (Float64 default)
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
+    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
     soil_indices = collect(1:get_soil_layers(model))
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
@@ -186,10 +186,18 @@ function initialize!(
     defVar(dataset, "layer", σ, ("layer",), attrib = Dict("units" => "1", "long_name" => "sigma layer"))
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
-    # VARIABLES, define every output variable in the netCDF file and write initial conditions
+    # VARIABLES, remove output variables not existent in simulation.variables
+    simulation = Simulation(vars, model)
+    nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
+    if !isempty(nonexisting_vars)
+        @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
+    end
+    delete!(output, nonexisting_vars...)
+
+    # then define every output variable in the netCDF file and write initial conditions
     for (key, var) in output.variables
         define_variable!(dataset, var, eltype(output.field2D))
-        output!(output, var, Simulation(vars, model))
+        output!(output, var, simulation)
     end
 
     return nothing
@@ -217,48 +225,6 @@ function define_variable!(
 end
 
 """$(TYPEDSIGNATURES)
-Output a `variable` into `output`. Interpolates onto the output grid and resolution
-as specified in `output`. Method used for all output variables `<: AbstractOutputVariable`
-with dispatch over the second argument. Interpolates, scales, custom transform,
-bitrounding and writes via the backend-specific [`write_array!`](@ref)."""
-function output!(
-        output::AbstractOutput,
-        variable::AbstractOutputVariable,
-        simulation::AbstractSimulation,
-    )
-    # escape immediately after first call if variable doesn't have a time dimension
-    ~hastime(variable) && output.output_counter > 1 && return nothing
-
-    # interpolate 2D/3D variables
-    var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
-
-    try
-        raw = on_architecture(CPU(), path(variable, simulation))
-        RingGrids.interpolate!(var, raw, output.interpolator)
-    catch FieldError
-        var .= variable.missing_value
-    end
-
-    # unscale if variable.unscale == true and exists
-    if hasproperty(variable, :unscale)
-        if variable.unscale
-            scale!(var, inv(simulation.variables.prognostic.scale[]))
-        end
-    end
-
-    if hasproperty(variable, :transform)    # transform (e.g. scale, offset, exp, etc) if defined
-        @. var = variable.transform(var)
-    end
-
-    if hasproperty(variable, :keepbits)     # round mantissabits for compression
-        round!(var, variable.keepbits)
-    end
-
-    write_array!(output, variable, var)
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
 Backend-specific write of an interpolated, post-processed field `field` for `variable`
 into `output`. Implementations exist for [`NetCDFOutput`](@ref) and `ZarrOutput`."""
 function write_array!(
@@ -279,7 +245,6 @@ function output!(
         output::NetCDFOutput,
         time::DateTime,
     )
-    output.output_counter += 1      # output counter increases when writing time
     i = output.output_counter
 
     (; netcdf_file, startdate) = output
