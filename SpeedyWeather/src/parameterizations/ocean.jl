@@ -1,38 +1,3 @@
-"""
-Abstract super type for ocean models, which control the sea surface temperature
-and sea ice concentration as boundary conditions to a SpeedyWeather simulation.
-A new ocean model has to be defined as
-
-    CustomOceanModel <: AbstractOcean
-
-and can have parameters like `CustomOceanModel{T}` and fields. They need to extend
-the following functions
-
-    function initialize!(ocean_model::CustomOceanModel, model::PrimitiveEquation)
-        # your code here to initialize the ocean model itself
-        # you can use other fields from model, e.g. model.geometry
-    end
-
-    function initialize!(vars::Variables, ocean_model::CustomOceanModel, model::PrimitiveEquation)
-        # your code here to initialize the prognostic variables for the ocean
-        # namely, vars.prognostic.ocean.sea_surface_temperature, e.g.
-        # vars.prognostic.ocean.sea_surface_temperature .= 300      # 300K everywhere
-    end
-
-    function timestep!(vars::Variables, ocean_model::CustomOceanModel, model::PrimitiveEquation)
-        # your code here to change the vars.prognostic.ocean.sea_surface_temperature
-    end
-
-Temperatures in ocean.sea_surface_temperature have units of Kelvin,
-or NaN for no ocean. Note that neither sea surface temperature, land-sea mask
-or orography have to agree. It is possible to have an ocean on top of a mountain.
-For an ocean grid-cell that is (partially) masked by the land-sea mask, its value will
-be (fractionally) ignored in the calculation of surface fluxes (potentially leading
-to a zero flux depending on land surface temperatures). For an ocean grid-cell that is NaN
-but not masked by the land-sea mask, its value is always ignored.
-"""
-abstract type AbstractOcean <: AbstractModelComponent end
-
 # variable that AbstractOcean requires
 function variables(::AbstractOcean)
     return (
@@ -138,12 +103,12 @@ function timestep!(
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
     (; monthly_temperature) = ocean
-    sea_surface_temperature = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, ocean)
+    (; sea_surface_temperature) = vars.prognostic.ocean
     NF = eltype(sea_surface_temperature)
     weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
 
     launch!(
-        architecture(sea_surface_temperature), LinearWorkOrder, size(sea_surface_temperature),
+        architecture(sea_surface_temperature), ArrayWorkOrder, size(sea_surface_temperature),
         interpolate_monthly_climatology_kernel!,
         sea_surface_temperature, monthly_temperature, weight, this_month, next_month
     )
@@ -323,10 +288,17 @@ function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEq
     if ocean_model.mask
         masked_value = ocean_model.land_temperature
         sst = vars.prognostic.ocean.sea_surface_temperature.data
-        # TODO: broadcasting over views of Fields of GPUArrays doesn't work
         sst[isnan.(sst)] .= masked_value
+
+        # cap initial conditions at sea ice freezing temperature
+        if hasproperty(model, :sea_ice) && hasproperty(model.sea_ice, :freezing_temperature)
+            Tf = model.sea_ice.freezing_temperature
+            sst[sst .< Tf] .= Tf
+        end
+
         mask!(vars.prognostic.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
     end
+
     return nothing
 end
 

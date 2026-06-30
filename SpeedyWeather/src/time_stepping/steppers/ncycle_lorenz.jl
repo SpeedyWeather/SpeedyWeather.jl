@@ -146,7 +146,6 @@ function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
         clock::Clock,
-        scale::Number,
         time_stepping::NCycleLorenz,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,

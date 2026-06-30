@@ -60,6 +60,11 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::DiffusiveVerticalAdvection) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::DispersiveVerticalAdvection) = 2
 
+# Parameterizations should always be evaluated on the previous time step for Euler forward
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParameterization) = 1
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractOcean) = 2
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSeaIce) = 2
+
 # particle advection using u, v at current not previous time step
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
 
@@ -207,7 +212,6 @@ function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
         clock::Clock,
-        scale::Number,
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
