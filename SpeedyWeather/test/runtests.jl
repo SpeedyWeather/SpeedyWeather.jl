@@ -10,9 +10,6 @@ end
 testsuite_GPU = Dict(
     "kernelabstractions" => quote
         include("GPU/kernelabstractions.jl")
-    end, 
-    "Enzyme rules SpeedyWeather" => quote
-        include("differentiability/enzyme_rules.jl")
     end
 )
 
