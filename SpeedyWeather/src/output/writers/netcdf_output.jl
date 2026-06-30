@@ -61,6 +61,7 @@ $(TYPEDFIELDS)"""
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
     const interpolator::Interpolator
+    const land_fraction::Field2D
 
     # SCRATCH FIELDS TO INTERPOLATE ONTO
     const field2D::Field2D
@@ -95,6 +96,7 @@ function NetCDFOutput(
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
 
+    land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction 
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
@@ -102,6 +104,7 @@ function NetCDFOutput(
     output = NetCDFOutput(;
         interval = Second(interval),    # convert to seconds for dispatch
         interpolator,
+        land_fraction,
         field2D,
         field3D,
         field3Dland,
@@ -198,6 +201,11 @@ function initialize!(
     for (key, var) in output.variables
         define_variable!(dataset, var, eltype(output.field2D))
         output!(output, var, simulation)
+    end
+
+    # calculate land fraction on output grid
+    if hasproperty(model, :land_sea_mask)
+        interpolate!(output.land_fraction, model.land_sea_mask.land_fraction, output.interpolator)
     end
 
     return nothing
