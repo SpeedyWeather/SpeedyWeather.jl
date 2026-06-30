@@ -90,6 +90,7 @@ the Zarr group type once `initialize!` has been called (`Nothing` before)."""
     zarr_group::Union{Z, Nothing} = nothing
 
     const interpolator::Interpolator
+    const land_fraction::Field2D
 
     # SCRATCH FIELDS TO INTERPOLATE ONTO
     const field2D::Field2D
