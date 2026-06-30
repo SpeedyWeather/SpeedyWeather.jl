@@ -1,6 +1,18 @@
+"""Abstract supertype for all land models. Custom land models should subtype `AbstractWetLand`
+or `AbstractDryLand` and implement `initialize!`, `timestep!`, and optionally `variables` and `filter!`."""
 abstract type AbstractLand <: AbstractModelComponent end
+
+"""Abstract supertype for sub-components of a land model (soil temperature, soil moisture,
+snow, vegetation, rivers). Each component implements `initialize!`, `timestep!`, and optionally
+`variables` and `filter!`."""
 abstract type AbstractLandComponent <: AbstractModelComponent end
+
+"""Abstract land model type that includes hydrological processes (soil moisture, snow,
+vegetation, rivers). Intended for use with `PrimitiveWet`. The default concrete type is `LandModel`."""
 abstract type AbstractWetLand <: AbstractLand end
+
+"""Abstract land model type that omits hydrological processes and only includes soil temperature.
+Can be used with both `PrimitiveDry` and `PrimitiveWet`. The default concrete type is `DryLandModel`."""
 abstract type AbstractDryLand <: AbstractLand end
 
 const DEFAULT_NLAYERS_SOIL = 2
@@ -20,8 +32,10 @@ model_type(model::AbstractLand) = model_type(typeof(model))
 
 Base.show(io::IO, M::AbstractLand) = Base.show(io, M, values = false)
 
-# LandModel defined through its components
 export LandModel
+
+"""Full land model with all components: geometry, thermodynamics, soil temperature (bucket scheme),
+soil moisture, snow, vegetation, and optional rivers. Intended for use with `PrimitiveWet`. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef mutable struct LandModel{G, TD, T, SM, SN, V, R} <: AbstractWetLand
     spectral_grid::SpectralGrid
     @component geometry::G = LandGeometry(spectral_grid, nlayers = DEFAULT_NLAYERS_SOIL)
@@ -33,8 +47,10 @@ export LandModel
     @component rivers::R = nothing
 end
 
-# also allow spectral grid to be passed on as first an only positional argument to model constructors and nlayers to be passed as keyword argument directly to the constructor
-(L::Type{<:AbstractLand})(SG::SpectralGrid; nlayers = DEFAULT_NLAYERS_SOIL, kwargs...) = L(spectral_grid = SG, geometry = LandGeometry(SG, nlayers = nlayers); kwargs...)
+# also allow spectral grid to be passed on as first an only positional argument to model constructors
+# and nlayers to be passed as keyword argument directly to the constructor
+(L::Type{<:AbstractLand})(SG::SpectralGrid; nlayers = DEFAULT_NLAYERS_SOIL, kwargs...) =
+    L(spectral_grid = SG, geometry = LandGeometry(SG, nlayers = nlayers); kwargs...)
 
 # initializing the land model initializes its components
 function initialize!(land::LandModel, model::AbstractModel)
@@ -58,6 +74,9 @@ variables(land::LandModel) = (
 )
 
 export DryLandModel
+
+"""Simplified land model with only geometry, thermodynamics, and soil temperature, omitting
+hydrological components, i.e. no soil moisture, snow, vegetation, nor rivers. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef mutable struct DryLandModel{G, TD, T} <: AbstractDryLand
     spectral_grid::SpectralGrid
     @component geometry::G = LandGeometry(spectral_grid, nlayers = DEFAULT_NLAYERS_SOIL)
@@ -106,7 +125,11 @@ function initialize!(vars::Variables, land_model::AbstractLand, model::Primitive
     return nothing
 end
 
-function Base.filter!(vars::Variables, land_model::AbstractLand, model::PrimitiveEquation)
+# any land model has a nothing fallback for filter! (change variables after time step)
+Base.filter!(vars::Variables, land_model::AbstractLand, model::PrimitiveEquation) = nothing
+
+# LandModel passes on filter! to its components
+function Base.filter!(vars::Variables, land_model::LandModel, model::PrimitiveEquation)
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
     if model isa PrimitiveWet && land_model isa AbstractWetLand
         filter!(vars, land_model.snow, model)

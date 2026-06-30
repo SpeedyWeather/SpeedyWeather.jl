@@ -13,7 +13,7 @@ import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     initialize!, finalize!, output!, write_array!, set!, add!, add_default!,
     is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
     get_lond, get_latd, on_architecture, CPU,
-    AbstractFullGrid
+    AbstractFullGrid, path_or_nothing
 
 import SpeedyWeather.RingGrids
 import SpeedyWeather: round!
