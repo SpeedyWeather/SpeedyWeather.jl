@@ -6,29 +6,26 @@ function dynamics_tendencies!(
     )
     forcing!(vars, model)               # = (Fᵤ, Fᵥ) forcing for u, v
     drag!(vars, model)                  # drag term for u, v
+    scale_tendencies!(vars, model)      # dynamical core uses a scaled time step, Δt/radius
     vorticity_flux!(vars, model)        # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
     tracer_advection!(vars, model)
     return nothing
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Calculate all tendencies for the ShallowWaterModel."""
 function dynamics_tendencies!(
         vars::Variables,
         model::ShallowWater,
     )
-    (; planet, atmosphere, orography) = model
-    (; spectral_transform, geometry) = model
-
     forcing!(vars, model)               # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
     drag!(vars, model)                  # drag term for u, v
+    scale_tendencies!(vars, model)      # dynamical core uses a scaled time step, Δt/radius
 
     # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for vorticity
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence
     vorticity_flux!(vars, model)
-
-    geopotential!(vars, planet)         # geopotential Φ = gη in shallow water
+    geopotential!(vars, model)          # geopotential Φ = gη in shallow water
     bernoulli_potential!(vars, model)   # = -∇²(E+Φ), tendency for divergence
 
     # = -∇⋅(uh, vh), tendency for interface displacement η
@@ -48,6 +45,7 @@ function dynamics_tendencies!(
     )
     forcing!(vars, model)
     drag!(vars, model)
+    scale_tendencies!(vars, model)
 
     (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit, time_stepping) = model
 
@@ -154,6 +152,10 @@ function vertical_integration!(
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
     )
+    # TODO: σ_levels_thick is used here as the sigma-coordinate layer thickness Δσₖ for the
+    # Δσ-weighted vertical integrals (Simmons & Burridge 1981, eq. 3.12). Generalising to
+    # hybrid coordinates requires replacing Δσₖ with the actual pressure thickness divided
+    # by surface pressure, which varies in space and time.
     (; σ_levels_thick, nlayers) = geometry
     (; dpres_dx, dpres_dy) = vars.dynamics      # zonal, meridional grad of log surface pressure
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
@@ -203,6 +205,7 @@ function vertical_integration!(
         time_stepping::AbstractTimeStepper,
     )
 
+    # TODO: same as CPU version — Δσₖ weights baked into sigma-coordinate continuity equation.
     (; σ_levels_thick, nlayers) = geometry
     (; dpres_dx, dpres_dy) = vars.dynamics    # zonal, meridional grad of log surface pressure
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
@@ -341,6 +344,9 @@ function vertical_velocity!(
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
     )
+    # TODO: σ_levels_thick and σ_levels_half are used here to compute the sigma-coordinate
+    # vertical velocity σ̇ (Hoskins & Simmons 1975, eq. before 6). Generalising to hybrid
+    # coordinates requires a reformulation of the vertical velocity equation.
     (; σ_levels_thick, σ_levels_half, nlayers) = geometry
 
     # sum of Δσ-weighted div, uv∇lnp from 1:k-1
@@ -448,6 +454,7 @@ function vordiv_tendencies!(
         time_stepping::AbstractTimeStepper,
     )
     (; f) = coriolis                            # coriolis parameter
+    scale = vars.prognostic.scale[]             # scale Coriolis on the fly as is vorticity
     Tₖ = implicit.temp_profile                  # reference temperature profile
     (; coslat⁻¹) = geometry
 
@@ -458,11 +465,11 @@ function vordiv_tendencies!(
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     vor = get_prognostic_step(vars.grid.vorticity, time_stepping, DynamicalCore())
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
-    
+
     # if no humidity, pass a zero scratch array to the kernel
     humid = haskey(vars.grid, :humidity) ?
         get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) :
-        fill!(vars.scratch.grid.a, 0)                   
+        fill!(vars.scratch.grid.a, 0)
 
     (; dpres_dx, dpres_dy) = vars.dynamics              # zonal/meridional gradient of logarithm of surface pressure
     scratch_memory = vars.scratch.transform_memory
@@ -473,7 +480,7 @@ function vordiv_tendencies!(
     launch!(
         arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
         u_tend_grid, v_tend_grid, u, v, vor, temp, humid,
-        dpres_dx, dpres_dy, Tₖ, f, coslat⁻¹, whichring, atmosphere,
+        dpres_dx, dpres_dy, Tₖ, f, scale, coslat⁻¹, whichring, atmosphere,
     )
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     vor_tend = get_tendency_step(vars.tendencies.vorticity, time_stepping, DynamicalCore())
@@ -497,19 +504,19 @@ end
         vor_grid,               # Input: relative vorticity
         temp_grid,              # Input: temperature anomaly
         humid_grid,             # Input: humidity
-        dpres_dx,                 # Input: zonal gradient of log surface pressure
-        dpres_dy,                 # Input: meridional gradient of log surface pressure
+        dpres_dx,               # Input: zonal gradient of log surface pressure
+        dpres_dy,               # Input: meridional gradient of log surface pressure
         Tₖ,                     # Input: reference temperature profile
-        f,              # Input: coriolis parameter
-        coslat⁻¹,       # Input: 1/cos(latitude) for scaling
-        whichring,      # Input: mapping from grid point to latitude ring
+        f,                      # Input: coriolis parameter
+        scale,                  # Input: Scaling of vorticity, apply to Coriolis on the fly too
+        coslat⁻¹,               # Input: 1/cos(latitude) for scaling
+        whichring,              # Input: mapping from grid point to latitude ring
         atmosphere,             # Input: atmosphere for R_dry and μ_virt_temp
     )
     ij, k = @index(Global, NTuple)
     j = whichring[ij]           # latitude ring index for this grid point
     coslat⁻¹j = coslat⁻¹[j]     # get coslat⁻¹ for this latitude
-    f_j = f[j]                  # coriolis parameter for this latitude
-
+    f_j = f[j] * scale          # coriolis parameter for this latitude, scaled
     ω = vor_grid[ij, k] + f_j   # absolute vorticity
 
     # compute virtual temperature on the fly, temp_grid is anomaly
@@ -585,7 +592,7 @@ function temperature_tendency!(
 
     # use scratch array with zeros in case humidity doesn't exist
     humid = haskey(vars.grid, :humidity) ?
-        get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) : 
+        get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) :
         fill!(vars.scratch.grid.a, 0)
 
     (; pres_flux, pres_flux_sum_above, div_sum_above) = vars.dynamics
@@ -812,6 +819,7 @@ function vorticity_flux_curldiv!(
     )
 
     (; f) = model.coriolis
+    scale = vars.prognostic.scale[]     # used to scale Coriolis f on the fly, as it's being added to a scaled vorticity
     (; coslat⁻¹) = model.geometry
 
     u_tend_grid = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, DynamicalCore(), model)
@@ -825,7 +833,7 @@ function vorticity_flux_curldiv!(
 
     launch!(
         architecture(u), RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
-        u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring
+        u_tend_grid, v_tend_grid, u, v, vor, f, scale, coslat⁻¹, whichring
     )
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
@@ -847,17 +855,17 @@ function vorticity_flux_curldiv!(
 end
 
 @kernel inbounds = true function _vorticity_flux_kernel!(
-        u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring
+        u_tend_grid, v_tend_grid, u, v, vor, f, scale, coslat⁻¹, whichring
     )
     # Get indices
     ij, k = @index(Global, NTuple)
     j = whichring[ij]
 
     # Get the coriolis parameter and cosine latitude factor for this latitude
-    f_j = f[j]
+    f_j = f[j] * scale              # scaled as is vorticity
     coslat⁻¹j = coslat⁻¹[j]
 
-    # Calculate absolute vorticity
+    # Calculate absolute vorticity, scale f as is vorticity too on the fly
     ω = vor[ij, k] + f_j
 
     # Update tendencies

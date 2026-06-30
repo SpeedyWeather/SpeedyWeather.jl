@@ -47,10 +47,10 @@ tendency_steps(::AbstractLeapfrog) = 1
 
 # in Leapfrog use the current (=2nd) in the dynamical core
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractGeopotential) = 2
 
 # the linear terms in the dynamical core have to be evaluated at the previous time step
 # they are then moved forward within the implicit corrections
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractGeopotential) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::LinearDynamicalCore) = 1
 
 # but in Barotropc/ShallowWater models the 2nd one doesn't exist on the grid and the 1st is considered to be the current step
@@ -211,8 +211,10 @@ function update_prognostic!(
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
+        scale::Real = 1,
     )
-    Δt = time_step(time_stepping, clock) / scale    # scale time step on the fly *1/radius for atmospheric variables
+    Δt = time_step(time_stepping, clock)
+    Δt /= oftype(Δt, scale)                         # scale time step on the fly *1/radius for atmospheric variables
     lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index
     var_old, var_new = get_steps(var)
     var_lf = get_step(var, lf)                      # view on either t or t+dt to dis/enable Williams filter

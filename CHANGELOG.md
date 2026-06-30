@@ -3,6 +3,11 @@
 ## Unreleased
 
 - Make sea surface temperature a time-stepped variable [#1140](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1140)
+- Scale time step on the fly, and forcing/drag/parameterizations inside dycore
+ [#1139](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1139)
+- Fix scalar indexing error constructing `SigmaCoordinates`/`Geometry` on GPU [#1142](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1142)
+- Sigma-pressure coordinates, part 1 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137)
+- NetCDF output coordinates always in Float64 as determined by RingGrids.get_lond [#1141](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1141)
 - ArrayWorkOrder instead of Array3DWorkOrder as both preserve dimensions [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
 - Allocation-free masked copy between RingGrids Field and subset array via mask [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
 - Rename land-sea mask array land_fraction [#1219](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1134)

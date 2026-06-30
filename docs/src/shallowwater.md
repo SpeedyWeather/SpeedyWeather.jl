@@ -271,6 +271,10 @@ does not actually change because ``\xi^2\nabla^2 = \tilde{\xi}^2\tilde{\nabla}^2
 ``1/R^2``, but the Laplace operator with ``R^2``. So overall we just have to use the scaled time step ``\tilde{\Delta t}``
 and normalized eigenvalues for ``\tilde{\nabla}^2``.
 
+When adding (custom) forcing or drag terms, in most cases this scaling does not have to be applied
+manually but is done automatically within the dynamical core. But there are exceptions,
+see [Forcing scaling](@ref) for more details.
+
 
 ## References
 

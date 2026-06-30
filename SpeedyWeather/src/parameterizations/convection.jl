@@ -33,6 +33,9 @@ and relaxes current vertical profiles to the adjusted references."""
 @propagate_inbounds function convection!(ij, vars, convection::BettsMillerConvection, model)
 
     (; geometry, planet, atmosphere, time_stepping) = model
+    # TODO: σ, σ_half, Δσ are used for buoyancy level detection and moisture flux
+    # calculations in the Betts-Miller scheme. These are baked into sigma-coordinate
+    # formulations and would need revisiting for hybrid coordinates.
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
@@ -282,6 +285,7 @@ and relaxes current vertical profiles to the adjusted references."""
 @propagate_inbounds function convection!(ij, vars, DBM::BettsMillerDryConvection, model)
 
     (; geometry, atmosphere, time_stepping) = model
+    # TODO: same as above — σ, σ_half, Δσ baked into Betts-Miller dry convection scheme.
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
