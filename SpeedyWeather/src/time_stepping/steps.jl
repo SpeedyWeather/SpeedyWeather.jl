@@ -64,6 +64,13 @@ get_step(var) = get_step(var, size(var, ndims(var)))
 # LowerTriangularArrays
 # for 2D spectral variables step can be 1 that'll be the ignored additional singleton dimension
 # otherwise an error is thrown
+#
+# NOTE on Enzyme/Julia ≥ 1.11: a `get_step(var, step)` with a *runtime* `step` builds a view with
+# a runtime last-dimension offset; once that view participates in a differentiated kernel Enzyme's
+# type analysis can fail with `EnzymeNoTypeError` (the view construction can no longer be typed).
+# Rather than branch the runtime step to a literal here (which is bad for Reactant tracing), the
+# `get_step` views are handled by a custom `EnzymeRules` rule in `SpeedyWeatherEnzymeExt` that makes
+# `get_step` a differentiation boundary — keeping this primal code branchless and Reactant-friendly.
 @inline get_step(var::LowerTriangularArray{T, 1}, step::Integer) where {T} = lta_view(var, :, step)
 
 """$(TYPEDSIGNATURES)
