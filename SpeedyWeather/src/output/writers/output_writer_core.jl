@@ -12,12 +12,12 @@ Call `initialize!(core, output, model)` inside the writer's `initialize!` method
 populate all derived fields from the writer's option fields and the model time step.
 Call `output!(core, output)` each time step to check if output should be written.
 Fields are $(TYPEDFIELDS)"""
-@kwdef mutable struct OutputWriterCore
+@kwdef mutable struct OutputWriterCore <: AbstractOutputCore
     "[DERIVED] folder name where data is stored, determined at initialize!"
-    run_folder::S = ""
+    run_folder::String = ""
 
     "[DERIVED] full path to folder where data is stored, determined at initialize!"
-    run_path::S = ""
+    run_path::String = ""
 
     "[DERIVED] output frequency in time steps, computed at initialize!"
     output_every_n_steps::Int = 0
@@ -26,7 +26,7 @@ Fields are $(TYPEDFIELDS)"""
     timestep_counter::Int = 0
 
     "[DERIVED] output step counter, incremented every time output is written"
-    output_counter::I = 0
+    output_counter::Int = 0
 end
 
 const OUTPUT_WRITER_CORE_FIELDS = fieldnames(OutputWriterCore)

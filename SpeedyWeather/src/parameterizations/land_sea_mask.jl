@@ -115,7 +115,7 @@ end
 function EarthLandSeaMask(spectral_grid::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, grid) = spectral_grid
     mask = zeros(GridVariable2D, grid)
-    return EarthLandSeaMask{NF, GridVariable2D, Bool}(; mask, kwargs...)
+    return EarthLandSeaMask{NF, GridVariable2D, Bool}(; land_fraction, kwargs...)
 end
 
 # set mask with grid, scalar, function; just define path `mask.land_fraction` to grid here
@@ -163,8 +163,7 @@ function load_mask!(land_sea_mask::EarthLandSeaMask{NF}) where NF
         land_sea_mask.land_fraction .= round.(land_sea_mask.land_fraction ./ q) .* q
     end
 
-    # TODO: do it again with extrema, once reactant bug resolved
-    lo, hi = minimum(land_sea_mask.mask), maximum(land_sea_mask.land_fraction)
+    lo, hi = minimum(land_sea_mask.land_fraction), maximum(land_sea_mask.land_fraction)
     if (lo < 0 || hi > 1)
         # @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
         land_sea_mask.land_fraction .= clamp.(land_sea_mask.land_fraction, 0, 1)

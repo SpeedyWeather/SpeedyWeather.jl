@@ -32,10 +32,7 @@ $(TYPEDFIELDS)"""
     "[DERIVED] vertical temperature profile, obtained from diagn on first time step"
     temp_profile::VectorType = zeros(NF, nlayers)
 
-    "time step 2α*Δt packed in RefValue for mutability"
-    ξ::Base.RefValue{NF} = Ref{NF}(0)
-
-    "divergence: operator for the geopotential calculation"
+    "[DERIVED] divergence: operator for the geopotential calculation"
     R::MatrixType = zeros(NF, nlayers, nlayers)
 
     "[DERIVED] divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
@@ -103,21 +100,15 @@ end
 """$(TYPEDSIGNATURES)
 Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
-        implicit::ImplicitPrimitiveEquation,
-        dt::Real,                                           # the scaled time step radius*dt
+        implicit::ImplicitPrimitiveEquation{NF},
+        Δt::Real,                                           # the time step [s], scaled
         temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
         geometry::AbstractGeometry,
         geopotential::AbstractGeopotential,
         atmosphere::AbstractAtmosphere,
         adiabatic_conversion::AbstractAdiabaticConversion,
-    )
-
-    NF = eltype(temp_average)
-
-    # option to skip reinitialization at restart
-    (implicit.initialized && !implicit.reinitialize) && return nothing
-
-    (; trunc, nlayers, α) = implicit
+    ) where {NF}
+    (; trunc, nlayers) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
@@ -147,8 +138,12 @@ function initialize!(
     # TODO: reactive when issues with Reactant resolved
     # all(isfinite.(temp_profile)) || return nothing
 
-    ξ = α * dt                          # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    implicit.ξ[] = ξ                    # also store in Implicit struct
+    @assert 0.5 <= implicit.centering <= 1 "Centering coefficient must be between 0.5 (centred implicit) and 1 (backward implicit)"
+    ξ = implicit.centering * Δt                 # 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
+
+    # index vectors for broadcasting: rows = 1:nlayers (column), cols = (1:nlayers)' (row)
+    rows = (1:nlayers)
+    cols = (1:nlayers)'
 
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
     # R[row, k] = -Δp_geopot_full[k] for row <= k, additionally -Δp_geopot_half[k] for row < k
@@ -195,7 +190,62 @@ function initialize!(
     return nothing
 end
 
-set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = true)
+# Compute S⁻¹ for each spectral degree l via Gauss-Jordan elimination
+# S = I - ξ²*eigenvalue*(R*L + U*Wᵀ), then invert S per l
+# S_scratch[l,:,:] stores the S matrix during elimination,
+# while S⁻¹[l,:,:] tracks the identity → inverse transformation
+@kernel inbounds = true function _implicit_invert_S_kernel!(
+        S⁻¹,                           # Output: (trunc+2) × nlayers × nlayers tensor
+        S_scratch,                     # Scratch: same shape as S⁻¹, stores S per l
+        @Const(R),                      # Input: divergence operator matrix
+        @Const(L),                      # Input: temperature operator matrix
+        @Const(U),                      # Input: divergence vector
+        @Const(W),                      # Input: pressure vector
+        @Const(ξ),                      # Input: semi-implicit time step coefficient
+        @Const(nlayers),                # Input: number of layers
+    )
+    l = @index(Global, Linear)      # spectral degree (1-based)
+
+    NF = eltype(S⁻¹)
+    eigenvalue = -l * (l - 1)       # 1-based, -l*(l+1) → -l*(l-1)
+    ξ²λ = ξ^2 * eigenvalue
+
+    # Compute S = I - ξ²λ*(R*L + U*Wᵀ) into S_scratch[l,:,:]
+    # and initialize S⁻¹[l,:,:] as identity
+    for k in 1:nlayers
+        for r in 1:nlayers
+            RL_kr = zero(NF)
+            for j in 1:nlayers
+                RL_kr += R[k, j] * L[j, r]
+            end
+            S_scratch[l, k, r] = (k == r ? one(NF) : zero(NF)) - ξ²λ * (RL_kr + U[k] * W[r])
+            S⁻¹[l, k, r] = k == r ? one(NF) : zero(NF)
+        end
+    end
+
+    # Gauss-Jordan elimination: reduce S_scratch[l,:,:] (S) to I,
+    # applying the same row operations to S⁻¹[l,:,:] (I → S⁻¹)
+    for pivot in 1:nlayers
+        inv_pivot = 1/S_scratch[l, pivot, pivot]   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
+
+        # Scale pivot row
+        for r in 1:nlayers
+            S_scratch[l, pivot, r] *= inv_pivot
+            S⁻¹[l, pivot, r] *= inv_pivot
+        end
+
+        # Eliminate all other rows
+        for k in 1:nlayers
+            if k != pivot
+                factor = S_scratch[l, k, pivot]
+                for r in 1:nlayers
+                    S_scratch[l, k, r] -= factor * S_scratch[l, pivot, r]
+                    S⁻¹[l, k, r] -= factor * S⁻¹[l, pivot, r]
+                end
+            end
+        end
+    end
+end
 
 """$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
@@ -236,12 +286,6 @@ function implicit_correction!(
         temp_tend, pres_tend, div_tend, G, geopotential,
         div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers
     )
-
-    zero_last_degree!(div_tend)
-    zero_last_degree!(pres_tend)
-    zero_last_degree!(temp_tend)
-
-    pres_tend.data[1:1] .= 0    # mass conservation
 
     return nothing
 end

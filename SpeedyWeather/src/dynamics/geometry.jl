@@ -83,7 +83,7 @@ $(TYPEDFIELDS)
     coslat²::VTLat = coslat .^ 2
 
     "= 1/cos²(lat)"
-    coslat⁻²::VectorType = 1 ./ coslat²
+    coslat⁻²::VTLat = 1 ./ coslat²
 
     "Vertical coordinates used"
     vertical_coordinates::VC
