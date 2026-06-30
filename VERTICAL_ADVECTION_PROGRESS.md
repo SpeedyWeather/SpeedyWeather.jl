@@ -152,3 +152,18 @@ The stash itself is left untouched (not dropped) until its content is fully abso
   resolutions with `dynamics_only`, unrelated to this PR; not investigated further.
 
   Committed Phase 3 as the next commit (kernel + dispatch threshold + GPU test).
+
+- 2026-06-29 (later): user decided to skip Phase 4 (fusion) for now — implemented it, then
+  reverted (`git checkout --`) on request before committing, so HEAD stays at the Phase 3
+  state. Ran a comprehensive CPU+GPU benchmark sweep (old vs new, 10 resolutions x 3 schemes)
+  instead; results written to `BENCHMARK_RESULTS.md` for the PR. CPU: clean 1.1-2.8x win
+  everywhere, consistent with Phase 2's spot numbers. GPU: Centered2 neutral; Upwind5/WENO
+  show a REGRESSION (0.28-0.78x) in the full `vertical_advection!` call at trunc>=63 that
+  contradicts the isolated single-kernel-launch benchmark the dispatch threshold was tuned
+  on (which still reproduces 1.05-1.29x column win when re-checked). Root cause not found
+  before running out of time — ruled out: short-warmup branch divergence, dispatch not
+  firing, environmental drift (isolated test still reproduces). **Open issue: the GPU
+  per-column kernel's dispatch threshold needs re-investigation before this can be
+  considered a GPU win for Upwind/WENO — possibly revert GPU dispatch to always use the
+  per-(ij,k) kernel until understood, or the full-pipeline call has some per-field state
+  interaction the isolated test doesn't capture.**
