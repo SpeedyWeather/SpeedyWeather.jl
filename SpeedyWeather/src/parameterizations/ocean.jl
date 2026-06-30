@@ -331,7 +331,7 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
     C₀ = ocean_model.heat_capacity_mixed_layer
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping
     Δt_C₀ = Δt / C₀
 
     (; land_fraction) = model.land_sea_mask

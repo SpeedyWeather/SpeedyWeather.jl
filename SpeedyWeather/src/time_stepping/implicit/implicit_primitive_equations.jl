@@ -23,7 +23,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
     centering::NF = 1.0
 
-    "[DERIVED] (Scaled) time step used to initialize. Used to check whether time step has changed and reinitialization is needed."
+    "[DERIVED] Time step [s] used to initialize. Used to check whether time step has changed and reinitialization is needed."
     Δt::Base.RefValue{NF} = Ref(zero(NF))
 
     # PRECOMPUTED ARRAYS, to be initialized with initialize!
@@ -88,8 +88,10 @@ function reinitialize!(
     (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
     Δt = time_step(time_stepping, vars.prognostic.clock) 
     implicit.Δt[] == Δt && return nothing                   # if time step has not changed no need to reinitialize
+    scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
     Tₖ = vars.dynamics.average_temperature_profile
-    initialize!(implicit, Δt, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
+    initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
+    implicit.Δt[] = Δt
     return nothing
 end
 
@@ -97,7 +99,7 @@ end
 Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
         implicit::ImplicitPrimitiveEquation,
-        Δt::Real,                                           # the scaled time step radius*dt
+        Δt::Real,                                           # the time step [s], scaled
         temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
         geometry::AbstractGeometry,
         geopotential::AbstractGeopotential,
@@ -157,7 +159,6 @@ function initialize!(
 
     @assert 0.5 <= implicit.centering <= 1 "Centering coefficient must be between 0.5 (centred implicit) and 1 (backward implicit)"
     ξ = implicit.centering * Δt                 # 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    implicit.Δt[] = Δt                          # store the time step used for initialization to check for changes later
 
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
     @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
@@ -247,8 +248,9 @@ function implicit_correction!(
     (; S⁻¹, R, U, L, W, nlayers) = implicit
     
     # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
+    # dynamical core uses scaled time step, scale on the fly
     Δt = time_step(time_stepping, vars.prognostic.clock)       
-    ξ = implicit.centering * Δt
+    ξ = implicit.centering * Δt / vars.prognostic.scale[]
 
     temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, implicit)
     pres_tend = get_tendency_step(vars.tendencies.pressure, time_stepping, implicit)

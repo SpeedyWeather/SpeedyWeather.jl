@@ -82,7 +82,7 @@ function initialize!(
         model::AbstractModel,
     )
     # auto-regressive factor in the AR1 process
-    dt = model.time_stepping.Δt_sec         # in seconds
+    dt = model.time_stepping.Δt             # in seconds
     process.autoregressive_factor[] = exp(-dt / Second(process.time_scale).value)
 
     # noise factors per total wavenumber in the AR1 process
