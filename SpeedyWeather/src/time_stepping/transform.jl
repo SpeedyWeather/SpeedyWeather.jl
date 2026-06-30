@@ -146,9 +146,9 @@ function SpeedyTransforms.transform!(
 
     # Batched spec→grid for the prognostic state: one call covers vorticity, divergence,
     # temperature, pressure (and humidity for PrimitiveWet).
-    prog_parent = parent(vars.fused.prognostic)
-    grid_parent = parent(vars.fused.grid)
-    transform!(get_prognostic_step(grid_parent, time_stepping, S), get_prognostic_step(prog_parent, time_stepping, S), scratch_memory, S)
+    prognostic_variables = get_prognostic_step(parent(vars.fused.prognostic), time_stepping, S)
+    grid_variables = get_prognostic_step(parent(vars.fused.grid), time_stepping, S)
+    transform!(grid_variables, prognostic_variables, scratch_memory, S)
 
     if model isa PrimitiveWet
         humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
