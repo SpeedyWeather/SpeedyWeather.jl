@@ -58,7 +58,7 @@ function build_cache(S::SpectralTransform, nlayers::Integer, ::GPU{<:ROCBackend}
         dev(istart_n), dev(istart_s), dev(nlons_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, j_equator,
         architecture(packed_real),
-        Dict{UInt, Any}(),
+        Dict{UInt, Any}(),  # HIPGraphExec may not exist at compile time, so Any is unavoidable
         Dict{UInt, Any}(),
     )
 end
@@ -71,9 +71,9 @@ end
 # =====================================================================================
 
 function run_graph!(
-        ::GPUFourierGraphCache{<:Any, <:Any, <:Any, <:Any, <:Any, <:GPU{<:ROCBackend}},
-        execs::AbstractDict, key, loop!::F,
-    ) where {F}
+        ::GPUFourierGraphCache{<:Any, <:Any, <:Any, <:Any, <:Any, <:GPU{<:ROCBackend}, E},
+        execs::Dict{UInt, E}, key, loop!::F,
+    ) where {E, F}
     if !_HIP_GRAPHS_AVAILABLE
         loop!()                              # no graph API: run the fused loop directly
         return nothing

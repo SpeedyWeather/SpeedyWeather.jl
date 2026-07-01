@@ -68,7 +68,7 @@ gather/scatter index metadata, and the instantiated GPU graphs keyed by field bu
 A graph value of `nothing` marks a buffer for which capture failed (fall back to direct
 loop). The `A` type parameter holds the architecture and is used to dispatch `run_graph!`
 and `build_cache` to the correct backend extension."""
-struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
+struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A, E}
     packed_real::PR             # GPU vector of NF — all rings' dense real blocks
     packed_complex::PC          # GPU vector of Complex{NF} — all rings' dense complex blocks
     real_view::RV               # Vector of per-ring reshaped (nlon_j × nlayers) views into packed_real
@@ -89,8 +89,8 @@ struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
     has_equator::Bool           # whether the grid has a ring on the equator
     j_equator::Int              # latitude index of the equator ring (if any)
     arch::A                     # SpeedyWeather GPU architecture (for launch! and run_graph! dispatch)
-    forward_execs::Dict{UInt, Any}  # per-buffer forward graph: missing=unseen, nothing=failed, else exec
-    inverse_execs::Dict{UInt, Any}  # per-buffer inverse graph
+    forward_execs::Dict{UInt, E}  # per-buffer forward graph: missing=unseen, nothing=failed, else exec
+    inverse_execs::Dict{UInt, E}  # per-buffer inverse graph
 end
 
 # One cache per (SpectralTransform, transform size), keyed by the *forward FFT plan set*.

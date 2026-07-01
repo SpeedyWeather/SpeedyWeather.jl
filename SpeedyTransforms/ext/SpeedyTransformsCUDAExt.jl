@@ -42,6 +42,7 @@ function build_cache(S::SpectralTransform, nlayers::Integer, ::GPU{<:CUDA.CUDABa
     complex_view = [reshape(view(packed_complex, complex_offset[j] + 1:complex_offset[j] + block_complex[j]), nfreqs[j], nlayers) for j in 1:nlat_half]
 
     dev(x) = CuArray(x)
+    exec_dict() = Dict{UInt, Union{Nothing, CuGraphExec}}()
     return GPUFourierGraphCache(
         packed_real, packed_complex, real_view, complex_view,
         rfft_plans, brfft_plans,
@@ -49,20 +50,22 @@ function build_cache(S::SpectralTransform, nlayers::Integer, ::GPU{<:CUDA.CUDABa
         dev(istart_n), dev(istart_s), dev(nlons_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, j_equator,
         architecture(packed_real),
-        Dict{UInt, Any}(),
-        Dict{UInt, Any}(),
+        exec_dict(),
+        exec_dict(),
     )
 end
 
 # =====================================================================================
 # run_graph!: CUDA-specific graph capture and replay.
 # Dispatches on the A=GPU{<:CUDA.CUDABackend} type parameter of GPUFourierGraphCache.
+# The E type param on the dict ensures exec is Union{Nothing, CuGraphExec, Missing}
+# — a small union Julia handles without boxing.
 # =====================================================================================
 
 function run_graph!(
-        ::GPUFourierGraphCache{<:Any, <:Any, <:Any, <:Any, <:Any, <:GPU{<:CUDA.CUDABackend}},
-        execs::AbstractDict, key, loop!::F,
-    ) where {F}
+        ::GPUFourierGraphCache{<:Any, <:Any, <:Any, <:Any, <:Any, <:GPU{<:CUDA.CUDABackend}, E},
+        execs::Dict{UInt, E}, key, loop!::F,
+    ) where {E, F}
     exec = get(execs, key, missing)
     if exec isa CuGraphExec
         launch(exec)                         # hot path: pure replay
