@@ -24,6 +24,15 @@ AllOutputVariables() = (
 )
 
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
+
+"""$(TYPEDSIGNATURES)
+Ensemble-aware variant: appends the `ensemble_index` as the outermost (last, Julia
+column-major) index when ensemble output is on (`ensemble_index > 0`), otherwise falls
+back to the regular indices. Works for both time-varying and static variables (static
+variables ignore `i`). Used by the ensemble-capable `ZarrOutput` backend."""
+get_indices(i, variable::AbstractOutputVariable, ensemble_index::Integer) =
+    ensemble_index > 0 ? (get_indices(i, variable)..., ensemble_index) : get_indices(i, variable)
+
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{true}, t::Val{true}) = (:, :, :, i)   # 3D + time
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{true}, t::Val{false}) = (:, :, :)     # 3D
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{true}) = (:, :, i)     # 2D + time
