@@ -25,18 +25,18 @@ export SigmaCoordinates
 Levels are defined by `σ_half` (half levels at layer interfaces, including `σ = 0` at
 the top and `σ = 1` at the surface); full levels sit at the midpoints.
 $(TYPEDFIELDS)"""
-struct SigmaCoordinates{IntType, VectorType} <: AbstractVerticalCoordinates
+struct SigmaCoordinates{IntType, VectorTypeHalf, VectorTypeFull} <: AbstractVerticalCoordinates
     "[DERIVED] Number of vertical layers"
     nlayers::IntType
 
     "[DERIVED] σ at half levels (interfaces); k = 1 is top of atmosphere (σ = 0), k = nlayers+1 is surface (σ = 1)"
-    σ_half::VectorType
+    σ_half::VectorTypeHalf
 
     "[DERIVED] σ at full levels (layer midpoints); σ_full[k] = (σ_half[k] + σ_half[k+1]) / 2"
-    σ_full::VectorType
+    σ_full::VectorTypeFull
 
     "[DERIVED] Layer thickness in sigma; σ_thickness[k] = σ_half[k+1] - σ_half[k], sums to 1"
-    σ_thickness::VectorType
+    σ_thickness::VectorTypeFull
 end
 
 Adapt.@adapt_structure SigmaCoordinates
@@ -47,7 +47,7 @@ function SigmaCoordinates(SG::SpectralGrid, σ_half::AbstractVector)
     σ_half = on_architecture(SG.architecture, convert.(SG.NF, σ_half))
     σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
     σ_thickness = σ_half[2:end] - σ_half[1:(end - 1)]
-    return SigmaCoordinates{typeof(nlayers), typeof(σ_half)}(nlayers, σ_half, σ_full, σ_thickness)
+    return SigmaCoordinates{typeof(nlayers), typeof(σ_half), typeof(σ_full)}(nlayers, σ_half, σ_full, σ_thickness)
 end
 
 # other constructors for convenience
@@ -153,27 +153,27 @@ export SigmaPressureCoordinates
 `transition(σ) = 1` gives pure sigma levels (terrain-following). See
 `CubicSigmaPressureCoordinates` for a ready-to-use constructor with a smooth transition.
 $(TYPEDFIELDS)"""
-struct SigmaPressureCoordinates{NF, VectorType} <: AbstractVerticalCoordinates
+struct SigmaPressureCoordinates{NF, VectorTypeHalf, VectorTypeFull} <: AbstractVerticalCoordinates
     "[DERIVED] Reference pressure for the pressure component [Pa]"
     reference_pressure::NF
 
     "[DERIVED] Pressure component coefficient at half levels (k = 1 top, nlayers+1 surface)"
-    A_half::VectorType
+    A_half::VectorTypeHalf
 
     "[DERIVED] Sigma component coefficient at half levels"
-    B_half::VectorType
+    B_half::VectorTypeHalf
 
     "[DERIVED] Pressure component coefficient at full levels"
-    A_full::VectorType
+    A_full::VectorTypeFull
 
     "[DERIVED] Sigma component coefficient at full levels"
-    B_full::VectorType
+    B_full::VectorTypeFull
 
     "[DERIVED] Pressure component of layer thickness (ΔA = A_half[k+1] - A_half[k])"
-    A_thickness::VectorType
+    A_thickness::VectorTypeFull
 
     "[DERIVED] Sigma component of layer thickness (ΔB = B_half[k+1] - B_half[k])"
-    B_thickness::VectorType
+    B_thickness::VectorTypeFull
 end
 
 Adapt.@adapt_structure SigmaPressureCoordinates
