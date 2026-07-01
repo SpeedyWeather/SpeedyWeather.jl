@@ -32,25 +32,25 @@ end
 
 gpu_backend = load_gpu_package()
 
-# KERNEL LAUNCHING AND UTILS
-include("kernels_GPU.jl")
-
-# SPECTRAL TRANSFORMS
-include("spectral_transform.jl")
-
-# INTERPOLATION OF RINGGRIDS
-include("interpolate.jl")
-
-# SET FUNCTIONS, GPU SPECIFIC
-include("set.jl")
-
-# VERTICAL, GPU SPECIFIC
-include("vertical_integration.jl")
-
-# FULL MODELS
-include("barotropic.jl")
-include("shallowwater.jl")
-include("primitive_wet.jl")
+# # KERNEL LAUNCHING AND UTILS
+# include("kernels_GPU.jl")
+#
+# # SPECTRAL TRANSFORMS
+# include("spectral_transform.jl")
+#
+# # INTERPOLATION OF RINGGRIDS
+# include("interpolate.jl")
+#
+# # SET FUNCTIONS, GPU SPECIFIC
+# include("set.jl")
+#
+# # VERTICAL, GPU SPECIFIC
+# include("vertical_integration.jl")
+#
+# # FULL MODELS
+# include("barotropic.jl")
+# include("shallowwater.jl")
+# include("primitive_wet.jl")
 
 if gpu_backend === :CUDA
 

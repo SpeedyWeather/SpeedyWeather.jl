@@ -6,7 +6,7 @@
     ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt)
     if ext !== nothing
         # GPU-graphs path is on by default (SpectralTransform's gpu_graphs = true)
-        spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = GPU())
+        spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = SpeedyWeather.GPU())
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
 
@@ -41,7 +41,7 @@ end
 @testset "HIP Graphs: per-step views of one buffer reuse a single graph" begin
     ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt)
     if ext !== nothing
-        spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = GPU())
+        spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = SpeedyWeather.GPU())
         S = SpectralTransform(spectral_grid)
         nlayers = spectral_grid.nlayers
 
