@@ -198,13 +198,13 @@ end
             coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
 
             # reference: generic (allocating) GPU path, graphs disabled on this transform
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
             S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
             spec_off = transform(field, S_off)      # grid -> spectral
             grid_off = transform(coeffs, S_off)      # spectral -> grid
 
             # GPU-graphs path (default, gpu_graphs = true)
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
             S_on = SpectralTransform(spectral_grid)
             spec_on = transform(field, S_on)
             grid_on = transform(coeffs, S_on)
@@ -215,7 +215,7 @@ end
             @test Array(grid_on.data) ≈ Array(grid_off.data) rtol = sqrt(eps(Float32))
 
             # a graph was actually captured and cached
-            @test !isempty(ext.GRAPH_CACHES)
+            @test !isempty(SpeedyTransforms.GRAPH_CACHES)
 
             # replaying into the same buffers across repeated calls stays correct
             spec_repeat = similar(spec_on)
@@ -224,7 +224,7 @@ end
             end
             @test Array(spec_repeat.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
         end
     end
 end
