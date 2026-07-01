@@ -222,8 +222,10 @@ end
 initialize!(::Variables, ::AbstractLongwave, ::AbstractModel) = nothing
 
 @propagate_inbounds function parameterization!(ij, vars, radiation::OneBandLongwave, model)
-    # read the precomputed, state-independent transmissivity (nlayers × nlat)
-    t = vars.parameterizations.longwave_transmissivity
+    # per-column layer transmissivity into the scratch: precomputed per latitude ring for
+    # state-independent coordinates, computed on the fly for state-dependent ones (see
+    # transmissivity_column! and longwave_transmissivity.jl)
+    t = transmissivity_column!(ij, vars, radiation.transmissivity, model.geometry.vertical_coordinates, model)
     longwave_radiative_transfer!(ij, vars, t, radiation.radiative_transfer, model)
     return nothing
 end
@@ -259,7 +261,6 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
     pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     nlayers = size(T, 2)
-    j = model.geometry.whichring[ij]                        # latitude ring index for transmissivity[k, j]
 
     ϵ_ocean = longwave.emissivity_ocean
     ϵ_land = longwave.emissivity_land
@@ -283,14 +284,14 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
     # UPWARD BEAM
     for k in nlayers:-1:2
-        t = transmissivity[k, j]
+        t = transmissivity[ij, k]
         U = U * t + (1 - t) * σ * T[ij, k]^4
         dTdt[ij, k] -= flux_to_tendency(U / cₚ, pₛ, k, model)           # out of layer k
         dTdt[ij, k - 1] += flux_to_tendency(U / cₚ, pₛ, k - 1, model)   # into layer k-1
     end
 
     # Outgoing longwave radiation at TOA
-    t = transmissivity[1, j]
+    t = transmissivity[ij, 1]
     U = U * t + (1 - t) * σ * T[ij, 1]^4
     dTdt[ij, 1] -= flux_to_tendency(U / cₚ, pₛ, 1, model)               # out of layer 1
     vars.parameterizations.outgoing_longwave[ij] = U
@@ -298,14 +299,14 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     # DOWNWARD BEAM
     D::NF = 0               # top boundary condition (no longwave coming from space)
     for k in 1:(nlayers - 1)
-        t = transmissivity[k, j]
+        t = transmissivity[ij, k]
         D = D * t + (1 - t) * σ * T[ij, k]^4
         dTdt[ij, k] -= flux_to_tendency(D / cₚ, pₛ, k, model)           # out of layer k
         dTdt[ij, k + 1] += flux_to_tendency(D / cₚ, pₛ, k + 1, model)   # into layer k+1
     end
 
     # Surface downward longwave radiation
-    t = transmissivity[nlayers, j]
+    t = transmissivity[ij, nlayers]
     D = D * t + (1 - t) * σ * T[ij, nlayers]^4
     vars.parameterizations.surface_longwave_down[ij] = D
     dTdt[ij, nlayers] -= surface_flux_to_tendency(D / cₚ, pₛ, model)    # out of layer k

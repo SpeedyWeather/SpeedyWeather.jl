@@ -61,6 +61,10 @@ get_σ_half(σ::SigmaCoordinates) = σ.σ_half
 get_σ_full(σ::SigmaCoordinates) = σ.σ_full
 get_σ_thickness(σ::SigmaCoordinates) = σ.σ_thickness
 
+on_architecture(arch::AbstractArchitecture, c::SigmaCoordinates) = SigmaCoordinates(
+    c.nlayers, on_architecture(arch, c.σ_half), on_architecture(arch, c.σ_full), on_architecture(arch, c.σ_thickness),
+)
+
 function Base.show(io::IO, σ::SigmaCoordinates)
     params = "{$(typeof(σ.nlayers)), $(typeof(σ.σ_half))}"
     println(io, "$(σ.nlayers)-layer ", styled"{warning:SigmaCoordinates}", styled"{note:$params}")
@@ -250,6 +254,14 @@ get_nlayers(S::SigmaPressureCoordinates) = length(S.B_full)
 get_σ_half(σ::SigmaPressureCoordinates) = σ.B_half
 get_σ_full(σ::SigmaPressureCoordinates) = σ.B_full
 get_σ_thickness(σ::SigmaPressureCoordinates) = σ.B_thickness
+
+# move the coordinate (and its arrays) to another architecture, e.g. to the host for precomputations
+on_architecture(arch::AbstractArchitecture, c::SigmaPressureCoordinates) = SigmaPressureCoordinates(
+    c.reference_pressure,
+    on_architecture(arch, c.A_half), on_architecture(arch, c.B_half),
+    on_architecture(arch, c.A_full), on_architecture(arch, c.B_full),
+    on_architecture(arch, c.A_thickness), on_architecture(arch, c.B_thickness),
+)
 
 """$(TYPEDSIGNATURES)
 Pressure [Pa] at full level `k` given `surface_pressure` [Pa] and hybrid sigma-pressure `coordinate`.

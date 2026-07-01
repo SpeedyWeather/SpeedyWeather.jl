@@ -33,9 +33,12 @@ end
         @test size(t_pre) == (nlayers, nlat)
         @test all(0 .<= t_pre .<= 1)
 
-        # the precomputed field must equal the per-column transmissivity! formula at every
-        # grid point (so CPU results are unchanged and the two code paths can't drift apart),
-        # and the full radiative transfer must run reading t[k, whichring[ij]].
+        # the on-the-fly transmissivity! reads the actual surface pressure while the precompute
+        # uses the reference pressure. For SigmaCoordinates (the default here) the transmissivity
+        # is independent of surface pressure, so with any nonzero pₛ the two paths must be
+        # bit-identical at every grid point; we use the reference pressure to make that explicit.
+        # This guards that the precomputed and on-the-fly code paths can't drift apart.
+        vars.parameterizations.surface_pressure .= model.atmosphere.reference_pressure
         whichring = model.geometry.whichring
         for ij in 1:npoints
             SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
