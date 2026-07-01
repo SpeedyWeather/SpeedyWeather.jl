@@ -61,57 +61,46 @@ get_step(var) = get_step(var, size(var, ndims(var)))
 @inline get_step(var::AbstractArray{T, 2}, step::Integer) where {T} = view(var, :, step)
 @inline get_step(var::AbstractArray{T, 3}, step::Integer) where {T} = view(var, :, :, step)
 
-# A view built from a *runtime* last-dimension offset cannot be type-analysed by Enzyme on Julia
-# ≥ 1.11 once that view participates in a differentiated KernelAbstractions kernel — it throws an
-# `EnzymeNoTypeError`. A view with a *compile-time* offset is handled natively and correctly (the
-# aliasing read/write semantics that the leapfrog relies on are preserved). `_literal_step` therefore
-# resolves the small, statically-bounded step index to a literal via a short branch ladder, so every
-# step view carries a compile-time offset.
-#
-# Note: a custom `get_step` `EnzymeRules` rule was tried instead (to keep this branchless for Reactant)
-# but rejected — `get_step` returns a view used *mutably* (read and written, aliasing the prognostic)
-# in the leapfrog, which a custom rule cannot model; `EnzymeTestUtils.test_reverse` confirmed it gave
-# wrong gradients. The branch is resolved at trace time whenever `step` is a concrete value (the usual
-# case, since the clock step counter is a scalar), so it does not introduce control flow under Reactant.
-@inline function _literal_step(builder::F, step::Integer) where {F}
-    step == 1 && return builder(1)
-    step == 2 && return builder(2)
-    return builder(step)
-end
+# NOTE on Enzyme (Julia ≥ 1.11): a `get_step` view built from a *runtime* step offset cannot be
+# type-analysed by Enzyme once it participates in a differentiated KernelAbstractions kernel — it
+# throws an `EnzymeNoTypeError`. This is *not* worked around here (kept branchless / Reactant-clean).
+# Instead the affected consumer — the leapfrog `update_prognostic!` — folds the step into a plain
+# array index inside its kernel rather than passing a runtime-step view (same approach as the vertical
+# advection stencil). All other `get_step` uses pass a compile-time (literal) step, which is fine.
 
 # LowerTriangularArrays
 # for 2D spectral variables step can be 1 that'll be the ignored additional singleton dimension
 # otherwise an error is thrown
-@inline get_step(var::LowerTriangularArray{T, 1}, step::Integer) where {T} = _literal_step(d -> lta_view(var, :, d), step)
+@inline get_step(var::LowerTriangularArray{T, 1}, step::Integer) where {T} = lta_view(var, :, step)
 
 """$(TYPEDSIGNATURES)
 Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
 "step" refers to the last dimension, for prognostic variables e.g. used for the leapfrog time step.
 This method is for a 2D spectral variable (horizontal only) with steps in the 3rd dimension."""
-@inline get_step(var::LowerTriangularArray{T, 2}, step::Integer) where {T} = _literal_step(d -> lta_view(var, :, d), step)
+@inline get_step(var::LowerTriangularArray{T, 2}, step::Integer) where {T} = lta_view(var, :, step)
 
 """$(TYPEDSIGNATURES)
 Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
 "step" refers to the last dimension, for prognostic variables e.g. used for the leapfrog time step.
 This method is for a 3D spectral variable (horizontal + vertical) with steps in the 4rd dimension."""
-@inline get_step(var::LowerTriangularArray{T, 3}, step::Integer) where {T} = _literal_step(d -> lta_view(var, :, :, d), step)
+@inline get_step(var::LowerTriangularArray{T, 3}, step::Integer) where {T} = lta_view(var, :, :, step)
 
 # FIELDS
 # for 2D fields step can be 1 that'll be the ignored additional singleton dimension
 # otherwise an error is thrown
-@inline get_step(var::AbstractField{T, 1}, step::Integer) where {T} = _literal_step(d -> field_view(var, :, d), step)
+@inline get_step(var::AbstractField{T, 1}, step::Integer) where {T} = field_view(var, :, step)
 
 """$(TYPEDSIGNATURES)
 Get the i-th step of a 3D field as a view (wrapped into the same type as the input variable).
 "step" refers to the last dimension, for prognostic variables e.g. used for the leapfrog time step.
 This method is for a 2D field (horizontal only) with steps in the 3rd dimension."""
-@inline get_step(var::AbstractField{T, 2}, step::Integer) where {T} = _literal_step(d -> field_view(var, :, d), step)
+@inline get_step(var::AbstractField{T, 2}, step::Integer) where {T} = field_view(var, :, step)
 
 """$(TYPEDSIGNATURES)
 Get the i-th step of a 4D field as a view (wrapped into the same type as the input variable).
 "step" refers to the last dimension, for prognostic variables e.g. used for the leapfrog time step.
 This method is for a 3D field (horizontal + vertical) with steps in the 4rd dimension."""
-@inline get_step(var::AbstractField{T, 3}, step::Integer) where {T} = _literal_step(d -> field_view(var, :, :, d), step)
+@inline get_step(var::AbstractField{T, 3}, step::Integer) where {T} = field_view(var, :, :, step)
 
 # anything that can decide which variable step to get
 const STEP_COMPONENT = Union{AbstractModelComponent, SpeedyTransforms.AbstractSpectralTransform}
