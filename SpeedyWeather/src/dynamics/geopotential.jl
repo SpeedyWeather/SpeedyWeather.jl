@@ -86,7 +86,7 @@ function geopotential!(
     if typeof(arch) <: AbstractCPU
         geopotential_grid_cpu!(Φ, T, q, orography, pₛ, g, G, atmosphere, vertical_coordinates)
     else
-        launch!(arch, LinearWorkOrder, (size(T, 1),), geopotential_kernel!, Φ, T, q, orography, g, G, atmosphere)
+        launch!(arch, LinearWorkOrder, (size(T, 1),), geopotential_grid_kernel!, Φ, T, q, orography, pₛ, g, G, atmosphere, vertical_coordinates)
     end
     return nothing
 end
