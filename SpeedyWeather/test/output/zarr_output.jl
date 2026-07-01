@@ -269,16 +269,16 @@ end
     # members 2..N find the marker, open the existing store and write their own slice.
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_ensemble_")
     period = Day(1)
-    n_ensemble = 3
+    ensemble_size = 3
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
 
     store_path = ""
-    for member in 1:n_ensemble
+    for member in 1:ensemble_size
         output = ZarrOutput(
             spectral_grid, ShallowWater;
             path = tmp_output_path, write_restart = false,
-            ensemble_index = member, n_ensemble = n_ensemble,
+            ensemble_index = member, ensemble_size = ensemble_size,
         )
         model = ShallowWaterModel(spectral_grid; output)
         simulation = initialize!(model)
@@ -291,9 +291,9 @@ end
 
     g = Zarr.zopen(store_path)
 
-    # ensemble coordinate exists and has length n_ensemble
+    # ensemble coordinate exists and has length ensemble_size
     @test haskey(g.arrays, "ensemble")
-    @test g["ensemble"][:] == collect(1:n_ensemble)
+    @test g["ensemble"][:] == collect(1:ensemble_size)
 
     # a single shared time axis was written (only the creator writes it)
     nlon = length(g["lon"][:])
@@ -303,13 +303,13 @@ end
     # 3D variable gains a trailing ensemble axis; ensemble is first in row-major dims
     z_vor = g["vor"]
     @test ndims(z_vor) == 5
-    @test size(z_vor) == (nlon, nlat, spectral_grid.nlayers, nt, n_ensemble)
+    @test size(z_vor) == (nlon, nlat, spectral_grid.nlayers, nt, ensemble_size)
     @test z_vor.attrs["_ARRAY_DIMENSIONS"] == ["ensemble", "time", "layer", "lat", "lon"]
     # ensemble axis is chunked with size 1 so members write disjoint chunk files
     @test z_vor.metadata.chunks[end] == 1
 
     # every member wrote finite data into its own ensemble slice
-    for e in 1:n_ensemble
+    for e in 1:ensemble_size
         @test all(isfinite, g["vor"][:, :, :, :, e])
     end
 end
