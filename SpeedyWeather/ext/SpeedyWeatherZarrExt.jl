@@ -236,7 +236,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Block until the ensemble creator (member 1) has written the readiness marker for the
-shared store at `store_path`, polling at 0.1 s intervals and erroring after
+shared store at `store_path`, polling at 1s intervals and erroring after
 `output.ensemble_timeout` seconds."""
 function wait_for_ensemble_store(output::ZarrOutput, store_path::AbstractString)
     marker = ensemble_marker_path(output)
@@ -247,7 +247,7 @@ function wait_for_ensemble_store(output::ZarrOutput, store_path::AbstractString)
                 "$(output.ensemble_timeout)s waiting for member 1 to create the shared store at " *
                 "$store_path. Ensure the member with ensemble_index=1 is running."
         )
-        sleep(0.1)
+        sleep(1)
     end
     return nothing
 end
@@ -361,9 +361,7 @@ function write_array!(
 end
 
 """$(TYPEDSIGNATURES)
-Write the current time `time::DateTime` to the Zarr store in `output`. In ensemble mode
-only the creator (member 1) writes the shared, single-writer `time` axis; other members
-skip it to avoid concurrent writes to the same chunk file."""
+Write the current time `time::DateTime` to the Zarr store in `output`."""
 function output!(output::ZarrOutput, time::DateTime)
     output.ensemble_index > 1 && return nothing
     i = output.output_counter
