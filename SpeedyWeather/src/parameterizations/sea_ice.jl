@@ -4,7 +4,8 @@
 
 function variables(::AbstractSeaIce)
     return (
-        PrognosticVariable(:sea_ice_concentration, Grid2D(), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
+        # all prognostic variables need a step dimension, by default use only one
+        PrognosticVariable(:sea_ice_concentration, Grid3D(1), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
     )
 end
 
@@ -47,14 +48,21 @@ function variables(::ThermodynamicSeaIce, model::AbstractModel)
     )
 end
 
+# leapfrog when possible
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::ThermodynamicSeaIce) = 2
+
 function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation)
     # escape immediately if there is no sea surface temperature
     haskey(vars.prognostic.ocean, :sea_surface_temperature) || return nothing
 
-    # sea ice concentration [0, 1] as \aleph yay!
+    # if ocean does not have an SST tendency use scratch array to write into the void
+    dsst = haskey(vars.tendencies.ocean, :sea_surface_temperature) ?
+        get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, model.time_stepping, sea_ice_model) :
+        vars.scratch.grid.a_2D
+
+    # sea ice concentration written as \aleph yay!
     dℵ = get_tendency_step(vars.tendencies.ocean.sea_ice_concentration, model.time_stepping, sea_ice_model)  
-    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, model.time_stepping, sea_ice_model)  
-    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, sea_ice_model)
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, model.ocean)
     
     (; Δt) = model.time_stepping
     (; land_fraction) = model.land_sea_mask

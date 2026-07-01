@@ -1,7 +1,7 @@
 # variable that AbstractOcean requires
 function variables(::AbstractOcean)
     return (
-        PrognosticVariable(:sea_surface_temperature, Grid2D(), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
+        PrognosticVariable(:sea_surface_temperature, Grid3D(1), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
     )
 end
 
@@ -52,8 +52,14 @@ $(TYPEDFIELDS)"""
     "[OPTION] Grid the sea surface temperature file comes on"
     FieldType::Type{<:AbstractField} = FullGaussianField
 
+    "[OPTION] Mask initial sea surface temperature with land-sea mask?"
+    mask::Bool = true
+
+    "[OPTION] SST over land [K]"
+    land_temperature::NF = 285
+
     # to be filled from file
-    "Monthly sea surface temperatures [K], interpolated onto Grid"
+    "[DERIVED] Monthly sea surface temperatures [K], interpolated onto Grid"
     monthly_temperature::GridVariable3D = zeros(GridVariable3D, grid, 12)
 end
 
@@ -84,6 +90,13 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, sst, NF = Float32)
     interpolate!(monthly_temperature, sst, interp)
+
+    if ocean.mask
+        mt = monthly_temperature.data
+        mt[isnan.(mt)] .= ocean.land_temperature
+        mask!(monthly_temperature, model.land_sea_mask, :land; masked_value = ocean.land_temperature)
+    end
+
     return nothing
 end
 
@@ -112,6 +125,7 @@ function timestep!(
         interpolate_monthly_climatology_kernel!,
         sea_surface_temperature, monthly_temperature, weight, this_month, next_month
     )
+
     return nothing
 end
 
@@ -138,7 +152,7 @@ To be created like
 and the ocean time is set with `initialize!(model, time=time)`.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct ConstantOceanClimatology <: AbstractOcean
+@kwdef struct ConstantOceanClimatology{NF} <: AbstractOcean
     "[OPTION] filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 
@@ -157,12 +171,15 @@ $(TYPEDFIELDS)"""
     "[OPTION] Grid the sea surface temperature file comes on"
     FieldType::Type{<:AbstractField} = FullGaussianField
 
-    "[OPTION] The missing value in the data respresenting land"
-    missing_value::Float64 = NaN
+    "[OPTION] Mask initial sea surface temperature with land-sea mask?"
+    mask::Bool = true
+
+    "[OPTION] SST over land [K]"
+    land_temperature::NF = 285
 end
 
 # generator
-ConstantOceanClimatology(SG::SpectralGrid; kwargs...) = ConstantOceanClimatology(; kwargs...)
+ConstantOceanClimatology(SG::SpectralGrid; kwargs...) = ConstantOceanClimatology{SG.NF}(; kwargs...)
 
 # nothing to initialize for model.ocean
 initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
@@ -171,10 +188,10 @@ initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
 function initialize!(vars::Variables, ocean_model::ConstantOceanClimatology, model)
 
     # create a seasonal model, initialize it and the variables
-    (; path, file, varname, FieldType) = ocean_model
+    (; path, file, varname, FieldType, mask, land_temperature) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
     seasonal_model = SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(;
-        grid, path, file, varname, FieldType
+        grid, path, file, varname, FieldType, mask, land_temperature
     )
     initialize!(seasonal_model, model)
 
@@ -195,19 +212,22 @@ export AquaPlanet
 AquaPlanet sea surface temperatures that are constant in time and longitude,
 but vary in latitude following a coslat². To be created like
 
-    ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
+    ocean = AquaPlanet(spectral_grid, temperature_equator=302, temperature_poles=273)
 
 Fields and options are
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct AquaPlanet{NF} <: AbstractOcean
     "[OPTION] Temperature on the Equator [K]"
-    @param temp_equator::NF = 302 (bounds = Positive,)
+    @param temperature_equator::NF = 302 (bounds = Positive,)
 
     "[OPTION] Temperature at the poles [K]"
-    @param temp_poles::NF = 273 (bounds = Positive,)
+    @param temperature_poles::NF = 273 (bounds = Positive,)
 
-    "[OPTION] Mask the sea surface temperature according to model.land_sea_mask?"
+    "[OPTION] Mask initial sea surface temperature with land-sea mask?"
     mask::Bool = true
+
+    "[OPTION] SST over land [K]"
+    land_temperature::NF = 285
 end
 
 # generator function
@@ -218,20 +238,29 @@ initialize!(::AquaPlanet, ::PrimitiveEquation) = nothing
 
 # set initial conditions: cos²(lat) SST profile
 function initialize!(vars::Variables, ocean_model::AquaPlanet, model::PrimitiveEquation)
-    (; sea_surface_temperature) = vars.prognostic.ocean
-    Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
+    sea_surface_temperature = get_step(vars.prognostic.ocean.sea_surface_temperature, 1)
+    Te, Tp = ocean_model.temperature_equator, ocean_model.temperature_poles
     sst(λ, φ) = (Te - Tp) * cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
-    ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
+
+    if ocean_model.mask
+        masked_value = ocean_model.land_temperature
+        mask!(vars.prognostic.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
+    end
+
     return nothing
 end
 
 # SST is constant in time, so timestep! is a no-op
 timestep!(vars::Variables, ocean_model::AquaPlanet, model::PrimitiveEquation) = nothing
 
-
 export SlabOcean
 
+"""Interactive slab ocean model that evolves sea surface temperature with the central time stepper.
+Tendencies are from net surface radiation and surface latent and sensible heat fluxes.
+The effective mixed-layer heat capacity is `specific_heat_capacity * mixed_layer_depth * density`.
+Initialised from seasonal SST climatology, with land points set to `land_temperature`.
+Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef mutable struct SlabOcean{NF} <: AbstractOcean
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
@@ -246,7 +275,7 @@ export SlabOcean
     mask::Bool = true
 
     "[OPTION] SST over land [K]"
-    land_temperature::NF = 283
+    land_temperature::NF = 285
 
     "[DERIVED] Effective mixed-layer heat capacity [J/K/m²]"
     heat_capacity_mixed_layer::NF = specific_heat_capacity * mixed_layer_depth * density
@@ -272,6 +301,9 @@ function variables(::SlabOcean, model::AbstractModel)
         ParameterizationVariable(:surface_sensible_heat_flux, Grid2D(), desc = "Surface sensible heat flux", units = "kg/s/m^2", namespace = :ocean),
     )
 end
+
+# leapfrog if possible
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::SlabOcean) = 2
 
 # nothing to initialize for SlabOcean model itself
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing

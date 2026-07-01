@@ -56,8 +56,9 @@
 
     # grids
     set!(simulation, sea_surface_temperature = A[:, 1], namespace = :ocean)
-    @test prog_new.ocean.sea_surface_temperature == A[:, 1]
+    @test get_step(prog_new.ocean.sea_surface_temperature, 1) == A[:, 1]
 
+    set!(simulation, sea_ice_concentration = B[:, 1], namespace = :ocean, add = true)
     set!(simulation, sea_ice_concentration = B[:, 1], namespace = :ocean, add = true)
     C = similar(A[:, 1])
     RingGrids.interpolate!(C, B[:, 1]; NF)
