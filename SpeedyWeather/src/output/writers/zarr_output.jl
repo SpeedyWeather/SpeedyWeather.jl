@@ -84,11 +84,11 @@ the Zarr group type once `initialize!` has been called (`Nothing` before)."""
     vertical_chunk::Int = 0
 
     # ENSEMBLE OPTIONS
-    "[OPTION] this writer's ensemble member index. 0 (default) disables ensemble output; >0 adds an ensemble dimension and this member writes into slot `ensemble_index`. Members are indexed 1..n_ensemble; member 1 creates the shared store."
+    "[OPTION] this writer's ensemble member index. 0 (default) disables ensemble output; >0 adds an ensemble dimension and this member writes into slot `ensemble_index`. Members are indexed 1..ensemble_size; member 1 creates the shared store."
     ensemble_index::Int = 0
 
     "[OPTION] total number of ensemble members, sizes the ensemble dimension. Must be ≥ ensemble_index when ensemble output is on."
-    n_ensemble::Int = 0
+    ensemble_size::Int = 0
 
     "[OPTION] seconds a non-creator ensemble member waits for the creator (member 1) to finish building the shared store before erroring."
     ensemble_timeout::Int = 600
@@ -140,7 +140,7 @@ function Base.show(io::IO, output::ZarrOutput{F}) where {F}
     println(io, styled"├ {info:interval} = $(output.interval)")
     println(io, styled"├ {info:time chunk} = $(output.time_chunk)")
     println(io, styled"├ {info:spatial chunks (lon,lat,vertical)} = ($(output.lon_chunk),$(output.lat_chunk),$(output.vertical_chunk)) (0 ⇒ full extent)")
-    ensemble_str = output.ensemble_index > 0 ? "member $(output.ensemble_index)/$(output.n_ensemble)" : "off"
+    ensemble_str = output.ensemble_index > 0 ? "member $(output.ensemble_index)/$(output.ensemble_size)" : "off"
     println(io, styled"├ {info:ensemble} = $ensemble_str")
     print(io, styled"└ {info:variables}")
     nvars = length(output.variables)

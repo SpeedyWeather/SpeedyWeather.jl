@@ -92,10 +92,10 @@ the store has dimensions `lon`, `lat`, `layer`, `soil_layer`, `time` plus one
 chunked array per output variable.
 
 When ensemble output is on (`output.ensemble_index > 0`) an additional `ensemble`
-dimension of length `n_ensemble` is added, chunked with size 1 so that each member
+dimension of length `ensemble_size` is added, chunked with size 1 so that each member
 writes disjoint chunk files. All members share a deterministic run folder and hence
 one store; member 1 (the *creator*) builds the store schema, coordinates and the shared
-`time` axis, then drops a readiness marker; members `2..n_ensemble` (the *writers*) wait
+`time` axis, then drops a readiness marker; members `2..ensemble_size` (the *writers*) wait
 for that marker, open the existing store and write only their own ensemble slice."""
 function initialize!(
         output::ZarrOutput,
@@ -113,8 +113,8 @@ function initialize!(
 
     ensemble = output.ensemble_index > 0
     if ensemble
-        @assert 1 <= output.ensemble_index <= output.n_ensemble "ensemble_index=$(output.ensemble_index)" *
-            " must be in 1..n_ensemble=$(output.n_ensemble). Set n_ensemble to the total number of members."
+        @assert 1 <= output.ensemble_index <= output.ensemble_size "ensemble_index=$(output.ensemble_index)" *
+            " must be in 1..ensemble_size=$(output.ensemble_size). Set ensemble_size to the total number of members."
     end
 
     # SHARED INITIALIZATION (output frequency, counters, callbacks). For ensemble output
@@ -157,7 +157,7 @@ function initialize!(
     write_zarr_coordinates!(g, output, model)
     if ensemble
         write_coordinate!(
-            g, "ensemble", collect(1:output.n_ensemble);
+            g, "ensemble", collect(1:output.ensemble_size);
             attrs = Dict("units" => "1", "long_name" => "ensemble member", "_ARRAY_DIMENSIONS" => ["ensemble"])
         )
     end
@@ -306,7 +306,7 @@ function define_variable!(
     # Ensemble output: append the ensemble axis as the outermost (last, Julia
     # column-major) dimension, chunked with size 1 so members write disjoint chunk files.
     if output.ensemble_index > 0
-        shape = (shape..., output.n_ensemble)
+        shape = (shape..., output.ensemble_size)
         chunks = (chunks..., 1)
         push!(dims, "ensemble")
     end

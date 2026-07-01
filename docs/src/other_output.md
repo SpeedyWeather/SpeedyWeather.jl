@@ -149,25 +149,25 @@ options:
 
 | Option | Meaning |
 |--------|---------|
-| `ensemble_index::Int` | This writer's ensemble member index. `0` (default) disables ensemble output and reproduces the layout described above. A value `> 0` adds an `ensemble` dimension and makes this writer store its data into slot `ensemble_index`. Members are indexed `1..n_ensemble`. |
-| `n_ensemble::Int` | Total number of ensemble members. It sizes the `ensemble` dimension and must be passed up front; it has to satisfy `n_ensemble ≥ ensemble_index`. |
+| `ensemble_index::Int` | This writer's ensemble member index. `0` (default) disables ensemble output and reproduces the layout described above. A value `> 0` adds an `ensemble` dimension and makes this writer store its data into slot `ensemble_index`. Members are indexed `1..ensemble_size`. |
+| `ensemble_size::Int` | Total number of ensemble members. It sizes the `ensemble` dimension and must be passed up front; it has to satisfy `ensemble_size ≥ ensemble_index`. |
 | `ensemble_timeout::Int` | Seconds a member waits for member 1 to create the shared store before erroring (default `600`). |
 
 The design targets **parallel ensemble members running as separate processes**, all
 writing into one store. This is safe because the `ensemble` axis is chunked with size 1,
 so member `e` only ever writes chunk files carrying its own index and no two members
 touch the same chunk file. Each process constructs a `ZarrOutput` with the *same*
-`path`, `id`, `run_number`, `filename` and `n_ensemble`, and a distinct `ensemble_index`,
+`path`, `id`, `run_number`, `filename` and `ensemble_size`, and a distinct `ensemble_index`,
 so all members resolve to the same run folder and store:
 
 ```julia
 using SpeedyWeather, Zarr
 
-# in each process, `member` is this process' ensemble index (1..n_ensemble)
+# in each process, `member` is this process' ensemble index (1..ensemble_size)
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 output = ZarrOutput(spectral_grid, PrimitiveWet;
     ensemble_index = member,        # e.g. read from an environment variable / job array id
-    n_ensemble = 10,
+    ensemble_size = 10,
     interval = Hour(6),
 )
 model = PrimitiveWetModel(spectral_grid; output)
