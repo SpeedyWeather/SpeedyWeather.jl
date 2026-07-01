@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced firsti in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
+- Update the extended differentiability tests to new time stepping syntax [#1148](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1148)
 - Scale time step on the fly [#1139](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1139)
 - Fix scalar indexing error constructing `SigmaCoordinates`/`Geometry` on GPU [#1142](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1142)
 - Sigma-pressure coordinates, part 1 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137)
