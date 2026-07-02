@@ -184,8 +184,8 @@ end
 # already counted on `vars.fused.<sym>`, so charging them again on every view that aliases
 # it (e.g. `vars.tendencies.grid.u.data::SubArray`) would inflate the reported size.
 _pretty_size(x) = Base.summarysize(x)                # generic leaves (Clock, Ref, plain arrays, ...)
-_pretty_size(x::AbstractField) = is_view_entry(x) ? 0 : Base.summarysize(x)
-_pretty_size(x::LowerTriangularArray) = is_view_entry(x) ? 0 : Base.summarysize(x)
+_pretty_size(x::AbstractField) = is_view_entry(x) ? 0 : Base.summarysize(x.data)
+_pretty_size(x::LowerTriangularArray) = is_view_entry(x) ? 0 : Base.summarysize(x.data)
 _pretty_size(x::SubArray) = 0
 _pretty_size(nt::NamedTuple) = isempty(nt) ? Base.summarysize(nt) : sum(_pretty_size, values(nt))
 _pretty_size(v::Variables) = sum(_pretty_size, (getfield(v, k) for k in propertynames(v)))
@@ -250,9 +250,100 @@ function Variables(model::AbstractModel)
     # Validates that fuse symbols are globally unique across namespaces.
     fused = build_fused_namespace(fuse_parents)
 
+    # If both the spectral prognostic parent and its grid-snapshot parent exist, they
+    # must declare members in matching order so a mega-batched spec→grid transform can
+    # map slot k of `prognostic` to slot k of `grid`.
+    # TODO: Maybe just move this to unit tests? Do we need to test this every time? 
+    if haskey(fused, :prognostic) && haskey(fused, :grid)
+        _assert_fuse_alignment(fused.prognostic, fused.grid;
+                               name_a = :prognostic, name_b = :grid)
+    end
+
     return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch, fused)
 end
 # runic: on
+
+"""
+$(TYPEDSIGNATURES)
+Wraps a fused parent buffer with the per-member slot map computed at construction.
+
+`parent` is the underlying `LowerTriangularArray` or `Field`. `slot_map` is a `NamedTuple`
+mapping each fuse member's `name::Symbol` to its `UnitRange{Int}` along the parent's layer
+axis (axis 2 of `parent.data`). E.g. for a `:prognostic` fuse group on `PrimitiveWet` with
+`nlayers = 8`:
+
+```
+slot_map = (vorticity = 1:8, divergence = 9:16, temperature = 17:24, humidity = 25:32, pressure = 33:33)
+```
+
+The slot map is used `get_prognostic_step` and `get_tendency_step` to slice the parent directly and 
+by `_assert_fuse_alignment` to check that two fuse parents agree on member order.
+"""
+struct FusedParent{P, S <: NamedTuple}
+    parent::P
+    slot_map::S
+end
+
+Base.parent(fp::FusedParent) = fp.parent
+Base.size(fp::FusedParent, args...) = size(fp.parent, args...)
+Base.eltype(fp::FusedParent) = eltype(fp.parent)
+Base.eltype(::Type{<:FusedParent{P}}) where {P} = eltype(P)
+Base.summary(io::IO, fp::FusedParent) = Base.summary(io, fp.parent)
+Base.summary(fp::FusedParent) = Base.summary(fp.parent)
+
+function Base.show(io::IO, fp::FusedParent)
+    nslots = length(fp.slot_map)
+    fpsize = prettymemory(_pretty_size(fp))
+    print(io, styled"{warning:FusedParent}", " ", Base.summary(fp.parent),
+          styled"{note: ($nslots slots, $fpsize)}")
+    names = keys(fp.slot_map)
+    for (i, name) in enumerate(names)
+        s = i == length(names) ? "└" : "├"                  # choose ending └ for last slot
+        range = getfield(fp.slot_map, name)
+        print(io, "\n$s ", styled"{magenta:$name}", ": ", range)
+    end
+    return nothing
+end
+
+Architectures.architecture(fp::FusedParent) = architecture(fp.parent)
+Architectures.on_architecture(arch::AbstractArchitecture, fp::FusedParent) =
+    FusedParent(on_architecture(arch, fp.parent), fp.slot_map)
+Adapt.adapt_structure(to, fp::FusedParent) = Adapt.adapt(to, fp.parent)
+
+# A fused parent owns its storage; it is not a view of someone else's buffer.
+is_view_entry(::FusedParent) = false
+
+# Pretty-print size delegates to the wrapped buffer so view-vs-parent accounting in
+# `Base.show(::Variables)` stays correct.
+_pretty_size(fp::FusedParent) = _pretty_size(fp.parent)
+
+# `copyto!` and `_copy_entry!` operate on the wrapped buffer. `slot_map` is structural
+# metadata — never copied.
+Base.copyto!(dest::FusedParent, src::FusedParent) = (copyto!(dest.parent, src.parent); dest)
+_copy_entry!(dest::FusedParent, src::FusedParent) = _copy_entry!(dest.parent, src.parent)
+
+"""$(TYPEDSIGNATURES)
+Assert that two fuse parents `a` and `b` declare members in matching order — i.e. they
+agree both on which member names exist and on each member's layer-axis slot range. This
+is what lets a mega-batched `transform!` map slot k of one parent to slot k of the other
+(e.g. `:prognostic` ↔ `:prog_grid`).
+
+`name_a` / `name_b` are used purely for the error message."""
+function _assert_fuse_alignment(a::FusedParent, b::FusedParent; name_a = :a, name_b = :b)
+    keys(a.slot_map) == keys(b.slot_map) || error(
+        "Fuse parents `$name_a` and `$name_b` have different members: " *
+        "$(keys(a.slot_map)) vs $(keys(b.slot_map))."
+    )
+    for k in keys(a.slot_map)
+        ra, rb = a.slot_map[k], b.slot_map[k]
+        ra == rb || error(
+            "Fuse parents `$name_a` and `$name_b` disagree on slot range for `$k`: " *
+            "$ra vs $rb. The two parents must declare members in matching order " *
+            "so that mega-batched transforms map slot k of one to slot k of the other."
+        )
+    end
+    return nothing
+end
 
 """$(TYPEDSIGNATURES) Build the `vars.fused` NamedTuple from the `fuse_parents` Dict.
 Keyed flat by fuse symbol; errors if the same fuse symbol is reused across namespaces."""
@@ -269,7 +360,7 @@ function build_fused_namespace(fuse_parents)
             )
         end
         seen[fuse_sym] = ns
-        push!(pairs, fuse_sym => entry.parent)
+        push!(pairs, fuse_sym => entry.parent)        # entry.parent is already a FusedParent (see build_fuse_parents)
     end
     return (; pairs...)
 end
@@ -284,19 +375,23 @@ slot range, that slot ranges are pairwise non-overlapping, and that together the
 fused axis exactly with no gaps. This catches offset/order bugs in `_split_views_*` and ensures
 the right variable is wired to the right slot."""
 function build_fuse_parents(all_vars, model)
-    # Group all fused vars by (namespace, fuse), deduped by (namespace, name) Tuple.
-    seen = Dict{Tuple{Symbol, Symbol}, AbstractVariable}()   # (namespace, name) => first variable seen
+    # Group all fused vars by (namespace, fuse), deduped by (namespace, fuse, name) Tuple.
+    # NOTE: the dedup key includes the fuse symbol so that the same variable `name` may
+    # appear in different fuse groups (e.g. `:vorticity` as a PrognosticVariable in
+    # `:prognostic` AND as a GridVariable in `:grid` — those are legitimate cross-group
+    # uses, not the cross-type-within-one-group collision we want to reject).
+    seen = Dict{Tuple{Symbol, Symbol, Symbol}, AbstractVariable}()   # (namespace, fuse, name) => first variable seen
     groups = Dict{Tuple{Symbol, Symbol}, Vector{AbstractVariable}}()
     for v in all_vars
         v.fuse === Symbol() && continue
-        key = (v.namespace, v.name)
+        key = (v.namespace, v.fuse, v.name)
         if haskey(seen, key)
             prev = seen[key]
             nonparametric_type(prev) === nonparametric_type(v) && continue  # same type, same var declared twice — fine
             error(
                 "Fuse group `$(v.fuse)` (namespace `$(v.namespace)`): variable `$(v.name)` is " *
                 "declared as both $(nonparametric_type(prev)) and $(nonparametric_type(v)). " *
-                "Each (namespace, name) pair may appear at most once across all variable types in a fuse group."
+                "Each (namespace, name) pair may appear at most once across all variable types in a single fuse group."
             )
         end
         seen[key] = v
@@ -326,9 +421,15 @@ function build_fuse_parents(all_vars, model)
         parent, views, slots = allocate_fused(vars, model)
         # Build-time correctness check: every view aliases the parent at its declared slot
         # range, slots are pairwise disjoint, and they tile the parent's fused axis exactly.
+        # NOTE: runs on the *raw* parent (before wrapping) so the .data === check still works.
         _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
+        # Persist the per-name slot map on the parent. Used by `get_step` to slice the
+        # parent directly (avoiding SubArray-of-SubArray) and by `_assert_fuse_alignment`
+        # to check that two fuse parents agree on member order.
+        slot_map = NamedTuple{Tuple(v.name for v in vars)}(Tuple(slots))
+        fused_parent = FusedParent(parent, slot_map)
         parents[(ns, fuse_sym)] = (
-            parent = parent,
+            parent = fused_parent,
             views = Dict{Tuple{Symbol, Symbol}, Any}((v.namespace, v.name) => views[i] for (i, v) in enumerate(vars)),
         )
     end

@@ -126,16 +126,9 @@ function SpeedyTransforms.transform!(
     initialize && initialize!(vars, time_stepping, model)
 
     S = model.spectral_transform
-    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S)
-    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S)
-    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S)
-    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, S)
-    pres_grid = get_prognostic_step(vars.grid.pressure, time_stepping, S)
-    temp_grid = get_prognostic_step(vars.grid.temperature, time_stepping, S)
 
     vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
     div = get_prognostic_step(vars.prognostic.divergence, time_stepping, S)
-    pres = get_prognostic_step(vars.prognostic.pressure, time_stepping, S)
     temp = get_prognostic_step(vars.prognostic.temperature, time_stepping, S)
 
     scratch_memory = vars.scratch.transform_memory
@@ -146,26 +139,29 @@ function SpeedyTransforms.transform!(
     # if not initial step do before transforms i.e before that step is overwritten
     initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
 
-    transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
-    transform!(div_grid, div, scratch_memory, S)    # get divergence on grid from spectral div
-    transform!(temp_grid, temp, scratch_memory, S)  # -- temperature --
-    transform!(pres_grid, pres, scratch_memory, S)  # -- pressure --
-
-    if model isa PrimitiveWet
-        humid = get_prognostic_step(vars.prognostic.humidity, time_stepping, S)
-        humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
-        transform!(humid_grid, humid, scratch_memory, S)
-        hole_filling!(humid_grid, model.hole_filling, model)  # clamp negative humidity to zero
-    end
-
     # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
 
-    # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
-    transform!(u_grid, U, scratch_memory, S, unscale_coslat = true)
-    transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
+    # Batched spec→grid for the prognostic state: one call covers vorticity, divergence,
+    # temperature, pressure (and humidity for PrimitiveWet).
+    prognostic_variables = get_prognostic_step(parent(vars.fused.prognostic), time_stepping, S)
+    grid_variables = get_prognostic_step(parent(vars.fused.grid), time_stepping, S)
+    transform!(grid_variables, prognostic_variables, scratch_memory, S)
+
+    if model isa PrimitiveWet
+        humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
+        hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
+    end
+
+    # Batched spec→grid for the velocities: the general-purpose `:spectral_scratch` fuse packs
+    # `(:a, :b)` (here holding U, V) into one Spectral3D parent, and `:uv_grid` packs `(:u, :v)`
+    # TODO: theoretically we could merge this with the other big transform and then unscale coslat
+    # seperately, but the dimensions don't quite align, shall we still do that in a hacky way?    
+    transform!(get_prognostic_step(parent(vars.fused.uv_grid), time_stepping, S),
+               parent(vars.fused.spectral_scratch), scratch_memory, S;
+               unscale_coslat = true)
 
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
     # only do after transforms to avoid copying uninitialized zeros
