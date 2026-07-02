@@ -83,6 +83,8 @@ function dynamics_tendencies!(
         vars::Variables,
         model::ShallowWater,
     )
+    (; spectral_transform, time_stepping) = model
+
     forcing!(vars, model)               # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
     drag!(vars, model)                  # drag term for u, v
     scale_tendencies!(vars, model)      # dynamical core uses a scaled time step, Δt/radius
@@ -95,7 +97,7 @@ function dynamics_tendencies!(
     # batched transform of grid tendencies to spectral space
     transform!(get_tendency_step(parent(vars.fused.spectral_tendencies), time_stepping, DynamicalCore()),
                get_tendency_step(parent(vars.fused.grid_tendencies), time_stepping, DynamicalCore()),
-               vars.scratch.transform_memory, model.spectral_transform)
+               vars.scratch.transform_memory, spectral_transform)
 
     # accumulates into final spectral tendencies: vorticity, divergence
     spectral_tendencies!(vars, model)
