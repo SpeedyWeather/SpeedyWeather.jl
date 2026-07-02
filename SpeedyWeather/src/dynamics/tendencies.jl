@@ -147,7 +147,7 @@ u, v are averaged in grid-point space, divergence in spectral space.
 # For the vertical integration and vertical average, the kernel version is unreasonably slow
 # on CPU, that's why we have two seperate versions for this function
 function vertical_integration!(
-        ::CPU,
+        ::AbstractCPU,
         vars::Variables,
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
@@ -199,7 +199,7 @@ function vertical_integration!(
 end
 
 function vertical_integration!(
-        ::GPU,
+        ::AbstractArchitecture,
         vars::Variables,
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
@@ -333,7 +333,8 @@ function surface_pressure_tendency!(
     # for semi-implicit div_mean is calc at time step i-1 in vertical_integration!
     @. pres_tend -= ūv̄∇lnpₛ + div_mean      # add the -div_mean term in spectral, swap sign
 
-    pres_tend.data[1:1] .= 0                # for mass conservation
+    #pres_tend.data[1:1] .= 0
+    set_scalar!(pres_tend.data, 1, zero(eltype(pres_tend.data)))  # for mass conservation
     return nothing
 end
 

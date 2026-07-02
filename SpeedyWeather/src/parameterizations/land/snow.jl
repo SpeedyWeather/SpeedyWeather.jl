@@ -9,7 +9,7 @@ from the diagnosed precipitation, melts once the top soil layer exceeds
 `melting_threshold`, and is capped at `snow_depth_cap` to limit infinite snow/ice accumulation
 over perennial ice caps and glaciers.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SnowModel{NF} <: AbstractSnow
+@parameterized @kwdef struct SnowModel{NF, S} <: AbstractSnow
     "[OPTION] Temperature threshold for snow melting [K]"
     @param melting_threshold::NF = 275 (bounds = Positive,)
 
@@ -20,7 +20,7 @@ end
 Adapt.@adapt_structure SnowModel
 
 # generator function
-SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF}(; kwargs...)
+SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF, Dates.Second}(; kwargs...)
 
 function variables(::SnowModel)
     return (
@@ -88,8 +88,9 @@ end
         # check for melting of snow if temperature above melting threshold
         # check for NaNs here to prevent land temperatures read from NetCDF data
         # to cause an immediate blow up in case the land-sea mask doesn't align
-        δT_melt = isfinite(soil_temperature[ij, 1]) ?
-            max(soil_temperature[ij, 1] - melting_threshold, 0) : zero(soil_temperature[ij, 1])
+        δT_melt = ifelse(isfinite(soil_temperature[ij, 1]),
+            max(soil_temperature[ij, 1] - melting_threshold, zero(soil_temperature[ij, 1])),
+            zero(soil_temperature[ij, 1]))
 
         # energy available from soil warming above melting threshold [J/m²/s]
         # heat capacity per volume, so not *density needed

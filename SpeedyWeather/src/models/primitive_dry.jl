@@ -52,13 +52,14 @@ $(TYPEDFIELDS)"""
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
         PV,     # <:Val
+        B,      # <:Bool
     } <: PrimitiveDry
 
     spectral_grid::SG
     architecture::AR = spectral_grid.architecture
 
     # DYNAMICS
-    dynamics::Bool = true
+    dynamics::B = true
     @component geometry::GE = Geometry(spectral_grid)
     @component planet::PL = Earth(spectral_grid)
     @component atmosphere::AT = EarthDryAtmosphere(spectral_grid)
@@ -75,7 +76,7 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # BOUNDARY CONDITIONS
-    dynamics_only::Bool = false
+    dynamics_only::B = false
     @component orography::OR = EarthOrography(spectral_grid)
     @component land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
     @component ocean::OC = SlabOcean(spectral_grid)

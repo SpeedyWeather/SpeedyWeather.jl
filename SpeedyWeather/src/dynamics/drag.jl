@@ -15,12 +15,12 @@ export LinearDrag
 
 """Linear boundary layer drag following Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct LinearDrag{NF, VectorType} <: AbstractDrag
+@parameterized @kwdef struct LinearDrag{NF, VectorType, S} <: AbstractDrag
     "[OPTION] Sigma coordinate below which linear drag is applied"
     @param σb::NF = 0.7 (bounds = 0 .. 1,)
 
     "[OPTION] Time scale for linear drag coefficient at σ=1 (=1/kf in HS96)"
-    time_scale::Second = Day(1)
+    time_scale::S = Day(1)
 
     "[DERIVED] Precomputed drag coefficients for each layer"
     drag_coefs::VectorType
@@ -29,7 +29,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator function using `nlayers` from `SG::SpectralGrid`"""
-LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF, SG.VectorType}(drag_coefs = zeros(SG.NF, SG.nlayers); kwargs...)
+LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF, SG.VectorType, Dates.Second}(drag_coefs = zeros(SG.NF, SG.nlayers); kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -200,9 +200,9 @@ function drag!(
 end
 
 export JetDrag
-@parameterized @kwdef struct JetDrag{NF, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
+@parameterized @kwdef struct JetDrag{NF, SpectralVariable2D, S} <: SpeedyWeather.AbstractDrag
     "[OPTION] Relaxation time scale τ"
-    time_scale::Second = Day(6)
+    time_scale::S = Day(6)
 
     "[OPTION] Jet strength [m/s]"
     @param u₀::NF = 20
@@ -220,7 +220,7 @@ end
 
 function JetDrag(SG::SpectralGrid; kwargs...)
     ζ₀ = zeros(Complex{SG.NF}, SG.spectrum)
-    return JetDrag{SG.NF, SG.SpectralVariable2D}(; ζ₀, kwargs...)
+    return JetDrag{SG.NF, SG.SpectralVariable2D, Dates.Second}(; ζ₀, kwargs...)
 end
 
 function initialize!(drag::JetDrag, model::AbstractModel)

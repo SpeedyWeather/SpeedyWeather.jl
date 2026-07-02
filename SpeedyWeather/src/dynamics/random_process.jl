@@ -35,11 +35,11 @@ independently. Transformed after every time step to grid space with a
 `clamp` applied to limit extrema. For reproducability `seed` can be
 provided and an independent `random_number_generator` is used
 that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
-@kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType} <: AbstractRandomProcess
+@kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType, RefV, TS} <: AbstractRandomProcess
     trunc::IntType
 
     "[OPTION] Time scale of the AR1 process"
-    time_scale::Second = Hour(6)
+    time_scale::TS = Hour(6)
 
     "[OPTION] Wavenumber of the AR1 process"
     wavenumber::IntType = 12
@@ -57,7 +57,7 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
     random_number_generator::RNG = Random.Xoshiro(seed)
 
     "Precomputed auto-regressive factor [1], function of time scale and model time step"
-    autoregressive_factor::Base.RefValue{NF} = Ref(zero(NF))
+    autoregressive_factor::RefV = Ref(zero(NF))
 
     "Precomputed noise factors [1] for every total wavenumber l"
     noise_factors::VectorType = zeros(NF, trunc + 2)
@@ -67,7 +67,7 @@ end
 function SpectralAR1Process(SG::SpectralGrid; kwargs...)
     RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
     SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
-    return SpectralAR1Process{SG.NF, SG.VectorType, SeedType, RNG, typeof(SG.trunc)}(trunc = SG.trunc; kwargs...)
+    return SpectralAR1Process{SG.NF, SG.VectorType, SeedType, RNG, typeof(SG.trunc), Base.RefValue{SG.NF}, Dates.Second}(trunc = SG.trunc; kwargs...)
 end
 
 function variables(::SpectralAR1Process)

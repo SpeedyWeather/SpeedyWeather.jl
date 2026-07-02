@@ -538,7 +538,13 @@ function Base.copyto!(
         Base.OneTo(minimum(size.((L1, L2), 2; as = Matrix)))
     )
 
-    L1.data .= convert.(T, L2.data)
+    # avoid `convert.(T, …)` when eltypes already match — Reactant cannot trace
+    # `convert(ComplexF32, ::TracedRNumber{ComplexF32})` even though it's a no-op.
+    if eltype(L2.data) === T
+        L1.data .= L2.data
+    else
+        L1.data .= convert.(T, L2.data)
+    end
     return L1
 end
 
@@ -593,7 +599,9 @@ function Base.copyto!(
         M::AbstractArray
     ) where {T}    # copy from M
     @boundscheck size(L, as = Matrix) == size(M) || throw(BoundsError)
-    L.data .= convert.(T, M[lowertriangle_indices(M)])
+    # Skip `convert.()` when eltypes match
+    M_lt = M[lowertriangle_indices(M)]
+    L.data .= eltype(M_lt) == T ? M_lt : convert.(T, M_lt)
     return L
 end
 
@@ -608,7 +616,9 @@ function Base.copyto!(
     upper_triangle_indices = @. ~lower_triangle_indices # upper triangle without main diagonal
 
     M[upper_triangle_indices] .= zero(T)
-    M[lower_triangle_indices] = convert.(T, L.data)
+    # Skip `convert.()` when eltypes match (Reactant can't trace it).
+    L_data = M isa Array && !(L.data isa Array) ? Array(L.data) : L.data
+    M[lower_triangle_indices] = eltype(L_data) == T ? L_data : convert.(T, L_data)
 
     return M
 end
@@ -619,7 +629,7 @@ function Base.copyto!(
         V::AbstractArray{S, N}
     ) where {T, S, N} # copy from V
     @boundscheck size(L, as = Vector) == size(V) || throw(BoundsError)
-    L.data .= convert.(T, V)
+    L.data .= eltype(V) == T ? V : convert.(T, V)
     return L
 end
 
@@ -637,7 +647,8 @@ function Base.convert(
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where {T}
-    return LowerTriangularArray(T.(L.data), L.spectrum)
+    data = eltype(L.data) === T ? L.data : T.(L.data)
+    return LowerTriangularArray(data, L.spectrum)
 end
 
 function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, I::Integer...) where {T, N, ArrayType, SP}
@@ -768,6 +779,7 @@ find_L(x) = x
 find_L(::Tuple{}) = nothing
 find_L(a::LowerTriangularArray, rest) = a
 find_L(::Any, rest) = find_L(rest)
+find_L(ex::Base.Broadcast.Extruded) = find_L(ex.x)
 
 parent_or_not(x::Union{SubArray, Transpose}) = parent(x)
 parent_or_not(x) = x

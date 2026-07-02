@@ -28,7 +28,7 @@ abstract type AbstractLandSeaMask <: AbstractModelComponent end
 
 function mask!(
         field::AbstractField,
-        mask::AbstractField,
+        mask::AbstractArray,
         land_or_sea::Symbol;
         masked_value = NaN,
     )
@@ -36,8 +36,7 @@ function mask!(
     val = land_or_sea == :land ? 1 : 0
     masked_val = convert(eltype(field), masked_value)
 
-    @boundscheck fields_match(field, mask, horizontal_only = true) || throw(DimensionMismatch(field, mask))
-    @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
+    @boundscheck size(field,1) == size(mask,1) || throw(DimensionMismatch(field, mask))
 
     arch = architecture(field)
     launch!(arch, RingGridWorkOrder, size(field), mask_kernel!, field, mask, val, masked_val)
@@ -45,9 +44,16 @@ function mask!(
 end
 
 # 2D, 3D or ND variant via Cartesian indexing
-@kernel inbounds = true function mask_kernel!(field, mask, val, masked_val)
+@kernel inbounds = true function mask_kernel!(field::AbstractArray{T, N}, mask::AbstractVector{R}, val, masked_val) where {T, R, N}
     ijk = @index(Global, Cartesian)
     if mask[ijk[1]] == val
+        field[ijk] = masked_val
+    end
+end
+
+@kernel inbounds = true function mask_kernel!(field::AbstractArray{T, N}, mask::AbstractArray{R, N}, val, masked_val) where {T, R, N}
+    ijk = @index(Global, Cartesian)
+    if mask[ijk] == val
         field[ijk] = masked_val
     end
 end
@@ -65,7 +71,7 @@ export EarthLandSeaMask
 
 """Land-sea mask, fractional, read from file.
 $(TYPEDFIELDS)"""
-@kwdef struct EarthLandSeaMask{NF, GridVariable2D} <: AbstractLandSeaMask
+@kwdef struct EarthLandSeaMask{NF, GridVariable2D, B} <: AbstractLandSeaMask
 
     # OPTIONS
     "filename of land sea mask"
@@ -75,7 +81,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "flag to check for land-sea mask in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -87,7 +93,7 @@ $(TYPEDFIELDS)"""
     FieldType::Type{<:AbstractField} = FullClenshawField
 
     "[OPTION] Quantization to fraction?"
-    quantization::Float64 = 0.01
+    quantization::NF = 0.01
 
     # FIELDS (to be initialized in initialize!)
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
@@ -104,6 +110,12 @@ function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...
     (; NF, GridVariable2D, grid) = spectral_grid
     land_fraction = zeros(GridVariable2D, grid)
     return L{NF, GridVariable2D}(; land_fraction, kwargs...)
+end
+
+function EarthLandSeaMask(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, GridVariable2D, grid) = spectral_grid
+    land_fraction = zeros(GridVariable2D, grid)
+    return EarthLandSeaMask{NF, GridVariable2D, Bool}(; land_fraction, kwargs...)
 end
 
 # set mask with grid, scalar, function; just define path `mask.land_fraction` to grid here
@@ -127,19 +139,19 @@ $(TYPEDSIGNATURES)
 Loads the land-sea mask from the path set in `land_sea_mask`, interpolates (grid-cell average) 
 onto the model grid for a fractional sea mask and saves it to the field `land_sea_mask.land_fraction`.
 """
-function load_mask!(land_sea_mask::EarthLandSeaMask)
+function load_mask!(land_sea_mask::EarthLandSeaMask{NF}) where NF
 
     arch = architecture(land_sea_mask.land_fraction)
 
     # LOAD NETCDF FILE
-    lsm_highres = get_asset(
+    lsm_highres = NF.(get_asset(
         land_sea_mask.path;
         from_assets = land_sea_mask.from_assets,
         name = land_sea_mask.varname,
         ArrayType = land_sea_mask.FieldType,
         FileFormat = NCDataset,
         version = land_sea_mask.version
-    )
+    ))
 
     # average onto grid cells of the model
     cpu_mask = on_architecture(CPU(), land_sea_mask.land_fraction)
@@ -151,7 +163,7 @@ function load_mask!(land_sea_mask::EarthLandSeaMask)
         land_sea_mask.land_fraction .= round.(land_sea_mask.land_fraction ./ q) .* q
     end
 
-    lo, hi = extrema(land_sea_mask.land_fraction)
+    lo, hi = minimum(land_sea_mask.land_fraction), maximum(land_sea_mask.land_fraction)
     if (lo < 0 || hi > 1)
         # @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
         land_sea_mask.land_fraction .= clamp.(land_sea_mask.land_fraction, 0, 1)

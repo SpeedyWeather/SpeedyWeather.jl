@@ -117,7 +117,7 @@ function initialize!(
     (; orography, surface_geopotential, η₀, u₀) = orog
     NF = eltype(orography)
 
-    ηᵥ = (1 - η₀) * π / 2                     # ηᵥ-coordinate of the surface [1]
+    ηᵥ = (1 - η₀) * π / 2                   # ηᵥ-coordinate of the surface [1]
     A = NF(u₀ * cos(ηᵥ)^(3 / 2))            # amplitude [m/s]
     RΩ = NF(radius * rotation)              # [m/s]
     g⁻¹ = NF(inv(gravity))                  # inverse gravity [s²/m]
@@ -145,7 +145,7 @@ export EarthOrography
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-@kwdef struct EarthOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
+@kwdef struct EarthOrography{NF, GridVariable2D, SpectralVariable2D, B} <: AbstractOrography
     "[OPTION] filename of orography"
     file::String = "orography.nc"
 
@@ -153,7 +153,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for orography in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -168,7 +168,7 @@ $(TYPEDFIELDS)"""
     scale::NF = 1.0
 
     "[OPTION] smooth the orography field?"
-    smoothing::Bool = true
+    smoothing::B = true
 
     "[OPTION] ower of Laplacian for smoothing"
     smoothing_power::NF = 1.0
@@ -191,7 +191,7 @@ function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
     orography = zeros(GridVariable2D, grid)
     surface_geopotential = zeros(SpectralVariable2D, spectrum)
-    return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(; orography, surface_geopotential, kwargs...)
+    return EarthOrography{NF, GridVariable2D, SpectralVariable2D, Bool}(; orography, surface_geopotential, kwargs...)
 end
 
 # function barrier
@@ -215,6 +215,7 @@ function initialize!(
 
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
+    (; architecture) = S
 
     # load orography from file
     field = get_asset(
@@ -228,8 +229,9 @@ function initialize!(
 
     orography_highres = on_architecture(S.architecture, field)
 
-    # Interpolate/coarsen to desired resolution
-    interpolate!(orography, orography_highres)
+    # Interpolate/coarsen to desired resolution.
+    interp = RingGrids.interpolator(orography, orography_highres)
+    @maybe_jit S.architecture interpolate!(orography, orography_highres, interp)
     orography .*= scale                     # scale orography (default 1)
     transform!(surface_geopotential, orography, S)   # no *gravity yet
 
@@ -243,7 +245,9 @@ function initialize!(
         SpeedyTransforms.spectral_smoothing!(surface_geopotential, c; power, truncation)
     end
 
-    transform!(orography, surface_geopotential, S)                  # to grid-point space
+    # For
+    transform!(orography, surface_geopotential, S)
+
     surface_geopotential .*= gravity                                # turn orography into surface geopotential
     SpeedyTransforms.spectral_truncation!(surface_geopotential)     # set the lmax+1 harmonics to zero
     return nothing

@@ -187,7 +187,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
 
     for k in 1:nlayers
         # 1. cloud reflection?
-        if k == cloud_top
+        @trace if k == cloud_top
             R = cloud_albedo * cloud_cover
             U_reflected = D * R
             D *= (1 - R)

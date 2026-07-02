@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Most of the `PrimitiveWetModel` is now Reactant compatible, this includes a revision to make most structs fully parametric [#985](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/985)
 - Update the extended differentiability tests to new time stepping syntax [#1148](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1148)
 - Scale time step on the fly [#1139](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1139)
 - Fix scalar indexing error constructing `SigmaCoordinates`/`Geometry` on GPU [#1142](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1142)

@@ -88,7 +88,7 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    Δσₖ⁻¹ = inv(Δσ[k])
+    Δσₖ⁻¹ = 1/Δσ[k]   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
 
     # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
     k⁻ = max(1, k - 1)
@@ -115,21 +115,21 @@ end
 
 # 1st order upwind
 @inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
-    ifelse(
+    @trace ifelse(
     u > 0, ξ[ij, k[1], s],
     ξ[ij, k[2], s]
 )
 
 # 3rd order upwind
 @inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
-    ifelse(
+    @trace ifelse(
     u > 0, (2ξ[ij, k[1], s] + 5ξ[ij, k[2], s] - ξ[ij, k[3], s]) * 1 // 6,
     (2ξ[ij, k[4], s] + 5ξ[ij, k[3], s] - ξ[ij, k[2], s]) * 1 // 6
 )
 
 # 5th order upwind
 @inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
-    ifelse(
+    @trace ifelse(
     u > 0, (2ξ[ij, k[1], s] - 13ξ[ij, k[2], s] + 47ξ[ij, k[3], s] + 27ξ[ij, k[4], s] - 3ξ[ij, k[5], s]) * 1 // 60,
     (2ξ[ij, k[6], s] - 13ξ[ij, k[5], s] + 47ξ[ij, k[4], s] + 27ξ[ij, k[3], s] - 3ξ[ij, k[2], s]) * 1 // 60
 )
@@ -172,7 +172,7 @@ const d₂ = 1 // 10
 end
 
 @inline function reconstructed_at_face(ξ, ij, s, k, u, ::WENOVerticalAdvection)
-    if u > 0
+    @trace if u > 0
         S₀ = (ξ[ij, k[3], s], ξ[ij, k[4], s], ξ[ij, k[5], s])
         S₁ = (ξ[ij, k[2], s], ξ[ij, k[3], s], ξ[ij, k[4], s])
         S₂ = (ξ[ij, k[1], s], ξ[ij, k[2], s], ξ[ij, k[3], s])

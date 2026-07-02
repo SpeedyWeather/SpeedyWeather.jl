@@ -69,7 +69,7 @@ end
 @kernel inbounds = true function sea_ice_kernel!(ℵ, sst, land_fraction, parameters)
     ij = @index(Global, Linear)    # every grid point ij
 
-    if land_fraction[ij] < 1 && isfinite(sst[ij])   # at least partially ocean, SST not NaN (=masked)
+    if land_fraction[ij] < 1 & isfinite(sst[ij])   # at least partially ocean, SST not NaN (=masked)
 
         (; m, f, temp_freeze, Δt) = parameters
 

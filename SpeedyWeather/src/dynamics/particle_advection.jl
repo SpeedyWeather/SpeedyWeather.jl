@@ -31,6 +31,7 @@ export ParticleAdvection2D
         NF,
         GeometryType, # <: AbstractGridGeometry
         IntType,
+        RefV,         # Base.RefValue{NF}
     } <: AbstractParticleAdvection
 
     "[OPTION] Number of particles"
@@ -43,7 +44,7 @@ export ParticleAdvection2D
     layer::IntType = 1
 
     "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
-    Δt::Base.RefValue{NF} = Ref(zero(NF))
+    Δt::RefV = Ref(zero(NF))
 
     "[DERIVED] Interpolation geometry used during advection"
     geometry::GeometryType
@@ -51,7 +52,7 @@ end
 
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.trunc)}(; geometry, kwargs...)
+    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.trunc), Base.RefValue{SG.NF}}(; geometry, kwargs...)
 end
 
 function variables(P::ParticleAdvection2D)

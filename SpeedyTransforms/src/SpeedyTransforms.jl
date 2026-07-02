@@ -22,7 +22,7 @@ import Atomix
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.KernelLaunching
-import SpeedyWeatherInternals.Utils: Utils, @maybe_jit
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, set_scalar!
 using RingGrids
 using LowerTriangularArrays
 
