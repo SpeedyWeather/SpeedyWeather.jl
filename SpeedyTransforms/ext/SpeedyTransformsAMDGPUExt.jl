@@ -101,12 +101,23 @@ function run_graph!(
     loop!()
     KernelAbstractions.synchronize(ROCBackend())
 
-    graph = AMDGPU.HIP.capture(throw_error = false) do
-        loop!()
+    # `throw_error = false` only swallows `hipErrorStreamCaptureInvalidated` — capture can
+    # also fail with a *different* HIPError (e.g. hipErrorStreamCaptureUnsupported, seen when
+    # rocFFT's `mul!` performs an operation that isn't graph-capturable) which `capture` still
+    # rethrows. Catch that too: the warm-up run above already produced the correct result for
+    # this call, so it's safe to just record capture as failed and fall back for future calls.
+    graph = try
+        AMDGPU.HIP.capture(throw_error = false) do
+            loop!()
+        end
+    catch err
+        err isa AMDGPU.HIP.HIPError || rethrow()
+        nothing
     end
 
     if graph === nothing
-        # capture invalidated; warmup already produced the correct result
+        # capture invalidated or failed with a hard HIP error; warmup already produced
+        # the correct result
         execs[key] = nothing
         return nothing
     end
