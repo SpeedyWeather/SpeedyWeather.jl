@@ -87,7 +87,7 @@ function dynamics_tendencies!(
     drag!(vars, model)                  # drag term for u, v
     scale_tendencies!(vars, model)      # dynamical core uses a scaled time step, Δt/radius
 
-    geopotential!(vars, planet)             # geopotential Φ = gη in shallow water
+    geopotential!(vars, model)          # geopotential Φ = gη in shallow water
 
     # compute tendencies in grid space: u, v, kinetic_energy
     grid_tendencies!(vars, model)
