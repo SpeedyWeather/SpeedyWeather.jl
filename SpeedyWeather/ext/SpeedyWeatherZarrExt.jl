@@ -176,7 +176,8 @@ function initialize!(
 
     # calculate land fraction on output grid
     if hasproperty(model, :land_sea_mask)
-        interpolate!(output.land_fraction, model.land_sea_mask.land_fraction, output.interpolator)
+        land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
+        interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
     end
 
     return nothing
