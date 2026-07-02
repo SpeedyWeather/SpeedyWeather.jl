@@ -55,6 +55,7 @@ function MatrixSpectralTransform(
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
         nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
+        transform_batch = nothing,                                                      # accepted+ignored: MatrixSpectralTransform has no FFT plans to multiplex
     )
     (; architecture) = spectrum                       # 1-based spectral truncation order and degree
 

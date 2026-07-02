@@ -146,9 +146,9 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
     ts = nsteps.tendency_spectral
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(ps), desc = "Divergence", units = "1/s"),
-        PrognosticVariable(:temperature, Spectral4D(ps), desc = "Temperature", units = "K"),
-        PrognosticVariable(:pressure, Spectral3D(ps), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+        PrognosticVariable(:divergence, Spectral4D(ps), desc = "Divergence", units = "1/s", fuse = :prognostic),
+        PrognosticVariable(:temperature, Spectral4D(ps), desc = "Temperature", units = "K", fuse = :prognostic),
+        PrognosticVariable(:pressure, Spectral3D(ps), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :prognostic),
 
         TendencyVariable(:divergence, Spectral4D(ts), desc = "Tendency of divergence", units = "1/s²"),
         TendencyVariable(:temperature, Spectral4D(ts), desc = "Tendency of temperature", units = "K/s"),
@@ -157,9 +157,9 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         TendencyVariable(:temperature, Grid4D(tg), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
         TendencyVariable(:pressure, Grid3D(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
         
-        GridVariable(:divergence, Grid4D(pg), desc = "Divergence", units = "1/s"),
-        GridVariable(:temperature, Grid4D(pg), desc = "Temperature", units = "K"),
-        GridVariable(:pressure, Grid3D(pg), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+        GridVariable(:divergence, Grid4D(pg), desc = "Divergence", units = "1/s", fuse=:grid),
+        GridVariable(:temperature, Grid4D(pg), desc = "Temperature", units = "K", fuse=:grid),
+        GridVariable(:pressure, Grid3D(pg), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse=:grid),
         ParameterizationVariable(:surface_pressure, Grid2D(), desc = "Surface pressure", units = "Pa"),
 
         DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),

@@ -12,7 +12,7 @@ struct Simulation{V, M <: AbstractModel} <: AbstractSimulation{M}
 end
 
 function Base.show(io::IO, S::AbstractSimulation)
-    vsize = prettymemory(Base.summarysize(S.variables))
+    vsize = prettymemory(_pretty_size(S.variables))
     Msize = prettymemory(Base.summarysize(S.model))
     Ssize = prettymemory(Base.summarysize(S))
     println(io, styled"{warning:Simulation}", "{...} ", styled"{note:($Ssize)}")
