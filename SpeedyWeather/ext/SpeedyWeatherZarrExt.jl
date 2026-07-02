@@ -13,7 +13,7 @@ import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     initialize!, finalize!, output!, write_array!, set!, add!, add_default!,
     is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
     get_lond, get_latd, on_architecture, CPU,
-    AbstractFullGrid
+    AbstractFullGrid, path_or_nothing
 
 import SpeedyWeather.RingGrids
 import SpeedyWeather: round!
@@ -52,6 +52,7 @@ function ZarrOutput(
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
+    land_fraction = Field(output_NF, output_grid)
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
@@ -73,6 +74,7 @@ function ZarrOutput(
     output = ZarrOutput{F2, F3, Itp, DT, S, C, Z}(;
         interval = interval_sec,
         interpolator,
+        land_fraction,
         field2D,
         field3D,
         field3Dland,
@@ -124,7 +126,7 @@ function initialize!(
     # which is what Xarray/NetCDF-Zarr uses for dataset round-tripping.
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
+    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
     soil_indices = collect(1:get_soil_layers(model))
 
     write_coordinate!(
@@ -158,10 +160,24 @@ function initialize!(
     )
     output!(output, vars.prognostic.clock.time)   # write initial time
 
-    # VARIABLES (pre-allocated to full length along the time axis)
+    # VARIABLES, remove output variables not existent in simulation.variables
+    simulation = Simulation(vars, model)
+    nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
+    if !isempty(nonexisting_vars)
+        @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
+    end
+    delete!(output, nonexisting_vars...)
+
+    # then define every output variable in the Zarr store and write initial conditions
     for (key, var) in output.variables
         define_variable!(g, output, var, n_outputs, eltype(output.field2D))
-        output!(output, var, Simulation(vars, model))
+        output!(output, var, simulation)
+    end
+
+    # calculate land fraction on output grid
+    if hasproperty(model, :land_sea_mask)
+        land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
+        interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
     end
 
     return nothing
