@@ -79,8 +79,13 @@ function _legendre!(
     lmax = lmax - 1                     # 0-based max degree l of spherical harmonics
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
-    @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, specs))
+    # Scratch dim 2 is the per-call capacity (= max(planned_K) on CPU, S.nlayers elsewhere);
+    # allow it to exceed length(nlayers) so chunked/sliced callers (e.g. test scratches copied
+    # from CPU) still pass.
+    @boundscheck (size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
+                  size(g_north, 3) == nlat_half && size(g_north, 2) >= length(nlayers)) ||
+                 throw(DimensionMismatch(S, specs))
+    @boundscheck length(nlayers) <= S.nlayers || throw(DimensionMismatch(S, specs))
 
     g_north .= 0
     g_south .= 0
@@ -183,7 +188,9 @@ function _legendre!(                        # GRID TO SPECTRAL
     nlayers = size(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, S.grid.nlat_half) || throw(DimensionMismatch(S, specs))
+    @boundscheck (size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
+                  size(f_north, 3) == S.grid.nlat_half && size(f_north, 2) >= nlayers) ||
+                 throw(DimensionMismatch(S, specs))
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, specs))
 
     fill!(specs, 0)                         # reset as we accumulate into specs
