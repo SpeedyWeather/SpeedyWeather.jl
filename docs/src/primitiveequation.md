@@ -853,7 +853,12 @@ Now loop over
 
 ## Scaled primitive equations
 
-TODO
+The primitive equations in SpeedyWeather are scaled by the radius, and vorticity and divergence variables are also scaled by the radius,
+effectively scaling these equations by the radius squared. However, in most cases this scaling is hidden from the user and developer
+and only when forcing vorticity or divergence directly it has to be applied manually. Otherwise all scaling is done internally,
+see [Forcing scaling](@ref) for more details.
+
+Derivation of the scaled primitive equations will be added here.
 
 ## References
 

@@ -347,7 +347,7 @@ model.atmosphere.layer_thickness
 so those waves are with an amplitude of 2000m quite strong.
 But the semi-implicit time integration can handle that even with fairly large time steps of
 ```@example gravity_wave_setup
-model.time_stepping.Δt_sec
+model.time_stepping.Δt
 ```
 seconds. Note that the gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s,
 given the speed of gravity waves we don't have to integrate for long.
