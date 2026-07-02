@@ -89,11 +89,12 @@ function reinitialize!(
     )
     (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
     Δt = time_step(time_stepping, vars.prognostic.clock) 
-    implicit.Δt[] == Δt && return nothing                   # if time step has not changed no need to reinitialize
-    scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
-    Tₖ = vars.dynamics.average_temperature_profile
-    initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
-    implicit.Δt[] = Δt
+    @trace if implicit.Δt[] != Δt                   # if time step has not changed no need to reinitialize
+        scale = vars.prognostic.scale[]             # implicit solver needs to be initialized with scaled time step
+        Tₖ = vars.dynamics.average_temperature_profile
+        initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
+        implicit.Δt[] = Δt
+    end
     return nothing
 end
 
