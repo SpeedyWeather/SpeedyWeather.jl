@@ -163,7 +163,7 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     # northern rings
     launch!(arch, ArrayWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_north, complex_offset, nfreqs)
     @inbounds for j in 1:nlat_half
-        fft_inverse_mul!(real_view[j], brfft_plans[j], complex_view[j])
+        LinearAlgebra.mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
     launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons, istart_n)
 
@@ -171,7 +171,7 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     launch!(arch, ArrayWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_south, complex_offset, nfreqs)
     @inbounds for j in 1:nlat_half
         (cache.has_equator && j == j_equator) && continue
-        fft_inverse_mul!(real_view[j], brfft_plans[j], complex_view[j])
+        LinearAlgebra.mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
     launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons_s, istart_s)
     return nothing
@@ -180,16 +180,6 @@ end
 # Stubs extended by backend extensions with methods dispatching on the A type param.
 function build_cache end
 function run_graph! end
-
-"""$(TYPEDSIGNATURES)
-Execute the inverse (complex → real) FFT plan `plan` on `x`, writing into `y`. Defaults to the
-generic AbstractFFTs `mul!`. Backend extensions may override this for plan types whose generic
-`mul!` performs extra work that isn't HIP/CUDA-graph-capture-safe — e.g. AMDGPU's rocFFT wrapper
-defensively copies `x` into a scratch buffer before executing (rocFFT's C2R transform destroys
-its input), and that copy is not capturable on some ROCm versions (`hipErrorStreamCaptureUnsupported`).
-That copy is unnecessary here: `complex_view[j]` is never read again after this call within a
-timestep, so backends may bypass it and let the FFT destroy its input directly."""
-fft_inverse_mul!(y, plan, x) = LinearAlgebra.mul!(y, plan, x)
 
 # =====================================================================================
 # _fourier_batched! for any GPU backend (CuArray, ROCArray, MtlArray all <: AbstractGPUArray).

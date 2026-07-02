@@ -6,7 +6,7 @@ using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-import SpeedyTransforms: SpectralTransform, GPUFourierGraphCache, build_cache, run_graph!, fft_plans, fft_inverse_mul!
+import SpeedyTransforms: SpectralTransform, GPUFourierGraphCache, build_cache, run_graph!, fft_plans
 
 import SpeedyWeatherInternals.Architectures: GPU, architecture
 
@@ -52,23 +52,6 @@ function build_cache(S::SpectralTransform, nlayers::Integer, ::GPU{<:ROCBackend}
         Dict{UInt, Nothing}(),  # unused: run_graph! never captures on AMDGPU, see below
         Dict{UInt, Nothing}(),
     )
-end
-
-# =====================================================================================
-# fft_inverse_mul!: bypass AMDGPU.jl's generic `mul!` for out-of-place complex→real rocFFT
-# plans. That `mul!` defensively `copyto!`s the input into a plan-owned scratch buffer first
-# (rocFFT's C2R transform destroys its input) — a device-to-device copy that is not
-# HIP-graph-capturable on some ROCm versions (observed: hipErrorStreamCaptureUnsupported).
-# We don't need that protection: `inverse_loop!` never reads `complex_view[j]` again after this
-# call within a timestep. Calling AMDGPU's internal `unsafe_execute!` directly skips the copy.
-# =====================================================================================
-
-function fft_inverse_mul!(
-        y::ROCArray, plan::AMDGPU.rocFFT.ROCFFTPlan{<:Any, <:Any, false}, x::ROCArray,
-    )
-    AMDGPU.rocFFT.assert_applicable(plan, x, y)
-    AMDGPU.rocFFT.unsafe_execute!(plan, x, y)
-    return y
 end
 
 # =====================================================================================
