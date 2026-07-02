@@ -102,7 +102,7 @@ end
 Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
         implicit::ImplicitPrimitiveEquation{NF},
-        Δt::Real,                                           # the time step [s], scaled
+        Δt::Number,                                          # the time step [s], scaled
         temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
         geometry::AbstractGeometry,
         geopotential::AbstractGeopotential,

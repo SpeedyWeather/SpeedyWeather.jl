@@ -5,7 +5,7 @@ function extrema_in(v::AbstractVector, a::Real, b::Real)
     # https://github.com/EnzymeAD/Reactant.jl/issues/2387
     vmin, vmax = (minimum(v), maximum(v))
     #vmin, vmax = extrema(v)
-    return (vmin >= a) && (vmax <= b)
+    return (vmin >= a) & (vmax <= b)
 end
 
 # MATRIX rotations
