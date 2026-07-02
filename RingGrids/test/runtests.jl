@@ -10,6 +10,7 @@ include("reverse.jl")
 include("rotate.jl")
 include("scaling.jl")
 include("get_asset.jl")
+include("copy_unmasked.jl")
 
 # must be last due to using CairoMakie and GeoMakie
 # which export rotate! too

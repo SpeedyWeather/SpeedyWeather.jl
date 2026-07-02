@@ -173,7 +173,7 @@ function output!(
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)
         if variable.unscale
-            scale!(var, inv(simulation.variables.prognostic.scale[]))
+            unscale!(var, simulation.variables.prognostic.scale[])
         end
     end
 

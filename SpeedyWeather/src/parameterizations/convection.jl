@@ -33,11 +33,14 @@ and relaxes current vertical profiles to the adjusted references."""
 @propagate_inbounds function convection!(ij, vars, convection::BettsMillerConvection, model)
 
     (; geometry, planet, atmosphere, time_stepping) = model
+    # TODO: σ, σ_half, Δσ are used for buoyancy level detection and moisture flux
+    # calculations in the Betts-Miller scheme. These are baked into sigma-coordinate
+    # formulations and would need revisiting for hybrid coordinates.
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
     nlayers = length(σ)
-    Δt = time_stepping.Δt_sec
+    (; Δt) = model.time_stepping                            # time step in [s]
 
     # use previous time step for more stable calculations
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, convection)
@@ -45,7 +48,7 @@ and relaxes current vertical profiles to the adjusted references."""
     geopotential = vars.dynamics.geopotential
     temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, convection)
     humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, convection)
-    pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]        # surface pressure [Pa]
     NF = eltype(temp)
 
     # thermodynamics
@@ -282,6 +285,7 @@ and relaxes current vertical profiles to the adjusted references."""
 @propagate_inbounds function convection!(ij, vars, DBM::BettsMillerDryConvection, model)
 
     (; geometry, atmosphere, time_stepping) = model
+    # TODO: same as above — σ, σ_half, Δσ baked into Betts-Miller dry convection scheme.
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick

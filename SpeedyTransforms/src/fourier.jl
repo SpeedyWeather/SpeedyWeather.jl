@@ -1,6 +1,7 @@
 # Function barrier for batched or serial transforms. FFTW/cuFFT plans bake the batch dim K
 # into the plan, so we look up a pre-planned bundle by K = size(field, 2) and fall back to
-# the serial path (K=1 plan, looped) when no batched plan exists for that K.
+# the serial path (K=1 plan, looped) when no batched plan exists for that K. The batch dim 
+# K is the sum of number of vertical layers batched together in a single FFT plan.
 function _fourier!(f_north, f_south, field::AbstractField, S::SpectralTransform)
     K = size(field, 2)
     if K > 1 && haskey(S.rfft_plans, K)

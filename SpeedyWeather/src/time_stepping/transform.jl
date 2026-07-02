@@ -146,9 +146,9 @@ function SpeedyTransforms.transform!(
 
     # Batched spec→grid for the prognostic state: one call covers vorticity, divergence,
     # temperature, pressure (and humidity for PrimitiveWet).
-    prog_parent = parent(vars.fused.prognostic)
-    grid_parent = parent(vars.fused.grid)
-    transform!(get_prognostic_step(grid_parent, time_stepping, S), get_prognostic_step(prog_parent, time_stepping, S), scratch_memory, S)
+    prognostic_variables = get_prognostic_step(parent(vars.fused.prognostic), time_stepping, S)
+    grid_variables = get_prognostic_step(parent(vars.fused.grid), time_stepping, S)
+    transform!(grid_variables, prognostic_variables, scratch_memory, S)
 
     if model isa PrimitiveWet
         humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
@@ -166,16 +166,16 @@ function SpeedyTransforms.transform!(
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
     # only do after transforms to avoid copying uninitialized zeros
     initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
-    
-    # include humidity effect into temp for everything stability-related
-    temperature_average!(vars, temp, S)
-    geopotential!(vars, model)                  # calculate geopotential
 
     # convert the logarithm of surface pressure to actual surface pressure in Pascal for parameterizations
     # dispatch over DummyParameterization (= any parameterization) to let time steppers decide the step
     log_pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, DummyParameterization())    # log Pa
     vars.parameterizations.surface_pressure .= exp.(log_pₛ)                                     # in Pa
 
+    # include humidity effect into temp for everything stability-related
+    temperature_average!(vars, temp, S)
+    geopotential!(vars, model)                  # calculate geopotential
+        
     for (name, tracer) in model.tracers
         tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
         tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)

@@ -5,7 +5,7 @@ using DocStringExtensions
 # kernel
 export configure_kernel, launch!
 export AbstractWorkOrder, SpectralWorkOrder, RingGridWorkOrder, SpectralInnerWorkOrder
-export DiagonalWorkOrder, Array3DWorkOrder, LinearWorkOrder
+export DiagonalWorkOrder, ArrayWorkOrder, LinearWorkOrder
 
 import ..Architectures: device
 
@@ -54,7 +54,7 @@ struct DiagonalWorkOrder <: AbstractWorkOrder end
 """
 Work order for kernels over a regular 3D array.
 """
-struct Array3DWorkOrder <: AbstractWorkOrder end
+struct ArrayWorkOrder <: AbstractWorkOrder end
 
 """
 Work order for kernels over linear/eachindex iteration.
@@ -102,7 +102,7 @@ end
 $(TYPEDSIGNATURES)
 Returns the `workgroup` and `worksize` for launching a kernel over a regular 3D array.
 """
-function work_layout(::Type{Array3DWorkOrder}, worksize::NTuple{N, Int}) where {N}
+function work_layout(::Type{ArrayWorkOrder}, worksize::NTuple{N, Int}) where {N}
     return heuristic_workgroup(worksize...), worksize
 end
 
