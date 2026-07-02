@@ -1,2 +1,2 @@
 ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt)
-test_gpu_graphs(ext, "HIP")
+test_gpu_graphs(ext, "HIP"; expect_capture = false)

@@ -2,22 +2,13 @@ module SpeedyTransformsAMDGPUExt
 
 import AMDGPU: AMDGPU, ROCArray, ROCBackend
 
-using KernelAbstractions
-
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-import SpeedyTransforms: SpectralTransform, GPUFourierGraphCache, build_cache, run_graph!, MAX_GRAPHS, fft_plans, fft_inverse_mul!
+import SpeedyTransforms: SpectralTransform, GPUFourierGraphCache, build_cache, run_graph!, fft_plans, fft_inverse_mul!
 
 import SpeedyWeatherInternals.Architectures: GPU, architecture
-
-# Probe for the high-level HIP graph API. AMDGPU.HIP exports these in newer versions;
-# on older installs only the raw C bindings (hipGraph_t, hipGraphExec_t, …) are present.
-const _HIP_GRAPHS_AVAILABLE =
-    isdefined(AMDGPU, :HIP) &&
-    isdefined(AMDGPU.HIP, :HIPGraphExec) &&
-    isdefined(AMDGPU.HIP, :capture)
 
 # =====================================================================================
 # build_cache: allocate the packed work buffers and per-ring views on AMDGPU device memory.
@@ -58,8 +49,8 @@ function build_cache(S::SpectralTransform, nlayers::Integer, ::GPU{<:ROCBackend}
         dev(istart_n), dev(istart_s), dev(nlons_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, j_equator,
         architecture(packed_real),
-        Dict{UInt, Any}(),  # HIPGraphExec may not exist at compile time, so Any is unavoidable
-        Dict{UInt, Any}(),
+        Dict{UInt, Nothing}(),  # unused: run_graph! never captures on AMDGPU, see below
+        Dict{UInt, Nothing}(),
     )
 end
 
@@ -81,67 +72,24 @@ function fft_inverse_mul!(
 end
 
 # =====================================================================================
-# run_graph!: HIP-specific graph capture and replay.
-# Dispatches on the A=GPU{<:ROCBackend} type parameter of GPUFourierGraphCache.
-# Falls back to running the allocation-free loop directly when the HIP graph API is
-# unavailable (older AMDGPU.jl) or when capture fails.
+# run_graph!: HIP graph capture is currently disabled for AMDGPU. ROCm's stream-capture
+# validator does not reliably reject operations that are illegal to capture — some raise a
+# catchable HIPError (e.g. hipErrorStreamCaptureUnsupported, seen from rocFFT's `mul!`), but
+# others are silently accepted at capture time and only surface later as a GPU memory access
+# fault when the (corrupt) graph is replayed. That failure mode was confirmed on real hardware
+# (LUMI) even after removing the one identifiable offending call, and matches a known upstream
+# gap: HIP Graph capture on AMD GPUs does not raise `operation not permitted` for illegal
+# operations the way CUDA Graph capture does (see pytorch/pytorch#155684, #155720). Since
+# capture failures aren't reliably catchable, "try capture and fall back on error" isn't safe
+# here — always run the allocation-free direct loop instead. Revisit once ROCm/AMDGPU.jl
+# provides reliable stream-capture validation for library calls like rocFFT execution.
 # =====================================================================================
 
 function run_graph!(
         ::GPUFourierGraphCache{<:Any, <:Any, <:Any, <:Any, <:Any, <:GPU{<:ROCBackend}, E},
-        execs::Dict{UInt, E}, key, loop!::F,
+        ::Dict{UInt, E}, key, loop!::F,
     ) where {E, F}
-    if !_HIP_GRAPHS_AVAILABLE
-        loop!()                              # no graph API: run the fused loop directly
-        return nothing
-    end
-
-    HIPGraphExecT = AMDGPU.HIP.HIPGraphExec  # only evaluated when _HIP_GRAPHS_AVAILABLE
-
-    exec = get(execs, key, missing)
-    if exec isa HIPGraphExecT
-        AMDGPU.HIP.launch(exec)              # hot path: pure replay on AMDGPU.stream()
-        return nothing
-    elseif exec === nothing                  # capture previously failed; run directly
-        loop!()
-        return nothing
-    end
-
-    # first time we see this buffer (exec === missing)
-    if length(execs) >= MAX_GRAPHS
-        loop!()                              # cache full: don't capture, just run
-        return nothing
-    end
-
-    # warm up so that one-time work (rocFFT init, kernel JIT, memory-pool growth) happens
-    # OUTSIDE the capture region where it is not allowed
     loop!()
-    KernelAbstractions.synchronize(ROCBackend())
-
-    # `throw_error = false` only swallows `hipErrorStreamCaptureInvalidated` — capture can
-    # also fail with a *different* HIPError (e.g. hipErrorStreamCaptureUnsupported, seen when
-    # rocFFT's `mul!` performs an operation that isn't graph-capturable) which `capture` still
-    # rethrows. Catch that too: the warm-up run above already produced the correct result for
-    # this call, so it's safe to just record capture as failed and fall back for future calls.
-    graph = try
-        AMDGPU.HIP.capture(throw_error = false) do
-            loop!()
-        end
-    catch err
-        err isa AMDGPU.HIP.HIPError || rethrow()
-        nothing
-    end
-
-    if graph === nothing
-        # capture invalidated or failed with a hard HIP error; warmup already produced
-        # the correct result
-        execs[key] = nothing
-        return nothing
-    end
-
-    exec = AMDGPU.HIP.instantiate(graph)
-    execs[key] = exec
-    AMDGPU.HIP.launch(exec)
     return nothing
 end
 
