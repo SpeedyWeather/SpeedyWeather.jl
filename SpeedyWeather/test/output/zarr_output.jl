@@ -272,7 +272,7 @@ end
     ensemble_size = 3
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
-
+    initial_conditions = ZonalJet(spectral_grid)    # deterministic IC, identical for all members
     store_path = ""
     for member in 1:ensemble_size
         output = ZarrOutput(
@@ -280,7 +280,7 @@ end
             path = tmp_output_path, write_restart = false,
             ensemble_index = member, ensemble_size = ensemble_size,
         )
-        model = ShallowWaterModel(spectral_grid; output)
+        model = ShallowWaterModel(spectral_grid; output, initial_conditions)
         simulation = initialize!(model)
         run!(simulation, output = true; period)
         @test simulation.model.feedback.nans_detected == false
@@ -308,9 +308,15 @@ end
     # ensemble axis is chunked with size 1 so members write disjoint chunk files
     @test z_vor.metadata.chunks[end] == 1
 
-    # every member wrote finite data into its own ensemble slice
-    for e in 1:ensemble_size
-        @test all(isfinite, g["vor"][:, :, :, :, e])
+    # every member wrote finite data into its own ensemble slice; since all members share
+    # the same deterministic IC and there's no stochastic physics in ShallowWater, every
+    # ensemble slice should be (approximately) identical
+    vor_1 = g["vor"][:, :, :, :, 1]
+    @test all(isfinite, vor_1)
+    for e in 2:ensemble_size
+        vor_e = g["vor"][:, :, :, :, e]
+        @test all(isfinite, vor_e)
+        @test vor_e ≈ vor_1
     end
 end
 
