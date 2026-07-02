@@ -333,7 +333,7 @@ function horizontal_diffusion!(
     pres_tend = get_tendency_step(vars.tendencies.pressure, model.time_stepping, diffusion)
     zero_last_degree!(pres_tend)
 
-    pres_tend.data[1:1] .= 0    # mass conservation
+    set_scalar!(pres_tend.data, 1, 0)    # mass conservation
 
     if haskey(vars.tendencies, :humidity)
         humid = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, diffusion)
