@@ -527,7 +527,7 @@ end
 # when there's a dimension mismatch always choose the larger dimension
 FieldGPUStyle{N, Grid}(::Val{N}) where {N, Grid} = FieldGPUStyle{N, Grid}()
 FieldGPUStyle{1, Grid}(::Val{2}) where {Grid} = FieldGPUStyle{2, Grid}()
-FieldGPUStyle{1, Grid}(::Val{0}) where {Grid} = FieldGPUStyle{2, Grid}()
+FieldGPUStyle{1, Grid}(::Val{0}) where {Grid} = FieldGPUStyle{1, Grid}()
 FieldGPUStyle{2, Grid}(::Val{3}) where {Grid} = FieldGPUStyle{3, Grid}()
 FieldGPUStyle{3, Grid}(::Val{4}) where {Grid} = FieldGPUStyle{4, Grid}()
 
