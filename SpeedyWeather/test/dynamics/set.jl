@@ -55,21 +55,25 @@
     @test get_step(prog_new.vorticity, step) == (2 .* A_spec)
 
     # grids
-    set!(simulation, sea_surface_temperature = A[:, 1], namespace = :ocean)
-    @test get_step(prog_new.ocean.sea_surface_temperature, 1) == A[:, 1]
+    set!(simulation, sea_surface_temperature = A[:, 1]; namespace = :ocean)
+    @test prog_new.ocean.sea_surface_temperature[:, 1] == A[:, 1]
+    set!(simulation, sea_surface_temperature = A[:, 1]; step, namespace = :ocean)
+    @test prog_new.ocean.sea_surface_temperature[:, step] == A[:, 1]
 
-    set!(simulation, sea_ice_concentration = B[:, 1], namespace = :ocean, add = true)
-    set!(simulation, sea_ice_concentration = B[:, 1], namespace = :ocean, add = true)
+    set!(simulation, sea_ice_concentration = B[:, 1]; step, namespace = :ocean, add = true)
     C = similar(A[:, 1])
     RingGrids.interpolate!(C, B[:, 1]; NF)
-    @test all(isapprox(prog_new.ocean.sea_ice_concentration, prog_old.ocean.sea_ice_concentration .+ C, atol = 1.0e-6))
+
+    sic_new = get_step(prog_new.ocean.sea_ice_concentration, step)
+    sic_old = get_step(prog_old.ocean.sea_ice_concentration, step)
+    @test all(isapprox(sic_new, sic_old .+ C, atol = 1.0e-6))
 
     Di = deepcopy(prog_new.land.soil_temperature)
     RingGrids.interpolate!(Di, D; NF)
-    set!(simulation, soil_temperature = D, namespace = :land)
+    set!(simulation, soil_temperature = D, step = nothing, namespace = :land)
     @test prog_new.land.soil_temperature == Di
 
-    set!(simulation, soil_moisture = D; step, namespace = :land)
+    set!(simulation, soil_moisture = D; step = nothing, namespace = :land)
     @test prog_new.land.soil_moisture == Di
 
     # numbers
@@ -81,10 +85,10 @@
     set!(simulation, vorticity = Float32(3.0); step, add = true)
     @test get_step(prog_new.vorticity, step) ≈ (2 .* M3_spec)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0), namespace = :ocean)
+    set!(simulation, sea_surface_temperature = Float16(3.0), step = nothing, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature .≈ 3.0)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0), add = true, namespace = :ocean)
+    set!(simulation, sea_surface_temperature = Float16(3.0), step = nothing, add = true, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature .≈ 6.0)
 
     # vor_div, create u,v first in spectral space
@@ -134,7 +138,8 @@
     @test get_step(prog_new.vorticity, step) ≈ A_spec
 
     # groups
-    set!(simulation, geopotential = 1, group = :dynamics)
+    # non-stepped variables need step = nothing
+    set!(simulation, geopotential = 1, step=nothing, group = :dynamics)
     @test all(simulation.variables.dynamics.geopotential .== 1)
 end
 
