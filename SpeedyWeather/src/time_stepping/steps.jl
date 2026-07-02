@@ -43,6 +43,16 @@ get_steps(var::AbstractArray{T, 1}) where {T} = (var,)
 get_steps(var::AbstractArray{T, 2}) where {T} = ntuple(step -> get_step(var, step), size(var, 2))
 get_steps(var::AbstractArray{T, 3}) where {T} = ntuple(step -> get_step(var, step), size(var, 3))
 
+"""$(TYPEDSIGNATURES)
+Get the first `N` steps of a variable as a tuple of views with a COMPILE-TIME length,
+fully unrolled via `Val(N)` (branchless, in contrast to the runtime-length methods above
+whose `ntuple(f, ::Int)` returns a small union of tuple types; that union breaks Enzyme's
+type analysis on Julia ≥ 1.11, see https://github.com/EnzymeAD/Enzyme.jl/issues/3275).
+NOTE: in Enzyme-differentiated code that launches kernels on the views, even a compile-time
+tuple of large step views (e.g. of a `LowerTriangularArray`) can exceed Enzyme's type
+analysis — there, avoid the tuple altogether and bind steps individually via `get_step`."""
+get_steps(var::AbstractArray, ::Val{N}) where {N} = ntuple(step -> get_step(var, step), Val(N))
+
 export get_step
 
 """$(TYPEDSIGNATURES)
@@ -60,13 +70,6 @@ get_step(var) = get_step(var, size(var, ndims(var)))
 @inline get_step(var::AbstractArray{T, 1}, step::Integer) where {T} = view(var, :, step)
 @inline get_step(var::AbstractArray{T, 2}, step::Integer) where {T} = view(var, :, step)
 @inline get_step(var::AbstractArray{T, 3}, step::Integer) where {T} = view(var, :, :, step)
-
-# NOTE on Enzyme (Julia ≥ 1.11): a `get_step` view built from a *runtime* step offset cannot be
-# type-analysed by Enzyme once it participates in a differentiated KernelAbstractions kernel — it
-# throws an `EnzymeNoTypeError`. This is *not* worked around here (kept branchless / Reactant-clean).
-# Instead the affected consumer — the leapfrog `update_prognostic!` — folds the step into a plain
-# array index inside its kernel rather than passing a runtime-step view (same approach as the vertical
-# advection stencil). All other `get_step` uses pass a compile-time (literal) step, which is fine.
 
 # LowerTriangularArrays
 # for 2D spectral variables step can be 1 that'll be the ignored additional singleton dimension

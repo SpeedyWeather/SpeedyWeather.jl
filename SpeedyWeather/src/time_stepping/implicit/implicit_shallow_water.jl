@@ -113,8 +113,10 @@ function implicit_correction!(
     ξ = w * implicit.centering * Δt
 
     # use Hotta et al. 2016 notation for current tendency F and previous (averaged) tendency G
-    F_div, G_div = get_steps(vars.tendencies.divergence)
-    F_η, G_η = get_steps(vars.tendencies.η)
+    F_div = get_step(vars.tendencies.divergence, 1)    # no tuple (get_steps) here: a tuple of step
+    G_div = get_step(vars.tendencies.divergence, 2)    # views breaks Enzyme on Julia >= 1.11
+    F_η = get_step(vars.tendencies.η, 1)
+    G_η = get_step(vars.tendencies.η, 2)
 
     H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
     g = model.planet.gravity                    # gravitational acceleration [m/s²]
