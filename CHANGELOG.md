@@ -4,6 +4,8 @@
 
 - Sea surface temperature and sea ice concentration are now time-stepped variables [#1140](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1140)
 - Scale time step on the fly, and forcing/drag/parameterizations inside dycore [#1139](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1139)
+- Ensemble output dimension for `ZarrOutput`: multiple members can write into one shared store via `ensemble_index`/`ensemble_size` [#1149](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1149)
+- Prognostic and grid variables are now fused and their transform batched on GPU [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
 - Update the extended differentiability tests to new time stepping syntax [#1148](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1148)
 - Fix scalar indexing error constructing `SigmaCoordinates`/`Geometry` on GPU [#1142](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1142)
 - Sigma-pressure coordinates, part 1 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137)
