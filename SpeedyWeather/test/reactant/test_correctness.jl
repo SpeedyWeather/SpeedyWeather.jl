@@ -75,7 +75,7 @@ numerical paths through @jit), the resulting grid variables — and therefore
 the tendencies — can differ at the level of the spectral transform
 discrepancy. We therefore compare tendencies after running both models in
 the same self-consistent way, mirroring `test_time_stepping!`."""
-function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothing; nsteps = 1, rtol = RTOL, atol = ATOL)
+function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothing; nsteps = 1, tolerances::NamedTuple = TOLERANCES)
     println("\n" * "-"^60)
     println("Testing tendencies ($nsteps steps)")
     println("-"^60)
@@ -133,7 +133,7 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothi
 end
 
 """Test prognostic and grid variables after running for nsteps on already-initialized simulations."""
-function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = nothing; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
+function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = nothing; nsteps = NSTEPS, tolerances::NamedTuple = TOLERANCES)
     println("\n" * "-"^60)
     println("Testing time stepping ($nsteps steps)")
     println("-"^60)
@@ -242,8 +242,8 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, tolerances:
     end
 
     @testset "$model_name CPU vs Reactant" begin
-        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name, r_timestep!; rtol, atol)
-        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name, r_timestep!; nsteps, rtol, atol)
+        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name, r_timestep!; tolerances)
+        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name, r_timestep!; nsteps, tolerances)
     end
 
     println("\n" * "="^60)
