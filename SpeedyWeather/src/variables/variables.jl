@@ -118,6 +118,9 @@ copies (CPU ↔ Reactant) the broadcast-aliasing check inside `copyto!` fails.
 Skipping view leaves avoids both problems."""
 function Base.copy!(dest::Variables, src::Variables)
     for group in propertynames(dest)
+        # skip scratch: it is write-before-read (never needs to survive a sync) and its size
+        # is architecture-dependent 
+        group === :scratch && continue
         copy_variables!(getfield(dest, group), getfield(src, group))
     end
     return dest
