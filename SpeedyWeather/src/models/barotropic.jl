@@ -70,19 +70,19 @@ function variables(::Type{<:Barotropic}, nsteps = DEFAULT_NSTEPS)
     return (
         PrognosticVariable(:clock, ClockDim(), desc = "Clock", units = "s"),
         PrognosticVariable(:scale, ScalarDim(1), desc = "Scaling of vor and div in the dynamical core", units = "m"),
-        PrognosticVariable(:vorticity, Spectral4D(ps), desc = "Relative vorticity", units = "1/s"),
+        PrognosticVariable(:vorticity, Spectral4D(ps), desc = "Relative vorticity", units = "1/s", fuse = :prognostic),
 
         TendencyVariable(:vorticity, Spectral4D(ts), desc = "Tendency of relative vorticity", units = "1/s²"),
         TendencyVariable(:vorticity, Grid4D(tg), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²"),
         TendencyVariable(:u, Grid4D(tg), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²"),
         TendencyVariable(:v, Grid4D(tg), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²"),
 
-        GridVariable(:vorticity, Grid4D(pg), desc = "Relative vorticity", units = "1/s"),
-        GridVariable(:u, Grid4D(pg), desc = "Zonal wind", units = "m/s"),
-        GridVariable(:v, Grid4D(pg), desc = "Meridional wind", units = "m/s"),
+        GridVariable(:vorticity, Grid4D(pg), desc = "Relative vorticity", units = "1/s", fuse = :grid),
+        GridVariable(:u, Grid4D(pg), desc = "Zonal wind", units = "m/s", fuse = :uv_grid),
+        GridVariable(:v, Grid4D(pg), desc = "Meridional wind", units = "m/s", fuse = :uv_grid),
 
-        ScratchVariable(:a, Spectral3D(), desc = "Scratch array", units = "?"),
-        ScratchVariable(:b, Spectral3D(), desc = "Scratch array", units = "?"),
+        ScratchVariable(:a, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
+        ScratchVariable(:b, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
     )
 end
 

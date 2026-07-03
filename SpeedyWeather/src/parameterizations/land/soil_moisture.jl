@@ -211,7 +211,7 @@ function timestep!(
         model::PrimitiveEquation,
     )
     (; soil_moisture) = vars.prognostic.land
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping                            # time step in [s]
     ρ = model.atmosphere.water_density
     (; land_fraction) = model.land_sea_mask
 

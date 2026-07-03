@@ -858,7 +858,6 @@ function BroadcastStyle(
     return LowerTriangularGPUStyle{N}()
 end
 
-
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 LowerTriangularStyle{N}(::Val{M}) where {N, M} = LowerTriangularStyle{N}()
 LowerTriangularGPUStyle{N}(::Val{M}) where {N, M} = LowerTriangularGPUStyle{N}()

@@ -665,6 +665,15 @@ function Base.BroadcastStyle(
     return FieldGPUStyle{N, nonparametric_type(Grid)}()
 end
 
+# Views into GPU arrays (e.g. FusedParent slot views) must broadcast on the GPU too;
+# without this, dispatch falls back to FieldStyle and the broadcast runs scalar
+# `getindex` on the device, triggering GPUArrays' scalar-indexing error.
+function Base.BroadcastStyle(
+        ::Type{F}
+    ) where {F <: AbstractField{T, N, ArrayType, Grid}} where {T, N, A <: GPUArrays.AbstractGPUArray, ArrayType <: SubArray{T, N, A}, Grid}
+    return FieldGPUStyle{N, nonparametric_type(Grid)}()
+end
+
 function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
     # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result

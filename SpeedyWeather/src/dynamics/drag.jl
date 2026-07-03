@@ -59,10 +59,8 @@ function drag!(
     Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, drag)
     Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, drag)
 
-    # include radius scaling
-    c = vars.prognostic.scale[]
-    @. Fu -= c * drag.drag_coefs' .* u
-    @. Fv -= c * drag.drag_coefs' .* v
+    @. Fu -= drag.drag_coefs' .* u
+    @. Fv -= drag.drag_coefs' .* v
 
     return nothing
 end
@@ -98,11 +96,8 @@ function drag!(
     Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
     Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 
-    # total drag coefficient with radius scaling
-    # note that while the equations (with prognostic variable vorticity) are scaled
-    # with radius R squared, one R will go into the curl operator applied to forcing of u, v
-    # to yield a tendency for vorticity, so only one R is needed here in the drag coefficient scaling
-    c = scheme.drag / model.atmosphere.layer_thickness * vars.prognostic.scale[]
+    # total drag coefficient
+    c = scheme.drag / model.atmosphere.layer_thickness
 
     launch!(
         architecture(Fu), LinearWorkOrder, (size(Fu, 1),), quadratic_drag_kernel!,
@@ -156,8 +151,8 @@ function drag!(
     Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
     Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 
-    # total drag coefficient with radius scaling
-    c = scheme.drag * vars.prognostic.scale[]
+    # total drag coefficient
+    c = scheme.drag
     (; speed_limit) = scheme
 
     launch!(
@@ -200,11 +195,7 @@ function drag!(
     )
     vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, drag)
     vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, drag)
-
-    # scale by radius (but only once, the second radius is in vor)
-    c = drag.c * vars.prognostic.scale[]
-    vor_tend .-= c * vor
-
+    vor_tend .-= drag.c * vor
     return nothing
 end
 
@@ -258,10 +249,8 @@ function drag!(
     vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, drag)
     (; ζ₀) = drag
 
-    # scale by radius as is vorticity
-    s = vars.prognostic.scale[]
-    r = s / drag.time_scale.value
-
+    # drag coefficient r as inverse time scale [1/s]
+    r = inv(drag.time_scale.value)
     k = size(vor, 2)   # drag only on surface layer
 
     # GPU kernel launch

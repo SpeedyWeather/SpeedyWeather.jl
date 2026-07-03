@@ -263,6 +263,63 @@ end
     @test z_vor.metadata.chunks[3] == 1     # nlayers=1 ⇒ z clamped to 1
 end
 
+@testset "ZarrOutput ensemble members into one store" begin
+    # Emulate parallel ensemble members within a single process by running members
+    # 1..N sequentially: member 1 (creator) builds the shared store + readiness marker,
+    # members 2..N find the marker, open the existing store and write their own slice.
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_ensemble_")
+    period = Day(1)
+    ensemble_size = 3
+
+    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    initial_conditions = ZonalJet(spectral_grid)    # deterministic IC, identical for all members
+    store_path = ""
+    for member in 1:ensemble_size
+        output = ZarrOutput(
+            spectral_grid, ShallowWater;
+            path = tmp_output_path, write_restart = false,
+            ensemble_index = member, ensemble_size = ensemble_size,
+        )
+        model = ShallowWaterModel(spectral_grid; output, initial_conditions)
+        simulation = initialize!(model)
+        run!(simulation, output = true; period)
+        @test simulation.model.feedback.nans_detected == false
+        # all members must resolve to the same shared run folder / store
+        member == 1 && (store_path = joinpath(model.output.run_path, model.output.filename))
+        @test joinpath(model.output.run_path, model.output.filename) == store_path
+    end
+
+    g = Zarr.zopen(store_path)
+
+    # ensemble coordinate exists and has length ensemble_size
+    @test haskey(g.arrays, "ensemble")
+    @test g["ensemble"][:] == collect(1:ensemble_size)
+
+    # a single shared time axis was written (only the creator writes it)
+    nlon = length(g["lon"][:])
+    nlat = length(g["lat"][:])
+    nt = length(g["time"][:])
+
+    # 3D variable gains a trailing ensemble axis; ensemble is first in row-major dims
+    z_vor = g["vor"]
+    @test ndims(z_vor) == 5
+    @test size(z_vor) == (nlon, nlat, spectral_grid.nlayers, nt, ensemble_size)
+    @test z_vor.attrs["_ARRAY_DIMENSIONS"] == ["ensemble", "time", "layer", "lat", "lon"]
+    # ensemble axis is chunked with size 1 so members write disjoint chunk files
+    @test z_vor.metadata.chunks[end] == 1
+
+    # every member wrote finite data into its own ensemble slice; since all members share
+    # the same deterministic IC and there's no stochastic physics in ShallowWater, every
+    # ensemble slice should be (approximately) identical
+    vor_1 = g["vor"][:, :, :, :, 1]
+    @test all(isfinite, vor_1)
+    for e in 2:ensemble_size
+        vor_e = g["vor"][:, :, :, :, e]
+        @test all(isfinite, vor_e)
+        @test vor_e ≈ vor_1
+    end
+end
+
 @testset "ZarrOutput second run! creates a new store" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_rerun_")
     period = Day(1)
