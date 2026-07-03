@@ -4,14 +4,16 @@ for compatibility across full and reduced grids), the other dimensions can be us
 time or other dimensions. The `grid` can be shared across multiple fields, e.g. a 2D and a 3D field
 can share the same grid which just defines the discretization and the architecture (CPU/GPU) the grid is on.
 $(TYPEDFIELDS)"""
-struct Field{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
+struct Field{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid, Dims <: AbstractArrayDimensions} <: AbstractField{T, N, ArrayType, Grid, Dims}
     data::ArrayType
     grid::Grid
+    dims::Dims
 
     # Inner constructor to check for matching grid and data
-    function Field(data, grid)
+    function Field(data, grid, dims = default_field_dimensions(data))
         data_matches_grid(data, grid; horizontal_dim = 1) || throw(DimensionMismatch(data, grid))
-        return new{eltype(data), ndims(data), typeof(data), typeof(grid)}(data, grid)
+        data_matches_dims(data, dims) || throw(DimensionMismatch(data, dims))
+        return new{eltype(data), ndims(data), typeof(data), typeof(grid), typeof(dims)}(data, grid, dims)
     end
 end
 
@@ -22,8 +24,9 @@ const Field4D = Field{T, 3} where {T}
 
 # default constructors
 Field(grid::AbstractGrid, k...) = zeros(grid, k...)
-Field(::Type{T}, grid::AbstractGrid, k...) where {T} = zeros(T, grid, k...)
-(::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid) where {T} = Field(T.(data), grid)
+Field(grid::AbstractGrid, dims::AbstractArrayDimensions, k...) = zeros(grid, dims, k...)
+Field(::Type{T}, grid::AbstractGrid, dims::AbstractArrayDimensions, k...) where {T} = zeros(T, grid, dims, k...)
+(::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid, args...) where {T} = Field(T.(data), grid, args...)
 
 # TYPES
 Architectures.nonparametric_type(::Type{<:Field}) = Field
@@ -60,9 +63,22 @@ function Base.DimensionMismatch(f1::AbstractField, f2s::AbstractField...)
     return DimensionMismatch(chop(s, tail = 2))
 end
 
+function data_matches_dims(data::AbstractArray, dims::AbstractArrayDimensions)
+    return ndims(data) >= ndims(dims)
+end
+
+function Base.DimensionMismatch(data::AbstractArray, dims::AbstractArrayDimensions)
+    return DimensionMismatch("Dimensionality of $(summary(data)) does not match $dims")
+end
+
+ArrayDimensions.hastime(::Field{T, N, A, G, D}) where {T, N, A, G, D} = hastime(D)
+ArrayDimensions.hasvertical(::Field{T, N, A, G, D}) where {T, N, A, G, D} = hasvertical(D)
+additional_dimensions(field::Field) = ndims(field) > ndims(field.dims)
+
 # for fields, also add info about the number of rings
 function Base.array_summary(io::IO, field::AbstractField, inds::Tuple{Vararg{Base.OneTo}})
-    print(io, Base.dims2string(length.(inds)), ", $(get_nlat(field))-ring ")
+    plus = additional_dimensions(field) ? "+" : ""
+    print(io, Base.dims2string(length.(inds)), ", $(get_nlat(field))-ring ($(Base.dims2string(field.dims))$plus) ")
     return Base.showarg(io, field, true)
 end
 
@@ -226,10 +242,22 @@ for f in (:zeros, :ones, :rand, :randn)
             return Field(data, grid)
         end
 
+        # zeros(grid, dims, nlayers...)
+        function Base.$f(grid::AbstractGrid, dims::AbstractArrayDimensions, k::Integer...)
+            data = array_type(grid.architecture)($f(DEFAULT_NF, get_npoints(grid), k...))
+            return Field(data, grid, dims)
+        end
+
         # zeros(NF, grid, nlayers...)
         function Base.$f(::Type{T}, grid::AbstractGrid, k::Integer...) where {T}
             data = array_type(grid.architecture)($f(T, get_npoints(grid), k...))
             return Field(data, grid)
+        end
+
+        # zeros(NF, grid, dims, nlayers...)
+        function Base.$f(::Type{T}, grid::AbstractGrid, dims::AbstractArrayDimensions, k::Integer...) where {T}
+            data = array_type(grid.architecture)($f(T, get_npoints(grid), k...))
+            return Field(data, grid, dims)
         end
 
         # zeros(Grid, nlat_half, nlayers...)
@@ -289,13 +317,14 @@ for f in (:zeros, :ones, :rand, :randn)
 end
 
 # zero element of a Field with new data but same grid
-Base.zero(field::F) where {F <: AbstractField} = F(zero(field.data), field.grid)
+Base.zero(field::F) where {F <: AbstractField} = F(zero(field.data), field.grid, field.dims)
 
 # similar data but share grid
-Base.similar(field::F) where {F <: AbstractField} = F(similar(field.data), field.grid)
+Base.similar(field::F) where {F <: AbstractField} = F(similar(field.data), field.grid, field.dims)
 
 # data with new type T but share grid
-Base.similar(field::F, ::Type{T}) where {F <: AbstractField, T} = nonparametric_type(F)(similar(field.data, T), field.grid)
+Base.similar(field::F, ::Type{T}) where {F <: AbstractField, T} =
+    nonparametric_type(F)(similar(field.data, T), field.grid, field.dims)
 
 # data with same type T but new size (=new grid)
 function Base.similar(
@@ -450,15 +479,15 @@ end
 # view(array, :) unravels like array[:] does, hence "::Colon, i, args..." used to enforce one argument after :
 # exception is view(vector, :) which preserves the vector structure, equivalent here is the Field2D
 # TODO extend Base.view?
-field_view(field::AbstractField, c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid)
-field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid)
+field_view(field::AbstractField, c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid, field.dims)
+field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid, field.dims)
 field_view(field::AbstractField, args...) = view(field, args...)   # fallback to normal view
 
 # needed for Enzyme 
 Base.unaliascopy(A::Field) =
        Field(Base.unaliascopy(A.data), A.grid)
 
-## BROADCASTING
+# BROADCASTING
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 

@@ -14,13 +14,14 @@ field = Field(grid, k...)
 column_field = transpose(field)
 ```
 """
-struct ColumnField{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
+struct ColumnField{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid, Dims} <: AbstractField{T, N, ArrayType, Grid, Dims}
     data::ArrayType
     grid::Grid
+    dims::Dims
 
-    function ColumnField(data, grid)
+    function ColumnField(data, grid, dims = default_column_field_dimensions(data))
         data_matches_grid(data, grid; horizontal_dim = 2) || throw(DimensionMismatch(data, grid))
-        return new{eltype(data), ndims(data), typeof(data), typeof(grid)}(data, grid)
+        return new{eltype(data), ndims(data), typeof(data), typeof(grid), typeof(dims)}(data, grid, dims)
     end
 end
 

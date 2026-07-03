@@ -30,6 +30,13 @@ using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.KernelLaunching
 import SpeedyWeatherInternals: Utils
 
+# To be moved to SpeedyWeatherInternals.ArrayDimensions
+include("dimensions.jl")
+import .ArrayDimensions: ArrayDimensions, AbstractArrayDimensions,
+    hastime, hasvertical,
+    default_field_dimensions, default_column_field_dimensions
+export ArrayDimensions
+
 # ABSTRACT GRIDS
 export AbstractGrid,
     AbstractFullGrid,

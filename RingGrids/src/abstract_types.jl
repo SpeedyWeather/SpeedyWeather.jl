@@ -33,13 +33,13 @@ Fields can be full or reduced, 2D, 3D, or 4D, depending on the grid and the numb
 Fields are used to store data on the grid, e.g. temperature, pressure, or any other variable.
 Every `Field` has `data` the grid-free array of the data and `grid` which contains information about the grid
 the field is defined on."""
-abstract type AbstractField{T, N, ArrayType, Grid} <: AbstractArray{T, N} end
+abstract type AbstractField{T, N, ArrayType, Grid, Dims} <: AbstractArray{T, N} end
 
 """Abstract supertype for all fields on full grids, i.e. grids with a constant number of longitude points across latitude rings."""
-const AbstractFullField = AbstractField{T, N, ArrayType, Grid} where {T, N, ArrayType, Grid <: AbstractFullGrid}
+const AbstractFullField = AbstractField{T, N, ArrayType, Grid, Dims} where {T, N, ArrayType, Grid <: AbstractFullGrid, Dims}
 
 """Abstract supertype for all fields on reduced grids, i.e. grids with a reduced number of longitude points towards the poles."""
-const AbstractReducedField = AbstractField{T, N, ArrayType, Grid} where {T, N, ArrayType, Grid <: AbstractReducedGrid}
+const AbstractReducedField = AbstractField{T, N, ArrayType, Grid, Dims} where {T, N, ArrayType, Grid <: AbstractReducedGrid, Dims}
 
 """Abstract supertype for all 2D fields, i.e. fields with the horizontal dimensions only. Note that this is a `<:AbstractVector`
 as the horizontal dimensions are unravelled into a vector for all grids to be conistent with the reduced grids that cannot be
