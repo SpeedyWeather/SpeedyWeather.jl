@@ -305,6 +305,23 @@ L = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 L_gpu = adapt(CuArray, L)
 ```
 
+## Array dimensions
+
+Like `Field` (see [Array dimensions](@ref) in RingGrids), a `LowerTriangularArray` carries a
+`dims::AbstractArrayDimensions` field that records what the dimensions beyond the spherical
+harmonics (`l`, `m`) represent. The only difference is the name of the 2D (horizontal) dimension:
+`LM` instead of `XY`, since a `LowerTriangularArray` stores spherical harmonic coefficients
+rather than grid-point values. Correspondingly `LMZ`, `LMT`, and `LMZT` add a vertical and/or
+time dimension, exactly as `XYZ`, `XYT`, `XYZT` do for `Field`. `LM` is the default if no `dims`
+is given, e.g. for the `L`, `L2` created above. Everything else -- `ArrayDimensions.hasvertical`,
+`ArrayDimensions.hastime`, preservation through `similar`/`zero`/views/indexing -- works the
+same way as described for `Field`.
+
+```@repl LowerTriangularArrays
+L3 = zeros(LowerTriangularArray{Float32}, 5, 5, LowerTriangularArrays.ArrayDimensions.LMZ(), 3)
+LowerTriangularArrays.ArrayDimensions.hasvertical(L3), LowerTriangularArrays.ArrayDimensions.hastime(L3)
+```
+
 ## The `Spectrum` type
 
 Internally, a `LowerTriangularArray` is represented by an array that holds all non-zero elements of the matrices and a `Spectrum` type that holds all spectral discretization information and the architecture the array is on. The `Spectrum` can also be used to create new `LowerTriangularArray`s with the same spectral discretization:
