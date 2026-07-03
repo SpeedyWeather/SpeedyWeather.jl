@@ -211,9 +211,9 @@ end
 $(TYPEDSIGNATURES)
 calculates the geopotential in the ShallowWaterModel as g*η,
 i.e. gravity times the interface displacement (field `pres`)"""
-function geopotential!(vars::Variables, planet::AbstractPlanet)
+function geopotential!(vars::Variables, model::ShallowWater)
     η = vars.grid.η                 # has a singleton step dimension for 2D models
     Φ = vars.dynamics.geopotential  # has in 2D a singleton vertical dimension
-    Φ .= planet.gravity .* η
+    Φ .= model.planet.gravity .* η
     return Φ
 end

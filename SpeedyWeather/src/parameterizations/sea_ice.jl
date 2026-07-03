@@ -51,7 +51,7 @@ function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::P
     haskey(vars.prognostic.ocean, :sea_surface_temperature) || return nothing
     sst = vars.prognostic.ocean.sea_surface_temperature
 
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping
     (; land_fraction) = model.land_sea_mask
 
     m = sea_ice_model.melt_rate             # melt rate [m²/m²/s/K]
