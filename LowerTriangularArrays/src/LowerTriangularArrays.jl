@@ -15,6 +15,8 @@ import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture
 
 import SpeedyWeatherInternals.KernelLaunching: launch!, SpectralWorkOrder
 
+import SpeedyWeatherInternals.ArrayDimensions: ArrayDimensions, AbstractArrayDimensions, hastime, hasvertical
+
 # NUMERICS
 import LinearAlgebra: Transpose, tril!
 

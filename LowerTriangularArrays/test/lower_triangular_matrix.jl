@@ -982,3 +982,54 @@ end
         end
     end
 end
+
+@testset "ArrayDimensions" begin
+    using SpeedyWeatherInternals.ArrayDimensions: LM, LMZ, LMT, LMZT, hastime, hasvertical
+
+    s = Spectrum(trunc = 5)
+
+    # default dims is LM (2D spectral)
+    L2 = zeros(LowerTriangularMatrix{Float32}, s)
+    @test L2.dims isa LM
+    @test !hastime(L2)
+    @test !hasvertical(L2)
+
+    # explicit 3D spectral + vertical
+    L3z = zeros(LowerTriangularArray{Float32}, s, LMZ(), 3)
+    @test L3z.dims isa LMZ
+    @test !hastime(L3z)
+    @test hasvertical(L3z)
+
+    # explicit 3D spectral + time
+    L3t = zeros(LowerTriangularArray{Float32}, s, LMT(), 3)
+    @test L3t.dims isa LMT
+    @test hastime(L3t)
+    @test !hasvertical(L3t)
+
+    # explicit 4D spectral + vertical + time
+    L4 = zeros(LowerTriangularArray{Float32}, s, LMZT(), 3, 2)
+    @test L4.dims isa LMZT
+    @test hastime(L4)
+    @test hasvertical(L4)
+
+    # dims are preserved through similar, zero, and lta_view
+    L3z_sim = similar(L3z)
+    @test L3z_sim.dims isa LMZ
+
+    L3z_zero = zero(L3z)
+    @test L3z_zero.dims isa LMZ
+
+    L3z_view = lta_view(L3z, :, 1)
+    @test L3z_view.dims isa LM
+
+    L3z_range_view = lta_view(L3z, :, 1:2)
+    @test L3z_range_view.dims isa LMZ
+
+    # getindex with integer drops dims; range preserves
+    @test L3z[:, 1].dims isa LM
+    @test L3z[:, 1:2].dims isa LMZ
+
+    # 4D: two explicit non-horizontal indices
+    @test L4[:, 1:3, 1].dims isa LMZ   # drop time, keep vertical range
+    @test L4[:, 1, 1].dims isa LM      # drop both vertical and time
+end
