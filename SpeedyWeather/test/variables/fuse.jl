@@ -2,7 +2,8 @@ using SpeedyWeather
 using SpeedyWeather: AbstractVariable, GridVariable, TendencyVariable, ScratchVariable,
     DynamicsVariable, PrognosticVariable,
     Grid2D, Grid3D, Grid4D, Spectral2D, Spectral3D, Spectral4D,
-    allocate_fused, build_fuse_parents, fuse_family, fused_slots
+    allocate_fused, build_fuse_parents, fuse_family, fused_slots,
+    FusedParent, _assert_fuse_alignment
 
 # Helpers used by all testsets — build a model and unwrap a few useful pieces.
 function _testmodel(; trunc = 10, nlayers = 4)
@@ -213,6 +214,103 @@ end
     end
     @test err isa ErrorException
     @test occursin("u", err.msg)
+end
+
+# ---------------------------------------------------------------------------
+# D0: FusedParent wrapper + slot_map + _assert_fuse_alignment
+# ---------------------------------------------------------------------------
+
+@testset "FusedParent: build_fuse_parents wraps each parent and persists slot_map" begin
+    model = _testmodel(nlayers = 4)
+    vars = AbstractVariable[
+        TendencyVariable(:u, Grid3D(), namespace = :grid, fuse = :fp_g),
+        TendencyVariable(:v, Grid3D(), namespace = :grid, fuse = :fp_g),
+        ScratchVariable(:p, Grid2D(), namespace = :grid, fuse = :fp_g),
+    ]
+    parents = build_fuse_parents(vars, model)
+    entry = parents[(:grid, :fp_g)]
+
+    # The parent stored in the Dict is now wrapped in a FusedParent
+    @test entry.parent isa FusedParent
+
+    # slot_map keys match the declared member names in order
+    @test keys(entry.parent.slot_map) === (:u, :v, :p)
+
+    # 3D members use nlayers=4 slots each; the Grid2D member uses 1.
+    @test entry.parent.slot_map.u == 1:4
+    @test entry.parent.slot_map.v == 5:8
+    @test entry.parent.slot_map.p == 9:9
+
+    # The wrapped buffer is the actual parent Field/LTA
+    @test entry.parent.parent isa SpeedyWeather.AbstractField   # grid family
+    @test size(entry.parent.parent.data, 2) == 9                # 4 + 4 + 1
+end
+
+@testset "FusedParent: forwarding accessors (parent, size, architecture, is_view_entry)" begin
+    model = _testmodel(nlayers = 4)
+    vars = AbstractVariable[
+        TendencyVariable(:u, Grid3D(), namespace = :grid, fuse = :fp_fw),
+        TendencyVariable(:v, Grid3D(), namespace = :grid, fuse = :fp_fw),
+    ]
+    parents = build_fuse_parents(vars, model)
+    fp = parents[(:grid, :fp_fw)].parent
+
+    # Base.parent returns the wrapped buffer
+    @test parent(fp) === fp.parent
+
+    # size / eltype forward correctly
+    @test size(fp) == size(fp.parent)
+    @test eltype(fp) == eltype(fp.parent)
+
+    # architecture forwards correctly
+    @test SpeedyWeather.architecture(fp) === SpeedyWeather.architecture(fp.parent)
+
+    # A FusedParent is a backing buffer, not a view
+    @test SpeedyWeather.is_view_entry(fp) === false
+end
+
+@testset "_assert_fuse_alignment: matching member order accepted, mismatch rejected" begin
+    model = _testmodel(nlayers = 4)
+    # Two fuse groups with the same member names in the same order — should pass.
+    a_vars = AbstractVariable[
+        TendencyVariable(:u, Grid3D(), namespace = :a, fuse = :a_grp),
+        TendencyVariable(:v, Grid3D(), namespace = :a, fuse = :a_grp),
+    ]
+    b_vars = AbstractVariable[
+        GridVariable(:u, Grid3D(), namespace = :b, fuse = :b_grp),
+        GridVariable(:v, Grid3D(), namespace = :b, fuse = :b_grp),
+    ]
+    fp_a = build_fuse_parents(a_vars, model)[(:a, :a_grp)].parent
+    fp_b = build_fuse_parents(b_vars, model)[(:b, :b_grp)].parent
+    @test _assert_fuse_alignment(fp_a, fp_b) === nothing
+
+    # Order swapped — same names, different slot ranges → should error.
+    c_vars = AbstractVariable[
+        GridVariable(:v, Grid3D(), namespace = :c, fuse = :c_grp),
+        GridVariable(:u, Grid3D(), namespace = :c, fuse = :c_grp),
+    ]
+    fp_c = build_fuse_parents(c_vars, model)[(:c, :c_grp)].parent
+    @test_throws ErrorException _assert_fuse_alignment(fp_a, fp_c)
+
+    # Different member names → should error.
+    d_vars = AbstractVariable[
+        GridVariable(:u, Grid3D(), namespace = :d, fuse = :d_grp),
+        GridVariable(:w, Grid3D(), namespace = :d, fuse = :d_grp),
+    ]
+    fp_d = build_fuse_parents(d_vars, model)[(:d, :d_grp)].parent
+    @test_throws ErrorException _assert_fuse_alignment(fp_a, fp_d)
+end
+
+@testset "FusedParent: vars.fused.<sym> is the FusedParent (after model construction)" begin
+    model = _testmodel(nlayers = 4)
+    vars = AbstractVariable[
+        TendencyVariable(:u, Grid3D(), namespace = :grid, fuse = :probe),
+    ]
+    parents = build_fuse_parents(vars, model)
+    fused_nt = SpeedyWeather.build_fused_namespace(parents)
+    @test haskey(fused_nt, :probe)
+    @test fused_nt.probe isa FusedParent
+    @test fused_nt.probe.slot_map.u == 1:4
 end
 
 # Activate these test once we actually use fused variables in the model
