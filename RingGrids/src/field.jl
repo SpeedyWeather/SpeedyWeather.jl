@@ -10,7 +10,7 @@ struct Field{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid, Dims <: Abs
     dims::Dims
 
     # Inner constructor to check for matching grid and data
-    function Field(data, grid, dims = default_field_dimensions(data))
+    function Field(data, grid, dims = ArrayDimensions.XY())
         data_matches_grid(data, grid; horizontal_dim = 1) || throw(DimensionMismatch(data, grid))
         data_matches_dims(data, dims) || throw(DimensionMismatch(data, dims))
         return new{eltype(data), ndims(data), typeof(data), typeof(grid), typeof(dims)}(data, grid, dims)
@@ -24,6 +24,7 @@ const Field4D = Field{T, 3} where {T}
 
 # default constructors
 Field(grid::AbstractGrid, k...) = zeros(grid, k...)
+Field(::Type{T}, grid::AbstractGrid, k...) where {T} = zeros(T, grid, k...)
 Field(grid::AbstractGrid, dims::AbstractArrayDimensions, k...) = zeros(grid, dims, k...)
 Field(::Type{T}, grid::AbstractGrid, dims::AbstractArrayDimensions, k...) where {T} = zeros(T, grid, dims, k...)
 (::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid, args...) where {T} = Field(T.(data), grid, args...)
@@ -31,6 +32,7 @@ Field(::Type{T}, grid::AbstractGrid, dims::AbstractArrayDimensions, k...) where 
 # TYPES
 Architectures.nonparametric_type(::Type{<:Field}) = Field
 grid_type(field::AbstractField) = grid_type(typeof(field))
+grid_type(::Type{Field{T, N, A, G, D}}) where {T, N, A, G, D} = G
 grid_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = G
 field_type(field::AbstractField) = typeof(field)
 field_type(::Type{F}) where {F <: AbstractField} = F
@@ -38,6 +40,7 @@ field_type(grid::AbstractGrid) = field_type(typeof(grid))
 field_type(::Type{G}) where {G <: AbstractGrid} = Field{T, N, A, G} where {T, N, A}
 full_grid_type(field::AbstractField) = full_grid_type(typeof(field.grid))
 full_grid_type(::Type{F}) where {F <: AbstractField} = full_grid_type(grid_type(F))
+Architectures.array_type(::Type{Field{T, N, A, G, D}}) where {T, N, A, G, D} = A
 Architectures.array_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = A
 Architectures.array_type(field::AbstractField) = array_type(typeof(field))
 Architectures.ismatching(arch::AbstractArchitecture, field::AbstractField) = ismatching(arch, field.data)
@@ -63,9 +66,7 @@ function Base.DimensionMismatch(f1::AbstractField, f2s::AbstractField...)
     return DimensionMismatch(chop(s, tail = 2))
 end
 
-function data_matches_dims(data::AbstractArray, dims::AbstractArrayDimensions)
-    return ndims(data) >= ndims(dims)
-end
+data_matches_dims(data::AbstractArray, dims::AbstractArrayDimensions) = ndims(data) >= ndims(dims)
 
 function Base.DimensionMismatch(data::AbstractArray, dims::AbstractArrayDimensions)
     return DimensionMismatch("Dimensionality of $(summary(data)) does not match $dims")
@@ -129,7 +130,7 @@ Base.@propagate_inbounds Base.setindex!(field::AbstractField, x, ijk...) = setin
 Base.fill!(field::AbstractField, x) = fill!(field.data, x)
 
 # make [:, k...] not escape the Field
-@inline Base.getindex(field::AbstractField, col::Colon, k...) = Field(field.data[col, k...], field.grid)
+@inline Base.getindex(field::AbstractField, col::Colon, k...) = Field(field.data[col, k...], field.grid, field.dims[col, k...])
 
 # ITERATORS
 """$(TYPEDSIGNATURES)
@@ -268,6 +269,13 @@ for f in (:zeros, :ones, :rand, :randn)
             return Field(data, grid)
         end
 
+        # zeros(Grid, nlat_half, dims, nlayers...)
+        function Base.$f(Grid::Type{<:AbstractGrid}, nlat_half::Integer, dims::AbstractArrayDimensions, k::Integer...; architecture = DEFAULT_ARCHITECTURE())
+            grid = Grid(nlat_half, architecture)
+            data = array_type(architecture)($f(DEFAULT_NF, get_npoints(grid), k...))
+            return Field(data, grid, dims)
+        end
+
         # zeros(NF, Grid, nlat_half, nlayers...)
         function Base.$f(
                 ::Type{T},
@@ -279,6 +287,20 @@ for f in (:zeros, :ones, :rand, :randn)
             grid = Grid(nlat_half, architecture)
             data = array_type(architecture)($f(T, get_npoints(grid), k...))
             return Field(data, grid)
+        end
+
+        # zeros(NF, Grid, nlat_half, dims, nlayers...)
+        function Base.$f(
+                ::Type{T},
+                Grid::Type{<:AbstractGrid},
+                nlat_half::Integer,
+                dims::AbstractArrayDimensions,
+                k::Integer...;
+                architecture = DEFAULT_ARCHITECTURE(),
+            ) where {T}
+            grid = Grid(nlat_half, architecture)
+            data = array_type(architecture)($f(T, get_npoints(grid), k...))
+            return Field(data, grid, dims)
         end
 
         function Base.$f(
@@ -296,6 +318,19 @@ for f in (:zeros, :ones, :rand, :randn)
         function Base.$f(
                 ::Type{F},
                 nlat_half::Integer,
+                dims::AbstractArrayDimensions,
+                k::Integer...;
+                architecture = DEFAULT_ARCHITECTURE(),
+            ) where {F <: AbstractField}
+            Grid = grid_type(F)
+            grid = nonparametric_type(Grid)(nlat_half, architecture)
+            data = array_type(architecture)($f(get_npoints(grid), k...))
+            return Field(data, grid, dims)
+        end
+
+        function Base.$f(
+                ::Type{F},
+                nlat_half::Integer,
                 k::Integer...;
                 architecture = DEFAULT_ARCHITECTURE(),
             ) where {F <: AbstractField{T}} where {T}
@@ -307,11 +342,34 @@ for f in (:zeros, :ones, :rand, :randn)
 
         function Base.$f(
                 ::Type{F},
+                nlat_half::Integer,
+                dims::AbstractArrayDimensions,
+                k::Integer...;
+                architecture = DEFAULT_ARCHITECTURE(),
+            ) where {F <: AbstractField{T}} where {T}
+            Grid = grid_type(F)
+            grid = nonparametric_type(Grid)(nlat_half, architecture)
+            data = array_type(architecture)($f(T, get_npoints(grid), k...))
+            return Field(data, grid, dims)
+        end
+
+        function Base.$f(
+                ::Type{F},
                 grid::AbstractGrid,
                 k::Integer...,
             ) where {F <: AbstractField{T}} where {T}
             data = array_type(F)($f(T, get_npoints(grid), k...))
             return Field(data, grid)
+        end
+
+        function Base.$f(
+                ::Type{F},
+                grid::AbstractGrid,
+                dims::AbstractArrayDimensions,
+                k::Integer...,
+            ) where {F <: AbstractField{T}} where {T}
+            data = array_type(F)($f(T, get_npoints(grid), k...))
+            return Field(data, grid, dims)
         end
     end
 end
@@ -326,7 +384,7 @@ Base.similar(field::F) where {F <: AbstractField} = F(similar(field.data), field
 Base.similar(field::F, ::Type{T}) where {F <: AbstractField, T} =
     nonparametric_type(F)(similar(field.data, T), field.grid, field.dims)
 
-# data with same type T but new size (=new grid)
+# data with same type T but new size (=new grid), preserve dims
 function Base.similar(
         field::AbstractField,
         nlat_half::Integer,
@@ -335,10 +393,10 @@ function Base.similar(
     # use same architecture though
     new_grid = typeof(field.grid)(nlat_half, field.grid.architecture)
     similar_data = similar(field.data, get_npoints(new_grid), k...)
-    return Field(similar_data, new_grid)
+    return Field(similar_data, new_grid, field.dims)
 end
 
-# data with new type T and new size
+# data with new type T and new size, preserve dims
 function Base.similar(
         field::AbstractField,
         ::Type{Tnew},
@@ -348,7 +406,7 @@ function Base.similar(
     # use same architecture though
     new_grid = typeof(field.grid)(nlat_half, field.grid.architecture)
     similar_data = similar(field.data, Tnew, get_npoints(new_grid), k...)
-    return Field(similar_data, new_grid)
+    return Field(similar_data, new_grid, field.dims)
 end
 
 # general version with ArrayType{T, N}(undef, ...) generator
@@ -364,6 +422,17 @@ function (::Type{F})(
     return Field(data, grid)
 end
 
+function (::Type{F})(
+        ::UndefInitializer,
+        nlat_half::Integer,
+        dims::AbstractArrayDimensions,
+        k::Integer...,
+    ) where {F <: AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid <: AbstractGrid{Architecture}} where {Architecture}
+    grid = nonparametric_type(Grid)(nlat_half, Architecture())
+    data = nonparametric_type(ArrayType){T}(undef, get_npoints(grid), k...)
+    return Field(data, grid, dims)
+end
+
 # in case Architecture is not provided use DEFAULT_ARCHITECTURE
 function (::Type{F})(
         ::UndefInitializer,
@@ -373,6 +442,17 @@ function (::Type{F})(
     grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
     data = nonparametric_type(ArrayType){T}(undef, get_npoints(grid), k...)
     return Field(data, grid)
+end
+
+function (::Type{F})(
+        ::UndefInitializer,
+        nlat_half::Integer,
+        dims::AbstractArrayDimensions,
+        k::Integer...,
+    ) where {F <: AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid <: AbstractGrid}
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = nonparametric_type(ArrayType){T}(undef, get_npoints(grid), k...)
+    return Field(data, grid, dims)
 end
 
 # in case only grid is provided (e.g. FullGaussianField) use Float64, Array, DEFAULT_ARCHITECTURE
@@ -387,6 +467,18 @@ function (::Type{F})(
     return Field(data, grid)
 end
 
+function (::Type{F})(
+        ::UndefInitializer,
+        nlat_half::Integer,
+        dims::AbstractArrayDimensions,
+        k::Integer...,
+    ) where {F <: AbstractField}
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = Array{DEFAULT_NF}(undef, get_npoints(grid), k...)
+    return Field(data, grid, dims)
+end
+
 # in case only number format is provided use Array and DEFAULT_ARCHITECTURE
 function (::Type{F})(
         ::UndefInitializer,
@@ -397,6 +489,18 @@ function (::Type{F})(
     grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
     data = Array{T}(undef, get_npoints(grid), k...)
     return Field(data, grid)
+end
+
+function (::Type{F})(
+        ::UndefInitializer,
+        nlat_half::Integer,
+        dims::AbstractArrayDimensions,
+        k::Integer...,
+    ) where {F <: AbstractField{T}} where {T}
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = Array{T}(undef, get_npoints(grid), k...)
+    return Field(data, grid, dims)
 end
 
 #  same as above but with N (ignored though as obtained from integer arguments)
@@ -411,6 +515,18 @@ function (::Type{F})(
     return Field(data, grid)
 end
 
+function (::Type{F})(
+        ::UndefInitializer,
+        nlat_half::Integer,
+        dims::AbstractArrayDimensions,
+        k::Integer...,
+    ) where {F <: AbstractField{T, N}} where {T, N}
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = Array{T}(undef, get_npoints(grid), k...)
+    return Field(data, grid, dims)
+end
+
 # in case ArrayType is provided use that!
 function (::Type{F})(
         ::UndefInitializer,
@@ -423,11 +539,23 @@ function (::Type{F})(
     return Field(data, grid)
 end
 
+function (::Type{F})(
+        ::UndefInitializer,
+        nlat_half::Integer,
+        dims::AbstractArrayDimensions,
+        k::Integer...,
+    ) where {F <: AbstractField{T, N, ArrayType}} where {T, N, ArrayType}
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = nonparametric_type(ArrayType){T}(undef, get_npoints(grid), k...)
+    return Field(data, grid, dims)
+end
+
 function Base.convert(
         ::Type{F},
         field::AbstractField,
     ) where {F <: AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid}
-    return F(field.data, field.grid)
+    return F(field.data, field.grid, field.dims)
 end
 
 # to allow one_field .= another_field; return the destination field (copyto! convention),
@@ -479,13 +607,13 @@ end
 # view(array, :) unravels like array[:] does, hence "::Colon, i, args..." used to enforce one argument after :
 # exception is view(vector, :) which preserves the vector structure, equivalent here is the Field2D
 # TODO extend Base.view?
-field_view(field::AbstractField, c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid, field.dims)
+field_view(field::AbstractField, c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid, field.dims[c, i, args...])
 field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid, field.dims)
 field_view(field::AbstractField, args...) = view(field, args...)   # fallback to normal view
 
 # needed for Enzyme 
 Base.unaliascopy(A::Field) =
-       Field(Base.unaliascopy(A.data), A.grid)
+       Field(Base.unaliascopy(A.data), A.grid, A.dims)
 
 # BROADCASTING
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
