@@ -1,6 +1,6 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-version = "0.1.5+DEV"
+version = "0.2.0-DEV"
 authors = ["SpeedyTransforms contributors"]
 
 [deps]

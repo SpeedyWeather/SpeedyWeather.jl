@@ -756,6 +756,15 @@ function BroadcastStyle(
     return LowerTriangularGPUStyle{N}()
 end
 
+# Views into GPU arrays (e.g. FusedParent slot views) must broadcast on the GPU too;
+# without this, dispatch falls back to LowerTriangularStyle and the broadcast runs
+# scalar `getindex` on the device, triggering GPUArrays' scalar-indexing error.
+function BroadcastStyle(
+        ::Type{LowerTriangularArray{T, N, ArrayType, S}},
+    ) where {T, N, A <: GPUArrays.AbstractGPUArray, ArrayType <: SubArray{T, N, A}, S}
+    return LowerTriangularGPUStyle{N}()
+end
+
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 LowerTriangularStyle{N}(::Val{M}) where {N, M} = LowerTriangularStyle{N}()
 LowerTriangularGPUStyle{N}(::Val{M}) where {N, M} = LowerTriangularGPUStyle{N}()

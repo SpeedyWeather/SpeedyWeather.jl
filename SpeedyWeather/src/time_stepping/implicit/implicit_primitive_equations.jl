@@ -255,7 +255,8 @@ function implicit_correction!(
     temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, implicit)
     pres_tend = get_tendency_step(vars.tendencies.pressure, time_stepping, implicit)
     div_tend = get_tendency_step(vars.tendencies.divergence, time_stepping, implicit)
-    div_old, div_new = get_steps(vars.prognostic.divergence)
+    div_old = get_step(vars.prognostic.divergence, 1)  # no tuple (get_steps) here: a tuple of step
+    div_new = get_step(vars.prognostic.divergence, 2)  # views breaks Enzyme on Julia >= 1.11
     G = vars.scratch.a                  # reuse work arrays, used for combined tendency G
     geopotential = vars.scratch.b       # used for geopotential
     geopotential .= 0
