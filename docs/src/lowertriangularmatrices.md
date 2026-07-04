@@ -217,7 +217,7 @@ L' * L
 ```
 
 Summation with `sum` follows the flat, single index logic
-```@repl
+```@repl LowerTriangularArrays
 L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 sum(L, dims=2)
 ```
@@ -305,7 +305,7 @@ L = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 L_gpu = adapt(CuArray, L)
 ```
 
-## Array dimensions
+## Array dimensions for `LowerTriangularArray`
 
 Like `Field` (see [Array dimensions](@ref) in RingGrids), a `LowerTriangularArray` carries a
 `dims::AbstractArrayDimensions` field that records what the dimensions beyond the spherical
@@ -318,8 +318,8 @@ is given, e.g. for the `L`, `L2` created above. Everything else -- `ArrayDimensi
 same way as described for `Field`.
 
 ```@repl LowerTriangularArrays
-L3 = zeros(LowerTriangularArray{Float32}, 5, 5, LowerTriangularArrays.ArrayDimensions.LMZ(), 3)
-LowerTriangularArrays.ArrayDimensions.hasvertical(L3), LowerTriangularArrays.ArrayDimensions.hastime(L3)
+L3 = zeros(LowerTriangularArray{Float32}, 5, 5, ArrayDimensions.LMZ(), 3)
+ArrayDimensions.hasvertical(L3), ArrayDimensions.hastime(L3)
 ```
 
 ## The `Spectrum` type
@@ -338,7 +338,10 @@ L = rand(Float32, spectrum)
 L = rand(ComplexF32, spectrum, 5)
 ```
 
-In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type, and all `LowerTriangularArray`s are created with the same `Spectrum`. Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s with the same spectral discretization as follows:
+In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type,
+and all `LowerTriangularArray`s are created with the same `Spectrum`.
+Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s
+with the same spectral discretization as follows:
 
 ```@repl LowerTriangularArrays
 SG = SpectralGrid(trunc=31)
