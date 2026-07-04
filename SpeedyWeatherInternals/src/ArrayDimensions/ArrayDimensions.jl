@@ -81,4 +81,10 @@ struct LMZT <: FourDimensions end
 
 Base.dims2string(dims::AbstractArrayDimensions) = string(nameof(typeof(dims)))
 
+# move here as otherwise Method overwritten if
+# defined in both LowerTriangularArrays and RingGrids
+function Base.DimensionMismatch(data::AbstractArray, dims::AbstractArrayDimensions)
+    return DimensionMismatch("Dimensionality of $(summary(data)) does not match $dims")
+end
+
 end

@@ -68,10 +68,6 @@ end
 
 data_matches_dims(data::AbstractArray, dims::AbstractArrayDimensions) = ndims(data) >= ndims(dims)
 
-function Base.DimensionMismatch(data::AbstractArray, dims::AbstractArrayDimensions)
-    return DimensionMismatch("Dimensionality of $(summary(data)) does not match $dims")
-end
-
 ArrayDimensions.hastime(::Field{T, N, A, G, D}) where {T, N, A, G, D} = hastime(D)
 ArrayDimensions.hasvertical(::Field{T, N, A, G, D}) where {T, N, A, G, D} = hasvertical(D)
 additional_dimensions(field::Field) = ndims(field) > ndims(field.dims)

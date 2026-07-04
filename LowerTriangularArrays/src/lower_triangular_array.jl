@@ -31,10 +31,6 @@ end
 
 data_matches_dims(data::AbstractArray, dims::AbstractArrayDimensions) = ndims(data) >= ndims(dims)
 
-function Base.DimensionMismatch(data::AbstractArray, dims::AbstractArrayDimensions)
-    return DimensionMismatch("Dimensionality of $(summary(data)) does not match $dims")
-end
-
 """2D `LowerTriangularArray` of type `T`"""
 const LowerTriangularMatrix = LowerTriangularArray{T, 1} where {T}
 
