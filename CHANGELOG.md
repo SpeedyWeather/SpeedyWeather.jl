@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Improved compatability with Enzyme with Julia 1.12: `get_step` instead of `get_steps` used more commonly and default `maxtypeoffset!` increased [#1143](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1143)
 - Ensemble output dimension for `ZarrOutput`: multiple members can write into one shared store via `ensemble_index`/`ensemble_size` [#1149](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1149)
 - Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced first in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
 - Update the extended differentiability tests to new time stepping syntax [#1148](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1148)
