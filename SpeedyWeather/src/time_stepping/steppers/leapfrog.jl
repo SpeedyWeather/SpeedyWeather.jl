@@ -218,7 +218,8 @@ function update_prognostic!(
     Δt = time_step(time_stepping, clock)
     Δt /= oftype(Δt, scale)                         # scale time step on the fly *1/radius for atmospheric variables
     lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index
-    var_old, var_new = get_steps(var)
+    var_old = get_step(var, 1)                      # no tuple (get_steps) here: a tuple of step views
+    var_new = get_step(var, 2)                      # breaks Enzyme's type analysis on Julia >= 1.11
     var_lf = get_step(var, lf)                      # view on either t or t+dt to dis/enable Williams filter
     var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
 
