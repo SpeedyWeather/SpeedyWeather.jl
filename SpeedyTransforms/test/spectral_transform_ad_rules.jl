@@ -63,6 +63,67 @@ end
             end
         end
     end
+    @testset "wrapped_view Enzyme rules" begin
+        # alias rules in SpeedyTransformsEnzymeExt: the shadow of a wrapped_view is built
+        # explicitly as the same view of the parent's shadow (fixes the reverse pass of
+        # chunked/fused transforms where Enzyme mis-constructs that shadow)
+        trunc = 5
+        spectrum = Spectrum(trunc, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[1]))
+
+        # mutating consumers routing data through wrapped_view on both wrapper types;
+        # gradients must match finite differences
+        function field_chunk_double!(out, in)
+            a = SpeedyTransforms.wrapped_view(in, :, 3:4)
+            b = SpeedyTransforms.wrapped_view(out, :, 1:2)
+            b.data .= 2 .* a.data
+            return nothing
+        end
+        field_in = rand(Float32, grid, 4)
+        field_out = zeros(Float32, grid, 4)
+        test_reverse(
+            field_chunk_double!, Const, (field_out, Duplicated), (field_in, Duplicated);
+            fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+        )
+
+        function lta_chunk_double!(out, in)
+            a = SpeedyTransforms.wrapped_view(in, :, 3:4)
+            b = SpeedyTransforms.wrapped_view(out, :, 1:2)
+            b.data .= 2 .* a.data
+            return nothing
+        end
+        lta_in = rand(Float32, spectrum, 4)
+        lta_out = zeros(Float32, spectrum, 4)
+        test_reverse(
+            lta_chunk_double!, Const, (lta_out, Duplicated), (lta_in, Duplicated);
+            fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+        )
+
+        # integration: the CHUNKED transform (unplanned K routes through wrapped_view chunks)
+        # must produce the same gradient as the batched transform (no chunking)
+        NL = 4
+        S_chunked = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1])
+        S_batched = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1, NL])
+        @test SpeedyTransforms._needs_chunking(NL, S_chunked)
+
+        dcoeffs = map((S_chunked, S_batched)) do S
+            coeffs = rand(ComplexF32, spectrum, NL)
+            field = zeros(Float32, grid, NL)
+            scratch = deepcopy(S.scratch_memory)
+            dfield = zero(field)
+            dfield .= 1
+            dc = make_zero(coeffs)
+            autodiff(
+                set_runtime_activity(Reverse), transform!, Const,
+                Duplicated(field, dfield), Duplicated(coeffs, dc),
+                Duplicated(scratch, make_zero(scratch)), Const(S),
+            )
+            dc
+        end
+        @test all(isfinite, dcoeffs[1].data)
+        @test any(!iszero, dcoeffs[1].data)
+        @test isapprox(dcoeffs[1].data, dcoeffs[2].data, rtol = 1.0e-4)
+    end
     @testset "Complete Transform ChainRules" begin
         # WIP
     end

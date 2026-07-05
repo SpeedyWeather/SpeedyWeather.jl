@@ -10,7 +10,7 @@ using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-import SpeedyTransforms: _fourier!
+import SpeedyTransforms: _fourier!, wrapped_view
 
 # Rules for SpeedyTransforms
 
@@ -125,6 +125,47 @@ function reverse(
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
+end
+
+### Alias rules for wrapped_view (chunked transforms)
+#
+# `_transform_chunked!` passes `wrapped_view(field, :, chunk)` — a Field/LowerTriangularArray
+# wrapping a SubArray of an (already view-backed) fused parent — into the custom `_fourier!`
+# rules above. Enzyme mis-constructs the shadow of that nested wrapper (degenerate (0, 1)
+# Field shadow), which reads out of bounds in the `_fourier!` reverse (BoundsError on
+# Julia >= 1.11, GC corruption on 1.10). These rules build the shadow explicitly as the SAME
+# view of the parent's shadow; since the shadow view aliases the parent shadow, all adjoint
+# accumulation lands in the parent automatically and the reverse pass is a no-op.
+function augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(wrapped_view)}, ::Type{<:Annotation},
+        x::Duplicated, args::Const...,
+    )
+    primal = needs_primal(config) ? func.val(x.val, map(a -> a.val, args)...) : nothing
+    shadow = needs_shadow(config) ? func.val(x.dval, map(a -> a.val, args)...) : nothing
+    return AugmentedReturn(primal, shadow, nothing)
+end
+
+function reverse(
+        ::EnzymeRules.RevConfigWidth{1}, ::Const{typeof(wrapped_view)}, ::Type{<:Annotation}, tape,
+        x::Duplicated, args::Const...,
+    )
+    return (nothing, ntuple(_ -> nothing, length(args))...)
+end
+
+# Const passthrough (inactive input -> inactive view, no shadow)
+function augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(wrapped_view)}, ::Type{<:Annotation},
+        x::Const, args::Const...,
+    )
+    primal = needs_primal(config) ? func.val(x.val, map(a -> a.val, args)...) : nothing
+    return AugmentedReturn(primal, nothing, nothing)
+end
+
+function reverse(
+        ::EnzymeRules.RevConfigWidth{1}, ::Const{typeof(wrapped_view)}, ::Type{<:Annotation}, tape,
+        x::Const, args::Const...,
+    )
+    return (nothing, ntuple(_ -> nothing, length(args))...)
 end
 
 end
