@@ -450,9 +450,9 @@ end
 # view(array, :) unravels like array[:] does, hence "::Colon, i, args..." used to enforce one argument after :
 # exception is view(vector, :) which preserves the vector structure, equivalent here is the Field2D
 # TODO extend Base.view?
-field_view(field::AbstractField, c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid)
-field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid)
-field_view(field::AbstractField, args...) = view(field, args...)   # fallback to normal view
+Base.@propagate_inbounds field_view(field::AbstractField, c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid)
+Base.@propagate_inbounds field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid)
+Base.@propagate_inbounds field_view(field::AbstractField, args...) = view(field, args...)   # fallback to normal view
 
 # needed for Enzyme 
 Base.unaliascopy(A::Field) =

@@ -733,9 +733,9 @@ Base.unaliascopy(A::LowerTriangularArray) =
 # view(array, :) unravels like array[:] does hence "::Colon, i, args..." used to enforce one argument after :
 # exception is view(vector, :) which preserves the vector structure, equivalent here is the LowerTriangularMatrix
 # TODO extend Base.view?
-lta_view(L::LowerTriangularArray, c::Colon, i, args...) = LowerTriangularArray(view(L.data, c, i, args...), L.spectrum)
-lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data, c), L.spectrum)
-lta_view(L::LowerTriangularArray, args...) = view(L, args...)   # fallback to normal view
+Base.@propagate_inbounds lta_view(L::LowerTriangularArray, c::Colon, i, args...) = LowerTriangularArray(view(L.data, c, i, args...), L.spectrum)
+Base.@propagate_inbounds lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data, c), L.spectrum)
+Base.@propagate_inbounds lta_view(L::LowerTriangularArray, args...) = view(L, args...)   # fallback to normal view
 
 # Broadcast CPU/GPU
 import Base.Broadcast: BroadcastStyle, Broadcasted

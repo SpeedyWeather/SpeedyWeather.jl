@@ -127,45 +127,138 @@ function reverse(
     return (nothing, nothing, nothing, nothing)
 end
 
-### Alias rules for wrapped_view (chunked transforms)
+### Custom rules for the CHUNKED transforms (_chunked_spec2grid!/_chunked_grid2spec!)
 #
-# `_transform_chunked!` passes `wrapped_view(field, :, chunk)` — a Field/LowerTriangularArray
-# wrapping a SubArray of an (already view-backed) fused parent — into the custom `_fourier!`
-# rules above. Enzyme mis-constructs the shadow of that nested wrapper (degenerate (0, 1)
-# Field shadow), which reads out of bounds in the `_fourier!` reverse (BoundsError on
-# Julia >= 1.11, GC corruption on 1.10). These rules build the shadow explicitly as the SAME
-# view of the parent's shadow; since the shadow view aliases the parent shadow, all adjoint
-# accumulation lands in the parent automatically and the reverse pass is a no-op.
+# The chunk loop passes `wrapped_view(field, :, chunk)` — a Field/LowerTriangularArray wrapping
+# a SubArray — into `transform!`. Enzyme cannot be allowed to differentiate through that loop:
+#  (a) it mis-constructs the shadow of the nested view wrapper when the parent is itself
+#      view-backed (degenerate (0, 1) shadow → OOB in the `_fourier!` reverse; GC corruption
+#      on Julia 1.10), and
+#  (b) even for plain parents it reuses the LAST iteration's view shadows for ALL chunk
+#      reverses, silently zeroing every chunk's gradient except the last.
+# These rules replace the whole chunked transform: the forward pass runs the primal chunk loop
+# unchanged (allocation-free views); the reverse pass applies the analytic adjoint of the
+# (linear) spectral transform directly — no differentiation of the loop, no nested autodiff
+# (nested `autodiff`/`autodiff_deferred` inside a rule triggers Enzyme compilation reentrancy /
+# stack overflow). The batched (non-chunked) path is left to native Enzyme + the `_fourier!`
+# rules above, which is correct and cheap there; these rules only cover the chunked path.
+#
+# Adjoint derivation (transform is linear; see docs/src/spectral_transform.md and legendre.jl):
+#   synthesis (spec→grid) = inverse Legendre ∘ inverse FFT
+#   analysis  (grid→spec) = forward FFT ∘ forward Legendre (the latter carries the solid-angle
+#                           quadrature weight ΔΩ = sinθ Δθ Δϕ that the synthesis lacks).
+#   The FFT adjoint reuses `adjoint_scale` exactly as the `_fourier!` reverse rules do; the
+#   Legendre adjoint is the opposite-direction Legendre with the ΔΩ weight removed/added.
+# Both pullbacks are FD-validated (`_adjoint_check.jl`): rel err ~1e-6, batched and chunked.
+# The pullbacks chunk over layers (Kc ≤ largest planned batch ≤ S.nlayers) so the internal
+# `_fourier!`/`_legendre!` calls stay within the planned/serial FFT limits, matching the primal.
+
+import SpeedyTransforms:
+    _chunked_spec2grid!, _chunked_grid2spec!, _largest_planned_batch, _legendre!, ColumnScratchMemory
+
+# adjoint of spec→grid transform! w.r.t coeffs: field_bar → coeffs_bar (accumulates into coeffs_bar)
+function spec2grid_pullback!(coeffs_bar, field_bar, S; unscale_coslat::Bool = false)
+    NF = eltype(S)
+    (; nlat_half) = S.grid
+    K = size(field_bar, 2)
+    K_batched = _largest_planned_batch(K, S)
+    scale = adjoint_scale(S)
+    dOmega = reshape(view(S.solid_angles, 1:nlat_half), 1, 1, :)
+    clat = reshape(view(S.coslat⁻¹, 1:nlat_half), 1, 1, :)
+    c = 1
+    while c <= K
+        c_end = min(c + K_batched - 1, K)
+        chunk = c:c_end
+        Kc = c_end - c + 1
+        dg_n = zeros(Complex{NF}, S.nfreq_max, Kc, nlat_half)
+        dg_s = zeros(Complex{NF}, S.nfreq_max, Kc, nlat_half)
+        _fourier!(dg_n, dg_s, wrapped_view(field_bar, :, chunk), S)      # adjoint of inverse FFT: fwd FFT
+        dg_n .*= scale
+        dg_s .*= scale
+        if unscale_coslat                                               # adjoint of the coslat unscaling
+            dg_n .*= clat
+            dg_s .*= clat
+        end
+        dg_n ./= dOmega                                                 # cancel the ΔΩ the fwd Legendre applies
+        dg_s ./= dOmega
+        col = ColumnScratchMemory(zeros(Complex{NF}, Kc), zeros(Complex{NF}, Kc))
+        cbar = zeros(Complex{NF}, S.spectrum, Kc)
+        _legendre!(cbar, dg_n, dg_s, col, S)                            # adjoint of inverse Legendre: fwd Legendre
+        wrapped_view(coeffs_bar, :, chunk).data .+= cbar.data
+        c = c_end + 1
+    end
+    return coeffs_bar
+end
+
+# adjoint of grid→spec transform! w.r.t field: coeffs_bar → field_bar (accumulates into field_bar)
+function grid2spec_pullback!(field_bar, coeffs_bar, S)
+    NF = eltype(S)
+    (; nlat_half) = S.grid
+    K = size(coeffs_bar, 2)
+    K_batched = _largest_planned_batch(K, S)
+    scale = adjoint_scale(S)
+    dOmega = reshape(view(S.solid_angles, 1:nlat_half), 1, 1, :)
+    c = 1
+    while c <= K
+        c_end = min(c + K_batched - 1, K)
+        chunk = c:c_end
+        Kc = c_end - c + 1
+        df_n = zeros(Complex{NF}, S.nfreq_max, Kc, nlat_half)
+        df_s = zeros(Complex{NF}, S.nfreq_max, Kc, nlat_half)
+        col = ColumnScratchMemory(zeros(Complex{NF}, Kc), zeros(Complex{NF}, Kc))
+        _legendre!(df_n, df_s, wrapped_view(coeffs_bar, :, chunk), col, S)   # adjoint of fwd Legendre: inv Legendre
+        df_n .*= dOmega                                                 # re-apply the ΔΩ weight
+        df_s .*= dOmega
+        df_n ./= scale                                                  # adjoint of fwd FFT: inv FFT of df/scale
+        df_s ./= scale
+        fbar = zeros(NF, S.grid, Kc)
+        _fourier!(fbar, df_n, df_s, S)
+        wrapped_view(field_bar, :, chunk).data .+= fbar.data
+        c = c_end + 1
+    end
+    return field_bar
+end
+
 function augmented_primal(
-        config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(wrapped_view)}, ::Type{<:Annotation},
-        x::Duplicated, args::Const...,
+        config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_chunked_spec2grid!)}, ::Type{<:Annotation},
+        field::Duplicated, coeffs::Duplicated, scratch::Union{Const, Duplicated},
+        S::Union{Const, MixedDuplicated}, unscale_coslat::Const,
     )
-    primal = needs_primal(config) ? func.val(x.val, map(a -> a.val, args)...) : nothing
-    shadow = needs_shadow(config) ? func.val(x.dval, map(a -> a.val, args)...) : nothing
+    func.val(field.val, coeffs.val, scratch.val, S.val, unscale_coslat.val)
+    primal = needs_primal(config) ? field.val : nothing
+    shadow = needs_shadow(config) ? field.dval : nothing
     return AugmentedReturn(primal, shadow, nothing)
 end
 
 function reverse(
-        ::EnzymeRules.RevConfigWidth{1}, ::Const{typeof(wrapped_view)}, ::Type{<:Annotation}, tape,
-        x::Duplicated, args::Const...,
+        ::EnzymeRules.RevConfigWidth{1}, ::Const{typeof(_chunked_spec2grid!)}, ::Type{<:Annotation}, tape,
+        field::Duplicated, coeffs::Duplicated, scratch::Union{Const, Duplicated},
+        S::Union{Const, MixedDuplicated}, unscale_coslat::Const,
     )
-    return (nothing, ntuple(_ -> nothing, length(args))...)
+    spec2grid_pullback!(coeffs.dval, field.dval, S.val; unscale_coslat = unscale_coslat.val)
+    make_zero!(field.dval)      # the output cotangent has been propagated to coeffs
+    return (nothing, nothing, nothing, nothing, nothing)
 end
 
-# Const passthrough (inactive input -> inactive view, no shadow)
 function augmented_primal(
-        config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(wrapped_view)}, ::Type{<:Annotation},
-        x::Const, args::Const...,
+        config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_chunked_grid2spec!)}, ::Type{<:Annotation},
+        coeffs::Duplicated, field::Duplicated, scratch::Union{Const, Duplicated},
+        S::Union{Const, MixedDuplicated},
     )
-    primal = needs_primal(config) ? func.val(x.val, map(a -> a.val, args)...) : nothing
-    return AugmentedReturn(primal, nothing, nothing)
+    func.val(coeffs.val, field.val, scratch.val, S.val)
+    primal = needs_primal(config) ? coeffs.val : nothing
+    shadow = needs_shadow(config) ? coeffs.dval : nothing
+    return AugmentedReturn(primal, shadow, nothing)
 end
 
 function reverse(
-        ::EnzymeRules.RevConfigWidth{1}, ::Const{typeof(wrapped_view)}, ::Type{<:Annotation}, tape,
-        x::Const, args::Const...,
+        ::EnzymeRules.RevConfigWidth{1}, ::Const{typeof(_chunked_grid2spec!)}, ::Type{<:Annotation}, tape,
+        coeffs::Duplicated, field::Duplicated, scratch::Union{Const, Duplicated},
+        S::Union{Const, MixedDuplicated},
     )
-    return (nothing, ntuple(_ -> nothing, length(args))...)
+    grid2spec_pullback!(field.dval, coeffs.dval, S.val)
+    make_zero!(coeffs.dval)     # the output cotangent has been propagated to field
+    return (nothing, nothing, nothing, nothing)
 end
 
 end

@@ -391,10 +391,20 @@ end
 # without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
 # that path for the bulk of the layers and effectively restores the previous behavior before 
 # fusion/batching without performance penalties. 
+# kwarg-free positional cores: the Enzyme extension defines custom reverse rules for these
+# (the chunk loop must not be differentiated through — Enzyme mis-handles the per-iteration
+# view shadows; the rule replays the loop chunk-by-chunk with explicitly constructed shadows)
 function _transform_chunked!(                       # SPECTRAL TO GRID
         field::AbstractField, coeffs::LowerTriangularArray,
         scratch_memory::ScratchMemory, S::SpectralTransform;
         unscale_coslat::Bool = false,
+    )
+    return _chunked_spec2grid!(field, coeffs, scratch_memory, S, unscale_coslat)
+end
+
+function _chunked_spec2grid!(
+        field::AbstractField, coeffs::LowerTriangularArray,
+        scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
     )
     K = size(field, 2)
     K_batched = _largest_planned_batch(K, S)
@@ -411,6 +421,13 @@ function _transform_chunked!(                       # SPECTRAL TO GRID
 end
 
 function _transform_chunked!(                       # GRID TO SPECTRAL
+        coeffs::LowerTriangularArray, field::AbstractField,
+        scratch_memory::ScratchMemory, S::SpectralTransform,
+    )
+    return _chunked_grid2spec!(coeffs, field, scratch_memory, S)
+end
+
+function _chunked_grid2spec!(
         coeffs::LowerTriangularArray, field::AbstractField,
         scratch_memory::ScratchMemory, S::SpectralTransform,
     )
