@@ -172,7 +172,7 @@ import SpeedyTransforms:
 # Allocation-free apart from the FFT plan outputs (inherent to the primal too): the freq-space
 # intermediates reuse the passed `scratch` (.north/.south/.column, which the forward pass no longer
 # needs by the time the reverse runs), and the forward Legendre accumulates straight into
-# coeffs_bar (`reset=false`) instead of into a temporary spectral array.
+# coeffs_bar (`add=true`) instead of into a temporary spectral array.
 function spec2grid_pullback!(coeffs_bar, field_bar, scratch, S; unscale_coslat::Bool = false)
     (; nlat_half) = S.grid
     K = size(field_bar, 2)
@@ -196,8 +196,8 @@ function spec2grid_pullback!(coeffs_bar, field_bar, scratch, S; unscale_coslat::
         end
         dg_n ./= dOmega                                                 # cancel the ΔΩ the fwd Legendre applies
         dg_s ./= dOmega
-        # adjoint of inverse Legendre = fwd Legendre; accumulate onto the coeffs cotangent (reset=false)
-        _legendre!(wrapped_view(coeffs_bar, :, chunk), dg_n, dg_s, scratch.column, S; reset = false)
+        # adjoint of inverse Legendre = fwd Legendre; accumulate onto the coeffs cotangent (add=true)
+        _legendre!(wrapped_view(coeffs_bar, :, chunk), dg_n, dg_s, scratch.column, S; add = true)
         c = c_end + 1
     end
     return coeffs_bar
