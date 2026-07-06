@@ -198,7 +198,7 @@ where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively."""
 @inline function saturation_vapor_pressure(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
     (; e₀, T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
-    C, T = @trace ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))      # change coefficients above/below freezing
+    C, T = ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))      # change coefficients above/below freezing
     temp_celsius = temp_kelvin - T₀
     return e₀ * exp(C * temp_celsius / (temp_celsius + T))
 end
@@ -212,6 +212,6 @@ Gradient of the Tetens equation wrt to temperature, evaluated at `temp_kelvin`."
 @inline function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
     (; T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
     e = saturation_vapor_pressure(TetensCoefficients, temp_kelvin)  # saturation vapor pressure
-    C, T = @trace ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))      # change coefficients above/below freezing
+    C, T = ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))      # change coefficients above/below freezing
     return e * C * T / (temp_kelvin - T₀ - T)^2                     # chain rule: times derivative of inner function
 end
