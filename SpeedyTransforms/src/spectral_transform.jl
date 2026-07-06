@@ -391,20 +391,14 @@ end
 # without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
 # that path for the bulk of the layers and effectively restores the previous behavior before 
 # fusion/batching without performance penalties. 
-# kwarg-free positional cores: the Enzyme extension defines custom reverse rules for these
-# (the chunk loop must not be differentiated through — Enzyme mis-handles the per-iteration
-# view shadows; the rule replays the loop chunk-by-chunk with explicitly constructed shadows)
+# Chunked (sequential) transform for unplanned K on CPU. Called only from the positional
+# transform cores `_transform_grid!`/`_transform_spec!`, for which the Enzyme extension defines
+# analytic-adjoint reverse rules; this chunk loop is therefore only ever executed as primal
+# (never differentiated through — Enzyme mis-handles the per-iteration view shadows).
 function _transform_chunked!(                       # SPECTRAL TO GRID
         field::AbstractField, coeffs::LowerTriangularArray,
         scratch_memory::ScratchMemory, S::SpectralTransform;
         unscale_coslat::Bool = false,
-    )
-    return _chunked_spec2grid!(field, coeffs, scratch_memory, S, unscale_coslat)
-end
-
-function _chunked_spec2grid!(
-        field::AbstractField, coeffs::LowerTriangularArray,
-        scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
     )
     K = size(field, 2)
     K_batched = _largest_planned_batch(K, S)
@@ -421,13 +415,6 @@ function _chunked_spec2grid!(
 end
 
 function _transform_chunked!(                       # GRID TO SPECTRAL
-        coeffs::LowerTriangularArray, field::AbstractField,
-        scratch_memory::ScratchMemory, S::SpectralTransform,
-    )
-    return _chunked_grid2spec!(coeffs, field, scratch_memory, S)
-end
-
-function _chunked_grid2spec!(
         coeffs::LowerTriangularArray, field::AbstractField,
         scratch_memory::ScratchMemory, S::SpectralTransform,
     )
@@ -465,6 +452,19 @@ function transform!(                        # SPECTRAL TO GRID
         scratch_memory::ScratchMemory,      # explicit scratch memory to use
         S::SpectralTransform;               # precomputed transform
         unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
+    )
+    # thin forwarder to the positional core (see `_transform_grid!`)
+    return _transform_grid!(field, coeffs, scratch_memory, S, unscale_coslat)
+end
+
+# Positional core of the spectral-to-grid `transform!`. The Enzyme extension defines an
+# analytic-adjoint reverse rule for this function, so the whole transform (chunked or batched) is
+# a single AD boundary: Enzyme never differentiates the Legendre/Fourier internals. This is both
+# cheaper to compile and avoids the mutable-model type-analysis failure that native
+# differentiation of `_legendre!` triggers on Julia ≥ 1.11. See SpeedyTransformsEnzymeExt.
+function _transform_grid!(
+        field::AbstractField, coeffs::LowerTriangularArray,
+        scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
     )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
@@ -512,6 +512,16 @@ function transform!(                                    # GRID TO SPECTRAL
         field::AbstractField,                           # input: gridded values
         scratch_memory::ScratchMemory,                  # explicit scratch memory to use
         S::SpectralTransform,                           # precomputed spectral transform
+    )
+    # thin forwarder to the positional core (see `_transform_spec!`)
+    return _transform_spec!(coeffs, field, scratch_memory, S)
+end
+
+# Positional core of the grid-to-spectral `transform!`; analytic-adjoint AD boundary, see
+# `_transform_grid!` and SpeedyTransformsEnzymeExt.
+function _transform_spec!(
+        coeffs::LowerTriangularArray, field::AbstractField,
+        scratch_memory::ScratchMemory, S::SpectralTransform,
     )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))

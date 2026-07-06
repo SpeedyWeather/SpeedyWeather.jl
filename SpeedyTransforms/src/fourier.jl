@@ -11,12 +11,12 @@ function _fourier!(f_north, f_south, field::AbstractField, S::SpectralTransform)
     end
 end
 
-function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform)
+function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform; add::Bool = false)
     K = size(field, 2)
     if K > 1 && haskey(S.brfft_plans, K)
-        return _fourier_batched!(field, f_north, f_south, S)
+        return _fourier_batched!(field, f_north, f_south, S; add)
     else
-        return _fourier_serial!(field, f_north, f_south, S)
+        return _fourier_serial!(field, f_north, f_south, S; add)
     end
 end
 
@@ -61,14 +61,17 @@ function _apply_batched_fft!(
         j::Int,
         nlon::Int,
         ilons::UnitRange{Int};
-        not_equator::Bool = true
+        not_equator::Bool = true,
+        add::Bool = false,          # accumulate onto `field` instead of overwriting? (Enzyme adjoint rule)
     )
     nlayers = size(field, 2)        # number of vertical layers
     brfft_plan = S.brfft_plans[nlayers][j]  # plan pre-built for this K and this ring
     nfreq = nlon ÷ 2 + 1
 
     if not_equator  # skip FFT, redundant when north already did that latitude
-        view(field.data, ilons, :) .= brfft_plan * view_only_on_cpu(g_in, 1:nfreq, 1:nlayers, j)
+        dest = view(field.data, ilons, :)
+        rhs = brfft_plan * view_only_on_cpu(g_in, 1:nfreq, 1:nlayers, j)
+        add ? (dest .+= rhs) : (dest .= rhs)
     end
     return nothing
 end
@@ -104,13 +107,16 @@ function _apply_serial_fft!(
         k::Int,
         nfreq::Int,
         ilons::UnitRange{Int};
-        not_equator::Bool = true
+        not_equator::Bool = true,
+        add::Bool = false,          # accumulate onto `field` instead of overwriting? (Enzyme adjoint rule)
     )
     brfft_plan = S.brfft_plans[1][j]   # K=1 plan, FFT planned wrt nlon on ring
     k_grid = eachlayer(field)[k]       # Precomputed ring index (as a Cartesian index)
 
     if not_equator
-        view(field.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
+        dest = view(field.data, ilons, k_grid)
+        rhs = brfft_plan * view(g_in, 1:nfreq, k, j)
+        add ? (dest .+= rhs) : (dest .= rhs)
     end
     return nothing
 end
@@ -206,7 +212,8 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
         field::AbstractField,                   # gridded output
         g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed input
         g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
-        S::SpectralTransform                   # precomputed transform
+        S::SpectralTransform;                  # precomputed transform
+        add::Bool = false,                      # accumulate onto `field`? (Enzyme adjoint rule)
     )
     (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
@@ -227,11 +234,11 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
         ilons = rings[j_north]              # in-ring indices northern ring
 
         # northern latitude
-        _apply_batched_fft!(field, g_north, S, j, nlon, ilons)
+        _apply_batched_fft!(field, g_north, S, j, nlon, ilons; add = add)
 
         # southern latitude, don't call redundant 2nd FFT if ring is on equator
         ilons = rings[j_south]              # in-ring indices southern ring
-        _apply_batched_fft!(field, g_south, S, j, nlon, ilons; not_equator = not_equator)
+        _apply_batched_fft!(field, g_south, S, j, nlon, ilons; not_equator = not_equator, add = add)
 
     end
 end
@@ -244,7 +251,8 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
         field::AbstractField,                   # gridded output
         g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed input
         g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
-        S::SpectralTransform                   # precomputed transform
+        S::SpectralTransform;                  # precomputed transform
+        add::Bool = false,                      # accumulate onto `field`? (Enzyme adjoint rule)
     )
     (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
@@ -266,11 +274,11 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
 
             # Apply FFT in the northern latitudes
             ilons = rings[j_north]              # in-ring indices northern ring
-            _apply_serial_fft!(field, g_north, S, j, k, nfreq, ilons)
+            _apply_serial_fft!(field, g_north, S, j, k, nfreq, ilons; add = add)
 
             # southern latitude, don't call redundant 2nd fft if ring is on equator
             ilons = rings[j_south]              # in-ring indices southern ring
-            _apply_serial_fft!(field, g_south, S, j, k, nfreq, ilons; not_equator = not_equator)
+            _apply_serial_fft!(field, g_south, S, j, k, nfreq, ilons; not_equator = not_equator, add = add)
         end
     end
 end

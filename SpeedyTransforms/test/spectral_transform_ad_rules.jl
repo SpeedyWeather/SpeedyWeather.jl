@@ -98,6 +98,17 @@ end
         @test any(!iszero, dcoeffs[1].data)
         @test isapprox(dcoeffs[1].data, dcoeffs[2].data, rtol = 1.0e-4)
 
+        # the rule must ACCUMULATE into the (input) coeffs cotangent, not overwrite it: seeding a
+        # pre-existing gradient `base_c` must yield base_c + pullback (guards the reset=false path)
+        base_c = rand(ComplexF32, spectrum, NL)
+        dc_acc = deepcopy(base_c)
+        autodiff(
+            set_runtime_activity(Reverse), transform!, Const,
+            Duplicated(zeros(Float32, grid, NL), deepcopy(dfield0)), Duplicated(deepcopy(coeffs0), dc_acc),
+            Duplicated(deepcopy(S_chunked.scratch_memory), make_zero(deepcopy(S_chunked.scratch_memory))), Const(S_chunked),
+        )
+        @test isapprox(dc_acc.data, base_c.data .+ dcoeffs[1].data, rtol = 1.0e-4)
+
         # grid -> spec: vjp w.r.t field must agree between chunked and batched transforms
         field0 = rand(Float32, grid, NL)
         dcoeffs0 = rand(ComplexF32, spectrum, NL)
@@ -116,6 +127,16 @@ end
         @test all(isfinite, dfields[1].data)
         @test any(!iszero, dfields[1].data)
         @test isapprox(dfields[1].data, dfields[2].data, rtol = 1.0e-4)
+
+        # accumulate into the (input) field cotangent, not overwrite (guards the add=true path)
+        base_f = rand(Float32, grid, NL)
+        df_acc = deepcopy(base_f)
+        autodiff(
+            set_runtime_activity(Reverse), transform!, Const,
+            Duplicated(zeros(ComplexF32, spectrum, NL), deepcopy(dcoeffs0)), Duplicated(deepcopy(field0), df_acc),
+            Duplicated(deepcopy(S_chunked.scratch_memory), make_zero(deepcopy(S_chunked.scratch_memory))), Const(S_chunked),
+        )
+        @test isapprox(df_acc.data, base_f.data .+ dfields[1].data, rtol = 1.0e-4)
     end
     @testset "Complete Transform ChainRules" begin
         # WIP

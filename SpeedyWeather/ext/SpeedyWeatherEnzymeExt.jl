@@ -4,6 +4,8 @@ using SpeedyWeather
 using Enzyme
 using SpeedyWeather.ProgressMeter
 
+# currently not needed anymore:
+#=
 function __init__()
     # On Julia > 1.10, Enzyme's type analysis fails on large aggregates 
     # differentiated kernels (EnzymeNoTypeError, see https://github.com/EnzymeAD/Enzyme.jl/issues/3275).
@@ -13,6 +15,7 @@ function __init__()
     end
     return nothing
 end
+=# 
 
 ###
 # implement make_zero where the default one fails
