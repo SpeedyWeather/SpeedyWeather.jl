@@ -79,6 +79,27 @@ end
         @test SpeedyTransforms._needs_chunking(NL, S_chunked)
         @test !SpeedyTransforms._needs_chunking(NL, S_batched)
 
+        # EnzymeTestUtils reverse-rule check against finite differences, for the CHUNKED transform
+        # (exercises the analytic-adjoint transform! rule; scratch Const so FD doesn't perturb it)
+        @testset "EnzymeTestUtils reverse rule test" begin
+            let field = zeros(Float32, grid, NL), coeffs = rand(ComplexF32, spectrum, NL)
+                test_reverse(
+                    transform!, Const,
+                    (field, Duplicated), (coeffs, Duplicated),
+                    (deepcopy(S_chunked.scratch_memory), Const), (S_chunked, Const);
+                    fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                )
+            end
+            let coeffs = zeros(ComplexF32, spectrum, NL), field = rand(Float32, grid, NL)
+                test_reverse(
+                    transform!, Const,
+                    (coeffs, Duplicated), (field, Duplicated),
+                    (deepcopy(S_chunked.scratch_memory), Const), (S_chunked, Const);
+                    fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                )
+            end
+        end
+
         # spec -> grid: vjp w.r.t coeffs must agree between chunked and batched transforms
         coeffs0 = rand(ComplexF32, spectrum, NL)
         dfield0 = rand(Float32, grid, NL)
