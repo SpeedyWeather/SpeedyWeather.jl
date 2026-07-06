@@ -49,6 +49,7 @@ function _fd_diff_leaves(vars::SpeedyWeather.Variables)
     return acc
 end
 _fd_push_leaves!(acc, x::NamedTuple) = foreach(k -> _fd_push_leaves!(acc, getfield(x, k)), keys(x))
+_fd_push_leaves!(acc, x::SpeedyWeather.FusedParent) = _fd_push_leaves!(acc, x.parent)   # the fuse buffer
 _fd_push_leaves!(acc, x::LowerTriangularArray) = SpeedyWeather.is_view_entry(x) || push!(acc, x.data)
 _fd_push_leaves!(acc, x::SpeedyWeather.RingGrids.AbstractField) = SpeedyWeather.is_view_entry(x) || push!(acc, x.data)
 _fd_push_leaves!(acc, ::SubArray) = nothing
