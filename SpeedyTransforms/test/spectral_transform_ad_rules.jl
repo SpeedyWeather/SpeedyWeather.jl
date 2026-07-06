@@ -80,11 +80,15 @@ end
         @test !SpeedyTransforms._needs_chunking(NL, S_batched)
 
         # EnzymeTestUtils reverse-rule check against finite differences, for the CHUNKED transform
-        # (exercises the analytic-adjoint transform! rule; scratch Const so FD doesn't perturb it)
+        # (exercises the analytic-adjoint transform! rule; scratch Const so FD doesn't perturb it).
+        # Wrapped to return `nothing` (like `_fourier!`) — otherwise ETU treats the returned mutated
+        # output array as an extra differentiable output and its FD Jacobian goes out of bounds.
+        transform_s2g!(field, coeffs, scratch, S) = (transform!(field, coeffs, scratch, S); nothing)
+        transform_g2s!(coeffs, field, scratch, S) = (transform!(coeffs, field, scratch, S); nothing)
         @testset "EnzymeTestUtils reverse rule test" begin
             let field = zeros(Float32, grid, NL), coeffs = rand(ComplexF32, spectrum, NL)
                 test_reverse(
-                    transform!, Const,
+                    transform_s2g!, Const,
                     (field, Duplicated), (coeffs, Duplicated),
                     (deepcopy(S_chunked.scratch_memory), Const), (S_chunked, Const);
                     fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
@@ -92,7 +96,7 @@ end
             end
             let coeffs = zeros(ComplexF32, spectrum, NL), field = rand(Float32, grid, NL)
                 test_reverse(
-                    transform!, Const,
+                    transform_g2s!, Const,
                     (coeffs, Duplicated), (field, Duplicated),
                     (deepcopy(S_chunked.scratch_memory), Const), (S_chunked, Const);
                     fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
