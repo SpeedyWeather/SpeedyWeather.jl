@@ -42,10 +42,8 @@ default_column_field_dimensions(::AbstractArray) = ArrayDimensions.ZXY()
 
 # TYPES
 Architectures.nonparametric_type(::Type{<:ColumnField}) = ColumnField
-grid_type(::Type{ColumnField{T, N, A, G, D}}) where {T, N, A, G, D} = G
-grid_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = G
-Architectures.array_type(::Type{ColumnField{T, N, A, G, D}}) where {T, N, A, G, D} = A
-Architectures.array_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = A
+grid_type(::Type{<:ColumnField{T, N, A, G}}) where {T, N, A, G} = G
+Architectures.array_type(::Type{<:ColumnField{T, N, A, G}}) where {T, N, A, G} = A
 
 # CONVERSION from Field
 LinearAlgebra.transpose(field::Field) = transpose_safe(field)

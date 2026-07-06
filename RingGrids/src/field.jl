@@ -32,16 +32,14 @@ Field(::Type{T}, grid::AbstractGrid, dims::AbstractArrayDimensions, k...) where 
 # TYPES
 Architectures.nonparametric_type(::Type{<:Field}) = Field
 grid_type(field::AbstractField) = grid_type(typeof(field))
-grid_type(::Type{Field{T, N, A, G, D}}) where {T, N, A, G, D} = G
-grid_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = G
+grid_type(::Type{<:Field{T, N, A, G}}) where {T, N, A, G} = G
 field_type(field::AbstractField) = typeof(field)
 field_type(::Type{F}) where {F <: AbstractField} = F
 field_type(grid::AbstractGrid) = field_type(typeof(grid))
 field_type(::Type{G}) where {G <: AbstractGrid} = Field{T, N, A, G} where {T, N, A}
 full_grid_type(field::AbstractField) = full_grid_type(typeof(field.grid))
 full_grid_type(::Type{F}) where {F <: AbstractField} = full_grid_type(grid_type(F))
-Architectures.array_type(::Type{Field{T, N, A, G, D}}) where {T, N, A, G, D} = A
-Architectures.array_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = A
+Architectures.array_type(::Type{<:Field{T, N, A, G}}) where {T, N, A, G} = A
 Architectures.array_type(field::AbstractField) = array_type(typeof(field))
 Architectures.ismatching(arch::AbstractArchitecture, field::AbstractField) = ismatching(arch, field.data)
 
@@ -640,7 +638,7 @@ find_field(::Any, rest) = find_field(rest)
 function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
     # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
-    return nonparametric_type(typeof(field))(similar(parent(field.data), T, axes(bc)), field.grid)
+    return nonparametric_type(typeof(field))(similar(parent(field.data), T, axes(bc)), field.grid, field.dims)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
@@ -673,7 +671,7 @@ end
 function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
     # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
-    return nonparametric_type(typeof(field))(similar(parent(field.data), T, axes(bc)), field.grid)
+    return nonparametric_type(typeof(field))(similar(parent(field.data), T, axes(bc)), field.grid, field.dims)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
@@ -708,5 +706,5 @@ function Architectures.on_architecture(
     # if not matching, create new grid with other architecture
     arch = ismatching(field.grid, typeof(adapted_data)) ? arch : architecture(typeof(adapted_data))
 
-    return Field(adapted_data, on_architecture(arch, field.grid))
+    return Field(adapted_data, on_architecture(arch, field.grid), field.dims)
 end

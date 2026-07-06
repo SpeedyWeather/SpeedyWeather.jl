@@ -819,22 +819,12 @@ struct LowerTriangularStyle{N} <: Broadcast.AbstractArrayStyle{N} end
 # GPU without scalar indexing
 struct LowerTriangularGPUStyle{N} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
-function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType, S, D}}) where {T, N, ArrayType <: AbstractArray, S, D}
-    return LowerTriangularStyle{N}()
-end
-
-function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType <: AbstractArray, S}
+function BroadcastStyle(::Type{<:LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType <: AbstractArray, S}
     return LowerTriangularStyle{N}()
 end
 
 function BroadcastStyle(
-        ::Type{LowerTriangularArray{T, N, ArrayType, S, D}},
-    ) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, S, D}
-    return LowerTriangularGPUStyle{N}()
-end
-
-function BroadcastStyle(
-        ::Type{LowerTriangularArray{T, N, ArrayType, S}},
+        ::Type{<:LowerTriangularArray{T, N, ArrayType, S}},
     ) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, S}
     return LowerTriangularGPUStyle{N}()
 end
@@ -843,13 +833,7 @@ end
 # without this, dispatch falls back to LowerTriangularStyle and the broadcast runs
 # scalar `getindex` on the device, triggering GPUArrays' scalar-indexing error.
 function BroadcastStyle(
-        ::Type{LowerTriangularArray{T, N, ArrayType, S, D}},
-    ) where {T, N, A <: GPUArrays.AbstractGPUArray, ArrayType <: SubArray{T, N, A}, S, D}
-    return LowerTriangularGPUStyle{N}()
-end
-
-function BroadcastStyle(
-        ::Type{LowerTriangularArray{T, N, ArrayType, S}},
+        ::Type{<:LowerTriangularArray{T, N, ArrayType, S}},
     ) where {T, N, A <: GPUArrays.AbstractGPUArray, ArrayType <: SubArray{T, N, A}, S}
     return LowerTriangularGPUStyle{N}()
 end
