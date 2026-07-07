@@ -197,18 +197,27 @@ allocate(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.Anvil
 
 fuse_family(::Grid2D) = :grid
 fuse_family(::Grid3D) = :grid
+fuse_family(::GridXYZ) = :grid
+fuse_family(::GridXYT) = :grid
 fuse_family(::Grid4D) = :grid
+fuse_family(::GridXYZT) = :grid
 fuse_family(::Spectral2D) = :spectral
 fuse_family(::Spectral3D) = :spectral
+fuse_family(::SpectralXYZ) = :spectral
+fuse_family(::SpectralXYT) = :spectral
 fuse_family(::Spectral4D) = :spectral
+fuse_family(::SpectralXYZT) = :spectral
 fuse_family(d::AbstractVariableDim) = error(
     "Fusion is not supported for dim type $(typeof(d)). " *
-    "Supported dim types: Grid2D, Grid3D, Grid4D, Spectral2D, Spectral3D, Spectral4D."
+    "Supported dim types: Grid2D, Grid3D, GridXYZ, GridXYT, Grid4D, GridXYZT, " *
+    "Spectral2D, Spectral3D, SpectralXYZ, SpectralXYT, Spectral4D, SpectralXYZT."
 )
 
 # Whether a member's dim forces the parent to be 4D.
 is_fuse_4d(::Grid4D) = true
+is_fuse_4d(::GridXYZT) = true
 is_fuse_4d(::Spectral4D) = true
+is_fuse_4d(::SpectralXYZT) = true
 is_fuse_4d(::AbstractVariableDim) = false
 
 # Whether a member's dim is a "horizontal-only" 2D field/LTA (no layer dim).
@@ -218,7 +227,9 @@ is_fuse_2d(::AbstractVariableDim) = false
 
 # Trailing-dim size for 4D members, how many n_steps
 fuse_trailing_n(d::Grid4D) = d.n
+fuse_trailing_n(d::GridXYZT) = d.n
 fuse_trailing_n(d::Spectral4D) = d.n
+fuse_trailing_n(d::SpectralXYZT) = d.n
 
 # Layer-axis slot count for a member, depending on whether the parent is 3D or 4D.
 # In a 4D parent every non-4D member collapses to 1 layer slot (it shares the trailing
@@ -229,6 +240,9 @@ function fused_slots(d::AbstractVariableDim, model::AbstractModel; parent_is_4d:
     else
         is_fuse_2d(d) ? 1 :
         d isa Spectral3D ? (d.n == 0 ? get_nlayers(model) : d.n) :
+        d isa SpectralXYT ? d.n :
+        d isa Grid3D ? (d.n == 0 ? get_nlayers(model) : d.n) :
+        d isa GridXYT ? d.n :
         get_nlayers(model)
     end
 end
