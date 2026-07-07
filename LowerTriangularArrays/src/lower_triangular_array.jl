@@ -251,6 +251,16 @@ for f in (:zeros, :ones, :rand, :randn)
             return LowerTriangularArray(array_type(spectrum.architecture)($f(T, nonzeros(spectrum), I...)), spectrum, dims)
         end
 
+        # Fully parameterized type (includes Dims parameter) — extract and thread through
+        function Base.$f(
+                ::Type{LowerTriangularArray{T, N, ArrayType, S, D}},
+                spectrum::AbstractSpectrum,
+                I::Vararg{Integer, M},
+            ) where {T, N, M, ArrayType, S <: AbstractSpectrum, D <: AbstractArrayDimensions}
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(spectrum), I...)), spectrum, D())
+        end
+
         Base.$f(::Type{LowerTriangularMatrix{T}}, spectrum::AbstractSpectrum) where {T} =
             $f(LowerTriangularArray{T}, spectrum)
         Base.$f(::Type{LowerTriangularMatrix{T}}, spectrum::AbstractSpectrum, dims::AbstractArrayDimensions) where {T} =

@@ -41,6 +41,8 @@ full_grid_type(field::AbstractField) = full_grid_type(typeof(field.grid))
 full_grid_type(::Type{F}) where {F <: AbstractField} = full_grid_type(grid_type(F))
 Architectures.array_type(::Type{<:Field{T, N, A, G}}) where {T, N, A, G} = A
 Architectures.array_type(field::AbstractField) = array_type(typeof(field))
+dims_type(field::AbstractField) = dims_type(typeof(field))
+dims_type(::Type{<:Field{T, N, A, G, D}}) where {T, N, A, G, D} = D
 Architectures.ismatching(arch::AbstractArchitecture, field::AbstractField) = ismatching(arch, field.data)
 
 # test number of horizontal grid points matches
@@ -353,7 +355,7 @@ for f in (:zeros, :ones, :rand, :randn)
                 k::Integer...,
             ) where {F <: AbstractField{T}} where {T}
             data = array_type(F)($f(T, get_npoints(grid), k...))
-            return Field(data, grid)
+            return Field(data, grid, dims_type(F)())
         end
 
         function Base.$f(
