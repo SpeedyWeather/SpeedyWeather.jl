@@ -230,7 +230,6 @@ function SpeedyWeather.timestep!(
     )
     state = vars.prognostic.land.terrarium
     tmodel = land.model
-    consts = tmodel.constants
     NF = eltype(state)
     mask = land_mask(land)
     indices = land.mask_indices
