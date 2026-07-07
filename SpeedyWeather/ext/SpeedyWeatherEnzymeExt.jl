@@ -34,10 +34,7 @@ end
 #
 # Some prognostic/grid leaves are `SubArray`-backed views into a shared parent that lives under
 # `vars.fused.*`. Enzyme's default `make_zero` materialises those views into plain `Array`s, so the
-# shadow's type no longer matches the view-backed primal. That mismatch breaks AD of the leapfrog:
-# `Duplicated(view-LTA, Array-LTA)` has no method (barotropic `update_prognostic!`), and Enzyme's
-# reverse of the `get_step` store over the mismatched types hits a codegen error on Julia >= 1.11
-# ("unhandled accumulate with partial sizes", full `time_step!` / `full_diff_CI.jl`).
+# shadow's type no longer matches the view-backed primal. That mismatch breaks AD.
 #
 # Build the shadow as a `deepcopy` (which preserves the view→fused-parent aliasing and all types),
 # then zero the differentiable data through the fuse parents / non-view leaves — the aliasing views
