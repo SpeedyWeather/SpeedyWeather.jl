@@ -722,8 +722,8 @@ function parameterization_tendencies_only!(
     vor_tend = get_tendency_step(vars.tendencies.vorticity, TS, DynamicalCore())
     div_tend = get_tendency_step(vars.tendencies.divergence, TS, DynamicalCore())
     temp_tend = get_tendency_step(vars.tendencies.temperature, TS, DynamicalCore())
-    u_tend = vars.dynamics.u_tendency        # spectral u-tendency 
-    v_tend = vars.dynamics.v_tendency        # spectral v-tendency
+    u_tend = get_tendency_step(vars.dynamics.u_tendency, TS, DynamicalCore())   # spectral u-tendency
+    v_tend = get_tendency_step(vars.dynamics.v_tendency, TS, DynamicalCore())   # spectral v-tendency
 
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
