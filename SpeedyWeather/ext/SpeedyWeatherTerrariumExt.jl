@@ -71,6 +71,17 @@ only allocates columns where this mask is `true`, so every Terrarium state field
 has length `sum(mask)` (the number of land columns)."""
 @inline land_mask(land::AbstractTerrariumLandModel) = land.model.grid.mask.data
 
+# extend the allocation free copies here to work with the Oceananigans Fields as well
+@inline SpeedyWeather.RingGrids.copy_unmasked!(
+    dest::Terrarium.Oceananigans.AbstractField,
+    src::SpeedyWeather.AbstractField,
+    indices) = SpeedyWeather.RingGrids.copy_unmasked!(interior(dest), src, indices)
+
+@inline SpeedyWeather.RingGrids.copy_unmasked!(
+    dest::SpeedyWeather.AbstractField, 
+    src::Terrarium.Oceananigans.AbstractField,
+    indices) = SpeedyWeather.RingGrids.copy_unmasked!(dest, interior(src), indices)
+
 """$(TYPEDEF)
 
 The canonical [`AbstractTerrariumLandModel`](@ref) implementation for wet
@@ -88,6 +99,7 @@ struct TerrariumLand{
         IV <: Tuple,
         IN <: NamedTuple,
         FL <: NamedTuple,
+        MI,
     } <: AbstractTerrariumLandModel
     "SpeedyWeather spectral grid"
     spectral_grid::SpectralGrid
@@ -107,6 +119,8 @@ struct TerrariumLand{
     fields::FL
     "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
     Δt::NF
+    "Indices of the common land sea mask, used for allocation-free copying between SpeedyWeather and Terrarium"
+    mask_indices::MI
 end
 
 """$(TYPEDSIGNATURES)
@@ -129,9 +143,10 @@ function TerrariumLand(
     # as the layer thickness for the SpeedyWeather LandGeometry. It's not actually used, but
     # we set it here for consistency.
     geometry = LandGeometry(1, NF[Δz_arr[end]])
+    mask_indices = RingGrids.unmasked_indices(model.grid.mask)
     return TerrariumLand(
         spectral_grid, geometry, model, timestepper,
-        boundary_conditions, input_variables, initializers, fields, NF(Δt),
+        boundary_conditions, input_variables, initializers, fields, NF(Δt), mask_indices,
     )
 end
 
@@ -217,34 +232,28 @@ function SpeedyWeather.timestep!(
     tmodel = land.model
     consts = tmodel.constants
     NF = eltype(state)
-    # Boolean land mask: SpeedyWeather fields span the full ring grid, Terrarium
-    # only the land columns.
     mask = land_mask(land)
+    indices = land.mask_indices
+    nlayers = model.spectral_grid.nlayers
 
     # Atmospheric forcings on the lowest model level / surface
     # choose step dimension depending on atmospheric time stepper
     # and read like parameterization via DummyParameterization
     l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
-    Tair = vars.grid.temperature[mask, end, l]
-    humid = vars.grid.humidity[mask, end, l]
-    pres = vars.parameterizations.surface_pressure[mask]
-    wind = vars.parameterizations.surface_wind_speed[mask]
-    rain = vars.parameterizations.rain_rate[mask]
-    snow = vars.parameterizations.snow_rate[mask]
-    Rsd = vars.parameterizations.surface_shortwave_down[mask]
-    Rld = vars.parameterizations.surface_longwave_down[mask]
+    Tair = view(vars.grid.temperature, :, nlayers, l)
+    humid = view(vars.grid.humidity, :, nlayers, l)
 
     # Push forcings into Terrarium inputs (set! avoids allocating new fields)
     inputs = state.inputs
-    Terrarium.set!(inputs.air_temperature, Tair)
+    RingGrids.copy_unmasked!(inputs.air_temperature, Tair, indices)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
-    Terrarium.set!(inputs.air_pressure, pres)
-    Terrarium.set!(inputs.specific_humidity, humid)
-    Terrarium.set!(inputs.rainfall, rain)
-    Terrarium.set!(inputs.snowfall, snow)
-    Terrarium.set!(inputs.windspeed, wind)
-    Terrarium.set!(inputs.surface_shortwave_down, Rsd)
-    Terrarium.set!(inputs.surface_longwave_down, Rld)
+    RingGrids.copy_unmasked!(inputs.air_pressure, pres, indices)
+    RingGrids.copy_unmasked!(inputs.specific_humidity, humid, indices)
+    RingGrids.copy_unmasked!(inputs.rainfall, rain, indices)
+    RingGrids.copy_unmasked!(inputs.snowfall, snow, indices)
+    RingGrids.copy_unmasked!(inputs.windspeed, wind, indices)
+    RingGrids.copy_unmasked!(inputs.surface_shortwave_down, Rsd, indices)
+    RingGrids.copy_unmasked!(inputs.surface_longwave_down, Rld, indices)
 
     # Constructing ModelIntegrator is allocation-free: it is an immutable struct
     # of references so no data is copied.  `InputSources` is empty intentionally:
@@ -263,16 +272,16 @@ function SpeedyWeather.timestep!(
     vars.prognostic.land.soil_temperature[mask] .= interior(state.skin_temperature) .+ NF(273.15)
     vars.prognostic.land.soil_moisture[mask] .= @view interior(state.saturation_water_ice)[:, 1, end]
     if haskey(vars.prognostic.land, :sensible_heat_flux)
-        vars.prognostic.land.sensible_heat_flux[mask] .= interior(state.sensible_heat_flux)
+        RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, state.sensible_heat_flux, indices)
     end
     if haskey(vars.prognostic.land, :surface_humidity_flux)
-        vars.prognostic.land.surface_humidity_flux[mask] .= interior(state.latent_heat_flux) ./ consts.thermodynamics.latent_heat_vaporization
+        RingGrids.copy_unmasked!(vars.prognostic.land.surface_humidity_flux, state.latent_heat_flux, indices)
     end
     if haskey(vars.parameterizations, :surface_longwave_up)
-        vars.parameterizations.surface_longwave_up[mask] .= interior(state.surface_longwave_up)
+        RingGrids.copy_unmasked!(vars.parameterizations.surface_longwave_up, state.surface_longwave_up, indices)
     end
     if haskey(vars.parameterizations, :surface_shortwave_up)
-        vars.parameterizations.surface_shortwave_up[mask] .= interior(state.surface_shortwave_up)
+        RingGrids.copy_unmasked!(vars.parameterizations.surface_shortwave_up, state.surface_shortwave_up, indices)
     end
     return nothing
 end
