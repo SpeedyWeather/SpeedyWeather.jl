@@ -242,8 +242,14 @@ function SpeedyWeather.timestep!(
     l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
     Tair = view(vars.grid.temperature, :, nlayers, l)
     humid = view(vars.grid.humidity, :, nlayers, l)
+    pres = vars.parameterizations.surface_pressure
+    wind = vars.parameterizations.surface_wind_speed
+    rain = vars.parameterizations.rain_rate
+    snow = vars.parameterizations.snow_rate
+    Rsd = vars.parameterizations.surface_shortwave_down
+    Rld = vars.parameterizations.surface_longwave_down
 
-    # Push forcings into Terrarium inputs (set! avoids allocating new fields)
+    # Push forcings into Terrarium inputs (copy_unmasked! avoids allocations)
     inputs = state.inputs
     RingGrids.copy_unmasked!(inputs.air_temperature, Tair, indices)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
