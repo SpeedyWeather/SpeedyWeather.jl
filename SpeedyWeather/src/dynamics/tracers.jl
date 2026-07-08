@@ -63,7 +63,7 @@ function variables(T::Tracer, model::AbstractModel)
     return (
         PrognosticVariable(T.name, SpectralXYZT(ps), desc = "$(T.name)", namespace = :tracers),
         GridVariable(T.name, GridXYZT(pg), desc = "$(T.name)", namespace = :tracers),
-        TendencyVariable(T.name, SpectralXYZT(ps), desc = "Tendency of $(T.name)", namespace = :tracers),
+        TendencyVariable(T.name, SpectralXYZT(ts), desc = "Tendency of $(T.name)", namespace = :tracers),
         TendencyVariable(T.name, GridXYZT(tg), desc = "Tendency of $(T.name)", namespace = :grid_tracers),
         ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
         ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
