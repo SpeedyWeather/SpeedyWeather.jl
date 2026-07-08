@@ -259,12 +259,12 @@ function allocate_fused(vars::AbstractVector{<:AbstractVariable}, model::Abstrac
     NF = model.spectral_grid.NF
     if family === :grid
         parent = parent_is_4d ?
-            zeros(NF, model.spectral_grid.grid, total, n_steps) :
-            zeros(NF, model.spectral_grid.grid, total)
+            zeros(NF, model.spectral_grid.grid, ArrayDimensions.XYZT(), total, n_steps) :
+            zeros(NF, model.spectral_grid.grid, ArrayDimensions.XYZ(), total)
     else
         parent = parent_is_4d ?
-            zeros(Complex{NF}, model.spectral_grid.spectrum, total, n_steps) :
-            zeros(Complex{NF}, model.spectral_grid.spectrum, total)
+            zeros(Complex{NF}, model.spectral_grid.spectrum, ArrayDimensions.LMZT(), total, n_steps) :
+            zeros(Complex{NF}, model.spectral_grid.spectrum, ArrayDimensions.LMZ(), total)
     end
     views, slots = _split_views(parent, vars, model, parent_is_4d)
 
