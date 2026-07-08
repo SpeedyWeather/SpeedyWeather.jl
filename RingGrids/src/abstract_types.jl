@@ -59,3 +59,11 @@ const AbstractFullField4D = AbstractFullField{T, 3} where {T}
 const AbstractReducedField2D = AbstractReducedField{T, 1} where {T}
 const AbstractReducedField3D = AbstractReducedField{T, 2} where {T}
 const AbstractReducedField4D = AbstractReducedField{T, 3} where {T}
+
+# Trait-based dispatch on dimensions
+"""Abstract supertype for all fields with a time dimension"""
+const AbstractFieldWithTime = AbstractField{T, N, ArrayType, Grid, Dims} where {T, N, ArrayType, Grid, Dims <: DimensionsWithTime}
+"""Abstract supertype for all fields with a vertical dimension"""
+const AbstractFieldWithVertical = AbstractField{T, N, ArrayType, Grid, Dims} where {T, N, ArrayType, Grid, Dims <: DimensionsWithVertical}
+"""Abstract supertype for all fields with both time and vertical dimensions"""
+const AbstractFieldWithTimeAndVertical = AbstractField{T, N, ArrayType, Grid, Dims} where {T, N, ArrayType, Grid, Dims <: DimensionsWithTimeAndVertical}

@@ -9,7 +9,7 @@ abstract type ThreeDimensions <: AbstractArrayDimensions end
 """Super type for all (physical) 4D dimensions, i.e. 3 array dimensions (horizontal is unravelled)"""
 abstract type FourDimensions <: AbstractArrayDimensions end
 
-# when viewing a getindex dimensions have to be converted, generalize this with a 
+# when viewing a getindex dimensions have to be converted, generalize this with a
 @inline Base.getindex(dims::AbstractArrayDimensions, args...) = dims
 
 # Fields
@@ -20,18 +20,18 @@ struct XY <: TwoDimensions end
 """Field Dimensions: 3D horizontal + vertical"""
 struct XYZ <: ThreeDimensions end
 @inline Base.ndims(::XYZ) = 2
-@inline Base.getindex(::XYZ, ::Colon, k::Union{Integer, CartesianIndex}, args...) = XY() 
+@inline Base.getindex(::XYZ, ::Colon, k::Union{Integer, CartesianIndex}, args...) = XY()
 
 """Field Dimensions: 3D horizontal + time"""
 struct XYT <: ThreeDimensions end
 @inline Base.ndims(::XYT) = 2
-@inline Base.getindex(::XYT, ::Colon, s::Union{Integer, CartesianIndex}, args...) = XY() 
+@inline Base.getindex(::XYT, ::Colon, s::Union{Integer, CartesianIndex}, args...) = XY()
 
-"""4Field Dimensions: D horizontal + vertical + time"""
+"""Field Dimensions: 4D horizontal + vertical + time"""
 struct XYZT <: FourDimensions end
 @inline Base.ndims(::XYZT) = 3
-@inline Base.getindex(::XYZT, ::Colon, k::Union{Integer, CartesianIndex}, args...) = XYT() 
-@inline Base.getindex(::XYZT, ::Colon, k, s::Union{Integer, CartesianIndex}, args...) = XYZ() 
+@inline Base.getindex(::XYZT, ::Colon, k::Union{Integer, CartesianIndex}, args...) = XYT()
+@inline Base.getindex(::XYZT, ::Colon, k, s::Union{Integer, CartesianIndex}, args...) = XYZ()
 @inline Base.getindex(::XYZT, ::Colon, k::Union{Integer, CartesianIndex}, s::Union{Integer, CartesianIndex}, args...) = XY() 
 
 # ColumnFields
@@ -78,6 +78,20 @@ struct LMZT <: FourDimensions end
 @inline hastime(::Type{XYZ}) = false
 @inline hastime(::Type{LMZ}) = false
 @inline hastime(::Type{<:FourDimensions}) = true
+
+# Dimension grouping unions for dispatch
+"""Union of all 2D dimension types"""
+const Dimensions2D = Union{XY, LM}
+"""Union of all 3D dimension types"""
+const Dimensions3D = Union{XYZ, XYT, ZXY, LMZ, LMT}
+"""Union of all 4D dimension types"""
+const Dimensions4D = Union{XYZT, ZXYT, LMZT}
+"""Union of dimension types that have a time dimension"""
+const DimensionsWithTime = Union{XYT, XYZT, LMT, LMZT, ZXYT}
+"""Union of dimension types that have a vertical dimension"""
+const DimensionsWithVertical = Union{XYZ, XYZT, LMZ, LMZT, ZXY, ZXYT}
+"""Union of dimension types that have both time and vertical dimensions"""
+const DimensionsWithTimeAndVertical = Union{XYZT, ZXYT, LMZT}
 
 Base.dims2string(dims::AbstractArrayDimensions) = string(nameof(typeof(dims)))
 

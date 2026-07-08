@@ -31,7 +31,8 @@ using SpeedyWeatherInternals.KernelLaunching
 import SpeedyWeatherInternals: Utils
 
 import SpeedyWeatherInternals.ArrayDimensions: ArrayDimensions, AbstractArrayDimensions,
-    hastime, hasvertical
+    hastime, hasvertical, Dimensions2D, Dimensions3D, Dimensions4D,
+    DimensionsWithTime, DimensionsWithVertical, DimensionsWithTimeAndVertical
 export ArrayDimensions
 
 # ABSTRACT GRIDS
@@ -52,7 +53,8 @@ export OctahedralGaussianGrid,
     OctaminimalGaussianGrid
 
 # FIELDS (Data on grids)
-export AbstractField, AbstractField2D, AbstractField3D,
+export AbstractField, AbstractField2D, AbstractField3D, AbstractField4D,
+    AbstractFieldWithTime, AbstractFieldWithVertical, AbstractFieldWithTimeAndVertical,
     Field, Field2D, Field3D
 
 export FullGaussianField,
