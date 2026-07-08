@@ -261,6 +261,17 @@ for f in (:zeros, :ones, :rand, :randn)
             return LowerTriangularArray(ArrayType_($f(T, nonzeros(spectrum), I...)), spectrum, D())
         end
 
+        # Fully parameterized type with integer arguments (lmax, mmax, ...)
+        function Base.$f(
+                ::Type{LowerTriangularArray{T, N, ArrayType, S, D}},
+                lmax::Integer,
+                mmax::Integer,
+                I::Vararg{Integer, M},
+            ) where {T, N, M, ArrayType, S <: AbstractSpectrum, D <: AbstractArrayDimensions}
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax, architecture = architecture(ArrayType_)), D())
+        end
+
         Base.$f(::Type{LowerTriangularMatrix{T}}, spectrum::AbstractSpectrum) where {T} =
             $f(LowerTriangularArray{T}, spectrum)
         Base.$f(::Type{LowerTriangularMatrix{T}}, spectrum::AbstractSpectrum, dims::AbstractArrayDimensions) where {T} =
@@ -283,26 +294,26 @@ for f in (:zeros, :ones, :rand, :randn)
             return LowerTriangularArray(array_type(spectrum.architecture)($f(T, nonzeros(spectrum), I...)), spectrum, dims)
         end
 
-        # use Float64 as default if type T is not provided
+        # use DEFAULT_NF as default if type T is not provided
         Base.$f(::Type{LowerTriangularArray}, lmax::Integer, mk::Integer...) =
-            $f(LowerTriangularArray{Float64}, lmax, mk...)
+            $f(LowerTriangularArray{DEFAULT_NF}, lmax, mk...)
         Base.$f(::Type{LowerTriangularMatrix}, lmax::Integer, mmax::Integer) =
-            $f(LowerTriangularArray{Float64}, lmax, mmax)
+            $f(LowerTriangularArray{DEFAULT_NF}, lmax, mmax)
 
         Base.$f(::Type{LowerTriangularArray}, spectrum::AbstractSpectrum, I::Vararg{Integer, M}) where {M} =
-            $f(LowerTriangularArray{Float64}, spectrum, I...)
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum, I...)
         Base.$f(::Type{LowerTriangularMatrix}, spectrum::AbstractSpectrum) =
-            $f(LowerTriangularArray{Float64}, spectrum)
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum)
         Base.$f(spectrum::AbstractSpectrum, I::Vararg{Integer, M}) where {M} =
-            $f(LowerTriangularArray{Float64}, spectrum, I...)
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum, I...)
 
         # dims variants for default-type constructors
         Base.$f(::Type{LowerTriangularArray}, spectrum::AbstractSpectrum, dims::AbstractArrayDimensions, I::Vararg{Integer, M}) where {M} =
-            $f(LowerTriangularArray{Float64}, spectrum, dims, I...)
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum, dims, I...)
         Base.$f(::Type{LowerTriangularMatrix}, spectrum::AbstractSpectrum, dims::AbstractArrayDimensions) =
-            $f(LowerTriangularMatrix{Float64}, spectrum, dims)
+            $f(LowerTriangularMatrix{DEFAULT_NF}, spectrum, dims)
         Base.$f(spectrum::AbstractSpectrum, dims::AbstractArrayDimensions, I::Vararg{Integer, M}) where {M} =
-            $f(LowerTriangularArray{Float64}, spectrum, dims, I...)
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum, dims, I...)
     end
 end
 
