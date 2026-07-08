@@ -711,31 +711,30 @@ function parameterization_tendencies_only!(
     S = model.spectral_transform
     TS = model.time_stepping
 
-    # already contain parameterizations
+    # physics has filled the grid tendencies (u, v, temperature, humidity). The wind tendencies
+    # need the 1/coslat scaling that the curl/divergence operators expect (as in grid_tendencies!).
     u_tend_grid = get_tendency_step(vars.tendencies.grid.u, TS, DummyParameterization())
     v_tend_grid = get_tendency_step(vars.tendencies.grid.v, TS, DummyParameterization())
-    temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, TS, DummyParameterization())
     RingGrids._scale_lat!(u_tend_grid, coslat⁻¹)
     RingGrids._scale_lat!(v_tend_grid, coslat⁻¹)
 
-    # divergence and curl of that u, v_tend vector for vor, div tendencies
+    # One batched transform of the full, contiguous grid-tendency parent into the spectral-tendency
+    # parent (mirrors dynamics_tendencies!). The fuse slots are aligned, so this maps
+    # u → u_tendency, v → v_tendency, temperature → temperature, humidity → humidity. The
+    # dynamics-only product slots (uT_anomaly, kinetic_energy, uq, ...) are never written on the
+    # physics-only path (grid_tendencies! is not called), so they stay zero and their spectral
+    # images are harmless. A per-variable transform of the individual slot views would pass
+    # non-contiguous SubArrays to the GPU Legendre transform, whose `reinterpret` fails to compile
+    # (InvalidIRError); the full contiguous parent transform is the GPU-safe path.
+    transform!(parent(vars.fused.spectral_tendencies),
+               parent(vars.fused.grid_tendencies),
+               scratch_memory, S)
+
+    # divergence and curl of the (now spectral) u, v tendencies for vor, div tendencies
     vor_tend = get_tendency_step(vars.tendencies.vorticity, TS, DynamicalCore())
     div_tend = get_tendency_step(vars.tendencies.divergence, TS, DynamicalCore())
-    temp_tend = get_tendency_step(vars.tendencies.temperature, TS, DynamicalCore())
-    u_tend = get_tendency_step(vars.dynamics.u_tendency, TS, DynamicalCore())   # spectral u-tendency
-    v_tend = get_tendency_step(vars.dynamics.v_tendency, TS, DynamicalCore())   # spectral v-tendency
-
-    transform!(u_tend, u_tend_grid, scratch_memory, S)
-    transform!(v_tend, v_tend_grid, scratch_memory, S)
-    transform!(temp_tend, temp_tend_grid, scratch_memory, S)
-
-    # humidity only for models that have humidity
-    if haskey(vars.tendencies, :humidity)
-        humid_tend_grid = get_tendency_step(vars.tendencies.grid.humidity, TS, DummyParameterization())
-        humid_tend = get_tendency_step(vars.tendencies.humidity, TS, DynamicalCore())
-        transform!(humid_tend, humid_tend_grid, scratch_memory, S)
-    end
-
+    u_tend = get_tendency_step(vars.dynamics.u_tendency, TS, DynamicalCore())   # spectral u-tendency (fused slot, filled above)
+    v_tend = get_tendency_step(vars.dynamics.v_tendency, TS, DynamicalCore())   # spectral v-tendency (fused slot, filled above)
     curl!(vor_tend, u_tend, v_tend, S)         # ∂ζ/∂t = ∇×(u_tend, v_tend)
     divergence!(div_tend, u_tend, v_tend, S)   # ∂D/∂t = ∇⋅(u_tend, v_tend)
     return nothing
