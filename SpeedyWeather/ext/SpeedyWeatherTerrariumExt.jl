@@ -232,6 +232,7 @@ function SpeedyWeather.timestep!(
     )
     state = vars.prognostic.land.terrarium
     tmodel = land.model
+    consts = tmodel.constants
     NF = eltype(state)
     mask = land_mask(land)
     indices = land.mask_indices
@@ -283,6 +284,7 @@ function SpeedyWeather.timestep!(
     end
     if haskey(vars.prognostic.land, :surface_humidity_flux)
         RingGrids.copy_unmasked!(vars.prognostic.land.surface_humidity_flux, state.latent_heat_flux, indices)
+        vars.prognostic.land.surface_humidity_flux.data ./= consts.thermodynamics.latent_heat_vaporization
     end
     if haskey(vars.parameterizations, :surface_longwave_up)
         RingGrids.copy_unmasked!(vars.parameterizations.surface_longwave_up, state.surface_longwave_up, indices)
