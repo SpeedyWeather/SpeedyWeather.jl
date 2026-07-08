@@ -143,7 +143,9 @@ function TerrariumLand(
     # as the layer thickness for the SpeedyWeather LandGeometry. It's not actually used, but
     # we set it here for consistency.
     geometry = LandGeometry(1, NF[Δz_arr[end]])
-    mask_indices = RingGrids.unmasked_indices(model.grid.mask)
+    # `unmasked_indices` treats `true` as masked-out; `model.grid.mask` is `true` at land
+    # points, so invert it to get the indices of the (unmasked) land columns.
+    mask_indices = RingGrids.unmasked_indices(.!model.grid.mask)
     return TerrariumLand(
         spectral_grid, geometry, model, timestepper,
         boundary_conditions, input_variables, initializers, fields, NF(Δt), mask_indices,
@@ -239,8 +241,8 @@ function SpeedyWeather.timestep!(
     # choose step dimension depending on atmospheric time stepper
     # and read like parameterization via DummyParameterization
     l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
-    Tair = view(vars.grid.temperature, :, nlayers, l)
-    humid = view(vars.grid.humidity, :, nlayers, l)
+    Tair = RingGrids.field_view(vars.grid.temperature, :, nlayers, l)
+    humid = RingGrids.field_view(vars.grid.humidity, :, nlayers, l)
     pres = vars.parameterizations.surface_pressure
     wind = vars.parameterizations.surface_wind_speed
     rain = vars.parameterizations.rain_rate
