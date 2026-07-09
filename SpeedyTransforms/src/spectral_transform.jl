@@ -391,10 +391,6 @@ end
 # without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
 # that path for the bulk of the layers and effectively restores the previous behavior before 
 # fusion/batching without performance penalties. 
-# Chunked (sequential) transform for unplanned K on CPU. Called only from the positional
-# transform cores `_transform_grid!`/`_transform_spec!`, for which the Enzyme extension defines
-# analytic-adjoint reverse rules; this chunk loop is therefore only ever executed as primal
-# (never differentiated through — Enzyme mis-handles the per-iteration view shadows).
 function _transform_chunked!(                       # SPECTRAL TO GRID
         field::AbstractField, coeffs::LowerTriangularArray,
         scratch_memory::ScratchMemory, S::SpectralTransform;
@@ -457,11 +453,6 @@ function transform!(                        # SPECTRAL TO GRID
     return _transform_grid!(field, coeffs, scratch_memory, S, unscale_coslat)
 end
 
-# Positional core of the spectral-to-grid `transform!`. The Enzyme extension defines an
-# analytic-adjoint reverse rule for this function, so the whole transform (chunked or batched) is
-# a single AD boundary: Enzyme never differentiates the Legendre/Fourier internals. This is both
-# cheaper to compile and avoids the mutable-model type-analysis failure that native
-# differentiation of `_legendre!` triggers on Julia ≥ 1.11. See SpeedyTransformsEnzymeExt.
 function _transform_grid!(
         field::AbstractField, coeffs::LowerTriangularArray,
         scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
