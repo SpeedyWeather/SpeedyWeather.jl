@@ -107,16 +107,17 @@ field = HEALPixField(undef, 2)              # using undef initializor
 field = HEALPixField{Float16}(undef, 2, 3)  # using Float16 as eltype
 ```
 
-## Array dimensions
+## Array dimensions of a Field
 
 Besides `data` and `grid`, a `Field` also carries a `dims::AbstractArrayDimensions` that
 records what the dimensions beyond the horizontal actually represent, e.g. vertical layers
-or time steps. This is bookkeeping only (it does not change how the field is indexed or
-computed on) but it allows `ArrayDimensions.hasvertical(field)` and `ArrayDimensions.hastime(field)`
-to answer what a given non-horizontal dimension stands for, and it is preserved through
-`similar`, `zero`, views and indexing (dropping a dimension whenever you index into it with
-an integer). The dimensions defined for `Field` are `XY` (2D, horizontal only, the default),
+or time steps, see [Array dimensions](@ref array_dimensions) for a general overview of
+these dimension tags. The tags defined for `Field` are `XY` (2D, horizontal only, the default),
 `XYZ` (horizontal + vertical), `XYT` (horizontal + time), and `XYZT` (horizontal + vertical + time).
+They are bookkeeping only (they do not change how the field is indexed or computed on) but allow
+`ArrayDimensions.hasvertical(field)` and `ArrayDimensions.hastime(field)` to answer what a given
+non-horizontal dimension stands for, and they are preserved through `similar`, `zero`, views and
+indexing (dropping a dimension whenever you index into it with an integer).
 
 To create a `Field` with an explicit dimension, pass an instance of one of these types as an
 extra argument, e.g. after the `grid`

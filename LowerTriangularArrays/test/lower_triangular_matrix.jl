@@ -1032,4 +1032,16 @@ end
     # 4D: two explicit non-horizontal indices
     @test L4[:, 1:3, 1].dims isa LMZ   # drop time, keep vertical range
     @test L4[:, 1, 1].dims isa LM      # drop both vertical and time
+
+    # dims are preserved through truncate and interpolate
+    L3z_trunc = LowerTriangularArrays.truncate(L3z, 3)
+    @test L3z_trunc.dims isa LMZ
+    @test size(L3z_trunc, ZeroBased, as = Matrix) == (3, 3, 3)
+
+    L3z_interp = LowerTriangularArrays.interpolate(L3z, 10)
+    @test L3z_interp.dims isa LMZ
+    @test size(L3z_interp, ZeroBased, as = Matrix) == (10, 10, 3)
+
+    L2_trunc = LowerTriangularArrays.truncate(L2, 3)
+    @test L2_trunc.dims isa LM
 end

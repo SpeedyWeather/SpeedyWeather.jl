@@ -307,15 +307,16 @@ L_gpu = adapt(CuArray, L)
 
 ## Array dimensions for `LowerTriangularArray`
 
-Like `Field` (see [Array dimensions](@ref) in RingGrids), a `LowerTriangularArray` carries a
-`dims::AbstractArrayDimensions` field that records what the dimensions beyond the spherical
-harmonics (`l`, `m`) represent. The only difference is the name of the 2D (horizontal) dimension:
-`LM` instead of `XY`, since a `LowerTriangularArray` stores spherical harmonic coefficients
-rather than grid-point values. Correspondingly `LMZ`, `LMT`, and `LMZT` add a vertical and/or
-time dimension, exactly as `XYZ`, `XYT`, `XYZT` do for `Field`. `LM` is the default if no `dims`
-is given, e.g. for the `L`, `L2` created above. Everything else -- `ArrayDimensions.hasvertical`,
-`ArrayDimensions.hastime`, preservation through `similar`/`zero`/views/indexing -- works the
-same way as described for `Field`.
+Like `Field` (see [Array dimensions of a Field](@ref) in RingGrids), a `LowerTriangularArray`
+carries a `dims::AbstractArrayDimensions` field that records what the dimensions beyond the
+spherical harmonics (`l`, `m`) represent, see [Array dimensions](@ref array_dimensions) for
+a general overview of these dimension tags. The only difference is the name of the 2D
+(horizontal) dimension: `LM` instead of `XY`, since a `LowerTriangularArray` stores spherical
+harmonic coefficients rather than grid-point values. Correspondingly `LMZ`, `LMT`, and `LMZT`
+add a vertical and/or time dimension, exactly as `XYZ`, `XYT`, `XYZT` do for `Field`. `LM` is
+the default if no `dims` is given, e.g. for the `L`, `L2` created above. Everything else --
+`ArrayDimensions.hasvertical`, `ArrayDimensions.hastime`, preservation through
+`similar`/`zero`/views/indexing -- works the same way as described for `Field`.
 
 ```@repl LowerTriangularArrays
 L3 = zeros(LowerTriangularArray{Float32}, 5, 5, ArrayDimensions.LMZ(), 3)
