@@ -49,7 +49,7 @@ SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = Seas
 
 function variables(::SeasonalSoilMoisture)
     return (
-        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
     )
 end
 
@@ -279,7 +279,7 @@ end
 
 function variables(::LandBucketMoisture)
     return (
-        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         ParameterizationVariable(:river_runoff, Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
         ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),

@@ -1,6 +1,7 @@
 using RingGrids
 using Test
 
+include("field_types.jl")
 include("column_field.jl")
 include("geodesics.jl")
 include("grids.jl")
