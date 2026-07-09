@@ -268,6 +268,13 @@ end
 whichring(grid::AbstractGrid) = grid.whichring
 whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat_half, eachring(Grid, nlat_half))
 
+"""$(TYPEDSIGNATURES) First index and length of every ring in `grid` as two vectors
+on architecture `arch`, for use inside kernels where the CPU-only `grid.rings` is unavailable."""
+function eachring_on_architecture(arch, grid::AbstractGrid)
+    rings = eachring(grid)
+    return on_architecture(arch, first.(rings)), on_architecture(arch, length.(rings))
+end
+
 # for architectures / adapt
 Architectures.ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) = ismatching(grid.architecture, array_type)
 Architectures.ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))

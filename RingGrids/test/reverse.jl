@@ -40,3 +40,21 @@
         end
     end
 end
+
+@testset "Reverse n-dimensional fields" begin
+    @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid, HEALPixGrid)
+        grid = Grid(4)
+        @testset for trailing_dims in ((2,), (2, 3), (2, 3, 2))
+            field = rand(Float32, grid, trailing_dims...)
+            @testset for dims in (:lat, :lon)
+                reversed = reverse(field, dims = dims)
+
+                # reversing all layers at once == reversing every 2D layer independently
+                for c in CartesianIndices(trailing_dims)
+                    layer = Field(field.data[:, c], grid)
+                    @test reverse(layer, dims = dims) == Field(reversed.data[:, c], grid)
+                end
+            end
+        end
+    end
+end

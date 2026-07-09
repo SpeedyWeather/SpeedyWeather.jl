@@ -6,20 +6,28 @@ Rotate the field(s) represented by a LowerTriangularArray zonally by `degree`
 by multiplication of the spherical harmonics by exp(-i*m*2π*degree/360),
 with `m` the order of the spherical harmonic."""
 function rotate!(L::LowerTriangularArray, degree::Real)
-    lmax, mmax = size(L, OneBased, as = Matrix)
+    mmax = size(L, 2, OneBased, as = Matrix)
 
-    for k in eachmatrix(L)
-        lm = 0
-        for m in 1:mmax
-            # complex rotation, exp(-i*m*2π*degree/360) but more accurate
-            o = convert(complex(eltype(L)), cispi(-(m - 1) * degree / 180))
-            for l in m:lmax
-                lm += 1
-                L[lm, k] *= o
-            end
-        end
-    end
+    # complex rotation per order m, exp(-i*m*2π*degree/360) but more accurate;
+    # precomputed in the precision of `degree` before conversion for accuracy
+    NF = complex(eltype(L))
+
+    # allocates a vector here but keeps the cispi out of kernels
+    # which is not supported on some architectures (e.g. Metal)
+    rotation = [convert(NF, cispi(-(m - 1) * degree / 180)) for m in 1:mmax]
+
+    arch = architecture(L)
+    launch!(
+        arch, SpectralWorkOrder, size(L), rotate_kernel!,
+        L.data, on_architecture(arch, rotation), L.spectrum.m_indices,
+    )
     return L
+end
+
+@kernel inbounds = true function rotate_kernel!(data, @Const(rotation), @Const(m_indices))
+    I = @index(Global, NTuple)
+    m = m_indices[I[1]]     # order m of the harmonic at running index lm = I[1]
+    data[I...] *= rotation[m]
 end
 
 # also allow long names longitude, latitude
@@ -35,20 +43,18 @@ represent the coefficients of the spherical harmonics. Reversal
 in latitude direction is obtained by flipping the sign of the
 odd harmonics. Reverses `L` in place."""
 function Base._reverse!(L::LowerTriangularArray, ::Val{:lat})
-    lmax, mmax = size(L, OneBased, as = Matrix)
-
-    for k in eachmatrix(L)      # loop over any additional dimensions
-        lm = 0
-        for m in 1:mmax
-            for l in m:lmax
-                lm += 1
-                if isodd(l + m)   # odd harmonics only
-                    L[lm, k] = -L[lm, k]
-                end
-            end
-        end
-    end
+    (; l_indices, m_indices) = L.spectrum
+    arch = architecture(L)
+    launch!(arch, SpectralWorkOrder, size(L), reverse_lat_kernel!, L.data, l_indices, m_indices)
     return L
+end
+
+@kernel inbounds = true function reverse_lat_kernel!(data, @Const(l_indices), @Const(m_indices))
+    I = @index(Global, NTuple)
+    lm = I[1]
+    if isodd(l_indices[lm] + m_indices[lm])     # odd harmonics only
+        data[I...] = -data[I...]
+    end
 end
 
 """$(TYPEDSIGNATURES)
