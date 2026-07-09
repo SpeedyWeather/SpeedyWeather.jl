@@ -17,7 +17,7 @@ struct SpectralTransform{
         VectorType,                 # <: ArrayType{NF, 1},
         ArrayTypeIntMatrix,         # <: ArrayType{Int, 2}
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
-        LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
+        LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}, ...},
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
         GradientType,               # <: NamedTuple for gradients
         IntType,                    # <: Integer
@@ -201,7 +201,7 @@ function SpectralTransform(
         array_type(architecture, NF, 1),
         array_type(architecture, Int, 2),
         array_type(architecture, Complex{NF}, 2),
-        LowerTriangularArray{NF, 2, array_type(architecture, NF, 2), typeof(spectrum)},
+        typeof(legendre_polynomials),
         typeof(scratch_memory),
         typeof(gradients),
         typeof(nlayers),
