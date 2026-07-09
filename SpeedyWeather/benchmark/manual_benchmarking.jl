@@ -9,6 +9,11 @@ Usage:
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-cpu   # Reactant on CPU
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU
 
+An optional second argument multiplies the number of timesteps per timed run
+(default 1), for longer, more robust publication-ready timings, e.g.
+
+    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl gpu 10         # 10× longer timed runs
+
 The CPU label is auto-derived from `Sys.ARCH` (`cpu-arm` for aarch64/arm64,
 `cpu-x86` otherwise). GPU runs require a CUDA-capable device — `using CUDA`
 is loaded automatically. The Reactant variants additionally `using Reactant`
@@ -66,11 +71,20 @@ end
 const ARCH, ARCH_LABEL = pick_architecture(ARCH_ARG)
 @info "Running benchmarks for architecture: $ARCH_LABEL ($(typeof(ARCH)))"
 
+# Optional second argument: a multiplier on the number of timesteps per timed run.
+# Lengthens every run for more robust (e.g. publication-ready) timings; defaults
+# to 1. Example: `julia manual_benchmarking.jl gpu 10`.
+const TIMESTEP_MULTIPLIER = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 1.0
+TIMESTEP_MULTIPLIER > 0 || error("timestep multiplier must be > 0, got $TIMESTEP_MULTIPLIER")
+@info "Timestep multiplier: $TIMESTEP_MULTIPLIER"
+
 include("benchmark_suite.jl")
 include("define_benchmarks.jl")
 
 for suite in values(benchmarks)
     suite.architecture = ARCH
+    # BenchmarkSuiteDynamics has no timed-run step count, so skip it there.
+    hasproperty(suite, :timestep_multiplier) && (suite.timestep_multiplier = TIMESTEP_MULTIPLIER)
 end
 
 # Deterministic suite ordering (sort by key for reproducible README sections).
