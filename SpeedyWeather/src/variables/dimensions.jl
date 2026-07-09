@@ -15,12 +15,12 @@ allocate(::AbstractVariable{Grid2D}, model::AbstractModel) = zeros(model.spectra
 const GridXY = Grid2D
 
 """Dimension for 3D grid variables on the horizontal grid with an unspecified 3rd dimension
-of length `n` (use `n=0` for the number of vertical layers). Carries a neutral tag; prefer
+of length `n` (default 1, a trailing singleton dimension). Carries a neutral tag; prefer
 `GridXYZ` or `GridXYT` when the 3rd dimension is specifically vertical or time."""
 @kwdef struct Grid3D <: AbstractVariableDim3D
-    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
+    n::Int = 1                                                  # length of 3rd dimension
 end
-allocate(v::AbstractVariable{Grid3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model) : v.dims.n)
+allocate(v::AbstractVariable{Grid3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n)
 
 """Dimension for 3D grid variables on the horizontal grid with vertical levels (nlayers)."""
 struct GridXYZ <: AbstractVariableDim3D end
@@ -51,12 +51,12 @@ allocate(v::AbstractVariable{Land4D}, model::AbstractModel) = zeros(model.spectr
 const LandXYZT = Land4D
 
 """Dimension for 3D ocean variables with an unspecified 3rd dimension of length `n`
-(use `n=0` for the number of ocean layers). Carries a neutral tag; prefer `OceanXYZ` or
+(default 1, a trailing singleton dimension). Carries a neutral tag; prefer `OceanXYZ` or
 `OceanXYT` when the 3rd dimension is specifically vertical or time."""
 @kwdef struct Ocean3D <: AbstractVariableDim3D
-    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
+    n::Int = 1                                                  # length of 3rd dimension
 end
-allocate(v::AbstractVariable{Ocean3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model.ocean) : v.dims.n)
+allocate(v::AbstractVariable{Ocean3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n)
 
 """Dimension for 3D ocean variables, horizontal + vertical (ocean layers)."""
 struct OceanXYZ <: AbstractVariableDim3D end
@@ -80,12 +80,12 @@ struct Spectral2D <: AbstractVariableDim2D end
 allocate(::AbstractVariable{Spectral2D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable2D, model.spectral_grid.spectrum)
 
 """Dimension for 3D spectral variables with an unspecified 3rd dimension of length `n`
-(use `n=0` for the number of vertical layers). Carries a neutral tag; prefer `SpectralXYZ`
+(default 1, a trailing singleton dimension). Carries a neutral tag; prefer `SpectralXYZ`
 or `SpectralXYT` when the 3rd dimension is specifically vertical or time."""
 @kwdef struct Spectral3D <: AbstractVariableDim3D
-    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
+    n::Int = 1                                                  # length of 3rd dimension
 end
-allocate(v::AbstractVariable{Spectral3D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, v.dims.n == 0 ? get_nlayers(model) : v.dims.n)
+allocate(v::AbstractVariable{Spectral3D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, v.dims.n)
 
 """Dimension for 3D spectral variables, horizontal + vertical (nlayers)."""
 struct SpectralXYZ <: AbstractVariableDim3D end
@@ -181,8 +181,8 @@ allocate(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.Anvil
 #   ----------------------------------+---------------------------------------------
 #   Grid2D     → 1 slot,  scalar idx  | DISALLOWED because no time step / n step
 #                 view (npoints,)     |
-#   Grid3D     → nlayers slots, range | 1 slot, scalar layer-idx, trailing `:`
-#                 view (npoints, nlayers) → view (npoints, nsteps)
+#   Grid3D     → n slots, range       | 1 slot, scalar layer-idx, trailing `:`
+#                 view (npoints, n)   → view (npoints, nsteps)
 #   Grid4D     → forces parent to 4D  | nlayers slots, range, trailing `:`
 #                                     → view (npoints, nlayers, nsteps)
 #
@@ -190,7 +190,7 @@ allocate(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.Anvil
 #
 # `fused_slots` says how many parent layer-axis columns a member needs. It is
 # *parent-rank-dependent* via the `parent_is_4d` flag: a Grid3D member uses
-# `nlayers` slots in a 3D parent but only 1 slot in a 4D parent (because it is encoding 
+# `n` slots in a 3D parent but only 1 slot in a 4D parent (because it is encoding
 # a 2D field with steps for the solver in this case).
 # `fuse_family` says which parent family the member is compatible with; fusion across
 # families is rejected in `build_fuse_parents`.
@@ -239,9 +239,9 @@ function fused_slots(d::AbstractVariableDim, model::AbstractModel; parent_is_4d:
         is_fuse_4d(d) ? get_nlayers(model) : 1
     else
         is_fuse_2d(d) ? 1 :
-        d isa Spectral3D ? (d.n == 0 ? get_nlayers(model) : d.n) :
+        d isa Spectral3D ? d.n :
         d isa SpectralXYT ? d.n :
-        d isa Grid3D ? (d.n == 0 ? get_nlayers(model) : d.n) :
+        d isa Grid3D ? d.n :
         d isa GridXYT ? d.n :
         get_nlayers(model)
     end

@@ -64,8 +64,11 @@ and a new prognostic variable `my_prognostic_variable` for our parameterization.
 Depending on the scope you define this in you may need to add `SpeedyWeather.` in
 front of functions and types. The flux variable is defined as a two-dimensional
 variable on our grid, and the prognostic variable is defined as a spectral variable.
-Three-dimensional variables are also possible by using `Grid3D` and `Spectral3D` as `dims`
-(the 2nd argument).
+Three-dimensional variables are also possible by using `GridXYZ` and `SpectralXYZ` as `dims`
+(the 2nd argument) for a vertical dimension with the number of layers of the model, or
+`GridXYT(n)`/`SpectralXYT(n)` for a time/step dimension (of lenth `n = 1` by default).
+`Grid3D(n)` and `Spectral3D(n)` exist for a
+third dimension of length `n` (default 1) of unspecified meaning.
 
 These variables are then passed to the `parameterization!` function inside the `Variables` object.
 Additionally, `Variables` has several scratch arrays that you can reuse `vars.scratch.grid.a` and `.b`
