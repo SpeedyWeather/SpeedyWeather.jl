@@ -1,7 +1,7 @@
 # variable that AbstractOcean requires
 function variables(::AbstractOcean)
     return (
-        PrognosticVariable(:sea_surface_temperature, Grid3D(1), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
+        PrognosticVariable(:sea_surface_temperature, GridXYT(), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
     )
 end
 
@@ -289,8 +289,8 @@ function variables(::SlabOcean, model::AbstractModel)
     pg = nsteps.prognostic_grid
     tg = nsteps.tendency_grid
     return (
-        PrognosticVariable(:sea_surface_temperature, Grid3D(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
-        TendencyVariable(:sea_surface_temperature, Grid3D(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),
+        PrognosticVariable(:sea_surface_temperature, GridXYT(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
+        TendencyVariable(:sea_surface_temperature, GridXYT(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),
 
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m^2"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),

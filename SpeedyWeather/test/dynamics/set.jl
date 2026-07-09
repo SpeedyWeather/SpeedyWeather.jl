@@ -70,10 +70,10 @@
 
     Di = deepcopy(prog_new.land.soil_temperature)
     RingGrids.interpolate!(Di, D; NF)
-    set!(simulation, soil_temperature = D, step = nothing, namespace = :land)
+    set!(simulation, soil_temperature = D, namespace = :land)
     @test prog_new.land.soil_temperature == Di
 
-    set!(simulation, soil_moisture = D; step = nothing, namespace = :land)
+    set!(simulation, soil_moisture = D; namespace = :land)
     @test prog_new.land.soil_moisture == Di
 
     # numbers
@@ -85,11 +85,15 @@
     set!(simulation, vorticity = Float32(3.0); step, add = true)
     @test get_step(prog_new.vorticity, step) ≈ (2 .* M3_spec)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0), step = nothing, namespace = :ocean)
-    @test all(prog_new.ocean.sea_surface_temperature .≈ 3.0)
+    set!(simulation, sea_surface_temperature = Float16(3.0), namespace = :ocean)
+    @test all(prog_new.ocean.sea_surface_temperature[:, 1] .≈ 3.0)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0), step = nothing, add = true, namespace = :ocean)
-    @test all(prog_new.ocean.sea_surface_temperature .≈ 6.0)
+    set!(simulation, sea_surface_temperature = Float16(3.0), step = 1, add = true, namespace = :ocean)
+    @test all(prog_new.ocean.sea_surface_temperature[:, 1] .≈ 6.0)
+
+    set!(simulation, sea_surface_temperature = 5, step = 1, namespace = :ocean)
+    set!(simulation, sea_surface_temperature = 5, step = 2, namespace = :ocean)
+    @test all(prog_new.ocean.sea_surface_temperature .== 5)
 
     # vor_div, create u,v first in spectral space
     u = randn(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
@@ -139,7 +143,7 @@
 
     # groups
     # non-stepped variables need step = nothing
-    set!(simulation, geopotential = 1, step=nothing, group = :dynamics)
+    set!(simulation, geopotential = 1, group = :dynamics)
     @test all(simulation.variables.dynamics.geopotential .== 1)
 end
 

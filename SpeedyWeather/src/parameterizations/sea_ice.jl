@@ -43,8 +43,8 @@ function variables(::ThermodynamicSeaIce, model::AbstractModel)
     pg = nsteps.prognostic_grid
     tg = nsteps.tendency_grid
     return (
-        PrognosticVariable(:sea_ice_concentration, Grid3D(pg), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
-        TendencyVariable(:sea_ice_concentration, Grid3D(tg), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
+        PrognosticVariable(:sea_ice_concentration, GridXYT(pg), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
+        TendencyVariable(:sea_ice_concentration, GridXYT(tg), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
     )
 end
 
