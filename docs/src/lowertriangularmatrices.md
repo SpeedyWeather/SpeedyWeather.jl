@@ -217,7 +217,7 @@ L' * L
 ```
 
 Summation with `sum` follows the flat, single index logic
-```@repl
+```@repl LowerTriangularArrays
 L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 sum(L, dims=2)
 ```
@@ -305,6 +305,24 @@ L = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 L_gpu = adapt(CuArray, L)
 ```
 
+## Array dimensions for `LowerTriangularArray`
+
+Like `Field` (see [Array dimensions of a Field](@ref) in RingGrids), a `LowerTriangularArray`
+carries a `dims::AbstractArrayDimensions` field that records what the dimensions beyond the
+spherical harmonics (`l`, `m`) represent, see [Array dimensions](@ref array_dimensions) for
+a general overview of these dimension tags. The only difference is the name of the 2D
+(horizontal) dimension: `LM` instead of `XY`, since a `LowerTriangularArray` stores spherical
+harmonic coefficients rather than grid-point values. Correspondingly `LMZ`, `LMT`, and `LMZT`
+add a vertical and/or time dimension, exactly as `XYZ`, `XYT`, `XYZT` do for `Field`. `LM` is
+the default if no `dims` is given, e.g. for the `L`, `L2` created above. Everything else --
+`ArrayDimensions.hasvertical`, `ArrayDimensions.hastime`, preservation through
+`similar`/`zero`/views/indexing -- works the same way as described for `Field`.
+
+```@repl LowerTriangularArrays
+L3 = zeros(LowerTriangularArray{Float32}, 5, 5, ArrayDimensions.LMZ(), 3)
+ArrayDimensions.hasvertical(L3), ArrayDimensions.hastime(L3)
+```
+
 ## The `Spectrum` type
 
 Internally, a `LowerTriangularArray` is represented by an array that holds all non-zero elements of the matrices and a `Spectrum` type that holds all spectral discretization information and the architecture the array is on. The `Spectrum` can also be used to create new `LowerTriangularArray`s with the same spectral discretization:
@@ -321,7 +339,10 @@ L = rand(Float32, spectrum)
 L = rand(ComplexF32, spectrum, 5)
 ```
 
-In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type, and all `LowerTriangularArray`s are created with the same `Spectrum`. Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s with the same spectral discretization as follows:
+In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type,
+and all `LowerTriangularArray`s are created with the same `Spectrum`.
+Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s
+with the same spectral discretization as follows:
 
 ```@repl LowerTriangularArrays
 SG = SpectralGrid(trunc=31)

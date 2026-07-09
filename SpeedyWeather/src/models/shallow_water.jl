@@ -68,21 +68,21 @@ function variables(model::ShallowWater)
     ts = nsteps.tendency_spectral
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(ps), desc = "Divergence", units = "1/s", fuse = :prognostic),
-        PrognosticVariable(:η, Spectral3D(ps), desc = "Interface displacement", units = "m", fuse = :prognostic),
+        PrognosticVariable(:divergence, SpectralXYZT(ps), desc = "Divergence", units = "1/s", fuse = :prognostic),
+        PrognosticVariable(:η, SpectralXYT(ps), desc = "Interface displacement", units = "m", fuse = :prognostic),
 
-        TendencyVariable(:divergence, Spectral4D(ts), desc = "Tendency of divergence", units = "1/s²"),
-        TendencyVariable(:divergence, Grid4D(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:divergence, SpectralXYZT(ts), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:divergence, GridXYZT(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
 
-        TendencyVariable(:η, Spectral3D(ts), desc = "Tendency of interface displacement", units = "m/s"),
-        TendencyVariable(:η, Grid3D(tg), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
+        TendencyVariable(:η, SpectralXYT(ps), desc = "Tendency of interface displacement", units = "m/s"),
+        TendencyVariable(:η, GridXYT(tg), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
 
-        GridVariable(:divergence, Grid4D(pg), desc = "Divergence", units = "1/s", fuse = :grid),
-        GridVariable(:η, Grid3D(pg), desc = "Interface displacement", units = "m", fuse = :grid),
-        DynamicsVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m²/s²"),
+        GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse = :grid),
+        GridVariable(:η, GridXYT(pg), desc = "Interface displacement", units = "m", fuse = :grid),
+        DynamicsVariable(:geopotential, GridXYZ(), desc = "Geopotential", units = "m²/s²"),
 
-        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
-        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
     )
 end
 

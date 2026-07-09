@@ -1,5 +1,3 @@
-const DEFAULT_ARCHITECTURE = CPU
-
 abstract type AbstractSpectrum end
 
 """$(TYPEDSIGNATURES) 
