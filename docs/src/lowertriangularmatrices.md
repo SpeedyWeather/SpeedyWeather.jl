@@ -20,7 +20,7 @@ So, for example a ``(10\times 10\times 10)`` `LowerTriangularArray` holds 10 `Lo
 ## Creation of `LowerTriangularArray`
 
 A `LowerTriangularMatrix` and `LowerTriangularArray` can be created using `zeros`, `ones`, `rand`, or `randn`
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 using LowerTriangularArrays
 
 L = rand(LowerTriangularMatrix{Float32}, 5, 5)
@@ -36,7 +36,7 @@ matrix with 15 elements forming a 5x5 matrix, but the zeros are not shown.
 
 Alternatively, it can be created through conversion from `Array`, which drops the upper triangle
 entries and sets them to zero (which are not stored however)
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 M = rand(Float16, 3, 3)
 L = LowerTriangularMatrix(M)
 
@@ -48,7 +48,7 @@ L2 = LowerTriangularArray(M2)
 
 There are three different ways to describe the size of a `LowerTriangularArray`. For example with `L`
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L = rand(LowerTriangularMatrix, 5, 5)
 ```
 
@@ -56,7 +56,7 @@ we have (additional dimensions follow naturally thereafter)
 
 ### 1-based vector indexing (default)
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 size(L)    # equivalently size(L, OneBased, as=Vector)
 ```
 
@@ -64,7 +64,7 @@ The lower triangle is unravelled hence the number of elements in the lower trian
 
 ### 1-based matrix indexing
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 size(L, as=Matrix)    # equivalently size(L, OneBased, as=Matrix)
 ```
 
@@ -77,7 +77,7 @@ Because `LowerTriangularArray`s are used to represent the coefficients of spheri
 are commonly indexed based on zero (i.e. starting with the zero mode representing the mean),
 we also add `ZeroBased` to get the corresponding size.
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 size(L, ZeroBased, as=Matrix)
 ```
 which is convenient if you want to know the maximum degree and order of the spherical harmonics in `L`.
@@ -93,18 +93,18 @@ We illustrate the two types of indexing `LowerTriangularArray` supports.
 
 The matrix index works as expected
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L
 
 L[2, 2]
 ```
 But the single index skips the zero entries in the upper triangle, i.e. a `2, 2` index points to the
 same element as the index `6`
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L[6]
 ```
 which, important, is different from single indices of an `AbstractMatrix`
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 Matrix(L)[6]
 ```
 which would point to the first element in the upper triangle (hence zero).
@@ -114,7 +114,7 @@ to the index of the underlying data vector. The matrix index is somewhat slower
 as it first has to be converted to the corresponding single index.
 
 Consequently, many loops in SpeedyWeather.jl are build with the following structure
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 n, m = size(L, as=Matrix)
 
 ij = 0
@@ -134,7 +134,7 @@ loop body or to perform any calculation (`i+j` here).
 
 The `setindex!` functionality of matrices will throw a `BoundsError` when trying to write
 into the upper triangle of a `LowerTriangularArray`, for example
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L[2, 1] = 0    # valid index
 
 L[1, 2] = 0    # invalid index in the upper triangle
@@ -142,14 +142,14 @@ L[1, 2] = 0    # invalid index in the upper triangle
 
 But reading from it will just return a zero
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L[2, 3]     # in the upper triangle
 ```
 
 Higher dimensional `LowerTriangularArray` can be indexed with multidimensional array indices
 like most other arrays types. Both the vector index and the matrix index for the lower
 triangle work as shown here
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 
 L[2, 1] # second lower triangle element of the first lower triangle matrix
@@ -161,7 +161,7 @@ The `setindex!` functionality follows accordingly.
 ### Iterators
 
 An iterator over all entries in the array can be created with `eachindex`
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L = rand(LowerTriangularArray, 5, 5, 5)
 for ij in eachindex(L)
     # do something
@@ -172,19 +172,19 @@ eachindex(L)
 
 In order to only loop over the harmonics (essentially the horizontal, ignoring other dimensions)
 use `eachharmonic`
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 eachharmonic(L)
 ```
 
 If you only want to loop over the other dimensions use `eachmatrix`
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 eachmatrix(L)
 ```
 
 together they can be used as
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 for k in eachmatrix(L)
     for lm in eachharmonic(L)
         L[lm, k]
@@ -202,7 +202,7 @@ The [LowerTriangularArrays](@ref lowertriangularmatrices) module's main purpose 
 and typical matrix operations will not work with `LowerTriangularMatrix` because it's treated as a vector
 not as a matrix, meaning that the following will not work as expected
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L = rand(LowerTriangularMatrix{Float32}, 3, 3)
 L * L
 inv(L)
@@ -212,12 +212,12 @@ And many other operations that require `L` to be a `AbstractMatrix` which it isn
 vector operations like a scalar product between two "LowerTriangularMatrix" vectors does work
 
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L' * L
 ```
 
 Summation with `sum` follows the flat, single index logic
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 sum(L, dims=2)
 ```
@@ -231,13 +231,13 @@ when transformed to grid space. We implement `rotate!` (and `rotate` for an allo
 for `LowerTriangularArray` to rotate these coefficients in complex number space to represent
 a longitude rotation of the represented grid space field. For example start with
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 M = rand(LowerTriangularMatrix{ComplexF32}, 3, 3)
 ```
 
 Now `rotate!(::LowerTriangularArray, degree)`
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 rotate!(M, 45)
 ```
 
@@ -252,7 +252,7 @@ but isn't here as created by the `rand`) and for the other modes this amounts to
 With ``\phi`` the rotation angle in degrees (positive eastward) and ``m`` the zonal wavenumber (order of the
 spherical harmonic, the zero-based column index). Rotating again by 315˚ yields the original array
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 rotate!(M, 315)
 ```
 
@@ -268,13 +268,13 @@ odd harmonics, which are the ones that are not symmetric around the equator. Sph
 reversed in longitude by taking the complex conjugate of every element as this flips the sign of the
 imaginary parts, which effectively mirrors the rotation of that harmonic around 0˚E.
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 reverse(M, dims=:lat)
 ```
 
 and in longitude
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 reverse(M, dims=:lon)
 ```
 
@@ -284,7 +284,7 @@ In contrast to linear algebra, many element-wise operations work as expected tha
 so operations that can be written in `.` notation whether implicit `+`, `2*`, ... or explicitly
 written `.+`, `.^`, ... or via the `@.` macro
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L + L
 2L
 
@@ -318,7 +318,7 @@ the default if no `dims` is given, e.g. for the `L`, `L2` created above. Everyth
 `ArrayDimensions.hasvertical`, `ArrayDimensions.hastime`, preservation through
 `similar`/`zero`/views/indexing -- works the same way as described for `Field`.
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L3 = zeros(LowerTriangularArray{Float32}, 5, 5, ArrayDimensions.LMZ(), 3)
 ArrayDimensions.hasvertical(L3), ArrayDimensions.hastime(L3)
 ```
@@ -327,15 +327,15 @@ ArrayDimensions.hasvertical(L3), ArrayDimensions.hastime(L3)
 
 Internally, a `LowerTriangularArray` is represented by an array that holds all non-zero elements of the matrices and a `Spectrum` type that holds all spectral discretization information and the architecture the array is on. The `Spectrum` can also be used to create new `LowerTriangularArray`s with the same spectral discretization:
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 spectrum = Spectrum(5, 5) # initailize
 ```
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L = rand(Float32, spectrum)
 ```
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 L = rand(ComplexF32, spectrum, 5)
 ```
 
@@ -344,7 +344,7 @@ and all `LowerTriangularArray`s are created with the same `Spectrum`.
 Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s
 with the same spectral discretization as follows:
 
-```@repl LowerTriangularArrays
+```@example LowerTriangularArrays
 SG = SpectralGrid(trunc=31)
 L = rand(Float32, SG.spectrum)
 ```
