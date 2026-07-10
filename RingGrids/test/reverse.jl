@@ -32,7 +32,10 @@
                 @test reverse!(grid2, dims = :longitude) == grid
                 @test reverse(reverse(grid, dims = :lon), dims = :lon) == grid
 
-                if k < 2
+                # reversing both dims == reversing the whole (flat) array, but only for
+                # grids where all rings have a longitudinal offset: without one the first
+                # point of each ring stays in place under reverse(dims = :lon)
+                if k < 2 && Grid in (OctaminimalGaussianGrid, OctaHEALPixGrid)
                     @test reverse(reverse(grid, dims = :lat), dims = :lon) == reverse(grid)
                     @test reverse(reverse(grid, dims = :lon), dims = :lat) == reverse(grid)
                 end
@@ -55,6 +58,47 @@ end
                     @test reverse(layer, dims = dims) == Field(reversed.data[:, c], grid)
                 end
             end
+        end
+    end
+end
+
+@testset "Reverse :lon mirrors at the 0˚ meridian" begin
+    @testset for Grid in (
+            FullGaussianGrid,
+            FullClenshawGrid,
+            FullHEALPixGrid,
+            FullOctaHEALPixGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+            OctaminimalGaussianGrid,
+        )
+
+        nlat_half = 4
+        grid = Grid(nlat_half)
+        field = zeros(grid)
+        for ring in eachring(grid)
+            field[ring] .= 1:length(ring)
+        end
+
+        reverse!(field, dims = :lon)
+        for (j, ring) in enumerate(eachring(grid))
+            n = length(ring)
+            if hasoffset(Grid, nlat_half, j)
+                @test field[ring] == n:-1:1         # 1, 2, ..., n -> n, ..., 2, 1
+            else
+                @test field[ring] == [1; n:-1:2]    # first point (on 0˚) stays
+            end
+        end
+
+        # mirror at 0˚ is only possible in-place because every ring's longitudes
+        # map onto themselves under λ -> (360 - λ) % 360
+        londs, _ = get_londlatds(grid)
+        for ring in eachring(grid)
+            lond = londs[ring]
+            mirrored = sort!([mod(360 - λ, 360) for λ in lond])
+            @test mirrored ≈ sort(lond)
         end
     end
 end

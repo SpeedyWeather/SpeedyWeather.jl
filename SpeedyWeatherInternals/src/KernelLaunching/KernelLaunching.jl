@@ -107,7 +107,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Returns the `workgroup` and `worksize` for launching a kernel over a regular 3D array.
+Returns the `workgroup` and `worksize` for launching a kernel over a regular N-D array.
 """
 function work_layout(::Type{ArrayWorkOrder}, worksize::NTuple{N, Int}) where {N}
     return heuristic_workgroup(worksize...), worksize

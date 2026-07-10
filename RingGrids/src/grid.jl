@@ -275,6 +275,21 @@ function eachring_on_architecture(arch, grid::AbstractGrid)
     return on_architecture(arch, first.(rings)), on_architecture(arch, length.(rings))
 end
 
+"""$(TYPEDSIGNATURES) True if the first longitude point on every ring of the grid is offset
+half a longitudinal grid spacing east of the 0˚ meridian, false if the first point lies on
+0˚ exactly. Defined per grid type; grids where only some rings have an offset (`HEALPixGrid`)
+only define the per-ring `hasoffset(Grid, nlat_half, j)`."""
+hasoffset(grid::AbstractGrid) = hasoffset(typeof(grid))
+
+"""$(TYPEDSIGNATURES) Like `hasoffset(grid)` but for ring `j`, for grids like `HEALPixGrid`
+where only some rings have a longitudinal offset."""
+hasoffset(Grid::Type{<:AbstractGrid}, nlat_half::Integer, j::Integer) = hasoffset(Grid)
+
+"""$(TYPEDSIGNATURES) The longitudinal offset of `grid` as passed to kernels: `hasoffset(grid)`
+as a scalar Bool for grids where it is identical on every ring, but a Bool vector (one per
+ring, on architecture `arch`) for grids like `HEALPixGrid` where it is ring-dependent."""
+offset_maybe_vector(arch, grid::AbstractGrid) = hasoffset(grid)
+
 # for architectures / adapt
 Architectures.ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) = ismatching(grid.architecture, array_type)
 Architectures.ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))

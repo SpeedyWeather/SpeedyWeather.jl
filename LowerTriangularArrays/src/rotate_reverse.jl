@@ -2,9 +2,10 @@ import LinearAlgebra: rotate!
 export rotate!
 
 """$(TYPEDSIGNATURES)
-Rotate the field(s) represented by a LowerTriangularArray zonally by `degree`
+Rotate the field(s) represented by a LowerTriangularArray zonally eastward by `degree`
 by multiplication of the spherical harmonics by exp(-i*m*2π*degree/360),
-with `m` the order of the spherical harmonic."""
+with `m` the order of the spherical harmonic. Any `degree` is allowed,
+in contrast to the grid-space `rotate!` which is restricted to multiples of 90˚."""
 function rotate!(L::LowerTriangularArray, degree::Real)
     mmax = size(L, 2, OneBased, as = Matrix)
 
@@ -38,10 +39,10 @@ Base._reverse!(L::LowerTriangularArray, ::Val{:longitude}) = Base._reverse!(L, V
 Base._reverse!(L::LowerTriangularArray, sym::Symbol) = Base._reverse!(L, Val(sym))
 
 """$(TYPEDSIGNATURES)
-Reverse the field represented by `L` in latitude when the element in `L`
-represent the coefficients of the spherical harmonics. Reversal
-in latitude direction is obtained by flipping the sign of the
-odd harmonics. Reverses `L` in place."""
+Reverse the field represented by `L` in latitude (mirror at the equator)
+when the elements in `L` represent the coefficients of the spherical harmonics.
+Reversal in latitude direction is obtained by flipping the sign of the
+harmonics with odd degree + order `l + m`. Reverses `L` in place."""
 function Base._reverse!(L::LowerTriangularArray, ::Val{:lat})
     (; l_indices, m_indices) = L.spectrum
     arch = architecture(L)
@@ -58,9 +59,10 @@ end
 end
 
 """$(TYPEDSIGNATURES)
-Reverse the field represented by `L` in longitude (mirror at 0˚)
-when the element in `L` represent the coefficients of the spherical harmonics.
-Reversal in longitude direction is obtained by the complex harmonics.
+Reverse the field represented by `L` in longitude (mirror at the 0˚ meridian)
+when the elements in `L` represent the coefficients of the spherical harmonics.
+Reversal in longitude direction is obtained by taking the complex conjugate
+of the harmonics, consistent with the grid-space `reverse!(field, dims=:lon)`.
 Reverses `L` in place."""
 function Base._reverse!(L::LowerTriangularArray, ::Val{:lon})
     L .= conj.(L)
