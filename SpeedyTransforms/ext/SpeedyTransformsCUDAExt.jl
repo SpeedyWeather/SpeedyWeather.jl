@@ -1,6 +1,7 @@
 module SpeedyTransformsCUDAExt
 
-import CUDA: CUDA, CUFFT, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
+import CUDA: CUDA, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
+using cuFFT
 import AbstractFFTs
 import LinearAlgebra
 import LinearAlgebra: mul!
