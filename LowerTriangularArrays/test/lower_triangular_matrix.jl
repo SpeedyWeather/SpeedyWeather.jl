@@ -617,7 +617,6 @@ end
     end
 end
 
-
 @testset "GPU (JLArrays)" begin
     # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
     NF = Float32
