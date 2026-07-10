@@ -157,14 +157,14 @@ function variables(::Type{<:PrimitiveWet}, nsteps = DEFAULT_NSTEPS)
 
         # Add humidity
         PrognosticVariable(:humidity, SpectralXYZT(ps), desc = "Specific humidity", units = "kg/kg", fuse=:prognostic),
-        GridVariable(:humidity, GridXYZT(tg), desc = "Specific Humidity", units = "kg/kg", fuse=:grid),
-        TendencyVariable(:humidity, SpectralXYZT(ps), desc = "Tendency of specific humidity", units = "kg/kg/s", fuse = :spectral_tendencies),
+        GridVariable(:humidity, GridXYZT(pg), desc = "Specific Humidity", units = "kg/kg", fuse=:grid),
+        TendencyVariable(:humidity, SpectralXYZT(ts), desc = "Tendency of specific humidity", units = "kg/kg/s", fuse = :spectral_tendencies),
         TendencyVariable(:humidity, GridXYZT(tg), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s", fuse = :grid_tendencies),
 
         DynamicsVariable(:uq, GridXYZT(tg), desc = "u*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
         DynamicsVariable(:vq, GridXYZT(tg), desc = "v*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:uq, SpectralXYZT(ps), desc = "u*humidity intermediate in spectral space", fuse = :spectral_tendencies),
-        DynamicsVariable(:vq, SpectralXYZT(ps), desc = "v*humidity intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:uq, SpectralXYZT(ts), desc = "u*humidity intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vq, SpectralXYZT(ts), desc = "v*humidity intermediate in spectral space", fuse = :spectral_tendencies),
     )
 end
 

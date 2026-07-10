@@ -82,7 +82,7 @@ function variables(model::ShallowWater)
         DynamicsVariable(:geopotential, GridXYZ(), desc = "Geopotential", units = "m²/s²"),
 
         DynamicsVariable(:kinetic_energy, GridXYZT(tg), desc = "Kinetic energy intermediate, ½(u²+v²)+Φ", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:kinetic_energy, SpectralXYZT(ps), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:kinetic_energy, SpectralXYZT(ts), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
 
         ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
         ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
