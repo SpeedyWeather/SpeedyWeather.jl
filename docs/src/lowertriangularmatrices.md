@@ -226,10 +226,12 @@ sums along the second dimension of the underlying vector, not of the full matrix
 ## Rotation of `LowerTriangularArray`
 
 `LowerTriangularArray`s are used to describe spherical harmonics. In that case each element
-represents the coefficient in fron of the respective harmonic describing a field on the sphere
+represents the coefficient in front of the respective harmonic describing a field on the sphere
 when transformed to grid space. We implement `rotate!` (and `rotate` for an allocating version)
 for `LowerTriangularArray` to rotate these coefficients in complex number space to represent
-a longitude rotation of the represented grid space field. For example start with
+a longitude rotation of the represented grid space field. In contrast to the grid-space
+`rotate!` (see [Rotate and reverse Fields](@ref)) which is restricted to multiples of 90˚,
+any rotation angle is possible in spectral space. For example start with
 
 ```@example LowerTriangularArrays
 M = rand(LowerTriangularMatrix{ComplexF32}, 3, 3)
@@ -260,13 +262,15 @@ rotate!(M, 315)
 
 A `LowerTriangularArray` is an `AbstractArray`, as such `reverse` and `reverse!` (in-place) are defined,
 reversing all elements of these arrays in the way how they are indexed with a single index.
-For `LowerTriangularArra` representing the coefficients of the spherical harmonics this does not make
+For `LowerTriangularArray` representing the coefficients of the spherical harmonics this does not make
 much sense, however, we describe here the functionality to `reverse` these arrays as they represent
 spherical harmonics, adding methods for `dims=:lat` for reversal in latitude direction and `dims=:lon` in
 longitude direction. Spherical harmonics are reversed in latitude by flipping the sign of the
 odd harmonics, which are the ones that are not symmetric around the equator. Spherical harmonics are
 reversed in longitude by taking the complex conjugate of every element as this flips the sign of the
 imaginary parts, which effectively mirrors the rotation of that harmonic around 0˚E.
+Both are consistent with reversing the corresponding field in grid space,
+see [Rotate and reverse Fields](@ref).
 
 ```@example LowerTriangularArrays
 reverse(M, dims=:lat)
@@ -345,7 +349,8 @@ Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTria
 with the same spectral discretization as follows:
 
 ```@example LowerTriangularArrays
-SG = SpectralGrid(trunc=31)
+using SpeedyWeather    # SpectralGrid is not defined in LowerTriangularArrays
+SG = SpectralGrid(trunc=5)
 L = rand(Float32, SG.spectrum)
 ```
 
