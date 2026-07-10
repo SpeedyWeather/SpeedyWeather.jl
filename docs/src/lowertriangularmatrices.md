@@ -113,7 +113,7 @@ In performance-critical code a single index should be used, as this directly map
 to the index of the underlying data vector. The matrix index is somewhat slower
 as it first has to be converted to the corresponding single index.
 
-Consequently, many loops in SpeedyWeather.jl are build with the following structure
+Consequently, you may loop with the following structure
 ```@example LowerTriangularArrays
 n, m = size(L, as=Matrix)
 
@@ -125,7 +125,11 @@ end
 ```
 which loops over all lower triangle entries of `L::LowerTriangularArray` and the single
 index `ij` is simply counted up. However, one could also use `[i, j]` as indices in the
-loop body or to perform any calculation (`i+j` here).
+loop body or to perform any calculation (`i+j` here). However note that this
+does not work on the GPU as the running index `ij` and scalar indexing generally does not work.
+Hence internally, SpeedyWeather will write such an operation either via broadcasting
+(see [Broadcasting with `LowerTriangularArray`](@ref))
+if simple or with a custom kernel in general, see [GPU and Architectures](@ref).
 
 !!! warning "`end` doesn't work for matrix indexing"
     Indexing `LowerTriangularMatrix` and `LowerTriangularArray` in matrix style (`[i, j]`) with
@@ -134,9 +138,8 @@ loop body or to perform any calculation (`i+j` here).
 
 The `setindex!` functionality of matrices will throw a `BoundsError` when trying to write
 into the upper triangle of a `LowerTriangularArray`, for example
-```@example LowerTriangularArrays
+```@repl LowerTriangularArrays
 L[2, 1] = 0    # valid index
-
 L[1, 2] = 0    # invalid index in the upper triangle
 ```
 
@@ -202,7 +205,7 @@ The [LowerTriangularArrays](@ref lowertriangularmatrices) module's main purpose 
 and typical matrix operations will not work with `LowerTriangularMatrix` because it's treated as a vector
 not as a matrix, meaning that the following will not work as expected
 
-```@example LowerTriangularArrays
+```@repl LowerTriangularArrays
 L = rand(LowerTriangularMatrix{Float32}, 3, 3)
 L * L
 inv(L)
@@ -329,7 +332,10 @@ ArrayDimensions.hasvertical(L3), ArrayDimensions.hastime(L3)
 
 ## The `Spectrum` type
 
-Internally, a `LowerTriangularArray` is represented by an array that holds all non-zero elements of the matrices and a `Spectrum` type that holds all spectral discretization information and the architecture the array is on. The `Spectrum` can also be used to create new `LowerTriangularArray`s with the same spectral discretization:
+Internally, a `LowerTriangularArray` is represented by an array that holds all non-zero elements
+of the matrices and a `Spectrum` type that holds all spectral discretization information and the
+architecture the array is on. The `Spectrum` can also be used to create new `LowerTriangularArray`s
+with the same spectral discretization:
 
 ```@example LowerTriangularArrays
 spectrum = Spectrum(5, 5) # initailize
