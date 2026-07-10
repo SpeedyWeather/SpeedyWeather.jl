@@ -166,7 +166,7 @@ The `setindex!` functionality follows accordingly.
 An iterator over all entries in the array can be created with `eachindex`
 ```@example LowerTriangularArrays
 L = rand(LowerTriangularArray, 5, 5, 5)
-for ij in eachindex(L)
+for lm in eachindex(L)
     # do something
 end
 
@@ -174,14 +174,29 @@ eachindex(L)
 ```
 
 In order to only loop over the harmonics (essentially the horizontal, ignoring other dimensions)
-use `eachharmonic`
+use `eachharmonic` which will create iterators for both `l, m` via `zip` to be used like
 ```@example LowerTriangularArrays
-eachharmonic(L)
+L = zeros(LowerTriangularMatrix{Float32}, 3, 3)
+for (l, m) in eachharmonic(L)
+    L[l, m] = l+m
+end
+L
+```
+
+But this needs to recalculate the running index `lm` for the non-zero harmonics,
+faster but otherwise identical is
+
+```@example LowerTriangularArrays
+for (lm, (l, m)) in enumerate(eachharmonic(L))
+    L[lm] = l+m
+end
+L
 ```
 
 If you only want to loop over the other dimensions use `eachmatrix`
 
 ```@example LowerTriangularArrays
+L = zeros(LowerTriangularArray, 3, 3, 3)
 eachmatrix(L)
 ```
 
@@ -189,13 +204,13 @@ together they can be used as
 
 ```@example LowerTriangularArrays
 for k in eachmatrix(L)
-    for lm in eachharmonic(L)
+    for (lm, (l, m)) in enumerate(eachharmonic(L))
         L[lm, k]
     end
 end
 ```
 
-Note that `k` is a `CartesianIndex` that will loop over *all* other dimensions, whether there's only 1
+Note that `k` is a `CartesianIndices` that will loop over *all* other dimensions, whether there's only 1
 (representing a 3D variable) or 5 (representing a 6D variable with the first two dimensions being a
 lower triangular matrix).
 

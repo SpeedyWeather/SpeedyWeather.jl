@@ -138,3 +138,7 @@ Adapt.@adapt_structure Spectrum
 Architectures.architecture(s::Spectrum) = s.architecture
 Architectures.on_architecture(architecture::AbstractArchitecture, s::Spectrum) = Spectrum(s; architecture)
 Architectures.on_architecture(s::Spectrum, x) = on_architecture(architecture(s), x)
+
+# indexing
+eachharmonic(S::Spectrum) = zip(S.l_indices, S.m_indices)
+Base.eachindex(S::Spectrum) = Base.OneTo(length(S.l_indices))
