@@ -1016,3 +1016,84 @@ end
         end
     end
 end
+
+@testset "ArrayDimensions" begin
+    using SpeedyWeatherInternals.ArrayDimensions: LM, LMZ, LMT, LMZT, hastime, hasvertical
+
+    s = Spectrum(trunc = 5)
+
+    # default dims is LM (2D spectral)
+    L2 = zeros(LowerTriangularMatrix{Float32}, s)
+    @test L2.dims isa LM
+    @test !hastime(L2)
+    @test !hasvertical(L2)
+
+    # explicit 3D spectral + vertical
+    L3z = zeros(LowerTriangularArray{Float32}, s, LMZ(), 3)
+    @test L3z.dims isa LMZ
+    @test !hastime(L3z)
+    @test hasvertical(L3z)
+
+    # explicit 3D spectral + time
+    L3t = zeros(LowerTriangularArray{Float32}, s, LMT(), 3)
+    @test L3t.dims isa LMT
+    @test hastime(L3t)
+    @test !hasvertical(L3t)
+
+    # explicit 4D spectral + vertical + time
+    L4 = zeros(LowerTriangularArray{Float32}, s, LMZT(), 3, 2)
+    @test L4.dims isa LMZT
+    @test hastime(L4)
+    @test hasvertical(L4)
+
+    # dims are preserved through similar, zero, and lta_view
+    L3z_sim = similar(L3z)
+    @test L3z_sim.dims isa LMZ
+
+    L3z_zero = zero(L3z)
+    @test L3z_zero.dims isa LMZ
+
+    L3z_view = lta_view(L3z, :, 1)
+    @test L3z_view.dims isa LM
+
+    L3z_range_view = lta_view(L3z, :, 1:2)
+    @test L3z_range_view.dims isa LMZ
+
+    # getindex with integer drops dims; range preserves
+    @test L3z[:, 1].dims isa LM
+    @test L3z[:, 1:2].dims isa LMZ
+
+    # 4D: two explicit non-horizontal indices
+    @test L4[:, 1:3, 1].dims isa LMZ   # drop time, keep vertical range
+    @test L4[:, 1, 1].dims isa LM      # drop both vertical and time
+
+    # dims are preserved through truncate and interpolate
+    L3z_trunc = LowerTriangularArrays.truncate(L3z, 3)
+    @test L3z_trunc.dims isa LMZ
+    @test size(L3z_trunc, ZeroBased, as = Matrix) == (3, 3, 3)
+
+    L3z_interp = LowerTriangularArrays.interpolate(L3z, 10)
+    @test L3z_interp.dims isa LMZ
+    @test size(L3z_interp, ZeroBased, as = Matrix) == (10, 10, 3)
+
+    L2_trunc = LowerTriangularArrays.truncate(L2, 3)
+    @test L2_trunc.dims isa LM
+end
+
+@testset "Rotate/Reverse n-dimensional" begin
+    @testset for trailing_dims in ((2,), (2, 3), (2, 3, 2))
+        L = rand(LowerTriangularArray{ComplexF64}, 10, 10, trailing_dims...)
+
+        rotated = rotate!(deepcopy(L), 30)
+        reversed_lat = reverse(L, dims = :lat)
+        reversed_lon = reverse(L, dims = :lon)
+
+        # operating on all matrices at once == operating on every matrix independently
+        for c in CartesianIndices(trailing_dims)
+            layer = L[:, c]
+            @test rotate!(deepcopy(layer), 30) == rotated[:, c]
+            @test reverse(layer, dims = :lat) == reversed_lat[:, c]
+            @test reverse(layer, dims = :lon) == reversed_lon[:, c]
+        end
+    end
+end

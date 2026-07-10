@@ -24,10 +24,10 @@ Geopotential(SG::SpectralGrid) = Geopotential(
 
 function variables(::Geopotential)
     return (
-        DynamicsVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m^2/s^2"),
+        DynamicsVariable(:geopotential, GridXYZ(), desc = "Geopotential", units = "m^2/s^2"),
         # TODO only the grid should be necessary, remove this when adapting the geopotential calculation
         # in the dynamical core to only need grid geopotential
-        DynamicsVariable(:spectral_geopotential, Spectral3D(), desc = "Geopotential", units = "m^2/s^2"),
+        DynamicsVariable(:spectral_geopotential, SpectralXYZ(), desc = "Geopotential", units = "m^2/s^2"),
     )
 end
 

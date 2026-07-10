@@ -217,7 +217,7 @@ L' * L
 ```
 
 Summation with `sum` follows the flat, single index logic
-```@repl
+```@repl LowerTriangularArrays
 L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 sum(L, dims=2)
 ```
@@ -226,10 +226,12 @@ sums along the second dimension of the underlying vector, not of the full matrix
 ## Rotation of `LowerTriangularArray`
 
 `LowerTriangularArray`s are used to describe spherical harmonics. In that case each element
-represents the coefficient in fron of the respective harmonic describing a field on the sphere
+represents the coefficient in front of the respective harmonic describing a field on the sphere
 when transformed to grid space. We implement `rotate!` (and `rotate` for an allocating version)
 for `LowerTriangularArray` to rotate these coefficients in complex number space to represent
-a longitude rotation of the represented grid space field. For example start with
+a longitude rotation of the represented grid space field. In contrast to the grid-space
+`rotate!` (see [Rotate and reverse Fields](@ref)) which is restricted to multiples of 90˚,
+any rotation angle is possible in spectral space. For example start with
 
 ```@repl LowerTriangularArrays
 M = rand(LowerTriangularMatrix{ComplexF32}, 3, 3)
@@ -260,13 +262,15 @@ rotate!(M, 315)
 
 A `LowerTriangularArray` is an `AbstractArray`, as such `reverse` and `reverse!` (in-place) are defined,
 reversing all elements of these arrays in the way how they are indexed with a single index.
-For `LowerTriangularArra` representing the coefficients of the spherical harmonics this does not make
+For `LowerTriangularArray` representing the coefficients of the spherical harmonics this does not make
 much sense, however, we describe here the functionality to `reverse` these arrays as they represent
 spherical harmonics, adding methods for `dims=:lat` for reversal in latitude direction and `dims=:lon` in
 longitude direction. Spherical harmonics are reversed in latitude by flipping the sign of the
 odd harmonics, which are the ones that are not symmetric around the equator. Spherical harmonics are
 reversed in longitude by taking the complex conjugate of every element as this flips the sign of the
 imaginary parts, which effectively mirrors the rotation of that harmonic around 0˚E.
+Both are consistent with reversing the corresponding field in grid space,
+see [Rotate and reverse Fields](@ref).
 
 ```@repl LowerTriangularArrays
 reverse(M, dims=:lat)
@@ -305,6 +309,24 @@ L = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 L_gpu = adapt(CuArray, L)
 ```
 
+## Array dimensions for `LowerTriangularArray`
+
+Like `Field` (see [Array dimensions of a Field](@ref) in RingGrids), a `LowerTriangularArray`
+carries a `dims::AbstractArrayDimensions` field that records what the dimensions beyond the
+spherical harmonics (`l`, `m`) represent, see [Array dimensions](@ref array_dimensions) for
+a general overview of these dimension tags. The only difference is the name of the 2D
+(horizontal) dimension: `LM` instead of `XY`, since a `LowerTriangularArray` stores spherical
+harmonic coefficients rather than grid-point values. Correspondingly `LMZ`, `LMT`, and `LMZT`
+add a vertical and/or time dimension, exactly as `XYZ`, `XYT`, `XYZT` do for `Field`. `LM` is
+the default if no `dims` is given, e.g. for the `L`, `L2` created above. Everything else --
+`ArrayDimensions.hasvertical`, `ArrayDimensions.hastime`, preservation through
+`similar`/`zero`/views/indexing -- works the same way as described for `Field`.
+
+```@repl LowerTriangularArrays
+L3 = zeros(LowerTriangularArray{Float32}, 5, 5, ArrayDimensions.LMZ(), 3)
+ArrayDimensions.hasvertical(L3), ArrayDimensions.hastime(L3)
+```
+
 ## The `Spectrum` type
 
 Internally, a `LowerTriangularArray` is represented by an array that holds all non-zero elements of the matrices and a `Spectrum` type that holds all spectral discretization information and the architecture the array is on. The `Spectrum` can also be used to create new `LowerTriangularArray`s with the same spectral discretization:
@@ -321,10 +343,14 @@ L = rand(Float32, spectrum)
 L = rand(ComplexF32, spectrum, 5)
 ```
 
-In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type, and all `LowerTriangularArray`s are created with the same `Spectrum`. Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s with the same spectral discretization as follows:
+In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type,
+and all `LowerTriangularArray`s are created with the same `Spectrum`.
+Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s
+with the same spectral discretization as follows:
 
 ```@repl LowerTriangularArrays
-SG = SpectralGrid(trunc=31)
+using SpeedyWeather
+SG = SpectralGrid(trunc=5)
 L = rand(Float32, SG.spectrum)
 ```
 
