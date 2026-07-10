@@ -1,5 +1,12 @@
 abstract type AbstractHorizontalDiffusion <: AbstractModelComponent end
 
+# dispatch via diffusion type
+horizontal_diffusion!(vars::Variables, model::AbstractModel) =
+    horizontal_diffusion!(vars, model.horizontal_diffusion, model)
+
+# dispatch to decide between implicit or explicit diffusion
+@inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Union{Nothing, AbstractImplicit}, ::AbstractTimeStepper) = true
+
 export HyperDiffusion
 
 """
@@ -57,11 +64,10 @@ $(TYPEDFIELDS)"""
 end
 
 """$(TYPEDSIGNATURES)
-Generator function based on the resolutin in `spectral_grid`.
+Generator function based on the resolution in `spectral_grid`.
 Passes on keyword arguments."""
 function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
-    MatrixType = ArrayType{NF, 2}
+    (; NF, trunc, nlayers, MatrixType) = spectral_grid        # take resolution parameters from spectral_grid
     return HyperDiffusion{NF, MatrixType, typeof(trunc), Dates.Second}(; trunc, nlayers, kwargs...)
 end
 
@@ -71,25 +77,18 @@ model time step, and possibly with a changing strength/power in
 the vertical."""
 function initialize!(
         diffusion::HyperDiffusion,
-        model::AbstractModel
+        model::AbstractModel,
     )
-    return initialize!(diffusion, model.geometry, model.time_stepping)
-end
-
-"""$(TYPEDSIGNATURES)
-Precomputes the hyper diffusion terms for all layers based on the
-model time step in `L`, the vertical level sigma level in `G`."""
-function initialize!(
-        diffusion::HyperDiffusion,
-        G::AbstractGeometry,
-        L::AbstractTimeStepper,
-    )
-    (; trunc, nlayers, resolution_scaling) = diffusion
-    (; power, power_stratosphere, tapering_σ) = diffusion
-    (; Δt, radius) = L
+    (; trunc, nlayers) = diffusion
+    (; resolution_scaling, power, power_stratosphere, tapering_σ) = diffusion
+    Δt = default_time_step(model.time_stepping)
+    
+    # radius scaling for the dynamical core as these are all precomputed arrays
+    (; radius) = model.planet
+    Δt /= radius
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
-    # times 1/radius because time step Δt is scaled with 1/radius
+    # divide by radius because the equations are in the radius-scaled form (see Radius scaling)
     time_scale = Second(diffusion.time_scale).value / radius * (32 / (trunc + 1))^resolution_scaling
     time_scale_div = Second(diffusion.time_scale_div).value / radius * (32 / (trunc + 1))^resolution_scaling
 
@@ -105,13 +104,13 @@ function initialize!(
     ∇²ⁿ_implicit = diffusion.impl
     ∇²ⁿ_div = diffusion.expl_div
     ∇²ⁿ_div_implicit = diffusion.impl_div
-    σ_levels_full = G.σ_levels_full
+    σ_levels_full = model.geometry.σ_levels_full
 
     # Launch kernel
     arch = architecture(∇²ⁿ)
     worksize = (trunc + 2, nlayers)
     launch!(
-        arch, Array3DWorkOrder, worksize, _initialize_hyperdiffusion_kernel!,
+        arch, ArrayWorkOrder, worksize, _initialize_hyperdiffusion_kernel!,
         ∇²ⁿ, ∇²ⁿ_implicit, ∇²ⁿ_div, ∇²ⁿ_div_implicit, σ_levels_full,
         trunc, power, power_stratosphere, tapering_σ,
         time_scale, time_scale_div, Δt, largest_eigenvalue
@@ -160,9 +159,9 @@ end
         ∇²ⁿ[l_plus_1, k] = -eigenvalue_norm^power / time_scale
         ∇²ⁿ_div[l_plus_1, k] = -eigenvalue_norm^p / time_scale_div
 
-        # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
-        ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - 2Δt * ∇²ⁿ[l_plus_1, k])
-        ∇²ⁿ_div_implicit[l_plus_1, k] = 1 / (1 - 2Δt * ∇²ⁿ_div[l_plus_1, k])
+        # and implicit part of the diffusion (= 1/(1-Δtν∇²ⁿ))
+        ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - Δt * ∇²ⁿ[l_plus_1, k])
+        ∇²ⁿ_div_implicit[l_plus_1, k] = 1 / (1 - Δt * ∇²ⁿ_div[l_plus_1, k])
     end
 end
 
@@ -171,7 +170,7 @@ Apply horizontal diffusion to a 2D field `var` in spectral space by updating its
 with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
 into an explicit part `expl` and an implicit part `impl`, such that both can be calculated
 in a single forward step by using `var` as well as its tendency `tendency`."""
-function horizontal_diffusion!(
+function horizontal_diffusion!(             # implicit version
         tendency::LowerTriangularArray,     # tendency of a
         var::LowerTriangularArray,          # spectral horizontal field to diffuse
         expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
@@ -185,13 +184,13 @@ function horizontal_diffusion!(
     @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError(expl, nlayers))
 
     launch!(
-        architecture(tendency), SpectralWorkOrder, size(tendency), _horizontal_diffusion_kernel!,
+        architecture(tendency), SpectralWorkOrder, size(tendency), _implicit_horizontal_diffusion_kernel!,
         tendency, var, expl, impl, var.spectrum.l_indices
     )
     return nothing
 end
 
-@kernel inbounds = true function _horizontal_diffusion_kernel!(
+@kernel inbounds = true function _implicit_horizontal_diffusion_kernel!(
         tendency, var, expl, impl, l_indices
     )
 
@@ -206,24 +205,59 @@ end
     tendency[I] = (tendency[I] + expl[l, k] * var[I]) * impl[l, k]
 end
 
+function horizontal_diffusion!(             # explicit version
+        tendency::LowerTriangularArray,     # tendency of var
+        var::LowerTriangularArray,          # spectral horizontal field to diffuse
+        expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
+        impl::Nothing,                      # pass on nothing to dispatch to explicit diffusion                         
+    )
+    lmax, mmax = size(tendency, OneBased, as = Matrix)
+    nlayers = size(var, 2)
+
+    @boundscheck size(tendency) == size(var) || throw(BoundsError(tendency))
+    @boundscheck lmax <= size(expl, 1) || throw(BoundsError(expl, lmax))
+    @boundscheck nlayers <= size(expl, 2) || throw(BoundsError(expl, nlayers))
+
+    launch!(
+        architecture(tendency), SpectralWorkOrder, size(tendency), _explicit_horizontal_diffusion_kernel!,
+        tendency, var, expl, var.spectrum.l_indices
+    )
+    return nothing
+end
+
+@kernel inbounds = true function _explicit_horizontal_diffusion_kernel!(
+        tendency, var, expl, l_indices
+    )
+
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(var) == 1 ? 1 : I[2]
+
+    # Get the degree l for this coefficient
+    l = l_indices[lm]
+
+    # Apply horizontal diffusion
+    tendency[I] += expl[l, k] * var[I]
+end
+
 """$(TYPEDSIGNATURES)
 Apply horizontal diffusion to vorticity in the BarotropicModel."""
 function horizontal_diffusion!(
         vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::Barotropic,
-        lf::Integer = 1,    # leapfrog index used (2 is unstable)
     )
-    (; expl, impl) = diffusion
+    (; expl) = diffusion
+    impl = implicit_diffusion(diffusion, model.implicit, model.time_stepping) ? diffusion.impl : nothing
 
     # Barotropic model diffuses vorticity (only variable)
-    vor = get_step(vars.prognostic.vorticity, lf)                               # lta_view for leapfrog index
-    vor_tend = vars.tendencies.vorticity
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, diffusion)
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, diffusion)
     horizontal_diffusion!(vor_tend, vor, expl, impl)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)          # lta_view for leapfrog index
-        tracer_tend = vars.tendencies.tracers[name]
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
+        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
     return nothing
@@ -235,21 +269,32 @@ function horizontal_diffusion!(
         vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::ShallowWater,
-        lf::Integer = 1,    # leapfrog index used (2 is unstable)
     )
-    (; expl, impl, expl_div, impl_div) = diffusion
+    (; expl, expl_div) = diffusion
+
+    # apply diffusion explicitly by passing on nothing for the precomputed implicit array
+    do_implicitly = implicit_diffusion(diffusion, model.implicit, model.time_stepping)
+    impl = do_implicitly ? diffusion.impl : nothing
+    impl_div = do_implicitly ? diffusion.impl_div : nothing
 
     # ShallowWater model diffuses vorticity and divergence
-    vor = get_step(vars.prognostic.vorticity, lf)
-    div = get_step(vars.prognostic.divergence, lf)
-    vor_tend = vars.tendencies.vorticity
-    div_tend = vars.tendencies.divergence
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, diffusion)
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, diffusion)
+    div = get_prognostic_step(vars.prognostic.divergence, model.time_stepping, diffusion)
+    div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, diffusion)
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
 
+    # horizontal diffusion is also responsible to set a tendency's last degree to zero
+    # all variables carry this degree but it's not used for the scalar quantities that
+    # all our prognostic variables are, so set to zero now for those variables that
+    # aren't subject to diffusion
+    η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, diffusion)
+    zero_last_degree!(η_tend)
+
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)      # lta_view for leapfrog index
-        tracer_tend = vars.tendencies.tracers[name]
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
+        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
     return nothing
@@ -262,34 +307,43 @@ function horizontal_diffusion!(
         vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::PrimitiveEquation,
-        lf::Integer = 1,    # leapfrog index used (2 is unstable)
     )
-    # use stronger diffusion operators that taper and change power with height for divergence
-    (; expl_div, impl_div) = diffusion
+    (; expl, expl_div) = diffusion
 
-    # and those for all other variables
-    (; expl, impl) = diffusion
+    # apply diffusion explicitly by passing on nothing for the precomputed implicit array
+    do_implicitly = implicit_diffusion(diffusion, model.implicit, model.time_stepping)
+    impl = do_implicitly ? diffusion.impl : nothing
+    impl_div = do_implicitly ? diffusion.impl_div : nothing
 
     # Primitive equation models diffuse vorticity, divergence, temp (and humidity for wet core)
-    vor = get_step(vars.prognostic.vorticity, lf)
-    div = get_step(vars.prognostic.divergence, lf)
-    temp = get_step(vars.prognostic.temperature, lf)
-    vor_tend = vars.tendencies.vorticity
-    div_tend = vars.tendencies.divergence
-    temp_tend = vars.tendencies.temperature
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, diffusion)
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, diffusion)
+    div = get_prognostic_step(vars.prognostic.divergence, model.time_stepping, diffusion)
+    div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, diffusion)
+    temp = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, diffusion)
+    temp_tend = get_tendency_step(vars.tendencies.temperature, model.time_stepping, diffusion)
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
     horizontal_diffusion!(temp_tend, temp, expl, impl)
 
+    # horizontal diffusion is also responsible to set a tendency's last degree to zero
+    # all variables carry this degree but it's not used for the scalar quantities that
+    # all our prognostic variables are, so set to zero now for those variables that
+    # aren't subject to diffusion
+    pres_tend = get_tendency_step(vars.tendencies.pressure, model.time_stepping, diffusion)
+    zero_last_degree!(pres_tend)
+
+    pres_tend.data[1:1] .= 0    # mass conservation
+
     if haskey(vars.tendencies, :humidity)
-        humid = get_step(vars.prognostic.humidity, lf)
-        humid_tend = vars.tendencies.humidity
+        humid = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, diffusion)
+        humid_tend = get_tendency_step(vars.tendencies.humidity, model.time_stepping, diffusion)
         horizontal_diffusion!(humid_tend, humid, expl, impl)
     end
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)      # lta_view for leapfrog index
-        tracer_tend = vars.tendencies.tracers[name]
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
+        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
 
@@ -352,20 +406,20 @@ function SpectralFilter(spectral_grid::SpectralGrid; kwargs...)
     return SpectralFilter{NF, MatrixType, typeof(trunc)}(; trunc, nlayers, kwargs...)
 end
 
-function initialize!(diffusion::SpectralFilter, model::AbstractModel)
-    return initialize!(diffusion, model.time_stepping)
-end
-
 function initialize!(
         diffusion::SpectralFilter,
-        L::AbstractTimeStepper,
+        model::AbstractModel,
     )
     (; trunc, nlayers) = diffusion
     (; expl, impl, expl_div, impl_div) = diffusion
     (; scale, shift, power, power_div, resolution_scaling) = diffusion
-    (; Δt, radius) = L
+    Δt = default_time_step(model.time_stepping)
 
-    # times 1/radius because time step Δt is scaled with 1/radius
+    # radius scaling for the dynamical core as these are all precomputed arrays
+    (; radius) = model.planet
+    Δt /= radius
+
+    # divide by radius because the equations are in the radius-scaled form (see Radius scaling)
     time_scale = Second(diffusion.time_scale).value / radius * (32 / (trunc + 1))^resolution_scaling
     time_scale_div = Second(diffusion.time_scale_div).value / radius * (32 / (trunc + 1))^resolution_scaling
 

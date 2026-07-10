@@ -6,11 +6,12 @@
             horizontal_diffusion = HD(spectral_grid)
             model = PrimitiveWetModel(spectral_grid; horizontal_diffusion)
             simulation = initialize!(model)
+            initialize!(simulation)
 
             (; variables) = simulation
             (; expl, impl) = model.horizontal_diffusion
             vor = get_step(variables.prognostic.vorticity, 1)
-            vor_tend = variables.tendencies.vorticity
+            vor_tend = get_step(variables.tendencies.vorticity, 1)
 
             # apply diffusion
             SpeedyWeather.horizontal_diffusion!(vor_tend, vor, expl, impl)
@@ -28,16 +29,14 @@
             end
 
             vor2 = get_step(variables.prognostic.vorticity, 2)
-            SpeedyWeather.leapfrog!(vor, vor2, vor_tend, model.time_stepping.Δt, 1, model.time_stepping)
+            SpeedyWeather.update_prognostic!(variables, model)
 
             @test any(vor .!= vor2)    # check that at least some coefficients are different
             @test any(vor .== vor2)    # check that at least some coefficients are identical
 
             # damping should not increase real or imaginary part of variable
-            for lmk in eachindex(vor, vor2)
-                @test abs(real(vor2[lmk])) <= abs(real(vor[lmk]))
-                @test abs(imag(vor2[lmk])) <= abs(imag(vor[lmk]))
-            end
+            @test all(abs.(real.(vor2)) .<= abs.(real.(vor)))
+            @test all(abs.(imag.(vor2)) .<= abs.(imag.(vor)))
         end
     end
 end

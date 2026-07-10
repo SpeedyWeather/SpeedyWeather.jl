@@ -165,7 +165,7 @@ run!(simulation, period = Day(0))
 
 # visualise the initial conditions for this tracer
 using CairoMakie
-abc0 = simulation.variables.grid.tracers.abc[:, 1]
+abc0 = get_step(simulation.variables.grid.tracers.abc)[:, 1]
 
 heatmap(abc0, title="Tracer abc, initial conditions")
 save("tracer_abc.png", ans) # hide
@@ -175,14 +175,14 @@ nothing # hide
 
 So we started with a north-south stripe of some tracer.
 `[:, 1]` is used to pull out all values `:` on the one and only
-layer `1`.
+layer `1`, see [Step dimension](@ref)
 The `ShallowWaterModel` has by default a jet in the northern
 hemisphere which will advect that tracer, after some days:
 
 ```@example tracers
 run!(simulation, period=Day(3))
 
-abc1 = simulation.variables.grid.tracers.abc[:, 1]
+abc1 = get_step(simulation.variables.grid.tracers.abc)[:, 1]
 heatmap(abc1, title="Tracer abc, after 3 days")
 save("tracer2.png", ans) # hide
 nothing # hide

@@ -6,7 +6,6 @@ Takes the spectral `random_pattern` in the prognostic variables
 and transforms it to spectral space in `diagn.grid.random_pattern`."""
 function SpeedyTransforms.transform!(
         vars::Variables,
-        lf::Integer,
         random_process::AbstractRandomProcess,
         spectral_transform::AbstractSpectralTransform,
     )
@@ -25,15 +24,7 @@ end
 """$(TYPEDSIGNATURES)
 `random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
-function SpeedyTransforms.transform!(
-        vars::Variables,
-        lf::Integer,
-        random_process::Nothing,
-        spectral_transform::AbstractSpectralTransform,
-    )
-    return nothing
-end
-
+SpeedyTransforms.transform!(::Variables, ::Nothing, ::AbstractSpectralTransform) = nothing
 random_process!(::Variables, process::Nothing) = nothing
 
 export SpectralAR1Process
@@ -91,7 +82,7 @@ function initialize!(
         model::AbstractModel,
     )
     # auto-regressive factor in the AR1 process
-    dt = model.time_stepping.Δt_sec         # in seconds
+    dt = model.time_stepping.Δt             # in seconds
     process.autoregressive_factor[] = exp(-dt / Second(process.time_scale).value)
 
     # noise factors per total wavenumber in the AR1 process

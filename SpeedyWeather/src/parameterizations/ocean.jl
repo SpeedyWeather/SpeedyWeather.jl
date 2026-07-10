@@ -331,10 +331,10 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
     C₀ = ocean_model.heat_capacity_mixed_layer
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping
     Δt_C₀ = Δt / C₀
 
-    (; mask) = model.land_sea_mask
+    (; land_fraction) = model.land_sea_mask
 
     # Frierson et al. 2006, eq (1), all W/m² except humidity flux in kg/m²/s
     Rsd = vars.parameterizations.surface_shortwave_down         # before albedo
@@ -348,14 +348,14 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
 
     launch!(
         architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!,
-        sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params
+        sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params
     )
     return nothing
 end
 
-@kernel inbounds = true function slab_ocean_kernel!(sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params)
+@kernel inbounds = true function slab_ocean_kernel!(sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params)
     ij = @index(Global, Linear)         # every grid point ij
-    if mask[ij] < 1                     # at least partially ocean
+    if land_fraction[ij] < 1            # at least partially ocean
         (; Δt_C₀, Lᵥ) = params
         sst[ij] += Δt_C₀ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij])
     end

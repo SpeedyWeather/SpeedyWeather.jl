@@ -15,9 +15,12 @@ initialize!(::ConstantLongwaveTransmissivity, ::AbstractModel) = nothing
     nlayers = size(t, 2)
 
     τ = -log(CLT.transmissivity)            # total optical depth of the atmosphere
-    dσ = model.geometry.σ_levels_thick      # divide optical depth wrt to pressure thickness of each layer
+    coord = model.geometry.vertical_coordinates
+    pₛ = vars.parameterizations.surface_pressure[ij]
+
     for k in 1:nlayers
-        t[ij, k] = exp(-τ * dσ[k])          # transmissivity through layer k
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ   
+        t[ij, k] = exp(-τ * Δσₖ)            # transmissivity through layer k
     end
     return t
 end
@@ -49,7 +52,8 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     (; τ₀_equator, τ₀_pole, fₗ) = transmissivity
 
     # coordinates
-    σ = model.geometry.σ_levels_half
+    coord = model.geometry.vertical_coordinates
+    pₛ = vars.parameterizations.surface_pressure[ij]
     θ = model.geometry.latds[ij]
 
     # Frierson 2006, eq. (4), (5) but in a differential form, computing dτ between half levels below and above
@@ -59,9 +63,10 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 
     τ_above::NF = 0
     τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sind(θ)^2
-    for k in 2:(nlayers + 1)        # loop over half levels below
-        τ_below = τ₀ * (fₗ * σ[k] + (1 - fₗ) * σ[k]^4)
-        t[ij, k - 1] = exp(-(τ_below - τ_above))
+    for k in 1:nlayers              # loop over half levels below
+        σₖ = pressure_below(k, pₛ, coord) / pₛ
+        τ_below = τ₀ * (fₗ * σₖ + (1 - fₗ) * σₖ^4)
+        t[ij, k] = exp(-(τ_below - τ_above))
         τ_above = τ_below
     end
 

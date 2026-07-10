@@ -59,6 +59,9 @@ abstract type AbstractBenchmarkSuite end
     Δt::Vector{Float64} = fill(0.0, nruns)
     memory::Vector{Int} = fill(0, nruns)
     architecture::Any = SpeedyWeather.CPU()
+    # Scale factor on `n_timesteps` for the timed run; >1 lengthens every run for
+    # more robust (e.g. publication-ready) timings. Set globally by the driver.
+    timestep_multiplier::Real = 1
 end
 
 default_nlayers(::Type{<:Barotropic}) = 1
@@ -66,9 +69,13 @@ default_nlayers(::Type{<:ShallowWater}) = 1
 default_nlayers(::Type{<:PrimitiveEquation}) = 8
 default_nlayers(models) = [default_nlayers(model) for model in models]
 
-# this should return number of timesteps so that every simulation
-# only takes seconds
-n_timesteps(trunc, nlayers) = max(10, round(Int, 4.0e8 / trunc^3 / nlayers^2))
+# Number of timesteps for a timed run, chosen so every simulation takes a few
+# seconds. The step count is clamped between a floor and a ceiling:
+# `multiplier` scales the (clamped) result — pass e.g. `10` for longer,
+# publication-ready runs with more robust timings; applied after the clamp so it
+# lengthens even the floored/ceilinged configs.
+n_timesteps(trunc, nlayers, multiplier = 1) =
+    round(Int, multiplier * clamp(round(Int, 4.0e9 / trunc^3 / nlayers^2), 50, 600))
 
 function run_benchmark_suite!(suite::BenchmarkSuite)
     for i in 1:suite.nruns
@@ -100,15 +107,30 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         simulation = initialize!(model)
         suite.memory[i] = Base.summarysize(simulation)
 
-        nsteps = n_timesteps(trunc, nlayers)
-        period = Second(round(Int, model.time_stepping.Δt_sec * (nsteps + 1)))
+        nsteps = n_timesteps(trunc, nlayers, suite.timestep_multiplier)
+        period = Second(round(Int, model.time_stepping.Δt * (nsteps + 1)))
+
+        # Warm up before timing: run a few steps so JIT compilation of the time
+        # loop happens here rather than inside the timed run below. The timed run
+        # is short (≈nsteps steps, only a few seconds), so without this its
+        # wallclock is dominated by one-off compilation, which massively
+        # understates SYPD and can even invert the ordering between models
+        # (e.g. the model compiled first appears slower than a later one that
+        # reuses the compiled code). A handful of steps covers the Euler spin-up
+        # plus regular steps. We then re-initialize so the timed run starts from
+        # the same initial state as before.
+        warmup_period = Second(round(Int, model.time_stepping.Δt * 3))
+        run!(simulation; period = warmup_period)
+        synchronize(architecture)
+
+        simulation = initialize!(model)
         run!(simulation; period)
         synchronize(architecture)
 
         time_elapsed = model.feedback.progress_meter.tlast - model.feedback.progress_meter.tinit
-        sypd = model.time_stepping.Δt_sec * nsteps / (time_elapsed * 365.25)
+        sypd = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
 
-        suite.Δt[i] = model.time_stepping.Δt_sec
+        suite.Δt[i] = model.time_stepping.Δt
         suite.SYPD[i] = sypd
     end
     return
@@ -230,31 +252,29 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         simulation = initialize!(model)
 
         vars, model = SpeedyWeather.unpack(simulation)
-        lf = 2
-        (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
-        lf_implicit = implicit.α == 0 ? lf : 1
+        (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit, time_stepping) = model
 
         # Each benchmark sample also calls `synchronize(arch)` to wait for the device.
         safe_benchmark!(suite, i, 1) do
-            @benchmark (_jit($arch, SpeedyWeather.pressure_gradient_flux!, $vars, $lf, $spectral_transform); synchronize($arch))
+            @benchmark (_jit($arch, SpeedyWeather.pressure_gradient_flux!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
         end
         safe_benchmark!(suite, i, 2) do
-            @benchmark (_jit($arch, SpeedyWeather.linear_virtual_temperature!, $vars, $lf_implicit, $model); synchronize($arch))
+            @benchmark (_jit($arch, SpeedyWeather.linear_virtual_temperature!, $vars, $model); synchronize($arch))
         end
         safe_benchmark!(suite, i, 3) do
             @benchmark (_jit($arch, SpeedyWeather.geopotential!, $vars, $geopotential, $orography); synchronize($arch))
         end
         safe_benchmark!(suite, i, 4) do
-            @benchmark (_jit($arch, SpeedyWeather.vertical_integration!, $vars, $lf_implicit, $geometry); synchronize($arch))
+            @benchmark (_jit($arch, SpeedyWeather.vertical_integration!, $vars, $geometry, $time_stepping); synchronize($arch))
         end
         safe_benchmark!(suite, i, 5) do
-            @benchmark (_jit($arch, SpeedyWeather.surface_pressure_tendency!, $vars, $spectral_transform); synchronize($arch))
+            @benchmark (_jit($arch, SpeedyWeather.surface_pressure_tendency!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
         end
         safe_benchmark!(suite, i, 6) do
-            @benchmark (_jit($arch, SpeedyWeather.vertical_velocity!, $vars, $geometry); synchronize($arch))
+            @benchmark (_jit($arch, SpeedyWeather.vertical_velocity!, $vars, $geometry, $time_stepping); synchronize($arch))
         end
         safe_benchmark!(suite, i, 7) do
-            @benchmark (_jit($arch, SpeedyWeather.linear_pressure_gradient!, $vars, $lf_implicit, $atmosphere, $implicit); synchronize($arch))
+            @benchmark (_jit($arch, SpeedyWeather.linear_pressure_gradient!, $vars, $atmosphere, $implicit, $time_stepping); synchronize($arch))
         end
         safe_benchmark!(suite, i, 8) do
             @benchmark (_jit($arch, SpeedyWeather.vertical_advection!, $vars, $model); synchronize($arch))
@@ -269,7 +289,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
             @benchmark (_jit($arch, SpeedyWeather.humidity_tendency!, $vars, $model); synchronize($arch))
         end
         safe_benchmark!(suite, i, 12) do
-            @benchmark (_jit($arch, SpeedyWeather.bernoulli_potential!, $vars, $spectral_transform); synchronize($arch))
+            @benchmark (_jit($arch, SpeedyWeather.bernoulli_potential!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
         end
     end
 

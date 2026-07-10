@@ -4,7 +4,35 @@
 
 - Fused kernels in the dynamical core for better GPU efficiency [#1102](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1102)
 - Dynamical reordered and transformed batched for improved GPU performance. The majority of the dycore now follows the scheme: `grid_tendencies!`, `transform!`, `spectral_tendencies!` to batch together all grid -> spectral transforms of tendencies and auxiliary tendencies [#1101](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1101)
+- Dynamical core reordered and transformed batched for improved GPU performance. The majority of the dycore now follows the scheme: `grid_tendencies!` -> `transform!` -> `spectral_tendencies!` to batch together all grid -> spectral transforms of tendencies and auxiliary tendencies [#1101](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1101)
 - Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced firsti in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
+- Terrarium coupling uses the allocation-free masked copy to optimize performance [#1152](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1152)
+- Improved compatability with Enzyme with Julia 1.12: `get_step` instead of `get_steps` used more commonly and default `maxtypeoffset!` increased [#1143](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1143)
+- Ensemble output dimension for `ZarrOutput`: multiple members can write into one shared store via `ensemble_index`/`ensemble_size` [#1149](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1149)
+- Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced first in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
+- Update the extended differentiability tests to new time stepping syntax [#1148](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1148)
+- Scale time step on the fly [#1139](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1139)
+- Fix scalar indexing error constructing `SigmaCoordinates`/`Geometry` on GPU [#1142](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1142)
+- Sigma-pressure coordinates, part 1 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137)
+- NetCDF output coordinates always in Float64 as determined by RingGrids.get_lond [#1141](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1141)
+- ArrayWorkOrder instead of Array3DWorkOrder as both preserve dimensions [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
+- Allocation-free masked copy between RingGrids Field and subset array via mask [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
+- Rename land-sea mask array land_fraction [#1219](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1134)
+- Fix vertical advection performance regression by indexing the contiguous time step directly in the stencil kernel instead of a `get_*_step` view [#1131](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1131)
+- Reduce allocations in some broadcasted operations [#1133](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1133)
+- Add a warm to the benchmark to not measure pre-compile [#1129](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1129)
+- Adjust benchmarking to new timestepping logic [#1128](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1128)
+- Relax Enzyme compatability again to allow recent Enzyme versions [#1126](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1126)
+- reinitialize! logic to allow for model.implicit to be reinitialized [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
+- get_prognostic_step, get_tendency_step in dycore and parameterizations [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
+- time stepping modularised [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
+- NCycleLorenz time stepping for Barotropic models [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035) [#937](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/937)
+
+## v0.21.1
+
+- Update usage of Terrarium input APIs in extension module [#1117](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1117)
+- Update Buildkite pipeline for the new JuliaGPU cluster [#1124](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1124)
+- Allow for tuples of output variables in add! [#1122](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1122)
 - Browzarr extension, Zarr.jl compatibilty includes `v0.9` [#1093](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1093) [#1096](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1096)
 
 ## v0.21.0

@@ -422,6 +422,12 @@ end
         @test (field2 .* field3)[:, 1, 1] == (field2[:, 1] .* field3[:, 1, 1])
         @test (field1 .* field2_2)[:, 1] == (field1 .* field2_2[:, 1])
         @test (field1 .* field2_2)[:, 2] == (field1 .* field2_2[:, 2])
+
+        # mixed-rank broadcast promotes to the higher rank, order-independent
+        # (a non-commutative BroadcastStyle rule would error or disagree here)
+        @test ndims(field1 .* field2_2) == 2
+        @test ndims(field2_2 .* field1) == 2
+        @test (field1 .* field2_2) == (field2_2 .* field1)
     end
 end
 

@@ -5,7 +5,7 @@ using Reactant
 using DocStringExtensions
 using Dates
 
-using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, timestep!, first_timesteps!, later_timestep!
+using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, time_step!
 
 const ReactantDatesExt = Base.get_extension(
     Reactant, :ReactantDatesExt
@@ -30,34 +30,28 @@ Example usage:
 ```julia
 simulation = initialize!(model) 
 initialize!(simulation; steps=10) # don't forget this! 
-r_first! = @compile SpeedyWeather.first_timesteps!(simulation)
-r_later! = @compile SpeedyWeather.later_timestep!(simulation)
-SpeedyWeather.time_stepping!(simulation, r_first!, r_later!)
+r_time_step! = @compile SpeedyWeather.time_step!(simulation)
+SpeedyWeather.time_stepping!(simulation, r_time_step!)
 SpeedyWeather.finalize!(simulation)
 ```
 """
-function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_timesteps! = nothing, r_later_timestep! = nothing, enable_checkpointing = true)
-    if isnothing(r_first_timesteps!)
-        @info "Reactant compiling first_timesteps!"
-        r_first_timesteps! = @compile first_timesteps!(simulation)
-    end
-
-    if isnothing(r_later_timestep!)
-        @info "Reactant compiling later_timestep!"
-        r_later_timestep! = @compile later_timestep!(simulation)
+function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_time_step! = nothing, enable_checkpointing = true)
+    if isnothing(r_time_step!)
+        @info "Reactant compiling time_step!"
+        r_time_step! = @compile time_step!(simulation)
     end
 
     clock = simulation.variables.prognostic.clock
 
     #TODO: reenable @trace once Reactant issues fixed
-    #@trace checkpointing = enable_checkpointing for _ in clock.timestep_counter:clock.n_timesteps
-    #    r_later_timestep!(simulation)
+    #@trace checkpointing = enable_checkpointing for _ in 1:clock.n_steps
+    #    r_time_step!(simulation)
     #end
 
-    r_first_timesteps!(simulation)
-
-    for _ in (Int(clock.timestep_counter) + 1):Int(clock.n_timesteps)
-        r_later_timestep!(simulation)
+    # n_steps (not n_time_steps) to match time_stepping!(::AbstractSimulation),
+    # it includes time stepper spin-up steps (e.g. initial Euler step for Leapfrog)
+    for _ in 1:Int(clock.n_steps)
+        r_time_step!(simulation)
     end
     return
 end

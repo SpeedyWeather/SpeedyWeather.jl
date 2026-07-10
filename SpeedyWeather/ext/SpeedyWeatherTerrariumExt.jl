@@ -10,8 +10,10 @@ $(TYPEDSIGNATURES)
 Construct a [`TerrariumLand`](@ref) from a pre-built Terrarium model for usage 
 as a SpeedyWeather land model. Based on the SpeedyWeather model type either a 
 dry or wet land model is used."""
-SpeedyWeather.LandModel(spectral_grid::SpectralGrid,
-        model::Terrarium.AbstractModel{NF}; kwargs...) where {NF} =
+SpeedyWeather.LandModel(
+    spectral_grid::SpectralGrid,
+    model::Terrarium.AbstractModel{NF}; kwargs...
+) where {NF} =
     TerrariumLand(spectral_grid, model; kwargs...)
 
 """$(TYPEDEF)
@@ -69,6 +71,17 @@ only allocates columns where this mask is `true`, so every Terrarium state field
 has length `sum(mask)` (the number of land columns)."""
 @inline land_mask(land::AbstractTerrariumLandModel) = land.model.grid.mask.data
 
+# extend the allocation free copies here to work with the Oceananigans Fields as well
+@inline SpeedyWeather.RingGrids.copy_unmasked!(
+    dest::Terrarium.Oceananigans.AbstractField,
+    src::SpeedyWeather.AbstractField,
+    indices) = SpeedyWeather.RingGrids.copy_unmasked!(interior(dest), src, indices)
+
+@inline SpeedyWeather.RingGrids.copy_unmasked!(
+    dest::SpeedyWeather.AbstractField, 
+    src::Terrarium.Oceananigans.AbstractField,
+    indices) = SpeedyWeather.RingGrids.copy_unmasked!(dest, interior(src), indices)
+
 """$(TYPEDEF)
 
 The canonical [`AbstractTerrariumLandModel`](@ref) implementation for wet
@@ -86,6 +99,7 @@ struct TerrariumLand{
         IV <: Tuple,
         IN <: NamedTuple,
         FL <: NamedTuple,
+        MI,
     } <: AbstractTerrariumLandModel
     "SpeedyWeather spectral grid"
     spectral_grid::SpectralGrid
@@ -105,6 +119,8 @@ struct TerrariumLand{
     fields::FL
     "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
     Δt::NF
+    "Indices of the common land sea mask, used for allocation-free copying between SpeedyWeather and Terrarium"
+    mask_indices::MI
 end
 
 """$(TYPEDSIGNATURES)
@@ -124,12 +140,15 @@ function TerrariumLand(
     field_grid = Terrarium.get_field_grid(model.grid)
     Δz_arr = Terrarium.on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
     # The Oceananigans vertical spacing is an OffsetArray; take the last entry
-    # as the layer thickness for the SpeedyWeather LandGeometry. It's not actually used, but 
-    # we set it here for consistency. 
+    # as the layer thickness for the SpeedyWeather LandGeometry. It's not actually used, but
+    # we set it here for consistency.
     geometry = LandGeometry(1, NF[Δz_arr[end]])
+    # `unmasked_indices` treats `true` as masked-out; `model.grid.mask` is `true` at land
+    # points, so invert it to get the indices of the (unmasked) land columns.
+    mask_indices = RingGrids.unmasked_indices(.!model.grid.mask)
     return TerrariumLand(
         spectral_grid, geometry, model, timestepper,
-        boundary_conditions, input_variables, initializers, fields, NF(Δt),
+        boundary_conditions, input_variables, initializers, fields, NF(Δt), mask_indices,
     )
 end
 
@@ -175,7 +194,7 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel)
     )
 end
 
-# wet land model 
+# wet land model
 function SpeedyWeather.initialize!(
         vars::Variables,
         land::AbstractTerrariumLandModel,
@@ -191,7 +210,7 @@ function SpeedyWeather.initialize!(
 
     # initialize the "ModelIntegrator"
     integrator = ModelIntegrator(
-        state.clock, land.model, InputSources(),
+        state.clock, land.model, InputSources(NF),
         state, land.initializers, land.timestepper,
     )
     Terrarium.initialize!(integrator)
@@ -209,45 +228,47 @@ end
 function SpeedyWeather.timestep!(
         vars::Variables,
         land::AbstractTerrariumLandModel,
-        ::PrimitiveWetModel,
+        model::PrimitiveWetModel,
     )
     state = vars.prognostic.land.terrarium
     tmodel = land.model
     consts = tmodel.constants
     NF = eltype(state)
-    # Boolean land mask: SpeedyWeather fields span the full ring grid, Terrarium
-    # only the land columns.
     mask = land_mask(land)
+    indices = land.mask_indices
+    nlayers = model.spectral_grid.nlayers
 
     # Atmospheric forcings on the lowest model level / surface
-    Tair = vars.grid.temperature[mask, end]
-    humid = vars.grid.humidity[mask, end]
-    pres = vars.grid.pressure[mask]                          # log surface pressure
-    wind = vars.parameterizations.surface_wind_speed[mask]
-    rain = vars.parameterizations.rain_rate[mask]
-    snow = vars.parameterizations.snow_rate[mask]
-    Rsd = vars.parameterizations.surface_shortwave_down[mask]
-    Rld = vars.parameterizations.surface_longwave_down[mask]
+    # choose step dimension depending on atmospheric time stepper
+    # and read like parameterization via DummyParameterization
+    l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
+    Tair = RingGrids.field_view(vars.grid.temperature, :, nlayers, l)
+    humid = RingGrids.field_view(vars.grid.humidity, :, nlayers, l)
+    pres = vars.parameterizations.surface_pressure
+    wind = vars.parameterizations.surface_wind_speed
+    rain = vars.parameterizations.rain_rate
+    snow = vars.parameterizations.snow_rate
+    Rsd = vars.parameterizations.surface_shortwave_down
+    Rld = vars.parameterizations.surface_longwave_down
 
-    # Push forcings into Terrarium inputs (set! avoids allocating new fields)
+    # Push forcings into Terrarium inputs (copy_unmasked! avoids allocations)
     inputs = state.inputs
-    Terrarium.set!(inputs.air_temperature, Tair)
+    RingGrids.copy_unmasked!(inputs.air_temperature, Tair, indices)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
-    Terrarium.set!(inputs.air_pressure, pres)
-    Terrarium.set!(inputs.air_pressure, exp(inputs.air_pressure))                  # log(Pa) -> Pa
-    Terrarium.set!(inputs.specific_humidity, humid)
-    Terrarium.set!(inputs.rainfall, rain)
-    Terrarium.set!(inputs.snowfall, snow)
-    Terrarium.set!(inputs.windspeed, wind)
-    Terrarium.set!(inputs.surface_shortwave_down, Rsd)
-    Terrarium.set!(inputs.surface_longwave_down, Rld)
+    RingGrids.copy_unmasked!(inputs.air_pressure, pres, indices)
+    RingGrids.copy_unmasked!(inputs.specific_humidity, humid, indices)
+    RingGrids.copy_unmasked!(inputs.rainfall, rain, indices)
+    RingGrids.copy_unmasked!(inputs.snowfall, snow, indices)
+    RingGrids.copy_unmasked!(inputs.windspeed, wind, indices)
+    RingGrids.copy_unmasked!(inputs.surface_shortwave_down, Rsd, indices)
+    RingGrids.copy_unmasked!(inputs.surface_longwave_down, Rld, indices)
 
     # Constructing ModelIntegrator is allocation-free: it is an immutable struct
-    # of references so no data is copied.  InputSources() is empty intentionally:
+    # of references so no data is copied.  `InputSources` is empty intentionally:
     # we own the input-update cycle above (via set!) and do not want Terrarium's
     # update_inputs! to overwrite those values during the substeps.
     integrator = ModelIntegrator(
-        state.clock, tmodel, InputSources(),
+        state.clock, tmodel, InputSources(NF),
         state, land.initializers, land.timestepper,
     )
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
@@ -259,16 +280,17 @@ function SpeedyWeather.timestep!(
     vars.prognostic.land.soil_temperature[mask] .= interior(state.skin_temperature) .+ NF(273.15)
     vars.prognostic.land.soil_moisture[mask] .= @view interior(state.saturation_water_ice)[:, 1, end]
     if haskey(vars.prognostic.land, :sensible_heat_flux)
-        vars.prognostic.land.sensible_heat_flux[mask] .= interior(state.sensible_heat_flux)
+        RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, state.sensible_heat_flux, indices)
     end
     if haskey(vars.prognostic.land, :surface_humidity_flux)
-        vars.prognostic.land.surface_humidity_flux[mask] .= interior(state.latent_heat_flux) ./ consts.thermodynamics.latent_heat_vaporization
+        RingGrids.copy_unmasked!(vars.prognostic.land.surface_humidity_flux, state.latent_heat_flux, indices)
+        vars.prognostic.land.surface_humidity_flux.data ./= consts.thermodynamics.latent_heat_vaporization
     end
     if haskey(vars.parameterizations, :surface_longwave_up)
-        vars.parameterizations.surface_longwave_up[mask] .= interior(state.surface_longwave_up)
+        RingGrids.copy_unmasked!(vars.parameterizations.surface_longwave_up, state.surface_longwave_up, indices)
     end
     if haskey(vars.parameterizations, :surface_shortwave_up)
-        vars.parameterizations.surface_shortwave_up[mask] .= interior(state.surface_shortwave_up)
+        RingGrids.copy_unmasked!(vars.parameterizations.surface_shortwave_up, state.surface_shortwave_up, indices)
     end
     return nothing
 end
@@ -294,23 +316,26 @@ end
 function SpeedyWeather.timestep!(
         vars::Variables,
         land::TerrariumLand,
-        ::PrimitiveDryModel,
+        model::PrimitiveDryModel,
     )
     state = vars.prognostic.land.terrarium
-    tmodel = land.model
+    land_model = land.model
     NF = eltype(state)
     mask = land_mask(land)
 
     # Only air temperature is needed; convert K -> °C
-    Tair = vars.grid.temperature[mask, end]
+    # choose step dimension depending on atmospheric time stepper
+    # and read like parameterization via DummyParameterization
+    l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
+    Tair = vars.grid.temperature[mask, end, l]
     inputs = state.inputs
     Terrarium.set!(inputs.air_temperature, Tair)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))
 
     # Same reasoning as in TerrariumLand.timestep!: free to construct, empty
-    # InputSources() so SpeedyWeather owns the input-update cycle.
+    # InputSources(NF) so SpeedyWeather owns the input-update cycle.
     integrator = ModelIntegrator(
-        state.clock, tmodel, InputSources(),
+        state.clock, land_model, InputSources(NF),
         state, land.initializers, land.timestepper,
     )
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)

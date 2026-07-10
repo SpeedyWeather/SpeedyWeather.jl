@@ -223,9 +223,9 @@ function timestep!(
     soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture : nothing
     Lᵥ = latent_heat_condensation(model.atmosphere)
     Lᵢ = latent_heat_sublimation(model.atmosphere)
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping                                # time step in [s]
 
-    (; mask) = model.land_sea_mask
+    (; land_fraction) = model.land_sea_mask
     (; thermodynamics, geometry) = model.land
 
     # Sum up flux F following Frierson et al. 2006, eq (1)
@@ -256,7 +256,7 @@ function timestep!(
 
     launch!(
         architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
+        land_bucket_temperature_kernel!, soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
         params
     )
 
@@ -264,12 +264,12 @@ function timestep!(
 end
 
 @kernel inbounds = true function land_bucket_temperature_kernel!(
-        soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M, params
+        soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M, params
     )
 
     ij = @index(Global, Linear)
 
-    if mask[ij] > 0                         # at least partially land
+    if land_fraction[ij] > 0               # at least partially land
         (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
 
         # Cooling from snow melt rate, in [W/m²] = [J/kg] * [kg/m²/s]

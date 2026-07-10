@@ -12,43 +12,79 @@ the Earth's radius which is used in the dynamical core."""
     return vars
 end
 
-scale!(var::AbstractField, scale::Real) = (var .*= scale)
+function scale_tendencies!(vars::Variables, model::AbstractModel)
+    scale = vars.prognostic.scale[]
+    (; tendencies) = vars
+    TS = model.time_stepping
 
-"""$(TYPEDSIGNATURES)
-Scale the tendencies of u, v, temp, humid with scalar `scale`.
-Intended use to scale the tendencies of the parameterizations
-by the radius for the dynamical core."""
-@propagate_inbounds function scale_tendencies!(vars::NamedTuple, scale::Real)
-    haskey(vars, :u) && (vars.u .*= scale)
-    haskey(vars, :v) && (vars.v .*= scale)
-    haskey(vars, :temperature) && (vars.temperature .*= scale)
-    haskey(vars, :humidity) && (vars.humidity .*= scale)
+    # Scale each fused tendency parent exactly ONCE, then the standalone tendencies below.
+    # Fused tendencies (e.g. the grid u/v/temperature/humidity/pressure tendencies) are
+    # `SubArray` views into a shared fused parent buffer. Scaling them per-view would issue
+    # several in-place broadcasts into the same buffer, which Reactant mis-handles within a
+    # single compiled trace: multiple in-place updates to distinct views of one buffer corrupt
+    # the data (this broke the reactant correctness tests). Scaling the whole parent once (a
+    # single broadcast) is equivalent — the scale factor is uniform across members — and
+    # Reactant-safe. Non-tendency intermediates that share these parents (uT_anomaly, uq,
+    # kinetic_energy, the spectral u/v tendencies, …) are overwritten later in
+    # `grid_tendencies!`/`spectral_tendencies!` before being read, so scaling them is harmless.
+    haskey(vars.fused, :spectral_tendencies) &&
+        scale!(get_tendency_step(parent(vars.fused.spectral_tendencies), TS, DummyParameterization()), scale)
+    haskey(vars.fused, :grid_tendencies) &&
+        scale!(get_tendency_step(parent(vars.fused.grid_tendencies), TS, DummyParameterization()), scale)
+
+    # Scale the standalone (non-fused) tendencies individually. 
+    # spectral
+    for varname in tendency_names(vars)
+        var = getfield(tendencies, varname)
+        is_view_entry(var) || scale!(get_tendency_step(var, TS, DummyParameterization()), scale)
+    end
+
+    # grid
+    for varname in tendency_and_uv_names(vars)
+        var = getfield(tendencies.grid, varname)
+        is_view_entry(var) || scale!(get_tendency_step(var, TS, DummyParameterization()), scale)
+    end
+
+    # tracers
+    for varname in tracer_tendency_names(vars)
+        var = getfield(tendencies.grid_tracers, varname)
+        is_view_entry(var) || scale!(get_tendency_step(var, TS, DummyParameterization()), scale)
+    end
     return nothing
 end
 
-@propagate_inbounds function scale_tendencies!(ij, vars::NamedTuple, scale::Real)
-    haskey(vars, :u) && (
-        for k in eachlayer(vars.u)
-            vars.u[ij, k] *= scale
-        end
-    )
-    haskey(vars, :v) && (
-        for k in eachlayer(vars.v)
-            vars.v[ij, k] *= scale
-        end
-    )
-    haskey(vars, :temperature) && (
-        for k in eachlayer(vars.temperature)
-            vars.temperature[ij, k] *= scale
-        end
-    )
-    haskey(vars, :humidity) && (
-        for k in eachlayer(vars.humidity)
-            vars.humidity[ij, k] *= scale
-        end
-    )
+function unscale_tendencies!(vars::Variables)
+    scale = vars.prognostic.scale[]
+    (; tendencies) = vars
+
+    # Mirror `scale_tendencies!`: unscale each fused tendency parent once, then the standalone
+    # tendencies individually (skipping fused members, which are views into the parents). This
+    # avoids multiple in-place broadcasts into a shared buffer, which Reactant mis-handles in a
+    # single compiled trace — see [`scale_tendencies!`](@ref) for details.
+    inv_scale = inv(scale)
+    haskey(vars.fused, :spectral_tendencies) && (parent(vars.fused.spectral_tendencies).data .*= inv_scale)
+    haskey(vars.fused, :grid_tendencies) && (parent(vars.fused.grid_tendencies).data .*= inv_scale)
+
+    # spectral
+    for varname in tendency_names(vars)
+        var = getfield(tendencies, varname)
+        is_view_entry(var) || unscale!(var, scale)
+    end
+
+    # grid
+    for varname in tendency_and_uv_names(vars)
+        var = getfield(tendencies.grid, varname)
+        is_view_entry(var) || unscale!(var, scale)
+    end
+
+    # tracers
+    for varname in tracer_tendency_names(vars)
+        var = getfield(tendencies.grid_tracers, varname)
+        is_view_entry(var) || unscale!(var, scale)
+    end
     return nothing
 end
+
 
 """$(TYPEDSIGNATURES)
 Undo the radius-scaling of vorticity and divergence from `scale_prognostic!(vars, scale::Real)`."""
@@ -62,30 +98,28 @@ function unscale!(vars::Variables)
     haskey(vars.grid, :vorticity) && (vars.grid.vorticity .*= inv_scale)
     haskey(vars.grid, :divergence) && (vars.grid.divergence .*= inv_scale)
 
-    # TODO unscale the tendencies too?
+    # also unscale tendencies
+    unscale_tendencies!(vars)
 
     progn.scale[] = 1                   # set scale back to 1=unscaled
     return vars
 end
 
-"""
-$(TYPEDSIGNATURES)
-Scale the variable `var` with scalar `scale`.
-"""
-@propagate_inbounds function scale!(
-        variable::Union{LowerTriangularArray, Field},
+"""$(TYPEDSIGNATURES)
+Scale the variable `var` with scalar `scale`."""
+@inline function scale!(
+        variable::Union{LowerTriangularArray, AbstractField},
         scale::Real
     )
-    return variable.data .*= scale
+    variable.data .*= scale
+    return variable
 end
 
-"""
-$(TYPEDSIGNATURES)
-Undo the scaling of the variable `var` with scalar `scale`.
-"""
-@propagate_inbounds function unscale!(
-        variable::Union{LowerTriangularArray, Field},
+"""$(TYPEDSIGNATURES)
+Undo the scaling of the variable `var` with scalar `scale`."""
+@inline function unscale!(
+        variable::Union{LowerTriangularArray, AbstractField},
         scale::Real
     )
-    return variable.data ./= scale
+    return scale!(variable, inv(scale))
 end

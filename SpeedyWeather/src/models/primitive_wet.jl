@@ -144,27 +144,27 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-function variables(model::PrimitiveWet)
-    nsteps = get_prognostic_steps(model.time_stepping)
-    return variables(typeof(model), nsteps)
-end
+variables(model::PrimitiveWet) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
 """($TYPEDSIGNATURES) All variables needed for the primitive wet model itself (components excluded)."""
-function variables(::Type{<:PrimitiveWet}, nsteps)
+function variables(::Type{<:PrimitiveWet}, nsteps = DEFAULT_NSTEPS)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
         variables(PrimitiveDry, nsteps)...,
 
         # Add humidity
-        PrognosticVariable(:humidity, Spectral4D(nsteps), desc = "Specific humidity", units = "kg/kg", fuse = :prognostic),
-        GridVariable(:humidity, Grid3D(), desc = "Humidity", units = "kg/kg", fuse = :grid),
-        GridVariable(:humidity_prev, Grid3D(), desc = "Specific humidity at previous time step", units = "kg/kg", fuse = :grid_prev),
-        TendencyVariable(:humidity, Spectral3D(), desc = "Tendency of specific humidity", units = "kg/kg/s", fuse = :spectral_tendencies),
-        TendencyVariable(:humidity, Grid3D(), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s", fuse = :grid_tendencies),
+        PrognosticVariable(:humidity, Spectral4D(ps), desc = "Specific humidity", units = "kg/kg", fuse=:prognostic),
+        GridVariable(:humidity, Grid4D(pg), desc = "Specific Humidity", units = "kg/kg", fuse=:grid),
+        TendencyVariable(:humidity, Spectral4D(ts), desc = "Tendency of specific humidity", units = "kg/kg/s", fuse = :spectral_tendencies),
+        TendencyVariable(:humidity, Grid4D(ts), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s", fuse = :grid_tendencies),
 
-        DynamicsVariable(:uq, Grid3D(), desc = "u*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:vq, Grid3D(), desc = "v*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:uq, Spectral3D(), desc = "u*humidity intermediate in spectral space", fuse = :spectral_tendencies),
-        DynamicsVariable(:vq, Spectral3D(), desc = "v*humidity intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:uq, Grid4D(tg), desc = "u*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vq, Grid4D(tg), desc = "v*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:uq, Spectral4D(ts), desc = "u*humidity intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vq, Spectral4D(ts), desc = "v*humidity intermediate in spectral space", fuse = :spectral_tendencies),
     )
 end
 
@@ -222,6 +222,11 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(variables, model)
 
     return Simulation(variables, model)
+end
+
+function reinitialize!(model::PrimitiveWetModel, vars::AbstractVariables)
+    reinitialize!(model.implicit, model, vars)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

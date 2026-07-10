@@ -300,7 +300,7 @@ Default `transform_batch` for a `SpectralGrid`. Architecture-dependent because:
 
 - On GPU, batched plans are essential, default:
   `[1, nlayers, 2*nlayers, 4*nlayers + 1]` — covers single-layer (`1`), one variable (`L`),
-  U/V together (`2L`), and the prognostic mega-batch (`4L + 1`),  6L+1 and 9L+1 (tendency mega-batch)
+  U/V together (`2L`), and the prognostic batch (`4L + 1`),  6L+1 and 9L+1 (tendency batch)
 """
 default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_transform_batch(typeof(arch), nlayers)
 default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]

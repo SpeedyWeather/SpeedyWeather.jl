@@ -78,12 +78,10 @@ which have to be discretized in ``[0, 1]``
 ```@example howto
 vertical_coordinates = SigmaCoordinates(0:0.2:1)
 ```
-These are regularly spaced [Sigma coordinates](@ref), defined through their half levels.
-The cell centers or called full levels are marked with an ×.
-You have to provide this as an argument to `Geometry`,
-i.e. `Geometry(spectral_grid, vertical_coordinates=σ)` and pass this on to the
-model constructor if you want to use custom sigma coordinates. At the moment,
-other vertical coordinates are not supported.
+These are regularly spaced [Sigma coordinates](@ref sigma_coordinates_usage), defined through
+their half levels. The cell centers or full levels are marked with an ×. SpeedyWeather.jl also
+supports hybrid sigma-pressure coordinates — see [Vertical coordinates](@ref vertical_coordinates_page)
+for details and all available constructors.
 
 ## [Creating model components](@id create_model_components)
 
@@ -119,13 +117,10 @@ depends on a `SpectralGrid` as first argument.
 spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(15))
 ```
-The actual time step at the given resolution (here T63) is then `Δt_sec`, there's
-also `Δt` which is a scaled time step used internally, because SpeedyWeather.jl
-[scales the equations](@ref scaled_swm) with the radius of the Earth,
-but this is largely hidden (except here) from the user. With this new 
-`Leapfrog` time stepper constructed we can create a model by passing
+The actual time step at the given resolution (here T63) is then `Δt`.
+With this new `Leapfrog` time stepper constructed we can create a model by passing
 on the components (they are keyword arguments so either use `; time_stepping`
-for which the naming must match, or `time_stepping=my_time_stepping` with
+for which the naming must match, or `time_stepping = my_time_stepping` with
 any name)
 ```@example howto
 model = ShallowWaterModel(spectral_grid; time_stepping)

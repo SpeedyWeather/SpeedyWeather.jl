@@ -1,15 +1,13 @@
 export ShallowWaterModel
 
-"""
-The ShallowWaterModel contains all model components needed for the simulation of the
-shallow water equations. To be constructed like
+"""The ShallowWaterModel contains all model components needed for the simulation
+of the shallow water equations. To be constructed like
 
     model = ShallowWaterModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
-passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
-model components, are
-$(TYPEDFIELDS)"""
+passed on as keyword arguments, e.g. `planet = Earth(spectral_grid)`.
+Fields, representing model components, are $(TYPEDFIELDS)"""
 @parameterized @kwdef mutable struct ShallowWaterModel{
         SG,     # <:SpectralGrid
         AR,     # <:AbstractArchitecture,
@@ -63,23 +61,28 @@ end
 
 """($TYPEDSIGNATURES) All variables needed for the shallow water model itself (components excluded)."""
 function variables(model::ShallowWater)
-    nsteps = get_prognostic_steps(model.time_stepping)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s", fuse = :prognostic),
-        PrognosticVariable(:η, Spectral3D(nsteps), desc = "Interface displacement", units = "m", fuse = :prognostic),
+        PrognosticVariable(:divergence, Spectral4D(ps), desc = "Divergence", units = "1/s", fuse = :prognostic),
+        PrognosticVariable(:η, Spectral3D(ps), desc = "Interface displacement", units = "m", fuse = :prognostic),
 
-        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s", fuse = :grid),
-        GridVariable(:η, Grid2D(), desc = "Interface displacement", units = "m", fuse = :grid),
-        GridVariable(:geopotential, Grid2D(), desc = "Geopotential", units = "m²/s²"),
+        TendencyVariable(:divergence, Spectral4D(ts), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:divergence, Grid4D(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
 
-        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
-        TendencyVariable(:η, Spectral2D(), desc = "Tendency of interface displacement", units = "m/s"),
-        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
-        TendencyVariable(:η, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
+        TendencyVariable(:η, Spectral3D(ts), desc = "Tendency of interface displacement", units = "m/s"),
+        TendencyVariable(:η, Grid3D(tg), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
 
-        DynamicsVariable(:kinetic_energy, Grid3D(), desc = "Kinetic energy intermediate, ½(u²+v²)+Φ", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:kinetic_energy, Spectral3D(), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
+        GridVariable(:divergence, Grid4D(pg), desc = "Divergence", units = "1/s", fuse = :grid),
+        GridVariable(:η, Grid3D(pg), desc = "Interface displacement", units = "m", fuse = :grid),
+        DynamicsVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m²/s²"),
+
+        DynamicsVariable(:kinetic_energy, Grid4D(tg), desc = "Kinetic energy intermediate, ½(u²+v²)+Φ", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:kinetic_energy, Spectral4D(ts), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
 
         ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
         ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
