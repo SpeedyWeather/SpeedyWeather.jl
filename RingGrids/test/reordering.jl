@@ -35,3 +35,19 @@ end
         end
     end
 end
+
+@testset "Reordering n-dimensional fields" begin
+    grid = OctaHEALPixGrid(4)
+    @testset for trailing_dims in ((2,), (2, 3), (2, 3, 2))
+        field = rand(Float32, grid, trailing_dims...)
+        @testset for order in (RingGrids.nested_order, RingGrids.matrix_order)
+            reordered = order(field)
+
+            # reordering all layers at once == reordering every 2D layer independently
+            for c in CartesianIndices(trailing_dims)
+                layer = Field(field.data[:, c], grid)
+                @test order(layer) == Field(reordered.data[:, c], grid)
+            end
+        end
+    end
+end

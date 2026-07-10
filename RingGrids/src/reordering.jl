@@ -18,14 +18,14 @@ function reorder!(
     @assert ispow2(get_nlat_half(field.grid)) "Reordering only supported for nlat_half power of 2, got $(get_nlat_half(field.grid))."
 
     arch = architecture(field)
-    # Ensure worksize is always 2D by adding layer dimension dim=1
-    worksize = ndims(field) == 1 ? (size(field, 1), 1) : size(field)
-    launch!(arch, RingGridWorkOrder, worksize, reorder_kernel!, out, field, order, field.grid)
+    launch!(arch, RingGridWorkOrder, size(field), reorder_kernel!, out, field, order, field.grid)
     return out
 end
 
 @kernel inbounds = true function reorder_kernel!(out, field, order, grid)
-    ij, k = @index(Global, NTuple)
+    I = @index(Global, Cartesian)
+    ij = I[1]                                   # grid point index
+    k = CartesianIndex(Base.tail(Tuple(I)))     # all non-horizontal dimensions
     # TODO the recomputes the reordering for every layer k, maybe distribute only over ij?
     out_indices = reorder(order, ij, grid)
     out[out_indices, k] = field[ij, k]

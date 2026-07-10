@@ -1045,3 +1045,21 @@ end
     L2_trunc = LowerTriangularArrays.truncate(L2, 3)
     @test L2_trunc.dims isa LM
 end
+
+@testset "Rotate/Reverse n-dimensional" begin
+    @testset for trailing_dims in ((2,), (2, 3), (2, 3, 2))
+        L = rand(LowerTriangularArray{ComplexF64}, 10, 10, trailing_dims...)
+
+        rotated = rotate!(deepcopy(L), 30)
+        reversed_lat = reverse(L, dims = :lat)
+        reversed_lon = reverse(L, dims = :lon)
+
+        # operating on all matrices at once == operating on every matrix independently
+        for c in CartesianIndices(trailing_dims)
+            layer = L[:, c]
+            @test rotate!(deepcopy(layer), 30) == rotated[:, c]
+            @test reverse(layer, dims = :lat) == reversed_lat[:, c]
+            @test reverse(layer, dims = :lon) == reversed_lon[:, c]
+        end
+    end
+end
