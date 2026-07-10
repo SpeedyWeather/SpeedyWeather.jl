@@ -85,7 +85,7 @@ end
         reverse!(field, dims = :lon)
         for (j, ring) in enumerate(eachring(grid))
             n = length(ring)
-            if hasoffset(Grid, nlat_half, j)
+            if RingGrids.hasoffset(Grid, nlat_half, j)
                 @test field[ring] == n:-1:1         # 1, 2, ..., n -> n, ..., 2, 1
             else
                 @test field[ring] == [1; n:-1:2]    # first point (on 0˚) stays
