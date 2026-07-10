@@ -183,7 +183,7 @@ and [UnicodePlots's](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap`, 
 [Visualisation via Makie](@ref) and [Visualisation via UnicodePlots](@ref).
 
 ```@example ringgrids
-using CairoMakie    # triggers loading of Makie extension, or do using UnicodePlots instead!
+import CairoMakie: heatmap   # triggers loading of Makie extension, or use UnicodePlots instead!
 grid = OctahedralGaussianGrid(24)
 field = randn(grid)
 heatmap(field)
