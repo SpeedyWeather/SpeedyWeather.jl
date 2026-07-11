@@ -140,5 +140,15 @@ Architectures.on_architecture(architecture::AbstractArchitecture, s::Spectrum) =
 Architectures.on_architecture(s::Spectrum, x) = on_architecture(architecture(s), x)
 
 # indexing
+"""
+$(TYPEDSIGNATURES)
+Iterator over all spherical harmonics in `S`, yielding `(l, m)` tuples of
+degree `l` and order `m` (both 1-based) for every harmonic in the lower triangle.
+To be used like
+
+    for (l, m) in eachharmonic(S)
+        L[l, m, k]
+    end
+"""
 eachharmonic(S::Spectrum) = zip(S.l_indices, S.m_indices)
 Base.eachindex(S::Spectrum) = Base.OneTo(length(S.l_indices))
