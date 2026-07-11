@@ -15,6 +15,8 @@ struct Spectrum{A, O, L, IntType} <: AbstractSpectrum
     lm_orders::O    # used by eachorder
 end
 
+Adapt.@adapt_structure Spectrum
+
 """
 $(TYPEDSIGNATURES)
 Create a `Spectrum` from the spectral truncation `lmax` and `mmax`. Both are 
@@ -132,9 +134,6 @@ end
 
 Architectures.ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)
 Architectures.ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeof(array))
-
-Adapt.@adapt_structure Spectrum
-
 Architectures.architecture(s::Spectrum) = s.architecture
 Architectures.on_architecture(architecture::AbstractArchitecture, s::Spectrum) = Spectrum(s; architecture)
 Architectures.on_architecture(s::Spectrum, x) = on_architecture(architecture(s), x)
@@ -147,7 +146,7 @@ degree `l` and order `m` (both 1-based) for every harmonic in the lower triangle
 To be used like
 
     for (l, m) in eachharmonic(S)
-        L[l, m, k]
+        L[l, m]
     end
 """
 eachharmonic(S::Spectrum) = zip(S.l_indices, S.m_indices)
