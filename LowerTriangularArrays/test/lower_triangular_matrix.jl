@@ -618,7 +618,6 @@ end
 end
 
 @testset "GPU (JLArrays)" begin
-    # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
     NF = Float32
     idims = (5,)
     spectrum = Spectrum(10, 10)
@@ -634,7 +633,7 @@ end
 
     # getindex
     @test typeof(L[1, :]) <: JLArray
-    for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L))
+    for lm in eachindex(L.spectrum)
         @test Array(L[lm, :]) == L_cpu[lm, :]
     end
 
@@ -645,7 +644,7 @@ end
 
     # fill
     fill!(L, 2)
-    for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L2))
+    for lm in eachindex(L2.spectrum)
         @test all(L[lm, [Colon() for i in 1:length(idims)]...] .== 2)
     end
 
@@ -662,7 +661,8 @@ end
     L3 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, spectrum, idims...))
     L4 = convert(LowerTriangularArray{Float16, 2, JLArray{Float16, 2}, typeof(spectrum_jlarray)}, L3)
 
-    for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L, L3))
+    # for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L, L3))
+    for lm in eachindex(L3.spectrum)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])
     end
 
