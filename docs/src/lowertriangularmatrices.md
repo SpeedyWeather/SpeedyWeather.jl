@@ -111,25 +111,8 @@ which would point to the first element in the upper triangle (hence zero).
 
 In performance-critical code a single index should be used, as this directly maps
 to the index of the underlying data vector. The matrix index is somewhat slower
-as it first has to be converted to the corresponding single index.
-
-Consequently, you may loop with the following structure
-```@example LowerTriangularArrays
-n, m = size(L, as=Matrix)
-
-ij = 0
-for j in 1:m, i in j:n
-    ij += 1
-    L[ij] = i+j
-end
-```
-which loops over all lower triangle entries of `L::LowerTriangularArray` and the single
-index `ij` is simply counted up. However, one could also use `[i, j]` as indices in the
-loop body or to perform any calculation (`i+j` here). However note that this
-does not work on the GPU as the running index `ij` and scalar indexing generally does not work.
-Hence internally, SpeedyWeather will write such an operation either via broadcasting
-(see [Broadcasting with `LowerTriangularArray`](@ref))
-if simple or with a custom kernel in general, see [GPU and Architectures](@ref).
+as it first has to be converted to the corresponding single index,
+see [Iterators](@ref) below.
 
 !!! warning "`end` doesn't work for matrix indexing"
     Indexing `LowerTriangularMatrix` and `LowerTriangularArray` in matrix style (`[i, j]`) with
@@ -192,6 +175,11 @@ for (lm, (l, m)) in enumerate(eachharmonic(L))
 end
 L
 ```
+
+However note that this does not work on the GPU as scalar indexing generally does not work.
+Hence internally, SpeedyWeather will write such an operation either via broadcasting
+(see [Broadcasting with `LowerTriangularArray`](@ref))
+if simple or with a custom kernel in general, see [GPU and Architectures](@ref).
 
 If you only want to loop over the other dimensions use `eachmatrix`
 
