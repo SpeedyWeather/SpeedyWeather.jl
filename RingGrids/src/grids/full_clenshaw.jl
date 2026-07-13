@@ -47,6 +47,7 @@ get_nlon(::Type{<:FullClenshawGrid}, nlat_half::Integer) = 4nlat_half
 ## COORDINATES
 get_latd(::Type{<:FullClenshawGrid}, nlat_half::Integer) = [90 - 90j / nlat_half for j in 1:(2nlat_half - 1)]
 get_lond(::Type{<:FullClenshawGrid}, nlat_half::Integer) = get_lond(FullGaussianGrid, nlat_half)
+hasoffset(::Type{<:FullClenshawGrid}) = false   # first longitude point on 0˚
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullClenshawGrid}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)

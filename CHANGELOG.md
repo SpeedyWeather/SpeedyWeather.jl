@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Revised EnzymeRules for SpeedyTransforms [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
+- Rotate/reverse Field/LowerTriangularArray kernelized [#1154](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1154)
 - ArrayDimensions in RingGrids and LowerTriangularArrays [#1150](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1150/)
 - Terrarium coupling uses the allocation-free masked copy to optimize performance [#1152](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1152)
 - Improved compatability with Enzyme with Julia 1.12: `get_step` instead of `get_steps` used more commonly and default `maxtypeoffset!` increased [#1143](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1143)
