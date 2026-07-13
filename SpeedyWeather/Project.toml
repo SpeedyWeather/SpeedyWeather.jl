@@ -58,6 +58,7 @@ SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
 SpeedyWeatherGeoMakieExt = "GeoMakie"
 SpeedyWeatherReactantExt = ["Reactant", "Dates"]
 SpeedyWeatherTerrariumExt = "Terrarium"
+SpeedyWeatherTerrariumZarrExt = ["Terrarium", "Zarr"]
 SpeedyWeatherUnicodePlotsExt = "UnicodePlots"
 SpeedyWeatherZarrExt = "Zarr"
 

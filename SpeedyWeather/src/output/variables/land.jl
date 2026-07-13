@@ -122,3 +122,15 @@ LandOutput() = (
     SnowDepthOutput(),
     LandSeaMaskOutput(),
 )
+
+"""$(TYPEDSIGNATURES)
+Output variables for the state of a Terrarium land model in coupled
+Terrarium-SpeedyWeather simulations. Constructor methods are defined in the
+SpeedyWeatherTerrariumExt extension, i.e. Terrarium.jl has to be loaded first.
+Call as `TerrariumOutput(terrarium_model)` to create output variables for all
+prognostic and auxiliary variables of the Terrarium model, or as
+`TerrariumOutput(terrarium_model, :variable_name)` for a single one. Output
+variables are added to a model's output via `add!(model, TerrariumOutput(terrarium_model)...)`.
+Supported by `NetCDFOutput`, and by `ZarrOutput` once Zarr.jl is loaded
+(SpeedyWeatherTerrariumZarrExt extension)."""
+function TerrariumOutput end

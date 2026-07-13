@@ -1,8 +1,3 @@
-module SpeedyWeatherTerrariumExt
-
-using SpeedyWeather
-using Terrarium
-using DocStringExtensions
 
 """
 $(TYPEDSIGNATURES)
@@ -344,5 +339,3 @@ function SpeedyWeather.timestep!(
     vars.prognostic.land.soil_temperature[mask] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
     return nothing
 end
-
-end # module

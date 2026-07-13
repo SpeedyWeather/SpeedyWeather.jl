@@ -104,8 +104,10 @@ function initialize!(
     )
     output.active || return nothing
 
-    # only checked for models that have a land component
-    if hasfield(typeof(model), :land) && !isnothing(model.land)
+    # only checked for models that have a land component and output variables that
+    # actually use the soil vertical dimension (and its scratch field `field3Dland`)
+    if hasfield(typeof(model), :land) && !isnothing(model.land) &&
+            any(var -> is_land(var) && is3D(var), values(output.variables))
         @assert SpeedyWeather.get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
             " soil layers initialized for output, but $(SpeedyWeather.get_nlayers(model.land)) soil layers initialized for model." *
             " Please construct ZarrOutput with the same `nlayers_soil` as the model."
