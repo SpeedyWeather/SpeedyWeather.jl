@@ -389,9 +389,12 @@ end
 
     S = SpectralTransform(spectrum, grid; NF, nlayers, transform_batch = Int[1, 2, 4])
 
-    # (a) keys present, scratch sized to max planned K
-    @test sort!(collect(keys(S.rfft_plans))) == [1, 2, 4]
-    @test sort!(collect(keys(S.brfft_plans))) == [1, 2, 4]
+    # (a) planned plans present, scratch sized to max planned K. K=1 lives in the always-built serial
+    # plan vector; the batched (K>1) plans are keyed by K in the batched Dicts.
+    @test length(S.rfft_plan_serial) == S.grid.nlat_half
+    @test length(S.brfft_plan_serial) == S.grid.nlat_half
+    @test sort!(collect(keys(S.rfft_plans_batched))) == [2, 4]
+    @test sort!(collect(keys(S.brfft_plans_batched))) == [2, 4]
     @test S.nlayers == 4
 
     # (b)+(c) roundtrip at each K — including K=3 which is NOT in the planned set

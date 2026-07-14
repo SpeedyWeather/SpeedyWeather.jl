@@ -22,6 +22,10 @@ struct SpectralTransform{
         GradientType,               # <: NamedTuple for gradients
         IntType,                    # <: Integer
         B,                          # <: Bool
+        RFFTSerialType,             # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D forward plans)
+        BRFFTSerialType,            # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D inverse plans)
+        RFFTBatchedType,            # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D forward)
+        BRFFTBatchedType,           # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D inverse)
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -35,7 +39,7 @@ struct SpectralTransform{
 
     # GRID
     grid::GridType                  # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::IntType                # max number of layers in the vertical (= maximum(keys(rfft_plans)); for scratch memory size)
+    nlayers::IntType                # max number of layers in the vertical (= max planned batch K; for scratch memory size)
 
     # CORRESPONDING GRID SIZE
     nlon_max::IntType               # Maximum number of longitude points (at Equator)
@@ -51,13 +55,16 @@ struct SpectralTransform{
     # NORMALIZATION
     norm_sphere::NF                 # normalization of the l=0, m=0 mode
 
-    # FFT plans keyed by batch size K. For each planned K, value is a length-nlat_half vector
-    # of per-ring plans. K=1 entry is the per-layer fallback (used by `_fourier_serial!`).
-    # FFTW/cuFFT plans bake K into the plan at construction, so a single K-plan cannot be reused
-    # for a different K. Hot K values (batched dycore transforms, prognostic spec→grid, U/V,
-    # single-layer) are pre-planned; everything else falls back to the K=1 plan in a loop.
-    rfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}}   # grid → spectral (forward) FFT plans
-    brfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}}  # spectral → grid (inverse) FFT plans
+    # FFT plans, split into concretely-typed serial (K=1, 1-D) and batched (K>1, 2-D) sets so that
+    # `plan * view` / `mul!` is a static call (the K=1 and K>1 plans are different concrete FFTW/cuFFT
+    # types and cannot share one container). FFTW/cuFFT plans bake K into the plan at construction.
+    # The serial plans are the per-layer fallback (used by `_fourier_serial!`), always present. Hot K
+    # values (batched dycore transforms, prognostic spec→grid, U/V) are pre-planned in the batched
+    # Dicts, keyed by K; everything else falls back to the serial plans in a loop.
+    rfft_plan_serial::RFFTSerialType     # grid → spectral (forward), K=1 per-ring 1-D plans
+    brfft_plan_serial::BRFFTSerialType   # spectral → grid (inverse), K=1 per-ring 1-D plans
+    rfft_plans_batched::RFFTBatchedType  # grid → spectral (forward), K>1 per-ring 2-D plans, keyed by K
+    brfft_plans_batched::BRFFTBatchedType # spectral → grid (inverse), K>1 per-ring 2-D plans, keyed by K
 
     # LEGENDRE POLYNOMIALS, for all latitudes, precomputed
     legendre_polynomials::LowerTriangularArrayType
@@ -155,15 +162,11 @@ function SpectralTransform(
     # to hold one such chunk. GPU shouldn't chunk and must fit the full input K.
     scratch_memory = ScratchMemory(NF, architecture, grid, _scratch_nlayers(architecture, nlayers, planned_K))
 
-    rfft_plans = Dict{Int, Vector{AbstractFFTs.Plan}}()
-    brfft_plans = Dict{Int, Vector{AbstractFFTs.Plan}}()
-
     fake_grid_data = on_architecture(architecture, zeros(NF, grid, nlayers))
 
-    # PLAN THE FFTs for each batch size K in `planned_K`
-    plan_FFTs!(
-        rfft_plans, brfft_plans, planned_K,
-        fake_grid_data, scratch_memory.north, rings, nlons
+    # PLAN THE FFTs: concretely-typed serial (K=1) plan vectors + batched (K>1) plan Dicts
+    rfft_plan_serial, brfft_plan_serial, rfft_plans_batched, brfft_plans_batched = plan_FFTs(
+        planned_K, fake_grid_data, scratch_memory.north, rings, nlons
     )
 
     # PRECOMPUTE KJM INDICES FOR LEGENDRE TRANSFORM (0-based)
@@ -206,6 +209,10 @@ function SpectralTransform(
         typeof(gradients),
         typeof(nlayers),
         typeof(cuda_graphs),
+        typeof(rfft_plan_serial),
+        typeof(brfft_plan_serial),
+        typeof(rfft_plans_batched),
+        typeof(brfft_plans_batched),
     }(
         architecture,
         spectrum, nfreq_max,
@@ -214,7 +221,8 @@ function SpectralTransform(
         nlon_max, nlons, nlat, rings,
         coslat, coslat⁻¹, lon_offsets,
         norm_sphere,
-        rfft_plans, brfft_plans,
+        rfft_plan_serial, brfft_plan_serial,
+        rfft_plans_batched, brfft_plans_batched,
         legendre_polynomials,
         scratch_memory,
         jm_index_size, kjm_indices,
@@ -359,7 +367,7 @@ _scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:In
 # GPU doesn't need any of that we have seperate plans for each K 
 @inline function _needs_chunking(K::Integer, S::SpectralTransform{NF, <:AbstractCPU}) where {NF}
     K > 1 || return false                            # K=1 always handled directly
-    haskey(S.rfft_plans, K) && return false          # K is directly planned, no chunking needed
+    haskey(S.rfft_plans_batched, K) && return false  # K is directly planned, no chunking needed
     # K > 1 and not directly planned: chunk through whichever planned K is largest (≤ K_total).
     # Note this includes the degenerate case `keys(rfft_plans) == [1]`: chunks then have K=1
     # and route to the K=1 plan one layer at a time. Scratch (sized to maximum(planned_K))
@@ -372,7 +380,7 @@ end
 # Largest planned batch K ≤ K_total, excluding the K=1 fallback. Used to pick the chunk size. Typically this will just be the number of layers in the model. 
 @inline function _largest_planned_batch(K_total::Integer, S::SpectralTransform)
     best = 1
-    for k in keys(S.rfft_plans)
+    for k in keys(S.rfft_plans_batched)
         if k > best && k <= K_total
             best = k
         end

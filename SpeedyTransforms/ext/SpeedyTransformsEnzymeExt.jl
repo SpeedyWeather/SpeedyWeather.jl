@@ -28,8 +28,8 @@ EnzymeRules.inactive_type(::Type{<:SpectralTransform}) = true
 function adjoint_scale(S::SpectralTransform)
     (; nlons) = S
     (; nlat_half) = S.grid
-    # The K=1 plan vector (always built) is sufficient to read each ring's nfreq.
-    rfft_plans_1D = S.rfft_plans[1]
+    # The serial (K=1) plan vector (always built) is sufficient to read each ring's nfreq.
+    rfft_plans_1D = S.rfft_plan_serial
     nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans_1D]
 
     scale = zeros(Int, maximum(nfreqs), 1, nlat_half) # the scratch memory is (Freq x lvl x lat), so we insert
