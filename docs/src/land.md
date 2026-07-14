@@ -491,7 +491,7 @@ variable metadata. Add all prognostic and auxiliary Terrarium variables with
 add!(model, TerrariumOutput(terrarium_model)...)
 ```
 
-or add a single variable (here renamed in the NetCDF file via `name`, any Terrarium
+or add a single variable (here renamed in the output file via `name`, any Terrarium
 variable name works, e.g. also `:saturation_water_ice` or `:sensible_heat_flux`) with
 
 ```@example terrarium
@@ -501,9 +501,16 @@ nothing # hide
 
 Then run the simulation with `run!(simulation, output = true)` as usual.
 3D (subsurface) variables like the soil `temperature` are written on an
-additional vertical NetCDF dimension `soil_depth` with the depths of the
+additional vertical dimension `soil_depth` with the depths of the
 Terrarium soil layer centres (in meters, positive down) as coordinates.
 Ocean grid points, where Terrarium does not simulate anything, are filled
-with NaN. Terrarium output variables are currently only supported with
-`NetCDFOutput` (not `ZarrOutput`).
+with NaN. Terrarium output variables are supported both with `NetCDFOutput`
+and, once Zarr.jl is loaded, with `ZarrOutput`:
+
+```julia
+using Zarr
+output = ZarrOutput(spectral_grid, PrimitiveWet)
+model = PrimitiveWetModel(spectral_grid; land, output, ...)
+add!(model, TerrariumOutput(terrarium_model)...)
+```
 

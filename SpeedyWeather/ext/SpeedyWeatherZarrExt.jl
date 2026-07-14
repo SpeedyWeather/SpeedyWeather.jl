@@ -10,7 +10,7 @@ import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     DEFAULT_OUTPUT_NF, DEFAULT_OUTPUT_INTERVAL, DEFAULT_MISSING_VALUE,
     DEFAULT_COMPRESSION_LEVEL, DEFAULT_KEEPBITS,
     Variables, Simulation, SpectralGrid, Field,
-    initialize!, finalize!, output!, write_array!, set!, add!, add_default!,
+    initialize!, finalize!, output!, write_array!, define_variable!, set!, add!, add_default!,
     is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
     get_lond, get_latd, on_architecture, CPU,
     AbstractFullGrid, run_folder_name
