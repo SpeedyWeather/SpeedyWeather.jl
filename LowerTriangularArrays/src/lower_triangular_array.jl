@@ -860,8 +860,8 @@ function BroadcastStyle(
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-LowerTriangularStyle{N}(::Val{M}) where {N, M} = LowerTriangularStyle{N}()
-LowerTriangularGPUStyle{N}(::Val{M}) where {N, M} = LowerTriangularGPUStyle{N}()
+LowerTriangularStyle{N}(::Val{M}) where {N, M} = LowerTriangularStyle{max(N, M)}()
+LowerTriangularGPUStyle{N}(::Val{M}) where {N, M} = LowerTriangularGPUStyle{max(N, M)}()
 
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments.
 Adapted from Julia documentation of Broadcast interface"
