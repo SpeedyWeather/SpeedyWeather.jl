@@ -11,7 +11,7 @@ import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     DEFAULT_COMPRESSION_LEVEL, DEFAULT_KEEPBITS,
     Variables, Simulation, SpectralGrid, Field,
     initialize!, finalize!, output!, write_array!, define_variable!, set!, add!, add_default!,
-    define_dimension!, vertical_dimension, get_nlayers, get_dimension, define_coordinate!,
+    define_dimension!, vertical_dimension, get_nlayers, get_dimension_length, define_coordinate!,
     is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
     get_lond, get_latd, on_architecture, CPU,
     AbstractFullGrid, run_folder_name
@@ -273,10 +273,10 @@ end
 
 """$(TYPEDSIGNATURES)
 Length of the coordinate array `name` in the Zarr group `g` or `nothing` if not
-defined. Zarr-store equivalent of `get_dimension(::NCDataset, name)` so that
+defined. Zarr-store equivalent of `get_dimension_length(::NCDataset, name)` so that
 custom output variables can define their own dimension in `define_dimension!`
 with one method for all output backends."""
-get_dimension(g::Zarr.ZGroup, name::String) = haskey(g, name) ? length(g[name]) : nothing
+get_dimension_length(g::Zarr.ZGroup, name::String) = haskey(g, name) ? length(g[name]) : nothing
 
 """$(TYPEDSIGNATURES)
 Define a coordinate in the Zarr group `g`: a 1D array `name` with `values` and

@@ -125,8 +125,7 @@ LandOutput() = (
 
 """$(TYPEDSIGNATURES)
 Output variables for the state of a Terrarium land model in coupled
-Terrarium-SpeedyWeather simulations. Constructor methods are defined in the
-SpeedyWeatherTerrariumExt extension, i.e. Terrarium.jl has to be loaded first.
+Terrarium-SpeedyWeather simulations.
 Call as `TerrariumOutput(terrarium_model)` to create output variables for all
 prognostic and auxiliary variables of the Terrarium model, or as
 `TerrariumOutput(terrarium_model, :variable_name)` for a single one. Output

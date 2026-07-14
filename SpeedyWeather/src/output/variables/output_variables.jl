@@ -58,11 +58,11 @@ get_nlayers(output::AbstractOutput, variable::AbstractOutputVariable) =
     is_land(variable) ? size(output.field3Dland, 2) : size(output.field3D, 2)
 
 """$(TYPEDSIGNATURES)
-Hook called by `define_variable!` before `variable` is defined in the output
+Function called by `define_variable!` before `variable` is defined in the output
 file or store `dest`; no-op by default as the default dimensions (see
 [`vertical_dimension`](@ref)) are defined upfront by `initialize!`. Custom
-output variables written on their own vertical dimension extend this to lazily
-define that dimension, typically via [`get_dimension`](@ref) and
+output variables written on their own vertical dimension extend this to
+define that dimension, typically via [`get_dimension_length`](@ref) and
 [`define_coordinate!`](@ref) so that one method covers all output backends."""
 define_dimension!(dest, variable::AbstractOutputVariable) = nothing
 

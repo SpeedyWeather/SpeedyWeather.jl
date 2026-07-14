@@ -231,18 +231,16 @@ end
 
 """$(TYPEDSIGNATURES)
 Length of dimension `name` in `dataset` or `nothing` if not defined.
-Used by custom output variables to lazily define their own dimension in
-[`define_dimension!`](@ref); a Zarr store equivalent is defined in the
-Zarr extension."""
-get_dimension(dataset::NCDataset, name::String) =
+Used by custom output variables to define their own dimension in
+[`define_dimension!`](@ref)."""
+get_dimension_length(dataset::NCDataset, name::String) =
     haskey(dataset.dim, name) ? dataset.dim[name] : nothing
 
 """$(TYPEDSIGNATURES)
 Define a coordinate in `dataset`: a dimension `name` of `length(values)` with
 `values` as its coordinate variable and `attribs` as its attributes.
-Used by custom output variables to lazily define their own dimension in
-[`define_dimension!`](@ref); a Zarr store equivalent is defined in the
-Zarr extension."""
+Used by custom output variables to define their own dimension in
+[`define_dimension!`](@ref)."""
 define_coordinate!(dataset::NCDataset, name::String, values::AbstractVector; attribs = Dict{String, String}()) =
     defVar(dataset, name, values, (name,), attrib = attribs)
 

@@ -5,7 +5,7 @@
 
 import SpeedyWeather: TerrariumOutput, AbstractOutput, AbstractSimulation,
     path, path_or_nothing, output!, write_array!, hastime, is3D,
-    vertical_dimension, get_nlayers, define_dimension!, get_dimension, define_coordinate!
+    vertical_dimension, get_nlayers, define_dimension!, get_dimension_length, define_coordinate!
 
 # name of the vertical output dimension shared by all 3D Terrarium output variables
 const SOIL_DEPTH_DIM_NAME = "soil_depth"
@@ -220,10 +220,10 @@ Lazily define the vertical dimension of Terrarium output variables in the output
 file or store `dest` (an `NCDataset` or a Zarr group): a `soil_depth` coordinate
 (shared between all Terrarium output variables) with the depths of the Terrarium
 soil layer centres [m, positive down] as values. Backend-agnostic via
-[`get_dimension`](@ref) and [`define_coordinate!`](@ref)."""
+[`get_dimension_length`](@ref) and [`define_coordinate!`](@ref)."""
 function SpeedyWeather.define_dimension!(dest, variable::TerrariumOutputVariable)
     is3D(variable) || return nothing        # only 3D variables have a vertical dimension
-    nlayers = get_dimension(dest, SOIL_DEPTH_DIM_NAME)
+    nlayers = get_dimension_length(dest, SOIL_DEPTH_DIM_NAME)
     if isnothing(nlayers)
         define_coordinate!(
             dest, SOIL_DEPTH_DIM_NAME, variable.depths,
