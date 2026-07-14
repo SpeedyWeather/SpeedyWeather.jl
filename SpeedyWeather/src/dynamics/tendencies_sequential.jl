@@ -214,3 +214,17 @@ function vorticity_flux_curldiv!(
     vorticity_flux_spectral_tendencies!(vars, S, time_stepping; div, add)
     return nothing
 end
+
+#TODO: OLD VERSION / SEQUENTIAL VERSION: MIGHT BE DELETED
+function bernoulli_potential!(vars::Variables, model::ShallowWater)
+    S = model.spectral_transform
+    bernoulli_grid_potential!(vars, model, model.time_stepping)
+
+    bernoulli = get_step(vars.dynamics.kinetic_energy)
+    bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
+    scratch_memory = vars.scratch.transform_memory
+    transform!(bernoulli, bernoulli_grid, scratch_memory, S)
+
+    bernoulli_spectral_potential!(vars, model, model.time_stepping)
+    return nothing
+end
