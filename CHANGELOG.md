@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Rotate/reverse Field/LowerTriangularArray kernelized [#1154](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1154)
 - ArrayDimensions in RingGrids and LowerTriangularArrays [#1150](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1150/)
 - Terrarium coupling uses the allocation-free masked copy to optimize performance [#1152](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1152)
