@@ -155,8 +155,8 @@ function dynamics_tendencies!(
 
     
     # batched transform of grid tendencies to spectral space
-    transform!(parent(vars.fused.spectral_tendencies),
-               parent(vars.fused.grid_tendencies),
+    transform!(get_tendency_step(parent(vars.fused.spectral_tendencies), time_stepping, DynamicalCore()),
+               get_tendency_step(parent(vars.fused.grid_tendencies), time_stepping, DynamicalCore()),
                vars.scratch.transform_memory, spectral_transform)
 
     # accumulates into final spectral tendencies: vorticity, divergence, temperature, divergence, pressure (, humidity)
@@ -739,8 +739,8 @@ function parameterization_tendencies_only!(
     # images are harmless. A per-variable transform of the individual slot views would pass
     # non-contiguous SubArrays to the GPU Legendre transform, whose `reinterpret` fails to compile
     # (InvalidIRError); the full contiguous parent transform is the GPU-safe path.
-    transform!(parent(vars.fused.spectral_tendencies),
-               parent(vars.fused.grid_tendencies),
+    transform!(get_tendency_step(parent(vars.fused.spectral_tendencies), TS, DynamicalCore()),
+               get_tendency_step(parent(vars.fused.grid_tendencies), TS, DynamicalCore()),
                scratch_memory, S)
 
     # divergence and curl of the (now spectral) u, v tendencies for vor, div tendencies

@@ -51,11 +51,11 @@ function set!(
         if varname in (:u, :v)  # already handled in special case above
             nothing
         elseif varname in keys(vars)
-            var = vars[varname] isa LowerTriangularArray ? get_step(vars[varname], step) : vars[varname]
+            var = ArrayDimensions.hastime(vars[varname]) ? get_step(vars[varname], step) : vars[varname]
             set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
         elseif namespace in keys(vars)
             if varname in keys(vars[namespace])
-                var = vars[namespace][varname] isa LowerTriangularArray ?
+                var = ArrayDimensions.hastime(vars[namespace][varname]) ?
                     get_step(vars[namespace][varname], step) : vars[namespace][varname]
                 set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
             else

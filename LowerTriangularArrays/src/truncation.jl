@@ -83,7 +83,7 @@ function truncate(
 
     # preallocate new (smaller) array
     ArrayType_ = nonparametric_type(ArrayType)
-    alms_trunc = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc + 1, mtrunc + 1, architecture = architecture(alms)), k...)
+    alms_trunc = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc + 1, mtrunc + 1, architecture = architecture(alms)), alms.dims, k...)
 
     # copy data over, copyto! copies the largest matching subset of harmonics
     copyto!(alms_trunc, alms)
@@ -113,11 +113,12 @@ function interpolate(
 
     # preallocate new (larger) array
     ArrayType_ = nonparametric_type(ArrayType)
-    alms_interp = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc + 1, mtrunc + 1, architecture = architecture(alms)), k...)
+    alms_interp = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc + 1, mtrunc + 1, architecture = architecture(alms)), alms.dims, k...)
 
     # copy data over, copyto! copies the largest matching subset of harmonics
     copyto!(alms_interp, alms)
     return alms_interp
 end
 
+interpolate(alms::LowerTriangularArray, ltrunc::Integer, mtrunc::Integer) = interpolate(eltype(alms), alms, ltrunc, mtrunc)
 interpolate(alms::LowerTriangularArray, trunc::Integer) = interpolate(alms, trunc, trunc)

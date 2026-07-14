@@ -63,6 +63,7 @@ makedocs(
             "Surface fluxes" => "surface_fluxes.md",
         ],
         "Numerics" => [
+            "Array dimensions" => "array_dimensions.md",
             "Grids" => "grids.md",
             "RingGrids" => "ringgrids.md",
             "LowerTriangularArrays" => "lowertriangularmatrices.md",
