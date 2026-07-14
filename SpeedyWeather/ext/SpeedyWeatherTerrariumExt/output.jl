@@ -165,7 +165,7 @@ function terrarium_output_field!(
     tfield = path_or_nothing(variable, simulation)      # Oceananigans field of the land columns
     isnothing(tfield) && return nothing                 # silently escape if not in simulation
 
-    # lazily allocate the scratch fields on the first call
+    # allocate the scratch fields on the first call
     output_NF = eltype(output.field2D)
     if isnothing(variable.scratch_grid)
         grid = SpeedyWeather.on_architecture(SpeedyWeather.CPU(), simulation.model.spectral_grid.grid)
@@ -216,7 +216,7 @@ SpeedyWeather.vertical_dimension(::TerrariumOutputVariable) = SOIL_DEPTH_DIM_NAM
 SpeedyWeather.get_nlayers(::AbstractOutput, variable::TerrariumOutputVariable) = variable.nlayers
 
 """$(TYPEDSIGNATURES)
-Lazily define the vertical dimension of Terrarium output variables in the output
+Define the vertical dimension of Terrarium output variables in the output
 file or store `dest` (an `NCDataset` or a Zarr group): a `soil_depth` coordinate
 (shared between all Terrarium output variables) with the depths of the Terrarium
 soil layer centres [m, positive down] as values. Backend-agnostic via

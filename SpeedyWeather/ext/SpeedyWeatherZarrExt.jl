@@ -299,7 +299,7 @@ function define_variable!(
         n_outputs::Int,
         output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
     )
-    # hook for custom output variables to lazily define their own (vertical) dimension
+    # hook for custom output variables to define their own (vertical) dimension
     define_dimension!(g, var)
 
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
