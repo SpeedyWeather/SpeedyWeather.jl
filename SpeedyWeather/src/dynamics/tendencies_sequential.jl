@@ -215,6 +215,24 @@ function vorticity_flux_curldiv!(
     return nothing
 end
 
+"""$(TYPEDSIGNATURES)
+
+SEQUENTIAL VERSION
+
+Computes the (negative) divergence of the volume fluxes `uh, vh` for the continuity
+equation, `η_tend -= ∇⋅(uh, vh)`, with its own grid→spectral transforms of the fluxes."""
+function volume_flux_divergence!(vars::Variables, model::ShallowWater)
+    volume_flux_divergence_grid!(vars, model)
+
+    S = model.spectral_transform
+    scratch_memory = vars.scratch.transform_memory
+    transform!(get_step(vars.dynamics.uh), get_step(vars.dynamics.grid.uh), scratch_memory, S)
+    transform!(get_step(vars.dynamics.vh), get_step(vars.dynamics.grid.vh), scratch_memory, S)
+
+    volume_flux_divergence_spectral!(vars, model)
+    return nothing
+end
+
 #TODO: OLD VERSION / SEQUENTIAL VERSION: MIGHT BE DELETED
 function bernoulli_potential!(vars::Variables, model::ShallowWater)
     S = model.spectral_transform

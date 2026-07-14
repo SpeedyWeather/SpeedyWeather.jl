@@ -10,6 +10,7 @@ Calculate tendencies in grid space for the ShallowWater model."""
 function grid_tendencies!(vars::Variables, model::ShallowWater)
     vorticity_flux_grid_tendencies!(vars, model)
     bernoulli_grid_potential!(vars, model, model.time_stepping)   # kinetic_energy_grid = ½(u²+v²)+Φ
+    volume_flux_divergence_grid!(vars, model)                     # uh_grid, vh_grid = (u, v)*h
     return nothing
 end
 
@@ -36,6 +37,7 @@ Reads transformed spectral tendencies and accumulates the final spectral tendenc
 function spectral_tendencies!(vars::Variables, model::ShallowWater)
     vorticity_flux_spectral_tendencies!(vars, model.spectral_transform, model.time_stepping; div = true, add = true)
     bernoulli_spectral_potential!(vars, model)
+    volume_flux_divergence_spectral!(vars, model)     # η_tend -= ∇⋅(uh, vh)
     return nothing
 end
 
@@ -91,19 +93,16 @@ function dynamics_tendencies!(
 
     geopotential!(vars, model)          # geopotential Φ = gη in shallow water
 
-    # compute tendencies in grid space: u, v, kinetic_energy
+    # compute tendencies in grid space: u, v, kinetic_energy, volume fluxes uh, vh
     grid_tendencies!(vars, model)
-    
+
     # batched transform of grid tendencies to spectral space
     transform!(get_tendency_step(parent(vars.fused.spectral_tendencies), time_stepping, DynamicalCore()),
                get_tendency_step(parent(vars.fused.grid_tendencies), time_stepping, DynamicalCore()),
                vars.scratch.transform_memory, spectral_transform)
 
-    # accumulates into final spectral tendencies: vorticity, divergence
+    # accumulates into final spectral tendencies: vorticity, divergence, η
     spectral_tendencies!(vars, model)
-
-    # = -∇⋅(uh, vh), tendency for interface displacement η
-    volume_flux_divergence!(vars, model)
 
     # advect all tracers
     tracer_advection!(vars, model)
@@ -1099,20 +1098,6 @@ vorticity ζ, coriolis f."""
 vorticity_flux!(vars::Variables, model::Barotropic) =
     vorticity_flux_curldiv!(vars, model, div = false, add = true)
 
-#TODO: OLD VERSION / SEQUENTIAL VERSION: MIGHT BE DELETED
-function bernoulli_potential!(vars::Variables, model::ShallowWater)
-    S = model.spectral_transform
-    bernoulli_grid_potential!(vars, model, model.time_stepping)
-
-    bernoulli = get_step(vars.dynamics.kinetic_energy)
-    bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
-    scratch_memory = vars.scratch.transform_memory
-    transform!(bernoulli, bernoulli_grid, scratch_memory, S)
-
-    bernoulli_spectral_potential!(vars, model, model.time_stepping)
-    return nothing
-end
-
 """
 $(TYPEDSIGNATURES)
 Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral space.
@@ -1210,14 +1195,14 @@ end
 
 
 """$(TYPEDSIGNATURES)
-Computes the (negative) divergence of the volume fluxes `uh, vh` for the continuity equation, -∇⋅(uh, vh)."""
-function volume_flux_divergence!(
+Gridded half of `volume_flux_divergence!`: computes the dynamic layer thickness
+`h = η + H - Hb` on the grid and writes the volume fluxes `(uh, vh)` to the fused
+`uh`/`vh` slots for the batched grid→spectral transform."""
+function volume_flux_divergence_grid!(
         vars::Variables,
         model::ShallowWater,
     )
-
     η = get_prognostic_step(vars.grid.η, model.time_stepping, ContinuityEquation(), model)
-    η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, ContinuityEquation())
     (; orography) = model.orography
     H = model.atmosphere.layer_thickness
 
@@ -1228,8 +1213,23 @@ function volume_flux_divergence!(
     # change to h = η + H - Hb here using a scratch array for h?
     η .+= H .- orography
 
-    # now do -∇⋅(uh, vh) and store in η_tend
-    flux_divergence!(η_tend, η, vars, model, add = true, flipsign = true)
+    # write uh, vh on grid for the flux divergence
+    flux_grid_divergence!(get_step(vars.dynamics.grid.uh), get_step(vars.dynamics.grid.vh), η, vars, model)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Spectral half of `volume_flux_divergence!`: `uh`, `vh` are assumed to already hold the
+spectral transforms of the volume fluxes (from the batched transform). Accumulates the
+(negative) divergence of the volume fluxes for the continuity equation, `η_tend -= ∇⋅(uh, vh)`."""
+function volume_flux_divergence_spectral!(
+        vars::Variables,
+        model::ShallowWater,
+    )
+    η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, ContinuityEquation())
+    uh = get_step(vars.dynamics.uh)
+    vh = get_step(vars.dynamics.vh)
+    flux_spectral_divergence!(η_tend, uh, vh, model.spectral_transform; add = true, flipsign = true)
     return nothing
 end
 

@@ -84,6 +84,11 @@ function variables(model::ShallowWater)
         DynamicsVariable(:kinetic_energy, GridXYZT(tg), desc = "Kinetic energy intermediate, ½(u²+v²)+Φ", namespace = :grid, fuse = :grid_tendencies),
         DynamicsVariable(:kinetic_energy, SpectralXYZT(ts), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
 
+        DynamicsVariable(:uh, GridXYT(tg), desc = "u*h volume flux intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vh, GridXYT(tg), desc = "v*h volume flux intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:uh, SpectralXYT(ts), desc = "u*h volume flux intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vh, SpectralXYT(ts), desc = "v*h volume flux intermediate in spectral space", fuse = :spectral_tendencies),
+
         ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
         ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
     )
