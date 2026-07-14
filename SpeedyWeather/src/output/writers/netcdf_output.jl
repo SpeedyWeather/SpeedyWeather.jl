@@ -212,11 +212,14 @@ function define_variable!(
         var::AbstractOutputVariable,
         output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
     )
+    # hook for custom output variables to lazily define their own (vertical) dimension
+    define_dimension!(dataset, var)
+
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
     attributes = Dict("long_name" => var.long_name, "units" => var.unit, "_FillValue" => output_NF(missing_value))
 
-    # land variables have a different vertical dimension
-    all_dims = is_land(var) ? ("lon", "lat", "soil_layer", "time") : ("lon", "lat", "layer", "time")
+    # the vertical dimension depends on the variable, e.g. "layer" or "soil_layer"
+    all_dims = ("lon", "lat", vertical_dimension(var), "time")
     dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
     # pick defaults for compression if not defined
@@ -225,6 +228,23 @@ function define_variable!(
 
     return defVar(dataset, var.name, output_NF, dims, attrib = attributes; deflatelevel, shuffle)
 end
+
+"""$(TYPEDSIGNATURES)
+Length of dimension `name` in `dataset` or `nothing` if not defined.
+Used by custom output variables to lazily define their own dimension in
+[`define_dimension!`](@ref); a Zarr store equivalent is defined in the
+Zarr extension."""
+get_dimension(dataset::NCDataset, name::String) =
+    haskey(dataset.dim, name) ? dataset.dim[name] : nothing
+
+"""$(TYPEDSIGNATURES)
+Define a coordinate in `dataset`: a dimension `name` of `length(values)` with
+`values` as its coordinate variable and `attribs` as its attributes.
+Used by custom output variables to lazily define their own dimension in
+[`define_dimension!`](@ref); a Zarr store equivalent is defined in the
+Zarr extension."""
+define_coordinate!(dataset::NCDataset, name::String, values::AbstractVector; attribs = Dict{String, String}()) =
+    defVar(dataset, name, values, (name,), attrib = attribs)
 
 """$(TYPEDSIGNATURES)
 Backend-specific write of an interpolated, post-processed field `field` for `variable`

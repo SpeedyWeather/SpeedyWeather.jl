@@ -4,12 +4,10 @@ using Dates
 using NCDatasets
 using Zarr
 
-# The SpeedyWeatherTerrariumExt extension activates once both packages are loaded;
-# SpeedyWeatherTerrariumZarrExt additionally requires Zarr.jl.
+# The SpeedyWeatherTerrariumExt extension activates once both packages are loaded.
 const SWTerrariumOutputExt = Base.get_extension(SpeedyWeather, :SpeedyWeatherTerrariumExt)
 @assert SWTerrariumOutputExt !== nothing "SpeedyWeatherTerrariumExt failed to load"
 const TerrariumOutputVariable = SWTerrariumOutputExt.TerrariumOutputVariable
-@assert Base.get_extension(SpeedyWeather, :SpeedyWeatherTerrariumZarrExt) !== nothing "SpeedyWeatherTerrariumZarrExt failed to load"
 
 @testset "TerrariumOutput" begin
     # Small coupled setup as in test/parameterizations/terrarium_coupling.jl

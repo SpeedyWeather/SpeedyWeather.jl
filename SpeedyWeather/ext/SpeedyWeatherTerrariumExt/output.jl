@@ -4,12 +4,11 @@
 # and dimensionality derived from Terrarium's variable descriptors.
 
 import SpeedyWeather: TerrariumOutput, AbstractOutput, AbstractSimulation,
-    path, path_or_nothing, output!, define_variable!, write_array!,
-    hastime, is3D, NetCDFOutput
-import SpeedyWeather.NCDatasets: NCDataset, defVar
+    path, path_or_nothing, output!, write_array!, hastime, is3D,
+    vertical_dimension, get_nlayers, define_dimension!, get_dimension, define_coordinate!
 
-# name of the vertical netCDF dimension shared by all 3D Terrarium output variables
-const SOIL_DEPTH_DIM = "soil_depth"
+# name of the vertical output dimension shared by all 3D Terrarium output variables
+const SOIL_DEPTH_DIM_NAME = "soil_depth"
 
 """Output variable for a variable of the Terrarium land state in
 `simulation.variables.prognostic.land.terrarium`, used with the constructors
@@ -195,9 +194,10 @@ end
 
 """$(TYPEDSIGNATURES)
 Output `variable` into `output`: gather, interpolate, transform (via
-[`terrarium_output_field!`](@ref)) and write to the netCDF file."""
+[`terrarium_output_field!`](@ref)) and write via the backend-specific
+[`write_array!`](@ref); works for both `NetCDFOutput` and `ZarrOutput`."""
 function SpeedyWeather.output!(
-        output::NetCDFOutput,
+        output::AbstractOutput,
         variable::TerrariumOutputVariable,
         simulation::AbstractSimulation,
     )
@@ -209,44 +209,32 @@ function SpeedyWeather.output!(
     return nothing
 end
 
-# informative error for other output backends without a dedicated method
-# (ZarrOutput is supported once Zarr.jl is loaded, see SpeedyWeatherTerrariumZarrExt)
-SpeedyWeather.output!(output::AbstractOutput, variable::TerrariumOutputVariable, ::AbstractSimulation) =
-    error("TerrariumOutput variables are not supported with $(nameof(typeof(output))). " *
-        "Supported are NetCDFOutput, and ZarrOutput once Zarr.jl is loaded.")
+# Terrarium output variables are written on their own vertical dimension
+# (e.g. soil depth) instead of the "layer"/"soil_layer" dimensions; the generic
+# `define_variable!` of every backend picks these up via the hooks below.
+SpeedyWeather.vertical_dimension(::TerrariumOutputVariable) = SOIL_DEPTH_DIM_NAME
+SpeedyWeather.get_nlayers(::AbstractOutput, variable::TerrariumOutputVariable) = variable.nlayers
 
 """$(TYPEDSIGNATURES)
-Define `variable` in the netCDF `dataset`. 3D variables use their own vertical
-dimension `soil_depth` (shared between all Terrarium output variables) with the
-depths of the Terrarium soil layer centres [m, positive down] as coordinates."""
-function SpeedyWeather.define_variable!(
-        dataset::NCDataset,
-        variable::TerrariumOutputVariable,
-        output_NF::Type{<:AbstractFloat} = SpeedyWeather.DEFAULT_OUTPUT_NF,
-    )
-    if is3D(variable)   # lazily define the shared soil depth dimension + coordinates
-        if !haskey(dataset.dim, SOIL_DEPTH_DIM)
-            defVar(
-                dataset, SOIL_DEPTH_DIM, variable.depths, (SOIL_DEPTH_DIM,),
-                attrib = Dict(
-                    "units" => "m", "long_name" => "depth of soil layer centre",
-                    "positive" => "down"
-                )
+Lazily define the vertical dimension of Terrarium output variables in the output
+file or store `dest` (an `NCDataset` or a Zarr group): a `soil_depth` coordinate
+(shared between all Terrarium output variables) with the depths of the Terrarium
+soil layer centres [m, positive down] as values. Backend-agnostic via
+[`get_dimension`](@ref) and [`define_coordinate!`](@ref)."""
+function SpeedyWeather.define_dimension!(dest, variable::TerrariumOutputVariable)
+    is3D(variable) || return nothing        # only 3D variables have a vertical dimension
+    nlayers = get_dimension(dest, SOIL_DEPTH_DIM_NAME)
+    if isnothing(nlayers)
+        define_coordinate!(
+            dest, SOIL_DEPTH_DIM_NAME, variable.depths,
+            attribs = Dict(
+                "units" => "m", "long_name" => "depth of soil layer centre",
+                "positive" => "down"
             )
-        elseif dataset.dim[SOIL_DEPTH_DIM] != variable.nlayers
-            error("Terrarium output variable $(variable.name) has $(variable.nlayers) soil layers, " *
-                "but the $SOIL_DEPTH_DIM dimension already has $(dataset.dim[SOIL_DEPTH_DIM]).")
-        end
+        )
+    elseif nlayers != variable.nlayers
+        error("Terrarium output variable $(variable.name) has $(variable.nlayers) soil layers, " *
+            "but the $SOIL_DEPTH_DIM_NAME dimension already has $nlayers.")
     end
-
-    attributes = Dict(
-        "long_name" => variable.long_name, "units" => variable.unit,
-        "_FillValue" => output_NF(variable.missing_value)
-    )
-    all_dims = ("lon", "lat", SOIL_DEPTH_DIM, "time")
-    dims = collect(dim for (dim, this_dim) in zip(all_dims, variable.dims_xyzt) if this_dim)
-    return defVar(
-        dataset, variable.name, output_NF, dims, attrib = attributes;
-        deflatelevel = variable.compression_level, shuffle = variable.shuffle
-    )
+    return nothing
 end
