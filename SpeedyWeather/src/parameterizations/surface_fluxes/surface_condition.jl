@@ -1,5 +1,3 @@
-abstract type AbstractSurfaceCondition <: AbstractParameterization end
-
 export SurfaceCondition
 
 """Surface condition parameterization that calculates near-surface atmospheric
@@ -7,7 +5,7 @@ variables needed for surface flux calculations. Computes surface wind speed
 including sub-grid scale gusts, surface air density, and surface air temperature
 by extrapolating from the lowest model level to the surface using standard
 atmospheric relationships. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceCondition{NF} <: AbstractSurfaceCondition
+@kwdef struct SurfaceCondition{NF} <: AbstractBoundaryLayer
     "[OPTION] Ratio of near-surface wind to lowest-level wind [1]"
     wind_slowdown::NF = 0.95
 
@@ -18,14 +16,6 @@ end
 Adapt.@adapt_structure SurfaceCondition
 
 SurfaceCondition(SG::SpectralGrid; kwargs...) = SurfaceCondition{SG.NF}(; kwargs...)
-
-function variables(::AbstractSurfaceCondition)
-    return (
-        ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
-        ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m³"),
-        ParameterizationVariable(:surface_air_temperature, Grid2D(), desc = "Surface air temperature", units = "K"),
-    )
-end
 
 initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
 
