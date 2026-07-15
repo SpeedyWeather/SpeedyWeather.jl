@@ -94,7 +94,6 @@ struct TerrariumLand{
         NF,
         LG <: LandGeometry,
         TM <: Terrarium.AbstractModel{NF},
-        TS <: Terrarium.AbstractTimeStepper,
         BC <: NamedTuple,
         IV <: Tuple,
         IN <: NamedTuple,
@@ -107,8 +106,6 @@ struct TerrariumLand{
     geometry::LG
     "Underlying Terrarium land model"
     model::TM
-    "Terrarium time stepper used inside each SpeedyWeather step"
-    timestepper::TS
     "Boundary conditions forwarded to `Terrarium.initialize`"
     boundary_conditions::BC
     "Additional input variables forwarded to `Terrarium.initialize`"
@@ -130,7 +127,6 @@ SpeedyWeather spectral grid."""
 function TerrariumLand(
         spectral_grid::SpectralGrid,
         model::Terrarium.AbstractModel{NF};
-        timestepper::Terrarium.AbstractTimeStepper = ForwardEuler(NF),
         boundary_conditions::NamedTuple = (;),
         input_variables::Tuple = (),
         initializers::NamedTuple = (;),
@@ -147,7 +143,7 @@ function TerrariumLand(
     # points, so invert it to get the indices of the (unmasked) land columns.
     mask_indices = RingGrids.unmasked_indices(.!model.grid.mask)
     return TerrariumLand(
-        spectral_grid, geometry, model, timestepper,
+        spectral_grid, geometry, model,
         boundary_conditions, input_variables, initializers, fields, NF(Δt), mask_indices,
     )
 end
@@ -165,7 +161,6 @@ function TerrariumLand(
     spectral_grid = SpectralGrid(integrator.model.grid.rings; NF, spectral_grid_kwargs...)
     return TerrariumLand(
         spectral_grid, integrator.model;
-        timestepper = integrator.timestepper,
         initializers = integrator.initializers,
     )
 end
@@ -211,7 +206,7 @@ function SpeedyWeather.initialize!(
     # initialize the "ModelIntegrator"
     integrator = ModelIntegrator(
         state.clock, land.model, InputSources(NF),
-        state, land.initializers, land.timestepper,
+        state, land.initializers,
     )
     Terrarium.initialize!(integrator)
 
@@ -269,7 +264,7 @@ function SpeedyWeather.timestep!(
     # update_inputs! to overwrite those values during the substeps.
     integrator = ModelIntegrator(
         state.clock, tmodel, InputSources(NF),
-        state, land.initializers, land.timestepper,
+        state, land.initializers,
     )
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
 
@@ -336,7 +331,7 @@ function SpeedyWeather.timestep!(
     # InputSources(NF) so SpeedyWeather owns the input-update cycle.
     integrator = ModelIntegrator(
         state.clock, land_model, InputSources(NF),
-        state, land.initializers, land.timestepper,
+        state, land.initializers,
     )
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
 
