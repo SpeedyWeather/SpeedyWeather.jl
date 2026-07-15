@@ -27,7 +27,18 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
 end
 
 export NeutralWindSpeed
-@kwdef struct NeutralWindSpeed{NF} <: AbstractBoundaryLayer end
+@parameterized @kwdef struct NeutralWindSpeed{NF} <: AbstractBoundaryLayer
+    # Parameters for neutral wind calculation
+    @param c1::NF = NF(-0.039317116)
+    @param c2::NF = NF(-2.9858496)
+    @param c3::NF = NF(2.0046231e-10)
+    @param c4::NF = NF(1.0768474)
+    @param c5::NF = NF(0.20268184)
+    @param c6::NF = NF(1.2684147)
+    @param c7::NF = NF(-0.94933933)
+    @param c8::NF = NF(0.041551278)
+    @param c9::NF = NF(5.8649142)
+end
 
 Adapt.@adapt_structure NeutralWindSpeed
 NeutralWindSpeed(SG::SpectralGrid; kwargs...) = NeutralWindSpeed{SG.NF}(; kwargs...)
@@ -168,35 +179,25 @@ For vertical stability in the boundary layer."""
     return bulk_richardson
 end
 
-@propagate_inbounds function parameterization!(ij, vars, scheme::NeutralWindSpeed{NF}, model) where {NF}
+@propagate_inbounds function parameterization!(ij, vars, nw::NeutralWindSpeed{NF}, model) where {NF}
     (; land_fraction) = model.land_sea_mask
     (land_fraction[ij] < 1) || return nothing # TODO train a land-based neutral wind speed parameterization
-    return neutral_wind_speed(ij, vars, scheme, model)
+    return neutral_wind_speed(ij, vars, nw, model)
 end
 
 """Ocean-based neutral wind speed calculation from actual wind speed, 
 derived from ERA5 data via symbolic regression."""
-@propagate_inbounds function neutral_wind_speed(ij, vars, scheme::NeutralWindSpeed{NF}, model) where {NF}
+@propagate_inbounds function neutral_wind_speed(ij, vars, nw::NeutralWindSpeed{NF}, model) where {NF}
     (; surface_wind_speed) = vars.parameterizations
     (; surface_air_temperature) = vars.parameterizations
-
-    c1 = NF(-0.039317116)
-    c2 = NF(-2.9858496)
-    c3 = NF(2.0046231e-10)
-    c4 = NF(1.0768474)
-    c5 = NF(0.20268184)
-    c6 = NF(1.2684147)
-    c7 = NF(-0.94933933)
-    c8 = NF(0.041551278)
-    c9 = NF(5.8649142)
 
     sst = vars.prognostic.ocean.sea_surface_temperature[ij]
     t_diff = surface_air_temperature[ij] - sst # TODO: replace SST with ocean skin temperature
     ws_safe = max(surface_wind_speed[ij], NF(1.0e-6))
-    log_arg = max(c1 * ws_safe * t_diff + exp(t_diff), NF(1.0e-8))
+    log_arg = max(nw.c1 * ws_safe * t_diff + exp(t_diff), NF(1.0e-8))
 
-    numerator = 2 * t_diff + c8 * exp(t_diff) - c3 * (c4^surface_air_temperature[ij])
-    denominator = t_diff * (log(log_arg) + c2) + c5 * (c6^ws_safe) + c9 * (ws_safe^c7) + ws_safe
+    numerator = 2 * t_diff + nw.c8 * exp(t_diff) - nw.c3 * (nw.c4^surface_air_temperature[ij])
+    denominator = t_diff * (log(log_arg) + nw.c2) + nw.c5 * (nw.c6^ws_safe) + nw.c9 * (ws_safe^nw.c7) + ws_safe
 
     vars.parameterizations.neutral_wind_speed[ij] = max(surface_wind_speed[ij] - (numerator / denominator), 0)
 
