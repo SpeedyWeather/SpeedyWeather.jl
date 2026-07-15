@@ -27,7 +27,7 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
 end
 
 export NeutralWindSpeed
-@parameterised @kwdef struct NeutralWindSpeed{NF} <: AbstractBoundaryLayer 
+@parameterized @kwdef struct NeutralWindSpeed{NF} <: AbstractBoundaryLayer 
     # Parameters for neutral wind calculation
     @param c1 = NF(-0.039317116)
     @param c2 = NF(-2.9858496)
