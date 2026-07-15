@@ -45,6 +45,7 @@ end
     (; nlayers) = model.geometry
     coord = model.geometry.vertical_coordinates
     (; atmosphere) = model
+    (; land_fraction) = model.land_sea_mask
 
     # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
     u_grid = get_prognostic_step(vars.grid.u, model.time_stepping, surface_condition)
@@ -78,7 +79,7 @@ end
     surface_air_temperature[ij] = T                 # store for surface temp/humidity fluxes
 
     # Only valid for ocean grid points
-    if surface_condition.neutral_wind
+    if surface_condition.neutral_wind & (land_fraction[ij] < 1)
         sst = vars.prognostic.ocean.sea_surface_temperature[ij]
         vars.parameterizations.neutral_wind_speed[ij] = neutral_wind_speed(surface_wind_speed, T, sst)
     end
@@ -106,5 +107,5 @@ via symbolic regression."""
     numerator = 2 * t_diff + c8 * exp(t_diff) - c3 * (c4^t2m)
     denominator = t_diff * (log(log_arg) + c2) + c5 * (c6^ws_safe) + c9 * (ws_safe^c7) + ws_safe
 
-    return surface_wind_speed - (numerator / denominator)
+    return max(surface_wind_speed - (numerator / denominator), 0)
 end
