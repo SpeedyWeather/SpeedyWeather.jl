@@ -47,53 +47,17 @@ end
 
 @testset "Terrarium coupling: initialize + run + NaN check" begin
     # Small ring grid + matching Terrarium column grid; keep Nz tiny so the
-    # test runs in seconds even on CI.
+    # test runs in seconds even on CI. Derive the boolean Terrarium mask from the
+    # fractional SpeedyWeather land-sea mask (a column wherever there is any land).
     ring_grid = SpeedyWeather.RingGrids.FullGaussianGrid(12)
     spectral_grid = SpectralGrid(ring_grid)
     land_sea_mask = EarthLandSeaMask(spectral_grid)
     SpeedyWeather.load_mask!(land_sea_mask)
 
-    Nz = 4
-    Δz_min = 0.05
-    # Terrarium needs a boolean land mask: a column is allocated wherever there is
-    # any land. Derive it from the fractional SpeedyWeather land-sea mask.
-    land_mask = land_sea_mask.land_fraction .> 0
-    column_grid = Terrarium.ColumnRingGrid(
-        Terrarium.CPU(), Float32,
-        Terrarium.ExponentialSpacing(; N = Nz, Δz_min),
-        ring_grid,
-        land_mask,
-    )
-
-    soil_initializer = Terrarium.SoilInitializer(eltype(column_grid))
-    soil = Terrarium.SoilEnergyWaterCarbon(
-        eltype(column_grid);
-        hydrology = Terrarium.SoilHydrology(eltype(column_grid)),
-    )
-    terrarium_model = Terrarium.LandModel(
-        column_grid;
-        initializer = soil_initializer,
-        vegetation = nothing,
-        soil,
-    )
-
-    land = SpeedyWeather.LandModel(spectral_grid, terrarium_model; Δt = 300.0)
-    @test land isa AbstractTerrariumLandModel
-    @test land isa SpeedyWeather.AbstractLand
-    @test SpeedyWeather.get_nlayers(land) == 1
-
-    surface_heat_flux = SurfaceHeatFlux(land.spectral_grid, land = PrescribedLandHeatFlux())
-    surface_humidity_flux = SurfaceHumidityFlux(land.spectral_grid, land = PrescribedLandHumidityFlux())
-    time_stepping = Leapfrog(land.spectral_grid, Δt_at_T31 = Minute(15))
-
-    model = PrimitiveWetModel(
-        land.spectral_grid;
-        land,
-        surface_heat_flux,
-        surface_humidity_flux,
-        land_sea_mask,
-        time_stepping,
-    )
+    model = build_terrarium_wet_model(ring_grid, land_sea_mask, land_sea_mask.land_fraction .> 0)
+    @test model.land isa AbstractTerrariumLandModel
+    @test model.land isa SpeedyWeather.AbstractLand
+    @test SpeedyWeather.get_nlayers(model.land) == 1
 
     sim = SpeedyWeather.initialize!(model)
 
