@@ -20,11 +20,7 @@ initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
 
 """
 Learned ocean surface roughness for momentum, heat and moisture fluxes."""
-@parameterized @kwdef struct LearnedSurfaceRoughness{NF} <: AbstractSurfaceRoughness
-    "[OPTION] Learned roughness length over ocean [m]"
-    @param roughness_length_ocean::NF = 1.0e-4 (bounds = Nonnegative,)
-    @param roughness_length_land::NF = 0.5 (bounds = Nonnegative,)
-end
+@kwdef struct LearnedSurfaceRoughness{NF} <: AbstractSurfaceRoughness end
 
 Adapt.@adapt_structure LearnedSurfaceRoughness
 LearnedSurfaceRoughness(SG::SpectralGrid; kwargs...) = LearnedSurfaceRoughness{SG.NF}(; kwargs...)
@@ -90,10 +86,10 @@ end
 Calculates the high-wind speed aerodynamic ceiling z_max(uₙ) for momentum roughness.
 Uses branchless clamping for GPU efficiency.
 """
-@inline function maximum_momentum_roughness(uₙ::T) where {T<:Real}
-    z_cap  = T(6.74e-3)
-    z_high = T(1.30e-3)
-    U_cap  = T(33.0)
+@inline function maximum_momentum_roughness(uₙ::T) where {T <: Real}
+    z_cap = T(6.74e-3)
+    z_high = T(1.3e-3)
+    U_cap = T(33.0)
     U_high = T(55.0)
 
     # The compiler folds this constant arithmetic at compile-time (m ≈ -2.4727e-4)
@@ -107,7 +103,7 @@ Uses branchless clamping for GPU efficiency.
 end
 
 """
-ocean_momentum_roughness(uₙ::NF, αᵪ::NF) where {NF<:Real}
+    ocean_momentum_roughness(uₙ::NF, αᵪ::NF) where {NF<:Real}
 
 Evaluates the symbolic regression closure for ocean momentum roughness z₀M.
 """
@@ -131,4 +127,26 @@ Evaluates the symbolic regression closure for ocean momentum roughness z₀M.
     z_max = maximum_momentum_roughness(uₙ)
 
     return min(z_base, z_max)
+end
+
+"""
+    ocean_heat_roughness(uₙ::NF) where {NF <: Real}
+
+Evaluates the symbolic regression closure for ocean heat roughness z₀H.
+"""
+@inline function ocean_heat_roughness(uₙ::NF) where {NF <: Real}
+    c1 = NF(-8.207549)
+    c2 = NF(0.18300448)
+    c3 = NF(0.08970642)
+    c4 = NF(-1.6667988)
+    log_roughness = (c1 * ((wind_mag + c2)^c3)) - exp(c4 / wind_mag)
+    return exp(log_roughness)
+end
+
+"""
+    ocean_moisture_roughness(uₙ::NF) where {NF <: Real}
+Evaluates the symbolic regression closure for ocean moisture roughness z₀Q.
+"""
+@inline function ocean_moisture_roughness(uₙ::NF) where {NF <: Real}
+    return ocean_heat_roughness(uₙ) # same as heat roughness
 end
