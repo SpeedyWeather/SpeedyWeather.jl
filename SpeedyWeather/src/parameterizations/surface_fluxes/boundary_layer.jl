@@ -22,12 +22,26 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
     return nothing
 end
 
+export NeutralWindSpeed
+@kwdef struct NeutralWindSpeed{NF} <: AbstractBoundaryLayer end
+
+Adapt.@adapt_structure NeutralWindSpeed
+NeutralWindSpeed(SG::SpectralGrid; kwargs...) = NeutralWindSpeed{SG.NF}(; kwargs...)
+initialize!(::NeutralWindSpeed, ::PrimitiveEquation) = nothing
+
+function variables(::NeutralWindSpeed)
+    return (
+        ParameterizationVariable(:neutral_wind_speed, Grid2D(), desc = "Neutral surface wind speed", units = "m/s"),
+    )
+end
+
 export BoundaryLayer
 """Composite type, containing surface roughness computation
 and drag coefficient computation. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct BoundaryLayer{SR, D} <: AbstractBoundaryLayer
+@parameterized @kwdef struct BoundaryLayer{SR, D, NW} <: AbstractBoundaryLayer
     @component surface_roughness::SR
     @component drag::D
+    @component neutral_wind_speed::NW
 end
 
 Adapt.@adapt_structure BoundaryLayer
@@ -35,13 +49,15 @@ function BoundaryLayer(
         SG::SpectralGrid;
         surface_roughness = ConstantSurfaceRoughness(SG),
         drag = BulkRichardsonDrag(SG),
+        neutral_wind_speed = NeutralWindSpeed(SG),
     )
-    return BoundaryLayer(surface_roughness, drag)
+    return BoundaryLayer(surface_roughness, drag, neutral_wind_speed)
 end
 
 function initialize!(BL::BoundaryLayer)
     initialize!(BL.surface_roughness)
     initialize!(BL.drag)
+    initialize!(BL.neutral_wind_speed)
     return nothing
 end
 
@@ -49,12 +65,14 @@ end
 variables(BL::BoundaryLayer) = (
     variables(BL.surface_roughness)...,
     variables(BL.drag)...,
+    variables(BL.neutral_wind_speed)...,
 )
 
 # just call the sub-paramterizations one after another
 @propagate_inbounds function parameterization!(ij, vars, BL::BoundaryLayer, model)
     parameterization!(ij, vars, BL.surface_roughness, model)
     parameterization!(ij, vars, BL.drag, model)
+    parameterization!(ij, vars, BL.neutral_wind_speed, model)
     return nothing
 end
 
@@ -145,4 +163,39 @@ For vertical stability in the boundary layer."""
     Θ₁ = Θ₀ + ΔΦ₀       # virtual dry static energy at first model level (z=z)
     bulk_richardson = ΔΦ₀ * (Θ₁ - Θ₀) / (Θ₀ * Vₛ^2)
     return bulk_richardson
+end
+
+@propagate_inbounds function parameterization!(ij, vars, scheme::NeutralWindSpeed{NF}, model) where {NF}
+    (; land_fraction) = model.land_sea_mask
+    (land_fraction[ij] < 1) || return nothing # TODO train a land-based neutral wind speed parameterization
+    return neutral_wind_speed(ij, vars, scheme, model)
+end
+
+"""Ocean-based neutral wind speed calculation from actual wind speed, 
+derived from ERA5 data via symbolic regression."""
+@propagate_inbounds function neutral_wind_speed(ij, vars, scheme::NeutralWindSpeed{NF}, model) where {NF}
+    (; surface_wind_speed) = vars.parameterizations
+    (; surface_air_temperature) = vars.parameterizations
+
+    c1 = NF(-0.039317116)
+    c2 = NF(-2.9858496)
+    c3 = NF(2.0046231e-10)
+    c4 = NF(1.0768474)
+    c5 = NF(0.20268184)
+    c6 = NF(1.2684147)
+    c7 = NF(-0.94933933)
+    c8 = NF(0.041551278)
+    c9 = NF(5.8649142)
+
+    sst = vars.prognostic.ocean.sea_surface_temperature[ij]
+    t_diff = surface_air_temperature[ij] - sst # TODO: replace SST with ocean skin temperature
+    ws_safe = max(surface_wind_speed[ij], NF(1.0e-6))
+    log_arg = max(c1 * ws_safe * t_diff + exp(t_diff), NF(1.0e-8))
+
+    numerator = 2 * t_diff + c8 * exp(t_diff) - c3 * (c4^surface_air_temperature[ij])
+    denominator = t_diff * (log(log_arg) + c2) + c5 * (c6^ws_safe) + c9 * (ws_safe^c7) + ws_safe
+
+    vars.parameterizations.neutral_wind_speed[ij] = max(surface_wind_speed[ij] - (numerator / denominator), 0)
+
+    return nothing
 end

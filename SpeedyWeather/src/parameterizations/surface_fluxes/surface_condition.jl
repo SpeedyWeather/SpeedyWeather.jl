@@ -1,27 +1,6 @@
 abstract type AbstractSurfaceCondition <: AbstractParameterization end
 
 export SurfaceCondition
-export OceanNeutralWindSpeed
-
-@kwdef struct OceanNeutralWindSpeed{NF} <: AbstractParameterization end
-
-Adapt.@adapt_structure OceanNeutralWindSpeed
-
-OceanNeutralWindSpeed(SG::SpectralGrid; kwargs...) = OceanNeutralWindSpeed{SG.NF}(; kwargs...)
-
-function variables(::OceanNeutralWindSpeed)
-    return (
-        ParameterizationVariable(:neutral_wind_speed, Grid2D(), desc = "Neutral surface wind speed", units = "m/s"),
-    )
-end
-
-initialize!(::OceanNeutralWindSpeed, ::PrimitiveEquation) = nothing
-
-@propagate_inbounds function parameterization!(ij, vars, scheme::OceanNeutralWindSpeed{NF}, model) where {NF}
-    (; land_fraction) = model.land_sea_mask
-    (land_fraction[ij] < 1) || return nothing
-    return neutral_wind_speed(ij, vars, scheme, model)
-end
 
 """Surface condition parameterization that calculates near-surface atmospheric
 variables needed for surface flux calculations. Computes surface wind speed
@@ -34,19 +13,15 @@ atmospheric relationships. Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Wind speed of sub-grid scale gusts [m/s]"
     gust_speed::NF = 5
-
-    "[OPTION] Calculate the neutral wind speed [m/s]"
-    neutral_wind::OceanNeutralWindSpeed{NF}
 end
 
 Adapt.@adapt_structure SurfaceCondition
 
 function SurfaceCondition(
         SG::SpectralGrid;
-        neutral_wind = OceanNeutralWindSpeed(SG),
         kwargs...
     )
-    return SurfaceCondition{SG.NF}(; neutral_wind, kwargs...)
+    return SurfaceCondition{SG.NF}(; kwargs...)
 end
 
 function variables(SC::AbstractSurfaceCondition)
@@ -101,36 +76,6 @@ end
     (; surface_air_temperature) = vars.parameterizations
     T *= σ⁻ᵏ                                        # lower to surface assuming dry adiabatic lapse rate
     surface_air_temperature[ij] = T                 # store for surface temp/humidity fluxes
-
-    return nothing
-end
-
-
-"""Ocean-based neutral wind speed calculation from actual wind speed, 
-derived from ERA5 data via symbolic regression."""
-@propagate_inbounds function neutral_wind_speed(ij, vars, scheme::OceanNeutralWindSpeed{NF}, model) where {NF}
-    (; surface_wind_speed) = vars.parameterizations
-    (; surface_air_temperature) = vars.parameterizations
-
-    c1 = NF(-0.039317116)
-    c2 = NF(-2.9858496)
-    c3 = NF(2.0046231e-10)
-    c4 = NF(1.0768474)
-    c5 = NF(0.20268184)
-    c6 = NF(1.2684147)
-    c7 = NF(-0.94933933)
-    c8 = NF(0.041551278)
-    c9 = NF(5.8649142)
-
-    sst = vars.prognostic.ocean.sea_surface_temperature[ij]
-    t_diff = surface_air_temperature[ij] - sst # TODO: replace SST with ocean skin temperature
-    ws_safe = max(surface_wind_speed[ij], NF(1.0e-6))
-    log_arg = max(c1 * ws_safe * t_diff + exp(t_diff), NF(1.0e-8))
-
-    numerator = 2 * t_diff + c8 * exp(t_diff) - c3 * (c4^surface_air_temperature[ij])
-    denominator = t_diff * (log(log_arg) + c2) + c5 * (c6^ws_safe) + c9 * (ws_safe^c7) + ws_safe
-
-    vars.parameterizations.neutral_wind_speed[ij] = max(surface_wind_speed[ij] - (numerator / denominator), 0)
 
     return nothing
 end
