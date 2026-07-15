@@ -3,6 +3,7 @@ using RingGrids, LowerTriangularArrays
 using Test
 
 include("spectral_transform.jl")
+include("dispatch.jl")
 include("spectral_gradients.jl")
 include("power_spectrum.jl")
 include("resolutions.jl")
