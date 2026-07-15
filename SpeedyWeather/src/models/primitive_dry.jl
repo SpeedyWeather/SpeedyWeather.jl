@@ -149,20 +149,30 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         PrognosticVariable(:temperature, SpectralXYZT(ps), desc = "Temperature", units = "K", fuse = :prognostic),
         PrognosticVariable(:pressure, SpectralXYT(ps), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :prognostic),
 
-        TendencyVariable(:divergence, SpectralXYZT(ts), desc = "Tendency of divergence", units = "1/s²"),
-        TendencyVariable(:temperature, SpectralXYZT(ts), desc = "Tendency of temperature", units = "K/s"),
-        TendencyVariable(:pressure, SpectralXYT(ts), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
+        TendencyVariable(:divergence, SpectralXYZT(ts), desc = "Tendency of divergence", units = "1/s²"), # not fused because computed directly by divergence op
+        TendencyVariable(:temperature, SpectralXYZT(ts), desc = "Tendency of temperature", units = "K/s", fuse = :spectral_tendencies),
+        TendencyVariable(:pressure, SpectralXYT(ts), desc = "Tendency of surface pressure", units = "log(Pa)/s", fuse = :spectral_tendencies),
         TendencyVariable(:divergence, GridXYZT(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
-        TendencyVariable(:temperature, GridXYZT(tg), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
-        TendencyVariable(:pressure, GridXYT(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
-
+        TendencyVariable(:temperature, GridXYZT(tg), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :grid_tendencies),
+        TendencyVariable(:pressure, GridXYT(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :grid_tendencies),
+        
         GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse=:grid),
         GridVariable(:temperature, GridXYZT(pg), desc = "Temperature", units = "K", fuse=:grid),
         GridVariable(:pressure, GridXYT(pg), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse=:grid),
         ParameterizationVariable(:surface_pressure, Grid2D(), desc = "Surface pressure", units = "Pa"),
 
-        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),
-        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure"),
+        DynamicsVariable(:uT_anomaly, GridXYZT(tg), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vT_anomaly, GridXYZT(tg), desc = "v*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:uT_anomaly, SpectralXYZT(ts), desc = "u*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vT_anomaly, SpectralXYZT(ts), desc = "v*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
+
+        DynamicsVariable(:kinetic_energy, GridXYZT(tg), desc = "Kinetic energy intermediate, ½(u²+v²)", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:kinetic_energy, SpectralXYZT(ts), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
+
+        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure", fuse = :dpres_grad),
+        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure", fuse = :dpres_grad),
+        DynamicsVariable(:dpres_dx_spec, Spectral2D(), desc = "Zonal gradient of lnpₛ in spectral space", fuse = :dpres_grad_spec),
+        DynamicsVariable(:dpres_dy_spec, Spectral2D(), desc = "Meridional gradient of lnpₛ in spectral space", fuse = :dpres_grad_spec),
         DynamicsVariable(:pres_flux, GridXYZ(), desc = "Pressure gradient flux, (u, v) ⋅ ∇lnp_s"),
         DynamicsVariable(:virtual_temperature, SpectralXYZ(), desc = "Virtual temperature", units = "K"),
         DynamicsVariable(:u_mean_grid, Grid2D(), desc = "Vertically integrated zonal velocity", units = "m/s"),

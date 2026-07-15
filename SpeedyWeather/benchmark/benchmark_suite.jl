@@ -59,6 +59,9 @@ abstract type AbstractBenchmarkSuite end
     Δt::Vector{Float64} = fill(0.0, nruns)
     memory::Vector{Int} = fill(0, nruns)
     architecture::Any = SpeedyWeather.CPU()
+    # Scale factor on `n_timesteps` for the timed run; >1 lengthens every run for
+    # more robust (e.g. publication-ready) timings. Set globally by the driver.
+    timestep_multiplier::Real = 1
 end
 
 default_nlayers(::Type{<:Barotropic}) = 1
@@ -66,9 +69,13 @@ default_nlayers(::Type{<:ShallowWater}) = 1
 default_nlayers(::Type{<:PrimitiveEquation}) = 8
 default_nlayers(models) = [default_nlayers(model) for model in models]
 
-# this should return number of timesteps so that every simulation
-# only takes seconds
-n_timesteps(trunc, nlayers) = max(10, round(Int, 4.0e8 / trunc^3 / nlayers^2))
+# Number of timesteps for a timed run, chosen so every simulation takes a few
+# seconds. The step count is clamped between a floor and a ceiling:
+# `multiplier` scales the (clamped) result — pass e.g. `10` for longer,
+# publication-ready runs with more robust timings; applied after the clamp so it
+# lengthens even the floored/ceilinged configs.
+n_timesteps(trunc, nlayers, multiplier = 1) =
+    round(Int, multiplier * clamp(round(Int, 4.0e9 / trunc^3 / nlayers^2), 50, 600))
 
 function run_benchmark_suite!(suite::BenchmarkSuite)
     for i in 1:suite.nruns
@@ -100,7 +107,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         simulation = initialize!(model)
         suite.memory[i] = Base.summarysize(simulation)
 
-        nsteps = n_timesteps(trunc, nlayers)
+        nsteps = n_timesteps(trunc, nlayers, suite.timestep_multiplier)
         period = Second(round(Int, model.time_stepping.Δt * (nsteps + 1)))
 
         # Warm up before timing: run a few steps so JIT compilation of the time
