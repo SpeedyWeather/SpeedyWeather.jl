@@ -1,5 +1,3 @@
-abstract type AbstractSurfaceCondition <: AbstractParameterization end
-
 export SurfaceCondition
 
 """Surface condition parameterization that calculates near-surface atmospheric
@@ -7,30 +5,17 @@ variables needed for surface flux calculations. Computes surface wind speed
 including sub-grid scale gusts, surface air density, and surface air temperature
 by extrapolating from the lowest model level to the surface using standard
 atmospheric relationships. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceCondition{NF} <: AbstractSurfaceCondition
+@kwdef struct SurfaceCondition{NF} <: AbstractBoundaryLayer
     "[OPTION] Ratio of near-surface wind to lowest-level wind [1]"
     wind_slowdown::NF = 0.95
 
     "[OPTION] Wind speed of sub-grid scale gusts [m/s]"
     gust_speed::NF = 5
-
-    "[OPTION] Calculate the neutral wind speed [m/s]"
-    neutral_wind::Bool = true
 end
 
 Adapt.@adapt_structure SurfaceCondition
 
 SurfaceCondition(SG::SpectralGrid; kwargs...) = SurfaceCondition{SG.NF}(; kwargs...)
-
-function variables(SC::AbstractSurfaceCondition)
-    base_vars = (
-        ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
-        ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m³"),
-        ParameterizationVariable(:surface_air_temperature, Grid2D(), desc = "Surface air temperature", units = "K"),
-    )
-    base_vars = SC.neutral_wind ? (base_vars..., ParameterizationVariable(:neutral_wind_speed, Grid2D(), desc = "Neutral surface wind speed", units = "m/s")) : base_vars
-    return base_vars
-end
 
 initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
 
@@ -45,7 +30,6 @@ end
     (; nlayers) = model.geometry
     coord = model.geometry.vertical_coordinates
     (; atmosphere) = model
-    (; land_fraction) = model.land_sea_mask
 
     # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
     u_grid = get_prognostic_step(vars.grid.u, model.time_stepping, surface_condition)
@@ -77,35 +61,5 @@ end
     (; surface_air_temperature) = vars.parameterizations
     T *= σ⁻ᵏ                                        # lower to surface assuming dry adiabatic lapse rate
     surface_air_temperature[ij] = T                 # store for surface temp/humidity fluxes
-
-    # Only valid for ocean grid points
-    if surface_condition.neutral_wind & (land_fraction[ij] < 1)
-        sst = vars.prognostic.ocean.sea_surface_temperature[ij]
-        vars.parameterizations.neutral_wind_speed[ij] = neutral_wind_speed(surface_wind_speed, T, sst)
-    end
-
     return nothing
-end
-
-"""Neutral wind speed calculation from actual wind speed, derived from ERA5 data 
-via symbolic regression."""
-@propagate_inbounds function neutral_wind_speed(surface_wind_speed::NF, t2m::NF, sst::NF) where {NF}
-    c1 = NF(-0.039317116)
-    c2 = NF(-2.9858496)
-    c3 = NF(2.0046231e-10)
-    c4 = NF(1.0768474)
-    c5 = NF(0.20268184)
-    c6 = NF(1.2684147)
-    c7 = NF(-0.94933933)
-    c8 = NF(0.041551278)
-    c9 = NF(5.8649142)
-
-    t_diff = t2m - sst # TODO: replace SST with ocean skin temperature
-    ws_safe = max(surface_wind_speed, NF(1.0e-6))
-    log_arg = max(c1 * ws_safe * t_diff + exp(t_diff), NF(1.0e-8))
-
-    numerator = 2 * t_diff + c8 * exp(t_diff) - c3 * (c4^t2m)
-    denominator = t_diff * (log(log_arg) + c2) + c5 * (c6^ws_safe) + c9 * (ws_safe^c7) + ws_safe
-
-    return max(surface_wind_speed - (numerator / denominator), 0)
 end
