@@ -10,31 +10,12 @@ Type for dispatching on kernel operations in spectral gradient calculations.
 """
 struct KernelOP{mode, flipsign, add} end
 
-# Curl operations (mode == true): a+b-c
-# Standard curl (no flipsign, no add)
-@inline (::KernelOP{true, false, false})(o, a, b, c) = a + b - c
-
-# Curl with flipsign (no add)
-@inline (::KernelOP{true, true, false})(o, a, b, c) = -(a + b - c)
-
-# Curl with add (no flipsign)
-@inline (::KernelOP{true, false, true})(o, a, b, c) = o + (a + b - c)
-
-# Curl with flipsign and add
-@inline (::KernelOP{true, true, true})(o, a, b, c) = o - (a + b - c)
-
-# Divergence operations (mode == false): a-b+c
-# Standard divergence (no flipsign, no add)
-@inline (::KernelOP{false, false, false})(o, a, b, c) = a - b + c
-
-# Divergence with flipsign (no add)
-@inline (::KernelOP{false, true, false})(o, a, b, c) = -(a - b + c)
-
-# Divergence with add (no flipsign)
-@inline (::KernelOP{false, false, true})(o, a, b, c) = o + (a - b + c)
-
-# Divergence with flipsign and add
-@inline (::KernelOP{false, true, true})(o, a, b, c) = o - (a - b + c)
+# `mode`, `flipsign` and `add` are type parameters, so the branches below are compile-time constants
+@inline function (::KernelOP{mode, flipsign, add})(o, a, b, c) where {mode, flipsign, add}
+    base = mode ? (a + b - c) : (a - b + c)     # curl : divergence
+    val = flipsign ? -base : base
+    return add ? o + val : val
+end
 
 
 """
@@ -56,8 +37,7 @@ function curl!(
         kwargs...,
     )
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
-    kernel = KernelOP{true, flipsign, add}()
-    return _divergence!(kernel, curl, v, u, S; kwargs...)      # flip u, v -> v, u
+    return _divergence_split(Val(true), flipsign, add, curl, v, u, S; kwargs...)   # flip u, v -> v, u
 end
 
 """
@@ -78,8 +58,26 @@ function divergence!(
         kwargs...,
     )
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel = KernelOP{false, flipsign, add}()
-    return _divergence!(kernel, div, u, v, S; kwargs...)
+    return _divergence_split(Val(false), flipsign, add, div, u, v, S; kwargs...)
+end
+
+# `KernelOP` encodes `flipsign`/`add` as type parameters (the functors above dispatch on them inside the
+# kernel), but `curl!`/`divergence!` receive them as *runtime* `Bool`s — so `KernelOP{mode, flipsign, add}()`
+# would widen to the abstract `KernelOP{mode}` and force `_divergence!` through a runtime dispatch.
+# Manually union-split on the two Bools so each `_divergence!` call sees a CONCRETE `KernelOP`.
+# `mode` is passed as `Val` (a literal at both call sites) so it const-folds.
+@inline function _divergence_split(
+        ::Val{mode}, flipsign::Bool, add::Bool,
+        div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray,
+        S::AbstractSpectralTransform; kwargs...,
+    ) where {mode}
+    return if flipsign
+        add ? _divergence!(KernelOP{mode, true, true}(), div, u, v, S; kwargs...) :
+              _divergence!(KernelOP{mode, true, false}(), div, u, v, S; kwargs...)
+    else
+        add ? _divergence!(KernelOP{mode, false, true}(), div, u, v, S; kwargs...) :
+              _divergence!(KernelOP{mode, false, false}(), div, u, v, S; kwargs...)
+    end
 end
 
 function _divergence!(
