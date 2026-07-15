@@ -211,7 +211,6 @@ end
         ring_grid, land_sea_mask, consistent_mask;
         ocean_temperature = 290, ocean_moisture = 0,
     )
-    @test model.land.mask == true
     @test model.land.ocean_temperature == 290
 
     sim = SpeedyWeather.initialize!(model)

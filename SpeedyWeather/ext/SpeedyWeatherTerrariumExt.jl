@@ -106,7 +106,6 @@ Terrarium only owns the mask points; every other point keeps its allocation valu
 otherwise, which shows up as unphysical 0 K soil temperatures at ocean/coastal cells and
 smears into the output."""
 function fill_fallback!(vars::Variables, land::AbstractTerrariumLandModel)
-    land.mask || return nothing
     mask = land_mask(land)
     NF = eltype(vars.prognostic.land.soil_temperature)
     st = vars.prognostic.land.soil_temperature.data
@@ -198,8 +197,6 @@ struct TerrariumLand{
     Δt::NF
     "Indices of the common land sea mask, used for allocation-free copying between SpeedyWeather and Terrarium"
     mask_indices::MI
-    "Fill grid points outside the Terrarium land mask with fallback values for the soil mirror variables?"
-    mask::Bool
     "Fallback soil temperature [K] for grid points outside the Terrarium land mask (ocean-only cells)"
     ocean_temperature::NF
     "Fallback soil moisture (saturation fraction) [1] for grid points outside the Terrarium land mask (ocean-only cells)"
@@ -219,7 +216,6 @@ function TerrariumLand(
         initializers::NamedTuple = (;),
         fields::NamedTuple = (;),
         Δt::Real = 300,
-        mask::Bool = true,
         ocean_temperature::Real = 285,
         ocean_moisture::Real = 0,
     ) where {NF}
@@ -235,7 +231,7 @@ function TerrariumLand(
     return TerrariumLand(
         spectral_grid, geometry, model, timestepper,
         boundary_conditions, input_variables, initializers, fields, NF(Δt), mask_indices,
-        mask, NF(ocean_temperature), NF(ocean_moisture),
+        NF(ocean_temperature), NF(ocean_moisture),
     )
 end
 
