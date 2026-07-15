@@ -105,13 +105,13 @@ work buffers, the per-ring reshaped views and FFT plans used by the transforms, 
 gather/scatter index metadata, and the instantiated CUDA graphs (one per distinct `field`
 buffer and direction). A graph value of `nothing` marks a buffer for which capture failed
 (fall back to direct loop)."""
-struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
+struct GPUFourierGraphCache{PR, PC, RV, CV, RFP, BFP, IV, A}
     packed_real::PR             # CuVector{NF}          — all rings' dense real blocks
     packed_complex::PC          # CuVector{Complex{NF}} — all rings' dense complex blocks
     real_view::RV               # Vector of per-ring reshaped (nlon_j × nlayers) views into packed_real
     complex_view::CV            # Vector of per-ring reshaped (nfreq_j × nlayers) views into packed_complex
-    rfft_plans::Vector{AbstractFFTs.Plan}   # forward FFT plans for THIS size (nlayers batches), per ring
-    brfft_plans::Vector{AbstractFFTs.Plan}  # inverse FFT plans for THIS size, per ring
+    rfft_plans::RFP             # forward FFT plans for THIS size (nlayers batches), per ring
+    brfft_plans::BFP            # inverse FFT plans for THIS size, per ring
     real_offset::IV             # 0-based real-block offset per ring
     complex_offset::IV          # 0-based complex-block offset per ring
     nlons::IV                   # longitudes per ring
