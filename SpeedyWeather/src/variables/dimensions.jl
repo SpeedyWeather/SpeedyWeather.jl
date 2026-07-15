@@ -281,7 +281,7 @@ function _fuse_rank_and_n(vars::AbstractVector{<:AbstractVariable})
     isempty(fourD_members) && return (false, 0)
     ns_set = unique(fuse_trailing_n(v.dims) for v in fourD_members)
     length(ns_set) == 1 || error(
-        "Fuse group has 4D members with mixed trailing-dim sizes $(collect(ns_set)). " *
+        "Fuse group $(first(vars).fuse) has 4D members with mixed trailing-dim sizes $(collect(ns_set)). " *
         "All 4D members of a fuse group must share the same `n`."
     )
     for v in vars

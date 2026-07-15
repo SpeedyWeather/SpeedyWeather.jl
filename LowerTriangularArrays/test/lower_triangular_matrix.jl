@@ -617,6 +617,41 @@ end
     end
 end
 
+@testset "Mixed-rank broadcast" begin
+    # broadcasting a single field (rank-1 LowerTriangularMatrix) against a layered
+    # array (rank-2 LowerTriangularArray) must promote to the higher rank and give
+    # the same result regardless of argument order. A non-commutative BroadcastStyle
+    # rule previously raised "conflicting broadcast rules defined" here.
+    @testset for NF in (Float32, Float64)
+        @testset for nlayers in (1, 3)
+            L_array = randn(LowerTriangularArray{NF}, 10, 10, nlayers)  # (lm, nlayers)
+            L_matrix = randn(LowerTriangularMatrix{NF}, 10, 10)         # (lm,)
+
+            R1 = L_array .- L_matrix
+            R2 = L_matrix .- L_array
+
+            # result promotes to the higher (rank-2) container, both orderings
+            @test R1 isa LowerTriangularArray{NF, 2}
+            @test R2 isa LowerTriangularArray{NF, 2}
+            @test size(R1) == size(L_array)
+            @test size(R2) == size(L_array)
+
+            # values match plain-array broadcasting, including layer by layer
+            @test R1.data ≈ L_array.data .- L_matrix.data
+            @test R2.data ≈ L_matrix.data .- L_array.data
+            for k in 1:nlayers
+                @test R1.data[:, k] ≈ L_array.data[:, k] .- L_matrix.data
+            end
+
+            # in-place accumulation as used in surface_pressure_spectral_tendency!
+            dest = deepcopy(L_array)
+            @. dest = -dest - L_matrix
+            @test dest.data ≈ -L_array.data .- L_matrix.data
+        end
+    end
+end
+
+
 @testset "GPU (JLArrays)" begin
     NF = Float32
     idims = (5,)
