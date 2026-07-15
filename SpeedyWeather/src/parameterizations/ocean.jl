@@ -293,6 +293,7 @@ SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 function variables(::SlabOcean)
     return (
         PrognosticVariable(:sea_surface_temperature, Grid2D(), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
+        ParameterizationVariable(:charnock_parameter, Grid2D(), namespace = :ocean, desc = "Charnock parameter", units = ""),
 
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m^2"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
@@ -344,19 +345,39 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
 
+    αᵪ = vars.parameterizations.ocean.charnock_parameter
+    uₙ = vars.parameterizations.neutral_wind_speed
+
     params = (; Δt_C₀, Lᵥ)                              # pack into NamedTuple for kernel
 
     launch!(
         architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!,
-        sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params
+        sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, αᵪ, uₙ, params
     )
     return nothing
 end
 
-@kernel inbounds = true function slab_ocean_kernel!(sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params)
+@kernel inbounds = true function slab_ocean_kernel!(sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, αᵪ, uₙ, params)
     ij = @index(Global, Linear)         # every grid point ij
     if land_fraction[ij] < 1            # at least partially ocean
         (; Δt_C₀, Lᵥ) = params
         sst[ij] += Δt_C₀ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij])
+        αᵪ[ij] = calculate_charnock(uₙ[ij])
     end
+end
+
+"""
+charnock_parameter(uₙ::T) where {T<:Real}
+
+Calculates an empirical Charnock parameter from neutral wind speed uₙ.
+"""
+@inline function calculate_charnock(uₙ::T) where {T<:Real}
+    Uₜ = T(7.0) # threshold wind speed [m/s] for Charnock parameterization
+    
+    charnock = ifelse(
+        uₙ ≤ Uₜ,
+        muladd(uₙ * uₙ, muladd(T(1.8449e-6), uₙ, T(9.7104e-5)), T(0.0075)),
+        muladd(T(0.0016), uₙ - Uₜ, T(0.0129)) # for uₙ > Uₜ, linear increase with wind speed
+    )
+    return log(charnock)
 end
