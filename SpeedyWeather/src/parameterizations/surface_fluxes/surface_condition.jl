@@ -1,23 +1,23 @@
 abstract type AbstractSurfaceCondition <: AbstractParameterization end
 
 export SurfaceCondition
-export NeutralWindSpeed
+export OceanNeutralWindSpeed
 
-@kwdef struct NeutralWindSpeed{NF} <: AbstractParameterization end
+@kwdef struct OceanNeutralWindSpeed{NF} <: AbstractParameterization end
 
-Adapt.@adapt_structure NeutralWindSpeed
+Adapt.@adapt_structure OceanNeutralWindSpeed
 
-NeutralWindSpeed(SG::SpectralGrid; kwargs...) = NeutralWindSpeed{SG.NF}(; kwargs...)
+OceanNeutralWindSpeed(SG::SpectralGrid; kwargs...) = OceanNeutralWindSpeed{SG.NF}(; kwargs...)
 
-function variables(::NeutralWindSpeed)
+function variables(::OceanNeutralWindSpeed)
     return (
         ParameterizationVariable(:neutral_wind_speed, Grid2D(), desc = "Neutral surface wind speed", units = "m/s"),
     )
 end
 
-initialize!(::NeutralWindSpeed, ::PrimitiveEquation) = nothing
+initialize!(::OceanNeutralWindSpeed, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function parameterization!(ij, vars, scheme::NeutralWindSpeed{NF}, model) where {NF}
+@propagate_inbounds function parameterization!(ij, vars, scheme::OceanNeutralWindSpeed{NF}, model) where {NF}
     (; land_fraction) = model.land_sea_mask
     (land_fraction[ij] < 1) || return nothing
     return neutral_wind_speed(ij, vars, scheme, model)
@@ -36,14 +36,14 @@ atmospheric relationships. Fields are $(TYPEDFIELDS)"""
     gust_speed::NF = 5
 
     "[OPTION] Calculate the neutral wind speed [m/s]"
-    neutral_wind::NeutralWindSpeed{NF}
+    neutral_wind::OceanNeutralWindSpeed{NF}
 end
 
 Adapt.@adapt_structure SurfaceCondition
 
 function SurfaceCondition(
         SG::SpectralGrid;
-        neutral_wind = NeutralWindSpeed(SG),
+        neutral_wind = OceanNeutralWindSpeed(SG),
         kwargs...
     )
     return SurfaceCondition{SG.NF}(; neutral_wind, kwargs...)
@@ -106,9 +106,9 @@ end
 end
 
 
-"""Neutral wind speed calculation from actual wind speed, derived from ERA5 data 
-via symbolic regression."""
-@propagate_inbounds function neutral_wind_speed(ij, vars, scheme::NeutralWindSpeed{NF}, model) where {NF}
+"""Ocean-based neutral wind speed calculation from actual wind speed, 
+derived from ERA5 data via symbolic regression."""
+@propagate_inbounds function neutral_wind_speed(ij, vars, scheme::OceanNeutralWindSpeed{NF}, model) where {NF}
     (; surface_wind_speed) = vars.parameterizations
     (; surface_air_temperature) = vars.parameterizations
 
