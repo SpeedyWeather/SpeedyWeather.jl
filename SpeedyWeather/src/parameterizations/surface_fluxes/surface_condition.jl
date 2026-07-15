@@ -17,14 +17,9 @@ end
 
 Adapt.@adapt_structure SurfaceCondition
 
-function SurfaceCondition(
-        SG::SpectralGrid;
-        kwargs...
-    )
-    return SurfaceCondition{SG.NF}(; kwargs...)
-end
+SurfaceCondition(SG::SpectralGrid; kwargs...) = SurfaceCondition{SG.NF}(; kwargs...)
 
-function variables(SC::AbstractSurfaceCondition)
+function variables(::AbstractSurfaceCondition)
     return (
         ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
         ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m³"),
@@ -76,6 +71,5 @@ end
     (; surface_air_temperature) = vars.parameterizations
     T *= σ⁻ᵏ                                        # lower to surface assuming dry adiabatic lapse rate
     surface_air_temperature[ij] = T                 # store for surface temp/humidity fluxes
-
     return nothing
 end
