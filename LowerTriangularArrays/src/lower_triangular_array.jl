@@ -632,9 +632,11 @@ function Base.copyto!(
         L2::LowerTriangularArray
     ) where {T}
     # if sizes don't match copy over the largest subset of indices
+    # (positional size methods: the `as = Matrix` kwcall relies on constant propagation
+    # which (depending on Julia/JET version) can fail and widen `as` to a runtime dispatch)
     size(L1) != size(L2) && return copyto!(
-        L1, L2, Base.OneTo(minimum(size.((L1, L2), 1; as = Matrix))),
-        Base.OneTo(minimum(size.((L1, L2), 2; as = Matrix)))
+        L1, L2, Base.OneTo(min(size(L1, 1, OneBased, Matrix), size(L2, 1, OneBased, Matrix))),
+        Base.OneTo(min(size(L1, 2, OneBased, Matrix), size(L2, 2, OneBased, Matrix)))
     )
 
     if eltype(L2) === T
@@ -652,7 +654,7 @@ function Base.copyto!(
         ms::AbstractUnitRange
     )
 
-    lmax, mmax = size(L2; as = Matrix)            # use the size of L2 for boundscheck
+    lmax, mmax = size(L2, OneBased, Matrix)       # use the size of L2 for boundscheck (positional, see above)
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax || throw(BoundsError)
 
