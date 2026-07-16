@@ -335,10 +335,6 @@ function run_graph!(execs::AbstractDict, key, loop!::F) where {F}
     exec = instantiate(graph)
     execs[key] = exec
 
-    # NOTE: do NOT launch the graph here. `capture` only RECORDS the work, it does not execute it, so
-    # the warmup above has already produced this call's result; launching would apply the work a second
-    # time. That is invisible for an overwriting loop (idempotent) but silently doubles an accumulating
-    # one (`add=true`, the Enzyme adjoint rules). The graph is cached and replayed from the next call on.
     return nothing
 end
 
