@@ -354,7 +354,7 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     αᵪ = vars.parameterizations.ocean.charnock_parameter
     uₙ = vars.parameterizations.neutral_wind_speed
 
-    params = (; Δt_C₀, Lᵥ)                              # pack into NamedTuple for kernel
+    params = (; C₀⁻¹, Lᵥ)                              # pack into NamedTuple for kernel
 
     launch!(
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,
