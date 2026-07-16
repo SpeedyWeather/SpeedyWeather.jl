@@ -265,7 +265,7 @@ function vertical_integration!(
         end
 
         # SPECTRAL SPACE: divergence
-        for lm in eachharmonic(div, div_mean)
+        for lm in eachindex(div_mean)
             div_mean[lm] += div[lm, k] * Δσₖ
         end
     end
