@@ -316,7 +316,7 @@ Spectral transform `S` and lower triangular matrix `L` match if the
 spectral dimensions `(lmax, mmax)` match and the number of vertical layers is
 equal or larger in the transform (constraints due to allocated scratch memory size)."""
 function Architectures.ismatching(S::AbstractSpectralTransform, L::LowerTriangularArray; horizontal_only::Bool = false)
-    resolution_match = resolution(S.spectrum) == size(L, OneBased, as = Matrix)[1:2]
+    resolution_match = resolution(S.spectrum) == size(L, OneBased, Matrix)[1:2]
     vertical_match = horizontal_only ? true : length(axes(L, 2)) <= S.nlayers
     return resolution_match && vertical_match
 end
