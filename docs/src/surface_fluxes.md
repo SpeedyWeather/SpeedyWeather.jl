@@ -22,11 +22,11 @@ subtypes(SpeedyWeather.AbstractSurfaceMomentumFlux)
 ```
 
 !!! note "Interdependence of surface flux computations"
-    `model.surface_condition` extrapolates atmospheric variables (wind, temperature, humidity)
+    `model.boundary_layer.surface_condition` extrapolates atmospheric variables (wind, temperature, humidity)
     to the surface. `model.boundary_layer` computes centrally a drag coefficient for surface
-    momentum, heat and humidity fluxes. Setting `model.surface_condition = nothing` or
-    `model.boundar_layer = nothing` will therefore disable all other surface fluxes unless
-    those are have `use_boundar_layer_drag = false` which lets them use independently their
+    momentum, heat and humidity fluxes. Setting `model.boundary_layer.surface_condition = nothing` or
+    `model.boundary_layer = nothing` will therefore disable all other surface fluxes unless
+    those are have `use_boundary_layer_drag = false` which lets them use independently their
     own drag coefficient.
 
 with more explanation below. The surface heat fluxes currently implemented are
@@ -42,15 +42,9 @@ and the surface humidity fluxes (this does not include [Convection](@ref) or
 subtypes(SpeedyWeather.AbstractSurfaceHumidityFlux)
 ```
 
-The calculation of thermodynamic quantities at the surface (air density, temperature, humidity)
-are handled by
-
-```@example surface_fluxes
-subtypes(SpeedyWeather.AbstractSurfaceCondition)
-```
-
+The calculation of thermodynamic quantities at the surface (air density, temperature, humidity) 
 and the computation of drag coefficients (which is used by default for the surface fluxes above)
-is handled through the `model.boundary_layer` where currently implemented are
+are handled through the `model.boundary_layer` where currently implemented are
 
 ```@example surface_fluxes
 subtypes(SpeedyWeather.AbstractBoundaryLayer)

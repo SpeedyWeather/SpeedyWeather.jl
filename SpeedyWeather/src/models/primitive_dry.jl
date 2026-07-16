@@ -33,7 +33,6 @@ $(TYPEDFIELDS)"""
         AL,     # <:AbstractAlbedo,
         BL,     # <:AbstractBoundaryLayer,
         VD,     # <:AbstractVerticalDiffusion,
-        SC,     # <:AbstractSurfaceCondition,
         SM,     # <:AbstractSurfaceMomentumFlux,
         SH,     # <:AbstractSurfaceHeatFlux,
         CV,     # <:AbstractConvection,
@@ -87,7 +86,6 @@ $(TYPEDFIELDS)"""
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer::BL = BoundaryLayer(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    @component surface_condition::SC = SurfaceCondition(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
@@ -124,7 +122,6 @@ $(TYPEDFIELDS)"""
         :shortwave_radiation,
         :longwave_radiation,
         :boundary_layer,            # surface fluxes
-        :surface_condition,
         :surface_momentum_flux,
         :surface_heat_flux,
         :stochastic_physics,        # perturbations
@@ -227,7 +224,6 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
     initialize!(model.greenhouse_gases, model)
-    initialize!(model.surface_condition, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.stochastic_physics, model)
