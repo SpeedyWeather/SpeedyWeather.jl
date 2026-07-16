@@ -42,15 +42,9 @@ and the surface humidity fluxes (this does not include [Convection](@ref) or
 subtypes(SpeedyWeather.AbstractSurfaceHumidityFlux)
 ```
 
-The calculation of thermodynamic quantities at the surface (air density, temperature, humidity)
-are handled by
-
-```@example surface_fluxes
-subtypes(SpeedyWeather.AbstractSurfaceCondition)
-```
-
+The calculation of thermodynamic quantities at the surface (air density, temperature, humidity) 
 and the computation of drag coefficients (which is used by default for the surface fluxes above)
-is handled through the `model.boundary_layer` where currently implemented are
+are handled through the `model.boundary_layer` where currently implemented are
 
 ```@example surface_fluxes
 subtypes(SpeedyWeather.AbstractBoundaryLayer)
