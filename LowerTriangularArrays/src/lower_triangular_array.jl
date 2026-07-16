@@ -637,7 +637,11 @@ function Base.copyto!(
         Base.OneTo(minimum(size.((L1, L2), 2; as = Matrix)))
     )
 
-    L1.data .= convert.(T, L2.data)
+    if eltype(L2) === T
+        copyto!(L1.data, L2.data)
+    else
+        L1.data .= convert.(T, L2.data)
+    end
     return L1
 end
 

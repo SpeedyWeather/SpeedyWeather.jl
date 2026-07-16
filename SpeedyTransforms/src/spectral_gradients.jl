@@ -394,10 +394,8 @@ function ∇²!(
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.gradients.eigenvalues⁻¹ : S.gradients.eigenvalues
 
-    kernel = flipsign ? (add ? (o, a) -> (o - a) : (o, a) -> -a) :
-        (add ? (o, a) -> (o + a) : (o, a) -> a)
 
-    launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
+    launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, add, flipsign, alms.spectrum.l_indices)
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -408,14 +406,16 @@ function ∇²!(
     return ∇²alms
 end
 
-@kernel function ∇²_kernel!(∇²alms, alms, eigenvalues, kernel_func, l_indices)
+@kernel function ∇²_kernel!(∇²alms, alms, eigenvalues, add, flipsign, l_indices)
 
     I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
     # we use cartesian index instead of NTuple here
     # because this works for 2D and 3D matrices
     l = l_indices[I[1]]
 
-    ∇²alms[I] = kernel_func(∇²alms[I], alms[I] * eigenvalues[l])
+    a = alms[I] * eigenvalues[l]
+    a = flipsign ? -a : a
+    ∇²alms[I] = add ? ∇²alms[I] + a : a
 end
 
 """
