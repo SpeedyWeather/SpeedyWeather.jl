@@ -364,7 +364,7 @@ end
                 L = LowerTriangularArray(A)
                 # fill
                 fill!(L, 2)
-                for lm in LowerTriangularArrays.eachharmonic(L)
+                for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L))
                     @test all(L[lm, [Colon() for i in 1:length(idims)]...] .== 2)
                 end
 
@@ -379,7 +379,7 @@ end
                 # convert
                 L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
                 L3 = convert(LowerTriangularArray{Float16, 1 + length(idims), Array{Float16, 1 + length(idims)}, typeof(spectrum)}, L)
-                for lm in LowerTriangularArrays.eachharmonic(L, L3)
+                for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L, L3))
                     @test Float16(L[lm, [1 for i in 1:length(idims)]...]) == L3[lm, [1 for i in 1:length(idims)]...]
                 end
 
@@ -404,7 +404,7 @@ end
 
             # fill
             fill!(L, 2)
-            for lm in LowerTriangularArrays.eachharmonic(L)
+            for lm in LowerTriangularArrays.eachindex(L)
                 @test L[lm] == 2
             end
 
@@ -419,7 +419,7 @@ end
             # convert
             L = randn(LowerTriangularMatrix{NF}, lmax, mmax)
             L3 = convert(LowerTriangularMatrix{Float16}, L)
-            for lm in LowerTriangularArrays.eachharmonic(L, L3)
+            for lm in LowerTriangularArrays.eachindex(L, L3)
                 @test Float16(L[lm]) == L3[lm]
             end
         end
@@ -617,9 +617,42 @@ end
     end
 end
 
+@testset "Mixed-rank broadcast" begin
+    # broadcasting a single field (rank-1 LowerTriangularMatrix) against a layered
+    # array (rank-2 LowerTriangularArray) must promote to the higher rank and give
+    # the same result regardless of argument order. A non-commutative BroadcastStyle
+    # rule previously raised "conflicting broadcast rules defined" here.
+    @testset for NF in (Float32, Float64)
+        @testset for nlayers in (1, 3)
+            L_array = randn(LowerTriangularArray{NF}, 10, 10, nlayers)  # (lm, nlayers)
+            L_matrix = randn(LowerTriangularMatrix{NF}, 10, 10)         # (lm,)
+
+            R1 = L_array .- L_matrix
+            R2 = L_matrix .- L_array
+
+            # result promotes to the higher (rank-2) container, both orderings
+            @test R1 isa LowerTriangularArray{NF, 2}
+            @test R2 isa LowerTriangularArray{NF, 2}
+            @test size(R1) == size(L_array)
+            @test size(R2) == size(L_array)
+
+            # values match plain-array broadcasting, including layer by layer
+            @test R1.data ≈ L_array.data .- L_matrix.data
+            @test R2.data ≈ L_matrix.data .- L_array.data
+            for k in 1:nlayers
+                @test R1.data[:, k] ≈ L_array.data[:, k] .- L_matrix.data
+            end
+
+            # in-place accumulation as used in surface_pressure_spectral_tendency!
+            dest = deepcopy(L_array)
+            @. dest = -dest - L_matrix
+            @test dest.data ≈ -L_array.data .- L_matrix.data
+        end
+    end
+end
+
 
 @testset "GPU (JLArrays)" begin
-    # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
     NF = Float32
     idims = (5,)
     spectrum = Spectrum(10, 10)
@@ -635,7 +668,7 @@ end
 
     # getindex
     @test typeof(L[1, :]) <: JLArray
-    for lm in LowerTriangularArrays.eachharmonic(L)
+    for lm in eachindex(L.spectrum)
         @test Array(L[lm, :]) == L_cpu[lm, :]
     end
 
@@ -646,7 +679,7 @@ end
 
     # fill
     fill!(L, 2)
-    for lm in LowerTriangularArrays.eachharmonic(L2)
+    for lm in eachindex(L2.spectrum)
         @test all(L[lm, [Colon() for i in 1:length(idims)]...] .== 2)
     end
 
@@ -663,7 +696,8 @@ end
     L3 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, spectrum, idims...))
     L4 = convert(LowerTriangularArray{Float16, 2, JLArray{Float16, 2}, typeof(spectrum_jlarray)}, L3)
 
-    for lm in LowerTriangularArrays.eachharmonic(L, L3)
+    # for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L, L3))
+    for lm in eachindex(L3.spectrum)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])
     end
 

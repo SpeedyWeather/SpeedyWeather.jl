@@ -60,6 +60,14 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::DiffusiveVerticalAdvection) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::DispersiveVerticalAdvection) = 2
 
+# Parameterizations should always be evaluated on the previous time step for Euler forward
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParameterization) = 1
+
+# by default use the first step here but you may extend for subtypes of AbstractOcean elsewhere
+# e.g. to leapfrog also a SlabOcean model's SST
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractOcean) = 1
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSeaIce) = 1
+
 # particle advection using u, v at current not previous time step
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
 
