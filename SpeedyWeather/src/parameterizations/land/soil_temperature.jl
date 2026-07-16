@@ -241,7 +241,7 @@ function timestep!(
     M = haskey(vars.parameterizations.land, :snow_melt_rate) ? vars.parameterizations.land.snow_melt_rate : nothing
 
     @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, S, horizontal_only = true) ||
-        throw(DimensionMismatch(soil_temperature, Rs))
+        throw(DimensionMismatch(soil_temperature, Rsd))
     @boundscheck size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
 
     λ = thermodynamics.heat_conductivity_dry_soil

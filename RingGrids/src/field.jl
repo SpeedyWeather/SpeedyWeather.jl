@@ -584,7 +584,7 @@ function fields_match(
         horizontal_only::Bool = false,
         vertical_only::Bool = false,
     )
-    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_only and vertical_only = $vertical_only"
+    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only and vertical_only cannot both be true"
 
     horizontal_only && return grids_match(A, B)
     vertical_only && return size(A)[2:end] == size(B)[2:end]
