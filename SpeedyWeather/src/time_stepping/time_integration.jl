@@ -131,6 +131,12 @@ function update_prognostic!(
 
     # evolve the random pattern in time
     random_process!(vars, model.random_process)
+
+    # allow ocean, sea ice and land to "filter" variables, e.g. cap sea ice concentration at [0, 1]
+    hasproperty(model, :ocean) && filter!(vars, model.ocean, model)
+    hasproperty(model, :sea_ice) && filter!(vars, model.sea_ice, model)
+    hasproperty(model, :land) && filter!(vars, model.land, model)
+
     return nothing
 end
 
