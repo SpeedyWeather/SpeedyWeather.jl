@@ -2,7 +2,9 @@ abstract type AbstractBoundaryLayer <: AbstractParameterization end
 
 variables(::AbstractBoundaryLayer) = (
     ParameterizationVariable(:neutral_wind_speed, Grid2D(), desc = "Neutral surface wind speed", units = "m/s"),
-    ParameterizationVariable(:boundary_layer_drag, Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer drag coefficient for momentum", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer drag coefficient for heat", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer drag coefficient for humidity", units = "1"),
     ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
     ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m³"),
     ParameterizationVariable(:surface_air_temperature, Grid2D(), desc = "Surface air temperature", units = "K"),
@@ -134,12 +136,20 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     κ = drag.von_Karman
 
     # Get surface roughness length (computed by the surface_roughness parameterization)
-    z₀ = vars.parameterizations.surface_roughness[ij]
+    z₀M = vars.parameterizations.momentum_roughness[ij]
+    z₀H = vars.parameterizations.heat_roughness[ij]
+    z₀Q = vars.parameterizations.moisture_roughness[ij]
 
-    # should be z > z₀, z=z₀ means an infinitely high drag, choose one order higher than roughness length at least
-    # 0 < z < z₀ doesn't make sense so cap here
-    z = max(z, 10z₀)
-    drag_max = (κ / log(z / z₀))^2
+    function calc_drag_max(z₀)
+        # should be z > z₀, z=z₀ means an infinitely high drag, choose one order higher than roughness length at least
+        # 0 < z < z₀ doesn't make sense so cap here
+        z = max(z, 10z₀)
+        return (κ / log(z / z₀))^2
+    end
+
+    drag_max_momentum = calc_drag_max(z₀M)
+    drag_max_heat = calc_drag_max(z₀H)
+    drag_max_humidity = calc_drag_max(z₀Q)
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
@@ -153,7 +163,9 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # if Ri_c > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_c)^2
     # if Ri_c < 0 then κ^2/log(z/z₀)^2
     Ri = clamp(Ri, 0, Ri_c)
-    vars.parameterizations.boundary_layer_drag[ij] = max(drag_min, drag_max * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.boundary_layer_drag_momentum[ij] = max(drag_min, drag_max_momentum * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.boundary_layer_drag_heat[ij] = max(drag_min, drag_max_heat * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.boundary_layer_drag_humidity[ij] = max(drag_min, drag_max_humidity * (1 - Ri / Ri_c)^2)
     return nothing
 end
 

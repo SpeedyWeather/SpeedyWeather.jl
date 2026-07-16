@@ -88,7 +88,7 @@ variables(::SurfaceOceanHumidityFlux) = (
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(SST)
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
-    d = vars.parameterizations.boundary_layer_drag[ij]
+    d = vars.parameterizations.boundary_layer_drag_humidity[ij]
     drag_ocean = humidity_flux.use_boundary_layer_drag ? d : humidity_flux.drag
 
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
@@ -150,7 +150,7 @@ variables(::SurfaceLandHumidityFlux) = (
     surface_humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, humidity_flux)[ij, surface]
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
-    d = vars.parameterizations.boundary_layer_drag[ij]
+    d = vars.parameterizations.boundary_layer_drag_humidity[ij]
     drag_land = humidity_flux.use_boundary_layer_drag ? d : humidity_flux.drag
 
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)

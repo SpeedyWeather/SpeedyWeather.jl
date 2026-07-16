@@ -150,10 +150,10 @@ end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct BoundaryLayerDragOutput <: AbstractOutputVariable
-    name::String = "bld"
+@kwdef mutable struct MomentumBoundaryLayerDragOutput <: AbstractOutputVariable
+    name::String = "bld_m"
     unit::String = "1"
-    long_name::String = "Boundary layer drag coefficient"
+    long_name::String = "Momentum flux related boundary layer drag coefficient"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -161,15 +161,44 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::BoundaryLayerDragOutput, simulation) =
-    simulation.variables.parameterizations.boundary_layer_drag
+path(::MomentumBoundaryLayerDragOutput, simulation) =
+    simulation.variables.parameterizations.boundary_layer_drag_momentum
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LandSurfaceRoughnessOutput <: AbstractOutputVariable
+@kwdef mutable struct HeatBoundaryLayerDragOutput <: AbstractOutputVariable
+    name::String = "bld_h"
+    unit::String = "1"
+    long_name::String = "Heat flux related boundary layer drag coefficient"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::HeatBoundaryLayerDragOutput, simulation) =
+    simulation.variables.parameterizations.boundary_layer_drag_heat
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct MoistureBoundaryLayerDragOutput <: AbstractOutputVariable
+    name::String = "bld_q"
+    unit::String = "1"
+    long_name::String = "Moisture flux related boundary layer drag coefficient"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct MomentumLandSurfaceRoughnessOutput <: AbstractOutputVariable
     name::String = "lsr"
     unit::String = "m"
-    long_name::String = "Land surface roughness length"
+    long_name::String = "Land momentum surface roughness length"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -177,15 +206,15 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::LandSurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.land.surface_roughness
+path(::MomentumLandSurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.land.momentum_roughness
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct OceanSurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "osr"
+@kwdef mutable struct HeatLandSurfaceRoughnessOutput <: AbstractOutputVariable
+    name::String = "lsr_h"
     unit::String = "m"
-    long_name::String = "Ocean surface roughness length"
+    long_name::String = "Land heat surface roughness length"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -193,12 +222,61 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::OceanSurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.ocean.surface_roughness
+path(::HeatLandSurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.land.heat_roughness
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct SurfaceRoughnessOutput <: AbstractOutputVariable
+@kwdef mutable struct MomentumOceanSurfaceRoughnessOutput <: AbstractOutputVariable
+    name::String = "osr_m"
+    unit::String = "m"
+    long_name::String = "Ocean momentum surface roughness length"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::MomentumOceanSurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.ocean.momentum_roughness
+
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct HeatOceanSurfaceRoughnessOutput <: AbstractOutputVariable
+    name::String = "osr_h"
+    unit::String = "m"
+    long_name::String = "Ocean heat surface roughness length"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::HeatOceanSurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.ocean.heat_roughness
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct MoistureOceanSurfaceRoughnessOutput <: AbstractOutputVariable
+    name::String = "osr_q"
+    unit::String = "m"
+    long_name::String = "Ocean moisture surface roughness length"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::MoistureOceanSurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.ocean.moisture_roughness
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct MomentumSurfaceRoughnessOutput <: AbstractOutputVariable
     name::String = "sr"
     unit::String = "m"
     long_name::String = "Surface roughness length"
@@ -209,14 +287,22 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::SurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.surface_roughness
+path(::MomentumSurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.momentum_roughness
 
 # collect all in one for convenience
 BoundaryLayerOutput() = (
     ZonalVelocity10mOutput(),
     MeridionalVelocity10mOutput(),
     SurfaceTemperatureOutput(),
-    BoundaryLayerDragOutput(),
-    SurfaceRoughnessOutput(),
+    MomentumBoundaryLayerDragOutput(),
+    HeatBoundaryLayerDragOutput(),
+    MoistureBoundaryLayerDragOutput(),
+    MomentumLandSurfaceRoughnessOutput(),
+    HeatLandSurfaceRoughnessOutput(),
+    MoistureLandSurfaceRoughnessOutput(),
+    MomentumOceanSurfaceRoughnessOutput(),
+    HeatOceanSurfaceRoughnessOutput(),
+    MoistureOceanSurfaceRoughnessOutput(),
+    MomentumSurfaceRoughnessOutput()
 )
