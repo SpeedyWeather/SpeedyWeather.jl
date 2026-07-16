@@ -317,8 +317,7 @@ function plan_FFTs(
     # BATCHED (K>1, 2-D) plans — a `Dict{Int, Vector{P2}}` keyed by K with CONCRETE plan type P2.
     # The Dict value type is fixed up-front from a throwaway 2-column plan (a plan's Julia type depends
     # only on eltype/ndims/region, not on the array size), so the Dict stays concretely typed even when
-    # empty (nlayers==1). That keeps the (compiled but never-taken) batched branch of `_fourier!`
-    # dispatch-free — without it, an abstract empty Dict re-introduces the `plan*view → ::Any` cascade.
+    # empty (nlayers==1). 
     NF_real = eltype(fake_grid_data.data)
     tmp_real = similar(fake_grid_data.data, NF_real, (nlons[1], 2))
     tmp_complex = similar(scratch_memory_north, Complex{NF_real}, (nfreqj(1), 2))
