@@ -193,86 +193,8 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MomentumLandSurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "lsr"
-    unit::String = "m"
-    long_name::String = "Land momentum surface roughness length"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 7
-end
-
-path(::MomentumLandSurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.land.momentum_roughness
-
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct HeatLandSurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "lsr_h"
-    unit::String = "m"
-    long_name::String = "Land heat surface roughness length"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 7
-end
-
-path(::HeatLandSurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.land.heat_roughness
-
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MomentumOceanSurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "osr_m"
-    unit::String = "m"
-    long_name::String = "Ocean momentum surface roughness length"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 7
-end
-
-path(::MomentumOceanSurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.ocean.momentum_roughness
-
-
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct HeatOceanSurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "osr_h"
-    unit::String = "m"
-    long_name::String = "Ocean heat surface roughness length"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 7
-end
-
-path(::HeatOceanSurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.ocean.heat_roughness
-
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MoistureOceanSurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "osr_q"
-    unit::String = "m"
-    long_name::String = "Ocean moisture surface roughness length"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 7
-end
-
-path(::MoistureOceanSurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.ocean.moisture_roughness
+path(::MoistureBoundaryLayerDragOutput, simulation) =
+    simulation.variables.parameterizations.boundary_layer_drag_moisture
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -290,6 +212,20 @@ end
 path(::MomentumSurfaceRoughnessOutput, simulation) =
     simulation.variables.parameterizations.momentum_roughness
 
+@kwdef mutable struct HeatSurfaceRoughnessOutput <: AbstractOutputVariable
+    name::String = "sr_h"
+    unit::String = "m"
+    long_name::String = "Surface heat roughness length"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::HeatSurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.heat_roughness
+
 # collect all in one for convenience
 BoundaryLayerOutput() = (
     ZonalVelocity10mOutput(),
@@ -298,11 +234,6 @@ BoundaryLayerOutput() = (
     MomentumBoundaryLayerDragOutput(),
     HeatBoundaryLayerDragOutput(),
     MoistureBoundaryLayerDragOutput(),
-    MomentumLandSurfaceRoughnessOutput(),
-    HeatLandSurfaceRoughnessOutput(),
-    MoistureLandSurfaceRoughnessOutput(),
-    MomentumOceanSurfaceRoughnessOutput(),
-    HeatOceanSurfaceRoughnessOutput(),
-    MoistureOceanSurfaceRoughnessOutput(),
-    MomentumSurfaceRoughnessOutput()
+    MomentumSurfaceRoughnessOutput(),
+    HeatSurfaceRoughnessOutput(),
 )

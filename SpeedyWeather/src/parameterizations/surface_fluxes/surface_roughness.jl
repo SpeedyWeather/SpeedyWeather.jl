@@ -73,9 +73,9 @@ initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
     return nothing
 end
 
-@kwdef struct LearnedLandRoughness{NF} <: AbstractSurfaceRoughness 
+@kwdef struct LearnedLandRoughness{NF} <: AbstractSurfaceRoughness
     "[OPTION] constant momentum roughness length over land [m]"
-    momentum_roughness_land::NF = 0.5 
+    momentum_roughness_land::NF = 0.5
 
     "[OPTION] constant heat roughness length over land [m]"
     heat_roughness_land::NF = 0.5
@@ -158,8 +158,17 @@ end
         return nothing
     end
 
-    z₀M_land = scheme.momentum_roughness_land
-    z₀H_land = scheme.heat_roughness_land
+    # Unpack predictors from the land parameterization
+    vₕ = vars.parameterizations.land.vegetation_high[ij]
+    vₗ = vars.parameterizations.land.vegetation_low[ij]
+    laiₕ = vars.parameterizations.land.lai_vegetation_high[ij]
+    laiₗ = vars.parameterizations.land.lai_vegetation_low[ij]
+    sd = vars.prognostic.land.snow_depth[ij]
+    soil_moisture = vars.prognostic.land.soil_moisture[ij, begin]  # currently top layer
+    soil_temperature = vars.prognostic.land.soil_temperature[ij, end]  # currently bottom layer
+
+    z₀M_land = land_momentum_roughness(vₕ, vₗ, laiₕ, laiₗ, sd, soil_temperature, soil_moisture)
+    z₀H_land = land_heat_roughness(vₕ, vₗ, laiₕ, laiₗ, soil_temperature, soil_moisture)
 
     land.momentum_roughness[ij] = z₀M_land
     land.heat_roughness[ij] = z₀H_land
@@ -200,12 +209,6 @@ end
     return max(base, NF(1.0e-3))
 end
 
-"""
-    maximum_momentum_roughness(uₙ::NF) where {NF<:Real}
-
-Calculates the high-wind speed aerodynamic ceiling z_max(uₙ) for momentum roughness.
-Uses branchless clamping for GPU efficiency.
-"""
 @inline function maximum_momentum_roughness(uₙ::NF) where {NF <: Real}
     z_cap = NF(6.74e-3)
     z_high = NF(1.3e-3)
@@ -222,11 +225,6 @@ Uses branchless clamping for GPU efficiency.
     return clamp(z_linear, z_high, z_cap)
 end
 
-"""
-    ocean_momentum_roughness(uₙ::NF, αᵪ::NF) where {NF<:Real}
-
-Evaluates the symbolic regression closure for ocean momentum roughness z₀M.
-"""
 @inline function ocean_momentum_roughness(uₙ::NF, αᵪ::NF, siconc::NF) where {NF <: Real}
     c1 = NF(0.48786303)
     c2 = NF(3.374574)
@@ -252,11 +250,6 @@ Evaluates the symbolic regression closure for ocean momentum roughness z₀M.
     return sea_ice_momentum_roughness(siconc) * siconc + (1 - siconc) * z₀M
 end
 
-"""
-    ocean_heat_roughness(uₙ::NF) where {NF <: Real}
-
-Evaluates the symbolic regression closure for ocean heat roughness z₀H.
-"""
 @inline function ocean_heat_roughness(uₙ::NF, siconc::NF) where {NF <: Real}
     c1 = NF(-8.207549)
     c2 = NF(0.18300448)
@@ -266,17 +259,6 @@ Evaluates the symbolic regression closure for ocean heat roughness z₀H.
     return NF(1.0e-3) * siconc + (1 - siconc) * exp(log_roughness) # following IFS documentation, ice roughness is 1e-3 m
 end
 
-"""
-    land_momentum_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, S::NF, T::NF, W::NF) where {NF<:Real}
-
-Calculates the momentum surface roughness length (z_0M) over land using symbolic regression closures.
-Arguments:
-- C_H, C_L: High and low vegetation fractions [0-1]
-- L_H, L_L: Leaf area indices for high and low vegetation
-- S: Snow depth
-- T: Soil temperature
-- W: Volumetric soil water
-"""
 @inline function land_momentum_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, S::NF, T::NF, W::NF) where {NF <: Real}
     # Coefficients for z_0M
     c1 = NF(-7.231684)
@@ -309,16 +291,6 @@ Arguments:
     return exp(log_roughness)
 end
 
-"""
-    land_heat_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, T::NF, W::NF) where {NF<:Real}
-
-Calculates the heat surface roughness length (z_0H) over land using symbolic regression closures.
-Arguments:
-- C_H, C_L: High and low vegetation fractions [0-1]
-- L_H, L_L: Leaf area indices for high and low vegetation
-- T: Soil temperature
-- W: Volumetric soil water
-"""
 @inline function land_heat_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, T::NF, W::NF) where {NF <: Real}
     # Coefficients for z_0H
     c1 = NF(373.86444)
