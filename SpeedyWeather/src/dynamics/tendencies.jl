@@ -686,7 +686,8 @@ function temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation)
     temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, DynamicalCore())
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
-    (; u, v) = vars.grid
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
 
     # use scratch array with zeros in case humidity doesn't exist
     humid = haskey(vars.grid, :humidity) ?
@@ -804,9 +805,10 @@ function humidity_grid_tendency!(vars::Variables, model::PrimitiveWet)
     (; time_stepping) = model
     humid_tend_grid = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, DynamicalCore())
     humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore())
-    
-    div_grid = vars.grid.divergence
-    (; u, v) = vars.grid
+
+    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     uq_grid = vars.dynamics.grid.uq
     vq_grid = vars.dynamics.grid.vq
     (; coslat⁻¹) = G
