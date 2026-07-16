@@ -34,9 +34,8 @@ function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars},
     return Terrarium.initialize(
         land.model;
         clock = Terrarium.Clock(time = SpeedyWeather.DEFAULT_DATE),
-        inputs = land.input_variables,
         boundary_conditions = land.boundary_conditions,
-        initializers = land.initializers,
+        input_variables = land.input_variables,
         fields = land.fields,
     )
 end
