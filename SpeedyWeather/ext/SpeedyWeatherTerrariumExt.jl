@@ -31,7 +31,7 @@ function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars},
     # DateTime; the actual initial datetime is synced from the SpeedyWeather clock
     # in `initialize!(vars, land, model)` once the user-provided `time` has been
     # written there.
-    return Terrarium.initialize(
+    return Terrarium.StateVariables(
         land.model;
         clock = Terrarium.Clock(time = SpeedyWeather.DEFAULT_DATE),
         boundary_conditions = land.boundary_conditions,
