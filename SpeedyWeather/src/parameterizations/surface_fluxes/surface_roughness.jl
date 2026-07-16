@@ -3,6 +3,23 @@ abstract type AbstractSurfaceRoughness <: AbstractParameterization end
 export ConstantSurfaceRoughness
 export LearnedSurfaceRoughness
 
+variables(::AbstractSurfaceRoughness) = (
+    # Momentum, heat and moisture roughness lengths
+    ParameterizationVariable(:momentum_roughness, Grid2D(), desc = "Momentum roughness length", units = "m"),
+    ParameterizationVariable(:heat_roughness, Grid2D(), desc = "Heat roughness length", units = "m"),
+    ParameterizationVariable(:moisture_roughness, Grid2D(), desc = "Moisture roughness length", units = "m"),
+
+    # Momentum, heat and moisture roughness lengths for the land
+    ParameterizationVariable(:momentum_roughness, Grid2D(), desc = "Land momentum roughness length", units = "m", namespace = :land),
+    ParameterizationVariable(:heat_roughness, Grid2D(), desc = "Land heat roughness length", units = "m", namespace = :land),
+    ParameterizationVariable(:moisture_roughness, Grid2D(), desc = "Land moisture roughness length", units = "m", namespace = :land),
+
+    # Momentum, heat and moisture roughness lengths for the ocean
+    ParameterizationVariable(:momentum_roughness, Grid2D(), desc = "Ocean momentum roughness length", units = "m", namespace = :ocean),
+    ParameterizationVariable(:heat_roughness, Grid2D(), desc = "Ocean heat roughness length", units = "m", namespace = :ocean),
+    ParameterizationVariable(:moisture_roughness, Grid2D(), desc = "Ocean moisture roughness length", units = "m", namespace = :ocean),
+)
+
 """
 Surface roughness length parameterization with constant roughness length
 over land and ocean. Fields are $(TYPEDFIELDS)"""
@@ -25,40 +42,6 @@ Adapt.@adapt_structure ConstantSurfaceRoughness
 ConstantSurfaceRoughness(SG::SpectralGrid; kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
 initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
 
-"""
-Learned ocean surface roughness for momentum, heat and moisture fluxes."""
-@kwdef struct LearnedSurfaceRoughness{NF} <: AbstractSurfaceRoughness
-    a_h::NF = NF(0.4) # heat related constant
-    a_q::NF = NF(0.62) # moisture related constant
-
-    # temporary
-    momentum_roughness_land::NF = NF(0.5)
-    heat_roughness_land::NF = NF(0.5)
-end
-
-Adapt.@adapt_structure LearnedSurfaceRoughness
-LearnedSurfaceRoughness(SG::SpectralGrid; kwargs...) = LearnedSurfaceRoughness{SG.NF}(; kwargs...)
-initialize!(::LearnedSurfaceRoughness, ::PrimitiveEquation) = nothing
-
-@propagate_inbounds parameterization!(ij, vars, scheme::AbstractSurfaceRoughness, model) =
-    surface_roughness!(ij, vars, scheme, model.land_sea_mask)
-
-variables(::AbstractSurfaceRoughness) = (
-    # Momentum, heat and moisture roughness lengths
-    ParameterizationVariable(:momentum_roughness, Grid2D(), desc = "Momentum roughness length", units = "m"),
-    ParameterizationVariable(:heat_roughness, Grid2D(), desc = "Heat roughness length", units = "m"),
-    ParameterizationVariable(:moisture_roughness, Grid2D(), desc = "Moisture roughness length", units = "m"),
-
-    # Momentum, heat and moisture roughness lengths for the land
-    ParameterizationVariable(:momentum_roughness, Grid2D(), desc = "Land momentum roughness length", units = "m", namespace = :land),
-    ParameterizationVariable(:heat_roughness, Grid2D(), desc = "Land heat roughness length", units = "m", namespace = :land),
-    ParameterizationVariable(:moisture_roughness, Grid2D(), desc = "Land moisture roughness length", units = "m", namespace = :land),
-
-    # Momentum, heat and moisture roughness lengths for the ocean
-    ParameterizationVariable(:momentum_roughness, Grid2D(), desc = "Ocean momentum roughness length", units = "m", namespace = :ocean),
-    ParameterizationVariable(:heat_roughness, Grid2D(), desc = "Ocean heat roughness length", units = "m", namespace = :ocean),
-    ParameterizationVariable(:moisture_roughness, Grid2D(), desc = "Ocean moisture roughness length", units = "m", namespace = :ocean),
-)
 
 @propagate_inbounds function surface_roughness!(ij, vars, scheme::ConstantSurfaceRoughness, land_sea_mask)
     land_fraction = land_sea_mask.land_fraction[ij]
@@ -90,34 +73,123 @@ variables(::AbstractSurfaceRoughness) = (
     return nothing
 end
 
-@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedSurfaceRoughness, land_sea_mask)
-    land_fraction = land_sea_mask.land_fraction[ij]
-    siconc = vars.prognostic.ocean.sea_ice_concentration[ij] # sea ice concentration [0-1]
-    (; land, ocean, surface_wind_speed) = vars.parameterizations
-    αᵪ = ocean.charnock_parameter[ij] # in log form
+@kwdef struct LearnedLandRoughness{NF} <: AbstractSurfaceRoughness 
+    "[OPTION] constant momentum roughness length over land [m]"
+    momentum_roughness_land::NF = 0.5 
 
-    z₀M_land = scheme.momentum_roughness_land
-    z₀M_ocean = ocean_momentum_roughness(surface_wind_speed[ij], αᵪ, siconc)
-    z₀H_land = scheme.heat_roughness_land
-    z₀H_ocean = ocean_heat_roughness(surface_wind_speed[ij], siconc)
+    "[OPTION] constant heat roughness length over land [m]"
+    heat_roughness_land::NF = 0.5
+end
+
+Adapt.@adapt_structure LearnedLandRoughness
+LearnedLandRoughness(SG::SpectralGrid; kwargs...) = LearnedLandRoughness{SG.NF}(; kwargs...)
+initialize!(::LearnedLandRoughness, ::PrimitiveEquation) = nothing
+
+@kwdef struct LearnedOceanRoughness{NF} <: AbstractSurfaceRoughness
+    a_h::NF = NF(0.4) # heat related constant
+    a_q::NF = NF(0.62) # moisture related constant
+end
+
+Adapt.@adapt_structure LearnedOceanRoughness
+LearnedOceanRoughness(SG::SpectralGrid; kwargs...) = LearnedOceanRoughness{SG.NF}(; kwargs...)
+initialize!(::LearnedOceanRoughness, ::PrimitiveEquation) = nothing
+
+"""
+Learned ocean surface roughness for momentum, heat and moisture fluxes."""
+@kwdef struct LearnedSurfaceRoughness{LLR, LOR} <: AbstractSurfaceRoughness
+    "[OPTION] learned land surface roughness scheme"
+    land_surface_roughness::LLR
+
+    "[OPTION] learned ocean surface roughness scheme"
+    ocean_surface_roughness::LOR
+
+end
+
+Adapt.@adapt_structure LearnedSurfaceRoughness
+function LearnedSurfaceRoughness(
+        SG::SpectralGrid;
+        land_surface_roughness = LearnedLandRoughness(SG),
+        ocean_surface_roughness = LearnedOceanRoughness(SG),
+    )
+    return LearnedSurfaceRoughness(land_surface_roughness, ocean_surface_roughness)
+end
+
+function initialize!(LSR::LearnedSurfaceRoughness, model::PrimitiveEquation)
+    initialize!(LSR.land_surface_roughness, model)
+    initialize!(LSR.ocean_surface_roughness, model)
+    return nothing
+end
+
+# First land, then ocean, then combine!
+@propagate_inbounds function parameterization!(ij, vars, LSR::LearnedSurfaceRoughness, model)
+    surface_roughness!(ij, vars, LSR.land_surface_roughness, model.land_sea_mask)
+    surface_roughness!(ij, vars, LSR.ocean_surface_roughness, model.land_sea_mask)
+    surface_roughness!(ij, vars, LSR, model.land_sea_mask)
+    return nothing
+end
+
+@propagate_inbounds function surface_roughness!(ij, vars, LSR::LearnedSurfaceRoughness, land_sea_mask)
+    land_fraction = land_sea_mask.land_fraction[ij]
+    (; land, ocean) = vars.parameterizations
 
     # Momentum roughness
-    land.momentum_roughness[ij] = ifelse(land_fraction > 0, z₀M_land, zero(z₀M_land))
-    ocean.momentum_roughness[ij] = ifelse(land_fraction < 1, z₀M_ocean, zero(z₀M_ocean))
     vars.parameterizations.momentum_roughness[ij] = land_fraction * land.momentum_roughness[ij] +
         (1 - land_fraction) * ocean.momentum_roughness[ij]
 
     # Heat roughness
-    land.heat_roughness[ij] = ifelse(land_fraction > 0, z₀H_land, zero(z₀H_land))
-    ocean.heat_roughness[ij] = ifelse(land_fraction < 1, z₀H_ocean, zero(z₀H_ocean))
     vars.parameterizations.heat_roughness[ij] = land_fraction * land.heat_roughness[ij] +
         (1 - land_fraction) * ocean.heat_roughness[ij]
 
     # Moisture roughness
-    land.moisture_roughness[ij] = ifelse(land_fraction > 0, z₀H_land, zero(z₀H_land)) # same as heat roughness for land
-    ocean.moisture_roughness[ij] = ifelse(land_fraction < 1, z₀H_ocean * (scheme.a_q / scheme.a_h), zero(z₀H_ocean)) # (just heat times a constant)
     vars.parameterizations.moisture_roughness[ij] = land_fraction * land.moisture_roughness[ij] +
         (1 - land_fraction) * ocean.moisture_roughness[ij]
+    return nothing
+end
+
+@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedLandRoughness, land_sea_mask)
+    land_fraction = land_sea_mask.land_fraction[ij]
+    (; land) = vars.parameterizations
+
+    if land_fraction <= 0
+        zero_val = zero(land_fraction)
+        land.momentum_roughness[ij] = zero_val
+        land.heat_roughness[ij] = zero_val
+        land.moisture_roughness[ij] = zero_val
+        return nothing
+    end
+
+    z₀M_land = scheme.momentum_roughness_land
+    z₀H_land = scheme.heat_roughness_land
+
+    land.momentum_roughness[ij] = z₀M_land
+    land.heat_roughness[ij] = z₀H_land
+    land.moisture_roughness[ij] = z₀H_land # same as heat roughness over land
+
+    return nothing
+end
+
+@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, land_sea_mask)
+    land_fraction = land_sea_mask.land_fraction[ij]
+    (; ocean) = vars.parameterizations
+
+    if land_fraction >= 1
+        zero_val = zero(land_fraction)
+        ocean.momentum_roughness[ij] = zero_val
+        ocean.heat_roughness[ij] = zero_val
+        ocean.moisture_roughness[ij] = zero_val
+        return nothing
+    end
+
+    siconc = vars.prognostic.ocean.sea_ice_concentration[ij]
+    (; surface_wind_speed) = vars.parameterizations
+    αᵪ = ocean.charnock_parameter[ij] # in log form
+
+    z₀M_ocean = ocean_momentum_roughness(surface_wind_speed[ij], αᵪ, siconc)
+    z₀H_ocean = ocean_heat_roughness(surface_wind_speed[ij], siconc)
+
+    ocean.momentum_roughness[ij] = z₀M_ocean
+    ocean.heat_roughness[ij] = z₀H_ocean
+    ocean.moisture_roughness[ij] = z₀H_ocean * (scheme.a_q / scheme.a_h) # moisture roughness is heat times a constant
 
     return nothing
 end
@@ -191,13 +263,84 @@ Evaluates the symbolic regression closure for ocean heat roughness z₀H.
     c3 = NF(0.08970642)
     c4 = NF(-1.6667988)
     log_roughness = (c1 * ((uₙ + c2)^c3)) - exp(c4 / uₙ)
-    return 1.0e-3 * siconc + (1 - siconc) * exp(log_roughness) # following IFS documentation, ice roughness is 1e-3 m
+    return NF(1.0e-3) * siconc + (1 - siconc) * exp(log_roughness) # following IFS documentation, ice roughness is 1e-3 m
 end
 
-@inline function land_momentum_roughness()
+"""
+    land_momentum_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, S::NF, T::NF, W::NF) where {NF<:Real}
 
+Calculates the momentum surface roughness length (z_0M) over land using symbolic regression closures.
+Arguments:
+- C_H, C_L: High and low vegetation fractions [0-1]
+- L_H, L_L: Leaf area indices for high and low vegetation
+- S: Snow depth
+- T: Soil temperature
+- W: Volumetric soil water
+"""
+@inline function land_momentum_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, S::NF, T::NF, W::NF) where {NF <: Real}
+    # Coefficients for z_0M
+    c1 = NF(-7.231684)
+    c2 = NF(11.078163)
+    c3 = NF(-0.14265412)
+    c4 = NF(-5.916258)
+    c5 = NF(2.2420337)
+    c6 = NF(0.00613743)
+    c7 = NF(0.51263654)
+    c8 = NF(2.6413066)
+    c9 = NF(0.60989547)
+
+    # Numerator terms
+    exp_arg1 = S / muladd(c2, C_H, -c3) # c2*C_H - c3
+    term1 = c4 * exp(exp_arg1)
+
+    min_inner = min(c5 * L_L, muladd(c6, T, -W)) # min(c5*L_L, c6*T - W)
+    exp_arg2 = C_L * (min_inner - (c7^L_L))
+    term2 = exp(exp_arg2)
+
+    numerator = max(c1, term1 + term2)
+
+    # Denominator terms
+    term3 = exp(C_H * max(L_H, c8))
+    term4 = min(L_H, W)
+
+    denominator = term3 + term4
+
+    log_roughness = (numerator / denominator) + c9
+    return exp(log_roughness)
 end
 
-@inline function land_heat_roughness()
+"""
+    land_heat_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, T::NF, W::NF) where {NF<:Real}
 
+Calculates the heat surface roughness length (z_0H) over land using symbolic regression closures.
+Arguments:
+- C_H, C_L: High and low vegetation fractions [0-1]
+- L_H, L_L: Leaf area indices for high and low vegetation
+- T: Soil temperature
+- W: Volumetric soil water
+"""
+@inline function land_heat_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, T::NF, W::NF) where {NF <: Real}
+    # Coefficients for z_0H
+    c1 = NF(373.86444)
+    c2 = NF(5.981257)
+    c3 = NF(3.5229454)
+    c4 = NF(7.781359)
+    c5 = NF(2.1035099)
+    c6 = NF(-0.41931123)
+    c7 = NF(0.00037635124)
+    c8 = NF(-5.4191554)
+
+    # Calculate intermediate Gamma term (eq. land_z0H line 1)
+    # Note: c1^c2 is folded as a constant if c1 and c2 are hardcoded, but evaluated safely here
+    gamma_term1 = ((c1^c2) * min(C_H, L_H)) / ((L_L + T)^c2) + L_H
+    gamma_term2 = muladd(NF(2), C_H, c3) # 2*C_H + c3
+    Γ = max(gamma_term1, gamma_term2)
+
+    # Calculate z_0H (eq. land_z0H line 2)
+    inner_min = min(C_L, L_L - W)
+    arg1 = muladd(c5, Γ - c4 + C_L * inner_min, -(c6 * L_H)) # c5*(...) - c6*L_H
+    arg2 = c8 * (c7^C_H)
+
+    log_roughness = min(arg1, arg2)
+    return exp(log_roughness)
 end
