@@ -23,6 +23,3 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Terrarium = "80418d68-07fa-499d-ae2b-c12e531f5cd8"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
-
-[compat]
-Terrarium = "0.1.1"

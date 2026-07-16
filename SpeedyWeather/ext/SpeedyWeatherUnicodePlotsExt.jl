@@ -21,7 +21,7 @@ function UnicodePlots.heatmap(L::LowerTriangularMatrix{T}; mode::Function = abs)
     title = "$l×$m LowerTriangularMatrix{$T}"
 
     Lplot = similar(L, real(T))
-    for lm in eachharmonic(L)
+    for lm in eachindex(L)
         Lplot[lm] = mode(L[lm])
     end
     Lplot = Matrix(Lplot)

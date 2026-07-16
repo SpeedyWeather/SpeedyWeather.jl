@@ -26,6 +26,7 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 10
+    ocean_fraction::Bool = true     # scale by ocean fraction of cell
 end
 
 path(::SeaIceConcentrationOutput, simulation) =

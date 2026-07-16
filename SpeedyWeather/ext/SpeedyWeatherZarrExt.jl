@@ -10,10 +10,11 @@ import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     DEFAULT_OUTPUT_NF, DEFAULT_OUTPUT_INTERVAL, DEFAULT_MISSING_VALUE,
     DEFAULT_COMPRESSION_LEVEL, DEFAULT_KEEPBITS,
     Variables, Simulation, SpectralGrid, Field,
-    initialize!, finalize!, output!, write_array!, set!, add!, add_default!,
+    initialize!, finalize!, output!, write_array!, define_variable!, set!, add!, add_default!,
+    define_dimension!, vertical_dimension, get_nlayers, get_dimension_length, define_coordinate!,
     is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
     get_lond, get_latd, on_architecture, CPU,
-    AbstractFullGrid, run_folder_name
+    AbstractFullGrid, path_or_nothing, run_folder_name
 
 import SpeedyWeather.RingGrids
 import SpeedyWeather: round!
@@ -53,6 +54,7 @@ function ZarrOutput(
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
+    land_fraction = Field(output_NF, output_grid)
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
@@ -74,6 +76,7 @@ function ZarrOutput(
     output = ZarrOutput{F2, F3, Itp, DT, S, C, Z}(;
         interval = interval_sec,
         interpolator,
+        land_fraction,
         field2D,
         field3D,
         field3Dland,
@@ -104,8 +107,10 @@ function initialize!(
     )
     output.active || return nothing
 
-    # only checked for models that have a land component
-    if hasfield(typeof(model), :land) && !isnothing(model.land)
+    # only checked for models that have a land component and output variables that
+    # actually use the soil vertical dimension (and its scratch field `field3Dland`)
+    if hasfield(typeof(model), :land) && !isnothing(model.land) &&
+            any(var -> is_land(var) && is3D(var), values(output.variables))
         @assert SpeedyWeather.get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
             " soil layers initialized for output, but $(SpeedyWeather.get_nlayers(model.land)) soil layers initialized for model." *
             " Please construct ZarrOutput with the same `nlayers_soil` as the model."
@@ -176,10 +181,24 @@ function initialize!(
     )
     output!(output, vars.prognostic.clock.time)   # write initial time
 
-    # VARIABLES (pre-allocated to full length along the time axis)
+    # VARIABLES, remove output variables not existent in simulation.variables
+    simulation = Simulation(vars, model)
+    nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
+    if !isempty(nonexisting_vars)
+        @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
+    end
+    delete!(output, nonexisting_vars...)
+
+    # then define every output variable in the Zarr store and write initial conditions
     for (key, var) in output.variables
         define_variable!(g, output, var, n_outputs, eltype(output.field2D))
-        output!(output, var, Simulation(vars, model))
+        output!(output, var, simulation)
+    end
+
+    # calculate land fraction on output grid
+    if hasproperty(model, :land_sea_mask)
+        land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
+        RingGrids.interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
     end
 
     # readiness marker so writer members (ensemble_index > 1) may proceed
@@ -194,7 +213,7 @@ group `g` for `output`, shared by the ensemble and non-ensemble store layouts.""
 function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::AbstractModel)
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
+    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
     soil_indices = collect(1:get_soil_layers(model))
 
     write_coordinate!(
@@ -269,6 +288,22 @@ function write_coordinate!(g::Zarr.ZGroup, name::AbstractString, data::AbstractV
 end
 
 """$(TYPEDSIGNATURES)
+Length of the coordinate array `name` in the Zarr group `g` or `nothing` if not
+defined. Zarr-store equivalent of `get_dimension_length(::NCDataset, name)` so that
+custom output variables can define their own dimension in `define_dimension!`
+with one method for all output backends."""
+get_dimension_length(g::Zarr.ZGroup, name::String) = haskey(g, name) ? length(g[name]) : nothing
+
+"""$(TYPEDSIGNATURES)
+Define a coordinate in the Zarr group `g`: a 1D array `name` with `values` and
+`attribs` as attributes, tagged with its own `_ARRAY_DIMENSIONS`. Zarr-store
+equivalent of `define_coordinate!(::NCDataset, ...)` so that custom output
+variables can define their own dimension in `define_dimension!` with one
+method for all output backends."""
+define_coordinate!(g::Zarr.ZGroup, name::String, values::AbstractVector; attribs = Dict{String, String}()) =
+    write_coordinate!(g, name, values; attrs = merge(Dict{String, Any}("_ARRAY_DIMENSIONS" => [name]), attribs))
+
+"""$(TYPEDSIGNATURES)
 Define a Zarr array for output `var` in the Zarr group `g`. Shape and chunk
 shape are derived from `var.dims_xyzt` and the output grid; the time axis is
 pre-allocated to its final length `n_outputs`. Unwritten chunks read back as
@@ -280,12 +315,15 @@ function define_variable!(
         n_outputs::Int,
         output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
     )
+    # hook for custom output variables to define their own (vertical) dimension
+    define_dimension!(g, var)
+
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
 
     # Shape per dimension; `false` means the dimension is collapsed away.
     nlon = length(get_lond(output.field2D))
     nlat = length(get_latd(output.field2D))
-    nz = is_land(var) ? size(output.field3Dland, 2) : size(output.field3D, 2)
+    nz = get_nlayers(output, var)
     full_shape = (nlon, nlat, nz, n_outputs)
 
     # Spatial chunking: 0 (default) or any non-positive value ⇒ full extent.
@@ -295,7 +333,9 @@ function define_variable!(
     cy = output.lat_chunk > 0 ? min(output.lat_chunk, nlat) : nlat
     cz = output.vertical_chunk > 0 ? min(output.vertical_chunk, nz) : nz
     full_chunks = (cx, cy, cz, max(output.time_chunk, 1))
-    all_dims = is_land(var) ? ("lon", "lat", "soil_layer", "time") : ("lon", "lat", "layer", "time")
+
+    # the vertical dimension depends on the variable, e.g. "layer" or "soil_layer"
+    all_dims = ("lon", "lat", vertical_dimension(var), "time")
 
     # Pick out the active dims as flagged by var.dims_xyzt.
     active = var.dims_xyzt
