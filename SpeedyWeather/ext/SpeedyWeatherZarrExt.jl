@@ -229,6 +229,11 @@ function initialize!(
         RingGrids.interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
     end
 
+    # consolidate the store metadata (.zmetadata) for faster opening with xarray etc.;
+    # the schema is complete at this point and all later writes (any ensemble member,
+    # any time step) only touch chunk files, so the consolidated view stays valid
+    Zarr.consolidate_metadata(g)
+
     # readiness marker so writer members (ensemble_index > 1) may proceed
     ensemble && touch(ensemble_marker_path(output))
 
