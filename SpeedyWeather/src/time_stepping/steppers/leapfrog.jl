@@ -140,7 +140,7 @@ end
 
 @generated function move_grid_tracers_back!(vars::Variables{Po, G, T}) where {Po, G, T}
     calls = [
-        :(_copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name)))))
+        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name)))))
             for name in _namespace_names(T, :tracers)
     ]
     return Expr(:block, calls..., :(return nothing))
