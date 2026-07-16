@@ -399,21 +399,24 @@ end
 # without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
 # that path for the bulk of the layers and effectively restores the previous behavior before 
 # fusion/batching without performance penalties. 
+# Greedy chunk sizes: at each position take the largest planned batch that fits the remaining
+# layers (1 = the always-planned serial fallback when nothing larger fits). Reproduces the
+# previous recursive re-chunking exactly (e.g. K=13, planned {1,3,8} → 8+3+1+1) but iteratively,
+# and each chunk calls the NON-chunked core directly
 function _transform_chunked!(                       # SPECTRAL TO GRID
         field::AbstractField, coeffs::LowerTriangularArray,
         scratch_memory::ScratchMemory, S::SpectralTransform;
         unscale_coslat::Bool = false,
     )
     K = size(field, 2)
-    K_batched = _largest_planned_batch(K, S)
     c = 1
     while c <= K
-        c_end = min(c + K_batched - 1, K)
-        chunk = c:c_end
+        len = _largest_planned_batch(K - c + 1, S)  # planned batch (or 1) fitting the remainder
+        chunk = c:(c + len - 1)
         field_chunk = wrapped_view(field, :, chunk)
         coeffs_chunk = wrapped_view(coeffs, :, chunk)
-        transform!(field_chunk, coeffs_chunk, scratch_memory, S; unscale_coslat)
-        c = c_end + 1
+        _transform_grid_nonchunked!(field_chunk, coeffs_chunk, scratch_memory, S, unscale_coslat)
+        c += len
     end
     return field
 end
@@ -423,15 +426,14 @@ function _transform_chunked!(                       # GRID TO SPECTRAL
         scratch_memory::ScratchMemory, S::SpectralTransform,
     )
     K = size(field, 2)
-    K_batched = _largest_planned_batch(K, S)
     c = 1
     while c <= K
-        c_end = min(c + K_batched - 1, K)
-        chunk = c:c_end
+        len = _largest_planned_batch(K - c + 1, S)  # planned batch (or 1) fitting the remainder
+        chunk = c:(c + len - 1)
         field_chunk = wrapped_view(field, :, chunk)
         coeffs_chunk = wrapped_view(coeffs, :, chunk)
-        transform!(coeffs_chunk, field_chunk, scratch_memory, S)
-        c = c_end + 1
+        _transform_spec_nonchunked!(coeffs_chunk, field_chunk, scratch_memory, S)
+        c += len
     end
     return coeffs
 end
@@ -476,7 +478,13 @@ function _transform_grid!(
     if _needs_chunking(K, S)
         return _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
     end
+    return _transform_grid_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
+end
 
+function _transform_grid_nonchunked!(
+        field::AbstractField, coeffs::LowerTriangularArray,
+        scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
+    )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
     @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
@@ -529,7 +537,15 @@ function _transform_spec!(
     if _needs_chunking(K, S)
         return _transform_chunked!(coeffs, field, scratch_memory, S)
     end
+    return _transform_spec_nonchunked!(coeffs, field, scratch_memory, S)
+end
 
+# Non-chunked core, factored out for the same recursion-breaking + AD-boundary reasons as
+# `_transform_grid_nonchunked!` above.
+function _transform_spec_nonchunked!(
+        coeffs::LowerTriangularArray, field::AbstractField,
+        scratch_memory::ScratchMemory, S::SpectralTransform,
+    )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
     @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
