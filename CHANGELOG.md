@@ -8,6 +8,7 @@
 - Reduce CI time of vertical coordinates test [#1158](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1158)
 - Dynamical core reordered and transformed batched for improved GPU performance. The majority of the dycore now follows the scheme: `grid_tendencies!` -> `transform!` -> `spectral_tendencies!` to batch together all grid -> spectral transforms of tendencies and auxiliary tendencies [#1101](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1101)
 - Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced firsti in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
+- `TerrariumOutput` for flexible NetCDF/Zarr output of Terrarium state variables in coupled Terrarium-SpeedyWeather simulations [#1155](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1155)
 - Rotate/reverse Field/LowerTriangularArray kernelized [#1154](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1154)
 - ArrayDimensions in RingGrids and LowerTriangularArrays [#1150](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1150/)
 - Terrarium coupling uses the allocation-free masked copy to optimize performance [#1152](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1152)

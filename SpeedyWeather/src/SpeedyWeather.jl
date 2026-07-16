@@ -112,6 +112,9 @@ import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 export animate, globe
 function animate end
 
+# constructors to be defined in Terrarium extension
+export TerrariumOutput
+
 # abstract types
 include("variables/abstract_types.jl")
 include("models/abstract_models.jl")
