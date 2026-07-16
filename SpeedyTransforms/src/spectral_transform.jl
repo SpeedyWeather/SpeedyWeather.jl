@@ -415,7 +415,7 @@ function _transform_chunked!(                       # SPECTRAL TO GRID
         chunk = c:(c + len - 1)
         field_chunk = wrapped_view(field, :, chunk)
         coeffs_chunk = wrapped_view(coeffs, :, chunk)
-        _transform_grid_nonchunked!(field_chunk, coeffs_chunk, scratch_memory, S, unscale_coslat)
+        _transform_nonchunked!(field_chunk, coeffs_chunk, scratch_memory, S, unscale_coslat)
         c += len
     end
     return field
@@ -432,7 +432,7 @@ function _transform_chunked!(                       # GRID TO SPECTRAL
         chunk = c:(c + len - 1)
         field_chunk = wrapped_view(field, :, chunk)
         coeffs_chunk = wrapped_view(coeffs, :, chunk)
-        _transform_spec_nonchunked!(coeffs_chunk, field_chunk, scratch_memory, S)
+        _transform_nonchunked!(coeffs_chunk, field_chunk, scratch_memory, S)
         c += len
     end
     return coeffs
@@ -478,10 +478,10 @@ function _transform_grid!(
     if _needs_chunking(K, S)
         return _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
     end
-    return _transform_grid_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
+    return _transform_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
 end
 
-function _transform_grid_nonchunked!(
+function _transform_nonchunked!(
         field::AbstractField, coeffs::LowerTriangularArray,
         scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
     )
@@ -537,12 +537,12 @@ function _transform_spec!(
     if _needs_chunking(K, S)
         return _transform_chunked!(coeffs, field, scratch_memory, S)
     end
-    return _transform_spec_nonchunked!(coeffs, field, scratch_memory, S)
+    return _transform_nonchunked!(coeffs, field, scratch_memory, S)
 end
 
 # Non-chunked core, factored out for the same recursion-breaking + AD-boundary reasons as
-# `_transform_grid_nonchunked!` above.
-function _transform_spec_nonchunked!(
+# `_transform_nonchunked!` above.
+function _transform_nonchunked!(
         coeffs::LowerTriangularArray, field::AbstractField,
         scratch_memory::ScratchMemory, S::SpectralTransform,
     )
