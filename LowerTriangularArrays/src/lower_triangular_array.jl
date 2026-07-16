@@ -483,15 +483,17 @@ Base.eachindex(Ls::LowerTriangularArray...) = eachindex((L.data for L in Ls)...)
 
 """
 $(TYPEDSIGNATURES)
-creates `unit_range::UnitRange` to loop over all non-zeros/spherical harmonics numbers in a LowerTriangularArray `L`.
-Like `eachindex` but skips the upper triangle with zeros in `L`."""
-eachharmonic(L::LowerTriangularArray) = axes(L.data, 1)
+Iterator over all spherical harmonics in `L`, yielding `(l, m)` tuples of degree `l` and
+order `m` (both 1-based) for every harmonic in the lower triangle. Only loops over the
+horizontal dimension; combine with `eachmatrix` for the other dimensions."""
+eachharmonic(L::LowerTriangularArray) = eachharmonic(L.spectrum)
 
 """
 $(TYPEDSIGNATURES)
-creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangularArrays
-provided as arguments. Checks bounds first. All LowerTriangularMatrix's need to be of the same size.
-Like `eachindex` but skips the upper triangle with zeros in `L`."""
+Iterator over all spherical harmonics of the LowerTriangularArrays provided as arguments,
+yielding `(l, m)` tuples of degree `l` and order `m` (both 1-based). Checks first that
+all arrays match in the horizontal, other dimensions may differ.
+Only loops over the horizontal dimension; combine with `eachmatrix` for the others."""
 function eachharmonic(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     lowertriangular_match(L1, Ls...; horizontal_only = true) || throw(DimensionMismatch(L1, Ls...))
     return eachharmonic(L1)

@@ -441,7 +441,7 @@ column_grid = Terrarium.ColumnRingGrid(
     Terrarium.CPU(), Float32,
     Terrarium.ExponentialSpacing(; N = Nz, Δz_min),
     ring_grid,
-    land_sea_mask.land_fraction .> 0
+    land_sea_mask,
 )
 
 # Soil column + initial state, matching `LandModel: Soil, no vegetation`

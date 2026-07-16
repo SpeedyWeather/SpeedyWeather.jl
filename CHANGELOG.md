@@ -2,7 +2,10 @@
 
 ## Unreleased
 
+- Terrarium coupling: fill soil mirror variables with ocean fallback values (285 K / 0) outside the Terrarium land mask, warn when the Terrarium and SpeedyWeather land masks disagree [#1159](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1159)
+- Sea surface temperature and sea ice concentration are now time-stepped variables [#1140](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1140)
 - Revised EnzymeRules for SpeedyTransforms [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
+- Reduced dynamic dispatches and added unit tests with JET to detect them [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
 - Reduce CI time of vertical coordinates test [#1158](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1158)
 - Dynamical core reordered and transformed batched for improved GPU performance. The majority of the dycore now follows the scheme: `grid_tendencies!` -> `transform!` -> `spectral_tendencies!` to batch together all grid -> spectral transforms of tendencies and auxiliary tendencies [#1101](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1101)
 - Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced firsti in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
@@ -13,7 +16,7 @@
 - Ensemble output dimension for `ZarrOutput`: multiple members can write into one shared store via `ensemble_index`/`ensemble_size` [#1149](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1149)
 - Prognostic and grid variables are now fused and the transform batched [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
 - Update the extended differentiability tests to new time stepping syntax [#1148](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1148)
-- Scale time step on the fly [#1139](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1139)
+- Scale time step on the fly, and forcing/drag/parameterizations inside dycore [#1139](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1139)
 - Fix scalar indexing error constructing `SigmaCoordinates`/`Geometry` on GPU [#1142](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1142)
 - Sigma-pressure coordinates, part 1 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137)
 - NetCDF output coordinates always in Float64 as determined by RingGrids.get_lond [#1141](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1141)
