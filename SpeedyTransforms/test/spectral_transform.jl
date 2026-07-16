@@ -93,7 +93,7 @@ end
                         map = transform(alms, S)
                         alms2 = transform(map, S)
 
-                        for lm in eachharmonic(alms, alms2)
+                        for lm in eachindex(alms, alms2)
                             @test alms[lm] ≈ alms2[lm] atol = 100 * eps(NF)
                         end
                     end
@@ -270,7 +270,7 @@ end
 
                         tol = 1.0e-3
 
-                        for lm in eachharmonic(alms, alms2)
+                        for lm in eachindex(alms, alms2)
                             @test alms[lm] ≈ alms2[lm] atol = tol rtol = tol
                         end
                     end
@@ -314,7 +314,7 @@ end
 
                 tol = NF == Float32 ? 2 * sqrt(eps(NF)) : 5.0e-7
 
-                for lm in eachharmonic(oro_spec1, oro_spec2)
+                for lm in eachindex(oro_spec1, oro_spec2)
                     @test oro_spec1[lm] ≈ oro_spec2[lm] atol = tol rtol = tol
                 end
                 for ij in eachindex(oro_grid1, oro_grid2)

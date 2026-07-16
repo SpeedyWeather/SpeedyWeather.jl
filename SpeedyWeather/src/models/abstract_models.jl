@@ -39,6 +39,11 @@ end
 @inline reinitialize!(::Nothing, ::AbstractModel, ::AbstractVariables) = nothing
 @inline reinitialize!(::AbstractModelComponent, ::AbstractModel, ::AbstractVariables) = nothing
 
+# ocean, land and sea ice are allowed to filter variables, i.e. apply some correction after time step update
+# define here only the fallback
+@inline Base.filter!(::AbstractVariables, ::AbstractModelComponent, ::AbstractModel) = nothing
+@inline Base.filter!(::AbstractVariables, ::Nothing, ::AbstractModel) = nothing
+
 function Base.show(io::IO, P::AbstractModelComponent; values = true)
     type_str = split("$(typeof(P))", "{", limit = 2)
     type_itself = type_str[1]
