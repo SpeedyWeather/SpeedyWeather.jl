@@ -697,7 +697,7 @@ function temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation)
     uT_anomaly_grid = vars.dynamics.grid.uT_anomaly
     vT_anomaly_grid = vars.dynamics.grid.vT_anomaly
     (; temp_profile) = implicit
-    (; coslat⁻¹) = G
+    (; coslat⁻¹) = model.geometry
     (; whichring) = temp_tend_grid.grid
 
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
