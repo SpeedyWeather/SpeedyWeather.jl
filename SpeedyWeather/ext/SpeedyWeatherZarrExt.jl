@@ -99,7 +99,14 @@ dimension of length `ensemble_size` is added, chunked with size 1 so that each m
 writes disjoint chunk files. All members share a deterministic run folder and hence
 one store; member 1 (the *creator*) builds the store schema, coordinates and the shared
 `time` axis, then drops a readiness marker; members `2..ensemble_size` (the *writers*) wait
-for that marker, open the existing store and write only their own ensemble slice."""
+for that marker, open the existing store and write only their own ensemble slice.
+Writer members never create Zarr arrays or coordinates (concurrent metadata writes from
+parallel processes would corrupt the store). Every member (creator included) writes its
+side files (parameters txt, progress txt, restart file) under member-specific filenames
+(`_member\$index` suffix) so they don't clobber each other. When rerunning an ensemble
+into the same run folder with `overwrite=true`, start the creator before (or together
+with) the writers: a writer launched against a leftover store from a previous run cannot
+distinguish its readiness marker from the current run's."""
 function initialize!(
         output::ZarrOutput,
         vars::Variables,
@@ -126,7 +133,14 @@ function initialize!(
     # we manage the (shared, deterministic) run folder ourselves so that all members
     # resolve to the same store path instead of auto-incrementing into separate folders.
     initialize!(output.core, output, model; create_folder = !ensemble)
-    ensemble && setup_ensemble_run_folder!(output)
+    if ensemble
+        setup_ensemble_run_folder!(output)
+        # all members share one run folder but run as independent parallel processes:
+        # give the side-file callbacks (parameters/progress txt, restart file) of every
+        # member — including the creator (member 1) — unique filenames so they don't
+        # clobber each other's files and share one consistent naming scheme
+        set_ensemble_member_filenames!(model, output.ensemble_index)
+    end
 
     # Total number of output snapshots: IC + one per `output_every_n_steps`.
     n_outputs = vars.prognostic.clock.n_time_steps ÷ output.output_every_n_steps + 1
@@ -137,12 +151,28 @@ function initialize!(
 
     # WRITER member (ensemble_index > 1): wait for the creator to build the store, then
     # open it and write only this member's ensemble slice. The schema, coordinates and
-    # shared time axis are owned by the creator.
+    # shared time axis are owned by the creator; a writer member must never create Zarr
+    # arrays or coordinates (`zcreate`, `write_coordinate!`, ...) because concurrent
+    # metadata writes from parallel processes corrupt the store. `zopen` only reads the
+    # metadata and slice-assignments below only touch this member's own chunk files
+    # (the ensemble axis is chunked with size 1).
     if ensemble && output.ensemble_index != 1
         wait_for_ensemble_store(output, store_path)
-        output.zarr_group = Zarr.zopen(store_path, "w")
+        g = Zarr.zopen(store_path, "w")
+        output.zarr_group = g
+
+        # remove output variables not existent in simulation.variables (mirrors the
+        # creator, which prunes them with a warning before defining the store schema)
+        simulation = Simulation(vars, model)
+        nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
+        isempty(nonexisting_vars) || delete!(output, nonexisting_vars...)
+
+        # the creator's store must match this member's configuration, error early
+        # (and clearly) otherwise instead of writing into wrong time/ensemble slots
+        validate_ensemble_store(g, output, n_outputs)
+
         for (key, var) in output.variables
-            output!(output, var, Simulation(vars, model))
+            output!(output, var, simulation)
         end
         return nothing
     end
@@ -201,6 +231,11 @@ function initialize!(
         RingGrids.interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
     end
 
+    # consolidate the store metadata (.zmetadata) for faster opening with xarray etc.;
+    # the schema is complete at this point and all later writes (any ensemble member,
+    # any time step) only touch chunk files, so the consolidated view stays valid
+    Zarr.consolidate_metadata(g)
+
     # readiness marker so writer members (ensemble_index > 1) may proceed
     ensemble && touch(ensemble_marker_path(output))
 
@@ -209,8 +244,10 @@ end
 
 """$(TYPEDSIGNATURES)
 Write the spatial coordinate arrays (`lon`, `lat`, `layer`, `soil_layer`) into the Zarr
-group `g` for `output`, shared by the ensemble and non-ensemble store layouts."""
+group `g` for `output`, shared by the ensemble and non-ensemble store layouts.
+Must only ever be called by the ensemble creator (member 1) or a non-ensemble run."""
 function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::AbstractModel)
+    assert_ensemble_creator(output)
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
     σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
@@ -236,9 +273,72 @@ function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::Abst
 end
 
 """$(TYPEDSIGNATURES)
+Assert that `output` is allowed to create Zarr arrays/coordinates in the shared store:
+either non-ensemble output (`ensemble_index == 0`) or the ensemble creator (member 1).
+Writer members (`ensemble_index > 1`) run as parallel processes and must never write
+Zarr metadata — concurrent metadata writes corrupt the store."""
+function assert_ensemble_creator(output::ZarrOutput)
+    @assert output.ensemble_index <= 1 "ZarrOutput ensemble writer member " *
+        "$(output.ensemble_index) must not create Zarr arrays or coordinates; only the " *
+        "creator (ensemble_index == 1) builds the shared store schema."
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
 Path to the readiness marker file dropped by the ensemble creator (member 1) once the
 shared store schema, coordinates and time axis are in place."""
 ensemble_marker_path(output::ZarrOutput) = joinpath(output.run_path, ".zarr_ensemble_ready")
+
+"""$(TYPEDSIGNATURES)
+Give the side-file callbacks added by the output initialization (parameters txt,
+progress txt, restart file) of an ensemble `member` unique filenames with a
+`_member\$member` suffix, e.g. `progress_member2.txt`. All ensemble members share one
+run folder but run as independent parallel processes; with the default filenames every
+member would concurrently write the same `parameters.txt`, `progress.txt` and
+`restart.jld2`, garbling or corrupting them. Every member — including the creator
+(member 1) — gets the suffix so the whole ensemble shares one consistent naming scheme."""
+function set_ensemble_member_filenames!(model::AbstractModel, member::Integer)
+    for key in (:parameters_txt, :progress_txt, :variables_restart_file)
+        haskey(model.callbacks, key) || continue
+        callback = model.callbacks[key]
+        hasfield(typeof(callback), :filename) || continue
+        base, extension = splitext(callback.filename)
+        callback.filename = string(base, "_member", member, extension)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Validate that the shared ensemble store `g` built by the creator (member 1) matches this
+writer member's configuration: same number of output time steps `n_outputs`, same
+ensemble size, and every output variable of this member defined. Errors otherwise —
+a mismatch means the members were launched with inconsistent options (e.g. different
+`period` or output `interval`, different output variables) or the readiness marker
+belonged to a stale store from a previous run into the same run folder."""
+function validate_ensemble_store(g::Zarr.ZGroup, output::ZarrOutput, n_outputs::Integer)
+    member = output.ensemble_index
+
+    n_time = get_dimension_length(g, "time")
+    n_time == n_outputs || error(
+        "ZarrOutput ensemble member $member: the shared store has $n_time output time " *
+            "steps but this member expects $n_outputs. All ensemble members must be run " *
+            "with the same simulation period, time step and output interval."
+    )
+
+    n_ensemble = get_dimension_length(g, "ensemble")
+    n_ensemble == output.ensemble_size || error(
+        "ZarrOutput ensemble member $member: the shared store has an ensemble dimension " *
+            "of $n_ensemble but this member expects ensemble_size=$(output.ensemble_size)."
+    )
+
+    undefined_vars = [var.name for var in values(output.variables) if !haskey(g, var.name)]
+    isempty(undefined_vars) || error(
+        "ZarrOutput ensemble member $member: variable(s) $(join(undefined_vars, ", ")) " *
+            "not defined in the shared store by the creator (member 1). Ensure all members " *
+            "use the same output variables and that the store is not left over from a previous run."
+    )
+    return nothing
+end
 
 """$(TYPEDSIGNATURES)
 Set a deterministic (non-auto-incrementing) run folder for an ensemble `output` so all
@@ -315,6 +415,8 @@ function define_variable!(
         n_outputs::Int,
         output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
     )
+    assert_ensemble_creator(output)
+
     # hook for custom output variables to define their own (vertical) dimension
     define_dimension!(g, var)
 
