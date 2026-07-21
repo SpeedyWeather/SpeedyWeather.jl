@@ -161,9 +161,7 @@ end
 #                           quadrature weight ΔΩ = sinθ Δθ Δϕ that the synthesis lacks).
 #   The FFT adjoint reuses `adjoint_scale` exactly as the `_fourier!` reverse rules do; the
 #   Legendre adjoint is the opposite-direction Legendre with the ΔΩ weight removed/added.
-# Both pullbacks are FD-validated (`_adjoint_check.jl`): rel err ~1e-6, batched and chunked.
-# The pullbacks chunk over layers (Kc ≤ largest planned batch ≤ S.nlayers) so the internal
-# `_fourier!`/`_legendre!` calls stay within the planned/serial FFT limits, matching the primal.
+# Both pullbacks are FD-validated in the unit tests with EnzymeTestUtils: rel err ~1e-6, batched and chunked.
 
 import SpeedyTransforms:
     _transform_grid!, _transform_spec!, _largest_planned_batch, _legendre!

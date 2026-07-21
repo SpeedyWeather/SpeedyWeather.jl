@@ -62,7 +62,7 @@ function _apply_batched_fft!(
         nlon::Int,
         ilons::UnitRange{Int};
         not_equator::Bool = true,
-        add::Bool = false,          # accumulate onto `field` instead of overwriting? (Enzyme adjoint rule)
+        add::Bool = false,          # accumulate onto `field` instead of overwriting? (used by Enzyme adjoint rule)
     )
     nlayers = size(field, 2)        # number of vertical layers
     brfft_plan = S.brfft_plans_batched[nlayers][j]  # concrete K-batched plan for this ring
@@ -108,7 +108,7 @@ function _apply_serial_fft!(
         nfreq::Int,
         ilons::UnitRange{Int};
         not_equator::Bool = true,
-        add::Bool = false,          # accumulate onto `field` instead of overwriting? (Enzyme adjoint rule)
+        add::Bool = false,          # accumulate onto `field` instead of overwriting? (used by Enzyme adjoint rule)
     )
     brfft_plan = S.brfft_plan_serial[j]   # concrete K=1 (1-D) plan, planned wrt nlon on ring
     k_grid = eachlayer(field)[k]       # Precomputed ring index (as a Cartesian index)
@@ -213,7 +213,7 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
         g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed input
         g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
         S::SpectralTransform;                  # precomputed transform
-        add::Bool = false,                      # accumulate onto `field`? (Enzyme adjoint rule)
+        add::Bool = false,                      # accumulate onto `field`? (used by Enzyme adjoint rule)
     )
     (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
@@ -252,7 +252,7 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
         g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed input
         g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
         S::SpectralTransform;                  # precomputed transform
-        add::Bool = false,                      # accumulate onto `field`? (Enzyme adjoint rule)
+        add::Bool = false,                      # accumulate onto `field`? (used by Enzyme adjoint rule)
     )
     (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
@@ -290,7 +290,7 @@ concrete types so `plan * view` / `mul!` is a static call — see `SpectralTrans
 
 - The **serial (K=1)** plans (1-D input, one layer) are always built — the per-layer fallback used by
   `_fourier_serial!`. Returned as concretely-typed `Vector`s.
-- The **batched (K>1)** plans (2-D input, batched over the trailing dim) are built for each hot K in
+- The **batched (K>1)** plans (2-D input, batched over the trailing dim) are built for each K in
   `planned_K` and returned as `Dict{Int, Vector{P}}` keyed by K, with a concrete plan type `P`. When no
   batched K is planned (e.g. `nlayers==1`) the Dict is empty (never indexed).
 

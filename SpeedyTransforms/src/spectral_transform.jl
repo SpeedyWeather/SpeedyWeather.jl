@@ -400,9 +400,7 @@ end
 # that path for the bulk of the layers and effectively restores the previous behavior before 
 # fusion/batching without performance penalties. 
 # Greedy chunk sizes: at each position take the largest planned batch that fits the remaining
-# layers (1 = the always-planned serial fallback when nothing larger fits). Reproduces the
-# previous recursive re-chunking exactly (e.g. K=13, planned {1,3,8} → 8+3+1+1) but iteratively,
-# and each chunk calls the NON-chunked core directly
+# layers (1 = the always-planned serial fallback when nothing larger fits)
 function _transform_chunked!(                       # SPECTRAL TO GRID
         field::AbstractField, coeffs::LowerTriangularArray,
         scratch_memory::ScratchMemory, S::SpectralTransform;

@@ -27,7 +27,7 @@ using JET
         @test_opt target_modules = (SpeedyTransforms,) transform!(field, specs, scratch, S)  # spectral → grid
 
         # `curl!`/`divergence!` take `flipsign`/`add` as runtime `Bool`s but encode them as `KernelOP`
-        # type parameters; without the union split in `_divergence_split` the `KernelOP` widens to an
+        # type parameters; without the union split in `_divergence!` the `KernelOP` widens to an
         # abstract type and `_divergence!` is reached by runtime dispatch.
         u = rand(ComplexF32, spectrum, nlayers)
         v = rand(ComplexF32, spectrum, nlayers)

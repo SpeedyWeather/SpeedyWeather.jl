@@ -37,7 +37,7 @@ function curl!(
         kwargs...,
     )
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
-    return _divergence_split(Val(true), flipsign, add, curl, v, u, S; kwargs...)   # flip u, v -> v, u
+    return _divergence!(Val(true), flipsign, add, curl, v, u, S; kwargs...)   # flip u, v -> v, u
 end
 
 """
@@ -58,7 +58,7 @@ function divergence!(
         kwargs...,
     )
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    return _divergence_split(Val(false), flipsign, add, div, u, v, S; kwargs...)
+    return _divergence!(Val(false), flipsign, add, div, u, v, S; kwargs...)
 end
 
 # `KernelOP` encodes `flipsign`/`add` as type parameters (the functors above dispatch on them inside the
@@ -66,7 +66,7 @@ end
 # would widen to the abstract `KernelOP{mode}` and force `_divergence!` through a runtime dispatch.
 # Manually union-split on the two Bools so each `_divergence!` call sees a CONCRETE `KernelOP`.
 # `mode` is passed as `Val` (a literal at both call sites) so it const-folds.
-@inline function _divergence_split(
+@inline function _divergence!(
         ::Val{mode}, flipsign::Bool, add::Bool,
         div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray,
         S::AbstractSpectralTransform; kwargs...,
@@ -393,7 +393,6 @@ function ∇²!(
 
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.gradients.eigenvalues⁻¹ : S.gradients.eigenvalues
-
 
     launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, add, flipsign, alms.spectrum.l_indices)
 
