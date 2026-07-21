@@ -3,7 +3,8 @@
 ## Unreleased
 
 - Revised EnzymeRules for SpeedyTransforms [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
-- Eliminate dynamic dispatchs in the model integration code and unit test for them [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
+- Eliminate dynamic dispatchs in the model integration code and unit test for them with JET [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
+- ZarrOutput ensemble mode hardened for parallel jobs, Zarr store metadata consolidated at creation for faster opening [#1160](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1160)
 - Terrarium coupling: fill soil mirror variables with ocean fallback values (285 K / 0) outside the Terrarium land mask, warn when the Terrarium and SpeedyWeather land masks disagree [#1159](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1159)
 - Sea surface temperature and sea ice concentration are now time-stepped variables [#1140](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1140)
 - Reduce CI time of vertical coordinates test [#1158](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1158)
