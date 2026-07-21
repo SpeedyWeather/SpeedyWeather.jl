@@ -39,12 +39,20 @@ SpeedyWeather/test/differentiability/run_bisect_local.sh            # all 11 var
 SpeedyWeather/test/differentiability/run_bisect_local.sh A2_param C2_paramtend   # a subset
 ```
 
-**Batch / extensive — SLURM array** (one task per variant; edit partition/account/Julia first):
+**Batch / extensive — SLURM array** (one task per variant):
 ```
 sbatch SpeedyWeather/test/differentiability/bisect_pwet_param.slurm
 # logs: SpeedyWeather/test/differentiability/_logs/bisect_<jobid>_<taskid>.log
 # exit 134 in a task = that variant's component is the culprit
 ```
+> **Cluster config — inspect your CURRENT local SLURM scripts first.** `bisect_pwet_param.slurm`
+> has placeholder `--qos/--account/--partition/--mail-user/module load` lines. These values are
+> cluster/project-specific **and change over time**, so start by opening a SLURM script you actually
+> use right now and copy its current values — do not trust old ones. Look under
+> `~/Nextcloud/*/submit*.sh` (e.g. `NeuralQG3/`, `mcbb-climate-project/`); historically PIK with
+> `qos=gpushort/priority, account=flai/brasnet`, but **verify against a recent script** (the ones on
+> disk `module load` old Julia 1.9/1.3). You need a **Julia 1.12 x86** build (module or
+> juliaup/local), and the abort needs the assertions-enabled x86 `Enzyme_jll` (the Linux x86 default).
 
 **Single variant, directly:**
 ```
