@@ -92,7 +92,7 @@ function _divergence!(
 
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
 
-    launch!(architecture(div), SpectralWorkOrder, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2)
+    launch!(architecture(div), SpectralWorkOrder, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2, size(div, 1))
 
     # radius scaling if not unit sphere
     if radius != 1
@@ -102,11 +102,10 @@ function _divergence!(
     return div
 end
 
-@kernel inbounds = true function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2) where {mode, flipsign, add}
+@kernel inbounds = true function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2, lmmax) where {mode, flipsign, add}
 
     I = @index(Global, Cartesian)
     lm = I[1]
-    lmmax = size(div, 1)
     k = ndims(div) == 1 ? CartesianIndex() : I[2]
 
     if lm == 1
@@ -114,7 +113,11 @@ end
     elseif lm == lmmax
         div[I] = 0
     else
-        ∂u∂λ = im * grad_x_vordiv[lm] * u[I]
+        # ∂u/∂λ = i·m·u: multiply-by-imaginary is a 90° rotate + scale (2 real muls) rather than the
+        # generic 4-mul/2-add complex product the compiler emits for `im * m * u`.
+        z = u[I]
+        m = grad_x_vordiv[lm]
+        ∂u∂λ = Complex(-m * imag(z), m * real(z))
         ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm - 1, k]
         ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm + 1, k]
         div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
