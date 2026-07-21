@@ -37,49 +37,50 @@ Simulated years per wallclock day (SYPD) for the `PrimitiveWetModel` resolution 
 
 | T | L | Transform | cpu-arm | cpu-x86 | gpu-nvidia |
 | --- | --- | --- | --- | --- | --- |
-| 31 | 8 | LT+FFT | 1326 | 908 | 2171 |
-| 31 | 8 | MT | 678 | 71 | 4140 |
-| 42 | 8 | LT+FFT | 556 | 389 | 1187 |
-| 42 | 8 | MT | 157 | 19 | 2118 |
-| 63 | 8 | LT+FFT | 146 | 116 | 592 |
-| 63 | 8 | MT | 33 | 2.7 | 1016 |
-| 85 | 8 | LT+FFT | 63 | 45 | 350 |
-| 85 | 8 | MT | 7.4 | 0.7 | 268 |
-| 85 | 16 | LT+FFT | 31 | 54 | 1175 |
-| 85 | 16 | MT | 5.1 | 0.8 | 572 |
-| 85 | 24 | LT+FFT | 15 | 41 | 1209 |
-| 85 | 24 | MT | 4.1 | 0.6 | 370 |
-| 127 | 8 | LT+FFT | 14 | 12 | 156 |
-| 127 | 8 | MT | 0.5 | 0.1 | 58 |
-| 127 | 16 | LT+FFT | 7.9 | 16 | 368 |
-| 127 | 16 | MT | 0.4 | 0.1 | 82 |
-| 127 | 24 | LT+FFT | 4.8 | 12 | 373 |
-| 127 | 24 | MT | 0.4 | 0.1 | 54 |
-| 170 | 8 | LT+FFT | 5.3 | 4.4 | 72 |
-| 170 | 16 | LT+FFT | 2.9 | 6.1 | 141 |
-| 170 | 24 | LT+FFT | 1.7 | 4.7 | 167 |
-| 255 | 8 | LT+FFT | 1.4 | 1.1 | 24 |
-| 255 | 16 | LT+FFT | 0.7 | 1.5 | 43 |
-| 255 | 24 | LT+FFT | 0.5 | 1.1 | 43 |
+| 31 | 8 | LT+FFT | 1400 | 856 | 2225 |
+| 31 | 8 | MT | 757 | 107 | 4150 |
+| 42 | 8 | LT+FFT | 564 | 370 | 1310 |
+| 42 | 8 | MT | 272 | 28 | 2290 |
+| 63 | 8 | LT+FFT | 147 | 107 | 562 |
+| 63 | 8 | MT | 48 | 3.7 | 941 |
+| 85 | 8 | LT+FFT | 57 | 39 | 320 |
+| 85 | 8 | MT | 13 | 0.9 | 254 |
+| 85 | 16 | LT+FFT | 51 | 49 | 627 |
+| 85 | 16 | MT | 19 | 1.1 | 398 |
+| 85 | 24 | LT+FFT | 48 | 38 | 686 |
+| 85 | 24 | MT | 11 | 0.9 | 370 |
+| 127 | 8 | LT+FFT | 15 | 11 | 130 |
+| 127 | 8 | MT | 1.5 | 0.1 | 52 |
+| 127 | 16 | LT+FFT | 21 | 15 | 304 |
+| 127 | 16 | MT | 2.1 | 0.2 | 75 |
+| 127 | 24 | LT+FFT | 15 | 11 | 288 |
+| 127 | 24 | MT | 1.7 | 0.1 | 52 |
+| 170 | 8 | LT+FFT | 5.5 | 3.9 | 64 |
+| 170 | 16 | LT+FFT | 7.7 | 5.6 | 129 |
+| 170 | 24 | LT+FFT | 4.3 | 4.5 | 136 |
+| 255 | 8 | LT+FFT | 1.4 | 1.0 | 21 |
+| 255 | 16 | LT+FFT | 1.9 | 1.3 | 37 |
+| 255 | 24 | LT+FFT | 1.5 | 1.0 | 36 |
 
 ## Architecture: `cpu-arm`
 
-Created for SpeedyWeather.jl v0.21.1+DEV on Tue, 30 Jun 2026 18:02:48.
+Created for SpeedyWeather.jl v0.21.1+DEV on Tue, 21 Jul 2026 17:31:54.
 
 ### Machine details
 
 ```julia
 julia> versioninfo()
-Julia Version 1.11.9
-Commit 53a02c0720c (2026-02-06 00:27 UTC)
+Julia Version 1.12.6
+Commit 15346901f00 (2026-04-09 19:20 UTC)
 Build Info:
-  Official https://julialang.org/ release
+  Official https://julialang.org release
 Platform Info:
   OS: macOS (arm64-apple-darwin24.0.0)
   CPU: 8 × Apple M3
   WORD_SIZE: 64
-  LLVM: libLLVM-16.0.6 (ORCJIT, apple-m2)
-Threads: 1 default, 0 interactive, 1 GC (on 4 virtual cores)
+  LLVM: libLLVM-18.1.7 (ORCJIT, apple-m3)
+  GC: Built with stock GC
+Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)
 ```
 
 
@@ -87,94 +88,94 @@ Threads: 1 default, 0 interactive, 1 GC (on 4 virtual cores)
 
 | Model | T | L | Physics | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- |
-| BarotropicModel | 31 | 1 | false | 1800 | 35318 | 746.37 KB |
-| ShallowWaterModel | 31 | 1 | false | 2400 | 24399 | 880.97 KB |
-| PrimitiveDryModel | 31 | 8 | true | 2400 | 2247 | 4.70 MB |
-| PrimitiveWetModel | 31 | 8 | true | 2400 | 1212 | 5.38 MB |
+| BarotropicModel | 31 | 1 | false | 1800 | 46826 | 780.58 KB |
+| ShallowWaterModel | 31 | 1 | false | 2400 | 35514 | 962.86 KB |
+| PrimitiveDryModel | 31 | 8 | true | 2400 | 2222 | 5.27 MB |
+| PrimitiveWetModel | 31 | 8 | true | 2400 | 1435 | 6.22 MB |
 
 ### Shallow water model, resolution
 
 | Model | T | L | Rings | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- |
-| ShallowWaterModel | 31 | 1 | 48 | 2400 | 25538 | 880.97 KB |
-| ShallowWaterModel | 42 | 1 | 64 | 1800 | 11692 | 1.54 MB |
-| ShallowWaterModel | 63 | 1 | 96 | 1200 | 3663 | 3.47 MB |
-| ShallowWaterModel | 85 | 1 | 128 | 900 | 1411 | 6.32 MB |
-| ShallowWaterModel | 127 | 1 | 192 | 600 | 294 | 14.97 MB |
-| ShallowWaterModel | 170 | 1 | 256 | 450 | 137 | 28.31 MB |
-| ShallowWaterModel | 255 | 1 | 384 | 300 | 27 | 71.53 MB |
+| ShallowWaterModel | 31 | 1 | 48 | 2400 | 18732 | 962.86 KB |
+| ShallowWaterModel | 42 | 1 | 64 | 1800 | 15114 | 1.68 MB |
+| ShallowWaterModel | 63 | 1 | 96 | 1200 | 3442 | 3.77 MB |
+| ShallowWaterModel | 85 | 1 | 128 | 900 | 1658 | 6.84 MB |
+| ShallowWaterModel | 127 | 1 | 192 | 600 | 392 | 16.12 MB |
+| ShallowWaterModel | 170 | 1 | 256 | 450 | 133 | 30.33 MB |
+| ShallowWaterModel | 255 | 1 | 384 | 300 | 28 | 76.02 MB |
 
 ### Primitive wet model, resolution
 
 | Model | T | L | Rings | Transform | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 31 | 8 | 48 | default | 2400 | 1326 | 5.38 MB |
-| PrimitiveWetModel | 42 | 8 | 64 | default | 1800 | 556 | 9.10 MB |
-| PrimitiveWetModel | 63 | 8 | 96 | default | 1200 | 146 | 19.35 MB |
-| PrimitiveWetModel | 85 | 8 | 128 | default | 900 | 63 | 33.68 MB |
-| PrimitiveWetModel | 127 | 8 | 192 | default | 600 | 14 | 74.25 MB |
-| PrimitiveWetModel | 170 | 8 | 256 | default | 450 | 5.3 | 131.86 MB |
-| PrimitiveWetModel | 255 | 8 | 384 | default | 300 | 1.4 | 300.09 MB |
-| PrimitiveWetModel | 85 | 16 | 128 | default | 900 | 31 | 57.92 MB |
-| PrimitiveWetModel | 127 | 16 | 192 | default | 600 | 7.9 | 126.80 MB |
-| PrimitiveWetModel | 170 | 16 | 256 | default | 450 | 2.9 | 223.74 MB |
-| PrimitiveWetModel | 255 | 16 | 384 | default | 300 | 0.7 | 502.99 MB |
-| PrimitiveWetModel | 85 | 24 | 128 | default | 900 | 15 | 82.21 MB |
-| PrimitiveWetModel | 127 | 24 | 192 | default | 600 | 4.8 | 179.42 MB |
-| PrimitiveWetModel | 170 | 24 | 256 | default | 450 | 1.7 | 315.70 MB |
-| PrimitiveWetModel | 255 | 24 | 384 | default | 300 | 0.5 | 706.03 MB |
-| PrimitiveWetModel | 31 | 8 | 48 | matrix | 2400 | 678 | 47.28 MB |
-| PrimitiveWetModel | 42 | 8 | 64 | matrix | 1800 | 157 | 132.47 MB |
-| PrimitiveWetModel | 63 | 8 | 96 | matrix | 1200 | 33 | 579.81 MB |
-| PrimitiveWetModel | 85 | 8 | 128 | matrix | 900 | 7.4 | 1.75 GB |
-| PrimitiveWetModel | 127 | 8 | 192 | matrix | 600 | 0.5 | 8.18 GB |
-| PrimitiveWetModel | 85 | 16 | 128 | matrix | 900 | 5.1 | 1.77 GB |
-| PrimitiveWetModel | 127 | 16 | 192 | matrix | 600 | 0.4 | 8.22 GB |
-| PrimitiveWetModel | 85 | 24 | 128 | matrix | 900 | 4.1 | 1.79 GB |
-| PrimitiveWetModel | 127 | 24 | 192 | matrix | 600 | 0.4 | 8.26 GB |
+| PrimitiveWetModel | 31 | 8 | 48 | default | 2400 | 1400 | 6.22 MB |
+| PrimitiveWetModel | 42 | 8 | 64 | default | 1800 | 564 | 10.51 MB |
+| PrimitiveWetModel | 63 | 8 | 96 | default | 1200 | 147 | 22.34 MB |
+| PrimitiveWetModel | 85 | 8 | 128 | default | 900 | 57 | 38.87 MB |
+| PrimitiveWetModel | 127 | 8 | 192 | default | 600 | 15 | 85.50 MB |
+| PrimitiveWetModel | 170 | 8 | 256 | default | 450 | 5.5 | 151.57 MB |
+| PrimitiveWetModel | 255 | 8 | 384 | default | 300 | 1.4 | 343.69 MB |
+| PrimitiveWetModel | 85 | 16 | 128 | default | 900 | 51 | 67.81 MB |
+| PrimitiveWetModel | 127 | 16 | 192 | default | 600 | 21 | 148.26 MB |
+| PrimitiveWetModel | 170 | 16 | 256 | default | 450 | 7.7 | 261.34 MB |
+| PrimitiveWetModel | 255 | 16 | 384 | default | 300 | 1.9 | 586.14 MB |
+| PrimitiveWetModel | 85 | 24 | 128 | default | 900 | 48 | 96.80 MB |
+| PrimitiveWetModel | 127 | 24 | 192 | default | 600 | 15 | 211.09 MB |
+| PrimitiveWetModel | 170 | 24 | 256 | default | 450 | 4.3 | 371.20 MB |
+| PrimitiveWetModel | 255 | 24 | 384 | default | 300 | 1.5 | 828.73 MB |
+| PrimitiveWetModel | 31 | 8 | 48 | matrix | 2400 | 757 | 48.11 MB |
+| PrimitiveWetModel | 42 | 8 | 64 | matrix | 1800 | 272 | 133.88 MB |
+| PrimitiveWetModel | 63 | 8 | 96 | matrix | 1200 | 48 | 582.80 MB |
+| PrimitiveWetModel | 85 | 8 | 128 | matrix | 900 | 13 | 1.75 GB |
+| PrimitiveWetModel | 127 | 8 | 192 | matrix | 600 | 1.5 | 8.19 GB |
+| PrimitiveWetModel | 85 | 16 | 128 | matrix | 900 | 19 | 1.78 GB |
+| PrimitiveWetModel | 127 | 16 | 192 | matrix | 600 | 2.1 | 8.24 GB |
+| PrimitiveWetModel | 85 | 24 | 128 | matrix | 900 | 11 | 1.80 GB |
+| PrimitiveWetModel | 127 | 24 | 192 | matrix | 600 | 1.7 | 8.30 GB |
 
 ### Primitive Equation, Float32 vs Float64
 
 | Model | NF | T | L | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | Float32 | 31 | 8 | 2400 | 677 | 5.38 MB |
-| PrimitiveWetModel | Float64 | 31 | 8 | 2400 | 1055 | 9.69 MB |
+| PrimitiveWetModel | Float32 | 31 | 8 | 2400 | 1227 | 6.22 MB |
+| PrimitiveWetModel | Float64 | 31 | 8 | 2400 | 1232 | 11.35 MB |
 
 ### Grids
 
 | Model | T | L | Grid | Rings | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 63 | 8 | FullGaussianGrid | 96 | 1200 | 86 | 28.09 MB |
-| PrimitiveWetModel | 63 | 8 | FullClenshawGrid | 95 | 1200 | 115 | 27.86 MB |
-| PrimitiveWetModel | 63 | 8 | OctahedralGaussianGrid | 96 | 1200 | 145 | 19.35 MB |
-| PrimitiveWetModel | 63 | 8 | OctahedralClenshawGrid | 95 | 1200 | 144 | 19.11 MB |
-| PrimitiveWetModel | 63 | 8 | HEALPixGrid | 95 | 1200 | 266 | 14.14 MB |
-| PrimitiveWetModel | 63 | 8 | OctaHEALPixGrid | 95 | 1200 | 181 | 17.21 MB |
+| PrimitiveWetModel | 63 | 8 | FullGaussianGrid | 96 | 1200 | 80 | 32.40 MB |
+| PrimitiveWetModel | 63 | 8 | FullClenshawGrid | 95 | 1200 | 109 | 32.13 MB |
+| PrimitiveWetModel | 63 | 8 | OctahedralGaussianGrid | 96 | 1200 | 158 | 22.34 MB |
+| PrimitiveWetModel | 63 | 8 | OctahedralClenshawGrid | 95 | 1200 | 146 | 22.06 MB |
+| PrimitiveWetModel | 63 | 8 | HEALPixGrid | 95 | 1200 | 219 | 16.42 MB |
+| PrimitiveWetModel | 63 | 8 | OctaHEALPixGrid | 95 | 1200 | 171 | 19.89 MB |
 
 ### Number of vertical layers
 
 | Model | T | L | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 31 | 4 | 2400 | 2184 | 3.41 MB |
-| PrimitiveWetModel | 31 | 8 | 2400 | 1500 | 5.38 MB |
-| PrimitiveWetModel | 31 | 12 | 2400 | 973 | 7.36 MB |
-| PrimitiveWetModel | 31 | 16 | 2400 | 803 | 9.35 MB |
+| PrimitiveWetModel | 31 | 4 | 2400 | 2324 | 3.87 MB |
+| PrimitiveWetModel | 31 | 8 | 2400 | 1404 | 6.22 MB |
+| PrimitiveWetModel | 31 | 12 | 2400 | 1003 | 8.58 MB |
+| PrimitiveWetModel | 31 | 16 | 2400 | 771 | 10.94 MB |
 
 ### PrimitiveDryModel: Physics or dynamics only
 
 | Model | T | L | Dynamics | Physics | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveDryModel | 31 | 8 | true | true | 2400 | 2342 | 4.70 MB |
-| PrimitiveDryModel | 31 | 8 | true | false | 2400 | 3058 | 4.70 MB |
-| PrimitiveDryModel | 31 | 8 | false | true | 2400 | 3352 | 4.70 MB |
+| PrimitiveDryModel | 31 | 8 | true | true | 2400 | 2368 | 5.27 MB |
+| PrimitiveDryModel | 31 | 8 | true | false | 2400 | 4046 | 5.27 MB |
+| PrimitiveDryModel | 31 | 8 | false | true | 2400 | 2614 | 5.27 MB |
 
 ### PrimitiveWetModel: Physics or dynamics only
 
 | Model | T | L | Dynamics | Physics | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 31 | 8 | true | true | 2400 | 1482 | 5.38 MB |
-| PrimitiveWetModel | 31 | 8 | true | false | 2400 | 3360 | 5.38 MB |
-| PrimitiveWetModel | 31 | 8 | false | true | 2400 | 1913 | 5.38 MB |
+| PrimitiveWetModel | 31 | 8 | true | true | 2400 | 1423 | 6.22 MB |
+| PrimitiveWetModel | 31 | 8 | true | false | 2400 | 3055 | 6.22 MB |
+| PrimitiveWetModel | 31 | 8 | false | true | 2400 | 1558 | 6.22 MB |
 
 ### Individual dynamics functions
 
@@ -183,22 +184,22 @@ Threads: 1 default, 0 interactive, 1 GC (on 4 virtual cores)
 
 | Function | Time | Memory | Allocations |
 | --- | --- | --- | --- |
-| pressure_gradient_flux! | 38.750 μs| 49.06 KiB| 594 |
-| linear_virtual_temperature! | 1.754 μs| 0 bytes| 0 |
-| geopotential! | 5.868 μs| 800 bytes| 14 |
-| vertical_integration! | 13.666 μs| 0 bytes| 0 |
-| surface_pressure_tendency! | 14.375 μs| 25.41 KiB| 288 |
-| vertical_velocity! | 21.541 μs| 0 bytes| 0 |
-| linear_pressure_gradient! | 1.750 μs| 0 bytes| 0 |
-| vertical_advection! | 115.834 μs| 3.88 KiB| 64 |
-| vordiv_tendencies! | 229.208 μs| 260.75 KiB| 714 |
-| temperature_tendency! | 300.292 μs| 382.69 KiB| 1015 |
-| humidity_tendency! | 287.875 μs| 381.44 KiB| 1005 |
-| bernoulli_potential! | 90.042 μs| 126.03 KiB| 328 |
+| pressure_gradient_flux! | 39.666 μs| 31.98 KiB| 200 |
+| linear_virtual_temperature! | 2.056 μs| 0 bytes| 0 |
+| geopotential! | 7.562 μs| 384 bytes| 6 |
+| vertical_integration! | 14.500 μs| 0 bytes| 0 |
+| surface_pressure_tendency! | 11.875 μs| 15.66 KiB| 96 |
+| vertical_velocity! | 23.333 μs| 0 bytes| 0 |
+| linear_pressure_gradient! | 2.065 μs| 0 bytes| 0 |
+| vertical_advection! | 112.500 μs| 2.44 KiB| 32 |
+| vordiv_tendencies! | 224.375 μs| 231.83 KiB| 284 |
+| temperature_tendency! | 291.583 μs| 344.77 KiB| 401 |
+| humidity_tendency! | 279.375 μs| 344.09 KiB| 396 |
+| bernoulli_potential! | 93.667 μs| 114.30 KiB| 129 |
 
 ## Architecture: `cpu-x86`
 
-Created for SpeedyWeather.jl v0.21.1+DEV on Thu, 09 Jul 2026 17:06:12.
+Created for SpeedyWeather.jl v0.21.1+DEV on Tue, 21 Jul 2026 16:59:17.
 
 ### Machine details
 
@@ -224,94 +225,94 @@ Environment:
 
 | Model | T | L | Physics | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- |
-| BarotropicModel | 31 | 1 | false | 1800 | 18285 | 764.91 KB |
-| ShallowWaterModel | 31 | 1 | false | 2400 | 17906 | 907.93 KB |
-| PrimitiveDryModel | 31 | 8 | true | 2400 | 1426 | 5.20 MB |
-| PrimitiveWetModel | 31 | 8 | true | 2400 | 905 | 6.15 MB |
+| BarotropicModel | 31 | 1 | false | 1800 | 10654 | 780.69 KB |
+| ShallowWaterModel | 31 | 1 | false | 2400 | 19394 | 962.97 KB |
+| PrimitiveDryModel | 31 | 8 | true | 2400 | 1467 | 5.27 MB |
+| PrimitiveWetModel | 31 | 8 | true | 2400 | 819 | 6.22 MB |
 
 ### Shallow water model, resolution
 
 | Model | T | L | Rings | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- |
-| ShallowWaterModel | 31 | 1 | 48 | 2400 | 18802 | 907.93 KB |
-| ShallowWaterModel | 42 | 1 | 64 | 1800 | 7145 | 1.59 MB |
-| ShallowWaterModel | 63 | 1 | 96 | 1200 | 2382 | 3.56 MB |
-| ShallowWaterModel | 85 | 1 | 128 | 900 | 901 | 6.49 MB |
-| ShallowWaterModel | 127 | 1 | 192 | 600 | 232 | 15.33 MB |
-| ShallowWaterModel | 170 | 1 | 256 | 450 | 87 | 28.95 MB |
-| ShallowWaterModel | 255 | 1 | 384 | 300 | 19 | 72.94 MB |
+| ShallowWaterModel | 31 | 1 | 48 | 2400 | 19308 | 962.97 KB |
+| ShallowWaterModel | 42 | 1 | 64 | 1800 | 8616 | 1.68 MB |
+| ShallowWaterModel | 63 | 1 | 96 | 1200 | 2297 | 3.77 MB |
+| ShallowWaterModel | 85 | 1 | 128 | 900 | 960 | 6.84 MB |
+| ShallowWaterModel | 127 | 1 | 192 | 600 | 231 | 16.12 MB |
+| ShallowWaterModel | 170 | 1 | 256 | 450 | 86 | 30.33 MB |
+| ShallowWaterModel | 255 | 1 | 384 | 300 | 18 | 76.02 MB |
 
 ### Primitive wet model, resolution
 
 | Model | T | L | Rings | Transform | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 31 | 8 | 48 | default | 2400 | 908 | 6.15 MB |
-| PrimitiveWetModel | 42 | 8 | 64 | default | 1800 | 389 | 10.40 MB |
-| PrimitiveWetModel | 63 | 8 | 96 | default | 1200 | 116 | 22.10 MB |
-| PrimitiveWetModel | 85 | 8 | 128 | default | 900 | 45 | 38.45 MB |
-| PrimitiveWetModel | 127 | 8 | 192 | default | 600 | 12 | 84.59 MB |
-| PrimitiveWetModel | 170 | 8 | 256 | default | 450 | 4.4 | 149.99 MB |
-| PrimitiveWetModel | 255 | 8 | 384 | default | 300 | 1.1 | 340.17 MB |
-| PrimitiveWetModel | 85 | 16 | 128 | default | 900 | 54 | 67.40 MB |
-| PrimitiveWetModel | 127 | 16 | 192 | default | 600 | 16 | 147.35 MB |
-| PrimitiveWetModel | 170 | 16 | 256 | default | 450 | 6.1 | 259.75 MB |
-| PrimitiveWetModel | 255 | 16 | 384 | default | 300 | 1.5 | 582.63 MB |
-| PrimitiveWetModel | 85 | 24 | 128 | default | 900 | 41 | 96.39 MB |
-| PrimitiveWetModel | 127 | 24 | 192 | default | 600 | 12 | 210.18 MB |
-| PrimitiveWetModel | 170 | 24 | 256 | default | 450 | 4.7 | 369.61 MB |
-| PrimitiveWetModel | 255 | 24 | 384 | default | 300 | 1.1 | 825.21 MB |
-| PrimitiveWetModel | 31 | 8 | 48 | matrix | 2400 | 71 | 48.05 MB |
-| PrimitiveWetModel | 42 | 8 | 64 | matrix | 1800 | 19 | 133.77 MB |
-| PrimitiveWetModel | 63 | 8 | 96 | matrix | 1200 | 2.7 | 582.56 MB |
-| PrimitiveWetModel | 85 | 8 | 128 | matrix | 900 | 0.7 | 1.75 GB |
+| PrimitiveWetModel | 31 | 8 | 48 | default | 2400 | 856 | 6.22 MB |
+| PrimitiveWetModel | 42 | 8 | 64 | default | 1800 | 370 | 10.51 MB |
+| PrimitiveWetModel | 63 | 8 | 96 | default | 1200 | 107 | 22.34 MB |
+| PrimitiveWetModel | 85 | 8 | 128 | default | 900 | 39 | 38.87 MB |
+| PrimitiveWetModel | 127 | 8 | 192 | default | 600 | 11 | 85.50 MB |
+| PrimitiveWetModel | 170 | 8 | 256 | default | 450 | 3.9 | 151.57 MB |
+| PrimitiveWetModel | 255 | 8 | 384 | default | 300 | 1.0 | 343.69 MB |
+| PrimitiveWetModel | 85 | 16 | 128 | default | 900 | 49 | 67.81 MB |
+| PrimitiveWetModel | 127 | 16 | 192 | default | 600 | 15 | 148.26 MB |
+| PrimitiveWetModel | 170 | 16 | 256 | default | 450 | 5.6 | 261.34 MB |
+| PrimitiveWetModel | 255 | 16 | 384 | default | 300 | 1.3 | 586.14 MB |
+| PrimitiveWetModel | 85 | 24 | 128 | default | 900 | 38 | 96.80 MB |
+| PrimitiveWetModel | 127 | 24 | 192 | default | 600 | 11 | 211.09 MB |
+| PrimitiveWetModel | 170 | 24 | 256 | default | 450 | 4.5 | 371.20 MB |
+| PrimitiveWetModel | 255 | 24 | 384 | default | 300 | 1.0 | 828.73 MB |
+| PrimitiveWetModel | 31 | 8 | 48 | matrix | 2400 | 107 | 48.11 MB |
+| PrimitiveWetModel | 42 | 8 | 64 | matrix | 1800 | 28 | 133.88 MB |
+| PrimitiveWetModel | 63 | 8 | 96 | matrix | 1200 | 3.7 | 582.80 MB |
+| PrimitiveWetModel | 85 | 8 | 128 | matrix | 900 | 0.9 | 1.75 GB |
 | PrimitiveWetModel | 127 | 8 | 192 | matrix | 600 | 0.1 | 8.19 GB |
-| PrimitiveWetModel | 85 | 16 | 128 | matrix | 900 | 0.8 | 1.78 GB |
-| PrimitiveWetModel | 127 | 16 | 192 | matrix | 600 | 0.1 | 8.24 GB |
-| PrimitiveWetModel | 85 | 24 | 128 | matrix | 900 | 0.6 | 1.80 GB |
+| PrimitiveWetModel | 85 | 16 | 128 | matrix | 900 | 1.1 | 1.78 GB |
+| PrimitiveWetModel | 127 | 16 | 192 | matrix | 600 | 0.2 | 8.24 GB |
+| PrimitiveWetModel | 85 | 24 | 128 | matrix | 900 | 0.9 | 1.80 GB |
 | PrimitiveWetModel | 127 | 24 | 192 | matrix | 600 | 0.1 | 8.30 GB |
 
 ### Primitive Equation, Float32 vs Float64
 
 | Model | NF | T | L | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | Float32 | 31 | 8 | 2400 | 904 | 6.15 MB |
-| PrimitiveWetModel | Float64 | 31 | 8 | 2400 | 789 | 11.23 MB |
+| PrimitiveWetModel | Float32 | 31 | 8 | 2400 | 850 | 6.22 MB |
+| PrimitiveWetModel | Float64 | 31 | 8 | 2400 | 767 | 11.35 MB |
 
 ### Grids
 
 | Model | T | L | Grid | Rings | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 63 | 8 | FullGaussianGrid | 96 | 1200 | 76 | 32.04 MB |
-| PrimitiveWetModel | 63 | 8 | FullClenshawGrid | 95 | 1200 | 84 | 31.78 MB |
-| PrimitiveWetModel | 63 | 8 | OctahedralGaussianGrid | 96 | 1200 | 116 | 22.10 MB |
-| PrimitiveWetModel | 63 | 8 | OctahedralClenshawGrid | 95 | 1200 | 108 | 21.82 MB |
-| PrimitiveWetModel | 63 | 8 | HEALPixGrid | 95 | 1200 | 170 | 16.24 MB |
-| PrimitiveWetModel | 63 | 8 | OctaHEALPixGrid | 95 | 1200 | 126 | 19.68 MB |
+| PrimitiveWetModel | 63 | 8 | FullGaussianGrid | 96 | 1200 | 71 | 32.40 MB |
+| PrimitiveWetModel | 63 | 8 | FullClenshawGrid | 95 | 1200 | 74 | 32.13 MB |
+| PrimitiveWetModel | 63 | 8 | OctahedralGaussianGrid | 96 | 1200 | 100 | 22.34 MB |
+| PrimitiveWetModel | 63 | 8 | OctahedralClenshawGrid | 95 | 1200 | 100 | 22.06 MB |
+| PrimitiveWetModel | 63 | 8 | HEALPixGrid | 95 | 1200 | 163 | 16.42 MB |
+| PrimitiveWetModel | 63 | 8 | OctaHEALPixGrid | 95 | 1200 | 119 | 19.89 MB |
 
 ### Number of vertical layers
 
 | Model | T | L | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 31 | 4 | 2400 | 1415 | 3.80 MB |
-| PrimitiveWetModel | 31 | 8 | 2400 | 901 | 6.15 MB |
-| PrimitiveWetModel | 31 | 12 | 2400 | 635 | 8.51 MB |
-| PrimitiveWetModel | 31 | 16 | 2400 | 495 | 10.87 MB |
+| PrimitiveWetModel | 31 | 4 | 2400 | 1412 | 3.87 MB |
+| PrimitiveWetModel | 31 | 8 | 2400 | 851 | 6.22 MB |
+| PrimitiveWetModel | 31 | 12 | 2400 | 603 | 8.58 MB |
+| PrimitiveWetModel | 31 | 16 | 2400 | 467 | 10.94 MB |
 
 ### PrimitiveDryModel: Physics or dynamics only
 
 | Model | T | L | Dynamics | Physics | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveDryModel | 31 | 8 | true | true | 2400 | 1464 | 5.20 MB |
-| PrimitiveDryModel | 31 | 8 | true | false | 2400 | 1766 | 5.20 MB |
-| PrimitiveDryModel | 31 | 8 | false | true | 2400 | 1603 | 5.20 MB |
+| PrimitiveDryModel | 31 | 8 | true | true | 2400 | 1456 | 5.27 MB |
+| PrimitiveDryModel | 31 | 8 | true | false | 2400 | 2293 | 5.27 MB |
+| PrimitiveDryModel | 31 | 8 | false | true | 2400 | 1609 | 5.27 MB |
 
 ### PrimitiveWetModel: Physics or dynamics only
 
 | Model | T | L | Dynamics | Physics | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 31 | 8 | true | true | 2400 | 896 | 6.15 MB |
-| PrimitiveWetModel | 31 | 8 | true | false | 2400 | 1725 | 6.15 MB |
-| PrimitiveWetModel | 31 | 8 | false | true | 2400 | 1026 | 6.15 MB |
+| PrimitiveWetModel | 31 | 8 | true | true | 2400 | 852 | 6.22 MB |
+| PrimitiveWetModel | 31 | 8 | true | false | 2400 | 1773 | 6.22 MB |
+| PrimitiveWetModel | 31 | 8 | false | true | 2400 | 951 | 6.22 MB |
 
 ### Individual dynamics functions
 
@@ -320,22 +321,22 @@ Environment:
 
 | Function | Time | Memory | Allocations |
 | --- | --- | --- | --- |
-| pressure_gradient_flux! | 81.283 μs| 52.20 KiB| 593 |
-| linear_virtual_temperature! | 3.331 μs| 0 bytes| 0 |
-| geopotential! | 11.171 μs| 816 bytes| 13 |
-| vertical_integration! | 13.970 μs| 0 bytes| 0 |
-| surface_pressure_tendency! | 22.021 μs| 25.41 KiB| 288 |
-| vertical_velocity! | 59.412 μs| 0 bytes| 0 |
-| linear_pressure_gradient! | 3.076 μs| 0 bytes| 0 |
-| vertical_advection! | 167.826 μs| 4.69 KiB| 60 |
-| vordiv_tendencies! | 424.156 μs| 249.42 KiB| 711 |
-| temperature_tendency! | 552.770 μs| 365.66 KiB| 1012 |
-| humidity_tendency! | 529.530 μs| 364.31 KiB| 1002 |
-| bernoulli_potential! | 173.087 μs| 120.16 KiB| 327 |
+| pressure_gradient_flux! | 70.633 μs| 31.98 KiB| 200 |
+| linear_virtual_temperature! | 3.278 μs| 0 bytes| 0 |
+| geopotential! | 10.260 μs| 384 bytes| 6 |
+| vertical_integration! | 13.680 μs| 0 bytes| 0 |
+| surface_pressure_tendency! | 18.721 μs| 15.66 KiB| 96 |
+| vertical_velocity! | 59.542 μs| 0 bytes| 0 |
+| linear_pressure_gradient! | 3.179 μs| 0 bytes| 0 |
+| vertical_advection! | 160.256 μs| 2.44 KiB| 32 |
+| vordiv_tendencies! | 412.104 μs| 218.48 KiB| 284 |
+| temperature_tendency! | 532.669 μs| 324.75 KiB| 401 |
+| humidity_tendency! | 507.748 μs| 324.08 KiB| 396 |
+| bernoulli_potential! | 174.696 μs| 107.62 KiB| 129 |
 
 ## Architecture: `gpu-nvidia`
 
-Created for SpeedyWeather.jl v0.21.1+DEV on Thu, 09 Jul 2026 16:15:22.
+Created for SpeedyWeather.jl v0.21.1+DEV on Tue, 21 Jul 2026 16:51:50.
 
 ### Machine details
 
@@ -373,11 +374,11 @@ CUDA libraries:
 - NVML: 13.0.0+580.126.9
 
 Julia packages: 
-- CUDACore: 6.2.0
+- CUDACore: 6.2.1
 - GPUArrays: 11.5.8
-- GPUCompiler: 1.22.7
+- GPUCompiler: 1.23.0
 - KernelAbstractions: 0.9.42
-- CUDA_Driver_jll: 13.3.0+0
+- CUDA_Driver_jll: 13.3.0+1
 - CUDA_Compiler_jll: 0.4.4+1
 - CUDA_Runtime_jll: 0.23.0+1
 - NVPTX_LLVM_Backend_jll: 22.1.7+1
@@ -387,7 +388,7 @@ Toolchain:
 - LLVM: 18.1.7
 
 1 device:
-  0: NVIDIA H100 80GB HBM3 (sm_90, 65.604 GiB / 79.647 GiB available)
+  0: NVIDIA H100 80GB HBM3 (sm_90, 65.768 GiB / 79.647 GiB available)
      compiles to sm_90a / PTX 9.3 (LLVM: sm_90a / PTX 9.0)
 ```
 
@@ -396,94 +397,94 @@ Toolchain:
 
 | Model | T | L | Physics | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- |
-| BarotropicModel | 31 | 1 | false | 1800 | 1701 | 470.62 KB |
-| ShallowWaterModel | 31 | 1 | false | 2400 | 907 | 473.65 KB |
-| PrimitiveDryModel | 31 | 8 | true | 2400 | 300 | 629.74 KB |
-| PrimitiveWetModel | 31 | 8 | true | 2400 | 2287 | 634.88 KB |
+| BarotropicModel | 31 | 1 | false | 1800 | 2099 | 489.24 KB |
+| ShallowWaterModel | 31 | 1 | false | 2400 | 1712 | 492.74 KB |
+| PrimitiveDryModel | 31 | 8 | true | 2400 | 322 | 648.86 KB |
+| PrimitiveWetModel | 31 | 8 | true | 2400 | 2321 | 654.00 KB |
 
 ### Shallow water model, resolution
 
 | Model | T | L | Rings | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- |
-| ShallowWaterModel | 31 | 1 | 48 | 2400 | 923 | 473.65 KB |
-| ShallowWaterModel | 42 | 1 | 64 | 1800 | 503 | 791.35 KB |
-| ShallowWaterModel | 63 | 1 | 96 | 1200 | 216 | 1.68 MB |
-| ShallowWaterModel | 85 | 1 | 128 | 900 | 120 | 2.90 MB |
-| ShallowWaterModel | 127 | 1 | 192 | 600 | 52 | 6.36 MB |
-| ShallowWaterModel | 170 | 1 | 256 | 450 | 29 | 11.15 MB |
-| ShallowWaterModel | 255 | 1 | 384 | 300 | 13 | 24.78 MB |
+| ShallowWaterModel | 31 | 1 | 48 | 2400 | 1660 | 492.74 KB |
+| ShallowWaterModel | 42 | 1 | 64 | 1800 | 920 | 824.77 KB |
+| ShallowWaterModel | 63 | 1 | 96 | 1200 | 411 | 1.75 MB |
+| ShallowWaterModel | 85 | 1 | 128 | 900 | 234 | 3.03 MB |
+| ShallowWaterModel | 127 | 1 | 192 | 600 | 104 | 6.65 MB |
+| ShallowWaterModel | 170 | 1 | 256 | 450 | 57 | 11.68 MB |
+| ShallowWaterModel | 255 | 1 | 384 | 300 | 26 | 25.96 MB |
 
 ### Primitive wet model, resolution
 
 | Model | T | L | Rings | Transform | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 31 | 8 | 48 | default | 2400 | 2171 | 634.88 KB |
-| PrimitiveWetModel | 42 | 8 | 64 | default | 1800 | 1187 | 1.06 MB |
-| PrimitiveWetModel | 63 | 8 | 96 | default | 1200 | 592 | 2.24 MB |
-| PrimitiveWetModel | 85 | 8 | 128 | default | 900 | 350 | 3.87 MB |
-| PrimitiveWetModel | 127 | 8 | 192 | default | 600 | 156 | 8.49 MB |
-| PrimitiveWetModel | 170 | 8 | 256 | default | 450 | 72 | 14.91 MB |
-| PrimitiveWetModel | 255 | 8 | 384 | default | 300 | 24 | 33.15 MB |
-| PrimitiveWetModel | 85 | 16 | 128 | default | 900 | 1175 | 4.92 MB |
-| PrimitiveWetModel | 127 | 16 | 192 | default | 600 | 368 | 10.85 MB |
-| PrimitiveWetModel | 170 | 16 | 256 | default | 450 | 141 | 19.10 MB |
-| PrimitiveWetModel | 255 | 16 | 384 | default | 300 | 43 | 42.59 MB |
-| PrimitiveWetModel | 85 | 24 | 128 | default | 900 | 1209 | 5.97 MB |
-| PrimitiveWetModel | 127 | 24 | 192 | default | 600 | 373 | 13.21 MB |
-| PrimitiveWetModel | 170 | 24 | 256 | default | 450 | 167 | 23.30 MB |
-| PrimitiveWetModel | 255 | 24 | 384 | default | 300 | 43 | 52.03 MB |
-| PrimitiveWetModel | 31 | 8 | 48 | matrix | 2400 | 4140 | 562.25 KB |
-| PrimitiveWetModel | 42 | 8 | 64 | matrix | 1800 | 2118 | 960.72 KB |
-| PrimitiveWetModel | 63 | 8 | 96 | matrix | 1200 | 1016 | 2.10 MB |
-| PrimitiveWetModel | 85 | 8 | 128 | matrix | 900 | 268 | 3.68 MB |
-| PrimitiveWetModel | 127 | 8 | 192 | matrix | 600 | 58 | 8.20 MB |
-| PrimitiveWetModel | 85 | 16 | 128 | matrix | 900 | 572 | 4.73 MB |
-| PrimitiveWetModel | 127 | 16 | 192 | matrix | 600 | 82 | 10.56 MB |
-| PrimitiveWetModel | 85 | 24 | 128 | matrix | 900 | 370 | 5.78 MB |
-| PrimitiveWetModel | 127 | 24 | 192 | matrix | 600 | 54 | 12.92 MB |
+| PrimitiveWetModel | 31 | 8 | 48 | default | 2400 | 2225 | 654.00 KB |
+| PrimitiveWetModel | 42 | 8 | 64 | default | 1800 | 1310 | 1.09 MB |
+| PrimitiveWetModel | 63 | 8 | 96 | default | 1200 | 562 | 2.31 MB |
+| PrimitiveWetModel | 85 | 8 | 128 | default | 900 | 320 | 4.00 MB |
+| PrimitiveWetModel | 127 | 8 | 192 | default | 600 | 130 | 8.78 MB |
+| PrimitiveWetModel | 170 | 8 | 256 | default | 450 | 64 | 15.43 MB |
+| PrimitiveWetModel | 255 | 8 | 384 | default | 300 | 21 | 34.33 MB |
+| PrimitiveWetModel | 85 | 16 | 128 | default | 900 | 627 | 5.05 MB |
+| PrimitiveWetModel | 127 | 16 | 192 | default | 600 | 304 | 11.14 MB |
+| PrimitiveWetModel | 170 | 16 | 256 | default | 450 | 129 | 19.63 MB |
+| PrimitiveWetModel | 255 | 16 | 384 | default | 300 | 37 | 43.77 MB |
+| PrimitiveWetModel | 85 | 24 | 128 | default | 900 | 686 | 6.10 MB |
+| PrimitiveWetModel | 127 | 24 | 192 | default | 600 | 288 | 13.50 MB |
+| PrimitiveWetModel | 170 | 24 | 256 | default | 450 | 136 | 23.82 MB |
+| PrimitiveWetModel | 255 | 24 | 384 | default | 300 | 36 | 53.21 MB |
+| PrimitiveWetModel | 31 | 8 | 48 | matrix | 2400 | 4150 | 581.36 KB |
+| PrimitiveWetModel | 42 | 8 | 64 | matrix | 1800 | 2290 | 994.16 KB |
+| PrimitiveWetModel | 63 | 8 | 96 | matrix | 1200 | 941 | 2.17 MB |
+| PrimitiveWetModel | 85 | 8 | 128 | matrix | 900 | 254 | 3.81 MB |
+| PrimitiveWetModel | 127 | 8 | 192 | matrix | 600 | 52 | 8.50 MB |
+| PrimitiveWetModel | 85 | 16 | 128 | matrix | 900 | 398 | 4.86 MB |
+| PrimitiveWetModel | 127 | 16 | 192 | matrix | 600 | 75 | 10.86 MB |
+| PrimitiveWetModel | 85 | 24 | 128 | matrix | 900 | 370 | 5.91 MB |
+| PrimitiveWetModel | 127 | 24 | 192 | matrix | 600 | 52 | 13.22 MB |
 
 ### Primitive Equation, Float32 vs Float64
 
 | Model | NF | T | L | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | Float32 | 31 | 8 | 2400 | 2006 | 634.88 KB |
-| PrimitiveWetModel | Float64 | 31 | 8 | 2400 | 2151 | 635.49 KB |
+| PrimitiveWetModel | Float32 | 31 | 8 | 2400 | 2181 | 654.00 KB |
+| PrimitiveWetModel | Float64 | 31 | 8 | 2400 | 1920 | 654.61 KB |
 
 ### Grids
 
 | Model | T | L | Grid | Rings | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 63 | 8 | FullGaussianGrid | 96 | 1200 | 615 | 2.33 MB |
-| PrimitiveWetModel | 63 | 8 | FullClenshawGrid | 95 | 1200 | 666 | 2.31 MB |
-| PrimitiveWetModel | 63 | 8 | OctahedralGaussianGrid | 96 | 1200 | 618 | 2.24 MB |
-| PrimitiveWetModel | 63 | 8 | OctahedralClenshawGrid | 95 | 1200 | 625 | 2.22 MB |
-| PrimitiveWetModel | 63 | 8 | HEALPixGrid | 95 | 1200 | 668 | 2.17 MB |
-| PrimitiveWetModel | 63 | 8 | OctaHEALPixGrid | 95 | 1200 | 657 | 2.20 MB |
+| PrimitiveWetModel | 63 | 8 | FullGaussianGrid | 96 | 1200 | 580 | 2.40 MB |
+| PrimitiveWetModel | 63 | 8 | FullClenshawGrid | 95 | 1200 | 574 | 2.38 MB |
+| PrimitiveWetModel | 63 | 8 | OctahedralGaussianGrid | 96 | 1200 | 577 | 2.31 MB |
+| PrimitiveWetModel | 63 | 8 | OctahedralClenshawGrid | 95 | 1200 | 538 | 2.29 MB |
+| PrimitiveWetModel | 63 | 8 | HEALPixGrid | 95 | 1200 | 619 | 2.24 MB |
+| PrimitiveWetModel | 63 | 8 | OctaHEALPixGrid | 95 | 1200 | 583 | 2.27 MB |
 
 ### Number of vertical layers
 
 | Model | T | L | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 31 | 4 | 2400 | 2283 | 561.15 KB |
-| PrimitiveWetModel | 31 | 8 | 2400 | 2279 | 634.88 KB |
-| PrimitiveWetModel | 31 | 12 | 2400 | 2285 | 708.61 KB |
-| PrimitiveWetModel | 31 | 16 | 2400 | 2257 | 782.33 KB |
+| PrimitiveWetModel | 31 | 4 | 2400 | 2189 | 580.27 KB |
+| PrimitiveWetModel | 31 | 8 | 2400 | 2173 | 654.00 KB |
+| PrimitiveWetModel | 31 | 12 | 2400 | 2113 | 727.73 KB |
+| PrimitiveWetModel | 31 | 16 | 2400 | 2227 | 801.45 KB |
 
 ### PrimitiveDryModel: Physics or dynamics only
 
 | Model | T | L | Dynamics | Physics | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveDryModel | 31 | 8 | true | true | 2400 | 285 | 629.74 KB |
-| PrimitiveDryModel | 31 | 8 | true | false | 2400 | 292 | 629.74 KB |
-| PrimitiveDryModel | 31 | 8 | false | true | 2400 | 314 | 629.74 KB |
+| PrimitiveDryModel | 31 | 8 | true | true | 2400 | 291 | 648.86 KB |
+| PrimitiveDryModel | 31 | 8 | true | false | 2400 | 296 | 648.86 KB |
+| PrimitiveDryModel | 31 | 8 | false | true | 2400 | 332 | 648.86 KB |
 
 ### PrimitiveWetModel: Physics or dynamics only
 
 | Model | T | L | Dynamics | Physics | Δt | SYPD | Memory|
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PrimitiveWetModel | 31 | 8 | true | true | 2400 | 2261 | 634.88 KB |
-| PrimitiveWetModel | 31 | 8 | true | false | 2400 | 2597 | 634.88 KB |
-| PrimitiveWetModel | 31 | 8 | false | true | 2400 | 7845 | 634.88 KB |
+| PrimitiveWetModel | 31 | 8 | true | true | 2400 | 2304 | 654.00 KB |
+| PrimitiveWetModel | 31 | 8 | true | false | 2400 | 2505 | 654.00 KB |
+| PrimitiveWetModel | 31 | 8 | false | true | 2400 | 6314 | 654.00 KB |
 
 ### Individual dynamics functions
 
@@ -492,14 +493,14 @@ Toolchain:
 
 | Function | Time | Memory | Allocations |
 | --- | --- | --- | --- |
-| pressure_gradient_flux! | 1.419 ms| 187.58 KiB| 6336 |
-| linear_virtual_temperature! | 13.280 μs| 2.77 KiB| 52 |
-| geopotential! | 21.820 μs| 4.09 KiB| 108 |
-| vertical_integration! | 32.330 μs| 8.83 KiB| 163 |
+| pressure_gradient_flux! | 1.398 ms| 182.48 KiB| 6127 |
+| linear_virtual_temperature! | 13.590 μs| 2.77 KiB| 52 |
+| geopotential! | 20.020 μs| 3.73 KiB| 101 |
+| vertical_integration! | 29.220 μs| 7.17 KiB| 141 |
 | surface_pressure_tendency! | N/A| N/A| N/A |
-| vertical_velocity! | 26.720 μs| 8.45 KiB| 191 |
-| linear_pressure_gradient! | 13.090 μs| 2.34 KiB| 50 |
-| vertical_advection! | 32.170 μs| 10.72 KiB| 170 |
+| vertical_velocity! | 25.940 μs| 8.45 KiB| 191 |
+| linear_pressure_gradient! | 13.390 μs| 2.34 KiB| 50 |
+| vertical_advection! | 25.660 μs| 9.09 KiB| 142 |
 | vordiv_tendencies! | N/A| N/A| N/A |
 | temperature_tendency! | N/A| N/A| N/A |
 | humidity_tendency! | N/A| N/A| N/A |
