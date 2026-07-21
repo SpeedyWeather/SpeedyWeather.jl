@@ -75,7 +75,7 @@ default_nlayers(models) = [default_nlayers(model) for model in models]
 # publication-ready runs with more robust timings; applied after the clamp so it
 # lengthens even the floored/ceilinged configs.
 n_timesteps(trunc, nlayers, multiplier = 1) =
-    round(Int, multiplier * clamp(round(Int, 4.0e9 / trunc^3 / nlayers^2), 50, 600))
+    round(Int, multiplier * clamp(round(Int, 4.0e9 / trunc^3 / nlayers^2), 50, 1200))
 
 function run_benchmark_suite!(suite::BenchmarkSuite)
     for i in 1:suite.nruns
@@ -123,11 +123,15 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         run!(simulation; period = warmup_period)
         synchronize(architecture)
 
+        # Time the run with a real wallclock timer rather than the progress
+        # meter's `tlast - tinit`. The latter measures only up to the *last*
+        # progress-bar render (every `feedback_dt = 0.1 s`)
         simulation = initialize!(model)
+        t0 = time()
         run!(simulation; period)
         synchronize(architecture)
+        time_elapsed = time() - t0
 
-        time_elapsed = model.feedback.progress_meter.tlast - model.feedback.progress_meter.tinit
         sypd = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
 
         suite.Δt[i] = model.time_stepping.Δt
