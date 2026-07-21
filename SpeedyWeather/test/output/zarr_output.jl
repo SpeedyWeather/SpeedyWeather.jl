@@ -289,13 +289,13 @@ end
         @test joinpath(model.output.run_path, model.output.filename) == store_path
     end
 
-    # side files: members run as parallel processes but share one run folder, so the
-    # creator keeps the default filenames and writer members get a _member suffix
+    # side files: members run as parallel processes but share one run folder, so every
+    # member — including the creator (member 1) — gets a _member suffix so they don't
+    # clobber each other and share one consistent naming scheme
     run_path = dirname(store_path)
     for filename in ("parameters", "progress", "restart")
         extension = filename == "restart" ? ".jld2" : ".txt"
-        @test isfile(joinpath(run_path, filename * extension))              # creator (member 1)
-        for member in 2:ensemble_size                                       # writer members
+        for member in 1:ensemble_size
             @test isfile(joinpath(run_path, filename * "_member$member" * extension))
         end
     end

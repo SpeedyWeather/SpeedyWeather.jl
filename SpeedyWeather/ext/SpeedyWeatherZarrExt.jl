@@ -101,8 +101,9 @@ one store; member 1 (the *creator*) builds the store schema, coordinates and the
 `time` axis, then drops a readiness marker; members `2..ensemble_size` (the *writers*) wait
 for that marker, open the existing store and write only their own ensemble slice.
 Writer members never create Zarr arrays or coordinates (concurrent metadata writes from
-parallel processes would corrupt the store) and write their side files (parameters txt,
-progress txt, restart file) under member-specific filenames. When rerunning an ensemble
+parallel processes would corrupt the store). Every member (creator included) writes its
+side files (parameters txt, progress txt, restart file) under member-specific filenames
+(`_member\$index` suffix) so they don't clobber each other. When rerunning an ensemble
 into the same run folder with `overwrite=true`, start the creator before (or together
 with) the writers: a writer launched against a leftover store from a previous run cannot
 distinguish its readiness marker from the current run's."""
@@ -135,9 +136,10 @@ function initialize!(
     if ensemble
         setup_ensemble_run_folder!(output)
         # all members share one run folder but run as independent parallel processes:
-        # give the side-file callbacks (parameters/progress txt, restart file) of writer
-        # members unique filenames so they don't clobber each other's files
-        output.ensemble_index != 1 && set_ensemble_member_filenames!(model, output.ensemble_index)
+        # give the side-file callbacks (parameters/progress txt, restart file) of every
+        # member — including the creator (member 1) — unique filenames so they don't
+        # clobber each other's files and share one consistent naming scheme
+        set_ensemble_member_filenames!(model, output.ensemble_index)
     end
 
     # Total number of output snapshots: IC + one per `output_every_n_steps`.
@@ -289,11 +291,12 @@ ensemble_marker_path(output::ZarrOutput) = joinpath(output.run_path, ".zarr_ense
 
 """$(TYPEDSIGNATURES)
 Give the side-file callbacks added by the output initialization (parameters txt,
-progress txt, restart file) of an ensemble writer `member` unique filenames with a
+progress txt, restart file) of an ensemble `member` unique filenames with a
 `_member\$member` suffix, e.g. `progress_member2.txt`. All ensemble members share one
 run folder but run as independent parallel processes; with the default filenames every
 member would concurrently write the same `parameters.txt`, `progress.txt` and
-`restart.jld2`, garbling or corrupting them. The creator (member 1) keeps the defaults."""
+`restart.jld2`, garbling or corrupting them. Every member — including the creator
+(member 1) — gets the suffix so the whole ensemble shares one consistent naming scheme."""
 function set_ensemble_member_filenames!(model::AbstractModel, member::Integer)
     for key in (:parameters_txt, :progress_txt, :variables_restart_file)
         haskey(model.callbacks, key) || continue
