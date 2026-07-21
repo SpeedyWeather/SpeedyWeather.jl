@@ -70,3 +70,6 @@ settings.json
 
 # netCDF files shouldn't generally be excluded but using the particle tracker may create this
 particles.nc
+
+# scratch folder
+scratch/
