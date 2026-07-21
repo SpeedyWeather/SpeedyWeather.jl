@@ -217,10 +217,32 @@ function add_results!(suite::AbstractBenchmarkSuiteTimed, trial::BenchmarkTools.
     return suite
 end
 
+# Individual dynamics functions that are not GPU-compatible: each performs a
+# per-variable grid→spectral `transform!` on a non-contiguous view (a layer slot of
+# the fused tendency buffer). `reinterpret` of such a strided view is not GPU-safe,
+# so cuFFT falls back to a CPU path (StackOverflowError) and the Legendre kernel
+# fails to compile (InvalidIRError). The full model avoids this by transforming the
+# contiguous fused parent in one batched call, so these are only exercised in
+# isolation here. Skip them on GPU rather than triggering the (slow) failures.
+const GPU_INCOMPATIBLE_FUNCTIONS = Set([
+    "surface_pressure_tendency!",
+    "vordiv_tendencies!",
+    "temperature_tendency!",
+    "humidity_tendency!",
+    "bernoulli_potential!",
+])
+
 # Run one @benchmark and store the result. On failure, record NaN/0 and warn
 # (used for individual function benchmarks that may not be GPU-compatible).
 function safe_benchmark!(f, suite::AbstractBenchmarkSuiteTimed, i_run::Integer, i_func::Integer)
     name = suite.function_names[i_func]
+    if suite.architecture isa SpeedyWeather.GPU && name in GPU_INCOMPATIBLE_FUNCTIONS
+        @info "Skipping $name on $(suite.architecture): not GPU-compatible in isolation; recording N/A"
+        suite.time[i_run][i_func] = NaN
+        suite.memory[i_run][i_func] = 0
+        suite.allocs[i_run][i_func] = 0
+        return suite
+    end
     try
         trial = f()
         add_results!(suite, trial, i_run, i_func)
