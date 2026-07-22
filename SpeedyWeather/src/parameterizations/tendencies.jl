@@ -64,26 +64,30 @@ end
 
 # CPU without kernel, just a loop, change loop order compared to GPU though:
 # outer loop over parameterizations, inner loop over horizontal grid points
-# this yields a more contiguous memory access pattern on CPU
-function column_parameterizations_cpu!(vars, model)
-    _column_parameterizations_cpu!(vars, get_parameterizations(model), model)
-    return nothing
-end
-
-# Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
-@generated function _column_parameterizations_cpu!(vars, parameterizations::NamedTuple{names}, model) where {names}
+# this yields a more contiguous memory access pattern on CPU.
+# Use @generated to unroll the parameterization iteration at compile time also on
+# CPU for performance; parameterization names are read off the model type and each
+# parameterization is accessed as model.$name directly (like get_parameterizations,
+# but without constructing the NamedTuple — materializing that mixed-activity
+# NamedTuple inside a non-inlined function breaks Enzyme's reverse-mode primal on
+# Julia 1.12, "Vararg length is negative" at a checkbounds splat; Enzyme ≤ 0.13.177.
+# The GPU path still builds the NamedTuple as kernels need it as an argument.)
+@generated function column_parameterizations_cpu!(vars, model::ModelType) where {ModelType <: PrimitiveEquation}
+    params_type = fieldtype(ModelType, :params)
+    param_names = params_type.parameters[1]         # extract tuple from Val{tuple}
     # runic: off
     calls = [
         quote
             for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
-                parameterization!(ij, vars, parameterizations.$name, model)
+                parameterization!(ij, vars, model.$name, model)
             end
-        end for name in names                       # parameterizations outer loop
+        end for name in param_names                 # parameterizations outer loop
     ]
     # runic: on
     return quote
         Base.@_propagate_inbounds_meta
         $(Expr(:block, calls...))
+        return nothing
     end
 end
 

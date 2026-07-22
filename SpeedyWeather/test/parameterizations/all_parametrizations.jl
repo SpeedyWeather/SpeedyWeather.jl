@@ -11,7 +11,7 @@
         vars, model = SpeedyWeather.unpack(simulation)
 
         # call parameterization without @inbounds to check for boundserrors
-        SpeedyWeather._column_parameterizations_cpu!(vars, SpeedyWeather.get_parameterizations(model), model)
+        SpeedyWeather.column_parameterizations_cpu!(vars, model)
 
         for key in keys(vars.parameterizations)
             if key != :land && key != :ocean
