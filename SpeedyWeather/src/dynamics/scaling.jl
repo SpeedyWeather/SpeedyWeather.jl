@@ -17,43 +17,75 @@ function scale_tendencies!(vars::Variables, model::AbstractModel)
     (; tendencies) = vars
     TS = model.time_stepping
 
-    # spectral
-    for varname in tendency_names(vars)
-        var = get_tendency_step(getfield(tendencies, varname), TS, DummyParameterization())
-        scale!(var, scale)
-    end
+    # Scale each fused tendency parent exactly ONCE, then the standalone tendencies below.
+    # Fused tendencies (e.g. the grid u/v/temperature/humidity/pressure tendencies) are
+    # `SubArray` views into a shared fused parent buffer. Scaling them per-view would issue
+    # several in-place broadcasts into the same buffer, which Reactant mis-handles within a
+    # single compiled trace: multiple in-place updates to distinct views of one buffer corrupt
+    # the data (this broke the reactant correctness tests). Scaling the whole parent once (a
+    # single broadcast) is equivalent — the scale factor is uniform across members — and
+    # Reactant-safe. Non-tendency intermediates that share these parents (uT_anomaly, uq,
+    # kinetic_energy, the spectral u/v tendencies, …) are overwritten later in
+    # `grid_tendencies!`/`spectral_tendencies!` before being read, so scaling them is harmless.
+    haskey(vars.fused, :spectral_tendencies) &&
+        scale!(get_tendency_step(parent(vars.fused.spectral_tendencies), TS, DummyParameterization()), scale)
+    haskey(vars.fused, :grid_tendencies) &&
+        scale!(get_tendency_step(parent(vars.fused.grid_tendencies), TS, DummyParameterization()), scale)
 
-    # grid
-    for varname in tendency_and_uv_names(vars)
-        var = get_tendency_step(getfield(tendencies.grid, varname), TS, DummyParameterization())
-        scale!(var, scale)
-    end
-
-    # tracers
-    for varname in tracer_tendency_names(vars)
-        var = get_tendency_step(getfield(tendencies.grid_tracers, varname), TS, DummyParameterization())
-        scale!(var, scale)
-    end
+    # Scale the standalone (non-fused) tendencies individually — unrolled per name
+    _scale_tendencies_unrolled!(vars, TS, scale)
     return nothing
+end
+
+# scale one standalone tendency; the fused-view members are skipped (their fuse parent is
+# scaled contiguously above). With a concrete `var` the `is_view_entry` check constant-folds.
+@inline function _scale_one_tendency!(var, TS, scale)
+    is_view_entry(var) || scale!(get_tendency_step(var, TS, DummyParameterization()), scale)
+    return nothing
+end
+
+@generated function _scale_tendencies_unrolled!(vars::Variables{Po, G, T}, TS, scale) where {Po, G, T}
+    calls = Expr[]
+    for name in _tendency_names(T)                  # spectral
+        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies, $(QuoteNode(name))), TS, scale)))
+    end
+    for name in _tendency_and_uv_names(T)           # grid (+ u, v)
+        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies.grid, $(QuoteNode(name))), TS, scale)))
+    end
+    for name in _namespace_names(T, :tracers)       # grid tracers
+        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies.grid_tracers, $(QuoteNode(name))), TS, scale)))
+    end
+    return Expr(:block, calls..., :(return nothing))
 end
 
 function unscale_tendencies!(vars::Variables)
     scale = vars.prognostic.scale[]
     (; tendencies) = vars
 
+    # Mirror `scale_tendencies!`: unscale each fused tendency parent once, then the standalone
+    # tendencies individually (skipping fused members, which are views into the parents). This
+    # avoids multiple in-place broadcasts into a shared buffer, which Reactant mis-handles in a
+    # single compiled trace — see [`scale_tendencies!`](@ref) for details.
+    inv_scale = inv(scale)
+    haskey(vars.fused, :spectral_tendencies) && (parent(vars.fused.spectral_tendencies).data .*= inv_scale)
+    haskey(vars.fused, :grid_tendencies) && (parent(vars.fused.grid_tendencies).data .*= inv_scale)
+
     # spectral
     for varname in tendency_names(vars)
-        unscale!(getfield(tendencies, varname), scale)
+        var = getfield(tendencies, varname)
+        is_view_entry(var) || unscale!(var, scale)
     end
 
     # grid
     for varname in tendency_and_uv_names(vars)
-        unscale!(getfield(tendencies.grid, varname), scale)
+        var = getfield(tendencies.grid, varname)
+        is_view_entry(var) || unscale!(var, scale)
     end
 
     # tracers
     for varname in tracer_tendency_names(vars)
-        unscale!(getfield(tendencies.grid_tracers, varname), scale)
+        var = getfield(tendencies.grid_tracers, varname)
+        is_view_entry(var) || unscale!(var, scale)
     end
     return nothing
 end

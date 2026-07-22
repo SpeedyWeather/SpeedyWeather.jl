@@ -74,18 +74,18 @@ variables(::SurfaceOceanHumidityFlux) = (
     )
 
     surface = model.geometry.nlayers
-    SST = vars.prognostic.ocean.sea_surface_temperature[ij]
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, humidity_flux)
 
     # SATURATION HUMIDITY OVER OCEAN
     pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
-    sat_humid_ocean = saturation_humidity(SST, pₛ, model.atmosphere)
+    sat_humid_ocean = saturation_humidity(SST[ij], pₛ, model.atmosphere)
 
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]
     surface_humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, humidity_flux)[ij, surface]
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
-        vars.prognostic.ocean.sea_ice_concentration[ij] : zero(SST)
+        vars.prognostic.ocean.sea_ice_concentration[ij] : zero(SST[ij])
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
@@ -93,7 +93,7 @@ variables(::SurfaceOceanHumidityFlux) = (
 
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
     # but remove the max( ,0) to allow for surface condensation
-    flux_ocean = ifelse(isfinite(SST), ρ * drag_ocean * V₀ * (sat_humid_ocean - surface_humid), zero(SST))
+    flux_ocean = ρ * drag_ocean * V₀ * (sat_humid_ocean - surface_humid)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     flux_ocean /= 1 + sea_ice_concentration / humidity_flux.sea_ice_insulation

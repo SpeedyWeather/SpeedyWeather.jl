@@ -64,11 +64,20 @@ struct SpectralGrid{
     "[DERIVED] Type of spectral variable in 2D (horizontal only, flattened into 1D vector)"
     SpectralVariable2D::Type{<:AbstractArray}
 
-    "[DERIVED] Type of spectral variable in 3D (horizontal only + e.g vertical, flattened into 2D matrix)"
+    "[DERIVED] Type of spectral variable in 3D (horizontal + unspecified, flattened into 2D matrix)"
     SpectralVariable3D::Type{<:AbstractArray}
 
-    "[DERIVED] Type of spectral variable in 4D (horizontal only + e.g. vertical and time, flattened into 3D array)"
+    "[DERIVED] Type of spectral variable in 3D (horizontal + vertical, flattened into 2D matrix)"
+    SpectralVariableXYZ::Type{<:AbstractArray}
+
+    "[DERIVED] Type of spectral variable in 3D (horizontal + time, flattened into 2D matrix)"
+    SpectralVariableXYT::Type{<:AbstractArray}
+
+    "[DERIVED] Type of spectral variable in 4D (horizontal + 2 unspecified, flattened into 3D array)"
     SpectralVariable4D::Type{<:AbstractArray}
+
+    "[DERIVED] Type of spectral variable in 4D (horizontal + vertical + time, flattened into 3D array)"
+    SpectralVariableXYZT::Type{<:AbstractArray}
 
     # SIZE OF GRID from trunc, Grid, dealiasing:
     "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
@@ -92,11 +101,20 @@ struct SpectralGrid{
     "[DERIVED] Type of grid variable in 2D (horizontal only, flattened into 1D vector)"
     GridVariable2D::Type{<:AbstractArray}
 
-    "[DERIVED] Type of grid variable in 3D (horizontal + e.g. vertical, flattened into 2D matrix)"
+    "[DERIVED] Type of grid variable in 3D (horizontal + unspecified, flattened into 2D matrix)"
     GridVariable3D::Type{<:AbstractArray}
 
-    "[DERIVED] Type of grid variable in 4D (horizontal + e.g. vertical + time, flattened into 3D array)"
+    "[DERIVED] Type of grid variable in 3D (horizontal + vertical, flattened into 2D matrix)"
+    GridVariableXYZ::Type{<:AbstractArray}
+
+    "[DERIVED] Type of grid variable in 3D (horizontal + time, flattened into 2D matrix)"
+    GridVariableXYT::Type{<:AbstractArray}
+
+    "[DERIVED] Type of grid variable in 4D (horizontal + 2 unspecified, flattened into 3D array)"
     GridVariable4D::Type{<:AbstractArray}
+    
+    "[DERIVED] Type of grid variable in 4D (horizontal + vertical + time, flattened into 3D array)"
+    GridVariableXYZT::Type{<:AbstractArray}
 
     # PARTICLES
     "[DERIVED] ArrayType of particle vector"
@@ -222,14 +240,20 @@ function SpectralGrid(
     TensorIntType = array_type(architecture, Int, 3)
 
     # Spectral variable types
-    SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, array_type(architecture, Complex{NF}, 1), typeof(spectrum)}
-    SpectralVariable3D = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum)}
-    SpectralVariable4D = LowerTriangularArray{Complex{NF}, 3, array_type(architecture, Complex{NF}, 3), typeof(spectrum)}
+    SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, array_type(architecture, Complex{NF}, 1), typeof(spectrum), ArrayDimensions.LM}
+    SpectralVariable3D = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum), ArrayDimensions.LM}
+    SpectralVariableXYZ = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum), ArrayDimensions.LMZ}
+    SpectralVariableXYT = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum), ArrayDimensions.LMT}
+    SpectralVariable4D = LowerTriangularArray{Complex{NF}, 3, array_type(architecture, Complex{NF}, 3), typeof(spectrum), ArrayDimensions.LM}
+    SpectralVariableXYZT = LowerTriangularArray{Complex{NF}, 3, array_type(architecture, Complex{NF}, 3), typeof(spectrum), ArrayDimensions.LMZT}
 
     # Grid variable types
-    GridVariable2D = Field{NF, 1, array_type(architecture, NF, 1), typeof(grid)}
-    GridVariable3D = Field{NF, 2, array_type(architecture, NF, 2), typeof(grid)}
-    GridVariable4D = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid)}
+    GridVariable2D = Field{NF, 1, array_type(architecture, NF, 1), typeof(grid), ArrayDimensions.XY}
+    GridVariable3D = Field{NF, 2, array_type(architecture, NF, 2), typeof(grid), ArrayDimensions.XY}
+    GridVariableXYZ = Field{NF, 2, array_type(architecture, NF, 2), typeof(grid), ArrayDimensions.XYZ}
+    GridVariableXYT = Field{NF, 2, array_type(architecture, NF, 2), typeof(grid), ArrayDimensions.XYT}
+    GridVariable4D = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid), ArrayDimensions.XY}
+    GridVariableXYZT = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid), ArrayDimensions.XYZT}
 
     # Particle vector type
     # TODO: For Reactant we need something else in the long run
@@ -255,7 +279,10 @@ function SpectralGrid(
         spectrum,
         SpectralVariable2D,
         SpectralVariable3D,
+        SpectralVariableXYZ,
+        SpectralVariableXYT,
         SpectralVariable4D,
+        SpectralVariableXYZT,
         dealiasing_f32,
         nlat_half,
         nlat,
@@ -264,7 +291,10 @@ function SpectralGrid(
         nonparametric_type(grid),
         GridVariable2D,
         GridVariable3D,
+        GridVariableXYZ,
+        GridVariableXYT,
         GridVariable4D,
+        GridVariableXYZT,
         ParticleVectorType,
         nlayers,
         transform_batch,
@@ -300,11 +330,14 @@ Default `transform_batch` for a `SpectralGrid`. Architecture-dependent because:
 
 - On GPU, batched plans are essential, default:
   `[1, nlayers, 2*nlayers, 4*nlayers + 1]` — covers single-layer (`1`), one variable (`L`),
-  U/V together (`2L`), and the prognostic mega-batch (`4L + 1`).
+  U/V together (`2L`), and the prognostic batch (`4L + 1`),  6L+1 and 9L+1 (tendency batch)
 """
 default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_transform_batch(typeof(arch), nlayers)
 default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]
-default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) = Int[1, nlayers, 2 * nlayers, 4 * nlayers + 1]
+
+# TODO: planning both 6L+1 and 9L+1 is slightly wasteful (we only need one of them for wet and dry model respectively)
+default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) =
+    Int[1, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, 9 * nlayers + 1]
 
 function variables(::SpeedyTransforms.AbstractSpectralTransform)
     return (

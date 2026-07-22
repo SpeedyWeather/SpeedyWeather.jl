@@ -77,10 +77,13 @@ meridional_gradient_factors(spectrum::Spectrum) = meridional_gradient_factors(DE
 
 # zonal gradient used to get from u, v/coslat to vorticity and divergence
 function zonal_gradient_factors(
+        ::Type{NF},
         spectrum::Spectrum,
-    )
+    ) where {NF}
     spectrum_cpu = on_architecture(CPU(), spectrum)         # always construct on CPU
-    grad_x_vordiv = zeros(Int, spectrum_cpu)                # allocate as int, can be converted later
+    # store in NF (not Int): the kernel multiplies this straight into a Complex{NF} field, so a float
+    # array avoids an Int→NF convert and (on GPU) a wider Int64 load per element
+    grad_x_vordiv = zeros(NF, spectrum_cpu)
     for (m, degrees) in enumerate(orders(spectrum_cpu))     # 1-based degree l, order m
         for l in degrees
             grad_x_vordiv[l, m] = m - 1                     # just the 0-based order (=zonal wavenumber), omit imaginary unit
@@ -162,7 +165,7 @@ Precompute all gradient-related arrays for spherical harmonics defined by `spect
 function gradient_arrays(::Type{NF}, spectrum::Spectrum) where {NF}
 
     grad_y1, grad_y2, grad_y_vordiv1, grad_y_vordiv2 = meridional_gradient_factors(NF, spectrum)
-    grad_x_vordiv = zonal_gradient_factors(spectrum)
+    grad_x_vordiv = zonal_gradient_factors(NF, spectrum)
 
     # VORTICITY, DIVERGENCE TO U, V includes some precomputed "integration" factors
     vordiv_to_uv1, vordiv_to_uv2 = meridional_integration_factors(NF, spectrum)

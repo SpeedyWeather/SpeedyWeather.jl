@@ -1,6 +1,7 @@
 module SpeedyTransformsCUDAExt
 
-import CUDA: CUDA, CUFFT, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
+import CUDA: CUDA, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
+using cuFFT
 import AbstractFFTs
 import LinearAlgebra
 import LinearAlgebra: mul!
@@ -86,11 +87,21 @@ end
 end
 
 # packed real buffer  ->  grid field ring rows  (inverse scatter)
-@kernel inbounds = true function scatter_real_kernel!(dst, packed, real_offset, nlons, istart)
+# `add` selects overwrite (`=`, the plain transform) vs accumulate (`+=`, used by the Enzyme adjoint
+# rules). It is a plain `Bool` kernel argument rather than a type parameter: the branch is uniform
+# across all threads (no divergence) and graphs are captured per `add` mode anyway (see
+# `inverse_execs`), so a second specialisation would buy nothing.
+@kernel inbounds = true function scatter_real_kernel!(dst, packed, real_offset, nlons, istart, add)
     i, j, k = @index(Global, NTuple)
     nlon = nlons[j]
     if i <= nlon
-        dst[istart[j] + i - 1, k] = packed[real_offset[j] + (k - 1) * nlon + i]
+        i_dst = istart[j] + i - 1
+        val = packed[real_offset[j] + (k - 1) * nlon + i]
+        if add
+            dst[i_dst, k] += val
+        else
+            dst[i_dst, k] = val
+        end
     end
 end
 
@@ -105,13 +116,13 @@ work buffers, the per-ring reshaped views and FFT plans used by the transforms, 
 gather/scatter index metadata, and the instantiated CUDA graphs (one per distinct `field`
 buffer and direction). A graph value of `nothing` marks a buffer for which capture failed
 (fall back to direct loop)."""
-struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
+struct GPUFourierGraphCache{PR, PC, RV, CV, RFP, BFP, IV, A}
     packed_real::PR             # CuVector{NF}          — all rings' dense real blocks
     packed_complex::PC          # CuVector{Complex{NF}} — all rings' dense complex blocks
     real_view::RV               # Vector of per-ring reshaped (nlon_j × nlayers) views into packed_real
     complex_view::CV            # Vector of per-ring reshaped (nfreq_j × nlayers) views into packed_complex
-    rfft_plans::Vector{AbstractFFTs.Plan}   # forward FFT plans for THIS size (nlayers batches), per ring
-    brfft_plans::Vector{AbstractFFTs.Plan}  # inverse FFT plans for THIS size, per ring
+    rfft_plans::RFP             # forward FFT plans for THIS size (nlayers batches), per ring
+    brfft_plans::BFP            # inverse FFT plans for THIS size, per ring
     real_offset::IV             # 0-based real-block offset per ring
     complex_offset::IV          # 0-based complex-block offset per ring
     nlons::IV                   # longitudes per ring
@@ -126,8 +137,10 @@ struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
     has_equator::Bool           # whether the grid has a ring on the equator that needs special handling
     j_equator::Int              # latitude index of the equator ring (if any)
     arch::A                     # SpeedyWeather GPU architecture (for launch!)
-    forward_execs::Dict{UInt, Union{Nothing, CuGraphExec}} # forward graphs
-    inverse_execs::Dict{UInt, Union{Nothing, CuGraphExec}} # inverse graphs
+    forward_execs::Dict{UInt, Union{Nothing, CuGraphExec}} # forward graphs, keyed by field buffer
+    # inverse graphs, keyed by (field buffer, `add`): a captured graph bakes in whether the scatter
+    # overwrites or accumulates, so the two modes must never share a graph.
+    inverse_execs::Dict{Tuple{UInt, Bool}, Union{Nothing, CuGraphExec}}
 end
 
 # One cache per (SpectralTransform, transform size), keyed by the *forward FFT plan set*
@@ -142,7 +155,7 @@ const GRAPH_CACHES = IdDict{Any, GPUFourierGraphCache}()
 # assumes a single size; override this for an `S` that stores several plan sets (e.g. keyed
 # by layer count) and the rest — caches, packing, capture, replay — follows automatically.
 # gets called by `cache_key` when accessing the different caches and graphs
-fft_plans(S::SpectralTransform, nlayers::Integer) = (S.rfft_plans[nlayers], S.brfft_plans[nlayers])
+fft_plans(S::SpectralTransform, nlayers::Integer) = (S.rfft_plans_batched[nlayers], S.brfft_plans_batched[nlayers])
 
 # build/allocate the cache for a transform of `nlayers` layers
 function build_cache(S::SpectralTransform, nlayers::Integer)
@@ -182,7 +195,7 @@ function build_cache(S::SpectralTransform, nlayers::Integer)
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, j_equator,
         architecture(packed_real),
         Dict{UInt, Union{Nothing, CuGraphExec}}(),
-        Dict{UInt, Union{Nothing, CuGraphExec}}(),
+        Dict{Tuple{UInt, Bool}, Union{Nothing, CuGraphExec}}(),
     )
 end
 
@@ -244,8 +257,10 @@ end
 """$(TYPEDSIGNATURES)
 Allocation-free, fused inverse (spectral → grid) batched Fourier loop: one gather kernel
 packs all rings from the scratch, per-ring in-place inverse cuFFTs run on reshaped views,
-one scatter kernel writes the grid field. Suitable for CUDA-graph capture."""
-function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_north, g_south, S::SpectralTransform)
+one scatter kernel writes the grid field. `add` accumulates onto `field` instead of overwriting it
+(Enzyme adjoint rule); it is baked into the captured graph, hence the per-`add` graph cache key.
+Suitable for CUDA-graph capture."""
+function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_north, g_south, S::SpectralTransform, add::Bool = false)
     (; arch) = cache
     (; nlat_half, nlayers) = cache
     (; nlon_max, nfreq_max, nlons, nlons_s, nfreqs, j_equator) = cache
@@ -260,7 +275,7 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     @inbounds for j in 1:nlat_half
         mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
-    launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons, istart_n)
+    launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons, istart_n, add)
 
     # southern rings (the equator ring, if any, is skipped: north already wrote those rows)
     launch!(arch, ArrayWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_south, complex_offset, nfreqs)
@@ -268,7 +283,7 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
         (cache.has_equator && j == j_equator) && continue
         mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
-    launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons_s, istart_s)
+    launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons_s, istart_s, add)
     return nothing
 end
 
@@ -316,12 +331,10 @@ function run_graph!(execs::AbstractDict, key, loop!::F) where {F}
         return nothing
     end
 
-    # save the graph 
+    # save the graph
     exec = instantiate(graph)
     execs[key] = exec
 
-    # run the graph
-    launch(exec)                             # produce the result via the graph
     return nothing
 end
 
@@ -374,16 +387,19 @@ function _fourier_batched!(
         field::AbstractField,
         g_north::CuArray{<:Complex, 3},
         g_south::CuArray{<:Complex, 3},
-        S::SpectralTransform,
+        S::SpectralTransform;
+        add::Bool = false,          # accumulate onto `field` instead of overwriting? (Enzyme adjoint rule)
     )
     if !S.cuda_graphs
         return Base.@invoke _fourier_batched!(
             field::AbstractField, g_north::AbstractArray{<:Complex, 3},
-            g_south::AbstractArray{<:Complex, 3}, S::SpectralTransform,
+            g_south::AbstractArray{<:Complex, 3}, S::SpectralTransform; add,
         )
     end
     cache = get_cache(S, size(field, 2))
-    run_graph!(cache.inverse_execs, graph_key(field.data), () -> inverse_loop!(cache, field, g_north, g_south, S))
+    # `add` is part of the graph key: a captured graph bakes in overwrite-vs-accumulate, so replaying
+    # the wrong one would silently produce incorrect results.
+    run_graph!(cache.inverse_execs, (graph_key(field.data), add), () -> inverse_loop!(cache, field, g_north, g_south, S, add))
     return nothing
 end
 

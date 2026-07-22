@@ -13,7 +13,7 @@ const ReactantGridGeometry = RingGrids.GridGeometry{<:AbstractGrid{<:ReactantDev
 # broadcasts (e.g. `field .*= scale`) get JIT-compiled instead of iterating scalar.
 # Must dispatch on `Type{F} where F <: AbstractField{...}` (not `Type{AbstractField{...}}`)
 # to match the concrete `Field{...}` type Julia sees at a broadcast site.
-Base.Broadcast.BroadcastStyle(::Type{F}) where {F <: AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType <: AnyReactantArray, Grid} = Base.Broadcast.BroadcastStyle(ArrayType)
+Base.Broadcast.BroadcastStyle(::Type{<:AbstractField{T, N, ArrayType, Grid}}) where {T, N, ArrayType <: AnyReactantArray, Grid} = Base.Broadcast.BroadcastStyle(ArrayType)
 
 # Unwrap Fields with Reactant-backed data to their underlying `.data` so that Reactant's
 # broadcast JIT compiler sees plain ConcretePJRTArrays it knows how to trace (instead of

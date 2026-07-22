@@ -108,16 +108,16 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     Tₜ = longwave.temp_tropopause
 
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    sst = vars.prognostic.ocean.sea_surface_temperature[ij]
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, longwave)
     lst = vars.prognostic.land.soil_temperature[ij, 1]  # TODO use skin temperature?
 
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
-    Fₖ_ocean = ifelse(isfinite(sst), ϵ_ocean * σ * sst^4, zero(sst))          # [W/m²]
+    Fₖ_ocean = ϵ_ocean * σ * sst[ij]^4                                  # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = Fₖ_ocean     # for ocean model forcing
 
-    Fₖ_land = ifelse(isfinite(lst), ϵ_land * σ * lst^4, zero(lst))            # [W/m²]
+    Fₖ_land = ϵ_land * σ * lst^4                                        # [W/m²]
     vars.parameterizations.land.surface_longwave_up[ij] = Fₖ_land       # for land model forcing
 
     Fₖ_down = ϵ * σ * T[ij, nlayers]^4
@@ -268,13 +268,13 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     cₚ = model.atmosphere.heat_capacity
 
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    sst = vars.prognostic.ocean.sea_surface_temperature[ij]
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, longwave)
     lst = vars.prognostic.land.soil_temperature[ij, 1]                  # TODO use skin temperature?
 
-    U_ocean = ifelse(isfinite(sst), ϵ_ocean * σ * sst^4, zero(sst))     # [W/m²]
+    U_ocean = ϵ_ocean * σ * sst[ij]^4                                   # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = U_ocean      # for ocean model forcing
 
-    U_land = ifelse(isfinite(lst), ϵ_land * σ * lst^4, zero(lst))       # [W/m²]
+    U_land = ϵ_land * σ * lst^4                                         # [W/m²]
     vars.parameterizations.land.surface_longwave_up[ij] = U_land        # for land model forcing
 
     # land-sea mask weighted combined flux from land and ocean (surface boundary condition)

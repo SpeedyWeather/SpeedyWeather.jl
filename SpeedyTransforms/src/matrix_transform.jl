@@ -182,7 +182,15 @@ function transform!(                        # GRID TO SPECTRAL
     @boundscheck ismatching(M, coeffs, horizontal_only = true) || throw(DimensionMismatch(M, coeffs))
     # TODO: deactivated temporarily because of Reactant issue
     #@boundscheck size(coeffs, 2) == size(field, 2) || throw(DimensionMismatch(field.data, coeffs.data))
-    @maybe_jit M.architecture LinearAlgebra.mul!(coeffs.data, M.forward, field.data)
+
+    # Collapse any batch/layer dimensions into columns so the single dense matrix multiply also
+    # works for n-dimensional (batched/fused) fields, not just 2D. This is not a batched matmul
+    # (one matrix `M.forward` × many columns), so one big `mul!` (→ `BLAS.gemm!`) is both correct
+    # and optimal. `reshape` on a contiguous array is zero-copy and a no-op for genuinely 2D input,
+    # so the 2D path is unaffected; the result is written in place through the shared memory.
+    coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), :)
+    field_matrix = reshape(field.data, size(field.data, 1), :)
+    @maybe_jit M.architecture LinearAlgebra.mul!(coeffs_matrix, M.forward, field_matrix)
     return coeffs
 end
 
@@ -203,14 +211,20 @@ function transform!(                        # SPECTRAL TO GRID
     @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
     @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
 
-    nlayers = size(coeffs, 2)
-    scratch = ndims(coeffs) == 1 ? view(scratch_memory, :, 1) : nlayers < size(scratch_memory, 2) ? view(scratch_memory, :, 1:nlayers) : scratch_memory
+    # Collapse any batch/layer dimensions into columns (see the grid→spectral transform above),
+    # so the dense matrix multiply also works for n-dimensional (batched/fused) coefficients.
+    # `scratch_memory` is sized (in spectral_grid.jl) to the largest batch a spectral→grid
+    # transform emits, so a column-view of the required width always fits.
+    ncolumns = length(coeffs.data) ÷ size(coeffs.data, 1)
+    coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), ncolumns)
+    field_matrix = reshape(field.data, size(field.data, 1), ncolumns)
+    scratch = view(scratch_memory, :, 1:ncolumns)
 
     # the result is real-valued, therefore we can split the complex multiplication
     # into two real-valued multiplications; both must run in a single @maybe_jit call
     # so that the accumulation (β=1) in the second mul! sees the result of the first
     # within the same compiled context (avoids Reactant first-call NaN)
-    @maybe_jit M.architecture _backward_mul!(field.data, coeffs.data, scratch, M.backward_real, M.backward_imag)
+    @maybe_jit M.architecture _backward_mul!(field_matrix, coeffs_matrix, scratch, M.backward_real, M.backward_imag)
 
     if unscale_coslat
         @maybe_jit M.architecture RingGrids._scale_lat!(field, M.coslat⁻¹)

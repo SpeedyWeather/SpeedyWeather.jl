@@ -10,31 +10,12 @@ Type for dispatching on kernel operations in spectral gradient calculations.
 """
 struct KernelOP{mode, flipsign, add} end
 
-# Curl operations (mode == true): a+b-c
-# Standard curl (no flipsign, no add)
-@inline (::KernelOP{true, false, false})(o, a, b, c) = a + b - c
-
-# Curl with flipsign (no add)
-@inline (::KernelOP{true, true, false})(o, a, b, c) = -(a + b - c)
-
-# Curl with add (no flipsign)
-@inline (::KernelOP{true, false, true})(o, a, b, c) = o + (a + b - c)
-
-# Curl with flipsign and add
-@inline (::KernelOP{true, true, true})(o, a, b, c) = o - (a + b - c)
-
-# Divergence operations (mode == false): a-b+c
-# Standard divergence (no flipsign, no add)
-@inline (::KernelOP{false, false, false})(o, a, b, c) = a - b + c
-
-# Divergence with flipsign (no add)
-@inline (::KernelOP{false, true, false})(o, a, b, c) = -(a - b + c)
-
-# Divergence with add (no flipsign)
-@inline (::KernelOP{false, false, true})(o, a, b, c) = o + (a - b + c)
-
-# Divergence with flipsign and add
-@inline (::KernelOP{false, true, true})(o, a, b, c) = o - (a - b + c)
+# `mode`, `flipsign` and `add` are type parameters, so the branches below are compile-time constants
+@inline function (::KernelOP{mode, flipsign, add})(o, a, b, c) where {mode, flipsign, add}
+    base = mode ? (a + b - c) : (a - b + c)     # curl : divergence
+    val = flipsign ? -base : base
+    return add ? o + val : val
+end
 
 
 """
@@ -56,8 +37,7 @@ function curl!(
         kwargs...,
     )
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
-    kernel = KernelOP{true, flipsign, add}()
-    return _divergence!(kernel, curl, v, u, S; kwargs...)      # flip u, v -> v, u
+    return _divergence!(Val(true), flipsign, add, curl, v, u, S; kwargs...)   # flip u, v -> v, u
 end
 
 """
@@ -78,8 +58,26 @@ function divergence!(
         kwargs...,
     )
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel = KernelOP{false, flipsign, add}()
-    return _divergence!(kernel, div, u, v, S; kwargs...)
+    return _divergence!(Val(false), flipsign, add, div, u, v, S; kwargs...)
+end
+
+# `KernelOP` encodes `flipsign`/`add` as type parameters (the functors above dispatch on them inside the
+# kernel), but `curl!`/`divergence!` receive them as *runtime* `Bool`s — so `KernelOP{mode, flipsign, add}()`
+# would widen to the abstract `KernelOP{mode}` and force `_divergence!` through a runtime dispatch.
+# Manually union-split on the two Bools so each `_divergence!` call sees a CONCRETE `KernelOP`.
+# `mode` is passed as `Val` (a literal at both call sites) so it const-folds.
+@inline function _divergence!(
+        ::Val{mode}, flipsign::Bool, add::Bool,
+        div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray,
+        S::AbstractSpectralTransform; kwargs...,
+    ) where {mode}
+    return if flipsign
+        add ? _divergence!(KernelOP{mode, true, true}(), div, u, v, S; kwargs...) :
+              _divergence!(KernelOP{mode, true, false}(), div, u, v, S; kwargs...)
+    else
+        add ? _divergence!(KernelOP{mode, false, true}(), div, u, v, S; kwargs...) :
+              _divergence!(KernelOP{mode, false, false}(), div, u, v, S; kwargs...)
+    end
 end
 
 function _divergence!(
@@ -94,7 +92,7 @@ function _divergence!(
 
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
 
-    launch!(architecture(div), SpectralWorkOrder, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2)
+    launch!(architecture(div), SpectralWorkOrder, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2, size(div, 1))
 
     # radius scaling if not unit sphere
     if radius != 1
@@ -104,11 +102,10 @@ function _divergence!(
     return div
 end
 
-@kernel inbounds = true function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2) where {mode, flipsign, add}
+@kernel inbounds = true function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2, lmmax) where {mode, flipsign, add}
 
     I = @index(Global, Cartesian)
     lm = I[1]
-    lmmax = size(div, 1)
     k = ndims(div) == 1 ? CartesianIndex() : I[2]
 
     if lm == 1
@@ -116,7 +113,11 @@ end
     elseif lm == lmmax
         div[I] = 0
     else
-        ∂u∂λ = im * grad_x_vordiv[lm] * u[I]
+        # ∂u/∂λ = i·m·u: multiply-by-imaginary is a 90° rotate + scale (2 real muls) rather than the
+        # generic 4-mul/2-add complex product the compiler emits for `im * m * u`.
+        z = u[I]
+        m = grad_x_vordiv[lm]
+        ∂u∂λ = Complex(-m * imag(z), m * real(z))
         ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm - 1, k]
         ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm + 1, k]
         div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
@@ -396,10 +397,7 @@ function ∇²!(
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.gradients.eigenvalues⁻¹ : S.gradients.eigenvalues
 
-    kernel = flipsign ? (add ? (o, a) -> (o - a) : (o, a) -> -a) :
-        (add ? (o, a) -> (o + a) : (o, a) -> a)
-
-    launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
+    launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, add, flipsign, alms.spectrum.l_indices)
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -410,14 +408,16 @@ function ∇²!(
     return ∇²alms
 end
 
-@kernel function ∇²_kernel!(∇²alms, alms, eigenvalues, kernel_func, l_indices)
+@kernel function ∇²_kernel!(∇²alms, alms, eigenvalues, add, flipsign, l_indices)
 
     I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
     # we use cartesian index instead of NTuple here
     # because this works for 2D and 3D matrices
     l = l_indices[I[1]]
 
-    ∇²alms[I] = kernel_func(∇²alms[I], alms[I] * eigenvalues[l])
+    a = alms[I] * eigenvalues[l]
+    a = flipsign ? -a : a
+    ∇²alms[I] = add ? ∇²alms[I] + a : a
 end
 
 """

@@ -24,7 +24,7 @@ using SpeedyWeatherInternals.KernelLaunching
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, AbstractCPU, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
 export CPU, GPU, on_architecture, architecture                # export device functions
-export SpeedyWeatherInternals, Architectures, KernelLaunching
+export SpeedyWeatherInternals, Architectures, KernelLaunching, ArrayDimensions
 
 # INPUT OUTPUT
 import TOML
@@ -112,10 +112,13 @@ import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 export animate, globe
 function animate end
 
+# constructors to be defined in Terrarium extension
+export TerrariumOutput
+
 # abstract types
 include("variables/abstract_types.jl")
 include("models/abstract_models.jl")
-include("parameterizations/parameterizations.jl")
+include("parameterizations/abstract_types.jl")
 include("time_stepping/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
@@ -147,6 +150,7 @@ include("dynamics/horizontal_diffusion.jl")
 include("dynamics/vertical_advection.jl")
 include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
+include("dynamics/tendencies_sequential.jl")
 include("dynamics/hole_filling.jl")
 include("dynamics/particle_advection.jl")
 include("dynamics/random_process.jl")
@@ -162,6 +166,7 @@ include("time_stepping/implicit/implicit_shallow_water.jl")
 include("time_stepping/implicit/implicit_primitive_equations.jl")
 
 # PARAMETERIZATIONS
+include("parameterizations/general.jl")
 include("parameterizations/albedo.jl")
 include("parameterizations/tendencies.jl")
 include("parameterizations/vertical_diffusion.jl")

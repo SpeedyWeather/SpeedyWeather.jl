@@ -47,7 +47,7 @@ end
 
 function variables(::SeasonalLandTemperature)
     return (
-        PrognosticVariable(:soil_temperature, Land3D(), namespace = :land),
+        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land),
     )
 end
 
@@ -151,7 +151,7 @@ timestep!(vars::Variables, land::ConstantLandTemperature, args...) = nothing
 
 function variables(::ConstantLandTemperature)
     return (
-        PrognosticVariable(:soil_temperature, Land3D(), namespace = :land),
+        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land),
     )
 end
 
@@ -174,7 +174,7 @@ LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothin
 
 function variables(::LandBucketTemperature)
     return (
-        PrognosticVariable(:soil_temperature, Land3D(), desc = "Soil temperature", units = "K", namespace = :land),
+        PrognosticVariable(:soil_temperature, LandXYZ(), desc = "Soil temperature", units = "K", namespace = :land),
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m²"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up", units = "W/m²", namespace = :land),
         ParameterizationVariable(:surface_longwave_down, Grid2D(), desc = "Surface longwave radiation down", units = "W/m²"),
@@ -238,7 +238,7 @@ function timestep!(
     M = haskey(vars.parameterizations.land, :snow_melt_rate) ? vars.parameterizations.land.snow_melt_rate : nothing
 
     @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, S, horizontal_only = true) ||
-        throw(DimensionMismatch(soil_temperature, Rs))
+        throw(DimensionMismatch(soil_temperature, Rsd))
     @boundscheck size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
 
     λ = thermodynamics.heat_conductivity_dry_soil

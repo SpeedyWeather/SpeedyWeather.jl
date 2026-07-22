@@ -10,7 +10,15 @@ using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-import SpeedyTransforms: _fourier!
+import SpeedyTransforms: _fourier!, wrapped_view
+
+# The spectral transform `S` is fixed geometry (Legendre polynomials, quadrature weights, FFT
+# plans) and is never a differentiation target. Marking it inactive stops Enzyme from building a
+# shadow of the large `SpectralTransform` aggregate when it is loaded out of a `Duplicated`
+# (mutable) model — the "cannot deduce type of copy" type-analysis failure on Julia >= 1.11 that
+# otherwise requires `Enzyme.API.maxtypeoffset!`. The transform! adjoint rules below read only
+# `S.val`, so treating `S` as a constant everywhere is consistent.
+EnzymeRules.inactive_type(::Type{<:SpectralTransform}) = true
 
 # Rules for SpeedyTransforms
 
@@ -20,8 +28,8 @@ import SpeedyTransforms: _fourier!
 function adjoint_scale(S::SpectralTransform)
     (; nlons) = S
     (; nlat_half) = S.grid
-    # The K=1 plan vector (always built) is sufficient to read each ring's nfreq.
-    rfft_plans_1D = S.rfft_plans[1]
+    # The serial (K=1) plan vector (always built) is sufficient to read each ring's nfreq.
+    rfft_plans_1D = S.rfft_plan_serial
     nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans_1D]
 
     scale = zeros(Int, maximum(nfreqs), 1, nlat_half) # the scratch memory is (Freq x lvl x lat), so we insert
@@ -124,6 +132,142 @@ function reverse(
     make_zero!(grids.dval)
 
     # the function has no return values, so we also return nothing here
+    return (nothing, nothing, nothing, nothing)
+end
+
+### Analytic-adjoint rules for the whole `transform!` (positional cores `_transform_grid!` /
+### `_transform_spec!`, which every `transform!` call routes through — chunked and batched alike).
+#
+# These rules make `transform!` a single AD boundary: the forward pass runs the primal transform
+# unchanged (chunked or batched, allocation-free); the reverse pass applies the analytic adjoint
+# of the (linear) spectral transform directly. This is preferred over letting Enzyme differentiate
+# the internals because:
+#  * differentiating the chunk loop is unsafe — Enzyme mis-constructs the per-iteration view
+#    shadows (degenerate (0, 1) shadow → OOB in the `_fourier!` reverse / GC corruption on Julia
+#    1.10) and reuses the last iteration's shadow for every chunk (silently zeroing all but the
+#    last chunk's gradient);
+#  * differentiating the batched path natively works but goes through `_legendre!` with an
+#    S-derived loop bound loaded from the (mutable) model — the type-analysis failure that needs
+#    `maxtypeoffset!` on Julia ≥ 1.11 — whereas an analytic rule sidesteps it and compiles cheaper;
+#  * nested `autodiff`/`autodiff_deferred` inside a rule is not an option (Enzyme compilation
+#    reentrancy → stack overflow).
+# Note the rules treat `S` as inactive (`Const`-like, only `.val` read): there is no gradient
+# w.r.t. the transform geometry itself (Legendre polynomials, quadrature weights). State AD and
+# parameter AD for physical parameters are unaffected (those do not flow through `S`)
+#
+# Adjoint derivation (transform is linear; see docs/src/spectral_transform.md and legendre.jl):
+#   synthesis (spec→grid) = inverse Legendre ∘ inverse FFT
+#   analysis  (grid→spec) = forward FFT ∘ forward Legendre (the latter carries the solid-angle
+#                           quadrature weight ΔΩ = sinθ Δθ Δϕ that the synthesis lacks).
+#   The FFT adjoint reuses `adjoint_scale` exactly as the `_fourier!` reverse rules do; the
+#   Legendre adjoint is the opposite-direction Legendre with the ΔΩ weight removed/added.
+# Both pullbacks are FD-validated in the unit tests with EnzymeTestUtils: rel err ~1e-6, batched and chunked.
+
+import SpeedyTransforms:
+    _transform_grid!, _transform_spec!, _largest_planned_batch, _legendre!
+
+# adjoint of spec→grid transform! w.r.t coeffs: field_bar → coeffs_bar (accumulates into coeffs_bar).
+# Allocation-free apart from the FFT plan outputs (inherent to the primal too): the freq-space
+# intermediates reuse the passed `scratch` (.north/.south/.column, which the forward pass no longer
+# needs by the time the reverse runs), and the forward Legendre accumulates straight into
+# coeffs_bar (`add=true`) instead of into a temporary spectral array.
+function spec2grid_pullback!(coeffs_bar, field_bar, scratch, S; unscale_coslat::Bool = false)
+    (; nlat_half) = S.grid
+    K = size(field_bar, 2)
+    K_batched = _largest_planned_batch(K, S)
+    scale = adjoint_scale(S)
+    dOmega = reshape(view(S.solid_angles, 1:nlat_half), 1, 1, :)
+    clat = reshape(view(S.coslat⁻¹, 1:nlat_half), 1, 1, :)
+    c = 1
+    while c <= K
+        c_end = min(c + K_batched - 1, K)
+        chunk = c:c_end
+        Kc = c_end - c + 1
+        dg_n = view(scratch.north, :, 1:Kc, :)                          # reuse scratch, no allocation
+        dg_s = view(scratch.south, :, 1:Kc, :)
+        _fourier!(dg_n, dg_s, wrapped_view(field_bar, :, chunk), S)      # adjoint of inverse FFT: fwd FFT
+        dg_n .*= scale                                                  # (also zeros stale padding rows: scale=0 there)
+        dg_s .*= scale
+        if unscale_coslat                                               # adjoint of the coslat unscaling
+            dg_n .*= clat
+            dg_s .*= clat
+        end
+        dg_n ./= dOmega                                                 # cancel the ΔΩ the fwd Legendre applies
+        dg_s ./= dOmega
+        # adjoint of inverse Legendre = fwd Legendre; accumulate onto the coeffs cotangent (add=true)
+        _legendre!(wrapped_view(coeffs_bar, :, chunk), dg_n, dg_s, scratch.column, S; add = true)
+        c = c_end + 1
+    end
+    return coeffs_bar
+end
+
+# adjoint of grid→spec transform! w.r.t field: coeffs_bar → field_bar (accumulates into field_bar).
+# Allocation-free apart from the FFT plan outputs: freq-space intermediates reuse `scratch`, and the
+# inverse FFT accumulates straight into field_bar (`add=true`) instead of into a temporary field.
+function grid2spec_pullback!(field_bar, coeffs_bar, scratch, S)
+    (; nlat_half) = S.grid
+    K = size(coeffs_bar, 2)
+    K_batched = _largest_planned_batch(K, S)
+    scale = adjoint_scale(S)
+    dOmega = reshape(view(S.solid_angles, 1:nlat_half), 1, 1, :)
+    c = 1
+    while c <= K
+        c_end = min(c + K_batched - 1, K)
+        chunk = c:c_end
+        Kc = c_end - c + 1
+        df_n = view(scratch.north, :, 1:Kc, :)                          # reuse scratch, no allocation
+        df_s = view(scratch.south, :, 1:Kc, :)
+        _legendre!(df_n, df_s, wrapped_view(coeffs_bar, :, chunk), scratch.column, S)   # adjoint of fwd Legendre: inv Legendre
+        df_n .*= dOmega                                                 # re-apply the ΔΩ weight
+        df_s .*= dOmega
+        df_n ./= scale                                                  # adjoint of fwd FFT: inv FFT of df/scale
+        df_s ./= scale
+        # accumulate onto the field cotangent (add=true) instead of into a temporary field
+        _fourier!(wrapped_view(field_bar, :, chunk), df_n, df_s, S; add = true)
+        c = c_end + 1
+    end
+    return field_bar
+end
+
+function augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_transform_grid!)}, ::Type{<:Annotation},
+        field::Duplicated, coeffs::Duplicated, scratch::Union{Const, Duplicated},
+        S::Union{Const, Duplicated, MixedDuplicated}, unscale_coslat::Const,
+    )
+    func.val(field.val, coeffs.val, scratch.val, S.val, unscale_coslat.val)
+    primal = needs_primal(config) ? field.val : nothing
+    shadow = needs_shadow(config) ? field.dval : nothing
+    return AugmentedReturn(primal, shadow, nothing)
+end
+
+function reverse(
+        ::EnzymeRules.RevConfigWidth{1}, ::Const{typeof(_transform_grid!)}, ::Type{<:Annotation}, tape,
+        field::Duplicated, coeffs::Duplicated, scratch::Union{Const, Duplicated},
+        S::Union{Const, Duplicated, MixedDuplicated}, unscale_coslat::Const,
+    )
+    spec2grid_pullback!(coeffs.dval, field.dval, scratch.val, S.val; unscale_coslat = unscale_coslat.val)
+    make_zero!(field.dval)      # the output cotangent has been propagated to coeffs
+    return (nothing, nothing, nothing, nothing, nothing)
+end
+
+function augmented_primal(
+        config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_transform_spec!)}, ::Type{<:Annotation},
+        coeffs::Duplicated, field::Duplicated, scratch::Union{Const, Duplicated},
+        S::Union{Const, Duplicated, MixedDuplicated},
+    )
+    func.val(coeffs.val, field.val, scratch.val, S.val)
+    primal = needs_primal(config) ? coeffs.val : nothing
+    shadow = needs_shadow(config) ? coeffs.dval : nothing
+    return AugmentedReturn(primal, shadow, nothing)
+end
+
+function reverse(
+        ::EnzymeRules.RevConfigWidth{1}, ::Const{typeof(_transform_spec!)}, ::Type{<:Annotation}, tape,
+        coeffs::Duplicated, field::Duplicated, scratch::Union{Const, Duplicated},
+        S::Union{Const, Duplicated, MixedDuplicated},
+    )
+    grid2spec_pullback!(field.dval, coeffs.dval, scratch.val, S.val)
+    make_zero!(coeffs.dval)     # the output cotangent has been propagated to field
     return (nothing, nothing, nothing, nothing)
 end
 

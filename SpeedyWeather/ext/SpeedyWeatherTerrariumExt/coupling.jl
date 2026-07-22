@@ -1,8 +1,3 @@
-module SpeedyWeatherTerrariumExt
-
-using SpeedyWeather
-using Terrarium
-using DocStringExtensions
 
 """
 $(TYPEDSIGNATURES)
@@ -71,6 +66,93 @@ only allocates columns where this mask is `true`, so every Terrarium state field
 has length `sum(mask)` (the number of land columns)."""
 @inline land_mask(land::AbstractTerrariumLandModel) = land.model.grid.mask.data
 
+"""$(TYPEDSIGNATURES)
+
+Boolean land mask (`Field{Bool}`) derived from a SpeedyWeather [`AbstractLandSeaMask`](@ref):
+`true` wherever the fractional `land_fraction` exceeds `threshold`. Pass the result to
+`Terrarium.ColumnRingGrid` so the Terrarium land columns are derived from the *same*
+land-sea mask object the atmospheric model uses, instead of a separately loaded copy. The
+default `threshold = 0` makes the Terrarium mask a superset of the SpeedyWeather land, which
+is required for consistent coupling (see [`check_mask_consistency`](@ref))."""
+land_mask(land_sea_mask::SpeedyWeather.AbstractLandSeaMask; threshold = 0) =
+    land_sea_mask.land_fraction .> threshold
+
+"""$(TYPEDSIGNATURES)
+
+Convenience constructor building a Terrarium [`ColumnRingGrid`](@ref) directly from a
+SpeedyWeather [`AbstractLandSeaMask`](@ref), so the Terrarium land columns and the
+atmospheric land-sea mask share a single source. Equivalent to passing
+`land_mask(land_sea_mask; threshold)` as the mask; `threshold` selects the fractional
+land cutoff (default `0`, i.e. any land)."""
+Terrarium.ColumnRingGrid(
+    arch::Terrarium.AbstractArchitecture,
+    NF::Type{<:AbstractFloat},
+    vert::Terrarium.AbstractVerticalSpacing,
+    rings::SpeedyWeather.RingGrids.AbstractGrid,
+    land_sea_mask::SpeedyWeather.AbstractLandSeaMask;
+    threshold = 0,
+) = Terrarium.ColumnRingGrid(arch, NF, vert, rings, land_mask(land_sea_mask; threshold))
+
+"""$(TYPEDSIGNATURES)
+
+Fill the SpeedyWeather soil mirror variables (`soil_temperature`, and `soil_moisture`
+if present) with fallback values at every grid point *outside* the Terrarium land mask.
+Terrarium only owns the mask points; every other point keeps its allocation value (`0`)
+otherwise, which shows up as unphysical 0 K soil temperatures at ocean/coastal cells and
+smears into the output."""
+function fill_fallback!(vars::Variables, land::AbstractTerrariumLandModel)
+    mask = land_mask(land)
+    NF = eltype(vars.prognostic.land.soil_temperature)
+    st = vars.prognostic.land.soil_temperature.data
+    @views st[.!mask, :] .= NF(land.ocean_temperature)
+    if haskey(vars.prognostic.land, :soil_moisture)
+        sm = vars.prognostic.land.soil_moisture.data
+        @views sm[.!mask, :] .= NF(land.ocean_moisture)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+
+Warn if the SpeedyWeather land-sea mask and the Terrarium land mask disagree. Terrarium
+allocates a soil column only where its Boolean mask is `true`, whereas SpeedyWeather weights
+land fluxes by the fractional `land_fraction`. A grid point with `land_fraction > 0` but no
+Terrarium column receives no soil state from Terrarium and hence contributes no
+land surface fluxes even though it is (partially) land. A column at
+a point with `land_fraction == 0` only wastes compute. The recommended construction is
+`mask = land_fraction .> 0` so the Terrarium mask is a superset of the SpeedyWeather land."""
+function check_mask_consistency(land::AbstractTerrariumLandModel, land_sea_mask)
+    mask = SpeedyWeather.on_architecture(SpeedyWeather.CPU(), land_mask(land))
+    land_fraction = SpeedyWeather.on_architecture(SpeedyWeather.CPU(), land_sea_mask.land_fraction.data)
+
+    is_speedy_land = land_fraction .> 0
+    orphaned = is_speedy_land .& .!mask         # land in SpeedyWeather, no Terrarium column
+    if any(orphaned)
+        @warn "Terrarium land mask misses $(count(orphaned)) grid point(s) with " *
+            "land_fraction > 0 (max land_fraction = $(maximum(land_fraction[orphaned]))). " *
+            "These cells get fallback soil values and contribute zero land surface fluxes. " *
+            "Build the Terrarium mask as `land_sea_mask.land_fraction .> 0` to cover all land."
+    end
+
+    superfluous = .!is_speedy_land .& mask      # Terrarium column over pure ocean
+    if any(superfluous)
+        @info "Terrarium allocates $(count(superfluous)) soil column(s) over grid points " *
+            "with land_fraction == 0. These are integrated but never coupled back (wasted compute)."
+    end
+    return nothing
+end
+
+# extend the allocation free copies here to work with the Oceananigans Fields as well
+@inline SpeedyWeather.RingGrids.copy_unmasked!(
+    dest::Terrarium.Oceananigans.AbstractField,
+    src::SpeedyWeather.AbstractField,
+    indices) = SpeedyWeather.RingGrids.copy_unmasked!(interior(dest), src, indices)
+
+@inline SpeedyWeather.RingGrids.copy_unmasked!(
+    dest::SpeedyWeather.AbstractField, 
+    src::Terrarium.Oceananigans.AbstractField,
+    indices) = SpeedyWeather.RingGrids.copy_unmasked!(dest, interior(src), indices)
+
 """$(TYPEDEF)
 
 The canonical [`AbstractTerrariumLandModel`](@ref) implementation for wet
@@ -88,6 +170,7 @@ struct TerrariumLand{
         IV <: Tuple,
         IN <: NamedTuple,
         FL <: NamedTuple,
+        MI,
     } <: AbstractTerrariumLandModel
     "SpeedyWeather spectral grid"
     spectral_grid::SpectralGrid
@@ -107,6 +190,12 @@ struct TerrariumLand{
     fields::FL
     "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
     Δt::NF
+    "Indices of the common land sea mask, used for allocation-free copying between SpeedyWeather and Terrarium"
+    mask_indices::MI
+    "Fallback soil temperature [K] for grid points outside the Terrarium land mask (ocean-only cells)"
+    ocean_temperature::NF
+    "Fallback soil moisture (saturation fraction) [1] for grid points outside the Terrarium land mask (ocean-only cells)"
+    ocean_moisture::NF
 end
 
 """$(TYPEDSIGNATURES)
@@ -122,6 +211,8 @@ function TerrariumLand(
         initializers::NamedTuple = (;),
         fields::NamedTuple = (;),
         Δt::Real = 300,
+        ocean_temperature::Real = 285,
+        ocean_moisture::Real = 0,
     ) where {NF}
     field_grid = Terrarium.get_field_grid(model.grid)
     Δz_arr = Terrarium.on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
@@ -129,9 +220,13 @@ function TerrariumLand(
     # as the layer thickness for the SpeedyWeather LandGeometry. It's not actually used, but
     # we set it here for consistency.
     geometry = LandGeometry(1, NF[Δz_arr[end]])
+    # `unmasked_indices` treats `true` as masked-out; `model.grid.mask` is `true` at land
+    # points, so invert it to get the indices of the (unmasked) land columns.
+    mask_indices = RingGrids.unmasked_indices(.!model.grid.mask)
     return TerrariumLand(
         spectral_grid, geometry, model, timestepper,
-        boundary_conditions, input_variables, initializers, fields, NF(Δt),
+        boundary_conditions, input_variables, initializers, fields, NF(Δt), mask_indices,
+        NF(ocean_temperature), NF(ocean_moisture),
     )
 end
 
@@ -203,6 +298,12 @@ function SpeedyWeather.initialize!(
 
     @assert length(mask) == length(vars.prognostic.land.soil_temperature) "Terrarium land mask (length = $(length(mask))) does not span the full SpeedyWeather ring grid (length = $(length(vars.prognostic.land.soil_temperature)))."
     @assert count(mask) == length(Tsoil) "Number of Terrarium land columns (length = $(length(Tsoil))) does not match the number of land points in the mask (count = $(count(mask)))."
+
+    # warn if the Terrarium mask and the SpeedyWeather land-sea mask disagree
+    check_mask_consistency(land, model.land_sea_mask)
+
+    # fill ocean/non-Terrarium points with fallback values first, then seed the land columns
+    fill_fallback!(vars, land)
     vars.prognostic.land.soil_temperature[mask] .= Tsoil
     vars.prognostic.land.soil_moisture[mask] .= sat
     return nothing
@@ -217,34 +318,34 @@ function SpeedyWeather.timestep!(
     tmodel = land.model
     consts = tmodel.constants
     NF = eltype(state)
-    # Boolean land mask: SpeedyWeather fields span the full ring grid, Terrarium
-    # only the land columns.
     mask = land_mask(land)
+    indices = land.mask_indices
+    nlayers = model.spectral_grid.nlayers
 
     # Atmospheric forcings on the lowest model level / surface
     # choose step dimension depending on atmospheric time stepper
     # and read like parameterization via DummyParameterization
     l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
-    Tair = vars.grid.temperature[mask, end, l]
-    humid = vars.grid.humidity[mask, end, l]
-    pres = vars.parameterizations.surface_pressure[mask]
-    wind = vars.parameterizations.surface_wind_speed[mask]
-    rain = vars.parameterizations.rain_rate[mask]
-    snow = vars.parameterizations.snow_rate[mask]
-    Rsd = vars.parameterizations.surface_shortwave_down[mask]
-    Rld = vars.parameterizations.surface_longwave_down[mask]
+    Tair = RingGrids.field_view(vars.grid.temperature, :, nlayers, l)
+    humid = RingGrids.field_view(vars.grid.humidity, :, nlayers, l)
+    pres = vars.parameterizations.surface_pressure
+    wind = vars.parameterizations.surface_wind_speed
+    rain = vars.parameterizations.rain_rate
+    snow = vars.parameterizations.snow_rate
+    Rsd = vars.parameterizations.surface_shortwave_down
+    Rld = vars.parameterizations.surface_longwave_down
 
-    # Push forcings into Terrarium inputs (set! avoids allocating new fields)
+    # Push forcings into Terrarium inputs (copy_unmasked! avoids allocations)
     inputs = state.inputs
-    Terrarium.set!(inputs.air_temperature, Tair)
+    RingGrids.copy_unmasked!(inputs.air_temperature, Tair, indices)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
-    Terrarium.set!(inputs.air_pressure, pres)
-    Terrarium.set!(inputs.specific_humidity, humid)
-    Terrarium.set!(inputs.rainfall, rain)
-    Terrarium.set!(inputs.snowfall, snow)
-    Terrarium.set!(inputs.windspeed, wind)
-    Terrarium.set!(inputs.surface_shortwave_down, Rsd)
-    Terrarium.set!(inputs.surface_longwave_down, Rld)
+    RingGrids.copy_unmasked!(inputs.air_pressure, pres, indices)
+    RingGrids.copy_unmasked!(inputs.specific_humidity, humid, indices)
+    RingGrids.copy_unmasked!(inputs.rainfall, rain, indices)
+    RingGrids.copy_unmasked!(inputs.snowfall, snow, indices)
+    RingGrids.copy_unmasked!(inputs.windspeed, wind, indices)
+    RingGrids.copy_unmasked!(inputs.surface_shortwave_down, Rsd, indices)
+    RingGrids.copy_unmasked!(inputs.surface_longwave_down, Rld, indices)
 
     # Constructing ModelIntegrator is allocation-free: it is an immutable struct
     # of references so no data is copied.  `InputSources` is empty intentionally:
@@ -263,16 +364,17 @@ function SpeedyWeather.timestep!(
     vars.prognostic.land.soil_temperature[mask] .= interior(state.skin_temperature) .+ NF(273.15)
     vars.prognostic.land.soil_moisture[mask] .= @view interior(state.saturation_water_ice)[:, 1, end]
     if haskey(vars.prognostic.land, :sensible_heat_flux)
-        vars.prognostic.land.sensible_heat_flux[mask] .= interior(state.sensible_heat_flux)
+        RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, state.sensible_heat_flux, indices)
     end
     if haskey(vars.prognostic.land, :surface_humidity_flux)
-        vars.prognostic.land.surface_humidity_flux[mask] .= interior(state.latent_heat_flux) ./ consts.thermodynamics.latent_heat_vaporization
+        RingGrids.copy_unmasked!(vars.prognostic.land.surface_humidity_flux, state.latent_heat_flux, indices)
+        vars.prognostic.land.surface_humidity_flux.data ./= consts.thermodynamics.latent_heat_vaporization
     end
     if haskey(vars.parameterizations, :surface_longwave_up)
-        vars.parameterizations.surface_longwave_up[mask] .= interior(state.surface_longwave_up)
+        RingGrids.copy_unmasked!(vars.parameterizations.surface_longwave_up, state.surface_longwave_up, indices)
     end
     if haskey(vars.parameterizations, :surface_shortwave_up)
-        vars.parameterizations.surface_shortwave_up[mask] .= interior(state.surface_shortwave_up)
+        RingGrids.copy_unmasked!(vars.parameterizations.surface_shortwave_up, state.surface_shortwave_up, indices)
     end
     return nothing
 end
@@ -281,7 +383,7 @@ end
 function SpeedyWeather.initialize!(
         vars::Variables,
         land::TerrariumLand,
-        ::PrimitiveDryModel,
+        model::PrimitiveDryModel,
     )
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
@@ -291,6 +393,11 @@ function SpeedyWeather.initialize!(
     # which was set from the `time` kwarg of `initialize!(model; time=...)`.
     state.clock.time = vars.prognostic.clock.time
 
+    # warn if the Terrarium mask and the SpeedyWeather land-sea mask disagree
+    check_mask_consistency(land, model.land_sea_mask)
+
+    # fill ocean/non-Terrarium points with fallback values first, then seed the land columns
+    fill_fallback!(vars, land)
     vars.prognostic.land.soil_temperature[mask] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
     return nothing
 end
@@ -326,5 +433,3 @@ function SpeedyWeather.timestep!(
     vars.prognostic.land.soil_temperature[mask] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
     return nothing
 end
-
-end # module

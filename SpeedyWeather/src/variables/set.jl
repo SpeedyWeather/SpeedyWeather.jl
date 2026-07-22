@@ -22,12 +22,14 @@ The input may be:
 Specify the namespace as a symbol in case the `vars::NamedTuple` contains them, e.g.
 
     set!(vars, sea_surface_temperature = 1, namespace=:ocean)
-    
+   
+The keyword argument `step` specifies the step index to set, default is 1.
+For variables without a step dimension use `step = nothing` to skip the `get_step`.
 """
 function set!(
         vars::NamedTuple,
         geometry::Geometry;
-        step::Integer = 1,
+        step = 1,
         add::Bool = false,
         spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing,
         coslat_scaling_included::Bool = false,
@@ -52,11 +54,11 @@ function set!(
         if varname in (:u, :v)  # already handled in special case above
             nothing
         elseif varname in keys(vars)
-            var = vars[varname] isa LowerTriangularArray ? get_step(vars[varname], step) : vars[varname]
+            var = ArrayDimensions.hastime(vars[varname]) ? get_step(vars[varname], step) : vars[varname]
             set!(var, kwargs[varname], geometry, spectral_transform; add, static_func, scratch_field)
         elseif namespace in keys(vars)
             if varname in keys(vars[namespace])
-                var = vars[namespace][varname] isa LowerTriangularArray ?
+                var = ArrayDimensions.hastime(vars[namespace][varname]) ?
                     get_step(vars[namespace][varname], step) : vars[namespace][varname]
                 set!(var, kwargs[varname], geometry, spectral_transform; add, static_func, scratch_field)
             else

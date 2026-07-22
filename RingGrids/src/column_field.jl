@@ -14,13 +14,14 @@ field = Field(grid, k...)
 column_field = transpose(field)
 ```
 """
-struct ColumnField{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
+struct ColumnField{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid, Dims} <: AbstractField{T, N, ArrayType, Grid, Dims}
     data::ArrayType
     grid::Grid
+    dims::Dims
 
-    function ColumnField(data, grid)
+    function ColumnField(data, grid, dims = default_column_field_dimensions(data))
         data_matches_grid(data, grid; horizontal_dim = 2) || throw(DimensionMismatch(data, grid))
-        return new{eltype(data), ndims(data), typeof(data), typeof(grid)}(data, grid)
+        return new{eltype(data), ndims(data), typeof(data), typeof(grid), typeof(dims)}(data, grid, dims)
     end
 end
 
@@ -37,10 +38,13 @@ ColumnField(::Type{T}, grid::AbstractGrid, k...) where {T} = transpose(zeros(T, 
 (::Type{<:ColumnField{T}})(data::AbstractArray, grid::AbstractGrid) where {T} =
     ColumnField(eltype(data) === T ? data : T.(data), grid)
 
+default_column_field_dimensions(::AbstractVector) = ArrayDimensions.XY()
+default_column_field_dimensions(::AbstractArray) = ArrayDimensions.ZXY()
+
 # TYPES
 Architectures.nonparametric_type(::Type{<:ColumnField}) = ColumnField
-grid_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = G
-Architectures.array_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = A
+grid_type(::Type{<:ColumnField{T, N, A, G}}) where {T, N, A, G} = G
+Architectures.array_type(::Type{<:ColumnField{T, N, A, G}}) where {T, N, A, G} = A
 
 # CONVERSION from Field
 LinearAlgebra.transpose(field::Field) = transpose_safe(field)

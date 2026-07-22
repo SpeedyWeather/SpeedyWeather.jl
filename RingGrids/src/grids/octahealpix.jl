@@ -80,6 +80,8 @@ function get_lond_per_ring(Grid::Type{<:OctaHEALPixGrid}, nlat_half::Integer, j:
     return collect((180 / nlon):(360 / nlon):360)
 end
 
+hasoffset(::Type{<:OctaHEALPixGrid}) = true     # first longitude point dlon/2 east of 0˚
+
 ## INDEXING
 function each_index_in_ring(
         ::Type{<:OctaHEALPixGrid},     # function for OctaHEALPix grids

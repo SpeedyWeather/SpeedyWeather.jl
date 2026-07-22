@@ -7,44 +7,44 @@ additional `N`-dimensional or "matrix-style" indexing.
 Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:, :, ..]`
 is a matrix in lower triangular form, e.g. a (5x5x3)-LowerTriangularArray would hold 3 lower
 triangular matrices."""
-struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum} <: AbstractArray{T, N}
+struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum, Dims <: AbstractArrayDimensions} <: AbstractArray{T, N}
     data::ArrayType     # non-zero elements unravelled into an in which the lower triangle is flattened
     spectrum::S         # spectrum, that holds all spectral discretization information and the architecture the array is on
+    dims::Dims          # empty type just to declare what dimensions the 
 
-    LowerTriangularArray{T, N, ArrayType, S}(data::AbstractArray, spectrum::S) where {T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum} =
-        check_lta_input_array(data, spectrum, N) ?
-        new(data, spectrum) :
-        error(lta_error_message(data, spectrum, T, N, ArrayType, S))
+    function LowerTriangularArray(data, spectrum, dims = ArrayDimensions.LM())
+        data_matches_spectrum(data, spectrum) || throw(DimensionMismatch(data, spectrum))
+        data_matches_dims(data, dims) || throw(DimensionMismatch(data, dims))
+        return new{eltype(data), ndims(data), typeof(data), typeof(spectrum), typeof(dims)}(data, spectrum, dims)
+    end
 end
 
-check_lta_input_array(data, spectrum, N) =
-    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) # & ismatching(spectrum, typeof(data)) TODO: reactivate this? problem for constructors
+# test that data length matches the number of non-zeros in the spectrum times the extra dimensions
+data_matches_spectrum(data::AbstractArray, spectrum::AbstractSpectrum) =
+    length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)
 
-function lta_error_message(data, spectrum, T, N, ArrayType, S)
-    return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create " *
-        "a $(Base.dims2string(matrix_size(data, spectrum))) LowerTriangularArray{$T, $N, $ArrayType, $S}"
+function Base.DimensionMismatch(data::AbstractArray, spectrum::AbstractSpectrum)
+    nz = nonzeros(spectrum)
+    S = nonparametric_type(spectrum)
+    return DimensionMismatch("$(summary(data)) cannot be used to create a LowerTriangularArray with $nz non-zeros in a $(spectrum.lmax)x$(spectrum.mmax) $S")
 end
+
+data_matches_dims(data::AbstractArray, dims::AbstractArrayDimensions) = ndims(data) >= ndims(dims)
 
 """2D `LowerTriangularArray` of type `T`"""
 const LowerTriangularMatrix = LowerTriangularArray{T, 1} where {T}
 
-# construct LTA from data and spectrum
-LowerTriangularArray(data::ArrayType, spectrum::S) where {T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum} =
-    LowerTriangularArray{T, N, ArrayType, S}(data, spectrum)
-
-# or construct using LowerTriangularMatrix for 1D arrays
-LowerTriangularMatrix(data::ArrayType, spectrum::S) where {T, ArrayType <: AbstractArray{T, 1}, S <: AbstractSpectrum} =
-    LowerTriangularArray{T, 1, ArrayType, S}(data, spectrum)
+# construct using LowerTriangularMatrix for 1D arrays
+LowerTriangularMatrix(data::AbstractArray, spectrum::AbstractSpectrum) = LowerTriangularArray(data, spectrum)
+LowerTriangularMatrix(data::AbstractArray, spectrum::AbstractSpectrum, dims::AbstractArrayDimensions) = LowerTriangularArray(data, spectrum, dims)
 
 function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T, N}}
-    spectrum = Spectrum(lmax, mmax, architecture = architecture(ArrayType))
-    return LowerTriangularArray{T, N, ArrayType, typeof(spectrum)}(data, spectrum)
+    return LowerTriangularArray(data, Spectrum(lmax, mmax, architecture = architecture(ArrayType)))
+end
+function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer, dims::AbstractArrayDimensions) where {T, N, ArrayType <: AbstractArray{T, N}}
+    return LowerTriangularArray(data, Spectrum(lmax, mmax, architecture = architecture(ArrayType)), dims)
 end
 
-function LowerTriangularMatrix(data::ArrayType, lmax::Integer, mmax::Integer) where {T, ArrayType <: AbstractArray{T, 1}}
-    spectrum = Spectrum(lmax, mmax)
-    return LowerTriangularArray{T, 1, ArrayType, typeof(spectrum)}(data, spectrum)
-end
 
 # SIZE ETC
 """$(TYPEDSIGNATURES)
@@ -100,6 +100,10 @@ Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
 
 Architectures.nonparametric_type(::Type{<:LowerTriangularArray}) = LowerTriangularArray
 
+ArrayDimensions.hastime(::LowerTriangularArray{T, N, A, S, D}) where {T, N, A, S, D} = hastime(D)
+ArrayDimensions.hasvertical(::LowerTriangularArray{T, N, A, S, D}) where {T, N, A, S, D} = hasvertical(D)
+additional_dimensions(L::LowerTriangularArray) = ndims(L) > ndims(L.dims)
+
 function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularMatrix)
     Base.array_summary(io, L, axes(L))
     L_print = on_architecture(CPU(), L)
@@ -141,9 +145,10 @@ function Base.array_summary(io::IO, L::LowerTriangularMatrix{T, A}, inds::Tuple{
     return print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T, $A_{...}}")
 end
 
-function Base.array_summary(io::IO, ::LowerTriangularArray{T, N, A}, inds::Tuple{Vararg{Base.OneTo}}) where {T, N, A}
+function Base.array_summary(io::IO, L::LowerTriangularArray{T, N, A}, inds::Tuple{Vararg{Base.OneTo}}) where {T, N, A}
     A_ = nonparametric_type(A)
-    return print(io, Base.dims2string(length.(inds)), " LowerTriangularArray{$T, $N, $A_{...}}")
+    plus = additional_dimensions(L) ? "+" : ""
+    return print(io, Base.dims2string(length.(inds)), " ($(Base.dims2string(L.dims))$plus) LowerTriangularArray{$T, $N, $A_{...}}")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularArray)
@@ -176,11 +181,32 @@ for f in (:zeros, :ones, :rand, :randn)
 
         function Base.$f(
                 ::Type{LowerTriangularArray{T, N, ArrayType, S}},
+                lmax::Integer,
+                mmax::Integer,
+                dims::AbstractArrayDimensions,
+                I::Vararg{Integer, M},
+            ) where {T, N, M, ArrayType, S <: AbstractSpectrum}
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax, architecture = architecture(ArrayType_)), dims)
+        end
+
+        function Base.$f(
+                ::Type{LowerTriangularArray{T, N, ArrayType, S}},
                 spectrum::AbstractSpectrum,
                 I::Vararg{Integer, M},
             ) where {T, N, M, ArrayType, S <: AbstractSpectrum}
             ArrayType_ = nonparametric_type(ArrayType)
             return LowerTriangularArray(ArrayType_($f(T, nonzeros(spectrum), I...)), spectrum)
+        end
+
+        function Base.$f(
+                ::Type{LowerTriangularArray{T, N, ArrayType, S}},
+                spectrum::AbstractSpectrum,
+                dims::AbstractArrayDimensions,
+                I::Vararg{Integer, M},
+            ) where {T, N, M, ArrayType, S <: AbstractSpectrum}
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(spectrum), I...)), spectrum, dims)
         end
 
         # default CPU, use Array
@@ -194,12 +220,19 @@ for f in (:zeros, :ones, :rand, :randn)
         end
 
         function Base.$f(
-                ::Type{LowerTriangularMatrix{T}},
+                ::Type{LowerTriangularArray{T}},
                 lmax::Integer,
                 mmax::Integer,
-            ) where {T}
-            return LowerTriangularMatrix($f(T, nonzeros(lmax, mmax)), Spectrum(lmax, mmax, architecture = architecture(Array)))
+                dims::AbstractArrayDimensions,
+                I::Vararg{Integer, M},
+            ) where {T, M}
+            return LowerTriangularArray($f(T, nonzeros(lmax, mmax), I...), Spectrum(lmax, mmax, architecture = architecture(Array)), dims)
         end
+
+        Base.$f(::Type{LowerTriangularMatrix{T}}, lmax::Integer, mmax::Integer) where {T} =
+            $f(LowerTriangularArray{T}, lmax, mmax)
+        Base.$f(::Type{LowerTriangularMatrix{T}}, lmax::Integer, mmax::Integer, dims::AbstractArrayDimensions) where {T} =
+            $f(LowerTriangularArray{T}, lmax, mmax, dims)
 
         function Base.$f(
                 ::Type{LowerTriangularArray{T}},
@@ -210,11 +243,39 @@ for f in (:zeros, :ones, :rand, :randn)
         end
 
         function Base.$f(
-                ::Type{LowerTriangularMatrix{T}},
+                ::Type{LowerTriangularArray{T}},
                 spectrum::AbstractSpectrum,
-            ) where {T}
-            return LowerTriangularMatrix(array_type(spectrum.architecture)($f(T, nonzeros(spectrum))), spectrum)
+                dims::AbstractArrayDimensions,
+                I::Vararg{Integer, M},
+            ) where {T, M}
+            return LowerTriangularArray(array_type(spectrum.architecture)($f(T, nonzeros(spectrum), I...)), spectrum, dims)
         end
+
+        # Fully parameterized type (includes Dims parameter) — extract and thread through
+        function Base.$f(
+                ::Type{LowerTriangularArray{T, N, ArrayType, S, D}},
+                spectrum::AbstractSpectrum,
+                I::Vararg{Integer, M},
+            ) where {T, N, M, ArrayType, S <: AbstractSpectrum, D <: AbstractArrayDimensions}
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(spectrum), I...)), spectrum, D())
+        end
+
+        # Fully parameterized type with integer arguments (lmax, mmax, ...)
+        function Base.$f(
+                ::Type{LowerTriangularArray{T, N, ArrayType, S, D}},
+                lmax::Integer,
+                mmax::Integer,
+                I::Vararg{Integer, M},
+            ) where {T, N, M, ArrayType, S <: AbstractSpectrum, D <: AbstractArrayDimensions}
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax, architecture = architecture(ArrayType_)), D())
+        end
+
+        Base.$f(::Type{LowerTriangularMatrix{T}}, spectrum::AbstractSpectrum) where {T} =
+            $f(LowerTriangularArray{T}, spectrum)
+        Base.$f(::Type{LowerTriangularMatrix{T}}, spectrum::AbstractSpectrum, dims::AbstractArrayDimensions) where {T} =
+            $f(LowerTriangularArray{T}, spectrum, dims)
 
         function Base.$f(
                 ::Type{T},
@@ -224,23 +285,42 @@ for f in (:zeros, :ones, :rand, :randn)
             return LowerTriangularArray(array_type(spectrum.architecture)($f(T, nonzeros(spectrum), I...)), spectrum)
         end
 
-        # use Float64 as default if type T is not provided
+        function Base.$f(
+                ::Type{T},
+                spectrum::AbstractSpectrum,
+                dims::AbstractArrayDimensions,
+                I::Vararg{Integer, M},
+            ) where {T <: Number, M}
+            return LowerTriangularArray(array_type(spectrum.architecture)($f(T, nonzeros(spectrum), I...)), spectrum, dims)
+        end
+
+        # use DEFAULT_NF as default if type T is not provided
         Base.$f(::Type{LowerTriangularArray}, lmax::Integer, mk::Integer...) =
-            $f(LowerTriangularArray{Float64}, lmax, mk...)
+            $f(LowerTriangularArray{DEFAULT_NF}, lmax, mk...)
         Base.$f(::Type{LowerTriangularMatrix}, lmax::Integer, mmax::Integer) =
-            $f(LowerTriangularArray{Float64}, lmax, mmax)
+            $f(LowerTriangularArray{DEFAULT_NF}, lmax, mmax)
 
         Base.$f(::Type{LowerTriangularArray}, spectrum::AbstractSpectrum, I::Vararg{Integer, M}) where {M} =
-            $f(LowerTriangularArray{Float64}, spectrum, I...)
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum, I...)
         Base.$f(::Type{LowerTriangularMatrix}, spectrum::AbstractSpectrum) =
-            $f(LowerTriangularArray{Float64}, spectrum)
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum)
         Base.$f(spectrum::AbstractSpectrum, I::Vararg{Integer, M}) where {M} =
-            $f(LowerTriangularArray{Float64}, spectrum, I...)
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum, I...)
+
+        # dims variants for default-type constructors
+        Base.$f(::Type{LowerTriangularArray}, spectrum::AbstractSpectrum, dims::AbstractArrayDimensions, I::Vararg{Integer, M}) where {M} =
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum, dims, I...)
+        Base.$f(::Type{LowerTriangularMatrix}, spectrum::AbstractSpectrum, dims::AbstractArrayDimensions) =
+            $f(LowerTriangularMatrix{DEFAULT_NF}, spectrum, dims)
+        Base.$f(spectrum::AbstractSpectrum, dims::AbstractArrayDimensions, I::Vararg{Integer, M}) where {M} =
+            $f(LowerTriangularArray{DEFAULT_NF}, spectrum, dims, I...)
     end
 end
 
-Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, L.spectrum, size(L)[2:end]...)
-Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, L.spectrum, size(L)[2:end]...)
+Base.zero(L::LowerTriangularArray{T, N, ArrayType, S}) where {T, N, ArrayType, S} =
+    zeros(LowerTriangularArray{T, N, ArrayType, S}, L.spectrum, L.dims, size(L)[2:end]...)
+Base.one(L::LowerTriangularArray{T, N, ArrayType, S}) where {T, N, ArrayType, S} =
+    ones(LowerTriangularArray{T, N, ArrayType, S}, L.spectrum, L.dims, size(L)[2:end]...)
 
 function LowerTriangularArray{T, N, ArrayType, S}(
         ::UndefInitializer,
@@ -257,6 +337,15 @@ function LowerTriangularArray{T, N, ArrayType, S}(
     return LowerTriangularArray(ArrayType(undef, nonzeros(spectrum), I...), spectrum)
 end
 
+function LowerTriangularArray{T, N, ArrayType, S}(
+        ::UndefInitializer,
+        spectrum::AbstractSpectrum,
+        dims::AbstractArrayDimensions,
+        I::Vararg{Integer, M},
+    ) where {T, N, M, ArrayType <: AbstractArray{T}, S <: AbstractSpectrum}
+    return LowerTriangularArray(ArrayType(undef, nonzeros(spectrum), I...), spectrum, dims)
+end
+
 function LowerTriangularArray{T, N, ArrayType, SP}(
         ::UndefInitializer,
         size::S,
@@ -266,11 +355,19 @@ end
 
 # note the following constructors hardcode Vector TODO generalise ?
 function LowerTriangularMatrix{T}(::UndefInitializer, lmax::Integer, mmax::Integer) where {T}
-    return LowerTriangularMatrix(Vector{T}(undef, nonzeros(lmax, mmax)), lmax, mmax)
+    return LowerTriangularArray(Vector{T}(undef, nonzeros(lmax, mmax)), lmax, mmax)
+end
+
+function LowerTriangularMatrix{T}(::UndefInitializer, lmax::Integer, mmax::Integer, dims::AbstractArrayDimensions) where {T}
+    return LowerTriangularArray(Vector{T}(undef, nonzeros(lmax, mmax)), lmax, mmax, dims)
 end
 
 function LowerTriangularMatrix{T}(::UndefInitializer, spectrum::AbstractSpectrum) where {T}
-    return LowerTriangularMatrix(Vector{T}(undef, nonzeros(spectrum)), spectrum)
+    return LowerTriangularArray(Vector{T}(undef, nonzeros(spectrum)), spectrum)
+end
+
+function LowerTriangularMatrix{T}(::UndefInitializer, spectrum::AbstractSpectrum, dims::AbstractArrayDimensions) where {T}
+    return LowerTriangularArray(Vector{T}(undef, nonzeros(spectrum)), spectrum, dims)
 end
 
 Base.eltype(L::LowerTriangularArray) = eltype(L.data)
@@ -317,7 +414,7 @@ i2lm(I::CartesianIndex, mmax::Int) = CartesianIndex(i2lm(I[1], mmax)..., I.I[2:e
 
 # indexing with : + other indices, returns a LowerTriangularArray
 @inline function Base.getindex(L::LowerTriangularArray{T, N}, col::Colon, I...) where {T, N}
-    return LowerTriangularArray(getindex(L.data, col, I...), L.spectrum.lmax, L.spectrum.mmax)
+    return LowerTriangularArray(getindex(L.data, col, I...), L.spectrum.lmax, L.spectrum.mmax, L.dims[col, I...])
 end
 
 # l,m sph "matrix-style"  indexing with integer + other indices
@@ -386,15 +483,17 @@ Base.eachindex(Ls::LowerTriangularArray...) = eachindex((L.data for L in Ls)...)
 
 """
 $(TYPEDSIGNATURES)
-creates `unit_range::UnitRange` to loop over all non-zeros/spherical harmonics numbers in a LowerTriangularArray `L`.
-Like `eachindex` but skips the upper triangle with zeros in `L`."""
-eachharmonic(L::LowerTriangularArray) = axes(L.data, 1)
+Iterator over all spherical harmonics in `L`, yielding `(l, m)` tuples of degree `l` and
+order `m` (both 1-based) for every harmonic in the lower triangle. Only loops over the
+horizontal dimension; combine with `eachmatrix` for the other dimensions."""
+eachharmonic(L::LowerTriangularArray) = eachharmonic(L.spectrum)
 
 """
 $(TYPEDSIGNATURES)
-creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangularArrays
-provided as arguments. Checks bounds first. All LowerTriangularMatrix's need to be of the same size.
-Like `eachindex` but skips the upper triangle with zeros in `L`."""
+Iterator over all spherical harmonics of the LowerTriangularArrays provided as arguments,
+yielding `(l, m)` tuples of degree `l` and order `m` (both 1-based). Checks first that
+all arrays match in the horizontal, other dimensions may differ.
+Only loops over the horizontal dimension; combine with `eachmatrix` for the others."""
 function eachharmonic(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     lowertriangular_match(L1, Ls...; horizontal_only = true) || throw(DimensionMismatch(L1, Ls...))
     return eachharmonic(L1)
@@ -514,7 +613,7 @@ function LowerTriangularArray(M::ArrayType) where {T, N, ArrayType <: AbstractAr
     return LowerTriangularArray(M[lowertriangle_indices(lmax, mmax), [Colon() for i in 1:(N - 2)]...], lmax, mmax)
 end
 
-LowerTriangularArray(L::LowerTriangularArray) = LowerTriangularArray(L.data, L.spectrum)
+LowerTriangularArray(L::LowerTriangularArray) = LowerTriangularArray(L.data, L.spectrum, L.dims)
 LowerTriangularMatrix(M::AbstractMatrix) = LowerTriangularArray(M)
 
 function Base.Matrix(L::LowerTriangularMatrix{T}) where {T}
@@ -533,15 +632,15 @@ function Base.copyto!(
         L2::LowerTriangularArray
     ) where {T}
     # if sizes don't match copy over the largest subset of indices
+    # (positional size methods: the `as = Matrix` kwcall relies on constant propagation
+    # which (depending on Julia/JET version) can fail and widen `as` to a runtime dispatch)
     size(L1) != size(L2) && return copyto!(
-        L1, L2, Base.OneTo(minimum(size.((L1, L2), 1; as = Matrix))),
-        Base.OneTo(minimum(size.((L1, L2), 2; as = Matrix)))
+        L1, L2, Base.OneTo(min(size(L1, 1, OneBased, Matrix), size(L2, 1, OneBased, Matrix))),
+        Base.OneTo(min(size(L1, 2, OneBased, Matrix), size(L2, 2, OneBased, Matrix)))
     )
 
-    # avoid `convert.(T, …)` when eltypes already match — Reactant cannot trace
-    # `convert(ComplexF32, ::TracedRNumber{ComplexF32})` even though it's a no-op.
-    if eltype(L2.data) === T
-        L1.data .= L2.data
+    if eltype(L2) === T
+        copyto!(L1.data, L2.data)
     else
         L1.data .= convert.(T, L2.data)
     end
@@ -555,7 +654,7 @@ function Base.copyto!(
         ms::AbstractUnitRange
     )
 
-    lmax, mmax = size(L2; as = Matrix)            # use the size of L2 for boundscheck
+    lmax, mmax = size(L2, OneBased, Matrix)       # use the size of L2 for boundscheck (positional, see above)
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax || throw(BoundsError)
 
@@ -643,7 +742,7 @@ function Base.convert(
         ::Type{LowerTriangularArray{T1, N, ArrayTypeT1, S}},
         L::LowerTriangularArray{T2, N, ArrayTypeT2, S},
     ) where {T1, T2, N, S <: AbstractSpectrum, ArrayTypeT1 <: AbstractArray{T1}, ArrayTypeT2 <: AbstractArray{T2}}
-    return LowerTriangularArray{T1, N, ArrayTypeT1, S}(L.data, L.spectrum)
+    return LowerTriangularArray(T1.(L.data), L.spectrum, L.dims)
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where {T}
@@ -654,33 +753,30 @@ end
 function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, I::Integer...) where {T, N, ArrayType, SP}
     if resolution(L.spectrum) != I[1:2]
         new_spectrum = Spectrum(I[1], I[2], architecture = L.spectrum.architecture)
-        return LowerTriangularArray{T, N, ArrayType, SP}(undef, new_spectrum, I[3:end]...)
+        return LowerTriangularArray{T, N, ArrayType, SP}(undef, new_spectrum, L.dims, I[3:end]...)
     else
-        return LowerTriangularArray{T, N, ArrayType, SP}(undef, L.spectrum, I[3:end]...)
+        return LowerTriangularArray{T, N, ArrayType, SP}(undef, L.spectrum, L.dims, I[3:end]...)
     end
 end
 
 function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, size::S) where {T, N, ArrayType, SP, S <: Tuple}
     if resolution(L.spectrum) != size[1:2]
         new_spectrum = Spectrum(size[1], size[2], architecture = L.spectrum.architecture)
-        return LowerTriangularArray{T, N, ArrayType, SP}(undef, new_spectrum, size[3:end]...)
+        return LowerTriangularArray{T, N, ArrayType, SP}(undef, new_spectrum, L.dims, size[3:end]...)
     else
-        return LowerTriangularArray{T, N, ArrayType, SP}(undef, L.spectrum, size[3:end]...)
+        return LowerTriangularArray{T, N, ArrayType, SP}(undef, L.spectrum, L.dims, size[3:end]...)
     end
 end
 
 function Base.similar(L::LowerTriangularArray{S, N, ArrayType, SP}, ::Type{T}) where {T, S, N, SP, ArrayType}
-    ArrayType_ = nonparametric_type(ArrayType)
-    return LowerTriangularArray{T, N, ArrayType_{T, N}, SP}(similar(L.data, T), L.spectrum)
+    # If L.data is a SubArray (e.g. L is a view obtained through a fused parent), the
+    # fresh storage returned by `similar(L.data, T)` is a plain Array/CuArray — not a
+    # SubArray. The inner constructor infers the type from the actual array we hold.
+    return LowerTriangularArray(similar(L.data, T), L.spectrum, L.dims)
 end
 
 function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, N, ArrayType, SP}
-    # If L.data is a SubArray (e.g. L is a view obtained through a fused parent), the
-    # fresh storage returned by `similar(L.data, T)` is a plain Array/CuArray — not a
-    # SubArray. Strip the parameters off ArrayType so the new LTA's type tag matches
-    # the actual array we hold.
-    ArrayType_ = nonparametric_type(ArrayType)
-    return LowerTriangularArray{T, N, ArrayType_{T, N}, SP}(similar(L.data, T), L.spectrum)
+    return LowerTriangularArray(similar(L.data, T), L.spectrum, L.dims)
 end
 Base.similar(L::LowerTriangularArray{T}) where {T} = similar(L, T)
 
@@ -738,15 +834,15 @@ Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.
 
 # needed for Enzyme 
 Base.unaliascopy(A::LowerTriangularArray) =
-       LowerTriangularArray(Base.unaliascopy(A.data), A.spectrum)
+       LowerTriangularArray(Base.unaliascopy(A.data), A.spectrum, A.dims)
 
 # Views that return a LowerTriangularArray again (need to retain all horizontal grid points, hence `:, 1` for example)
 # view(array, :) unravels like array[:] does hence "::Colon, i, args..." used to enforce one argument after :
 # exception is view(vector, :) which preserves the vector structure, equivalent here is the LowerTriangularMatrix
 # TODO extend Base.view?
-lta_view(L::LowerTriangularArray, c::Colon, i, args...) = LowerTriangularArray(view(L.data, c, i, args...), L.spectrum)
-lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data, c), L.spectrum)
-lta_view(L::LowerTriangularArray, args...) = view(L, args...)   # fallback to normal view
+Base.@propagate_inbounds lta_view(L::LowerTriangularArray, c::Colon, i, args...) = LowerTriangularArray(view(L.data, c, i, args...), L.spectrum, L.dims[c, i, args...])
+Base.@propagate_inbounds lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data, c), L.spectrum, L.dims)
+Base.@propagate_inbounds lta_view(L::LowerTriangularArray, args...) = view(L, args...)   # fallback to normal view
 
 # Broadcast CPU/GPU
 import Base.Broadcast: BroadcastStyle, Broadcasted
@@ -757,12 +853,12 @@ struct LowerTriangularStyle{N} <: Broadcast.AbstractArrayStyle{N} end
 # GPU without scalar indexing
 struct LowerTriangularGPUStyle{N} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
-function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType <: AbstractArray, S}
+function BroadcastStyle(::Type{<:LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType <: AbstractArray, S}
     return LowerTriangularStyle{N}()
 end
 
 function BroadcastStyle(
-        ::Type{LowerTriangularArray{T, N, ArrayType, S}},
+        ::Type{<:LowerTriangularArray{T, N, ArrayType, S}},
     ) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, S}
     return LowerTriangularGPUStyle{N}()
 end
@@ -771,14 +867,14 @@ end
 # without this, dispatch falls back to LowerTriangularStyle and the broadcast runs
 # scalar `getindex` on the device, triggering GPUArrays' scalar-indexing error.
 function BroadcastStyle(
-        ::Type{LowerTriangularArray{T, N, ArrayType, S}},
+        ::Type{<:LowerTriangularArray{T, N, ArrayType, S}},
     ) where {T, N, A <: GPUArrays.AbstractGPUArray, ArrayType <: SubArray{T, N, A}, S}
     return LowerTriangularGPUStyle{N}()
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-LowerTriangularStyle{N}(::Val{M}) where {N, M} = LowerTriangularStyle{N}()
-LowerTriangularGPUStyle{N}(::Val{M}) where {N, M} = LowerTriangularGPUStyle{N}()
+LowerTriangularStyle{N}(::Val{M}) where {N, M} = LowerTriangularStyle{max(N, M)}()
+LowerTriangularGPUStyle{N}(::Val{M}) where {N, M} = LowerTriangularGPUStyle{max(N, M)}()
 
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments.
 Adapted from Julia documentation of Broadcast interface"
@@ -799,7 +895,7 @@ function Base.similar(
     ) where {N, T}
     L = find_L(bc)
     # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
-    return nonparametric_type(typeof(L))(similar(parent_or_not(L.data), T, axes(bc)), L.spectrum)
+    return nonparametric_type(typeof(L))(similar(parent_or_not(L.data), T, axes(bc)), L.spectrum, L.dims)
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
@@ -809,7 +905,7 @@ function Base.similar(
     ) where {N, T}
     L = find_L(bc)
     # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
-    return nonparametric_type(typeof(L))(similar(parent_or_not(L.data), T, axes(bc)), L.spectrum)
+    return nonparametric_type(typeof(L))(similar(parent_or_not(L.data), T, axes(bc)), L.spectrum, L.dims)
 end
 
 function KernelAbstractions.get_backend(
