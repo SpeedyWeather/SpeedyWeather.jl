@@ -258,7 +258,7 @@ function SpectralGrid(
     # Particle vector type
     # TODO: For Reactant we need something else in the long run
     # use Nothing as a dummy type, it's not actually working
-    ParticleVectorType = typeof(architecture) <: ReactantDevice ? Nothing : array_type(architecture, Particle{NF}, 1)
+    ParticleVectorType = typeof(architecture) <: ReactantDevice ? Nothing : array_type(architecture, Particle{NF, Bool}, 1)
 
     # Normalize transform_batch: always include 1 (serial fallback) and the model's nlayers,
     # dedup and sort.

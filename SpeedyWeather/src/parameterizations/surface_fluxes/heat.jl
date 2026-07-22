@@ -50,9 +50,9 @@ export SurfaceOceanHeatFlux
 turbulent exchange of sensible heat between the ocean surface and the atmosphere
 based on temperature differences and wind speed. Uses bulk aerodynamic formulas
 with drag coefficients. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
-    "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
-    use_boundary_layer_drag::Bool = true
+@parameterized @kwdef struct SurfaceOceanHeatFlux{NF, B} <: AbstractSurfaceHeatFlux
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
+    use_boundary_layer_drag::B = true
 
     "[OPTION] Or fixed drag coefficient for heat fluxes over ocean"
     @param drag::NF = 0.9e-3 (bounds = Nonnegative,)
@@ -62,7 +62,7 @@ with drag coefficients. Fields are $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure SurfaceOceanHeatFlux
-SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(; kwargs...)
+SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF, Bool}(; kwargs...)
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
 variables(::SurfaceOceanHeatFlux) = (
@@ -116,9 +116,9 @@ turbulent exchange of sensible heat between the land surface and the atmosphere
 based on soil temperature differences and wind speed. Uses bulk aerodynamic 
 formulas with drag coefficients that can account for surface roughness. 
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
-    "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
-    use_boundary_layer_drag::Bool = true
+@parameterized @kwdef struct SurfaceLandHeatFlux{NF, B} <: AbstractSurfaceHeatFlux
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
+    use_boundary_layer_drag::B = true
 
     "[OPTION] Or fixed drag coefficient for heat fluxes over land"
     @param drag::NF = 1.2e-3 (bounds = Nonnegative,)       # for neutral stability
@@ -128,7 +128,7 @@ Fields are $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure SurfaceLandHeatFlux
-SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)
+SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF, Bool}(; kwargs...)
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
 variables(::SurfaceLandHeatFlux) = (

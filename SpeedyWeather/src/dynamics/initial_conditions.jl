@@ -47,6 +47,9 @@ function initialize!(vars::Variables, model::AbstractModel)
     # green house gases are function of time only, just do one "timestep"
     greenhouse_gases_time_step!(vars, model)
 
+    # precompute state-independent parameterization fields (e.g. longwave transmissivity)
+    hasproperty(model, :longwave_radiation) && initialize!(vars, model.longwave_radiation, model)
+
     # then atmosphere as this may include initial conditions like StartFromFile
     # which would contain ocean/land initial conditions that should overwrite the above if they are included
     initialize!(vars, model.initial_conditions, model)
@@ -76,7 +79,7 @@ export RandomVorticity
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVorticity{NF, S, RNG} <: AbstractInitialConditions
+@kwdef mutable struct RandomVorticity{NF, S, RNG, I} <: AbstractInitialConditions
     "[OPTION] Power of the spectral distribution k^power"
     power::NF = -3
 
@@ -84,7 +87,7 @@ $(TYPEDFIELDS)"""
     amplitude::NF = 1.0e-4
 
     "[OPTION] Maximum wavenumber"
-    max_wavenumber::Int = 20
+    max_wavenumber::I = 20
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
     seed::S = 123
@@ -96,7 +99,7 @@ end
 function RandomVorticity(SG::SpectralGrid; kwargs...)
     RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
     SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
-    return RandomVorticity{SG.NF, SeedType, RNG}(; kwargs...)
+    return RandomVorticity{SG.NF, SeedType, RNG, Int}(; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -163,19 +166,19 @@ end
     l = l_indices[lm]
 
     # Skip zonal modes (m=0, which are the first lmax harmonics)
-    ξ[I] = ifelse(lm > lmax & l <= max_wavenumber, amplitude * l^power * random_values[I], 0)
+    ξ[I] = ifelse(lm > lmax & l <= max_wavenumber, amplitude * l^power * random_values[I], zero(amplitude))
 end
 
 export RandomVelocity
 
 """Start with random velocity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVelocity{NF, S, RNG} <: AbstractInitialConditions
+@kwdef mutable struct RandomVelocity{NF, S, RNG, I} <: AbstractInitialConditions
     "[OPTION] maximum speed [ms⁻¹]"
     max_speed::NF = 60
 
     "[OPTION] Maximum wavenumber after truncation"
-    truncation::Int = 15
+    truncation::I = 15
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
     seed::S = 0
@@ -187,7 +190,7 @@ end
 function RandomVelocity(SG::SpectralGrid; kwargs...)
     RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
     SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
-    return RandomVelocity{SG.NF, SeedType, RNG}(; kwargs...)
+    return RandomVelocity{SG.NF, SeedType, RNG, Int}(; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -218,8 +221,13 @@ function initialize!(
     u_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
     v_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
 
-    u = Field(2A .* u_data .- A, grid)
-    v = Field(2A .* v_data .- A, grid)
+    # broadcast on the raw data, then wrap as Field — on Reactant backends `Field`s
+    # are unwrapped to their `.data` by `broadcastable`, so the broadcast result of
+    # `2A .* Field(u_data, grid) .- A` is a plain array and breaks downstream `transform`.
+    u_data .= 2A .* u_data .- A
+    v_data .= 2A .* v_data .- A
+    u = Field(u_data, grid)
+    v = Field(v_data, grid)
 
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)
@@ -231,8 +239,11 @@ function initialize!(
 
     @allowscalar ξ[1] = 0  # remove mean
 
-    # repeat over vertical layers
-    ξks = repeat(ξ, 1, nlayers)
+    # repeat over vertical layers (broadcast-assign instead of `repeat` because
+    # `repeat(::ConcretePJRTArray, …)` falls back to scalar indexing on Reactant)
+    ξks_data = similar(ξ.data, size(ξ.data, 1), nlayers)
+    ξks_data .= ξ.data
+    ξks = LowerTriangularArray(ξks_data, ξ.spectrum)
     set!(vars, model; vorticity = ξks)
 
     return nothing
@@ -384,7 +395,7 @@ end
     θ = lat[j]  # latitude in radians
 
     # Compute velocity per latitude, u as in Galewsky, 2004
-    u_θ = ifelse(θ₀ < θ < θ₁, umax / eₙ * exp(1 / (θ - θ₀) / (θ - θ₁)), 0)
+    u_θ = ifelse(θ₀ < θ < θ₁, umax / eₙ * exp(1 / (θ - θ₀) / (θ - θ₁)), zero(umax))
 
     # Store velocity with scaling for curl!
     u_grid[ij] = u_θ / radius * coslat⁻¹[j]
@@ -443,12 +454,13 @@ function initialize!(
     sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
     (; radius) = model.planet
     R = radius * perturb_radius         # spatial extent of perturbation
+    scratch_field = vars.scratch.grid.a
 
     vor_ic = JablonowskiVorticity(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
 
     # apply those to set the initial conditions for vor, div
-    set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true)
+    set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true, scratch_field)
     return nothing
 end
 
@@ -467,7 +479,7 @@ end
 
 Adapt.@adapt_structure JablonowskiVorticity
 
-@inline function (J::JablonowskiVorticity)(λ, φ, η)
+@inline function (J::JablonowskiVorticity)(λ::NF, φ::NF , η::NF) where {NF}
     (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
 
     # great circle distance to perturbation
@@ -475,7 +487,7 @@ Adapt.@adapt_structure JablonowskiVorticity
     r = radius * acos(X)
 
     # Eq (3), the unperturbed zonal wind
-    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(3 / 2) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(NF(3 // 2)) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
 
     # Eq (12), the perturbation
     perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
@@ -514,14 +526,14 @@ export RossbyHaurwitzWave
 """Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
 with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field.
 Parameters are $(TYPEDFIELDS)"""
-@kwdef struct RossbyHaurwitzWave{NF} <: AbstractInitialConditions
-    m::Int = 4
+@kwdef struct RossbyHaurwitzWave{NF, I} <: AbstractInitialConditions
+    m::I = 4
     ω::NF = 7.848e-6
     K::NF = 7.848e-6
     c::NF = 1.0e-10
 end
 
-RossbyHaurwitzWave(SG::SpectralGrid; kwargs...) = RossbyHaurwitzWave{SG.NF}(; kwargs...)
+RossbyHaurwitzWave(SG::SpectralGrid; kwargs...) = RossbyHaurwitzWave{SG.NF, Int}(; kwargs...)
 
 """$(TYPEDSIGNATURES)
 Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
@@ -617,70 +629,49 @@ function initialize!(
     (; radius, rotation, gravity) = model.planet
 
     (; σ_levels_full) = model.geometry
-    σ_levels_full_cpu = on_architecture(CPU(), σ_levels_full)
     φ = model.geometry.latds
 
     # vertical profile
-    Tη = similar(σ_levels_full_cpu)
-    for k in 1:nlayers
-        σ = σ_levels_full_cpu[k]
-        Tη[k] = T₀ * σ^(R_dry * Γ / gravity)        # Jablonowski and Williamson eq. 4
-
-        if σ < σ_tropopause
-            Tη[k] += ΔT * (σ_tropopause - σ)^5      # Jablonowski and Williamson eq. 5
-        end
-    end
-
-    Tη .= max.(Tη, Tmin)
-    Tη = on_architecture(model.architecture, Tη)
+    exponent = R_dry * Γ / gravity
+    Tη = T₀ .* σ_levels_full .^ exponent .+
+        ifelse.(
+        σ_levels_full .< σ_tropopause,
+        ΔT .* (σ_tropopause .- σ_levels_full) .^ 5,
+        zero(NF)
+    )
+    Tη = max.(Tη, Tmin)
 
     # temperature
-    temp_grid = zeros(NF, grid, nlayers)
+    temp_grid = similar(vars.prognostic.temperature[:, :, 2], grid, NF)
     aΩ = radius * rotation
 
-    # Launch kernel
-    launch!(
-        architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
-        jablonowski_temperature_kernel!, temp_grid, Tη, φ, σ_levels_full,
-        η₀, u₀, R_dry, aΩ
-    )
+    launch!(architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
+        _jablonowski_temperature_kernel!, temp_grid, Tη, φ, σ_levels_full, η₀, u₀, R_dry, aΩ)
 
     set!(vars, model; temperature = temp_grid)
 
     return nothing
 end
 
-@kernel inbounds = true function jablonowski_temperature_kernel!(
-        temp_grid,
-        Tη,
-        φ,
-        σ_levels_full,
-        η₀,
-        u₀,
-        R_dry,
-        aΩ
+@kernel inbounds = true function _jablonowski_temperature_kernel!(
+        temp_grid, Tη, φ, σ_levels_full, η₀, u₀, R_dry, aΩ
     )
     ij, k = @index(Global, NTuple)
-
-    # Jablonowski and Williamson use η for σ coordinates
-    η = σ_levels_full[k]
-    ηᵥ = (η - η₀) * π * 1 // 2  # auxiliary variable for vertical coordinate
-
-    # Amplitudes with height
-    A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
-    A2 = 2u₀ * cos(ηᵥ)^(3 // 2)
-
-    # Get latitude
-    φij = φ[ij]
-    sinφ = sind(φij)
-    cosφ = cosd(φij)
-
     NF = eltype(temp_grid)
+
+    η = σ_levels_full[k]
+    ηᵥ = (η - η₀) * NF(π) / 2
+
+    A1 = 3 // 4 * η * NF(π) * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
+    A2 = 2 * u₀ * cos(ηᵥ)^(3 // 2)
+
+    sinφ = sin(φ[ij] * NF(π) / 180)
+    cosφ = cos(φ[ij] * NF(π) / 180)
 
     # Jablonowski and Williamson, eq. (6)
     temp_grid[ij, k] = Tη[k] + A1 * (
-        (-2sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63) * A2 +
-            (8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - convert(NF, π) * 1 // 4) * aΩ
+        (-2 * sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63) * A2 +
+            (8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - NF(π) / 4) * aΩ
     )
 end
 
@@ -691,7 +682,7 @@ Restart from a previous SpeedyWeather.jl simulation via the restart file restart
 Applies interpolation in the horizontal but not in the vertical. restart.jld2 is
 identified by
 $(TYPEDFIELDS)"""
-@kwdef mutable struct StartFromFile <: AbstractInitialConditions
+@kwdef mutable struct StartFromFile{I} <: AbstractInitialConditions
     "path for restart file"
     path::String = pwd()
 
@@ -702,10 +693,10 @@ $(TYPEDFIELDS)"""
     id::String = ""
 
     "run number, e.g. 1 in `run_set1_0001/restart.jld2`"
-    run_number::Int = 1
+    run_number::I = 1
 
     "run digits, e.g. 4 in `run_set1_0001/restart.jld2` for run_number=1"
-    run_digits::Int = 4
+    run_digits::I = 4
 
     "directly specify the run folder, e.q. `run_0001`"
     run_folder::String = ""
@@ -714,7 +705,7 @@ $(TYPEDFIELDS)"""
     filename::String = "restart.jld2"
 end
 
-StartFromFile(SG::SpectralGrid; kwargs...) = StartFromFile(; kwargs...)
+StartFromFile(SG::SpectralGrid; kwargs...) = StartFromFile{Int}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -778,7 +769,6 @@ function initialize!(
 
     lnp₀ = log(p₀)                      # logarithm of reference surface pressure [log(Pa)]
     lnp_grid = similar(orography)       # allocate log surface pressure on grid
-
     RΓg⁻¹ = R_dry * Γ / gravity         # for convenience
     ΓT₀⁻¹ = Γ / T₀
     @. lnp_grid = lnp₀ + log(1 - ΓT₀⁻¹ * orography) / RΓg⁻¹
@@ -828,42 +818,27 @@ function initialize!(
     (; σ_levels_full) = model.geometry
     (; atmosphere) = model
 
-    # get pressure [Pa] on grid
     lnpₛ = get_step(vars.prognostic.pressure, 1)  # 1 = first leapfrog timestep
-    pres_grid = transform(lnpₛ, model.spectral_transform)
-    pres_grid .= exp.(pres_grid)
+    lnpₛ_grid = transform(lnpₛ, model.spectral_transform)
 
-    temp = get_step(vars.prognostic.temperature, 1)  #  1 = first leapfrog timestep
+    temp = get_step(vars.prognostic.temperature, 1)  # 1 = first leapfrog timestep
     temp_grid = transform(temp, model.spectral_transform)
-    humid_grid = zero(temp_grid)
+    humid_grid = similar(temp_grid)
 
-    # Launch kernel
-    launch!(
-        architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
-        constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
-        σ_levels_full, relhumid_ref, atmosphere,
-    )
+    launch!(architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
+        _constant_relative_humidity_kernel!, humid_grid, temp_grid, lnpₛ_grid, σ_levels_full,
+        relhumid_ref, atmosphere)
+
     set!(vars, model; humidity = humid_grid)
-
     return nothing
 end
 
-@kernel inbounds = true function constant_relative_humidity_kernel!(
-        humid_grid,
-        temp_grid,
-        pres_grid,
-        σ_levels_full,
-        relhumid_ref,
-        atmosphere,
+@kernel inbounds = true function _constant_relative_humidity_kernel!(
+        humid_grid, temp_grid, lnpₛ_grid, σ_levels_full, relhumid_ref, atmosphere
     )
     ij, k = @index(Global, NTuple)
-
-    # Compute pressure at this level
-    pₖ = σ_levels_full[k] * pres_grid[ij]
-    T = temp_grid[ij, k]
-
-    # Set humidity as fraction of saturation
-    humid_grid[ij, k] = relhumid_ref * saturation_humidity(T, pₖ, atmosphere)
+    pres = σ_levels_full[k] * exp(lnpₛ_grid[ij])
+    humid_grid[ij, k] = relhumid_ref * saturation_humidity(temp_grid[ij, k], pres, atmosphere)
 end
 
 export RandomWaves
@@ -871,18 +846,18 @@ export RandomWaves
 """Parameters for random initial conditions for the interface displacement η
 in the shallow water equations.
 $(TYPEDFIELDS)"""
-@kwdef struct RandomWaves{NF} <: AbstractInitialConditions
+@kwdef struct RandomWaves{NF, I} <: AbstractInitialConditions
     """[OPTION] amplitude [m]"""
     amplitude::NF = 2000
 
     """[OPTION] minimum wavenumber"""
-    lmin::Int = 10
+    lmin::I = 10
 
     """[OPTION] maximum wavenumber"""
-    lmax::Int = 30
+    lmax::I = 30
 end
 
-RandomWaves(SG::SpectralGrid; kwargs...) = RandomWaves{SG.NF}(; kwargs...)
+RandomWaves(SG::SpectralGrid; kwargs...) = RandomWaves{SG.NF, Int}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)

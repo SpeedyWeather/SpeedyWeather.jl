@@ -16,10 +16,10 @@ initialize!(::ConstantLongwaveTransmissivity, ::AbstractModel) = nothing
 
     τ = -log(CLT.transmissivity)            # total optical depth of the atmosphere
     coord = model.geometry.vertical_coordinates
-    pₛ = vars.parameterizations.surface_pressure[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]    # actual surface pressure, see NOTE below
 
     for k in 1:nlayers
-        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ   
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ   # sigma thickness of layer k
         t[ij, k] = exp(-τ * Δσₖ)            # transmissivity through layer k
     end
     return t
@@ -53,8 +53,9 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 
     # coordinates
     coord = model.geometry.vertical_coordinates
-    pₛ = vars.parameterizations.surface_pressure[ij]
-    θ = model.geometry.latds[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]    # actual surface pressure, see NOTE below
+    j = model.geometry.whichring[ij]
+    sinlat = model.geometry.sinlat[j]   # sin(latitude), avoids calling sind() on traced scalars
 
     # Frierson 2006, eq. (4), (5) but in a differential form, computing dτ between half levels below and above
     # --- τ(k=1/2)                  # half level above
@@ -62,9 +63,9 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     # --- τ(k=1+1/2)                # half level below
 
     τ_above::NF = 0
-    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sind(θ)^2
+    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sinlat^2
     for k in 1:nlayers              # loop over half levels below
-        σₖ = pressure_below(k, pₛ, coord) / pₛ
+        σₖ = pressure_below(k, pₛ, coord) / pₛ  # sigma at half level below full level k
         τ_below = τ₀ * (fₗ * σₖ + (1 - fₗ) * σₖ^4)
         t[ij, k] = exp(-(τ_below - τ_above))
         τ_above = τ_below
@@ -73,3 +74,63 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     # return so the radiative_trasfer uses the right scratch array
     return t
 end
+
+"""$(TYPEDSIGNATURES)
+Precompute the (state-independent) longwave transmissivity once into
+a `nlayers × nlat` matrix `t` (one column per latitude ring). Computing on the
+host with libm `exp` and transferring the SAME array to the device makes the
+transmissivity bit-identical across CPU/GPU/Reactant. Only valid for state-independent
+coordinates (`SigmaCoordinates`); state-dependent coordinates compute `transmissivity!` per
+column at run time instead."""
+function fill_longwave_transmissivity!(t::AbstractMatrix, CLT::ConstantLongwaveTransmissivity, model)
+    nlayers, nlat = size(t)
+    # pull the coordinate to host so the loop runs host libm `exp`, not device/XLA `exp`;
+    # on CPU this is a no-op, under Reactant it transfers ConcretePJRTArray → Vector
+    coord = on_architecture(CPU(), model.geometry.vertical_coordinates)
+    pₛ = model.atmosphere.reference_pressure # reference (not prognostic) surface pressure, see NOTE above
+    τ = -log(CLT.transmissivity)            # total optical depth of the atmosphere
+    for j in 1:nlat, k in 1:nlayers
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ   # sigma thickness of layer k at the reference pₛ
+        t[k, j] = exp(-τ * Δσₖ)             # transmissivity through layer k (lat-independent)
+    end
+    return t
+end
+
+function fill_longwave_transmissivity!(t::AbstractMatrix, transmissivity::FriersonLongwaveTransmissivity, model)
+    nlayers, nlat = size(t)
+    NF = eltype(t)
+    (; τ₀_equator, τ₀_pole, fₗ) = transmissivity
+    # pull the coordinate + sinlat to host so the loop runs host libm `exp`, not device/XLA `exp`
+    coord = on_architecture(CPU(), model.geometry.vertical_coordinates)
+    pₛ = model.atmosphere.reference_pressure # reference (not prognostic) surface pressure, see NOTE above
+    sinlat = on_architecture(CPU(), model.geometry.sinlat)          # sin(latitude) per ring
+    for j in 1:nlat
+        τ_above = zero(NF)
+        τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sinlat[j]^2
+        for k in 1:nlayers                  # loop over half levels below
+            σₖ = pressure_below(k, pₛ, coord) / pₛ  # sigma at half level below full level k at the reference pₛ
+            τ_below = τ₀ * (fₗ * σₖ + (1 - fₗ) * σₖ^4)
+            t[k, j] = exp(-(τ_below - τ_above))
+            τ_above = τ_below
+        end
+    end
+    return t
+end
+
+# Provide the per-column layer transmissivity for grid point `ij` in the scratch array (indexed
+# `[ij, k]`), which the radiative transfer then reads. Dispatches on the vertical coordinate:
+#  - `SigmaCoordinates` (state-independent): copy the precomputed per-latitude-ring column
+#  - any other coordinate (state-dependent): compute on the fly from the actual surface pressure
+@propagate_inbounds function transmissivity_column!(ij, vars, transmissivity, ::SigmaCoordinates, model)
+    t = vars.scratch.grid.a
+    t_precomputed = vars.parameterizations.longwave_transmissivity   # nlayers × nlat
+    j = model.geometry.whichring[ij]
+    nlayers = size(t, 2)
+    for k in 1:nlayers
+        t[ij, k] = t_precomputed[k, j]
+    end
+    return t
+end
+
+@propagate_inbounds transmissivity_column!(ij, vars, transmissivity, ::AbstractVerticalCoordinates, model) =
+    transmissivity!(ij, vars, transmissivity, model)

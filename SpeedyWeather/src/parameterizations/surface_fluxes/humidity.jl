@@ -50,9 +50,9 @@ end
 
 export SurfaceOceanHumidityFlux
 """Humidity flux parameterization over ocean surfaces. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceOceanHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
-    "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
-    use_boundary_layer_drag::Bool = true
+@parameterized @kwdef struct SurfaceOceanHumidityFlux{NF, B} <: AbstractSurfaceHumidityFlux
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
+    use_boundary_layer_drag::B = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
     @param drag::NF = 0.9e-3 (bounds = 0 .. 1,)
@@ -62,7 +62,7 @@ export SurfaceOceanHumidityFlux
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
-SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF}(; kwargs...)
+SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF, Bool}(; kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 variables(::SurfaceOceanHumidityFlux) = (
@@ -113,9 +113,9 @@ end
 
 export SurfaceLandHumidityFlux
 """Humidity flux parameterization over land surfaces. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceLandHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
-    "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
-    use_boundary_layer_drag::Bool = true
+@parameterized @kwdef struct SurfaceLandHumidityFlux{NF, B} <: AbstractSurfaceHumidityFlux
+    "[OPTION] Use column.boundary_layer_drag coefficient"
+    use_boundary_layer_drag::B = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over land"
     @param drag::NF = 1.2e-3 (bounds = 0 .. 1,)
@@ -125,7 +125,7 @@ export SurfaceLandHumidityFlux
 end
 
 Adapt.@adapt_structure SurfaceLandHumidityFlux
-SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF}(; kwargs...)
+SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF, Bool}(; kwargs...)
 initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
 variables(::SurfaceLandHumidityFlux) = (
@@ -151,11 +151,11 @@ variables(::SurfaceLandHumidityFlux) = (
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
-    drag_land = humidity_flux.use_boundary_layer_drag ? d : humidity_flux.drag
+    drag_land = ifelse(humidity_flux.use_boundary_layer_drag, d, convert(typeof(d), humidity_flux.drag))
 
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
     # but remove the max( ,0) to allow for surface condensation
-    flux_land = ifelse(isfinite(T) && isfinite(α), ρ * drag_land * V₀ * (α * sat_humid_land - surface_humid), zero(T))
+    flux_land = ifelse(isfinite(T) & isfinite(α), ρ * drag_land * V₀ * (α * sat_humid_land - surface_humid), zero(T))
 
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
     flux_land /= 1 + snow_depth / humidity_flux.snow_insulation_depth

@@ -28,6 +28,7 @@ StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 cuFFT = "533571aa-0936-420e-b4be-9c66f5f626ca"
 
 [sources]
@@ -39,6 +40,7 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 SpeedyTransformsAMDGPUExt = "AMDGPU"
 SpeedyTransformsCUDAExt = ["CUDA", "cuFFT"]
 SpeedyTransformsEnzymeExt = "Enzyme"
+SpeedyTransformsReactantExt = "Reactant"
 
 [compat]
 AMDGPU = "2.1.2"

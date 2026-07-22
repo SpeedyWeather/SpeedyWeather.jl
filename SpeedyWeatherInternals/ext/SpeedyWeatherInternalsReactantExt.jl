@@ -3,9 +3,10 @@ module SpeedyWeatherInternalsReactantExt
 using KernelAbstractions
 using SpeedyWeatherInternals
 using Reactant
+using GPUArrays: @allowscalar
 
 import SpeedyWeatherInternals.Architectures: Architectures, CPU, ReactantDevice, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type, device
-import SpeedyWeatherInternals.Utils: _jit
+import SpeedyWeatherInternals.Utils: _jit, _set_scalar!
 
 # grab the proper KernelAbstractions backend for Reactant
 const ReactantKernelAbstractionsExt = Base.get_extension(
@@ -20,8 +21,8 @@ Architectures.array_type(::ReactantDevice) = ConcreteRArray
 Architectures.array_type(::Type{<:ReactantDevice}) = ConcreteRArray
 Architectures.array_type(::ReactantDevice, NF::Type, N::Int) = ConcretePJRTArray{NF, N, 1}
 
-Architectures.compatible_array_types(::ReactantDevice) = (ConcreteRArray, AnyConcreteReactantArray)
-Architectures.compatible_array_types(::Type{<:ReactantDevice}) = (ConcreteRArray, AnyConcreteReactantArray)
+Architectures.compatible_array_types(::ReactantDevice) = (ConcreteRArray, AnyConcreteReactantArray, Reactant.AnyTracedRArray)
+Architectures.compatible_array_types(::Type{<:ReactantDevice}) = (ConcreteRArray, AnyConcreteReactantArray, Reactant.AnyTracedRArray)
 
 Architectures.nonparametric_type(::Type{<:ConcreteRArray}) = ConcreteRArray
 
@@ -70,5 +71,10 @@ function _jit(::ReactantDevice, f, args...; kwargs...)
         return Reactant.@jit f(args...; kwargs...)
     end
 end
+
+# In Reactant actually use @allowscalar (in constrast to regular model which needs a workaround for Enzyme)
+function _set_scalar!(::ReactantDevice, x::AbstractArray, i::Integer, v::Number)
+    @allowscalar x[i] = v
+end 
 
 end

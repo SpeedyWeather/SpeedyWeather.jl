@@ -63,9 +63,9 @@ function MatrixSpectralTransform(
     ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
-    latd = RingGrids.get_latd(grid)                                     # latitude in degrees (90˚Nto -90˚N)
-    coslat = on_architecture(architecture, NF.(cosd.(latd)))            # cos(lat)
-    coslat⁻¹ = on_architecture(architecture, NF.(inv.(cosd.(latd))))   # 1/cos(lat)
+    latd = RingGrids.get_latd(grid)                         # latitude in degrees (90˚Nto -90˚N)
+    coslat = on_architecture(architecture, NF.(cosd.(latd)))     # cos(lat)
+    coslat⁻¹ = on_architecture(architecture, NF.(inv.(coslat)))  # 1/cos(lat)
 
     # Create another SpectralTransform to calculate the transform matrices from (do this on the CPU)
     spectrum_cpu = on_architecture(CPU(), spectrum)
@@ -129,7 +129,7 @@ data yields spectral coefficients. This function is not yet implemented."""
 function forward_matrix!(F, S::AbstractSpectralTransform, field::AbstractField2D, coeffs::LowerTriangularMatrix, progress = nothing)
     for ij in eachindex(field)
         field .= 0                              # unit vector of input
-        GPUArrays.@allowscalar field[ij] = 1
+        set_scalar!(field.data, ij, one(eltype(field)))
         transform!(coeffs, field, S)            # forward transforms of unit vectors
         F[:, ij] .= coeffs.data                 # are the columns of the transformation matrix F
         isnothing(progress) || ProgressMeter.next!(progress)
@@ -147,14 +147,14 @@ function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2
     for lm in axes(coeffs.data, 1)
         # real part of column: set coeffs[lm] = 1 (real unit vector)
         coeffs.data .= 0
-        GPUArrays.@allowscalar coeffs.data[lm] = 1
+        set_scalar!(coeffs.data, lm, one(eltype(coeffs.data)))
         transform!(field, coeffs, S)
         real_response = copy(field.data)
 
         # imaginary part of column: set coeffs[lm] = im (imaginary unit vector)
         # field = Re(B * c) = Re(B)*Re(c) - Im(B)*Im(c), with c[lm]=im: field = -Im(B)[:, lm]
         coeffs.data .= 0
-        GPUArrays.@allowscalar coeffs.data[lm] = im
+        set_scalar!(coeffs.data, lm, im * one(eltype(coeffs.data)))
         transform!(field, coeffs, S)
 
         B[:, lm] .= real_response .+ im .* (.-field.data)
@@ -207,7 +207,6 @@ function transform!(                        # SPECTRAL TO GRID
         M::MatrixSpectralTransform;         # precomputed transform
         unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
     )
-
     # catch incorrect sizes early
     @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
     @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
@@ -222,15 +221,21 @@ function transform!(                        # SPECTRAL TO GRID
     scratch = view(scratch_memory, :, 1:ncolumns)
 
     # the result is real-valued, therefore we can split the complex multiplication
-    # into two real-valued multiplications
-    scratch .= real.(coeffs_matrix)
-    @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_real, scratch)
-
-    scratch .= imag.(coeffs_matrix)
-    @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_imag, scratch, -1, 1)
+    # into two real-valued multiplications; both must run in a single @maybe_jit call
+    # so that the accumulation (β=1) in the second mul! sees the result of the first
+    # within the same compiled context (avoids Reactant first-call NaN)
+    @maybe_jit M.architecture _backward_mul!(field_matrix, coeffs_matrix, scratch, M.backward_real, M.backward_imag)
 
     if unscale_coslat
         @maybe_jit M.architecture RingGrids._scale_lat!(field, M.coslat⁻¹)
     end
     return field
+end
+
+@inline function _backward_mul!(field_data, coeffs_data, scratch, backward_real, backward_imag)
+    scratch .= real.(coeffs_data)
+    LinearAlgebra.mul!(field_data, backward_real, scratch)
+    scratch .= imag.(coeffs_data)
+    LinearAlgebra.mul!(field_data, backward_imag, scratch, -1, 1)
+    return nothing
 end

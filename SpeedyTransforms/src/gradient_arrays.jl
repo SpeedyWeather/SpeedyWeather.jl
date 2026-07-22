@@ -173,7 +173,7 @@ function gradient_arrays(::Type{NF}, spectrum::Spectrum) where {NF}
 
     eigenvalues = get_eigenvalues(NF, spectrum)     # = -l*(l+1), degree l of spherical harmonic
     eigenvalues⁻¹ = inv.(eigenvalues)
-    GPUArrays.@allowscalar eigenvalues⁻¹[1] = 0     # set the integration constant to 0
+    set_scalar!(eigenvalues⁻¹, 1, zero(eltype(eigenvalues⁻¹)))     # set the integration constant to 0
 
     gradients = (;
         # GRADIENTS

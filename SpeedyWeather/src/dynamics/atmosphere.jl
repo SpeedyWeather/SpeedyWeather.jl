@@ -135,22 +135,23 @@ Clausius-Clapeyron equation,
     e(T) = e₀ * exp( -Lᵥ/Rᵥ * (1/T - 1/T₀)),
 
 where T is in Kelvin, Lᵥ the the latent heat of condensation and Rᵥ the gas constant of water vapor"""
-function saturation_vapor_pressure(T, A::AbstractWetAtmosphere)
+@inline function saturation_vapor_pressure(T, A::AbstractWetAtmosphere)
     e₀ = A.saturation_vapor_pressure
     Lᵥ = A.latent_heat_condensation
-    (; R_vapor) = A
+    R_vapor = A.R_vapor
     T₀ = A.temperature_freezing
-    T = convert(eltype(T₀), T)      # ensure type of A
-    return e₀ * exp(Lᵥ / R_vapor * (inv(T₀) - inv(T)))
+    #T = convert(eltype(T₀), T)      # ensure type of A
+    # TODO: replace 1/T with inv(T) once Reactant issue fixed https://github.com/EnzymeAD/Reactant.jl/issues/2560
+    return e₀ * exp(Lᵥ / R_vapor * ((1/T₀) - (1/T)))
 end
 
-saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)
+@inline saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)
 
 """$(TYPEDSIGNATURES)
 Saturation specific humidity as a function of temperature [K] and pressure [Pa], defined as
     qₛ = ε * eₛ(T) / p,
 with saturation vapor pressure eₛ(T), pressure p [Pa] and ratio of gas constants `ε = R_dry/R_vapor`."""
-function saturation_humidity(T, p, A::AbstractWetAtmosphere)
+@inline function saturation_humidity(T, p, A::AbstractWetAtmosphere)
     eₛ = saturation_vapor_pressure(T, A)
     ϵ = A.mol_ratio
     return ϵ * eₛ / p
@@ -197,7 +198,7 @@ where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively."""
 @inline function saturation_vapor_pressure(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
     (; e₀, T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
-    C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)      # change coefficients above/below freezing
+    C, T = ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))      # change coefficients above/below freezing
     temp_celsius = temp_kelvin - T₀
     return e₀ * exp(C * temp_celsius / (temp_celsius + T))
 end
@@ -211,6 +212,6 @@ Gradient of the Tetens equation wrt to temperature, evaluated at `temp_kelvin`."
 @inline function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
     (; T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
     e = saturation_vapor_pressure(TetensCoefficients, temp_kelvin)  # saturation vapor pressure
-    C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)   # change coefficients above/below freezing
-    return e * C * T / (temp_kelvin - T₀ - T)^2           # chain rule: times derivative of inner function
+    C, T = ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))      # change coefficients above/below freezing
+    return e * C * T / (temp_kelvin - T₀ - T)^2                     # chain rule: times derivative of inner function
 end

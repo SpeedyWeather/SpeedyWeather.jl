@@ -55,13 +55,14 @@ $(TYPEDFIELDS)"""
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
         PV,     # <:Val
+        B,      # <:Bool
     } <: PrimitiveWet
 
     spectral_grid::SG
     architecture::AR = spectral_grid.architecture
 
     # DYNAMICS
-    dynamics::Bool = true
+    dynamics::B = true
     @component geometry::GE = Geometry(spectral_grid)
     @component planet::PL = Earth(spectral_grid)
     @component atmosphere::AT = EarthAtmosphere(spectral_grid)
@@ -78,7 +79,7 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # BOUNDARY CONDITIONS
-    dynamics_only::Bool = false
+    dynamics_only::B = false
     @component orography::OR = EarthOrography(spectral_grid)
     @component land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
     @component ocean::OC = SlabOcean(spectral_grid)
@@ -117,7 +118,7 @@ $(TYPEDFIELDS)"""
 
     # COMPONENTS
     # Tuples with symbols or instances of all parameterizations and parameter functions
-    # Used to initiliaze variables and for the column-based parameterizations
+    # Used to initialize variables and for the column-based parameterizations
     # also determine order in which parameterizations are called
     core_components::TS1 = (
         :architecture, :time_stepping, :orography, :geopotential, :atmosphere,
@@ -174,6 +175,7 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
+
     # NUMERICS (implicit is initialized later)
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)

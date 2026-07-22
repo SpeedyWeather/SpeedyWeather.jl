@@ -16,7 +16,7 @@ Galewsky, 2004, but mirrored for both hemispheres.
 
 $(TYPEDFIELDS)
 """
-@parameterized @kwdef mutable struct JetStreamForcing{NF, VectorType} <: AbstractForcing
+@parameterized @kwdef mutable struct JetStreamForcing{NF, VectorType, S} <: AbstractForcing
     "[OPTION] jet latitude [˚N]"
     @param latitude::NF = 45 (bounds = -90 .. 90,)
 
@@ -30,7 +30,7 @@ $(TYPEDFIELDS)
     @param speed::NF = 85
 
     "[OPTION] time scale [days]"
-    time_scale::Second = Day(30)
+    time_scale::S = Day(30)
 
     "[DERIVED] precomputed amplitude vector [m/s²]"
     amplitude::VectorType
@@ -44,7 +44,7 @@ function JetStreamForcing(SG::SpectralGrid; kwargs...)
     amplitude = on_architecture(SG.architecture, zeros(SG.NF, SG.nlat))
     tapering = on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
 
-    return JetStreamForcing{SG.NF, SG.VectorType}(; amplitude, tapering, kwargs...)
+    return JetStreamForcing{SG.NF, SG.VectorType, Dates.Second}(; amplitude, tapering, kwargs...)
 end
 
 function initialize!(
@@ -253,15 +253,15 @@ export HeldSuarez
 
 """Temperature relaxation from Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-@kwdef struct HeldSuarez{NF, VectorType, MatrixType} <: AbstractForcing
+@kwdef struct HeldSuarez{NF, VectorType, MatrixType, S} <: AbstractForcing
     "[OPTION] sigma coordinate below which faster surface relaxation is applied"
     σb::NF = 0.7
 
     "[OPTION] time scale for slow global relaxation"
-    relax_time_slow::Second = Day(40)
+    relax_time_slow::S = Day(40)
 
     "[OPTION] time scale for faster tropical surface relaxation"
-    relax_time_fast::Second = Day(4)
+    relax_time_fast::S = Day(4)
 
     "[OPTION] minimum equilibrium temperature [K]"
     Tmin::NF = 200
@@ -299,7 +299,7 @@ function HeldSuarez(SG::SpectralGrid; kwargs...)
     temp_equil_a = on_architecture(SG.architecture, zeros(SG.NF, nlat))
     temp_equil_b = on_architecture(SG.architecture, zeros(SG.NF, nlat))
 
-    return HeldSuarez{NF, VectorType, MatrixType}(; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
+    return HeldSuarez{NF, VectorType, MatrixType, Dates.Second}(; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)

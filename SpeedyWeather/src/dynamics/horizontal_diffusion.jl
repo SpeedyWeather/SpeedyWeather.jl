@@ -335,7 +335,7 @@ function horizontal_diffusion!(
     pres_tend = get_tendency_step(vars.tendencies.pressure, model.time_stepping, diffusion)
     zero_last_degree!(pres_tend)
 
-    pres_tend.data[1:1] .= 0    # mass conservation
+    set_scalar!(pres_tend.data, 1, 0)    # mass conservation
 
     if haskey(vars.tendencies, :humidity)
         humid = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, diffusion)
@@ -359,6 +359,7 @@ export SpectralFilter
         NF,
         MatrixType,
         IntType,
+        S,
     } <: AbstractHorizontalDiffusion
 
     # DIMENSIONS
@@ -376,10 +377,10 @@ export SpectralFilter
     scale::NF = 0.05
 
     "[OPTION] diffusion time scale"
-    time_scale::Second = Hour(4)
+    time_scale::S = Hour(4)
 
     "[OPTION] stronger diffusion time scale for divergence"
-    time_scale_div::Second = Minute(30)
+    time_scale_div::S = Minute(30)
 
     "[OPTION] resolution scaling to shorten time_scale with trunc"
     resolution_scaling::NF = 1
@@ -405,7 +406,7 @@ Passes on keyword arguments."""
 function SpectralFilter(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
     MatrixType = ArrayType{NF, 2}
-    return SpectralFilter{NF, MatrixType, typeof(trunc)}(; trunc, nlayers, kwargs...)
+    return SpectralFilter{NF, MatrixType, typeof(trunc), Dates.Second}(; trunc, nlayers, kwargs...)
 end
 
 function initialize!(

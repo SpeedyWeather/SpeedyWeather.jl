@@ -5,7 +5,7 @@ export SeasonalLandTemperature
 """SeasonalLandTemperature model that prescribes land surface temperature from a monthly climatology file.
 The temperature is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
+@kwdef struct SeasonalLandTemperature{NF, GridVariable3D, B} <: AbstractLandTemperature
     "[OPTION] filename of land surface temperatures"
     file::String = "land_surface_temperature.nc"
 
@@ -13,7 +13,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for lst in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -25,7 +25,7 @@ $(TYPEDFIELDS)"""
     FieldType::Type{<:AbstractField} = FullGaussianField
 
     "[OPTION] Apply land-sea mask to use fallback ocean temperature for ocean-only points?"
-    mask::Bool = true
+    mask::B = true
 
     "[OPTION] Fallback ocean temperature when mask=true [K]"
     ocean_temperature::NF = 285
@@ -42,7 +42,7 @@ end
 function SeasonalLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
     (; NF, GridVariable3D, grid) = SG
     monthly_temperature = zeros(GridVariable3D, grid, 12)  # 12 months
-    return SeasonalLandTemperature{NF, GridVariable3D}(; monthly_temperature, kwargs...)
+    return SeasonalLandTemperature{NF, GridVariable3D, Bool}(; monthly_temperature, kwargs...)
 end
 
 function variables(::SeasonalLandTemperature)
@@ -71,16 +71,14 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, lst, NF = Float32)
-    interpolate!(monthly_temperature, lst, interp)
+    @maybe_jit model.architecture interpolate!(monthly_temperature, lst, interp)
 
     # mask ocean points to fallback ocean temperature
     # set ocean "land" temperature points (100% ocean only)
     masked_value = land.ocean_temperature
     if land.mask
         # Replace NaN values in soil temperature with a fallback ocean temperature
-        # unpack via .data due to broadcasting issues
-        mtd = monthly_temperature.data
-        mtd[isnan.(mtd)] .= masked_value
+        mask!(monthly_temperature, isnan.(monthly_temperature), :land; masked_value)
 
         # but land-sea mask may not align so also set those 100% ocean points to
         # the same fallback ocean temperature
@@ -126,16 +124,16 @@ end
 
 # CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
-@parameterized @kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
+@parameterized @kwdef struct ConstantLandTemperature{NF, B} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
     @param temperature::NF = 285 (bounds = Positive,)
 
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
-    mask::Bool = true
+    mask::B = true
 end
 
 # generator function
-ConstantLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
+ConstantLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = ConstantLandTemperature{SG.NF, Bool}(; kwargs...)
 
 initialize!(land::ConstantLandTemperature, model::PrimitiveEquation) = nothing
 function initialize!(
@@ -161,9 +159,9 @@ export LandBucketTemperature
 
 """MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html).
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
+@kwdef struct LandBucketTemperature{NF, B} <: AbstractLandTemperature
     "[OPTION] Apply land-sea mask to set ocean-only points?"
-    mask::Bool = true
+    mask::B = true
 
     "[OPTION] Initial soil temperature over ocean [K]"
     ocean_temperature::NF = 285
@@ -172,7 +170,7 @@ end
 Adapt.@adapt_structure LandBucketTemperature
 
 # generator function
-LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
+LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF, Bool}(; kwargs...)
 
 function variables(::LandBucketTemperature)
     return (
@@ -206,9 +204,8 @@ function initialize!(
     # set ocean "land" temperature points (100% ocean only)
     if land.mask
         masked_value = land.ocean_temperature
-        # TODO currently requries .data because of broadcasting issues
-        lst = vars.prognostic.land.soil_temperature.data
-        lst[isnan.(lst)] .= masked_value
+
+        mask!(vars.prognostic.land.soil_temperature, isnan.(vars.prognostic.land.soil_temperature), :land; masked_value) # land because 1 in isnan.(x) is set to masked_value
         mask!(vars.prognostic.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
     end
     return nothing

@@ -484,15 +484,15 @@ function ∇!(
         dpdx::LowerTriangularArray,             # Output: zonal gradient
         dpdy::LowerTriangularArray,             # Output: meridional gradient
         p::LowerTriangularArray,                # Input: spectral coefficients
-        S::AbstractSpectralTransform;           # includes precomputed arrays
+        S::AbstractSpectralTransform{NF};           # includes precomputed arrays
         radius = DEFAULT_RADIUS,                # scale with radius if provided, otherwise unit sphere
-    )
+    ) where {NF}
     (; grad_y1, grad_y2) = S.gradients
     (; m_indices) = p.spectrum
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
     # TODO: there's currently a scalar indexing error when using p direclty instead of p.data, this should be fixed
-    @. dpdx = complex(0, m_indices - 1) * p.data
+    @. dpdx = complex(0, m_indices - one(NF)) * p.data
 
     launch!(architecture(dpdy), SpectralWorkOrder, size(dpdy), dpdy_kernel!, dpdy, p.data, grad_y1, grad_y2)
 
