@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- CPU column parameterization loop accesses model components directly instead of materializing the `get_parameterizations` NamedTuple, working around an Enzyme reverse-mode mis-compilation on Julia 1.12, Enzyme compat with 1.12 enabled [#1163](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1163)
 - Revised EnzymeRules for SpeedyTransforms [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
 - Eliminate dynamic dispatchs in the model integration code and unit test for them with JET [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
 - ZarrOutput ensemble mode hardened for parallel jobs, Zarr store metadata consolidated at creation for faster opening [#1160](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1160)
