@@ -584,7 +584,7 @@ function fields_match(
         horizontal_only::Bool = false,
         vertical_only::Bool = false,
     )
-    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_only and vertical_only = $vertical_only"
+    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only and vertical_only cannot both be true"
 
     horizontal_only && return grids_match(A, B)
     vertical_only && return size(A)[2:end] == size(B)[2:end]
@@ -603,9 +603,9 @@ end
 # view(array, :) unravels like array[:] does, hence "::Colon, i, args..." used to enforce one argument after :
 # exception is view(vector, :) which preserves the vector structure, equivalent here is the Field2D
 # TODO extend Base.view?
-field_view(field::AbstractField, c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid, field.dims[c, i, args...])
-field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid, field.dims)
-field_view(field::AbstractField, args...) = view(field, args...)   # fallback to normal view
+Base.@propagate_inbounds field_view(field::AbstractField, c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid, field.dims[c, i, args...])
+Base.@propagate_inbounds field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid, field.dims)
+Base.@propagate_inbounds field_view(field::AbstractField, args...) = view(field, args...)   # fallback to normal view
 
 # needed for Enzyme 
 Base.unaliascopy(A::Field) =

@@ -630,45 +630,53 @@ function warn_undefvar(vars::Variables, key::Symbol, group::Symbol = :prognostic
     return true # return true to allow for short-circuiting with && return nothing to skip exit the following code early
 end
 
+# Generator-time name computations on the *type* of the tendencies NamedTuple. These plain
+# functions are the single source for the `*_names` providers below AND the
+# `@generated` unrolled drivers in the time stepping (`_update_prognostic_unrolled!` etc.)
+# top-level tendency names: every field that is not a namespace NamedTuple (:grid, :tracers, …)
+_tendency_names(T::Type{<:NamedTuple}) =
+    Symbol[k for (i, k) in enumerate(fieldnames(T)) if !(fieldtype(T, i) <: NamedTuple)]
+
+# like `_tendency_names` but with :u, :v appended if :vorticity is present (grid tendencies)
+function _tendency_and_uv_names(T::Type{<:NamedTuple})
+    names = _tendency_names(T)
+    return :vorticity in names ? vcat(names, [:u, :v]) : names
+end
+
+# field names of the namespace NamedTuple `ns` (:ocean, :land, :tracers), or empty if absent
+_namespace_names(T::Type{<:NamedTuple}, ns::Symbol) =
+    ns in fieldnames(T) ? collect(fieldnames(fieldtype(T, ns))) : Symbol[]
+
 """$(TYPEDSIGNATURES)
 Names (Tuple of Symbols) of the tendencies in `::Variables`. Used to define which (atmopsheric) variables are time stepped.
 Ignores any other names spaces."""
 @generated function tendency_names(::Variables{Po, G, T}) where {Po, G, T}
-    names = Symbol[k for (i, k) in enumerate(fieldnames(T)) if !(fieldtype(T, i) <: NamedTuple)]
-    return Expr(:tuple, QuoteNode.(names)...)
+    return Expr(:tuple, QuoteNode.(_tendency_names(T))...)
 end
 
 """$(TYPEDSIGNATURES)
 Like `tendency_names`, but adds `:u` and `:v` if `:vorticity` is present."""
 @generated function tendency_and_uv_names(::Variables{Po, G, T}) where {Po, G, T}
-    names = Symbol[k for (i, k) in enumerate(fieldnames(T)) if !(fieldtype(T, i) <: NamedTuple)]
-    names = :vorticity in names ? vcat(names, [:u, :v]) : names
-    return Expr(:tuple, QuoteNode.(names)...)
+    return Expr(:tuple, QuoteNode.(_tendency_and_uv_names(T))...)
 end
 
 """$(TYPEDSIGNATURES)
 Names (Tuple of Symbols) of the land tendencies in `::Variables`. Used to define which land variables are time stepped.
 Ignores any other names spaces."""
 @generated function land_tendency_names(::Variables{Po, G, T}) where {Po, G, T}
-    :land in fieldnames(T) || return :(())
-    names = collect(fieldnames(fieldtype(T, :land)))
-    return Expr(:tuple, QuoteNode.(names)...)
+    return Expr(:tuple, QuoteNode.(_namespace_names(T, :land))...)
 end
 
 """$(TYPEDSIGNATURES)
 Names (Tuple of Symbols) of the ocean tendencies in `::Variables`. Used to define which ocean variables are time stepped.
 Ignores any other names spaces."""
 @generated function ocean_tendency_names(::Variables{Po, G, T}) where {Po, G, T}
-    :ocean in fieldnames(T) || return :(())
-    names = collect(fieldnames(fieldtype(T, :ocean)))
-    return Expr(:tuple, QuoteNode.(names)...)
+    return Expr(:tuple, QuoteNode.(_namespace_names(T, :ocean))...)
 end
 
 """$(TYPEDSIGNATURES)
-Names (Tuple of Symbols) of the ocean tendencies in `::Variables`. Used to define which ocean variables are time stepped.
+Names (Tuple of Symbols) of the tracer tendencies in `::Variables`. Used to define which tracer variables are time stepped.
 Ignores any other names spaces."""
 @generated function tracer_tendency_names(::Variables{Po, G, T}) where {Po, G, T}
-    :tracers in fieldnames(T) || return :(())
-    names = collect(fieldnames(fieldtype(T, :tracers)))
-    return Expr(:tuple, QuoteNode.(names)...)
+    return Expr(:tuple, QuoteNode.(_namespace_names(T, :tracers))...)
 end
