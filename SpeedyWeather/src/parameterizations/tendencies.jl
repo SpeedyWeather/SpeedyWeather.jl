@@ -29,33 +29,44 @@ end
 end
 
 # COLUMN-BASED PARAMETERIZATIONS
+#
+# Both the CPU and GPU paths fuse all column parameterizations and access each one
+# as `model.$name` directly (names read off the model type). 
+
 function column_parameterizations!(vars, model)
     (; architecture, npoints) = model.spectral_grid
     if architecture isa Architectures.AbstractCPU
         # bypass kernel launch on CPU
         column_parameterizations_cpu!(vars, model)
     else
-        # GPU: all other parameterizations are fused into a single kernel over horizontal grid point index ij
+        # GPU: fuse all parameterizations into a single kernel over horizontal grid point index ij
         launch!(
             architecture, LinearWorkOrder, (npoints,), column_parameterizations_kernel!,
-            vars, get_parameterizations(model), model
+            vars, model
         )
     end
     return nothing
 end
 
-# GPU kernel, unrolling NamedTuple iteration at compile time, fuses all parameterizations
-@kernel inbounds = true function column_parameterizations_kernel!(vars, parameterizations, model)
+# GPU kernel: one thread per horizontal grid point ij, all parameterizations unrolled inside
+@kernel inbounds = true function column_parameterizations_kernel!(vars, model)
 
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
     # manually unroll loop over all parameterizations (NamedTuple iteration not GPU-compatible)
-    column_parameterizations!(ij, vars, parameterizations, model)
+    column_parameterizations!(ij, vars, model)
 end
 
-# Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
-@generated function column_parameterizations!(ij, vars, parameterizations::NamedTuple{names}, model) where {names}
-    calls = [:(parameterization!(ij, vars, parameterizations.$name, model)) for name in names]
+# Use @generated to unroll the parameterization iteration at compile time; names are read off the
+# model type and each parameterization is accessed as model.$name directly (GPU-compatible).
+# NOTE: on GPU `model` here is the ADAPTED model, i.e. a `NamedTuple` (see Adapt.adapt_structure),
+# NOT a `PrimitiveEquation` — so we must NOT constrain the type. Both a real model struct and the
+# adapted NamedTuple carry a `params` field/entry (::Val{names}) and each `model.$name`, because
+# `adapt_structure` folds the parameterizations + `params` into the NamedTuple.
+@generated function column_parameterizations!(ij, vars, model)
+    params_type = fieldtype(model, :params)
+    param_names = params_type.parameters[1]         # extract tuple from Val{tuple}
+    calls = [:(parameterization!(ij, vars, model.$name, model)) for name in param_names]
     return quote
         Base.@_propagate_inbounds_meta
         $(Expr(:block, calls...))
@@ -63,27 +74,26 @@ end
 end
 
 # CPU without kernel, just a loop, change loop order compared to GPU though:
-# outer loop over parameterizations, inner loop over horizontal grid points
-# this yields a more contiguous memory access pattern on CPU
-function column_parameterizations_cpu!(vars, model)
-    _column_parameterizations_cpu!(vars, get_parameterizations(model), model)
-    return nothing
-end
-
-# Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
-@generated function _column_parameterizations_cpu!(vars, parameterizations::NamedTuple{names}, model) where {names}
+# outer loop over parameterizations, inner loop over horizontal grid points —
+# this yields a more contiguous memory access pattern on CPU. Same direct
+# `model.$name` access (no NamedTuple) as the GPU path above; the only difference
+# is the loop nesting.
+@generated function column_parameterizations_cpu!(vars, model::ModelType) where {ModelType <: PrimitiveEquation}
+    params_type = fieldtype(ModelType, :params)
+    param_names = params_type.parameters[1]         # extract tuple from Val{tuple}
     # runic: off
     calls = [
         quote
             for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
-                parameterization!(ij, vars, parameterizations.$name, model)
+                parameterization!(ij, vars, model.$name, model)
             end
-        end for name in names                       # parameterizations outer loop
+        end for name in param_names                 # parameterizations outer loop
     ]
     # runic: on
     return quote
         Base.@_propagate_inbounds_meta
         $(Expr(:block, calls...))
+        return nothing
     end
 end
 

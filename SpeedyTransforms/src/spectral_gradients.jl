@@ -397,7 +397,18 @@ function ∇²!(
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.gradients.eigenvalues⁻¹ : S.gradients.eigenvalues
 
-    launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, add, flipsign, alms.spectrum.l_indices)
+    # Union-split the runtime Bools like `_divergence!` above so the kernel sees them as
+    # compile-time constants: runtime-`Bool` selects on the ComplexF32 (`flipsign ? -a : a`)
+    # make LLVM ≥ 18 (Julia 1.12) scalarize it into two Float32 halves repacked with
+    # `or disjoint`, which Enzyme (≤ 0.13.190) cannot differentiate. With the options as
+    # type parameters the branches fold and the kernel stays select-free.
+    if flipsign
+        add ? _∇²!(LaplaceOP{true, true}(), ∇²alms, alms, eigenvalues) :
+            _∇²!(LaplaceOP{true, false}(), ∇²alms, alms, eigenvalues)
+    else
+        add ? _∇²!(LaplaceOP{false, true}(), ∇²alms, alms, eigenvalues) :
+            _∇²!(LaplaceOP{false, false}(), ∇²alms, alms, eigenvalues)
+    end
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -408,16 +419,36 @@ function ∇²!(
     return ∇²alms
 end
 
-@kernel function ∇²_kernel!(∇²alms, alms, eigenvalues, add, flipsign, l_indices)
+"""
+    LaplaceOP{flipsign, add}
+
+Type for dispatching on the `flipsign`/`add` options of the Laplacian kernel,
+like [`KernelOP`](@ref) for divergence/curl.
+- `flipsign`: `true` or `false` to negate the result
+- `add`: `true` or `false` to add to the output instead of overwriting"""
+struct LaplaceOP{flipsign, add} end
+
+# `flipsign` and `add` are type parameters, so the branches below are compile-time constants
+@inline function (::LaplaceOP{flipsign, add})(o, val) where {flipsign, add}
+    val = flipsign ? -val : val
+    return add ? o + val : val
+end
+
+@inline function _∇²!(kernel_func::LaplaceOP, ∇²alms, alms, eigenvalues)
+    return launch!(
+        architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!,
+        kernel_func, ∇²alms, alms, eigenvalues, alms.spectrum.l_indices,
+    )
+end
+
+@kernel function ∇²_kernel!(kernel_func::LaplaceOP, ∇²alms, alms, eigenvalues, l_indices)
 
     I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
     # we use cartesian index instead of NTuple here
     # because this works for 2D and 3D matrices
     l = l_indices[I[1]]
 
-    a = alms[I] * eigenvalues[l]
-    a = flipsign ? -a : a
-    ∇²alms[I] = add ? ∇²alms[I] + a : a
+    ∇²alms[I] = kernel_func(∇²alms[I], alms[I] * eigenvalues[l])
 end
 
 """
