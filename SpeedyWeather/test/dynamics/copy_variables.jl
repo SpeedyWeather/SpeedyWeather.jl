@@ -14,7 +14,8 @@
         @test vars_copy.prognostic.vorticity == vars.prognostic.vorticity
         # clock copied
         @test vars_copy.prognostic.clock.time == vars.prognostic.clock.time
-        @test vars_copy.prognostic.clock.timestep_counter == vars.prognostic.clock.timestep_counter
+        @test vars_copy.prognostic.clock.step_counter == vars.prognostic.clock.step_counter
+        @test vars_copy.prognostic.clock.time_step_counter == vars.prognostic.clock.time_step_counter
         # scalar Ref copied
         @test vars_copy.prognostic.scale[] == vars.prognostic.scale[]
 
@@ -92,6 +93,7 @@
     @testset "copy! returns dest" begin
         spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
         model = BarotropicModel(spectral_grid)
+        model.feedback.verbose = false
         simulation = initialize!(model)
 
         vars = simulation.variables

@@ -13,8 +13,8 @@ S_{l, m}^i &= A\left[1-\exp\left(-2\tfrac{\Delta t}{\tau}\right)\right]Q^i_{l, m
 \end{aligned}
 ```
 
-So there is a term `S` that is supposed to force the vorticity equation in the
-[Barotropic vorticity model]. However, this term is also stochastically
+So there is a term ``S`` that is supposed to force the vorticity equation in the
+[Barotropic vorticity model](@ref barotropic_vorticity_model). However, this term is also stochastically
 evolving in time, meaning we have to store the previous time steps, ``i-1``,
 in spectral space, because that's where the forcing is defined: for degree
 ``l`` and order ``m`` of the spherical harmonics. ``A`` is a real amplitude.
@@ -138,12 +138,11 @@ actually do
 function SpeedyWeather.initialize!( forcing::StochasticStirring,
                                     model::AbstractModel)
 
-    # precompute forcing strength, scale with radius^2 as is the vorticity equation
-    (; radius) = model.planet
-    A = radius^2 * forcing.strength
+    # precompute forcing strength, scale with radius as is the vorticity equation
+    A = forcing.strength * model.planet.radius
 
     # precompute noise and auto-regressive factor, packed in RefValue for mutability
-    dt = model.time_stepping.Δt_sec
+    dt = model.time_stepping.Δt                 # in seconds
     τ = forcing.decorrelation_time.value        # in seconds
     forcing.a[] = A*sqrt(1 - exp(-2dt/τ))
     forcing.b[] = exp(-dt/τ)
@@ -181,8 +180,11 @@ initialize or generally alter several model components in one, but that is not a
 and can easily lead to unexpected behaviour because of multiple dispatch.
 
 As a last note on `initialize!`, you can see that we scale the amplitude/strength `A`
-with the radius squared, this is because the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
-are scaled that way, so we have to scale `S` too.
+with the radius, this is because the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
+is scaled that way, so we have to scale `S` too. The scaling applied to the dynamical core
+is mostly hidden from the user but adding a forcing not proportional to vorticity is
+one of the few exceptions where we do need to apply the scaling manually.
+For more details see [Forcing scaling](@ref).
 
 ## Custom forcing: forcing! function
 
@@ -196,33 +198,28 @@ then this will be called automatically with multiple dispatch.
 function SpeedyWeather.forcing!(
     vars::Variables,
     forcing::StochasticStirring,
-    lf::Integer,
     model::AbstractModel,
 )
     # function barrier only
-    forcing!(vars, forcing, model.spectral_transform)
+    forcing!(vars, forcing, model.spectral_transform, model.time_stepping)
 end
 ```
 
 The function signature (types and number of its arguments) has to be as outlined above.
 The first argument has to be of type `Variables` as it contains the tendencies you will
-want to change as well as the current model state. But all state fields should be
+want to change as well as the current prognostic variables. But all those should be
 considered read-only when applying a forcing.
 `vars.tendencies` contains the tendencies (in grid and spectral space) and
 `vars.prognostic` contains the prognostic variables in spectral space, including
 `vars.prognostic.clock.time` the current time for time-dependent forcing.
-The third argument has to be of the type of our new custom forcing, here `StochasticStirring`,
-so that multiple dispatch calls the correct method of `forcing!`. The forth argument is of type
+The second argument has to be of the type of our new custom forcing, here `StochasticStirring`,
+so that multiple dispatch calls the correct method of `forcing!`. The third argument is of type
 `AbstractModel`, so that the forcing can also make use of anything inside `model`, e.g.
 `model.geometry` or `model.planet` etc. But you can be more restrictive to define a forcing only
 for the `BarotropicModel` for example, use `model::Barotropic` in that case.
 Or you could define two methods, one for `Barotropic` one for all other models with
 `AbstractModel` (not `Barotropic` as a more specific method is prioritised with multiple
-dispatch). The 5th argument is the leapfrog index `lf` which after the first time step will
-be `lf=2` to denote that tendencies are evaluated at the current time not at the previous time
-(how leapfrogging works). Unless you want to read the prognostic variables, for which
-you need to know whether to read `lf=1` or `lf=2`, you can ignore this (but need to include
-it as argument).
+dispatch). 
 
 As you can see, for now not much is actually happening inside this function,
 this is what is often called a function barrier, the only thing we do in here
@@ -237,7 +234,8 @@ So we define the actual `forcing!` function that's then called as follows
 function forcing!(
     vars::Variables,
     forcing::StochasticStirring{NF},
-    spectral_transform::SpectralTransform
+    spectral_transform::SpectralTransform,
+    time_stepping,
 ) where NF
 
     # noise and auto-regressive factors
@@ -258,8 +256,9 @@ function forcing!(
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
 
-    # back to spectral space
-    vor_tend = vars.tendencies.vorticity
+    # back to spectral space; tendencies may hold several steps (e.g. to accumulate
+    # weighted tendencies), get_tendency_step returns the one to write into
+    vor_tend = SpeedyWeather.get_tendency_step(vars.tendencies.vorticity, time_stepping, forcing)
     transform!(vor_tend, S_grid, spectral_transform)
 
     return nothing
@@ -285,7 +284,7 @@ which we do by extending the `variables` function
 
 ```@example extend
 SpeedyWeather.variables(::StochasticStirring) = (
-    ScratchVariable(:a, SpeedyWeather.Grid3D(), namespace=:grid),
+    ScratchVariable(:a, SpeedyWeather.GridXYZ(), namespace=:grid),
 )
 ```
 
@@ -293,7 +292,7 @@ For details, please see [Declare variables](@ref).
 
 Scratch arrays have an undefined state as any component is free to use
 them and write data into it. In that sense, they should be treated as
-write-before-read for example to store and intermediate result. You also
+write-before-read for example to store an intermediate result. You also
 should expect them to be overwritten momentarily once the function concludes
 and no information will remain. The only exception are situations where
 a model component implements two functions that are directly called
@@ -356,7 +355,7 @@ run!(simulation)
 
 # visualisation
 using CairoMakie
-vor = simulation.variables.grid.vorticity[:, 1]
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]
 heatmap(vor, title="Stochastically stirred vorticity")
 save("stochastic_stirring.png", ans) # hide
 nothing # hide
@@ -419,3 +418,58 @@ these need to correspond to ``\partial_t \ln p_s`` so not in units of Pa/s but
 including the logarithm! In the shallow water model, the pressure-equivalent variable
 is called `η` instead as it's the interface displacement in meters (and not actually pressure),
 so this should have the normal units of m/s instead.
+
+Each of these tendencies will have an additional [Step dimension](@ref) and so
+you will need to view the right step with `get_tendency_step(tend, time_stepping, forcing)`
+which lets the time stepper decide.
+
+## Forcing scaling
+
+In SpeedyWeather all (atmospheric) prognostic equations are scaled with the radius ``R`` of the planet,
+see [Radius scaling](@ref scaling). We also use radius-scaled vorticity and divergence so these
+two equations are effectively scaled by ``R^2``. This scaling is mostly hidden from the user and
+is applied within the dynamical core such that as a user/developer you can mostly ignore this.
+The tendencies of parameterizations + forcing + drag are being scaled automatically within the dynamical core,
+so adding a custom term forcing the temperature you can simply write this to have units of Kelvin per second
+and do not worry about scaling.
+
+!!! info "Manual scaling only required for spectral forcing of vorticity or divergence"
+    Any tendency that's formulated as a parameterization, forcing or drag does not have to be scaled
+    unless you are forcing the vorticity or divergence equation directly (and not via ``u, v``).
+    The correct scaling is automatically applied within the dynamical core.
+    Only when forcing vorticity or divergence directly (and in spectral space) manual scaling may
+    apply, read on for the details.
+
+However, there is a few remaining situations where you do need to account for scaling which are discussed here.
+In brief, this only applies when you force the vorticity or divergence equation directly.
+And also then only when this forcing is not proportional to vorticity or divergence.
+To illustrate this compare two terms,
+
+```math
+\begin{aligned}
+\frac{\partial \zeta}{\partial t} &= F \qquad &(1)\\
+\frac{\partial \zeta}{\partial t} &= a\zeta \qquad &(2)
+\end{aligned}
+```
+
+now scale both equations with ``R^2`` one radius scaling is going into the time step ``t \to t/R = t^\star``,
+the other one into the variable itself ``\zeta \to \zeta R = \zeta^\star``, then we have
+
+```math
+\begin{aligned}
+\frac{\partial \zeta^\star}{\partial t^\star} &= R^2F = RF^\star \qquad &(1)\\
+\frac{\partial \zeta^\star}{\partial t^\star} &= (a\zeta^\star)^\star \qquad &(2)
+\end{aligned}
+```
+
+So the in the (1) case, one ``R`` is automatically applied when scaling the tendency (outside of the definition of that forcing)
+but the 2nd ``R`` is required to be applied within the formulation of the forcing itself.
+In the (2) case, one radius-scaling goes into the variable ``\zeta^\star`` (which is what the dynamical core uses), the 2nd radius-scaling
+is automatically applied when the tendencies enter the dynamical core. So a term of the form (2) can be written without worrying about scaling.
+The reason no radius scaling applies in (2) is that this term is linear/proportional to the vorticity (or divergence).
+Mathematically, this generalizes to
+
+- Forcing vorticity or divergence with a constant/non-linear term ``\propto \zeta^n`` where ``n \neq 1`` then manual scaling with ``R^{1-n}`` has to be applied
+
+Forcing vorticity with a constant (``n=0``) one has to scale that forcing with ``R`` manually (as shown above and for the `StochasticStirring`).
+If forcing with a quadratic term (``n=2``), manual scaling with ``1/R`` has to be applied, and for higher order terms similarly.

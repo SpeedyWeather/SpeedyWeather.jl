@@ -155,10 +155,11 @@ So at the current state of our simulation we have a total energy
 (per square meter as we haven't multiplied by the surface area of the planet).
 
 ```@example analysis
-# flat copies for convenience
-u = simulation.variables.grid.u[:, 1]
-v = simulation.variables.grid.v[:, 1]
-η = simulation.variables.grid.η
+# get_step to select the step dimension all prognostic/tendency variables have
+# [:, 1] for all horizontal points and 1 to select the one and only vertical layer
+u = get_step(simulation.variables.grid.u)[:, 1]
+v = get_step(simulation.variables.grid.v)[:, 1]
+η = get_step(simulation.variables.grid.η)
 
 TE = total_energy(u, v, η, model)
 ```
@@ -211,11 +212,11 @@ as
 
 ```@example analysis
 # vorticity
-ζ = simulation.variables.grid.vorticity[:,1]
+ζ = get_step(simulation.variables.grid.vorticity)[:, 1]
 f = coriolis(ζ)     # create f on that grid
 
 # layer thickness
-η = simulation.variables.grid.η
+η = get_step(simulation.variables.grid.η)
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
 h = @. η + H - Hb
@@ -431,10 +432,10 @@ end
 
 # unpack diagnostic variables and call global_diagnostics from above
 function global_diagnostics(vars::Variables, model::AbstractModel)
-    u = vars.grid.u[:, 1]
-    v = vars.grid.v[:, 1]
-    ζR = vars.grid.vorticity[:, 1]
-    η = vars.grid.η
+    u  = get_step(vars.grid.u)[:, 1]
+    v  = get_step(vars.grid.v)[:, 1]
+    ζR = get_step(vars.grid.vorticity)[:, 1]
+    η  = get_step(vars.grid.η)
 
     # vorticity during simulation is scaled by radius R, unscale here
     ζ = ζR ./ vars.prognostic.scale[]
@@ -462,7 +463,7 @@ details)
 ```@example analysis
 # define a GlobalDiagnostics callback and the fields it needs
 @kwdef mutable struct GlobalDiagnostics <: SpeedyWeather.AbstractCallback
-    timestep_counter::Int = 0
+    time_step_counter::Int = 0
 
     time::Vector{DateTime} = []
     M::Vector{Float64} = []  # mean mass per time step
@@ -480,7 +481,7 @@ function SpeedyWeather.initialize!(
     model::AbstractModel,
 )
     # replace with vector of correct length
-    n = vars.prognostic.clock.n_timesteps + 1    # +1 for initial conditions
+    n = vars.prognostic.clock.n_steps + 1    # +1 for initial conditions
     callback.time = zeros(DateTime, n)
     callback.M = zeros(n)
     callback.C = zeros(n)
@@ -499,7 +500,7 @@ function SpeedyWeather.initialize!(
     callback.P[1] = P  # set initial conditions
     callback.Q[1] = Q  # set initial conditions
 
-    callback.timestep_counter = 1  # (re)set counter to 1
+    callback.time_step_counter = 1  # (re)set counter to 1
 
     return nothing
 end
@@ -510,8 +511,8 @@ function SpeedyWeather.callback!(
     vars::Variables,
     model::AbstractModel,
 )
-    callback.timestep_counter += 1
-    i = callback.timestep_counter
+    callback.time_step_counter += 1
+    i = callback.time_step_counter
 
     M, C, Λ, K, P, Q = global_diagnostics(vars, model)
 
@@ -529,13 +530,13 @@ using NCDatasets
 
 # define how to finalize a GlobalDiagnostics callback after simulation finished
 function SpeedyWeather.finalize!(callback::GlobalDiagnostics, args...)
-    n_timesteps = callback.timestep_counter
+    n_time_steps = callback.time_step_counter
 
     # create a netCDF file in current path
     ds = NCDataset(joinpath(pwd(), "global_diagnostics.nc"), "c")
 
     # save diagnostics variables within
-    defDim(ds, "time", n_timesteps)
+    defDim(ds, "time", n_time_steps)
     defVar(ds, "time",                  callback.time,  ("time",))
     defVar(ds, "mass",                  callback.M,     ("time",))
     defVar(ds, "circulation",           callback.C,     ("time",))

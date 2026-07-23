@@ -18,3 +18,15 @@ as an output field for spectral transforms.
 function Base.similar(field::AbstractField, spectrum::AbstractSpectrum, T::DataType = eltype(field.data))
     return LowerTriangularArray(similar(field.data, T, LowerTriangularArrays.nonzeros(spectrum), size(field.data)[2:end]...), spectrum)
 end
+
+"""
+$(TYPEDSIGNATURES)
+Creates a Field with a view on the underlying data. It will therefore be of type `Field{T, N, <:SubArray}`. 
+"""
+Base.@propagate_inbounds wrapped_view(field::AbstractField, args...) = field_view(field, args...)
+
+"""
+$(TYPEDSIGNATURES)
+Creates a LowerTriangularArray with a view on the underlying data. It will therefore be of type `LowerTriangularArray{T, N, <:SubArray}`. 
+"""
+Base.@propagate_inbounds wrapped_view(specs::LowerTriangularArray, args...) = lta_view(specs, args...)

@@ -2,7 +2,7 @@
 Albedo structs should be defined as MyAlbedo <: AbstractAlbedo and implement the following interface:
 
 - `initialize!(albedo::MyAlbedo, model)`
-- `albedo!(ij, vars::Variables, albedo::MyAlbedo, model)`
+- `albedo!(ij, albedofield, vars::Variables, albedo::MyAlbedo, model)`
 
 `initialize!` is as for every model component but in contrast to other parameterizations albedos
 should not implement `parameterization!` but rather `albedo!`, which is called from within `parameterization!`.
@@ -249,7 +249,7 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
     end
 
     # 2. Add snow cover
-    if haskey(vars.prognostic.land, :snow_depth)
+    if haskey(vars.prognostic, :land) && haskey(vars.prognostic.land, :snow_depth)
         (; snow_depth) = vars.prognostic.land
         (; albedo_snow, snow_depth_scale) = scheme
 

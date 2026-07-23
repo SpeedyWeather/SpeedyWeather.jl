@@ -54,18 +54,22 @@ deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers...
 # delete from tracer dictionary, identified by its `name::Symbol`
 Base.delete!(model::AbstractModel, tracer::Tracer) = delete!(model.tracers, tracer.name)
 
-function variables(T::Tracer)
+function variables(T::Tracer, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
-        PrognosticVariable(T.name, Spectral4D(2), desc = "$(T.name)", namespace = :tracers),    # 2 for 2 leapfrog steps
-        GridVariable(T.name, Grid3D(), desc = "$(T.name)", namespace = :tracers),
-        GridVariable(Symbol(T.name, :_prev), Grid3D(), desc = "$(T.name)", namespace = :tracers),
-        TendencyVariable(T.name, Spectral3D(), desc = "Tendency of $(T.name)", namespace = :tracers),
-        TendencyVariable(Symbol(T.name, :_grid), Grid3D(), desc = "Tendency of $(T.name)", namespace = :tracers),
-        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
-        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
+        PrognosticVariable(T.name, SpectralXYZT(ps), desc = "$(T.name)", namespace = :tracers),
+        GridVariable(T.name, GridXYZT(pg), desc = "$(T.name)", namespace = :tracers),
+        TendencyVariable(T.name, SpectralXYZT(ts), desc = "Tendency of $(T.name)", namespace = :tracers),
+        TendencyVariable(T.name, GridXYZT(tg), desc = "Tendency of $(T.name)", namespace = :grid_tracers),
+        ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
     )
 end
 
-function variables(D::TRACER_DICT)
-    return (variables(tracer) for tracer in values(D)) |> Iterators.flatten |> Tuple
+function variables(D::TRACER_DICT, model::AbstractModel)
+    return (variables(tracer, model) for tracer in values(D)) |> Iterators.flatten |> Tuple
 end

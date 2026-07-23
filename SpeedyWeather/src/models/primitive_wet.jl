@@ -41,6 +41,7 @@ $(TYPEDFIELDS)"""
         CV,     # <:AbstractConvection,
         SW,     # <:AbstractShortwave,
         LW,     # <:AbstractLongwave,
+        GHG,    # NamedTuple of <:AbstractGreenhouseGas,
         SP,     # <:AbstractStochasticPhysics,
         CP,     # <:AbstractParameterization
         TS,     # <:AbstractTimeStepper,
@@ -87,7 +88,7 @@ $(TYPEDFIELDS)"""
     # PHYSICS/PARAMETERIZATIONS
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
-    @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
+    @component boundary_layer::BL = BoundaryLayer(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_condition::SC = SurfaceCondition(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
@@ -97,6 +98,7 @@ $(TYPEDFIELDS)"""
     @component convection::CV = BettsMillerConvection(spectral_grid)
     @component shortwave_radiation::SW = OneBandShortwave(spectral_grid)
     @component longwave_radiation::LW = OneBandLongwave(spectral_grid)
+    @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
@@ -122,21 +124,19 @@ $(TYPEDFIELDS)"""
         :planet, :geometry, :land_sea_mask,
     )
     parameterizations::TS2 = (
-        # external forcing
-        :solar_zenith,
-
-        # mixing and precipitation
-        :vertical_diffusion, :large_scale_condensation, :convection,
-
-        # radiation
-        :albedo, :shortwave_radiation, :longwave_radiation,
-
-        # surface fluxes
-        :boundary_layer_drag, :surface_condition,
-        :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux,
-
-        # perturbations
-        :stochastic_physics,
+        :solar_zenith,              # external forcing
+        :vertical_diffusion,        # mixing and precipitation
+        :large_scale_condensation,
+        :convection,
+        :albedo,                    # radiation
+        :shortwave_radiation,
+        :longwave_radiation,
+        :boundary_layer,            # surface fluxes
+        :surface_condition,
+        :surface_momentum_flux,
+        :surface_heat_flux,
+        :surface_humidity_flux,
+        :stochastic_physics,        # perturbations
     )
 
     # DERIVED
@@ -144,22 +144,27 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-function variables(model::PrimitiveWet)
-    nsteps = get_prognostic_steps(model.time_stepping)
-    return variables(typeof(model), nsteps)
-end
+variables(model::PrimitiveWet) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
 """($TYPEDSIGNATURES) All variables needed for the primitive wet model itself (components excluded)."""
-function variables(::Type{<:PrimitiveWet}, nsteps)
+function variables(::Type{<:PrimitiveWet}, nsteps = DEFAULT_NSTEPS)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
         variables(PrimitiveDry, nsteps)...,
 
         # Add humidity
-        PrognosticVariable(:humidity, Spectral4D(nsteps), desc = "Specific humidity", units = "kg/kg"),
-        GridVariable(:humidity, Grid3D(), desc = "Humidity", units = "kg/kg"),
-        GridVariable(:humidity_prev, Grid3D(), desc = "Specific humidity at previous time step", units = "kg/kg"),
-        TendencyVariable(:humidity, Spectral3D(), desc = "Tendency of specific humidity", units = "kg/kg/s"),
-        TendencyVariable(:humidity, Grid3D(), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s"),
+        PrognosticVariable(:humidity, SpectralXYZT(ps), desc = "Specific humidity", units = "kg/kg", fuse=:prognostic),
+        GridVariable(:humidity, GridXYZT(pg), desc = "Specific Humidity", units = "kg/kg", fuse=:grid),
+        TendencyVariable(:humidity, SpectralXYZT(ts), desc = "Tendency of specific humidity", units = "kg/kg/s", fuse = :spectral_tendencies),
+        TendencyVariable(:humidity, GridXYZT(tg), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s", fuse = :grid_tendencies),
+
+        DynamicsVariable(:uq, GridXYZT(tg), desc = "u*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vq, GridXYZT(tg), desc = "v*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:uq, SpectralXYZT(ts), desc = "u*humidity intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vq, SpectralXYZT(ts), desc = "v*humidity intermediate in spectral space", fuse = :spectral_tendencies),
     )
 end
 
@@ -192,12 +197,13 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.albedo, model)
 
     # parameterizations
-    initialize!(model.boundary_layer_drag, model)
+    initialize!(model.boundary_layer, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
+    initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_condition, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
@@ -216,6 +222,11 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(variables, model)
 
     return Simulation(variables, model)
+end
+
+function reinitialize!(model::PrimitiveWetModel, vars::AbstractVariables)
+    reinitialize!(model.implicit, model, vars)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

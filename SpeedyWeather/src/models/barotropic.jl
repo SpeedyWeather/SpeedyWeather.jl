@@ -48,7 +48,7 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS
-    time_stepping::TS = Leapfrog(spectral_grid)
+    time_stepping::TS = NCycleLorenz(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = nothing
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
@@ -59,29 +59,33 @@ $(TYPEDFIELDS)"""
     feedback::FB = Feedback()
 end
 
-function variables(model::Barotropic)
-    nsteps = get_prognostic_steps(model.time_stepping)
-    return variables(typeof(model), nsteps)
-end
+variables(model::Barotropic) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
 """($TYPEDSIGNATURES) All variables needed for the barotropic model itself (components excluded)."""
-function variables(::Type{<:Barotropic}, nsteps)
+function variables(::Type{<:Barotropic}, nsteps = DEFAULT_NSTEPS)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
         PrognosticVariable(:clock, ClockDim(), desc = "Clock", units = "s"),
         PrognosticVariable(:scale, ScalarDim(1), desc = "Scaling of vor and div in the dynamical core", units = "m"),
-        PrognosticVariable(:vorticity, Spectral4D(nsteps), desc = "Relative vorticity", units = "1/s"),
+        PrognosticVariable(:vorticity, SpectralXYZT(ps), desc = "Relative vorticity", units = "1/s", fuse = :prognostic),
 
-        TendencyVariable(:vorticity, Spectral3D(), desc = "Tendency of relative vorticity", units = "1/s²"),
-        TendencyVariable(:vorticity, Grid3D(), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²"),
-        TendencyVariable(:u, Grid3D(), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²"),
-        TendencyVariable(:v, Grid3D(), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²"),
+        TendencyVariable(:vorticity, SpectralXYZT(ts), desc = "Tendency of relative vorticity", units = "1/s²"), # tendencies are unfused as they are directly computed by a curl op
+        TendencyVariable(:vorticity, GridXYZT(tg), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²"),
+        TendencyVariable(:u, GridXYZT(tg), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²", fuse = :grid_tendencies),
+        TendencyVariable(:v, GridXYZT(tg), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²", fuse = :grid_tendencies),
 
-        GridVariable(:vorticity, Grid3D(), desc = "Relative vorticity", units = "1/s"),
-        GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s"),
-        GridVariable(:v, Grid3D(), desc = "Meridional wind", units = "m/s"),
+        DynamicsVariable(:u_tendency, SpectralXYZT(ts), desc = "Tendency of zonal wind", units = "m/s²", fuse = :spectral_tendencies),
+        DynamicsVariable(:v_tendency, SpectralXYZT(ts), desc = "Tendency of meridional wind", units = "m/s²", fuse = :spectral_tendencies),
 
-        ScratchVariable(:a, Spectral3D(), desc = "Scratch array", units = "?"),
-        ScratchVariable(:b, Spectral3D(), desc = "Scratch array", units = "?"),
+        GridVariable(:vorticity, GridXYZT(pg), desc = "Relative vorticity", units = "1/s", fuse = :grid),
+        GridVariable(:u, GridXYZT(pg), desc = "Zonal wind", units = "m/s", fuse = :uv_grid),
+        GridVariable(:v, GridXYZT(pg), desc = "Meridional wind", units = "m/s", fuse = :uv_grid),
+
+        ScratchVariable(:a, SpectralXYZ(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
+        ScratchVariable(:b, SpectralXYZ(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
     )
 end
 

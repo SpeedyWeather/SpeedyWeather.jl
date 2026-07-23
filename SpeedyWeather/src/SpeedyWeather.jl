@@ -24,7 +24,7 @@ using SpeedyWeatherInternals.KernelLaunching
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
 export CPU, GPU, on_architecture, architecture                # export device functions
-export SpeedyWeatherInternals, Architectures, KernelLaunching
+export SpeedyWeatherInternals, Architectures, KernelLaunching, ArrayDimensions
 
 # INPUT OUTPUT
 import TOML
@@ -112,15 +112,18 @@ import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 export animate, globe
 function animate end
 
+# constructors to be defined in Terrarium extension
+export TerrariumOutput
+
 # abstract types
-include("models/abstract_models.jl")
 include("variables/abstract_types.jl")
-include("parameterizations/parameterizations.jl")
+include("models/abstract_models.jl")
+include("parameterizations/abstract_types.jl")
 include("time_stepping/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
-include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
+include("dynamics/vertical_coordinates.jl")
 include("dynamics/geometry.jl")
 include("dynamics/coriolis.jl")
 include("dynamics/planet.jl")
@@ -134,7 +137,7 @@ include("variables/dimensions.jl")
 include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
-include("dynamics/clock.jl")
+include("time_stepping/clock.jl")
 include("variables/set.jl")
 
 # MODEL COMPONENTS
@@ -147,23 +150,29 @@ include("dynamics/horizontal_diffusion.jl")
 include("dynamics/vertical_advection.jl")
 include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
+include("dynamics/tendencies_sequential.jl")
 include("dynamics/hole_filling.jl")
 include("dynamics/particle_advection.jl")
 include("dynamics/random_process.jl")
 
 # TIME STEPPING
 include("time_stepping/time_integration.jl")
-include("time_stepping/leapfrog.jl")
-include("time_stepping/lorenz_ncycle.jl")
+include("time_stepping/steps.jl")
+include("time_stepping/steppers/general.jl")
+include("time_stepping/steppers/leapfrog.jl")
+include("time_stepping/steppers/ncycle_lorenz.jl")
 include("time_stepping/transform.jl")
-include("time_stepping/implicit.jl")
+include("time_stepping/implicit/implicit_shallow_water.jl")
+include("time_stepping/implicit/implicit_primitive_equations.jl")
 
 # PARAMETERIZATIONS
+include("parameterizations/general.jl")
 include("parameterizations/albedo.jl")
 include("parameterizations/tendencies.jl")
 include("parameterizations/vertical_diffusion.jl")
 include("parameterizations/large_scale_condensation.jl")
 include("parameterizations/surface_fluxes/boundary_layer.jl")
+include("parameterizations/surface_fluxes/surface_roughness.jl")
 include("parameterizations/surface_fluxes/surface_condition.jl")
 include("parameterizations/surface_fluxes/momentum.jl")
 include("parameterizations/surface_fluxes/heat.jl")
@@ -175,6 +184,7 @@ include("parameterizations/radiation/shortwave_transmissivity.jl")
 include("parameterizations/radiation/clouds.jl")
 include("parameterizations/radiation/longwave_radiation.jl")
 include("parameterizations/radiation/longwave_transmissivity.jl")
+include("parameterizations/radiation/greenhouse_gases.jl")
 include("parameterizations/stochastic_physics.jl")
 
 # OCEAN AND LAND

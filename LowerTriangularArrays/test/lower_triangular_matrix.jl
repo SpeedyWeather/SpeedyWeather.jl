@@ -364,7 +364,7 @@ end
                 L = LowerTriangularArray(A)
                 # fill
                 fill!(L, 2)
-                for lm in LowerTriangularArrays.eachharmonic(L)
+                for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L))
                     @test all(L[lm, [Colon() for i in 1:length(idims)]...] .== 2)
                 end
 
@@ -379,13 +379,16 @@ end
                 # convert
                 L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
                 L3 = convert(LowerTriangularArray{Float16, 1 + length(idims), Array{Float16, 1 + length(idims)}, typeof(spectrum)}, L)
-                for lm in LowerTriangularArrays.eachharmonic(L, L3)
+                for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L, L3))
                     @test Float16(L[lm, [1 for i in 1:length(idims)]...]) == L3[lm, [1 for i in 1:length(idims)]...]
                 end
 
                 L_rep = repeat(L, 1, [2 for i in 1:length(idims)]...)
                 @test typeof(L_rep) <: LowerTriangularArray
                 @test size(L_rep, as = Vector) == (size(L, 1), [10 for i in 1:length(idims)]...) # 10 = 2 * 5 = 2*idims[i]
+
+                Lu = Base.unaliascopy(L)
+                @test Lu == L && Lu.data !== L.data
             end
         end
     end
@@ -401,7 +404,7 @@ end
 
             # fill
             fill!(L, 2)
-            for lm in LowerTriangularArrays.eachharmonic(L)
+            for lm in LowerTriangularArrays.eachindex(L)
                 @test L[lm] == 2
             end
 
@@ -416,7 +419,7 @@ end
             # convert
             L = randn(LowerTriangularMatrix{NF}, lmax, mmax)
             L3 = convert(LowerTriangularMatrix{Float16}, L)
-            for lm in LowerTriangularArrays.eachharmonic(L, L3)
+            for lm in LowerTriangularArrays.eachindex(L, L3)
                 @test Float16(L[lm]) == L3[lm]
             end
         end
@@ -614,9 +617,42 @@ end
     end
 end
 
+@testset "Mixed-rank broadcast" begin
+    # broadcasting a single field (rank-1 LowerTriangularMatrix) against a layered
+    # array (rank-2 LowerTriangularArray) must promote to the higher rank and give
+    # the same result regardless of argument order. A non-commutative BroadcastStyle
+    # rule previously raised "conflicting broadcast rules defined" here.
+    @testset for NF in (Float32, Float64)
+        @testset for nlayers in (1, 3)
+            L_array = randn(LowerTriangularArray{NF}, 10, 10, nlayers)  # (lm, nlayers)
+            L_matrix = randn(LowerTriangularMatrix{NF}, 10, 10)         # (lm,)
+
+            R1 = L_array .- L_matrix
+            R2 = L_matrix .- L_array
+
+            # result promotes to the higher (rank-2) container, both orderings
+            @test R1 isa LowerTriangularArray{NF, 2}
+            @test R2 isa LowerTriangularArray{NF, 2}
+            @test size(R1) == size(L_array)
+            @test size(R2) == size(L_array)
+
+            # values match plain-array broadcasting, including layer by layer
+            @test R1.data ≈ L_array.data .- L_matrix.data
+            @test R2.data ≈ L_matrix.data .- L_array.data
+            for k in 1:nlayers
+                @test R1.data[:, k] ≈ L_array.data[:, k] .- L_matrix.data
+            end
+
+            # in-place accumulation as used in surface_pressure_spectral_tendency!
+            dest = deepcopy(L_array)
+            @. dest = -dest - L_matrix
+            @test dest.data ≈ -L_array.data .- L_matrix.data
+        end
+    end
+end
+
 
 @testset "GPU (JLArrays)" begin
-    # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
     NF = Float32
     idims = (5,)
     spectrum = Spectrum(10, 10)
@@ -632,7 +668,7 @@ end
 
     # getindex
     @test typeof(L[1, :]) <: JLArray
-    for lm in LowerTriangularArrays.eachharmonic(L)
+    for lm in eachindex(L.spectrum)
         @test Array(L[lm, :]) == L_cpu[lm, :]
     end
 
@@ -643,7 +679,7 @@ end
 
     # fill
     fill!(L, 2)
-    for lm in LowerTriangularArrays.eachharmonic(L2)
+    for lm in eachindex(L2.spectrum)
         @test all(L[lm, [Colon() for i in 1:length(idims)]...] .== 2)
     end
 
@@ -660,7 +696,8 @@ end
     L3 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, spectrum, idims...))
     L4 = convert(LowerTriangularArray{Float16, 2, JLArray{Float16, 2}, typeof(spectrum_jlarray)}, L3)
 
-    for lm in LowerTriangularArrays.eachharmonic(L, L3)
+    # for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L, L3))
+    for lm in eachindex(L3.spectrum)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])
     end
 
@@ -976,6 +1013,87 @@ end
                     end
                 end
             end
+        end
+    end
+end
+
+@testset "ArrayDimensions" begin
+    using SpeedyWeatherInternals.ArrayDimensions: LM, LMZ, LMT, LMZT, hastime, hasvertical
+
+    s = Spectrum(trunc = 5)
+
+    # default dims is LM (2D spectral)
+    L2 = zeros(LowerTriangularMatrix{Float32}, s)
+    @test L2.dims isa LM
+    @test !hastime(L2)
+    @test !hasvertical(L2)
+
+    # explicit 3D spectral + vertical
+    L3z = zeros(LowerTriangularArray{Float32}, s, LMZ(), 3)
+    @test L3z.dims isa LMZ
+    @test !hastime(L3z)
+    @test hasvertical(L3z)
+
+    # explicit 3D spectral + time
+    L3t = zeros(LowerTriangularArray{Float32}, s, LMT(), 3)
+    @test L3t.dims isa LMT
+    @test hastime(L3t)
+    @test !hasvertical(L3t)
+
+    # explicit 4D spectral + vertical + time
+    L4 = zeros(LowerTriangularArray{Float32}, s, LMZT(), 3, 2)
+    @test L4.dims isa LMZT
+    @test hastime(L4)
+    @test hasvertical(L4)
+
+    # dims are preserved through similar, zero, and lta_view
+    L3z_sim = similar(L3z)
+    @test L3z_sim.dims isa LMZ
+
+    L3z_zero = zero(L3z)
+    @test L3z_zero.dims isa LMZ
+
+    L3z_view = lta_view(L3z, :, 1)
+    @test L3z_view.dims isa LM
+
+    L3z_range_view = lta_view(L3z, :, 1:2)
+    @test L3z_range_view.dims isa LMZ
+
+    # getindex with integer drops dims; range preserves
+    @test L3z[:, 1].dims isa LM
+    @test L3z[:, 1:2].dims isa LMZ
+
+    # 4D: two explicit non-horizontal indices
+    @test L4[:, 1:3, 1].dims isa LMZ   # drop time, keep vertical range
+    @test L4[:, 1, 1].dims isa LM      # drop both vertical and time
+
+    # dims are preserved through truncate and interpolate
+    L3z_trunc = LowerTriangularArrays.truncate(L3z, 3)
+    @test L3z_trunc.dims isa LMZ
+    @test size(L3z_trunc, ZeroBased, as = Matrix) == (3, 3, 3)
+
+    L3z_interp = LowerTriangularArrays.interpolate(L3z, 10)
+    @test L3z_interp.dims isa LMZ
+    @test size(L3z_interp, ZeroBased, as = Matrix) == (10, 10, 3)
+
+    L2_trunc = LowerTriangularArrays.truncate(L2, 3)
+    @test L2_trunc.dims isa LM
+end
+
+@testset "Rotate/Reverse n-dimensional" begin
+    @testset for trailing_dims in ((2,), (2, 3), (2, 3, 2))
+        L = rand(LowerTriangularArray{ComplexF64}, 10, 10, trailing_dims...)
+
+        rotated = rotate!(deepcopy(L), 30)
+        reversed_lat = reverse(L, dims = :lat)
+        reversed_lon = reverse(L, dims = :lon)
+
+        # operating on all matrices at once == operating on every matrix independently
+        for c in CartesianIndices(trailing_dims)
+            layer = L[:, c]
+            @test rotate!(deepcopy(layer), 30) == rotated[:, c]
+            @test reverse(layer, dims = :lat) == reversed_lat[:, c]
+            @test reverse(layer, dims = :lon) == reversed_lon[:, c]
         end
     end
 end

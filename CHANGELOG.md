@@ -3,6 +3,79 @@
 ## Unreleased
 
 - Column-based parametrizations are now multithreaded on CPU [#1032](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1032)
+- Revised EnzymeRules for SpeedyTransforms [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
+- Eliminate dynamic dispatchs in the model integration code and unit test for them with JET [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
+- ZarrOutput ensemble mode hardened for parallel jobs, Zarr store metadata consolidated at creation for faster opening [#1160](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1160)
+- Terrarium coupling: fill soil mirror variables with ocean fallback values (285 K / 0) outside the Terrarium land mask, warn when the Terrarium and SpeedyWeather land masks disagree [#1159](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1159)
+- Sea surface temperature and sea ice concentration are now time-stepped variables [#1140](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1140)
+- Reduce CI time of vertical coordinates test [#1158](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1158)
+- Dynamical core reordered and transformed batched for improved GPU performance. The majority of the dycore now follows the scheme: `grid_tendencies!` -> `transform!` -> `spectral_tendencies!` to batch together all grid -> spectral transforms of tendencies and auxiliary tendencies [#1101](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1101)
+- Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced firsti in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
+- `TerrariumOutput` for flexible NetCDF/Zarr output of Terrarium state variables in coupled Terrarium-SpeedyWeather simulations [#1155](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1155)
+- Rotate/reverse Field/LowerTriangularArray kernelized [#1154](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1154)
+- ArrayDimensions in RingGrids and LowerTriangularArrays [#1150](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1150/)
+- Terrarium coupling uses the allocation-free masked copy to optimize performance [#1152](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1152)
+- Improved compatability with Enzyme with Julia 1.12: `get_step` instead of `get_steps` used more commonly and default `maxtypeoffset!` increased [#1143](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1143)
+- Ensemble output dimension for `ZarrOutput`: multiple members can write into one shared store via `ensemble_index`/`ensemble_size` [#1149](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1149)
+- Prognostic and grid variables are now fused and the transform batched [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
+- Update the extended differentiability tests to new time stepping syntax [#1148](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1148)
+- Scale time step on the fly, and forcing/drag/parameterizations inside dycore [#1139](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1139)
+- Fix scalar indexing error constructing `SigmaCoordinates`/`Geometry` on GPU [#1142](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1142)
+- Sigma-pressure coordinates, part 1 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137)
+- NetCDF output coordinates always in Float64 as determined by RingGrids.get_lond [#1141](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1141)
+- ArrayWorkOrder instead of Array3DWorkOrder as both preserve dimensions [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
+- Allocation-free masked copy between RingGrids Field and subset array via mask [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
+- Rename land-sea mask array land_fraction [#1219](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1134)
+- Fix vertical advection performance regression by indexing the contiguous time step directly in the stencil kernel instead of a `get_*_step` view [#1131](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1131)
+- Reduce allocations in some broadcasted operations [#1133](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1133)
+- Add a warm to the benchmark to not measure pre-compile [#1129](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1129)
+- Adjust benchmarking to new timestepping logic [#1128](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1128)
+- Relax Enzyme compatability again to allow recent Enzyme versions [#1126](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1126)
+- reinitialize! logic to allow for model.implicit to be reinitialized [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
+- get_prognostic_step, get_tendency_step in dycore and parameterizations [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
+- time stepping modularised [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
+- NCycleLorenz time stepping for Barotropic models [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035) [#937](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/937)
+
+## v0.21.1
+
+- Update usage of Terrarium input APIs in extension module [#1117](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1117)
+- Update Buildkite pipeline for the new JuliaGPU cluster [#1124](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1124)
+- Allow for tuples of output variables in add! [#1122](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1122)
+- Browzarr extension, Zarr.jl compatibilty includes `v0.9` [#1093](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1093) [#1096](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1096)
+
+## v0.21.0
+
+- Fix bibtex entry formatting alignment for DJ4Earth article [#1121](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1121)
+- Added `Base.unaliascopy` for `LowerTriangularArray` and `Fild` [#1119](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1119)
+- [BREAKING] `model.boundary_layer` introduced (and `model.boundary_layer_drag` removed) to group surface roughness and drag computations [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
+- Surface roughness modularised with `ConstantSurfaceRoughness default [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
+- Restrict Enzyme compat to `0.13 - 0.13.153` (cap at v0.13.153) [#1116](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1116)
+- Optimised CUDA GPU transforms with CUDA graphs [#1109](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1109)
+- `MLDataDevices.get_device` extension mapping SpeedyWeather architectures to MLDataDevices devices [#1115](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1107)
+- Fixed `SolarZenithSeason` kernel: uninitialized typed variables and `acos` domain error [#1113](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1113)
+- Fixed punctuation in spectral transform docs [#1112](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1112)
+
+## v0.20.3
+
+- Terrarium extension now handles land sea masks correctly [#1110](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1110)
+- Revised benchmark suite to make it compare between different architectures [#1103](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1103)
+
+## v0.20.2
+
+- Handle heterogeneous parameter attributes in `ParameterEditing` [#1106](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1106)
+- Coupling to the Terrarium.jl land model via an SpeedyWeatherTerrariumExt [#1090](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1090)
+- The `ShallowWaterModel` is now GPU compatible [#1104](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1104)
+- Updated citations and funding information [#1100](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1100)
+- Allow for variables to be fused together (prelimnary work for GPU optiminization) [#1083](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1083)
+- Fixed docs broken layout due to `NetCDFOutput` by using @docs instead of @doc [#1098](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1098)
+- Enzyme is a weakdep again instead of dep (this was a mistake) [#1097](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1097)
+- Fixed several typos in the documentation [#1094](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1094)
+- Fixed a wrong reference in the documentation [#1092](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1092)
+- Variable system: rename function that allocates new variables from `Base.zero` to `allocate` [#1087](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1087)
+
+## v0.20.1
+
+- Implement CO2 and greenhouse gases [#993](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/993)
 - `ZarrOutput` for writing simulation output to a Zarr store, implemented as a Zarr.jl extension [#1076](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1076)
 - Add non-unicode function name aliases laplace, inverse_laplace, gradient [#1078](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1078)
 

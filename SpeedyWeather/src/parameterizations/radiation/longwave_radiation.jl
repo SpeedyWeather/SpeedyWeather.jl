@@ -33,8 +33,8 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, longwave::UniformCooling, model)
 
-    T = vars.grid.temperature_prev
-    dTdt = vars.tendencies.grid.temperature
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
     (; temp_min, temp_stratosphere) = longwave
     nlayers = size(T, 2)
 
@@ -92,9 +92,9 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, longwave::JeevanjeeRadiation, model)
 
-    T = vars.grid.temperature                                  # to match Seeley, 2023 notation
-    dTdt = vars.tendencies.grid.temperature
-    pₛ = vars.grid.pressure_prev[ij]                        # surface pressure [Pa]
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
+    pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
     nlayers = size(T, 2)
 
     (; α) = longwave
@@ -106,17 +106,17 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     cₚ = model.atmosphere.heat_capacity
     Tₜ = longwave.temp_tropopause
 
-    land_fraction = model.land_sea_mask.mask[ij]
-    sst = vars.prognostic.ocean.sea_surface_temperature[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, longwave)
     lst = vars.prognostic.land.soil_temperature[ij, 1]  # TODO use skin temperature?
 
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
-    Fₖ_ocean = isfinite(sst) ? ϵ_ocean * σ * sst^4 : zero(sst)          # [W/m²]
+    Fₖ_ocean = ϵ_ocean * σ * sst[ij]^4                                  # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = Fₖ_ocean     # for ocean model forcing
 
-    Fₖ_land = isfinite(lst) ? ϵ_land * σ * lst^4 : zero(lst)            # [W/m²]
+    Fₖ_land = ϵ_land * σ * lst^4                                        # [W/m²]
     vars.parameterizations.land.surface_longwave_up[ij] = Fₖ_land       # for land model forcing
 
     Fₖ_down = ϵ * σ * T[ij, nlayers]^4
@@ -156,7 +156,7 @@ end
 
 export OneBandLongwave
 """One-band longwave radiation scheme with transmissivity and radiative transfer components.
-Following Frierson, 2006, JAS, https://doi.org/10.1175/JAS3706.1. Fields are $(TYPEDFIELDS)"""
+Following Frierson, 2006, JAS, https://doi.org/10.1175/JAS3753.1. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct OneBandLongwave{T, R} <: AbstractLongwave
     @component transmissivity::T
     @component radiative_transfer::R
@@ -225,10 +225,10 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
         longwave::OneBandLongwaveRadiativeTransfer,
         model,
     )
-    T = vars.grid.temperature_prev
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
     NF = eltype(T)
-    dTdt = vars.tendencies.grid.temperature
-    pₛ = vars.grid.pressure_prev[ij]                        # surface pressure [Pa]
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
+    pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     nlayers = size(T, 2)
 
     ϵ_ocean = longwave.emissivity_ocean
@@ -236,14 +236,14 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     σ = model.atmosphere.stefan_boltzmann
     cₚ = model.atmosphere.heat_capacity
 
-    land_fraction = model.land_sea_mask.mask[ij]
-    sst = vars.prognostic.ocean.sea_surface_temperature[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, longwave)
     lst = vars.prognostic.land.soil_temperature[ij, 1]                  # TODO use skin temperature?
 
-    U_ocean = ifelse(isfinite(sst), ϵ_ocean * σ * sst^4, zero(sst))     # [W/m²]
+    U_ocean = ϵ_ocean * σ * sst[ij]^4                                   # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = U_ocean      # for ocean model forcing
 
-    U_land = ifelse(isfinite(lst), ϵ_land * σ * lst^4, zero(lst))       # [W/m²]
+    U_land = ϵ_land * σ * lst^4                                         # [W/m²]
     vars.parameterizations.land.surface_longwave_up[ij] = U_land        # for land model forcing
 
     # land-sea mask weighted combined flux from land and ocean (surface boundary condition)

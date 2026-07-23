@@ -37,6 +37,7 @@ get_nlon(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = 4nlat_half
 ## COORDINATES
 get_latd(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = get_latd(HEALPixGrid, nlat_half)
 get_lond(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = get_lond(FullGaussianGrid, nlat_half)
+hasoffset(::Type{<:FullHEALPixGrid}) = false    # first longitude point on 0˚
 
 # QUADRATURE (use weights from reduced grids though!)
 get_quadrature_weights(::Type{<:FullHEALPixGrid}, nlat_half::Integer) =

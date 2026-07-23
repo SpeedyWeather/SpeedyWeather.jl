@@ -2,6 +2,9 @@ using Documenter
 using DocumenterVitepress
 using SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms, SpeedyWeather
 
+# Auto-generate the Benchmarks page from the JSON results before makedocs runs.
+include(joinpath(@__DIR__, "generate_benchmarks_page.jl"))
+
 makedocs(
     format = DocumenterVitepress.MarkdownVitepress(
         repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
@@ -39,6 +42,7 @@ makedocs(
         "Advanced" => [
             "Extensions" => "extensions.md",
             "Variable system" => "variable_system.md",
+            "Vertical coordinates" => "vertical_coordinates.md",
             "Forcing and drag" => "forcing_drag.md",
             "Parameterizations" => "parameterizations.md",
             "Input data" => "input_data.md",
@@ -59,6 +63,7 @@ makedocs(
             "Surface fluxes" => "surface_fluxes.md",
         ],
         "Numerics" => [
+            "Array dimensions" => "array_dimensions.md",
             "Grids" => "grids.md",
             "RingGrids" => "ringgrids.md",
             "LowerTriangularArrays" => "lowertriangularmatrices.md",
@@ -67,6 +72,7 @@ makedocs(
             "Gradient operators" => "gradients.md",
         ],
         "API" => "api.md",
+        "Benchmarks" => "benchmarks.md",
     ]
 )
 

@@ -1,6 +1,6 @@
 name = "SpeedyWeatherInternals"
 uuid = "34489162-d270-4603-8b96-37b04f830d73"
-version = "0.2.0"
+version = "0.2.2+DEV"
 authors = ["SpeedyWeatherInternals contributors"]
 
 [deps]
@@ -18,6 +18,7 @@ StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
+MLDataDevices = "7e8f7934-dd98-4c1a-8fe8-92b47a384d40"
 Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 
@@ -25,6 +26,7 @@ Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 SpeedyWeatherInternalsAMDGPUExt = "AMDGPU"
 SpeedyWeatherInternalsCUDAExt = "CUDA"
 SpeedyWeatherInternalsJLArraysExt = "JLArrays"
+SpeedyWeatherInternalsMLDataDevicesExt = "MLDataDevices"
 SpeedyWeatherInternalsMetalExt = "Metal"
 SpeedyWeatherInternalsReactantExt = ["Reactant", "KernelAbstractions"]
 
@@ -37,6 +39,7 @@ DocStringExtensions = "0.9"
 DomainSets = "0.7, 0.8"
 JLArrays = "0.1, 0.2, 0.3"
 KernelAbstractions = "0.9"
+MLDataDevices = "1"
 MacroTools = "0.5"
 Metal = "1.8.0"
 ModelParameters = "0.4"

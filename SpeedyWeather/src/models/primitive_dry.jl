@@ -39,6 +39,7 @@ $(TYPEDFIELDS)"""
         CV,     # <:AbstractConvection,
         SW,     # <:AbstractShortwave,
         LW,     # <:AbstractLongwave,
+        GHG,    # NamedTuple of <:AbstractGreenhouseGas,
         SP,     # <:AbstractStochasticPhysics,
         CP,     # <:AbstractParameterization,
         TS,     # <:AbstractTimeStepper,
@@ -84,7 +85,7 @@ $(TYPEDFIELDS)"""
     # PHYSICS/PARAMETERIZATIONS
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
-    @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
+    @component boundary_layer::BL = BoundaryLayer(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_condition::SC = SurfaceCondition(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
@@ -92,6 +93,7 @@ $(TYPEDFIELDS)"""
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
     @component shortwave_radiation::SW = OneBandGreyShortwave(spectral_grid)
     @component longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
+    @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
@@ -115,20 +117,17 @@ $(TYPEDFIELDS)"""
     )
 
     parameterizations::TS2 = (
-        # orbit or external forcing
-        :solar_zenith,
-
-        # mixing
-        :vertical_diffusion, :convection,
-
-        # radiation
-        :albedo, :shortwave_radiation, :longwave_radiation,
-
-        # surface fluxes
-        :boundary_layer_drag, :surface_condition, :surface_momentum_flux, :surface_heat_flux,
-
-        # perturbations
-        :stochastic_physics,
+        :solar_zenith,              # orbit or external forcing
+        :vertical_diffusion,        # mixing
+        :convection,
+        :albedo,                    # radiation
+        :shortwave_radiation,
+        :longwave_radiation,
+        :boundary_layer,            # surface fluxes
+        :surface_condition,
+        :surface_momentum_flux,
+        :surface_heat_flux,
+        :stochastic_physics,        # perturbations
     )
 
     # DERIVED
@@ -136,49 +135,56 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-function variables(model::PrimitiveDry)
-    nsteps = get_prognostic_steps(model.time_stepping)
-    return variables(typeof(model), nsteps)
-end
+variables(model::PrimitiveDry) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
 """($TYPEDSIGNATURES) All variables needed for the primitive dry model itself (components excluded)."""
-function variables(::Type{<:PrimitiveDry}, nsteps)
+function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s"),
-        PrognosticVariable(:temperature, Spectral4D(nsteps), desc = "Temperature", units = "K"),
-        PrognosticVariable(:pressure, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+        PrognosticVariable(:divergence, SpectralXYZT(ps), desc = "Divergence", units = "1/s", fuse = :prognostic),
+        PrognosticVariable(:temperature, SpectralXYZT(ps), desc = "Temperature", units = "K", fuse = :prognostic),
+        PrognosticVariable(:pressure, SpectralXYT(ps), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :prognostic),
 
-        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s"),
-        GridVariable(:temperature, Grid3D(), desc = "Temperature", units = "K"),
-        GridVariable(:pressure, Grid2D(), desc = "Logarithm of surface pressure", units = ""),
-        GridVariable(:divergence_prev, Grid3D(), desc = "Divergence at previous time step", units = "1/s"),
-        GridVariable(:temperature_prev, Grid3D(), desc = "Temperature at previous time step", units = "K"),
-        GridVariable(:pressure_prev, Grid2D(), desc = "Logarithm of surface pressure at previous time step", units = ""),
-        GridVariable(:u_prev, Grid3D(), desc = "Zonal wind at previous time step", units = "m/s"),
-        GridVariable(:v_prev, Grid3D(), desc = "Meridional wind at previous time step", units = "m/s"),
+        TendencyVariable(:divergence, SpectralXYZT(ts), desc = "Tendency of divergence", units = "1/s²"), # not fused because computed directly by divergence op
+        TendencyVariable(:temperature, SpectralXYZT(ts), desc = "Tendency of temperature", units = "K/s", fuse = :spectral_tendencies),
+        TendencyVariable(:pressure, SpectralXYT(ts), desc = "Tendency of surface pressure", units = "log(Pa)/s", fuse = :spectral_tendencies),
+        TendencyVariable(:divergence, GridXYZT(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:temperature, GridXYZT(tg), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :grid_tendencies),
+        TendencyVariable(:pressure, GridXYT(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :grid_tendencies),
+        
+        GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse=:grid),
+        GridVariable(:temperature, GridXYZT(pg), desc = "Temperature", units = "K", fuse=:grid),
+        GridVariable(:pressure, GridXYT(pg), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse=:grid),
+        ParameterizationVariable(:surface_pressure, Grid2D(), desc = "Surface pressure", units = "Pa"),
 
-        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
-        TendencyVariable(:temperature, Spectral3D(), desc = "Tendency of temperature", units = "K/s"),
-        TendencyVariable(:pressure, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
-        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
-        TendencyVariable(:temperature, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
-        TendencyVariable(:pressure, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
+        DynamicsVariable(:uT_anomaly, GridXYZT(tg), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vT_anomaly, GridXYZT(tg), desc = "v*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:uT_anomaly, SpectralXYZT(ts), desc = "u*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vT_anomaly, SpectralXYZT(ts), desc = "v*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
 
-        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),
-        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure"),
-        DynamicsVariable(:pres_flux, Grid3D(), desc = "Pressure gradient flux, (u, v) ⋅ ∇lnp_s"),
-        DynamicsVariable(:virtual_temperature, Spectral3D(), desc = "Virtual temperature", units = "K"),
+        DynamicsVariable(:kinetic_energy, GridXYZT(tg), desc = "Kinetic energy intermediate, ½(u²+v²)", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:kinetic_energy, SpectralXYZT(ts), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
+
+        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure", fuse = :dpres_grad),
+        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure", fuse = :dpres_grad),
+        DynamicsVariable(:dpres_dx_spec, Spectral2D(), desc = "Zonal gradient of lnpₛ in spectral space", fuse = :dpres_grad_spec),
+        DynamicsVariable(:dpres_dy_spec, Spectral2D(), desc = "Meridional gradient of lnpₛ in spectral space", fuse = :dpres_grad_spec),
+        DynamicsVariable(:pres_flux, GridXYZ(), desc = "Pressure gradient flux, (u, v) ⋅ ∇lnp_s"),
+        DynamicsVariable(:virtual_temperature, SpectralXYZ(), desc = "Virtual temperature", units = "K"),
         DynamicsVariable(:u_mean_grid, Grid2D(), desc = "Vertically integrated zonal velocity", units = "m/s"),
         DynamicsVariable(:v_mean_grid, Grid2D(), desc = "Vertically integrated meridional velocity", units = "m/s"),
         DynamicsVariable(:div_mean_grid, Grid2D(), desc = "Vertically integrated divergence", units = "1/s"),
         DynamicsVariable(:div_mean, Spectral2D(), desc = "Vertically integrated divergence", units = "1/s"),
-        DynamicsVariable(:div_sum_above, Grid3D(), desc = "Partially vertically integrated divergence, top to layer above", units = "1/s"),
-        DynamicsVariable(:pres_flux_sum_above, Grid3D(), desc = "Partially vertically integrated pressure gradient flux, top to layer above"),
-        DynamicsVariable(:w, Grid3D(), desc = "Vertical velocity, dσ/dt.", units = "1/s"),
+        DynamicsVariable(:div_sum_above, GridXYZ(), desc = "Partially vertically integrated divergence, top to layer above", units = "1/s"),
+        DynamicsVariable(:pres_flux_sum_above, GridXYZ(), desc = "Partially vertically integrated pressure gradient flux, top to layer above"),
+        DynamicsVariable(:w, GridXYZ(), desc = "Vertical velocity, dσ/dt.", units = "1/s"),
 
-        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
-        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
         ScratchVariable(:a_2D, Spectral2D(), desc = "Scratch array"),
         ScratchVariable(:b_2D, Spectral2D(), desc = "Scratch array"),
         ScratchVariable(:a_2D, Grid2D(), desc = "Scratch array", namespace = :grid),
@@ -215,11 +221,12 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.albedo, model)
 
     # parameterizations
-    initialize!(model.boundary_layer_drag, model)
+    initialize!(model.boundary_layer, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
+    initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_condition, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
@@ -237,6 +244,11 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(variables, model)
 
     return Simulation(variables, model)
+end
+
+function reinitialize!(model::PrimitiveDryModel, vars::AbstractVariables)
+    reinitialize!(model.implicit, model, vars)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

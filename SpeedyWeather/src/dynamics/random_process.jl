@@ -6,7 +6,6 @@ Takes the spectral `random_pattern` in the prognostic variables
 and transforms it to spectral space in `diagn.grid.random_pattern`."""
 function SpeedyTransforms.transform!(
         vars::Variables,
-        lf::Integer,
         random_process::AbstractRandomProcess,
         spectral_transform::AbstractSpectralTransform,
     )
@@ -16,7 +15,8 @@ function SpeedyTransforms.transform!(
     transform!(pattern_grid, pattern, scratch_memory, spectral_transform)
 
     if :clamp in fieldnames(typeof(random_process))
-        clamp!(pattern_grid, random_process.clamp...)
+        lo, hi = random_process.clamp
+        @. pattern_grid = clamp(pattern_grid, lo, hi)
     end
     return nothing
 end
@@ -24,15 +24,7 @@ end
 """$(TYPEDSIGNATURES)
 `random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
-function SpeedyTransforms.transform!(
-        vars::Variables,
-        lf::Integer,
-        random_process::Nothing,
-        spectral_transform::AbstractSpectralTransform,
-    )
-    return nothing
-end
-
+SpeedyTransforms.transform!(::Variables, ::Nothing, ::AbstractSpectralTransform) = nothing
 random_process!(::Variables, process::Nothing) = nothing
 
 export SpectralAR1Process
@@ -90,7 +82,7 @@ function initialize!(
         model::AbstractModel,
     )
     # auto-regressive factor in the AR1 process
-    dt = model.time_stepping.Δt_sec         # in seconds
+    dt = model.time_stepping.Δt             # in seconds
     process.autoregressive_factor[] = exp(-dt / Second(process.time_scale).value)
 
     # noise factors per total wavenumber in the AR1 process
@@ -103,15 +95,13 @@ function initialize!(
     F₀_denominator = 2 * sum([(2l + 1) * exp(-l * (l + 1) / (k * (k + 1))) for l in 1:process.trunc])
     F₀ = sqrt(σ^2 * (1 - a^2) / F₀_denominator) * model.spectral_transform.norm_sphere
 
-    for l in eachindex(process.noise_factors)       # total wavenumber, but 1-based
-        eigenvalue = l * (l - 1)                        # (negative) eigenvalue l*(l+1) but 1-based l->l-1
-
-        # ECMWF Tech Memorandum 598, Appendix 8, eq. 17
-        process.noise_factors[l] = F₀ * exp(-eigenvalue / (2k * (k + 1)))
-    end
-
-    # set mean of random pattern to zero
-    process.noise_factors[1] = 0
+    # ECMWF Tech Memorandum 598, Appendix 8, eq. 17
+    # eigenvalue = l * (l - 1), 1-based l so l=1 (mean) gets factor 0 instead of F₀
+    NF = eltype(process.noise_factors)
+    ls = 1:length(process.noise_factors)
+    denom = NF(2k * (k + 1))
+    F₀_NF = NF(F₀)
+    @. process.noise_factors = ifelse(ls > 1, F₀_NF * exp(-ls * (ls - 1) / denom), zero(NF))
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = process.seed == 0 ? rand(UInt) : process.seed
@@ -125,25 +115,33 @@ function random_process!(
     ) where {NF}
 
     (; random_pattern) = vars.prognostic
-    lmax, mmax = size(random_pattern, OneBased, as = Matrix)  # max degree l, order m of harmonics (1-based)
-
     a = process.autoregressive_factor[]
     RNG = process.random_number_generator
     s = convert(NF, 2 / sqrt(2))              # to scale: std(real(randn(Complex))) = √2/2 to 1
 
-    lm = 0
-    @inbounds for m in 1:mmax
-        for l in m:lmax
-            lm += 1
+    arch = architecture(random_pattern)
+    n = length(random_pattern)                # total number of harmonics
 
-            # draw from independent N(0,1) in real and imaginary parts
-            r = s * randn(RNG, Complex{NF})   # scale to unit variance in real/imaginary
-
-            # ECMWF Tech Memorandum 598, Appendix 8, eq. 14
-            ξ = process.noise_factors[l]
-            random_pattern[lm] *= a         # auto-regressive term
-            random_pattern[lm] += ξ * r       # noise term
-        end
+    # draw all complex normals on CPU through the seeded RNG to keep reproducibility,
+    # then transfer to the device in one go (GPU has no compatible Random.Xoshiro RNG)
+    r_cpu = Vector{Complex{NF}}(undef, n)
+    @inbounds for i in 1:n
+        r_cpu[i] = s * randn(RNG, Complex{NF})
     end
+    r = on_architecture(arch, r_cpu)
+
+    launch!(
+        arch, SpectralWorkOrder, size(random_pattern), spectral_ar1_kernel!,
+        random_pattern, r, process.noise_factors, random_pattern.spectrum.l_indices, a
+    )
     return nothing
+end
+
+@kernel inbounds = true function spectral_ar1_kernel!(
+        random_pattern, r, noise_factors, l_indices, a
+    )
+    lm = @index(Global, Linear)
+    l = l_indices[lm]
+    ξ = noise_factors[l]
+    random_pattern[lm] = a * random_pattern[lm] + ξ * r[lm]
 end

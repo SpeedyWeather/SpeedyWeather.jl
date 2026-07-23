@@ -25,7 +25,7 @@ SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...
 function variables(::SnowModel)
     return (
         PrognosticVariable(:snow_depth, Grid2D(), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
-        PrognosticVariable(:soil_temperature, Land3D(), namespace = :land, units = "K", desc = "Soil temperature"),
+        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land, units = "K", desc = "Soil temperature"),
         ParameterizationVariable(:snow_melt_rate, Grid2D(), namespace = :land, units = "kg/m²/s", desc = "Snow melt rate"),
     )
 end
@@ -43,14 +43,14 @@ function timestep!(
         model::PrimitiveEquation,
     )
 
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping                            # time step [s]
     (; snow_depth) = vars.prognostic.land                   # in equivalent liquid water height [m]
     (; soil_temperature) = vars.prognostic.land
-    (; mask) = model.land_sea_mask
+    (; land_fraction) = model.land_sea_mask
 
     # Some thermodynamics needed by snow
     ρ_water = model.atmosphere.water_density                # water density [kg/m³]
-    Lᵢ = model.atmosphere.latent_heat_fusion                  # latent heat of fusion
+    Lᵢ = model.atmosphere.latent_heat_fusion                # latent heat of fusion
     cₛ = model.land.thermodynamics.heat_capacity_dry_soil
     z₁ = model.land.geometry.layer_thickness[1]
     (; melting_threshold, snow_depth_cap) = snow
@@ -69,19 +69,19 @@ function timestep!(
 
     launch!(
         architecture(snow_depth), LinearWorkOrder, size(snow_depth), land_snow_kernel!,
-        snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, mask,
+        snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, land_fraction,
         params,
     )
     return nothing
 end
 
 @kernel inbounds = true function land_snow_kernel!(
-        snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, mask,
+        snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, land_fraction,
         params,
     )
     ij = @index(Global, Linear)             # every grid point ij
 
-    if mask[ij] > 0                         # at least partially land
+    if land_fraction[ij] > 0               # at least partially land
 
         (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, snow_depth_cap) = params
 

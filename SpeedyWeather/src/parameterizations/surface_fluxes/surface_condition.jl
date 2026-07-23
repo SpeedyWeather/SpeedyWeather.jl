@@ -37,32 +37,39 @@ end
 @propagate_inbounds function surface_condition!(ij, vars, surface_condition::SurfaceCondition, model)
 
     (; wind_slowdown, gust_speed) = surface_condition
-    nlayers = model.geometry.nlayers
+    (; nlayers) = model.geometry
+    coord = model.geometry.vertical_coordinates
     (; atmosphere) = model
 
     # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
-    uₛ = wind_slowdown * vars.grid.u_prev[ij, nlayers]
-    vₛ = wind_slowdown * vars.grid.v_prev[ij, nlayers]
+    u_grid = get_prognostic_step(vars.grid.u, model.time_stepping, surface_condition)
+    v_grid = get_prognostic_step(vars.grid.v, model.time_stepping, surface_condition)
+    uₛ = wind_slowdown * u_grid[ij, nlayers]
+    vₛ = wind_slowdown * v_grid[ij, nlayers]
 
     # Fortran SPEEDY documentation eq. 50, sqrt(u² + v² + gust_speed²)
     surface_wind_speed = sqrt(muladd(uₛ, uₛ, muladd(vₛ, vₛ, gust_speed^2)))
     vars.parameterizations.surface_wind_speed[ij] = surface_wind_speed
 
     # Surface air density
+    (; surface_air_density) = vars.parameterizations
+    temperature = get_prognostic_step(vars.grid.temperature, model.time_stepping, surface_condition)
+    pₛ = vars.parameterizations.surface_pressure[ij] # surface pressure [Pa]
     (; R_dry, κ) = model.atmosphere
-    σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
-    pₛ = vars.grid.pressure_prev[ij]                    # surface pressure [Pa]
-    T = vars.grid.temperature_prev[ij, nlayers]            # virtual temperature at lowest model level [K]
-    q = haskey(vars.grid, :humidity_prev) ?
-        vars.grid.humidity_prev[ij, nlayers] : zero(T) # specific humidity at lowest model level [kg/kg]
+
+    σ = pressure(nlayers, pₛ, coord) / pₛ           # σ vertical coordinate at lowest model level
+    T = temperature[ij, nlayers]                    # virtual temperature at lowest model level [K]
+    q = haskey(vars.grid, :humidity) ?              # specific humidity at lowest model level [kg/kg]
+        get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)
     Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
     σ⁻ᵏ = σ^(-κ)                                    # precalculate
     Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate
-    ρ = pₛ / (R_dry * Tᵥ)                               # surface air density [kg/m³] from ideal gas law
-    vars.parameterizations.surface_air_density[ij] = ρ       # store for surface temp/humidity fluxes
+    ρ = pₛ / (R_dry * Tᵥ)                           # surface air density [kg/m³] from ideal gas law
+    surface_air_density[ij] = ρ                     # store for surface temp/humidity fluxes
 
     # Surface air temperature
+    (; surface_air_temperature) = vars.parameterizations
     T *= σ⁻ᵏ                                        # lower to surface assuming dry adiabatic lapse rate
-    vars.parameterizations.surface_air_temperature[ij] = T   # store for surface temp/humidity fluxes
+    surface_air_temperature[ij] = T                 # store for surface temp/humidity fluxes
     return nothing
 end

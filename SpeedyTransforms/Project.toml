@@ -1,6 +1,6 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-version = "0.1.3"
+version = "0.2.0-DEV"
 authors = ["SpeedyTransforms contributors"]
 
 [deps]
@@ -28,6 +28,7 @@ StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+cuFFT = "533571aa-0936-420e-b4be-9c66f5f626ca"
 
 [sources]
 LowerTriangularArrays = {path = "../LowerTriangularArrays"}
@@ -36,7 +37,7 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 
 [extensions]
 SpeedyTransformsAMDGPUExt = "AMDGPU"
-SpeedyTransformsCUDAExt = "CUDA"
+SpeedyTransformsCUDAExt = ["CUDA", "cuFFT"]
 SpeedyTransformsEnzymeExt = "Enzyme"
 
 [compat]
@@ -62,4 +63,5 @@ RingGrids = "0.1"
 SpeedyWeatherInternals = "0.2"
 Statistics = "1.10"
 StyledStrings = "1"
+cuFFT = "6"
 julia = "1.10"

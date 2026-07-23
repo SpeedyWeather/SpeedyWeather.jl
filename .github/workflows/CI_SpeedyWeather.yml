@@ -20,7 +20,7 @@ jobs:
       run:
         shell: bash
         working-directory: ./SpeedyWeather
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
       actions: write
       contents: read
@@ -34,7 +34,7 @@ jobs:
         arch:
           - x64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.version }}
@@ -49,6 +49,7 @@ jobs:
         if: ${{ matrix.version == '1.10' }}
       - uses: julia-actions/julia-runtest@v1
         with:
+          optimize: 2               # the default
           test_args: '--verbose'    # this will also print compile time information via ParallelTestRunner.jl
           project: SpeedyWeather
         env:

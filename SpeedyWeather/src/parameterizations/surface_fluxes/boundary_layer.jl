@@ -6,19 +6,56 @@ variables(::AbstractBoundaryLayer) = (
 
 export ConstantDrag
 """Constant boundary layer drag coefficient. Fields are $(TYPEDFIELDS)"""
-@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
+@parameterized @kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
     "[OPTION] Constant drag coefficient [1]"
-    drag::NF = 1.0e-3
+    @param drag::NF = 1.0e-3
 end
 
 Adapt.@adapt_structure ConstantDrag
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
-@propagate_inbounds parameterization!(ij, diagn, progn, drag::ConstantDrag, model) =
-    boundary_layer_drag!(ij, diagn, drag)
+@propagate_inbounds parameterization!(ij, vars, drag::ConstantDrag, model) =
+    boundary_layer_drag!(ij, vars, drag)
 
-@propagate_inbounds function boundary_layer_drag!(ij, diagn, scheme::ConstantDrag)
-    return diagn.physics.boundary_layer_drag[ij] = scheme.drag
+@propagate_inbounds function boundary_layer_drag!(ij, vars, scheme::ConstantDrag)
+    vars.parameterizations.boundary_layer_drag[ij] = scheme.drag
+    return nothing
+end
+
+export BoundaryLayer
+"""Composite type, containing surface roughness computation
+and drag coefficient computation. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct BoundaryLayer{SR, D} <: AbstractBoundaryLayer
+    @component surface_roughness::SR
+    @component drag::D
+end
+
+Adapt.@adapt_structure BoundaryLayer
+function BoundaryLayer(
+        SG::SpectralGrid;
+        surface_roughness = ConstantSurfaceRoughness(SG),
+        drag = BulkRichardsonDrag(SG),
+    )
+    return BoundaryLayer(surface_roughness, drag)
+end
+
+function initialize!(BL::BoundaryLayer)
+    initialize!(BL.surface_roughness)
+    initialize!(BL.drag)
+    return nothing
+end
+
+# variables of boundary layer are the union of surface roughness and drag variables
+variables(BL::BoundaryLayer) = (
+    variables(BL.surface_roughness)...,
+    variables(BL.drag)...,
+)
+
+# just call the sub-paramterizations one after another
+@propagate_inbounds function parameterization!(ij, vars, BL::BoundaryLayer, model)
+    parameterization!(ij, vars, BL.surface_roughness, model)
+    parameterization!(ij, vars, BL.drag, model)
+    return nothing
 end
 
 export BulkRichardsonDrag
@@ -26,21 +63,15 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
+@parameterized @kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "[OPTION] von Kármán constant [1]"
-    von_Karman::NF = 0.4
-
-    "[OPTION] roughness length over land [m]"
-    roughness_length_land::NF = 0.5
-
-    "[OPTION] roughness length over ocean [m]"
-    roughness_length_ocean::NF = 1.0e-4
+    @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    critical_Richardson::NF = 10
+    @param critical_Richardson::NF = 10 (bounds = Positive,)
 
     "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
-    drag_min::NF = 1.0e-5
+    @param drag_min::NF = 1.0e-5 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure BulkRichardsonDrag
@@ -49,38 +80,39 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, vars, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
+    boundary_layer_drag!(ij, vars, drag, model.atmosphere, model.planet, model.orography, model.time_stepping)
 
 @propagate_inbounds function boundary_layer_drag!(
         ij,
         vars,
         drag::BulkRichardsonDrag,
-        land_sea_mask,
         atmosphere,
         planet,
         orography,
+        time_stepping,
     )
-    land_fraction = land_sea_mask.mask[ij]
 
     # Height z [m] of lowermost layer above ground
-    surface = size(vars.grid.geopotential, 2)    # surface index = nlayers
+    surface = size(vars.dynamics.geopotential, 2)    # surface index = nlayers
     (; gravity) = planet
-    z = vars.grid.geopotential[ij, surface] / gravity - orography.orography[ij]
+    z = vars.dynamics.geopotential[ij, surface] / gravity - orography.orography[ij]
 
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     κ = drag.von_Karman
-    z₀ = land_fraction * drag.roughness_length_land + (1 - land_fraction) * drag.roughness_length_ocean
 
-    # should be z > z₀, z=z₀ means an infinitely high drag
+    # Get surface roughness length (computed by the surface_roughness parameterization)
+    z₀ = vars.parameterizations.surface_roughness[ij]
+
+    # should be z > z₀, z=z₀ means an infinitely high drag, choose one order higher than roughness length at least
     # 0 < z < z₀ doesn't make sense so cap here
-    z = max(z, z₀)
+    z = max(z, 10z₀)
     drag_max = (κ / log(z / z₀))^2
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
-    ΔΦ₀ = gravity * z     # geopotential high relative to surface
-    Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere)
+    ΔΦ₀ = gravity * z     # geopotential height relative to surface
+    Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
     Ri_c = drag.critical_Richardson
     (; drag_min) = drag
 
@@ -97,14 +129,15 @@ end
 $(TYPEDSIGNATURES)
 Calculate the bulk Richardson number following Frierson, 2006.
 For vertical stability in the boundary layer."""
-@propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere)
+@propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
     cₚ = atmosphere.heat_capacity
-    NF = eltype(vars.grid.temperature_prev)
-    surface = size(vars.grid.temperature_prev, 2)     # surface index = nlayers
+    temp = get_prognostic_step(vars.grid.temperature, time_stepping, drag)
+    NF = eltype(temp)
+    surface = size(temp, 2)     # surface index = nlayers
 
     Vₛ = vars.parameterizations.surface_wind_speed[ij]
-    T = vars.grid.temperature_prev[ij, surface]
-    q = haskey(vars.grid, :humidity_prev) ? vars.grid.humidity_prev[ij, surface] : zero(NF)
+    T = temp[ij, surface]
+    q = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, drag)[ij, surface] : zero(NF)
     Tᵥ = virtual_temperature(T, q, atmosphere)
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)

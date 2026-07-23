@@ -93,7 +93,7 @@ end
                         map = transform(alms, S)
                         alms2 = transform(map, S)
 
-                        for lm in eachharmonic(alms, alms2)
+                        for lm in eachindex(alms, alms2)
                             @test alms[lm] ≈ alms2[lm] atol = 100 * eps(NF)
                         end
                     end
@@ -270,7 +270,7 @@ end
 
                         tol = 1.0e-3
 
-                        for lm in eachharmonic(alms, alms2)
+                        for lm in eachindex(alms, alms2)
                             @test alms[lm] ≈ alms2[lm] atol = tol rtol = tol
                         end
                     end
@@ -314,7 +314,7 @@ end
 
                 tol = NF == Float32 ? 2 * sqrt(eps(NF)) : 5.0e-7
 
-                for lm in eachharmonic(oro_spec1, oro_spec2)
+                for lm in eachindex(oro_spec1, oro_spec2)
                     @test oro_spec1[lm] ≈ oro_spec2[lm] atol = tol rtol = tol
                 end
                 for ij in eachindex(oro_grid1, oro_grid2)
@@ -371,5 +371,39 @@ end
 
             @test grid_roundtrip ≈ grid rtol = tolerances[i_grid]
         end
+    end
+end
+
+@testset "Transform: per-K FFT plan multiplexing" begin
+    # FFTW/cuFFT plans bake the batch dim K into the plan. SpectralTransform pre-plans for each
+    # K in `transform_batch`; the K=1 entry is the serial fallback. This test verifies:
+    #   (a) the plan dict has the expected K keys,
+    #   (b) batched calls at each planned K give a faithful spec→grid→spec→grid roundtrip,
+    #   (c) unplanned K still works (falls back to serial via `_fourier!` dispatch).
+    NF = Float64
+    trunc = 31
+    dealiasing = 3
+    nlayers = 4
+    spectrum = Spectrum(trunc)
+    grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc, dealiasing))
+
+    S = SpectralTransform(spectrum, grid; NF, nlayers, transform_batch = Int[1, 2, 4])
+
+    # (a) planned plans present, scratch sized to max planned K. K=1 lives in the always-built serial
+    # plan vector; the batched (K>1) plans are keyed by K in the batched Dicts.
+    @test length(S.rfft_plan_serial) == S.grid.nlat_half
+    @test length(S.brfft_plan_serial) == S.grid.nlat_half
+    @test sort!(collect(keys(S.rfft_plans_batched))) == [2, 4]
+    @test sort!(collect(keys(S.brfft_plans_batched))) == [2, 4]
+    @test S.nlayers == 4
+
+    # (b)+(c) roundtrip at each K — including K=3 which is NOT in the planned set
+    # and must therefore go through the K=1 serial fallback via `_fourier!` dispatch.
+    for K in (1, 2, 3, 4)
+        spec_in = randn(Complex{NF}, spectrum, K)
+        grid_out = transform(spec_in, S)
+        spec_back = transform(grid_out, S)
+        grid_back = transform(spec_back, S)
+        @test grid_back ≈ grid_out rtol = 1.0e-13
     end
 end

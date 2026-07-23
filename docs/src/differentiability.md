@@ -54,7 +54,7 @@ dmodel.planet.gravity
 
 ## Differentiating longer trajectories and checkpointing 
 
-In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/SpeedyWeather/test/differentiatibility/sensitivity_examples/).
+In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/SpeedyWeather/test/differentiability/sensitivity_examples/).
 
 
 ## Parameter handling
@@ -69,7 +69,7 @@ params = parameters(model)
 # output (truncated)
 Parameters:
 ┌───────┬──────────────────────────┬──────────┬────────────┬──────────────────────────────┬─────────────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────────┐
-│   idx │                fieldname │      val │  component │               componentttype │                              bounds │                                                                                     desc │
+│   idx │                fieldname │      val │  component │               component_type │                              bounds │                                                                                     desc │
 │ Int64 │                   Symbol │  Float32 │     Symbol │                     DataType │ IntervalSets.TypedEndpointsInterval │                                                                                   String │
 ├───────┼──────────────────────────┼──────────┼────────────┼──────────────────────────────┼─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────┤
 │     1 │                 rotation │  7.29e-5 │     planet │               Earth{Float32} │       -Inf .. Inf (open) (RealLine) │                                            angular frequency of Earth's rotation [rad/s] │
@@ -106,7 +106,7 @@ param_subset = params[["planet.gravity", "atmosphere.heat_capacity"]]
 
 Parameters:
 ┌───────┬───────────────┬─────────┬────────────┬──────────────────────────┬───────────────────────────────────────┬────────────────────────────────────────────────┐
-│   idx │     fieldname │     val │  component │           componentttype │                                bounds │                                           desc │
+│   idx │     fieldname │     val │  component │           component_type │                                bounds │                                           desc │
 │ Int64 │        Symbol │ Float32 │     Symbol │                 DataType │ DomainSets.HalfLine{Float64, :closed} │                                         String │
 ├───────┼───────────────┼─────────┼────────────┼──────────────────────────┼───────────────────────────────────────┼────────────────────────────────────────────────┤
 │     1 │       gravity │    9.81 │     planet │           Earth{Float32} │   0.0 .. Inf (closed-open) (HalfLine) │             gravitational acceleration [m/s^2] │
@@ -133,7 +133,7 @@ We can use the resulting parameter vector to calculate sensitivities over a sing
 ```julia
 initialize!(simulation)
 run!(simulation, period=Day(10))
-(; Δt, Δt_sec) = simulation.model.time_stepping
+(; Δt) = simulation.model.time_stepping
 ps = parameters(model)
 pvec = vec(ps)
 dp = zero(pvec)

@@ -107,6 +107,30 @@ field = HEALPixField(undef, 2)              # using undef initializor
 field = HEALPixField{Float16}(undef, 2, 3)  # using Float16 as eltype
 ```
 
+## Array dimensions of a Field
+
+Besides `data` and `grid`, a `Field` also carries a `dims::AbstractArrayDimensions` that
+records what the dimensions beyond the horizontal actually represent, e.g. vertical layers
+or time steps, see [Array dimensions](@ref array_dimensions) for a general overview of
+these dimension tags. The tags defined for `Field` are `XY` (2D, horizontal only, the default),
+`XYZ` (horizontal + vertical), `XYT` (horizontal + time), and `XYZT` (horizontal + vertical + time).
+They are bookkeeping only (they do not change how the field is indexed or computed on) but allow
+`ArrayDimensions.hasvertical(field)` and `ArrayDimensions.hastime(field)` to answer what a given
+non-horizontal dimension stands for, and they are preserved through `similar`, `zero`, views and
+indexing (dropping a dimension whenever you index into it with an integer).
+
+To create a `Field` with an explicit dimension, pass an instance of one of these types as an
+extra argument, e.g. after the `grid`
+
+```@example ringgrids
+grid = FullGaussianGrid(4)
+field = zeros(grid, ArrayDimensions.XYZ(), 3)  # 3 layers are vertical, not time
+ArrayDimensions.hasvertical(field), ArrayDimensions.hastime(field)
+```
+
+If no `dims` is provided (as in [Creating a Field](@ref)) `XY` is used by default, meaning
+that no assumption is made about the meaning of any additional dimension.
+
 ## Creating a Field from data
 
 A `field` has `field.data` (some `AbstractArray{T, N}`) and `field.grid` (some `AbstractGrid` as described above).
@@ -159,7 +183,7 @@ and [UnicodePlots's](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap`, 
 [Visualisation via Makie](@ref) and [Visualisation via UnicodePlots](@ref).
 
 ```@example ringgrids
-using CairoMakie    # triggers loading of Makie extension, or do using UnicodePlots instead!
+import CairoMakie: heatmap   # triggers loading of Makie extension, or use UnicodePlots instead!
 grid = OctahedralGaussianGrid(24)
 field = randn(grid)
 heatmap(field)
@@ -216,6 +240,37 @@ for k in eachlayer(field)           # loop over 2 x 3
     end
 end
 ```
+
+## Rotate and reverse Fields
+
+A field can be rotated in longitude with `rotate!` (in-place) or `rotate` (allocating),
+shifting the data eastward along every ring. In grid space only rotations by multiples of
+90˚ are possible (all implemented grids have rings divisible by 4), negative degrees
+rotate westward
+
+```@example ringgrids
+field = randn(FullGaussianGrid(4))
+field2 = rotate(field, 90)      # rotate a copy 90˚ eastward
+rotate!(field2, 270)            # then 270˚ more in-place, back to the original
+field2 == field
+```
+
+For rotations by any angle use `rotate!` on the spectral coefficients, see
+[Rotation of `LowerTriangularArray`](@ref). A field can also be reversed in latitude
+(mirror at the equator) or longitude (mirror at the 0˚ meridian) with `reverse`/`reverse!`
+
+```@example ringgrids
+reverse(field, dims=:lat)       # mirror at the equator
+reverse!(field, dims=:lon)      # in-place, mirror at the 0˚ meridian
+nothing # hide
+```
+
+The mirror at 0˚ is possible in-place because every ring's longitudes map onto themselves
+under ``\lambda \to -\lambda``: on rings with a longitudinal offset (first point half a
+grid spacing east of 0˚, like the HEALPix-type grids) all points within a ring are reversed,
+on rings whose first point lies on 0˚ that point stays and only the remaining points are
+reversed. Both operations are therefore consistent with their counterparts acting on the
+spherical harmonic coefficients, see [Reverse of `LowerTriangularArray`](@ref).
 
 ## Interpolation between grids
 
@@ -471,6 +526,75 @@ nothing # hide
 ```
 ![Nested OctaHEALPix](octahealpix_nested.png)
 
+
+## Copying unmasked grid points
+
+Having a `field` and a `mask` on the same grid one can extract masked/unmasked elements (return as array)
+with `field[mask]` or `field[.~mask]`, however, this operation allocates memory and it is not
+immediately possible to write the results of these operations allocation-free into existing arrays.
+
+Hence, RingGrids provides `unmasked_indices` and `copy_unmasked!` that let you extract the unmasked subset of a
+ring-grid field into a (smaller) subset array, work on it, and scatter results back -- allocation free on
+both CPU and GPU. Only a reusable `indices` vector has to be precomputed that maps the indices between
+the unmasked elements of the field to the contiguous elements in the array.
+
+**Convention:** `mask` is a `Bool` field where `true` = masked (excluded), `false` = unmasked (included).
+
+Start with a mask on a grid
+
+```@example ringgrids
+grid = HEALPixGrid(2)
+mask = rand(Bool, grid)                   # or use your own Bool field
+```
+
+Precompute the indices to copy between field and array
+
+```@example ringgrids
+indices = unmasked_indices(mask)          # Vector of grid-point indices where mask == false
+```
+
+`indices` lives on the same device as `mask` (CPU or GPU) and is sorted.
+
+Now we can copy the unmasked elements of the field to the smaller plain array (gather):
+
+```@example ringgrids
+field = rand(Float32, grid)
+```
+
+The array must be of length `n` equal to the zero (=unmasked) elements in the mask
+
+```@example ringgrids
+n = length(mask) - sum(mask)
+array = zeros(Float32, n)
+copy_unmasked!(array, field, indices)
+array
+```
+
+Such that `array` is a subset of the elements in `field`.
+The unmasked values are identical
+
+```@example ringgrids
+array == field[.~mask]
+```
+
+Same works for 3D or higher dimensions, but the mask is always 2D
+
+```@example ringgrids
+nlayers = 3
+field3D = rand(Float32, grid, nlayers)
+array3D = zeros(Float32, n, nlayers)
+copy_unmasked!(array3D, field3D, indices)
+```
+
+And copy back, plain array → field (scatter):
+
+```@example ringgrids
+other_field3D = zeros(Float32, grid, nlayers)
+copy_unmasked!(other_field3D, array3D, indices)
+field3D[.~mask, :] == other_field3D[.~mask, :]
+```
+
+Grid points not referenced by `indices` (the masked ones) are **left unchanged**.
 
 ## Function index
 

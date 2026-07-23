@@ -17,10 +17,15 @@ struct SpectralTransform{
         VectorType,                 # <: ArrayType{NF, 1},
         ArrayTypeIntMatrix,         # <: ArrayType{Int, 2}
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
-        LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
+        LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}, ...},
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
         GradientType,               # <: NamedTuple for gradients
         IntType,                    # <: Integer
+        B,                          # <: Bool
+        RFFTSerialType,             # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D forward plans)
+        BRFFTSerialType,            # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D inverse plans)
+        RFFTBatchedType,            # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D forward)
+        BRFFTBatchedType,           # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D inverse)
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -34,7 +39,7 @@ struct SpectralTransform{
 
     # GRID
     grid::GridType                  # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::IntType                # number of layers in the vertical (for scratch memory size)
+    nlayers::IntType                # max number of layers in the vertical (= max planned batch K; for scratch memory size)
 
     # CORRESPONDING GRID SIZE
     nlon_max::IntType               # Maximum number of longitude points (at Equator)
@@ -50,13 +55,16 @@ struct SpectralTransform{
     # NORMALIZATION
     norm_sphere::NF                 # normalization of the l=0, m=0 mode
 
-    # FFT plans, one plan for each latitude ring, batched in the vertical
-    rfft_plans::Vector{AbstractFFTs.Plan}   # FFT plan for grid to spectral transform
-    brfft_plans::Vector{AbstractFFTs.Plan}  # spectral to grid transform (inverse)
-
-    # FFT plans, but unbatched
-    rfft_plans_1D::Vector{AbstractFFTs.Plan}
-    brfft_plans_1D::Vector{AbstractFFTs.Plan}
+    # FFT plans, split into concretely-typed serial (K=1, 1-D) and batched (K>1, 2-D) sets so that
+    # `plan * view` / `mul!` is a static call (the K=1 and K>1 plans are different concrete FFTW/cuFFT
+    # types and cannot share one container). FFTW/cuFFT plans bake K into the plan at construction.
+    # The serial plans are the per-layer fallback (used by `_fourier_serial!`), always present. Hot K
+    # values (batched dycore transforms, prognostic spec→grid, U/V) are pre-planned in the batched
+    # Dicts, keyed by K; everything else falls back to the serial plans in a loop.
+    rfft_plan_serial::RFFTSerialType     # grid → spectral (forward), K=1 per-ring 1-D plans
+    brfft_plan_serial::BRFFTSerialType   # spectral → grid (inverse), K=1 per-ring 1-D plans
+    rfft_plans_batched::RFFTBatchedType  # grid → spectral (forward), K>1 per-ring 2-D plans, keyed by K
+    brfft_plans_batched::BRFFTBatchedType # spectral → grid (inverse), K>1 per-ring 2-D plans, keyed by K
 
     # LEGENDRE POLYNOMIALS, for all latitudes, precomputed
     legendre_polynomials::LowerTriangularArrayType
@@ -74,6 +82,12 @@ struct SpectralTransform{
     solid_angles::VectorType                    # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
     gradients::GradientType                     # precomputed gradient and integration matrices
+
+    # CUDA GRAPHS
+    # toggle for the CUDA-Graphs accelerated batched Fourier transform
+    # Set to `false` to fall back to the generic (allocating) per-ring GPU
+    # Meaningless for non-CUDA architectures.
+    cuda_graphs::B
 end
 
 # eltype of a transform is the number format used within
@@ -91,9 +105,15 @@ function SpectralTransform(
         spectrum::AbstractSpectrum,                     # Spectral truncation
         grid::AbstractGrid;                             # grid used and resolution, e.g. FullGaussianGrid
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
-        nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
+        nlayers::Integer = DEFAULT_NLAYERS,                                             # scratch size — max layer count any single transform call may carry
+        transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
+        cuda_graphs::Bool = true,                                            # use CUDA-Graphs accelerated Fourier path (CUDA only)
     )
+    # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
+    # per-layer fallback used by `_fourier_serial!`).
+    planned_K = sort!(unique!(Int[1; transform_batch]))
+    @assert maximum(planned_K) <= nlayers "transform_batch $planned_K contains an entry larger than nlayers=$nlayers; scratch would be too small."
     (; lmax, mmax, architecture) = spectrum                       # 1-based spectral truncation order and degree
 
     ArrayType = array_type(architecture)
@@ -138,19 +158,15 @@ function SpectralTransform(
     end
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory = ScratchMemory(NF, architecture, grid, nlayers)
-
-    rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
-    brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
-    rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
-    brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
+    # CPU always chunks unplanned K down to the largest planned batch, so scratch only needs
+    # to hold one such chunk. GPU shouldn't chunk and must fit the full input K.
+    scratch_memory = ScratchMemory(NF, architecture, grid, _scratch_nlayers(architecture, nlayers, planned_K))
 
     fake_grid_data = on_architecture(architecture, zeros(NF, grid, nlayers))
 
-    # PLAN THE FFTs
-    plan_FFTs!(
-        rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
-        fake_grid_data, scratch_memory.north, rings, nlons
+    # PLAN THE FFTs: concretely-typed serial (K=1) plan vectors + batched (K>1) plan Dicts
+    rfft_plan_serial, brfft_plan_serial, rfft_plans_batched, brfft_plans_batched = plan_FFTs(
+        planned_K, fake_grid_data, scratch_memory.north, rings, nlons
     )
 
     # PRECOMPUTE KJM INDICES FOR LEGENDRE TRANSFORM (0-based)
@@ -188,10 +204,15 @@ function SpectralTransform(
         array_type(architecture, NF, 1),
         array_type(architecture, Int, 2),
         array_type(architecture, Complex{NF}, 2),
-        LowerTriangularArray{NF, 2, array_type(architecture, NF, 2), typeof(spectrum)},
+        typeof(legendre_polynomials),
         typeof(scratch_memory),
         typeof(gradients),
         typeof(nlayers),
+        typeof(cuda_graphs),
+        typeof(rfft_plan_serial),
+        typeof(brfft_plan_serial),
+        typeof(rfft_plans_batched),
+        typeof(brfft_plans_batched),
     }(
         architecture,
         spectrum, nfreq_max,
@@ -200,12 +221,14 @@ function SpectralTransform(
         nlon_max, nlons, nlat, rings,
         coslat, coslat⁻¹, lon_offsets,
         norm_sphere,
-        rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
+        rfft_plan_serial, brfft_plan_serial,
+        rfft_plans_batched, brfft_plans_batched,
         legendre_polynomials,
         scratch_memory,
         jm_index_size, kjm_indices,
         solid_angles,
         gradients,
+        cuda_graphs,
     )
 end
 
@@ -293,7 +316,7 @@ Spectral transform `S` and lower triangular matrix `L` match if the
 spectral dimensions `(lmax, mmax)` match and the number of vertical layers is
 equal or larger in the transform (constraints due to allocated scratch memory size)."""
 function Architectures.ismatching(S::AbstractSpectralTransform, L::LowerTriangularArray; horizontal_only::Bool = false)
-    resolution_match = resolution(S.spectrum) == size(L, OneBased, as = Matrix)[1:2]
+    resolution_match = resolution(S.spectrum) == size(L, OneBased, Matrix)[1:2]
     vertical_match = horizontal_only ? true : length(axes(L, 2)) <= S.nlayers
     return resolution_match && vertical_match
 end
@@ -330,6 +353,89 @@ function Base.DimensionMismatch(S::AbstractSpectralTransform, F::AbstractField)
     return DimensionMismatch(s)
 end
 
+# Layer size of scratch memory (north/south columns in `ScratchMemory`).
+# On CPU we typically use `nlayers` only (largest allocated plan and physical layers of the model)
+# On GPU we batch transforms much more, and need to use a scratch memory in 
+# accordance with the largest batch which is `nlayers` in this case and ISN'T equal to the physical layers of the model
+_scratch_nlayers(::AbstractCPU, ::Integer, planned_K::AbstractVector{<:Integer}) = maximum(planned_K)
+_scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:Integer}) = nlayers
+
+# Return true if a call with `K` layers should be split into chunks that are 
+# executed sequentially. 
+# Architecture-dispatched: 
+# CPU chunks to avoid FFTW's alignment-mismatch on x86 (no problem on ARM)
+# GPU doesn't need any of that we have seperate plans for each K 
+@inline function _needs_chunking(K::Integer, S::SpectralTransform{NF, <:AbstractCPU}) where {NF}
+    K > 1 || return false                            # K=1 always handled directly
+    haskey(S.rfft_plans_batched, K) && return false  # K is directly planned, no chunking needed
+    # K > 1 and not directly planned: chunk through whichever planned K is largest (≤ K_total).
+    # Note this includes the degenerate case `keys(rfft_plans) == [1]`: chunks then have K=1
+    # and route to the K=1 plan one layer at a time. Scratch (sized to maximum(planned_K))
+    # is guaranteed to fit each chunk in all cases.
+    return true
+end
+
+@inline _needs_chunking(::Integer, ::SpectralTransform) = false
+
+# Largest planned batch K ≤ K_total, excluding the K=1 fallback. Used to pick the chunk size. Typically this will just be the number of layers in the model. 
+@inline function _largest_planned_batch(K_total::Integer, S::SpectralTransform)
+    best = 1
+    for k in keys(S.rfft_plans_batched)
+        if k > best && k <= K_total
+            best = k
+        end
+    end
+    return best
+end
+
+# For CPU only: Split a transform over `K` layers into chunks that each match a pre-built batched FFT plan.
+# Each chunk is a sub-view of the input/output along the layer dim; calling `transform!`
+# on the sub-views routes through the regular batched path. The trailing remainder
+# (size < K_batched) goes through the K=1 serial path one layer at a time.
+#
+# Why this matters on CPU: FFT plans bake their batch dim K into the plan, and on x86 the
+# scratch column-stride (= nfreq_max * sizeof(Complex{NF})) is generally not a multiple
+# of the SIMD width, so the K=1 plan can't be applied to columns other than column 1
+# without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
+# that path for the bulk of the layers and effectively restores the previous behavior before 
+# fusion/batching without performance penalties. 
+# Greedy chunk sizes: at each position take the largest planned batch that fits the remaining
+# layers (1 = the always-planned serial fallback when nothing larger fits)
+function _transform_chunked!(                       # SPECTRAL TO GRID
+        field::AbstractField, coeffs::LowerTriangularArray,
+        scratch_memory::ScratchMemory, S::SpectralTransform;
+        unscale_coslat::Bool = false,
+    )
+    K = size(field, 2)
+    c = 1
+    while c <= K
+        len = _largest_planned_batch(K - c + 1, S)  # planned batch (or 1) fitting the remainder
+        chunk = c:(c + len - 1)
+        field_chunk = wrapped_view(field, :, chunk)
+        coeffs_chunk = wrapped_view(coeffs, :, chunk)
+        _transform_nonchunked!(field_chunk, coeffs_chunk, scratch_memory, S, unscale_coslat)
+        c += len
+    end
+    return field
+end
+
+function _transform_chunked!(                       # GRID TO SPECTRAL
+        coeffs::LowerTriangularArray, field::AbstractField,
+        scratch_memory::ScratchMemory, S::SpectralTransform,
+    )
+    K = size(field, 2)
+    c = 1
+    while c <= K
+        len = _largest_planned_batch(K - c + 1, S)  # planned batch (or 1) fitting the remainder
+        chunk = c:(c + len - 1)
+        field_chunk = wrapped_view(field, :, chunk)
+        coeffs_chunk = wrapped_view(coeffs, :, chunk)
+        _transform_nonchunked!(coeffs_chunk, field_chunk, scratch_memory, S)
+        c += len
+    end
+    return coeffs
+end
+
 """$(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from n-dimensional array `coeffs` of spherical harmonic
 coefficients to an n-dimensional array `field`. Uses FFT in the zonal direction,
@@ -350,6 +456,32 @@ function transform!(                        # SPECTRAL TO GRID
         scratch_memory::ScratchMemory,      # explicit scratch memory to use
         S::SpectralTransform;               # precomputed transform
         unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
+    )
+    # thin forwarder to the positional core (see `_transform_grid!`)
+    return _transform_grid!(field, coeffs, scratch_memory, S, unscale_coslat)
+end
+
+function _transform_grid!(
+        field::AbstractField, coeffs::LowerTriangularArray,
+        scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
+    )
+    # On CPU, an unplanned K would route the FFT through `_fourier_serial!`, which on x86
+    # crashes with an FFTW alignment mismatch when the scratch column-stride is not a multiple
+    # of the SIMD width (consecutive columns have differing alignment). Split into chunks
+    # matching the largest available batched plan; each chunk uses the batched FFT path
+    # against scratch starting at column 1 (always SIMD-aligned). `_needs_chunking` is
+    # statically false on GPU/others, so this branch elides there.
+    # Checked **before** the boundscheck below so chunking can handle K > S.nlayers
+    K = size(field, 2)
+    if _needs_chunking(K, S)
+        return _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
+    end
+    return _transform_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
+end
+
+function _transform_nonchunked!(
+        field::AbstractField, coeffs::LowerTriangularArray,
+        scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
     )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
@@ -386,6 +518,31 @@ function transform!(                                    # GRID TO SPECTRAL
         field::AbstractField,                           # input: gridded values
         scratch_memory::ScratchMemory,                  # explicit scratch memory to use
         S::SpectralTransform,                           # precomputed spectral transform
+    )
+    # thin forwarder to the positional core (see `_transform_spec!`)
+    return _transform_spec!(coeffs, field, scratch_memory, S)
+end
+
+# Positional core of the grid-to-spectral `transform!`; analytic-adjoint AD boundary, see
+# `_transform_grid!` and SpeedyTransformsEnzymeExt.
+function _transform_spec!(
+        coeffs::LowerTriangularArray, field::AbstractField,
+        scratch_memory::ScratchMemory, S::SpectralTransform,
+    )
+    # Same chunking-before-boundscheck pattern as the spec→grid `transform!` above —
+    # see comment there.
+    K = size(field, 2)
+    if _needs_chunking(K, S)
+        return _transform_chunked!(coeffs, field, scratch_memory, S)
+    end
+    return _transform_nonchunked!(coeffs, field, scratch_memory, S)
+end
+
+# Non-chunked core, factored out for the same recursion-breaking + AD-boundary reasons as
+# `_transform_nonchunked!` above.
+function _transform_nonchunked!(
+        coeffs::LowerTriangularArray, field::AbstractField,
+        scratch_memory::ScratchMemory, S::SpectralTransform,
     )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))

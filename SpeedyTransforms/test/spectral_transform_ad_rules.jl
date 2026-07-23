@@ -63,6 +63,106 @@ end
             end
         end
     end
+    @testset "chunked transform Enzyme rules" begin
+        # SpeedyTransformsEnzymeExt defines custom reverse rules for the CHUNKED (unplanned-K)
+        # CPU transform that apply the analytic adjoint of the (linear) spectral transform.
+        # The chunked-path gradient must match the batched path, which native Enzyme + the
+        # _fourier! rules already handle correctly. (Differentiating the chunk loop itself is
+        # unsafe: Enzyme mis-builds the per-chunk view shadows — degenerate (0,1) shadow / GC
+        # corruption on 1.10 — and reuses the last iteration's shadow for all chunks.)
+        trunc = 5
+        spectrum = Spectrum(trunc, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[1]))
+        NL = 4
+        S_chunked = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1])
+        S_batched = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1, NL])
+        @test SpeedyTransforms._needs_chunking(NL, S_chunked)
+        @test !SpeedyTransforms._needs_chunking(NL, S_batched)
+
+        # EnzymeTestUtils reverse-rule check against finite differences, for the CHUNKED transform
+        # (exercises the analytic-adjoint transform! rule; scratch Const so FD doesn't perturb it).
+        # Wrapped to return `nothing` (like `_fourier!`) — otherwise ETU treats the returned mutated
+        # output array as an extra differentiable output and its FD Jacobian goes out of bounds.
+        transform_s2g!(field, coeffs, scratch, S) = (transform!(field, coeffs, scratch, S); nothing)
+        transform_g2s!(coeffs, field, scratch, S) = (transform!(coeffs, field, scratch, S); nothing)
+        @testset "EnzymeTestUtils reverse rule test" begin
+            let field = zeros(Float32, grid, NL), coeffs = rand(ComplexF32, spectrum, NL)
+                test_reverse(
+                    transform_s2g!, Const,
+                    (field, Duplicated), (coeffs, Duplicated),
+                    (deepcopy(S_chunked.scratch_memory), Const), (S_chunked, Const);
+                    fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                )
+            end
+            let coeffs = zeros(ComplexF32, spectrum, NL), field = rand(Float32, grid, NL)
+                test_reverse(
+                    transform_g2s!, Const,
+                    (coeffs, Duplicated), (field, Duplicated),
+                    (deepcopy(S_chunked.scratch_memory), Const), (S_chunked, Const);
+                    fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                )
+            end
+        end
+
+        # spec -> grid: vjp w.r.t coeffs must agree between chunked and batched transforms
+        coeffs0 = rand(ComplexF32, spectrum, NL)
+        dfield0 = rand(Float32, grid, NL)
+        dcoeffs = map((S_chunked, S_batched)) do S
+            coeffs = deepcopy(coeffs0)
+            field = zeros(Float32, grid, NL)
+            dfield = deepcopy(dfield0)
+            dc = make_zero(coeffs)
+            autodiff(
+                set_runtime_activity(Reverse), transform!, Const,
+                Duplicated(field, dfield), Duplicated(coeffs, dc),
+                Duplicated(deepcopy(S.scratch_memory), make_zero(deepcopy(S.scratch_memory))), Const(S),
+            )
+            dc
+        end
+        @test all(isfinite, dcoeffs[1].data)
+        @test any(!iszero, dcoeffs[1].data)
+        @test isapprox(dcoeffs[1].data, dcoeffs[2].data, rtol = 1.0e-4)
+
+        # the rule must ACCUMULATE into the (input) coeffs cotangent, not overwrite it: seeding a
+        # pre-existing gradient `base_c` must yield base_c + pullback (guards the reset=false path)
+        base_c = rand(ComplexF32, spectrum, NL)
+        dc_acc = deepcopy(base_c)
+        autodiff(
+            set_runtime_activity(Reverse), transform!, Const,
+            Duplicated(zeros(Float32, grid, NL), deepcopy(dfield0)), Duplicated(deepcopy(coeffs0), dc_acc),
+            Duplicated(deepcopy(S_chunked.scratch_memory), make_zero(deepcopy(S_chunked.scratch_memory))), Const(S_chunked),
+        )
+        @test isapprox(dc_acc.data, base_c.data .+ dcoeffs[1].data, rtol = 1.0e-4)
+
+        # grid -> spec: vjp w.r.t field must agree between chunked and batched transforms
+        field0 = rand(Float32, grid, NL)
+        dcoeffs0 = rand(ComplexF32, spectrum, NL)
+        dfields = map((S_chunked, S_batched)) do S
+            field = deepcopy(field0)
+            coeffs = zeros(ComplexF32, spectrum, NL)
+            dcoeffs_seed = deepcopy(dcoeffs0)
+            df = make_zero(field)
+            autodiff(
+                set_runtime_activity(Reverse), transform!, Const,
+                Duplicated(coeffs, dcoeffs_seed), Duplicated(field, df),
+                Duplicated(deepcopy(S.scratch_memory), make_zero(deepcopy(S.scratch_memory))), Const(S),
+            )
+            df
+        end
+        @test all(isfinite, dfields[1].data)
+        @test any(!iszero, dfields[1].data)
+        @test isapprox(dfields[1].data, dfields[2].data, rtol = 1.0e-4)
+
+        # accumulate into the (input) field cotangent, not overwrite (guards the add=true path)
+        base_f = rand(Float32, grid, NL)
+        df_acc = deepcopy(base_f)
+        autodiff(
+            set_runtime_activity(Reverse), transform!, Const,
+            Duplicated(zeros(ComplexF32, spectrum, NL), deepcopy(dcoeffs0)), Duplicated(deepcopy(field0), df_acc),
+            Duplicated(deepcopy(S_chunked.scratch_memory), make_zero(deepcopy(S_chunked.scratch_memory))), Const(S_chunked),
+        )
+        @test isapprox(df_acc.data, base_f.data .+ dfields[1].data, rtol = 1.0e-4)
+    end
     @testset "Complete Transform ChainRules" begin
         # WIP
     end

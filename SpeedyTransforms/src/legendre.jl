@@ -54,7 +54,11 @@ function _legendre!(
     mmax = mmax - 1                           # 0-based max order m of spherical harmonics
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
+    # scratch dim 2 is the per-call capacity (= max(planned_K) on CPU, S.nlayers elsewhere);
+    # allow it to exceed length(nlayers) so chunked CPU calls pass the bound.
+    @boundscheck (size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
+                  size(g_north, 3) == nlat_half && size(g_north, 2) >= length(nlayers)) ||
+                 throw(DimensionMismatch(S, specs))
 
     north = scratch_memory.north     # use scratch memory for vertically-batched dot product
     south = scratch_memory.south
@@ -88,8 +92,8 @@ function _legendre!(
         end
 
         if unscale_coslat
-            g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
-            g_south[:, nlayers, j] .*= coslat⁻¹[j]
+            @views g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
+            @views g_south[:, nlayers, j] .*= coslat⁻¹[j]
         end
     end
 end
@@ -127,7 +131,8 @@ function _legendre!(                        # GRID TO SPECTRAL
         f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed input, northern latitudes
         f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
         scratch_memory::ColumnScratchMemory,    # scratch memory for vertically batched Legendre transform
-        S::SpectralTransform,                   # precomputed transform
+        S::SpectralTransform;                   # precomputed transform
+        add::Bool = false,                      # accumulate onto `specs` instead of overwriting it?
     )
     (; nlat) = S                            # dimensions
     (; nlat_half) = S.grid
@@ -141,12 +146,17 @@ function _legendre!(                        # GRID TO SPECTRAL
     mmax = mmax - 1                           # 0-based max order m of spherical harmonics
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
+    @boundscheck (size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
+                  size(f_north, 3) == nlat_half && size(f_north, 2) >= length(nlayers)) ||
+                 throw(DimensionMismatch(S, specs))
 
     even = scratch_memory.north      # use scratch memory for outer product
     odd = scratch_memory.south
 
-    fill!(specs, 0)                         # reset as we accumulate into specs
+    # by default reset specs to 0 (this transform accumulates into it internally); `add=true`
+    # (used by the Enzyme transform! adjoint rule, matching the inverse `_fourier!` `add` kwarg)
+    # accumulates onto the existing contents instead, so no scratch spectral array is needed
+    add || fill!(specs, 0)
 
     return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
@@ -192,7 +202,7 @@ function unscale_coslat!(
     )
 
     launch!(
-        architecture, Array3DWorkOrder, size(g_north), unscale_coslat_kernel!,
+        architecture, ArrayWorkOrder, size(g_north), unscale_coslat_kernel!,
         g_north, g_south, coslat⁻¹
     )
     return nothing

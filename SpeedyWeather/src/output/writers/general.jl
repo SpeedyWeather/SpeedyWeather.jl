@@ -36,6 +36,9 @@ function add!(model::AbstractModel, outputvariables::AbstractOutputVariable...)
     return model.output
 end
 
+# also allow for tuples by splatting, similar to add!(::AbstractModel, ::Tuple)
+add!(output::AbstractOutput, tuple::Tuple) = add!(output, tuple...)
+
 """$(TYPEDSIGNATURES)
 Delete output variables from `output` by their (short name) (Symbol or String), corresponding
 to the keys in the dictionary."""
@@ -112,11 +115,12 @@ Simply escapes for no netcdf output or if output shouldn't be written on this ti
 Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
 function output!(output::AbstractOutput, simulation::AbstractSimulation)
-    output!(output.core, output) || return nothing
+    (; clock) = simulation.variables.prognostic
+    do_output!(output.core, clock, output) || return nothing   # decide whether to output this time step
 
     (; clock) = simulation.variables.prognostic
-    output!(output, clock.time)                                         # increase counter, write time
-    output!(output, output.variables, simulation)                       # write variables
+    output!(output, clock.time)                         # increase counter, write time
+    output!(output, output.variables, simulation)       # write variables
     return output
 end
 
@@ -137,6 +141,61 @@ function output!(
         output!(output, var, simulation)
     end
     return
+end
+
+"""$(TYPEDSIGNATURES)
+Output a `variable` into `output`. Interpolates onto the output grid and resolution
+as specified in `output`. Method used for all output variables `<: AbstractOutputVariable`
+with dispatch over the second argument. Interpolates, scales, custom transform,
+bitrounding and writes via the backend-specific [`write_array!`](@ref)."""
+function output!(
+        output::AbstractOutput,
+        variable::AbstractOutputVariable,
+        simulation::AbstractSimulation,
+    )
+    # escape immediately after first call if variable doesn't have a time dimension
+    ~hastime(variable) && output.output_counter > 1 && return nothing
+
+    # interpolate 2D/3D variables
+    var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
+
+    ori = path_or_nothing(variable, simulation)         # original array as in simulation
+    isnothing(ori) && return nothing                    # silently escape early if variable is not defined in the simulation
+    ts = simulation.model.time_stepping
+
+    # decide on existence of step dimension by comparing dimensionality
+    has_step = (is3D(variable) && ndims(ori) == 3) ||   # 2D/3D variables have 1/2 array dimensions respectively 
+                (is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
+    ori = has_step ? get_prognostic_step(ori, ts, output) : ori
+    raw = on_architecture(CPU(), ori)
+    RingGrids.interpolate!(var, raw, output.interpolator)
+
+    # unscale if variable.unscale == true and exists
+    if hasproperty(variable, :unscale)
+        if variable.unscale
+            unscale!(var, simulation.variables.prognostic.scale[])
+        end
+    end
+
+    if hasproperty(variable, :transform)    # transform (e.g. scale, offset, exp, etc) if defined
+        @. var = variable.transform(var)
+    end
+
+    # scale variable by ocean/land fraction, e.g. sea ice concentration of 50% in cell that's 50% ocean becomes 25%
+    if hasproperty(output, :land_fraction)
+        if hasproperty(variable, :ocean_fraction) && variable.ocean_fraction
+            @. var .*= (1 - output.land_fraction)
+        elseif hasproperty(variable, :land_fraction) && variable.land_fraction
+            @. var .*= output.land_fraction
+        end
+    end
+
+    if hasproperty(variable, :keepbits)     # round mantissabits for compression
+        round!(var, variable.keepbits)
+    end
+
+    write_array!(output, variable, var)
+    return nothing
 end
 
 function finalize!(
@@ -212,8 +271,9 @@ get_full_output_file_path(output::AbstractOutput) = joinpath(output.run_path, ou
 
 """$(TYPEDSIGNATURES)
 Returns the full path of the output file for a `simulation`. Throws an error if output is not active."""
-function get_output_path(simulation::AbstractSimulation)
-    output = simulation.model.output
+get_output_path(simulation::AbstractSimulation) = get_output_path(simulation.model)
+get_output_path(model::AbstractModel) = get_output_path(model.output)
+function get_output_path(output::AbstractOutput)
     output.active || error("Output is not active")
     return joinpath(output.run_path, output.filename)
 end

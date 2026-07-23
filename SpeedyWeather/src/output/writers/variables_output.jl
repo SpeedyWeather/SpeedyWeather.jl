@@ -103,15 +103,31 @@ end
 Base.close(output::JLD2Output) = close(output.jld2_file)
 
 function output!(output::JLD2Output, simulation::AbstractSimulation)
-    output!(output.core, output) || return nothing
+    (; clock) = simulation.variables.prognostic
+    do_output!(output.core, clock, output) || return nothing
     return output_jld2!(output, simulation)
 end
 
+# Fused tendency/scratch fields share storage via SubArray views. JLD2 cannot
+# round-trip a Field/LTA whose data is a SubArray (the on-disk schema captures
+# the view's parent indirectly, which is brittle). Materialize any view-backed
+# array into an independent copy before handing the snapshot to JLD2.
+materialize_views(x) = x
+materialize_views(nt::NamedTuple) = NamedTuple{keys(nt)}(map(materialize_views, values(nt)))
+materialize_views(vars::Variables) = isempty(vars.fused) ? vars : Variables(;
+    (k => materialize_views(getfield(vars, k)) for k in fieldnames(Variables))...
+)
+materialize_views(f::Field) = f.data isa SubArray ? Field(Array(f.data), f.grid) : f
+function materialize_views(L::LowerTriangularArray)
+    return L.data isa SubArray ? LowerTriangularArray(Array(L.data), L.spectrum) : L
+end
+
 function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
-    output.output_counter += 1
+    # output_counter is advanced by do_output! (and set to 1 for the IC in initialize!),
+    # so here we only read it as the snapshot index
     i = output.output_counter
     snapshot = filter_groups(simulation.variables, output)
-    output.jld2_file["$i"] = on_architecture(CPU(), snapshot)
+    output.jld2_file["$i"] = materialize_views(on_architecture(CPU(), snapshot))
     return nothing
 end
 
@@ -216,8 +232,8 @@ function initialize!(
     initialize!(getfield(output, :core), output, model; create_folder = false) || return nothing
 
     # compute total number of output snapshots: IC + one per output_every_n_steps
-    n_timesteps = vars.prognostic.clock.n_timesteps
-    n_outputs = n_timesteps ÷ output.output_every_n_steps + 1   # +1 for the IC
+    n_time_steps = vars.prognostic.clock.n_time_steps
+    n_outputs = n_time_steps ÷ output.output_every_n_steps + 1   # + 1 for the IC
 
     # pre-allocate the full vector with deep copies
     ic = deepcopy(filter_groups(vars, output))
@@ -233,8 +249,9 @@ end
 Base.close(::ArrayOutput) = nothing
 
 function output!(output::ArrayOutput, simulation::AbstractSimulation)
-    output!(output.core, output) || return nothing
-    output.output_counter += 1
+    (; clock) = simulation.variables.prognostic
+    do_output!(output.core, clock, output) || return nothing
+    # output_counter is advanced by do_output! (and set to 1 for the IC in initialize!)
     i = output.output_counter
     getfield(output, :output)[i] = deepcopy(filter_groups(simulation.variables, output))
     return nothing

@@ -1,15 +1,13 @@
 export ShallowWaterModel
 
-"""
-The ShallowWaterModel contains all model components needed for the simulation of the
-shallow water equations. To be constructed like
+"""The ShallowWaterModel contains all model components needed for the simulation
+of the shallow water equations. To be constructed like
 
     model = ShallowWaterModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
-passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
-model components, are
-$(TYPEDFIELDS)"""
+passed on as keyword arguments, e.g. `planet = Earth(spectral_grid)`.
+Fields, representing model components, are $(TYPEDFIELDS)"""
 @parameterized @kwdef mutable struct ShallowWaterModel{
         SG,     # <:SpectralGrid
         AR,     # <:AbstractArchitecture,
@@ -63,23 +61,36 @@ end
 
 """($TYPEDSIGNATURES) All variables needed for the shallow water model itself (components excluded)."""
 function variables(model::ShallowWater)
-    nsteps = get_prognostic_steps(model.time_stepping)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s"),
-        PrognosticVariable(:η, Spectral3D(nsteps), desc = "Interface displacement", units = "m"),
+        PrognosticVariable(:divergence, SpectralXYZT(ps), desc = "Divergence", units = "1/s", fuse = :prognostic),
+        PrognosticVariable(:η, SpectralXYT(ps), desc = "Interface displacement", units = "m", fuse = :prognostic),
 
-        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s"),
-        GridVariable(:η, Grid2D(), desc = "Interface displacement", units = "m"),
-        GridVariable(:geopotential, Grid2D(), desc = "Geopotential", units = "m²/s²"),
+        TendencyVariable(:divergence, SpectralXYZT(ts), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:divergence, GridXYZT(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
 
-        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
-        TendencyVariable(:η, Spectral2D(), desc = "Tendency of interface displacement", units = "m/s"),
-        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
-        TendencyVariable(:η, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
+        TendencyVariable(:η, SpectralXYT(ps), desc = "Tendency of interface displacement", units = "m/s"),
+        TendencyVariable(:η, GridXYT(tg), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
 
-        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
-        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
+        GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse = :grid),
+        GridVariable(:η, GridXYT(pg), desc = "Interface displacement", units = "m", fuse = :grid),
+        DynamicsVariable(:geopotential, GridXYZ(), desc = "Geopotential", units = "m²/s²"),
+
+        DynamicsVariable(:kinetic_energy, GridXYZT(tg), desc = "Kinetic energy intermediate, ½(u²+v²)+Φ", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:kinetic_energy, SpectralXYZT(ts), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
+
+        DynamicsVariable(:uh, GridXYT(tg), desc = "u*h volume flux intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vh, GridXYT(tg), desc = "v*h volume flux intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:uh, SpectralXYT(ts), desc = "u*h volume flux intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vh, SpectralXYT(ts), desc = "v*h volume flux intermediate in spectral space", fuse = :spectral_tendencies),
+
+        ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
     )
 end
 
