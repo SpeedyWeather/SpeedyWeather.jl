@@ -70,15 +70,21 @@ function column_parameterizations_cpu!(vars, model)
     return nothing
 end
 
+# Threaded inner loop over horizontal grid points for a single parameterization.
+# Defined outside @generated to avoid the closure restriction.
+function _threaded_column_loop!(vars, parameterization, model)
+    Threads.@threads for ij in 1:model.geometry.npoints
+        @inbounds parameterization!(ij, vars, parameterization, model)
+    end
+    return nothing
+end
+
 # Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
 @generated function _column_parameterizations_cpu!(vars, parameterizations::NamedTuple{names}, model) where {names}
     # runic: off
     calls = [
-        quote
-            for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
-                parameterization!(ij, vars, parameterizations.$name, model)
-            end
-        end for name in names                       # parameterizations outer loop
+        :(_threaded_column_loop!(vars, parameterizations.$name, model))
+        for name in names                           # parameterizations outer loop
     ]
     # runic: on
     return quote
