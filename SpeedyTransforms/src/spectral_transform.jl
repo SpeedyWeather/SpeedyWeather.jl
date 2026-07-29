@@ -3,43 +3,49 @@ const DEFAULT_GRID = FullGaussianGrid
 const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
 
-abstract type AbstractSpectralTransform end
+abstract type AbstractSpectralTransform{NF, AR} end
+Architectures.nonparametric_type(S::AbstractSpectralTransform) = nonparametric_type(typeof(S))
 
 """SpectralTransform struct that contains all parameters and precomputed arrays
 to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
 struct SpectralTransform{
-    NF,
-    AR,                                   # <: AbstractArchitecture
-    ArrayType,                            # non-parametric array type
-    SpectrumType,                         # <: AbstractSpectrum
-    GridType,                             # <: AbstractGrid
-    VectorType,                           # <: ArrayType{NF, 1},
-    ArrayTypeIntMatrix,                   # <: ArrayType{Int, 2}
-    VectorComplexType,                    # <: ArrayType{Complex{NF}, 1},
-    MatrixComplexType,                    # <: ArrayType{Complex{NF}, 2},
-    ArrayComplexType,                     # <: ArrayType{Complex{NF}, 3},
-    LowerTriangularMatrixType,            # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
-    LowerTriangularArrayType,             # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
-} <: AbstractSpectralTransform
+        NF,
+        AR,                         # <: AbstractArchitecture
+        SpectrumType,               # <: AbstractSpectrum
+        GridType,                   # <: AbstractGrid
+        VectorType,                 # <: ArrayType{NF, 1},
+        ArrayTypeIntMatrix,         # <: ArrayType{Int, 2}
+        MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
+        LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}, ...},
+        ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
+        GradientType,               # <: NamedTuple for gradients
+        IntType,                    # <: Integer
+        B,                          # <: Bool
+        RFFTSerialType,             # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D forward plans)
+        BRFFTSerialType,            # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D inverse plans)
+        RFFTBatchedType,            # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D forward)
+        BRFFTBatchedType,           # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D inverse)
+    } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
     architecture::AR
 
     # SPECTRAL RESOLUTION
-    spectrum::SpectrumType          # spectral trunction 
-    nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
+    spectrum::SpectrumType          # spectral truncation
+    nfreq_max::IntType              # Maximum (at Equator) number of Fourier frequencies (real FFT)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} # Legendre shortcut for truncation of m loop
     mmax_truncation::Vector{Int}    # Maximum order m to retain per latitude ring
-    
+
     # GRID
     grid::GridType                  # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::Int                    # number of layers in the vertical (for scratch memory size)
+    nlayers::IntType                # max number of layers in the vertical (= max planned batch K; for scratch memory size)
 
     # CORRESPONDING GRID SIZE
-    nlon_max::Int                   # Maximum number of longitude points (at Equator)
+    nlon_max::IntType               # Maximum number of longitude points (at Equator)
     nlons::Vector{Int}              # Number of longitude points per ring
-    nlat::Int                       # Number of latitude rings
+    nlat::IntType                   # Number of latitude rings
+    rings::Vector{UnitRange{Int}}   # precomputed ring indices
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType              # Cosine of latitudes, north to south
@@ -49,51 +55,45 @@ struct SpectralTransform{
     # NORMALIZATION
     norm_sphere::NF                 # normalization of the l=0, m=0 mode
 
-    # FFT plans, one plan for each latitude ring, batched in the vertical
-    rfft_plans::Vector{AbstractFFTs.Plan}   # FFT plan for grid to spectral transform
-    brfft_plans::Vector{AbstractFFTs.Plan}  # spectral to grid transform (inverse)
-
-    # FFT plans, but unbatched
-    rfft_plans_1D::Vector{AbstractFFTs.Plan}
-    brfft_plans_1D::Vector{AbstractFFTs.Plan}
+    # FFT plans, split into concretely-typed serial (K=1, 1-D) and batched (K>1, 2-D) sets so that
+    # `plan * view` / `mul!` is a static call (the K=1 and K>1 plans are different concrete FFTW/cuFFT
+    # types and cannot share one container). FFTW/cuFFT plans bake K into the plan at construction.
+    # The serial plans are the per-layer fallback (used by `_fourier_serial!`), always present. Hot K
+    # values (batched dycore transforms, prognostic spec→grid, U/V) are pre-planned in the batched
+    # Dicts, keyed by K; everything else falls back to the serial plans in a loop.
+    rfft_plan_serial::RFFTSerialType     # grid → spectral (forward), K=1 per-ring 1-D plans
+    brfft_plan_serial::BRFFTSerialType   # spectral → grid (inverse), K=1 per-ring 1-D plans
+    rfft_plans_batched::RFFTBatchedType  # grid → spectral (forward), K>1 per-ring 2-D plans, keyed by K
+    brfft_plans_batched::BRFFTBatchedType # spectral → grid (inverse), K>1 per-ring 2-D plans, keyed by K
 
     # LEGENDRE POLYNOMIALS, for all latitudes, precomputed
     legendre_polynomials::LowerTriangularArrayType
-    
+
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
-    scratch_memory::ScratchMemory{NF, ArrayComplexType, VectorType, VectorComplexType} 
+    scratch_memory::ScratchType
 
-    jm_index_size::Int                             # number of indices per layer in kjm_indices
-    kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
+    jm_index_size::IntType                      # number of indices per layer in kjm_indices
+    kjm_indices::ArrayTypeIntMatrix             # precomputed kjm loop indices map for legendre transform
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
     # vector is pole to pole although only northern hemisphere required
-    solid_angles::VectorType                # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
+    solid_angles::VectorType                    # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
-    # GRADIENT MATRICES (on unit sphere, no 1/radius-scaling included)
-    grad_y1::LowerTriangularMatrixType  # precomputed meridional gradient factors, term 1
-    grad_y2::LowerTriangularMatrixType  # term 2
-    
-    # GRADIENT MATRICES FOR U, V -> Vorticity, Divergence
-    grad_x_vordiv::LowerTriangularMatrixType # precomputed zonal gradient factors
-    grad_y_vordiv1::LowerTriangularMatrixType
-    grad_y_vordiv2::LowerTriangularMatrixType
+    gradients::GradientType                     # precomputed gradient and integration matrices
 
-    # GRADIENT MATRICES FOR Vorticity, Divergence -> U, V
-    vordiv_to_uv_x::LowerTriangularMatrixType
-    vordiv_to_uv1::LowerTriangularMatrixType
-    vordiv_to_uv2::LowerTriangularMatrixType
-
-    # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
-    eigenvalues  ::VectorType           # = -l*(l+1), degree l of spherical harmonic
-    eigenvalues⁻¹::VectorType           # = -1/(l*(l+1))
+    # CUDA GRAPHS
+    # toggle for the CUDA-Graphs accelerated batched Fourier transform
+    # Set to `false` to fall back to the generic (allocating) per-ring GPU
+    # Meaningless for non-CUDA architectures.
+    cuda_graphs::B
 end
 
 # eltype of a transform is the number format used within
-Base.eltype(S::SpectralTransform{NF}) where NF = NF
-Architectures.array_type(S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT} = AT
+Base.eltype(S::AbstractSpectralTransform{NF}) where {NF} = NF
+Architectures.array_type(S::AbstractSpectralTransform{NF, AR}) where {NF, AR} = array_type(AR)
+Architectures.nonparametric_type(::Type{<:SpectralTransform}) = SpectralTransform
 
 """
 $(TYPEDSIGNATURES)
@@ -102,24 +102,32 @@ Generator function for a SpectralTransform struct. With `NF` the number format,
 necessary constants for the spetral transform. Also plans the Fourier transforms, retrieves the colatitudes,
 and preallocates the Legendre polynomials and quadrature weights."""
 function SpectralTransform(
-    spectrum::AbstractSpectrum,                     # Spectral truncation
-    grid::AbstractGrid;                             # grid used and resolution, e.g. FullGaussianGrid
-    NF::Type{<:Real} = DEFAULT_NF,                  # Number format NF
-    ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,   # Array type used for spectral coefficients (can be parametric)
-    nlayers::Integer = DEFAULT_NLAYERS,             # number of layers in the vertical (for scratch memory size)
-    LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,   # shorten Legendre loop over order m
-    architecture::AbstractArchitecture = architecture(ArrayType), # architecture that kernels are launched 
-)
-    (; nlat_half) = grid                            # number of latitude rings on one hemisphere incl equator
+        spectrum::AbstractSpectrum,                     # Spectral truncation
+        grid::AbstractGrid;                             # grid used and resolution, e.g. FullGaussianGrid
+        NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
+        nlayers::Integer = DEFAULT_NLAYERS,                                             # scratch size — max layer count any single transform call may carry
+        transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
+        LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
+        cuda_graphs::Bool = true,                                            # use CUDA-Graphs accelerated Fourier path (CUDA only)
+    )
+    # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
+    # per-layer fallback used by `_fourier_serial!`).
+    planned_K = sort!(unique!(Int[1; transform_batch]))
+    @assert maximum(planned_K) <= nlayers "transform_batch $planned_K contains an entry larger than nlayers=$nlayers; scratch would be too small."
+    (; lmax, mmax, architecture) = spectrum                       # 1-based spectral truncation order and degree
+
+    ArrayType = array_type(architecture)
     ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
-    (; lmax, mmax) = spectrum                       # 1-based spectral truncation order and degree
+
+    (; nlat_half) = grid                            # number of latitude rings on one hemisphere incl equator
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(grid)           # 2nlat_half but one less if grid has odd # of lat rings
     nlon_max = get_nlon_max(grid)   # number of longitudes around the equator
-                                    # number of longitudes per latitude ring (one hemisphere only)
+    # number of longitudes per latitude ring (one hemisphere only)
     nlons = [RingGrids.get_nlon_per_ring(grid, j) for j in 1:nlat_half]
-    nfreq_max = nlon_max÷2 + 1              # maximum number of fourier frequencies (real FFTs)
+    nfreq_max = nlon_max ÷ 2 + 1              # maximum number of fourier frequencies (real FFTs)
+    rings = on_architecture(CPU(), eachring(grid))  # precomputed ring indices
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
     latd = RingGrids.get_latd(grid)         # latitude in degrees (90˚Nto -90˚N)
@@ -128,19 +136,19 @@ function SpectralTransform(
     coslat = cosd.(latd)                    # cos(lat)
     coslat⁻¹ = inv.(coslat)                 # 1/cos(lat)
 
-    # LEGENDRE SHORTCUT OVER ORDER M (0-based), truncate the loop over order m 
+    # LEGENDRE SHORTCUT OVER ORDER M (0-based), truncate the loop over order m
     mmax_truncation = [LegendreShortcut(nlons[j], latd[j]) for j in 1:nlat_half]
-    mmax_truncation = min.(mmax_truncation, mmax-1)   # only to mmax in any case (otherwise BoundsError)
+    mmax_truncation = min.(mmax_truncation, mmax - 1)   # only to mmax in any case (otherwise BoundsError)
 
     # NORMALIZATION
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0, m=0 translates to 1s everywhere in grid space
-    
+
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     lons, _ = RingGrids.get_lonlats(grid)
     rings = adapt(Array, eachring(grid))                    # compute ring indices (on CPU)
     lon1s = [lons[rings[j].start] for j in 1:nlat_half]     # pick lons at first index for each ring
-    lon_offsets = [cispi(m*lon1/π) for m in 0:mmax-1, lon1 in lon1s]
-    
+    lon_offsets = [cispi(m * lon1 / π) for m in 0:(mmax - 1), lon1 in lon1s]
+
     # PRECOMPUTE LEGENDRE POLYNOMIALS
     legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum, nlat_half)
     legendre_polynomials_j = zeros(NF, lmax, mmax)          # temporary for one latitude
@@ -148,40 +156,36 @@ function SpectralTransform(
         Legendre.λlm!(legendre_polynomials_j, lmax - 1, mmax - 1, cos_colat[j])     # precompute l, m 0-based
         legendre_polynomials[:, j] = LowerTriangularArray(legendre_polynomials_j)   # store
     end
-    
-    # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory = ScratchMemory(NF, architecture, grid, nlayers)
 
-    rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
-    brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
-    rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
-    brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
+    # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
+    # CPU always chunks unplanned K down to the largest planned batch, so scratch only needs
+    # to hold one such chunk. GPU shouldn't chunk and must fit the full input K.
+    scratch_memory = ScratchMemory(NF, architecture, grid, _scratch_nlayers(architecture, nlayers, planned_K))
 
     fake_grid_data = on_architecture(architecture, zeros(NF, grid, nlayers))
 
-    # PLAN THE FFTs
-    plan_FFTs!(
-        rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
-        fake_grid_data, scratch_memory.north, rings, nlons
+    # PLAN THE FFTs: concretely-typed serial (K=1) plan vectors + batched (K>1) plan Dicts
+    rfft_plan_serial, brfft_plan_serial, rfft_plans_batched, brfft_plans_batched = plan_FFTs(
+        planned_K, fake_grid_data, scratch_memory.north, rings, nlons
     )
-    
+
     # PRECOMPUTE KJM INDICES FOR LEGENDRE TRANSFORM (0-based)
-    # For GPU it's quicker to precompute the indices for the loops in the 
-    # legendre transform and store them in a 3D array rather than computing them 
-    # on the fly. We also store the jm_index_size for the loop so we can 
-    # truncate to fewer layers if needed. 
+    # For GPU it's quicker to precompute the indices for the loops in the
+    # legendre transform and store them in a 3D array rather than computing them
+    # on the fly. We also store the jm_index_size for the loop so we can
+    # truncate to fewer layers if needed.
     jm_index_size = sum(mmax_truncation .+ 1)
     kjm_indices = zeros(Int, jm_index_size * nlayers, 3)
     i = 0
     for k in 1:nlayers
-        for (j, mmax_j) in enumerate(mmax_truncation) 
-            for m in 1:mmax_j+1
+        for (j, mmax_j) in enumerate(mmax_truncation)
+            for m in 1:(mmax_j + 1)
                 i += 1
                 kjm_indices[i, :] .= [k, j, m]
             end
         end
     end
-  
+
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
@@ -189,109 +193,42 @@ function SpectralTransform(
     # Δϕ = 2π/nlon is the azimuth every grid point covers
     solid_angles = get_solid_angles(grid)
 
-    # RECURSION FACTORS
-    ϵlms = get_recursion_factors(Spectrum(lmax+1, mmax))    # one more degree needed!
-
-    # GRADIENTS (on unit sphere, hence 1/radius-scaling is omitted)
-    # meridional gradient for scalars (coslat scaling included
-    # precomputations always on CPU, then transfered to the actual architecture used
-    spectrum_cpu = Spectrum(lmax, mmax)
-    grad_y1 = zeros(NF, spectrum_cpu)                           # term 1, mul with harmonic l-1, m
-    grad_y2 = zeros(NF, spectrum_cpu)                           # term 2, mul with harmonic l+1, m
-
-    for (m, degrees) in enumerate(orders(spectrum_cpu))          # 1-based degree l, order m
-        for l in degrees        
-            grad_y1[l, m] = -(l-2)*ϵlms[l, m]
-            grad_y2[l, m] = (l+1)*ϵlms[l+1, m]
-        end
-        # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
-        grad_y2[lmax, m] = 0
-    end
-    grad_y1 = on_architecture(architecture, grad_y1)
-    grad_y2 = on_architecture(architecture, grad_y2)
-
-    # meridional gradient used to get from u, v/coslat to vorticity and divergence
-    grad_x_vordiv = zeros(Int, spectrum_cpu)
-    for m in 1:mmax
-        for l in m:lmax-1                         
-            grad_x_vordiv[l, m] = m-1
-        end # last row zero to get vor and div correct
-        grad_x_vordiv[lmax, m] = 0
-    end
-    grad_x_vordiv = on_architecture(architecture, grad_x_vordiv)
-
-    grad_y_vordiv1 = zeros(NF, spectrum_cpu)                    # term 1, mul with harmonic l-1, m
-    grad_y_vordiv2 = zeros(NF, spectrum_cpu)                    # term 2, mul with harmonic l+1, m
- 
-    for (m, degrees) in enumerate(orders(spectrum_cpu))          # 1-based degree l, order m
-        for l in degrees           
-            grad_y_vordiv1[l, m] = l*ϵlms[l, m]
-            grad_y_vordiv2[l, m] = (l-1)*ϵlms[l+1, m]
-        end
-        # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
-        grad_y_vordiv1[lmax, m] = 0
-        grad_y_vordiv2[lmax, m] = 0
-    end
-    grad_y_vordiv1 = on_architecture(architecture, grad_y_vordiv1)
-    grad_y_vordiv2 = on_architecture(architecture, grad_y_vordiv2)
-
-    # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum_cpu)
-    vordiv_to_uv_x[1, 1] = 0
-    vordiv_to_uv_x = on_architecture(architecture, vordiv_to_uv_x)
-
-    # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv1 = zeros(NF, spectrum_cpu)                     # term 1, to be mul with harmonic l-1, m
-    vordiv_to_uv2 = zeros(NF, spectrum_cpu)                     # term 2, to be mul with harmonic l+1, m
-
-    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
-        for l in degrees             
-            vordiv_to_uv1[l, m] = ϵlms[l, m]/(l-1)
-            vordiv_to_uv2[l, m] = ϵlms[l+1, m]/l
-        end
-        # explicitly set the last row of vordiv_to_uv2 to zero, so that kernels yield correct gradient in last row 
-        vordiv_to_uv2[lmax, m] = 0
-    end
-
-    vordiv_to_uv1[1, 1] = 0                 # remove NaN from 0/0
-    vordiv_to_uv1 = on_architecture(architecture, vordiv_to_uv1)
-    vordiv_to_uv2 = on_architecture(architecture, vordiv_to_uv2)
-
-    # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
-    eigenvalues = [-l*(l+1) for l in 0:mmax]
-    eigenvalues⁻¹ = inv.(eigenvalues)
-    eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
+    # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES
+    gradients = gradient_arrays(NF, spectrum)
 
     return SpectralTransform{
         NF,
         typeof(architecture),
-        ArrayType_,
         typeof(spectrum),
         typeof(grid),
         array_type(architecture, NF, 1),
         array_type(architecture, Int, 2),
-        array_type(architecture, Complex{NF}, 1),
         array_type(architecture, Complex{NF}, 2),
-        array_type(architecture, Complex{NF}, 3),
-        LowerTriangularArray{NF, 1, array_type(architecture, NF, 1), typeof(spectrum)}, 
-        LowerTriangularArray{NF, 2, array_type(architecture, NF, 2), typeof(spectrum)},
+        typeof(legendre_polynomials),
+        typeof(scratch_memory),
+        typeof(gradients),
+        typeof(nlayers),
+        typeof(cuda_graphs),
+        typeof(rfft_plan_serial),
+        typeof(brfft_plan_serial),
+        typeof(rfft_plans_batched),
+        typeof(brfft_plans_batched),
     }(
         architecture,
-        spectrum, nfreq_max, 
+        spectrum, nfreq_max,
         LegendreShortcut, mmax_truncation,
         grid, nlayers,
-        nlon_max, nlons, nlat,
+        nlon_max, nlons, nlat, rings,
         coslat, coslat⁻¹, lon_offsets,
         norm_sphere,
-        rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
+        rfft_plan_serial, brfft_plan_serial,
+        rfft_plans_batched, brfft_plans_batched,
         legendre_polynomials,
-        scratch_memory, 
-        jm_index_size, kjm_indices, 
-        solid_angles, 
-        grad_y1, grad_y2,
-        grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
-        vordiv_to_uv1, vordiv_to_uv2,
-        eigenvalues, eigenvalues⁻¹
+        scratch_memory,
+        jm_index_size, kjm_indices,
+        solid_angles,
+        gradients,
+        cuda_graphs,
     )
 end
 
@@ -301,75 +238,72 @@ SpectralTransform(grid::AbstractGrid, spectrum::AbstractSpectrum; kwargs...) =
 
 # calculate spectrum if not provided
 function SpectralTransform(
-    grid::AbstractGrid;
-    trunc::Integer = 0,                         # spectral truncation (0-indexed)
-    dealiasing::Real = DEFAULT_DEALIASING,      # dealiasing factor
-    one_more_degree::Bool = false,              # returns a square LowerTriangularMatrix by default
-    kwargs...
-)
+        grid::AbstractGrid;
+        trunc::Integer = 0,                         # spectral truncation (0-indexed)
+        dealiasing::Real = DEFAULT_DEALIASING,      # dealiasing factor
+        one_more_degree::Bool = false,              # returns a square LowerTriangularMatrix by default
+        kwargs...
+    )
     # get trunc from dealiasing if not provided
     trunc = trunc > 0 ? trunc : get_truncation(grid, dealiasing)
-    spectrum = Spectrum(trunc+1+one_more_degree, trunc+1)
+    spectrum = Spectrum(trunc + 1 + one_more_degree, trunc + 1; architecture = architecture(grid))
     return SpectralTransform(spectrum, grid; kwargs...)
 end
 
 # calculate grid if not provided
 function SpectralTransform(
-    spectrum::AbstractSpectrum;                     # spectral coefficients
-    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,      # grid type, e.g. FullGaussianGrid
-    nlat_half::Integer = 0,                         # resolution parameter nlat_half
-    dealiasing::Real = DEFAULT_DEALIASING,          # dealiasing factor
-    kwargs...
-)
+        spectrum::AbstractSpectrum;                     # spectral coefficients
+        Grid::Type{<:AbstractGrid} = DEFAULT_GRID,      # grid type, e.g. FullGaussianGrid
+        nlat_half::Integer = 0,                         # resolution parameter nlat_half
+        dealiasing::Real = DEFAULT_DEALIASING,          # dealiasing factor
+        kwargs...
+    )
     # get nlat_half from dealiasing if not provided
     nlat_half = nlat_half > 0 ? nlat_half : get_nlat_half(spectrum.mmax - 1, dealiasing)
-    grid = Grid(nlat_half)                  # create grid with nlat_half
+    grid = Grid(nlat_half, spectrum.architecture)                  # create grid with nlat_half
     return SpectralTransform(spectrum, grid; kwargs...)
 end
 
 # use spectrum, NF, and ArrayType from coeffs
 function SpectralTransform(
-    coeffs::LowerTriangularArray;                   # spectral coefficients
-    kwargs...
-)
+        coeffs::LowerTriangularArray;                   # spectral coefficients
+        kwargs...
+    )
     (; spectrum) = coeffs
     NF = real(eltype(coeffs))
-    ArrayType = LowerTriangularArrays.array_type(coeffs)
     nlayers = size(coeffs, 2)
-    return SpectralTransform(spectrum; NF, ArrayType, nlayers, kwargs...)
+    return SpectralTransform(spectrum; NF, nlayers, kwargs...)
 end
 
 # use grid, NF, and ArrayType from field
 function SpectralTransform(
-    field::AbstractField;                       # gridded field
-    kwargs...
-)
+        field::AbstractField;                       # gridded field
+        kwargs...
+    )
     (; grid) = field
     NF = eltype(field)                          # number format of the spectral coefficients
-    ArrayType = RingGrids.array_type(field)
     nlayers = size(field, 2)
-    return SpectralTransform(grid; NF, ArrayType, nlayers, kwargs...)
+    return SpectralTransform(grid; NF, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct to transform between `field` and `coeffs`."""
 function SpectralTransform(
-    field::AbstractField,
-    coeffs::LowerTriangularArray;
-    kwargs...
-) 
+        field::AbstractField,
+        coeffs::LowerTriangularArray;
+        kwargs...
+    )
+    @boundscheck ismatching(architecture(field), architecture(coeffs)) || throw(ArgumentError("Architectures of field and coeffs do not match."))
+
     # infer types for SpectralTransform
     NF = promote_type(real(eltype(field)), real(eltype(coeffs)))
-    ArrayType = nonparametric_type(array_type(field))
-    ArrayType2 = nonparametric_type(array_type(coeffs))
-    @assert ArrayType == ArrayType2 "ArrayTypes of field ($_ArrayType1) and coeffs ($_ArrayType2) do not match."
 
     # get resolution
     (; spectrum) = coeffs
-    (; grid) = field 
+    (; grid) = field
     nlayers = size(field, 2)
-    @assert nlayers == size(coeffs, 2) "Number of layers in field ($nlayers) and coeffs ($(size(coeffs, 2))) do not match."
-    return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
+    @boundscheck nlayers == size(coeffs, 2) || throw(DimensionMismatch("Number of layers in field ($nlayers) and coeffs ($(size(coeffs, 2))) do not match."))
+    return SpectralTransform(spectrum, grid; NF, nlayers, kwargs...)
 end
 
 # make commutative
@@ -381,65 +315,126 @@ SpectralTransform(coeffs::LowerTriangularArray, field::AbstractField; kwargs...)
 Spectral transform `S` and lower triangular matrix `L` match if the
 spectral dimensions `(lmax, mmax)` match and the number of vertical layers is
 equal or larger in the transform (constraints due to allocated scratch memory size)."""
-function Architectures.ismatching(S::SpectralTransform, L::LowerTriangularArray)
-    resolution_math = resolution(S.spectrum) == size(L, OneBased, as=Matrix)[1:2]
-    vertical_match = length(axes(L, 2)) <= S.nlayers
-    return resolution_math && vertical_match
+function Architectures.ismatching(S::AbstractSpectralTransform, L::LowerTriangularArray; horizontal_only::Bool = false)
+    resolution_match = resolution(S.spectrum) == size(L, OneBased, Matrix)[1:2]
+    vertical_match = horizontal_only ? true : length(axes(L, 2)) <= S.nlayers
+    return resolution_match && vertical_match
 end
 
 """$(TYPEDSIGNATURES)
 Spectral transform `S` and `grid` match if the resolution `nlat_half` and the
 type of the grid match and the number of vertical layers is equal or larger in
 the transform (constraints due to allocated scratch memory size)."""
-function Architectures.ismatching(S::SpectralTransform, field::AbstractField)
+function Architectures.ismatching(S::AbstractSpectralTransform, field::AbstractField; horizontal_only::Bool = false)
     grid_match = S.grid == field.grid   # grid type and resolution match
-    vertical_match = size(field, 2) <= S.nlayers
+    vertical_match = horizontal_only ? true : size(field, 2) <= S.nlayers
     return grid_match && vertical_match
 end
 
 # make `ismatching` commutative
-Architectures.ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
-Architectures.ismatching(F::AbstractField,        S::SpectralTransform) = ismatching(S, F)
+Architectures.ismatching(L::LowerTriangularArray, S::AbstractSpectralTransform) = ismatching(S, L)
+Architectures.ismatching(F::AbstractField, S::AbstractSpectralTransform) = ismatching(S, F)
 
-function Base.DimensionMismatch(S::SpectralTransform, L::LowerTriangularArray)
-    s = "SpectralTransform for $(S.spectrum.lmax)x$(S.spectrum.mmax)x$(S.nlayers) LowerTriangularArrays "*
-        "with $(Base.dims2string(size(L, as=Matrix))) "*
+function Base.DimensionMismatch(S::AbstractSpectralTransform, L::LowerTriangularArray)
+    S_ = nonparametric_type(S)
+    s = "$S_ for $(S.spectrum.lmax)x$(S.spectrum.mmax)x$(S.nlayers) LowerTriangularArrays " *
+        "with $(Base.dims2string(size(L, as = Matrix))) " *
         "LowerTriangularArray do not match."
     return DimensionMismatch(s)
 end
 
-function Base.DimensionMismatch(S::SpectralTransform, F::AbstractField)
+function Base.DimensionMismatch(S::AbstractSpectralTransform, F::AbstractField)
+    S_ = nonparametric_type(S)
     sz = (RingGrids.get_npoints(S.grid), S.nlayers)
     Grid = nonparametric_type(S.grid)
     Grid2 = nonparametric_type(F.grid)
-    s = "SpectralTransform for $(Base.dims2string(sz)) $Grid with "*
+    s = "$S_ for $(Base.dims2string(sz)) $Grid with " *
         "$(Base.dims2string(size(F))) field on $Grid2 do not match."
     return DimensionMismatch(s)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
-ϵ(l, m) = sqrt((l^2-m^2)/(4*l^2-1))."""
-recursion_factor(l::Int, m::Int) = sqrt((l^2-m^2)/(4*l^2-1))
+# Layer size of scratch memory (north/south columns in `ScratchMemory`).
+# On CPU we typically use `nlayers` only (largest allocated plan and physical layers of the model)
+# On GPU we batch transforms much more, and need to use a scratch memory in 
+# accordance with the largest batch which is `nlayers` in this case and ISN'T equal to the physical layers of the model
+_scratch_nlayers(::AbstractCPU, ::Integer, planned_K::AbstractVector{<:Integer}) = maximum(planned_K)
+_scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:Integer}) = nlayers
 
-"""
-$(TYPEDSIGNATURES)     
-Returns a matrix of recursion factors `ϵ` up to degree `lmax` and order `mmax` (1-based) of the `spectrum` in number format `NF`."""
-function get_recursion_factors( ::Type{NF},             # number format NF
-                                spectrum::Spectrum,
-                                ) where NF
-    ϵlms = zeros(NF, spectrum)
-    for (m, degrees) in enumerate(orders(spectrum))     # loop over 1-based l, m
-        for l in degrees
-            ϵlms[l, m] = recursion_factor(l-1, m-1)     # convert to 0-based l, m for function arguments
-        end
-    end
-    return ϵlms
+# Return true if a call with `K` layers should be split into chunks that are 
+# executed sequentially. 
+# Architecture-dispatched: 
+# CPU chunks to avoid FFTW's alignment-mismatch on x86 (no problem on ARM)
+# GPU doesn't need any of that we have seperate plans for each K 
+@inline function _needs_chunking(K::Integer, S::SpectralTransform{NF, <:AbstractCPU}) where {NF}
+    K > 1 || return false                            # K=1 always handled directly
+    haskey(S.rfft_plans_batched, K) && return false  # K is directly planned, no chunking needed
+    # K > 1 and not directly planned: chunk through whichever planned K is largest (≤ K_total).
+    # Note this includes the degenerate case `keys(rfft_plans) == [1]`: chunks then have K=1
+    # and route to the K=1 plan one layer at a time. Scratch (sized to maximum(planned_K))
+    # is guaranteed to fit each chunk in all cases.
+    return true
 end
 
-# if number format not provided use Float64
-get_recursion_factors(spectrum::Spectrum) = get_recursion_factors(Float64, spectrum)
+@inline _needs_chunking(::Integer, ::SpectralTransform) = false
+
+# Largest planned batch K ≤ K_total, excluding the K=1 fallback. Used to pick the chunk size. Typically this will just be the number of layers in the model. 
+@inline function _largest_planned_batch(K_total::Integer, S::SpectralTransform)
+    best = 1
+    for k in keys(S.rfft_plans_batched)
+        if k > best && k <= K_total
+            best = k
+        end
+    end
+    return best
+end
+
+# For CPU only: Split a transform over `K` layers into chunks that each match a pre-built batched FFT plan.
+# Each chunk is a sub-view of the input/output along the layer dim; calling `transform!`
+# on the sub-views routes through the regular batched path. The trailing remainder
+# (size < K_batched) goes through the K=1 serial path one layer at a time.
+#
+# Why this matters on CPU: FFT plans bake their batch dim K into the plan, and on x86 the
+# scratch column-stride (= nfreq_max * sizeof(Complex{NF})) is generally not a multiple
+# of the SIMD width, so the K=1 plan can't be applied to columns other than column 1
+# without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
+# that path for the bulk of the layers and effectively restores the previous behavior before 
+# fusion/batching without performance penalties. 
+# Greedy chunk sizes: at each position take the largest planned batch that fits the remaining
+# layers (1 = the always-planned serial fallback when nothing larger fits)
+function _transform_chunked!(                       # SPECTRAL TO GRID
+        field::AbstractField, coeffs::LowerTriangularArray,
+        scratch_memory::ScratchMemory, S::SpectralTransform;
+        unscale_coslat::Bool = false,
+    )
+    K = size(field, 2)
+    c = 1
+    while c <= K
+        len = _largest_planned_batch(K - c + 1, S)  # planned batch (or 1) fitting the remainder
+        chunk = c:(c + len - 1)
+        field_chunk = wrapped_view(field, :, chunk)
+        coeffs_chunk = wrapped_view(coeffs, :, chunk)
+        _transform_nonchunked!(field_chunk, coeffs_chunk, scratch_memory, S, unscale_coslat)
+        c += len
+    end
+    return field
+end
+
+function _transform_chunked!(                       # GRID TO SPECTRAL
+        coeffs::LowerTriangularArray, field::AbstractField,
+        scratch_memory::ScratchMemory, S::SpectralTransform,
+    )
+    K = size(field, 2)
+    c = 1
+    while c <= K
+        len = _largest_planned_batch(K - c + 1, S)  # planned batch (or 1) fitting the remainder
+        chunk = c:(c + len - 1)
+        field_chunk = wrapped_view(field, :, chunk)
+        coeffs_chunk = wrapped_view(coeffs, :, chunk)
+        _transform_nonchunked!(coeffs_chunk, field_chunk, scratch_memory, S)
+        c += len
+    end
+    return coeffs
+end
 
 """$(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from n-dimensional array `coeffs` of spherical harmonic
@@ -448,20 +443,46 @@ and a Legendre Transform in the meridional direction exploiting symmetries. The 
 number format-flexible but `field` and the spectral transform `S` have to have the same number format.
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as `field.grid` and `S.grid` match."""
-transform!(                    # SPECTRAL TO GRID
-    field::AbstractField,               # gridded output
-    coeffs::LowerTriangularArray,       # spectral coefficients input
-    S::SpectralTransform;               # precomputed transform
-    unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
+transform!(                                 # SPECTRAL TO GRID
+    field::AbstractField,                   # gridded output
+    coeffs::LowerTriangularArray,           # spectral coefficients input
+    S::AbstractSpectralTransform;           # precomputed transform
+    unscale_coslat::Bool = false,           # unscale with cos(lat) on the fly?
 ) = transform!(field, coeffs, S.scratch_memory, S; unscale_coslat)
 
-function transform!(                                # SPECTRAL TO GRID
-    field::AbstractField,                           # gridded output
-    coeffs::LowerTriangularArray,                   # spectral coefficients input
-    scratch_memory::ScratchMemory,                  # explicit scratch memory to use
-    S::SpectralTransform;                           # precomputed transform
-    unscale_coslat::Bool = false,                   # unscale with cos(lat) on the fly?
-)
+function transform!(                        # SPECTRAL TO GRID
+        field::AbstractField,               # gridded output
+        coeffs::LowerTriangularArray,       # spectral coefficients input
+        scratch_memory::ScratchMemory,      # explicit scratch memory to use
+        S::SpectralTransform;               # precomputed transform
+        unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
+    )
+    # thin forwarder to the positional core (see `_transform_grid!`)
+    return _transform_grid!(field, coeffs, scratch_memory, S, unscale_coslat)
+end
+
+function _transform_grid!(
+        field::AbstractField, coeffs::LowerTriangularArray,
+        scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
+    )
+    # On CPU, an unplanned K would route the FFT through `_fourier_serial!`, which on x86
+    # crashes with an FFTW alignment mismatch when the scratch column-stride is not a multiple
+    # of the SIMD width (consecutive columns have differing alignment). Split into chunks
+    # matching the largest available batched plan; each chunk uses the batched FFT path
+    # against scratch starting at column 1 (always SIMD-aligned). `_needs_chunking` is
+    # statically false on GPU/others, so this branch elides there.
+    # Checked **before** the boundscheck below so chunking can handle K > S.nlayers
+    K = size(field, 2)
+    if _needs_chunking(K, S)
+        return _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
+    end
+    return _transform_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
+end
+
+function _transform_nonchunked!(
+        field::AbstractField, coeffs::LowerTriangularArray,
+        scratch_memory::ScratchMemory, S::SpectralTransform, unscale_coslat::Bool,
+    )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
     @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
@@ -486,18 +507,43 @@ and a Legendre Transform in the meridional direction exploiting symmetries. The 
 number format-flexible but `field` and the spectral transform `S` have to have the same number format.
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as `field.grid` and `S.grid` match."""
-transform!(                             # GRID TO SPECTRAL
-    coeffs::LowerTriangularArray,        # output: spectral coefficients
-    field::AbstractField,               # input: gridded values
-    S::SpectralTransform,               # precomputed spectral transform
+transform!(                                             # GRID TO SPECTRAL
+    coeffs::LowerTriangularArray,                       # output: spectral coefficients
+    field::AbstractField,                               # input: gridded values
+    S::AbstractSpectralTransform,                       # precomputed spectral transform
 ) = transform!(coeffs, field, S.scratch_memory, S)
-    
-function transform!(                               # GRID TO SPECTRAL
-    coeffs::LowerTriangularArray,                  # output: spectral coefficients
-    field::AbstractField,                          # input: gridded values
-    scratch_memory::ScratchMemory,                 # explicit scratch memory to use
-    S::SpectralTransform,                          # precomputed spectral transform
-)
+
+function transform!(                                    # GRID TO SPECTRAL
+        coeffs::LowerTriangularArray,                   # output: spectral coefficients
+        field::AbstractField,                           # input: gridded values
+        scratch_memory::ScratchMemory,                  # explicit scratch memory to use
+        S::SpectralTransform,                           # precomputed spectral transform
+    )
+    # thin forwarder to the positional core (see `_transform_spec!`)
+    return _transform_spec!(coeffs, field, scratch_memory, S)
+end
+
+# Positional core of the grid-to-spectral `transform!`; analytic-adjoint AD boundary, see
+# `_transform_grid!` and SpeedyTransformsEnzymeExt.
+function _transform_spec!(
+        coeffs::LowerTriangularArray, field::AbstractField,
+        scratch_memory::ScratchMemory, S::SpectralTransform,
+    )
+    # Same chunking-before-boundscheck pattern as the spec→grid `transform!` above —
+    # see comment there.
+    K = size(field, 2)
+    if _needs_chunking(K, S)
+        return _transform_chunked!(coeffs, field, scratch_memory, S)
+    end
+    return _transform_nonchunked!(coeffs, field, scratch_memory, S)
+end
+
+# Non-chunked core, factored out for the same recursion-breaking + AD-boundary reasons as
+# `_transform_nonchunked!` above.
+function _transform_nonchunked!(
+        coeffs::LowerTriangularArray, field::AbstractField,
+        scratch_memory::ScratchMemory, S::SpectralTransform,
+    )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
     @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
@@ -507,8 +553,8 @@ function transform!(                               # GRID TO SPECTRAL
     f_south = scratch_memory.south    # phase factors for southern latitudes
 
     # FOURIER TRANSFORM in zonal direction
-    _fourier!(f_north, f_south, field, S)    
-    
+    _fourier!(f_north, f_south, field, S)
+
     # LEGENDRE TRANSFORM in meridional direction
     _legendre!(coeffs, f_north, f_south, scratch_memory.column, S)
 
@@ -520,12 +566,11 @@ end
 """$(TYPEDSIGNATURES)
 Spherical harmonic transform from `field` to a newly allocated `coeffs::LowerTriangularArray`
 using the precomputed spectral transform `S`."""
-function transform(             # GRID TO SPECTRAL
-    field::AbstractField,       # input field
-    S::SpectralTransform,       # precomputed spectral transform
-)
-    ks = size(field)[2:end]     # the non-horizontal dimensions
-    coeffs = on_architecture(architecture(field), zeros(Complex{eltype(S)}, S.spectrum, ks...))
+function transform(                         # GRID TO SPECTRAL
+        field::AbstractField,               # input field
+        S::AbstractSpectralTransform,       # precomputed spectral transform
+    )
+    coeffs = similar(field, S.spectrum, Complex{eltype(S)})
     transform!(coeffs, field, S)
     return coeffs
 end
@@ -533,13 +578,12 @@ end
 """$(TYPEDSIGNATURES)
 Spherical harmonic transform from `coeffs` to a newly allocated `field::AbstractField`
 using the precomputed spectral transform `S`."""
-function transform(                 # SPECTRAL TO GRID
-    coeffs::LowerTriangularArray,   # input spectral coefficients
-    S::SpectralTransform;           # precomputed spectral transform
-    kwargs...                       # pass on unscale_coslat=true/false(default)
-)
-    ks = size(coeffs)[2:end]        # the non-horizontal dimensions
-    field = on_architecture(architecture(coeffs), zeros(eltype(S), S.grid, ks...))
+function transform(                     # SPECTRAL TO GRID
+        coeffs::LowerTriangularArray,   # input spectral coefficients
+        S::AbstractSpectralTransform;   # precomputed spectral transform
+        kwargs...                       # pass on unscale_coslat=true/false(default)
+    )
+    field = similar(coeffs, S.grid, eltype(S))
     transform!(field, coeffs, S; kwargs...)
     return field
 end
@@ -550,12 +594,12 @@ Spectral transform (spectral to grid space) from spherical coefficients `alms` t
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `transform(alms, S)`."""
 function transform(
-    coeffs::LowerTriangularArray;               # SPECTRAL TO GRID
-    unscale_coslat::Bool = false,               # separate from kwargs as argument for transform!
-    kwargs...                                   # arguments for SpectralTransform constructor
-)
-    S = SpectralTransform(coeffs; kwargs...)    # precompute transform
-    return transform(coeffs, S; unscale_coslat) # do the transform
+        coeffs::LowerTriangularArray;               # SPECTRAL TO GRID
+        unscale_coslat::Bool = false,               # separate from kwargs as argument for transform!
+        kwargs...                                   # arguments for SpectralTransform constructor
+    )
+    S = SpectralTransform(coeffs; kwargs...)        # precompute transform
+    return transform(coeffs, S; unscale_coslat)     # do the transform
 end
 
 """

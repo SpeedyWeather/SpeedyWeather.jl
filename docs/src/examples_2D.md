@@ -13,7 +13,7 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
     using SpeedyWeather
     spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     still_earth = Earth(spectral_grid, rotation=0)
-    initial_conditions = RandomVelocity()
+    initial_conditions = RandomVelocity(spectral_grid)
     forcing = nothing
     drag = nothing
     model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth, forcing, drag)
@@ -40,7 +40,7 @@ There are other options to create a planet but they are irrelevant for the
 barotropic vorticity equations. We also want to specify the initial conditions,
 randomly distributed velocity is already defined
 ```@example barotropic_setup
-initial_conditions = RandomVelocity()
+initial_conditions = RandomVelocity(spectral_grid)
 ```
 By default, the velocity has an approximate amplitude as given and also higher
 wavenumbers are truncated.
@@ -79,7 +79,7 @@ with default settings. More options on output in [NetCDF output](@ref).
     using SpeedyWeather
     spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     orography = NoOrography(spectral_grid)
-    initial_conditions = ZonalJet()
+    initial_conditions = ZonalJet(spectral_grid)
     model = ShallowWaterModel(spectral_grid; orography, initial_conditions)
     simulation = initialize!(model)
     run!(simulation, period=Day(6))
@@ -101,7 +101,7 @@ still initialize zero-arrays of the correct size and element type. Awesome.
 This time the initial conditions should be set the the Galewsky et al.[^G04] zonal
 jet, which is already defined as
 ```@example galewsky_setup
-initial_conditions = ZonalJet()
+initial_conditions = ZonalJet(spectral_grid)
 ```
 The jet sits at 45˚N with a maximum velocity of 80m/s and a perturbation as described in their paper.
 Now we construct a model, but this time a `ShallowWaterModel`
@@ -127,7 +127,7 @@ more on this in [Output path, identification and number](@ref).
 
 So let's plot that data. `joinpath(...)` in the following just joins folder and filename together,
 by default this would be "run_0001/output.nc" but the run number increases when you ran other simulations
-before
+before. You can use `SpeedyWeather.get_output_path(model)` for brevity too
 ```@example galewsky_setup
 using NCDatasets
 run_folder = model.output.run_folder
@@ -182,10 +182,10 @@ we will use `heatmap` to plot data on our grids directly, without storing output
 So for our current simulation, that means at time = 12 days, vorticity on the grid
 is stored in the diagnostic variables and can be visualised with
 (`[:, 1]` is horizontal x vertical dimension, so all grid points on the first and
-only vertical layer)
+only vertical layer, see [Step dimension](@ref))
 
 ```@example galewsky_setup
-vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky2.png", ans) # hide
 nothing # hide
@@ -212,13 +212,13 @@ needed.
 
 UnicodePlots look good in the Julia REPL, especially with the more colours
 a terminal like [iTerm](https://iterm2.com/) provides. But these plots are
-literally made up of unicode characters so the most you can expect is somthing like
+literally made up of unicode characters so the most you can expect is something like
 
 <img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
 
 However, here in the documentation they are usually vertically spaced as the line
 spacing is by default higher than in the REPL.
-A similar issue arises in Jupyter notebooks by default. Well, they are unicode
+A similar issue arises in Jupyter notebooks by default. Well, these plots are unicode
 after all!
 
 ### Adding mountains
@@ -229,7 +229,7 @@ Let's try it out! We create an `EarthOrography` struct like so
 ```@example galewsky_setup2
 using SpeedyWeather # hide
 spectral_grid = SpectralGrid(trunc=63, nlayers=1) # hide
-initial_conditions = ZonalJet() # hide                    
+initial_conditions = ZonalJet(spectral_grid) # hide
 orography = EarthOrography(spectral_grid)
 ```
 
@@ -255,13 +255,13 @@ using NCDatasets
 ds = NCDataset("$run_folder/output.nc")
 ```
 
-While you could plot the [NetCDF output](@ref) manually as before, 
+While you could plot the [NetCDF output](@ref) manually as before,
 we'll be plotting directly from the current state of the `simulation` using
 the Makie extension
 
 ```@example galewsky_setup2
 using CairoMakie
-vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]   # 1 to index surface
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide
 nothing # hide
@@ -298,7 +298,7 @@ a `LinearVorticityDrag` and use the default drag coefficient. Then visualize zon
 ```@example jet_stream_setup
 using CairoMakie
 
-u = simulation.diagnostic_variables.grid.u_grid[:, 1]
+u = get_step(simulation.variables.grid.u)[:, 1]
 heatmap(u, title="Zonal wind [m/s]")
 save("polar_jets.png", ans) # hide
 nothing # hide
@@ -316,12 +316,13 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlayers=1)
 
 # model components
-implicit = ImplicitShallowWater(spectral_grid, α=0.5)
+implicit = ImplicitShallowWater(spectral_grid, centering=0.5)
 orography = EarthOrography(spectral_grid, smoothing=false)
-initial_conditions = RandomWaves(lmin=10, lmax=30)      # between wavenumber 10 and 30
+initial_conditions = RandomWaves(spectral_grid, lmin=10, lmax=30)      # between wavenumber 10 and 30
+time_stepping = Leapfrog(spectral_grid)
 
 # construct, initialize, run
-model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit)
+model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit, time_stepping)
 simulation = initialize!(model)
 run!(simulation, period=Day(2))
 nothing # hide
@@ -329,14 +330,15 @@ nothing # hide
 
 How are gravity waves propagating around the globe? We want to use the shallow water model
 to start with some random perturbations of the interface displacement (the "sea surface height")
-but zero velocity and let them propagate around the globe. We set the ``\alpha`` parameter
+but zero velocity and let them propagate around the globe. We set the `centering` parameter
 of the [semi-implicit time integration](@ref implicit_swm) to ``0.5`` to have a centred
-implicit scheme which dampens the gravity waves less than a backward implicit scheme would do.
+implicit scheme (Crank-Nicolson) which dampens the gravity waves less than a
+backward implicit scheme (`centering = 1`) would do.
 But we also want to keep orography, and particularly no smoothing on it, to have the orography
 as rough as possible. The initial conditions are set to `RandomWaves` which set the spherical
 harmonic coefficients of ``\eta`` to between given wavenumbers to some random values
 ```@example gravity_wave_setup
-RandomWaves()
+RandomWaves(spectral_grid)
 ```
 so that the amplitude `A` is as desired, here 2000m. Our layer thickness in meters is by default
 ```@example gravity_wave_setup
@@ -345,11 +347,11 @@ model.atmosphere.layer_thickness
 so those waves are with an amplitude of 2000m quite strong.
 But the semi-implicit time integration can handle that even with fairly large time steps of
 ```@example gravity_wave_setup
-model.time_stepping.Δt_sec
+model.time_stepping.Δt
 ```
 seconds. Note that the gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s,
 given the speed of gravity waves we don't have to integrate for long.
-Visualise the dynamic layer thickness ``h = \eta + H + H_b`` 
+Visualise the dynamic layer thickness ``h = \eta + H + H_b``
 (interface displacement ``\eta``, layer thickness at rest ``H`` and orography ``H_b``)
 with
 
@@ -358,7 +360,7 @@ using CairoMakie
 
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
-η = simulation.diagnostic_variables.grid.pres_grid
+η = get_step(simulation.variables.grid.η)
 h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
 
 heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)

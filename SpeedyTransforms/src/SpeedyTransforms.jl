@@ -1,6 +1,9 @@
 module SpeedyTransforms
 
-using DocStringExtensions, Printf
+using DocStringExtensions
+using StyledStrings
+using Printf
+import ProgressMeter
 
 # NUMERICS
 import AssociatedLegendrePolynomials as Legendre
@@ -9,49 +12,61 @@ import FFTW
 import GenericFFT
 import LinearAlgebra
 import Primes
-import Adapt: adapt
-import KernelAbstractions: @kernel, @index, @Const, synchronize
+
+# GPU
+import GPUArrays: GPUArrays, AbstractGPUArray
+import Adapt: Adapt, adapt, adapt_structure
+import KernelAbstractions: @kernel, @index, synchronize
 import Atomix
 
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures
-using SpeedyWeatherInternals.Utils
-
+using SpeedyWeatherInternals.KernelLaunching
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit
 using RingGrids
-
 using LowerTriangularArrays
-import LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
 
 # TRANSFORM
-export  SpectralTransform,
-        transform!,
-        transform
+export SpectralTransform,
+    transform!,
+    transform
+
+export MatrixSpectralTransform
 
 # ALIASING
-export  get_nlat_half
+export get_nlat_half
 
 # GRADIENTS
-export  curl,
-        divergence,
-        curl!,
-        divergence!,
-        UV_from_vor!,
-        UV_from_vordiv!,
-        ∇²!, ∇⁻²!, ∇!,
-        ∇², ∇⁻², ∇
+export curl,
+    divergence,
+    curl!,
+    divergence!,
+    UV_from_vor!,
+    UV_from_vordiv!,
+    ∇²!, ∇⁻²!, ∇!,
+    ∇², ∇⁻², ∇,
+    laplace, inverse_laplace,
+    laplace!, inverse_laplace!,
+    gradient, gradient!
 
 # TRUNCATION
-export  spectral_truncation,
-        spectral_truncation!,
-        spectral_interpolation
+export spectral_truncation,
+    spectral_truncation!,
+    spectral_interpolation
 
 # ANALYSIS
-export  power_spectrum
+export power_spectrum
+
+# UTILS 
+export wrapped_view
 
 include("aliasing.jl")
 include("legendre_shortcuts.jl")
 include("scratch_memory.jl")
+include("gradient_arrays.jl")
+include("array_utils.jl")
 include("spectral_transform.jl")
+include("matrix_transform.jl")
 include("fourier.jl")
 include("legendre.jl")
 include("legendre_ka.jl")

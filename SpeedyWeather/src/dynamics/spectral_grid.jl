@@ -1,0 +1,353 @@
+abstract type AbstractSpectralGrid end
+
+# computing
+const DEFAULT_NF = Float32
+const DEFAULT_ARCHITECTURE = CPU()
+const DEFAULT_ARRAYTYPE = Array
+
+# numerics
+const DEFAULT_GRID = OctahedralGaussianGrid
+const DEFAULT_TRUNC = 31
+const DEFAULT_NLAYERS = 8
+
+export SpectralGrid
+
+"""
+Defines the horizontal spectral resolution and corresponding grid and the
+vertical coordinate for SpeedyWeather.jl. Options are
+$(TYPEDFIELDS)
+
+`nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
+`Grid` and `dealiasing`."""
+struct SpectralGrid{
+        ArchitectureType,      # <: AbstractArchitecture
+        SpectrumType,          # <: AbstractSpectrum
+        GridType,              # <: AbstractGrid
+        IntType,               # <: Integer
+        NFDealiasing,          # <: Float64
+    } <: AbstractSpectralGrid
+
+    "[OPTION] number format used throughout the model"
+    NF::Type{<:AbstractFloat}
+
+    "[OPTION] device architecture to run on"
+    architecture::ArchitectureType
+
+    "[DERIVED] array type to use for all variables, customize by define a new architecture"
+    ArrayType::Type{<:AbstractArray}
+
+    "[DERIVED] Type of vector"
+    VectorType::Type{<:AbstractVector}
+
+    "[DERIVED] Type of matrix"
+    MatrixType::Type{<:AbstractMatrix}
+
+    "[DERIVED] Type of 3D array"
+    TensorType::Type{<:AbstractArray}
+
+    "[DERIVED] Type of vector of integers"
+    VectorIntType::Type{<:AbstractVector}
+
+    "[DERIVED] Type of matrix of integers"
+    MatrixIntType::Type{<:AbstractMatrix}
+
+    "[DERIVED] Type of 3D array of integers"
+    TensorIntType::Type{<:AbstractArray}
+
+    # HORIZONTAL SPECTRAL
+    "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
+    trunc::IntType
+
+    "[DERIVED] spectral space"
+    spectrum::SpectrumType
+
+    "[DERIVED] Type of spectral variable in 2D (horizontal only, flattened into 1D vector)"
+    SpectralVariable2D::Type{<:AbstractArray}
+
+    "[DERIVED] Type of spectral variable in 3D (horizontal + unspecified, flattened into 2D matrix)"
+    SpectralVariable3D::Type{<:AbstractArray}
+
+    "[DERIVED] Type of spectral variable in 3D (horizontal + vertical, flattened into 2D matrix)"
+    SpectralVariableXYZ::Type{<:AbstractArray}
+
+    "[DERIVED] Type of spectral variable in 3D (horizontal + time, flattened into 2D matrix)"
+    SpectralVariableXYT::Type{<:AbstractArray}
+
+    "[DERIVED] Type of spectral variable in 4D (horizontal + 2 unspecified, flattened into 3D array)"
+    SpectralVariable4D::Type{<:AbstractArray}
+
+    "[DERIVED] Type of spectral variable in 4D (horizontal + vertical + time, flattened into 3D array)"
+    SpectralVariableXYZT::Type{<:AbstractArray}
+
+    # SIZE OF GRID from trunc, Grid, dealiasing:
+    "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
+    dealiasing::NFDealiasing
+
+    "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
+    nlat_half::IntType
+
+    "[DERIVED] number of latitude rings on both hemispheres"
+    nlat::IntType
+
+    "[DERIVED] total number of grid points in the horizontal"
+    npoints::IntType
+
+    "[DERIVED] instance of horizontal grid used for calculations in grid-point space"
+    grid::GridType
+
+    "[OPTION] type of horizontal grid used for calculations in grid-point space"
+    Grid::Type{<:AbstractGrid}
+
+    "[DERIVED] Type of grid variable in 2D (horizontal only, flattened into 1D vector)"
+    GridVariable2D::Type{<:AbstractArray}
+
+    "[DERIVED] Type of grid variable in 3D (horizontal + unspecified, flattened into 2D matrix)"
+    GridVariable3D::Type{<:AbstractArray}
+
+    "[DERIVED] Type of grid variable in 3D (horizontal + vertical, flattened into 2D matrix)"
+    GridVariableXYZ::Type{<:AbstractArray}
+
+    "[DERIVED] Type of grid variable in 3D (horizontal + time, flattened into 2D matrix)"
+    GridVariableXYT::Type{<:AbstractArray}
+
+    "[DERIVED] Type of grid variable in 4D (horizontal + 2 unspecified, flattened into 3D array)"
+    GridVariable4D::Type{<:AbstractArray}
+    
+    "[DERIVED] Type of grid variable in 4D (horizontal + vertical + time, flattened into 3D array)"
+    GridVariableXYZT::Type{<:AbstractArray}
+
+    # PARTICLES
+    "[DERIVED] ArrayType of particle vector"
+    ParticleVectorType::Type
+
+    # VERTICAL
+    "[OPTION] number of vertical layers in the atmosphere"
+    nlayers::IntType
+
+    # TRANSFORM BATCHING
+    "[OPTION] list of batch sizes K to pre-plan FFTs for. Each distinct K requires its own
+    FFTW/cuFFT plan (plans bake the batch dim at construction). The K=1 entry (always added)
+    is the per-layer fallback. The Legendre / column scratch is sized to
+    `maximum(transform_batch)`. Architecture-dependent default [`default_transform_batch`](@ref)."
+    transform_batch::Vector{Int}
+end
+
+function Base.show(io::IO, SG::SpectralGrid)
+    (; NF, trunc, grid, nlat, npoints, nlayers) = SG
+    (; architecture, ArrayType) = SG
+    Grid = nonparametric_type(grid)
+
+    # resolution information
+    radius = DEFAULT_RADIUS
+    average_resolution = sqrt(4π * radius^2 / npoints) / 1000  # in [km]
+    s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
+    radius_str = @sprintf("%.0f", radius / 1000)
+    average_degrees = 360 / sqrt(npoints * π)
+
+    # number of spherical harmonics
+    nharmonics = LowerTriangularArrays.nonzeros(SG.spectrum)
+
+    params = "{Spectrum{...}, $Grid{...}}"
+    println(io, styled"{warning:SpectralGrid}{note:$params}")
+    println(io, styled"├ {info:Number format}: $NF")
+    println(io, styled"├ {info:Spectral}:      T$trunc LowerTriangularMatrix, $nharmonics harmonics")
+    println(io, styled"├ {info:Grid}:          $nlat-ring $Grid, $npoints grid points")
+    println(io, styled"├ {info:Resolution}:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
+    println(io, styled"├ {info:Vertical}:      $nlayers-layer atmosphere")
+    print(io, styled"└ {info:Architecture}:  $architecture using $ArrayType")
+    return nothing
+end
+
+# Constructor that takes all [OPTION] parameters as keyword arguments
+# and calculates all derived fields
+"""$(TYPEDSIGNATURES) 
+Initialize a SpectralGrid from a given truncation and all [OPTION] parameters of SpectralGrid."""
+function SpectralGrid(;
+        NF::Type{<:AbstractFloat} = DEFAULT_NF,
+        architecture::Union{AbstractArchitecture, Type{<:AbstractArchitecture}} = DEFAULT_ARCHITECTURE,
+        trunc::Int = DEFAULT_TRUNC,
+        Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
+        dealiasing::Real = 2,
+        nlayers::Int = DEFAULT_NLAYERS,
+        transform_batch::AbstractVector{<:Integer} = default_transform_batch(architecture, nlayers),
+    )
+
+    # Convert architecture to instance if it is a type
+    if architecture isa Type
+        architecture = architecture()
+    end
+
+    # grid
+    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
+    grid = Grid(nlat_half, architecture)
+
+    # default dealiasing or user-defined one?
+    dealiasing = SpeedyTransforms.get_dealiasing(trunc, grid.nlat_half)
+
+    # Spectral space
+    spectrum = Spectrum(trunc + 2, trunc + 1, architecture = architecture)
+
+    # Create the SpectralGrid with all fields
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nlayers, transform_batch)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Initialize a SpectralGrid from a given grid.
+"""
+function SpectralGrid(
+        grid::AbstractGrid;
+        NF::Type{<:AbstractFloat} = DEFAULT_NF,
+        dealiasing::Real = 2,
+        nlayers::Int = DEFAULT_NLAYERS,
+        transform_batch::AbstractVector{<:Integer} = default_transform_batch(grid.architecture, nlayers),
+    )
+    architecture = grid.architecture
+    trunc = SpeedyTransforms.get_truncation(grid, dealiasing)
+    spectrum = Spectrum(trunc + 2, trunc + 1, architecture = architecture)
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nlayers, transform_batch)
+end
+
+# low level constructor, not intended to be used directly by users
+function SpectralGrid(
+        NF::Type{<:AbstractFloat},
+        spectrum::Spectrum,
+        grid::AbstractGrid,
+        dealiasing,
+        nlayers::Int,
+        transform_batch::AbstractVector{<:Integer} = Int[1],
+    )
+    @assert spectrum.architecture == grid.architecture "Architecture of grid and spectrum must match"
+
+    architecture = spectrum.architecture
+
+    # grid
+    nlat_half = SpeedyTransforms.get_nlat_half(grid)
+    nlat = RingGrids.get_nlat(grid)
+    npoints = RingGrids.get_npoints(grid)
+
+    # Convert numeric parameters to Float32
+    dealiasing_f32 = Float32(dealiasing)
+
+    # Calculate derived fields
+    ArrayType = array_type(architecture)
+    VectorType = array_type(architecture, NF, 1)
+    MatrixType = array_type(architecture, NF, 2)
+    TensorType = array_type(architecture, NF, 3)
+
+    VectorIntType = array_type(architecture, Int, 1)
+    MatrixIntType = array_type(architecture, Int, 2)
+    TensorIntType = array_type(architecture, Int, 3)
+
+    # Spectral variable types
+    SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, array_type(architecture, Complex{NF}, 1), typeof(spectrum), ArrayDimensions.LM}
+    SpectralVariable3D = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum), ArrayDimensions.LM}
+    SpectralVariableXYZ = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum), ArrayDimensions.LMZ}
+    SpectralVariableXYT = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum), ArrayDimensions.LMT}
+    SpectralVariable4D = LowerTriangularArray{Complex{NF}, 3, array_type(architecture, Complex{NF}, 3), typeof(spectrum), ArrayDimensions.LM}
+    SpectralVariableXYZT = LowerTriangularArray{Complex{NF}, 3, array_type(architecture, Complex{NF}, 3), typeof(spectrum), ArrayDimensions.LMZT}
+
+    # Grid variable types
+    GridVariable2D = Field{NF, 1, array_type(architecture, NF, 1), typeof(grid), ArrayDimensions.XY}
+    GridVariable3D = Field{NF, 2, array_type(architecture, NF, 2), typeof(grid), ArrayDimensions.XY}
+    GridVariableXYZ = Field{NF, 2, array_type(architecture, NF, 2), typeof(grid), ArrayDimensions.XYZ}
+    GridVariableXYT = Field{NF, 2, array_type(architecture, NF, 2), typeof(grid), ArrayDimensions.XYT}
+    GridVariable4D = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid), ArrayDimensions.XY}
+    GridVariableXYZT = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid), ArrayDimensions.XYZT}
+
+    # Particle vector type
+    # TODO: For Reactant we need something else in the long run
+    # use Nothing as a dummy type, it's not actually working
+    ParticleVectorType = typeof(architecture) <: ReactantDevice ? Nothing : array_type(architecture, Particle{NF}, 1)
+
+    # Normalize transform_batch: always include 1 (serial fallback) and the model's nlayers,
+    # dedup and sort.
+    transform_batch = sort!(unique!(Int[1; nlayers; transform_batch]))
+
+    # Create the SpectralGrid with all fields
+    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half), Float32}(
+        NF,
+        architecture,
+        ArrayType,
+        VectorType,
+        MatrixType,
+        TensorType,
+        VectorIntType,
+        MatrixIntType,
+        TensorIntType,
+        truncation(spectrum),
+        spectrum,
+        SpectralVariable2D,
+        SpectralVariable3D,
+        SpectralVariableXYZ,
+        SpectralVariableXYT,
+        SpectralVariable4D,
+        SpectralVariableXYZT,
+        dealiasing_f32,
+        nlat_half,
+        nlat,
+        npoints,
+        grid,
+        nonparametric_type(grid),
+        GridVariable2D,
+        GridVariable3D,
+        GridVariableXYZ,
+        GridVariableXYT,
+        GridVariable4D,
+        GridVariableXYZT,
+        ParticleVectorType,
+        nlayers,
+        transform_batch,
+    )
+end
+
+# also allow spectral grid to be passed on as first and only positional argument to model constructors
+(M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(; spectral_grid = SG, kwargs...)
+
+"""$(TYPEDSIGNATURES)
+Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct.
+`transform_batch` is forwarded as the list of FFT batch sizes K to pre-plan."""
+function (::Type{S})(
+        spectral_grid::SpectralGrid;
+        one_more_degree::Bool = true,
+        transform_batch::AbstractVector{<:Integer} = spectral_grid.transform_batch,
+        kwargs...
+    ) where {S <: SpeedyTransforms.AbstractSpectralTransform}
+    (; NF, spectrum, grid, nlayers) = spectral_grid
+    (; lmax, mmax, architecture) = spectrum
+    spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
+    # Scratch sized to the largest K the dycore can emit (PrimitiveWet's mega-batch) so any
+    # call ≤ this K works through `_fourier_serial!` even if K isn't pre-planned. `transform_batch`
+    # is independent — it just lists which Ks get a batched FFT plan.
+    scratch_nlayers = max(maximum(transform_batch), 4 * nlayers + 1)
+    return S(spectrum, grid; NF, nlayers = scratch_nlayers, transform_batch, kwargs...)
+end
+
+"""$(TYPEDSIGNATURES)
+Default `transform_batch` for a `SpectralGrid`. Architecture-dependent because:
+
+- On CPU, batched FFT plans give negligible speedup, default: `[1, nlayers]` — matches the pre-multiplexing system.
+
+- On GPU, batched plans are essential, default:
+  `[1, nlayers, 2*nlayers, 4*nlayers + 1]` — covers single-layer (`1`), one variable (`L`),
+  U/V together (`2L`), and the prognostic batch (`4L + 1`),  6L+1 and 9L+1 (tendency batch)
+"""
+default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_transform_batch(typeof(arch), nlayers)
+default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]
+
+# TODO: planning both 6L+1 and 9L+1 is slightly wasteful (we only need one of them for wet and dry model respectively)
+default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) =
+    Int[1, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, 9 * nlayers + 1]
+
+function variables(::SpeedyTransforms.AbstractSpectralTransform)
+    return (
+        ScratchVariable(:transform_memory, TransformScratchMemory(), desc = "Scratch memory for spectral transform"),
+    )
+end
+
+# because model components can be `nothing`, their constructor being `Nothing()`
+# we also allow `::SpectralGrid` as the first argument
+Base.Nothing(::SpectralGrid) = Nothing()
+
+# we do not actually want to adapt SpectralGrid
+Adapt.adapt_structure(to, sg::SpectralGrid) = nothing

@@ -14,8 +14,8 @@ can share the same grid which just defines the discretization and the architectu
 The resolution parameter of the horizontal grid is `nlat_half` (number of latitude rings on one hemisphere,
 Equator included) and the ring indices are precomputed in `rings`.
 $(TYPEDFIELDS)"""
-struct FullGaussianGrid{A, V, W} <: AbstractFullGrid{A}
-    nlat_half::Int              # number of latitudes on one hemisphere
+struct FullGaussianGrid{A, V, W, IntType} <: AbstractFullGrid{A}
+    nlat_half::IntType          # number of latitudes on one hemisphere
     architecture::A             # information about device, CPU/GPU
     rings::V                    # precomputed ring indices
     whichring::W                # precomputed ring index for each grid point ij
@@ -24,24 +24,24 @@ end
 Architectures.nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid
 
 # FIELD
-const FullGaussianField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullGaussianGrid}
+const FullGaussianField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid <: FullGaussianGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:FullGaussianField
 # to not have precendence over grid_type(::Type{Field{...})
 grid_type(::Type{FullGaussianField}) = FullGaussianGrid
-grid_type(::Type{FullGaussianField{T}}) where T = FullGaussianGrid
+grid_type(::Type{FullGaussianField{T}}) where {T} = FullGaussianGrid
 grid_type(::Type{FullGaussianField{T, N}}) where {T, N} = FullGaussianGrid
 
-function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullGaussianGrid{A}} where A <: AbstractArchitecture
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid <: FullGaussianGrid{A}} where {A <: AbstractArchitecture}
     print(io, "FullGaussianField{$T, $N}")
     toplevel && print(io, " as ", nonparametric_type(ArrayType))
-    toplevel && print(io, " on ", F.grid.architecture)
+    return toplevel && print(io, " on ", F.grid.architecture)
 end
 
 # SIZE
 nlat_odd(::Type{<:FullGaussianGrid}) = false        # Gaussian latitudes always even
 get_npoints(::Type{<:FullGaussianGrid}, nlat_half::Integer) = 8 * nlat_half^2
-get_nlat_half(::Type{<:FullGaussianGrid}, npoints::Integer) = round(Int, sqrt(npoints/8))
+get_nlat_half(::Type{<:FullGaussianGrid}, npoints::Integer) = round(Int, sqrt(npoints / 8))
 get_nlon(::Type{<:FullGaussianGrid}, nlat_half::Integer) = 4nlat_half
 
 ## COORDINATES
@@ -52,10 +52,10 @@ end
 function get_lond(::Type{<:FullGaussianGrid}, nlat_half::Integer)
     nlat_half == 0 && return Float64[]      # necessary to avoid error from /0 below
     nlon = get_nlon(FullGaussianGrid, nlat_half)
-    return collect(range(0, 360 - 180/nlon, step=360/nlon))
+    return collect(range(0, 360 - 180 / nlon, step = 360 / nlon))
 end
+
+hasoffset(::Type{<:FullGaussianGrid}) = false   # first longitude point on 0˚
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)
-
-Adapt.@adapt_structure FullGaussianGrid

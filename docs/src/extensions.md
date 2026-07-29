@@ -2,7 +2,7 @@
 
 Generally, SpeedyWeather is built in a very modular, extensible way.
 While that sounds fantastic in general, it does not save you from understanding
-its [modular logic](@ref logic) before you can extend SpeedyWeather.jl easily yourself.
+its [modular logic](@ref logic) before you can extend SpeedyWeather easily yourself.
 We highly recommend you to read the following sections if you would like to
 extend SpeedyWeather in some way, but it also gives you a good understanding
 of how we build SpeedyWeather in the first place. Because in the end there
@@ -47,16 +47,17 @@ In Julia this introduces a new (so-called compound) type that is a subtype of `A
 we have a bunch of these abstract super types defined (see [Abstract model components](@ref))
 and you want to piggy-back on them because of multiple-dispatch. This new type could also be 
 a `mutable struct`, could have keywords defined with `@kwdef` and can
-also be parametric with respect to the number format `NF` or grid, but let's skip
-those details for now. Conceptually you include into the type any parameters
-(example the float `a` here) that you may need and especially those that you want to change
-(ideally not work arrays, see discussion in [Use `ColumnVariables` work arrays](@ref)).
+also be parametric with respect to the number format `NF` (as we do in the example)
+or grid, but let's skip those details for now. Conceptually you include into the type any parameters
+(example the float `a` here) that you may need and especially those that you want to be able to change.
 This type will get a user-facing interface so that one can quickly create a new
 forcing but with altered parameters. Generally you should also include any
 kind of precomputed arrays (here a vector `v`). For example, you want to
 apply your forcing only in certain parts of the globe? Then you probably want
 to define a mask here that somehow includes the information of your region.
 For a more concrete example see [Custom forcing and drag](@ref).
+But note that once you include `Vector`, `Matrix`, or generally `Array`,
+there are some changes needed for GPU compatibility, see [GPU and Architectures](@ref).
 
 To define the new type's initialization, at the most basic level you need
 to extend the `initialize!` function for this new type. A dummy example:
@@ -85,27 +86,26 @@ that is called on _every_ step of the time integration. This new method
 for `forcing!` needs to have the following function signature
 ```@example extending
 function forcing!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
+    vars::Variables,
     forcing::MyForcing,
     model::AbstractModel,
     lf::Integer,
 )
     # whatever the forcing is supposed to do, in the end you want
     # to write into the tendency fields
-    diagn.tendencies.u_tend_grid = forcing.a
-    diagn.tendencies.v_tend_grid = forcing.a
-    diagn.tendencies.vor_tend = forcing.a
+    vars.tendencies.grid.u .= forcing.a
+    vars.tendencies.grid.v .= forcing.a
+    vars.tendencies.vorticity .= forcing.a
 end
 ```
-`DiagnosticVariables` is the type of the first argument, because it contains
-the tendencies you will want to change, so this is supposed to be read and write.
+`Variables` is the type of the first argument, because it contains
+both the tendencies you will want to change and the current state to read from.
 The other arguments should be treated read-only. You can make use of anything else
 in `model`, but often we unpack the model in a function barrier (which can help with
 type inference and therefore performance). But let's skip that detail for now.
 Generally, try to precompute what you can in
 `initialize!`. For the forcing you will need to force the velocities `u, v` in
-grid-point space or the vorticity `vor`, divergence `div` in spectral space.
+grid-point space or the vorticity `vorticity`, divergence `div` in spectral space.
 This is not a constrain in most applications we came across, but in case it
 is in yours please reach out.
 

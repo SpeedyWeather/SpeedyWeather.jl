@@ -1,0 +1,100 @@
+export Simulation
+
+"""$(TYPEDSIGNATURES)
+Simulation is a container struct simply wrapping the variables (prognostic and diagnostic)
+and the model. It contains $(TYPEDFIELDS)"""
+struct Simulation{V, M <: AbstractModel} <: AbstractSimulation{M}
+    "All variables"
+    variables::V
+
+    "All model components, containing parameters, constant at runtime"
+    model::M
+end
+
+function Base.show(io::IO, S::AbstractSimulation)
+    vsize = prettymemory(_pretty_size(S.variables))
+    Msize = prettymemory(Base.summarysize(S.model))
+    Ssize = prettymemory(Base.summarysize(S))
+    println(io, styled"{warning:Simulation}", "{...} ", styled"{note:($Ssize)}")
+    println(io, "├ ", styled"{info:variables}" * "::Variables{...} " * styled"{note:($vsize)}")
+    print(io, "└ ", styled"{info:model}" * "::$(model_type(S.model)){...} " * styled"{note:($Msize)}")
+    return nothing
+end
+
+unpack(sim::AbstractSimulation) = (sim.variables, sim.model)
+
+const DEFAULT_PERIOD = Day(10)
+const DEFAULT_TIMESTEPS = -1    # -1 means unspecified = use the period kwarg
+
+export run!
+
+"""$(TYPEDSIGNATURES)
+Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized."""
+function run!(
+        simulation::AbstractSimulation;
+        period::Period = DEFAULT_PERIOD,
+        steps::Int = DEFAULT_TIMESTEPS,
+        output::Bool = false,
+    )
+    initialize!(simulation; period, steps, output)      # scaling, initialize output, store initial conditions
+    time_stepping!(simulation)                          # run it, yeah!
+    finalize!(simulation)                               # unscale, finalize output, write restart file, finalize callbacks
+    return unicodeplot(simulation)                      # maybe unicodeplot?
+end
+
+# fallback to be extended when UnicodePlots extension is loaded
+unicodeplot(x) = nothing
+
+"""$(TYPEDSIGNATURES)
+Initializes a `simulation`. Scales the variables, initializes
+the output, stores initial conditions, initializes the progress meter feedback,
+callbacks and performs the first two initial time steps to spin up the
+leapfrogging scheme."""
+function initialize!(
+        simulation::AbstractSimulation;
+        period::Period = DEFAULT_PERIOD,
+        steps::Int = DEFAULT_TIMESTEPS,
+        output::Bool = false,
+    )
+    (; variables, model) = simulation
+    progn = variables.prognostic
+
+    # SET THE CLOCK
+    (; clock) = progn
+    (; time_stepping) = model
+    if steps != DEFAULT_TIMESTEPS
+        # sets the steps, calculate period from it, store the start date, reset counter
+        @assert period == DEFAULT_PERIOD "Period and steps cannot be set simultaneously"
+        initialize!(clock, time_stepping, steps)
+    else
+        # set period = how long to integrate for, store the start date, reset counter
+        initialize!(clock, time_stepping, period)
+    end
+
+    # SCALING we use vorticity*radius, divergence*radius in the dynamical core
+    scale_prognostic!(variables, model.planet.radius)
+    
+    # TRANSFORM variables from spectral to grid (= set the diagnostic variables in the correct initial state)
+    transform!(variables, model, initialize = true)
+    haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays
+
+    # OUTPUT, CALLBACKS, FEEDBACK only initialize output and callbacks now, just before the simulation starts
+    set!(simulation.model.output, active = output, reset_path = true)
+    initialize!(model.output, variables, model)
+    initialize!(model.callbacks, variables, model)
+    initialize!(model.feedback, variables, model)
+    return simulation
+end
+
+"""$(TYPEDSIGNATURES)
+Finalize a `simulation`. Finishes the progress meter, unscales variables,
+finalizes the output, writes a restart file and finalizes callbacks."""
+function finalize!(simulation::AbstractSimulation)
+    (; variables, model) = simulation
+    finalize!(model.feedback)                       # finish the progress meter, do first for benchmark accuracy
+    unscale!(variables)                             # undo radius-scaling for vor, div in the dynamical core
+    finalize!(model.output, simulation)             # possibly post-process output, then close netCDF file
+    finalize!(model.callbacks, variables, model)    # any callbacks to finalize?
+    synchronize(model.architecture)                 # synchronize the device in the end (e.g. for benchmarks)
+    return simulation
+end

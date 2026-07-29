@@ -58,7 +58,7 @@ would be a 2D field (though represented as a vector), temperature on several ver
 the atmosphere would be 3D (data represented as a matrix, horizontal x vertical), including
 time would make it 4D. Several fields can share the same grid. Given that the grid is always
 two-dimensional, a 2D and 3D field can also share the same grid, leaving the 3rd dimension
-not further specified for flexibility. 
+not further specified for flexibility.
 
 ## Creating a grid
 
@@ -71,7 +71,7 @@ grid = FullGaussianGrid(24)
 ```
 
 As a second argument `architecture` can be provided which helps to share information on the
-computing architecture (CPU/GPU) but this will not be further explained here. 
+computing architecture (CPU/GPU) but this will not be further explained here.
 
 ## Accessing coordinates
 
@@ -106,6 +106,30 @@ field = zeros(OctaminimalGaussianGrid, 2)   # nlat_half=2
 field = HEALPixField(undef, 2)              # using undef initializor
 field = HEALPixField{Float16}(undef, 2, 3)  # using Float16 as eltype
 ```
+
+## Array dimensions of a Field
+
+Besides `data` and `grid`, a `Field` also carries a `dims::AbstractArrayDimensions` that
+records what the dimensions beyond the horizontal actually represent, e.g. vertical layers
+or time steps, see [Array dimensions](@ref array_dimensions) for a general overview of
+these dimension tags. The tags defined for `Field` are `XY` (2D, horizontal only, the default),
+`XYZ` (horizontal + vertical), `XYT` (horizontal + time), and `XYZT` (horizontal + vertical + time).
+They are bookkeeping only (they do not change how the field is indexed or computed on) but allow
+`ArrayDimensions.hasvertical(field)` and `ArrayDimensions.hastime(field)` to answer what a given
+non-horizontal dimension stands for, and they are preserved through `similar`, `zero`, views and
+indexing (dropping a dimension whenever you index into it with an integer).
+
+To create a `Field` with an explicit dimension, pass an instance of one of these types as an
+extra argument, e.g. after the `grid`
+
+```@example ringgrids
+grid = FullGaussianGrid(4)
+field = zeros(grid, ArrayDimensions.XYZ(), 3)  # 3 layers are vertical, not time
+ArrayDimensions.hasvertical(field), ArrayDimensions.hastime(field)
+```
+
+If no `dims` is provided (as in [Creating a Field](@ref)) `XY` is used by default, meaning
+that no assumption is made about the meaning of any additional dimension.
 
 ## Creating a Field from data
 
@@ -159,7 +183,7 @@ and [UnicodePlots's](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap`, 
 [Visualisation via Makie](@ref) and [Visualisation via UnicodePlots](@ref).
 
 ```@example ringgrids
-using CairoMakie    # triggers loading of Makie extension, or do using UnicodePlots instead!
+import CairoMakie: heatmap   # triggers loading of Makie extension, or use UnicodePlots instead!
 grid = OctahedralGaussianGrid(24)
 field = randn(grid)
 heatmap(field)
@@ -216,6 +240,37 @@ for k in eachlayer(field)           # loop over 2 x 3
     end
 end
 ```
+
+## Rotate and reverse Fields
+
+A field can be rotated in longitude with `rotate!` (in-place) or `rotate` (allocating),
+shifting the data eastward along every ring. In grid space only rotations by multiples of
+90˚ are possible (all implemented grids have rings divisible by 4), negative degrees
+rotate westward
+
+```@example ringgrids
+field = randn(FullGaussianGrid(4))
+field2 = rotate(field, 90)      # rotate a copy 90˚ eastward
+rotate!(field2, 270)            # then 270˚ more in-place, back to the original
+field2 == field
+```
+
+For rotations by any angle use `rotate!` on the spectral coefficients, see
+[Rotation of `LowerTriangularArray`](@ref). A field can also be reversed in latitude
+(mirror at the equator) or longitude (mirror at the 0˚ meridian) with `reverse`/`reverse!`
+
+```@example ringgrids
+reverse(field, dims=:lat)       # mirror at the equator
+reverse!(field, dims=:lon)      # in-place, mirror at the 0˚ meridian
+nothing # hide
+```
+
+The mirror at 0˚ is possible in-place because every ring's longitudes map onto themselves
+under ``\lambda \to -\lambda``: on rings with a longitudinal offset (first point half a
+grid spacing east of 0˚, like the HEALPix-type grids) all points within a ring are reversed,
+on rings whose first point lies on 0˚ that point stays and only the remaining points are
+reversed. Both operations are therefore consistent with their counterparts acting on the
+spherical harmonic coefficients, see [Reverse of `LowerTriangularArray`](@ref).
 
 ## Interpolation between grids
 
@@ -375,7 +430,7 @@ Note that a, c and b, d do not necessarily share the same longitude/x-coordinate
 0^      a -------- o - b    # anvil-shaped average of a, b, c, d at location x
 .Δy                |
 .                  |
-.v                 x 
+.v                 x
 .                  |
 1         c ------ o ---- d
 
@@ -387,16 +442,159 @@ Note that a, c and b, d do not necessarily share the same longitude/x-coordinate
 This interpolation is chosen as by definition of the ring grids, a and b share the same latitude, so do c and d,
 but the longitudes can be different for all four, a, b, c, d.
 
-## ColumnField 
+## ColumnField
 
 Additionally to `Field` there is also a `ColumnField` type. `ColumnField` store the data in a column-major format, which is more efficient for column-based computations. As such, when indexing `ColumnField` the first dimension is the vertical dimension, while the second dimension is the horizontal dimension. Otherwise it behaves just like `Field`. To create a `ColumnField` from a `Field` one can use the `transpose` function, which will transpose the data in place and return a `ColumnField`:
 
 ```@example ringgrids
 grid = OctahedralClenshawGrid(5)    # define a grid
-field = randn(grid, 5)  
+field = randn(grid, 5)
 column_field = transpose(field)
 field == transpose(column_field)    # transposing again returns the original Field
 ```
+
+## Nested order on the OctaHEALPixGrid
+
+!!! warning "Nested order is an experimental feature"
+    While we do provide this functionality as is for now this is an experimental feature and
+    may change anytime in the future. At the moment we do not store the information of the ordering
+    in the grid or field.
+
+HEALPix grids are also famous because of their hierarchial grid structure. While one can use a grid cell order
+on the HEALPix grid that starts at 0˚ on the north pole and runs first east then south (the _ring_ order,
+efficient for spectral transforms) other orderings are possible. The so-called nested order is an
+order whereby 2x2 cells are indexed in the same patterns as the embedding 2x2 cells of 2x2 cells and so on.
+For a visualisation see [Gorski's HEALPix paper](https://iopscience.iop.org/article/10.1086/427976)
+or [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887). We don't implement (yet?) nested
+order for the HEALPix grid but have defined the equivalent on the OctaHEALPixGrid, e.g.
+
+```@example ringgrids
+nlat_half = 2
+grid = OctaHEALPixGrid(nlat_half)
+N = RingGrids.get_npoints(grid)
+
+field = Field(collect(1:N), grid)
+field_nested = RingGrids.nested_order(field)
+```
+
+Note this is now means that the 2nd element in the nested order is the 5th element in the
+ring order etc. Converting this back
+
+```@example ringgrids
+field_ring = RingGrids.ring_order(field_nested)
+```
+
+Note that currently we do not store the information about the order inside the
+On the nested order, changing the resolution is trivial as consecutive elements in chunks
+of 4 have to be averaged (reducing resolution) or every element has to be repeated 4 times
+(increasing resolution). But we don't have this functionality implemented yet.
+
+Visualising nested order via
+
+```@example ringgrids
+using CairoMakie, GeoMakie
+
+nlat_half = 8
+grid = OctaHEALPixGrid(nlat_half)
+N = RingGrids.get_npoints(grid)
+
+field = Field(collect(1:N), grid)               # assumed nested
+field_nested = RingGrids.ring_order(field)      # convert to ring order
+
+fig = Figure(size=(800, 500))
+ax1 = GeoAxis(fig[1, 1], dest = "+proj=ortho +lon_0=30 +lat_0=45", title="OctaHEALPix, ring order")
+ax2 = GeoAxis(fig[1, 2], dest = "+proj=ortho +lon_0=30 +lat_0=45", title="OctaHEALPix, nested order")
+meshimage!(ax1, -180..180, -90..90, rotr90(GeoMakie.earth()); npoints = 100)
+meshimage!(ax2, -180..180, -90..90, rotr90(GeoMakie.earth()); npoints = 100)
+
+londs, latds = RingGrids.get_londlatds(grid)
+
+for ij in 1:N
+    text!(ax1, londs[ij], latds[ij], text=string(field[ij]), color=:black, align=(:center, :center))
+    text!(ax2, londs[ij], latds[ij], text=string(field_nested[ij]), color=:black, align=(:center, :center))
+end
+
+faces = RingGrids.get_gridcell_polygons(typeof(grid), grid.nlat_half, add_nan=true)
+lines!(ax1, vec(faces); color=:black)
+lines!(ax2, vec(faces); color=:black)
+
+hidedecorations!(ax1)
+hidedecorations!(ax2)
+fig
+save("octahealpix_nested.png", fig) # hide
+nothing # hide
+```
+![Nested OctaHEALPix](octahealpix_nested.png)
+
+
+## Copying unmasked grid points
+
+Having a `field` and a `mask` on the same grid one can extract masked/unmasked elements (return as array)
+with `field[mask]` or `field[.~mask]`, however, this operation allocates memory and it is not
+immediately possible to write the results of these operations allocation-free into existing arrays.
+
+Hence, RingGrids provides `unmasked_indices` and `copy_unmasked!` that let you extract the unmasked subset of a
+ring-grid field into a (smaller) subset array, work on it, and scatter results back -- allocation free on
+both CPU and GPU. Only a reusable `indices` vector has to be precomputed that maps the indices between
+the unmasked elements of the field to the contiguous elements in the array.
+
+**Convention:** `mask` is a `Bool` field where `true` = masked (excluded), `false` = unmasked (included).
+
+Start with a mask on a grid
+
+```@example ringgrids
+grid = HEALPixGrid(2)
+mask = rand(Bool, grid)                   # or use your own Bool field
+```
+
+Precompute the indices to copy between field and array
+
+```@example ringgrids
+indices = unmasked_indices(mask)          # Vector of grid-point indices where mask == false
+```
+
+`indices` lives on the same device as `mask` (CPU or GPU) and is sorted.
+
+Now we can copy the unmasked elements of the field to the smaller plain array (gather):
+
+```@example ringgrids
+field = rand(Float32, grid)
+```
+
+The array must be of length `n` equal to the zero (=unmasked) elements in the mask
+
+```@example ringgrids
+n = length(mask) - sum(mask)
+array = zeros(Float32, n)
+copy_unmasked!(array, field, indices)
+array
+```
+
+Such that `array` is a subset of the elements in `field`.
+The unmasked values are identical
+
+```@example ringgrids
+array == field[.~mask]
+```
+
+Same works for 3D or higher dimensions, but the mask is always 2D
+
+```@example ringgrids
+nlayers = 3
+field3D = rand(Float32, grid, nlayers)
+array3D = zeros(Float32, n, nlayers)
+copy_unmasked!(array3D, field3D, indices)
+```
+
+And copy back, plain array → field (scatter):
+
+```@example ringgrids
+other_field3D = zeros(Float32, grid, nlayers)
+copy_unmasked!(other_field3D, array3D, indices)
+field3D[.~mask, :] == other_field3D[.~mask, :]
+```
+
+Grid points not referenced by `indices` (the masked ones) are **left unchanged**.
 
 ## Function index
 

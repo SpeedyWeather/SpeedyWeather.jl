@@ -2,7 +2,7 @@
 
 Large-scale condensation in an atmospheric general circulation represents the
 micro-physics that kick in when an air parcel reaches saturation.
-Subsequently, the water vapour inside it condenses, forms droplets around
+Subsequently, the water vapor inside it condenses, forms droplets around
 condensation nuclei, which grow, become heavy and eventually fall out
 as precipitation. This process is never actually representable at the resolution
 of global (or even regional) atmospheric models as typical cloud droplets
@@ -39,7 +39,7 @@ humidity calculated from temperature ``T_i`` is
 ```math
 \begin{aligned}
 q_{i+1} - q_i &= q^\star(T_i) - q_i \\
-T_{i+1} - T_i &= -\frac{L_v}{c_p}( q^\star(T_i) - q_i  )
+T_{i+1} - T_i &= -\frac{L_v}{c_p}[ q^\star(T_i) - q_i ]
 \end{aligned}
 ```
 
@@ -66,7 +66,7 @@ Now we make a linear approximation to the derivative and drop the ``O(\Delta T^2
 Inserting the (explicit) latent heat release yields
 
 ```math
-\Delta q = q^\star(T_i) + -\frac{L_v}{c_p} \Delta q \frac{\partial q^\star}{\partial T} (T_i) - q_i
+\Delta q = q^\star(T_i) - \frac{L_v}{c_p} \Delta q \frac{\partial q^\star}{\partial T} (T_i) - q_i
 ```
 
 And solving for ``\Delta q`` yields
@@ -93,7 +93,7 @@ anymore but over several time steps ``\Delta t`` of the leapfrogging.
 ```math
 \begin{aligned}
 \delta q = \frac{q_{i+1} - q_i}{\Delta t} &= \frac{q^\star(T_i) - q_i}{ \Delta t_c
-\left( 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right)} \\
+\left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right]} \\
 \delta T = \frac{T_{i+1} - T_i}{\Delta t} &= -\frac{L_v}{c_p}( \frac{q_{i+1} - q_i}{\Delta t} )
 \end{aligned}
 ```
@@ -118,7 +118,7 @@ as follows
 
 ```math
 \delta q = \frac{q_{i+1} - q_i}{\Delta t} = \frac{rq^\star(T_i) - q_i}{ \Delta t_c
-\left( 1 + \frac{L_vr}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right)}
+\left[ 1 + \frac{L_vr}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right]}
 ```
 ``r`` is a linear scale and therefore can be taken out of the gradient
 ``\frac{\partial q^\star}{\partial T}`` in the denominator.
@@ -160,7 +160,7 @@ implicit time stepping can be used as before if reevaporation is calculated befo
 latent heat release.
 
 The reevaportation in `ImplicitCondensation` is controlled by `reevaporation` (dimensionless),
-the proportionality constant ``c \geq 0`` here. 
+the proportionality constant ``c \geq 0`` here.
 
 ```@example condensation
 spectral_grid = SpectralGrid()
@@ -207,12 +207,12 @@ in meters per second what we also use for the snow and rain water fluxes ``F_r, 
 the actual snow height as it would have on the ground but if melted to water.
 
 ```math
-F_m = \min(F_s, \frac{E_m}{L_i}\frac{\Delta p}{\Delta t g\rho})
+F_m = \min\left(F_s, \frac{E_m}{L_i}\frac{\Delta p}{\Delta t g\rho}\right)
 ```
 
 We cap this to ``F_s`` so that one cannot melt more snow than there is. This snow melt flux
 is then subtracted from ``F_s`` but added to ``F_r`` to move snow water to rain water.
-The according latent heat required for melting is 
+The according latent heat required for melting is
 
 ```math
 \begin{aligned}
@@ -222,14 +222,14 @@ The according latent heat required for melting is
 ```
 
 But note that we do not add ``\delta q_m`` to the humidity tendency as this is a
-phase transition from snow to rain water and so does not increase water vapour ``q``.
+phase transition from snow to rain water and so does not increase water vapor ``q``.
 We solely use this to calculate the rain water concentration in ``[kg/kg]`` from melting,
 and translate it to latent heat.
 
 We calculate the melting of a downward snow flux before [Re-evaporation](@ref).
 This is such that melting snow becomes rain water and is subject to reevaporation
 within one layer. This is effectively equivalent to allowing sublimation of snow
-to water vapour.
+to water vapor.
 
 Snow can be enabled/disabled with the `snow` keyword argument, and
 ``T_f`` and ``T_m`` (both in Kelvin) can be passed on too, e.g.
@@ -246,7 +246,7 @@ integrated (top to bottom, the direction of pressure ``p``) to diagnose the
 large-scale precipitation ``P`` in units of meters
 
 ```math
-P = - \int_{top}^{bottom} \frac{\Delta t}{g \rho} \delta q dp 
+P = - \int_{top}^{bottom} \frac{\Delta t}{g \rho} \delta q dp
 ```
 
 with gravity ``g``, water density ``\rho`` and time step ``\Delta t``.

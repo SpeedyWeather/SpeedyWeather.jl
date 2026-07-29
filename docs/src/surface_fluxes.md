@@ -18,14 +18,16 @@ Currently implemented surface fluxes of momentum are
 ```@example surface_fluxes
 using InteractiveUtils # hide
 using SpeedyWeather
-subtypes(SpeedyWeather.AbstractSurfaceWind)
+subtypes(SpeedyWeather.AbstractSurfaceMomentumFlux)
 ```
 
 !!! note "Interdependence of surface flux computations"
-    `SurfaceWind` computes the surface fluxes of momentum but also the computation
-    of the surface wind (which by default includes wind gusts) meaning that `surface_wind_speed=nothing`
-    will also effectively disable other surface fluxes unless custom surface fluxes
-    have been implemented that do not rely on `column.surface_wind_speed`.
+    `model.surface_condition` extrapolates atmospheric variables (wind, temperature, humidity)
+    to the surface. `model.boundary_layer` computes centrally a drag coefficient for surface
+    momentum, heat and humidity fluxes. Setting `model.surface_condition = nothing` or
+    `model.boundar_layer = nothing` will therefore disable all other surface fluxes unless
+    those are have `use_boundar_layer_drag = false` which lets them use independently their
+    own drag coefficient.
 
 with more explanation below. The surface heat fluxes currently implemented are
 
@@ -44,7 +46,7 @@ The calculation of thermodynamic quantities at the surface (air density, tempera
 are handled by
 
 ```@example surface_fluxes
-subtypes(SpeedyWeather.AbstractSurfaceThermodynamics)
+subtypes(SpeedyWeather.AbstractSurfaceCondition)
 ```
 
 and the computation of drag coefficients (which is used by default for the surface fluxes above)
@@ -53,11 +55,6 @@ is handled through the `model.boundary_layer` where currently implemented are
 ```@example surface_fluxes
 subtypes(SpeedyWeather.AbstractBoundaryLayer)
 ```
-
-Note that `LinearDrag` is the linear drag following Held and Suarez (see [Held-Suarez forcing](@ref))
-which does not compute a drag coefficient and therefore by default effectively disables other
-surface fluxes (as the Held and Suarez forcing and drag is supposed to be used instead of
-physical parameterizations).
 
 ## Fluxes to tendencies
 
@@ -111,7 +108,7 @@ We use the same drag coefficient for momentum, heat and moisture fluxes.
 The bulk Richardson number at the lowermost model layer ``k = N`` of height ``z_N`` is
 
 ```math
-Ri_N = \frac{gz_N \left( \Theta_v(z_N) - \Theta_v(0) \right)}{|v(z_N)|^2 \Theta_v(0)}
+Ri_N = \frac{gz_N \left[ \Theta_v(z_N) - \Theta_v(0) \right]}{|v(z_N)|^2 \Theta_v(0)}
 ```
 
 with ``gz_N = \Phi_N`` the [Geopotential](@ref) at ``z = z_N``, ``\Theta =  c_pT_v + gz``
@@ -120,43 +117,34 @@ Then the drag coefficient ``C`` follows as
 
 ```math
 C = \begin{cases}
-        \kappa^2 \left( \log(\frac{z_N}{z_0}) \right)^{-2} \quad &\text{for} \quad Ri_N  \leq 0\\
-        \kappa^2 \left( \log(\frac{z_N}{z_0}) \right)^{-2} \left(1 - \frac{Ri_N}{Ri_c}\right)^2 \quad &\text{for} \quad 0 < Ri_N < Ri_c \\
-        0 \quad &\text{for} \quad Ri_N \geq Ri_c. \\
+        \kappa^2 \left[ \log(\frac{z_N}{z_0}) \right]^{-2} \quad &\text{for} \quad Ri_N  \leq 0\\
+        \kappa^2 \left[ \log(\frac{z_N}{z_0}) \right]^{-2} \left(1 - \frac{Ri_N}{Ri_c}\right)^2 \quad &\text{for} \quad 0 < Ri_N < Ri_c \\
+        0 \quad &\text{for} \quad Ri_N \geq Ri_c, \\
     \end{cases}
 ```
 
-with ``\kappa = 0.4`` the von Kármán constant, ``z_0 = 3.21 \cdot 10^{-5}`` the 
-roughness length. There is a maximum drag ``C`` for negative bulk Richardson numbers ``Ri_N``
+with ``\kappa = 0.4`` the von Kármán constant, ``z_0`` the
+roughness length (we currently use different values over ocean and land).
+There is a maximum drag ``C`` for negative bulk Richardson numbers ``Ri_N``
 but the drag becomes 0 for bulk Richardson numbers being larger than a critical
-``Ri_c = 1`` with a smooth transition in between. The height of the ``N``-th
+``Ri_c = 10`` with a smooth transition in between. The height of the ``N``-th
 model layer is ``z_N = \tfrac{\Phi_N - \Phi_0}{g}`` with the geopotential
 ```math
 \Phi_N = \Phi_{0} + T_N R_d ( \log p_{N+h} - \log p_N)
 ```
-which depends on the temperature ``T_N`` of that layer. To simplify this calculation
-and avoid the logarithm we use a constant ``Z \approx z_N`` from a reference temperature
-``T_{ref}`` instead of ``T_N`` in the calculation of ``log(z_N/z_0)``.
-While ``z_N`` depends on the vertical resolution (``\Delta p_N`` of the lowermost layer)
-it is proportional to that layer's temperature which in Kelvin does not change much
-in space and in time, especially with the logarithm applied.
-For ``T_{ref} = 200K`` with specific gas constant ``R_d = 287 J/kg/K``
-on sigma level ``\sigma_N = 0.95`` we have ``log(z_N/z_0) \approx 16.1`` for
-``T_{ref} = 300K`` this increases to ``log(z_N/z_0) \approx 16.5`` a 2.5%
-increase which we are happy to approximate. Note that we do
-not apply this approximation within the bulk Richardson number ``Ri_N``.
-So we calculate once a typical height of the lowermost layer
-``Z = T_{ref}R_d \log(1/\sigma_N)g^{-1}`` for the given parameter choices
-and then define a maximum drag constant
+which depends on the temperature ``T_N`` of that layer. This model layer
+height above the surface ``z_N`` is recalculated on every time step for
+every grid cell as it depends on temperature. The maximum drag coefficient
+then follows as
 
 ```math
-C_{max} = \left(\frac{\kappa}{\log(\frac{Z}{z_0})} \right)^2
+C_{max} = \left[\frac{\kappa}{\log(\frac{z}{z_0})} \right]^2
 ```
 
 to simplify the drag coefficient calculation to
 
 ```math
-C = C_{max} \left(1 - \frac{Ri_N^*}{Ri_c}\right)^2
+C = C_{max} \left[1 - \frac{Ri_N^*}{Ri_c}\right]^2
 ```
 with ``Ri_N^* = \max(0, \min(Ri_N, Ri_c))`` the clamped ``Ri_N`` which
 is at least ``0`` and at most ``Ri_c``.
@@ -219,7 +207,7 @@ This assumes that a very thin layer of air just above the ocean is saturated but
 assumption is less well justified as it should be a function of the soil moisture and how much
 of that is available to evaporate given vegetation, hence we include a soil moisture availability.
 We again make the simplification that ``q_s = q_N``, i.e. specific humidity of the surface is the
-same as in the lowermost atmospheric layer above. 
+same as in the lowermost atmospheric layer above.
 
 The surface humidity flux in ``kg/s/m^2``, positive up, is then
 
@@ -258,8 +246,7 @@ The land-sea mask determines solely how to weight the surface fluxes
 coming from land or from the ocean. For the sensible heat fluxes this uses
 land and sea surface temperatures and weights the respective fluxes
 proportional to the fractional mask. Similar for humidity fluxes.
-You can therefore define an ocean on top of a mountain, or a land without
-heat fluxes when the land-surface temperature is not defined, i.e. `NaN`.
+You can therefore define an ocean on top of a mountain, or vice versa.
 Let ``F_L, F_S`` be the fluxes coming from land and sea, respectively.
 Then the land-sea mask ``a \in [0,1]`` weights them as follows for the
 total flux ``F``
@@ -268,22 +255,26 @@ total flux ``F``
 F = aF_L + (1-a)F_S
 ```
 
-but ``F=F_L`` if the sea flux is NaN (because the ocean temperature is not defined)
-and ``F=F_S`` if the land flux is NaN (because the land temperature or soil moisture
-is not defined, for sensible heat fluxes or evaporation), and ``F=0`` if both fluxes
-are NaN.
+Note that this weighting is purely multiplicative: it does not protect
+against `NaN` propagating into ``F`` should ``F_L`` or ``F_S`` be `NaN`.
+Land and sea surface temperatures (and other quantities entering the flux
+calculation, such as soil moisture) must therefore be finite everywhere,
+even where the land-sea mask is 0 or 1, i.e. a `NaN` land or sea surface
+temperature is not supported anymore. Use a fallback temperature for
+grid cells without "real" land or ocean instead (e.g. `SlabOcean`'s
+`land_temperature`, or `SeasonalLandTemperature`'s `ocean_temperature`).
 
 Setting the land-sea mask to ocean therefore will disable any fluxes that
 may come from land, and vice versa. However, with an ocean-everywhere land-sea mask
-you must also define sea surface temperatures everywhere, otherwise the fluxes
-in those regions will be zero.
+you must still also define sea surface temperatures everywhere, otherwise the fluxes
+in those regions will be incorrect rather than simply zero.
 
 For more details see [The land-sea mask](@ref) implementation section.
 
 ## References
 
-[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1). 
+[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1).
 
 [^SPEEDY]: Franco Molteni and Fred Kucharski, 20??. Description of the ICTP AGCM (SPEEDY) Version 41. [https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf](https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
 
-[^Viterbo95]: Viterbo, P., and A. C. M. Beljaars, 1995: An Improved Land Surface Parameterization Scheme in the ECMWF Model and Its Validation. J. Climate, 8, 2716-2748, DOI:[10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2](https://doi.org/10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2). 
+[^Viterbo95]: Viterbo, P., and A. C. M. Beljaars, 1995: An Improved Land Surface Parameterization Scheme in the ECMWF Model and Its Validation. J. Climate, 8, 2716-2748, DOI:[10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2](https://doi.org/10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2).

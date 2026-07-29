@@ -9,10 +9,10 @@ logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidi
 
 ```math
 \begin{aligned}
-\frac{\partial \zeta}{\partial t} &= \nabla \times (\mathbf{\mathcal{P}}_\mathbf{u}
-+ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) \\
-\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (\mathcal{P}_\mathbf{u}
-+ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) - \nabla^2(\frac{1}{2}(u^2 + v^2) + \Phi) \\
+\frac{\partial \zeta}{\partial t} &= \nabla \times \left[\mathbf{\mathcal{P}}_\mathbf{u}
++ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s\right] \\
+\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot \left[\mathcal{P}_\mathbf{u}
++ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s\right] - \nabla^2\left[\tfrac{1}{2}(u^2 + v^2) + \Phi\right] \\
 \frac{\partial \ln p_s}{\partial t} &= -\frac{1}{p_s} \nabla \cdot \int_0^{p_s} \mathbf{u}~dp \\
 \frac{\partial T}{\partial t} &= \mathcal{P}_T -\nabla\cdot(\mathbf{u}T) + T\mathcal{D} - W(T) + \kappa T_v \frac{D \ln p}{Dt} \\
 \frac{\partial q}{\partial t} &= \mathcal{P}_q -\nabla\cdot(\mathbf{u}q) + q\mathcal{D} - W(q)\\
@@ -25,12 +25,12 @@ Coriolis parameter ``f``, ``W`` the [Vertical advection](@ref) operator, dry air
 and surface pressure ``p_s``, thermodynamic ``\kappa = R_d/c_p``
 with ``c_p`` the heat capacity at constant pressure. Horizontal hyper diffusion of the
 form ``(-1)^{n+1}\nu\nabla^{2n}`` with coefficient ``\nu`` and power ``n``  is added for
-every variable that is advected, meaning ``\zeta, \mathcal{D}, T, q``, but left out
+every variable that is advected, meaning ``\zeta``, ``\mathcal{D}``, ``T``, ``q``, but left out
 here for clarity, see [Horizontal diffusion](@ref diffusion).
 
-The parameterizations for the tendencies of ``u, v, T, q`` from physical processes are denoted as
-``\mathcal{P}_\mathbf{u} = (\mathcal{P}_u, \mathcal{P}_v), \mathcal{P}_T, \mathcal{P}_q``
-and are further described in the corresponding sections, see [Parameterizations](@ref).
+The parameterizations for the tendencies of ``\mathbf{u}=(u, v)``, ``T``, ``q`` from physical processes are
+denoted as ``\mathcal{P}_\mathbf{u} = (\mathcal{P}_u, \mathcal{P}_v)``, ``\mathcal{P}_T``, ``\mathcal{P}_q``
+respectively and are further described in the corresponding sections, see [Parameterizations](@ref).
 
 SpeedyWeather.jl implements a `PrimitiveWet` and a `PrimitiveDry` dynamical core.
 For a dry atmosphere, we have ``q = 0`` and the virtual temperature ``T_v = T``
@@ -46,9 +46,9 @@ the following sections.
     effect of humidity on the density while replacing density through the
     ideal gas law with temperature.
 
-We assume the atmosphere to be composed of two ideal gases: Dry air and water vapour.
+We assume the atmosphere to be composed of two ideal gases: Dry air and water vapor.
 Given a specific humidity ``q`` both gases mix, their pressures ``p_d``, ``p_w``
-(``d`` for dry, ``w`` for water vapour), and densities ``\rho_d, \rho_w`` add in a given
+(``d`` for dry, ``w`` for water vapor), and densities ``\rho_d, \rho_w`` add in a given
 air parcel that has temperature ``T``. The ideal gas law then holds for both gases
 ```math
 \begin{aligned}
@@ -65,13 +65,13 @@ p = p_d + p_w = (\rho_d R_d + \rho_w R_w)T
 We ultimately want to replace the density ``\rho = \rho_w + \rho_d`` in the dynamical core,
 using the ideal gas law, with the temperature ``T``, so that we never have
 to calculate the density explicitly. However, in order to not deal with
-two densities (dry air and water vapour) we would like to replace
+two densities (dry air and water vapor) we would like to replace
 temperature with a virtual temperature that includes the effect of
 humidity on the density. So, wherever we use the ideal gas law
 to replace density with temperature, we would use the virtual temperature,
 which is a function of the absolute temperature and specific humidity,
 instead. A higher specific humidity in an air parcel lowers
-the density as water vapour is lighter than dry air. Consequently,
+the density as water vapor is lighter than dry air. Consequently,
 the virtual temperature of moist air is higher than its absolute temperature
 because warmer air is lighter too at constant pressure. We therefore
 think of the virtual temperature as the temperature dry air would need to have
@@ -82,14 +82,14 @@ the ideal gas law as total density ``\rho`` times a gas constant
 times the virtual temperature that is supposed to be a function
 of absolute temperature, humidity and some constants
 ```math
-p  = (\rho R_d + \rho_w (R_w - R_d)) T = \rho R_d (1 +
-\frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}} \frac{\rho_w}{\rho_w + \rho_d})T
+p  = \left[\rho R_d + \rho_w (R_w - R_d)\right] T = \rho R_d \left(1 +
+\frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}} \frac{\rho_w}{\rho_w + \rho_d}\right)T
 ```
 Now we identify
 ```math
 \mu = \frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}}
 ```
-as some constant that is positive for water vapour being lighter than dry air
+as some constant that is positive for water vapor being lighter than dry air
 (``\tfrac{R_d}{R_w} = \tfrac{m_w}{m_d} < 1``) and
 ```math
 q = \frac{\rho_w}{\rho_w + \rho_d}
@@ -155,14 +155,9 @@ A flow field on such a level is therefore not continuous and one would need to d
 boundaries. Especially with spherical harmonics we need a terrain-following vertical
 coordinate to transform between continuous fields in grid-point space and spectral space.
 
-SpeedyWeather.jl currently uses so-called sigma coordinates for the vertical.
-This coordinate system uses fraction of surface pressure in the vertical, i.e.
-```math
-\sigma = \frac{p}{p_s}
-```
-with ``\sigma = [0, 1]`` and ``\sigma = 0`` being the top (zero pressure) and ``\sigma = 1``
-the surface (at surface pressure). As a consequence the vertical dimension is also
-indexed from top to surface.
+SpeedyWeather.jl supports pure sigma coordinates (`SigmaCoordinates`) and hybrid
+sigma-pressure coordinates (`SigmaPressureCoordinates`). For the full Julia interface,
+available constructors, and practical usage see [Vertical coordinates](@ref vertical_coordinates_page).
 
 !!! info "Vertical indexing"
     Pressure, sigma, or hybrid coordinates in the vertical range from lowest values at the top
@@ -170,26 +165,40 @@ indexed from top to surface.
     surface. This means that ``k=1`` is the top-most layer, and ``k=N_{lev}`` (or similar)
     is the layer that sits directly above the surface.
 
-Sigma coordinates are therefore terrain-following, as ``\sigma = 1`` is always at surface pressure
-and so this level bends itself around every mountain, although the actual pressure on this
-level can vary. For a visualisation see [#329](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/329).
+Sigma coordinates use the fraction of surface pressure as the vertical coordinate
+```math
+\sigma = \frac{p}{p_s}
+```
+with ``\sigma \in [0, 1]``, ``\sigma = 0`` at the top and ``\sigma = 1`` at the surface.
+Sigma coordinates are terrain-following: ``\sigma = 1`` is always at surface pressure,
+bending around every mountain. For a visualisation see
+[#329](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/329).
 
-One chooses ``\sigma`` levels associated with the ``k``-th layer and the pressure
-can be reobtained from the surface pressure ``p_s``
+One chooses ``\sigma`` levels associated with the ``k``-th layer; pressure is recovered as
 ```math
-p_k = \sigma_kp_s
+p_k = \sigma_k p_s, \qquad
+\Delta p_k = \Delta\sigma_k p_s
 ```
-The layer thickness in terms of pressure is
-```math
-\Delta p_k = p_{k+\tfrac{1}{2}} - p_{k-\tfrac{1}{2}} =
-(\sigma_{k+\tfrac{1}{2}} - \sigma_{k-\tfrac{1}{2}}) p_s = \Delta \sigma_k p_s
-```
-which can also be expressed with the layer thickness in sigma coordinates ``\Delta \sigma_k``
-times the surface pressure. In SpeedyWeather.jl one chooses the half levels
-``\sigma_{k+\tfrac{1}{2}}`` first and then obtains the full levels through averaging
+Half levels ``\sigma_{k+\tfrac{1}{2}}`` are specified first and full levels obtained as
 ```math
 \sigma_k = \frac{\sigma_{k+\tfrac{1}{2}} + \sigma_{k-\tfrac{1}{2}}}{2}
 ```
+
+### Hybrid sigma-pressure coordinates
+
+Hybrid sigma-pressure coordinates blend constant-pressure surfaces near the model top
+with terrain-following sigma surfaces near the surface. The pressure at layer ``k`` is
+```math
+p_k = A_k \, p_{\mathrm{ref}} + B_k \, p_s
+```
+with coefficients ``A_k = \sigma_k(1 - f(\sigma_k))``, ``B_k = \sigma_k f(\sigma_k)``
+for a transition function ``f \in [0,1]``, so ``A_k + B_k = \sigma_k`` always holds.
+The transition function should be 1 at the surface
+(to have terrain-following sigma coordinates near the planetary boundary)
+and 0 at the top with some smooth transition in between, see
+[Creating hybrid sigma-pressure coordinates](@ref) for examples.
+The layer thickness is ``\Delta p_k = \Delta A_k p_{\mathrm{ref}} + \Delta B_k p_s``.
+See [Vertical coordinates](@ref vertical_coordinates_page) for details and the Julia interface.
 
 ## Geopotential
 
@@ -251,16 +260,17 @@ at the top to ``N`` at the surface layer this can be written as
 \frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \nabla \cdot (\mathbf{u}_k \Delta p_k)
 ```
 which can be thought of as a vertical integration of the pressure thickness-weighted divergence.
-In ``\sigma``-coordinates with ``\Delta p_k = \Delta \sigma_k p_s`` (see [Vertical coordinates](@ref))
+In pure ``\sigma``-coordinates with ``\Delta p_k = \Delta \sigma_k p_s``
+(see [Sigma coordinates](@ref); for hybrid coordinates ``\Delta p_k = \Delta A_k p_{\mathrm{ref}} + \Delta B_k p_s``)
 this becomes
 ```math
-\frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \sigma_k \nabla \cdot (\mathbf{u}_k p_s)
-= -\sum_{k=1}^N \sigma_k (\mathbf{u}_k \cdot \nabla p_s + p_s \nabla \cdot \mathbf{u}_k)
+\frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \Delta \sigma_k \nabla \cdot (\mathbf{u}_k p_s)
+= -\sum_{k=1}^N \Delta \sigma_k (\mathbf{u}_k \cdot \nabla p_s + p_s \nabla \cdot \mathbf{u}_k)
 ```
 Using the logarithm of pressure ``\ln p`` as the vertical coordinate this becomes
 ```math
 \frac{\partial \ln p_s}{\partial t} =
--\sum_{k=1}^N \sigma_k (\mathbf{u}_k \cdot \nabla \ln p_s + \nabla \cdot \mathbf{u}_k)
+-\sum_{k=1}^N \Delta \sigma_k (\mathbf{u}_k \cdot \nabla \ln p_s + \nabla \cdot \mathbf{u}_k)
 ```
 The second term is the divergence ``\mathcal{D}_k`` at layer ``k``.
 We introduce ``\bar{a} = \sum_k \Delta \sigma_k a_k``, the ``\sigma``-weighted vertical integration operator
@@ -309,7 +319,7 @@ The advection equation ``\tfrac{DT}{Dt} = 0`` for a tracer ``T`` is, in flux for
 for layer ``k``:
 ```math
 \frac{\partial (T_k \Delta p_k)}{\partial t} = - \nabla \cdot (\mathbf{u}_k T_k \Delta p_k)
-- (M_{k+\tfrac{1}{2}}T_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}T_{k-\tfrac{1}{2}})
+- \left(M_{k+\tfrac{1}{2}}T_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}T_{k-\tfrac{1}{2}}\right)
 ```
 
 Starting from this equation in pressure layer $k$, we can derive the advective form of the tracer transport. Dividing through by the layer thickness ``\Delta p_k`` gives:
@@ -319,6 +329,13 @@ Starting from this equation in pressure layer $k$, we can derive the advective f
 ```
 
 In sigma coordinates, the vertical mass flux can be expressed as ``M = \dot{\sigma} p_s``, where ``\dot{\sigma}`` is the vertical velocity in sigma coordinates and ``p_s`` is the surface pressure. Assuming ``p_s`` is constant in time within the layer, and switching to sigma coordinates, we rewrite the equation as:
+
+!!! note "Sigma coordinate assumption"
+    The advection equation below uses ``\Delta \sigma_k`` as the layer thickness and
+    ``\dot{\sigma}`` as the vertical velocity. This is the pure sigma formulation. For
+    [hybrid sigma-pressure coordinates](@ref Hybrid-sigma-pressure-coordinates) the layer
+    thickness becomes ``\Delta p_k / p_s`` and the vertical velocity equation changes
+    accordingly.
 
 ```math
 \frac{\partial T_k}{\partial t} = -\nabla \cdot (\mathbf{u}_k T_k) - \frac{1}{\Delta \sigma_k} \left( \dot{\sigma}_{k+\frac{1}{2}} T_{k+\frac{1}{2}} - \dot{\sigma}_{k-\frac{1}{2}} T_{k-\frac{1}{2}} \right)
@@ -348,14 +365,14 @@ Rearranging terms, we obtain:
 
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
-- \frac{1}{\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+\tfrac{1}{2}} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-\tfrac{1}{2}})\right)
+- \frac{1}{\Delta \sigma_k}\left[\dot{\sigma}_{k+\tfrac{1}{2}}\left(T_{k+\tfrac{1}{2}} - T_k\right) + \dot{\sigma}_{k-\tfrac{1}{2}}\left(T_k - T_{k-\tfrac{1}{2}}\right)\right]
 ```
 
 With the reconstruction at the faces, ``T_{k+\tfrac{1}{2}}`` and ``T_{k-\tfrac{1}{2}}`` depending on one's choice of the advection scheme. For a second-order centered scheme, we choose ``T_{k+\tfrac{1}{2}} = \tfrac{1}{2}(T_k + T_{k+1})`` and obtain:
 
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
-- \frac{1}{2\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+1} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-1})\right)
+- \frac{1}{2\Delta \sigma_k}\left[\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+1} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-1})\right]
 ```
 
 However, note that this scheme is dispersive and easily leads to instabilities at higher resolution, where a more advanced vertical advection scheme becomes necessary. For convenience, we may write ``W(T)`` to denote the vertical advection term ``\dot{\sigma}\partial_\sigma T``, without specifying which schemes is used.
@@ -368,7 +385,7 @@ Similarly, the conservation of mass for layer ``k`` can be expressed as
 (setting ``T=1`` in the advection equation in section [Vertical advection](@ref))
 ```math
 \frac{\partial \Delta p_k}{\partial t} = -\nabla \cdot (\mathbf{u}_k \Delta p_k)
-- (M_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}})
+- \left(M_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}\right)
 ```
 Meaning that the pressure thickness ``\Delta p_k`` of layer ``k`` changes with
 a horizontal divergence ``-\nabla \cdot (\mathbf{u}_k \Delta p_k)`` if not
@@ -457,7 +474,7 @@ In vorticity-divergence formulation of the momentum equations the ``\nabla_\sigm
 drops out in the vorticity equation (``\nabla \times \nabla \Phi = 0``),
 but becomes a ``-\nabla^2 \Phi`` in the divergence equation,
 which is therefore combined with the kinetic energy term
-``-\nabla^2(\tfrac{1}{2}(u^2 + v^2))`` similar as it is done in the [Shallow water equations](@ref).
+``-\nabla^2[\tfrac{1}{2}(u^2 + v^2)]`` similar as it is done in the [Shallow water equations](@ref).
 You can think of ``\tfrac{1}{2}(u^2 + v^2) + \Phi`` as the Bernoulli potential in
 the primitive equations. However, due to the change into sigma coordinates the surface pressure
 gradient also has to be accounted for. Now highlighting only the pressure gradient force, we
@@ -595,7 +612,9 @@ with
 ```math
 \alpha_k = 1 - \frac{p_{k-\tfrac{1}{2}}}{\Delta p_k} \ln \frac{p_{k+\tfrac{1}{2}}}{p_{k-\tfrac{1}{2}}}
 ```
-In sigma coordinates this simplifies to, following similar steps as in [Surface pressure tendency](@ref)
+In pure sigma coordinates this simplifies to (for hybrid coordinates the ``\ln p`` ratios
+become ``\ln(A_k p_{\mathrm{ref}} + B_k p_s)`` and the simplification does not hold),
+following similar steps as in [Surface pressure tendency](@ref)
 ```math
 \begin{aligned}
 \left(\frac{D \ln p}{D t}\right)_k &= \mathbf{u}_k \cdot \nabla \ln p_s \\
@@ -679,7 +698,7 @@ So what is ``G`` in the [Primitive equation model](@ref primitive_equation_model
 
 ```math
 \begin{aligned}
-G_\mathcal{D} &= N^E_\mathcal{D} - \nabla^2(\Phi^{i-1} + R_dT_k^v (\ln p_s)^{i-1})
+G_\mathcal{D} &= N^E_\mathcal{D} - \nabla^2[\Phi^{i-1} + R_dT_k^v (\ln p_s)^{i-1}]
 = N^E_\mathcal{D} - \nabla^2( \mathbf{R}T^{i-1} + \mathbf{U}\ln p_s^{i-1}) \\
 G_{\ln p_s} &= N_{\ln p_s}^E - \overline{\mathcal{D}^{i-1}}
 = N_{\ln p_s}^E + \mathbf{W}\mathcal{D}^{i-1} \\
@@ -751,7 +770,7 @@ via
 ```
 (``\mathbf{UW}`` is a matrix of size ``N \times N``) yields
 ```math
-\delta D = \left( 1 + \xi^2\nabla^2(\mathbf{RL + UW})  \right)^{-1}G = \mathbf{S}^{-1}G
+\delta D = \left[ 1 + \xi^2\nabla^2(\mathbf{RL + UW}) \right]^{-1}G = \mathbf{S}^{-1}G
 ```
 The other tendencies ``\delta T`` and ``\delta \ln p_s`` are then obtained
 through insertion above. We may call the operator to be inverted ``\mathbf{S}``
@@ -834,7 +853,12 @@ Now loop over
 
 ## Scaled primitive equations
 
-TODO
+The primitive equations in SpeedyWeather are scaled by the radius, and vorticity and divergence variables are also scaled by the radius,
+effectively scaling these equations by the radius squared. However, in most cases this scaling is hidden from the user and developer
+and only when forcing vorticity or divergence directly it has to be applied manually. Otherwise all scaling is done internally,
+see [Forcing scaling](@ref) for more details.
+
+Derivation of the scaled primitive equations will be added here.
 
 ## References
 

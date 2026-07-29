@@ -1,9 +1,9 @@
 module SpeedyWeatherInternals
 
-    # ARCHITECTURES (Device handling)
-    include("Architectures/Architectures.jl")
-
-    # UTILS (Kernel launching and various utilities)
-    include("Utils/Utils.jl")
+include("Architectures/Architectures.jl")
+include("ArrayDimensions/ArrayDimensions.jl")
+include("KernelLaunching/KernelLaunching.jl")
+include("ParameterEditing/ParameterEditing.jl")
+include("Utils/Utils.jl")
 
 end

@@ -12,23 +12,23 @@ See also [Examples 2D](@ref Examples) for examples with the
 
 ```@example jablonowski
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, Grid=FullGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(trunc = 31, nlayers = 8, Grid=FullGaussianGrid, dealiasing = 3)
 
 orography = ZonalRidge(spectral_grid)
-initial_conditions = InitialConditions(
-    vordiv = ZonalWind(),
-    temp = JablonowskiTemperature(),
-    pres = ConstantPressure())
+initial_conditions = (;                             # collect initial conditions into NamedTuple (keys don't matter)
+    vordiv = ZonalWind(spectral_grid),
+    temperature = JablonowskiTemperature(spectral_grid),
+    pressure = ConstantPressure(spectral_grid))
 
-model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, physics=false)
+model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, dynamics_only = true)
 simulation = initialize!(model)
-run!(simulation, period=Day(9))
+run!(simulation, period = Day(9))
 nothing # hide
 ```
 
 The Jablonowski-Williamson baroclinic wave test case[^JW06] using the
 [Primitive equation model](@ref primitive_equation_model) particularly the dry model,
-as we switch off all physics with `physics=false`.
+as we switch off all parameterizations (and ocean, sea_ice and land) with `dynamics_only = true`.
 We want to use 8 vertical levels, and a lower resolution of T31 on a
 [full Gaussian grid](@ref FullGaussianGrid).
 The Jablonowski-Williamson initial conditions are `ZonalWind` for vorticity and divergence
@@ -40,7 +40,7 @@ off a wave propagating eastward. This wave becomes obvious when visualised with
 ```@example jablonowski
 using CairoMakie
 
-vor = simulation.diagnostic_variables.grid.vor_grid[:, end]
+vor = get_step(simulation.variables.grid.vorticity)[:, end]
 heatmap(vor, title="Surface relative vorticity")
 save("jablonowski.png", ans) # hide
 nothing # hide
@@ -51,53 +51,44 @@ nothing # hide
 
 ```@example heldsuarez
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
 
-# construct model with only Held-Suarez forcing, no other physics
+# construct model with only Held-Suarez forcing
 model = PrimitiveDryModel(
     spectral_grid,
 
     # Held-Suarez forcing and drag
-    temperature_relaxation = HeldSuarez(spectral_grid),
-    boundary_layer_drag = LinearDrag(spectral_grid),
+    forcing = HeldSuarez(spectral_grid),
+    drag = LinearDrag(spectral_grid),
 
-    # switch off other physics
-    convection = nothing,
-    shortwave_radiation = nothing,
-    longwave_radiation = nothing,
-    vertical_diffusion = nothing,
-
-    # switch off surface fluxes (makes ocean/land/land-sea mask redundant)
-    surface_wind = nothing,
-    surface_heat_flux = nothing,
+    # switch off other parameterizations, ocean, sea ice and land
+    dynamics_only = true,
 
     # use Earth's orography
     orography = EarthOrography(spectral_grid)
 )
 
 simulation = initialize!(model)
-run!(simulation, period=Day(20))
+run!(simulation, period = Day(20))
 nothing # hide
 ```
 
 The code above defines the Held-Suarez forcing [^HS94] in terms of temperature relaxation
 and a linear drag term that is applied near the planetary boundary but switches off
-all other physics in the primitive equation model without humidity.
-Switching off the surface wind would also automatically turn off the surface evaporation
-(not relevant in the primitive _dry_ model) and sensible heat flux as that one is proportional
-to the surface wind (which is zero with `nothing`).
-But to also avoid the calculation being run at all we use `nothing` for model components
-passed to the model constructor.
-Some model components use a `NoSomething` but most can just be set to `nothing`.
-`NoSomething`s do not require the spectral grid to be passed on, but as a convention
-we allow every model component to have it for construction even if not required.
+all other parameterizations in the primitive equation model without humidity.
+One could also just switch off the boundary layer scheme which would also automatically turn off
+the surface fluxes (heat and momentum) as they aren't supposed to run with Held-Suarez forcing.
+But to also avoid the calculation being run at all we use `dynamics_only = true`.
+The `forcing` and `drag` are considered to be terms of the dynamical core
+(regardless of which process they represent conceptually).
+Generally, model components can just be set to `nothing` where intuitive.
 
 Visualising surface temperature with
 
 ```@example heldsuarez
 using CairoMakie
 
-temp = simulation.diagnostic_variables.grid.temp_grid[:, end]
+temp = get_step(simulation.variables.grid.temperature)[:, end]
 heatmap(temp, title="Surface temperature [K]", colormap=:thermal)
 
 save("heldsuarez.png", ans) # hide
@@ -112,7 +103,7 @@ using SpeedyWeather
 
 # components
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
+ocean = AquaPlanet(spectral_grid, temperature_equator=302, temperature_poles=273)
 land_sea_mask = AquaPlanetMask(spectral_grid)
 orography = NoOrography(spectral_grid)
 
@@ -124,7 +115,7 @@ nothing # hide
 ```
 
 Here we have defined an aquaplanet simulation by
-- creating an `ocean::AquaPlanet`. This will use constant sea surface temperatures that only vary with latitude.
+- creating an `ocean::AquaPlanet`. This will use constant sea surface temperatures that only vary with latitude (and not with time).
 - creating a `land_sea_mask::AquaPlanetMask` this will use a land-sea mask with `false`=ocean everywhere.
 - creating an `orography::NoOrography` which will have no orography and zero surface geopotential.
 
@@ -146,7 +137,7 @@ of the convection scheme, causing updrafts and downdrafts in both humidity and t
 ```@example aquaplanet
 using CairoMakie
 
-humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
+humid = get_step(simulation.variables.grid.humidity)[:, end]
 heatmap(humid, title="Surface specific humidity [kg/kg]", colormap=:oslo)
 
 save("aquaplanet.png", ans) # hide
@@ -157,7 +148,7 @@ nothing # hide
 ## Aquaplanet without (deep) convection
 
 Now we want to compare the previous simulation to a simulation without
-deep convection, called `DryBettsMiller`, because it is the
+deep convection, called `BettsMillerDryConvection`, because it is the
 [Betts-Miller convection](@ref BettsMiller) but with humidity set to zero
 in which case the convection is always non-precipitating _shallow_
 (because the missing latent heat release from condensation makes it shallower)
@@ -168,7 +159,7 @@ and `orography` (because `spectral_grid` hasn't changed this is possible).
 
 ```@example aquaplanet
 # Execute the code from Aquaplanet above first!
-convection = DryBettsMiller(spectral_grid, time_scale=Hour(4))
+convection = BettsMillerDryConvection(spectral_grid, time_scale=Hour(4))
 
 # reuse other model components from before
 model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convection)
@@ -176,7 +167,7 @@ model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convec
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 
-humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
+humid = get_step(simulation.variables.grid.humidity)[:, end]       # end: surface layer
 heatmap(humid, title="No deep convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_nodeepconvection.png", ans) # hide
 nothing # hide
@@ -195,7 +186,7 @@ model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convec
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 
-humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
+humid = get_step(simulation.variables.grid.humidity)[:, end]       # end: surface layer
 heatmap(humid, title="No convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_noconvection.png", ans) # hide
 nothing # hide
@@ -212,19 +203,19 @@ And the comparison looks like
 using SpeedyWeather
 
 # components
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-large_scale_condensation = ImplicitCondensation(spectral_grid, snow=false)
-convection = SimplifiedBettsMiller(spectral_grid)
+spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+large_scale_condensation = ImplicitCondensation(spectral_grid, snow = false)
+convection = BettsMillerConvection(spectral_grid)
 
 # create model, initialize, run
 model = PrimitiveWetModel(spectral_grid; large_scale_condensation, convection)
 simulation = initialize!(model)
-run!(simulation, period=Day(10))
+run!(simulation, period = Day(10))
 nothing # hide
 ```
 
 We run the default `PrimitiveWetModel` with `ImplicitCondensation` as large-scale condensation
-(see [Implicit large-scale condensation](@ref)) and the `SimplifiedBettsMiller`
+(see [Implicit large-scale condensation](@ref)) and the `BettsMillerConvection`
 for convection (see [Simplified Betts-Miller](@ref BettsMiller)). These schemes
 have some additional parameters, we leave them as default for now, but you could
 do `ImplicitCondensation(spectral_grid, relative_humidity_threshold = 0.8)` to
@@ -232,12 +223,12 @@ let it rain at 80% instead of 100% relative humidity. We now want to analyse
 the precipitation that comes from these parameterizations.
 
 Note that the following only considers liquid precipitation for simplicity.
-We set `snow=false` in `ImplicitCondensation` and therefore deal with rain only.
+We set `snow = false` in `ImplicitCondensation` and therefore deal with rain only.
 
 ```@example precipitation
 using CairoMakie
 
-(; rain_large_scale, rain_convection) = simulation.diagnostic_variables.physics
+(; rain_large_scale, rain_convection) = simulation.variables.parameterizations
 m2mm = 1000     # convert from [m] to [mm]
 heatmap(m2mm*rain_large_scale, title="Large-scale precipiation (rain) [mm]: Accumulated over 10 days", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
@@ -246,7 +237,7 @@ nothing # hide
 ![Large-scale precipitation](large-scale_precipitation_acc.png)
 
 Precipitation (rain, both large-scale and convective) are written into the
-`simulation.diagnostic_variables.physics` which, however, accumulate all precipitation
+`simulation.variables.parameterizations` which, however, accumulate all precipitation
 during simulation. In the NetCDF output, precipitation rate (in mm/hr) is calculated
 from accumulated precipitation as a post-processing step.
 More interactively, you can also reset these accumulators and integrate for another 6 hours
@@ -254,8 +245,8 @@ to get the precipitation only in that period.
 
 ```@example precipitation
 # reset accumulators and simulate 6 hours
-simulation.diagnostic_variables.physics.rain_large_scale .= 0
-simulation.diagnostic_variables.physics.rain_convection .= 0
+simulation.variables.parameterizations.rain_large_scale .= 0
+simulation.variables.parameterizations.rain_convection .= 0
 run!(simulation, period=Hour(6))
 
 # visualise, rain_* arrays are flat copies, no need to read them out again!

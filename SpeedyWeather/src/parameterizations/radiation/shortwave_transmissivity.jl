@@ -1,0 +1,144 @@
+abstract type AbstractShortwaveTransmissivity <: AbstractShortwave end
+
+export TransparentShortwaveTransmissivity
+TransparentShortwaveTransmissivity(SG::SpectralGrid) = ConstantShortwaveTransmissivity(SG, transmissivity = 1)
+
+export ConstantShortwaveTransmissivity
+
+"""Constant transmissivity for the shortwave, weighted by pressure thickness per layer. ($TYPEDFIELDS)"""
+@parameterized @kwdef struct ConstantShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
+    "[OPTION] Transmissivity of the whole atmosphere (0 .. 1)"
+    @param transmissivity::NF = 0.85 (bounds = 0 .. 1,)
+end
+Adapt.@adapt_structure ConstantShortwaveTransmissivity
+ConstantShortwaveTransmissivity(SG::SpectralGrid; kwargs...) = ConstantShortwaveTransmissivity{SG.NF}(; kwargs...)
+initialize!(::ConstantShortwaveTransmissivity, ::AbstractModel) = nothing
+
+@propagate_inbounds function transmissivity!(
+        ij,
+        vars,
+        clouds,
+        CST::ConstantShortwaveTransmissivity,
+        model,
+    )
+    t = vars.scratch.grid.a
+    nlayers = size(t, 2)
+
+    τ = -log(CST.transmissivity)            # total optical depth of the atmosphere
+    coord = model.geometry.vertical_coordinates
+    pₛ = vars.parameterizations.surface_pressure[ij]
+
+    for k in 1:nlayers
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        t[ij, k] = exp(-τ * Δσₖ)            # transmissivity through layer k
+    end
+    return t
+end
+
+export BackgroundShortwaveTransmissivity
+
+"""BackgroundShortwaveTransmissivity <: AbstractShortwaveTransmissivity
+$(TYPEDFIELDS)."""
+@parameterized @kwdef struct BackgroundShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
+    "[OPTION] Zenith correction amplitude (SPEEDY azen) [1]"
+    @param zenith_amplitude::NF = 1 (bounds = Nonnegative,)
+
+    "[OPTION] Zenith correction exponent (SPEEDY nzen)"
+    @param zenith_exponent::NF = 2 (bounds = Nonnegative,)
+
+    # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absdry, fband weights)
+    "[OPTION] Absorptivity of dry air [per 10^5 Pa]"
+    @param absorptivity_dry_air::NF = 0.03135 (bounds = Nonnegative,)
+
+    "[OPTION] Constant aerosol concentration?"
+    aerosols::Bool = true
+
+    "[OPTION] Absorptivity of aerosols [per 10^5 Pa]"
+    # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absaer, fband weights)
+    @param absorptivity_aerosol::NF = 0.03135 (bounds = Nonnegative,)
+
+    # Weighted visible + near-IR: 0.95*0.022 + 0.05*15.0*0.2 = 0.171 per g/kg → 1.7e-4 per kg/kg (SPEEDY abswv1, abswv2)
+    # Value chosen following PR #974 for a ~75W/m^2 shortwave absorption target
+    "[OPTION] Absorptivity of water vapor [per kg/kg per 10^5 Pa]"
+    @param absorptivity_water_vapor::NF = 75 (bounds = Nonnegative,)
+
+    # Weighted visible band: 0.95*0.015 = 0.014 per g/kg → 1.4e-5 per kg/kg (SPEEDY abscl1)
+    "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
+    @param absorptivity_cloud_base::NF = 10 (bounds = Nonnegative,)
+
+    # Weighted one-band scaling: 0.95*0.15 = 0.1425 → rounded to 0.14 (SPEEDY abscl2)
+    "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
+    @param absorptivity_cloud_limit::NF = 0.14 (bounds = Nonnegative,)
+end
+
+Adapt.@adapt_structure BackgroundShortwaveTransmissivity
+BackgroundShortwaveTransmissivity(SG::SpectralGrid; kwargs...) = BackgroundShortwaveTransmissivity{SG.NF}(; kwargs...)
+initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
+
+@propagate_inbounds function transmissivity!(
+        ij,
+        vars,
+        clouds,    # NamedTuple from clouds!
+        transmissivity::BackgroundShortwaveTransmissivity,
+        model,
+    )
+
+    # use scratch array for transmissivity t
+    t = vars.scratch.grid.a
+    NF = eltype(t)
+
+    (;
+        absorptivity_dry_air, absorptivity_aerosol, absorptivity_water_vapor,
+        absorptivity_cloud_base, absorptivity_cloud_limit,
+    ) = transmissivity
+    (; cloud_top, cloud_cover) = clouds
+
+    humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, transmissivity)
+    cos_zenith = vars.parameterizations.cos_zenith[ij]
+    nlayers = size(t, 2)
+
+    coord = model.geometry.vertical_coordinates
+    pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
+    normalized_surface_pressure = pₛ / 100000
+
+    # Zenith angle correction factor
+    azen = transmissivity.zenith_amplitude
+    nzen = transmissivity.zenith_exponent
+    zenith_factor = 1 + azen * (1 - cos_zenith)^nzen
+
+    # Cloud absorption term based on cloud base humidity (SPEEDY logic)
+    q_base = nlayers > 1 ? humid[ij, nlayers - 1] : humid[ij, nlayers]
+    cloud_absorptivity_term = min(
+        absorptivity_cloud_base * q_base,
+        absorptivity_cloud_limit
+    )
+
+    for k in 1:nlayers
+        q = humid[ij, k]
+
+        # Aerosol factor: use mid-level sigma, squared (aerosol loading increases toward surface)
+        aerosol_factor = transmissivity.aerosols ? sigma(k, coord)^2 : zero(NF)
+
+        # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
+        layer_absorptivity = (
+            absorptivity_dry_air +
+                absorptivity_aerosol * aerosol_factor +
+                absorptivity_water_vapor * q
+        )
+
+        # Add cloud absorption below the final cloud top
+        if k >= cloud_top
+            layer_absorptivity += cloud_absorptivity_term * cloud_cover
+        end
+
+        # Compute differential optical depth with zenith correction
+        # Normalize pressure to 1e5 Pa since absorptivities are per 1e5 Pa
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        optical_depth = layer_absorptivity * Δσₖ * normalized_surface_pressure * zenith_factor
+
+        # Transmissivity through layer k
+        t[ij, k] = exp(-optical_depth)
+    end
+
+    return t
+end

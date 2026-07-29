@@ -13,7 +13,7 @@ Humidity, for example, is an _active_ tracer as it changes the [Geopotential](@r
 (and therefore the pressure gradient force) through the [Virtual temperature](@ref).
 A tracer is conserved in the absence of sources or sinks (the zero on the right-hand side above).
 Aerosols from wildfires might be considered to be a passive tracer, but the
-source term should increase the aerosol concentration whereever and whenever there is 
+source term should increase the aerosol concentration wherever and whenever there is
 a wildfire. And also a sink term should be added representing aerosols being washed out
 in rainfall, or deposited on the ground. However, aerosols should be considered
 _active_ and not _passive_ if they influence the radiation and hence the temperature
@@ -23,11 +23,11 @@ tracer is passive, but if a forcing or parameterization is defined that depends
 on the tracer it becomes active, affecting the flow. A tracer definition
 in itself therefore does not make distinction between active or passive
 tracers but a forcing/parameterization definition can make existing tracers
-active. 
+active.
 
 # Eulerian advection
 
-Numerically we solve ``Dq/Dt`` as 
+Numerically we solve ``Dq/Dt`` as
 
 ```math
 \frac{\partial q}{\partial t} = -\nabla\cdot(\mathbf{u}q) + q\mathcal{D} - W(q)
@@ -74,39 +74,25 @@ Tracers are just defined through their `key`, e.g. `:co2`, so while you can do
 the same tracer -- and no two tracers with the same key can exist inside `model`
 (and `simulation`).
 
-You can also add a tracer to a `simulation`, i.e. after the model is initialized.
+What you should not do is add a tracer to the `model` _after_ it has been initialized,
+as this would leave it without its required variables that are allocated at
+`initialize!(model)`.
+You can check that the tracers exists in the variables with
 
 ```@example tracers
 simulation = initialize!(model)
-add!(simulation, Tracer(:xyz))
+simulation.variables
 ```
 
-which will add the tracer to `model.tracers` as above but also add
-it to the prognostic and diagnostic variables (otherwise done at `initialize!`).
-There is no difference between adding a tracer to model versus adding it
-to the simulation. Conceptually, the existence of a tracer should be
-defined in `model` in the same way as `PrimitiveWetModel` defines the existence
-of humidity as an (active) tracer. But for convenience and the ability
-to add (or remove) a tracer at any time it is also possible to add
-a tracer to `simulation` (which will add it to the `model`, and the variables, too).
+Note that the tracer appear in several arrays, in the prognostic variables,
+a tendency and so on.
 
-What you should not do is add a tracer to the `model` _after_ it has been initialized.
-Then you end up with an additional tracer in `model` without there
-being variables for it, throwing an error. You can check that
-the tracers exists in the variables with
-
-```@example tracers
-simulation.prognostic_variables
-```
-
-where both `:abc` and `:xyz` are listed. Tracers in SpeedyWeather are
-based on dictionaries so the order of the tracers is arbitrary,
-they are always defined by their `key` instead.
-
-Note that a tracer can be added to or deleted from a simulation at _any time_.
-So you can run a simulation, add a tracer, continute the simulation,
-or delete a tracer and continue. You can also just activate them or
-deactivate them, see below.
+All tracers have to be added to the `model` before it is initialized to
+return the `simulation`. This is because that initialization determines
+all required variables and allocates them, after that `simulation.variables`
+is an immutable collection of (mutable) arrays. If you do want to start or
+pause a tracer advection at any time you have to activate or deactivate them,
+see below.
 
 ## (De)activate tracers
 
@@ -118,7 +104,7 @@ it also has a field `active` which can be changed any time.
 Do not confuse this with the discussion of active vs passive,
 categorising whether a tracer impacts the flow or not.
 Active versus deactivated here is solely used to describe
-whether its time evolution is temporarily "deactivated.
+whether its time evolution is (temporarily) _deactivated_.
 An activated tracer (the default) is advected,
 a deactivated tracer does not change in time
 (=frozen) but continues to exist and all its variables remain in place.
@@ -136,15 +122,17 @@ i.e. `activate!(simulation, Tracer(:abc))`.
 ## Set tracers
 
 Tracers can be set to values by using the `set!` function, which
-can take scalars, fields (spectral or grid) or functions as arguments,
+can take scalars, fields (spectral or grid) or functions as arguments.
+But note that tracers are placed in the namespace `tracer` which
+you have to pass on as a keyword argument (see [Setting variables](@ref))
 e.g.
 
 ```@example tracers
-set!(simulation, abc=1)
+set!(simulation, abc = 1, namespace = :tracers)
 
 (; GridVariable3D, nlat_half, nlayers) = spectral_grid
-set!(simulation, abc=randn(GridVariable3D, nlat_half, nlayers))
-set!(simulation, abc=(λ, φ, σ) -> exp(-(λ-180)^2/10^2))
+set!(simulation, abc=randn(GridVariable3D, nlat_half, nlayers), namespace = :tracers)
+set!(simulation, abc=(λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespace = :tracers)
 ```
 
 The first one sets `abc` to a global constant (not super exciting),
@@ -166,18 +154,18 @@ Let us illustrate some tracer advection in practice
 
 ```@example tracers
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=85, nlayers=1)
+spectral_grid = SpectralGrid(trunc = 85, nlayers = 1)
 model = ShallowWaterModel(spectral_grid)
+add!(model, Tracer(:abc))
 simulation = initialize!(model)
 
 # add and set tracer and run a 0-day simulation
-add!(simulation, Tracer(:abc))
-set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2))
-run!(simulation, period=Day(0))
+set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespace =:tracers)
+run!(simulation, period = Day(0))
 
 # visualise the initial conditions for this tracer
 using CairoMakie
-abc0 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
+abc0 = get_step(simulation.variables.grid.tracers.abc)[:, 1]
 
 heatmap(abc0, title="Tracer abc, initial conditions")
 save("tracer_abc.png", ans) # hide
@@ -187,14 +175,14 @@ nothing # hide
 
 So we started with a north-south stripe of some tracer.
 `[:, 1]` is used to pull out all values `:` on the one and only
-layer `1`.
+layer `1`, see [Step dimension](@ref)
 The `ShallowWaterModel` has by default a jet in the northern
 hemisphere which will advect that tracer, after some days:
 
 ```@example tracers
 run!(simulation, period=Day(3))
 
-abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
+abc1 = get_step(simulation.variables.grid.tracers.abc)[:, 1]
 heatmap(abc1, title="Tracer abc, after 3 days")
 save("tracer2.png", ans) # hide
 nothing # hide
@@ -204,4 +192,12 @@ nothing # hide
 
 ## Output tracers
 
-more to come...
+This follows equivalent to other [Output variables](@ref) but the
+tracer name as `Symbol` has to be provided
+
+```@example tracers
+add!(model, SpeedyWeather.TracerOutput(:abc))
+```
+
+and other keyword arguments like `long_name::String` and `units::String`
+can be passed on too. 
