@@ -2,9 +2,6 @@ module SpeedyTransformsEnzymeExt
 
 using Enzyme
 using Enzyme.EnzymeCore
-# `forward`, `reverse` and `augmented_primal` are NOT exported by EnzymeRules, so they have to be
-# imported explicitly to be extended. Defining e.g. `function forward(...)` without this import
-# silently creates a local function that Enzyme never calls, i.e. the rule is not registered.
 import .EnzymeRules: forward, reverse, augmented_primal
 using .EnzymeRules
 
@@ -143,8 +140,7 @@ end
 # Both the FFT and the full spectral transform are LINEAR in their input array, and `S` is inactive
 # geometry (see `inactive_type` above). The forward-mode tangent of a linear map is therefore the map
 # itself applied to the tangent: run the primal on `.val`, then the identical call on each tangent
-# `.dval`. This mirrors the analytic reverse rules below and keeps `transform!` a single AD boundary
-# in both modes — Enzyme never has to differentiate the chunk loop or `_legendre!` internals.
+# `.dval`. 
 
 # `nlayer`-th tangent of an annotated argument, `nothing` for inactive (Const) arguments.
 # Homogeneous-tuple indexing keeps this type stable for width > 1.
