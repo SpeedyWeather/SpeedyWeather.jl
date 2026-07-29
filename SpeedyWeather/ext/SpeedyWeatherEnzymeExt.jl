@@ -82,4 +82,60 @@ function EnzymeRules.forward(
     return EnzymeRules.needs_primal(config) ? primal : nothing
 end
 
+###
+# Enzyme FORWARD-mode rule for `reconstruct` on a model
+#
+# `reconstruct(model, p)` cannot be differentiated in forward mode: it is `@generated` and expands
+# to a `setproperties` over the entire model type, so the layout Enzyme has to flatten
+# the very complex model structre. Raising `Enzyme.API.maxtypeoffset!` also clears it (8192 is needed for
+# `PrimitiveWetModel`, 2048 is not), but that is a global that must be set before any
+# differentiation and only moves a threshold that drifts as the model type grows.
+#
+# The rule removes the dependence on type size, and is exact because `reconstruct` does NO
+# arithmetic: it is a pure structural scatter, where parameter-valued fields of the output come
+# from `values` and every other field comes from `obj`. It is therefore linear, and its tangent is
+# the same scatter over the tangents:
+#
+#     d/dε reconstruct(obj + ε·dobj, values + ε·dvalues) = reconstruct(dobj, dvalues)
+#
+# RESTRICTED TO `AbstractModel` ON PURPOSE. Enzyme aborts the process
+# ("Assertion failed: needsReRooting", FixupJuliaCallingConvention) one some comments with the rule (bug)
+
+# `b`-th tangent of an annotated argument. An inactive (Const) argument contributes a ZERO tangent,
+# which for a structural scatter means a zeroed copy — reusing the primal instead would leak primal
+# values into the shadow's non-parameter fields and corrupt downstream tangents.
+@inline _tangent(x::Union{Duplicated, DuplicatedNoNeed}, ::Int, _) = x.dval
+@inline _tangent(x::Union{BatchDuplicated, BatchDuplicatedNoNeed}, b::Int, _) = x.dval[b]
+@inline _tangent(::Const, ::Int, zeroed) = zeroed
+
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfig, func::Const{typeof(SpeedyWeather.reconstruct)}, ::Type{RT},
+        obj::Annotation{<:SpeedyWeather.AbstractModel}, values::Annotation,
+    ) where {RT <: Annotation}
+
+    # Each return path is written out separately, and `primal` is only bound on the path that uses
+    # it: binding it up front as `needs_primal(config) ? ... : nothing` would give it type
+    # `Union{Nothing, T}` and feed that Union into `Duplicated`.
+    if !EnzymeRules.needs_shadow(config)
+        return EnzymeRules.needs_primal(config) ? func.val(obj.val, values.val) : nothing
+    end
+
+    # zeroed stand-ins for inactive arguments, built once rather than per batch member
+    # (NOTE: `make_zero` on a whole model is not free; it is only paid when `obj` is Const)
+    zobj = obj isa Const ? Enzyme.make_zero(obj.val) : nothing
+    zval = values isa Const ? Enzyme.make_zero(values.val) : nothing
+
+    shadow = ntuple(
+        b -> func.val(_tangent(obj, b, zobj), _tangent(values, b, zval)),
+        Val(EnzymeRules.width(config)),      # Val so the width stays a compile-time constant
+    )
+
+    if !EnzymeRules.needs_primal(config)
+        return EnzymeRules.width(config) == 1 ? only(shadow) : shadow
+    end
+    primal = func.val(obj.val, values.val)
+    return EnzymeRules.width(config) == 1 ? Duplicated(primal, only(shadow)) :
+        BatchDuplicated(primal, shadow)
+end
+
 end

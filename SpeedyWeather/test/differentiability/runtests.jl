@@ -15,6 +15,7 @@ include("timestep_utils.jl")
 
 # TESTS
 include("speedy_transforms.jl")
+include("parameters.jl")
 include("barotropic.jl")
 include("primitivewet.jl")
 include("timestepping.jl")
