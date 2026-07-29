@@ -42,13 +42,6 @@ end
 # Build the shadow as a `deepcopy` (which preserves the view→fused-parent aliasing and all types),
 # then zero the differentiable data through the fuse parents / non-view leaves — the aliasing views
 # are zeroed automatically and keep their `SubArray` type, matching the primal.
-#
-# Every leaf must actually end up zero, including the transform scratch and scalar `Ref`s. For
-# REVERSE mode leaving the copied values in place is harmless (the shadow only accumulates, and
-# scratch is write-before-read), but in FORWARD mode the shadow IS the tangent, so a non-zero leaf
-# is a bogus tangent seed. `prognostic.scale` is the damaging one: it is read as
-# `scale = prognostic.scale[]` and multiplies the tendencies in `update_prognostic!`, so a shadow
-# carrying `dscale == scale` corrupts the whole JVP.
 function Enzyme.make_zero(prev::SpeedyWeather.Variables)
     z = deepcopy(prev)
     for group in SpeedyWeather.ALL_VARIABLE_GROUPS
