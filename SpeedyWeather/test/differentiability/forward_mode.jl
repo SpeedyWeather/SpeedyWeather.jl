@@ -10,7 +10,7 @@
 # question — a fixed-step central difference disagreed with the JVP by ~5e-3 there, but the two AD
 # modes agreed to ~1e-15 and a 9th-order FD rule converged onto the AD value.
 
-function _seed_prognostic!(shadow, vars0, seed)
+function _seed_prognostic!(shadow, vars0, seed) # seed only prognostic atmospheric variables with rms
     rng = Random.MersenneTwister(seed)
     n = 0
     for name in (:vorticity, :divergence, :temperature, :humidity, :pressure)
