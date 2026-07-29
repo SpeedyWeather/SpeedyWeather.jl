@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Forward mode differentiation of the whole model now works (in 1.10) [#1164](ttps://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1164)
+- Enzyme Forward rules for SpectralTransform [#767](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/767)
 - Revised EnzymeRules for SpeedyTransforms [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
 - Eliminate dynamic dispatchs in the model integration code and unit test for them with JET [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
 - ZarrOutput ensemble mode hardened for parallel jobs, Zarr store metadata consolidated at creation for faster opening [#1160](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1160)
@@ -209,7 +211,6 @@
 
 ## v0.17.2
 
-- Enzyme Forward rules for SpectralTransform [#767](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/767)
 - Expand scratch memory handling in spectral transforms for better differentiability with Enzyme and revise FFT plans [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
 - Increase version of RingGrids, LowerTriangularArrays and SpeedyTransforms to v0.1.1 [#875](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/875)
 - Pluto notebook example in README [#872](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/872/)

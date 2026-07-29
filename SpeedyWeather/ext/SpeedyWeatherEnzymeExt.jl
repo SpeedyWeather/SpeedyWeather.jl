@@ -2,6 +2,9 @@ module SpeedyWeatherEnzymeExt
 
 using SpeedyWeather
 using Enzyme
+using Enzyme.EnzymeCore                 # Annotation, Const, ...
+using Enzyme.EnzymeCore: Annotation
+import Enzyme.EnzymeCore.EnzymeRules    # `EnzymeRules.forward` is extended below (qualified)
 using SpeedyWeather.ProgressMeter
 
 # currently not needed anymore:
@@ -38,8 +41,7 @@ end
 #
 # Build the shadow as a `deepcopy` (which preserves the view→fused-parent aliasing and all types),
 # then zero the differentiable data through the fuse parents / non-view leaves — the aliasing views
-# are zeroed automatically and keep their `SubArray` type, matching the primal. Scratch/workspace and
-# scalar leaves keep their copied values (inactive / write-before-read, so harmless as a shadow).
+# are zeroed automatically and keep their `SubArray` type, matching the primal.
 function Enzyme.make_zero(prev::SpeedyWeather.Variables)
     z = deepcopy(prev)
     for group in SpeedyWeather.ALL_VARIABLE_GROUPS
@@ -53,6 +55,87 @@ _make_zero_view!(x::LowerTriangularArray) = SpeedyWeather.is_view_entry(x) || fi
 _make_zero_view!(x::SpeedyWeather.RingGrids.AbstractField) = SpeedyWeather.is_view_entry(x) || fill!(x.data, 0)
 _make_zero_view!(::SubArray) = nothing
 _make_zero_view!(x::AbstractArray) = eltype(x) <: Union{AbstractFloat, Complex} && fill!(x, 0)
+# the transform scratch is a plain struct, so it needs its own methods to be reached at all
+_make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ScratchMemory) =
+    (_make_zero_view!(x.north); _make_zero_view!(x.south); _make_zero_view!(x.column); nothing)
+_make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ColumnScratchMemory) =
+    (_make_zero_view!(x.north); _make_zero_view!(x.south); nothing)
+_make_zero_view!(x::Base.RefValue) = (x[] isa Number && (x[] = zero(x[])); nothing)
 _make_zero_view!(x) = nothing
+
+### 
+# TODO
+# Enzyme FORWARD-mode rule for iterating the tracer registry
+#
+# The time stepping iterates `model.tracers::TRACER_DICT` in 9 places (time_integration.jl,
+# time_stepping/transform.jl, horizontal_diffusion.jl, vertical_advection.jl, tendencies.jl).
+# Enzyme's forward mode fails with an internal error compiling `iterate(::Dict)` there, which
+# blocks `autodiff(Forward, time_step!, ...)` for every model.
+#
+# This is a temporary workaround that works for differnetiating the model in forward mode without tracers
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfig, func::Const{typeof(Base.iterate)}, ::Type{RT},
+        dict::Annotation{<:SpeedyWeather.TRACER_DICT}, args::Annotation...,
+    ) where {RT <: Annotation}
+    primal = func.val(dict.val, map(a -> a.val, args)...)
+    # the return holds only Symbol/Tracer, so no shadow is ever requested
+    return EnzymeRules.needs_primal(config) ? primal : nothing
+end
+
+###
+# Enzyme FORWARD-mode rule for `reconstruct` on a model
+#
+# `reconstruct(model, p)` cannot be differentiated in forward mode: it is `@generated` and expands
+# to a `setproperties` over the entire model type, so the layout Enzyme has to flatten
+# the very complex model structre. Raising `Enzyme.API.maxtypeoffset!` also clears it (8192 is needed for
+# `PrimitiveWetModel`, 2048 is not), but that is a global that must be set before any
+# differentiation and only moves a threshold that drifts as the model type grows.
+#
+# The rule removes the dependence on type size, and is exact because `reconstruct` does NO
+# arithmetic: it is a pure structural scatter, where parameter-valued fields of the output come
+# from `values` and every other field comes from `obj`. It is therefore linear, and its tangent is
+# the same scatter over the tangents:
+#
+#     d/dε reconstruct(obj + ε·dobj, values + ε·dvalues) = reconstruct(dobj, dvalues)
+#
+# RESTRICTED TO `AbstractModel` ON PURPOSE. Enzyme aborts the process
+# ("Assertion failed: needsReRooting", FixupJuliaCallingConvention) one some comments with the rule (bug)
+
+# `b`-th tangent of an annotated argument. An inactive (Const) argument contributes a ZERO tangent,
+# which for a structural scatter means a zeroed copy — reusing the primal instead would leak primal
+# values into the shadow's non-parameter fields and corrupt downstream tangents.
+@inline _tangent(x::Union{Duplicated, DuplicatedNoNeed}, ::Int, _) = x.dval
+@inline _tangent(x::Union{BatchDuplicated, BatchDuplicatedNoNeed}, b::Int, _) = x.dval[b]
+@inline _tangent(::Const, ::Int, zeroed) = zeroed
+
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfig, func::Const{typeof(SpeedyWeather.reconstruct)}, ::Type{RT},
+        obj::Annotation{<:SpeedyWeather.AbstractModel}, values::Annotation,
+    ) where {RT <: Annotation}
+
+    # Each return path is written out separately, and `primal` is only bound on the path that uses
+    # it: binding it up front as `needs_primal(config) ? ... : nothing` would give it type
+    # `Union{Nothing, T}` and feed that Union into `Duplicated`.
+    if !EnzymeRules.needs_shadow(config)
+        return EnzymeRules.needs_primal(config) ? func.val(obj.val, values.val) : nothing
+    end
+
+    # zeroed stand-ins for inactive arguments, built once rather than per batch member
+    # (NOTE: `make_zero` on a whole model is not free; it is only paid when `obj` is Const)
+    zobj = obj isa Const ? Enzyme.make_zero(obj.val) : nothing
+    zval = values isa Const ? Enzyme.make_zero(values.val) : nothing
+
+    shadow = ntuple(
+        b -> func.val(_tangent(obj, b, zobj), _tangent(values, b, zval)),
+        Val(EnzymeRules.width(config)),      # Val so the width stays a compile-time constant
+    )
+
+    if !EnzymeRules.needs_primal(config)
+        return EnzymeRules.width(config) == 1 ? only(shadow) : shadow
+    end
+    primal = func.val(obj.val, values.val)
+    return EnzymeRules.width(config) == 1 ? Duplicated(primal, only(shadow)) :
+        BatchDuplicated(primal, shadow)
+end
 
 end
