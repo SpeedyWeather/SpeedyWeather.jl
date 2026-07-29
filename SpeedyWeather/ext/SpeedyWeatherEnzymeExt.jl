@@ -2,6 +2,9 @@ module SpeedyWeatherEnzymeExt
 
 using SpeedyWeather
 using Enzyme
+using Enzyme.EnzymeCore                 # Annotation, Const, ...
+using Enzyme.EnzymeCore: Annotation
+import Enzyme.EnzymeCore.EnzymeRules    # `EnzymeRules.forward` is extended below (qualified)
 using SpeedyWeather.ProgressMeter
 
 # currently not needed anymore:
@@ -38,8 +41,14 @@ end
 #
 # Build the shadow as a `deepcopy` (which preserves the view→fused-parent aliasing and all types),
 # then zero the differentiable data through the fuse parents / non-view leaves — the aliasing views
-# are zeroed automatically and keep their `SubArray` type, matching the primal. Scratch/workspace and
-# scalar leaves keep their copied values (inactive / write-before-read, so harmless as a shadow).
+# are zeroed automatically and keep their `SubArray` type, matching the primal.
+#
+# Every leaf must actually end up zero, including the transform scratch and scalar `Ref`s. For
+# REVERSE mode leaving the copied values in place is harmless (the shadow only accumulates, and
+# scratch is write-before-read), but in FORWARD mode the shadow IS the tangent, so a non-zero leaf
+# is a bogus tangent seed. `prognostic.scale` is the damaging one: it is read as
+# `scale = prognostic.scale[]` and multiplies the tendencies in `update_prognostic!`, so a shadow
+# carrying `dscale == scale` corrupts the whole JVP.
 function Enzyme.make_zero(prev::SpeedyWeather.Variables)
     z = deepcopy(prev)
     for group in SpeedyWeather.ALL_VARIABLE_GROUPS
@@ -53,6 +62,31 @@ _make_zero_view!(x::LowerTriangularArray) = SpeedyWeather.is_view_entry(x) || fi
 _make_zero_view!(x::SpeedyWeather.RingGrids.AbstractField) = SpeedyWeather.is_view_entry(x) || fill!(x.data, 0)
 _make_zero_view!(::SubArray) = nothing
 _make_zero_view!(x::AbstractArray) = eltype(x) <: Union{AbstractFloat, Complex} && fill!(x, 0)
+# the transform scratch is a plain struct, so it needs its own methods to be reached at all
+_make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ScratchMemory) =
+    (_make_zero_view!(x.north); _make_zero_view!(x.south); _make_zero_view!(x.column); nothing)
+_make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ColumnScratchMemory) =
+    (_make_zero_view!(x.north); _make_zero_view!(x.south); nothing)
+_make_zero_view!(x::Base.RefValue) = (x[] isa Number && (x[] = zero(x[])); nothing)
 _make_zero_view!(x) = nothing
+
+### 
+# TODO
+# Enzyme FORWARD-mode rule for iterating the tracer registry
+#
+# The time stepping iterates `model.tracers::TRACER_DICT` in 9 places (time_integration.jl,
+# time_stepping/transform.jl, horizontal_diffusion.jl, vertical_advection.jl, tendencies.jl).
+# Enzyme's forward mode fails with an internal error compiling `iterate(::Dict)` there, which
+# blocks `autodiff(Forward, time_step!, ...)` for every model.
+#
+# This is a temporary workaround that works for differnetiating the model in forward mode without tracers
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfig, func::Const{typeof(Base.iterate)}, ::Type{RT},
+        dict::Annotation{<:SpeedyWeather.TRACER_DICT}, args::Annotation...,
+    ) where {RT <: Annotation}
+    primal = func.val(dict.val, map(a -> a.val, args)...)
+    # the return holds only Symbol/Tracer, so no shadow is ever requested
+    return EnzymeRules.needs_primal(config) ? primal : nothing
+end
 
 end
