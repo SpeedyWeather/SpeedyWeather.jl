@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Column-based parametrizations are now multithreaded on CPU [#1032](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1032)
 - Revised EnzymeRules for SpeedyTransforms [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
 - Eliminate dynamic dispatchs in the model integration code and unit test for them with JET [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
 - ZarrOutput ensemble mode hardened for parallel jobs, Zarr store metadata consolidated at creation for faster opening [#1160](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1160)
