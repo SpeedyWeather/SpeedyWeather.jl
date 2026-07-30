@@ -266,9 +266,6 @@ function implicit_correction!(
     temp_step = which_tendency_step(temperature_tendency, time_stepping, implicit)
     pres_step = which_tendency_step(pressure_tendency, time_stepping, implicit)
     div_step = which_tendency_step(divergence_tendency, time_stepping, implicit)
-    G = vars.scratch.a                  # reuse work arrays, used for combined tendency G
-    geopotential = vars.scratch.b       # used for geopotential
-    geopotential .= 0
 
     # Get precomputed l_indices from the spectrum
     l_indices = temperature_tendency.spectrum.l_indices
@@ -276,15 +273,17 @@ function implicit_correction!(
     arch = architecture(temperature_tendency)
 
     # Single kernel: All implicit correction steps for each spectral mode.
-    # NOTE: nlayers is passed as `Val` so that the vertical loops below have a
-    # COMPILE-TIME trip count. With a runtime bound, LLVM keeps the real and
-    # imaginary parts of the ComplexF32 accumulators in separate registers and
-    # re-packs them into an i64 at every store (`shl`/`or`); This is a workaround 
+    # NOTE: nlayers is passed as `Val` so that the vertical loops in the kernel have a
+    # COMPILE-TIME trip count, which the `ntuple`s holding the intermediate geopotential
+    # and G columns require. Those two intermediates used to be written to scratch arrays;
+    # keeping them in registers is what makes this kernel differentiable on Julia 1.12,
+    # where storing a ComplexF32 accumulator packs its real and imaginary halves into an
+    # i64 (`shl`/`or disjoint`) that Enzyme has no reverse rule for. Workaround for
     # https://github.com/EnzymeAD/Enzyme.jl/issues/3411
     launch!(
         arch, LinearWorkOrder, (size(pressure_tendency, 1),),
         implicit_primitive_leapfrog_kernel!,
-        temperature_tendency, pressure_tendency, divergence_tendency, G, geopotential,
+        temperature_tendency, pressure_tendency, divergence_tendency,
         divergence, temp_step, pres_step, div_step,
         S⁻¹, R, U, L, W, l_indices, ξ, Val(nlayers)
     )
@@ -294,7 +293,7 @@ end
 
 # Single kernel that does all steps for one spectral mode
 @kernel inbounds = true function implicit_primitive_leapfrog_kernel!(
-        temp_tend, pres_tend, div_tend, G, geopotential,
+        temp_tend, pres_tend, div_tend,
         divergence, temp_step, pres_step, div_step,
         S⁻¹, R, U, L, W, l_indices,
         ξ, ::Val{nlayers}
@@ -314,31 +313,31 @@ end
         temp_tend[lm, k, temp_step] += temp_tend_val
     end
 
-    for k in 1:nlayers
-        # skip 1:k-1 as integration is surface to k
-        geopotential_val = zero(eltype(geopotential))
-        for r in k:nlayers
-            geopotential_val += R[k, r] * temp_tend[lm, r, temp_step]
-        end
-        geopotential[lm, k] = geopotential_val
-    end
-
     eigenvalue = -l * (l - 1)  # 1-based, -l*(l+1) → -l*(l-1)
 
     # Step 2: Calculate the ξ*R*G_T term, vertical integration of geopotential
-    # (excl ξ, this is done in step 3)
+    # (excl ξ, this is done in step 3). Held in an `ntuple` (registers) rather than a
+    # scratch array, see the note at the launch site.
+    geopotential = ntuple(Val(nlayers)) do k
+        # skip 1:k-1 as integration is surface to k
+        geopotential_val = zero(eltype(temp_tend))
+        for r in k:nlayers
+            geopotential_val += R[k, r] * temp_tend[lm, r, temp_step]
+        end
+        geopotential_val
+    end
 
     # Step 3: Calculate the G = G_D + ξRG_T + ξUG_lnps terms
     # ∇² not part of U so *eigenvalues here
-    for k in 1:nlayers
-        G[lm, k] = div_tend[lm, k, div_step] + ξ * eigenvalue * (U[k] * pres_tend[lm, pres_step] + geopotential[lm, k])
+    G = ntuple(Val(nlayers)) do k
+        div_tend[lm, k, div_step] + ξ * eigenvalue * (U[k] * pres_tend[lm, pres_step] + geopotential[k])
     end
 
     # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
     for k in 1:nlayers
         div_val = zero(eltype(div_tend))
         for r in 1:nlayers
-            div_val += S⁻¹[l, k, r] * G[lm, r]
+            div_val += S⁻¹[l, k, r] * G[r]
         end
         div_tend[lm, k, div_step] = div_val
     end
