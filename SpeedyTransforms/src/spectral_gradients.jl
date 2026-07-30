@@ -395,7 +395,7 @@ function ∇²!(
     @boundscheck ismatching(S, ∇²alms) || throw(DimensionMismatch(S, ∇²alms))
 
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
-    eigenvalues = inverse ? S.gradients.eigenvalues⁻¹ : S.gradients.eigenvalues
+    eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
 
     launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, add, flipsign, alms.spectrum.l_indices)
 
