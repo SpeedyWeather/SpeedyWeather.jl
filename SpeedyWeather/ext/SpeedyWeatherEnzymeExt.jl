@@ -91,9 +91,14 @@ function EnzymeRules.augmented_primal(
         dict::Annotation{<:SpeedyWeather.TRACER_DICT}, args::Annotation...,
     ) where {RT <: Annotation}
     primal = func.val(dict.val, map(a -> a.val, args)...)
-    return EnzymeRules.AugmentedReturn(
-        EnzymeRules.needs_primal(config) ? primal : nothing, nothing, nothing,
-    )
+    # `iterate` returns `Union{Nothing, Tuple{Pair{Symbol, Tracer}, Int}}`, so the type parameters
+    # have to be pinned explicitly: letting the constructor infer them from the value splits the
+    # return into a Union of two `AugmentedReturn` types, which `primal_type` cannot resolve.
+    return if EnzymeRules.needs_primal(config)
+        EnzymeRules.AugmentedReturn{eltype(RT), Nothing, Nothing}(primal, nothing, nothing)
+    else
+        EnzymeRules.AugmentedReturn{Nothing, Nothing, Nothing}(nothing, nothing, nothing)
+    end
 end
 
 function EnzymeRules.reverse(
