@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- Forward mode differentiation of the whole model now works (in 1.10) [#1164](ttps://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1164)
+- Enable nested AD on CPU by shortening type name of `SpectralTransform`, e.g. by converting the gradient arrays into a type `Gradient` instead of a `NamedTuple` [#1165](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1165)
+- Forward mode differentiation of the whole model now works (in 1.10) [#1164](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1164)
+- Enzyme forward rule for `reconstruct` on an `AbstractModel` in `SpeedyWeatherEnzymeExt`, so forward mode over model parameters no longer overruns Enzyme's type-analysis size budget [#1164](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1164)
+- `make_zero(::Variables)` now zeroes the transform scratch and scalar `Ref`s too, which forward mode requires (the shadow is the tangent there) [#1164](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1164)
 - Enzyme Forward rules for SpectralTransform [#767](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/767)
 - Revised EnzymeRules for SpeedyTransforms [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
 - Eliminate dynamic dispatchs in the model integration code and unit test for them with JET [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
