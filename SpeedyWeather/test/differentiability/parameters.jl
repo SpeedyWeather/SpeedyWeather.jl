@@ -89,3 +89,42 @@ end
     dmodel = make_zero(model)
     @test autodiff(set_runtime_activity(Forward), readout, Duplicated, Duplicated(model, dmodel), Duplicated(p, dp2))[1] ≈ 2.5
 end
+
+@testset "Reverse-mode reconstruct on $(nameof(MT))" for (MT, nlayers) in
+        ((BarotropicModel, 1), (PrimitiveWetModel, 2))
+
+    spectral_grid = SpectralGrid(; trunc = 8, nlayers, NF = Float64)
+    model = MT(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
+    p = vec(parameters(model))
+
+    # reading one parameter back out has gradient e_{drag.c}: exactly 1 there, exactly 0 elsewhere
+    readout(m, q) = SpeedyWeather.reconstruct(m, q).drag.c
+    let dp = zero(p)
+        autodiff(set_runtime_activity(Reverse), readout, Active, Const(model), Duplicated(p, dp))
+        @test dp.drag.c ≈ 1
+        # no leakage into any other parameter
+        @test sum(abs2, vec(dp)) - dp.drag.c^2 ≈ 0 atol = 1.0e-20
+    end
+
+    # an active model shadow exercises the aliasing path in the rule (the output shadow's
+    # non-parameter fields alias `obj`'s shadow) and must give the same gradient
+    let dp = zero(p), dmodel = make_zero(model)
+        autodiff(set_runtime_activity(Reverse), readout, Active, Duplicated(model, dmodel), Duplicated(p, dp))
+        @test dp.drag.c ≈ 1
+    end
+
+    # a readout mixing several parameters recovers each coefficient independently
+    mixed(m, q) = (mm = SpeedyWeather.reconstruct(m, q); 3 * mm.drag.c + 2 * mm.planet.gravity)
+    let dp = zero(p)
+        autodiff(set_runtime_activity(Reverse), mixed, Active, Const(model), Duplicated(p, dp))
+        @test dp.drag.c ≈ 3
+        @test dp.planet.gravity ≈ 2
+    end
+
+    # the rule must ACCUMULATE into a pre-seeded cotangent, not overwrite it
+    let dp = zero(p)
+        dp.drag.c = 10
+        autodiff(set_runtime_activity(Reverse), readout, Active, Const(model), Duplicated(p, dp))
+        @test dp.drag.c ≈ 11
+    end
+end

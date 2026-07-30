@@ -138,4 +138,56 @@ function EnzymeRules.forward(
         BatchDuplicated(primal, shadow)
 end
 
+### REVERSE-mode rule for `reconstruct` on a model
+#
+# Needed for NESTED AD (reverse over forward): once a function carries a custom rule, Enzyme looks
+# one up for whichever mode is running, so the forward rule above has to be matched by a reverse
+# one. Plain single-mode reverse over `reconstruct` works without any rule and is unchanged by this.
+#
+# The pullback follows from `reconstruct` being a structural scatter. For each field of the output:
+#   * a parameter-valued field comes from `values` -> its cotangent belongs to `values`
+#   * every other field comes from `obj`           -> its cotangent belongs to `obj`
+#
+# The non-parameter fields are copied BY REFERENCE (`setproperties` shares the arrays), so building
+# the output shadow as `reconstruct(obj.dval, <zeroed values>)` makes those fields alias `obj`'s own
+# shadow: anything the caller accumulates into them lands in `obj.dval` directly, with no explicit
+# adjoint accumulation and no extra allocation. That leaves only the scalar parameter slots, which
+# are stored by value and so must be gathered explicitly in `reverse` — `parameters(shadow)` reads
+# exactly those slots back out, in the same layout as `values`.
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfig, func::Const{typeof(SpeedyWeather.reconstruct)}, ::Type{RT},
+        obj::Annotation{<:SpeedyWeather.AbstractModel}, values::Annotation,
+    ) where {RT <: Annotation}
+
+    primal = func.val(obj.val, values.val)
+
+    shadow = if EnzymeRules.needs_shadow(config)
+        # alias obj's shadow for the non-parameter fields (see above); zero the parameter slots so
+        # they start from zero and accumulate
+        base = obj isa Const ? Enzyme.make_zero(obj.val) : obj.dval
+        func.val(base, Enzyme.make_zero(values.val))
+    else
+        nothing
+    end
+
+    # the shadow is also the tape: `reverse` reads the accumulated cotangent back out of it
+    return EnzymeRules.AugmentedReturn(
+        EnzymeRules.needs_primal(config) ? primal : nothing, shadow, shadow,
+    )
+end
+
+function EnzymeRules.reverse(
+        ::EnzymeRules.RevConfig, ::Const{typeof(SpeedyWeather.reconstruct)}, ::Type{RT}, tape,
+        obj::Annotation{<:SpeedyWeather.AbstractModel}, values::Annotation,
+    ) where {RT <: Annotation}
+
+    # gather the parameter slots of the output cotangent into the `values` cotangent. The obj
+    # cotangent needs nothing here: its non-parameter fields alias the shadow built above.
+    if !(values isa Const) && tape !== nothing
+        values.dval .+= vec(SpeedyWeather.parameters(tape))
+    end
+
+    return (nothing, nothing)
+end
+
 end
