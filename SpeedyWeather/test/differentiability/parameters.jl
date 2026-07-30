@@ -128,3 +128,45 @@ end
         @test dp.drag.c ≈ 11
     end
 end
+
+# The tracer-registry `iterate` rules (SpeedyWeatherEnzymeExt). The forward rule unblocks forward
+# mode (Enzyme fails with an internal error compiling `iterate(::Dict)`); the reverse rule exists
+# because a function carrying any custom rule must have one for whichever mode is running, which
+# NESTED AD (reverse over forward) needs. Iterating the registry yields only a `Symbol` name and a
+# `Tracer` config, so neither rule may contribute a derivative — the differentiable tracer data is
+# reached separately via `vars.*.tracers[name]`.
+@testset "Tracer registry iterate rules" begin
+    spectral_grid = SpectralGrid(trunc = 8, nlayers = 1, NF = Float64)
+    model = BarotropicModel(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
+
+    # sum over the registry, scaled by an active parameter: the loop must not add any derivative of
+    # its own, so d/dx is just (number of tracers) * 1 — 0 for an empty registry.
+    function count_tracers(m, x)
+        n = 0.0
+        for (name, tracer) in m.tracers
+            n += tracer.active ? 1.0 : 0.0
+        end
+        return n * x[1]
+    end
+
+    @test count_tracers(model, [2.0]) == 0          # default registry is empty
+    let dx = zeros(1)
+        autodiff(set_runtime_activity(Reverse), count_tracers, Active, Const(model), Duplicated([2.0], dx))
+        @test dx[1] ≈ 0                              # empty registry -> no contribution
+    end
+    let dx = zeros(1)
+        d = autodiff(set_runtime_activity(Forward), count_tracers, Duplicated, Const(model), Duplicated([2.0], [1.0]))[1]
+        @test d ≈ 0
+    end
+
+    # with tracers registered the loop count enters linearly, and both modes must agree on it
+    add!(model, Tracer(:tracer_a), Tracer(:tracer_b))
+    @test count_tracers(model, [1.0]) == 2
+    let dx = zeros(1)
+        autodiff(set_runtime_activity(Reverse), count_tracers, Active, Const(model), Duplicated([2.0], dx))
+        @test dx[1] ≈ 2                              # d/dx of 2x
+    end
+    let d = autodiff(set_runtime_activity(Forward), count_tracers, Duplicated, Const(model), Duplicated([2.0], [1.0]))[1]
+        @test d ≈ 2
+    end
+end
