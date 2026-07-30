@@ -82,6 +82,27 @@ function EnzymeRules.forward(
     return EnzymeRules.needs_primal(config) ? primal : nothing
 end
 
+# ...and the matching REVERSE rule. Reverse mode over the tracer loop works without any rule, but
+# once a function carries a custom rule Enzyme looks one up for whichever mode is running, so the
+# forward rule above has to be matched by a reverse one for NESTED AD to compile. The iteration
+# still carries no derivative, so the pullback is empty. This is just a temporary workaround.
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfig, func::Const{typeof(Base.iterate)}, ::Type{RT},
+        dict::Annotation{<:SpeedyWeather.TRACER_DICT}, args::Annotation...,
+    ) where {RT <: Annotation}
+    primal = func.val(dict.val, map(a -> a.val, args)...)
+    return EnzymeRules.AugmentedReturn(
+        EnzymeRules.needs_primal(config) ? primal : nothing, nothing, nothing,
+    )
+end
+
+function EnzymeRules.reverse(
+        ::EnzymeRules.RevConfig, ::Const{typeof(Base.iterate)}, ::Type{RT}, tape,
+        dict::Annotation{<:SpeedyWeather.TRACER_DICT}, args::Annotation...,
+    ) where {RT <: Annotation}
+    return ntuple(_ -> nothing, 1 + length(args))    # one entry per argument, no gradients
+end
+
 ###
 # Enzyme FORWARD-mode rule for `reconstruct` on a model
 #
