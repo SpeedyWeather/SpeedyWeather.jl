@@ -79,28 +79,33 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
 @inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractParticleAdvection, ::TwoDModels) = 1
 
-# copy prognostic variables' 1st step to 2nd, that way which_prognostic_step can always be 2
+# copy prognostic variables' 1st step to 2nd, that way which_prognostic_step can always be 2.
 function initialize!(vars::Variables, ::AbstractLeapfrog, ::AbstractModel)
     # time step variables are dynamically defined by existence in tendencies
-    # but statically compiled into the tendency_names function
-    (; prognostic) = vars
-    for varname in tendency_names(vars)
-        var_old, var_new = get_steps(getfield(prognostic, varname))
-        var_new .= var_old
-    end
-    for varname in tracer_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(prognostic.tracers, varname))
-        var_new .= var_old
-    end
-    for varname in ocean_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(prognostic.ocean, varname))
-        var_new .= var_old
-    end
-    for varname in land_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(prognostic.land, varname))
-        var_new .= var_old
-    end
+    # but statically compiled into the *_names generators shared with the drivers
+    initialize_steps_unrolled!(vars)
     return nothing
+end
+
+# copy step 1 -> step 2 for one variable; steps bound individually via get_step
+@inline function copy_step_forward!(var)
+    var_old = get_step(var, 1)
+    var_new = get_step(var, 2)
+    var_new .= var_old
+    return nothing
+end
+
+@generated function initialize_steps_unrolled!(vars::Variables{Po, G, T}) where {Po, G, T}
+    calls = Expr[]
+    for name in _tendency_names(T)
+        push!(calls, :(copy_step_forward!(getfield(vars.prognostic, $(QuoteNode(name))))))
+    end
+    for namespace in (:tracers, :ocean, :land), name in _namespace_names(T, namespace)
+        push!(calls, :(copy_step_forward!(
+            getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name)))
+        )))
+    end
+    return Expr(:block, calls..., :(return nothing))
 end
 
 # copy grid prognostics from 2nd to 1st step to retain these fields for the previous time step
@@ -113,20 +118,32 @@ function move_prognostic_grid_variables_back!(
     # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_grid` fuse parent.
     # Together these cover exactly `tendency_and_uv_names`, so a single contiguous copy from the
     # current step (2nd) to the previous step (1st) per fuse parent replaces the per-variable loop.
-    (; grid) = vars
     for fused in (vars.fused.grid, vars.fused.uv_grid)
-        var_old, var_new = get_steps(parent(fused))
-        var_old .= var_new
+        copy_step_back!(parent(fused))
     end
-    # tracers, ocean and land grid variables are not part of the atmospheric fuse — copy per-variable
-    for varname in tracer_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(grid.tracers, varname))
-        var_old .= var_new
-    end
+    # tracers, ocean and land grid variables are not part of the atmospheric fuse — copy
+    # per-variable, unrolled per name (literal-Symbol getfield; steps bound individually)
+    move_grid_tracers_back!(vars)
     # does not have to be done for ocean/land as they don't have spectral variables
     # the grid variables are already in prognostic and the time stepper takes care
     # of moving them back during the update
     return nothing
+end
+
+# copy step 2 -> step 1 for one variable (retain current step as the previous one);
+@inline function copy_step_back!(var)
+    var_old = get_step(var, 1)
+    var_new = get_step(var, 2)
+    var_old .= var_new
+    return nothing
+end
+
+@generated function move_grid_tracers_back!(vars::Variables{Po, G, T}) where {Po, G, T}
+    calls = [
+        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name)))))
+            for name in _namespace_names(T, :tracers)
+    ]
+    return Expr(:block, calls..., :(return nothing))
 end
 
 # for leapfrog do first semi-implicit corrections then horizontal diffusion
