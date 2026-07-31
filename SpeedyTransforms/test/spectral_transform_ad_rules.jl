@@ -287,6 +287,62 @@ fourier_synthesis!(field, f_north, f_south, S) =
             @test all(iszero, dfield)
         end
     end
+    # The reverse rules end with `make_zero!` on their output cotangent, which is correct for a
+    # plain array: the primal overwrites that argument, so its input-side cotangent is zero (the
+    # `test_reverse` checks above pin exactly that against finite differences).
+    #
+    # In SpeedyWeather the transform arguments are NOT plain arrays — they are views into a shared
+    # "fused" parent buffer that several variables live in. Zeroing then reaches beyond the slice
+    # this call overwrote. These tests exercise that layout directly, which the plain-array tests
+    # above cannot: they check that a cotangent parked in a DISJOINT slice of the same parent
+    # survives a transform on a neighbouring slice, and that the transform's own slice still
+    # pulls back correctly.
+    @testset "reverse rules on view-backed (fused) arrays" begin
+        trunc = 5
+        spectrum = Spectrum(trunc, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[1]))
+        NL = 2
+        S = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1, NL])
+
+        # one parent buffer holding two independent layer-slices, as the fused variables do
+        spec_parent = rand(ComplexF32, spectrum, 2NL)
+        grid_parent = rand(Float32, grid, 2NL)
+        spec_a = wrapped_view(spec_parent, :, 1:NL)         # the transform's argument
+        spec_b = wrapped_view(spec_parent, :, (NL + 1):2NL) # a neighbour that must be left alone
+        field_a = wrapped_view(grid_parent, :, 1:NL)
+        field_b = wrapped_view(grid_parent, :, (NL + 1):2NL)
+
+        # spec -> grid: cotangent on the neighbouring grid slice must survive
+        let dspec = make_zero(spec_parent), dgrid = make_zero(grid_parent)
+            dfield_b = wrapped_view(dgrid, :, (NL + 1):2NL)
+            fill!(dfield_b.data, 1)                        # mark the neighbour's cotangent
+            marker = copy(dfield_b.data)
+            autodiff(
+                set_runtime_activity(Reverse), transform!, Const,
+                Duplicated(field_a, wrapped_view(dgrid, :, 1:NL)),
+                Duplicated(spec_a, wrapped_view(dspec, :, 1:NL)),
+                Const(deepcopy(S.scratch_memory)), Const(S),
+            )
+            @test wrapped_view(dgrid, :, (NL + 1):2NL).data == marker   # neighbour untouched
+            @test any(!iszero, wrapped_view(dspec, :, 1:NL).data)       # own slice pulled back
+        end
+
+        # grid -> spec: same, with the roles swapped
+        let dspec = make_zero(spec_parent), dgrid = make_zero(grid_parent)
+            dspec_b = wrapped_view(dspec, :, (NL + 1):2NL)
+            fill!(dspec_b.data, 1 + im)
+            marker = copy(dspec_b.data)
+            autodiff(
+                set_runtime_activity(Reverse), transform!, Const,
+                Duplicated(spec_a, wrapped_view(dspec, :, 1:NL)),
+                Duplicated(field_a, wrapped_view(dgrid, :, 1:NL)),
+                Const(deepcopy(S.scratch_memory)), Const(S),
+            )
+            @test wrapped_view(dspec, :, (NL + 1):2NL).data == marker   # neighbour untouched
+            @test any(!iszero, wrapped_view(dgrid, :, 1:NL).data)       # own slice pulled back
+        end
+    end
+
     @testset "Complete Transform ChainRules" begin
         # WIP
     end

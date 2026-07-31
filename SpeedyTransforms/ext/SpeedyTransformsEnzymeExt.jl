@@ -87,9 +87,10 @@ function reverse(
     _fourier!(dgridval, f_north.dval ./ scale, f_south.dval ./ scale, S.val) # inverse FFT (w/o normalization)
     grids.dval .+= dgridval
 
-    # no derivative wrt the f_north and f_south that were input because they are overwritten
-    make_zero!(f_north.dval)
-    make_zero!(f_south.dval)
+    # no derivative wrt the f_north and f_south that were input because they are overwritten.
+    # `fill!` and not `make_zero!`: because make_zero! would zero the whole fused buffer
+    fill!(f_north.dval, 0)
+    fill!(f_south.dval, 0)
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
@@ -128,8 +129,9 @@ function reverse(
     f_north.dval .+= scale .* dfnorthval
     f_south.dval .+= scale .* dfsouthval
 
-    # no derivative wrt the grids that were input because they are overwritten
-    make_zero!(grids.dval)
+    # no derivative wrt the grids that were input because they are overwritten.
+    # `fill!` on the view's data, not `make_zero!` on the whole parent — see above.
+    fill!(grids.dval.data, 0)
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
@@ -167,7 +169,7 @@ end
 # Enzyme asserted the derivative is not needed, so there is nothing to propagate.
 @inline function _linear_tangent!(op::F, dout, din, args...) where {F}
     dout === nothing && return nothing              # output inactive, nothing to propagate
-    din === nothing && return make_zero!(dout)      # input inactive ⇒ zero tangent
+    din === nothing && return fill!(dout.data, 0)   # input inactive ⇒ zero tangent (view-safe)
     op(dout, din, args...)
     return nothing
 end
@@ -184,8 +186,8 @@ function forward(
         dfield = _dval(field, b)
         dfnorth, dfsouth = _dval(f_north, b), _dval(f_south, b)
         if dfield === nothing                                               # inactive input ⇒ zero tangents
-            dfnorth === nothing || make_zero!(dfnorth)
-            dfsouth === nothing || make_zero!(dfsouth)
+            dfnorth === nothing || fill!(dfnorth, 0)    # view-safe, see the reverse rules
+            dfsouth === nothing || fill!(dfsouth, 0)
         elseif !(dfnorth === nothing || dfsouth === nothing)
             func.val(dfnorth, dfsouth, dfield, S.val)
         end
@@ -206,7 +208,7 @@ function forward(
         dfield = _dval(field, b)
         dfnorth, dfsouth = _dval(f_north, b), _dval(f_south, b)
         if dfnorth === nothing || dfsouth === nothing                       # inactive input ⇒ zero tangent
-            dfield === nothing || make_zero!(dfield)
+            dfield === nothing || fill!(dfield.data, 0)   # view-safe
         elseif dfield !== nothing
             func.val(dfield, dfnorth, dfsouth, S.val)
         end
@@ -327,7 +329,13 @@ function reverse(
         S::Union{Const, Duplicated, MixedDuplicated}, unscale_coslat::Const,
     )
     spec2grid_pullback!(coeffs.dval, field.dval, scratch.val, S.val; unscale_coslat = unscale_coslat.val)
-    make_zero!(field.dval)      # the output cotangent has been propagated to coeffs
+    # Zero the output cotangent: the primal OVERWRITES this argument, so its input-side cotangent is
+    # zero (pinned against finite differences by the `test_reverse` checks in the unit tests).
+    # `fill!(x.data, 0)` and NOT `make_zero!(x)`: these arguments are usually views into a fused
+    # parent buffer shared with other variables, and `make_zero!` zeroes the whole parent, wiping
+    # cotangents that belong to its neighbours. That silently made any reverse gradient seeded on a
+    # grid-space variable (e.g. `vars.grid.u`) come back identically zero.
+    fill!(field.dval.data, 0)
     return (nothing, nothing, nothing, nothing, nothing)
 end
 
@@ -348,7 +356,7 @@ function reverse(
         S::Union{Const, Duplicated, MixedDuplicated},
     )
     grid2spec_pullback!(field.dval, coeffs.dval, scratch.val, S.val)
-    make_zero!(coeffs.dval)     # the output cotangent has been propagated to field
+    fill!(coeffs.dval.data, 0)
     return (nothing, nothing, nothing, nothing)
 end
 

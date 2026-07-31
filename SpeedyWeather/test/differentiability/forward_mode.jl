@@ -72,4 +72,20 @@ end
     rhs = sum(to_vec(v)[1] .* to_vec(vjp)[1])       # <v, Jᵀ w>
     @test lhs != 0
     @test isapprox(lhs, rhs; rtol = 1.0e-10)
+
+    # A GRID-SPACE cotangent as well, not just prognostic. Seeding only prognostic variables leaves
+    # the grid-space block of the Jacobian untested
+    let w_grid = make_zero(vars0)
+        rng = Random.MersenneTwister(3)
+        w_grid.grid.u.data .= randn(rng, eltype(w_grid.grid.u.data), size(w_grid.grid.u.data))
+
+        vjp_grid = run_ad(Reverse, w_grid)
+        jtw = to_vec(vjp_grid)[1]
+        @test any(!iszero, jtw)                      # the adjoint path must not vanish
+
+        lhs_g = sum(jv .* to_vec(w_grid)[1])         # <J v, w_grid>
+        rhs_g = sum(to_vec(v)[1] .* jtw)             # <v, Jᵀ w_grid>
+        @test lhs_g != 0
+        @test isapprox(lhs_g, rhs_g; rtol = 1.0e-10)
+    end
 end
