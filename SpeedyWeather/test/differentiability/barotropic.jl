@@ -262,13 +262,22 @@ end
     )
 
     fdsim = ADSimulation(simulation)
+    # The output cotangent has to be the SAME one the `autodiff` call above used. This previously
+    # passed `make_zero(fdsim.vars)`, i.e. a zero cotangent, so `j′vp` returned identically zero and
+    # the comparison was vacuous — it only "passed" for parameters whose gradient is also zero.
+    _, fd_seed = ADseed(fdsim, :prognostic)
     fd_vjp = @time FiniteDifferences.j′vp(
         central_fdm(10, 1),
         x -> timestep_oop(deepcopy(fdsim.vars), deepcopy(fdsim.model), x),
-        make_zero(fdsim.vars),
+        fd_seed,
         copy(pvec),
     )
-    @test all(isapprox.(dp, fd_vjp[1], atol = 1.0e-5, rtol = 1.0e-3))
+    # `atol` clears the finite-difference noise floor. Only `forcing.strength`, `forcing.wavenumber`
+    # and `drag.c` actually enter a barotropic time step; Enzyme returns exactly 0 for the other 12
+    # parameters, while FD returns the same -4.3e-5 for all of them — an artifact of the model
+    # rebuild being nondeterministic (RandomVelocity reseeds), not 12 identical derivatives. The
+    # three real gradients (0.85 … 7.3e5) agree with FD to ~1e-7 relative.
+    @test all(isapprox.(dp, fd_vjp[1], atol = 1.0e-3, rtol = 1.0e-3))
 end
 
 #
