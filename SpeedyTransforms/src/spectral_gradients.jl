@@ -395,7 +395,7 @@ function ∇²!(
     @boundscheck ismatching(S, ∇²alms) || throw(DimensionMismatch(S, ∇²alms))
 
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
-    eigenvalues = inverse ? S.gradients.eigenvalues⁻¹ : S.gradients.eigenvalues
+    eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
 
     # Union-split the runtime Bools like `_divergence!` above so the kernel sees them as
     # compile-time constants: runtime-`Bool` selects on the ComplexF32 (`flipsign ? -a : a`)

@@ -19,9 +19,7 @@ struct SpectralTransform{
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
         LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}, ...},
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
-        GradientType,               # <: NamedTuple for gradients
-        IntType,                    # <: Integer
-        B,                          # <: Bool
+        GradientType,               # <: Gradients struct
         RFFTSerialType,             # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D forward plans)
         BRFFTSerialType,            # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D inverse plans)
         RFFTBatchedType,            # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D forward)
@@ -33,18 +31,18 @@ struct SpectralTransform{
 
     # SPECTRAL RESOLUTION
     spectrum::SpectrumType          # spectral truncation
-    nfreq_max::IntType              # Maximum (at Equator) number of Fourier frequencies (real FFT)
+    nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} # Legendre shortcut for truncation of m loop
     mmax_truncation::Vector{Int}    # Maximum order m to retain per latitude ring
 
     # GRID
     grid::GridType                  # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::IntType                # max number of layers in the vertical (= max planned batch K; for scratch memory size)
+    nlayers::Int                    # max number of layers in the vertical (= max planned batch K; for scratch memory size)
 
     # CORRESPONDING GRID SIZE
-    nlon_max::IntType               # Maximum number of longitude points (at Equator)
+    nlon_max::Int                   # Maximum number of longitude points (at Equator)
     nlons::Vector{Int}              # Number of longitude points per ring
-    nlat::IntType                   # Number of latitude rings
+    nlat::Int                       # Number of latitude rings
     rings::Vector{UnitRange{Int}}   # precomputed ring indices
 
     # CORRESPONDING GRID VECTORS
@@ -73,7 +71,7 @@ struct SpectralTransform{
     # state is undetermined, only read after writing to it
     scratch_memory::ScratchType
 
-    jm_index_size::IntType                      # number of indices per layer in kjm_indices
+    jm_index_size::Int                          # number of indices per layer in kjm_indices
     kjm_indices::ArrayTypeIntMatrix             # precomputed kjm loop indices map for legendre transform
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
@@ -81,13 +79,17 @@ struct SpectralTransform{
     # vector is pole to pole although only northern hemisphere required
     solid_angles::VectorType                    # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
+    # LAPLACE EIGENVALUES -l*(l+1) and their inverse, for ∇²/∇⁻².
+    eigenvalues::VectorType
+    eigenvalues⁻¹::VectorType
+
     gradients::GradientType                     # precomputed gradient and integration matrices
 
     # CUDA GRAPHS
     # toggle for the CUDA-Graphs accelerated batched Fourier transform
     # Set to `false` to fall back to the generic (allocating) per-ring GPU
     # Meaningless for non-CUDA architectures.
-    cuda_graphs::B
+    cuda_graphs::Bool
 end
 
 # eltype of a transform is the number format used within
@@ -193,8 +195,9 @@ function SpectralTransform(
     # Δϕ = 2π/nlon is the azimuth every grid point covers
     solid_angles = get_solid_angles(grid)
 
-    # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES
+    # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES + LAPLACE EIGENVALUES
     gradients = gradient_arrays(NF, spectrum)
+    eigenvalues, eigenvalues⁻¹ = get_eigenvalues_and_inverse(NF, spectrum)
 
     return SpectralTransform{
         NF,
@@ -207,8 +210,6 @@ function SpectralTransform(
         typeof(legendre_polynomials),
         typeof(scratch_memory),
         typeof(gradients),
-        typeof(nlayers),
-        typeof(cuda_graphs),
         typeof(rfft_plan_serial),
         typeof(brfft_plan_serial),
         typeof(rfft_plans_batched),
@@ -227,6 +228,7 @@ function SpectralTransform(
         scratch_memory,
         jm_index_size, kjm_indices,
         solid_angles,
+        eigenvalues, eigenvalues⁻¹,
         gradients,
         cuda_graphs,
     )
@@ -416,7 +418,7 @@ function _transform_chunked!(                       # SPECTRAL TO GRID
         _transform_nonchunked!(field_chunk, coeffs_chunk, scratch_memory, S, unscale_coslat)
         c += len
     end
-    return field
+    return nothing
 end
 
 function _transform_chunked!(                       # GRID TO SPECTRAL
@@ -433,7 +435,7 @@ function _transform_chunked!(                       # GRID TO SPECTRAL
         _transform_nonchunked!(coeffs_chunk, field_chunk, scratch_memory, S)
         c += len
     end
-    return coeffs
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -474,7 +476,7 @@ function _transform_grid!(
     # Checked **before** the boundscheck below so chunking can handle K > S.nlayers
     K = size(field, 2)
     if _needs_chunking(K, S)
-        return _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
+        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat); return field
     end
     return _transform_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
 end
@@ -533,7 +535,7 @@ function _transform_spec!(
     # see comment there.
     K = size(field, 2)
     if _needs_chunking(K, S)
-        return _transform_chunked!(coeffs, field, scratch_memory, S)
+        _transform_chunked!(coeffs, field, scratch_memory, S); return coeffs
     end
     return _transform_nonchunked!(coeffs, field, scratch_memory, S)
 end
