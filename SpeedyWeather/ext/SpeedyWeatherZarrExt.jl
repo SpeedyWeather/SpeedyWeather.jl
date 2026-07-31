@@ -486,18 +486,16 @@ end
 
 """$(TYPEDSIGNATURES)
 Write a single output time step for `variable` to the Zarr store in `output`.
-The generic [`output!`](@ref) handles interpolation, transforms and bitrounding;
-this method just performs the Zarr-specific store-side write.
 
 A Zarr chunk is the atomic unit of (de)compression and I/O, so writing one time
 slice into a chunk that spans `time_chunk > 1` steps would force a read-modify-write
-of the whole chunk on every step (read + decompress → patch one slice → recompress
-+ write). To avoid that, time-varying variables are buffered `time_chunk` slices deep
-(see `output.time_buffers`) and flushed a full chunk at a time via
-[`flush_time_chunk!`](@ref); a chunk-aligned full-chunk write is fulfilled by Zarr's
-single-chunk fast path with no read. The trailing partial chunk is flushed on `close`
-(see [`flush_partial_time_chunks!`](@ref)). With `time_chunk == 1` (and for static,
-non-time variables) each write is already its own chunk and is written directly."""
+of the whole chunk on every step. To avoid this, time-varying variables are buffered
+`time_chunk` slices deep (see `output.time_buffers`) and flushed one chunk at a time via
+[`flush_time_chunk!`](@ref); a chunk-aligned write is fulfilled by Zarr's
+single-chunk write operation with no read. Any remaning chunks in the buffer are flushed
+to disk on `close` (see [`flush_partial_time_chunks!`](@ref)). With `time_chunk == 1`
+(and for static, non-time variables) each write is already its own chunk and is written
+directly."""
 function write_array!(
         output::ZarrOutput,
         variable::AbstractOutputVariable,
@@ -536,9 +534,7 @@ end
 Write the `count` buffered time slices ending at time index `i_last` for `variable`
 from `buffer` to the Zarr store in `output` in a single write covering the time range
 `(i_last - count + 1):i_last`. A full-chunk flush (`count == time_chunk`) passes the
-buffer `Array` straight through so Zarr takes its single-chunk fast path (compress +
-store, no read); a trailing partial chunk passes a `count`-deep view and still writes a
-never-before-written chunk (no read-modify-write)."""
+buffer `Array` through so Zarr writes it directly."""
 function flush_time_chunk!(
         output::ZarrOutput,
         variable::AbstractOutputVariable,
