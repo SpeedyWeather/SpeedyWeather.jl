@@ -485,6 +485,13 @@ function define_variable!(
 end
 
 """$(TYPEDSIGNATURES)
+Return `true` if writes for `output` should be buffered along the time dimension.
+Buffering only pays off when a Zarr chunk spans more than one time step
+(`time_chunk > 1`); with `time_chunk == 1` every time slice is already its own chunk
+and is written directly (see [`write_array!`](@ref))."""
+time_buffered(output::ZarrOutput) = output.time_chunk > 1
+
+"""$(TYPEDSIGNATURES)
 Write a single output time step for `variable` to the Zarr store in `output`.
 
 A Zarr chunk is the atomic unit of (de)compression and I/O, so writing one time
@@ -493,30 +500,29 @@ of the whole chunk on every step. To avoid this, time-varying variables are buff
 `time_chunk` slices deep (see `output.time_buffers`) and flushed one chunk at a time via
 [`flush_time_chunk!`](@ref); a chunk-aligned write is fulfilled by Zarr's
 single-chunk write operation with no read. Any remaning chunks in the buffer are flushed
-to disk on `close` (see [`flush_partial_time_chunks!`](@ref)). With `time_chunk == 1`
-(and for static, non-time variables) each write is already its own chunk and is written
-directly."""
+to disk on `close` (see [`flush_partial_time_chunks!`](@ref)).
+
+Buffering is skipped entirely (see [`time_buffered`](@ref)) for static, non-temporal
+variables and when `time_chunk == 1`: in these cases, [`write_slice!`](@ref) writes the
+data directly to disk."""
 function write_array!(
         output::ZarrOutput,
         variable::AbstractOutputVariable,
         field,
     )
-    z = output.zarr_group[variable.name]
     data = parent_array(field)
-    time_chunk = max(output.time_chunk, 1)
 
-    # Static fields are written once (index 1); with time_chunk == 1 every time slice
-    # is its own chunk. Either way write directly — the ensemble slot, if any, is
-    # appended by get_indices.
-    if !hastime(variable) || time_chunk == 1
+    # Skip buffering for static variables (written once at index 1) and when
+    # time_chunk == 1 (every time slice is its own chunk): write the slice directly.
+    if !hastime(variable) || !time_buffered(output)
         i = hastime(variable) ? output.output_counter : 1
-        indices = get_indices(i, variable, output.ensemble_index)
-        z[indices...] = data
+        write_slice!(output, variable, data, i)
         return nothing
     end
 
     # Buffered path: copy this slice into the variable's time buffer (lazily allocated
     # to the chunk shape (spatial..., time_chunk)) at its offset within the current chunk.
+    time_chunk = output.time_chunk
     i = output.output_counter
     offset = mod1(i, time_chunk)    # 1..time_chunk position within the current chunk
     buffer = get!(output.time_buffers, variable.name) do
@@ -527,6 +533,17 @@ function write_array!(
     # A full chunk has been collected (this slice closes it, so it is chunk-aligned):
     # flush the whole buffer in one chunk-aligned write.
     offset == time_chunk && flush_time_chunk!(output, variable, buffer, i, time_chunk)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Write a single slice `data` for `variable` into its Zarr array at time index `i`
+(ignored for static variables). The ensemble slot, if any, is appended by
+[`get_indices`](@ref). This is the unbuffered write path used when
+[`time_buffered`](@ref) is `false`."""
+function write_slice!(output::ZarrOutput, variable::AbstractOutputVariable, data, i::Integer)
+    z = output.zarr_group[variable.name]
+    z[get_indices(i, variable, output.ensemble_index)...] = data
     return nothing
 end
 
@@ -560,8 +577,8 @@ lockstep every output step, so they share the same `output_counter`; when it is 
 multiple of `time_chunk` the last `output_counter % time_chunk` slices are still buffered
 and are written here. A no-op when `time_chunk == 1` or the final chunk was already full."""
 function flush_partial_time_chunks!(output::ZarrOutput)
-    time_chunk = max(output.time_chunk, 1)
-    (time_chunk == 1 || isempty(output.time_buffers)) && return nothing
+    (!time_buffered(output) || isempty(output.time_buffers)) && return nothing
+    time_chunk = output.time_chunk
     i = output.output_counter
     remainder = i % time_chunk
     remainder == 0 && return nothing    # last chunk already flushed by write_array!
