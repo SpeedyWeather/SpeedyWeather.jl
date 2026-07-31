@@ -418,7 +418,7 @@ function _transform_chunked!(                       # SPECTRAL TO GRID
         _transform_nonchunked!(field_chunk, coeffs_chunk, scratch_memory, S, unscale_coslat)
         c += len
     end
-    return field
+    return nothing
 end
 
 function _transform_chunked!(                       # GRID TO SPECTRAL
@@ -435,7 +435,7 @@ function _transform_chunked!(                       # GRID TO SPECTRAL
         _transform_nonchunked!(coeffs_chunk, field_chunk, scratch_memory, S)
         c += len
     end
-    return coeffs
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -476,7 +476,7 @@ function _transform_grid!(
     # Checked **before** the boundscheck below so chunking can handle K > S.nlayers
     K = size(field, 2)
     if _needs_chunking(K, S)
-        return _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
+        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat); return field
     end
     return _transform_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
 end
@@ -535,7 +535,7 @@ function _transform_spec!(
     # see comment there.
     K = size(field, 2)
     if _needs_chunking(K, S)
-        return _transform_chunked!(coeffs, field, scratch_memory, S)
+        _transform_chunked!(coeffs, field, scratch_memory, S); return coeffs
     end
     return _transform_nonchunked!(coeffs, field, scratch_memory, S)
 end
