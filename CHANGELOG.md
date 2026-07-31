@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- CPU column parameterization loop accesses model components directly instead of materializing the `get_parameterizations` NamedTuple, working around an Enzyme reverse-mode mis-compilation on Julia 1.12, Enzyme compat with 1.12 enabled [#1163](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1163)
 - Enable nested AD on CPU by shortening type name of `SpectralTransform`, e.g. by converting the gradient arrays into a type `Gradient` instead of a `NamedTuple` [#1165](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1165) [#1166](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1165)
 - Forward mode differentiation of the whole model now works (in 1.10) [#1164](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1164)
 - Enzyme Forward rules for SpectralTransform [#767](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/767)

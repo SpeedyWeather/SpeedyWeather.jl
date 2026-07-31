@@ -59,6 +59,36 @@ end
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-1))
 end
 
+#
+# GROUP 2 — PHYSICS, PARAMETER AD
+#
+@testset "Differentiability: PrimitiveWet parameterization_tendencies! (parameter AD)" begin
+    # Regression guard: with Duplicated(model), the CPU column-parameterization loop
+    # must not materialize the get_parameterizations NamedTuple inside a non-inlined
+    # function — that broke Enzyme's reverse-mode primal on Julia 1.12
+    # ("Vararg length is negative"); fixed by the direct model-field access in
+    # _column_parameterizations_cpu!(vars, model).
+    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    model = PrimitiveWetModel(; spectral_grid)
+    simulation = initialize!(model)
+    initialize!(simulation)
+    run!(simulation, period = Hour(6))          # spin-up for nonzero fields
+    adsim = ADSimulation(simulation)
+    m = adsim.model
+    dm = make_zero(m)
+
+    vars, dvars = ADseed(adsim, :tendencies)
+
+    @info "Running reverse-mode AD (parameter AD)"
+    @time autodiff(
+        set_runtime_activity(Reverse), SpeedyWeather.parameterization_tendencies!, Const,
+        Duplicated(vars, dvars), Duplicated(m, dm),
+    )
+
+    dvec, _ = to_vec(dvars)
+    @test all(isfinite.(dvec))
+end
+
 @testset "Differentiability: PrimitiveWet transform!(::Variables)" begin
     spectral_grid = SpectralGrid(trunc = 8, nlayers = 4)
     model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
