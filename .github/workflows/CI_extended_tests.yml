@@ -1,25 +1,13 @@
 name: Extended Tests
 on:
-  pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
 jobs:
   correctness-test:
     name: Extended Differentiablity Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
-    # temporarily disabled
-    if: false
-    # don't run if any of these labels are present
-    # if: >
-    #   !(
-    #   contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
-    #   contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
-    #   contains(github.event.pull_request.labels.*.name, 'skip-enzyme-ci')
-    #   )
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
       actions: write
       contents: read
