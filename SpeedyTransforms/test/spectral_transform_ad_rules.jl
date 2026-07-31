@@ -314,8 +314,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
 
         # spec -> grid: cotangent on the neighbouring grid slice must survive
         let dspec = make_zero(spec_parent), dgrid = make_zero(grid_parent)
+            fill!(wrapped_view(dgrid, :, 1:NL).data, 1)    # the OUTPUT cotangent being pulled back
             dfield_b = wrapped_view(dgrid, :, (NL + 1):2NL)
-            fill!(dfield_b.data, 1)                        # mark the neighbour's cotangent
+            fill!(dfield_b.data, 7)                        # mark the neighbour's cotangent
             marker = copy(dfield_b.data)
             autodiff(
                 set_runtime_activity(Reverse), transform!, Const,
@@ -329,8 +330,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
 
         # grid -> spec: same, with the roles swapped
         let dspec = make_zero(spec_parent), dgrid = make_zero(grid_parent)
+            fill!(wrapped_view(dspec, :, 1:NL).data, 1 + im)   # the OUTPUT cotangent being pulled back
             dspec_b = wrapped_view(dspec, :, (NL + 1):2NL)
-            fill!(dspec_b.data, 1 + im)
+            fill!(dspec_b.data, 7 + 7im)                       # mark the neighbour's cotangent
             marker = copy(dspec_b.data)
             autodiff(
                 set_runtime_activity(Reverse), transform!, Const,
