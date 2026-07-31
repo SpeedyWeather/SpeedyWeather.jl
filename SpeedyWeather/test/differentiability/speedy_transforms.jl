@@ -143,6 +143,12 @@ end
 _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
     sum(imag.(vec(Array(a))) .* imag.(vec(Array(b))))
 
+# Tolerance for the adjoint identity below. These run at the `SpectralGrid`'s number format, which
+# is Float32 by default, so a fixed 1e-10 is unreachable (Float32 eps is ~1.2e-7 and the dot
+# products accumulate over all coefficients). `sqrt(eps)` is ~3.4e-4 in Float32 — still ~40x tighter
+# than the ~1.4e-2 discrepancy a corrupted transform produced, so it retains its diagnostic power.
+_adjoint_rtol(::Type{NF}) where {NF} = sqrt(eps(real(NF)))
+
 # Every operator tested below (curl, divergence, ∇, ∇², UV_from_vor(div)) is LINEAR in its input, so
 # applying the primal to a direction `v` already gives the Jacobian-vector product L·v. The adjoint
 # identity  <L v, w> == <v, Lᵀ w>  then pins the reverse-mode result exactly, with no finite
@@ -154,15 +160,26 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
         if fd_tests[i_grid]
 
             spectral_grid = SpectralGrid(Grid = grid_type, trunc = 10, nlayers = 1, dealiasing = grid_dealiasing[i_grid])
-            S = SpectralTransform(spectral_grid, one_more_degree = true)
+
+            # Reverse-mode autodiff MUTATES the primal transform: it accumulates into
+            # `S.gradients.grad_y_vordiv1/2`, even though `SpectralTransform` is declared
+            # `EnzymeRules.inactive_type` and even when it is passed as `Const`. Forward mode and
+            # plain (non-AD) calls leave it alone. Reusing one transform across several `autodiff`
+            # calls therefore silently computes every call after the first with a corrupted
+            # operator — which is what made the checks below disagree with the analytic results.
+            # So: a fresh transform per `autodiff` call, plus `S_ref`, which is never handed to
+            # `autodiff` and is used for all primal/JVP references.
+            fresh_transform() = SpectralTransform(spectral_grid, one_more_degree = true)
+            S_ref = fresh_transform()
+            S = fresh_transform()
             dS = deepcopy(S)
 
             (; NF, grid, spectrum, nlayers) = spectral_grid
             u_grid = rand(NF, grid, nlayers)
             v_grid = rand(NF, grid, nlayers)
 
-            u = transform(u_grid, S)
-            v = transform(v_grid, S)
+            u = transform(u_grid, S_ref)
+            v = transform(v_grid, S_ref)
             du = zero(u)
             dv = zero(v)
 
@@ -189,19 +206,20 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
             # used above (`dcu` before it was consumed, i.e. all ones)
             let vu = rand(complex(NF), spectrum, nlayers), vv = rand(complex(NF), spectrum, nlayers)
                 w = zero(cu); fill!(w, 1)
-                Lv = zero(cu); curl!(Lv, vu, vv, S)          # linear ⇒ the primal IS the JVP
-                @test isapprox(_realdot(Lv, w), _realdot(vu, du) + _realdot(vv, dv); rtol = 1.0e-10)
+                Lv = zero(cu); curl!(Lv, vu, vv, S_ref)      # linear ⇒ the primal IS the JVP
+                @test isapprox(_realdot(Lv, w), _realdot(vu, du) + _realdot(vv, dv); rtol = _adjoint_rtol(NF))
             end
 
             # div test
-            u = transform(u_grid, S)
-            v = transform(v_grid, S)
+            u = transform(u_grid, S_ref)
+            v = transform(v_grid, S_ref)
             du = zero(u)
             dv = zero(v)
             div = zero(u)
             ddiv = zero(u)
             fill!(ddiv, 1 + 1im)
 
+            S = fresh_transform(); dS = deepcopy(S)
             autodiff(Reverse, divergence!, Const, Duplicated(div, ddiv), Duplicated(u, du), Duplicated(v, dv), Duplicated(S, dS))
 
             # we know the gradient of the divergence wrt u is easy: im*m
@@ -217,8 +235,8 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
             # adjoint identity for divergence, with the same seed (1 + 1im) as used above
             let vu = rand(complex(NF), spectrum, nlayers), vv = rand(complex(NF), spectrum, nlayers)
                 w = zero(div); fill!(w, 1 + 1im)
-                Lv = zero(div); divergence!(Lv, vu, vv, S)
-                @test isapprox(_realdot(Lv, w), _realdot(vu, du) + _realdot(vv, dv); rtol = 1.0e-10)
+                Lv = zero(div); divergence!(Lv, vu, vv, S_ref)
+                @test isapprox(_realdot(Lv, w), _realdot(vu, du) + _realdot(vv, dv); rtol = _adjoint_rtol(NF))
             end
             @test sum(du) != 0 # nonzero gradient
             @test sum(dv) != 0 # nonzero gradient
@@ -232,9 +250,10 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
             dv = fill!(dv, 1 + 1im)
 
             vor_grid = rand(NF, spectral_grid.grid, spectral_grid.nlayers)
-            vor = transform(vor_grid, S)
+            vor = transform(vor_grid, S_ref)
             dvor = zero(vor)
 
+            S = fresh_transform(); dS = deepcopy(S)
             autodiff(Reverse, SpeedyWeather.SpeedyTransforms.UV_from_vor!, Const, Duplicated(u, du), Duplicated(v, dv), Duplicated(vor, dvor), Duplicated(S, dS))
 
             # adjoint identity for UV_from_vor! (one input, two outputs), seeds as used above
@@ -242,8 +261,8 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
                 wu = zero(u); fill!(wu, 1 + 1im)
                 wv = zero(v); fill!(wv, 1 + 1im)
                 Lu = zero(u); Lv = zero(v)
-                SpeedyWeather.SpeedyTransforms.UV_from_vor!(Lu, Lv, vvor, S)
-                @test isapprox(_realdot(Lu, wu) + _realdot(Lv, wv), _realdot(vvor, dvor); rtol = 1.0e-10)
+                SpeedyWeather.SpeedyTransforms.UV_from_vor!(Lu, Lv, vvor, S_ref)
+                @test isapprox(_realdot(Lu, wu) + _realdot(Lv, wv), _realdot(vvor, dvor); rtol = _adjoint_rtol(NF))
             end
             @test sum(dvor) != 0 # nonzero gradient
 
@@ -255,13 +274,14 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
             dv = fill!(dv, 1 + 1im)
 
             vor_grid = rand(NF, grid, spectral_grid.nlayers)
-            vor = transform(vor_grid, S)
+            vor = transform(vor_grid, S_ref)
             dvor = zero(vor)
 
             div_grid = rand(NF, grid, spectral_grid.nlayers)
-            div = transform(div_grid, S)
+            div = transform(div_grid, S_ref)
             ddiv = zero(vor)
 
+            S = fresh_transform(); dS = deepcopy(S)
             autodiff(Reverse, SpeedyWeather.SpeedyTransforms.UV_from_vordiv!, Const, Duplicated(u, du), Duplicated(v, dv), Duplicated(vor, dvor), Duplicated(div, ddiv), Duplicated(S, dS))
 
             # adjoint identity for UV_from_vordiv! (two inputs, two outputs)
@@ -269,10 +289,10 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
                 wu = zero(u); fill!(wu, 1 + 1im)
                 wv = zero(v); fill!(wv, 1 + 1im)
                 Lu = zero(u); Lv = zero(v)
-                SpeedyWeather.SpeedyTransforms.UV_from_vordiv!(Lu, Lv, vvor, vdiv, S)
+                SpeedyWeather.SpeedyTransforms.UV_from_vordiv!(Lu, Lv, vvor, vdiv, S_ref)
                 @test isapprox(
                     _realdot(Lu, wu) + _realdot(Lv, wv),
-                    _realdot(vvor, dvor) + _realdot(vdiv, ddiv); rtol = 1.0e-10,
+                    _realdot(vvor, dvor) + _realdot(vdiv, ddiv); rtol = _adjoint_rtol(NF),
                 )
             end
             @test sum(dvor) != 0 # nonzero gradient
@@ -284,21 +304,22 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
             dres_∇ = zero(res_∇)
             fill!(dres_∇, 1 + im)
 
+            S = fresh_transform(); dS = deepcopy(S)
             autodiff(Reverse, SpeedyWeather.SpeedyTransforms.∇²!, Const, Duplicated(res_∇, dres_∇), Duplicated(vor, dvor), Duplicated(S, dS))
 
             # adjoint identity for ∇²
             let vvor = rand(complex(NF), spectrum, nlayers)
                 w = zero(res_∇); fill!(w, 1 + 1im)
                 Lv = zero(res_∇)
-                SpeedyWeather.SpeedyTransforms.∇²!(Lv, vvor, S)
-                @test isapprox(_realdot(Lv, w), _realdot(vvor, dvor); rtol = 1.0e-10)
+                SpeedyWeather.SpeedyTransforms.∇²!(Lv, vvor, S_ref)
+                @test isapprox(_realdot(Lv, w), _realdot(vvor, dvor); rtol = _adjoint_rtol(NF))
             end
             @test sum(dvor) != 0 # non-zero
 
             # test with the eigenvalues saved in S, result should just be seed * eigenvalues
             # (eigenvalues live directly on the transform, not in `S.gradients` — see the `Gradients` struct)
             for i in 1:(vor.spectrum.mmax)
-                @test all(isapprox.(Array(dvor[:, 1])[i, 1:i], S.eigenvalues[i] * (1 + im)))
+                @test all(isapprox.(Array(dvor[:, 1])[i, 1:i], S_ref.eigenvalues[i] * (1 + im)))
             end
 
             # ∇
@@ -311,6 +332,7 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
             fill!(dmerid_gradient, 1 + im)
 
             dvor = zero(vor)
+            S = fresh_transform(); dS = deepcopy(S)
             autodiff(Reverse, SpeedyWeather.SpeedyTransforms.∇!, Const, Duplicated(zonal_gradient, dzonal_gradient), Duplicated(merid_gradient, dmerid_gradient), Duplicated(vor, dvor), Duplicated(S, dS))
 
             # adjoint identity for ∇ (one input, two outputs: zonal and meridional gradient).
@@ -321,8 +343,8 @@ _realdot(a, b) = sum(real.(vec(Array(a))) .* real.(vec(Array(b)))) +
                 wz = zero(zonal_gradient); fill!(wz, 1 + 1im)
                 wm = zero(merid_gradient); fill!(wm, 1 + 1im)
                 Lz = zero(zonal_gradient); Lm = zero(merid_gradient)
-                SpeedyWeather.SpeedyTransforms.∇!(Lz, Lm, vvor, S)
-                @test isapprox(_realdot(Lz, wz) + _realdot(Lm, wm), _realdot(vvor, dvor); rtol = 1.0e-10)
+                SpeedyWeather.SpeedyTransforms.∇!(Lz, Lm, vvor, S_ref)
+                @test isapprox(_realdot(Lz, wz) + _realdot(Lm, wm), _realdot(vvor, dvor); rtol = _adjoint_rtol(NF))
             end
             @test sum(dvor) != 0 # nonzero
         end

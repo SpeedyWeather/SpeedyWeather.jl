@@ -345,6 +345,48 @@ fourier_synthesis!(field, f_north, f_south, S) =
         end
     end
 
+    @testset "reverse mode must not mutate the primal transform" begin
+        # `SpectralTransform` is declared `EnzymeRules.inactive_type`, so differentiating an
+        # operator that uses it must leave the transform untouched. Reverse mode currently violates
+        # this: it accumulates into `S.gradients.grad_y_vordiv1/2` (even when `S` is passed as
+        # `Const`), so every later call with the same transform silently computes with corrupted
+        # coefficients. Forward mode and plain calls are unaffected.
+        #
+        # This bit the extended differentiability tests, which built one transform and reused it
+        # across several `autodiff` calls; the checks after the first then disagreed with the
+        # analytic result by ~1%. Those tests now build a fresh transform per `autodiff` call.
+        spectrum = Spectrum(8, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(8, grid_dealiasing[1]))
+        make_S() = SpectralTransform(spectrum, grid; NF = Float64, nlayers = 1)
+
+        u = rand(ComplexF64, spectrum, 1)
+        v = rand(ComplexF64, spectrum, 1)
+        reference = make_S()
+        coefficients(S) = copy(S.gradients.grad_y_vordiv1)
+
+        # a plain call, and forward mode, both leave the transform alone
+        let S = make_S(), out = zero(u)
+            SpeedyTransforms.curl!(out, u, v, S)
+            @test coefficients(S) == coefficients(reference)
+        end
+        let S = make_S(), out = zero(u), dout = zero(u)
+            autodiff(
+                Forward, SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, fill!(zero(u), 1)), Duplicated(v, zero(v)), Const(S),
+            )
+            @test coefficients(S) == coefficients(reference)
+        end
+
+        # reverse mode does not -- flagged broken so we are told when Enzyme stops doing this
+        let S = make_S(), out = zero(u), dout = fill!(zero(u), 1)
+            autodiff(
+                Reverse, SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, zero(u)), Duplicated(v, zero(v)), Const(S),
+            )
+            @test_broken coefficients(S) == coefficients(reference)
+        end
+    end
+
     @testset "Complete Transform ChainRules" begin
         # WIP
     end
