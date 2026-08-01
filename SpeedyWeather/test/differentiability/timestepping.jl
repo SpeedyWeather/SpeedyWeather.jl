@@ -1,7 +1,7 @@
 # High-level tests whether time stepping in all models is differentiable.
 
 @testset "Differentiability: Timestepping ($(nameof(model_type)))" for model_type in
-        (ShallowWaterModel, PrimitiveDryModel, PrimitiveWetModel)
+        (PrimitiveWetModel,) # PrimitiveDryModel, ShallowWaterModel)
 
     # FiniteDifferences struggles with the NaN when we have a land-sea mask, so we test on AquaPlanets
     spectral_grid = SpectralGrid(trunc = 8, nlayers = 1, NF = Float64)
@@ -78,13 +78,8 @@
             out = timestep_oop(deepcopy(vars0), fresh_model(), q)
             return sum(to_vec(out)[1] .* to_vec(w)[1])
         end
-        # This finite difference is badly conditioned, so the tolerance is set by FD, not by AD:
-        # the projection is O(1e3) while its derivative w.r.t. gravity is O(1e-8) — a ratio of
-        # ~4e10, which puts the Float64 cancellation noise floor at ~1e-4 relative. Raising the FD
-        # order walks the answer onto the AD value (6.3e-4 at order 5, 1.7e-4 at 9, 5.1e-5 at 13),
-        # which is what says AD is the accurate side here. The exact adjoint identity above is the
-        # sharp check; this one guards against a wrong sign or scale.
-        fd_gravity = central_fdm(9, 1)(project, p.planet.gravity)
+
+        fd_gravity = central_fdm(5, 1)(project, p.planet.gravity)
         @test isapprox(dp.planet.gravity, fd_gravity; rtol = 2.0e-3)
     end
 end

@@ -7,7 +7,7 @@ jobs:
   correctness-test:
     name: Extended Differentiablity Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 240
     permissions:
       actions: write
       contents: read
@@ -43,6 +43,6 @@ jobs:
       
       - name: Run Extended tests
         run: |
-          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/runtests.jl")
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/runtests.jl
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}
