@@ -42,6 +42,10 @@ Adapt.@adapt_structure ConstantSurfaceRoughness
 ConstantSurfaceRoughness(SG::SpectralGrid; kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
 initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
 
+@propagate_inbounds function parameterization!(ij, vars, scheme::ConstantSurfaceRoughness, model)
+    surface_roughness!(ij, vars, scheme, model.land_sea_mask)
+    return nothing
+end
 
 @propagate_inbounds function surface_roughness!(ij, vars, scheme::ConstantSurfaceRoughness, land_sea_mask)
     land_fraction = land_sea_mask.land_fraction[ij]
