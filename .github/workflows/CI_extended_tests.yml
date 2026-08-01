@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 jobs:
   correctness-test:
     name: Extended Differentiablity Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
