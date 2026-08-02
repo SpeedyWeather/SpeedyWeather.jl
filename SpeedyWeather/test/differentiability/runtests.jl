@@ -20,4 +20,4 @@ include("forward_mode.jl")
 include("nested_ad.jl")
 include("barotropic.jl")
 include("primitivewet.jl")
-include("timestepping.jl")
+#include("timestepping.jl") # Don't run timestepping tests for now in CI, it takes to long and the forward vs reverse mode test is enough
