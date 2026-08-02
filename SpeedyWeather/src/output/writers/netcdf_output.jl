@@ -61,6 +61,7 @@ $(TYPEDFIELDS)"""
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
     const interpolator::Interpolator
+    const land_fraction::Field2D
 
     # SCRATCH FIELDS TO INTERPOLATE ONTO
     const field2D::Field2D
@@ -95,6 +96,7 @@ function NetCDFOutput(
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
 
+    land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction 
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
@@ -102,6 +104,7 @@ function NetCDFOutput(
     output = NetCDFOutput(;
         interval = Second(interval),    # convert to seconds for dispatch
         interpolator,
+        land_fraction,
         field2D,
         field3D,
         field3Dland,
@@ -146,8 +149,10 @@ function initialize!(
     )
     output.active || return nothing             # exit immediately for no output
 
-    # only checked for models that have a land component
-    if hasfield(typeof(model), :land) && !isnothing(model.land)
+    # only checked for models that have a land component and output variables that
+    # actually use the soil vertical dimension (and its scratch field `field3Dland`)
+    if hasfield(typeof(model), :land) && !isnothing(model.land) &&
+            any(var -> is_land(var) && is3D(var), values(output.variables))
         @assert get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
             " soil layers initialized for output, but $(get_nlayers(model.land)) soil layers initialized for model." *
             " Please construct NetCDFOutput with the same `nlayers_soil` as the model."
@@ -200,6 +205,12 @@ function initialize!(
         output!(output, var, simulation)
     end
 
+    # calculate land fraction on output grid
+    if hasproperty(model, :land_sea_mask)
+        land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
+        interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
+    end
+
     return nothing
 end
 
@@ -210,11 +221,14 @@ function define_variable!(
         var::AbstractOutputVariable,
         output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
     )
+    # hook for custom output variables to define their own (vertical) dimension
+    define_dimension!(dataset, var)
+
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
     attributes = Dict("long_name" => var.long_name, "units" => var.unit, "_FillValue" => output_NF(missing_value))
 
-    # land variables have a different vertical dimension
-    all_dims = is_land(var) ? ("lon", "lat", "soil_layer", "time") : ("lon", "lat", "layer", "time")
+    # the vertical dimension depends on the variable, e.g. "layer" or "soil_layer"
+    all_dims = ("lon", "lat", vertical_dimension(var), "time")
     dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
     # pick defaults for compression if not defined
@@ -223,6 +237,21 @@ function define_variable!(
 
     return defVar(dataset, var.name, output_NF, dims, attrib = attributes; deflatelevel, shuffle)
 end
+
+"""$(TYPEDSIGNATURES)
+Length of dimension `name` in `dataset` or `nothing` if not defined.
+Used by custom output variables to define their own dimension in
+[`define_dimension!`](@ref)."""
+get_dimension_length(dataset::NCDataset, name::String) =
+    haskey(dataset.dim, name) ? dataset.dim[name] : nothing
+
+"""$(TYPEDSIGNATURES)
+Define a coordinate in `dataset`: a dimension `name` of `length(values)` with
+`values` as its coordinate variable and `attribs` as its attributes.
+Used by custom output variables to define their own dimension in
+[`define_dimension!`](@ref)."""
+define_coordinate!(dataset::NCDataset, name::String, values::AbstractVector; attribs = Dict{String, String}()) =
+    defVar(dataset, name, values, (name,), attrib = attribs)
 
 """$(TYPEDSIGNATURES)
 Backend-specific write of an interpolated, post-processed field `field` for `variable`

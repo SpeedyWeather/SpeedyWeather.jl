@@ -69,15 +69,30 @@ c_i^* &= c_{i-1} + \Delta t \Delta c
 \end{aligned}
 ```
 
-And we bound the uncorrected sea surface temperature ``SST_i^*`` by freezing at ``T_f = -1.8˚C``
-and the uncorrected sea ice concentration ``c_i^*`` in ``[0, 1]`` by
+These corrections are not applied directly in place. The sea ice concentration bound is enforced
+exactly, after the full time step, via `filter!` (see [Filtering](@ref) below). The sea surface
+temperature correction, however, is only added as a tendency (alongside the other SST tendencies,
+e.g. from radiative and turbulent fluxes) for the time stepper to integrate; there is no
+equivalent post-hoc clamp for sea surface temperature. So while ``c_i`` is always exactly within
+``[0, 1]``, ``SST_i \geq T_f`` is only approximately enforced (exactly so for an isolated
+Euler-forward step, but not guaranteed once other sea surface temperature tendencies act within
+the same time step too):
 
 ```math
 \begin{aligned}
-SST_i &= \max(SST_i^*, T_f) \\
+SST_i &\approx \max(SST_i^*, T_f) \\
 c_i &= \max( \min( c_i^*, 1) , 0)
 \end{aligned}
 ```
+
+### Filtering
+
+Sea ice concentration cannot always be kept in ``[0, 1]`` through a tendency alone (e.g. when
+combined with other tendencies that push it outside those bounds), so `ThermodynamicSeaIce`
+clamps it after the time step instead. SpeedyWeather calls `filter!(vars, model.sea_ice, model)`
+(and similarly for `model.ocean`, `model.land`) once every time step, after all prognostic
+variables have been updated, so that components can apply such corrections that don't fit
+naturally into a tendency.
 
 ### Usage
 

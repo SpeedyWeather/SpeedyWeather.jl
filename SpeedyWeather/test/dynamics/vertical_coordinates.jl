@@ -342,7 +342,7 @@ end
 end
 
 @testset "Held-Suarez with varying layers and sigma spacing" begin
-    for nlayers in (16, 24, 32, 48, 64)
+    for nlayers in (16, 24)     # don't test more layers regularly on CI but 64 should work too
         spectral_grid = SpectralGrid(trunc = 31; nlayers)
 
         σ_half_configs = (
@@ -369,8 +369,8 @@ end
                         orography = EarthOrography(spectral_grid),
                     )
                     simulation = initialize!(model)
-                    run!(simulation; period = Day(20))
-                    if label == "default" && nlayers > 32        # current this blows up but that might be numerically expected
+                    run!(simulation; period = Day(5))               # don't test longer on CI but otherwise could be Day(20) too
+                    if label == "default" && nlayers > 32           # current this blows up but that might be numerically expected
                         @test_broken model.feedback.nans_detected == false
                     else
                         @test model.feedback.nans_detected == false

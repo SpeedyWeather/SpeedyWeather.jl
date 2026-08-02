@@ -246,8 +246,7 @@ The land-sea mask determines solely how to weight the surface fluxes
 coming from land or from the ocean. For the sensible heat fluxes this uses
 land and sea surface temperatures and weights the respective fluxes
 proportional to the fractional mask. Similar for humidity fluxes.
-You can therefore define an ocean on top of a mountain, or a land without
-heat fluxes when the land-surface temperature is not defined, i.e. `NaN`.
+You can therefore define an ocean on top of a mountain, or vice versa.
 Let ``F_L, F_S`` be the fluxes coming from land and sea, respectively.
 Then the land-sea mask ``a \in [0,1]`` weights them as follows for the
 total flux ``F``
@@ -256,15 +255,19 @@ total flux ``F``
 F = aF_L + (1-a)F_S
 ```
 
-but ``F=F_L`` if the sea flux is NaN (because the ocean temperature is not defined)
-and ``F=F_S`` if the land flux is NaN (because the land temperature or soil moisture
-is not defined, for sensible heat fluxes or evaporation), and ``F=0`` if both fluxes
-are NaN.
+Note that this weighting is purely multiplicative: it does not protect
+against `NaN` propagating into ``F`` should ``F_L`` or ``F_S`` be `NaN`.
+Land and sea surface temperatures (and other quantities entering the flux
+calculation, such as soil moisture) must therefore be finite everywhere,
+even where the land-sea mask is 0 or 1, i.e. a `NaN` land or sea surface
+temperature is not supported anymore. Use a fallback temperature for
+grid cells without "real" land or ocean instead (e.g. `SlabOcean`'s
+`land_temperature`, or `SeasonalLandTemperature`'s `ocean_temperature`).
 
 Setting the land-sea mask to ocean therefore will disable any fluxes that
 may come from land, and vice versa. However, with an ocean-everywhere land-sea mask
-you must also define sea surface temperatures everywhere, otherwise the fluxes
-in those regions will be zero.
+you must still also define sea surface temperatures everywhere, otherwise the fluxes
+in those regions will be incorrect rather than simply zero.
 
 For more details see [The land-sea mask](@ref) implementation section.
 

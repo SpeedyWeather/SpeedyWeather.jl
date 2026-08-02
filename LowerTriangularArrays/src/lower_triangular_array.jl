@@ -483,15 +483,17 @@ Base.eachindex(Ls::LowerTriangularArray...) = eachindex((L.data for L in Ls)...)
 
 """
 $(TYPEDSIGNATURES)
-creates `unit_range::UnitRange` to loop over all non-zeros/spherical harmonics numbers in a LowerTriangularArray `L`.
-Like `eachindex` but skips the upper triangle with zeros in `L`."""
-eachharmonic(L::LowerTriangularArray) = axes(L.data, 1)
+Iterator over all spherical harmonics in `L`, yielding `(l, m)` tuples of degree `l` and
+order `m` (both 1-based) for every harmonic in the lower triangle. Only loops over the
+horizontal dimension; combine with `eachmatrix` for the other dimensions."""
+eachharmonic(L::LowerTriangularArray) = eachharmonic(L.spectrum)
 
 """
 $(TYPEDSIGNATURES)
-creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangularArrays
-provided as arguments. Checks bounds first. All LowerTriangularMatrix's need to be of the same size.
-Like `eachindex` but skips the upper triangle with zeros in `L`."""
+Iterator over all spherical harmonics of the LowerTriangularArrays provided as arguments,
+yielding `(l, m)` tuples of degree `l` and order `m` (both 1-based). Checks first that
+all arrays match in the horizontal, other dimensions may differ.
+Only loops over the horizontal dimension; combine with `eachmatrix` for the others."""
 function eachharmonic(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     lowertriangular_match(L1, Ls...; horizontal_only = true) || throw(DimensionMismatch(L1, Ls...))
     return eachharmonic(L1)
@@ -630,12 +632,18 @@ function Base.copyto!(
         L2::LowerTriangularArray
     ) where {T}
     # if sizes don't match copy over the largest subset of indices
+    # (positional size methods: the `as = Matrix` kwcall relies on constant propagation
+    # which (depending on Julia/JET version) can fail and widen `as` to a runtime dispatch)
     size(L1) != size(L2) && return copyto!(
-        L1, L2, Base.OneTo(minimum(size.((L1, L2), 1; as = Matrix))),
-        Base.OneTo(minimum(size.((L1, L2), 2; as = Matrix)))
+        L1, L2, Base.OneTo(min(size(L1, 1, OneBased, Matrix), size(L2, 1, OneBased, Matrix))),
+        Base.OneTo(min(size(L1, 2, OneBased, Matrix), size(L2, 2, OneBased, Matrix)))
     )
 
-    L1.data .= convert.(T, L2.data)
+    if eltype(L2) === T
+        copyto!(L1.data, L2.data)
+    else
+        L1.data .= convert.(T, L2.data)
+    end
     return L1
 end
 
@@ -646,7 +654,7 @@ function Base.copyto!(
         ms::AbstractUnitRange
     )
 
-    lmax, mmax = size(L2; as = Matrix)            # use the size of L2 for boundscheck
+    lmax, mmax = size(L2, OneBased, Matrix)       # use the size of L2 for boundscheck (positional, see above)
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax || throw(BoundsError)
 
@@ -827,9 +835,9 @@ Base.unaliascopy(A::LowerTriangularArray) =
 # view(array, :) unravels like array[:] does hence "::Colon, i, args..." used to enforce one argument after :
 # exception is view(vector, :) which preserves the vector structure, equivalent here is the LowerTriangularMatrix
 # TODO extend Base.view?
-lta_view(L::LowerTriangularArray, c::Colon, i, args...) = LowerTriangularArray(view(L.data, c, i, args...), L.spectrum, L.dims[c, i, args...])
-lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data, c), L.spectrum, L.dims)
-lta_view(L::LowerTriangularArray, args...) = view(L, args...)   # fallback to normal view
+Base.@propagate_inbounds lta_view(L::LowerTriangularArray, c::Colon, i, args...) = LowerTriangularArray(view(L.data, c, i, args...), L.spectrum, L.dims[c, i, args...])
+Base.@propagate_inbounds lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data, c), L.spectrum, L.dims)
+Base.@propagate_inbounds lta_view(L::LowerTriangularArray, args...) = view(L, args...)   # fallback to normal view
 
 # Broadcast CPU/GPU
 import Base.Broadcast: BroadcastStyle, Broadcasted

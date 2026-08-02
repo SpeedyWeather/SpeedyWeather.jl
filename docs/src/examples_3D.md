@@ -103,7 +103,7 @@ using SpeedyWeather
 
 # components
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
+ocean = AquaPlanet(spectral_grid, temperature_equator=302, temperature_poles=273)
 land_sea_mask = AquaPlanetMask(spectral_grid)
 orography = NoOrography(spectral_grid)
 

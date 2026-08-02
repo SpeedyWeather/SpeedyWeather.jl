@@ -137,8 +137,8 @@ the architecture `arch`.
 @inline function configure_kernel(arch, work_order::Type{<:AbstractWorkOrder}, worksize, kernel!)
     workgroup, worksize = work_layout(work_order, worksize)
     dev = device(arch)
-    loop = kernel!(dev, workgroup, worksize)
-    return loop, worksize
+    loop = kernel!(dev)
+    return loop, worksize, workgroup
 end
 
 """
@@ -155,13 +155,14 @@ See [configure_kernel](@ref) for more information.
 # Inner interface for type-based dispatch (preferred)
 @inline function _launch!(arch, work_order::Type{<:AbstractWorkOrder}, worksize::Tuple, kernel!, kernel_args...)
 
-    loop!, worksize = configure_kernel(arch, work_order, worksize, kernel!)
+    loop!, worksize, workgroup = configure_kernel(arch, work_order, worksize, kernel!)
 
     # Don't launch kernels with no size
     haswork = prod(worksize) > 0
 
     if haswork
-        loop!(kernel_args...)
+        # sizes passed at call time -> `loop!` is concretely typed, so this is a static call
+        loop!(kernel_args...; ndrange = worksize, workgroupsize = workgroup)
     end
 
     return nothing

@@ -364,7 +364,7 @@ end
                 L = LowerTriangularArray(A)
                 # fill
                 fill!(L, 2)
-                for lm in LowerTriangularArrays.eachharmonic(L)
+                for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L))
                     @test all(L[lm, [Colon() for i in 1:length(idims)]...] .== 2)
                 end
 
@@ -379,7 +379,7 @@ end
                 # convert
                 L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
                 L3 = convert(LowerTriangularArray{Float16, 1 + length(idims), Array{Float16, 1 + length(idims)}, typeof(spectrum)}, L)
-                for lm in LowerTriangularArrays.eachharmonic(L, L3)
+                for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L, L3))
                     @test Float16(L[lm, [1 for i in 1:length(idims)]...]) == L3[lm, [1 for i in 1:length(idims)]...]
                 end
 
@@ -404,7 +404,7 @@ end
 
             # fill
             fill!(L, 2)
-            for lm in LowerTriangularArrays.eachharmonic(L)
+            for lm in LowerTriangularArrays.eachindex(L)
                 @test L[lm] == 2
             end
 
@@ -419,7 +419,7 @@ end
             # convert
             L = randn(LowerTriangularMatrix{NF}, lmax, mmax)
             L3 = convert(LowerTriangularMatrix{Float16}, L)
-            for lm in LowerTriangularArrays.eachharmonic(L, L3)
+            for lm in LowerTriangularArrays.eachindex(L, L3)
                 @test Float16(L[lm]) == L3[lm]
             end
         end
@@ -653,7 +653,6 @@ end
 
 
 @testset "GPU (JLArrays)" begin
-    # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
     NF = Float32
     idims = (5,)
     spectrum = Spectrum(10, 10)
@@ -669,7 +668,7 @@ end
 
     # getindex
     @test typeof(L[1, :]) <: JLArray
-    for lm in LowerTriangularArrays.eachharmonic(L)
+    for lm in eachindex(L.spectrum)
         @test Array(L[lm, :]) == L_cpu[lm, :]
     end
 
@@ -680,7 +679,7 @@ end
 
     # fill
     fill!(L, 2)
-    for lm in LowerTriangularArrays.eachharmonic(L2)
+    for lm in eachindex(L2.spectrum)
         @test all(L[lm, [Colon() for i in 1:length(idims)]...] .== 2)
     end
 
@@ -697,7 +696,8 @@ end
     L3 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, spectrum, idims...))
     L4 = convert(LowerTriangularArray{Float16, 2, JLArray{Float16, 2}, typeof(spectrum_jlarray)}, L3)
 
-    for lm in LowerTriangularArrays.eachharmonic(L, L3)
+    # for (lm, (l, m)) in enumerate(LowerTriangularArrays.eachharmonic(L, L3))
+    for lm in eachindex(L3.spectrum)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])
     end
 

@@ -78,8 +78,7 @@ variables(::SurfaceOceanHeatFlux) = (
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(ρ)
 
-    # TODO actually implement skin temperature?
-    SST = vars.prognostic.ocean.sea_surface_temperature[ij]
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, heat_flux)
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
@@ -91,7 +90,7 @@ variables(::SurfaceOceanHeatFlux) = (
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from ocean if available (not NaN) otherwise zero flux
     # leave out *cₚ here but include below to avoid division
-    flux_ocean = ifelse(isfinite(SST), ρ * drag_ocean * V₀ * (SST - T), zero(SST))
+    flux_ocean = ρ * drag_ocean * V₀ * (SST[ij] - T)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     flux_ocean /= 1 + sea_ice_concentration / heat_flux.sea_ice_insulation

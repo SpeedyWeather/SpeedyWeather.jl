@@ -205,6 +205,45 @@ end
     @test z_vor.metadata.compressor isa Zarr.BloscCompressor
 end
 
+@testset "ZarrOutput time_chunk write equivalence" begin
+    # Buffered, chunk-aligned writes (time_chunk > 1) must produce output identical
+    # to unbuffered per-slice writes (time_chunk == 1); only the write batching
+    # differs. The period is chosen so the number of output snapshots is NOT a
+    # multiple of time_chunk, exercising the trailing partial-chunk flush on close.
+    period = Day(2)
+    interval = Hour(6)      # => 9 output snapshots (IC + 8), not a multiple of 4
+    time_chunk = 4
+
+    function run_zarr_time_chunk(tc)
+        tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_eq_tc$(tc)_")
+        spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+        output = ZarrOutput(
+            spectral_grid, PrimitiveDry;
+            path = tmp_output_path, write_restart = false,
+            interval, time_chunk = tc,
+        )
+        model = PrimitiveDryModel(spectral_grid; output)
+        simulation = initialize!(model)
+        run!(simulation, output = true; period)
+        return Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    end
+
+    g_ref = run_zarr_time_chunk(1)          # per-slice baseline
+    g_buf = run_zarr_time_chunk(time_chunk) # buffered chunk-aligned writes
+
+    # sanity check: the trailing partial chunk is genuinely exercised
+    @test length(g_buf["time"]) % time_chunk != 0
+
+    # every array (data variables and coordinates, including `time`) is identical;
+    # isequal compares NaN (fill values / uninitialised mslp at t=0) as equal
+    for name in keys(g_ref.arrays)
+        a_ref = g_ref[name][:]
+        a_buf = g_buf[name][:]
+        @test size(a_ref) == size(a_buf)
+        @test all(isequal.(a_ref, a_buf))
+    end
+end
+
 @testset "ZarrOutput spatial chunking" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_spatial_")
     period = Day(1)
@@ -277,7 +316,7 @@ end
     for member in 1:ensemble_size
         output = ZarrOutput(
             spectral_grid, ShallowWater;
-            path = tmp_output_path, write_restart = false,
+            path = tmp_output_path,
             ensemble_index = member, ensemble_size = ensemble_size,
         )
         model = ShallowWaterModel(spectral_grid; output, initial_conditions)
@@ -288,6 +327,30 @@ end
         member == 1 && (store_path = joinpath(model.output.run_path, model.output.filename))
         @test joinpath(model.output.run_path, model.output.filename) == store_path
     end
+
+    # side files: members run as parallel processes but share one run folder, so every
+    # member — including the creator (member 1) — gets a _member suffix so they don't
+    # clobber each other and share one consistent naming scheme
+    run_path = dirname(store_path)
+    for filename in ("parameters", "progress", "restart")
+        extension = filename == "restart" ? ".jld2" : ".txt"
+        for member in 1:ensemble_size
+            @test isfile(joinpath(run_path, filename * "_member$member" * extension))
+        end
+    end
+
+    # a writer member configured inconsistently with the creator's store errors early
+    output = ZarrOutput(
+        spectral_grid, ShallowWater;
+        path = tmp_output_path,
+        ensemble_index = 2, ensemble_size = ensemble_size + 1,  # ensemble size mismatch
+    )
+    model = ShallowWaterModel(spectral_grid; output, initial_conditions)
+    simulation = initialize!(model)
+    @test_throws ErrorException run!(simulation, output = true; period)
+
+    # metadata was consolidated by the creator for faster opening (xarray etc.)
+    @test isfile(joinpath(store_path, ".zmetadata"))
 
     g = Zarr.zopen(store_path)
 
