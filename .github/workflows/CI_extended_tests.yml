@@ -5,9 +5,6 @@ on:
       - main
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-  pull_request:
-    branches:
-      - main
 jobs:
   correctness-test:
     name: Extended Differentiablity Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
