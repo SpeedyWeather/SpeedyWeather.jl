@@ -345,6 +345,59 @@ fourier_synthesis!(field, f_north, f_south, S) =
         end
     end
 
+    @testset "reverse mode must not mutate the primal transform" begin
+        # The gradient operators destructure the coefficient arrays out of `S.gradients` and pass
+        # them as bare arrays into a kernel computing `grad_y_vordiv1[lm] * v[lm-1, k]`. Enzyme sees
+        # ordinary float arrays feeding a multiply and computes ∂L/∂coefficients — the accumulated
+        # delta matches the analytic coefficient gradient to ~1e-16. That gradient needs somewhere
+        # to go: given a shadow it lands there, but with no shadow it lands in the PRIMAL, and every
+        # later call with the same transform then silently uses corrupted coefficients.
+
+        spectrum = Spectrum(8, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(8, grid_dealiasing[1]))
+        make_S() = SpectralTransform(spectrum, grid; NF = Float64, nlayers = 1)
+
+        u = rand(ComplexF64, spectrum, 1)
+        v = rand(ComplexF64, spectrum, 1)
+        reference = make_S()
+        coefficients(S) = copy(S.gradients.grad_y_vordiv1)
+
+        # a plain call, and forward mode, both leave the transform alone
+        let S = make_S(), out = zero(u)
+            SpeedyTransforms.curl!(out, u, v, S)
+            @test coefficients(S) == coefficients(reference)
+        end
+        let S = make_S(), out = zero(u), dout = zero(u)
+            autodiff(
+                Forward, SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, fill!(zero(u), 1)), Duplicated(v, zero(v)), Const(S),
+            )
+            @test coefficients(S) == coefficients(reference)
+        end
+
+        # reverse mode with a real shadow: the coefficient gradient goes to the shadow, and the
+        # primal is left intact. This is the supported way to differentiate these operators.
+        let S = make_S(), dS = make_zero(make_S()), out = zero(u), dout = fill!(zero(u), 1)
+            du = zero(u); dv = zero(v)
+            autodiff(
+                Reverse, SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, du), Duplicated(v, dv), Duplicated(S, dS),
+            )
+            @test coefficients(S) == coefficients(reference)      # primal untouched
+            @test any(!iszero, du.data)                            # and the real gradients still land
+        end
+
+        # `Const(S)` gives Enzyme nowhere to put ∂L/∂coefficients, so it still writes them into the
+        # primal. Flagged broken so we are told if Enzyme learns to discard them instead.
+        let S = make_S(), out = zero(u), dout = fill!(zero(u), 1)
+            autodiff(
+                Reverse, SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, zero(u)), Duplicated(v, zero(v)), Const(S),
+            )
+            @test_broken coefficients(S) == coefficients(reference)
+        end
+    end
+
     @testset "Complete Transform ChainRules" begin
         # WIP
     end

@@ -33,7 +33,7 @@ end
     spec0 = zeros(Complex{NF}, spectral_grid.spectrum)
     grid0 = zeros(NF, spectral_grid.grid)
     nc = length(parent(spec0))
-    coeffs = randn(MersenneTwister(2), NF, nc)
+    coeffs = randn(Random.MersenneTwister(2), NF, nc)
     v = ones(NF, nc)                        # forward-mode probe direction
 
     # OUTER reverse pass over the parameter p of the inner JVP — the nested case that used to fail.
