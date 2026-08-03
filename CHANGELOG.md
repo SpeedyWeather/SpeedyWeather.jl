@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- GPU CI is now run with Julia 1.12 [#1171](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1171)
 - Compatability with Terrarium 0.1.4 [#1157](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1157) [#1170](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1170)
 - Add time chunk buffering for ZarrOutput [#1162](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1162)
 - Enable nested AD on CPU by shortening type name of `SpectralTransform`, e.g. by converting the gradient arrays into a type `Gradient` instead of a `NamedTuple` [#1165](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1165) [#1166](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1165)
