@@ -593,8 +593,8 @@ end
         λs,            # longitudes to interpolate onto
         lon_offsets,   # longitude offsets for each ring
         nlons,         # number of longitude points per ring
+        ring_starts,   # starting flat index for each ring
         nlat,          # number of latitude rings
-        rings          # ring indices
     )
     k = @index(Global, Linear)
 
@@ -610,8 +610,8 @@ end
         # and b the next grid point to the right, such that
         # λ ∈ [a, b); while in most cases i_a + 1 = i_b, across 0˚E this is not the case
         i_a, i_b, Δ = find_lon_indices(λ, lon_offsets[j], nlons[j])
-        ij_as[k] = rings[j][i_a]    # index ij for a
-        ij_bs[k] = rings[j][i_b]    # index ij for b
+        ij_as[k] = ring_starts[j] + i_a - 1    # convert to flat index
+        ij_bs[k] = ring_starts[j] + i_b - 1    # convert to flat index
         Δabs[k] = Δ                 # distance fraction of λ between a, b
     end
 
@@ -622,8 +622,8 @@ end
     else
         # as above but for one ring further down
         i_c, i_d, Δ = find_lon_indices(λ, lon_offsets[j + 1], nlons[j + 1])
-        ij_cs[k] = rings[j + 1][i_c]  # index ij for c
-        ij_ds[k] = rings[j + 1][i_d]  # index ij for d
+        ij_cs[k] = ring_starts[j + 1] + i_c - 1  # convert to flat index
+        ij_ds[k] = ring_starts[j + 1] + i_d - 1  # convert to flat index
         Δcds[k] = Δ                 # distance fraction of λ between c, d
     end
 end
@@ -649,6 +649,10 @@ function find_grid_indices!(
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
 
+    # Precompute ring starting indices to avoid dynamic indexing in kernel
+    ring_starts = cumsum([1; nlons[1:end-1]])
+    ring_starts = on_architecture(architecture, ring_starts)
+
     launch!(
         architecture,
         LinearWorkOrder,
@@ -661,8 +665,8 @@ function find_grid_indices!(
         λs_converted,
         lon_offsets,
         nlons,
-        nlat,
-        rings
+        ring_starts,
+        nlat
     )
     return nothing
 end
