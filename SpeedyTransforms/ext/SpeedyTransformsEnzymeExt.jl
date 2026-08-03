@@ -12,13 +12,6 @@ using SpeedyTransforms.LowerTriangularArrays
 
 import SpeedyTransforms: _fourier!, wrapped_view
 
-# The spectral transform `S` is fixed geometry (Legendre polynomials, quadrature weights, FFT
-# plans) and is never a differentiation target. Marking it inactive stops Enzyme from building a
-# shadow of the large `SpectralTransform` aggregate when it is loaded out of a `Duplicated`
-# (mutable) model — the "cannot deduce type of copy" type-analysis failure on Julia >= 1.11 that
-# otherwise requires `Enzyme.API.maxtypeoffset!`. The transform! adjoint rules below read only
-# `S.val`, so treating `S` as a constant everywhere is consistent.
-EnzymeRules.inactive_type(::Type{<:SpectralTransform}) = true
 
 # Rules for SpeedyTransforms
 
