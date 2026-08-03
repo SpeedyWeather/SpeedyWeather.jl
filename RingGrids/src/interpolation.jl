@@ -18,6 +18,7 @@ struct GridGeometry{
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
     nlons::VectorIntType        # number of longitudinal points per ring
+    ring_starts::VectorIntType  # first flat index ij of each ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 
     # rings, GPU/architecture copy (if needed) of grid.rings
@@ -58,13 +59,18 @@ function GridGeometry(
     nlons = get_nlons(grid)                                 # number of longitude per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in eachring(grid)]   # offset of the first point from 0˚E
 
+    # first flat index ij of every ring, precomputed here so that the interpolation kernels
+    # can convert an in-ring index i to a flat index ij without indexing into rings (which
+    # would be dynamic indexing on GPU)
+    ring_starts = [first(ring) for ring in eachring(grid)]
+
     # vector type
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
     device_rings = on_architecture(architecture, grid.rings)
 
     return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings), typeof(nlat_half)}(
-        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, ring_starts, lon_offsets, device_rings
     )
 end
 
@@ -643,15 +649,10 @@ function find_grid_indices!(
 
     (; js, ij_as, ij_bs, ij_cs, ij_ds) = locator
     (; Δabs, Δcds) = locator
-    (; nlons, lon_offsets, nlat) = geometry
-    (; rings) = geometry # architecture version (GPU if needed)
+    (; nlons, ring_starts, lon_offsets, nlat) = geometry
 
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
-
-    # Precompute ring starting indices to avoid dynamic indexing in kernel
-    ring_starts = cumsum([1; nlons[1:end-1]])
-    ring_starts = on_architecture(architecture, ring_starts)
 
     launch!(
         architecture,
