@@ -140,16 +140,16 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     z₀H = vars.parameterizations.heat_roughness[ij]
     z₀Q = vars.parameterizations.moisture_roughness[ij]
 
-    function calc_drag_max(z₀)
+    function calc_drag_max(z₀, z)
         # should be z > z₀, z=z₀ means an infinitely high drag, choose one order higher than roughness length at least
         # 0 < z < z₀ doesn't make sense so cap here
-        z = max(z, 10z₀)
-        return (κ / log(z / z₀))^2
+        z_calc = max(z, 10z₀)
+        return (κ / log(z_calc / z₀))^2
     end
 
-    drag_max_momentum = calc_drag_max(z₀M)
-    drag_max_heat = calc_drag_max(z₀H)
-    drag_max_humidity = calc_drag_max(z₀Q)
+    drag_max_momentum = calc_drag_max(z₀M, z)
+    drag_max_heat = calc_drag_max(z₀H, z)
+    drag_max_humidity = calc_drag_max(z₀Q, z)
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
