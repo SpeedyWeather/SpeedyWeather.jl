@@ -26,7 +26,7 @@ subtypes(SpeedyWeather.AbstractSurfaceMomentumFlux)
     to the surface. `model.boundary_layer` computes centrally a drag coefficient for surface
     momentum, heat and humidity fluxes. Setting `model.boundary_layer.surface_condition = nothing` or
     `model.boundary_layer = nothing` will therefore disable all other surface fluxes unless
-    those are have `use_boundary_layer_drag = false` which lets them use independently their
+    they have `use_boundary_layer_drag = false` which lets them use independently their
     own drag coefficient.
 
 with more explanation below. The surface heat fluxes currently implemented are
