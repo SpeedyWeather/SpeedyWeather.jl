@@ -19,10 +19,9 @@
 
     # are m, lmax 0-based here or 1-based?
     lm_range = LowerTriangularArrays.get_lm_range(m, lmax)    # assumes 1-based
+    lm_offset = first(lm_range) - 1     # offset to index the lower triangular column directly
 
-    # view on lower triangular column, but batched in vertical
-    spec_view = view(specs_data, lm_range, :)
-    legendre_view = view(legendre_polynomials_data, lm_range, j)
+    legendre_view = view(legendre_polynomials_data, lm_range, j)    # always 2D, safe to view
 
     # dot product but split into even and odd harmonics on the fly as this
     # is how the previous implementation was enacted
@@ -37,13 +36,13 @@
     # Switched to while loop as more performant from inside a Kernel
     l = 1
     while l < lmax_even     # dot product in pairs for contiguous memory access
-        even_k += spec_view[l, k] * legendre_view[l]
-        odd_k += spec_view[l + 1, k] * legendre_view[l + 1]
+        even_k += specs_data[lm_offset + l, k] * legendre_view[l]
+        odd_k += specs_data[lm_offset + l + 1, k] * legendre_view[l + 1]
         l += 2
     end
 
     # now do the last row if lmax is odd
-    even_k += spec_view[end, k] * (isoddlmax * legendre_view[end])
+    even_k += specs_data[last(lm_range), k] * (isoddlmax * legendre_view[end])
     north = even_k + odd_k
     south = even_k - odd_k
 
