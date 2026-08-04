@@ -5,7 +5,7 @@ variables needed for surface flux calculations. Computes surface wind speed
 including sub-grid scale gusts, surface air density, and surface air temperature
 by extrapolating from the lowest model level to the surface using standard
 atmospheric relationships. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceCondition{NF} <: AbstractBoundaryLayer
+@kwdef struct SurfaceCondition{NF} <: AbstractParameterization
     "[OPTION] Ratio of near-surface wind to lowest-level wind [1]"
     wind_slowdown::NF = 0.95
 

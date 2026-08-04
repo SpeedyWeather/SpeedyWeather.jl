@@ -99,6 +99,9 @@ the Zarr group type once `initialize!` has been called (`Nothing` before)."""
     "[DERIVED] the Zarr group to be written into, created on initialize!"
     zarr_group::Union{Z, Nothing} = nothing
 
+    "[DERIVED] per-variable time-chunk write buffers keyed by variable name. Each buffer accumulates up to `time_chunk` interpolated output slices along the time dimension so that a full Zarr chunk is written in a single, chunk-aligned `setindex!` (which Zarr fulfils without a read-modify-write). Unused when `time_chunk == 1`; the trailing partial chunk is flushed on `close`."
+    time_buffers::Dict{String, Any} = Dict{String, Any}()
+
     const interpolator::Interpolator
     const land_fraction::Field2D
 

@@ -176,7 +176,9 @@ function horizontal_diffusion!(             # implicit version
         expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
         impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
     )
-    lmax, mmax = size(tendency, OneBased, as = Matrix)
+    # positional size method: the `as = Matrix` kwcall relies on constant propagation
+    # which (depending on Julia/JET version) can fail and widen `as` to a runtime dispatch
+    lmax, mmax = size(tendency, OneBased, Matrix)
     nlayers = size(var, 2)
 
     @boundscheck size(tendency) == size(var) || throw(BoundsError(tendency))
@@ -209,9 +211,9 @@ function horizontal_diffusion!(             # explicit version
         tendency::LowerTriangularArray,     # tendency of var
         var::LowerTriangularArray,          # spectral horizontal field to diffuse
         expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
-        impl::Nothing,                      # pass on nothing to dispatch to explicit diffusion                         
+        impl::Nothing,                      # pass on nothing to dispatch to explicit diffusion
     )
-    lmax, mmax = size(tendency, OneBased, as = Matrix)
+    lmax, mmax = size(tendency, OneBased, Matrix)    # positional size, see implicit version above
     nlayers = size(var, 2)
 
     @boundscheck size(tendency) == size(var) || throw(BoundsError(tendency))

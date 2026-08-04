@@ -131,7 +131,8 @@ function _legendre!(                        # GRID TO SPECTRAL
         f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed input, northern latitudes
         f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
         scratch_memory::ColumnScratchMemory,    # scratch memory for vertically batched Legendre transform
-        S::SpectralTransform,                   # precomputed transform
+        S::SpectralTransform;                   # precomputed transform
+        add::Bool = false,                      # accumulate onto `specs` instead of overwriting it?
     )
     (; nlat) = S                            # dimensions
     (; nlat_half) = S.grid
@@ -152,7 +153,10 @@ function _legendre!(                        # GRID TO SPECTRAL
     even = scratch_memory.north      # use scratch memory for outer product
     odd = scratch_memory.south
 
-    fill!(specs, 0)                         # reset as we accumulate into specs
+    # by default reset specs to 0 (this transform accumulates into it internally); `add=true`
+    # (used by the Enzyme transform! adjoint rule, matching the inverse `_fourier!` `add` kwarg)
+    # accumulates onto the existing contents instead, so no scratch spectral array is needed
+    add || fill!(specs, 0)
 
     return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
