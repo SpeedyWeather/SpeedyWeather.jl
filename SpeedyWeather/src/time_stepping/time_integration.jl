@@ -113,14 +113,11 @@ function update_prognostic!(
     (; clock) = prognostic
     scale = prognostic.scale[]
 
-    # atmospheric variables
-    for varname in tendency_names(vars)
-        var = getfield(prognostic, varname)
-        tendency = getfield(tendencies, varname)
-        update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model, scale)
-    end
+    # atmospheric variables (unrolled per name so it's compile-time)
+    update_prognostic_atmosphere!(vars, clock, time_stepping, model.implicit, model, scale)
 
-    # and time stepping for tracers if active
+    # and time stepping for tracers if active.
+    # TODO: might need to revise this to be a compile-time / generated loop
     for (name, tracer) in model.tracers
         if tracer.active
             var = prognostic.tracers[name]
@@ -129,19 +126,8 @@ function update_prognostic!(
         end
     end
 
-    # ocean variables, use unscaled time step
-    for varname in ocean_tendency_names(vars)
-        var = getfield(prognostic.ocean, varname)
-        tendency = getfield(tendencies.ocean, varname)
-        update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model)
-    end
-
-    # land variables, use unscaled time step
-    for varname in land_tendency_names(vars)
-        var = getfield(prognostic.land, varname)
-        tendency = getfield(tendencies.land, varname)
-        update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model)
-    end
+    # ocean and land variables, use unscaled time step (unrolled per name)
+    update_prognostic_namespaces!(vars, clock, time_stepping, model.implicit, model)
 
     # evolve the random pattern in time
     random_process!(vars, model.random_process)
@@ -152,4 +138,38 @@ function update_prognostic!(
     hasproperty(model, :land) && filter!(vars, model.land, model)
 
     return nothing
+end
+
+# Unrolled per-name drivers. The names ARE compile-time constants (they come from
+# the `Variables` type parameters), so these `@generated` drivers emit one call per literal
+# name instead; every `getfield` then infers concretely. Same pattern as `copy_variables!`
+# and `_global_parameterizations!`. Name computations shared with the `*_names` providers
+# (`_tendency_names`/`_namespace_names`, variables/variables.jl).
+@generated function update_prognostic_atmosphere!(
+        vars::Variables{Po, G, T}, clock::Clock, time_stepping::AbstractTimeStepper,
+        implicit, model::AbstractModel, scale,
+    ) where {Po, G, T}
+    calls = [
+        :(update_prognostic!(
+            getfield(vars.prognostic, $(QuoteNode(name))),
+            getfield(vars.tendencies, $(QuoteNode(name))),
+            clock, time_stepping, implicit, model, scale,
+        )) for name in _tendency_names(T)
+    ]
+    return Expr(:block, calls..., :(return nothing))
+end
+
+@generated function update_prognostic_namespaces!(
+        vars::Variables{Po, G, T}, clock::Clock, time_stepping::AbstractTimeStepper,
+        implicit, model::AbstractModel,
+    ) where {Po, G, T}
+    calls = Expr[]
+    for namespace in (:ocean, :land), name in _namespace_names(T, namespace)
+        push!(calls, :(update_prognostic!(
+            getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name))),
+            getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),
+            clock, time_stepping, implicit, model,   # no scale: ocean/land use the unscaled time step
+        )))
+    end
+    return Expr(:block, calls..., :(return nothing))
 end
