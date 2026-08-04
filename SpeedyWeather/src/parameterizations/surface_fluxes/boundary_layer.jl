@@ -1,7 +1,6 @@
 abstract type AbstractBoundaryLayer <: AbstractParameterization end
 
 variables(::AbstractBoundaryLayer) = (
-    ParameterizationVariable(:boundary_layer_drag, Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
     ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
     ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m³"),
     ParameterizationVariable(:surface_air_temperature, Grid2D(), desc = "Surface air temperature", units = "K"),
@@ -9,10 +8,14 @@ variables(::AbstractBoundaryLayer) = (
 
 export ConstantDrag
 """Constant boundary layer drag coefficient. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
+@parameterized @kwdef struct ConstantDrag{NF} <: AbstractParameterization
     "[OPTION] Constant drag coefficient [1]"
     @param drag::NF = 1.0e-3
 end
+
+variables(::ConstantDrag) = (
+    ParameterizationVariable(:boundary_layer_drag, Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
+)
 
 Adapt.@adapt_structure ConstantDrag
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
@@ -26,66 +29,99 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
 end
 
 export NeutralWindSpeed
-@parameterized @kwdef struct NeutralWindSpeed{NF} <: AbstractBoundaryLayer
+"""Ocean-based neutral wind speed calculation from actual wind speed, 
+derived from ERA5 data via symbolic regression. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct NeutralWindSpeed{NF} <: AbstractParameterization
     # Parameters for neutral wind calculation
-    @param c1::NF = NF(-0.039317116)
-    @param c2::NF = NF(-2.9858496)
-    @param c3::NF = NF(2.0046231e-10)
-    @param c4::NF = NF(1.0768474)
-    @param c5::NF = NF(0.20268184)
-    @param c6::NF = NF(1.2684147)
-    @param c7::NF = NF(-0.94933933)
-    @param c8::NF = NF(0.041551278)
-    @param c9::NF = NF(5.8649142)
+    "[OPTION] symbolic regression parameter 1 [1]"
+    @param c1::NF = -0.039317116
+
+    "[OPTION] symbolic regression parameter 2 [1]"
+    @param c2::NF = -2.9858496
+
+    "[OPTION] symbolic regression parameter 3 [1]"
+    @param c3::NF = 2.0046231e-10
+
+    "[OPTION] symbolic regression parameter 4 [1]"
+    @param c4::NF = 1.0768474
+
+    "[OPTION] symbolic regression parameter 5 [1]"
+    @param c5::NF = 0.20268184
+
+    "[OPTION] symbolic regression parameter 6 [1]"
+    @param c6::NF = 1.2684147
+
+    "[OPTION] symbolic regression parameter 7 [1]"
+    @param c7::NF = -0.94933933
+
+    "[OPTION] symbolic regression parameter 8 [1]"
+    @param c8::NF = 0.041551278
+
+    "[OPTION] symbolic regression parameter 9 [1]"
+    @param c9::NF = 5.8649142
+
+    # Safety parameters
+    "[OPTION] Minimum wind speed to avoid zero surface fluxes [m/s]"
+    minimum_wind::NF = 1.0e-6
+
+    "[OPTION] Minimum argument for logarithm to avoid log(0) [1]"
+    log_safety::NF = 1.0e-8
 end
+
+variables(::NeutralWindSpeed) = (
+    ParameterizationVariable(:neutral_wind_speed, Grid2D(), desc = "Neutral surface wind speed", units = "m/s"),
+)
+
 
 Adapt.@adapt_structure NeutralWindSpeed
 NeutralWindSpeed(SG::SpectralGrid; kwargs...) = NeutralWindSpeed{SG.NF}(; kwargs...)
 initialize!(::NeutralWindSpeed, ::PrimitiveEquation) = nothing
 
+Base.show(io::IO, M::AbstractBoundaryLayer) = Base.show(io, M, values = false)
+
 export BoundaryLayer
 """Composite type, containing surface roughness computation
 and drag coefficient computation. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct BoundaryLayer{SR, D, NW, SC} <: AbstractBoundaryLayer
+@parameterized @kwdef struct BoundaryLayer{SC, SR, D, NW} <: AbstractBoundaryLayer
+    @component surface_condition::SC
     @component neutral_wind_speed::NW
     @component surface_roughness::SR
     @component drag::D
-    @component surface_condition::SC
 end
 
 Adapt.@adapt_structure BoundaryLayer
 function BoundaryLayer(
         SG::SpectralGrid;
+        surface_condition = SurfaceCondition(SG),
         neutral_wind_speed = nothing,
         surface_roughness = ConstantSurfaceRoughness(SG),
         drag = BulkRichardsonDrag(SG),
-        surface_condition = SurfaceCondition(SG),
     )
-    return BoundaryLayer(neutral_wind_speed, surface_roughness, drag, surface_condition)
+    return BoundaryLayer(surface_condition, surface_roughness, drag, neutral_wind_speed)
 end
 
 function initialize!(BL::BoundaryLayer)
+    initialize!(BL.surface_condition)
     initialize!(BL.neutral_wind_speed)
     initialize!(BL.surface_roughness)
     initialize!(BL.drag)
-    initialize!(BL.surface_condition)
     return nothing
 end
 
 # variables of boundary layer are the union of surface roughness and drag variables
 variables(BL::BoundaryLayer) = (
+    variables(BL.surface_condition)...,
     variables(BL.neutral_wind_speed)...,
     variables(BL.surface_roughness)...,
     variables(BL.drag)...,
-    variables(BL.surface_condition)...,
 )
 
 # just call the sub-paramterizations one after another
 @propagate_inbounds function parameterization!(ij, vars, BL::BoundaryLayer, model)
+    parameterization!(ij, vars, BL.surface_condition, model)
     parameterization!(ij, vars, BL.neutral_wind_speed, model)
     parameterization!(ij, vars, BL.surface_roughness, model)
     parameterization!(ij, vars, BL.drag, model)
-    parameterization!(ij, vars, BL.surface_condition, model)
     return nothing
 end
 
@@ -94,7 +130,7 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
+@parameterized @kwdef struct BulkRichardsonDrag{NF} <: AbstractParameterization
     "[OPTION] von Kármán constant [1]"
     @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
 
@@ -104,6 +140,10 @@ $(TYPEDFIELDS)"""
     "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
     @param drag_min::NF = 1.0e-5 (bounds = Nonnegative,)
 end
+
+variables(::BulkRichardsonDrag) = (
+    ParameterizationVariable(:boundary_layer_drag, Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
+)
 
 Adapt.@adapt_structure BulkRichardsonDrag
 BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
@@ -184,16 +224,14 @@ end
     return neutral_wind_speed(ij, vars, nw, model)
 end
 
-"""Ocean-based neutral wind speed calculation from actual wind speed, 
-derived from ERA5 data via symbolic regression."""
 @propagate_inbounds function neutral_wind_speed(ij, vars, nw::NeutralWindSpeed{NF}, model) where {NF}
     (; surface_wind_speed) = vars.parameterizations
     (; surface_air_temperature) = vars.parameterizations
 
     sst = vars.prognostic.ocean.sea_surface_temperature[ij]
     t_diff = surface_air_temperature[ij] - sst # TODO: replace SST with ocean skin temperature
-    ws_safe = max(surface_wind_speed[ij], NF(1.0e-6))
-    log_arg = max(nw.c1 * ws_safe * t_diff + exp(t_diff), NF(1.0e-8))
+    ws_safe = max(surface_wind_speed[ij], nw.minimum_wind)
+    log_arg = max(nw.c1 * ws_safe * t_diff + exp(t_diff), nw.log_safety)
 
     numerator = 2 * t_diff + nw.c8 * exp(t_diff) - nw.c3 * (nw.c4^surface_air_temperature[ij])
     denominator = t_diff * (log(log_arg) + nw.c2) + nw.c5 * (nw.c6^ws_safe) + nw.c9 * (ws_safe^nw.c7) + ws_safe
