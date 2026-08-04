@@ -14,6 +14,7 @@ testsuite_GPU = Dict(
 )
 
 testsuite_dynamics = find_tests(joinpath(pwd(), "dynamics"))
+testsuite_long_integrations = find_tests(joinpath(pwd(), "long_integrations.jl"))
 testsuite_parameterizations = find_tests(joinpath(pwd(), "parameterizations"))
 testsuite_output = find_tests(joinpath(pwd(), "output"))
 testsuite_variables = find_tests(joinpath(pwd(), "variables"))
@@ -22,10 +23,16 @@ testsuite_variables = find_tests(joinpath(pwd(), "variables"))
 testsuite = merge(
     testsuite_GPU,
     testsuite_dynamics,
+    testsuite_long_integrations,
     testsuite_parameterizations,
     testsuite_variables,
     testsuite_output
 )
 
+# long integration tests should always be run with `-O2` compiler flag, as set in workflow yml,
+# return nothing uses default worker, but all other tests should use `-O0` as compile time heavy
+# 
+test_worker(name) = "long" in name ? nothing : addworker(; exeflags = ["-O0"])
+
 # run tests in parallel
-runtests(SpeedyWeather, ARGS; testsuite, init_code)
+runtests(SpeedyWeather, ARGS; test_worker, testsuite, init_code)
