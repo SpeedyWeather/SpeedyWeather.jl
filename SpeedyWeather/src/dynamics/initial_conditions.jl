@@ -467,7 +467,7 @@ end
 
 Adapt.@adapt_structure JablonowskiVorticity
 
-@inline function (J::JablonowskiVorticity)(λ, φ, η)
+@inline function (J::JablonowskiVorticity{NF})(λ, φ, η) where {NF}
     (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
 
     # great circle distance to perturbation
@@ -475,7 +475,7 @@ Adapt.@adapt_structure JablonowskiVorticity
     r = radius * acos(X)
 
     # Eq (3), the unperturbed zonal wind
-    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(3 / 2) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(NF(3 // 2)) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
 
     # Eq (12), the perturbation
     perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
