@@ -680,7 +680,10 @@ end
 
     Δλ = convert(NF, 360) / nlon          # longitude spacing
     ix = (λ - λ₀) / Δλ                      # grid index i but with fractional part
-    i = floor(Int, ix)                  # 0-based grid index to the left
+    # unsafe_trunc(Int, floor(ix)) instead of floor(Int, ix): the latter carries an
+    # InexactError branch which boxes ix, requiring GPU-side allocation. AMDGPU rejects
+    # that at compile time. λ, λ₀ are bounded degrees so the conversion cannot overflow.
+    i = Base.unsafe_trunc(Int, floor(ix))   # 0-based grid index to the left
     Δ = ix - i                            # distance fraction from i to i+1
 
     # λ ∈ [λa, λb), i.e. a is the next grid point to the left, b to the right
