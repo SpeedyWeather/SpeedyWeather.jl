@@ -12,12 +12,18 @@ export HyperDiffusion
 """
 Horizontal hyper diffusion of vorticity, div, temp, humid; implicitly in spectral space
 with a `power` of the Laplacian (default = 4) and the strength controlled by
-`time_scale` (default = 1 hour). For vorticity and divergence, by default,
-the `time_scale` (=1/strength of diffusion) is reduced with increasing resolution
-through `resolution_scaling` and the power is linearly decreased in the vertical
-above the `tapering_σ` sigma level to `power_stratosphere` (default 2).
+`time_scale` (default = 4 hours, `time_scale_div` = 1 hour for divergence).
+For all diffused variables the `time_scale` (=1/strength of diffusion) is reduced
+with increasing resolution through `resolution_scaling`.
 
-For the BarotropicModel and ShallowWaterModel no tapering or scaling is applied.
+Two sets of arrays are precomputed: `expl`/`impl` from `time_scale` at the constant `power`,
+applied to vorticity, temperature, humidity and tracers; and `expl_div`/`impl_div` from
+`time_scale_div` at a power that is linearly decreased in the vertical above the `tapering_σ`
+sigma level to `power_stratosphere` (default 2), applied to divergence only. The lower power
+aloft makes the diffusion less scale-selective there, acting as a sponge layer on the
+gravity waves that divergence carries.
+
+For the BarotropicModel and ShallowWaterModel no tapering is applied as they are single-layer.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct HyperDiffusion{
@@ -415,6 +421,9 @@ function initialize!(
     (; trunc, nlayers) = diffusion
     (; expl, impl, expl_div, impl_div) = diffusion
     (; scale, shift, power, power_div, resolution_scaling) = diffusion
+
+    # the time step the prognostic variables are actually advanced with, i.e. 2Δt for leapfrog,
+    # the implicit part below has to use exactly this step (as HyperDiffusion does)
     Δt = default_time_step(model.time_stepping)
 
     # radius scaling for the dynamical core as these are all precomputed arrays
@@ -431,9 +440,10 @@ function initialize!(
             expl[l + 1, k] = -(1 + tanh(scale * (l - trunc - shift)))^power / time_scale
             expl_div[l + 1, k] = -(1 + tanh(scale * (l - trunc - shift)))^power_div / time_scale_div
 
-            # and implicit part of the diffusion
-            impl[l + 1, k] = 1 / (1 - 2Δt * expl[l + 1, k])
-            impl_div[l + 1, k] = 1 / (1 - 2Δt * expl_div[l + 1, k])
+            # and implicit part of the diffusion (= 1/(1-Δtν∇²ⁿ)), Δt already the full
+            # prognostic step from default_time_step, so no additional factor 2 here
+            impl[l + 1, k] = 1 / (1 - Δt * expl[l + 1, k])
+            impl_div[l + 1, k] = 1 / (1 - Δt * expl_div[l + 1, k])
         end
 
         # last degree is only used by vector quantities; set to zero for implicit and explicit
