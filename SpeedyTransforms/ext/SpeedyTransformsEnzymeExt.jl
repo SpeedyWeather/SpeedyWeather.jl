@@ -2,7 +2,7 @@ module SpeedyTransformsEnzymeExt
 
 using Enzyme
 using Enzyme.EnzymeCore
-import .EnzymeRules: reverse, augmented_primal
+import .EnzymeRules: forward, reverse, augmented_primal
 using .EnzymeRules
 
 # import all functions for which we define rules
@@ -12,13 +12,19 @@ using SpeedyTransforms.LowerTriangularArrays
 
 import SpeedyTransforms: _fourier!, wrapped_view
 
-# The spectral transform `S` is fixed geometry (Legendre polynomials, quadrature weights, FFT
-# plans) and is never a differentiation target. Marking it inactive stops Enzyme from building a
-# shadow of the large `SpectralTransform` aggregate when it is loaded out of a `Duplicated`
-# (mutable) model — the "cannot deduce type of copy" type-analysis failure on Julia >= 1.11 that
-# otherwise requires `Enzyme.API.maxtypeoffset!`. The transform! adjoint rules below read only
-# `S.val`, so treating `S` as a constant everywhere is consistent.
-EnzymeRules.inactive_type(::Type{<:SpectralTransform}) = true
+# NOTE: differentiate the gradient operators with `set_runtime_activity(Reverse)`. They destructure
+# the coefficient arrays out of `S.gradients` and pass them as bare arrays into a kernel, so Enzyme
+# computes ∂L/∂coefficients regardless of how `S` is annotated. Under STATIC activity analysis that
+# gradient has nowhere to go and is written into the PRIMAL, silently corrupting every later call
+# with the same transform. Measured on Julia 1.10 for `divergence!` — primal corrupted?
+#
+#     mode                   Const(S)   Duplicated(S, make_zero(S))
+#     Reverse                yes        no
+#     set_runtime_activity   no         no
+#
+# so runtime activity is what makes this correct; the argument annotation alone is not enough.
+# `SpectralTransform` is also deliberately not declared `EnzymeRules.inactive_type`: that suppressed
+# the shadow without suppressing the accumulation, so it corrupted the primal under both annotations.
 
 # Rules for SpeedyTransforms
 
@@ -87,9 +93,10 @@ function reverse(
     _fourier!(dgridval, f_north.dval ./ scale, f_south.dval ./ scale, S.val) # inverse FFT (w/o normalization)
     grids.dval .+= dgridval
 
-    # no derivative wrt the f_north and f_south that were input because they are overwritten
-    make_zero!(f_north.dval)
-    make_zero!(f_south.dval)
+    # no derivative wrt the f_north and f_south that were input because they are overwritten.
+    # `fill!` and not `make_zero!`: because make_zero! would zero the whole fused buffer
+    fill!(f_north.dval, 0)
+    fill!(f_south.dval, 0)
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
@@ -128,12 +135,94 @@ function reverse(
     f_north.dval .+= scale .* dfnorthval
     f_south.dval .+= scale .* dfsouthval
 
-    # no derivative wrt the grids that were input because they are overwritten
-    make_zero!(grids.dval)
+    # no derivative wrt the grids that were input because they are overwritten.
+    # `fill!` on the view's data, not `make_zero!` on the whole parent — see above.
+    fill!(grids.dval.data, 0)
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
 end
+
+### FORWARD RULES
+#
+# Both the FFT and the full spectral transform are LINEAR in their input array, and `S` is fixed
+# geometry carrying no tangent. The forward-mode tangent of a linear map is therefore the map
+# itself applied to the tangent: run the primal on `.val`, then the identical call on each tangent
+# `.dval`. 
+
+# `nlayer`-th tangent of an annotated argument, `nothing` for inactive (Const) arguments.
+# Homogeneous-tuple indexing keeps this type stable for width > 1.
+@inline _dval(x::Union{Duplicated, DuplicatedNoNeed}, ::Int) = x.dval
+@inline _dval(x::Union{BatchDuplicated, BatchDuplicatedNoNeed}, b::Int) = x.dval[b]
+@inline _dval(::Const, ::Int) = nothing
+
+# Assemble what a forward rule must return for the mutated output argument `out`,
+# following `EnzymeRules.forward_rule_return_type(config, RT)`.
+@inline function _forward_return(config, out::Annotation)
+    return if needs_shadow(config)
+        if needs_primal(config)
+            width(config) == 1 ? Duplicated(out.val, out.dval) : BatchDuplicated(out.val, out.dval)
+        else
+            out.dval
+        end
+    else
+        needs_primal(config) ? out.val : nothing
+    end
+end
+
+# One tangent pass of a linear in-place `op(dout, din, ...)`. An inactive (Const) input carries a
+# zero tangent, so the output tangent is zeroed rather than transformed; an inactive output means
+# Enzyme asserted the derivative is not needed, so there is nothing to propagate.
+@inline function _linear_tangent!(op::F, dout, din, args...) where {F}
+    dout === nothing && return nothing              # output inactive, nothing to propagate
+    din === nothing && return fill!(dout.data, 0)   # input inactive ⇒ zero tangent (view-safe)
+    op(dout, din, args...)
+    return nothing
+end
+
+### Custom forward rule for _fourier!(f_north, f_south, field, S) — grid to Fourier space
+function forward(
+        config::EnzymeRules.FwdConfig, func::Const{typeof(_fourier!)}, ::Type{RT},
+        f_north::Annotation{<:AbstractArray{<:Complex, 3}}, f_south::Annotation{<:AbstractArray{<:Complex, 3}},
+        field::Annotation{<:AbstractField}, S::Annotation,
+    ) where {RT <: Annotation}
+
+    func.val(f_north.val, f_south.val, field.val, S.val)                    # primal
+    for b in 1:width(config)                                                # one FFT per tangent
+        dfield = _dval(field, b)
+        dfnorth, dfsouth = _dval(f_north, b), _dval(f_south, b)
+        if dfield === nothing                                               # inactive input ⇒ zero tangents
+            dfnorth === nothing || fill!(dfnorth, 0)    # view-safe, see the reverse rules
+            dfsouth === nothing || fill!(dfsouth, 0)
+        elseif !(dfnorth === nothing || dfsouth === nothing)
+            func.val(dfnorth, dfsouth, dfield, S.val)
+        end
+    end
+
+    return nothing      # `_fourier!` returns nothing, so RT is Const and no shadow is requested
+end
+
+### Custom forward rule for _fourier!(field, f_north, f_south, S) — Fourier space to grid
+function forward(
+        config::EnzymeRules.FwdConfig, func::Const{typeof(_fourier!)}, ::Type{RT},
+        field::Annotation{<:AbstractField}, f_north::Annotation{<:AbstractArray{<:Complex, 3}},
+        f_south::Annotation{<:AbstractArray{<:Complex, 3}}, S::Annotation,
+    ) where {RT <: Annotation}
+
+    func.val(field.val, f_north.val, f_south.val, S.val)                    # primal
+    for b in 1:width(config)                                                # one inverse FFT per tangent
+        dfield = _dval(field, b)
+        dfnorth, dfsouth = _dval(f_north, b), _dval(f_south, b)
+        if dfnorth === nothing || dfsouth === nothing                       # inactive input ⇒ zero tangent
+            dfield === nothing || fill!(dfield.data, 0)   # view-safe
+        elseif dfield !== nothing
+            func.val(dfield, dfnorth, dfsouth, S.val)
+        end
+    end
+
+    return nothing      # `_fourier!` returns nothing, so RT is Const and no shadow is requested
+end
+
 
 ### Analytic-adjoint rules for the whole `transform!` (positional cores `_transform_grid!` /
 ### `_transform_spec!`, which every `transform!` call routes through — chunked and batched alike).
@@ -246,7 +335,13 @@ function reverse(
         S::Union{Const, Duplicated, MixedDuplicated}, unscale_coslat::Const,
     )
     spec2grid_pullback!(coeffs.dval, field.dval, scratch.val, S.val; unscale_coslat = unscale_coslat.val)
-    make_zero!(field.dval)      # the output cotangent has been propagated to coeffs
+    # Zero the output cotangent: the primal OVERWRITES this argument, so its input-side cotangent is
+    # zero (pinned against finite differences by the `test_reverse` checks in the unit tests).
+    # `fill!(x.data, 0)` and NOT `make_zero!(x)`: these arguments are usually views into a fused
+    # parent buffer shared with other variables, and `make_zero!` zeroes the whole parent, wiping
+    # cotangents that belong to its neighbours. That silently made any reverse gradient seeded on a
+    # grid-space variable (e.g. `vars.grid.u`) come back identically zero.
+    fill!(field.dval.data, 0)
     return (nothing, nothing, nothing, nothing, nothing)
 end
 
@@ -267,8 +362,45 @@ function reverse(
         S::Union{Const, Duplicated, MixedDuplicated},
     )
     grid2spec_pullback!(field.dval, coeffs.dval, scratch.val, S.val)
-    make_zero!(coeffs.dval)     # the output cotangent has been propagated to field
+    fill!(coeffs.dval.data, 0)
     return (nothing, nothing, nothing, nothing)
+end
+
+### Forward rules for the whole `transform!` (same positional cores as the reverse rules above).
+# The transform is linear and `S` is inactive, so the tangent is the transform of the tangent.
+# Having these makes `transform!` an AD boundary in forward mode as well, so Enzyme never differentiates
+# the chunk loop or `_legendre!` internals (both problematic, see the comment above the reverse rules).
+# `scratch` is write-before-read workspace, so every pass can share `scratch.val` and no shadow
+# scratch is needed. The tangent passes run BEFORE the primal so that `scratch` is left holding the
+# primal's content on return, making the rule's observable side effects identical to the primal's
+# (the transform is linear, so no tangent pass depends on the primal's output).
+
+function forward(
+        config::EnzymeRules.FwdConfig, func::Const{typeof(_transform_grid!)}, ::Type{RT},
+        field::Annotation{<:AbstractField}, coeffs::Annotation{<:LowerTriangularArray},
+        scratch::Annotation, S::Annotation, unscale_coslat::Const,
+    ) where {RT <: Annotation}
+
+    for b in 1:width(config)                                                     # one transform per tangent
+        _linear_tangent!(func.val, _dval(field, b), _dval(coeffs, b), scratch.val, S.val, unscale_coslat.val)
+    end
+    func.val(field.val, coeffs.val, scratch.val, S.val, unscale_coslat.val)      # primal last, see above
+
+    return _forward_return(config, field)
+end
+
+function forward(
+        config::EnzymeRules.FwdConfig, func::Const{typeof(_transform_spec!)}, ::Type{RT},
+        coeffs::Annotation{<:LowerTriangularArray}, field::Annotation{<:AbstractField},
+        scratch::Annotation, S::Annotation,
+    ) where {RT <: Annotation}
+
+    for b in 1:width(config)                                                     # one transform per tangent
+        _linear_tangent!(func.val, _dval(coeffs, b), _dval(field, b), scratch.val, S.val)
+    end
+    func.val(coeffs.val, field.val, scratch.val, S.val)                          # primal last, see above
+
+    return _forward_return(config, coeffs)
 end
 
 end

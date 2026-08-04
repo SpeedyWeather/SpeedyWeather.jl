@@ -18,7 +18,7 @@ steps:
     agents:
       queue: "cuda"
     if: "!(build.pull_request.labels includes 'skip-ci' || build.pull_request.labels includes 'skip-gpu-ci')"
-    timeout_in_minutes: 30
+    timeout_in_minutes: 40
 
   - label: "AMDGPU, Julia v1.11"
     matrix:
@@ -40,4 +40,4 @@ steps:
       queue: "rocm"
       rocmgpu: "*"
     if: "!(build.pull_request.labels includes 'skip-ci' || build.pull_request.labels includes 'skip-gpu-ci')"
-    timeout_in_minutes: 30
+    timeout_in_minutes: 40

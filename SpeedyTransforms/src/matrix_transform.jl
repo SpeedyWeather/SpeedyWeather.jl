@@ -9,8 +9,7 @@ struct MatrixSpectralTransform{
         VectorType,                 # <: ArrayType{NF, 1},
         MatrixType,                 # <: ArrayType{NF, 2},
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
-        GradientType,               # <: NamedTuple for gradients
-        IntType,                    # <: Integer
+        GradientType,               # <: Gradients struct (see gradient_arrays.jl)
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -19,7 +18,7 @@ struct MatrixSpectralTransform{
     # SPECTRAL AND GRID RESOLUTION
     spectrum::SpectrumType              # spectral truncation
     grid::GridType                      # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::IntType                    # number of layers in vertical
+    nlayers::Int                        # number of layers in vertical
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType                  # Cosine of latitudes, north to south
@@ -27,6 +26,11 @@ struct MatrixSpectralTransform{
 
     # NORMALIZATION
     norm_sphere::NF                 # normalization of the l=0, m=0 mode
+
+    # LAPLACE EIGENVALUES -l*(l+1) and their inverse, for ∇²/∇⁻². Stored here (with the existing
+    # VectorType parameter) rather than inside `gradients` to keep the type name short.
+    eigenvalues::VectorType
+    eigenvalues⁻¹::VectorType
 
     # THE ACTUAL TRANSFORM MATRICES for forward = LT(FFT(input)) and backward = IFFT(ILT(input))
     forward::MatrixComplexType          # forward transform matrix
@@ -95,8 +99,10 @@ function MatrixSpectralTransform(
     scratch_memory = on_architecture(architecture, zeros(NF, spectrum, nlayers).data)
     #scratch_memory = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
 
-    # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES
+    # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES + LAPLACE EIGENVALUES (stored on the transform,
+    # not inside `gradients`, so the `gradients` type stays short — see `Gradients`)
     gradients = gradient_arrays(NF, spectrum)
+    eigenvalues, eigenvalues⁻¹ = get_eigenvalues_and_inverse(NF, spectrum)
 
     return MatrixSpectralTransform{
         NF,
@@ -107,12 +113,12 @@ function MatrixSpectralTransform(
         typeof(backward_real),
         typeof(forward),
         typeof(gradients),
-        typeof(nlayers),
     }(
         architecture,
         spectrum, grid, nlayers,
         coslat, coslat⁻¹,
         S.norm_sphere,
+        eigenvalues, eigenvalues⁻¹,
         forward,
         backward,
         backward_real,

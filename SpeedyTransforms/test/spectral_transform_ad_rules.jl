@@ -28,6 +28,14 @@ function EnzymeTestUtils.test_approx(x::AbstractFFTs.Plan, y::AbstractFFTs.Plan,
     return nothing
 end
 
+# `test_forward` requires a mutating function to RETURN the argument(s) it mutates — the opposite of
+# `test_reverse`, which needs it to return nothing. `_fourier!` returns nothing, so wrap it; the
+# grid -> Fourier direction writes both scratch halves, so both are returned to get both tangents checked.
+fourier_analysis!(f_north, f_south, field, S) =
+    (SpeedyTransforms._fourier!(f_north, f_south, field, S); (f_north, f_south))
+fourier_synthesis!(field, f_north, f_south, S) =
+    (SpeedyTransforms._fourier!(field, f_north, f_south, S); field)
+
 @testset "SpeedyTransforms: AD Rules" begin
     @testset "_fourier! Enzyme rules" begin
         @testset "EnzymeTestUtils reverse rule test" begin
@@ -58,6 +66,42 @@ end
                         SpeedyTransforms._fourier!, Const,
                         (field, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const);
                         fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                    )
+                end
+            end
+        end
+
+        # `runtime_activity` is needed throughout the forward tests because EnzymeTestUtils' own
+        # call wrapper stores constant memory into a differentiable tuple, which trips Enzyme's
+        # static activity analysis (the reverse tests above hit the same thing, hence the
+        # `set_runtime_activity(Reverse)` in the `autodiff` calls further down).
+        @testset "EnzymeTestUtils forward rule test" begin
+            for (i_grid, Grid) in enumerate(grid_types)
+
+                # same reduced-grid caveat as the reverse tests above
+                if !(Grid <: AbstractReducedGrid) & fd_tests[i_grid]
+                    trunc = 5
+                    spectrum = Spectrum(trunc, one_degree_more = true)
+                    grid = Grid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[i_grid]))
+                    S = SpectralTransform(spectrum, grid)
+                    field = rand(grid)
+                    f_north = zero(S.scratch_memory.north)
+                    f_south = zero(S.scratch_memory.south)
+
+                    # forward transform
+                    test_forward(
+                        fourier_analysis!, Duplicated,
+                        (f_north, Duplicated), (f_south, Duplicated), (field, Duplicated), (S, Const);
+                        fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                        runtime_activity = true,
+                    )
+
+                    # inverse transform
+                    test_forward(
+                        fourier_synthesis!, Duplicated,
+                        (zero(field), Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const);
+                        fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                        runtime_activity = true,
                     )
                 end
             end
@@ -162,7 +206,208 @@ end
             Duplicated(deepcopy(S_chunked.scratch_memory), make_zero(deepcopy(S_chunked.scratch_memory))), Const(S_chunked),
         )
         @test isapprox(df_acc.data, base_f.data .+ dfields[1].data, rtol = 1.0e-4)
+
+        # FORWARD MODE. `transform!` already returns the array it mutates, as `test_forward`
+        # requires, so no wrapper is needed here. Only the chunked transform is checked against
+        # finite differences — the rule is one code path for chunked and batched alike — while
+        # chunked/batched agreement is checked exactly in the next testset.
+        @testset "EnzymeTestUtils forward rule test" begin
+            let field = zeros(Float32, grid, NL), coeffs = rand(ComplexF32, spectrum, NL)
+                test_forward(
+                    transform!, Duplicated,
+                    (field, Duplicated), (coeffs, Duplicated),
+                    (deepcopy(S_chunked.scratch_memory), Const), (S_chunked, Const);
+                    fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                    runtime_activity = true,
+                )
+            end
+            let coeffs = zeros(ComplexF32, spectrum, NL), field = rand(Float32, grid, NL)
+                test_forward(
+                    transform!, Duplicated,
+                    (coeffs, Duplicated), (field, Duplicated),
+                    (deepcopy(S_chunked.scratch_memory), Const), (S_chunked, Const);
+                    fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                    runtime_activity = true,
+                )
+            end
+        end
+
+        # The transform is linear and `S` is inactive, so the jvp must be EXACTLY the transform of
+        # the tangent. That is a much tighter check than finite differences and costs almost
+        # nothing, so it is run for both the chunked and the batched path.
+        @testset "forward rule jvp == transform(tangent)" begin
+            for S in (S_chunked, S_batched)
+                # spec -> grid
+                coeffs, dcoeffs = rand(ComplexF32, spectrum, NL), rand(ComplexF32, spectrum, NL)
+                field, dfield = zeros(Float32, grid, NL), zeros(Float32, grid, NL)
+                autodiff(
+                    Forward, transform!, Const,
+                    Duplicated(field, dfield), Duplicated(coeffs, dcoeffs),
+                    Const(deepcopy(S.scratch_memory)), Const(S),
+                )
+                @test any(!iszero, dfield)
+                @test dfield ≈ transform!(zeros(Float32, grid, NL), dcoeffs, deepcopy(S.scratch_memory), S)
+                @test field ≈ transform!(zeros(Float32, grid, NL), coeffs, deepcopy(S.scratch_memory), S)
+
+                # grid -> spec
+                field2, dfield2 = rand(Float32, grid, NL), rand(Float32, grid, NL)
+                coeffs2, dcoeffs2 = zeros(ComplexF32, spectrum, NL), zeros(ComplexF32, spectrum, NL)
+                autodiff(
+                    Forward, transform!, Const,
+                    Duplicated(coeffs2, dcoeffs2), Duplicated(field2, dfield2),
+                    Const(deepcopy(S.scratch_memory)), Const(S),
+                )
+                @test any(!iszero, dcoeffs2)
+                @test dcoeffs2 ≈ transform!(zeros(ComplexF32, spectrum, NL), dfield2, deepcopy(S.scratch_memory), S)
+                @test coeffs2 ≈ transform!(zeros(ComplexF32, spectrum, NL), field2, deepcopy(S.scratch_memory), S)
+            end
+
+            # width > 1 (BatchDuplicated): every tangent must be transformed independently
+            coeffs = rand(ComplexF32, spectrum, NL)
+            dcoeffs = (rand(ComplexF32, spectrum, NL), rand(ComplexF32, spectrum, NL))
+            refs = map(dc -> transform!(zeros(Float32, grid, NL), dc, deepcopy(S_batched.scratch_memory), S_batched), dcoeffs)
+            field = zeros(Float32, grid, NL)
+            dfields = (zeros(Float32, grid, NL), zeros(Float32, grid, NL))
+            autodiff(
+                Forward, transform!, Const,
+                BatchDuplicated(field, dfields), BatchDuplicated(coeffs, dcoeffs),
+                Const(deepcopy(S_batched.scratch_memory)), Const(S_batched),
+            )
+            @test dfields[1] ≈ refs[1]
+            @test dfields[2] ≈ refs[2]
+
+            # an inactive (Const) input carries a zero tangent, so the output tangent is zeroed
+            dfield = zeros(Float32, grid, NL)
+            dfield .= 7     # pre-seeded, must not survive
+            autodiff(
+                Forward, transform!, Const,
+                Duplicated(zeros(Float32, grid, NL), dfield), Const(rand(ComplexF32, spectrum, NL)),
+                Const(deepcopy(S_batched.scratch_memory)), Const(S_batched),
+            )
+            @test all(iszero, dfield)
+        end
     end
+    # The reverse rules end with `make_zero!` on their output cotangent, which is correct for a
+    # plain array: the primal overwrites that argument, so its input-side cotangent is zero (the
+    # `test_reverse` checks above pin exactly that against finite differences).
+    #
+    # In SpeedyWeather the transform arguments are NOT plain arrays — they are views into a shared
+    # "fused" parent buffer that several variables live in. Zeroing then reaches beyond the slice
+    # this call overwrote. These tests exercise that layout directly, which the plain-array tests
+    # above cannot: they check that a cotangent parked in a DISJOINT slice of the same parent
+    # survives a transform on a neighbouring slice, and that the transform's own slice still
+    # pulls back correctly.
+    @testset "reverse rules on view-backed (fused) arrays" begin
+        trunc = 5
+        spectrum = Spectrum(trunc, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[1]))
+        NL = 2
+        S = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1, NL])
+
+        # one parent buffer holding two independent layer-slices, as the fused variables do
+        spec_parent = rand(ComplexF32, spectrum, 2NL)
+        grid_parent = rand(Float32, grid, 2NL)
+        spec_a = wrapped_view(spec_parent, :, 1:NL)         # the transform's argument
+        spec_b = wrapped_view(spec_parent, :, (NL + 1):2NL) # a neighbour that must be left alone
+        field_a = wrapped_view(grid_parent, :, 1:NL)
+        field_b = wrapped_view(grid_parent, :, (NL + 1):2NL)
+
+        # spec -> grid: cotangent on the neighbouring grid slice must survive
+        let dspec = make_zero(spec_parent), dgrid = make_zero(grid_parent)
+            fill!(wrapped_view(dgrid, :, 1:NL).data, 1)    # the OUTPUT cotangent being pulled back
+            dfield_b = wrapped_view(dgrid, :, (NL + 1):2NL)
+            fill!(dfield_b.data, 7)                        # mark the neighbour's cotangent
+            marker = copy(dfield_b.data)
+            autodiff(
+                set_runtime_activity(Reverse), transform!, Const,
+                Duplicated(field_a, wrapped_view(dgrid, :, 1:NL)),
+                Duplicated(spec_a, wrapped_view(dspec, :, 1:NL)),
+                Const(deepcopy(S.scratch_memory)), Const(S),
+            )
+            @test wrapped_view(dgrid, :, (NL + 1):2NL).data == marker   # neighbour untouched
+            @test any(!iszero, wrapped_view(dspec, :, 1:NL).data)       # own slice pulled back
+        end
+
+        # grid -> spec: same, with the roles swapped
+        let dspec = make_zero(spec_parent), dgrid = make_zero(grid_parent)
+            fill!(wrapped_view(dspec, :, 1:NL).data, 1 + im)   # the OUTPUT cotangent being pulled back
+            dspec_b = wrapped_view(dspec, :, (NL + 1):2NL)
+            fill!(dspec_b.data, 7 + 7im)                       # mark the neighbour's cotangent
+            marker = copy(dspec_b.data)
+            autodiff(
+                set_runtime_activity(Reverse), transform!, Const,
+                Duplicated(spec_a, wrapped_view(dspec, :, 1:NL)),
+                Duplicated(field_a, wrapped_view(dgrid, :, 1:NL)),
+                Const(deepcopy(S.scratch_memory)), Const(S),
+            )
+            @test wrapped_view(dspec, :, (NL + 1):2NL).data == marker   # neighbour untouched
+            @test any(!iszero, wrapped_view(dgrid, :, 1:NL).data)       # own slice pulled back
+        end
+    end
+
+    @testset "reverse mode must not mutate the primal transform" begin
+        # The gradient operators destructure the coefficient arrays out of `S.gradients` and pass
+        # them as bare arrays into a kernel computing `grad_y_vordiv1[lm] * v[lm-1, k]`. Enzyme sees
+        # ordinary float arrays feeding a multiply and computes ∂L/∂coefficients — the accumulated
+        # delta matches the analytic coefficient gradient to ~1e-16. That gradient needs somewhere
+        # to go: given a shadow it lands there, but with no shadow it lands in the PRIMAL, and every
+        # later call with the same transform then silently uses corrupted coefficients.
+
+        spectrum = Spectrum(8, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(8, grid_dealiasing[1]))
+        make_S() = SpectralTransform(spectrum, grid; NF = Float64, nlayers = 1)
+
+        u = rand(ComplexF64, spectrum, 1)
+        v = rand(ComplexF64, spectrum, 1)
+        reference = make_S()
+        coefficients(S) = copy(S.gradients.grad_y_vordiv1)
+
+        # a plain call, and forward mode, both leave the transform alone
+        let S = make_S(), out = zero(u)
+            SpeedyTransforms.curl!(out, u, v, S)
+            @test coefficients(S) == coefficients(reference)
+        end
+        # `set_runtime_activity` throughout: passing the transform without a shadow stores constant
+        # memory into a differentiable variable, which trips Enzyme's static activity analysis on
+        # Julia 1.12 (`EnzymeRuntimeActivityError`) — the same reason the tests further up use it.
+        let S = make_S(), out = zero(u), dout = zero(u)
+            autodiff(
+                set_runtime_activity(Forward), SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, fill!(zero(u), 1)), Duplicated(v, zero(v)), Const(S),
+            )
+            @test coefficients(S) == coefficients(reference)
+        end
+
+        # reverse mode with a real shadow: the coefficient gradient goes to the shadow, and the
+        # primal is left intact. This is the supported way to differentiate these operators.
+        let S = make_S(), dS = make_zero(make_S()), out = zero(u), dout = fill!(zero(u), 1)
+            du = zero(u); dv = zero(v)
+            autodiff(
+                set_runtime_activity(Reverse), SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, du), Duplicated(v, dv), Duplicated(S, dS),
+            )
+            @test coefficients(S) == coefficients(reference)      # primal untouched
+            @test any(!iszero, du.data)                            # and the real gradients still land
+        end
+
+        # ...and with runtime activity `Const(S)` is safe too. It is NOT safe under plain `Reverse`:
+        # static activity analysis then has nowhere to put ∂L/∂coefficients and writes it into the
+        # primal. Measured on Julia 1.10, `divergence!`, primal corrupted?
+        #
+        #     mode                     Const(S)   Duplicated(S, make_zero(S))
+        #     Reverse                  yes        no
+        #     set_runtime_activity     no         no
+        #
+        # so `set_runtime_activity` — not the argument annotation — is what makes this correct.
+        let S = make_S(), out = zero(u), dout = fill!(zero(u), 1)
+            autodiff(
+                set_runtime_activity(Reverse), SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, zero(u)), Duplicated(v, zero(v)), Const(S),
+            )
+            @test coefficients(S) == coefficients(reference)
+        end
+    end
+
     @testset "Complete Transform ChainRules" begin
         # WIP
     end
