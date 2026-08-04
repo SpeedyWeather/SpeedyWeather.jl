@@ -82,7 +82,7 @@ Base.show(io::IO, M::AbstractBoundaryLayer) = Base.show(io, M, values = false)
 export BoundaryLayer
 """Composite type, containing surface roughness computation
 and drag coefficient computation. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct BoundaryLayer{SC, SR, D, NW} <: AbstractBoundaryLayer
+@parameterized @kwdef struct BoundaryLayer{SC, NW, SR, D} <: AbstractBoundaryLayer
     @component surface_condition::SC
     @component neutral_wind_speed::NW
     @component surface_roughness::SR
@@ -97,7 +97,7 @@ function BoundaryLayer(
         surface_roughness = ConstantSurfaceRoughness(SG),
         drag = BulkRichardsonDrag(SG),
     )
-    return BoundaryLayer(surface_condition, surface_roughness, drag, neutral_wind_speed)
+    return BoundaryLayer(surface_condition, neutral_wind_speed, surface_roughness, drag)
 end
 
 function initialize!(BL::BoundaryLayer)
