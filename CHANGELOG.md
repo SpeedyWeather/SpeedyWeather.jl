@@ -3,6 +3,16 @@
 ## Unreleased
 
 - Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
+- Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
+- Revised extended differentiability tests [#1167](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1167)
+- Compatability with Terrarium 0.1.4 [#1157](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1157) [#1170](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1170)
+- Add time chunk buffering for ZarrOutput [#1162](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1162)
+- Enable nested AD on CPU by shortening type name of `SpectralTransform`, e.g. by converting the gradient arrays into a type `Gradient` instead of a `NamedTuple` [#1165](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1165) [#1166](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1165)
+- Forward mode differentiation of the whole model now works (in 1.10) [#1164](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1164)
+- Enzyme Forward rules for SpectralTransform [#767](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/767)
+- Revised EnzymeRules for SpeedyTransforms [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
+- Eliminate dynamic dispatchs in the model integration code and unit test for them with JET [#1151](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1151)
+- ZarrOutput ensemble mode hardened for parallel jobs, Zarr store metadata consolidated at creation for faster opening [#1160](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1160)
 - Terrarium coupling: fill soil mirror variables with ocean fallback values (285 K / 0) outside the Terrarium land mask, warn when the Terrarium and SpeedyWeather land masks disagree [#1159](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1159)
 - Sea surface temperature and sea ice concentration are now time-stepped variables [#1140](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1140)
 - Reduce CI time of vertical coordinates test [#1158](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1158)

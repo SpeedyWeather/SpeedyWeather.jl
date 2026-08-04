@@ -79,3 +79,48 @@ end
         ext.clear_fourier_graph_cache!()
     end
 end
+
+# `add=true` (accumulate onto the field instead of overwriting; used by the Enzyme adjoint rules) on the
+# CUDA-Graphs path. Two hazards, both regressions guarded here:
+#  1. A captured graph bakes in overwrite-vs-accumulate, so the two modes must NOT share a graph — the
+#     cache is therefore keyed by (field buffer, add). Sharing would silently give wrong results.
+#  2. `run_graph!` warms up and then captures; `capture` only RECORDS (it does not execute), so the
+#     warmup alone produces the call's result. Launching the graph as well would apply the work twice —
+#     invisible for an overwriting loop, but a double-accumulate for `add=true`.
+@testset "CUDA Graphs: add=true accumulates exactly once and uses its own graph" begin
+    ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
+    if ext !== nothing
+        ST = SpeedyWeather.SpeedyTransforms
+        spectral_grid = SpectralGrid(; trunc = 15, nlayers = 4, architecture = GPU())
+        S = SpectralTransform(spectral_grid)
+        nlayers = spectral_grid.nlayers
+        specs = rand(ComplexF32, spectral_grid.spectrum, nlayers)
+        field = zeros(Float32, spectral_grid.grid, nlayers)
+        scratch = S.scratch_memory
+
+        n_inverse() = sum(length(c.inverse_execs) for c in values(ext.GRAPH_CACHES); init = 0)
+
+        ext.clear_fourier_graph_cache!()
+        ST._transform_grid!(field, specs, scratch, S, false)    # populate the fourier scratch
+
+        ST._fourier!(field, scratch.north, scratch.south, S)                # overwrite → reference
+        once = Array(copy(field.data))
+        n_overwrite = n_inverse()
+
+        ST._fourier!(field, scratch.north, scratch.south, S; add = true)    # accumulate on same buffer
+        twice = Array(copy(field.data))
+
+        @test n_inverse() > n_overwrite                 # add=true captured its OWN graph (not shared)
+        @test twice ≈ 2 .* once                         # applied exactly once, not twice (no double-add)
+
+        # replaying both cached modes stays correct and captures nothing new
+        n_before = n_inverse()
+        ST._fourier!(field, scratch.north, scratch.south, S)
+        @test Array(field.data) ≈ once
+        ST._fourier!(field, scratch.north, scratch.south, S; add = true)
+        @test Array(field.data) ≈ 2 .* once
+        @test n_inverse() == n_before
+
+        ext.clear_fourier_graph_cache!()
+    end
+end

@@ -357,3 +357,46 @@ that submodule must be bumped according to its size:
 Bump the version of every submodule whose source you actually touched in the PR.
 A change confined to `SpeedyWeather/` does not require bumping
 `LowerTriangularArrays`, etc.
+
+## Implementation plans
+
+All major feature additions, bug fixes, or refactoring that requires substantial changes to the existing code must be prefaced with an **implementation plan** that is reviewed and signed off by a human. These plan documents should be organized by date and stored in `docs/dev/YYYY-MM`. Each document should be prefaced by the following template:
+
+```md
+# Descriptive title
+
+> Status: **planned**/**in progress**/**completed**. One sentence summary of current status.
+
+Date of initial draft: YYYY-MM-dd
+
+Base revision: <SHA1 of HEAD when plan was drafted>
+
+## Originating prompt
+
+> User prompts here
+
+## Revision log
+
+> User prompts here
+
+## Problem description
+
+## Background
+
+```
+
+The revision log should, to the greatest extent possible, briefly summarize changes to the plan that are made on-the-fly during development.
+
+The remainder of the plan document may be adapted on a case-by-case basis but should generally follow this structure:
+
+```md
+## Summary of changes
+
+## Testing and verification
+
+## Documentation changes
+
+## Known limitations
+
+## Future work
+```

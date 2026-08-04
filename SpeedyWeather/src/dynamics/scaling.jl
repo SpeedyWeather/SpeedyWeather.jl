@@ -32,25 +32,30 @@ function scale_tendencies!(vars::Variables, model::AbstractModel)
     haskey(vars.fused, :grid_tendencies) &&
         scale!(get_tendency_step(parent(vars.fused.grid_tendencies), TS, DummyParameterization()), scale)
 
-    # Scale the standalone (non-fused) tendencies individually. 
-    # spectral
-    for varname in tendency_names(vars)
-        var = getfield(tendencies, varname)
-        is_view_entry(var) || scale!(get_tendency_step(var, TS, DummyParameterization()), scale)
-    end
-
-    # grid
-    for varname in tendency_and_uv_names(vars)
-        var = getfield(tendencies.grid, varname)
-        is_view_entry(var) || scale!(get_tendency_step(var, TS, DummyParameterization()), scale)
-    end
-
-    # tracers
-    for varname in tracer_tendency_names(vars)
-        var = getfield(tendencies.grid_tracers, varname)
-        is_view_entry(var) || scale!(get_tendency_step(var, TS, DummyParameterization()), scale)
-    end
+    # Scale the standalone (non-fused) tendencies individually — unrolled per name
+    _scale_tendencies_unrolled!(vars, TS, scale)
     return nothing
+end
+
+# scale one standalone tendency; the fused-view members are skipped (their fuse parent is
+# scaled contiguously above). With a concrete `var` the `is_view_entry` check constant-folds.
+@inline function _scale_one_tendency!(var, TS, scale)
+    is_view_entry(var) || scale!(get_tendency_step(var, TS, DummyParameterization()), scale)
+    return nothing
+end
+
+@generated function _scale_tendencies_unrolled!(vars::Variables{Po, G, T}, TS, scale) where {Po, G, T}
+    calls = Expr[]
+    for name in _tendency_names(T)                  # spectral
+        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies, $(QuoteNode(name))), TS, scale)))
+    end
+    for name in _tendency_and_uv_names(T)           # grid (+ u, v)
+        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies.grid, $(QuoteNode(name))), TS, scale)))
+    end
+    for name in _namespace_names(T, :tracers)       # grid tracers
+        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies.grid_tracers, $(QuoteNode(name))), TS, scale)))
+    end
+    return Expr(:block, calls..., :(return nothing))
 end
 
 function unscale_tendencies!(vars::Variables)

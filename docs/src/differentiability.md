@@ -8,7 +8,7 @@ SpeedyWeather.jl is written with differentiability in mind. This means that our 
 For the differentiability of our model we rely on [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl). If you've used Enzyme before, just go ahead and try to differentiate the model! It should work. We have checked the correctness of the gradients extensively against a finite differences differentiation with [FiniteDifferences.jl](https://github.com/JuliaDiff/FiniteDifferences.jl/). In the following we present a simple example how we can take the gradient of a single timestep of the primitive equation model with respect to one of the model parameter.
 
 !!! warning "Enzyme with Julia 1.11"
-    Currently there are still some issues with Enzyme in Julia 1.11, we recommend to use Julia 1.10 for the following
+    Currently there are still some issues with Enzyme in Julia 1.11/1.12, we recommend to use Julia 1.10 for the following
 
 ## Differentiating through a single timestep
 
@@ -56,6 +56,9 @@ dmodel.planet.gravity
 
 In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/SpeedyWeather/test/differentiability/sensitivity_examples/).
 
+## Correctness 
+
+The correctness of gradients is tested in our CI in `SpeedyWeather/test/differentiability` by comparing the results of the reverse mode to analytic results for function where it's available, against the forward mode and against finite difference when no analytic results are possible. These differentiability tests also feature many scripts using the differentiabilty of SpeedyWeather and might be a good resource if you want to apply it, too!
 
 ## Parameter handling
 
