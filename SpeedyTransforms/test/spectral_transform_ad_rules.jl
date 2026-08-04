@@ -367,9 +367,12 @@ fourier_synthesis!(field, f_north, f_south, S) =
             SpeedyTransforms.curl!(out, u, v, S)
             @test coefficients(S) == coefficients(reference)
         end
+        # `set_runtime_activity` throughout: passing the transform without a shadow stores constant
+        # memory into a differentiable variable, which trips Enzyme's static activity analysis on
+        # Julia 1.12 (`EnzymeRuntimeActivityError`) — the same reason the tests further up use it.
         let S = make_S(), out = zero(u), dout = zero(u)
             autodiff(
-                Forward, SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                set_runtime_activity(Forward), SpeedyTransforms.curl!, Const, Duplicated(out, dout),
                 Duplicated(u, fill!(zero(u), 1)), Duplicated(v, zero(v)), Const(S),
             )
             @test coefficients(S) == coefficients(reference)
@@ -380,21 +383,28 @@ fourier_synthesis!(field, f_north, f_south, S) =
         let S = make_S(), dS = make_zero(make_S()), out = zero(u), dout = fill!(zero(u), 1)
             du = zero(u); dv = zero(v)
             autodiff(
-                Reverse, SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                set_runtime_activity(Reverse), SpeedyTransforms.curl!, Const, Duplicated(out, dout),
                 Duplicated(u, du), Duplicated(v, dv), Duplicated(S, dS),
             )
             @test coefficients(S) == coefficients(reference)      # primal untouched
             @test any(!iszero, du.data)                            # and the real gradients still land
         end
 
-        # `Const(S)` gives Enzyme nowhere to put ∂L/∂coefficients, so it still writes them into the
-        # primal. Flagged broken so we are told if Enzyme learns to discard them instead.
+        # ...and with runtime activity `Const(S)` is safe too. It is NOT safe under plain `Reverse`:
+        # static activity analysis then has nowhere to put ∂L/∂coefficients and writes it into the
+        # primal. Measured on Julia 1.10, `divergence!`, primal corrupted?
+        #
+        #     mode                     Const(S)   Duplicated(S, make_zero(S))
+        #     Reverse                  yes        no
+        #     set_runtime_activity     no         no
+        #
+        # so `set_runtime_activity` — not the argument annotation — is what makes this correct.
         let S = make_S(), out = zero(u), dout = fill!(zero(u), 1)
             autodiff(
-                Reverse, SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                set_runtime_activity(Reverse), SpeedyTransforms.curl!, Const, Duplicated(out, dout),
                 Duplicated(u, zero(u)), Duplicated(v, zero(v)), Const(S),
             )
-            @test_broken coefficients(S) == coefficients(reference)
+            @test coefficients(S) == coefficients(reference)
         end
     end
 
