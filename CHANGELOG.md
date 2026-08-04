@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
 - Revised extended differentiability tests [#1167](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1167)
 - Compatability with Terrarium 0.1.4 [#1157](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1157) [#1170](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1170)
