@@ -3,11 +3,13 @@
 # GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! now live in SpeedyTransforms
 # (src/fourier_gpu_graphs.jl); ext is only used to check whether the extension is loaded.
 #
-# `expect_capture` is false for HIP: AMDGPU's run_graph! never attempts graph capture at all
-# (see SpeedyTransformsAMDGPUExt.jl — ROCm's stream-capture validator doesn't reliably reject
-# illegal-to-capture operations, so a captured graph can silently replay into invalid memory).
-# The allocation-free direct loop still runs on every call, so results must still be correct
-# and no graphs should ever appear in the cache.
+# `expect_capture` is true for HIP as of the 2026-08-05 LUMI session that re-enabled capture in
+# SpeedyTransformsAMDGPUExt.jl to test whether the originally-observed corruption (ROCm's
+# stream-capture validator not reliably rejecting illegal-to-capture operations) still
+# reproduces on the current AMDGPU.jl/ROCm combination. If this test starts crashing or
+# producing NaNs/mismatches on LUMI, that confirms the original bug is still present and
+# run_graph! should go back to always running the direct loop (see git history:
+# 0c114dfc..c7dc49b1 on gd/hip-graphs for the previous disabled state and why).
 
 function test_gpu_graphs(ext, prefix; expect_capture::Bool = true)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin

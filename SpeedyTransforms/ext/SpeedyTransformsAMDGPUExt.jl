@@ -1,12 +1,18 @@
 module SpeedyTransformsAMDGPUExt
 
 import AMDGPU: AMDGPU, ROCArray, ROCBackend
+import AMDGPU.HIP:
+    hipStreamBeginCapture, hipStreamEndCapture,
+    hipGraphInstantiateWithFlags, hipGraphLaunch,
+    hipGraphExecDestroy, hipGraphDestroy,
+    hipStreamCaptureModeGlobal, hipGraph_t, hipGraphExec_t,
+    hipSuccess, hipGetErrorString, HIPError
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-import SpeedyTransforms: SpectralTransform, GPUFourierGraphCache, build_cache, run_graph!, fft_plans
+import SpeedyTransforms: SpectralTransform, GPUFourierGraphCache, build_cache, run_graph!, MAX_GRAPHS, fft_plans
 
 import SpeedyWeatherInternals.Architectures: GPU, architecture
 
@@ -42,6 +48,7 @@ function build_cache(S::SpectralTransform, nlayers::Integer, ::GPU{<:ROCBackend}
     complex_view = [reshape(view(packed_complex, complex_offset[j] + 1:complex_offset[j] + block_complex[j]), nfreqs[j], nlayers) for j in 1:nlat_half]
 
     dev(x) = ROCArray(x)
+    exec_dict() = Dict{UInt, Union{Nothing, hipGraphExec_t}}()
     return GPUFourierGraphCache(
         packed_real, packed_complex, real_view, complex_view,
         rfft_plans, brfft_plans,
@@ -49,30 +56,128 @@ function build_cache(S::SpectralTransform, nlayers::Integer, ::GPU{<:ROCBackend}
         dev(istart_n), dev(istart_s), dev(nlons_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, j_equator,
         architecture(packed_real),
-        Dict{UInt, Nothing}(),  # unused: run_graph! never captures on AMDGPU, see below
-        Dict{UInt, Nothing}(),
+        exec_dict(),
+        exec_dict(),
     )
 end
 
 # =====================================================================================
-# run_graph!: HIP graph capture is currently disabled for AMDGPU. ROCm's stream-capture
-# validator does not reliably reject operations that are illegal to capture — some raise a
-# catchable HIPError (e.g. hipErrorStreamCaptureUnsupported, seen from rocFFT's `mul!`), but
-# others are silently accepted at capture time and only surface later as a GPU memory access
-# fault when the (corrupt) graph is replayed. That failure mode was confirmed on real hardware
-# (LUMI) even after removing the one identifiable offending call, and matches a known upstream
-# gap: HIP Graph capture on AMD GPUs does not raise `operation not permitted` for illegal
-# operations the way CUDA Graph capture does (see pytorch/pytorch#155684, #155720). Since
-# capture failures aren't reliably catchable, "try capture and fall back on error" isn't safe
-# here — always run the allocation-free direct loop instead. Revisit once ROCm/AMDGPU.jl
-# provides reliable stream-capture validation for library calls like rocFFT execution.
+# EXPERIMENTAL, re-enabled 2026-08-05 for testing on LUMI (session investigating whether the
+# original crash still reproduces). Previously HIP graph capture was disabled outright: ROCm's
+# stream-capture validator was found not to reliably reject illegal-to-capture operations —
+# some raised a catchable HIPError (hipErrorStreamCaptureUnsupported, from rocFFT's `mul!`),
+# but others were silently accepted at capture time and only surfaced as a GPU memory access
+# fault on replay, confirmed on real hardware (LUMI) even after removing the one identifiable
+# offending call (see git history: 0c114dfc..c7dc49b1 on gd/hip-graphs, and matching upstream
+# gap pytorch/pytorch#155684, #155720).
+#
+# Standalone repro scripts (scratch_hip_graph_repro*.jl) run against the CURRENT AMDGPU.jl on
+# this LUMI environment found NO reproduction: isolated single rocFFT calls (both directions)
+# and full transform! calls (Legendre + all-ring Fourier, both directions) all captured cleanly
+# and replayed correctly across 5 iterations with fresh data each time. This may mean the
+# upstream bug is fixed; it may also just mean these tests aren't the right shape/scale to
+# trigger it. This re-enablement is to find out under the ACTUAL model test suite / a real
+# run!() -- do not consider this validated until that has been run and reviewed.
+#
+# Uses raw hip{Stream,Graph}* C bindings rather than a high-level capture/instantiate/launch
+# wrapper because AMDGPU.jl 2.1.2 (as resolved on LUMI) does not expose one: `AMDGPU.HIP.capture`
+# and `HIPGraphExec` are undefined on this version; only the raw C bindings are present.
+# =====================================================================================
+
+raw_stream() = AMDGPU.stream().stream
+
+function hip_ok!(err, label)
+    err == hipSuccess && return err
+    error("$label failed: $(unsafe_string(hipGetErrorString(err))) (code $err)")
+end
+
+# Low-level equivalent of AMDGPU.HIP.capture(f; throw_error=false), built on the raw
+# hipStream*Capture* bindings (see module docstring above for why). Returns the captured
+# hipGraph_t, or `nothing` if capture was invalidated. A HIPError raised inside f() propagates
+# to the caller, which is expected to catch it (mirrors capture(throw_error=false)'s contract
+# of only swallowing invalidation, not arbitrary capture errors).
+function raw_capture(f)
+    stream = raw_stream()
+    hip_ok!(hipStreamBeginCapture(stream, hipStreamCaptureModeGlobal), "hipStreamBeginCapture")
+
+    thrown = nothing
+    try
+        f()
+    catch err
+        thrown = err
+    end
+
+    graph_ref = Ref{hipGraph_t}()
+    end_err = hipStreamEndCapture(stream, graph_ref)
+
+    if thrown !== nothing
+        rethrow(thrown)
+    end
+
+    end_err == hipSuccess || return nothing   # capture invalidated
+    return graph_ref[]
+end
+
+function raw_instantiate(graph)
+    exec_ref = Ref{hipGraphExec_t}()
+    hip_ok!(hipGraphInstantiateWithFlags(exec_ref, graph, UInt64(0)), "hipGraphInstantiateWithFlags")
+    return exec_ref[]
+end
+
+function raw_launch!(exec)
+    hip_ok!(hipGraphLaunch(exec, raw_stream()), "hipGraphLaunch")
+    return nothing
+end
+
+# =====================================================================================
+# run_graph!: HIP-specific graph capture and replay.
+# Dispatches on the A=GPU{<:ROCBackend} type parameter of GPUFourierGraphCache.
 # =====================================================================================
 
 function run_graph!(
         ::GPUFourierGraphCache{<:Any, <:Any, <:Any, <:Any, <:Any, <:GPU{<:ROCBackend}, E},
-        ::Dict{UInt, E}, key, loop!::F,
+        execs::Dict{UInt, E}, key, loop!::F,
     ) where {E, F}
+    exec = get(execs, key, missing)
+    if exec isa hipGraphExec_t
+        raw_launch!(exec)                    # hot path: pure replay
+        return nothing
+    elseif exec === nothing                  # capture previously failed; run directly
+        loop!()
+        return nothing
+    end
+
+    # first time we see this buffer (exec === missing)
+    if length(execs) >= MAX_GRAPHS
+        loop!()                              # cache full: don't capture, just run
+        return nothing
+    end
+
+    # warm up so that one-time work (rocFFT init, kernel JIT, memory-pool growth) happens
+    # OUTSIDE the capture region where it is not allowed
     loop!()
+    AMDGPU.synchronize()
+
+    graph = try
+        raw_capture() do
+            loop!()
+        end
+    catch err
+        err isa HIPError || rethrow()
+        nothing
+    end
+
+    if graph === nothing
+        # capture invalidated or failed with a hard HIP error; warmup already produced
+        # the correct result
+        execs[key] = nothing
+        return nothing
+    end
+
+    exec = raw_instantiate(graph)
+    hipGraphDestroy(graph)   # exec is independently allocated; the graph template is not needed after this
+    execs[key] = exec
+    raw_launch!(exec)
     return nothing
 end
 
