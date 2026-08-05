@@ -218,7 +218,12 @@ end
                 set!(time_stepping, Δt=Δt)
                 @test time_stepping.Δt == Second(Δt).value
                 @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt))
-                @test time_stepping.Δt_at_T31 == Second(Second(Δt).value / ((trunc + 1) / (SpeedyWeather.DEFAULT_TRUNC + 1)))
+
+                # Δt = Δt_at_T31 * (32/(trunc+1)) (see get_Δt_millisec), so Δt_at_T31 is the
+                # requested Δt divided by that factor, i.e. LONGER than Δt for trunc > 31
+                factor = SpeedyWeather.resolution_factor(trunc, SpeedyWeather.DEFAULT_RADIUS)
+                @test time_stepping.Δt_at_T31.value ≈ Second(Δt).value / factor rtol = 0.05
+                @test time_stepping.Δt_at_T31 >= Second(Δt)   # never shorter than Δt itself
             end
         end
     end
