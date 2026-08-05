@@ -32,7 +32,7 @@ testsuite = merge(
 # long integration tests should always be run with `-O2` compiler flag, as set in workflow yml,
 # return nothing uses default worker, but all other tests should use `-O0` as compile time heavy
 # 
-test_worker(name) = "long" in name ? nothing : addworker(; exeflags = ["-O0"])
+test_worker(name) = contains(name, "long") ? nothing : addworker(; exeflags = ["-O0"])
 
 # run tests in parallel
 runtests(SpeedyWeather, ARGS; test_worker, testsuite, init_code)
