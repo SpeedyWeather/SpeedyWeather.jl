@@ -11,7 +11,7 @@ F(x, ω) = im * ω * x
 
     # loop over different precisions
     @testset for NF in (Float32, Float64)
-        spectral_grid = SpectralGrid(; NF, trunc=5, nlayers = 1)
+        spectral_grid = SpectralGrid(; NF, truncation = 6, nlayers = 1)
         L = Leapfrog(spectral_grid, adjust_with_output=false, robert_filter=0.05, williams_filter=0.51)
         model = BarotropicModel(spectral_grid; time_stepping=L)
         simulation = initialize!(model)
@@ -57,7 +57,7 @@ end
 
 @testset "Leapfrog spinup" begin
 
-    spectral_grid = SpectralGrid(trunc=5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
 
     # disable RAW filters
     time_stepping = Leapfrog(spectral_grid, adjust_with_output=false, robert_filter=0, williams_filter=1)
@@ -165,7 +165,7 @@ end
                                     SpeedyWeather.NCycleLorenzABBA,
                                     )
             @testset for steps in (3, 4)
-                spectral_grid = SpectralGrid(; NF, trunc=5, nlayers = 1)
+                spectral_grid = SpectralGrid(; NF, truncation = 6, nlayers = 1)
                 L = NCycleLorenz(spectral_grid; steps=steps, variant=Variant(), adjust_with_output=false)
                 model = BarotropicModel(spectral_grid; time_stepping=L)
                 simulation = initialize!(model)
@@ -211,14 +211,14 @@ end
 
 @testset "Set timestep manually" begin
     @testset for TS in (Leapfrog, NCycleLorenz)
-        @testset for trunc in (31, 63, 127)
+        @testset for truncation in (32, 64, 128)
             @testset for Δt in (Minute(10), Minute(20))
-                spectral_grid = SpectralGrid(; trunc)
+                spectral_grid = SpectralGrid(; truncation)
                 time_stepping = TS(spectral_grid)
                 set!(time_stepping, Δt=Δt)
                 @test time_stepping.Δt == Second(Δt).value
                 @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt))
-                @test time_stepping.Δt_at_T31 == Second(Second(Δt).value / ((trunc + 1) / (SpeedyWeather.DEFAULT_TRUNC + 1)))
+                @test time_stepping.Δt_at_T32 == Second(Second(Δt).value / (truncation / SpeedyWeather.DEFAULT_TRUNCATION))
             end
         end
     end
@@ -278,7 +278,7 @@ end
     # and could double-scale) — and `scale ∘ unscale` must round-trip to the identity.
     @testset for Model in (BarotropicModel, ShallowWaterModel, PrimitiveWetModel)
         nlayers = Model == PrimitiveWetModel ? 4 : 1
-        spectral_grid = SpectralGrid(; trunc = 8, nlayers)
+        spectral_grid = SpectralGrid(; truncation = 9, nlayers)
         model = Model(spectral_grid)
         vars = Variables(model)
         r = 3.0f0

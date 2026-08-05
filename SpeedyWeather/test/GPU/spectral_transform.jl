@@ -1,5 +1,5 @@
 @testset "GPU spectral transform roundtrip " begin
-    spectral_grid = SpectralGrid(trunc = 41, nlayers = 8, architecture = GPU())
+    spectral_grid = SpectralGrid(truncation = 42, nlayers = 8, architecture = GPU())
     S = SpectralTransform(spectral_grid)
 
     # first roundtrip
@@ -16,7 +16,7 @@
     @test L ≈ L2
 end
 
-spectral_resolutions = (31,) #, 63, 127)
+spectral_resolutions = (32,) #, 63, 127)
 nlayers_list = (8,) # 8, 32]
 # TODO: at the moment only tests for even grids (no ring on equator) pass for some reason
 grid_list = [
@@ -33,11 +33,11 @@ NFs = (Float32,)
 
 
 # Function to generate random inputs
-function get_test_data(; trunc, nlayers, Grid, NF)
+function get_test_data(; truncation, nlayers, Grid, NF)
     # We use dealiasing=3 to ensure that the transform is exact for both
     # Clenshaw and Gaussian grids
-    spectral_grid_cpu = SpectralGrid(; NF, trunc, nlayers, Grid, dealiasing = 3)
-    spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers, Grid, architecture = SpeedyWeather.GPU, dealiasing = 3)
+    spectral_grid_cpu = SpectralGrid(; NF, truncation, nlayers, Grid, dealiasing = 3)
+    spectral_grid_gpu = SpectralGrid(; NF, truncation, nlayers, Grid, architecture = SpeedyWeather.GPU, dealiasing = 3)
 
     S_cpu = SpectralTransform(spectral_grid_cpu)
     S_gpu = SpectralTransform(spectral_grid_gpu)
@@ -61,12 +61,12 @@ end
 
 @testset "Whole transform: test a round trip" begin
     @testset for NF in NFs
-        @testset for trunc in spectral_resolutions
+        @testset for truncation in spectral_resolutions
             @testset for nlayers in nlayers_list
                 @testset for Grid in grid_list
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
+                        truncation = truncation, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     gpu_arch = S_gpu.architecture
@@ -111,7 +111,7 @@ end
 
 @testset "Whole transform: works in 2D" begin
     S_cpu, S_gpu, field_cpu, field_gpu, spec_cpu, spec_gpu = get_test_data(
-        trunc = spectral_resolutions[1], nlayers = nlayers_list[1], Grid = grid_list[1], NF = NFs[1]
+        truncation = spectral_resolutions[1], nlayers = nlayers_list[1], Grid = grid_list[1], NF = NFs[1]
     )
 
     cpu_arch = S_cpu.architecture
@@ -147,9 +147,9 @@ end
 @testset "Whole transform: single-layer step view" begin
     # `get_step(vars.prognostic.pressure, 1)` hands `transform` a LowerTriangularMatrix whose
     # `.data` is a 1D view, a slightly different code path, so we test again seperatly here
-    NF, trunc, Grid = NFs[1], spectral_resolutions[1], grid_list[1]
-    spectral_grid_cpu = SpectralGrid(; NF, trunc, nlayers = 1, Grid, dealiasing = 3)
-    spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers = 1, Grid, architecture = SpeedyWeather.GPU, dealiasing = 3)
+    NF, truncation, Grid = NFs[1], spectral_resolutions[1], grid_list[1]
+    spectral_grid_cpu = SpectralGrid(; NF, truncation, nlayers = 1, Grid, dealiasing = 3)
+    spectral_grid_gpu = SpectralGrid(; NF, truncation, nlayers = 1, Grid, architecture = SpeedyWeather.GPU, dealiasing = 3)
 
     S_cpu = SpectralTransform(spectral_grid_cpu)
     S_gpu = SpectralTransform(spectral_grid_gpu)
@@ -184,13 +184,13 @@ end
 end
 
 @testset "fourier_batched: compare forward pass to CPU" begin
-    @testset for trunc in spectral_resolutions
+    @testset for truncation in spectral_resolutions
         @testset for nlayers in nlayers_list
             @testset for Grid in grid_list
                 @testset for NF in NFs
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
+                        truncation = truncation, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     cpu_arch = S_cpu.architecture
@@ -232,7 +232,7 @@ end
     ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
     if ext !== nothing
         @testset for Grid in grid_list
-            spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
+            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
             field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
             coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
 
@@ -269,13 +269,13 @@ end
 end
 
 @testset "fourier_batched: compare backward pass to CPU" begin
-    @testset for trunc in spectral_resolutions
+    @testset for truncation in spectral_resolutions
         @testset for nlayers in nlayers_list
             @testset for Grid in grid_list
                 @testset for NF in NFs
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
+                        truncation = truncation, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     cpu_arch = S_cpu.architecture
@@ -317,13 +317,13 @@ end
 
 
 @testset "fourier_serial: compare forward pass to CPU" begin
-    @testset for trunc in spectral_resolutions
+    @testset for truncation in spectral_resolutions
         @testset for nlayers in nlayers_list
             @testset for Grid in grid_list
                 @testset for NF in NFs
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
+                        truncation = truncation, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     gpu_arch = S_gpu.architecture
@@ -356,13 +356,13 @@ end
 
 # NOTE: Currently failing due to problem with Float32 FFTW planning
 # @testset "fourier_serial: compare backward pass to CPU" begin
-#     @testset for trunc in spectral_resolutions
+#     @testset for truncation in spectral_resolutions
 #         @testset for nlayers in nlayers_list
 #             @testset for Grid in grid_list
 #                 @testset for NF in (Float32, Float64)
 #                     # Generate test data
 #                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-#                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
+#                         truncation=truncation, nlayers=nlayers, Grid=Grid, NF=NF
 #                     )
 
 #                     # Use scratch memory to store mid-transform data, using the
@@ -396,12 +396,12 @@ end
 
 @testset "legendre: compare inverse transform to CPU" begin
     @testset for NF in NFs
-        @testset for trunc in spectral_resolutions
+        @testset for truncation in spectral_resolutions
             @testset for nlayers in nlayers_list
                 @testset for Grid in grid_list
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
+                        truncation = truncation, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     gpu_arch = S_gpu.architecture
@@ -439,12 +439,12 @@ end
 
 @testset "legendre: compare forward transform to CPU" begin
     @testset for NF in NFs
-        @testset for trunc in spectral_resolutions
+        @testset for truncation in spectral_resolutions
             @testset for nlayers in nlayers_list
                 @testset for Grid in grid_list
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
+                        truncation = truncation, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     gpu_arch = S_gpu.architecture

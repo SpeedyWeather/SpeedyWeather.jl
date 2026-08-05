@@ -218,7 +218,7 @@ They are as follows with more details below
     (e.g. "T31" for ``l_{max}=31``). SpeedyWeather.jl's `truncation` keyword is 1-based
     instead (`truncation = l_{max} + 1`) purely for user convenience: it lets you pick
     resolutions as powers of 2 (e.g. `truncation=32` or `truncation=64`) rather than
-    having to remember to subtract one every time.
+    having to remember to subtract one every time. For consistency, we may refer to a resolution as e.g. T32 too, though that's equivalent to T31 for everyone else.
 
 | `truncation`  | nlon | nlat | ``\Delta x`` |
 | ------------- | ---- | ---- | ------------ |

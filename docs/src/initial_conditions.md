@@ -206,7 +206,7 @@ initial_conditions = (;
                         pres=PressureOnOrography(spectral_grid))
 
 orography = NoOrography(spectral_grid)
-time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(30))   # 30min timestep scaled linearly
+time_stepping = Leapfrog(spectral_grid, Δt_at_T32=Minute(30))   # 30min timestep scaled linearly
 
 forcing = nothing
 drag = nothing

@@ -5,28 +5,23 @@ spin_up_steps(::AbstractTimeStepper) = 0
 default_time_step(L::AbstractTimeStepper) = L.Δt
 
 """$(TYPEDSIGNATURES)
-Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
-of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 
+Computes the time step in [ms]. `Δt_at_T32` is always scaled with the resolution `trunc` 
+of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T32` is additionally 
 adjusted to the closest divisor of `interval` so that the output time axis is keeping
 `interval` exactly."""
 function get_Δt_millisec(
-        Δt_at_T31::TimePeriod,
-        trunc,
-        radius,
+        Δt_at_T32::TimePeriod,
+        truncation,                     # spectral truncation
+        radius,                         # of the planet (determines Δx)
         adjust_with_output::Bool,
         interval::TimePeriod = DEFAULT_OUTPUT_INTERVAL,
     )
-    # linearly scale Δt with trunc+1 (which are often powers of two)
-    resolution_factor = (DEFAULT_TRUNC + 1) / (trunc + 1)
-
-    # radius also affects grid spacing, scale proportionally
-    radius_factor = radius / DEFAULT_RADIUS
-
-    # maybe rename to _at_trunc_and_radius?
-    Δt_at_trunc = Second(Δt_at_T31).value * resolution_factor * radius_factor
+    resolution_factor = DEFAULT_TRUNCATION / truncation     # linearly scale Δt with truncation
+    radius_factor = radius / DEFAULT_RADIUS                 # radius also affects grid spacing, scale proportionally
+    Δt_scaled = Second(Δt_at_T32).value * resolution_factor * radius_factor
 
     if adjust_with_output && (interval > Millisecond(0))
-        k = round(Int, Second(interval).value / Δt_at_trunc)
+        k = round(Int, Second(interval).value / Δt_scaled)
         divisors = Primes.divisors(Millisecond(interval).value)
         sort!(divisors)
         i = findfirst(x -> x >= k, divisors)
@@ -34,7 +29,7 @@ function get_Δt_millisec(
         Δt_millisec = Millisecond(round(Int, Millisecond(interval).value / k_new))
 
         # provide info when time step is significantly shortened or lengthened
-        Δt_millisec_unadjusted = round(Int, 1000 * Δt_at_trunc)
+        Δt_millisec_unadjusted = round(Int, 1000 * Δt_scaled)
         Δt_ratio = Δt_millisec.value / Δt_millisec_unadjusted
 
         if abs(Δt_ratio - 1) > 0.05     # print info only when +-5% changes
@@ -43,7 +38,7 @@ function get_Δt_millisec(
             @info "Time step changed from $Δt_millisec_unadjusted to $Δt_millisec ($ps$p%) to match output frequency."
         end
     else
-        Δt_millisec = Millisecond(round(Int, 1000 * Δt_at_trunc))
+        Δt_millisec = Millisecond(round(Int, 1000 * Δt_scaled))
     end
 
     return Δt_millisec
@@ -58,17 +53,17 @@ function set!(
         Δt::Period,
     )
     # if set! is used before `initialize!(model)` then the recalculation of
-    # Δt_at_T31 will make sure the desired time step is used when initialize!(model.time_stepping, ...) happens
+    # Δt_at_T32 will make sure the desired time step is used when initialize!(model.time_stepping, ...) happens
     # if set! is used after `initialize!(model)` then all fields are set consistently
 
     # get truncation/resolution factor implicitly from Δt at this resolution vs default T31 resolution
-    resolution_factor = L.Δt / Second(L.Δt_at_T31).value
+    resolution_factor = L.Δt / Second(L.Δt_at_T32).value
 
     L.Δt_millisec = Millisecond(Δt)         # recalculate all Δt fields
     L.Δt = Millisecond(L.Δt_millisec).value / 1000
 
     # recalculate the default time step at resolution T31 to be consistent
-    L.Δt_at_T31 = Second(round(Int, L.Δt * resolution_factor))
+    L.Δt_at_T32 = Second(round(Int, L.Δt * resolution_factor))
 
     # given Δt was manually set disallow adjustment to output frequency
     L.adjust_with_output = false
@@ -79,12 +74,12 @@ end
 set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 
 function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
-    (; trunc) = model.spectral_grid
+    (; truncation) = model.spectral_grid
     (; radius) = model.planet
     interval = get_interval(model.output)
 
     # take radius from planet and recalculate time step and possibly adjust with output dt
-    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, trunc, radius, L.adjust_with_output, interval)
+    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T32, truncation, radius, L.adjust_with_output, interval)
     L.Δt = L.Δt_millisec.value / 1000
 
     # check how time steps from time integration and output align

@@ -106,18 +106,19 @@ model.time_stepping
 
 Model components often contain parameters from the `SpectralGrid` as they are needed
 to determine the size of arrays and other internal reasons. You should, in most cases,
-just ignore those. But the `Leapfrog` time stepper comes with `Δt_at_T31` which
+just ignore those. But the `Leapfrog` time stepper comes with `Δt_at_T32` which
 is the parameter used to scale the time step automatically. This means at a spectral
-resolution of T31 it would use 30min steps, at T63 it would be ~half that, 15min, etc.
+resolution of T32 it would use 30min steps, at T64 it would be ~half that, 15min, etc
+(see [Available horizontal resolutions](@ref) for our meaning of T32).
 Meaning that if you want to have a shorter or longer time step you can create a new
 `Leapfrog` time stepper. All time inputs are supposed to be given with the help of 
 `Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that (almost) every model component
 depends on a `SpectralGrid` as first argument.
 ```@example howto
 spectral_grid = SpectralGrid(truncation=64, nlayers=1)
-time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(15))
+time_stepping = Leapfrog(spectral_grid, Δt_at_T32=Minute(15))
 ```
-The actual time step at the given resolution (here T63) is then `Δt`.
+The actual time step at the given resolution (here T64) is then `Δt`.
 With this new `Leapfrog` time stepper constructed we can create a model by passing
 on the components (they are keyword arguments so either use `; time_stepping`
 for which the naming must match, or `time_stepping = my_time_stepping` with

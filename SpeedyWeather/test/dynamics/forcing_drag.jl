@@ -2,7 +2,7 @@
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     # 2D models
-    spectral_grid = SpectralGrid(trunc = 42, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 43, nlayers = 1)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
     add!(output, SpeedyWeather.RandomPatternOutput())
     drag = LinearVorticityDrag(spectral_grid)
@@ -24,7 +24,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     # 3D models
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
     add!(output, SpeedyWeather.RandomPatternOutput())
     drag = LinearVorticityDrag(spectral_grid)

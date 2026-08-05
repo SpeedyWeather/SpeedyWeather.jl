@@ -7,7 +7,7 @@ fd_tests = [true, true]
     # can't use Enzyme or ChainRule Test tools for tests for that
     for (i_grid, grid_type) in enumerate(grid_types)
 
-        spectral_grid = SpectralGrid(Grid = grid_type, trunc = 10, nlayers = 1, dealiasing = grid_dealiasing[i_grid])
+        spectral_grid = SpectralGrid(Grid = grid_type, truncation = 11, nlayers = 1, dealiasing = grid_dealiasing[i_grid])
         S = SpectralTransform(spectral_grid)
         dS = deepcopy(S)
 
@@ -159,7 +159,7 @@ _adjoint_rtol(::Type{NF}) where {NF} = sqrt(eps(real(NF)))
 
         if fd_tests[i_grid]
 
-            spectral_grid = SpectralGrid(Grid = grid_type, trunc = 10, nlayers = 1, dealiasing = grid_dealiasing[i_grid])
+            spectral_grid = SpectralGrid(Grid = grid_type, truncation = 11, nlayers = 1, dealiasing = grid_dealiasing[i_grid])
 
             # Reverse-mode autodiff MUTATES the primal transform: it accumulates into
             # `S.gradients.grad_y_vordiv1/2`, even though `SpectralTransform` is declared
