@@ -81,7 +81,9 @@ triangle_number(m::Integer) = m * (m + 1) ÷ 2
 nonzeros(l::Integer, m::Integer) = l * m - triangle_number(m - 1)
 nonzeros(s::Spectrum) = nonzeros(s.lmax, s.mmax)
 resolution(s::Spectrum) = (s.lmax, s.mmax)
-truncation(s::Spectrum) = s.mmax - 1
+truncation(s::Spectrum, base = ZeroBased) = truncation(s, base) # TODO make OneBased default?
+truncation(s::Spectrum, ::Type{OneBased}) = s.mmax
+truncation(s::Spectrum, ::Type{ZeroBased}) = s.mmax - 1
 orders(s::Spectrum) = s.orders
 orders(s::Spectrum{<:GPU}) = Vector(s.orders) # on GPU transfer orders back to CPU first
 
