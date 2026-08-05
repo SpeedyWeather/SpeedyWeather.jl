@@ -53,6 +53,9 @@ function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquatio
     # also includes a 1/2 so that the diffusion coefficients on full levels can be added
     # which is equivalent to interpolating them on half levels for a ∂σ (K ∂σ) formulation
     # with σ-dependent diffusion coefficient K
+    # TODO: vertical diffusion coefficients are computed in sigma-coordinate space using
+    # σ[k] - σ[k±1] and σ_half spacings. Generalising to hybrid coordinates would require
+    # reformulating the ∂σ(K ∂σ) operator in terms of pressure.
     σ = on_architecture(CPU(), model.geometry.σ_levels_full)
     σ_half = on_architecture(CPU(), model.geometry.σ_levels_half)
     ∇²_above = on_architecture(CPU(), diffusion.∇²_above)

@@ -9,8 +9,7 @@ struct MatrixSpectralTransform{
         VectorType,                 # <: ArrayType{NF, 1},
         MatrixType,                 # <: ArrayType{NF, 2},
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
-        GradientType,               # <: NamedTuple for gradients
-        IntType,                    # <: Integer
+        GradientType,               # <: Gradients struct (see gradient_arrays.jl)
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -19,7 +18,7 @@ struct MatrixSpectralTransform{
     # SPECTRAL AND GRID RESOLUTION
     spectrum::SpectrumType              # spectral truncation
     grid::GridType                      # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::IntType                    # number of layers in vertical
+    nlayers::Int                        # number of layers in vertical
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType                  # Cosine of latitudes, north to south
@@ -27,6 +26,11 @@ struct MatrixSpectralTransform{
 
     # NORMALIZATION
     norm_sphere::NF                 # normalization of the l=0, m=0 mode
+
+    # LAPLACE EIGENVALUES -l*(l+1) and their inverse, for ∇²/∇⁻². Stored here (with the existing
+    # VectorType parameter) rather than inside `gradients` to keep the type name short.
+    eigenvalues::VectorType
+    eigenvalues⁻¹::VectorType
 
     # THE ACTUAL TRANSFORM MATRICES for forward = LT(FFT(input)) and backward = IFFT(ILT(input))
     forward::MatrixComplexType          # forward transform matrix
@@ -55,6 +59,7 @@ function MatrixSpectralTransform(
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
         nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
+        transform_batch = nothing,                                                      # accepted+ignored: MatrixSpectralTransform has no FFT plans to multiplex
     )
     (; architecture) = spectrum                       # 1-based spectral truncation order and degree
 
@@ -94,8 +99,10 @@ function MatrixSpectralTransform(
     scratch_memory = on_architecture(architecture, zeros(NF, spectrum, nlayers).data)
     #scratch_memory = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
 
-    # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES
+    # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES + LAPLACE EIGENVALUES (stored on the transform,
+    # not inside `gradients`, so the `gradients` type stays short — see `Gradients`)
     gradients = gradient_arrays(NF, spectrum)
+    eigenvalues, eigenvalues⁻¹ = get_eigenvalues_and_inverse(NF, spectrum)
 
     return MatrixSpectralTransform{
         NF,
@@ -106,12 +113,12 @@ function MatrixSpectralTransform(
         typeof(backward_real),
         typeof(forward),
         typeof(gradients),
-        typeof(nlayers),
     }(
         architecture,
         spectrum, grid, nlayers,
         coslat, coslat⁻¹,
         S.norm_sphere,
+        eigenvalues, eigenvalues⁻¹,
         forward,
         backward,
         backward_real,
@@ -181,7 +188,15 @@ function transform!(                        # GRID TO SPECTRAL
     @boundscheck ismatching(M, coeffs, horizontal_only = true) || throw(DimensionMismatch(M, coeffs))
     # TODO: deactivated temporarily because of Reactant issue
     #@boundscheck size(coeffs, 2) == size(field, 2) || throw(DimensionMismatch(field.data, coeffs.data))
-    @maybe_jit M.architecture LinearAlgebra.mul!(coeffs.data, M.forward, field.data)
+
+    # Collapse any batch/layer dimensions into columns so the single dense matrix multiply also
+    # works for n-dimensional (batched/fused) fields, not just 2D. This is not a batched matmul
+    # (one matrix `M.forward` × many columns), so one big `mul!` (→ `BLAS.gemm!`) is both correct
+    # and optimal. `reshape` on a contiguous array is zero-copy and a no-op for genuinely 2D input,
+    # so the 2D path is unaffected; the result is written in place through the shared memory.
+    coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), :)
+    field_matrix = reshape(field.data, size(field.data, 1), :)
+    @maybe_jit M.architecture LinearAlgebra.mul!(coeffs_matrix, M.forward, field_matrix)
     return coeffs
 end
 
@@ -203,16 +218,22 @@ function transform!(                        # SPECTRAL TO GRID
     @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
     @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
 
-    nlayers = size(coeffs, 2)
-    scratch = ndims(coeffs) == 1 ? view(scratch_memory, :, 1) : nlayers < size(scratch_memory, 2) ? view(scratch_memory, :, 1:nlayers) : scratch_memory
+    # Collapse any batch/layer dimensions into columns (see the grid→spectral transform above),
+    # so the dense matrix multiply also works for n-dimensional (batched/fused) coefficients.
+    # `scratch_memory` is sized (in spectral_grid.jl) to the largest batch a spectral→grid
+    # transform emits, so a column-view of the required width always fits.
+    ncolumns = length(coeffs.data) ÷ size(coeffs.data, 1)
+    coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), ncolumns)
+    field_matrix = reshape(field.data, size(field.data, 1), ncolumns)
+    scratch = view(scratch_memory, :, 1:ncolumns)
 
     # the result is real-valued, therefore we can split the complex multiplication
     # into two real-valued multiplications
-    scratch .= real.(coeffs.data)
-    @maybe_jit M.architecture LinearAlgebra.mul!(field.data, M.backward_real, scratch)
+    scratch .= real.(coeffs_matrix)
+    @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_real, scratch)
 
-    scratch .= imag.(coeffs.data)
-    @maybe_jit M.architecture LinearAlgebra.mul!(field.data, M.backward_imag, scratch, -1, 1)
+    scratch .= imag.(coeffs_matrix)
+    @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_imag, scratch, -1, 1)
 
     if unscale_coslat
         @maybe_jit M.architecture RingGrids._scale_lat!(field, M.coslat⁻¹)

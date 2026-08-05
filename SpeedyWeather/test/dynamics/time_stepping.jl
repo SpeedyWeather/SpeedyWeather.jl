@@ -155,6 +155,7 @@ end
     Δt = 2π / 192        # time step, choose 120 as both 3 and 4 are divisors
     n_rotations = 1     # times around the circle
     n_time_steps = round(Int, 2π * n_rotations / (ω * Δt))
+    scale = 1
 
     # loop over different precisions
     @testset for NF in (Float32, Float64)
@@ -215,9 +216,8 @@ end
                 spectral_grid = SpectralGrid(; trunc)
                 time_stepping = TS(spectral_grid)
                 set!(time_stepping, Δt=Δt)
-                @test time_stepping.Δt_sec == Minute(Δt).value * 60
-                @test time_stepping.Δt ≈ time_stepping.Δt_sec / SpeedyWeather.DEFAULT_RADIUS
-                @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt_sec))
+                @test time_stepping.Δt == Second(Δt).value
+                @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt))
                 @test time_stepping.Δt_at_T31 == Second(Second(Δt).value / ((trunc + 1) / (SpeedyWeather.DEFAULT_TRUNC + 1)))
             end
         end
@@ -268,5 +268,32 @@ end
             @test all(vor_restarted .≈  simulation.variables.prognostic.vorticity)
             @test time_restarted == simulation.variables.prognostic.clock.time
         end
+    end
+end
+
+@testset "scale_tendencies! / unscale_tendencies! with fused tendency parents" begin
+    # Regression test: the dycore's fused tendency members (e.g. grid u/v/temperature/…)
+    # are views into a shared parent buffer. `scale_tendencies!` must scale each parent
+    # buffer exactly once — not once per member view (which corrupts the data under Reactant,
+    # and could double-scale) — and `scale ∘ unscale` must round-trip to the identity.
+    @testset for Model in (BarotropicModel, ShallowWaterModel, PrimitiveWetModel)
+        nlayers = Model == PrimitiveWetModel ? 4 : 1
+        spectral_grid = SpectralGrid(; trunc = 8, nlayers)
+        model = Model(spectral_grid)
+        vars = Variables(model)
+        r = 3.0f0
+
+        # known nonzero tendency state across the whole fused grid_tendencies parent buffer
+        grid_parent = parent(vars.fused.grid_tendencies)
+        fill!(grid_parent.data, 2)
+        original = copy(Array(grid_parent.data))
+
+        vars.prognostic.scale[] = r                     # scale factor read by (un)scale_tendencies!
+        SpeedyWeather.scale_tendencies!(vars, model)
+        # scaled exactly once: 2*r everywhere (not 2*r² from double-scaling, not corrupted)
+        @test Array(grid_parent.data) ≈ original .* r
+
+        SpeedyWeather.unscale_tendencies!(vars)
+        @test Array(grid_parent.data) ≈ original         # round-trips to the identity
     end
 end

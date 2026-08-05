@@ -99,8 +99,10 @@ ocean = SlabOcean(spectral_grid)
 
 `specific_heat_capacity`, `mixed_layer_depth` and `density` determine
 multiplicatively the effective heat capacity of the mixed layer
-``C_0``. Then the temporal evolution of sea surface temperature ``SST``
-is given by
+``C_0``. At initialization, sea surface temperature over (fully) land points is
+set to `land_temperature` (if `mask=true`), and additionally capped at the sea
+ice freezing temperature if `model.sea_ice` is a `ThermodynamicSeaIce`. Then the
+temporal evolution of sea surface temperature ``SST`` is given by
 
 
 ```math

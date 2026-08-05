@@ -144,6 +144,45 @@ end
     @test field_2d_cpu_res_alloc ≈ on_architecture(cpu_arch, field_2d_gpu_res_alloc)
 end
 
+@testset "Whole transform: single-layer step view" begin
+    # `get_step(vars.prognostic.pressure, 1)` hands `transform` a LowerTriangularMatrix whose
+    # `.data` is a 1D view, a slightly different code path, so we test again seperatly here
+    NF, trunc, Grid = NFs[1], spectral_resolutions[1], grid_list[1]
+    spectral_grid_cpu = SpectralGrid(; NF, trunc, nlayers = 1, Grid, dealiasing = 3)
+    spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers = 1, Grid, architecture = SpeedyWeather.GPU, dealiasing = 3)
+
+    S_cpu = SpectralTransform(spectral_grid_cpu)
+    S_gpu = SpectralTransform(spectral_grid_gpu)
+    cpu_arch = S_cpu.architecture
+
+    # lm x nsteps, like a prognostic surface pressure with a leapfrog step dimension
+    pressure_cpu = rand(LowerTriangularArray{Complex{NF}}, spectral_grid_cpu.spectrum, 2)
+    pressure_gpu = on_architecture(S_gpu.architecture, pressure_cpu)
+
+    lnpₛ_cpu = get_step(pressure_cpu, 1)
+    lnpₛ_gpu = get_step(pressure_gpu, 1)
+    @test ndims(lnpₛ_gpu.data) == 1     # the 1D-data case that broke kernel compilation
+
+    # inverse Legendre transform in isolation, so a failure here localises to the kernel
+    # rather than to the Fourier stage that follows
+    g_north_cpu, g_south_cpu = zero(S_cpu.scratch_memory.north), zero(S_cpu.scratch_memory.south)
+    g_north_gpu, g_south_gpu = zero(S_gpu.scratch_memory.north), zero(S_gpu.scratch_memory.south)
+    SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, lnpₛ_cpu, S_cpu.scratch_memory.column, S_cpu)
+    SpeedyTransforms._legendre!(g_north_gpu, g_south_gpu, lnpₛ_gpu, S_gpu.scratch_memory.column, S_gpu)
+    @test g_north_cpu[:, 1:1, :] ≈ on_architecture(cpu_arch, g_north_gpu)[:, 1:1, :] rtol = sqrt(eps(Float32))
+    @test g_south_cpu[:, 1:1, :] ≈ on_architecture(cpu_arch, g_south_gpu)[:, 1:1, :] rtol = sqrt(eps(Float32))
+
+    # spectral -> grid
+    field_cpu = transform(lnpₛ_cpu, S_cpu)
+    field_gpu = transform(lnpₛ_gpu, S_gpu)
+    @test field_cpu ≈ on_architecture(cpu_arch, field_gpu) rtol = sqrt(eps(Float32))
+
+    # and back, grid -> spectral
+    spec_cpu = transform(field_cpu, S_cpu)
+    spec_gpu = transform(field_gpu, S_gpu)
+    @test spec_cpu ≈ on_architecture(cpu_arch, spec_gpu) rtol = sqrt(eps(Float32))
+end
+
 @testset "fourier_batched: compare forward pass to CPU" begin
     @testset for trunc in spectral_resolutions
         @testset for nlayers in nlayers_list
@@ -382,14 +421,16 @@ end
                     )
 
                     # Convert GPU to CPU for comparison, result is stored in the
-                    # scratch memory
+                    # scratch memory. Only the first `nlayers` columns are filled by
+                    # `_legendre!`; CPU and GPU scratch may differ in capacity (dim 2),
+                    # so slice to the meaningful range.
                     result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory.north)
                     result_cpu = S_cpu.scratch_memory.north
-                    @test result_cpu ≈ result_gpu rtol = sqrt(eps(Float32))   # GPU error tolerance always Float32
+                    @test result_cpu[:, 1:nlayers, :] ≈ result_gpu[:, 1:nlayers, :] rtol = sqrt(eps(Float32))   # GPU error tolerance always Float32
 
                     result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory.south)
                     result_cpu = S_cpu.scratch_memory.south
-                    @test result_cpu ≈ result_gpu rtol = sqrt(eps(Float32))
+                    @test result_cpu[:, 1:nlayers, :] ≈ result_gpu[:, 1:nlayers, :] rtol = sqrt(eps(Float32))
                 end
             end
         end

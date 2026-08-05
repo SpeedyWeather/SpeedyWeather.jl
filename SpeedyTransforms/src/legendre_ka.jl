@@ -19,10 +19,9 @@
 
     # are m, lmax 0-based here or 1-based?
     lm_range = LowerTriangularArrays.get_lm_range(m, lmax)    # assumes 1-based
+    lm_offset = first(lm_range) - 1     # offset to index the lower triangular column directly
 
-    # view on lower triangular column, but batched in vertical
-    spec_view = view(specs_data, lm_range, :)
-    legendre_view = view(legendre_polynomials_data, lm_range, j)
+    legendre_view = view(legendre_polynomials_data, lm_range, j)    # always 2D, safe to view
 
     # dot product but split into even and odd harmonics on the fly as this
     # is how the previous implementation was enacted
@@ -37,13 +36,13 @@
     # Switched to while loop as more performant from inside a Kernel
     l = 1
     while l < lmax_even     # dot product in pairs for contiguous memory access
-        even_k += spec_view[l, k] * legendre_view[l]
-        odd_k += spec_view[l + 1, k] * legendre_view[l + 1]
+        even_k += specs_data[lm_offset + l, k] * legendre_view[l]
+        odd_k += specs_data[lm_offset + l + 1, k] * legendre_view[l + 1]
         l += 2
     end
 
     # now do the last row if lmax is odd
-    even_k += spec_view[end, k] * (isoddlmax * legendre_view[end])
+    even_k += specs_data[last(lm_range), k] * (isoddlmax * legendre_view[end])
     north = even_k + odd_k
     south = even_k - odd_k
 
@@ -79,8 +78,13 @@ function _legendre!(
     lmax = lmax - 1                     # 0-based max degree l of spherical harmonics
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
-    @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, specs))
+    # Scratch dim 2 is the per-call capacity (= max(planned_K) on CPU, S.nlayers elsewhere);
+    # allow it to exceed length(nlayers) so chunked/sliced callers (e.g. test scratches copied
+    # from CPU) still pass.
+    @boundscheck (size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
+                  size(g_north, 3) == nlat_half && size(g_north, 2) >= length(nlayers)) ||
+                 throw(DimensionMismatch(S, specs))
+    @boundscheck length(nlayers) <= S.nlayers || throw(DimensionMismatch(S, specs))
 
     g_north .= 0
     g_south .= 0
@@ -183,7 +187,9 @@ function _legendre!(                        # GRID TO SPECTRAL
     nlayers = size(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, S.grid.nlat_half) || throw(DimensionMismatch(S, specs))
+    @boundscheck (size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
+                  size(f_north, 3) == S.grid.nlat_half && size(f_north, 2) >= nlayers) ||
+                 throw(DimensionMismatch(S, specs))
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, specs))
 
     fill!(specs, 0)                         # reset as we accumulate into specs

@@ -12,6 +12,7 @@ testsuite_GPU = Dict(
         include("GPU/kernelabstractions.jl")
     end
 )
+
 testsuite_dynamics = find_tests(joinpath(pwd(), "dynamics"))
 testsuite_parameterizations = find_tests(joinpath(pwd(), "parameterizations"))
 testsuite_output = find_tests(joinpath(pwd(), "output"))

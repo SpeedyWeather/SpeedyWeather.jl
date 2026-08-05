@@ -49,13 +49,10 @@ mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
     Δt_millisec::MS
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt_sec::NF
-
-    "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
 end
 
-Adapt.adapt_structure(to, L::NCycleLorenz) = Adapt.adapt_structure(to, NCycleLorenzCore(L.Δt_millisec, L.Δt_sec, L.Δt))
+Adapt.adapt_structure(to, L::NCycleLorenz) = Adapt.adapt_structure(to, NCycleLorenzCore(L.Δt_millisec, L.Δt))
 
 prognostic_steps(::NCycleLorenz) = 1
 tendency_grid_steps(::NCycleLorenz) = 1     # the grid tendencies are only for F though, the G term only needs storing in spectral space
@@ -78,7 +75,6 @@ end
 
 struct NCycleLorenzCore{NF, MS} <: AbstractNCycleLorenz
     Δt_millisec::MS
-    Δt_sec::NF
     Δt::NF
 end
 
@@ -92,16 +88,14 @@ function NCycleLorenz(
         variant = NCycleLorenzA(),
         Δt_at_T31 = Minute(30),
         adjust_with_output = true,
-        radius = DEFAULT_RADIUS,
     )
     (; NF, trunc) = spectral_grid
 
     # compute time step
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
-    Δt_sec::NF = Δt_millisec.value / 1000
-    Δt::NF = Δt_sec / radius
+    Δt::NF = Δt_millisec.value / 1000
 
-    return NCycleLorenz(steps, variant, Second(Δt_at_T31), adjust_with_output, Δt_millisec, Δt_sec, Δt)
+    return NCycleLorenz(steps, variant, Second(Δt_at_T31), adjust_with_output, Δt_millisec, Δt)
 end
 
 """$(TYPEDSIGNATURES)
@@ -155,15 +149,13 @@ function update_prognostic!(
         time_stepping::NCycleLorenz,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
+        scale::Real = 1,
     )
     (; Δt) = time_stepping
+    Δt /= oftype(Δt, scale)     # scale on the fly
     w = weight_coefficient(time_stepping, clock)
 
-    # with an implicit solver the tendency_average_kernel! has to be computed
-    # before the implicit solver, so the responsibility is left therein
-    # and execute the prognostic update here only, dispatched over the type of implicit
-    # without an implicit solver we compute both tendency average and update
-    # here in one kernel, notation following largely Hotta et al. 2016
+    # notation following largely Hotta et al. 2016
     F = get_step(tendency, 1)   # tendency of current time step (or weighted + implicitly corrected tendency)
     G = get_step(tendency, 2)   # accumulated weighted tendencies
 

@@ -6,6 +6,7 @@ function init_shortwave_state!(vars, model)
     vars.parameterizations.rain_rate .= 0
     vars.parameterizations.ocean.albedo .= 0.5
     vars.parameterizations.land.albedo .= 0.3
+    vars.parameterizations.surface_pressure .= 1e5
     return nothing
 end
 
@@ -24,17 +25,17 @@ end
 
         for ij in 1:model.spectral_grid.npoints
             SpeedyWeather.parameterization!(ij, vars, model.shortwave_radiation, model)
+        end
 
-            # top of atmosphere radiation down
-            trd = model.planet.solar_constant * vars.parameterizations.cos_zenith[ij]
+        # top of atmosphere radiation down
+        trd = model.planet.solar_constant * vars.parameterizations.cos_zenith
 
-            if !(sw isa Nothing)
-                osr = vars.parameterizations.outgoing_shortwave[ij]
-                ssrd = vars.parameterizations.surface_shortwave_down[ij]
-                @test 0 <= osr <= ssrd <= trd
-                @test isfinite(osr)
-                @test isfinite(ssrd)
-            end
+        if !(sw isa Nothing)
+            osr = vars.parameterizations.outgoing_shortwave
+            ssrd = vars.parameterizations.surface_shortwave_down
+            @test all(0 .<= osr .<= ssrd .<= trd)
+            @test all(isfinite.(osr))
+            @test all(isfinite.(ssrd))
         end
 
         if !(sw isa Nothing)
@@ -59,12 +60,14 @@ end
         vars = Variables(model)
         init_shortwave_state!(vars, model)
         vars.parameterizations.cos_zenith .= 1
-
+        
+        clouds = SpeedyWeather.clouds!(1, vars, model.shortwave_radiation.clouds, model)
+        t = SpeedyWeather.transmissivity!(1, vars, clouds, model.shortwave_radiation.transmissivity, model)
         for ij in 1:model.spectral_grid.npoints
             clouds = SpeedyWeather.clouds!(ij, vars, model.shortwave_radiation.clouds, model)
             t = SpeedyWeather.transmissivity!(ij, vars, clouds, model.shortwave_radiation.transmissivity, model)
-            @test all(0 .<= t[ij, :] .<= 1)
         end
+        @test all(0 .< t.<= 1)
     end
 end
 

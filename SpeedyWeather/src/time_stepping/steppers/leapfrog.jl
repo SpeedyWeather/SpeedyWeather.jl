@@ -21,13 +21,10 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
     Δt_millisec::MS
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt_sec::NF
-
-    "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
 end
 
-Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt))
+Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt))
 
 # HOW MANY STEPS DO VARIABLES NEED?
 # leapfrogging always needs 2 steps in spectral
@@ -50,10 +47,10 @@ tendency_steps(::AbstractLeapfrog) = 1
 
 # in Leapfrog use the current (=2nd) in the dynamical core
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractGeopotential) = 2
 
 # the linear terms in the dynamical core have to be evaluated at the previous time step
 # they are then moved forward within the implicit corrections
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractGeopotential) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::LinearDynamicalCore) = 1
 
 # but in Barotropc/ShallowWater models the 2nd one doesn't exist on the grid and the 1st is considered to be the current step
@@ -62,6 +59,14 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::DiffusiveVerticalAdvection) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::DispersiveVerticalAdvection) = 2
+
+# Parameterizations should always be evaluated on the previous time step for Euler forward
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParameterization) = 1
+
+# by default use the first step here but you may extend for subtypes of AbstractOcean elsewhere
+# e.g. to leapfrog also a SlabOcean model's SST
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractOcean) = 1
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSeaIce) = 1
 
 # particle advection using u, v at current not previous time step
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
@@ -74,28 +79,33 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
 @inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractParticleAdvection, ::TwoDModels) = 1
 
-# copy prognostic variables' 1st step to 2nd, that way which_prognostic_step can always be 2
+# copy prognostic variables' 1st step to 2nd, that way which_prognostic_step can always be 2.
 function initialize!(vars::Variables, ::AbstractLeapfrog, ::AbstractModel)
     # time step variables are dynamically defined by existence in tendencies
-    # but statically compiled into the tendency_names function
-    (; prognostic) = vars
-    for varname in tendency_names(vars)
-        var_old, var_new = get_steps(getfield(prognostic, varname))
-        var_new .= var_old
-    end
-    for varname in tracer_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(prognostic.tracers, varname))
-        var_new .= var_old
-    end
-    for varname in ocean_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(prognostic.ocean, varname))
-        var_new .= var_old
-    end
-    for varname in land_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(prognostic.land, varname))
-        var_new .= var_old
-    end
+    # but statically compiled into the *_names generators shared with the drivers
+    initialize_steps_unrolled!(vars)
     return nothing
+end
+
+# copy step 1 -> step 2 for one variable; steps bound individually via get_step
+@inline function copy_step_forward!(var)
+    var_old = get_step(var, 1)
+    var_new = get_step(var, 2)
+    var_new .= var_old
+    return nothing
+end
+
+@generated function initialize_steps_unrolled!(vars::Variables{Po, G, T}) where {Po, G, T}
+    calls = Expr[]
+    for name in _tendency_names(T)
+        push!(calls, :(copy_step_forward!(getfield(vars.prognostic, $(QuoteNode(name))))))
+    end
+    for namespace in (:tracers, :ocean, :land), name in _namespace_names(T, namespace)
+        push!(calls, :(copy_step_forward!(
+            getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name)))
+        )))
+    end
+    return Expr(:block, calls..., :(return nothing))
 end
 
 # copy grid prognostics from 2nd to 1st step to retain these fields for the previous time step
@@ -104,26 +114,36 @@ function move_prognostic_grid_variables_back!(
         time_stepping::AbstractLeapfrog,
         model::AbstractModel,
     )
-    # time step variables are dynamically defined by existence in tendencies
-    # but statically compiled into the tendency_names function
-    (; grid) = vars
-    for varname in tendency_and_uv_names(vars)      # includes uv if vorticity exists
-        var_old, var_new = get_steps(getfield(grid, varname))
-        var_old .= var_new
+    # The atmospheric grid prognostics (vorticity, divergence, temperature, [humidity], pressure/η)
+    # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_grid` fuse parent.
+    # Together these cover exactly `tendency_and_uv_names`, so a single contiguous copy from the
+    # current step (2nd) to the previous step (1st) per fuse parent replaces the per-variable loop.
+    for fused in (vars.fused.grid, vars.fused.uv_grid)
+        copy_step_back!(parent(fused))
     end
-    for varname in tracer_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(grid.tracers, varname))
-        var_old .= var_new
-    end
-    for varname in ocean_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(grid.ocean, varname))
-        var_old .= var_new
-    end
-    for varname in land_tendency_names(vars)
-        var_old, var_new = get_steps(getfield(grid.land, varname))
-        var_old .= var_new
-    end
+    # tracers, ocean and land grid variables are not part of the atmospheric fuse — copy
+    # per-variable, unrolled per name (literal-Symbol getfield; steps bound individually)
+    move_grid_tracers_back!(vars)
+    # does not have to be done for ocean/land as they don't have spectral variables
+    # the grid variables are already in prognostic and the time stepper takes care
+    # of moving them back during the update
     return nothing
+end
+
+# copy step 2 -> step 1 for one variable (retain current step as the previous one);
+@inline function copy_step_back!(var)
+    var_old = get_step(var, 1)
+    var_new = get_step(var, 2)
+    var_old .= var_new
+    return nothing
+end
+
+@generated function move_grid_tracers_back!(vars::Variables{Po, G, T}) where {Po, G, T}
+    calls = [
+        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name)))))
+            for name in _namespace_names(T, :tracers)
+    ]
+    return Expr(:block, calls..., :(return nothing))
 end
 
 # for leapfrog do first semi-implicit corrections then horizontal diffusion
@@ -140,9 +160,6 @@ struct LeapfrogCore{NF, MS} <: AbstractLeapfrog
     Δt_millisec::MS
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt_sec::NF
-
-    "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
 end
 
@@ -157,17 +174,15 @@ function Leapfrog(
         adjust_with_output = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
-        radius = DEFAULT_RADIUS,
     )
     (; NF, trunc) = spectral_grid
 
     # compute time step
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
-    Δt_sec::NF = Δt_millisec.value / 1000
-    Δt::NF = Δt_sec / radius
+    Δt::NF = Δt_millisec.value / 1000
 
     return Leapfrog(
-        Second(Δt_at_T31), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt_sec, Δt,
+        Second(Δt_at_T31), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
     )
 end
 
@@ -223,11 +238,14 @@ function update_prognostic!(
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
+        scale::Real = 1,
     )
     Δt = time_step(time_stepping, clock)
-    lf = prognostic_step(time_stepping, clock)  # leapfrog prognostic step index
-    var_old, var_new = get_steps(var)
-    var_lf = get_step(var, lf)                  # view on either t or t+dt to dis/enable Williams filter
+    Δt /= oftype(Δt, scale)                         # scale time step on the fly *1/radius for atmospheric variables
+    lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index
+    var_old = get_step(var, 1)                      # no tuple (get_steps) here: a tuple of step views
+    var_new = get_step(var, 2)                      # breaks Enzyme's type analysis on Julia >= 1.11
+    var_lf = get_step(var, lf)                      # view on either t or t+dt to dis/enable Williams filter
     var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
 
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())

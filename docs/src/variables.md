@@ -119,6 +119,11 @@ So prognostic and tendency variables have the following dimensions in that order
 - vertical (optional, many 2D variables will drop this)
 - step (all [Time stepped variables](@ref) and tendencies have this)
 
+What these dimensions represent is recorded in the arrays' dimension tags, see
+[Array dimensions](@ref array_dimensions). The step dimension is tagged as time `T`,
+so a spectral prognostic variable with vertical layers and a step dimension shows
+`(LMZT)` in its array summary, its grid-space equivalent `(XYZT)`.
+
 So a conceptually 2D horizontal-only variable may use an array of
 
 - one dimesion (unravelled horizontal dimension),

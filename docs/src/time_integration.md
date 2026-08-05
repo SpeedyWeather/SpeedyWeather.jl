@@ -147,8 +147,7 @@ This is such that in most cases the user does need to know what time step is sta
 you want a shorter time step the easiest is to choose `Δt_at_T31` (write `\Delta` then hit tab,
 works in the Julia REPL and other interfaces) relative to its default. If you half that time step
 you'll half the time step for all resolutions. The other "time steps" in `time_stepping` are
-explained in the docstring (`?Leapfrog`). Note that internally SpeedyWeather uses a time step
-scaled by the radius, so `time_stepping.Δt` will be in units of second divided by meter.
+explained in the docstring (`?Leapfrog`).
 
 You can also choose the time step manually with
 

@@ -24,14 +24,14 @@ function _scale_lat!(field::AbstractField, v::AbstractVector)
     @boundscheck get_nlat(field) == length(v) || throw(DimensionMismatch(field, v))
 
     arch = architecture(field)
-    # Ensure worksize is always 2D by adding layer dimension dim=1
-    worksize = ndims(field) == 1 ? (size(field, 1), 1) : size(field)
-    launch!(arch, RingGridWorkOrder, worksize, scale_lat_kernel!, field, v, whichring(field.grid))
+    launch!(arch, RingGridWorkOrder, size(field), scale_lat_kernel!, field, v, whichring(field.grid))
     return field
 end
 
 @kernel inbounds = true function scale_lat_kernel!(field, v, whichring)
-    ij, k = @index(Global, NTuple)
+    I = @index(Global, Cartesian)
+    ij = I[1]                                   # grid point index
+    k = CartesianIndex(Base.tail(Tuple(I)))     # all non-horizontal dimensions
     j = whichring[ij]   # get ring index for grid point ij
     field[ij, k] *= v[j]
 end

@@ -82,10 +82,13 @@ function initialize!(
     (; trunc, nlayers) = diffusion
     (; resolution_scaling, power, power_stratosphere, tapering_σ) = diffusion
     Δt = default_time_step(model.time_stepping)
+    
+    # radius scaling for the dynamical core as these are all precomputed arrays
     (; radius) = model.planet
+    Δt /= radius
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
-    # times 1/radius because time step Δt is scaled with 1/radius
+    # divide by radius because the equations are in the radius-scaled form (see Radius scaling)
     time_scale = Second(diffusion.time_scale).value / radius * (32 / (trunc + 1))^resolution_scaling
     time_scale_div = Second(diffusion.time_scale_div).value / radius * (32 / (trunc + 1))^resolution_scaling
 
@@ -173,7 +176,9 @@ function horizontal_diffusion!(             # implicit version
         expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
         impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
     )
-    lmax, mmax = size(tendency, OneBased, as = Matrix)
+    # positional size method: the `as = Matrix` kwcall relies on constant propagation
+    # which (depending on Julia/JET version) can fail and widen `as` to a runtime dispatch
+    lmax, mmax = size(tendency, OneBased, Matrix)
     nlayers = size(var, 2)
 
     @boundscheck size(tendency) == size(var) || throw(BoundsError(tendency))
@@ -206,9 +211,9 @@ function horizontal_diffusion!(             # explicit version
         tendency::LowerTriangularArray,     # tendency of var
         var::LowerTriangularArray,          # spectral horizontal field to diffuse
         expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
-        impl::Nothing,                      # pass on nothing to dispatch to explicit diffusion                         
+        impl::Nothing,                      # pass on nothing to dispatch to explicit diffusion
     )
-    lmax, mmax = size(tendency, OneBased, as = Matrix)
+    lmax, mmax = size(tendency, OneBased, Matrix)    # positional size, see implicit version above
     nlayers = size(var, 2)
 
     @boundscheck size(tendency) == size(var) || throw(BoundsError(tendency))
@@ -411,9 +416,12 @@ function initialize!(
     (; expl, impl, expl_div, impl_div) = diffusion
     (; scale, shift, power, power_div, resolution_scaling) = diffusion
     Δt = default_time_step(model.time_stepping)
-    (; radius) = model.planet
 
-    # times 1/radius because time step Δt is scaled with 1/radius
+    # radius scaling for the dynamical core as these are all precomputed arrays
+    (; radius) = model.planet
+    Δt /= radius
+
+    # divide by radius because the equations are in the radius-scaled form (see Radius scaling)
     time_scale = Second(diffusion.time_scale).value / radius * (32 / (trunc + 1))^resolution_scaling
     time_scale_div = Second(diffusion.time_scale_div).value / radius * (32 / (trunc + 1))^resolution_scaling
 

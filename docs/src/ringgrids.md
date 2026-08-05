@@ -107,6 +107,30 @@ field = HEALPixField(undef, 2)              # using undef initializor
 field = HEALPixField{Float16}(undef, 2, 3)  # using Float16 as eltype
 ```
 
+## Array dimensions of a Field
+
+Besides `data` and `grid`, a `Field` also carries a `dims::AbstractArrayDimensions` that
+records what the dimensions beyond the horizontal actually represent, e.g. vertical layers
+or time steps, see [Array dimensions](@ref array_dimensions) for a general overview of
+these dimension tags. The tags defined for `Field` are `XY` (2D, horizontal only, the default),
+`XYZ` (horizontal + vertical), `XYT` (horizontal + time), and `XYZT` (horizontal + vertical + time).
+They are bookkeeping only (they do not change how the field is indexed or computed on) but allow
+`ArrayDimensions.hasvertical(field)` and `ArrayDimensions.hastime(field)` to answer what a given
+non-horizontal dimension stands for, and they are preserved through `similar`, `zero`, views and
+indexing (dropping a dimension whenever you index into it with an integer).
+
+To create a `Field` with an explicit dimension, pass an instance of one of these types as an
+extra argument, e.g. after the `grid`
+
+```@example ringgrids
+grid = FullGaussianGrid(4)
+field = zeros(grid, ArrayDimensions.XYZ(), 3)  # 3 layers are vertical, not time
+ArrayDimensions.hasvertical(field), ArrayDimensions.hastime(field)
+```
+
+If no `dims` is provided (as in [Creating a Field](@ref)) `XY` is used by default, meaning
+that no assumption is made about the meaning of any additional dimension.
+
 ## Creating a Field from data
 
 A `field` has `field.data` (some `AbstractArray{T, N}`) and `field.grid` (some `AbstractGrid` as described above).
@@ -159,7 +183,7 @@ and [UnicodePlots's](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap`, 
 [Visualisation via Makie](@ref) and [Visualisation via UnicodePlots](@ref).
 
 ```@example ringgrids
-using CairoMakie    # triggers loading of Makie extension, or do using UnicodePlots instead!
+import CairoMakie: heatmap   # triggers loading of Makie extension, or use UnicodePlots instead!
 grid = OctahedralGaussianGrid(24)
 field = randn(grid)
 heatmap(field)
@@ -216,6 +240,37 @@ for k in eachlayer(field)           # loop over 2 x 3
     end
 end
 ```
+
+## Rotate and reverse Fields
+
+A field can be rotated in longitude with `rotate!` (in-place) or `rotate` (allocating),
+shifting the data eastward along every ring. In grid space only rotations by multiples of
+90˚ are possible (all implemented grids have rings divisible by 4), negative degrees
+rotate westward
+
+```@example ringgrids
+field = randn(FullGaussianGrid(4))
+field2 = rotate(field, 90)      # rotate a copy 90˚ eastward
+rotate!(field2, 270)            # then 270˚ more in-place, back to the original
+field2 == field
+```
+
+For rotations by any angle use `rotate!` on the spectral coefficients, see
+[Rotation of `LowerTriangularArray`](@ref). A field can also be reversed in latitude
+(mirror at the equator) or longitude (mirror at the 0˚ meridian) with `reverse`/`reverse!`
+
+```@example ringgrids
+reverse(field, dims=:lat)       # mirror at the equator
+reverse!(field, dims=:lon)      # in-place, mirror at the 0˚ meridian
+nothing # hide
+```
+
+The mirror at 0˚ is possible in-place because every ring's longitudes map onto themselves
+under ``\lambda \to -\lambda``: on rings with a longitudinal offset (first point half a
+grid spacing east of 0˚, like the HEALPix-type grids) all points within a ring are reversed,
+on rings whose first point lies on 0˚ that point stays and only the remaining points are
+reversed. Both operations are therefore consistent with their counterparts acting on the
+spherical harmonic coefficients, see [Reverse of `LowerTriangularArray`](@ref).
 
 ## Interpolation between grids
 

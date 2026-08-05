@@ -8,19 +8,23 @@ prognostic variables which has a field `ocean`, i.e. `simulation.variables.progn
 
 Both are two-dimensional grids using the same grid type and resolution as
 the dynamical core. So both sea surface temperature and sea ice concentration
-are globally defined but their mask is defined with [The land-sea mask](@ref).
-However, one should still set grid cells where the sea surface temperature
-is not defined to `NaN` in which case any fluxes are zero. This is important
-when a fractional land-sea mask does not align with the sea surface
-temperatures to not produce unphysical fluxes. The sea ice concentration
-is simply set to zero everywhere where there is no sea ice.
+are globally defined but their relative contribution to surface fluxes is
+weighted by [The land-sea mask](@ref). Sea surface temperature must be
+finite everywhere, including at (partially or fully) land-masked grid cells:
+the land-sea mask only weights the resulting flux multiplicatively, it does
+not guard against propagating a `NaN` through it, so `NaN` sea surface
+temperatures are not supported. Ocean models therefore fill grid cells
+without "real" ocean with a fallback temperature (e.g. `SlabOcean`'s
+`land_temperature` option) rather than leaving them `NaN`. The sea ice
+concentration is simply set to zero everywhere where there is no sea ice.
 
 Note that neither sea surface temperature, land-sea mask
 or orography have to agree. It is possible to have an ocean on top of a mountain.
 For an ocean grid-cell that is (partially) masked by the land-sea mask, its value will
-be (fractionally) ignored in the calculation of surface fluxes (potentially leading
-to a zero flux depending on land surface temperatures). For an ocean grid cell
-that is `NaN` but not masked by the land-sea mask, its value is always ignored.
+still be (fractionally) weighted into the calculation of surface fluxes
+(potentially leading to a small but nonzero flux depending on land surface
+temperatures), so a physically sensible, finite value should be provided
+everywhere, even where the land-sea mask is 1 (fully land).
 
 # Custom ocean model
 

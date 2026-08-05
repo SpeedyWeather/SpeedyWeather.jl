@@ -173,12 +173,21 @@ function output!(
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)
         if variable.unscale
-            scale!(var, inv(simulation.variables.prognostic.scale[]))
+            unscale!(var, simulation.variables.prognostic.scale[])
         end
     end
 
     if hasproperty(variable, :transform)    # transform (e.g. scale, offset, exp, etc) if defined
         @. var = variable.transform(var)
+    end
+
+    # scale variable by ocean/land fraction, e.g. sea ice concentration of 50% in cell that's 50% ocean becomes 25%
+    if hasproperty(output, :land_fraction)
+        if hasproperty(variable, :ocean_fraction) && variable.ocean_fraction
+            @. var .*= (1 - output.land_fraction)
+        elseif hasproperty(variable, :land_fraction) && variable.land_fraction
+            @. var .*= output.land_fraction
+        end
     end
 
     if hasproperty(variable, :keepbits)     # round mantissabits for compression

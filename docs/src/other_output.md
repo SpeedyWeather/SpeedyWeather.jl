@@ -141,6 +141,63 @@ work without extra work:
 ds.sel(time=slice("2000-01-05", "2000-01-08"))["temp"].mean("time")
 ```
 
+### Ensemble output
+
+Several runs of an ensemble can be written into a *single* Zarr store along an
+additional `ensemble` dimension. This is disabled by default and controlled by two
+options:
+
+| Option | Meaning |
+|--------|---------|
+| `ensemble_index::Int` | This writer's ensemble member index. `0` (default) disables ensemble output and reproduces the layout described above. A value `> 0` adds an `ensemble` dimension and makes this writer store its data into slot `ensemble_index`. Members are indexed `1..ensemble_size`. |
+| `ensemble_size::Int` | Total number of ensemble members. It sizes the `ensemble` dimension and must be passed up front; it has to satisfy `ensemble_size ≥ ensemble_index`. |
+| `ensemble_timeout::Int` | Seconds a member waits for member 1 to create the shared store before erroring (default `600`). |
+
+The design targets **parallel ensemble members running as separate processes**, all
+writing into one store. This is safe because the `ensemble` axis is chunked with size 1,
+so member `e` only ever writes chunk files carrying its own index and no two members
+touch the same chunk file. Each process constructs a `ZarrOutput` with the *same*
+`path`, `id`, `run_number`, `filename` and `ensemble_size`, and a distinct `ensemble_index`,
+so all members resolve to the same run folder and store:
+
+```julia
+using SpeedyWeather, Zarr
+
+# in each process, `member` is this process' ensemble index (1..ensemble_size)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+output = ZarrOutput(spectral_grid, PrimitiveWet;
+    ensemble_index = member,        # e.g. read from an environment variable / job array id
+    ensemble_size = 10,
+    interval = Hour(6),
+)
+model = PrimitiveWetModel(spectral_grid; output)
+simulation = initialize!(model)
+run!(simulation, period=Day(10), output=true)
+```
+
+The single shared artifacts (the group and coordinate metadata, and the `time` axis) are
+written once by the *creator* — the member with `ensemble_index == 1`, which builds the
+store schema and then signals readiness. The remaining *writer* members (`ensemble_index
+> 1`) wait for that signal, open the existing store and write only their own ensemble
+slice. This assumes that all members share the same time stepping so that one common
+`time` axis is correct.
+
+The resulting store gains an `ensemble` coordinate; the ensemble axis is the outermost
+(slowest-varying) dimension, so an xarray-compatible reader reports e.g.
+
+```python
+import xarray as xr
+ds = xr.open_zarr("run_0001/output.zarr", consolidated=False)
+print(ds)
+# Dimensions:  (ensemble: 10, time: 41, layer: 8, lat: 32, lon: 64)
+# Data variables:
+#     temp     (ensemble, time, layer, lat, lon) float32
+ds["temp"].mean("ensemble")     # ensemble mean
+```
+
+Note that this ensemble layout is currently specific to `ZarrOutput`; the
+[`NetCDFOutput`](@ref) does not support concurrent multi-process writes. 
+
 ## Parameter summary
 
 With `output=true` as an argument in the `run!(simulation)` call, the [NetCDFOutput](@ref) by default also

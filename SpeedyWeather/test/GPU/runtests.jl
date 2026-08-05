@@ -32,34 +32,31 @@ end
 
 gpu_backend = load_gpu_package()
 
-# --- Temporarily commented out: only running the HIP-graphs test (gd/hip-graphs LUMI session).
-# --- Re-enable these once the HIP-graphs investigation is done.
-#
-# # KERNEL LAUNCHING AND UTILS
-# include("kernels_GPU.jl")
-#
-# # SPECTRAL TRANSFORMS
-# include("spectral_transform.jl")
-#
-# # INTERPOLATION OF RINGGRIDS
-# include("interpolate.jl")
-#
-# # SET FUNCTIONS, GPU SPECIFIC
-# include("set.jl")
-#
-# # VERTICAL, GPU SPECIFIC
-# include("vertical_integration.jl")
-#
-# # FULL MODELS
-# include("barotropic.jl")
-# include("shallowwater.jl")
-# include("primitive_wet.jl")
+# KERNEL LAUNCHING AND UTILS
+include("kernels_GPU.jl")
 
-include("gpu_graphs_shared.jl")   # needed: defines test_gpu_graphs(), used by hip_graphs.jl
+# SPECTRAL TRANSFORMS
+include("spectral_transform.jl")
+
+# INTERPOLATION OF RINGGRIDS
+include("interpolate.jl")
+
+# SET FUNCTIONS, GPU SPECIFIC
+include("set.jl")
+
+# VERTICAL, GPU SPECIFIC
+include("vertical_integration.jl")
+
+# FULL MODELS
+include("barotropic.jl")
+include("shallowwater.jl")
+include("primitive_wet.jl")
+
+include("gpu_graphs_shared.jl")
 
 if gpu_backend === :CUDA
 
-    # include("CUDA/architecture.jl")
+    include("CUDA/architecture.jl")
 
     # CUDA-GRAPHS ACCELERATED FOURIER TRANSFORM (CUDA-only feature)
     include("cuda_graphs.jl")
@@ -69,11 +66,11 @@ if gpu_backend === :CUDA
 
 elseif gpu_backend === :AMDGPU
 
-    # include("AMDGPU/architecture.jl")
+    include("AMDGPU/architecture.jl")
 
     # HIP-GRAPHS ACCELERATED FOURIER TRANSFORM (AMDGPU-only feature)
     include("hip_graphs.jl")
 
 elseif gpu_backend === :Metal
-    # include("MetalGPU/metal.jl")
+    include("MetalGPU/metal.jl")
 end

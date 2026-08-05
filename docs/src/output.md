@@ -54,7 +54,7 @@ Example, we run the model at a resolution of T42 and the time step is going to b
 ```@example netcdf
 spectral_grid = SpectralGrid(trunc=42, nlayers=1)
 time_stepping = Leapfrog(spectral_grid)
-time_stepping.Δt_sec
+time_stepping.Δt
 ```
 seconds. Depending on the output frequency (we chose `interval = Hour(1)` above)
 this will be slightly adjusted during model initialization:
@@ -62,7 +62,7 @@ this will be slightly adjusted during model initialization:
 output = NetCDFOutput(spectral_grid, ShallowWater, interval=Hour(1))
 model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
-model.time_stepping.Δt_sec
+model.time_stepping.Δt
 ```
 The shorter the output interval the more the model time step needs to be adjusted
 to match the desired interval exactly. This is important so that for daily output at
@@ -70,7 +70,7 @@ noon this does not slowly shift towards night over years of the model integratio
 One can always disable this adjustment with
 ```@example netcdf
 time_stepping = Leapfrog(spectral_grid, adjust_with_output=false)
-time_stepping.Δt_sec
+time_stepping.Δt
 ```
 and a little info will be printed to explain that even though you wanted
 `interval = Hour(1)` you will not actually get this upon initialization:

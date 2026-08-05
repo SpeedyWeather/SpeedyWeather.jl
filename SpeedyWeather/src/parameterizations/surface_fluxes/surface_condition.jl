@@ -1,5 +1,3 @@
-abstract type AbstractSurfaceCondition <: AbstractParameterization end
-
 export SurfaceCondition
 
 """Surface condition parameterization that calculates near-surface atmospheric
@@ -7,7 +5,7 @@ variables needed for surface flux calculations. Computes surface wind speed
 including sub-grid scale gusts, surface air density, and surface air temperature
 by extrapolating from the lowest model level to the surface using standard
 atmospheric relationships. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceCondition{NF} <: AbstractSurfaceCondition
+@kwdef struct SurfaceCondition{NF} <: AbstractParameterization
     "[OPTION] Ratio of near-surface wind to lowest-level wind [1]"
     wind_slowdown::NF = 0.95
 
@@ -19,14 +17,6 @@ Adapt.@adapt_structure SurfaceCondition
 
 SurfaceCondition(SG::SpectralGrid; kwargs...) = SurfaceCondition{SG.NF}(; kwargs...)
 
-function variables(::AbstractSurfaceCondition)
-    return (
-        ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
-        ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m³"),
-        ParameterizationVariable(:surface_air_temperature, Grid2D(), desc = "Surface air temperature", units = "K"),
-    )
-end
-
 initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -37,7 +27,8 @@ end
 @propagate_inbounds function surface_condition!(ij, vars, surface_condition::SurfaceCondition, model)
 
     (; wind_slowdown, gust_speed) = surface_condition
-    nlayers = model.geometry.nlayers
+    (; nlayers) = model.geometry
+    coord = model.geometry.vertical_coordinates
     (; atmosphere) = model
 
     # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
@@ -55,10 +46,11 @@ end
     temperature = get_prognostic_step(vars.grid.temperature, model.time_stepping, surface_condition)
     pₛ = vars.parameterizations.surface_pressure[ij] # surface pressure [Pa]
     (; R_dry, κ) = model.atmosphere
-    σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
+
+    σ = pressure(nlayers, pₛ, coord) / pₛ           # σ vertical coordinate at lowest model level
     T = temperature[ij, nlayers]                    # virtual temperature at lowest model level [K]
     q = haskey(vars.grid, :humidity) ?              # specific humidity at lowest model level [kg/kg]
-        get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)  
+        get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)
     Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
     σ⁻ᵏ = σ^(-κ)                                    # precalculate
     Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate

@@ -24,10 +24,13 @@ end
 
         vars = Variables(model)
 
-        for ij in 1:model.spectral_grid.npoints
-            SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
-            t = SpeedyWeather.transmissivity!(ij, vars, model.longwave_radiation.transmissivity, model)
-            @test all(0 .<= t[ij, :] .<= 1)
+        # transmissivity depends on pressure thickness and thereofre surface pressure should be nonzero
+        vars.parameterizations.surface_pressure .= 1e5
+        t = SpeedyWeather.transmissivity!(1, vars, model.longwave_radiation.transmissivity, model)
+        for ij in 2:model.spectral_grid.npoints
+            SpeedyWeather.transmissivity!(ij, vars, model.longwave_radiation.transmissivity, model)
         end
+
+        @test all(0 .< t .<= 1)
     end
 end

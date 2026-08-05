@@ -6,6 +6,7 @@
             horizontal_diffusion = HD(spectral_grid)
             model = PrimitiveWetModel(spectral_grid; horizontal_diffusion)
             simulation = initialize!(model)
+            initialize!(simulation)
 
             (; variables) = simulation
             (; expl, impl) = model.horizontal_diffusion
@@ -34,10 +35,8 @@
             @test any(vor .== vor2)    # check that at least some coefficients are identical
 
             # damping should not increase real or imaginary part of variable
-            for lmk in eachindex(vor, vor2)
-                @test abs(real(vor2[lmk])) <= abs(real(vor[lmk]))
-                @test abs(imag(vor2[lmk])) <= abs(imag(vor[lmk]))
-            end
+            @test all(abs.(real.(vor2)) .<= abs.(real.(vor)))
+            @test all(abs.(imag.(vor2)) .<= abs.(imag.(vor)))
         end
     end
 end

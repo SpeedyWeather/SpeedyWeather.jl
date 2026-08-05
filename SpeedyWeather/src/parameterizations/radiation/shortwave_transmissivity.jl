@@ -25,9 +25,12 @@ initialize!(::ConstantShortwaveTransmissivity, ::AbstractModel) = nothing
     nlayers = size(t, 2)
 
     τ = -log(CST.transmissivity)            # total optical depth of the atmosphere
-    dσ = model.geometry.σ_levels_thick      # divide optical depth wrt to pressure thickness of each layer
+    coord = model.geometry.vertical_coordinates
+    pₛ = vars.parameterizations.surface_pressure[ij]
+
     for k in 1:nlayers
-        t[ij, k] = exp(-τ * dσ[k])          # transmissivity through layer k
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        t[ij, k] = exp(-τ * Δσₖ)            # transmissivity through layer k
     end
     return t
 end
@@ -43,8 +46,8 @@ $(TYPEDFIELDS)."""
     "[OPTION] Zenith correction exponent (SPEEDY nzen)"
     @param zenith_exponent::NF = 2 (bounds = Nonnegative,)
 
-    "[OPTION] Absorptivity of dry air [per 10^5 Pa]"
     # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absdry, fband weights)
+    "[OPTION] Absorptivity of dry air [per 10^5 Pa]"
     @param absorptivity_dry_air::NF = 0.03135 (bounds = Nonnegative,)
 
     "[OPTION] Constant aerosol concentration?"
@@ -63,8 +66,8 @@ $(TYPEDFIELDS)."""
     "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
     @param absorptivity_cloud_base::NF = 10 (bounds = Nonnegative,)
 
-    "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
     # Weighted one-band scaling: 0.95*0.15 = 0.1425 → rounded to 0.14 (SPEEDY abscl2)
+    "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
     @param absorptivity_cloud_limit::NF = 0.14 (bounds = Nonnegative,)
 end
 
@@ -94,8 +97,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     nlayers = size(t, 2)
 
-    sigma_levels = model.geometry.σ_levels_half
-    sigma_levels_full = model.geometry.σ_levels_full
+    coord = model.geometry.vertical_coordinates
     pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
     normalized_surface_pressure = pₛ / 100000
 
@@ -114,11 +116,10 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     for k in 1:nlayers
         q = humid[ij, k]
 
-        # Aerosol factor: use mid-level sigma, squared
-        aerosol_factor = transmissivity.aerosols ? sigma_levels_full[k]^2 : zero(NF)
+        # Aerosol factor: use mid-level sigma, squared (aerosol loading increases toward surface)
+        aerosol_factor = transmissivity.aerosols ? sigma(k, coord)^2 : zero(NF)
 
         # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
-        # Aerosol loading increases toward surface (proportional to σ²).
         layer_absorptivity = (
             absorptivity_dry_air +
                 absorptivity_aerosol * aerosol_factor +
@@ -132,8 +133,8 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
 
         # Compute differential optical depth with zenith correction
         # Normalize pressure to 1e5 Pa since absorptivities are per 1e5 Pa
-        delta_sigma = sigma_levels[k + 1] - sigma_levels[k]
-        optical_depth = layer_absorptivity * delta_sigma * normalized_surface_pressure * zenith_factor
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        optical_depth = layer_absorptivity * Δσₖ * normalized_surface_pressure * zenith_factor
 
         # Transmissivity through layer k
         t[ij, k] = exp(-optical_depth)

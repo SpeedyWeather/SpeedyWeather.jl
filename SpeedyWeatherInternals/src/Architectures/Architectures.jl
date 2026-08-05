@@ -2,7 +2,7 @@ module Architectures
 
 import KernelAbstractions
 
-export AbstractArchitecture
+export AbstractArchitecture, AbstractCPU
 export CPU, CPUStatic, GPU, ReactantDevice
 export CUDAGPU, MetalGPU, ROCGPU
 export array_type, on_architecture, architecture, device

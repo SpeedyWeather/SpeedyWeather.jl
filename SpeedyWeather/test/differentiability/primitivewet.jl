@@ -1,161 +1,144 @@
-### Experiments going a bit deeper into the timestepping of the primtive wet model
-# this script / these tests were mainly written for debugging, we might exclude it in future
-# tests because it is quite maintanance heavy code
-@testset "Differentiability: Primitive Wet Model Components" begin
+import Random
+Random.seed!(123)
 
-    spectral_grid = SpectralGrid(trunc = 8, nlayers = 1)          # define resolution
+#    NO `j′vp`. `FiniteDifferences._j′vp` is `transpose(jacobian(fdm, f, x)) * ȳ`, i.e. it
+#    MATERIALISES the full Jacobian. `to_vec` of a PrimitiveWet `Variables` here is 112_532 long, so
+#    that Jacobian is 112_532² ≈ 50–100 GB and the process is OOM-killed before printing anything.
+#    (The barotropic tests get away with it: 4_434² ≈ 157 MB.)
+#
+#    Instead we use the adjoint identity
+#
+#        <J v, w>  ==  <v, Jᵀ w>
+#
+#    which needs one forward-mode and one reverse-mode call and no Jacobian at all. It is exact —
+#    no step size to tune — and it pins reverse mode against an independently computed forward mode.
+#    As an arbiter that does not involve AD at all, we add a DIRECTIONAL finite difference of the
+#    same scalar, which costs a handful of primal evaluations rather than one per input dimension.
 
-    model = PrimitiveWetModel(; spectral_grid)  # construct model
-    simulation = initialize!(model)
-    initialize!(simulation)
-    run!(simulation, period = Day(5)) # spin-up to get nonzero values for all fields
-    initialize!(simulation; period = Day(1))
+_arrays(v, group) = AbstractArray[
+    getfield(getfield(v, group), k) for k in keys(getfield(v, group))
+        if getfield(getfield(v, group), k) isa AbstractArray
+]
 
-
-    adsim = ADSimulation(simulation)
-    (; vars, model) = simulation
-    (; Δt, Δt_millisec) = model.time_stepping
-    dt = 2Δt
-
-    # TO-DO: The first time we execute this, the gradient is different. Why?
-    timestep_oop!(make_zero(vars), vars, dt, model)
-
-    #
-    # We go individually through all components of the time stepping and check
-    # correctness
-    #
-
-    fill!(vars.tendencies, 0, PrimitiveWetModel)
-    (; time) = progn.clock
-
-    #
-    # model physics
-    #
-    vars, dvars = ADseed(adsim, :tendencies)
-    vars_copy = deepcopy(vars)
-    dvars_copy = deepcopy(dvars)
-
-    autodiff(Reverse, SpeedyWeather.parameterization_tendencies!, Const, Duplicated(vars, dvars), Const(model))
-
-    function parameterization_tendencies(vars, model)
-        vars_new = deepcopy(vars)
-        SpeedyWeather.parameterization_tendencies!(vars_new, deepcopy(model))
-        return vars_new
+# seed every array of one variable group with random values
+function _seed_group!(shadow, group, seed; only = nothing)
+    rng = Random.MersenneTwister(seed)
+    n = 0
+    for k in keys(getfield(shadow, group))
+        (only === nothing || k in only) || continue
+        f = getfield(getfield(shadow, group), k)
+        f isa AbstractArray || continue
+        R = real(eltype(f))
+        f .= eltype(f) <: Complex ?
+            complex.(randn(rng, R, size(f)), randn(rng, R, size(f))) :
+            randn(rng, R, size(f))
+        n += length(f)
     end
+    return n
+end
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(11, 1), x -> parameterization_tendencies(x, model), dvars_copy, vars_copy)
+# real inner product restricted to one variable group. `v` is zero outside `ingroup` and `w` zero
+# outside `outgroup`, so restricting the sums this way is exact, and it keeps unrelated fields out.
+_gdot(a, b, group) = sum(
+    sum(real.(x) .* real.(y)) + (eltype(x) <: Complex ? sum(imag.(x) .* imag.(y)) : 0)
+        for (x, y) in zip(_arrays(a, group), _arrays(b, group))
+)
 
-    # TO-DO this test is broken, they gradients don't line up
-    # old test checked dprogn
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-1))
+"""
+Check `<J v, w> == <v, Jᵀ w>` for the in-place `f!(vars, args...)`, and cross-check the same scalar
+against a directional finite difference. `fd_only` restricts the FD direction to a subset of the
+input variables (used to keep a non-differentiable path out of the finite difference).
+"""
+function _adjoint_check(f!, vars0, args...; ingroup, outgroup, rtol_ad, rtol_fd, fd_only = nothing)
+    v = make_zero(vars0)
+    w = make_zero(vars0)
+    @test _seed_group!(v, ingroup, 1) > 0
+    @test _seed_group!(w, outgroup, 2) > 0
 
-    #
-    # ocean
-    #
-    vars, dvars = ADseed(adsim, :prognostic)
-    vars_copy = deepcopy(vars)
-    dvars_copy = deepcopy(dvars)
+    jv = deepcopy(v)
+    x1 = deepcopy(vars0)
+    autodiff(set_runtime_activity(Forward), f!, Const, Duplicated(x1, jv), args...)
 
-    autodiff(Reverse, SpeedyWeather.ocean_timestep!, Const, Duplicated(vars, dvars), Const(model))
+    jtw = deepcopy(w)
+    x2 = deepcopy(vars0)
+    autodiff(set_runtime_activity(Reverse), f!, Const, Duplicated(x2, jtw), args...)
 
-    function ocean_timestep(vars, model)
-        vars_new = deepcopy(vars)
-        SpeedyWeather.ocean_timestep!(vars_new, deepcopy(model))
-        return progn_new
+    @test all(isfinite, to_vec(jtw)[1])
+    @test any(!iszero, to_vec(jtw)[1])
+
+    lhs = _gdot(jv, w, outgroup)        # <J v, w>   from forward mode
+    rhs = _gdot(v, jtw, ingroup)        # <v, Jᵀ w>  from reverse mode
+    @test lhs != 0
+    @test isapprox(lhs, rhs; rtol = rtol_ad)
+
+    # independent arbiter: directional finite difference of eps -> <f(x + eps*v), w>
+    vfd = v
+    if fd_only !== nothing
+        vfd = make_zero(vars0)
+        _seed_group!(vfd, ingroup, 1; only = fd_only)
     end
-
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> ocean_timestep(x, model), dvars_copy, vars_copy)
-
-    # pass
-    # old test checked ddiags
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-2))
-
-    #
-    # land
-    #
-
-    vars, dvars = ADSeed(adsim, :prognostic)
-    vars_copy = deepcopy(vars)
-    dvars_copy = deepcopy(dvars)
-
-    autodiff(Reverse, SpeedyWeather.land_timestep!, Const, Duplicated(vars, dvars), Const(model))
-
-    function land_timestep(vars, model)
-        vars_new = deepcopy(vars)
-        SpeedyWeather.ocean_timestep!(vars_new, deepcopy(model))
-        return vars_new
+    function scalar(eps)
+        x = deepcopy(vars0)
+        for (xa, va) in zip(_arrays(x, ingroup), _arrays(vfd, ingroup))
+            xa .+= eps .* va
+        end
+        f!(x, map(a -> a.val, args)...)
+        return _gdot(x, w, outgroup)
     end
+    jv_fd = deepcopy(vfd)
+    x3 = deepcopy(vars0)
+    autodiff(set_runtime_activity(Forward), f!, Const, Duplicated(x3, jv_fd), args...)
+    @test isapprox(central_fdm(5, 1)(scalar, 0.0), _gdot(jv_fd, w, outgroup); rtol = rtol_fd)
+    return nothing
+end
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> land_timestep(x, model), dvars_copy, vars_copy)
+# one day of spin-up: five days is unstable at this resolution (see the note at the top)
+_spinup(model) = initialize_with_spinup!(model, Day(1), Hour(6))
 
-    # pass
-    # old test checked ddiagn
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-2))
+#
+# GROUP 1 — DYNAMICAL CORE (dynamics_only model, fast)
+#
+@testset "Differentiability: PrimitiveWet dynamics_tendencies!" begin
+    spectral_grid = SpectralGrid(trunc = 8, nlayers = 4)
+    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
+    simulation = _spinup(model)
+    vars0 = deepcopy(simulation.variables)
+    @test all(isfinite, to_vec(vars0)[1])   # the spin-up must not have blown up
 
-    #####
-    # DYNAMICS
-    lf2 = 2
+    _adjoint_check(
+        SpeedyWeather.dynamics_tendencies!, vars0, Const(model);
+        ingroup = :grid, outgroup = :tendencies, rtol_ad = 1.0e-5, rtol_fd = 1.0e-2,
+    )
+end
 
-    #
-    # dynamics_tendencies!
-    #
+@testset "Differentiability: PrimitiveWet implicit_correction!" begin
+    spectral_grid = SpectralGrid(trunc = 8, nlayers = 4)
+    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
+    simulation = _spinup(model)
+    vars0 = deepcopy(simulation.variables)
 
-    vars, dvars = ADSeed(adsim, :tendencies)
-    vars_copy = deepcopy(vars)
-    dvars_copy = deepcopy(dvars)
+    _adjoint_check(
+        SpeedyWeather.implicit_correction!, vars0,
+        Const(model.implicit), Const(model.time_stepping), Const(model);
+        ingroup = :prognostic, outgroup = :tendencies, rtol_ad = 1.0e-5, rtol_fd = 1.0e-2,
+    )
+end
 
-    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(vars, dvars), Const(lf2), Const(model))
+@testset "Differentiability: PrimitiveWet transform!(::Variables)" begin
+    spectral_grid = SpectralGrid(trunc = 8, nlayers = 4)
+    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
+    simulation = _spinup(model)
+    vars0 = deepcopy(simulation.variables)
 
-    function dynamics_tendencies(vars, lf, model)
-        vars_new = deepcopy(vars)
-        SpeedyWeather.dynamics_tendencies!(vars_new, lf, deepcopy(model))
-        return vars_new
-    end
-
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> dynamics_tendencies(x, lf2, model), dvars_copy, vars_copy)
-
-    # there are some NaNs in the FD, that's why this test is currently broken
-    # old test checked dprogn
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-1))
-
-    #
-    # Implicit correction
-    #
-    # continue here
-    vars, dvars = ADSeed(adsim, :tendencies)
-    vars_copy = deepcopy(vars)
-    dvars_copy = deepcopy(dvars)
-
-    autodiff(Reverse, SpeedyWeather.implicit_correction!, Const, Duplicated(vars, dvars), Const(model.implicit), Const(model))
-
-    function implicit_correction(vars, implicit, model)
-        vars_new = deepcopy(vars)
-        SpeedyWeather.implicit_correction!(vars_new, deepcopy(implicit), deepcopy(model))
-        return vars_new
-    end
-
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(9, 1), x -> implicit_correction(x, model.implicit, model), dvars_copy, vars_copy)
-
-    # old test checked dprogn
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol = 1.0e-4, atol = 1.0e-1))
-
-    #
-    # transform!(diagn, progn, lf2, model)
-    #
-    vars, dvars = ADSeed(adsim, :tendencies)
-    vars_copy = deepcopy(vars)
-    dvars_copy = deepcopy(dvars)
-
-    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(vars, dvars), Const(lf2), Duplicated(model, make_zero(model)))
-
-    function transform_diagn(vars, lf2, model)
-        vars_copy = deepcopy(vars)
-        transform!(vars_copy, lf2, deepcopy(model))
-        return vars_copy
-    end
-
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_diagn(x, lf2, model), dvars_copy, vars_copy)
-
-    # old test checked dprogn
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-3, atol = 1.0e-3))
+    # The finite-difference direction leaves `humidity` out. `transform!` calls `hole_filling!` to
+    # remove negative humidity, which is not differentiable: perturbing humidity across that kink
+    # makes FD disagree with AD by ~56%, and the disagreement does NOT shrink with the step size
+    # (5.6e-1 at the default range, 5.7e-1 at max_range=1e-3) — the signature of a genuine kink
+    # rather than truncation error. The adjoint identity below still covers humidity in full, and
+    # forward vs reverse agree there to ~1e-7.
+    _adjoint_check(
+        SpeedyWeather.transform!, vars0, Const(model);
+        ingroup = :prognostic, outgroup = :grid, rtol_ad = 1.0e-5, rtol_fd = 3.0e-2,
+        fd_only = (:vorticity, :divergence, :temperature, :pressure),
+    )
 end

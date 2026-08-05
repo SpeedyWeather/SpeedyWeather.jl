@@ -196,7 +196,7 @@ The following shows how you can use `RossbyHaurwitzWave`
 in a `PrimitiveDryModel` (or `Wet`) but you probably
 also want to set initial conditions for temperature and pressure
 to not start at zero Kelvin and zero pressure. Also no orography,
-and let's switch off all physics parameterizations with `physics=false`.
+and let's switch off all physics parameterizations with `dynamics_only=true`.
 
 ```@example haurwitz
 spectral_grid = SpectralGrid(trunc=42, nlayers=8)
@@ -211,7 +211,7 @@ time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(30))   # 30min timeste
 forcing = nothing
 drag = nothing
 
-model = PrimitiveDryModel(spectral_grid; time_stepping, initial_conditions, orography, forcing, drag, dynamics_only=false)
+model = PrimitiveDryModel(spectral_grid; time_stepping, initial_conditions, orography, forcing, drag, dynamics_only=true)
 simulation = initialize!(model)
 run!(simulation, period=Day(5))
 nothing # hide

@@ -59,7 +59,7 @@ function initialize!(feedback::Feedback, variables::Variables, model::AbstractMo
 
     # hack: redefine element in global constant dt_in_sec
     # used to pass on the time step to ProgressMeter.speedstring
-    FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt_sec
+    FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt
     FEEDBACK_TIME[] = clock.time
 
     # reset those to default (-1 not shown)
@@ -274,7 +274,7 @@ function initialize!(progress_txt::ProgressTxt, vars, model)
     write(file, s * "\n")
     write(file, "Integrating:\n")
     write(file, "$SG\n")
-    write(file, "Time: $days days at Δt = $(L.Δt_sec)s\n")
+    write(file, "Time: $days days at Δt = $(L.Δt)s\n")
     model.output.active && write(file, "\nAll data will be stored in $run_path\n")
     model.output.active || write(file, "\nNo output will be written (output=false)\n")
     progress_txt.file = file

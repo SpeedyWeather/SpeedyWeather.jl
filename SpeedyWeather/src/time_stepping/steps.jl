@@ -43,6 +43,16 @@ get_steps(var::AbstractArray{T, 1}) where {T} = (var,)
 get_steps(var::AbstractArray{T, 2}) where {T} = ntuple(step -> get_step(var, step), size(var, 2))
 get_steps(var::AbstractArray{T, 3}) where {T} = ntuple(step -> get_step(var, step), size(var, 3))
 
+"""$(TYPEDSIGNATURES)
+Get the first `N` steps of a variable as a tuple of views with a COMPILE-TIME length,
+fully unrolled via `Val(N)` (branchless, in contrast to the runtime-length methods above
+whose `ntuple(f, ::Int)` returns a small union of tuple types; that union breaks Enzyme's
+type analysis on Julia ≥ 1.11, see https://github.com/EnzymeAD/Enzyme.jl/issues/3275).
+NOTE: in Enzyme-differentiated code that launches kernels on the views, even a compile-time
+tuple of large step views (e.g. of a `LowerTriangularArray`) can exceed Enzyme's type
+analysis — there, avoid the tuple altogether and bind steps individually via `get_step`."""
+get_steps(var::AbstractArray, ::Val{N}) where {N} = ntuple(step -> get_step(var, step), Val(N))
+
 export get_step
 
 """$(TYPEDSIGNATURES)
