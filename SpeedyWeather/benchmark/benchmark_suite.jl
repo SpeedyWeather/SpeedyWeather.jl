@@ -43,7 +43,7 @@ abstract type AbstractBenchmarkSuite end
     nruns::Int = 1
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
-    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNCATION, nruns)
     nlayers::Vector{Int} = default_nlayers(model)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
@@ -197,7 +197,7 @@ abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end
     nruns::Int = 1
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
-    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    truncation::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNCATION, nruns)
     nlayers::Vector{Int} = default_nlayers(model)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)

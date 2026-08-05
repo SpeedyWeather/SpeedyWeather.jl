@@ -8,7 +8,6 @@ const DEFAULT_ARRAYTYPE = Array
 # numerics
 const DEFAULT_GRID = OctahedralGaussianGrid
 const DEFAULT_TRUNCATION = 32
-const DEFAULT_TRUNC = DEFAULT_TRUNCATION - 1
 const DEFAULT_NLAYERS = 8
 
 export SpectralGrid
