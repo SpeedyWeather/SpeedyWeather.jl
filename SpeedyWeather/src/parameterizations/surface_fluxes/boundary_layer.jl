@@ -14,7 +14,9 @@ export ConstantDrag
 end
 
 variables(::ConstantDrag) = (
-    ParameterizationVariable(:boundary_layer_drag, Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer drag coefficient for momentum", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer drag coefficient for heat", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer drag coefficient for humidity", units = "1"),
 )
 
 Adapt.@adapt_structure ConstantDrag
@@ -142,7 +144,9 @@ $(TYPEDFIELDS)"""
 end
 
 variables(::BulkRichardsonDrag) = (
-    ParameterizationVariable(:boundary_layer_drag, Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer drag coefficient for momentum", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer drag coefficient for heat", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer drag coefficient for humidity", units = "1"),
 )
 
 Adapt.@adapt_structure BulkRichardsonDrag
@@ -177,16 +181,16 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     z₀H = vars.parameterizations.heat_roughness[ij]
     z₀Q = vars.parameterizations.moisture_roughness[ij]
 
-    function calc_drag_max(z₀, z)
+    function calc_drag_max(z₀)
         # should be z > z₀, z=z₀ means an infinitely high drag, choose one order higher than roughness length at least
         # 0 < z < z₀ doesn't make sense so cap here
         z_calc = max(z, 10z₀)
         return (κ / log(z_calc / z₀))^2
     end
 
-    drag_max_momentum = calc_drag_max(z₀M, z)
-    drag_max_heat = calc_drag_max(z₀H, z)
-    drag_max_humidity = calc_drag_max(z₀Q, z)
+    drag_max_momentum = calc_drag_max(z₀M)
+    drag_max_heat = calc_drag_max(z₀H)
+    drag_max_humidity = calc_drag_max(z₀Q)
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
