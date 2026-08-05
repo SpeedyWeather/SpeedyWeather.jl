@@ -1,5 +1,4 @@
-# These have been moved to LowerTriangularArrays
-# TODO remove, rename? Change 0 to 1-based indexing?
+# These have been moved to LowerTriangularArrays, TODO remove, rename?
 const spectral_truncation = LowerTriangularArrays.truncate
 const spectral_truncation! = LowerTriangularArrays.truncate!
 const spectral_interpolation = LowerTriangularArrays.interpolate

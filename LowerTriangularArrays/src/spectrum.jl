@@ -1,18 +1,29 @@
 abstract type AbstractSpectrum end
 
-"""$(TYPEDSIGNATURES) 
-Encodes the spectral trunction, orders and degrees of the spherical harmonics. 
+"""Encodes the spectral trunction, highested degree and order of the spherical harmonics (1-based).
 Is used by every `LowerTriangularArray` and also defines the architecture on which the 
-data of the `LowerTriangularArray` is stored.
-"""
+data of the `LowerTriangularArray` is stored. Fields are $(TYPEDFIELDS)"""
 struct Spectrum{A, O, L, IntType} <: AbstractSpectrum
+    "Highest order, meridional wavenumber, of the spherical harmonics (1-based)"
     lmax::IntType
+
+    "Highest degree, zonal wavenumber, of the spherical harmonics (1-based)"
     mmax::IntType
+
+    "Architecture used for LowerTriangularArrays created with this spectrum"
     architecture::A
+
+    "[DERIVED] Precomputed to facilitate kernel launch or looping over elements"
     orders::O
-    l_indices::L    # used by GPU kernels
-    m_indices::L    # used by GPU kernels
-    lm_orders::O    # used by eachorder
+
+    "[DERIVED] Precomputed to facilitate kernel launch or looping over elements"
+    l_indices::L
+
+    "[DERIVED] Precomputed to facilitate kernel launch or looping over elements"
+    m_indices::L
+
+    "[DERIVED] Precomputed to facilitate kernel launch or looping over elements"
+    lm_orders::O
 end
 
 Adapt.@adapt_structure Spectrum
@@ -50,22 +61,18 @@ function Spectrum(
     )
 end
 
-"""
-$(TYPEDSIGNATURES)
-Create a `Spectrum` for the spectral truncation `trunc`. `trunc` is assumed to be 
-zero-based, i.e. `trunc=4` will create a `Spectrum` with T4 truncation. With
-`one_degree_more==true` the `Spectrum` wil have an `lmax` increased by one, which 
-is needed for spectral gradients. 
-"""
-Spectrum(trunc::Integer; one_degree_more = false, kwargs...) =
-    Spectrum(trunc + 1 + one_degree_more, trunc + 1; kwargs...)
+"""$(TYPEDSIGNATURES)
+Create a `Spectrum` for the spectral `truncation` (1-based).
+E.g. `truncation = 4` will create a `Spectrum` with 4 zonal and meridional wavenumbers.
+With kwarg `one_degree_more=true` the `Spectrum` wil have a meridional wavenumber `lmax`
+increased by one, which is needed for spectral gradients."""
+Spectrum(truncation::Integer; one_degree_more = false, kwargs...) =
+    Spectrum(truncation + one_degree_more, truncation; kwargs...)
 
-Spectrum(; trunc::Integer, kwargs...) = Spectrum(trunc; kwargs...)
+Spectrum(; truncation::Integer, kwargs...) = Spectrum(truncation; kwargs...)
 
-"""
-$(TYPEDSIGNATURES)
-Create a `Spectrum` from another `Spectrum` but with a new architecture.
-"""
+"""$(TYPEDSIGNATURES)
+Create a `Spectrum` from another `Spectrum` but with a new architecture."""
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE()) =
     Spectrum(
     spectrum.lmax,
@@ -81,7 +88,7 @@ triangle_number(m::Integer) = m * (m + 1) ÷ 2
 nonzeros(l::Integer, m::Integer) = l * m - triangle_number(m - 1)
 nonzeros(s::Spectrum) = nonzeros(s.lmax, s.mmax)
 resolution(s::Spectrum) = (s.lmax, s.mmax)
-truncation(s::Spectrum, base = ZeroBased) = truncation(s, base) # TODO make OneBased default?
+truncation(s::Spectrum, base = OneBased) = truncation(s, base)
 truncation(s::Spectrum, ::Type{OneBased}) = s.mmax
 truncation(s::Spectrum, ::Type{ZeroBased}) = s.mmax - 1
 orders(s::Spectrum) = s.orders
@@ -127,7 +134,7 @@ Base.:(==)(s1::Spectrum, s2::Spectrum) =
     s1.lmax == s2.lmax && s1.mmax == s2.mmax
 
 function Base.show(io::IO, S::Spectrum)
-    println(io, styled"T$(S.mmax - 1) {warning:Spectrum}\{...\}")
+    println(io, styled"T$S.mmax {warning:Spectrum}\{...\}")
     println(io, styled"├ {info:lmax} = $(S.lmax) {note:(degrees)}")
     println(io, styled"├ {info:mmax} = $(S.mmax) {note:(orders)}")
     print(io, styled"└ {info:architecture} = $(typeof(S.architecture))")
@@ -140,9 +147,7 @@ Architectures.architecture(s::Spectrum) = s.architecture
 Architectures.on_architecture(architecture::AbstractArchitecture, s::Spectrum) = Spectrum(s; architecture)
 Architectures.on_architecture(s::Spectrum, x) = on_architecture(architecture(s), x)
 
-# indexing
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Iterator over all spherical harmonics in `S`, yielding `(l, m)` tuples of
 degree `l` and order `m` (both 1-based) for every harmonic in the lower triangle.
 To be used like

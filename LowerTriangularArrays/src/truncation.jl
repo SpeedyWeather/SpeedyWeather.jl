@@ -1,37 +1,32 @@
-"""
-$(TYPEDSIGNATURES)
-Triangular truncation to degree `ltrunc` and order `mtrunc` (both 0-based). Truncate spectral coefficients `alms` in-place
-by setting all coefficients for which the degree `l` is larger than the truncation `ltrunc` or order `m` larger
-than the truncaction `mtrunc`."""
+"""$(TYPEDSIGNATURES)
+Triangular truncation to degree `lmax` and order `mmax` (both 1-based). Truncate spectral coefficients `alms` in-place
+by setting all coefficients for which the degree `l` is larger than the truncation `lmax` or order `m` larger
+than the truncaction `mmax`."""
 function truncate!(
-        alms::LowerTriangularArray,     # spectral field to be truncated
-        ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
-        mtrunc::Integer,                # truncate to max order mtrunc (0-based)
+        alms::LowerTriangularArray,   # spectral field to be truncated
+        lmax::Integer,                # truncate to max degree (1-based)
+        mmax::Integer,                # truncate to max order (1-based)
     )
     (; l_indices, m_indices) = alms.spectrum
-
-    # Convert to 1-based indexing
-    ltrunc += 1     # 0-based to 1-based
-    mtrunc += 1
 
     # Launch kernel for GPU/Reactant compatibility
     arch = architecture(alms)
     launch!(
         arch, SpectralWorkOrder, size(alms), _truncate_kernel!,
-        alms.data, l_indices, m_indices, ltrunc, mtrunc
+        alms.data, l_indices, m_indices, lmax, mmax
     )
 
     return alms
 end
 
-@kernel inbounds = true function _truncate_kernel!(data, @Const(l_indices), @Const(m_indices), ltrunc, mtrunc)
+@kernel inbounds = true function _truncate_kernel!(data, @Const(l_indices), @Const(m_indices), lmax, mmax)
     I = @index(Global, NTuple)
     lm = I[1]
 
     l = l_indices[lm]
     m = m_indices[lm]
 
-    if l > ltrunc || m > mtrunc
+    if l > lmax || m > mmax
         data[I...] = 0
     end
 end
@@ -55,35 +50,35 @@ end
 """
 $(TYPEDSIGNATURES)
 Triangular truncation of `alms` to degree and order `trunc` in-place."""
-truncate!(alms::LowerTriangularArray, trunc::Integer) = truncate!(alms, trunc, trunc)
+truncate!(alms::LowerTriangularArray, truncation::Integer) = truncate!(alms, truncation, truncation)
 
 """
 $(TYPEDSIGNATURES)
 Triangular truncation of `alms` to the size of it, sets additional rows to zero."""
-truncate!(alms::LowerTriangularArray) = truncate!(alms, size(alms, 2, ZeroBased, as = Matrix))
+truncate!(alms::LowerTriangularArray) = truncate!(alms, size(alms, 2, OneBased, as = Matrix))
 
 
 """
 $(TYPEDSIGNATURES)
-Returns a LowerTriangularArray that is truncated from `alms` to the size (`ltrunc`+1) x (`mtrunc`+1),
-both inputs are 0-based. If `ltrunc` or `mtrunc` is larger than the corresponding size of`alms` than
+Returns a LowerTriangularArray that is truncated from `alms` to the size `ltrunc` x `mtrunc`,
+both inputs are 1-based. If `ltrunc` or `mtrunc` is larger than the corresponding size of`alms` than
 `truncate` is automatically called instead, returning a LowerTriangularArray padded zero
 coefficients for higher wavenumbers."""
 function truncate(
         ::Type{NF},                 # number format NF (can be complex)
         alms::LowerTriangularArray{T, N, ArrayType, S}, # spectral field to be truncated
-        ltrunc::Integer,            # truncate to max degree ltrunc (0-based)
-        mtrunc::Integer,            # truncate to max order mtrunc (0-based)
+        ltrunc::Integer,            # truncate to max degree (1-based)
+        mtrunc::Integer,            # truncate to max order (1-based)
     ) where {NF, T, N, S, ArrayType}
 
-    lmax, mmax, k... = size(alms, ZeroBased, as = Matrix)
+    lmax, mmax, k... = size(alms, OneBased, as = Matrix)
 
     # interpolate to higher resolution if output larger than input
     (ltrunc > lmax || mtrunc > mmax) && return interpolate(NF, alms, ltrunc, mtrunc)
 
     # preallocate new (smaller) array
     ArrayType_ = nonparametric_type(ArrayType)
-    alms_trunc = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc + 1, mtrunc + 1, architecture = architecture(alms)), alms.dims, k...)
+    alms_trunc = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc, mtrunc, architecture = architecture(alms)), alms.dims, k...)
 
     # copy data over, copyto! copies the largest matching subset of harmonics
     copyto!(alms_trunc, alms)
@@ -95,25 +90,25 @@ truncate(alms::LowerTriangularArray, trunc::Integer) = truncate(alms, trunc, tru
 
 """
 $(TYPEDSIGNATURES)
-Returns a LowerTriangularArray that is interpolated from `alms` to the size (`ltrunc`+1) x (`mtrunc`+1),
-both inputs are 0-based, by padding zeros for higher wavenumbers. If `ltrunc` or `mtrunc` are smaller than the
+Returns a LowerTriangularArray that is interpolated from `alms` to the size `ltrunc` x `mtrunc`,
+both inputs are 1-based, by padding zeros for higher wavenumbers. If `ltrunc` or `mtrunc` are smaller than the
 corresponding size of `alms` than `truncate` is automatically called instead, returning a smaller
 LowerTriangularArray."""
 function interpolate(
         ::Type{NF},                 # number format NF (can be complex)
         alms::LowerTriangularArray{T, N, ArrayType, S}, # spectral field to be truncated
-        ltrunc::Integer,            # truncate to max degree ltrunc (0-based)
-        mtrunc::Integer,            # truncate to max order mtrunc (0-based)
+        ltrunc::Integer,            # truncate to max degree ltrunc (1-based)
+        mtrunc::Integer,            # truncate to max order mtrunc (1-based)
     ) where {NF, T, N, S, ArrayType}
 
-    lmax, mmax, k... = size(alms, ZeroBased, as = Matrix)
+    lmax, mmax, k... = size(alms, OneBased, as = Matrix)
 
     # truncate to lower resolution if output smaller than input
     (ltrunc <= lmax && mtrunc <= mmax) && return truncate(NF, alms, ltrunc, mtrunc)
 
     # preallocate new (larger) array
     ArrayType_ = nonparametric_type(ArrayType)
-    alms_interp = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc + 1, mtrunc + 1, architecture = architecture(alms)), alms.dims, k...)
+    alms_interp = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc, mtrunc, architecture = architecture(alms)), alms.dims, k...)
 
     # copy data over, copyto! copies the largest matching subset of harmonics
     copyto!(alms_interp, alms)

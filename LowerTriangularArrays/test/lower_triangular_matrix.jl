@@ -961,9 +961,9 @@ end
             L = rand(LowerTriangularMatrix{NF}, lmax, mmax)
             L_original = deepcopy(L)
 
-            # Truncate to half the resolution (0-based)
-            ltrunc = lmax ÷ 2 - 1
-            mtrunc = mmax ÷ 2 - 1
+            # Truncate to half the resolution (1-based)
+            ltrunc = lmax ÷ 2
+            mtrunc = mmax ÷ 2
             LowerTriangularArrays.truncate!(L, ltrunc, mtrunc)
 
             # Check that coefficients beyond truncation are zero
@@ -1000,13 +1000,13 @@ end
             L_asym = rand(LowerTriangularMatrix{NF}, lmax, mmax)
             L_asym_original = deepcopy(L_asym)
 
-            ltrunc_asym = lmax - 2  # truncate only last degree
-            mtrunc_asym = mmax ÷ 2 - 1  # truncate half the orders
+            ltrunc_asym = lmax - 1  # truncate only last degree
+            mtrunc_asym = mmax ÷ 2  # truncate half the orders
             LowerTriangularArrays.truncate!(L_asym, ltrunc_asym, mtrunc_asym)
 
             for m in 1:mmax
                 for l in m:lmax
-                    if l > ltrunc_asym + 1 || m > mtrunc_asym + 1
+                    if l > ltrunc_asym || m > mtrunc_asym
                         @test L_asym[l, m] == 0
                     else
                         @test L_asym[l, m] == L_asym_original[l, m]

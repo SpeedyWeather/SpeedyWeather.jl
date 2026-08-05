@@ -77,9 +77,9 @@ and `finalize!`.
 Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
 
 ```julia
-vars.prognostic.vorticity                             # Spectral vorticity
+vars.prognostic.vorticity                       # Spectral vorticity
 vars.prognostic.ocean.sea_surface_temperature   # Ocean namespace
-vars.tendencies.vorticity                             # Spectral vorticity tendency
+vars.tendencies.vorticity                       # Spectral vorticity tendency
 vars.tendencies.grid.u                          # Grid-space u-wind tendency
 vars.dynamics.w                                 # Vertical velocity
 ```
@@ -109,7 +109,7 @@ using CUDA              # or AMDGPU, Metal
 using SpeedyWeather
 
 arch = SpeedyWeather.GPU()
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, architecture=arch)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8, architecture=arch)
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
