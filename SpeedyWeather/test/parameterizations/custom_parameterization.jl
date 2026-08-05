@@ -57,7 +57,7 @@
         custom_parameterization = SimpleAlbedo(spectral_grid),
         parameterizations = (
             :convection, :large_scale_condensation, :custom_parameterization,
-            :surface_condition, :surface_momentum_flux,
+            :boundary_layer, :surface_momentum_flux,
             :surface_heat_flux, :surface_humidity_flux,
             :stochastic_physics,
         )
