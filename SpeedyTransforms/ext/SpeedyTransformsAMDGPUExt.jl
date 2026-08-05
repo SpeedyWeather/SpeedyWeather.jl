@@ -132,15 +132,27 @@ end
 # =====================================================================================
 # run_graph!: HIP-specific graph capture and replay.
 # Dispatches on the A=GPU{<:ROCBackend} type parameter of GPUFourierGraphCache.
+#
+# DEBUG INSTRUMENTATION (temporary, 2026-08-05 LUMI crash isolation session): every phase is
+# announced with a flushed println tagged by direction/nlayers/buffer key, and AMDGPU.synchronize()
+# is inserted after every risky GPU operation (warm-up, replay) to force async faults to surface
+# at the point that actually caused them rather than at some later unrelated sync. This makes
+# replay slower than the real design intends -- REMOVE before considering this production code.
 # =====================================================================================
 
 function run_graph!(
-        ::GPUFourierGraphCache{<:Any, <:Any, <:Any, <:Any, <:Any, <:GPU{<:ROCBackend}, E},
+        cache::GPUFourierGraphCache{<:Any, <:Any, <:Any, <:Any, <:Any, <:GPU{<:ROCBackend}, E},
         execs::Dict{UInt, E}, key, loop!::F,
     ) where {E, F}
+    direction = execs === cache.forward_execs ? "forward" : (execs === cache.inverse_execs ? "inverse" : "unknown")
+    tag = "[$direction nlayers=$(cache.nlayers) key=0x$(string(key, base = 16))]"
+
     exec = get(execs, key, missing)
     if exec isa hipGraphExec_t
-        raw_launch!(exec)                    # hot path: pure replay
+        println("$tag replaying cached graph"); flush(stdout)
+        raw_launch!(exec)
+        AMDGPU.synchronize()
+        println("$tag replay OK"); flush(stdout)
         return nothing
     elseif exec === nothing                  # capture previously failed; run directly
         loop!()
@@ -153,31 +165,40 @@ function run_graph!(
         return nothing
     end
 
+    println("$tag first time seen -- warming up outside capture"); flush(stdout)
     # warm up so that one-time work (rocFFT init, kernel JIT, memory-pool growth) happens
     # OUTSIDE the capture region where it is not allowed
     loop!()
     AMDGPU.synchronize()
+    println("$tag warm-up OK"); flush(stdout)
 
+    println("$tag beginning capture"); flush(stdout)
     graph = try
         raw_capture() do
             loop!()
         end
     catch err
         err isa HIPError || rethrow()
+        println("$tag capture threw HIPError: $err"); flush(stdout)
         nothing
     end
 
     if graph === nothing
         # capture invalidated or failed with a hard HIP error; warmup already produced
         # the correct result
+        println("$tag capture invalidated/failed -- falling back to direct loop for this key"); flush(stdout)
         execs[key] = nothing
         return nothing
     end
+    println("$tag capture OK -- instantiating"); flush(stdout)
 
     exec = raw_instantiate(graph)
     hipGraphDestroy(graph)   # exec is independently allocated; the graph template is not needed after this
     execs[key] = exec
+    println("$tag instantiated -- launching first replay"); flush(stdout)
     raw_launch!(exec)
+    AMDGPU.synchronize()
+    println("$tag first replay OK"); flush(stdout)
     return nothing
 end
 
