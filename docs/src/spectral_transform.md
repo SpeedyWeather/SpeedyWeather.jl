@@ -57,7 +57,8 @@ and order ``m`` somehow. Most commonly, a triangular truncation is applied, such
 after ``l = l_{max}`` are discarded. Triangular because the retained array of the coefficients ``a_{l, m}``
 looks like a triangle. Other truncations like rhomboidal have been studied[^Daley78] but are rarely used
 since. Choosing ``l_{max}`` also constrains ``m_{max}`` and determines the (horizontal) spectral resolution.
-In SpeedyWeather.jl this resolution as chosen as `trunc` when creating the [SpectralGrid](@ref).
+In SpeedyWeather.jl this resolution as chosen as `truncation` (1-based, i.e. `truncation = l_{max} + 1`)
+when creating the [SpectralGrid](@ref).
 
 For ``f`` being a real-valued there is a symmetry
 ```math
@@ -66,9 +67,10 @@ a_{l, -m} = (-1)^m a^*_{l, +m},
 meaning that the coefficients at ``-m`` and ``m`` are the same, but the sign of the real and imaginary component
 can be flipped, as denoted with the ``(-1)^m`` and the complex conjugate ``a_{l, m}^*``. As we are only dealing with
 real-valued fields anyway, we therefore never have to store the negative orders ``-m`` and end up with a lower
-triangular matrix of size ``(l_{max}+1) \times (m_{max}+1)`` or technically ``(T+1)^2`` where ``T`` is
-the truncation `trunc`. One is added here because the degree ``l`` and order ``m`` use 0-based indexing
-but sizes (and so is Julia's indexing) are 1-based.
+triangular matrix of size ``(l_{max}+1) \times (m_{max}+1)`` or technically ``(T+1)^2`` where ``T``
+is the 0-based truncation ``l_{max}``, corresponding to `truncation - 1` (`truncation` is the
+1-based keyword argument of [SpectralGrid](@ref)). One is added here because the degree ``l``
+and order ``m`` use 0-based indexing but sizes (and so is Julia's indexing) are 1-based.
 
 For correctness we want to mention here that vector quantities require one more degree ``l`` due to the recurrence
 relation in the [Meridional derivative](@ref). Hence for practical reasons *all* spectral fields are represented
@@ -201,29 +203,37 @@ corresponding coefficient matrix is of size 32x32.
 
 ## Available horizontal resolutions
 
-Technically, SpeedyWeather.jl supports arbitrarily chosen resolution parameter `trunc` when
+Technically, SpeedyWeather.jl supports an arbitrarily chosen resolution parameter `truncation` when
 creating the [SpectralGrid](@ref) that refers to the highest non-zero degree ``l_{max}``
-that is resolved in spectral space. SpeedyWeather.jl will always try to choose an
-easily-Fourier transformable[^FFT] size of the grid, but as we use
+that is resolved in spectral space, 1-based, i.e. `truncation = l_{max} + 1`. SpeedyWeather.jl will
+always try to choose an easily-Fourier transformable[^FFT] size of the grid, but as we use
 [FFTW.jl](https://github.com/JuliaMath/FFTW.jl) there is quite some flexibility without
 performance sacrifice. However, this has traditionally lead to typical resolutions that
 we also use for testing we therefore recommend to use.
 They are as follows with more details below
 
-| `trunc`       | nlon | nlat | ``\Delta x`` |
+!!! warning "Why is `truncation` 1-based?"
+    Spherical harmonics are mathematically 0-based, i.e. the highest degree resolved is
+    ``l_{max}``, and most other spectral models refer to the resolution this way too
+    (e.g. "T31" for ``l_{max}=31``). SpeedyWeather.jl's `truncation` keyword is 1-based
+    instead (`truncation = l_{max} + 1`) purely for user convenience: it lets you pick
+    resolutions as powers of 2 (e.g. `truncation=32` or `truncation=64`) rather than
+    having to remember to subtract one every time.
+
+| `truncation`  | nlon | nlat | ``\Delta x`` |
 | ------------- | ---- | ---- | ------------ |
-| 31 (default)  | 96   | 48   | 400 km       |
-| 42            | 128  | 64   | 312 km       |
-| 63            | 192  | 96   | 216 km       |
-| 85            | 256  | 128  | 165 km       |
-| 127           | 384  | 192  | 112 km       |
-| 170           | 512  | 256  | 85 km        |
-| 255           | 768  | 384  | 58 km        |
-| 341           | 1024 | 512  | 43 km        |
-| 511           | 1536 | 768  | 29 km        |
-| 682           | 2048 | 1024 | 22 km        |
-| 1024          | 3072 | 1536 | 14 km        |
-| 1365          | 4096 | 2048 | 11 km        |
+| 32 (default)  | 96   | 48   | 400 km       |
+| 43            | 128  | 64   | 312 km       |
+| 64            | 192  | 96   | 216 km       |
+| 86            | 256  | 128  | 165 km       |
+| 128           | 384  | 192  | 112 km       |
+| 171           | 512  | 256  | 85 km        |
+| 256           | 768  | 384  | 58 km        |
+| 342           | 1024 | 512  | 43 km        |
+| 512           | 1536 | 768  | 29 km        |
+| 683           | 2048 | 1024 | 22 km        |
+| 1025          | 3072 | 1536 | 14 km        |
+| 1366          | 4096 | 2048 | 11 km        |
 
 Some remarks on this table
 - This assumes the default quadratic truncation, you can always adapt the grid resolution via the `dealiasing` option, see [Matching spectral and grid resolution](@ref)
@@ -247,7 +257,7 @@ resolution
 with ``N`` number of grid points over a sphere with radius ``R``. However, we have
 to acknowledge that this usually gives higher resolution compared to other methods
 of estimating the effective resolution, see [^Randall2021] for a discussion. You may therefore
-need to be careful to make claims that, e.g. `trunc=85` can resolve the
+need to be careful to make claims that, e.g. `truncation=86` can resolve the
 atmospheric dynamics at a scale of 165km.
 
 ## Derivatives in spherical coordinates

@@ -19,7 +19,7 @@ so your manual modifications will prevail after `initialize!`.
 To be used like
 
 ```@example sea_ice
-spectral_grid = SpectralGrid(trunc=31)
+spectral_grid = SpectralGrid(truncation=32)
 model = PrimitiveWetModel(spectral_grid; sea_ice=nothing)
 model.sea_ice
 ```

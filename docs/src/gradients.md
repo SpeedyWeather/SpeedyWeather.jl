@@ -109,7 +109,7 @@ SpeedyTransforms?
 
 Let us start by generating some data
 ```@example gradient
-spectral_grid = SpectralGrid(trunc=31, nlayers=1)
+spectral_grid = SpectralGrid(truncation=32, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = LinearVorticityDrag(spectral_grid)
 model = ShallowWaterModel(spectral_grid; forcing, drag)

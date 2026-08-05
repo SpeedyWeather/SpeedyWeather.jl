@@ -49,7 +49,7 @@ Earth's orography can be created with (here we use a resolution of T85, about 16
 
 ```@example orography
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=85)
+spectral_grid = SpectralGrid(truncation=86)
 orography = EarthOrography(spectral_grid)
 ```
 

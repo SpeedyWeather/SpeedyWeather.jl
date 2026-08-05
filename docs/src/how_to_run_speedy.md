@@ -47,21 +47,21 @@ grid is also stored in Float32. The resolution is therefore on average about 400
 In the vertical 8 levels are used, using [Sigma coordinates](@ref).
 
 The resolution of a SpeedyWeather.jl simulation is adjusted using the
-`trunc` argument, this defines the spectral resolution and the grid
+`truncation` argument, this defines the spectral resolution and the grid
 resolution is automatically adjusted to keep the aliasing between
 spectral and grid-point space constant (see [Matching spectral and grid resolution](@ref)).
 ```@example howto
-spectral_grid = SpectralGrid(trunc=85)
+spectral_grid = SpectralGrid(truncation=86)
 ```
-Typical values are 31, 42, 63, 85, 127, 170, ... although you can technically
+Typical values are 32, 43, 64, 86, 128, 171, ... although you can technically
 use any integer, see [Available horizontal resolutions](@ref) for details.
-Now with T85 (which is a common notation for `trunc=85`) the grid
+Now with T85 (which is a common notation for `truncation=86`) the grid
 is of higher resolution too. You may play with the `dealiasing` factor,
 a larger factor increases the grid resolution that is matched with a given
 spectral resolution. You don't choose the resolution of the grid directly,
 but using the `Grid` argument you can change its type (see [Grids](@ref))
 ```@example howto
-spectral_grid = SpectralGrid(trunc=85, dealiasing=3, Grid=HEALPixGrid)
+spectral_grid = SpectralGrid(truncation=86, dealiasing=3, Grid=HEALPixGrid)
 ```
 
 ## Vertical coordinates and resolution
@@ -114,7 +114,7 @@ Meaning that if you want to have a shorter or longer time step you can create a 
 `Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that (almost) every model component
 depends on a `SpectralGrid` as first argument.
 ```@example howto
-spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+spectral_grid = SpectralGrid(truncation=64, nlayers=1)
 time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(15))
 ```
 The actual time step at the given resolution (here T63) is then `Δt`.
@@ -153,7 +153,7 @@ the barotropic and shallow water models do not have any physical
 parameterizations. Conceptually you construct these different models with
 
 ```julia
-spectral_grid = SpectralGrid(trunc=..., ...)
+spectral_grid = SpectralGrid(truncation=..., ...)
 component1 = SomeComponent(spectral_grid, parameter1=..., ...)
 component2 = SomeOtherComponent(spectral_grid, parameter2=..., ...)
 model = BarotropicModel(spectral_grid; all_other_components..., ...)

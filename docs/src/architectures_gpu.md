@@ -8,7 +8,7 @@ Most of SpeedyWeather.jl supports GPU acceleration. All of our models can run GP
 ```julia
 using SpeedyWeather, CUDA # For AMD GPUs, replace `CUDA` with `AMDGPU`
 architecture = SpeedyWeather.GPU()
-spectral_grid = SpectralGrid(trunc=63, nlayers=8, architecture=architecture)           
+spectral_grid = SpectralGrid(truncation = 64, nlayers = 8, architecture = architecture)           
 
 model = PrimitiveWetModel(spectral_grid=spectral_grid)
 simulation = initialize!(model)

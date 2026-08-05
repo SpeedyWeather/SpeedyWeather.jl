@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 1-based truncation as resolution parameter [#1177](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1177)
 - Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
 - Revised extended differentiability tests [#1167](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1167)

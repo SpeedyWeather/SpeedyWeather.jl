@@ -239,7 +239,7 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 
 ```@example radiation
 using SpeedyWeather, CairoMakie
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
@@ -268,7 +268,7 @@ Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `Tra
 
 ```@example radiation
 using SpeedyWeather, CairoMakie
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
@@ -353,7 +353,7 @@ concentration is fitted to the Keeling curve. To customise or add greenhouse gas
 `NamedTuple` of gas objects to `greenhouse_gases`. The key of the named tuple will be used for the variable name, so `co2 = ..., carbon_dioxide = ...` can co-exist.
 
 ```@example radiation
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 
 # constant CO2 at 420 ppm
 model = PrimitiveWetModel(spectral_grid; greenhouse_gases = (; co2 = CO2(spectral_grid, 420)))

@@ -122,7 +122,7 @@ end
 ```
 Which allows us to do
 ```@example extend
-spectral_grid = SpectralGrid(trunc=42, nlayers=1)
+spectral_grid = SpectralGrid(truncation=43, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=30, decorrelation_time=Day(5))
 ```
 So the respective resolution parameters and the number format are just pulled from the `SpectralGrid`
@@ -346,7 +346,7 @@ modular interface that you can create instances of individual model components
 and just put them together as you like, and as long as you follow some rules.
 
 ```@example extend
-spectral_grid = SpectralGrid(trunc=85, nlayers=1)
+spectral_grid = SpectralGrid(truncation=86, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest(spectral_grid)
 model = BarotropicModel(spectral_grid; initial_conditions, forcing=stochastic_stirring)
