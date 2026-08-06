@@ -808,12 +808,12 @@ end
 
 @testset "Rotate" begin
     @testset for NF in (Float16, Float32, Float64)
-        @testset for trunc in (5, 10, 15)
+        @testset for truncation in (5, 10, 15)
             @testset for k in 0:3
                 if k == 0
-                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc)
+                    L = rand(LowerTriangularArray{Complex{NF}}, truncation, truncation)
                 else
-                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc, k)
+                    L = rand(LowerTriangularArray{Complex{NF}}, truncation, truncation, k)
                 end
 
                 L2 = deepcopy(L)
@@ -837,12 +837,12 @@ end
 
 @testset "Reverse" begin
     @testset for NF in (Float16, Float32, Float64)
-        @testset for trunc in (5, 10, 15)
+        @testset for truncation in (5, 10, 15)
             @testset for k in 0:3
                 if k == 0
-                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc)
+                    L = rand(LowerTriangularArray{Complex{NF}}, truncation, truncation)
                 else
-                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc, k)
+                    L = rand(LowerTriangularArray{Complex{NF}}, truncation, truncation, k)
                 end
 
                 L2 = reverse(L, dims = :lat)
@@ -868,8 +868,8 @@ end
 @testset "Spectrum" begin
     # truncation vs lmax, mmax constructors
     @test Spectrum(5, 5) == Spectrum(4, one_degree_more = false)
-    @test Spectrum(5, 5) == Spectrum(trunc = 4, one_degree_more = false)
-    @test Spectrum(6, 5) == Spectrum(trunc = 4, one_degree_more = true)
+    @test Spectrum(5, 5) == Spectrum(truncation = 4, one_degree_more = false)
+    @test Spectrum(6, 5) == Spectrum(truncation = 4, one_degree_more = true)
 
     s = Spectrum(5, 5)
     L = rand(Float32, s)
@@ -1020,7 +1020,7 @@ end
 @testset "ArrayDimensions" begin
     using SpeedyWeatherInternals.ArrayDimensions: LM, LMZ, LMT, LMZT, hastime, hasvertical
 
-    s = Spectrum(trunc = 5)
+    s = Spectrum(truncation = 6)
 
     # default dims is LM (2D spectral)
     L2 = zeros(LowerTriangularMatrix{Float32}, s)

@@ -4,7 +4,7 @@ using JET
 
 @testset "transform! free of runtime dispatch (JET)" begin
     arch = SpeedyTransforms.Architectures.CPU()
-    spectrum = Spectrum(trunc = 31, architecture = arch)
+    spectrum = Spectrum(truncation = 32, architecture = arch)
     grid = FullGaussianGrid(RingGrids.get_nlat_half(32), arch)
 
     # nlayers=1 exercises the serial (K=1) plans; nlayers=8 the batched (K>1) plans. nlayers=1 also

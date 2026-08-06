@@ -57,8 +57,8 @@ data `G` on the grid first
 using SpeedyWeather, CairoMakie
 
 # create some data with wave numbers 0,1,2,3,4
-trunc = 64                  # 1-based maximum degree of spherical harmonics
-L = randn(LowerTriangularMatrix{ComplexF32}, trunc, trunc)
+truncation = 64                  # 1-based maximum degree of spherical harmonics
+L = randn(LowerTriangularMatrix{ComplexF32}, truncation, truncation)
 SpeedyTransforms.spectral_truncation!(L, 5)  # remove higher wave numbers
 G = transform(L)
 heatmap(G, title="Some fake data G")        # requires `using CairoMakie`

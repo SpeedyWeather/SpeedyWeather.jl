@@ -49,7 +49,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Triangular truncation of `alms` to degree and order `trunc` in-place."""
+Triangular truncation of `alms` to degree and order `truncation` in-place."""
 truncate!(alms::LowerTriangularArray, truncation::Integer) = truncate!(alms, truncation, truncation)
 
 """
@@ -86,7 +86,7 @@ function truncate(
 end
 
 truncate(alms::LowerTriangularArray, ltrunc::Integer, mtrunc::Integer) = truncate(eltype(alms), alms, ltrunc, mtrunc)
-truncate(alms::LowerTriangularArray, trunc::Integer) = truncate(alms, trunc, trunc)
+truncate(alms::LowerTriangularArray, truncation::Integer) = truncate(alms, truncation, truncation)
 
 """
 $(TYPEDSIGNATURES)
@@ -116,4 +116,4 @@ function interpolate(
 end
 
 interpolate(alms::LowerTriangularArray, ltrunc::Integer, mtrunc::Integer) = interpolate(eltype(alms), alms, ltrunc, mtrunc)
-interpolate(alms::LowerTriangularArray, trunc::Integer) = interpolate(alms, trunc, trunc)
+interpolate(alms::LowerTriangularArray, truncation::Integer) = interpolate(alms, truncation, truncation)

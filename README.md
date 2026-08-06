@@ -101,10 +101,10 @@ The basic interface to SpeedyWeather.jl consist of 4 steps: define the grid,
 construct the model, initialize, run
 
 ```julia
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)   # define resolution
-model = PrimitiveWetModel(spectral_grid)            # construct model
-simulation = initialize!(model)                     # initialize all model components
-run!(simulation, period=Day(10), output=true)       # aaaand action!
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)  # define resolution
+model = PrimitiveWetModel(spectral_grid)                # construct model
+simulation = initialize!(model)                         # initialize all model components
+run!(simulation, period=Day(10), output=true)           # aaaand action!
 ```
 showing
 ```

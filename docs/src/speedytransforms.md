@@ -94,7 +94,7 @@ On such a coarse grid the transform error (absolute and relative) is about ``10^
 for higher resolution. The `transform` function will choose a corresponding
 grid-spectral resolution (see [Matching spectral and grid resolution](@ref)) following quadratic
 truncation, but you can always truncate/interpolate in spectral space with `spectral_truncation`,
-`spectral_interpolation` which takes `trunc` = ``l_{max} = m_{max}`` as second argument
+`spectral_interpolation` which takes `truncation` = ``l_{max} = m_{max}`` (1-based) as second argument
 ```@example speedytransforms
 spectral_truncation(alms, 2)
 ```
@@ -199,8 +199,8 @@ grid = rand(FullClenshawGrid, 12)
 SpectralTransform(grid)
 ```
 
-where you can also provide spectral resolution `trunc` or `dealiasing`. You can also
-provide both a grid and a lower triangular matrix to describe both spaces
+where you can also provide spectral resolution `truncation` or `dealiasing`.
+You can also provide both a grid and a lower triangular matrix to describe both spaces
 
 ```@example speedytransforms
 SpectralTransform(grid, alms)

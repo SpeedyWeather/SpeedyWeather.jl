@@ -148,7 +148,7 @@ Mainly two array types are used: `LowerTriangularArray` for spectral coefficient
 
 ```julia 
 arch = SpeedyWeather.CPU()
-spectrum = Spectrum(trunc=10, architecture = arch)
+spectrum = Spectrum(truncation=10, architecture = arch)
 nlayers = 5
 coeffs_zero = zeros(ComplexF32, spectrum, nlayers)
 coeffs_rand = rand(ComplexF32, spectrum, nlayers)

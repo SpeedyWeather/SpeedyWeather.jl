@@ -39,7 +39,7 @@ mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
     variant::V
 
-    "[OPTION] Time step for T31, scale linearly with resolution"
+    "[OPTION] Time step for T32 resolution, scale linearly with resolution"
     Δt_at_T32::S
 
     "[OPTION] Adjust `Δt_at_T32` with the `interval` to reach `interval` exactly"

@@ -31,7 +31,7 @@ grid_gpu = on_architecture(arch_gpu, grid_cpu)
 field_cpu = rand(grid_cpu)
 field_gpu = on_architecture(arch_gpu, field_cpu)
 
-spectrum_cpu = Spectrum(trunc=41, architecture=arch_cpu)
+spectrum_cpu = Spectrum(truncation=43, architecture=arch_cpu)
 spectrum_gpu = on_architecture(arch_gpu, spectrum_cpu)
 
 spec_cpu = rand(spectrum_cpu)

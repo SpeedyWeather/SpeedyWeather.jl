@@ -17,7 +17,7 @@ Defines the horizontal spectral resolution and corresponding grid and the
 vertical coordinate for SpeedyWeather.jl. Options are
 $(TYPEDFIELDS)
 
-`nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
+`nlat_half` and `npoints` should not be chosen but are derived from `truncation`,
 `Grid` and `dealiasing`."""
 struct SpectralGrid{
         ArchitectureType,      # <: AbstractArchitecture
@@ -82,7 +82,7 @@ struct SpectralGrid{
     "[DERIVED] Type of spectral variable in 4D (horizontal + vertical + time, flattened into 3D array)"
     SpectralVariableXYZT::Type{<:AbstractArray}
 
-    # SIZE OF GRID from trunc, Grid, dealiasing:
+    # SIZE OF GRID from truncation, Grid, dealiasing:
     "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
     dealiasing::NFDealiasing
 
@@ -187,11 +187,11 @@ function SpectralGrid(;
     end
 
     # grid
-    nlat_half = SpeedyTransforms.get_nlat_half(truncation-1, dealiasing)
+    nlat_half = SpeedyTransforms.get_nlat_half(truncation, dealiasing)
     grid = Grid(nlat_half, architecture)
 
     # recalculate the dealiasing
-    dealiasing = SpeedyTransforms.get_dealiasing(truncation-1, grid.nlat_half)
+    dealiasing = SpeedyTransforms.get_dealiasing(truncation, grid.nlat_half)
 
     # Spectral space
     spectrum = Spectrum(truncation + 1, truncation, architecture = architecture)
@@ -212,8 +212,8 @@ function SpectralGrid(
         transform_batch::AbstractVector{<:Integer} = default_transform_batch(grid.architecture, nlayers),
     )
     architecture = grid.architecture
-    trunc = SpeedyTransforms.get_truncation(grid, dealiasing)
-    spectrum = Spectrum(trunc + 2, trunc + 1, architecture = architecture)
+    truncation = SpeedyTransforms.get_truncation(grid, dealiasing)
+    spectrum = Spectrum(truncation + 1, truncation, architecture = architecture)
     return SpectralGrid(NF, spectrum, grid, dealiasing, nlayers, transform_batch)
 end
 
