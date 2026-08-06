@@ -134,9 +134,9 @@ Base.:(==)(s1::Spectrum, s2::Spectrum) =
     s1.lmax == s2.lmax && s1.mmax == s2.mmax
 
 function Base.show(io::IO, S::Spectrum)
-    println(io, styled"T$S.mmax {warning:Spectrum}\{...\}")
-    println(io, styled"├ {info:lmax} = $(S.lmax) {note:(degrees)}")
-    println(io, styled"├ {info:mmax} = $(S.mmax) {note:(orders)}")
+    println(io, styled"T$(S.mmax) {warning:Spectrum}\{...\}")
+    println(io, styled"├ {info:lmax} = $(S.lmax) {note:(degrees, 1-based)}")
+    println(io, styled"├ {info:mmax} = $(S.mmax) {note:(orders, 1-based)}")
     print(io, styled"└ {info:architecture} = $(typeof(S.architecture))")
     return nothing
 end
