@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Long integration CI with optimize 2, all other SpeedyWeather CI with optimize 0 [#1175](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1175)
+- Lower free convection gust constant [#1178](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1178)
 - Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
 - Revised extended differentiability tests [#1167](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1167)
