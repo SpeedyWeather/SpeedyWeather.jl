@@ -443,8 +443,6 @@ end
         @test size(similar(L)) == size(L)
         @test eltype(L) == eltype(similar(L, eltype(L)))
 
-        # TODO: before this was (5, 7), but now it is (5, 5)
-        # why did we even do (5,7) in the first place?
         @test (5, 5) == size(similar(L, 5, 5), as = Matrix)
         @test (5, 5) == size(similar(L, (5, 5)), as = Matrix)
 
@@ -518,7 +516,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32)
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64)
-        L2T = LowerTriangularArrays.truncate(L2, size(L1, ZeroBased, as = Matrix)...)
+        L2T = LowerTriangularArrays.truncate(L2, size(L1, OneBased, as = Matrix)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -581,7 +579,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...)
-            L2T = LowerTriangularArrays.truncate(L2, (size(L1, ZeroBased, as = Matrix)[1:2])...)
+            L2T = LowerTriangularArrays.truncate(L2, (size(L1, OneBased, as = Matrix)[1:2])...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -650,7 +648,6 @@ end
         end
     end
 end
-
 
 @testset "GPU (JLArrays)" begin
     NF = Float32
@@ -727,7 +724,7 @@ end
     L1 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
     L2 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, 65, 64, idims...))
 
-    L2T = LowerTriangularArrays.truncate(L2, (size(L1, ZeroBased; as = Matrix)[1:2])...)
+    L2T = LowerTriangularArrays.truncate(L2, (size(L1, OneBased; as = Matrix)[1:2])...)
     L3 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
 
     copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
@@ -969,7 +966,7 @@ end
             # Check that coefficients beyond truncation are zero
             for m in 1:mmax
                 for l in m:lmax
-                    if l > ltrunc + 1 || m > mtrunc + 1  # +1 for 1-based indexing
+                    if l > ltrunc || m > mtrunc  # 1-based indexing
                         @test L[l, m] == 0
                     else
                         # Check that coefficients within truncation are unchanged
@@ -987,7 +984,7 @@ end
             for k in 1:nlayers
                 for m in 1:mmax
                     for l in m:lmax
-                        if l > ltrunc + 1 || m > mtrunc + 1
+                        if l > ltrunc || m > mtrunc
                             @test L3D[l, m, k] == 0
                         else
                             @test L3D[l, m, k] == L3D_original[l, m, k]
@@ -1070,11 +1067,11 @@ end
     # dims are preserved through truncate and interpolate
     L3z_trunc = LowerTriangularArrays.truncate(L3z, 3)
     @test L3z_trunc.dims isa LMZ
-    @test size(L3z_trunc, ZeroBased, as = Matrix) == (3, 3, 3)
+    @test size(L3z_trunc, OneBased, as = Matrix) == (3, 3, 3)
 
     L3z_interp = LowerTriangularArrays.interpolate(L3z, 10)
     @test L3z_interp.dims isa LMZ
-    @test size(L3z_interp, ZeroBased, as = Matrix) == (10, 10, 3)
+    @test size(L3z_interp, OneBased, as = Matrix) == (10, 10, 3)
 
     L2_trunc = LowerTriangularArrays.truncate(L2, 3)
     @test L2_trunc.dims isa LM
