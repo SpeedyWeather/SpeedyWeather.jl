@@ -14,7 +14,7 @@ testsuite_GPU = Dict(
 )
 
 testsuite_dynamics = find_tests(joinpath(pwd(), "dynamics"))
-testsuite_long_integrations = find_tests(joinpath(pwd(), "long_integrations.jl"))
+testsuite_long_integrations = find_tests(joinpath(pwd(), "long_integrations"))
 testsuite_parameterizations = find_tests(joinpath(pwd(), "parameterizations"))
 testsuite_output = find_tests(joinpath(pwd(), "output"))
 testsuite_variables = find_tests(joinpath(pwd(), "variables"))
