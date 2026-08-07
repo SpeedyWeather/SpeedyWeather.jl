@@ -237,9 +237,9 @@ function SpectralTransform(
     # coefficients), the sign with which the southern hemisphere enters (+ for even, - for odd
     # degrees l-m, the north/south symmetry split) and the range of `jm_indices` rows that holds
     # the rings contributing at that order. Those rings are read from the table rather than
-    # derived from a first/last ring because the Legendre shortcut is not monotonic in latitude
-    # for all shortcuts (the coslat-dependent ones are not), so they do not always form a
-    # contiguous band of latitudes.
+    # derived from a first ring down to the equator: the coslat-dependent shortcuts are not
+    # monotonic in latitude, so a ring closer to the equator can retain fewer orders than one
+    # closer to the pole and the contributing rings do not always reach the equator.
     lm_indices = zeros(Int32, LowerTriangularArrays.nonzeros(spectrum), 4)
     for m in 1:mmax
         # empty range if no ring contributes at that order, then the coefficient stays zero

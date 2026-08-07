@@ -245,9 +245,11 @@ end
         end
     end
 
-    # The rings contributing to an order do not always form a contiguous band of latitudes: the
-    # coslat-dependent Legendre shortcuts are not monotonic in latitude. The forward kernel
-    # therefore reads its rings from a table instead of deriving them from a first/last ring.
+    # The rings contributing to an order do not always reach the equator. The coslat-dependent
+    # Legendre shortcuts are not monotonic in latitude, so a ring closer to the equator can retain
+    # fewer orders than one closer to the pole, and summing a whole band from the first
+    # contributing ring down to the equator would pick up rings the transform has to skip. The
+    # forward kernel therefore reads its rings from a table rather than assuming their extent.
     @testset "non-monotonic Legendre shortcut" begin
         NF, nlayers, LegendreShortcut = Float32, 2, SpeedyTransforms.LegendreShortcutLinCubCoslat
         spectral_grid_cpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid = HEALPixGrid)
