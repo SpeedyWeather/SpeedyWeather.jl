@@ -43,6 +43,7 @@
 - get_prognostic_step, get_tendency_step in dycore and parameterizations [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
 - time stepping modularised [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
 - NCycleLorenz time stepping for Barotropic models [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035) [#937](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/937)
+- Add a ML-based SIC model
 
 ## v0.21.1
 
