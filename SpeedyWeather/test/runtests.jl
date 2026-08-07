@@ -13,11 +13,11 @@ testsuite_GPU = Dict(
     end
 )
 
-testsuite_dynamics = find_tests(joinpath(pwd(), "dynamics"))
-testsuite_long_integrations = find_tests(joinpath(pwd(), "long_integrations"))
-testsuite_parameterizations = find_tests(joinpath(pwd(), "parameterizations"))
-testsuite_output = find_tests(joinpath(pwd(), "output"))
-testsuite_variables = find_tests(joinpath(pwd(), "variables"))
+testsuite_dynamics = find_tests(joinpath(@__DIR__, "dynamics"))
+testsuite_long_integrations = find_tests(joinpath(@__DIR__, "long_integrations"))
+testsuite_parameterizations = find_tests(joinpath(@__DIR__, "parameterizations"))
+testsuite_output = find_tests(joinpath(@__DIR__, "output"))
+testsuite_variables = find_tests(joinpath(@__DIR__, "variables"))
 
 # merge all testsuites
 testsuite = merge(
