@@ -22,6 +22,20 @@ Base revision: `f417c407` (`mg/optimize-legendre-gpu`)
   into step-by-step instructions: driver skeleton with exact phase ranges, `nsys`/`ncu` command
   lines and SLURM scripts, analysis recipes with decision rules, and known failure modes.
 
+- **2026-08-07, execution started.** Scripts for Phases A–D written under
+  `SpeedyWeather/test/GPU/modelbench/` and smoke-tested on CPU before spending GPU job time:
+  - `MODELBENCH_CPU=1` added to the Phase B driver so the B3 equivalence check and a driver
+    smoke test can run on a login node; profiling itself is still GPU-only.
+  - **B3 passes bitwise on CPU** (T31, 10 steps, all of vorticity/divergence/temperature/
+    humidity identical) — the driver does mirror `time_step!`.
+  - Bug caught by that check: the state snapshot listed surface pressure as `:pres`, but the
+    prognostic variable is `:pressure`, so it was being silently skipped. Both scripts now
+    assert every expected name exists instead of `hasproperty`-skipping, so an upstream rename
+    fails loudly rather than quietly shrinking coverage.
+  - Phase C report names verified against nsys 2025.3.2: `nvtx_pushpop_sum` (not `nvtx_sum`)
+    is the right host-span report for `NVTX.@range`, and `nvtx_kern_sum` gives the per-phase
+    kernel breakdown directly.
+
 ## Problem description
 
 The GPU Legendre transform work (`docs/dev/2026-08/legendre-gpu-optimization.md`) made the
