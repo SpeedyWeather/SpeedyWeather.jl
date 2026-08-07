@@ -63,6 +63,36 @@ Base revision: `12fbce2e` (drafted on `mg/fix-filter-and-diffusion`); implementa
 - **2026-08-07, "step 3 is skipped, for very low resolutions we have the matrix transform".** Step 3
   dropped; `MatrixSpectralTransform` is the answer at low resolution, not shaving launch overhead
   off the FFT + Legendre path.
+- **2026-08-07, loop form and fused multiply-adds.** The forward kernel's ring loop was written as a
+  `while` to match the comment in the inverse kernel claiming that is faster inside a kernel
+  (from #815). Re-measured: **the claim does not hold on this stack.** The apparent 1–7 % advantage
+  reversed when the measurement order was swapped (`for` ~244 µs consistently, `while` 246–254 µs at
+  T255), i.e. it was inside the ~4 % run-to-run spread. The generated PTX in fact favours `for`
+  (161 instructions vs 205, 34 loads vs 43), because `r += 1` adds an `Int64` literal to an `Int32`
+  counter and drags 64-bit conversions through the loop, while iterating a `UnitRange{Int32}` stays
+  32-bit. The forward loop was switched to `for`; the inverse keeps its `while` (two induction
+  variables advancing together plus the odd-degree tail) with the performance claim replaced by the
+  real reason.
+- **2026-08-07, "check if using FMA in the kernel further speeds it up".** Julia does not contract
+  `a + x*z` into fused multiply-adds by itself. Fusing the two real components explicitly gives a
+  consistent **3.6–7.4 % on the forward transform** and nothing measurable on the inverse (1–2 %,
+  inside noise — that one is bandwidth-bound at 41 % of peak, with little arithmetic to fuse).
+  Applying `muladd` to the *complex* number instead promotes the real factor and does a full complex
+  multiply-add, measuring 12–16 % *slower* than plain `*`/`+`.
+- **2026-08-07, "test `muladd` within `fma_complex` to make sure it's really performant across all
+  architectures and vendors".** The helper originally used `fma` on the components, which is a
+  portability hazard: `fma` requires a genuine single-rounding fused instruction and degrades to
+  software emulation where the hardware lacks one, while this code has to run on CUDA, AMDGPU,
+  Metal and the KernelAbstractions CPU backend. Switched to `muladd` (renaming the helper to
+  `muladd_complex`) and **verified that this costs nothing on CUDA**: the generated PTX has an
+  identical instruction mix for both spellings (inverse 189 instructions, 6 `fma.rn.f32`, 34 loads;
+  forward 155 instructions, 4 `fma.rn.f32`, 34 loads), differing only in load scheduling. So the
+  contraction happens either way where hardware supports it, and the fallback stays safe where it
+  does not.
+  - *A measurement lesson worth recording:* a standalone rewrite of the inverse kernel suggested a
+    17–22 % FMA win, but its own no-FMA baseline was ~20 % slower than the production kernel
+    (loads hoisted into locals changed scheduling). Kernel micro-experiments must be validated
+    against the real kernel through the normal benchmark before their numbers are believed.
 
 ## Problem description
 
@@ -196,6 +226,29 @@ are used instead.
   neighbouring rings, and the scratch is indexed frequency-first). That is 2 writes against `L_m`
   reads per thread, and the measurements show it does not dominate.
 
+### Fused multiply-adds
+
+Both kernels accumulate through `muladd_complex(x::Real, z::Complex, a::Complex)`, a small helper
+computing `a + x*z` with the real and imaginary parts fused separately. Julia does not contract that
+expression on its own. Two spellings matter and are easy to confuse:
+
+- **`muladd` applied to the complex number** promotes the real factor to complex and performs a full
+  complex multiply-add — 4 multiplies where 2 suffice. Measured **12–16 % slower** than not fusing
+  at all. This is the trap.
+- **`muladd` applied to the two real components** is what the helper does, and is correct.
+
+`muladd` rather than `fma` on the components is deliberate and portability-driven: `fma` demands a
+true single-rounding fused instruction and falls back to slow software emulation where the hardware
+has none, whereas `muladd` contracts where a fused instruction exists and degrades to a plain
+multiply and add otherwise. On CUDA the two are equivalent — the generated PTX has an identical
+instruction mix (inverse 189 instructions with 6 `fma.rn.f32`, forward 155 with 4; both spellings
+agree exactly, differing only in load scheduling) — so `muladd` costs nothing here and keeps
+AMDGPU, Metal and the CPU path safe.
+
+Worth 3.6–7.4 % on the forward transform, nothing measurable on the inverse (1–2 %, inside noise:
+it is bandwidth-bound at 41 % of peak with little arithmetic to hide). Accuracy improves marginally
+(~1e-7 relative, fewer roundings) and now matches the CPU reference, which already used `muladd`.
+
 ### Dependency cleanup
 
 The forward transform's atomics were the only user of `Atomix` anywhere in the repository, so the
@@ -244,13 +297,13 @@ complementary regime to the kernels optimised here.
 
 Kernel times per call (`nlayers = 8`, `Float32`, default grid), original code → after each step:
 
-| trunc | inverse: before | Step 0 | Step 2 | **total** | forward: before | Step 0 | Step 1 | **total** |
-|------:|----------:|---------:|--------:|------:|-----------:|-----------:|---------:|------:|
-| T31   | 20.3 µs   | 6.6 µs   | 7.1 µs  | **2.9×** | 14.7 µs    | 16.6 µs    | 9.7 µs   | **1.5×** |
-| T63   | 27.9 µs   | 16.1 µs  | 9.6 µs  | **2.9×** | 52.6 µs    | 65.9 µs    | 16.5 µs  | **3.2×** |
-| T127  | 110.4 µs  | 73.5 µs  | 21.7 µs | **5.1×** | 292.9 µs   | 301.9 µs   | 35.1 µs  | **8.3×** |
-| T255  | 1 809.7 µs | 566.4 µs | 120.7 µs | **15.0×** | 2 054.7 µs | 1 834.1 µs | 246.6 µs | **8.3×** |
-| T511  | 26 968.7 µs | 20 726.5 µs | 722.8 µs | **37.3×** | 16 003.5 µs | 67 982.8 µs | 1 689.8 µs | **9.5×** |
+| trunc | inverse: before | Step 0 | Step 2 | +FMA | **total** | forward: before | Step 0 | Step 1 | +FMA | **total** |
+|------:|----------:|---------:|--------:|------:|------:|-----------:|-----------:|---------:|------:|------:|
+| T31   | 20.3 µs   | 6.6 µs   | 7.1 µs  | 6.9 µs  | **2.9×** | 14.7 µs    | 16.6 µs    | 9.7 µs   | 9.8 µs   | **1.5×** |
+| T63   | 27.9 µs   | 16.1 µs  | 9.6 µs  | 9.6 µs  | **2.9×** | 52.6 µs    | 65.9 µs    | 16.5 µs  | 17.0 µs  | **3.1×** |
+| T127  | 110.4 µs  | 73.5 µs  | 21.7 µs | 22.2 µs | **5.0×** | 292.9 µs   | 301.9 µs   | 35.1 µs  | 35.4 µs  | **8.3×** |
+| T255  | 1 809.7 µs | 566.4 µs | 120.7 µs | 119.2 µs | **15.2×** | 2 054.7 µs | 1 834.1 µs | 246.6 µs | 235.2 µs | **8.7×** |
+| T511  | 26 968.7 µs | 20 726.5 µs | 722.8 µs | 713.2 µs | **37.8×** | 16 003.5 µs | 67 982.8 µs | 1 689.8 µs | 1 543.7 µs | **10.4×** |
 
 The Step 0 column for the forward transform shows the L2 regression described in the revision log,
 which Step 1 removes. Useful bandwidth of the inverse transform went from 1.4–8 % of peak to

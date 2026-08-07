@@ -1,5 +1,15 @@
 # KernelAbstractions implementation of Legendre transform used only on GPU
 
+"""$(TYPEDSIGNATURES)
+`muladd` for a complex number scaled by a real one, i.e. `a + x*z` with the real and imaginary
+parts fused separately. Julia does not contract `a + x*z` by itself, and calling `muladd` on the
+complex number directly promotes the real factor to a complex one, turning this into a full
+complex multiply-add (measurably slower). `muladd` rather than `fma` on the components: it
+contracts into a fused multiply-add wherever the hardware has one and falls back to a plain
+multiply and add where it does not, whereas `fma` would force a slow software emulation there."""
+@inline muladd_complex(x::Real, z::Complex, a::Complex) =
+    Complex(muladd(x, real(z), real(a)), muladd(x, imag(z), imag(a)))
+
 # (inverse) legendre transform kernel, called from _legendre!
 # One thread per (latitude ring j, order m, layer k); the (j, m) pair and the offset/length of
 # the lower-triangular column at order m come from the precomputed `jm_indices` table, whose rows
@@ -31,18 +41,19 @@
     even_k = zero(eltype(g_south))      # dot product with elements 1, 3, 5, ...
     odd_k = zero(eltype(g_north))       # dot product with elements 2, 4, 6, ...
 
-    # Switched to while loop as more performant from inside a Kernel
+    # a while loop here because the degree l and the index p into the transposed polynomials
+    # advance together, and the last degree is handled after the loop when the column is odd
     p = lm_offset * nlat_half + j       # transposed polynomials at (j, lm_offset + 1)
     l = 1
     while l < lmax_even                 # dot product in pairs for contiguous memory access
-        even_k += specs_data[lm_offset + l, k] * legendre_polynomials_data[p]
-        odd_k += specs_data[lm_offset + l + 1, k] * legendre_polynomials_data[p + nlat_half]
+        even_k = muladd_complex(legendre_polynomials_data[p], specs_data[lm_offset + l, k], even_k)
+        odd_k = muladd_complex(legendre_polynomials_data[p + nlat_half], specs_data[lm_offset + l + 1, k], odd_k)
         p += 2nlat_half
         l += 2
     end
 
     if isoddlmax                        # now do the last row if the column length is odd
-        even_k += specs_data[lm_offset + lmax_range, k] * legendre_polynomials_data[p]
+        even_k = muladd_complex(legendre_polynomials_data[p], specs_data[lm_offset + lmax_range, k], even_k)
     end
 
     # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
@@ -140,8 +151,8 @@ end
         # conjugate rotating back to the prime meridian
         ΔΩ_rotated = solid_angles[j] * conj(lon_offsets[m, j])
 
-        f = f_north[m, k, j] + hemisphere_sign * f_south[m, k, j]
-        spec += legendre_polynomials_data[lm, j] * (ΔΩ_rotated * f)
+        f = muladd_complex(hemisphere_sign, f_south[m, k, j], f_north[m, k, j])
+        spec = muladd_complex(legendre_polynomials_data[lm, j], ΔΩ_rotated * f, spec)
     end
 
     specs_data[lm, k] = spec
