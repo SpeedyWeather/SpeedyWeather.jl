@@ -3,6 +3,7 @@
 ## Unreleased
 
 - HIP graphs accelerated batched Fourier transform for AMDGPU (mirrors CUDA graphs from [#1109](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1109)); rename `SpectralTransform` field `cuda_graphs` → `gpu_graphs`
+- Lower free convection gust constant [#1178](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1178)
 - Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
 - Revised extended differentiability tests [#1167](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1167)
