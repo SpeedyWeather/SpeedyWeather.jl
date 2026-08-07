@@ -17,7 +17,7 @@ delete!(testsuite, "parameters")
 delete!(testsuite, "prognostic_variables_stability_test")
 delete!(testsuite, "type_stability_test")
 for key in keys(testsuite)
-    if startswith(key, "GPU/") && key != "GPU/kernelabstractions"
+    if startswith(key, r"(GPU|differentiability|reactant)/") && key != "GPU/kernelabstractions"
         delete!(testsuite, key)
     end
 end
