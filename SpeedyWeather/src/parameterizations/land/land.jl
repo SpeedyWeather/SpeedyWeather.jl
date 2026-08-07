@@ -50,7 +50,7 @@ end
 # allocate variables as defined by land components
 variables(land::LandModel, model::AbstractModel) = (
     variables(land.temperature, model)...,
-    variables(land.soil_moisture)...,
+    variables(land.soil_moisture, model)...,
     variables(land.snow)...,
     variables(land.vegetation)...,
     variables(land.rivers)...,

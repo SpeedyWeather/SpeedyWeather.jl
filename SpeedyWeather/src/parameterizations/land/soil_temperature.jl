@@ -230,7 +230,6 @@ function timestep!(
     soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture : nothing
     Lᵥ = latent_heat_condensation(model.atmosphere)
     Lᵢ = latent_heat_sublimation(model.atmosphere)
-    (; Δt) = model.time_stepping                                # time step in [s]
 
     (; land_fraction) = model.land_sea_mask
     (; thermodynamics, geometry) = model.land
@@ -259,7 +258,7 @@ function timestep!(
     z₂ = geometry.layer_thickness[2]
     Δ = 2λ / (z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
 
-    params = (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
+    params = (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ)
 
     launch!(
         architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),), land_bucket_temperature_kernel!,
@@ -277,7 +276,7 @@ end
     ij = @index(Global, Linear)
 
     if land_fraction[ij] > 0               # at least partially land
-        (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
+        (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ) = params
 
         # Cooling from snow melt rate, in [W/m²] = [J/kg] * [kg/m²/s]
         Q_melt = isnothing(M) ? zero(Lᵢ) : Lᵢ * M[ij]
