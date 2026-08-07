@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fix `SpeedLimitDrag` pointing along the quadrant diagonal instead of antiparallel to the flow (and being √2 too large for a 45° flow); default `drag` raised 4e-7 -> 3e-6 so the limiter actually binds, fixes previous high-resolution instabilities [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
+- Fix `set!(time_stepping, Δt=...)` inverting the resolution factor [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
+- Fix `SpectralFilter` implicit diffusion using twice the prognostic time step; docstring of `HyperDiffusion` corrected [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
 - Lower free convection gust constant [#1178](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1178)
 - Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
