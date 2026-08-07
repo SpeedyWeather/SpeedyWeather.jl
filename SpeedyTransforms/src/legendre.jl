@@ -197,13 +197,14 @@ Unscale by cosine of latitude on the fly.
 function unscale_coslat!(
         g_north::AbstractArray{<:Complex, 3},
         g_south::AbstractArray{<:Complex, 3},
-        coslat⁻¹::AbstractArray{<:Real, 1};
+        coslat⁻¹::AbstractArray{<:Real, 1},
+        nlayers::Integer = size(g_north, 2);     # scale only the layers this transform wrote
         architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE
     )
 
     launch!(
-        architecture, ArrayWorkOrder, size(g_north), unscale_coslat_kernel!,
-        g_north, g_south, coslat⁻¹
+        architecture, ArrayWorkOrder, (size(g_north, 1), nlayers, size(g_north, 3)),
+        unscale_coslat_kernel!, g_north, g_south, coslat⁻¹
     )
     return nothing
 end
