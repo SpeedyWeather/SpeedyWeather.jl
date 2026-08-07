@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Faster GPU Legendre transforms: coalesced memory access, no atomics, no scratch resets, 5-37x faster at T127-T511 [#1180](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1180)
 - Lower free convection gust constant [#1178](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1178)
 - Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
