@@ -1,7 +1,4 @@
-using JET
-
 # Regression guard for runtime dynamic dispatch in the spectral transform.
-
 @testset "transform! free of runtime dispatch (JET)" begin
     arch = SpeedyTransforms.Architectures.CPU()
     spectrum = Spectrum(truncation = 32, architecture = arch)
