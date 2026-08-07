@@ -174,8 +174,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] maximum speed [ms⁻¹]"
     max_speed::NF = 60
 
-    "[OPTION] Maximum wavenumber after truncation"
-    truncation::Int = 15
+    "[OPTION] Maximum wavenumber after truncation (1-based)"
+    truncation::Int = 14
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
     seed::S = 0

@@ -233,12 +233,13 @@ end
                             )
             s = 4      # run longer? As testing for approximate below, s can't be too large
 
-            spectral_grid = SpectralGrid(nlayers = 1)
+            spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
             time_stepping = NCycleLorenz(spectral_grid; steps, variant = Variant())
             planet = Earth(spectral_grid, radius = 2^22)  # use radius that is power of 2 to avoid rounding errors in scaling
 
             ic = RandomVelocity(spectral_grid, seed = 1234)
             model = BarotropicModel(spectral_grid; time_stepping, initial_conditions = ic)
+            model.feedback.verbose = false
 
             simulation = initialize!(model)
             run!(simulation, steps = 2*s*8*steps)
