@@ -1,6 +1,6 @@
 # GPU Legendre transform optimization
 
-> Status: **in progress**. Steps 0–2 are implemented and verified against the CPU reference: the Legendre transforms are 5–37× faster at T127–T511 and are no longer the bottleneck of `transform!`. Remaining: unit tests in the package test tree, and the optional Step 3.
+> Status: **completed**. Steps 0–2 are implemented, unit tested and verified against the CPU reference: the Legendre transforms are 5–37× faster at T127–T511 and are no longer the bottleneck of `transform!`. Step 3 was dropped in favour of `MatrixSpectralTransform` at low resolution.
 
 Date of initial draft: 2026-08-07
 
@@ -25,13 +25,16 @@ Base revision: `12fbce2e` (drafted on `mg/fix-filter-and-diffusion`); implementa
     the A40's 6 MB L2, whereas the old launch kept a single 1.05 MB layer column resident. This is
     moot once Step 1 removes the atomics, and it is the reason Step 1 was not deferred.
   - *Step 1 design changed.* The plan assumed the rings contributing to a given order `m` form a
-    contiguous band `j_start(m):nlat_half`, which would follow from `mmax_truncation` being
-    monotonic pole→equator. **Measured and disproved**: `LegendreShortcutLinCubCoslat` and
-    `LegendreShortcutLinQuadCoslat²` are non-monotonic (24 of 180 grid × shortcut × truncation
-    combinations tested, e.g. `HEALPixGrid` + `lincubcoslat` at every truncation). The kernel
-    therefore walks an explicit, precomputed list of contributing rings (`m_rings`, CSR-style)
-    instead of a range, which costs one extra warp-broadcast `Int32` load per iteration and makes
-    no assumption about the shortcut.
+    band `j_start(m):nlat_half` reaching the equator, which would follow from `mmax_truncation`
+    being monotonic pole→equator. **Measured and disproved**: `LegendreShortcutLinCubCoslat` and
+    `LegendreShortcutLinQuadCoslat²` are non-monotonic, because their denominator grows toward the
+    equator (`nlon/(2+2cos(lat))`, `nlon/(2+cos²(lat))`) faster than `nlon` does once `nlon`
+    saturates. Of 120 grid × shortcut × truncation combinations, **16 have a contributing band that
+    stops short of the equator** — always a contiguous interval, never with an interior hole
+    (0/120), but summing to `nlat_half` would still wrongly include the equatorward rings. The
+    kernel therefore walks an explicit, precomputed list of contributing rings instead of a range,
+    which costs one warp-broadcast `Int32` load per iteration and assumes nothing about the
+    shortcut.
 - **2026-08-07, "Inspect the CLAUDE.md of the project again and archive the plan in accordance to it
   in a docs/dev folder".** Plan moved from the repository root to
   `docs/dev/2026-08/legendre-gpu-optimization.md` and restructured to the template in `CLAUDE.md`.
@@ -54,6 +57,12 @@ Base revision: `12fbce2e` (drafted on `mg/fix-filter-and-diffusion`); implementa
     order in `jm_indices`, so they form the contiguous row range the forward transform sums over.
   - *Decision on memory (user, 2026-08-07):* "The factor 2 in memory consumption is still fine for
     now" — both layouts are kept; the numbers are recorded below so the trade can be revisited.
+- **2026-08-07, `Atomix` dependency removed.** The forward transform's atomics were its only user
+  anywhere in the repository, so it was dropped from `SpeedyTransforms` and from `SpeedyWeather`
+  (which declared but never used it).
+- **2026-08-07, "step 3 is skipped, for very low resolutions we have the matrix transform".** Step 3
+  dropped; `MatrixSpectralTransform` is the answer at low resolution, not shaving launch overhead
+  off the FFT + Legendre path.
 
 ## Problem description
 
@@ -187,12 +196,26 @@ are used instead.
   neighbouring rings, and the scratch is indexed frequency-first). That is 2 writes against `L_m`
   reads per thread, and the measurements show it does not dominate.
 
-### Step 3 — launch-count reduction for small truncations (optional, not started)
+### Dependency cleanup
 
-With one kernel per direction the Legendre step could be folded into the existing CUDA-graph capture
-in `SpeedyTransformsCUDAExt` (it is capture-safe: fixed buffers, no host synchronisation), saving the
-last ~5–10 µs of launch latency per call. The remaining small-truncation cost is on the Fourier side
-(~100 tiny per-ring kernels of device time) and is out of scope here.
+The forward transform's atomics were the only user of `Atomix` anywhere in the repository, so the
+dependency was dropped from `SpeedyTransforms` (`import Atomix` plus its `[deps]`/`[compat]`
+entries). `SpeedyWeather` declared it too but never used it — dead weight predating this work —
+and was cleaned up in the same pass. `Atomix` remains in the manifests as a transitive dependency
+of `KernelAbstractions`; only the two direct dependencies were removed, so the manifest diff is
+minimal rather than a full re-resolve.
+
+### Step 3 — launch-count reduction for small truncations (dropped)
+
+The plan proposed folding the Legendre kernels into the existing CUDA-graph capture in
+`SpeedyTransformsCUDAExt` to recover the last ~5–10 µs of launch latency per call, which only
+matters at small truncations. **Dropped**: at very low resolution the answer is not to shave launch
+overhead off the FFT + Legendre path but to use `MatrixSpectralTransform` instead, which replaces
+the whole ring-by-ring transform with one dense matrix-matrix multiply and is already the
+recommended choice there (see the "When to use it" section of `docs/src/speedytransforms.md`; it is
+also the transform the Reactant/XLA path requires). Its dense matrices scale as
+`O(n_grid × n_harmonics)`, which is exactly why it suits low resolution and not high — the
+complementary regime to the kernels optimised here.
 
 ## Testing and verification
 
@@ -300,9 +323,7 @@ would be the shortcut docstrings in `SpeedyTransforms/src/legendre_shortcuts.jl`
   crossover truncation is.
 - Non-CUDA backends (AMDGPU, Metal) are untested — the kernels stay pure KernelAbstractions with no
   warp intrinsics or shared memory, so they should work, but nobody has run them.
-- `import Atomix` in `SpeedyTransforms.jl` is now unused (the forward transform was its only user);
-  removing it and the dependency from `Project.toml` is deliberately left out of this change to
-  avoid touching the manifests mid-work.
+- ~~`import Atomix` is now unused~~ — removed, see *Summary of changes*.
 - Step 0 changed the meaning of `SpectralTransform.jm_index_size` (it now counts the extra
   zero-writing rows), and Step 2 changed the row *order* of `jm_indices` from ring-major to
   order-major. Any external code reading those fields would need updating; nothing in the
@@ -316,9 +337,9 @@ would be the shortcut docstrings in `SpeedyTransforms/src/legendre_shortcuts.jl`
 
 - **The Fourier stage is now the bottleneck of `transform!` at every truncation** (75–98 % of it).
   It runs ~2 FFTs plus a gather/scatter per latitude ring; batching multiple rings into one
-  execution is the obvious next project, and it is where the remaining time is.
-- Step 3 (folding the Legendre kernels into the existing CUDA-graph capture) is only worth it if
-  small-truncation GPU runs matter; it is worth ~5–10 µs per call.
+  execution is the obvious next project, and it is where the remaining time is. This matters most
+  at mid and high resolution, where `MatrixSpectralTransform` is not an option because its dense
+  matrices grow as `O(n_grid × n_harmonics)`.
 - Dropping to a single (transposed) copy of the polynomials if memory becomes binding — the cost is
   measured and recorded above.
 - The layer-count scaling measurement suggested the K=1 case (2-D surface fields) was ~20× off the
