@@ -43,9 +43,10 @@ function timestep!(
         model::PrimitiveEquation,
     )
 
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, snow)
+
     (; Δt) = model.time_stepping                            # time step [s]
     (; snow_depth) = vars.prognostic.land                   # in equivalent liquid water height [m]
-    (; soil_temperature) = vars.prognostic.land
     (; land_fraction) = model.land_sea_mask
 
     # Some thermodynamics needed by snow
@@ -86,10 +87,7 @@ end
         (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, snow_depth_cap) = params
 
         # check for melting of snow if temperature above melting threshold
-        # check for NaNs here to prevent land temperatures read from NetCDF data
-        # to cause an immediate blow up in case the land-sea mask doesn't align
-        δT_melt = isfinite(soil_temperature[ij, 1]) ?
-            max(soil_temperature[ij, 1] - melting_threshold, 0) : zero(soil_temperature[ij, 1])
+        δT_melt = max(soil_temperature[ij, 1] - melting_threshold, 0)
 
         # energy available from soil warming above melting threshold [J/m²/s]
         # heat capacity per volume, so not *density needed
