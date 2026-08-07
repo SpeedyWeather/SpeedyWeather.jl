@@ -132,9 +132,8 @@ end
     hemisphere_sign = convert(real(eltype(f_north)), lm_indices[lm, 2])
 
     spec = zero(eltype(specs_data))
-    r = lm_indices[lm, 3]           # first and last jm_indices row of the rings that contribute
-    r_last = lm_indices[lm, 4]      # at order m, an empty range if none do
-    while r <= r_last
+    # rows of jm_indices holding the rings that contribute at order m, empty if none do
+    for r in lm_indices[lm, 3]:lm_indices[lm, 4]
         j = jm_indices[r, 1]
 
         # SOLID ANGLE QUADRATURE WEIGHT (sinθ Δθ Δϕ) and LONGITUDE OFFSET, the complex
@@ -143,8 +142,6 @@ end
 
         f = f_north[m, k, j] + hemisphere_sign * f_south[m, k, j]
         spec += legendre_polynomials_data[lm, j] * (ΔΩ_rotated * f)
-
-        r += 1
     end
 
     specs_data[lm, k] = spec
