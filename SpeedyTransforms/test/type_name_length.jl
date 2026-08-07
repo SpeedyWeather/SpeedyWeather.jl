@@ -10,8 +10,8 @@
 # which blocks nested AD entirely. Testing the actual nested AD in the unit tests takes a long time, so we test here 
 # just the length of the type name.
 @testset "SpectralTransform type name length" begin
-    ENZYME_VALUE_NAME_CAP = 1024      # LLVM local value-name truncation limit
-    PREFIX = length("arg.Const{") + length("}")   # what Enzyme wraps the type name in
+    ENZYME_VALUE_NAME_CAP = 1024                    # LLVM local value-name truncation limit
+    PREFIX = length("arg.Const{") + length("}")     # what Enzyme wraps the type name in
 
     for Grid in (FullGaussianGrid, OctahedralGaussianGrid), NF in (Float32, Float64)
         grid = Grid(SpeedyTransforms.get_nlat_half(31, 2))
