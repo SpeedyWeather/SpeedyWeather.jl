@@ -33,7 +33,7 @@ import SpeedyWeatherInternals.Architectures: architecture
 #     allocate one contiguous packed buffer that holds every ring's dense block, and use
 #     in-place `mul!` reading/writing reshaped views into it.
 #  2. Few graph nodes. A single KernelAbstractions gather/scatter kernel moves ALL rings
-#     between the strided grid/scratch layout and the packed buffer in one launch. 
+#     between the strided grid/scratch layout and the packed buffer in one launch.
 #     This collapses the graph from ~6*nlat_half nodes to ~2*nlat_half + 4.
 #
 # The captured graph bakes in the device pointers of the input `field.data`,  and the
@@ -145,7 +145,7 @@ end
 
 # One cache per (SpectralTransform, transform size), keyed by the *forward FFT plan set*
 # (`fft_plans(S, nlayers)[1]`)
-# this is saved here directly as a global variable and not as a field of `S` because 
+# this is saved here directly as a global variable and not as a field of `S` because
 # it would be very hard to make `S` a concrete type again otherwise, and this seems to work
 # without problems and performance mali
 const GRAPH_CACHES = IdDict{Any, GPUFourierGraphCache}()
@@ -231,10 +231,10 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     (; real_view, complex_view, packed_real, packed_complex, rfft_plans) = cache
     (; real_offset, complex_offset, istart_n, istart_s) = cache
 
-    real_size = (nlon_max, nlat_half, nlayers)          # launch scatter/gather kernels over 
+    real_size = (nlon_max, nlat_half, nlayers)          # launch scatter/gather kernels over
     complex_size = (nfreq_max, nlat_half, nlayers)
 
-    # northern rings, 
+    # northern rings,
     launch!(arch, ArrayWorkOrder, real_size, gather_real_kernel!, packed_real, field.data, real_offset, nlons, istart_n)
     @inbounds for j in 1:nlat_half
         mul!(complex_view[j], rfft_plans[j], real_view[j])
@@ -366,7 +366,7 @@ function _fourier_batched!(
         S::SpectralTransform,
     )
     @assert eltype(field) == eltype(S) "Number format of grid $(eltype(field)) and SpectralTransform $(eltype(S)) need to match."
-    if !S.cuda_graphs
+    if !S.gpu_graphs
         return Base.@invoke _fourier_batched!(
             f_north::AbstractArray{<:Complex, 3}, f_south::AbstractArray{<:Complex, 3},
             field::AbstractField, S::SpectralTransform,
@@ -390,7 +390,7 @@ function _fourier_batched!(
         S::SpectralTransform;
         add::Bool = false,          # accumulate onto `field` instead of overwriting? (Enzyme adjoint rule)
     )
-    if !S.cuda_graphs
+    if !S.gpu_graphs
         return Base.@invoke _fourier_batched!(
             field::AbstractField, g_north::AbstractArray{<:Complex, 3},
             g_south::AbstractArray{<:Complex, 3}, S::SpectralTransform; add,

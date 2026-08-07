@@ -85,11 +85,12 @@ struct SpectralTransform{
 
     gradients::GradientType                     # precomputed gradient and integration matrices
 
-    # CUDA GRAPHS
-    # toggle for the CUDA-Graphs accelerated batched Fourier transform
-    # Set to `false` to fall back to the generic (allocating) per-ring GPU
-    # Meaningless for non-CUDA architectures.
-    cuda_graphs::Bool
+    # GPU GRAPHS (CUDA graphs only; HIP graphs for AMDGPU are not implemented)
+    # toggle for the GPU-graphs accelerated batched Fourier transform
+    # Set to `false` to fall back to the generic (allocating) per-ring GPU path.
+    # Only effective when the CUDA extension is loaded; ignored on CPU. On AMDGPU this is
+    # always treated as the generic path, with a one-time warning if set to `true`.
+    gpu_graphs::Bool
 end
 
 # eltype of a transform is the number format used within
@@ -110,7 +111,7 @@ function SpectralTransform(
         nlayers::Integer = DEFAULT_NLAYERS,                                             # scratch size — max layer count any single transform call may carry
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
-        cuda_graphs::Bool = true,                                            # use CUDA-Graphs accelerated Fourier path (CUDA only)
+        gpu_graphs::Bool = true,                                             # use GPU-graphs accelerated Fourier path (CUDA only; not implemented for AMDGPU)
     )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
     # per-layer fallback used by `_fourier_serial!`).
@@ -230,7 +231,7 @@ function SpectralTransform(
         solid_angles,
         eigenvalues, eigenvalues⁻¹,
         gradients,
-        cuda_graphs,
+        gpu_graphs,
     )
 end
 
