@@ -1,12 +1,7 @@
 module SpeedyTransformsAMDGPUExt
 
 import AMDGPU: AMDGPU, ROCArray, ROCBackend
-import AMDGPU.HIP:
-    hipStreamBeginCapture, hipStreamEndCapture,
-    hipGraphInstantiateWithFlags, hipGraphLaunch,
-    hipGraphExecDestroy, hipGraphDestroy,
-    hipStreamCaptureModeGlobal, hipGraph_t, hipGraphExec_t,
-    hipSuccess, hipGetErrorString, HIPError
+import AMDGPU.HIP: hipGraphExec_t
 import AbstractFFTs
 import LinearAlgebra
 import LinearAlgebra: mul!
@@ -280,124 +275,34 @@ end
 # =====================================================================================
 # Capture / replay management
 #
-# EXPERIMENTAL, re-enabled 2026-08-05 for testing on LUMI (session investigating whether the
-# original crash — a GPU memory access fault confirmed on real hardware, see git history:
-# 0c114dfc..c7dc49b1 on gd/hip-graphs — still reproduces). Uses raw hip{Stream,Graph}* C
-# bindings rather than a high-level capture/instantiate/launch wrapper because AMDGPU.jl 2.1.2
-# (as resolved on LUMI) does not expose one: `AMDGPU.HIP.capture` and `HIPGraphExec` are
-# undefined on this version; only the raw C bindings are present.
+# HIP graph capture is DISABLED here: ROCm's stream-capture validator does not reliably
+# reject operations that are illegal to capture — some raise a catchable HIPError (e.g.
+# hipErrorStreamCaptureUnsupported, seen from rocFFT's `mul!`), but others are silently
+# accepted at capture time and only surface later as a GPU memory access fault when the
+# (corrupt) graph is replayed. That failure mode was confirmed on real hardware (LUMI)
+# twice: the original crash (commit 93e9698c), and again in a 2026-08-05 LUMI session that
+# re-enabled capture on top of raw hip{Stream,Graph}* C bindings (AMDGPU.jl 2.1.2 has no
+# high-level capture/instantiate/launch wrapper) specifically to check whether the bug still
+# reproduces. It does: isolated repro scripts (a single captured rocFFT `mul!`, and a full
+# captured `transform!` replayed several times with fresh data) did NOT reproduce it, but the
+# actual instrumented model test (single-stepped `run!` plus the per-step-view graph-reuse
+# case) crashed the process with the same GPU memory access fault. This matches a known
+# upstream gap: HIP Graph capture on AMD GPUs does not raise `operation not permitted` for
+# illegal operations the way CUDA Graph capture does (see pytorch/pytorch#155684, #155720).
+# Since capture failures aren't reliably catchable here, "try capture and fall back on
+# error" isn't safe — always run the allocation-free direct loop instead.
 #
-# DEBUG INSTRUMENTATION (temporary, same session): every phase is announced with a flushed
-# println tagged by direction/nlayers/buffer key, and AMDGPU.synchronize() is inserted after
-# every risky GPU operation (warm-up, replay) to force async faults to surface at the point
-# that actually caused them rather than at some later unrelated sync. This makes replay slower
-# than the real design intends -- REMOVE before considering this production code.
+# Everything ELSE in this file (GPUFourierGraphCache, forward_execs/inverse_execs, the
+# gather/scatter kernels, forward_loop!/inverse_loop!, graph_key, run_graph!'s call sites) is
+# kept structurally identical to SpeedyTransformsCUDAExt.jl on purpose, so that re-enabling
+# capture — once ROCm/AMDGPU.jl provides reliable stream-capture validation for library calls
+# like rocFFT execution — only requires filling in this one function. See git history:
+# 0c114dfc..b4968ca2 on gd/hip-graphs for a previous capture-enabled implementation built on
+# the raw hip{Stream,Graph}* C bindings.
 # =====================================================================================
 
-raw_stream() = AMDGPU.stream().stream
-
-function hip_ok!(err, label)
-    err == hipSuccess && return err
-    error("$label failed: $(unsafe_string(hipGetErrorString(err))) (code $err)")
-end
-
-# Low-level equivalent of AMDGPU.HIP.capture(f; throw_error=false), built on the raw
-# hipStream*Capture* bindings (see module docstring above for why). Returns the captured
-# hipGraph_t, or `nothing` if capture was invalidated. A HIPError raised inside f() propagates
-# to the caller, which is expected to catch it (mirrors capture(throw_error=false)'s contract
-# of only swallowing invalidation, not arbitrary capture errors).
-function raw_capture(f)
-    stream = raw_stream()
-    hip_ok!(hipStreamBeginCapture(stream, hipStreamCaptureModeGlobal), "hipStreamBeginCapture")
-
-    thrown = nothing
-    try
-        f()
-    catch err
-        thrown = err
-    end
-
-    graph_ref = Ref{hipGraph_t}()
-    end_err = hipStreamEndCapture(stream, graph_ref)
-
-    if thrown !== nothing
-        rethrow(thrown)
-    end
-
-    end_err == hipSuccess || return nothing   # capture invalidated
-    return graph_ref[]
-end
-
-function raw_instantiate(graph)
-    exec_ref = Ref{hipGraphExec_t}()
-    hip_ok!(hipGraphInstantiateWithFlags(exec_ref, graph, UInt64(0)), "hipGraphInstantiateWithFlags")
-    return exec_ref[]
-end
-
-function raw_launch!(exec)
-    hip_ok!(hipGraphLaunch(exec, raw_stream()), "hipGraphLaunch")
-    return nothing
-end
-
-function run_graph!(cache::GPUFourierGraphCache, execs::AbstractDict, key, loop!::F) where {F}
-    direction = execs === cache.forward_execs ? "forward" : (execs === cache.inverse_execs ? "inverse" : "unknown")
-    # key is a UInt (forward) or a (UInt, Bool) tuple (inverse, `add` baked into the key)
-    ptr, add = key isa Tuple ? key : (key, nothing)
-    add_tag = add === nothing ? "" : " add=$add"
-    tag = "[$direction nlayers=$(cache.nlayers) key=0x$(string(ptr, base = 16))$add_tag]"
-
-    exec = get(execs, key, missing)
-    if exec isa hipGraphExec_t
-        println("$tag replaying cached graph"); flush(stdout)
-        raw_launch!(exec)
-        AMDGPU.synchronize()
-        println("$tag replay OK"); flush(stdout)
-        return nothing
-    elseif exec === nothing                  # capture previously failed; run directly
-        loop!()
-        return nothing
-    end
-
-    # first time we see this buffer (exec === missing)
-    if length(execs) >= MAX_GRAPHS
-        loop!()                              # cache full: don't capture, just run
-        return nothing
-    end
-
-    println("$tag first time seen -- warming up outside capture"); flush(stdout)
-    # warm up so that one-time work (rocFFT init, kernel JIT, memory-pool growth) happens
-    # OUTSIDE the capture region where it is not allowed
+function run_graph!(::AbstractDict, key, loop!::F) where {F}
     loop!()
-    AMDGPU.synchronize()
-    println("$tag warm-up OK"); flush(stdout)
-
-    println("$tag beginning capture"); flush(stdout)
-    graph = try
-        raw_capture() do
-            loop!()
-        end
-    catch err
-        err isa HIPError || rethrow()
-        println("$tag capture threw HIPError: $err"); flush(stdout)
-        nothing
-    end
-
-    if graph === nothing
-        # capture invalidated or failed with a hard HIP error; warmup already produced
-        # the correct result
-        println("$tag capture invalidated/failed -- falling back to direct loop for this key"); flush(stdout)
-        execs[key] = nothing
-        return nothing
-    end
-    println("$tag capture OK -- instantiating"); flush(stdout)
-
-    exec = raw_instantiate(graph)
-    hipGraphDestroy(graph)   # exec is independently allocated; the graph template is not needed after this
-    execs[key] = exec
-    println("$tag instantiated -- launching first replay"); flush(stdout)
-    raw_launch!(exec)
-    AMDGPU.synchronize()
-    println("$tag first replay OK"); flush(stdout)
     return nothing
 end
 
@@ -429,7 +334,7 @@ function _fourier_batched!(
         )
     end
     cache = get_cache(S, size(field, 2))
-    run_graph!(cache, cache.forward_execs, graph_key(field.data), () -> forward_loop!(cache, f_north, f_south, field, S))
+    run_graph!(cache.forward_execs, graph_key(field.data), () -> forward_loop!(cache, f_north, f_south, field, S))
     return nothing
 end
 
@@ -453,7 +358,7 @@ function _fourier_batched!(
     cache = get_cache(S, size(field, 2))
     # `add` is part of the graph key: a captured graph bakes in overwrite-vs-accumulate, so replaying
     # the wrong one would silently produce incorrect results.
-    run_graph!(cache, cache.inverse_execs, (graph_key(field.data), add), () -> inverse_loop!(cache, field, g_north, g_south, S, add))
+    run_graph!(cache.inverse_execs, (graph_key(field.data), add), () -> inverse_loop!(cache, field, g_north, g_south, S, add))
     return nothing
 end
 

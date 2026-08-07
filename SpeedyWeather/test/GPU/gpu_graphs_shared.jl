@@ -7,13 +7,15 @@
 # module docstring in SpeedyTransformsAMDGPUExt.jl for why (Enzyme's CPU-only AD tests broke
 # when these methods existed in every Julia session regardless of which GPU backend was loaded).
 #
-# `expect_capture` is true for HIP as of the 2026-08-05 LUMI session that re-enabled capture in
-# SpeedyTransformsAMDGPUExt.jl to test whether the originally-observed corruption (ROCm's
-# stream-capture validator not reliably rejecting illegal-to-capture operations) still
-# reproduces on the current AMDGPU.jl/ROCm combination. If this test starts crashing or
-# producing NaNs/mismatches on LUMI, that confirms the original bug is still present and
-# run_graph! should go back to always running the direct loop (see git history:
-# 0c114dfc..c7dc49b1 on gd/hip-graphs for the previous disabled state and why).
+# `expect_capture` is false for HIP: AMDGPU's run_graph! never attempts graph capture at all
+# (see SpeedyTransformsAMDGPUExt.jl — ROCm's stream-capture validator doesn't reliably reject
+# illegal-to-capture operations, so a captured graph can silently replay into invalid memory).
+# A 2026-08-05 LUMI session re-enabled capture experimentally to check whether that's still
+# true on the current AMDGPU.jl/ROCm combination: it is — isolated repro scripts (a single
+# captured rocFFT call, a full captured `transform!`) did not reproduce it, but the actual
+# instrumented model test crashed the process with the same GPU memory access fault as the
+# original bug. The allocation-free direct loop still runs on every call, so results must
+# still be correct and no graphs should ever appear in the cache.
 
 function test_gpu_graphs(ext, prefix; expect_capture::Bool = true)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
