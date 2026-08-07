@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- HIP graphs accelerated batched Fourier transform for AMDGPU (mirrors CUDA graphs from [#1109](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1109)); rename `SpectralTransform` field `cuda_graphs` → `gpu_graphs`
+- HIP graphs acceleration of the batched Fourier transform for AMDGPU was attempted (mirroring CUDA graphs from [#1109](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1109)) but is not implemented: ROCm's stream-capture validator does not reliably reject illegal-to-capture operations, so `gpu_graphs = true` now falls back to the unaccelerated path on AMDGPU with a one-time warning; rename `SpectralTransform` field `cuda_graphs` → `gpu_graphs`
 - Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
 - Revised extended differentiability tests [#1167](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1167)

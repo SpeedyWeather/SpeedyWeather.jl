@@ -1,23 +1,14 @@
-# Shared test logic for CUDA-graphs and HIP-graphs tests.
-# Called from cuda_graphs.jl and hip_graphs.jl with the appropriate extension and prefix.
-# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live inside each backend's own
-# extension module (SpeedyTransformsCUDAExt / SpeedyTransformsAMDGPUExt), not in the main
-# SpeedyTransforms package — hence accessed via `ext.` below, not `SpeedyTransforms.`. Keeping
-# this code extension-local (rather than shared via the main package) is deliberate: see the
-# module docstring in SpeedyTransformsAMDGPUExt.jl for why (Enzyme's CPU-only AD tests broke
-# when these methods existed in every Julia session regardless of which GPU backend was loaded).
-#
-# `expect_capture` is false for HIP: AMDGPU's run_graph! never attempts graph capture at all
-# (see SpeedyTransformsAMDGPUExt.jl — ROCm's stream-capture validator doesn't reliably reject
-# illegal-to-capture operations, so a captured graph can silently replay into invalid memory).
-# A 2026-08-05 LUMI session re-enabled capture experimentally to check whether that's still
-# true on the current AMDGPU.jl/ROCm combination: it is — isolated repro scripts (a single
-# captured rocFFT call, a full captured `transform!`) did not reproduce it, but the actual
-# instrumented model test crashed the process with the same GPU memory access fault as the
-# original bug. The allocation-free direct loop still runs on every call, so results must
-# still be correct and no graphs should ever appear in the cache.
+# Shared test logic for CUDA-graphs tests, called from cuda_graphs.jl.
+# HIP graphs are not implemented for AMDGPU (see SpeedyTransformsAMDGPUExt.jl and
+# hip_graphs.jl), so this is CUDA-only.
+# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live inside the CUDA extension
+# module (SpeedyTransformsCUDAExt), not in the main SpeedyTransforms package — hence
+# accessed via `ext.` below, not `SpeedyTransforms.`. Keeping this code extension-local
+# (rather than shared via the main package) is deliberate: it broke Enzyme's CPU-only AD
+# tests when these methods existed in every Julia session regardless of which GPU backend
+# was loaded.
 
-function test_gpu_graphs(ext, prefix; expect_capture::Bool = true)
+function test_gpu_graphs(ext, prefix)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
         if ext !== nothing
             spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = SpeedyWeather.GPU())
@@ -44,12 +35,8 @@ function test_gpu_graphs(ext, prefix; expect_capture::Bool = true)
             @test simulation.model.feedback.nans_detected == false
             @test s2.failed == 0                # nothing fell back to the un-captured direct loop
             @test s2.total == s1.total          # extra steps add no graphs → cache is bounded
-            if expect_capture
-                @test s1.total > 0                  # graphs were actually captured
-                @test s1.maxlen < ext.MAX_GRAPHS    # cache stays under the cap
-            else
-                @test s1.total == 0                 # capture disabled: never captures
-            end
+            @test s1.total > 0                  # graphs were actually captured
+            @test s1.maxlen < ext.MAX_GRAPHS    # cache stays under the cap
 
             ext.clear_fourier_graph_cache!()
         end
@@ -59,9 +46,9 @@ function test_gpu_graphs(ext, prefix; expect_capture::Bool = true)
     # transform's grid field via a per-step view (`get_step` → `field_view`). On GPU every
     # such view is a FRESH array wrapper aliasing the same device memory, so the cache must
     # key on the stable device pointer — not the churning wrapper identity — or it captures a
-    # new graph every step and grows without bound. Not applicable when capture is disabled.
+    # new graph every step and grows without bound.
     @testset "$prefix Graphs: per-step views of one buffer reuse a single graph" begin
-        if ext !== nothing && expect_capture
+        if ext !== nothing
             spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = SpeedyWeather.GPU())
             S = SpectralTransform(spectral_grid)
             nlayers = spectral_grid.nlayers
@@ -98,9 +85,8 @@ function test_gpu_graphs(ext, prefix; expect_capture::Bool = true)
     #  2. `run_graph!` warms up and then captures; capture only RECORDS (it does not execute), so
     #     the warmup alone produces the call's result. Launching the graph as well would apply the
     #     work twice — invisible for an overwriting loop, but a double-accumulate for `add=true`.
-    # Not applicable when capture is disabled (no graphs are ever captured to mix up).
     @testset "$prefix Graphs: add=true accumulates exactly once and uses its own graph" begin
-        if ext !== nothing && expect_capture
+        if ext !== nothing
             spectral_grid = SpectralGrid(; trunc = 15, nlayers = 4, architecture = SpeedyWeather.GPU())
             S = SpectralTransform(spectral_grid)
             nlayers = spectral_grid.nlayers
