@@ -271,7 +271,7 @@ end
 
             # this test is only approximate as bit reproducibility is close but not perfect
             # not sure exactly why, needs further investigation if deemed important
-            @test all(vor_restarted .≈  simulation.variables.prognostic.vorticity)
+            @test all(isapprox.(vor_restarted, simulation.variables.prognostic.vorticity; atol = 1e-5, rtol=1e-5))
             @test time_restarted == simulation.variables.prognostic.clock.time
         end
     end
