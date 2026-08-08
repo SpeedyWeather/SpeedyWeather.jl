@@ -10,7 +10,7 @@ atmospheric relationships. Fields are $(TYPEDFIELDS)"""
     wind_slowdown::NF = 0.95
 
     "[OPTION] Wind speed of sub-grid scale gusts [m/s]"
-    gust_speed::NF = 5
+    gust_speed::NF = 1
 end
 
 Adapt.@adapt_structure SurfaceCondition
