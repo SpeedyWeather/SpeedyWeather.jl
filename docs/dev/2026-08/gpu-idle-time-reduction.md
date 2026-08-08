@@ -1,9 +1,11 @@
 # Reducing GPU idle time in the `PrimitiveWetModel` time step
 
 > Status: **in progress**. W0 (confirmation) and W1 (the `K=2` batch-plan fix) are done and
-> implemented: planning `K=2` makes a GPU time step **1.9–2.3× faster** at T31–T255 on the A40,
-> confirmed by an instrumented A/B, and the new GPU regression test passes. The H100
-> confirmation job is queued but its result is not yet in. W2–W4 not started — see
+> measured on **both** GPUs: planning `K=2` makes a GPU time step **1.7–2.3× faster** at
+> T31–T255. W1's remaining test obligations are started but unfinished (see *Status as of
+> 2026-08-08*). W2 now has its mechanism pinned down — the existing stride on the feedback
+> diagnostics silently degenerates to *every step* whenever `verbose = false` — but the
+> behavioural decision is still open. W3/W4 wait on the post-W1 re-profile. See
 > *Where to continue* at the end.
 
 Date of initial draft: 2026-08-07
@@ -33,7 +35,20 @@ Base revision: `196bcc92e945ee7ac18588d06fdde8d21f67c615` (`mg/profile-gpu-primi
     the login-node A40 is shared.
   - W1's guard against recurrence became a counter in `SpeedyTransforms` rather than a test-side
     method override, so the check is available to any caller and cannot drift from the dispatch
-    condition it guards.
+    condition it guards. *(Superseded 2026-08-08: the counter was removed, see below.)*
+- **2026-08-08, "continue the GPU idle-time reduction".** Short session; work started on the
+  W1 test obligations and on the W2 diagnosis. Outcomes:
+  - the stale login-node A40 process was cleared (see *Known limitations*), so future login-node
+    timings are no longer taken against a GPU with 2.6 GB held by a dead benchmark;
+  - `verify_batch_equivalence.jl` was written (the batched-vs-serial tolerance comparison that W1
+    still owed) but **has not been run**;
+  - **the `SERIAL_FOURIER_FALLBACKS` counter was removed at the user's request**, reverting
+    `SpeedyTransforms/src/fourier.jl` to `HEAD`. W1 is now a *one-line* change to
+    `default_transform_batch` plus its test. The recurrence guard is instead a direct assertion
+    that the batched `K = 2` plans exist, which is the same condition `_fourier!` dispatches on;
+    `SpeedyTransforms` needs no version bump any more, only `SpeedyWeather`;
+  - W2 gained a measured mechanism (finding W2.0 below) which changes its character: the largest
+    part is a *bug*, not a behavioural trade-off, and so needs no decision.
 
 ## Problem description
 
@@ -129,11 +144,14 @@ Considerations:
 - If W0 shows the caller's `K` is actually derived from something (e.g. "2 leapfrog steps" or
   "u and v"), prefer deriving the batch entry from the same quantity over hard-coding `2`, so
   a future change cannot silently reintroduce the fallback.
-- **Guard against recurrence:** the serial fallback was silent. Add a lightweight counter to
-  `SpectralTransform` (or a `@debug` log) incremented on every `_fourier_serial!` dispatch
-  with `K > 1`, and a GPU unit test asserting that a default `PrimitiveWetModel` time step
-  performs **zero** serial-fallback Fourier transforms. That converts "unplanned batch size"
-  from a 60 %-of-launches performance cliff into a test failure.
+- **Guard against recurrence:** the serial fallback was silent. Assert in a GPU unit test that
+  a default `SpectralTransform` and a default `PrimitiveWetModel` actually carry batched
+  `K = 2` plans — `haskey(S.rfft_plans_batched, K)` is the exact condition `_fourier!`
+  dispatches on, so the test fails the moment the fallback returns. (An earlier draft added a
+  `SERIAL_FOURIER_FALLBACKS` counter to `SpeedyTransforms/src/fourier.jl` for this; it was
+  **removed on 2026-08-08** — a global mutable counter in a hot dispatch barrier is a large
+  permanent surface for a test-only concern, and checking the plan key tests the same
+  condition with no source change at all.)
 - Memory cost: one extra pair of batched rfft plans (K=2 forward/inverse) per
   `SpectralTransform` — negligible next to the existing plan set, but confirm no measurable
   `initialize!` slowdown.
@@ -141,7 +159,7 @@ Considerations:
   modelbench B3-style equivalence at tolerance (and the existing transform unit tests), not
   `==` across the two batch configurations.
 
-Deliverables: the source change, the fallback-counter test in `SpeedyWeather/test/GPU/`,
+Deliverables: the source change, the batch-plan test in `SpeedyWeather/test/GPU/`,
 `CHANGELOG.md` bullet, `SpeedyWeather` version `+DEV` bump, before/after Phase A table
 (both GPUs) appended here.
 
@@ -351,35 +369,75 @@ smallest at T255. As resolution grows, real per-kernel work grows while the fall
 grows only linearly in `nlat_half`, so its *share* of the step eventually falls. T255 at 1.91×
 is therefore the honest lower bound for production resolutions, not the outlier.
 
+### W2.0 — the feedback stride degenerates to *every step* exactly when nothing is printed (2026-08-08)
+
+`progress!` (`SpeedyWeather/src/output/feedback.jl:90-99`) *already* strides the two device
+reductions:
+
+```julia
+every_nsteps = feedback.progress_meter.core.check_iterations
+feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(vars)
+feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(vars)
+```
+
+`check_iterations` is ProgressMeter's adaptive "how often is it worth checking the clock"
+counter. It is only ever updated inside `updateProgress!`, whose **first line is
+`!p.enabled && return`** (ProgressMeter 1.11.0, `src/ProgressMeter.jl:247`). `enabled` is
+`feedback.verbose`. So with `verbose = false` the counter never leaves its initial value `1`,
+`mod(counter, 1) == 0` is always true, and both `extrema` reductions — each a device→host
+sync — run on **every** time step. Measured directly, independent of SpeedyWeather:
+
+| `Progress(…; enabled)` | `check_iterations` after 20 000 `next!` |
+|---|---:|
+| `false` (`verbose = false`, the default in scripts and benchmarks) | **1** — i.e. every step |
+| `true`  (interactive REPL) | 32681 — i.e. effectively never |
+
+This inverts the intent: the diagnostics are cheap-by-striding when they are displayed, and
+un-strided when they are *not*. It explains the whole Phase A3 gap (10–26 % of wallclock for
+0.05 ms of GPU work) without appealing to any deliberate design choice, and it means the first
+part of W2 is a **bug fix, not a behavioural change** — no decision needed for it:
+
+- **W2a (no decision needed):** do not compute `max_speed`/`temperature_range` when the progress
+  meter is disabled. Their only consumer is `progress_string` via `ProgressMeter.speedstring`,
+  which is only reached when printing, so nothing observable is lost. Gate on
+  `feedback.progress_meter.core.enabled` (equivalently `verbose`) rather than on
+  `check_iterations`, and keep the existing stride for the verbose case.
+- **W2b (decision still open):** `nan_detection!` is *not* strided at all — it runs every step
+  and its `@allowscalar vor[2, end]` read is a full device sync that stops the host running
+  ahead, which is the specific thing a launch-bound step cannot afford. Striding it delays the
+  early-abort in `time_stepping!` (`time_integration.jl:39,74`) by up to N−1 steps; a NaN
+  persists, so it is still detected, just later. Options 1/3 of the original W2 list apply here
+  only.
+
 ## Testing and verification
 
 - **Correctness:** the modelbench bitwise equivalence check (driver vs `run!`) after every
   source change; full GPU test suite (`SpeedyWeather/test/GPU/runtests.jl`); for W1
   additionally a CPU-vs-GPU and batched-vs-serial tolerance comparison of a short run, since
   batched cuFFT may not be bitwise identical to the serial path.
-- **No silent regressions:** the W1 serial-fallback counter test pins the fixed behaviour;
+- **No silent regressions:** the W1 batch-plan test pins the fixed behaviour;
   W3 graph work adds a launches-per-step assertion under the modelbench driver.
 - **Performance:** before/after Phase A tables per workstream, both GPUs, with the ±20 %
   benchmark-noise convention from `CLAUDE.md`; report anything outside it.
 - W2 needs a unit test that `nans_detected` still triggers (inject a NaN, step N+1 times,
   assert detection) under the strided scheme.
 
-### Status as of 2026-08-07
+### Status as of 2026-08-08
 
 | check | status |
 |---|---|
-| `SpeedyWeather/test/GPU/fft_batch_plans.jl` (new, A40) | **6/6 pass** (4m25s, almost all precompilation) |
+| `SpeedyWeather/test/GPU/fft_batch_plans.jl` (new, A40) | 6/6 passed on 2026-08-07, but the file was **rewritten on 2026-08-08** when the counter was dropped — the current version is **unrun** |
 | A/B timing, A40, T31–T255 | **done**, table above; every arm passed the `nans_detected` guard |
 | A/B timing, H100, T31–T255 | **done**, SLURM job `1731194` → `reports/verify_k2-1731194.log` |
-| full `SpeedyWeather/test/GPU/runtests.jl` | **not run yet** |
-| CPU test suites (`SpeedyTransforms`, `SpeedyWeather`) | **not run yet** |
+| full `SpeedyWeather/test/GPU/runtests.jl` | **started 2026-08-08, did not finish** — was still precompiling when the session ended; no result, rerun from scratch |
+| CPU suite `SpeedyTransforms` | **started 2026-08-08, did not finish** — had reached the transform tests with no failure reported, but incomplete, so it counts as not run |
+| CPU suite `SpeedyWeather` | **not run yet** |
+| batched-vs-serial tolerance comparison | script written (`modelbench/verify_batch_equivalence.jl`), **never executed — not even syntax-checked** |
 | Phase B/C re-profile after W1 | **not run yet** |
+| W2 mechanism | **diagnosed and measured** (finding W2.0); no source change made |
 
 ### Files changed by W1
 
-- `SpeedyTransforms/src/fourier.jl` — `SERIAL_FOURIER_FALLBACKS` counter plus
-  `serial_fourier_fallbacks()` / `reset_serial_fourier_fallbacks!()`, incremented in both
-  `_fourier!` dispatch barriers on the unplanned-`K>1` branch only (unexported diagnostics).
 - `SpeedyWeather/src/dynamics/spectral_grid.jl` — `2` added to the GPU
   `default_transform_batch`, with the reason documented in the docstring; a note added to the
   CPU method explaining why it does *not* need `2` (`_transform_chunked!` splits unplanned `K`
@@ -390,6 +448,8 @@ is therefore the honest lower bound for production resolutions, not the outlier.
   arms, call-site capture, alternated-order min-of-2 timing, post-fix confirmation pass).
 - `SpeedyWeather/test/GPU/modelbench/analyze_nsys.sh` — optional trace-prefix argument.
 - `SpeedyWeather/test/GPU/modelbench/submit_verify_k2.sh` (new) — H100 job.
+- `SpeedyWeather/test/GPU/modelbench/verify_batch_equivalence.jl` (new, 2026-08-08) — the
+  batched-vs-serial tolerance comparison. **Untested: written but never run.**
 
 **No version bumps were made.** `SpeedyTransforms` is already at `0.2.0-DEV` and
 `SpeedyWeather` at `0.21.1+DEV`; per the convention in `CLAUDE.md` those DEV tags already
@@ -437,13 +497,25 @@ PR is opened.
 W0 and W1 are complete and measured on both GPUs; the fix is in the working tree, uncommitted.
 In order:
 
-1. **Finish the test obligations for W1** — only the new focused test has been run so far:
+1. **Finish the test obligations for W1** — only the new focused test has been run so far. All
+   three were *started or prepared* on 2026-08-08 and none produced a result, so all three are
+   still open:
    - full GPU suite: `julia --project=SpeedyWeather SpeedyWeather/test/GPU/runtests.jl`
-   - CPU suites: `SpeedyTransforms` and `SpeedyWeather` (the counter touches a shared dispatch
-     barrier, and the CPU default was deliberately left unchanged — confirm neither regressed)
+     (budget ~10+ min; the first several minutes are precompilation with no output at all —
+     do not mistake a silent log for a hang)
+   - CPU suites: `SpeedyTransforms` and `SpeedyWeather` (the CPU `default_transform_batch` was
+     deliberately left unchanged — confirm neither regressed). Now that `SpeedyTransforms` is
+     untouched by W1, its suite is a formality rather than a real risk.
    - the batched-vs-serial tolerance comparison promised in W1: batched and serial cuFFT need
      not agree bitwise, so compare a short run under both `transform_batch` sets at tolerance.
      This is the one W1 deliverable with a real (if small) chance of surfacing a problem.
+     The script now exists — `julia --project=SpeedyWeather/test/GPU/modelbench
+     SpeedyWeather/test/GPU/modelbench/verify_batch_equivalence.jl [steps]` — but it has never
+     been executed, so expect to debug it (its three parts: one K=2 transform batched vs serial
+     at four truncations; a 100-step T31 model run under both batch sets compared variable by
+     variable; the same run on CPU as the reference scale for "how different is acceptable").
+     Its pass criterion is *relative*: the W1 difference must not exceed the CPU-vs-GPU
+     difference the suite already tolerates.
 2. **Re-profile (Phase B/C) with the fix in**, using the existing
    `submit_phaseB.sh` + `analyze_nsys.sh` + `phase_table.jl`. Two questions:
    - Are the 96/step `cuMemcpyDtoDAsync_v2` gone? That closes W4 without separate work (see the
@@ -451,11 +523,26 @@ In order:
    - What is the new GPU-busy fraction and the new residual launch budget in `dynamics`? That
      number is the input for choosing between W3(a) graph capture and W3(b) fusion — do not pick
      between them before seeing it.
-3. **W2 (feedback round-trips) still needs your decision** — it is the only behavioural change in
-   this plan. The recommendation stands: stride the diagnostics *and* skip
-   `max_speed`/`temperature_range` when `verbose == false`. Note its expected share has *grown*
-   in relative terms now that W1 removed ~half the step: the same ~10–26 % of the old step is a
-   larger fraction of the new one.
+   **Re-profile with the pre-fix traces preserved.** `submit_phaseB.sh` writes
+   `reports/model_T*_L8` with `--force-overwrite=true`, which would destroy the pre-W1 H100
+   baseline (and the A40 set is `reports/a40_T*_L8`). Give the script an output-prefix argument
+   — `analyze_nsys.sh` already takes one — and run the new traces as e.g. `w1_T*` / `a40w1_T*`
+   before comparing.
+
+3. **W2 is now two pieces, and only the second needs your decision** (see finding W2.0):
+   - **W2a is a bug fix, not a behaviour change** — `max_speed`/`temperature_range` are strided
+     by `progress_meter.core.check_iterations`, which ProgressMeter only ever updates while the
+     meter is *enabled*, so with `verbose = false` it stays at `1` and both device reductions run
+     every single step while nothing is displayed. Measured: `check_iterations` = 1 when
+     disabled vs 32681 when enabled. Skip them when the meter is disabled; nothing observable is
+     lost, because their only consumer is the progress string.
+   - **W2b needs your call** — `nan_detection!` runs unstrided every step and its scalar read is
+     a full device sync. Striding it (option 1) delays the early abort by up to N−1 steps;
+     keeping the check on device behind an async flag (option 3) removes the sync without
+     delaying anything but costs more machinery. Recommendation: stride it, with the stride an
+     option on `Feedback` defaulting to 1 on CPU (zero behaviour change) and >1 on GPU.
+   Note the expected share has *grown* in relative terms now that W1 removed ~half the step: the
+   same ~10–26 % of the old step is a larger fraction of the new one.
 4. **Housekeeping before the PR:** replace `NNN` in the `CHANGELOG.md` bullet with the real PR
    number, and re-check whether the `-DEV`/`+DEV` tags on `SpeedyTransforms` / `SpeedyWeather`
    still cover these changes at that point.
@@ -468,5 +555,8 @@ split into its own PR ahead of W2/W3 if you want the 2× banked early — the me
 regression test are already in hand for it.
 
 One environment note for whoever picks this up: a Julia process from an earlier session
-(pid 129728 at the time of writing, ~3.5 days old) was still holding 2.6 GB on the login-node
-A40. Worth checking for and clearing before trusting login-node timings.
+(pid 129728, ~3.9 days old) was holding 2.6 GB on the login-node A40. **Cleared on 2026-08-08**,
+so the A40 numbers in the W1 table were taken under that contention and the next set will not
+be — do not read a small A40 shift between the two sessions as a code effect. Check
+`nvidia-smi --query-compute-apps=pid,used_memory --format=csv` for strays before trusting any
+login-node timing; the A40 is shared with other users, whose processes are not yours to kill.
