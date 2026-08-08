@@ -78,11 +78,26 @@ end
 end
 
 @kwdef struct LearnedLandRoughness{NF} <: AbstractSurfaceRoughness
-    "[OPTION] constant momentum roughness length over land [m]"
-    momentum_roughness_land::NF = 0.5
+    "[OPTION] coefficient for momentum roughness closure over land"
+    m_c1::NF = -7.231684
+    m_c2::NF = 11.078163
+    m_c3::NF = -0.14265412
+    m_c4::NF = -5.916258
+    m_c5::NF = 2.2420337
+    m_c6::NF = 0.00613743
+    m_c7::NF = 0.51263654
+    m_c8::NF = 2.6413066
+    m_c9::NF = 0.60989547
 
-    "[OPTION] constant heat roughness length over land [m]"
-    heat_roughness_land::NF = 0.5
+    "[OPTION] coefficient for heat roughness closure over land"
+    h_c1::NF = 373.86444
+    h_c2::NF = 5.981257
+    h_c3::NF = 3.5229454
+    h_c4::NF = 7.781359
+    h_c5::NF = 2.1035099
+    h_c6::NF = -0.41931123
+    h_c7::NF = 0.00037635124
+    h_c8::NF = -5.4191554
 end
 
 Adapt.@adapt_structure LearnedLandRoughness
@@ -90,8 +105,24 @@ LearnedLandRoughness(SG::SpectralGrid; kwargs...) = LearnedLandRoughness{SG.NF}(
 initialize!(::LearnedLandRoughness, ::PrimitiveEquation) = nothing
 
 @kwdef struct LearnedOceanRoughness{NF} <: AbstractSurfaceRoughness
-    a_h::NF = NF(0.4) # heat related constant
-    a_q::NF = NF(0.62) # moisture related constant
+    a_h::NF = 0.4 # heat related constant
+    a_q::NF = 0.62 # moisture related constant
+
+    "[OPTION] coefficient for momentum roughness closure over ocean"
+    m_c1::NF = 0.48786303
+    m_c2::NF = 3.374574
+    m_c3::NF = 0.5460857
+    m_c4::NF = 0.45002246
+    m_c5::NF = 0.9827853
+    m_c6::NF = 0.043734703
+    m_c7::NF = 1.0346544
+    m_c8::NF = 7.1816134
+
+    "[OPTION] coefficient for heat roughness closure over ocean"
+    h_c1::NF = -8.207549
+    h_c2::NF = 0.18300448
+    h_c3::NF = 0.08970642
+    h_c4::NF = -1.6667988
 end
 
 Adapt.@adapt_structure LearnedOceanRoughness
@@ -171,8 +202,8 @@ end
     soil_moisture = vars.prognostic.land.soil_moisture[ij, begin]  # currently top layer
     soil_temperature = vars.prognostic.land.soil_temperature[ij, end]  # currently bottom layer
 
-    z₀M_land = land_momentum_roughness(vₕ, vₗ, laiₕ, laiₗ, sd, soil_temperature, soil_moisture)
-    z₀H_land = land_heat_roughness(vₕ, vₗ, laiₕ, laiₗ, soil_temperature, soil_moisture)
+    z₀M_land = land_momentum_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, sd, soil_temperature, soil_moisture)
+    z₀H_land = land_heat_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, soil_temperature, soil_moisture)
 
     land.momentum_roughness[ij] = z₀M_land
     land.heat_roughness[ij] = z₀H_land
@@ -214,31 +245,19 @@ end
 end
 
 @inline function maximum_momentum_roughness(uₙ::NF) where {NF <: Real}
+    # Momentum roughness cap following Willett et al. (2026)
     z_cap = NF(6.74e-3)
     z_high = NF(1.3e-3)
     U_cap = NF(33.0)
     U_high = NF(55.0)
 
-    # The compiler folds this constant arithmetic at compile-time (m ≈ -2.4727e-4)
     m = (z_high - z_cap) / (U_high - U_cap)
-
-    # Evaluate linear regime using FMA: z_cap + m*(uₙ - U_cap)
     z_linear = muladd(m, uₙ - U_cap, z_cap)
 
-    # Branchless clamp replaces max(z_high, min(z_linear, z_cap))
     return clamp(z_linear, z_high, z_cap)
 end
 
 @inline function ocean_momentum_roughness(uₙ::NF, αᵪ::NF, siconc::NF) where {NF <: Real}
-    c1 = NF(0.48786303)
-    c2 = NF(3.374574)
-    c3 = NF(0.5460857)
-    c4 = NF(0.45002246)
-    c5 = NF(0.9827853)
-    c6 = NF(0.043734703)
-    c7 = NF(1.0346544)
-    c8 = NF(7.1816134)
-
     num = muladd(c3, uₙ, αᵪ + c2)
     den = exp(muladd(c4, uₙ, -c5)) + c6
 
@@ -254,68 +273,40 @@ end
     return sea_ice_momentum_roughness(siconc) * siconc + (1 - siconc) * z₀M
 end
 
-@inline function ocean_heat_roughness(uₙ::NF, siconc::NF) where {NF <: Real}
-    c1 = NF(-8.207549)
-    c2 = NF(0.18300448)
-    c3 = NF(0.08970642)
-    c4 = NF(-1.6667988)
-    log_roughness = (c1 * ((uₙ + c2)^c3)) - exp(c4 / uₙ)
+@inline function ocean_heat_roughness(scheme, uₙ::NF, siconc::NF) where {NF <: Real}
+    log_roughness = (scheme.h_c1 * ((uₙ + scheme.h_c2)^scheme.h_c3)) - exp(scheme.h_c4 / uₙ)
     return NF(1.0e-3) * siconc + (1 - siconc) * exp(log_roughness) # following IFS documentation, ice roughness is 1e-3 m
 end
 
-@inline function land_momentum_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, S::NF, T::NF, W::NF) where {NF <: Real}
-    # Coefficients for z_0M
-    c1 = NF(-7.231684)
-    c2 = NF(11.078163)
-    c3 = NF(-0.14265412)
-    c4 = NF(-5.916258)
-    c5 = NF(2.2420337)
-    c6 = NF(0.00613743)
-    c7 = NF(0.51263654)
-    c8 = NF(2.6413066)
-    c9 = NF(0.60989547)
-
+@inline function land_momentum_roughness(scheme, C_H::NF, C_L::NF, L_H::NF, L_L::NF, S::NF, T::NF, W::NF) where {NF <: Real}
     # Numerator terms
-    exp_arg1 = S / muladd(c2, C_H, -c3) # c2*C_H - c3
-    term1 = c4 * exp(exp_arg1)
+    exp_arg1 = S / muladd(scheme.m_c2, C_H, -scheme.m_c3) 
+    term1 = scheme.m_c4 * exp(exp_arg1)
 
-    min_inner = min(c5 * L_L, muladd(c6, T, -W)) # min(c5*L_L, c6*T - W)
-    exp_arg2 = C_L * (min_inner - (c7^L_L))
+    min_inner = min(scheme.m_c5 * L_L, muladd(scheme.m_c6, T, -W))
+    exp_arg2 = C_L * (min_inner - (scheme.m_c7^L_L))
     term2 = exp(exp_arg2)
 
-    numerator = max(c1, term1 + term2)
+    numerator = max(scheme.m_c1, term1 + term2)
 
     # Denominator terms
-    term3 = exp(C_H * max(L_H, c8))
+    term3 = exp(C_H * max(L_H, scheme.m_c8))
     term4 = min(L_H, W)
 
     denominator = term3 + term4
 
-    log_roughness = (numerator / denominator) + c9
+    log_roughness = (numerator / denominator) + scheme.m_c9
     return exp(log_roughness)
 end
 
-@inline function land_heat_roughness(C_H::NF, C_L::NF, L_H::NF, L_L::NF, T::NF, W::NF) where {NF <: Real}
-    # Coefficients for z_0H
-    c1 = NF(373.86444)
-    c2 = NF(5.981257)
-    c3 = NF(3.5229454)
-    c4 = NF(7.781359)
-    c5 = NF(2.1035099)
-    c6 = NF(-0.41931123)
-    c7 = NF(0.00037635124)
-    c8 = NF(-5.4191554)
-
-    # Calculate intermediate Gamma term (eq. land_z0H line 1)
-    # Note: c1^c2 is folded as a constant if c1 and c2 are hardcoded, but evaluated safely here
-    gamma_term1 = ((c1^c2) * min(C_H, L_H)) / ((L_L + T)^c2) + L_H
-    gamma_term2 = muladd(NF(2), C_H, c3) # 2*C_H + c3
+@inline function land_heat_roughness(scheme, C_H::NF, C_L::NF, L_H::NF, L_L::NF, T::NF, W::NF) where {NF <: Real}
+    gamma_term1 = ((scheme.h_c1^scheme.h_c2) * min(C_H, L_H)) / ((L_L + T)^scheme.h_c2) + L_H
+    gamma_term2 = muladd(NF(2), C_H, scheme.h_c3)
     Γ = max(gamma_term1, gamma_term2)
 
-    # Calculate z_0H (eq. land_z0H line 2)
     inner_min = min(C_L, L_L - W)
-    arg1 = muladd(c5, Γ - c4 + C_L * inner_min, -(c6 * L_H)) # c5*(...) - c6*L_H
-    arg2 = c8 * (c7^C_H)
+    arg1 = muladd(scheme.h_c5, Γ - scheme.h_c4 + C_L * inner_min, -(scheme.h_c6 * L_H))
+    arg2 = scheme.h_c8 * (scheme.h_c7^C_H)
 
     log_roughness = min(arg1, arg2)
     return exp(log_roughness)
