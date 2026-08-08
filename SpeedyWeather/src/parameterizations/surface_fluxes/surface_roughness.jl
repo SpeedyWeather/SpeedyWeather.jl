@@ -104,7 +104,7 @@ Adapt.@adapt_structure LearnedLandRoughness
 LearnedLandRoughness(SG::SpectralGrid; kwargs...) = LearnedLandRoughness{SG.NF}(; kwargs...)
 initialize!(::LearnedLandRoughness, ::PrimitiveEquation) = nothing
 
-@kwdef struct Charnock{NF}
+@kwdef struct Charnock{NF} <: AbstractParameterization
     "[OPTION] threshold wind speed [m/s] for Charnock parameterization"
     Uₜ::NF = 7.0
 
@@ -129,11 +129,16 @@ Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
 
 @inline function (charnock_param::Charnock)(uₙ::T) where {T <: Real}
     Uₜ = T(charnock_param.Uₜ)
+    c1 = T(charnock_param.c1)
+    c2 = T(charnock_param.c2)
+    c3 = T(charnock_param.c3)
+    c4 = T(charnock_param.c4)
+    c5 = T(charnock_param.c5)
 
     val = ifelse(
         uₙ ≤ Uₜ,
-        muladd(uₙ * uₙ, muladd(T(charnock_param.c1), uₙ, T(charnock_param.c2)), T(charnock_param.c3)),
-        muladd(T(charnock_param.c4), uₙ - Uₜ, T(charnock_param.c5)) # for uₙ > Uₜ, linear increase
+        muladd(uₙ * uₙ, muladd(c1, uₙ, c2), c3),
+        muladd(c4, uₙ - Uₜ, c5) # for uₙ > Uₜ, linear increase
     )
     return log(val)
 end

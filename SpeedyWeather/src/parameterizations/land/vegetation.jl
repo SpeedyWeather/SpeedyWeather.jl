@@ -94,21 +94,21 @@ export VegetationClimatology
 
     # to be filled from file
     "High vegetation cover [1], interpolated onto Grid"
-    high_cover::GridVariable2D
+    high_vegetation_cover::GridVariable2D
 
     "Low vegetation cover [1], interpolated onto Grid"
-    low_cover::GridVariable2D
+    low_vegetation_cover::GridVariable2D
 
     "High vegetation leaf area index [1], interpolated onto Grid"
-    high_leaf_area::GridVariable2D
+    high_vegetation_leaf_area::GridVariable2D
 
     "Low vegetation leaf area index [1], interpolated onto Grid"
-    low_leaf_area::GridVariable2D
+    low_vegetation_leaf_area::GridVariable2D
 end
 
 # TODO to adapt create a ManualVegetationClimatology component like AlbedoClimatology is adapted to ManualAlbedo
 # do all vegetations need a low_veg_factor?
-# Adapt.adapt_structure(to, veg::VegetationClimatology) = adapt(to, ManualVegetationClimatology(veg.high_cover, veg.low_cover))
+# Adapt.adapt_structure(to, veg::VegetationClimatology) = adapt(to, ManualVegetationClimatology(veg.high_vegetation_cover, veg.low_vegetation_cover))
 
 # generator function
 function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
@@ -117,7 +117,7 @@ function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing
     low_cover = zeros(GridVariable2D, grid)
     high_lai = zeros(GridVariable2D, grid)
     low_lai = zeros(GridVariable2D, grid)
-    return VegetationClimatology{NF, GridVariable2D}(; high_cover, low_cover, high_lai, low_lai, kwargs...)
+    return VegetationClimatology{NF, GridVariable2D}(; high_vegetation_cover = high_cover, low_vegetation_cover = low_cover, high_vegetation_leaf_area = high_lai, low_vegetation_leaf_area = low_lai, kwargs...)
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
@@ -163,12 +163,12 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
     vegl = on_architecture(model.architecture, vegl)
     lai_hv = on_architecture(model.architecture, lai_hv)
     lai_lv = on_architecture(model.architecture, lai_lv)
-    high_lai = vegetation.high_leaf_area
-    low_lai = vegetation.low_leaf_area
+    high_lai = vegetation.high_vegetation_leaf_area
+    low_lai = vegetation.low_vegetation_leaf_area
 
     # interpolate onto grid
-    high_vegetation_cover = vegetation.high_cover
-    low_vegetation_cover = vegetation.low_cover
+    high_vegetation_cover = vegetation.high_vegetation_cover
+    low_vegetation_cover = vegetation.low_vegetation_cover
     interpolator = RingGrids.interpolator(high_vegetation_cover, vegh, NF = Float32)
     interpolate!(high_vegetation_cover, vegh, interpolator)
     interpolate!(high_lai, lai_hv, interpolator)
@@ -210,23 +210,23 @@ function soil_moisture_availability!(
         vegetation::VegetationClimatology,
         model::PrimitiveWet,
     )
-    (; vegetation_high, vegetation_low, lai_vegetation_high, lai_vegetation_low, soil_moisture_availability) = vars.parameterizations.land
+    (; high_vegetation_cover, low_vegetation_cover, high_vegetation_leaf_area, low_vegetation_leaf_area, soil_moisture_availability) = vars.parameterizations.land
     (; soil_moisture) = vars.prognostic.land
     (; low_veg_factor) = vegetation
 
     # copy over vegetation fields into diagnostic variables
-    vegetation_high .= vegetation.high_cover
-    vegetation_low .= vegetation.low_cover
-    lai_vegetation_high .= vegetation.high_leaf_area
-    lai_vegetation_low .= vegetation.low_leaf_area
+    high_vegetation_cover .= vegetation.high_vegetation_cover
+    low_vegetation_cover .= vegetation.low_vegetation_cover
+    high_vegetation_leaf_area .= vegetation.high_vegetation_leaf_area
+    low_vegetation_leaf_area .= vegetation.low_vegetation_leaf_area
 
     W_cap = model.land.thermodynamics.field_capacity
     W_wilt = model.land.thermodynamics.wilting_point
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    @boundscheck fields_match(vegetation_high, vegetation_low, soil_moisture_availability) ||
-        throw(DimensionMismatch(vegetation_high, soil_moisture_availability))
+    @boundscheck fields_match(high_vegetation_cover, low_vegetation_cover, soil_moisture_availability) ||
+        throw(DimensionMismatch(high_vegetation_cover, soil_moisture_availability))
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only = true) ||
         throw(DimensionMismatch(soil_moisture, soil_moisture_availability))
     @boundscheck size(soil_moisture, 2) >= 2                # defined for two layers
@@ -241,14 +241,14 @@ function soil_moisture_availability!(
     launch!(
         architecture(soil_moisture_availability), LinearWorkOrder,
         size(soil_moisture_availability), soil_moisture_availability_kernel!,
-        soil_moisture_availability, soil_moisture, vegetation_high, vegetation_low, params
+        soil_moisture_availability, soil_moisture, high_vegetation_cover, low_vegetation_cover, params
     )
 
     return nothing
 end
 
 @kernel inbounds = true function soil_moisture_availability_kernel!(
-        soil_moisture_availability, soil_moisture, vegetation_high, vegetation_low, params
+        soil_moisture_availability, soil_moisture, high_vegetation_cover, low_vegetation_cover, params
     )
 
     ij = @index(Global, Linear)    # every grid point ij
@@ -256,7 +256,7 @@ end
     (; low_veg_factor, r, W_cap, W_wilt, D_top, D_root) = params
 
     # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
-    veg = max(0, vegetation_high[ij] + low_veg_factor * vegetation_low[ij])
+    veg = max(0, high_vegetation_cover[ij] + low_veg_factor * low_vegetation_cover[ij])
 
     # Fortran SPEEDY documentation eq. 51, original formulation
     # soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +

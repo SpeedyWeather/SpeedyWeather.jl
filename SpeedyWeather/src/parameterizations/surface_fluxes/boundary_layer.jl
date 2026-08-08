@@ -95,8 +95,8 @@ Adapt.@adapt_structure BoundaryLayer
 function BoundaryLayer(
         SG::SpectralGrid;
         surface_condition = SurfaceCondition(SG),
-        neutral_wind_speed = nothing,
-        surface_roughness = ConstantSurfaceRoughness(SG),
+        neutral_wind_speed = NeutralWindSpeed(SG),
+        surface_roughness = LearnedSurfaceRoughness(SG),
         drag = BulkRichardsonDrag(SG),
     )
     return BoundaryLayer(surface_condition, neutral_wind_speed, surface_roughness, drag)
