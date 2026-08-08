@@ -174,9 +174,14 @@ Adapt.@adapt_structure LandBucketTemperature
 # generator function
 LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 
-function variables(::LandBucketTemperature)
+function variables(::LandBucketTemperature, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    tg = nsteps.tendency_grid
     return (
-        PrognosticVariable(:soil_temperature, LandXYZ(), desc = "Soil temperature", units = "K", namespace = :land),
+        PrognosticVariable(:soil_temperature, LandXYZT(pg), desc = "Soil temperature", units = "K", namespace = :land),
+        TendencyVariable(:soil_temperature, LandXYZT(tg), desc = "Tendency of soil temperature", units = "K/s", namespace = :land),
+        
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m²"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up", units = "W/m²", namespace = :land),
         ParameterizationVariable(:surface_longwave_down, Grid2D(), desc = "Surface longwave radiation down", units = "W/m²"),
@@ -219,11 +224,12 @@ function timestep!(
         land::LandBucketTemperature,
         model::PrimitiveEquation,
     )
-    (; soil_temperature) = vars.prognostic.land
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, land)
+    soil_temperature_tendency = get_tendency_step(vars.tendencies.land.soil_temperature, model.time_stepping, land)
+
     soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture : nothing
     Lᵥ = latent_heat_condensation(model.atmosphere)
     Lᵢ = latent_heat_sublimation(model.atmosphere)
-    (; Δt) = model.time_stepping                                # time step in [s]
 
     (; land_fraction) = model.land_sea_mask
     (; thermodynamics, geometry) = model.land
@@ -252,11 +258,11 @@ function timestep!(
     z₂ = geometry.layer_thickness[2]
     Δ = 2λ / (z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
 
-    params = (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
+    params = (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ)
 
     launch!(
-        architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
+        architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),), land_bucket_temperature_kernel!,
+        soil_temperature_tendency, soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
         params
     )
 
@@ -264,13 +270,13 @@ function timestep!(
 end
 
 @kernel inbounds = true function land_bucket_temperature_kernel!(
-        soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M, params
+        soil_temperature_tendency, soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M, params
     )
 
     ij = @index(Global, Linear)
 
     if land_fraction[ij] > 0               # at least partially land
-        (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
+        (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ) = params
 
         # Cooling from snow melt rate, in [W/m²] = [J/kg] * [kg/m²/s]
         Q_melt = isnothing(M) ? zero(Lᵢ) : Lᵢ * M[ij]
@@ -290,7 +296,7 @@ end
         D = Δ * (soil_temperature[ij, 1] - soil_temperature[ij, 2])
 
         # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_temperature[ij, 1] += Δt / (z₁ * C₁) * (F - D)
-        soil_temperature[ij, 2] += Δt / (z₂ * C₂) * D
+        soil_temperature_tendency[ij, 1] = (F - D) / (z₁ * C₁)
+        soil_temperature_tendency[ij, 2] = D / (z₂ * C₂)
     end
 end

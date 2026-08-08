@@ -159,6 +159,22 @@ end
 
 Adapt.@adapt_structure LandBucketMoisture
 LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+
+function variables(::LandBucketMoisture, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    tg = nsteps.tendency_grid
+    return (
+        PrognosticVariable(:soil_moisture, LandXYZT(pg), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        TendencyVariable(:soil_moisture, LandXYZT(tg), desc = "Tendency of soil moisture", units = "1/s", namespace = :land),
+        
+        ParameterizationVariable(:river_runoff, Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),
+        ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
+        ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
+        ParameterizationVariable(:snow_melt_rate, Grid2D(), desc = "Snow melt rate + snow runoff", units = "m/s", namespace = :land),
+    )
+end
+
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     nlayers = get_nlayers(model.land)
     @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *
@@ -210,8 +226,10 @@ function timestep!(
         soil::LandBucketMoisture,
         model::PrimitiveEquation,
     )
-    (; soil_moisture) = vars.prognostic.land
-    (; Δt) = model.time_stepping                            # time step in [s]
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, model.time_stepping, soil)
+    soil_moisture_tendency = get_tendency_step(vars.tendencies.land.soil_moisture, model.time_stepping, soil)
+
+    Δt = default_time_step(model.time_stepping)
     ρ = model.atmosphere.water_density
     (; land_fraction) = model.land_sea_mask
 
@@ -235,14 +253,14 @@ function timestep!(
     params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)  # pack into NamedTuple for kernel
 
     launch!(
-        architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, land_fraction, P, S, H, R, params
+        architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),), land_bucket_soil_moisture_kernel!,
+        soil_moisture_tendency, soil_moisture, land_fraction, P, S, H, R, params
     )
     return nothing
 end
 
 @kernel inbounds = true function land_bucket_soil_moisture_kernel!(
-        soil_moisture, land_fraction, P, S, H, R, params
+        soil_moisture_tendency, soil_moisture, land_fraction, P, S, H, R, params
     )
 
     ij = @index(Global, Linear)             # every grid point ij
@@ -261,28 +279,25 @@ end
         # vertical diffusion term between layers
         D = τ⁻¹ * (soil_moisture[ij, 1] - soil_moisture[ij, 2])
 
-        # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_moisture[ij, 1] += Δt / f₁ * F - Δt * D
-        soil_moisture[ij, 2] += Δt * f₁ / f₂ * D
-
-        # river runoff
+        # more excess water from upper layer into lower layer
         W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
         δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
-        soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
-        soil_moisture[ij, 2] += p * δW₁ * f₁ / f₂   # add fraction to lower layer
-        R[ij] += Δt * (1 - p) * δW₁ * f₁            # accumulate river runoff [m] of top layer
+        E = p * δW₁ / Δt                    # add excess fraction to lower layer within one time step
+        R[ij] += Δt * (1 - p) * δW₁ * f₁    # accumulate river runoff [m] = excess leftover of top layer
 
-        # remove excess water from lower layer (this disappears)
-        soil_moisture[ij, 2] = min(soil_moisture[ij, 2], 1)
+        # remove excess water from upper layer (moved to lower layer via tendency E), in filter!
+        # remove excess water from lower layer (this disappears), in filter!
+    
+        # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
+        soil_moisture_tendency[ij, 1] = F / f₁ - D
+        soil_moisture_tendency[ij, 2] = (D + E) * f₁ / f₂
     end
 end
 
-function variables(::LandBucketMoisture)
-    return (
-        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        ParameterizationVariable(:river_runoff, Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),
-        ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
-        ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
-        ParameterizationVariable(:snow_melt_rate, Grid2D(), desc = "Snow melt rate + snow runoff", units = "m/s", namespace = :land),
-    )
+# applied after the time stepping for any kind of "hacky" correction
+function Base.filter!(vars::Variables, ::LandBucketMoisture, model::PrimitiveEquation)    
+    # clamp soil moisture in [0, 1], removes excess humidity in lower layer
+    m = vars.prognostic.land.soil_moisture
+    m .= max.(min.(m, 1), 0)
+    return nothing
 end

@@ -22,10 +22,14 @@ Adapt.@adapt_structure SnowModel
 # generator function
 SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF}(; kwargs...)
 
-function variables(::SnowModel)
+function variables(::SnowModel, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    tg = nsteps.tendency_grid
     return (
-        PrognosticVariable(:snow_depth, Grid2D(), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
-        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land, units = "K", desc = "Soil temperature"),
+        PrognosticVariable(:snow_depth, GridXY(), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
+        PrognosticVariable(:soil_temperature, LandXYZT(pg), desc = "Soil temperature", units = "K", namespace = :land),
+
         ParameterizationVariable(:snow_melt_rate, Grid2D(), namespace = :land, units = "kg/m²/s", desc = "Snow melt rate"),
     )
 end
@@ -43,9 +47,10 @@ function timestep!(
         model::PrimitiveEquation,
     )
 
-    (; Δt) = model.time_stepping                            # time step [s]
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, snow)
     (; snow_depth) = vars.prognostic.land                   # in equivalent liquid water height [m]
-    (; soil_temperature) = vars.prognostic.land
+
+    (; Δt) = model.time_stepping                            # time step [s], don't use 2Δt here as snow uses Euler forward
     (; land_fraction) = model.land_sea_mask
 
     # Some thermodynamics needed by snow
@@ -86,10 +91,7 @@ end
         (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, snow_depth_cap) = params
 
         # check for melting of snow if temperature above melting threshold
-        # check for NaNs here to prevent land temperatures read from NetCDF data
-        # to cause an immediate blow up in case the land-sea mask doesn't align
-        δT_melt = isfinite(soil_temperature[ij, 1]) ?
-            max(soil_temperature[ij, 1] - melting_threshold, 0) : zero(soil_temperature[ij, 1])
+        δT_melt = max(soil_temperature[ij, 1] - melting_threshold, 0)
 
         # energy available from soil warming above melting threshold [J/m²/s]
         # heat capacity per volume, so not *density needed
