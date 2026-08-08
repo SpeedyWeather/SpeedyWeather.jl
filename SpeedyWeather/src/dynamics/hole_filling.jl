@@ -17,5 +17,6 @@ function hole_filling!(
 end
 
 function hole_filling!(q::AbstractField, ::ClipNegatives)
-    return @. q = max(q, 0)
+    z = zero(eltype(q))
+    return @. q = max(q, z)
 end

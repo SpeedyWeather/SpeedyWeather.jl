@@ -161,6 +161,23 @@ end
     end
 end
 
+@testset "Field{T, N, A, G}(data, grid) skips no-op cast" begin
+    # Regression: under Reactant, `T.(data)` with `eltype(data) === T` traces as a
+    # self-recursive `copy(::Broadcasted)` that blows the Julia stack. The constructor
+    # must pass `data` through identity-ically when the eltype already matches.
+    grid = HEALPixGrid(4)
+    data = zeros(Float32, RingGrids.get_npoints(grid))
+    F = typeof(Field(data, grid))   # Field{Float32, 1, Vector{Float32}, HEALPixGrid{...}}
+
+    field_same = F(data, grid)
+    @test field_same.data === data   # identity, no broadcast/copy
+
+    data64 = zeros(Float64, RingGrids.get_npoints(grid))
+    field_cast = F(data64, grid)
+    @test eltype(field_cast) === Float32
+    @test field_cast.data !== data64   # broadcast/cast ran
+end
+
 @testset "Field generators: ones" begin
     for NF in (Float32, Float64)
         for F in (

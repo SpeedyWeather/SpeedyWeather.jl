@@ -139,7 +139,7 @@ meaning also that's the default when creating a `SpectralTransform` from a `Spec
 But results don't change if the last degree (row) contains only zeros.
 
 ```@example speedytransforms
-alms = zeros(LowerTriangularMatrix{ComplexF64}, 7, 6)     # spectral coefficients
+alms = zeros(LowerTriangularMatrix{ComplexF32}, 7, 6)     # spectral coefficients
 alms[2, 2] = 1                                            # only l=1, m=1 harmonic
 
 map = transform(alms, S)

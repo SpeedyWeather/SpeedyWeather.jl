@@ -27,7 +27,8 @@ Field(grid::AbstractGrid, k...) = zeros(grid, k...)
 Field(::Type{T}, grid::AbstractGrid, k...) where {T} = zeros(T, grid, k...)
 Field(grid::AbstractGrid, dims::AbstractArrayDimensions, k...) = zeros(grid, dims, k...)
 Field(::Type{T}, grid::AbstractGrid, dims::AbstractArrayDimensions, k...) where {T} = zeros(T, grid, dims, k...)
-(::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid, args...) where {T} = Field(T.(data), grid, args...)
+(::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid, args...) where {T} =
+    Field(eltype(data) === T ? data : T.(data), grid, args...)
 
 # TYPES
 Architectures.nonparametric_type(::Type{<:Field}) = Field
@@ -633,6 +634,7 @@ find_field(x) = x
 find_field(::Tuple{}) = nothing
 find_field(a::AbstractField, rest) = a
 find_field(::Any, rest) = find_field(rest)
+find_field(ex::Base.Broadcast.Extruded) = find_field(ex.x)
 
 # allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
 # e.g. field1 + field2 creates a new field that share the grid of field1

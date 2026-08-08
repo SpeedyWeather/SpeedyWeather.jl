@@ -106,7 +106,7 @@ initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
 export AlbedoClimatology
 
 """Albedo climatology loaded from netcdf file. Fields are $(TYPEDFIELDS)"""
-@kwdef struct AlbedoClimatology{GridVariable2D} <: AbstractAlbedo
+@kwdef struct AlbedoClimatology{GridVariable2D, B} <: AbstractAlbedo
     "[OPTION] filename of albedo"
     file::String = "albedo.nc"
 
@@ -114,7 +114,7 @@ export AlbedoClimatology
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for soil moisture in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] variable name in netcdf file"
     varname::String = "alb"
@@ -135,7 +135,7 @@ Adapt.adapt_structure(to, albedo::AlbedoClimatology) = adapt(to, ManualAlbedo(al
 function AlbedoClimatology(SG::SpectralGrid; kwargs...)
     (; GridVariable2D, grid) = SG
     albedo = zeros(GridVariable2D, grid)
-    return AlbedoClimatology{GridVariable2D}(; albedo, kwargs...)
+    return AlbedoClimatology{GridVariable2D, Bool}(; albedo, kwargs...)
 end
 
 # set albedo with grid, scalar, function; just define path `albedo.albedo` to grid here
@@ -153,7 +153,7 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
         version = albedo.version
     )
 
-    return interpolate!(albedo.albedo, a)
+    return interpolate!(albedo.albedo, on_architecture(model.architecture, a))
 end
 
 @propagate_inbounds albedo!(ij, albedo, vars, scheme::AlbedoClimatology, model) = (albedo[ij] = scheme.albedo[ij])

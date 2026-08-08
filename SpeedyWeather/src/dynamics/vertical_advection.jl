@@ -88,7 +88,7 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    Δσₖ⁻¹ = inv(Δσ[k])
+    Δσₖ⁻¹ = 1/Δσ[k]   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
 
     # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
     k⁻ = max(1, k - 1)
@@ -172,7 +172,7 @@ const d₂ = 1 // 10
 end
 
 @inline function reconstructed_at_face(ξ, ij, s, k, u, ::WENOVerticalAdvection)
-    if u > 0
+    @trace if u > 0
         S₀ = (ξ[ij, k[3], s], ξ[ij, k[4], s], ξ[ij, k[5], s])
         S₁ = (ξ[ij, k[2], s], ξ[ij, k[3], s], ξ[ij, k[4], s])
         S₂ = (ξ[ij, k[1], s], ξ[ij, k[2], s], ξ[ij, k[3], s])

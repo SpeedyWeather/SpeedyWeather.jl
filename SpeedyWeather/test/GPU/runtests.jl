@@ -59,7 +59,7 @@ if gpu_backend === :CUDA
     # CUDA-GRAPHS ACCELERATED FOURIER TRANSFORM (CUDA-only feature)
     include("cuda_graphs.jl")
 
-    # REACTANT ON GPU (currently only works tested with CUDA)
+    # REACTANT ON GPU (currently only works with CUDA)
     #include("reactant.jl")
 
 elseif gpu_backend === :AMDGPU

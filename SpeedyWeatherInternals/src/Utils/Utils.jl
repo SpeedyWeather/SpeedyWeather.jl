@@ -10,6 +10,7 @@ import Dates        # Dates for readable_secs
 export isincreasing, isdecreasing
 export print_fields, readable_secs
 export _jit, @maybe_jit
+export set_scalar!
 include("utility_functions.jl")
 
 end

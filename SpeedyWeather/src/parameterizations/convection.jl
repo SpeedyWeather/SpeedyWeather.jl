@@ -5,9 +5,9 @@ export BettsMillerConvection
 """The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct BettsMillerConvection{NF} <: AbstractConvection
+@parameterized @kwdef struct BettsMillerConvection{NF, S} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
-    time_scale::Second = Hour(4)
+    time_scale::S = Hour(4)
 
     "[OPTION] Relative humidity for reference profile [1]"
     @param relative_humidity::NF = 0.7
@@ -16,7 +16,7 @@ end
 Adapt.@adapt_structure BettsMillerConvection
 
 # generator function
-BettsMillerConvection(SG::SpectralGrid; kwargs...) = BettsMillerConvection{SG.NF}(; kwargs...)
+BettsMillerConvection(SG::SpectralGrid; kwargs...) = BettsMillerConvection{SG.NF, Dates.Second}(; kwargs...)
 initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -64,7 +64,7 @@ and relaxes current vertical profiles to the adjusted references."""
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, atmosphere)
 
-    for k in level_zero_buoyancy:nlayers
+    @trace for k in level_zero_buoyancy:nlayers
         qsat = saturation_humidity(temp_ref_profile[ij, k], pₛ * σ[k], atmosphere)
         humid_ref_profile[ij, k] = qsat * convection.relative_humidity
     end
@@ -75,7 +75,7 @@ and relaxes current vertical profiles to the adjusted references."""
     Qref::NF = 0      # = ∫_pₛ^p_LZB -humid_ref_profile dp
 
     # skip constants compared to Frierson 2007, i.e. no /τ, /gravity, *cₚ/Lᵥ
-    for k in level_zero_buoyancy:nlayers
+    @trace for k in level_zero_buoyancy:nlayers
         # Frierson's equation (1)
         # δq = -(humid[ij, k] - humid_ref_profile[ij, k])/SBM.time_scale.value
         # Pq -= δq*Δσ[k]/gravity
@@ -99,7 +99,7 @@ and relaxes current vertical profiles to the adjusted references."""
     # height of zero buoyancy level in σ coordinates
     Δσ_lzb = σ_half[nlayers + 1] - σ_half[level_zero_buoyancy]
 
-    if deep_convection
+    @trace if deep_convection
 
         ΔT = (PT - Pq * Lᵥ / cₚ) / Δσ_lzb         # eq (5) but reusing PT, Pq, and /cₚ already included
 
@@ -129,8 +129,8 @@ and relaxes current vertical profiles to the adjusted references."""
     rain_convection::NF = 0
 
     # GET TENDENCIES FROM ADJUSTED PROFILES
-    τ⁻¹ = inv(convert(NF, Second(convection.time_scale).value))
-    for k in level_zero_buoyancy:nlayers
+    τ⁻¹ = 1/convert(NF, Second(convection.time_scale).value)   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
+    @trace for k in level_zero_buoyancy:nlayers
         temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij, k]) * τ⁻¹
         δq = (humid[ij, k] - humid_ref_profile[ij, k]) * τ⁻¹
         humid_tend[ij, k] -= δq
@@ -259,15 +259,15 @@ The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct BettsMillerDryConvection{NF} <: AbstractConvection
+@kwdef struct BettsMillerDryConvection{NF, S} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
-    time_scale::Second = Hour(4)
+    time_scale::S = Hour(4)
 end
 
-Adapt.adapt_structure(to, bmdc::BettsMillerDryConvection{NF}) where {NF} = BettsMillerDryConvection{NF}(adapt_structure(to, bmdc.time_scale))
+Adapt.adapt_structure(to, bmdc::BettsMillerDryConvection{NF, S}) where {NF, S} = BettsMillerDryConvection{NF, S}(adapt_structure(to, bmdc.time_scale))
 
 # generator function
-BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection{SG.NF}(; kwargs...)
+BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection{SG.NF, Dates.Second}(; kwargs...)
 initialize!(::BettsMillerDryConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -388,9 +388,9 @@ export ConvectiveHeating
 """Convective heating as defined by Lee and Kim, 2003, JAS
 implemented as convection parameterization. Fields are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct ConvectiveHeating{NF, VectorType} <: AbstractConvection
+@parameterized @kwdef struct ConvectiveHeating{NF, VectorType, S} <: AbstractConvection
     "[OPTION] Q_max heating strength as 1K/time_scale"
-    time_scale::Second = Hour(12)
+    time_scale::S = Hour(12)
 
     "[OPTION] Pressure of maximum heating [hPa]"
     @param p₀::NF = 525 (bounds = Positive,)
@@ -411,7 +411,7 @@ end
 Adapt.@adapt_structure ConvectiveHeating
 
 # generator
-ConvectiveHeating(SG::SpectralGrid; kwargs...) = ConvectiveHeating{SG.NF, SG.VectorType}(lat_mask = zeros(SG.nlat); kwargs...)
+ConvectiveHeating(SG::SpectralGrid; kwargs...) = ConvectiveHeating{SG.NF, SG.VectorType, Dates.Second}(lat_mask = zeros(SG.nlat); kwargs...)
 
 # precompute latitudinal mask
 function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
@@ -443,7 +443,7 @@ end
     latd = model.geometry.latd[j]
     σ = model.geometry.σ_levels_full
 
-    Qmax = ifelse(abs(latd) < scheme.σθ, inv(convert(NF, Second(scheme.time_scale).value)), NF(0))
+    Qmax = ifelse(abs(latd) < scheme.σθ, 1/convert(NF, Second(scheme.time_scale).value), NF(0))   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
     p₀ = scheme.p₀ * 100     # hPa -> Pa
     σₚ = scheme.σₚ * 100     # hPa -> Pa
     cos²θ_term = scheme.lat_mask[j]

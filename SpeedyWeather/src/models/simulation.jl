@@ -21,6 +21,8 @@ function Base.show(io::IO, S::AbstractSimulation)
     return nothing
 end
 
+Base.show(io::IO, ::Type{<:Simulation{V,M}}) where {V,M} = print(io, "Simulation{Variables, $(nameof(M)){…}}")
+
 unpack(sim::AbstractSimulation) = (sim.variables, sim.model)
 
 const DEFAULT_PERIOD = Day(10)
@@ -75,7 +77,7 @@ function initialize!(
     scale_prognostic!(variables, model.planet.radius)
     
     # TRANSFORM variables from spectral to grid (= set the diagnostic variables in the correct initial state)
-    transform!(variables, model, initialize = true)
+    @maybe_jit model.architecture  transform!(variables, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays
 
     # OUTPUT, CALLBACKS, FEEDBACK only initialize output and callbacks now, just before the simulation starts

@@ -39,7 +39,7 @@ export BackgroundShortwaveTransmissivity
 
 """BackgroundShortwaveTransmissivity <: AbstractShortwaveTransmissivity
 $(TYPEDFIELDS)."""
-@parameterized @kwdef struct BackgroundShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
+@parameterized @kwdef struct BackgroundShortwaveTransmissivity{NF, B} <: AbstractShortwaveTransmissivity
     "[OPTION] Zenith correction amplitude (SPEEDY azen) [1]"
     @param zenith_amplitude::NF = 1 (bounds = Nonnegative,)
 
@@ -51,7 +51,7 @@ $(TYPEDFIELDS)."""
     @param absorptivity_dry_air::NF = 0.03135 (bounds = Nonnegative,)
 
     "[OPTION] Constant aerosol concentration?"
-    aerosols::Bool = true
+    aerosols::B = true
 
     "[OPTION] Absorptivity of aerosols [per 10^5 Pa]"
     # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absaer, fband weights)
@@ -72,7 +72,7 @@ $(TYPEDFIELDS)."""
 end
 
 Adapt.@adapt_structure BackgroundShortwaveTransmissivity
-BackgroundShortwaveTransmissivity(SG::SpectralGrid; kwargs...) = BackgroundShortwaveTransmissivity{SG.NF}(; kwargs...)
+BackgroundShortwaveTransmissivity(SG::SpectralGrid; kwargs...) = BackgroundShortwaveTransmissivity{SG.NF, Bool}(; kwargs...)
 initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
 
 @propagate_inbounds function transmissivity!(
@@ -127,7 +127,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
         )
 
         # Add cloud absorption below the final cloud top
-        if k >= cloud_top
+        @trace if k >= cloud_top
             layer_absorptivity += cloud_absorptivity_term * cloud_cover
         end
 

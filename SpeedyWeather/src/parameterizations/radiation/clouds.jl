@@ -26,7 +26,7 @@ initialize!(clouds::NoClouds, ::AbstractModel) = nothing
 end
 
 export DiagnosticClouds
-@parameterized @kwdef struct DiagnosticClouds{NF} <: AbstractShortwaveClouds
+@parameterized @kwdef struct DiagnosticClouds{NF, B} <: AbstractShortwaveClouds
     "[OPTION] Relative humidity threshold for cloud cover = 0 [1]."
     @param relative_humidity_threshold_min::NF = 0.3 (bounds = 0 .. 1,)
 
@@ -58,14 +58,14 @@ export DiagnosticClouds
     @param stratocumulus_cover_max::NF = 0.6 (bounds = 0 .. 1,)
 
     "[OPTION] Enable stratocumulus cloud parameterization?"
-    use_stratocumulus::Bool = true
+    use_stratocumulus::B = true
 
     "[OPTION] Stratocumulus cloud factor (SPEEDY clfact) [1]"
     @param stratocumulus_cloud_factor::NF = 1.2 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure DiagnosticClouds
-DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF}(; kwargs...)
+DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF, Bool}(; kwargs...)
 initialize!(clouds::DiagnosticClouds, model::AbstractModel) = nothing
 @propagate_inbounds function clouds!(
         ij,
@@ -127,14 +127,12 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
         humidity_k = humid[ij, k]
         pₖ = pressure(k, pₛ, vertical_coordinates)
         qsat = saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
-        if humidity_k > q_min && qsat > 0
+        @trace if (humidity_k > q_min) & (qsat > 0)
             relative_humidity_k = humidity_k / qsat
-
-            if relative_humidity_k >= rh_min
-                rh_norm = max(0, (relative_humidity_k - rh_min) / (rh_max - rh_min))
-                humidity_term_cloud_top = min(1, rh_norm)^2
-                cloud_top_humidity = min(k, cloud_top_humidity)
-            end
+            rh_above_min = relative_humidity_k >= rh_min
+            rh_norm = max(zero(NF), (relative_humidity_k - rh_min) / (rh_max - rh_min))
+            humidity_term_cloud_top = ifelse(rh_above_min, min(one(NF), rh_norm)^2, humidity_term_cloud_top)
+            cloud_top_humidity = ifelse(rh_above_min, min(k, cloud_top_humidity), cloud_top_humidity)
         end
     end
 

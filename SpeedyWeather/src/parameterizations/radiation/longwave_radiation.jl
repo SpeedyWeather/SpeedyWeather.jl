@@ -12,9 +12,9 @@ relaxation term with `time_scale_stratosphere` towards `temp_stratosphere` is ap
     dT/dt = -1.5K/day for T > 207.5K else (200K-T) / 5 days
 
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct UniformCooling{NF} <: AbstractLongwave
+@parameterized @kwdef struct UniformCooling{NF, S} <: AbstractLongwave
     "[OPTION] time scale of cooling, default = -1.5K/day = -1K/16hrs"
-    time_scale::Second = Hour(16)
+    time_scale::S = Hour(16)
 
     "[OPTION] temperature [K] below which stratospheric relaxation is applied"
     @param temp_min::NF = 207.5 (bounds = Positive,)
@@ -23,11 +23,11 @@ Fields are $(TYPEDFIELDS)"""
     @param temp_stratosphere::NF = 200 (bounds = Positive,)
 
     "[OPTION] time scale of stratospheric relaxation"
-    time_scale_stratosphere::Second = Day(5)
+    time_scale_stratosphere::S = Day(5)
 end
 
 Adapt.@adapt_structure UniformCooling
-UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF}(; kwargs...)
+UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF, Dates.Second}(; kwargs...)
 initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
 # function barrier
@@ -39,8 +39,8 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
     nlayers = size(T, 2)
 
     NF = eltype(T)
-    cooling = -inv(convert(NF, Second(longwave.time_scale).value))
-    τ⁻¹ = inv(convert(NF, Second(longwave.time_scale_stratosphere).value))
+    cooling = -1/convert(NF, Second(longwave.time_scale).value)            #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
+    τ⁻¹ = 1/convert(NF, Second(longwave.time_scale_stratosphere).value)   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
 
     for k in 1:nlayers
         # Paulius and Garner, 2006, eq (1) and (2)
@@ -65,7 +65,7 @@ layer towards the tropopause temperature `T_t` with time scale `τ = 24h`
 (Seeley and Wordsworth, 2023 use 6h, which is unstable a low resolutions here).
 Fields are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
+@parameterized @kwdef struct JeevanjeeRadiation{NF, S} <: AbstractLongwave
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     @param α::NF = 0.025 (bounds = Nonnegative,)
 
@@ -82,11 +82,11 @@ $(TYPEDFIELDS)"""
     @param temp_tropopause::NF = 200 (bounds = Positive,)
 
     "[OPTION] Tropopause relaxation time scale to temp_tropopause"
-    time_scale::Second = Hour(24)
+    time_scale::S = Hour(24)
 end
 
 Adapt.@adapt_structure JeevanjeeRadiation
-JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF}(; kwargs...)
+JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF, Dates.Second}(; kwargs...)
 initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -98,7 +98,8 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     nlayers = size(T, 2)
 
     (; α) = longwave
-    τ⁻¹ = inv(convert(eltype(T), Second(longwave.time_scale).value))
+    #TODO: Reintroduce the `Second` here but in a way that's agnostic to the Second type
+    τ⁻¹ = 1/convert(eltype(T), longwave.time_scale.value)   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
     ϵ_ocean = longwave.emissivity_ocean
     ϵ_land = longwave.emissivity_land
     ϵ = longwave.emissivity_atmosphere
@@ -185,6 +186,20 @@ end
 
 Base.show(io::IO, M::OneBandLongwave) = Base.show(io, M, values = false)
 
+# OneBandLongwave additionally needs the precomputed, state-independent layer
+# transmissivity as a constant `nlayers × nlat` field (one column per latitude
+# ring). It is filled once on the host in `initialize!(vars, ::OneBandLongwave, model)`.
+function variables(radiation::OneBandLongwave, model::AbstractModel)
+    (; nlayers, nlat) = model.spectral_grid
+    return (
+        variables(radiation)...,                        # surface flux diagnostics (variables(::AbstractLongwave))
+        ParameterizationVariable(
+            :longwave_transmissivity, MatrixDim(m = nlayers, n = nlat),
+            desc = "Precomputed longwave layer transmissivity (state-independent, per latitude ring)", units = "1",
+        ),
+    )
+end
+
 # initialize one after another
 function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)
     initialize!(radiation.transmissivity, model)
@@ -192,9 +207,25 @@ function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)
     return nothing
 end
 
+# Fill the precomputed transmissivity field once the Variables are allocated.
+# Computed on the HOST (libm `exp`) and transferred to the device so CPU and
+# Reactant read identical values (see longwave_transmissivity.jl NOTE).
+function initialize!(vars::Variables, radiation::OneBandLongwave, model::AbstractModel)
+    t = vars.parameterizations.longwave_transmissivity      # nlayers × nlat, on architecture
+    t_host = zeros(model.spectral_grid.NF, size(t)...)
+    fill_longwave_transmissivity!(t_host, radiation.transmissivity, model)
+    t .= on_architecture(model.spectral_grid.architecture, t_host)
+    return nothing
+end
+
+# other longwave schemes (UniformCooling, JeevanjeeRadiation, …) have nothing to precompute
+initialize!(::Variables, ::AbstractLongwave, ::AbstractModel) = nothing
+
 @propagate_inbounds function parameterization!(ij, vars, radiation::OneBandLongwave, model)
-    # pass on array that was used to compute transmissivity (scratch array)
-    t = transmissivity!(ij, vars, radiation.transmissivity, model)
+    # per-column layer transmissivity into the scratch: precomputed per latitude ring for
+    # state-independent coordinates, computed on the fly for state-dependent ones (see
+    # transmissivity_column! and longwave_transmissivity.jl)
+    t = transmissivity_column!(ij, vars, radiation.transmissivity, model.geometry.vertical_coordinates, model)
     longwave_radiative_transfer!(ij, vars, t, radiation.radiative_transfer, model)
     return nothing
 end

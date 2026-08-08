@@ -7,6 +7,7 @@ end
 
 # function barrier for all oceans
 ocean_timestep!(vars::Variables, model::PrimitiveEquation) = timestep!(vars, model.ocean, model)
+
 initialize!(vars::Variables, ocean::AbstractOcean, model) =
     @warn "`$(typeof(ocean))` does not have an `initialize!(::Variables, ::$(typeof(ocean)), model)` method " *
     "to set the initial conditions for the ocean prognostic variables."
@@ -30,7 +31,7 @@ fields from file, and interpolates them in time on every time step
 and writes them to the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractOcean
+@kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D, B} <: AbstractOcean
     "Grid used for the model"
     grid::Grid
 
@@ -41,7 +42,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for sst in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -66,7 +67,7 @@ end
 # generator function
 function SeasonalOceanClimatology(SG::SpectralGrid; kwargs...)
     (; NF, GridVariable3D, grid) = SG
-    return SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(; grid, kwargs...)
+    return SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D, Bool}(; grid, kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
@@ -89,7 +90,7 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, sst, NF = Float32)
-    interpolate!(monthly_temperature, sst, interp)
+    @maybe_jit model.architecture interpolate!(monthly_temperature, sst, interp)
 
     if ocean.mask
         mt = monthly_temperature.data
@@ -152,7 +153,7 @@ To be created like
 and the ocean time is set with `initialize!(model, time=time)`.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct ConstantOceanClimatology{NF} <: AbstractOcean
+@kwdef struct ConstantOceanClimatology{NF, B} <: AbstractOcean
     "[OPTION] filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 
@@ -160,7 +161,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for sst in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -179,7 +180,7 @@ $(TYPEDFIELDS)"""
 end
 
 # generator
-ConstantOceanClimatology(SG::SpectralGrid; kwargs...) = ConstantOceanClimatology{SG.NF}(; kwargs...)
+ConstantOceanClimatology(SG::SpectralGrid; kwargs...) = ConstantOceanClimatology{SG.NF, Bool}(; kwargs...)
 
 # nothing to initialize for model.ocean
 initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
@@ -190,7 +191,7 @@ function initialize!(vars::Variables, ocean_model::ConstantOceanClimatology, mod
     # create a seasonal model, initialize it and the variables
     (; path, file, varname, FieldType, mask, land_temperature) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
-    seasonal_model = SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(;
+    seasonal_model = SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D, Bool}(;
         grid, path, file, varname, FieldType, mask, land_temperature
     )
     initialize!(seasonal_model, model)
@@ -216,22 +217,22 @@ but vary in latitude following a coslat². To be created like
 
 Fields and options are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct AquaPlanet{NF} <: AbstractOcean
+@parameterized @kwdef struct AquaPlanet{NF, B} <: AbstractOcean
     "[OPTION] Temperature on the Equator [K]"
     @param temperature_equator::NF = 302 (bounds = Positive,)
 
     "[OPTION] Temperature at the poles [K]"
     @param temperature_poles::NF = 273 (bounds = Positive,)
 
-    "[OPTION] Mask initial sea surface temperature with land-sea mask?"
-    mask::Bool = true
-
+    "[OPTION] Mask the sea surface temperature according to model.land_sea_mask?"
+    mask::B = true
+  
     "[OPTION] SST over land [K]"
     land_temperature::NF = 285
 end
 
 # generator function
-AquaPlanet(SG::SpectralGrid; kwargs...) = AquaPlanet{SG.NF}(; kwargs...)
+AquaPlanet(SG::SpectralGrid; kwargs...) = AquaPlanet{SG.NF, Bool}(; kwargs...)
 
 # nothing to initialize for AquaPlanet model itself
 initialize!(::AquaPlanet, ::PrimitiveEquation) = nothing
@@ -261,7 +262,7 @@ Tendencies are from net surface radiation and surface latent and sensible heat f
 The effective mixed-layer heat capacity is `specific_heat_capacity * mixed_layer_depth * density`.
 Initialised from seasonal SST climatology, with land points set to `land_temperature`.
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef mutable struct SlabOcean{NF} <: AbstractOcean
+@parameterized @kwdef mutable struct SlabOcean{NF, B} <: AbstractOcean
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
@@ -272,7 +273,7 @@ Fields are $(TYPEDFIELDS)"""
     density::NF = 1000
 
     "[OPTION] Mask initial sea surface temperature with land-sea mask?"
-    mask::Bool = true
+    mask::B = true
 
     "[OPTION] SST over land [K]"
     land_temperature::NF = 285
@@ -282,7 +283,7 @@ Fields are $(TYPEDFIELDS)"""
 end
 
 # generator function
-SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
+SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF, Bool}(; kwargs...)
 
 function variables(::SlabOcean, model::AbstractModel)
     nsteps = get_nsteps(model.time_stepping, model)
@@ -319,8 +320,8 @@ function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEq
     # set land "sst" points (100% land only)
     if ocean_model.mask
         masked_value = ocean_model.land_temperature
-        sst = vars.prognostic.ocean.sea_surface_temperature.data
-        sst[isnan.(sst)] .= masked_value
+
+        mask!(vars.prognostic.ocean.sea_surface_temperature, isnan.(vars.prognostic.ocean.sea_surface_temperature), :land; masked_value)
 
         # cap initial conditions at sea ice freezing temperature
         if hasproperty(model, :sea_ice) && hasproperty(model.sea_ice, :freezing_temperature)

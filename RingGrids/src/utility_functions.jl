@@ -1,8 +1,11 @@
 """$(TYPEDSIGNATURES)
 For every element vᵢ in v does a<=vi<=b hold?"""
 function extrema_in(v::AbstractVector, a::Real, b::Real)
-    vmin, vmax = extrema(v)
-    return (vmin >= a) && (vmax <= b)
+    # TODO: return to `extrema` when Reactant fixed 
+    # https://github.com/EnzymeAD/Reactant.jl/issues/2387
+    vmin, vmax = (minimum(v), maximum(v))
+    #vmin, vmax = extrema(v)
+    return (vmin >= a) & (vmax <= b)
 end
 
 # MATRIX rotations

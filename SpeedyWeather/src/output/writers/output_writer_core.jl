@@ -22,6 +22,9 @@ Fields are $(TYPEDFIELDS)"""
     "[DERIVED] output frequency in time steps, computed at initialize!"
     output_every_n_steps::Int = 0
 
+    "[DERIVED] time step counter, incremented every time step"
+    timestep_counter::Int = 0
+
     "[DERIVED] output step counter, incremented every time output is written"
     output_counter::Int = 0
 end
@@ -69,7 +72,7 @@ function initialize!(
     # OUTPUT FREQUENCY, recalculate interval after rounding
     f = round(Int, Millisecond(output.interval).value / model.time_stepping.Δt_millisec.value)
     core.output_every_n_steps = max(1, f)
-    output.interval = Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt))
+    output.interval = convert(typeof(output.interval), Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt)))
 
     # RESET COUNTERS
     core.output_counter = 1             # start at 1 for writing the initial conditions

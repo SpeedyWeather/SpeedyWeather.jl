@@ -11,9 +11,10 @@ By default, a particle is active, of number format DEFAULT_NF and at 0˚N, 0˚E,
 $(TYPEDFIELDS)"""
 struct Particle{
         NF <: AbstractFloat,  # number format of coordinates
+        B,                    # Bool
     } <: AbstractParticle{NF}
     "activity"
-    active::Bool
+    active::B
     "longitude in [0,360˚]"
     lon::NF
     "latitude [-90˚,90˚]"
@@ -24,23 +25,27 @@ end
 
 Adapt.@adapt_structure Particle
 
+# positional constructor with explicit active flag
+Particle{NF}(active, lon, lat, σ) where {NF} = Particle{NF, Bool}(active, NF(lon), NF(lat), NF(σ))
+
 # keyword constructors
-Particle{NF}(; lon, lat, σ = 0) where {NF} = Particle{NF}(true, lon, lat, σ)
+Particle{NF}(; lon, lat, σ = 0) where {NF} = Particle{NF, Bool}(true, lon, lat, σ)
 Particle(; lon, lat, σ = 0) = Particle(lon, lat, σ)
 
 # parametric constructors
-Particle{NF}(lon, lat) where {NF} = Particle{NF}(true, lon, lat, 0)
-Particle{NF}(lon, lat, σ) where {NF} = Particle{NF}(true, lon, lat, σ)
+Particle{NF}(lon, lat) where {NF} = Particle{NF, Bool}(true, lon, lat, 0)
+Particle{NF}(lon, lat, σ) where {NF} = Particle{NF, Bool}(true, lon, lat, σ)
 
 # promotion of arguments if NF not provided
 Particle(lon, lat) = Particle(lon, lat, 0)
-Particle(lon, lat, σ) = Particle{promote_type(typeof.((lon, lat, σ))...)}(true, lon, lat, σ)
+Particle(lon, lat, σ) = Particle{promote_type(typeof.((lon, lat, σ))...), Bool}(true, lon, lat, σ)
 Particle(lon::Integer, lat::Integer) = Particle(lon, lat, 0)
-Particle(lon::Integer, lat::Integer, σ::Integer) = Particle{DEFAULT_NF}(true, lon, lat, σ)
+Particle(lon::Integer, lat::Integer, σ::Integer) = Particle{DEFAULT_NF, Bool}(true, lon, lat, σ)
 
 # zero generators
-Base.zero(::Type{Particle}) = Particle{DEFAULT_NF}(true, 0, 0, 0)
-Base.zero(::Type{Particle{NF}}) where {NF} = Particle{NF}(true, 0, 0, 0)
+Base.zero(::Type{Particle}) = Particle{DEFAULT_NF, Bool}(true, 0, 0, 0)
+Base.zero(::Type{Particle{NF}}) where {NF} = Particle{NF, Bool}(true, 0, 0, 0)
+Base.zero(::Type{Particle{NF, Bool}}) where {NF} = Particle{NF, Bool}(true, 0, 0, 0)
 Base.zero(::P) where {P <: Particle} = zero(P)
 function Base.zeros(ArrayType::Type{<:AbstractArray{P}}, n::Int...) where {P <: Particle}
     z = ArrayType(undef, n...)
@@ -55,13 +60,14 @@ Base.eltype(::Type{Particle{NF}}) where {NF} = NF
 Base.eltype(::Particle{NF}) where {NF} = NF
 
 Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle}) = rand(rng, Particle{DEFAULT_NF})
+Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF, Bool}}) where {NF} = rand(rng, Particle{NF})
 
 # rand uniformly distributed over the globe with cos-distribution for poles
 function Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF}}) where {NF}
     lon = 360 * rand(rng, NF)                  # ∈ [0,360˚E]
     lat = asind(2rand(rng, NF) - 1)            # cos-distributed latitude
     σ = rand(rng, NF)
-    return Particle{NF}(lon, lat, σ)
+    return Particle{NF, Bool}(true, lon, lat, σ)
 end
 
 # equality with same location and same activity
@@ -89,7 +95,7 @@ function Base.isapprox(
     return b
 end
 
-Base.convert(::Type{Particle{NF}}, p::Particle) where {NF} = Particle{NF}(p.lon, p.lat, p.σ)
+Base.convert(::Type{Particle{NF}}, p::Particle) where {NF} = Particle{NF, Bool}(p.active, p.lon, p.lat, p.σ)
 
 function Base.show(io::IO, p::Particle{NF}) where {NF}
     lat = @sprintf("%6.2f", p.lat)
@@ -105,7 +111,7 @@ Move a particle with increments (dlon, dlat, dσ) in those respective coordinate
 @inline function move(p::Particle{NF}, dlon, dlat, dσ) where {NF}
     if isactive(p)
         (; lon, lat, σ) = p
-        return Particle{NF}(p.active, lon + dlon, lat + dlat, σ + dσ)
+        return Particle{NF, typeof(p.active)}(p.active, lon + dlon, lat + dlat, σ + dσ)
     else
         return p
     end
@@ -116,7 +122,7 @@ Move a particle with increments (dlon, dlat) in 2D. No movement in vertical σ."
 @inline function move(p::Particle{NF}, dlon, dlat) where {NF}
     if isactive(p)
         (; lon, lat, σ) = p
-        return Particle{NF}(p.active, lon + dlon, lat + dlat, σ)
+        return Particle{NF, typeof(p.active)}(p.active, lon + dlon, lat + dlat, σ)
     else
         return p
     end
@@ -150,11 +156,11 @@ export activate, deactivate, isactive
 
 """$(TYPEDSIGNATURES)
 Activate particle. Active particles can move."""
-activate(p::Particle{NF}) where {NF} = Particle{NF}(true, p.lon, p.lat, p.σ)
+activate(p::Particle{NF}) where {NF} = Particle{NF, Bool}(true, p.lon, p.lat, p.σ)
 
 """$(TYPEDSIGNATURES)
 Deactivate particle. Inactive particles cannot move."""
-deactivate(p::Particle{NF}) where {NF} = Particle{NF}(false, p.lon, p.lat, p.σ)
+deactivate(p::Particle{NF}) where {NF} = Particle{NF, Bool}(false, p.lon, p.lat, p.σ)
 
 """$(TYPEDSIGNATURES)
 Check whether particle is active."""
