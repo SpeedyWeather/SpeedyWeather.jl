@@ -51,7 +51,7 @@ end
 variables(land::LandModel, model::AbstractModel) = (
     variables(land.temperature, model)...,
     variables(land.soil_moisture, model)...,
-    variables(land.snow)...,
+    variables(land.snow, model)...,
     variables(land.vegetation)...,
     variables(land.rivers)...,
 )

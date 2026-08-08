@@ -22,10 +22,14 @@ Adapt.@adapt_structure SnowModel
 # generator function
 SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF}(; kwargs...)
 
-function variables(::SnowModel)
+function variables(::SnowModel, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    tg = nsteps.tendency_grid
     return (
-        PrognosticVariable(:snow_depth, Grid2D(), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
-        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land, units = "K", desc = "Soil temperature"),
+        PrognosticVariable(:snow_depth, GridXY(), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
+        PrognosticVariable(:soil_temperature, LandXYZT(pg), desc = "Soil temperature", units = "K", namespace = :land),
+
         ParameterizationVariable(:snow_melt_rate, Grid2D(), namespace = :land, units = "kg/m²/s", desc = "Snow melt rate"),
     )
 end
@@ -44,9 +48,9 @@ function timestep!(
     )
 
     soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, snow)
-
-    (; Δt) = model.time_stepping                            # time step [s]
     (; snow_depth) = vars.prognostic.land                   # in equivalent liquid water height [m]
+
+    (; Δt) = model.time_stepping                            # time step [s], don't use 2Δt here as snow uses Euler forward
     (; land_fraction) = model.land_sea_mask
 
     # Some thermodynamics needed by snow
