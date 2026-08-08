@@ -104,9 +104,46 @@ Adapt.@adapt_structure LearnedLandRoughness
 LearnedLandRoughness(SG::SpectralGrid; kwargs...) = LearnedLandRoughness{SG.NF}(; kwargs...)
 initialize!(::LearnedLandRoughness, ::PrimitiveEquation) = nothing
 
+@kwdef struct Charnock{NF}
+    "[OPTION] threshold wind speed [m/s] for Charnock parameterization"
+    Uₜ::NF = 7.0
+
+    "[OPTION] low wind cubic term coefficient"
+    c1::NF = 1.8449e-6
+
+    "[OPTION] low wind quadratic term coefficient"
+    c2::NF = 9.7104e-5
+
+    "[OPTION] low wind constant term coefficient"
+    c3::NF = 0.0075
+
+    "[OPTION] high wind linear term coefficient"
+    c4::NF = 0.0016
+
+    "[OPTION] high wind constant term coefficient"
+    c5::NF = 0.0129
+end
+
+Adapt.@adapt_structure Charnock
+Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
+
+@inline function (charnock_param::Charnock)(uₙ::T) where {T <: Real}
+    Uₜ = T(charnock_param.Uₜ)
+
+    val = ifelse(
+        uₙ ≤ Uₜ,
+        muladd(uₙ * uₙ, muladd(T(charnock_param.c1), uₙ, T(charnock_param.c2)), T(charnock_param.c3)),
+        muladd(T(charnock_param.c4), uₙ - Uₜ, T(charnock_param.c5)) # for uₙ > Uₜ, linear increase
+    )
+    return log(val)
+end
+
 @kwdef struct LearnedOceanRoughness{NF} <: AbstractSurfaceRoughness
     a_h::NF = 0.4 # heat related constant
     a_q::NF = 0.62 # moisture related constant
+
+    "[OPTION] Charnock parameter estimation"
+    charnock_param::Charnock{NF} = Charnock{NF}()
 
     "[OPTION] coefficient for momentum roughness closure over ocean"
     m_c1::NF = 0.48786303
@@ -212,6 +249,17 @@ end
     return nothing
 end
 
+@inline function calculate_charnock(uₙ::T) where {T <: Real}
+    Uₜ = T(7.0) # threshold wind speed [m/s] for Charnock parameterization
+
+    charnock = ifelse(
+        uₙ ≤ Uₜ,
+        muladd(uₙ * uₙ, muladd(T(1.8449e-6), uₙ, T(9.7104e-5)), T(0.0075)),
+        muladd(T(0.0016), uₙ - Uₜ, T(0.0129)) # for uₙ > Uₜ, linear increase with wind speed
+    )
+    return log(charnock)
+end
+
 @propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, land_sea_mask)
     land_fraction = land_sea_mask.land_fraction[ij]
     (; ocean) = vars.parameterizations
@@ -225,11 +273,11 @@ end
     end
 
     siconc = vars.prognostic.ocean.sea_ice_concentration[ij]
-    (; surface_wind_speed) = vars.parameterizations
-    αᵪ = ocean.charnock_parameter[ij] # in log form
+    (; surface_wind_speed, neutral_wind_speed) = vars.parameterizations
+    αᵪ = scheme.charnock_param(neutral_wind_speed[ij])
 
-    z₀M_ocean = ocean_momentum_roughness(surface_wind_speed[ij], αᵪ, siconc)
-    z₀H_ocean = ocean_heat_roughness(surface_wind_speed[ij], siconc)
+    z₀M_ocean = ocean_momentum_roughness(scheme, surface_wind_speed[ij], αᵪ, siconc)
+    z₀H_ocean = ocean_heat_roughness(scheme, surface_wind_speed[ij], siconc)
 
     ocean.momentum_roughness[ij] = z₀M_ocean
     ocean.heat_roughness[ij] = z₀H_ocean
@@ -257,11 +305,11 @@ end
     return clamp(z_linear, z_high, z_cap)
 end
 
-@inline function ocean_momentum_roughness(uₙ::NF, αᵪ::NF, siconc::NF) where {NF <: Real}
-    num = muladd(c3, uₙ, αᵪ + c2)
-    den = exp(muladd(c4, uₙ, -c5)) + c6
+@inline function ocean_momentum_roughness(scheme, uₙ::NF, αᵪ::NF, siconc::NF) where {NF <: Real}
+    num = muladd(scheme.m_c1, uₙ, αᵪ + scheme.m_c2)
+    den = exp(muladd(scheme.m_c3, uₙ, -scheme.m_c4)) + scheme.m_c5
 
-    log_roughness = (uₙ^c1) - (num / den) + muladd(c7, αᵪ, -c8)
+    log_roughness = (uₙ^scheme.m_c6) - (num / den) + muladd(scheme.m_c7, αᵪ, -scheme.m_c8)
     z_base = exp(log_roughness)
 
     # Calculate the max roughness
@@ -280,7 +328,7 @@ end
 
 @inline function land_momentum_roughness(scheme, C_H::NF, C_L::NF, L_H::NF, L_L::NF, S::NF, T::NF, W::NF) where {NF <: Real}
     # Numerator terms
-    exp_arg1 = S / muladd(scheme.m_c2, C_H, -scheme.m_c3) 
+    exp_arg1 = S / muladd(scheme.m_c2, C_H, -scheme.m_c3)
     term1 = scheme.m_c4 * exp(exp_arg1)
 
     min_inner = min(scheme.m_c5 * L_L, muladd(scheme.m_c6, T, -W))

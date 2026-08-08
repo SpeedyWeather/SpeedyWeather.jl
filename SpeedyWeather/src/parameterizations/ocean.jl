@@ -289,7 +289,6 @@ function variables(::SlabOcean, model::AbstractModel)
     pg = nsteps.prognostic_grid
     tg = nsteps.tendency_grid
     return (
-        ParameterizationVariable(:charnock_parameter, Grid2D(), namespace = :ocean, desc = "Charnock parameter", units = ""),
         PrognosticVariable(:sea_surface_temperature, GridXYT(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
         TendencyVariable(:sea_surface_temperature, GridXYT(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),
 
@@ -351,34 +350,19 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
 
-    αᵪ = vars.parameterizations.ocean.charnock_parameter
-    uₙ = vars.parameterizations.neutral_wind_speed
-
     params = (; C₀⁻¹, Lᵥ)                              # pack into NamedTuple for kernel
 
     launch!(
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,
-        dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, αᵪ, uₙ, params
+        dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params
     )
     return nothing
 end
 
-@inline function calculate_charnock(uₙ::T) where {T <: Real}
-    Uₜ = T(7.0) # threshold wind speed [m/s] for Charnock parameterization
-
-    charnock = ifelse(
-        uₙ ≤ Uₜ,
-        muladd(uₙ * uₙ, muladd(T(1.8449e-6), uₙ, T(9.7104e-5)), T(0.0075)),
-        muladd(T(0.0016), uₙ - Uₜ, T(0.0129)) # for uₙ > Uₜ, linear increase with wind speed
-    )
-    return log(charnock)
-end
-
-@kernel inbounds = true function slab_ocean_kernel!(dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, αᵪ, uₙ, params)
+@kernel inbounds = true function slab_ocean_kernel!(dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params)
     ij = @index(Global, Linear)         # every grid point ij
     if land_fraction[ij] < 1            # at least partially ocean
         (; C₀⁻¹, Lᵥ) = params
         dsst[ij] = C₀⁻¹ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij])
-        αᵪ[ij] = calculate_charnock(uₙ[ij])
     end
 end
