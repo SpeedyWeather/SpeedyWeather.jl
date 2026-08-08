@@ -127,7 +127,7 @@ end
 Adapt.@adapt_structure Charnock
 Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
 
-@inline function (charnock_param::Charnock)(uₙ::T) where {T <: Real}
+@inline function (charnock_param::Charnock{NF})(uₙ::T) where {NF, T <: Real}
     Uₜ = T(charnock_param.Uₜ)
     c1 = T(charnock_param.c1)
     c2 = T(charnock_param.c2)
@@ -143,12 +143,12 @@ Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
     return log(val)
 end
 
-@kwdef struct LearnedOceanRoughness{NF} <: AbstractSurfaceRoughness
+@kwdef struct LearnedOceanRoughness{NF, CH} <: AbstractSurfaceRoughness
     a_h::NF = 0.4 # heat related constant
     a_q::NF = 0.62 # moisture related constant
 
     "[OPTION] Charnock parameter estimation"
-    charnock_param::Charnock{NF} = Charnock{NF}()
+    charnock_param::CH
 
     "[OPTION] coefficient for momentum roughness closure over ocean"
     m_c1::NF = 0.48786303
@@ -168,7 +168,9 @@ end
 end
 
 Adapt.@adapt_structure LearnedOceanRoughness
-LearnedOceanRoughness(SG::SpectralGrid; kwargs...) = LearnedOceanRoughness{SG.NF}(; kwargs...)
+function LearnedOceanRoughness(SG::SpectralGrid; charnock_param = Charnock(SG), kwargs...)
+    return LearnedOceanRoughness{SG.NF, typeof(charnock_param)}(; charnock_param, kwargs...)
+end
 initialize!(::LearnedOceanRoughness, ::PrimitiveEquation) = nothing
 
 """
@@ -253,16 +255,6 @@ end
     return nothing
 end
 
-@inline function calculate_charnock(uₙ::T) where {T <: Real}
-    Uₜ = T(7.0) # threshold wind speed [m/s] for Charnock parameterization
-
-    charnock = ifelse(
-        uₙ ≤ Uₜ,
-        muladd(uₙ * uₙ, muladd(T(1.8449e-6), uₙ, T(9.7104e-5)), T(0.0075)),
-        muladd(T(0.0016), uₙ - Uₜ, T(0.0129)) # for uₙ > Uₜ, linear increase with wind speed
-    )
-    return log(charnock)
-end
 
 @propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, land_sea_mask)
     land_fraction = land_sea_mask.land_fraction[ij]
