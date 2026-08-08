@@ -19,7 +19,10 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     Grid = nonparametric_type(grid)
 
     # add information about size of Legendre polynomials and scratch memory
-    polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
+    # (including the transposed copy the GPU inverse transform reads, empty on CPU)
+    polysize_str = prettymemory(
+        Base.summarysize(S.legendre_polynomials) + sizeof(S.legendre_polynomials_transposed)
+    )
     memorysize_str = prettymemory(
         sizeof(S.scratch_memory.north) +      # add all scratch_memories
             sizeof(S.scratch_memory.south) +
