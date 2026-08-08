@@ -183,6 +183,96 @@ end
     @test spec_cpu ≈ on_architecture(cpu_arch, spec_gpu) rtol = sqrt(eps(Float32))
 end
 
+@testset "legendre kernels: compare to CPU" begin
+    # Both GPU Legendre kernels write every output they are responsible for instead of
+    # accumulating into a pre-zeroed array, so the scratch memory and the output coefficients are
+    # dirtied first: anything the kernels fail to write shows up as a mismatch rather than being
+    # masked by a leftover zero.
+    NF = Float32
+    @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid)
+        @testset for nlayers in (1, 4)
+            spectral_grid_cpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid)
+            spectral_grid_gpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid, architecture = SpeedyWeather.GPU)
+            S_cpu = SpectralTransform(spectral_grid_cpu)
+            S_gpu = SpectralTransform(spectral_grid_gpu)
+            cpu_arch = S_cpu.architecture
+            nfreqs = S_cpu.nlons .÷ 2 .+ 1      # frequencies per ring the Fourier transform reads
+
+            specs_cpu = rand(LowerTriangularArray{Complex{NF}}, spectral_grid_cpu.spectrum, nlayers)
+            specs_gpu = on_architecture(S_gpu.architecture, specs_cpu)
+
+            # INVERSE, spectral coefficients -> Fourier coefficients per ring
+            g_north_cpu, g_south_cpu = zero(S_cpu.scratch_memory.north), zero(S_cpu.scratch_memory.south)
+            g_north_gpu, g_south_gpu = S_gpu.scratch_memory.north, S_gpu.scratch_memory.south
+            fill!(g_north_gpu, NaN)
+            fill!(g_south_gpu, NaN)
+            SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, specs_cpu, S_cpu.scratch_memory.column, S_cpu)
+            SpeedyTransforms._legendre!(g_north_gpu, g_south_gpu, specs_gpu, S_gpu.scratch_memory.column, S_gpu)
+            g_north_test = on_architecture(cpu_arch, g_north_gpu)
+            g_south_test = on_architecture(cpu_arch, g_south_gpu)
+
+            # only the frequencies the Fourier transform reads on a ring are defined, which
+            # includes those past the Legendre truncation: the kernel has to zero those
+            @test all(
+                j -> g_north_cpu[1:nfreqs[j], 1:nlayers, j] ≈ g_north_test[1:nfreqs[j], 1:nlayers, j],
+                eachindex(nfreqs)
+            )
+            @test all(
+                j -> g_south_cpu[1:nfreqs[j], 1:nlayers, j] ≈ g_south_test[1:nfreqs[j], 1:nlayers, j],
+                eachindex(nfreqs)
+            )
+
+            # FORWARD, Fourier coefficients per ring -> spectral coefficients
+            field_cpu = rand(NF, spectral_grid_cpu.grid, nlayers)
+            field_gpu = on_architecture(S_gpu.architecture, field_cpu)
+            SpeedyTransforms._fourier!(
+                S_cpu.scratch_memory.north, S_cpu.scratch_memory.south, field_cpu, S_cpu
+            )
+            SpeedyTransforms._fourier!(
+                S_gpu.scratch_memory.north, S_gpu.scratch_memory.south, field_gpu, S_gpu
+            )
+            out_cpu = rand(LowerTriangularArray{Complex{NF}}, spectral_grid_cpu.spectrum, nlayers)
+            out_gpu = on_architecture(S_gpu.architecture, out_cpu)      # dirty on purpose
+            SpeedyTransforms._legendre!(
+                out_cpu, S_cpu.scratch_memory.north, S_cpu.scratch_memory.south,
+                S_cpu.scratch_memory.column, S_cpu
+            )
+            SpeedyTransforms._legendre!(
+                out_gpu, S_gpu.scratch_memory.north, S_gpu.scratch_memory.south,
+                S_gpu.scratch_memory.column, S_gpu
+            )
+            @test out_cpu ≈ on_architecture(cpu_arch, out_gpu) rtol = sqrt(eps(NF))
+        end
+    end
+
+    # The rings contributing to an order do not always reach the equator. The coslat-dependent
+    # Legendre shortcuts are not monotonic in latitude, so a ring closer to the equator can retain
+    # fewer orders than one closer to the pole, and summing a whole band from the first
+    # contributing ring down to the equator would pick up rings the transform has to skip. The
+    # forward kernel therefore reads its rings from a table rather than assuming their extent.
+    @testset "non-monotonic Legendre shortcut" begin
+        NF, nlayers, LegendreShortcut = Float32, 2, SpeedyTransforms.LegendreShortcutLinCubCoslat
+        spectral_grid_cpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid = HEALPixGrid)
+        spectral_grid_gpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid = HEALPixGrid, architecture = SpeedyWeather.GPU)
+        S_cpu = SpectralTransform(spectral_grid_cpu; LegendreShortcut)
+        S_gpu = SpectralTransform(spectral_grid_gpu; LegendreShortcut)
+        cpu_arch = S_cpu.architecture
+
+        # guard: this really is the non-monotonic case the kernels have to cope with
+        @test !issorted(S_cpu.mmax_truncation)
+
+        specs_cpu = rand(LowerTriangularArray{Complex{NF}}, spectral_grid_cpu.spectrum, nlayers)
+        specs_gpu = on_architecture(S_gpu.architecture, specs_cpu)
+
+        field_cpu = transform(specs_cpu, S_cpu)
+        field_gpu = transform(specs_gpu, S_gpu)
+        @test field_cpu ≈ on_architecture(cpu_arch, field_gpu) rtol = sqrt(eps(NF))
+
+        @test transform(field_cpu, S_cpu) ≈
+            on_architecture(cpu_arch, transform(field_gpu, S_gpu)) rtol = sqrt(eps(NF))
+    end
+end
+
 @testset "fourier_batched: compare forward pass to CPU" begin
     @testset for truncation in spectral_resolutions
         @testset for nlayers in nlayers_list

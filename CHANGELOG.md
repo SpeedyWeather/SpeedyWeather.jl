@@ -3,6 +3,8 @@
 ## Unreleased
 
 - 1-based truncation as resolution parameter [#1177](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1177)
+- Long integration CI with optimize 2, all other SpeedyWeather CI with optimize 0 [#1175](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1175)
+- Faster GPU Legendre transforms: coalesced memory access, no atomics, no scratch resets, 5-37x faster at T127-T511 [#1180](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1180)
 - Fix `SpeedLimitDrag` pointing along the quadrant diagonal instead of antiparallel to the flow (and being √2 too large for a 45° flow); default `drag` raised 4e-7 -> 3e-6 so the limiter actually binds, fixes previous high-resolution instabilities [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
 - Fix `set!(time_stepping, Δt=...)` inverting the resolution factor [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
 - Fix `SpectralFilter` implicit diffusion using twice the prognostic time step; docstring of `HyperDiffusion` corrected [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
