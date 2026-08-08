@@ -1,7 +1,7 @@
 @testset "Create transform at uncommon resolutions" begin
-    @testset for trunc in rand(15:200, 10)
-        spectrum = Spectrum(trunc)
-        grid = FullClenshawGrid(SpeedyTransforms.get_nlat_half(trunc))
+    @testset for truncation in rand(15:200, 10)
+        spectrum = Spectrum(truncation)
+        grid = FullClenshawGrid(SpeedyTransforms.get_nlat_half(truncation))
         S = SpectralTransform(spectrum, grid)
     end
 end

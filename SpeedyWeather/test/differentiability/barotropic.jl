@@ -15,7 +15,7 @@ Random.seed!(123)
 #
 @testset "Differentiability: dynamics_tendencies! on Barotropic model" begin
     # T9 still yields somewhat sensible dynamics, that's why it's chosen here
-    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1) # define resolution
+    spectral_grid = SpectralGrid(truncation = 10, nlayers = 1) # define resolution
     model = BarotropicModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid)) # construct model
     simulation = initialize_with_spinup!(model)
 
@@ -50,7 +50,7 @@ end
 # horizontal_diffusion!
 #
 @testset "Differentiability: horizontal_diffusion! on Barotropic model" begin
-    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 10, nlayers = 1)
     model = BarotropicModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid))
     simulation = initialize_with_spinup!(model)
 
@@ -82,7 +82,7 @@ end
 # Test the leapfrog time step (now `update_prognostic!`)
 #
 @testset "Differentiability: update_prognostic! (leapfrog) on Barotropic model" begin
-    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 10, nlayers = 1)
     model = BarotropicModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid))
     simulation = initialize_with_spinup!(model)
 
@@ -143,7 +143,7 @@ end
 end
 
 @testset "Differentiability: transform!(::Variables)" begin
-    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 10, nlayers = 1)
     model = BarotropicModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid))
     simulation = initialize_with_spinup!(model)
 
@@ -181,7 +181,7 @@ end
 
 @testset "Differentiability: time_step! on Barotropic model" begin
     # T9 still yields somewhat sensible dynamics, that's why it's chosen here
-    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 10, nlayers = 1)
     model = BarotropicModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid))
     simulation = initialize_with_spinup!(model)
 
@@ -243,7 +243,7 @@ end
 
 @testset "Differentiability: Barotropic model parameters" begin
     # T9 still yields somewhat sensible dynamics, that's why it's chosen here
-    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)          # define resolution
+    spectral_grid = SpectralGrid(truncation = 10, nlayers = 1)          # define resolution
     model = BarotropicModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid))   # construct model
     simulation = initialize_with_spinup!(model)
     ps = parameters(model)
@@ -286,7 +286,7 @@ end
 # gradient (plus a loose finite-difference sanity statistic).
 #
 @testset "Differentiability: time_step! on Barotropic model with NCycleLorenz" begin
-    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 10, nlayers = 1)
     model = BarotropicModel(; spectral_grid, time_stepping = SpeedyWeather.NCycleLorenz(spectral_grid))
     simulation = initialize_with_spinup!(model)
 

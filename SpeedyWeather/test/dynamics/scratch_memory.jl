@@ -1,5 +1,5 @@
 @testset "Scratch memory allocation" begin
-    SG = SpectralGrid(trunc = 21, nlayers = 3)
+    SG = SpectralGrid(truncation = 22, nlayers = 3)
 
     # created via transform or directly
     S = SpectralTransform(SG)

@@ -17,7 +17,7 @@ First we initialize the model as usual:
 ```julia
 using SpeedyWeather, Enzyme
 
-spectral_grid = SpectralGrid(trunc=23, nlayers=3)
+spectral_grid = SpectralGrid(truncation=24, nlayers=3)
 model = PrimitiveWetModel(; spectral_grid)
 simulation = initialize!(model)
 initialize!(simulation)
@@ -65,7 +65,7 @@ The correctness of gradients is tested in our CI in `SpeedyWeather/test/differen
 SpeedyWeather also provides automated parameter handling for all models and subcomponents via an extension of [ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl). Parameters can be automatically collected via the `parameters` method:
 
 ```julia
-spectral_grid = SpectralGrid(trunc=23, nlayers=1) 
+spectral_grid = SpectralGrid(truncation=24, nlayers=1) 
 model = BarotropicModel(; spectral_grid)
 params = parameters(model)
 

@@ -45,9 +45,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
                 # this is likely due to FiniteDifferences and not our EnzymeRules
                 # see comments in https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589
                 if !(Grid <: AbstractReducedGrid) & fd_tests[i_grid]
-                    trunc = 5
-                    spectrum = Spectrum(trunc, one_degree_more = true)
-                    grid = Grid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[i_grid]))
+                    truncation = 6
+                    spectrum = Spectrum(truncation, one_degree_more = true)
+                    grid = Grid(SpeedyTransforms.get_nlat_half(truncation, grid_dealiasing[i_grid]))
                     S = SpectralTransform(spectrum, grid)
                     field = rand(grid)
                     f_north = S.scratch_memory.north
@@ -80,9 +80,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
 
                 # same reduced-grid caveat as the reverse tests above
                 if !(Grid <: AbstractReducedGrid) & fd_tests[i_grid]
-                    trunc = 5
-                    spectrum = Spectrum(trunc, one_degree_more = true)
-                    grid = Grid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[i_grid]))
+                    truncation = 6
+                    spectrum = Spectrum(truncation, one_degree_more = true)
+                    grid = Grid(SpeedyTransforms.get_nlat_half(truncation, grid_dealiasing[i_grid]))
                     S = SpectralTransform(spectrum, grid)
                     field = rand(grid)
                     f_north = zero(S.scratch_memory.north)
@@ -114,9 +114,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
         # _fourier! rules already handle correctly. (Differentiating the chunk loop itself is
         # unsafe: Enzyme mis-builds the per-chunk view shadows — degenerate (0,1) shadow / GC
         # corruption on 1.10 — and reuses the last iteration's shadow for all chunks.)
-        trunc = 5
-        spectrum = Spectrum(trunc, one_degree_more = true)
-        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[1]))
+        truncation = 6
+        spectrum = Spectrum(truncation, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(truncation, grid_dealiasing[1]))
         NL = 4
         S_chunked = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1])
         S_batched = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1, NL])
@@ -298,9 +298,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
     # survives a transform on a neighbouring slice, and that the transform's own slice still
     # pulls back correctly.
     @testset "reverse rules on view-backed (fused) arrays" begin
-        trunc = 5
-        spectrum = Spectrum(trunc, one_degree_more = true)
-        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[1]))
+        truncation = 6
+        spectrum = Spectrum(truncation, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(truncation, grid_dealiasing[1]))
         NL = 2
         S = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1, NL])
 

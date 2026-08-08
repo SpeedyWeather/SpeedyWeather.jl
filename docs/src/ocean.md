@@ -21,7 +21,7 @@ that only depends on latitude, applying a cosine squared between the
 Equator and the poles
 
 ```@example ocean
-spectral_grid = SpectralGrid(trunc=31)
+spectral_grid = SpectralGrid(truncation=32)
 ocean = AquaPlanet(spectral_grid)
 ```
 

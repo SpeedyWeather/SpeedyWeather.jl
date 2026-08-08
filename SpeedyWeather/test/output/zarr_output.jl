@@ -1,7 +1,7 @@
 using Zarr, Dates
 
 @testset "ZarrOutput type and defaults" begin
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(spectral_grid)
     @test output isa SpeedyWeather.ZarrOutput
     @test output.active == false
@@ -12,7 +12,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_sw_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false,
@@ -53,7 +53,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_pw_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 4)
     output = ZarrOutput(
         spectral_grid, PrimitiveWet;
         path = tmp_output_path, write_restart = false,
@@ -89,7 +89,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_2dfrom3d_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 4)
     output = ZarrOutput(
         spectral_grid, PrimitiveWet;
         path = tmp_output_path, write_restart = false,
@@ -120,7 +120,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_add_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false,
@@ -151,7 +151,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_dims_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false,
@@ -185,7 +185,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_opt_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path,
@@ -216,7 +216,7 @@ end
 
     function run_zarr_time_chunk(tc)
         tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_eq_tc$(tc)_")
-        spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+        spectral_grid = SpectralGrid(truncation = 6, nlayers = 4)
         output = ZarrOutput(
             spectral_grid, PrimitiveDry;
             path = tmp_output_path, write_restart = false,
@@ -248,7 +248,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_spatial_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 4)
     output = ZarrOutput(
         spectral_grid, PrimitiveDry;
         path = tmp_output_path, write_restart = false,
@@ -284,7 +284,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_clamp_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false,
@@ -310,7 +310,7 @@ end
     period = Day(1)
     ensemble_size = 3
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     initial_conditions = ZonalJet(spectral_grid)    # deterministic IC, identical for all members
     store_path = ""
     for member in 1:ensemble_size
@@ -387,7 +387,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_rerun_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false, id = "rerun",

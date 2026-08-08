@@ -307,14 +307,14 @@ SpectralTransform(grid::AbstractGrid, spectrum::AbstractSpectrum; kwargs...) =
 # calculate spectrum if not provided
 function SpectralTransform(
         grid::AbstractGrid;
-        trunc::Integer = 0,                         # spectral truncation (0-indexed)
+        truncation::Integer = 0,                    # spectral truncation (1-based)
         dealiasing::Real = DEFAULT_DEALIASING,      # dealiasing factor
         one_more_degree::Bool = false,              # returns a square LowerTriangularMatrix by default
         kwargs...
     )
-    # get trunc from dealiasing if not provided
-    trunc = trunc > 0 ? trunc : get_truncation(grid, dealiasing)
-    spectrum = Spectrum(trunc + 1 + one_more_degree, trunc + 1; architecture = architecture(grid))
+    # get truncation from dealiasing if not provided
+    truncation = truncation > 0 ? truncation : get_truncation(grid, dealiasing)
+    spectrum = Spectrum(truncation + one_more_degree, truncation; architecture = architecture(grid))
     return SpectralTransform(spectrum, grid; kwargs...)
 end
 
@@ -327,7 +327,7 @@ function SpectralTransform(
         kwargs...
     )
     # get nlat_half from dealiasing if not provided
-    nlat_half = nlat_half > 0 ? nlat_half : get_nlat_half(spectrum.mmax - 1, dealiasing)
+    nlat_half = nlat_half > 0 ? nlat_half : get_nlat_half(spectrum.mmax, dealiasing)
     grid = Grid(nlat_half, spectrum.architecture)                  # create grid with nlat_half
     return SpectralTransform(spectrum, grid; kwargs...)
 end
@@ -673,7 +673,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Spectral transform (grid to spectral space) from `field` to a newly allocated `LowerTriangularArray`.
-Based on the size of `field` and the keyword `dealiasing` the spectral resolution trunc is
+Based on the size of `field` and the keyword `dealiasing` the spectral resolution `truncation` is
 retrieved. SpectralTransform struct `S` is allocated to execute `transform(field, S)`."""
 function transform(field::AbstractField; kwargs...) # GRID TO SPECTRAL
     S = SpectralTransform(field; kwargs...)         # precompute transform

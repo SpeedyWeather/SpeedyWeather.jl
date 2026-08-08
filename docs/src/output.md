@@ -52,7 +52,7 @@ Note that the choice of `interval` can affect the actual time step that is used 
 integration, which is explained in the following.
 Example, we run the model at a resolution of T42 and the time step is going to be
 ```@example netcdf
-spectral_grid = SpectralGrid(trunc=42, nlayers=1)
+spectral_grid = SpectralGrid(truncation=43, nlayers=1)
 time_stepping = Leapfrog(spectral_grid)
 time_stepping.Δt
 ```

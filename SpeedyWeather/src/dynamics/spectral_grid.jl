@@ -7,7 +7,7 @@ const DEFAULT_ARRAYTYPE = Array
 
 # numerics
 const DEFAULT_GRID = OctahedralGaussianGrid
-const DEFAULT_TRUNC = 31
+const DEFAULT_TRUNCATION = 32
 const DEFAULT_NLAYERS = 8
 
 export SpectralGrid
@@ -17,7 +17,7 @@ Defines the horizontal spectral resolution and corresponding grid and the
 vertical coordinate for SpeedyWeather.jl. Options are
 $(TYPEDFIELDS)
 
-`nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
+`nlat_half` and `npoints` should not be chosen but are derived from `truncation`,
 `Grid` and `dealiasing`."""
 struct SpectralGrid{
         ArchitectureType,      # <: AbstractArchitecture
@@ -55,7 +55,10 @@ struct SpectralGrid{
     TensorIntType::Type{<:AbstractArray}
 
     # HORIZONTAL SPECTRAL
-    "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
+    "[OPTION] horizontal resolution as the maximum degree of spherical harmonics (1-based)"
+    truncation::IntType
+
+    "[OPTION] horizontal resolution as the maximum degree of spherical harmonics (0-based)"
     trunc::IntType
 
     "[DERIVED] spectral space"
@@ -79,7 +82,7 @@ struct SpectralGrid{
     "[DERIVED] Type of spectral variable in 4D (horizontal + vertical + time, flattened into 3D array)"
     SpectralVariableXYZT::Type{<:AbstractArray}
 
-    # SIZE OF GRID from trunc, Grid, dealiasing:
+    # SIZE OF GRID from truncation, Grid, dealiasing:
     "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
     dealiasing::NFDealiasing
 
@@ -133,7 +136,7 @@ struct SpectralGrid{
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
-    (; NF, trunc, grid, nlat, npoints, nlayers) = SG
+    (; NF, truncation, grid, nlat, npoints, nlayers) = SG
     (; architecture, ArrayType) = SG
     Grid = nonparametric_type(grid)
 
@@ -150,7 +153,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     params = "{Spectrum{...}, $Grid{...}}"
     println(io, styled"{warning:SpectralGrid}{note:$params}")
     println(io, styled"├ {info:Number format}: $NF")
-    println(io, styled"├ {info:Spectral}:      T$trunc LowerTriangularMatrix, $nharmonics harmonics")
+    println(io, styled"├ {info:Spectral}:      T$truncation LowerTriangularMatrix, $nharmonics harmonics")
     println(io, styled"├ {info:Grid}:          $nlat-ring $Grid, $npoints grid points")
     println(io, styled"├ {info:Resolution}:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
     println(io, styled"├ {info:Vertical}:      $nlayers-layer atmosphere")
@@ -165,7 +168,8 @@ Initialize a SpectralGrid from a given truncation and all [OPTION] parameters of
 function SpectralGrid(;
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
         architecture::Union{AbstractArchitecture, Type{<:AbstractArchitecture}} = DEFAULT_ARCHITECTURE,
-        trunc::Int = DEFAULT_TRUNC,
+        truncation::Int = DEFAULT_TRUNCATION,
+        trunc::Union{Int, Nothing} = nothing,
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
         dealiasing::Real = 2,
         nlayers::Int = DEFAULT_NLAYERS,
@@ -177,15 +181,20 @@ function SpectralGrid(;
         architecture = architecture()
     end
 
+    if trunc !== nothing
+        Base.depwarn("`trunc` is deprecated, use `truncation` instead (note `truncation = trunc + 1`). So typical truncations are now 32, 64, 128, ...", :SpectralGrid, force=true)
+        truncation = trunc + 1
+    end
+
     # grid
-    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
+    nlat_half = SpeedyTransforms.get_nlat_half(truncation, dealiasing)
     grid = Grid(nlat_half, architecture)
 
-    # default dealiasing or user-defined one?
-    dealiasing = SpeedyTransforms.get_dealiasing(trunc, grid.nlat_half)
+    # recalculate the dealiasing
+    dealiasing = SpeedyTransforms.get_dealiasing(truncation, grid.nlat_half)
 
     # Spectral space
-    spectrum = Spectrum(trunc + 2, trunc + 1, architecture = architecture)
+    spectrum = Spectrum(truncation + 1, truncation, architecture = architecture)
 
     # Create the SpectralGrid with all fields
     return SpectralGrid(NF, spectrum, grid, dealiasing, nlayers, transform_batch)
@@ -203,8 +212,8 @@ function SpectralGrid(
         transform_batch::AbstractVector{<:Integer} = default_transform_batch(grid.architecture, nlayers),
     )
     architecture = grid.architecture
-    trunc = SpeedyTransforms.get_truncation(grid, dealiasing)
-    spectrum = Spectrum(trunc + 2, trunc + 1, architecture = architecture)
+    truncation = SpeedyTransforms.get_truncation(grid, dealiasing)
+    spectrum = Spectrum(truncation + 1, truncation, architecture = architecture)
     return SpectralGrid(NF, spectrum, grid, dealiasing, nlayers, transform_batch)
 end
 
@@ -238,6 +247,10 @@ function SpectralGrid(
     VectorIntType = array_type(architecture, Int, 1)
     MatrixIntType = array_type(architecture, Int, 2)
     TensorIntType = array_type(architecture, Int, 3)
+
+    # spectrum
+    truncation_1based = truncation(spectrum, LowerTriangularArrays.OneBased)
+    truncation_0based = truncation(spectrum, LowerTriangularArrays.ZeroBased)
 
     # Spectral variable types
     SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, array_type(architecture, Complex{NF}, 1), typeof(spectrum), ArrayDimensions.LM}
@@ -275,7 +288,8 @@ function SpectralGrid(
         VectorIntType,
         MatrixIntType,
         TensorIntType,
-        truncation(spectrum),
+        truncation_1based,
+        truncation_0based,
         spectrum,
         SpectralVariable2D,
         SpectralVariable3D,

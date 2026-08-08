@@ -39,7 +39,7 @@ SpeedyWeather/src/
 
 | Type | Purpose |
 |------|---------|
-| `SpectralGrid` | Central config: resolution (`trunc`), grid type, `nlayers`, `NF`, architecture |
+| `SpectralGrid` | Central config: resolution (`truncation`), grid type, `nlayers`, `NF`, architecture |
 | `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch) |
 | `Simulation{V,M}` | Top-level container holding model + variables |
 | `Leapfrog` | Time stepper with Robert/Williams filters |
@@ -77,9 +77,9 @@ and `finalize!`.
 Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
 
 ```julia
-vars.prognostic.vorticity                             # Spectral vorticity
+vars.prognostic.vorticity                       # Spectral vorticity
 vars.prognostic.ocean.sea_surface_temperature   # Ocean namespace
-vars.tendencies.vorticity                             # Spectral vorticity tendency
+vars.tendencies.vorticity                       # Spectral vorticity tendency
 vars.tendencies.grid.u                          # Grid-space u-wind tendency
 vars.dynamics.w                                 # Vertical velocity
 ```
@@ -93,7 +93,7 @@ These are collected and allocated automatically by the `Variables(model)` constr
 
 ```julia
 arch = SpeedyWeather.CPU()
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, architecture=arch)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8, architecture=arch)
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period=Day(10), output=true)
@@ -109,7 +109,7 @@ using CUDA              # or AMDGPU, Metal
 using SpeedyWeather
 
 arch = SpeedyWeather.GPU()
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, architecture=arch)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8, architecture=arch)
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
@@ -148,7 +148,7 @@ Mainly two array types are used: `LowerTriangularArray` for spectral coefficient
 
 ```julia 
 arch = SpeedyWeather.CPU()
-spectrum = Spectrum(trunc=10, architecture = arch)
+spectrum = Spectrum(truncation=10, architecture = arch)
 nlayers = 5
 coeffs_zero = zeros(ComplexF32, spectrum, nlayers)
 coeffs_rand = rand(ComplexF32, spectrum, nlayers)
@@ -162,7 +162,7 @@ In case there's already a `SpectralGrid` use it instead:
 
 ```julia
 arch = SpeedyWeather.CPU()
-spectral_grid = SpectralGrid(trunc=10, architecture=arch)
+spectral_grid = SpectralGrid(truncation=11, architecture=arch)
 coeffs = rand(ComplexF32, spectral_grid.spectrum)
 field = rand(Float32, spectral_grid.grid)
 ```

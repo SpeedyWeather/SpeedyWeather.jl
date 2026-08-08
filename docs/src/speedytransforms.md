@@ -94,7 +94,7 @@ On such a coarse grid the transform error (absolute and relative) is about ``10^
 for higher resolution. The `transform` function will choose a corresponding
 grid-spectral resolution (see [Matching spectral and grid resolution](@ref)) following quadratic
 truncation, but you can always truncate/interpolate in spectral space with `spectral_truncation`,
-`spectral_interpolation` which takes `trunc` = ``l_{max} = m_{max}`` as second argument
+`spectral_interpolation` which takes `truncation` = ``l_{max} = m_{max}`` (1-based) as second argument
 ```@example speedytransforms
 spectral_truncation(alms, 2)
 ```
@@ -119,7 +119,7 @@ create a `SpectralTransform` is to start with a `SpectralGrid`, which already de
 which spectral resolution is supposed to be combined with a given grid.
 ```@example speedytransforms
 using SpeedyWeather
-spectral_grid = SpectralGrid(NF=Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(NF=Float32, truncation=6, Grid=OctahedralGaussianGrid, dealiasing=3)
 ```
 (We `using SpeedyWeather` here as `SpectralGrid` is exported therein).
 We also specify the number format `Float32` here to be used for the transform although this
@@ -199,8 +199,8 @@ grid = rand(FullClenshawGrid, 12)
 SpectralTransform(grid)
 ```
 
-where you can also provide spectral resolution `trunc` or `dealiasing`. You can also
-provide both a grid and a lower triangular matrix to describe both spaces
+where you can also provide spectral resolution `truncation` or `dealiasing`.
+You can also provide both a grid and a lower triangular matrix to describe both spaces
 
 ```@example speedytransforms
 SpectralTransform(grid, alms)
@@ -333,7 +333,7 @@ with 8 layers these are
 
 ```@example speedytransforms3
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=127, nlayers=8)
+spectral_grid = SpectralGrid(truncation=128, nlayers=8)
 SpectralTransform(spectral_grid)
 ```
 
@@ -419,7 +419,7 @@ convenience constructor that `SpectralTransform` uses:
 ```@example speedytransforms5
 using SpeedyWeather
 
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 M_sg = MatrixSpectralTransform(spectral_grid)
 ```
 
@@ -493,7 +493,7 @@ compared to the Legendre polynomials of `SpectralTransform` which only store one
 ring at a time. The `show` output prints the total matrix memory:
 
 ```@example speedytransforms5
-spectral_grid = SpectralGrid(trunc=63, nlayers=8)
+spectral_grid = SpectralGrid(truncation=64, nlayers=8)
 MatrixSpectralTransform(spectral_grid)
 ```
 
