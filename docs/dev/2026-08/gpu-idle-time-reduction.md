@@ -402,6 +402,29 @@ smallest at T255. As resolution grows, real per-kernel work grows while the fall
 grows only linearly in `nlat_half`, so its *share* of the step eventually falls. T255 at 1.91×
 is therefore the honest lower bound for production resolutions, not the outlier.
 
+### W1.1 — batched and serial cuFFT agree *bitwise* (2026-08-08)
+
+`verify_batch_equivalence.jl` on the A40, `Float32`. The plan expected a small round-off difference
+(different batch shape → possibly different cuFFT algorithm) and defined a relative pass criterion
+against the CPU-vs-GPU difference the suite already tolerates. The measured difference is **exactly
+zero** on every comparison:
+
+| comparison | max abs difference |
+|---|---:|
+| one `K=2` transform, forward, T31/63/127/255 | `0.000e+00` at every truncation |
+| one `K=2` transform, inverse, T31/63/127/255 | `0.000e+00` at every truncation |
+| 100-step `PrimitiveWetModel` T31 L8: vorticity, divergence, temperature, pressure, humidity | `0.000e+00` for all five |
+
+with the CPU-vs-GPU reference difference of the same run at `8.7e-03` relative (divergence) — i.e.
+the change is not merely inside the tolerated band, it does not move the state at all. That is the
+expected outcome in hindsight: for the same transform length cuFFT selects by length, and batching
+changes only how many independent transforms are issued per call, not the algorithm applied to each.
+
+Scope note: the model-run arm compares the five array-valued prognostics at the top level.
+Namespaced state (`ocean`, `land`, `tracers`) is a `NamedTuple` and is skipped by the comparison
+loop; it is only reachable through those five, so a difference there would have shown up here, but
+it is not directly asserted.
+
 ### W2.0 — the feedback stride degenerates to *every step* exactly when nothing is printed (2026-08-08)
 
 `progress!` (`SpeedyWeather/src/output/feedback.jl:90-99`) *already* strides the two device
@@ -532,7 +555,8 @@ would stride the strides.
 - **Correctness:** the modelbench bitwise equivalence check (driver vs `run!`) after every
   source change; full GPU test suite (`SpeedyWeather/test/GPU/runtests.jl`); for W1
   additionally a CPU-vs-GPU and batched-vs-serial tolerance comparison of a short run, since
-  batched cuFFT may not be bitwise identical to the serial path.
+  batched cuFFT may not be bitwise identical to the serial path. **Done, and the tolerance was
+  not needed — the two paths agree bitwise; see finding W1.1.**
 - **No silent regressions:** the W1 batch-plan test pins the fixed behaviour;
   W3 graph work adds a launches-per-step assertion under the modelbench driver.
 - **Performance:** before/after Phase A tables per workstream, both GPUs, with the ±20 %
@@ -548,15 +572,16 @@ would stride the strides.
 
 | check | status |
 |---|---|
-| `SpeedyWeather/test/GPU/fft_batch_plans.jl` (new, A40) | 6/6 passed on 2026-08-07, but the file was **rewritten on 2026-08-08** when the counter was dropped — the current version is **unrun** |
+| `SpeedyWeather/test/GPU/fft_batch_plans.jl` (new, A40) | **8/8 passed** as part of the full GPU suite below |
 | A/B timing, A40, T31–T255 | **done**, table above; every arm passed the `nans_detected` guard |
 | A/B timing, H100, T31–T255 | **done**, SLURM job `1731194` → `reports/verify_k2-1731194.log` |
-| full `SpeedyWeather/test/GPU/runtests.jl` | **started 2026-08-08, did not finish** — was still precompiling when the session ended; no result, rerun from scratch |
-| CPU suite `SpeedyTransforms` | **started 2026-08-08, did not finish** — had reached the transform tests with no failure reported, but incomplete, so it counts as not run |
-| CPU suite `SpeedyWeather` | **not run yet** |
-| batched-vs-serial tolerance comparison | script written (`modelbench/verify_batch_equivalence.jl`), **never executed — not even syntax-checked** |
-| Phase B/C re-profile after W1 | **not run yet** |
-| W2 mechanism | **diagnosed and measured** (finding W2.0); no source change made |
+| full `SpeedyWeather/test/GPU/runtests.jl` (A40) | **passed**, exit 0, no failures across all 26 testsets |
+| CPU suite `SpeedyTransforms` | see below |
+| CPU suite `SpeedyWeather` | see below |
+| batched-vs-serial comparison | **done and stronger than required — bitwise identical**, finding W1.1 |
+| Phase A after W1+W2 (A40) | see below |
+| Phase B/C re-profile after W1 | **not run yet**; `submit_phaseB.sh` now takes a trace-prefix argument so it cannot overwrite the pre-W1 baseline |
+| W2 source change | **implemented**, findings W2.1/W2.2, CPU feedback tests 9/9 |
 
 ### Files changed by W1
 
