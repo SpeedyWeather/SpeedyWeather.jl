@@ -655,16 +655,65 @@ of its kernels was counted; post-fix it runs batched inside a graph and none of 
 survive). That run is the actual input for choosing between W3(a) and W3(b), because W3(a) *is*
 "put more of the step into graphs" and the current traces are blind to precisely that.
 
-What can already be said about where the residual step time goes, from the API totals alone
-(T255, profiled span 14.486 ms/step against a native 14.280 — the profiler inflates by only 1.4 % at
-this resolution, so these shares are close to real): kernel launches 3.60 ms/step and graph launches
-2.02 ms/step, with the median launch at 2.93 µs but the mean at 37 µs — i.e. most launches are cheap
-and a few block. Excluding one 139 ms outlier synchronization (the capture-ending drain, which is not
-a per-step cost), the CUDA API accounts for ~6.3 ms of the 14.5 ms step. **The remaining ~8 ms/step is
-host-side Julia time that never enters the CUDA API at all.** If the `node`-granularity re-profile
-confirms that split, then fusion (W3b) and graphs (W3a) are attacking the same target from two sides —
-both reduce the number of times the host has to build and issue a launch — and the choice between
-them turns on portability rather than on which one the profile favours.
+The API totals in this trace set invite a wrong conclusion, and finding W3.1 below corrects it:
+at T255 kernel launches cost 3.60 ms/step and graph launches 2.02 ms/step, which leaves ~8 ms/step
+of the 14.5 ms step outside the CUDA API entirely. That looks like host-side Julia time. It is not —
+`cuGraphLaunch` blocks while the graph's GPU work runs, and this trace cannot see that work. Do not
+size W3 from this paragraph; use W3.1.
+
+### W3.1 — with graph nodes expanded, the step is 66–78 % GPU-busy: the launch-bound era is over (2026-08-08)
+
+Re-profile at `--cuda-graph-trace=node` (SLURM job `1732864`, traces `reports/w1g_T*_L8`), which
+expands each CUDA graph into its constituent kernels and so counts the FFT work the previous trace
+set dropped. Against the *native* Phase A step time (`phaseA_gpu_w1w2.json`, same H100, no profiler):
+
+| trunc | GPU busy ms/step | native ms/step | GPU busy % | kernels/step (incl. graph-internal) | host launches/step |
+|------:|-----------------:|---------------:|-----------:|------------------------------------:|-------------------:|
+| 31  | 0.745  | 1.126  | **66 %** | 319  | 97.2 |
+| 63  | 1.569  | 2.138  | **73 %** | 615  | 97.2 |
+| 127 | 3.735  | 4.777  | **78 %** | 1283 | 97.2 |
+| 255 | 10.465 | 14.280 | **73 %** | 2843 | 97.2 |
+
+against the 22–29 % that opened this plan. **The premise of W3 as written no longer holds.** The step
+is not launch-bound any more: 97 host launches per step drive 319–2843 kernels, because 96 % of the
+kernels now run inside four replayed graphs, and the GPU is busy for roughly three quarters of the
+step. The remaining idle is 22–34 %, not the 71–78 % the plan was scoped against, and the ceiling
+from removing *all* of it has fallen from ~3.4× to ~1.36× at T255.
+
+Where the GPU time actually goes now (T255, of 10.465 ms busy):
+
+| phase | busy ms/step | share | kernels/step |
+|---|---:|---:|---:|
+| `dynamics` (includes the transforms it calls) | 5.574 | 53 % | 1414 |
+| `transform` | 4.552 | 44 % | 1387 |
+| `parameterizations` | 0.213 | 2 % | 7 |
+| everything else | 0.126 | 1 % | 35 |
+
+so the spectral transform *is* the model at this resolution. Inside it the cost is not one big kernel
+but many small cuFFT ones — `preprocess_kernel` 606/step (0.836 ms), `regular_fft_factor<2>` 224/step
+(0.380 ms), `postprocess_kernel` 196/step (0.284 ms) — plus three Bluestein variants (lengths 729,
+625, 1024; 0.455 ms together), which is cuFFT's fallback for lengths it cannot factor cheaply. The
+two Legendre kernels are 1.231 ms (forward) and 0.739 ms (inverse). This is *GPU work*, not launch
+overhead: it is already inside graphs, so making the launches cheaper cannot touch it.
+
+**Consequence for W3: neither (a) nor (b) as scoped.** Extending graph capture (a) attacks a launch
+cost that is now 0.30 ms/step of `cuLaunchKernelEx` at T255 — 2 % of the step. Elementwise fusion (b)
+targets the `gpu_broadcast_kernel_*` family, which no longer appears anywhere near the top of the
+kernel table. The two candidates that the measurement actually points at are:
+
+- **the FFT itself** — 44 % of GPU busy at T255, spent in hundreds of ~1.4 µs cuFFT kernels per step.
+  Worth checking whether the ring lengths driving the Bluestein path can be avoided (grid choice, or
+  padding the transform length to a factorable one), and whether the per-ring plans can be merged
+  further so cuFFT issues fewer, larger kernels;
+- **the residual 22–34 % idle**, which is now small enough that it needs attribution before anything
+  is built: at T31 (66 % busy, the worst case) it is 0.38 ms/step, and the profiler's own inflation
+  is of the same order, so the first job is to establish that it is real.
+
+Caveat on this trace set: `node` granularity has "significant runtime overhead" by nsys's own
+documentation, so the busy *totals* may be slightly inflated. They are consistent with the
+`graph`-granularity set on everything both can see (identical host launch counts, identical non-graph
+kernel counts, `dynamics` busy 1.720 → 5.574 ms explained entirely by the graph-internal FFTs), so
+the direction is not in doubt even if the last few percent are.
 
 ## Testing and verification
 
