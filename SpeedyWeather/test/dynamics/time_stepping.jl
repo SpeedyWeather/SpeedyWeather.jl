@@ -40,7 +40,7 @@ F(x, ω) = im * ω * x
 
             # absolute error to exact result 1+0i
             error = abs.(X[:, 2] .- 1)
-            @info Leapfrog, error[1], abs(X[1])
+            # @info Leapfrog, error[1], abs(X[1])
             @test all(error .< 1.0e-2)
             @test all(abs.(X) .<= 1)         # stable integration?
 
@@ -184,7 +184,7 @@ end
 
                 # absolute error to exact result 1+0i
                 error = abs.(X .- 1)
-                @info (steps, Variant, error[1], abs(X[1]))
+                # @info (steps, Variant, error[1], abs(X[1]))
                 if steps == 3
                     @test all(error .< 1.0e-2)
                 else                            
@@ -221,7 +221,7 @@ end
 
                 # Δt = Δt_at_T32 * (32/truncation) (see get_Δt_millisec), so Δt_at_T32 is the
                 # requested Δt divided by that factor, i.e. LONGER than Δt for truncation > 32
-                factor = SpeedyWeather.resolution_factor(trunc, SpeedyWeather.DEFAULT_RADIUS)
+                factor = SpeedyWeather.resolution_factor(truncation, SpeedyWeather.DEFAULT_RADIUS)
                 @test time_stepping.Δt_at_T32.value ≈ Second(Δt).value / factor rtol = 0.05
                 @test time_stepping.Δt_at_T32 >= Second(Δt)   # never shorter than Δt itself
             end
