@@ -99,11 +99,11 @@ export VegetationClimatology
     "Low vegetation cover [1], interpolated onto Grid"
     low_cover::GridVariable2D
 
-    "High vegetation LAI [1], interpolated onto Grid"
-    high_lai::GridVariable2D
+    "High vegetation leaf area index [1], interpolated onto Grid"
+    high_leaf_area::GridVariable2D
 
-    "Low vegetation LAI [1], interpolated onto Grid"
-    low_lai::GridVariable2D
+    "Low vegetation leaf area index [1], interpolated onto Grid"
+    low_leaf_area::GridVariable2D
 end
 
 # TODO to adapt create a ManualVegetationClimatology component like AlbedoClimatology is adapted to ManualAlbedo
@@ -163,8 +163,8 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
     vegl = on_architecture(model.architecture, vegl)
     lai_hv = on_architecture(model.architecture, lai_hv)
     lai_lv = on_architecture(model.architecture, lai_lv)
-    high_lai = vegetation.high_lai
-    low_lai = vegetation.low_lai
+    high_lai = vegetation.high_leaf_area
+    low_lai = vegetation.low_leaf_area
 
     # interpolate onto grid
     high_vegetation_cover = vegetation.high_cover
@@ -217,8 +217,8 @@ function soil_moisture_availability!(
     # copy over vegetation fields into diagnostic variables
     vegetation_high .= vegetation.high_cover
     vegetation_low .= vegetation.low_cover
-    lai_vegetation_high .= vegetation.high_lai
-    lai_vegetation_low .= vegetation.low_lai
+    lai_vegetation_high .= vegetation.high_leaf_area
+    lai_vegetation_low .= vegetation.low_leaf_area
 
     W_cap = model.land.thermodynamics.field_capacity
     W_wilt = model.land.thermodynamics.wilting_point
@@ -272,10 +272,10 @@ end
 function variables(::VegetationClimatology)
     return (
         PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        ParameterizationVariable(:vegetation_high, Grid2D(), desc = "Vegetation high cover", units = "1", namespace = :land),
-        ParameterizationVariable(:vegetation_low, Grid2D(), desc = "Vegetation low cover", units = "1", namespace = :land),
-        ParameterizationVariable(:lai_vegetation_high, Grid2D(), desc = "Leaf Area Index of high vegetation", units = "1", namespace = :land),
-        ParameterizationVariable(:lai_vegetation_low, Grid2D(), desc = "Leaf Area Index of low vegetation", units = "1", namespace = :land),
+        ParameterizationVariable(:high_vegetation_cover, Grid2D(), desc = "Vegetation high cover", units = "1", namespace = :land),
+        ParameterizationVariable(:low_vegetation_cover, Grid2D(), desc = "Vegetation low cover", units = "1", namespace = :land),
+        ParameterizationVariable(:high_vegetation_leaf_area, Grid2D(), desc = "Leaf Area Index of high vegetation", units = "1", namespace = :land),
+        ParameterizationVariable(:low_vegetation_leaf_area, Grid2D(), desc = "Leaf Area Index of low vegetation", units = "1", namespace = :land),
         ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end
