@@ -17,7 +17,7 @@ $(TYPEDFIELDS)"""
     description::String = ""
 
     "[OPTION] Progress bar length in characters, `nothing` fits it to the terminal width, `0` shows no bar"
-    progress_bar_length::Union{Int, Nothing} = nothing
+    progress_bar_length::Union{Int, Nothing} = 0
 
     "[OPTION] show speed (e.g. in simulated years per day) in progress meter?"
     showspeed::Bool = true
