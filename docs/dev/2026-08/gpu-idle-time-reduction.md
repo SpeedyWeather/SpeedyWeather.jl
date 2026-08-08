@@ -69,6 +69,20 @@ Base revision: `196bcc92e945ee7ac18588d06fdde8d21f67c615` (`mg/profile-gpu-primi
     would silently hollow out the ~30 `@test model.feedback.nans_detected == false` assertions in
     the test suite, none of which runs 50 steps.
 
+- **2026-08-08 (third session), "continue the GPU idle-time reduction"** plus, mid-session, *"Does the
+  `max(interval, iterations)` make sense? And also calling `progress!` / `next!` still at every step?"*
+  Both questions were answered by measurement and the first one found a real defect in W2.1:
+  - `max(interval, check_iterations)` was **replaced by `enabled ? check_iterations : interval`**.
+    The `max` rested on the claim that `check_iterations` is huge while the meter is enabled
+    (32681, measured in the previous session). That measurement came from a bare `next!` loop with
+    no work per iteration and does not describe a model run: `calc_check_iterations` converges to
+    `feedback_dt / step_time`, so in a real *enabled* `PrimitiveWetModel` run it is **3–10**, and
+    `max(50, 3…10) = 50` would have made the displayed max speed and temperature range 5–15× staler
+    than the progress bar that shows them. See finding W2.2;
+  - `progress!` / `ProgressMeter.next!` **stays at every step**: measured 4.6 ns/call on a disabled
+    meter, and `p.counter` is the clock every stride in `progress!` is taken modulo, so it cannot be
+    strided itself.
+
 ## Problem description
 
 The profiling plan (`gpu-primitive-wet-model-profiling.md`, Phases A–C, measured on both an
@@ -411,6 +425,11 @@ sync — run on **every** time step. Measured directly, independent of SpeedyWea
 | `false` (`verbose = false`, the default in scripts and benchmarks) | **1** — i.e. every step |
 | `true`  (interactive REPL) | 32681 — i.e. effectively never |
 
+> **Read the second row with care** (see W2.2): 32681 is what a *bare* `next!` loop converges to,
+> because `check_iterations` tracks `feedback_dt / step_time`. A loop that also integrates the
+> atmosphere converges to 3–10 instead. The first row is the finding; the second is an artefact of
+> how it was measured, and building on it as if it described a model run was an error.
+
 This inverts the intent: the diagnostics are cheap-by-striding when they are displayed, and
 un-strided when they are *not*. It explains the whole Phase A3 gap (10–26 % of wallclock for
 0.05 ms of GPU work) without appealing to any deliberate design choice, and it means the first
@@ -437,13 +456,14 @@ part of W2 is a **bug fix, not a behavioural change** — no decision needed for
 interval::Int = 50
 ```
 
-and `progress!` becomes:
+and `progress!` becomes (the display stride as **revised** by W2.2):
 
 ```julia
-(; counter, n, check_iterations) = feedback.progress_meter
+(; counter, n, check_iterations, enabled) = feedback.progress_meter
 interval = max(1, feedback.interval)
 
-if mod(counter, max(interval, check_iterations)) == 0
+every_nsteps = enabled ? check_iterations : interval
+if mod(counter, every_nsteps) == 0
     feedback.show_umax && max_speed(vars)
     feedback.show_temperature_range && temperature_range(vars)
 end
@@ -457,11 +477,13 @@ feedback.debug && (mod(counter, interval) == 0 || last_step) &&
 
 Three deliberate asymmetries:
 
-- **`max(interval, check_iterations)` for the display quantities, `interval` alone for the NaN
+- **`enabled ? check_iterations : interval` for the display quantities, `interval` alone for the NaN
   check.** `check_iterations` answers "how often can the meter possibly *show* a new value", which
-  is the right upper bound for `max_speed`/`temperature_range` and meaningless for NaN detection.
-  Taking the maximum keeps the enabled-meter behaviour exactly as it was (W2.0's 32681) while
-  fixing the disabled case (W2.0's 1).
+  is the right bound for `max_speed`/`temperature_range` and meaningless for NaN detection. Branching
+  on `enabled` keeps the enabled case exactly as it was — and bounds its cost in *wallclock*
+  (one synchronization per displayed frame, i.e. per `feedback_dt`, at any resolution) — while the
+  disabled case, where `check_iterations` is frozen at W2.0's `1`, falls back to the step-count
+  bound `interval`.
 - **`max(1, interval)`** so `interval = 0` means "every step" instead of a `DivideError` in `mod`.
 - **`|| last_step`** so the final state of every run is NaN-checked regardless of length. Without
   it, `interval = 50` would reduce a 10-step test run to a single check at step 0 — i.e. a check of
@@ -471,6 +493,39 @@ Three deliberate asymmetries:
 `counter` runs `0 … n-1` inside `progress!` (it is incremented by `ProgressMeter.next!`, which
 does so whether or not the meter is enabled), so step 0 and the last step are both checked and
 `n` is the total step count from `clock.n_steps`.
+
+### W2.2 — `check_iterations` in a *model* run is 3–10, not 32681 (2026-08-08)
+
+`calc_check_iterations` (ProgressMeter 1.11.0, `src/ProgressMeter.jl:246`) is
+
+```julia
+iterations_per_dt = (p.check_iterations / (t - p.tlast)) * p.dt
+round(Int, clamp(iterations_per_dt, 1, p.check_iterations * 10))
+```
+
+whose fixed point is `dt / step_time` — the number of iterations that fit in one displayed frame.
+It is therefore **a function of how slow the loop body is**, and a bare `next!` loop (3 µs/iteration
+→ 32681) says nothing about a loop that integrates the atmosphere. Measured on a real enabled
+`PrimitiveWetModel`, 300 steps, CPU:
+
+| run | `check_iterations` after 300 steps |
+|---|---:|
+| T31, `nlayers = 8`, `verbose = true` | **10** |
+| T63, `nlayers = 8`, `verbose = true` | **3** |
+| any resolution, `verbose = false` | 1 (never updated, W2.0) |
+
+Consequence for W2.1 as first written: `max(interval, check_iterations)` = `max(50, 3…10)` = `50`,
+so the enabled meter would have kept printing at `feedback_dt` = 0.1 s while the max speed and
+temperature range inside it changed only every 50 steps — 5–15× staler than the bar carrying them,
+which is precisely the behaviour change the `max` was introduced to avoid. Branching on `enabled`
+instead gives each rule the regime it was derived for, and makes the enabled-case cost
+*wallclock*-bounded (one sync per displayed frame) rather than step-bounded.
+
+The companion question — whether `progress!` (`ProgressMeter.next!`) should also be strided — is
+answered no: **4.6 ns/call** with the meter disabled (`updateProgress!` returns on its first line,
+so no `time()`, no device access, and `lock_if_threading` does not lock single-threaded), and
+`p.counter` is the clock that every `mod(counter, …)` above is taken against, so striding `next!`
+would stride the strides.
 
 ## Testing and verification
 
