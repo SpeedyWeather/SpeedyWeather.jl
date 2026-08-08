@@ -49,6 +49,25 @@ Base revision: `196bcc92e945ee7ac18588d06fdde8d21f67c615` (`mg/profile-gpu-primi
     `SpeedyTransforms` needs no version bump any more, only `SpeedyWeather`;
   - W2 gained a measured mechanism (finding W2.0 below) which changes its character: the largest
     part is a *bug*, not a behavioural trade-off, and so needs no decision.
+- **2026-08-08 (second session), "for W2b I want to stride the `nan_detection!` and progress meter
+  calculations, make this a parameter called `interval`, set the default to 50 steps. Consider
+  reusing the `check_iterations` property of `ProgressCore` as well."** W2 implemented as one
+  striding mechanism covering both halves:
+  - the user's decision on the open W2b question is **option 1 (stride)**, with the stride exposed
+    as `Feedback.interval`, default `50`, and the same value used on CPU and GPU (the original
+    plan sketched `1` on CPU — dropped, a single default is simpler and 50 steps of latency on a
+    NaN abort is harmless on either device);
+  - **W2a is subsumed rather than implemented as sketched.** The plan had proposed *skipping*
+    `max_speed`/`temperature_range` whenever the progress meter is disabled. Instead they are
+    strided by `max(interval, check_iterations)`, which reuses ProgressMeter's own adaptive
+    counter for the enabled case (unchanged behaviour) and falls back to `interval` when the
+    counter is pinned at `1` because the meter is disabled. Cost when nothing is displayed drops
+    from 1 sync/step to 1/50 rather than to 0; the residue is negligible and, unlike skipping, it
+    keeps `FEEDBACK_UMAX`/`FEEDBACK_TMIN`/`FEEDBACK_TMAX` populated for any consumer;
+  - one addition not in the plan: `nan_detection!` also runs unconditionally on the **last** time
+    step of a run. Without it a run shorter than `interval` would be checked only at step 0, which
+    would silently hollow out the ~30 `@test model.feedback.nans_detected == false` assertions in
+    the test suite, none of which runs 50 steps.
 
 ## Problem description
 
@@ -409,6 +428,50 @@ part of W2 is a **bug fix, not a behavioural change** — no decision needed for
   persists, so it is still detected, just later. Options 1/3 of the original W2 list apply here
   only.
 
+### W2.1 — the implemented stride (2026-08-08)
+
+`Feedback` gains one option:
+
+```julia
+"[OPTION] Interval in time steps between NaN checks and progress meter diagnostics ..."
+interval::Int = 50
+```
+
+and `progress!` becomes:
+
+```julia
+(; counter, n, check_iterations) = feedback.progress_meter
+interval = max(1, feedback.interval)
+
+if mod(counter, max(interval, check_iterations)) == 0
+    feedback.show_umax && max_speed(vars)
+    feedback.show_temperature_range && temperature_range(vars)
+end
+
+progress!(feedback)
+
+last_step = counter == n - 1
+feedback.debug && (mod(counter, interval) == 0 || last_step) &&
+    nan_detection!(feedback, vars, model)
+```
+
+Three deliberate asymmetries:
+
+- **`max(interval, check_iterations)` for the display quantities, `interval` alone for the NaN
+  check.** `check_iterations` answers "how often can the meter possibly *show* a new value", which
+  is the right upper bound for `max_speed`/`temperature_range` and meaningless for NaN detection.
+  Taking the maximum keeps the enabled-meter behaviour exactly as it was (W2.0's 32681) while
+  fixing the disabled case (W2.0's 1).
+- **`max(1, interval)`** so `interval = 0` means "every step" instead of a `DivideError` in `mod`.
+- **`|| last_step`** so the final state of every run is NaN-checked regardless of length. Without
+  it, `interval = 50` would reduce a 10-step test run to a single check at step 0 — i.e. a check of
+  the initial conditions only — and the ~30 `nans_detected == false` assertions across the suite
+  would become nearly vacuous. Cost is one extra sync per `run!`, not per step.
+
+`counter` runs `0 … n-1` inside `progress!` (it is incremented by `ProgressMeter.next!`, which
+does so whether or not the meter is enabled), so step 0 and the last step are both checked and
+`n` is the total step count from `clock.n_steps`.
+
 ## Testing and verification
 
 - **Correctness:** the modelbench bitwise equivalence check (driver vs `run!`) after every
@@ -420,7 +483,11 @@ part of W2 is a **bug fix, not a behavioural change** — no decision needed for
 - **Performance:** before/after Phase A tables per workstream, both GPUs, with the ±20 %
   benchmark-noise convention from `CLAUDE.md`; report anything outside it.
 - W2 needs a unit test that `nans_detected` still triggers (inject a NaN, step N+1 times,
-  assert detection) under the strided scheme.
+  assert detection) under the strided scheme. **Done** — `"NaN detection with strided feedback"`
+  in `SpeedyWeather/test/output/feedback.jl`, 5/5 passing on CPU. It covers both branches of the
+  new condition (the strided check and the last-step check) plus a healthy run, because only the
+  last-step branch protects the many short-run `nans_detected == false` assertions elsewhere in
+  the suite.
 
 ### Status as of 2026-08-08
 
@@ -450,6 +517,18 @@ part of W2 is a **bug fix, not a behavioural change** — no decision needed for
 - `SpeedyWeather/test/GPU/modelbench/submit_verify_k2.sh` (new) — H100 job.
 - `SpeedyWeather/test/GPU/modelbench/verify_batch_equivalence.jl` (new, 2026-08-08) — the
   batched-vs-serial tolerance comparison. **Untested: written but never run.**
+
+### Files changed by W2
+
+- `SpeedyWeather/src/output/feedback.jl` — new `Feedback.interval` option (default `50`) and the
+  strided `progress!` shown in finding W2.1.
+- `SpeedyWeather/test/output/feedback.jl` — new `"NaN detection with strided feedback"` testset
+  with a `NaNInjector` callback: a NaN written mid-run is still detected under `interval = 4`; a
+  NaN in a run shorter than `interval` is caught by the last-step check; a healthy run is not
+  flagged. Passes (5/5) on CPU.
+- `SpeedyWeather/benchmark/README.md` — note that published numbers include feedback overhead, and
+  that pre-stride GPU numbers paid it every step.
+- `CHANGELOG.md` — bullet added under `## Unreleased`, **PR number still `NNN`**.
 
 **No version bumps were made.** `SpeedyTransforms` is already at `0.2.0-DEV` and
 `SpeedyWeather` at `0.21.1+DEV`; per the convention in `CLAUDE.md` those DEV tags already

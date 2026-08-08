@@ -34,6 +34,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] Show temperature range of simulation [˚C]"
     show_temperature_range::Bool = true
 
+    "[OPTION] Interval in time steps between NaN checks and progress meter diagnostics (maximum speed, temperature range)"
+    interval::Int = 50
+
     "[DERIVED] struct containing everything progress related"
     progress_meter::ProgressMeter.Progress =
         ProgressMeter.Progress(1, enabled = verbose)
@@ -88,13 +91,25 @@ end
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
-    every_nsteps = feedback.progress_meter.core.check_iterations
-    (; counter) = feedback.progress_meter.core
+    (; counter, n, check_iterations) = feedback.progress_meter
+    interval = max(1, feedback.interval)
     FEEDBACK_TIME[] = vars.prognostic.clock.time
-    feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(vars)
-    feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(vars)
+
+    # `check_iterations` is ProgressMeter's adaptive "how many steps until it's worth checking
+    # the clock again" counter, take the maximum with `interval` so that the two device
+    # reductions below are strided in either case. 
+    if mod(counter, max(interval, check_iterations)) == 0
+        feedback.show_umax && max_speed(vars)
+        feedback.show_temperature_range && temperature_range(vars)
+    end
+
     progress!(feedback)
-    feedback.debug && nan_detection!(feedback, vars, model)
+
+    # stride the NaN check by `interval` alone (it has no display consumer), but always check on
+    # the last time step so that the final state of a run shorter than `interval` is checked too
+    last_step = counter == n - 1
+    feedback.debug && (mod(counter, interval) == 0 || last_step) &&
+        nan_detection!(feedback, vars, model)
     return nothing
 end
 
