@@ -298,7 +298,7 @@ even though they are initialized and variables are created nevertheless
 model = PrimitiveWetModel(spectral_grid;
     custom_parameterization = SimpleAlbedo(spectral_grid),
     parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :shortwave_radiation,
-        :surface_condition, :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
+        :boundary_layer, :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
 
 simulation = initialize!(model)
 run!(simulation, period=Day(5)) # spin up the model a little

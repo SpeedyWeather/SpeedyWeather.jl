@@ -15,7 +15,7 @@ struct SpectralTransform{
         SpectrumType,               # <: AbstractSpectrum
         GridType,                   # <: AbstractGrid
         VectorType,                 # <: ArrayType{NF, 1},
-        ArrayTypeIntMatrix,         # <: ArrayType{Int, 2}
+        ArrayTypeIntMatrix,         # <: ArrayType{Int32, 2}
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
         LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}, ...},
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
@@ -66,13 +66,24 @@ struct SpectralTransform{
 
     # LEGENDRE POLYNOMIALS, for all latitudes, precomputed
     legendre_polynomials::LowerTriangularArrayType
+    # ... and transposed to (latitude ring, harmonic), flattened so that it needs no type
+    # parameter of its own; index it as [(lm - 1) * nlat_half + j].
+    # The GPU transforms read the polynomials along opposite axes -- the inverse has
+    # neighbouring threads on neighbouring rings, the forward on neighbouring harmonics -- and no
+    # single layout is coalesced for both, so the GPU keeps this second copy.
+    # Empty on CPU, which only uses the layout above.
+    legendre_polynomials_transposed::VectorType
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
     scratch_memory::ScratchType
 
-    jm_index_size::Int                          # number of indices per layer in kjm_indices
-    kjm_indices::ArrayTypeIntMatrix             # precomputed kjm loop indices map for legendre transform
+    # PRECOMPUTED THREAD INDEX MAPS FOR THE GPU LEGENDRE TRANSFORMS
+    # The inverse transform runs one thread per (latitude ring, order, layer), the forward one
+    # thread per (spherical harmonic coefficient, layer), so the two need different maps.
+    jm_index_size::Int                          # number of (j, m) rows in jm_indices
+    jm_indices::ArrayTypeIntMatrix              # (j, m, lm_offset, column length) per inverse-transform thread
+    lm_indices::ArrayTypeIntMatrix              # (m, hemisphere sign, jm_indices row range) per forward-transform thread
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -159,6 +170,12 @@ function SpectralTransform(
         legendre_polynomials[:, j] = LowerTriangularArray(legendre_polynomials_j)   # store
     end
 
+    # TRANSPOSED COPY OF THE LEGENDRE POLYNOMIALS FOR THE GPU INVERSE TRANSFORM, see the struct
+    # field. Costs as much memory again as the polynomials themselves, so only built on GPU.
+    legendre_polynomials_transposed = architecture isa Architectures.GPU ?
+        vec(permutedims(legendre_polynomials.data)) :
+        on_architecture(architecture, zeros(NF, 0))
+
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # CPU always chunks unplanned K down to the largest planned batch, so scratch only needs
     # to hold one such chunk. GPU shouldn't chunk and must fit the full input K.
@@ -171,20 +188,68 @@ function SpectralTransform(
         planned_K, fake_grid_data, scratch_memory.north, rings, nlons
     )
 
-    # PRECOMPUTE KJM INDICES FOR LEGENDRE TRANSFORM (0-based)
-    # For GPU it's quicker to precompute the indices for the loops in the
-    # legendre transform and store them in a 3D array rather than computing them
-    # on the fly. We also store the jm_index_size for the loop so we can
-    # truncate to fewer layers if needed.
-    jm_index_size = sum(mmax_truncation .+ 1)
-    kjm_indices = zeros(Int, jm_index_size * nlayers, 3)
+    # PRECOMPUTE (j, m) INDICES FOR THE GPU LEGENDRE TRANSFORM
+    # One row per (latitude ring j, order m) pair a thread works on; the vertical layer k is the
+    # kernel's second dimension so the table does not repeat over k. Columns 3 and 4 hold the
+    # offset and length of the lower-triangular column at order m, so the kernels index the
+    # coefficients directly without recomputing `get_lm_range`.
+    # Rows run to the ring's number of Fourier frequencies nfreq_j = nlon_j÷2+1, beyond the
+    # Legendre shortcut truncation. Those extra rows carry length 0 and mark the frequencies the
+    # inverse transform has to zero out (the FFT reads all of 1:nfreq_j), which saves resetting
+    # the whole scratch memory before every transform.
+    # The rows are ordered by order m first and latitude ring j second, so that neighbouring
+    # threads hold neighbouring rings at the same order and read the transposed Legendre
+    # polynomials below with coalesced access. Within an order the rings inside the Legendre
+    # truncation come first, so that they form the contiguous row range that the forward
+    # transform sums over (recorded in `lm_indices` below), followed by the zero-only rows.
+    nfreqs = nlons .÷ 2 .+ 1
+    n_orders = max.(nfreqs, mmax_truncation .+ 1)
+    n_orders_max = maximum(n_orders)
+    jm_index_size = sum(n_orders)
+    jm_indices = zeros(Int32, jm_index_size, 4)
+    truncated_rows = fill((1, 0), n_orders_max)     # rows inside the truncation, per order m
     i = 0
-    for k in 1:nlayers
-        for (j, mmax_j) in enumerate(mmax_truncation)
-            for m in 1:(mmax_j + 1)
-                i += 1
-                kjm_indices[i, :] .= [k, j, m]
-            end
+    for m in 1:n_orders_max
+        lm_range = m <= mmax ? LowerTriangularArrays.get_lm_range(m, lmax - 1) : (1:0)  # 0-based lmax
+        row_start = i + 1
+        for (j, mmax_j) in enumerate(mmax_truncation)   # rings inside the truncation, with a column to sum
+            m <= mmax_j + 1 || continue
+            i += 1
+            jm_indices[i, 1] = j
+            jm_indices[i, 2] = m
+            jm_indices[i, 3] = first(lm_range) - 1
+            jm_indices[i, 4] = length(lm_range)
+        end
+        truncated_rows[m] = (row_start, i)
+
+        for (j, mmax_j) in enumerate(mmax_truncation)   # then the rings the transform skips,
+            mmax_j + 1 < m <= n_orders[j] || continue   # left at length 0 as zero-only rows
+            i += 1
+            jm_indices[i, 1] = j
+            jm_indices[i, 2] = m
+        end
+    end
+
+    # PRECOMPUTE COEFFICIENT INDICES FOR THE GPU FORWARD LEGENDRE TRANSFORM
+    # The forward transform is parallelised over its output coefficients (one thread per
+    # coefficient lm and layer), each summing over the latitude rings.
+    # Per coefficient we store the order m (to index the Fourier
+    # coefficients), the sign with which the southern hemisphere enters (+ for even, - for odd
+    # degrees l-m, the north/south symmetry split) and the range of `jm_indices` rows that holds
+    # the rings contributing at that order. Those rings are read from the table rather than
+    # derived from a first ring down to the equator: the coslat-dependent shortcuts are not
+    # monotonic in latitude, so a ring closer to the equator can retain fewer orders than one
+    # closer to the pole and the contributing rings do not always reach the equator.
+    lm_indices = zeros(Int32, LowerTriangularArrays.nonzeros(spectrum), 4)
+    for m in 1:mmax
+        # empty range if no ring contributes at that order, then the coefficient stays zero
+        row_start, row_end = m <= n_orders_max ? truncated_rows[m] : (1, 0)
+
+        for (l, lm) in enumerate(LowerTriangularArrays.get_lm_range(m, lmax - 1))
+            lm_indices[lm, 1] = m
+            lm_indices[lm, 2] = isodd(l) ? 1 : -1
+            lm_indices[lm, 3] = row_start
+            lm_indices[lm, 4] = row_end
         end
     end
 
@@ -205,7 +270,7 @@ function SpectralTransform(
         typeof(spectrum),
         typeof(grid),
         array_type(architecture, NF, 1),
-        array_type(architecture, Int, 2),
+        array_type(architecture, Int32, 2),
         array_type(architecture, Complex{NF}, 2),
         typeof(legendre_polynomials),
         typeof(scratch_memory),
@@ -225,8 +290,9 @@ function SpectralTransform(
         rfft_plan_serial, brfft_plan_serial,
         rfft_plans_batched, brfft_plans_batched,
         legendre_polynomials,
+        legendre_polynomials_transposed,
         scratch_memory,
-        jm_index_size, kjm_indices,
+        jm_index_size, jm_indices, lm_indices,
         solid_angles,
         eigenvalues, eigenvalues⁻¹,
         gradients,

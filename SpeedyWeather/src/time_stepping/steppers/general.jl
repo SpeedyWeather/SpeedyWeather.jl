@@ -50,33 +50,54 @@ function get_Δt_millisec(
 end
 
 """$(TYPEDSIGNATURES)
-Change time step of timestepper `L` to `Δt` (unscaled)
-and disables adjustment to output frequency.
-`set!` can be used before or after `initialize!(model)`."""
+Factor between the time step at T31 and the time step at resolution `trunc` on a planet of
+`radius`, i.e. `Δt = Δt_at_T31 * resolution_factor`, matching [`get_Δt_millisec`](@ref)."""
+resolution_factor(trunc::Integer, radius::Real) =
+    (DEFAULT_TRUNC + 1) / (trunc + 1) * radius / DEFAULT_RADIUS
+
+"""$(TYPEDSIGNATURES) Resolution factor of `model`, from its `trunc` and planetary radius."""
+resolution_factor(model::AbstractModel) =
+    resolution_factor(model.spectral_grid.trunc, model.planet.radius)
+
+"""$(TYPEDSIGNATURES)
+Resolution factor inferred from a time stepper's own state, `Δt/Δt_at_T31`. Approximate: if the
+current `Δt` was adjusted to the output frequency (`adjust_with_output`) then that adjustment is
+folded into the ratio. Pass the `model` to [`set!`](@ref) to use the exact factor instead."""
+resolution_factor(L::AbstractTimeStepper) = L.Δt / Second(L.Δt_at_T31).value
+
+"""$(TYPEDSIGNATURES)
+Change the time step of timestepper `L` to `Δt` (unscaled) and disable adjustment to the output
+frequency. `set!` can be used before or after `initialize!(model)`: `Δt_at_T31` is the quantity
+`calculate_Δt!` derives the time step from, so it is back-computed here with `resolution_factor`
+to keep a later re-initialization at the requested `Δt`.
+
+Without a `model` the resolution factor is inferred from `L` itself and is only approximate when
+the current time step had been adjusted to the output frequency; pass `model` (or use
+`set!(model, Δt=...)`) for an exact round trip."""
 function set!(
         L::AbstractTimeStepper,
         Δt::Period,
+        factor::Real = resolution_factor(L),
     )
-    # if set! is used before `initialize!(model)` then the recalculation of
-    # Δt_at_T31 will make sure the desired time step is used when initialize!(model.time_stepping, ...) happens
-    # if set! is used after `initialize!(model)` then all fields are set consistently
-
-    # get truncation/resolution factor implicitly from Δt at this resolution vs default T31 resolution
-    resolution_factor = L.Δt / Second(L.Δt_at_T31).value
-
     L.Δt_millisec = Millisecond(Δt)         # recalculate all Δt fields
     L.Δt = Millisecond(L.Δt_millisec).value / 1000
 
-    # recalculate the default time step at resolution T31 to be consistent
-    L.Δt_at_T31 = Second(round(Int, L.Δt * resolution_factor))
+    # Δt = Δt_at_T31 * factor (see get_Δt_millisec), so invert to keep Δt_at_T31 consistent.
+    # Stored in whole seconds, so a re-initialization can be off by sub-second rounding.
+    L.Δt_at_T31 = Second(round(Int, L.Δt / factor))
 
     # given Δt was manually set disallow adjustment to output frequency
     L.adjust_with_output = false
     return L
 end
 
+"""$(TYPEDSIGNATURES) Set the time step of `L` using the exact resolution factor of `model`."""
+set!(L::AbstractTimeStepper, Δt::Period, model::AbstractModel) =
+    set!(L, Δt, resolution_factor(model))
+
 # also allow for keyword arguments
 set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
+set!(L::AbstractTimeStepper, model::AbstractModel; Δt::Period) = set!(L, Δt, model)
 
 function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
     (; trunc) = model.spectral_grid
