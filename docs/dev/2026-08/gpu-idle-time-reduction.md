@@ -1,12 +1,13 @@
 # Reducing GPU idle time in the `PrimitiveWetModel` time step
 
-> Status: **in progress**. W0 (confirmation) and W1 (the `K=2` batch-plan fix) are done and
-> measured on **both** GPUs: planning `K=2` makes a GPU time step **1.7–2.3× faster** at
-> T31–T255. W1's remaining test obligations are started but unfinished (see *Status as of
-> 2026-08-08*). W2 now has its mechanism pinned down — the existing stride on the feedback
-> diagnostics silently degenerates to *every step* whenever `verbose = false` — but the
-> behavioural decision is still open. W3/W4 wait on the post-W1 re-profile. See
-> *Where to continue* at the end.
+> Status: **in progress**. W0, W1, W2 and W4 are **done**; W3 is **re-scoped and not started**.
+> W1 (planning the `K=2` FFT batch) and W2 (striding the feedback diagnostics) together make a
+> GPU time step **1.67× faster at T255 and 2.2–2.45× at T31–T127** on the H100, measured, with
+> the full test suite behind them. W4 closed for free: the 96–768 device-to-device copies per
+> step were W1's bug. The post-fix re-profile then **invalidated W3's premise** — with CUDA
+> graph nodes expanded the step is **66–78 % GPU-busy**, not the 22–29 % this plan was written
+> against, so the model is no longer launch-bound and neither of W3's two proposed remedies
+> targets what is left. See finding W3.1 and *Where to continue* at the end.
 
 Date of initial draft: 2026-08-07
 
@@ -83,8 +84,22 @@ Base revision: `196bcc92e945ee7ac18588d06fdde8d21f67c615` (`mg/profile-gpu-primi
     `--cuda-graph-trace=graph`, under which the kernels inside a CUDA graph are **not collected at
     all**. Post-W1 the K=2 FFT moved from the serial path (counted) into a graph (uncounted), so the
     post-fix "GPU busy ms" and "kernels/step" understate the real GPU work and must not be compared
-    against the pre-fix ones. `submit_phaseB.sh` gained a granularity argument and a re-profile with
-    `node` granularity was submitted; see finding W3.0 and *Where to continue*.
+    against the pre-fix ones. `submit_phaseB.sh` gained a granularity argument and the re-profile was
+    re-run at `node` granularity (job `1732864`);
+  - **that re-profile re-scopes W3 entirely** (finding W3.1): with graph nodes expanded the step is
+    **66–78 % GPU-busy**, not 22–29 %. The model is no longer launch-bound, and 44 % of the remaining
+    GPU time at T255 is inside cuFFT — which neither W3(a) nor W3(b) as written is aimed at;
+  - mid-session the user reported the **progress bar never being drawn**. Diagnosed and fixed
+    (finding W2.3); it is a pre-existing `main` bug, not a W2 regression. The first draft of the fix
+    also computed a bar width that left room for SpeedyWeather's long progress string; **the user
+    asked for that helper to be dropped**, so the fix is now only the field type and its default;
+  - the CPU `SpeedyWeather` suite has **one failure, `dynamics/dispatch.jl`, that this plan did not
+    cause**: reverting only `feedback.jl` to pre-W2 in the same environment still reproduces it, and
+    the JET report names only KernelAbstractions and ModelParameters. See the status table;
+  - **a caution for future sessions**: an A/B experiment that reverts a tracked file with
+    `git checkout <rev> -- <path>` leaves that revert *staged*, and it was committed from the index
+    as `ef75b832 "feedback reverse"` before it could be undone. Use a scratch copy for such
+    experiments, or `git restore --staged` immediately after.
 
 - **2026-08-08 (third session), "continue the GPU idle-time reduction"** plus, mid-session, *"Does the
   `max(interval, iterations)` make sense? And also calling `progress!` / `next!` still at every step?"*
@@ -305,10 +320,12 @@ attribution shows measurable time or launch count; otherwise record and close.
 | step | depends on | expected gain (T255, H100) |
 |---|---|---|
 | W0 confirm | — | none (information) — **done** |
-| W1 `K=2` batch | W0 | **measured 1.91–2.27× on A40** (predicted 1.4–1.7×) — **done** |
-| W2 feedback | — | up to further ~1.15× (recovering the 14 % feedback gap) |
-| W3 residual launches | W1 (re-profile) | unknown; remaining idle after W1+W2 bounds it |
-| W4 DtoD copies | traces only | likely small; cheap to check |
+| W1 `K=2` batch | W0 | **measured 1.91–2.27× on A40, 1.71–2.07× on H100** — **done** |
+| W2 feedback | — | **measured: feedback cost 14–26 % → −0.3…3.0 %** (finding W1W2.1) — **done** |
+| W3 residual launches | W1 (re-profile) | **re-scoped, see W3.1**: the step is now 66–78 % GPU-busy, so the whole remaining idle is worth ≤1.36× at T255 and the launch-reduction premise is gone |
+| W4 DtoD copies | traces only | **closed at zero cost** — the 96–768 DtoD copies/step were W1's bug and are gone (finding W3.0) |
+
+Combined W1 + W2 on the H100: **2.45× at T31, 2.39× at T63, 2.20× at T127, 1.67× at T255.**
 
 Every workstream ends with the same measurement: Phase A `bench_model.jl` on A40 + H100, all
 four truncations, `nans_detected` guard, table appended to this document.
@@ -567,6 +584,28 @@ so no `time()`, no device access, and `lock_if_threading` does not lock single-t
 `p.counter` is the clock that every `mod(counter, …)` above is taken against, so striding `next!`
 would stride the strides.
 
+### W2.3 — the progress bar was never drawn: `barlen = 0`, not `nothing` (2026-08-08)
+
+Reported by the user mid-session while running a model on CPU: the progress meter printed its text
+(`100% Time: 0:00:10 (2000-03-01, 703.93 years/day, 88 m/s, [-81, 26] ˚C)`) but no bar.
+
+Not caused by W2 — `main` has the identical code. `Feedback.progress_bar_length` was declared
+`::Int = 0` while its own docstring said "nothing = full window width". ProgressMeter's `barlen` is
+`Union{Int, Nothing}`, where `nothing` means "fit to the terminal" and an integer is taken literally;
+`barstring` draws nothing for `barlen == 0`. So the field could never express the behaviour it
+documented, and every run got a zero-length bar. Fixed by retyping it `Union{Int, Nothing}` with
+default `nothing`, passed straight through to ProgressMeter.
+
+One consequence to be aware of: ProgressMeter's automatic width reserves 14 characters for the speed
+field, whereas SpeedyWeather's `progress_string` is 54 characters in a typical run and up to 60 in
+the worst case (measured: date 10, speed 22, maximum wind 10, temperature range 18). On a narrow
+terminal the line will therefore wrap. An earlier draft of this fix sized the bar itself from those
+four measured widths; it was **removed at the user's request** in favour of the plain pass-through.
+Setting `progress_bar_length` explicitly remains the escape hatch, and `0` still means "no bar".
+
+Unrelated but noticed while reading the same struct: `Feedback.show_time` is declared and documented
+but never read anywhere in `src/`. Left alone, recorded here.
+
 ### W1W2.1 — combined effect of W1 + W2 on the step time (2026-08-08)
 
 Phase A (`bench_model.jl`, `nlayers = 8`, `Float32`, no output, every arm passing the
@@ -650,12 +689,12 @@ of its kernels was counted; post-fix it runs batched inside a graph and none of 
   busy fraction (29 % → 19 % at T255) is largely an artefact of this. The host-side launch counts
   above are unaffected and are the trustworthy half of this trace set.
 
-`submit_phaseB.sh` now takes the granularity as a second argument, and a re-profile at
-`node` granularity was submitted as job `1732864` (prefix `w1g_T`, so `w1_T` and `model_T` both
-survive). That run is the actual input for choosing between W3(a) and W3(b), because W3(a) *is*
-"put more of the step into graphs" and the current traces are blind to precisely that.
+`submit_phaseB.sh` now takes the granularity as a second argument, and the re-profile at
+`node` granularity ran as job `1732864` (prefix `w1g_T`, so `w1_T` and `model_T` both survive).
+That is the trace set W3 must be sized from — see finding W3.1, which supersedes everything
+GPU-side in this one.
 
-The API totals in this trace set invite a wrong conclusion, and finding W3.1 below corrects it:
+The API totals here invite a wrong conclusion, and W3.1 corrects it:
 at T255 kernel launches cost 3.60 ms/step and graph launches 2.02 ms/step, which leaves ~8 ms/step
 of the 14.5 ms step outside the CUDA API entirely. That looks like host-side Julia time. It is not —
 `cuGraphLaunch` blocks while the graph's GPU work runs, and this trace cannot see that work. Do not
@@ -741,12 +780,13 @@ the direction is not in doubt even if the last few percent are.
 | A/B timing, A40, T31–T255 | **done**, table above; every arm passed the `nans_detected` guard |
 | A/B timing, H100, T31–T255 | **done**, SLURM job `1731194` → `reports/verify_k2-1731194.log` |
 | full `SpeedyWeather/test/GPU/runtests.jl` (A40) | **passed**, exit 0, no failures across all 26 testsets |
-| CPU suite `SpeedyTransforms` | see below |
-| CPU suite `SpeedyWeather` | see below |
+| CPU suite `SpeedyTransforms` | **passed**, exit 0 |
+| CPU suite `SpeedyWeather` | **one pre-existing failure, unrelated**: `dynamics/dispatch.jl` (the JET no-runtime-dispatch guard) fails, all other 50 testsets pass. Bisected by reverting *only* `feedback.jl` to the pre-W2 revision in the same environment — it still fails, and the JET report names only KernelAbstractions' CPU `__run`/`__thread_run` and `ModelParameters.withunits`, nothing in SpeedyWeather. It passes in a freshly-created worktree, so it is dependency-version-sensitive; `SpeedyWeather/test/Manifest.toml` is gitignored, so different checkouts of the same source disagree. Not caused by this plan; worth its own issue |
 | batched-vs-serial comparison | **done and stronger than required — bitwise identical**, finding W1.1 |
-| Phase A after W1+W2 (A40) | see below |
-| Phase B/C re-profile after W1 | **not run yet**; `submit_phaseB.sh` now takes a trace-prefix argument so it cannot overwrite the pre-W1 baseline |
-| W2 source change | **implemented**, findings W2.1/W2.2, CPU feedback tests 9/9 |
+| Phase A after W1+W2 (H100, T31–T255; A40, T31/T63) | **done**, finding W1W2.1 |
+| Phase B/C re-profile after W1 | **done twice**: `graph` granularity (job `1732491`, finding W3.0) and `node` granularity (job `1732864`, finding W3.1). Only the second can see inside CUDA graphs |
+| W2 source change | **implemented**, findings W2.1/W2.2, CPU feedback tests 11/11 |
+| progress bar fix | **implemented**, finding W2.3, covered by the `"Progress bar length"` testset |
 
 ### Files changed by W1
 
@@ -773,7 +813,14 @@ the direction is not in doubt even if the last few percent are.
   flagged. Passes (5/5) on CPU.
 - `SpeedyWeather/benchmark/README.md` — note that published numbers include feedback overhead, and
   that pre-stride GPU numbers paid it every step.
-- `CHANGELOG.md` — bullet added under `## Unreleased`, **PR number still `NNN`**.
+- `CHANGELOG.md` — bullet added under `## Unreleased`, PR [#1185].
+
+### Files changed by the progress-bar fix (finding W2.3)
+
+- `SpeedyWeather/src/output/feedback.jl` — `progress_bar_length` retyped
+  `Union{Int, Nothing}` and defaulted to `nothing`.
+- `SpeedyWeather/test/output/feedback.jl` — `"Progress bar length"` testset.
+- `CHANGELOG.md` — bullet under `## Unreleased`, PR [#1185].
 
 **No version bumps were made.** `SpeedyTransforms` is already at `0.2.0-DEV` and
 `SpeedyWeather` at `0.21.1+DEV`; per the convention in `CLAUDE.md` those DEV tags already
@@ -818,69 +865,50 @@ PR is opened.
 
 ## Where to continue (next session)
 
-W0 and W1 are complete and measured on both GPUs; the fix is in the working tree, uncommitted.
-In order:
+W0, W1, W2 and W4 are done and measured; the source changes are committed on
+`mg/profile-gpu-primitivewet` and carry PR number [#1185]. What is left:
 
-1. **Finish the test obligations for W1** — only the new focused test has been run so far. All
-   three were *started or prepared* on 2026-08-08 and none produced a result, so all three are
-   still open:
-   - full GPU suite: `julia --project=SpeedyWeather SpeedyWeather/test/GPU/runtests.jl`
-     (budget ~10+ min; the first several minutes are precompilation with no output at all —
-     do not mistake a silent log for a hang)
-   - CPU suites: `SpeedyTransforms` and `SpeedyWeather` (the CPU `default_transform_batch` was
-     deliberately left unchanged — confirm neither regressed). Now that `SpeedyTransforms` is
-     untouched by W1, its suite is a formality rather than a real risk.
-   - the batched-vs-serial tolerance comparison promised in W1: batched and serial cuFFT need
-     not agree bitwise, so compare a short run under both `transform_batch` sets at tolerance.
-     This is the one W1 deliverable with a real (if small) chance of surfacing a problem.
-     The script now exists — `julia --project=SpeedyWeather/test/GPU/modelbench
-     SpeedyWeather/test/GPU/modelbench/verify_batch_equivalence.jl [steps]` — but it has never
-     been executed, so expect to debug it (its three parts: one K=2 transform batched vs serial
-     at four truncations; a 100-step T31 model run under both batch sets compared variable by
-     variable; the same run on CPU as the reference scale for "how different is acceptable").
-     Its pass criterion is *relative*: the W1 difference must not exceed the CPU-vs-GPU
-     difference the suite already tolerates.
-2. **Re-profile (Phase B/C) with the fix in**, using the existing
-   `submit_phaseB.sh` + `analyze_nsys.sh` + `phase_table.jl`. Two questions:
-   - Are the 96/step `cuMemcpyDtoDAsync_v2` gone? That closes W4 without separate work (see the
-     W4 update above).
-   - What is the new GPU-busy fraction and the new residual launch budget in `dynamics`? That
-     number is the input for choosing between W3(a) graph capture and W3(b) fusion — do not pick
-     between them before seeing it.
-   **Re-profile with the pre-fix traces preserved.** `submit_phaseB.sh` writes
-   `reports/model_T*_L8` with `--force-overwrite=true`, which would destroy the pre-W1 H100
-   baseline (and the A40 set is `reports/a40_T*_L8`). Give the script an output-prefix argument
-   — `analyze_nsys.sh` already takes one — and run the new traces as e.g. `w1_T*` / `a40w1_T*`
-   before comparing.
+1. **W3 needs a fresh decision, because finding W3.1 removed its premise.** The step is 66–78 %
+   GPU-busy, so the whole remaining idle is worth at most ~1.36× at T255 and ~1.5× at T31, and both
+   remedies the plan proposed (more CUDA graphs / elementwise fusion) aim at launch traffic that is
+   already down to 97 host launches per step. Where the time now is, at T255: cuFFT 44 % of GPU busy
+   spread over ~1400 small kernels per step, the two Legendre kernels 19 %, parameterizations 2 %.
+   Before building anything:
+   - **check the busy fraction without a profiler.** `node` granularity carries "significant runtime
+     overhead" by nsys's own documentation, and the whole re-scoping rests on that one number. CUDA
+     events around the step in `nsys_target.jl`, or simply comparing the summed kernel time against
+     the native Phase A step, would confirm it independently and cheaply;
+   - then pick a target *inside* the transform rather than around it. The concrete lead is the
+     Bluestein fallback (lengths 729, 625, 1024 at T255, 0.455 ms/step together): cuFFT uses it for
+     lengths it cannot factor cheaply, and the lengths are the reduced grid's ring lengths, so a grid
+     or padding choice may avoid it. The `preprocess`/`postprocess` kernel pairs (802 launches,
+     1.12 ms/step) are the other visible overhead of issuing many short transforms.
+2. **Finish the A40 arm.** Post-fix Phase A on the A40 covers only T31 and T63
+   (`reports/phaseA_gpu_w2b_a40.json`). T127 and T255 are one login-node command and make the
+   two-GPU comparison complete.
+3. **Re-run the GPU suite.** `SpeedyWeather/test/GPU/runtests.jl` last passed on the A40 *before* W2
+   and the progress-bar fix landed. Both touch `Feedback`, which every GPU run exercises.
+4. **Housekeeping before the PR:** re-check the `-DEV`/`+DEV` tags on `SpeedyWeather`
+   (`0.21.1+DEV`) — `Feedback.progress_bar_length` changed type from `Int` to
+   `Union{Int, Nothing}`, which is a (small) public API change and may argue for a minor bump
+   rather than `+DEV`. `SpeedyTransforms` is untouched by the final form of W1.
+5. **Not ours, but file it:** `SpeedyWeather/test/dynamics/dispatch.jl` fails in this checkout and
+   passes in a fresh worktree of the same source. `SpeedyWeather/test/Manifest.toml` is gitignored,
+   so the JET guard silently depends on whichever KernelAbstractions/ModelParameters versions a
+   given checkout happens to have resolved. Either pin the manifest for that test or relax the
+   guard to SpeedyWeather-owned modules.
 
-3. **W2 is now two pieces, and only the second needs your decision** (see finding W2.0):
-   - **W2a is a bug fix, not a behaviour change** — `max_speed`/`temperature_range` are strided
-     by `progress_meter.core.check_iterations`, which ProgressMeter only ever updates while the
-     meter is *enabled*, so with `verbose = false` it stays at `1` and both device reductions run
-     every single step while nothing is displayed. Measured: `check_iterations` = 1 when
-     disabled vs 32681 when enabled. Skip them when the meter is disabled; nothing observable is
-     lost, because their only consumer is the progress string.
-   - **W2b needs your call** — `nan_detection!` runs unstrided every step and its scalar read is
-     a full device sync. Striding it (option 1) delays the early abort by up to N−1 steps;
-     keeping the check on device behind an async flag (option 3) removes the sync without
-     delaying anything but costs more machinery. Recommendation: stride it, with the stride an
-     option on `Feedback` defaulting to 1 on CPU (zero behaviour change) and >1 on GPU.
-   Note the expected share has *grown* in relative terms now that W1 removed ~half the step: the
-   same ~10–26 % of the old step is a larger fraction of the new one.
-4. **Housekeeping before the PR:** replace `NNN` in the `CHANGELOG.md` bullet with the real PR
-   number, and re-check whether the `-DEV`/`+DEV` tags on `SpeedyTransforms` / `SpeedyWeather`
-   still cover these changes at that point.
+Environment notes for whoever picks this up:
 
-Nothing is committed. `git status` shows the W1 source edits as modifications to
-`SpeedyTransforms/src/fourier.jl`, `SpeedyWeather/src/dynamics/spectral_grid.jl`,
-`SpeedyWeather/test/GPU/runtests.jl` and `CHANGELOG.md`, plus the untracked
-`SpeedyWeather/test/GPU/fft_batch_plans.jl` and this document. The W1 change is small enough to
-split into its own PR ahead of W2/W3 if you want the 2× banked early — the measurements and the
-regression test are already in hand for it.
-
-One environment note for whoever picks this up: a Julia process from an earlier session
-(pid 129728, ~3.9 days old) was holding 2.6 GB on the login-node A40. **Cleared on 2026-08-08**,
-so the A40 numbers in the W1 table were taken under that contention and the next set will not
-be — do not read a small A40 shift between the two sessions as a code effect. Check
-`nvidia-smi --query-compute-apps=pid,used_memory --format=csv` for strays before trusting any
-login-node timing; the A40 is shared with other users, whose processes are not yours to kill.
+- the login-node A40 is shared, and a stale 2.6 GB Julia process from an earlier session was
+  cleared on 2026-08-08 — the W1 A40 numbers were taken under that contention, later ones are not,
+  so do not read a small A40 shift between sessions as a code effect. Check
+  `nvidia-smi --query-compute-apps=pid,used_memory --format=csv` for strays before trusting any
+  login-node timing; other users' processes are not yours to kill.
+- `submit_phaseB.sh` takes `[prefix] [graph_granularity]`. Existing trace sets:
+  `model_T*` (pre-W1, H100), `a40_T*` (pre-W1, A40), `w1_T*` (post-W1+W2, H100, `graph`),
+  `w1g_T*` (post-W1+W2, H100, `node`). Use a new prefix; the script passes
+  `--force-overwrite=true`.
+- **use `--cuda-graph-trace=node` for any question about GPU work.** At the default `graph`
+  granularity the kernels inside a CUDA graph are not collected at all, which cost this
+  investigation one wrong conclusion (see the correction at the end of finding W3.0).
