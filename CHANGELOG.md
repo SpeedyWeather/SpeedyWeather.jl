@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- New `Feedback` option `interval` (default 50 time steps) that strides the NaN check and the progress meter's maximum-speed/temperature-range diagnostics [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
-- Plan the `K=2` FFT batch on GPU (https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+- Fix the progress bar not being drawn: `Feedback.progress_bar_length` now defaults to `nothing` (fit to the terminal width) instead of `0` (no bar) [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
+- New `Feedback` option `interval` (default 50 time steps) that strides the NaN check and the progress meter's maximum-speed/temperature-range diagnostics [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
+- Plan the `K=2` FFT batch on GPU [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
 - Long integration CI with optimize 2, all other SpeedyWeather CI with optimize 0 [#1175](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1175)
 - Faster GPU Legendre transforms: coalesced memory access, no atomics, no scratch resets, 5-37x faster at T127-T511 [#1180](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1180)
 - Fix `SpeedLimitDrag` pointing along the quadrant diagonal instead of antiparallel to the flow (and being √2 too large for a 45° flow); default `drag` raised 4e-7 -> 3e-6 so the limiter actually binds, fixes previous high-resolution instabilities [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
