@@ -174,7 +174,6 @@ Learned ocean surface roughness for momentum, heat and moisture fluxes."""
 
     "[OPTION] learned ocean surface roughness scheme"
     ocean_surface_roughness::LOR
-
 end
 
 Adapt.@adapt_structure LearnedSurfaceRoughness
@@ -231,10 +230,10 @@ end
     end
 
     # Unpack predictors from the land parameterization
-    vₕ = vars.parameterizations.land.vegetation_high[ij]
-    vₗ = vars.parameterizations.land.vegetation_low[ij]
-    laiₕ = vars.parameterizations.land.lai_vegetation_high[ij]
-    laiₗ = vars.parameterizations.land.lai_vegetation_low[ij]
+    vₕ = vars.parameterizations.land.high_vegetation_cover[ij]
+    vₗ = vars.parameterizations.land.low_vegetation_cover[ij]
+    laiₕ = vars.parameterizations.land.high_vegetation_leaf_area[ij]
+    laiₗ = vars.parameterizations.land.low_vegetation_leaf_area[ij]
     sd = vars.prognostic.land.snow_depth[ij]
     soil_moisture = vars.prognostic.land.soil_moisture[ij, begin]  # currently top layer
     soil_temperature = vars.prognostic.land.soil_temperature[ij, end]  # currently bottom layer
