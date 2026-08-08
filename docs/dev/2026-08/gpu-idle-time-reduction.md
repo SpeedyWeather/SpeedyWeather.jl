@@ -69,6 +69,23 @@ Base revision: `196bcc92e945ee7ac18588d06fdde8d21f67c615` (`mg/profile-gpu-primi
     would silently hollow out the ~30 `@test model.feedback.nans_detected == false` assertions in
     the test suite, none of which runs 50 steps.
 
+- **2026-08-08 (fourth session), "continue the gpu-idle-time-reduction".** No new source behaviour;
+  the session closed the measurement debts that W1 and W2 had left open. The previous session had
+  *produced* a post-W1+W2 Phase A run and a post-W1 Phase B trace set but analysed neither, so both
+  were sitting on disk unread. Outcomes:
+  - the combined W1+W2 Phase A result is in (finding W1W2.1): **1.67–2.45× faster** than the
+    pre-plan baseline on the H100, **2.6–2.8×** on the A40, and the `nofeedback` gap that motivated
+    W2 has collapsed from 14–26 % to −0.3…3.0 %, i.e. into the noise;
+  - the Phase B/C re-profile is in (finding W3.0) and it **closes W4 outright**: the 96–768
+    `cuMemcpyDtoDAsync_v2` per step are gone, along with the per-step device allocations. Every
+    host-side per-step count is now *resolution-independent*;
+  - one methodological defect found in the re-profile and fixed in the harness: `nsys` defaults to
+    `--cuda-graph-trace=graph`, under which the kernels inside a CUDA graph are **not collected at
+    all**. Post-W1 the K=2 FFT moved from the serial path (counted) into a graph (uncounted), so the
+    post-fix "GPU busy ms" and "kernels/step" understate the real GPU work and must not be compared
+    against the pre-fix ones. `submit_phaseB.sh` gained a granularity argument and a re-profile with
+    `node` granularity was submitted; see finding W3.0 and *Where to continue*.
+
 - **2026-08-08 (third session), "continue the GPU idle-time reduction"** plus, mid-session, *"Does the
   `max(interval, iterations)` make sense? And also calling `progress!` / `next!` still at every step?"*
   Both questions were answered by measurement and the first one found a real defect in W2.1:
@@ -549,6 +566,105 @@ answered no: **4.6 ns/call** with the meter disabled (`updateProgress!` returns 
 so no `time()`, no device access, and `lock_if_threading` does not lock single-threaded), and
 `p.counter` is the clock that every `mod(counter, …)` above is taken against, so striding `next!`
 would stride the strides.
+
+### W1W2.1 — combined effect of W1 + W2 on the step time (2026-08-08)
+
+Phase A (`bench_model.jl`, `nlayers = 8`, `Float32`, no output, every arm passing the
+`nans_detected` guard). H100 = SLURM job `1732490` → `reports/phaseA_gpu_w1w2.json`; A40 =
+login node, T31/T63 only → `reports/phaseA_gpu_w2b_a40.json`. Baselines are the pre-plan Phase A
+runs (`phaseA_gpu.json`, `phaseA_gpu_a40.json`) measured with the same harness:
+
+| trunc | H100 before | H100 after | speedup | A40 before | A40 after | speedup |
+|------:|------------:|-----------:|--------:|-----------:|----------:|--------:|
+| 31  | 2.760  | **1.126**  | **2.45×** | 3.590 | **1.277** | **2.81×** |
+| 63  | 5.120  | **2.138**  | **2.39×** | 6.256 | **2.386** | **2.62×** |
+| 127 | 10.485 | **4.777**  | **2.20×** | — | — | — |
+| 255 | 23.833 | **14.280** | **1.67×** | — | — | — |
+
+W2 is verified *within* the run rather than by dividing two harnesses: the `nofeedback` variant is
+the same model with `feedback = nothing`, so the gap between it and `default` **is** the feedback
+cost, and it is what W2 was aimed at:
+
+| trunc | feedback cost before (H100) | after (H100) | before (A40) | after (A40) |
+|------:|----------------------------:|-------------:|-------------:|------------:|
+| 31  | 16.1 % | **3.0 %**  | 10.5 % | **1.0 %** |
+| 63  | 26.1 % | **−0.2 %** | 19.2 % | **0.9 %** |
+| 127 | 24.9 % | **−0.3 %** | — | — |
+| 255 | 14.0 % | **1.8 %**  | — | — |
+
+Negative entries are `nofeedback` measuring *slower* than `default` — i.e. the remaining cost is
+below the run-to-run noise of the harness, which is the intended end state. The stride therefore
+recovered essentially all of the Phase A3 gap, not merely part of it.
+
+The `dynamics_only` variant tells the complementary story: the whole parameterization suite costs
+1.8–10.2 % of the post-fix step (was 1.2–8.2 % of a step twice as long), so in absolute terms it is
+unchanged — W1 and W2 removed overhead, not physics.
+
+Note the shape of the speedup: **largest at T31, smallest at T255**, the same gradient as W1 alone.
+Both fixes remove per-step *overhead* whose size grows more slowly than the real work, so their
+share shrinks as resolution grows. T255's 1.67× is the honest production figure.
+
+### W3.0 — the post-W1+W2 re-profile: every per-step host count is now resolution-independent (2026-08-08)
+
+Phase B re-run on the H100 with the fix in (SLURM job `1732491`, traces `reports/w1_T*_L8`, the
+pre-W1 `model_T*` set preserved), exported with `analyze_nsys.sh w1_T` and tabulated by
+`phase_table.jl`. 20 captured steady-state steps per truncation. Host-side CUDA API calls **per
+step**:
+
+| API call | T31 → | T63 → | T127 → | T255 → | after (all truncations) |
+|---|---:|---:|---:|---:|---:|
+| kernel launches (`cuLaunchKernel` + `…Ex`) | 301 | 545 | 1073 | 2237 | **97.2** |
+| `cuMemcpyDtoDAsync_v2` | 96 | 192 | 384 | 768 | **0** |
+| `cuMemAllocFromPoolAsync` | 101 | 197 | 389 | 773 | **1.2** |
+| `cuStreamGetCaptureInfo` | 2333 | 3485 | 5789 | 10397 | **1162** |
+| `cuStreamSynchronize` | 6 | 6 | 6 | 6 | **0.5** |
+| `cuMemcpyDtoHAsync_v2` | 3 | 3 | 3 | 3 | **0.2** |
+| `cuGraphLaunch` | 3 | 3 | 3 | 3 | **4** |
+
+Every count that used to scale with `nlat_half` is now flat, and identical at all four truncations —
+which is what a launch sequence determined by the *program* rather than by the *grid* looks like.
+Three consequences:
+
+- **W4 is closed with no separate work.** The 96/step `cuMemcpyDtoDAsync_v2` at T31 (768 at T255) are
+  at exactly zero. The W4 update's prediction — that they were the serial inverse path's
+  per-iteration `dest .= rhs` temporaries and not an independent phenomenon — is confirmed. The
+  per-step device allocations (`cuMemAllocFromPoolAsync`, 773/step at T255) vanished with them,
+  which is the allocation half of the same line and the reason W1 beat its own launch-count estimate.
+- **The two per-step host round-trips of W2 are visible as such**: `cuMemcpyDtoHAsync_v2` 3 → 0.2 and
+  `cuStreamSynchronize` 6 → 0.5 per step, i.e. one every other step rather than six every step.
+- **`cuStreamGetCaptureInfo` is now the most frequent CUDA call in the step** at 1162/step — twelve
+  per kernel launch, CUDA.jl checking whether it is inside a capture. At 73 ns each it is only
+  0.085 ms/step, so it is not worth attacking on its own, but it scales with launch count and is a
+  reason to prefer *fewer, larger* launches over cheaper ones in W3.
+
+**Caveat that must be carried into W3 — these traces cannot see inside CUDA graphs.**
+`nsys` defaults to `--cuda-graph-trace=graph`, which records a graph as a single GPU operation and
+**does not collect the kernels inside it**. Pre-fix, the K=2 FFT ran on the serial path and every one
+of its kernels was counted; post-fix it runs batched inside a graph and none of them are. Hence:
+
+- the post-fix kernel table contains **no FFT kernels at all** (pre-fix: 964/step at T255, 2.695 ms),
+  and the "69 distinct kernels" is 69 *non-graph* kernels;
+- the post-fix "GPU busy" of 0.267 ms/step (T31) and 2.797 ms/step (T255) **excludes all graph work**
+  and is therefore a lower bound. The pre-fix 0.619/7.020 ms included the serial FFT, so
+  **the pre/post GPU-busy and kernels-per-step numbers are not comparable** and the apparent fall in
+  busy fraction (29 % → 19 % at T255) is largely an artefact of this. The host-side launch counts
+  above are unaffected and are the trustworthy half of this trace set.
+
+`submit_phaseB.sh` now takes the granularity as a second argument, and a re-profile at
+`node` granularity was submitted as job `1732864` (prefix `w1g_T`, so `w1_T` and `model_T` both
+survive). That run is the actual input for choosing between W3(a) and W3(b), because W3(a) *is*
+"put more of the step into graphs" and the current traces are blind to precisely that.
+
+What can already be said about where the residual step time goes, from the API totals alone
+(T255, profiled span 14.486 ms/step against a native 14.280 — the profiler inflates by only 1.4 % at
+this resolution, so these shares are close to real): kernel launches 3.60 ms/step and graph launches
+2.02 ms/step, with the median launch at 2.93 µs but the mean at 37 µs — i.e. most launches are cheap
+and a few block. Excluding one 139 ms outlier synchronization (the capture-ending drain, which is not
+a per-step cost), the CUDA API accounts for ~6.3 ms of the 14.5 ms step. **The remaining ~8 ms/step is
+host-side Julia time that never enters the CUDA API at all.** If the `node`-granularity re-profile
+confirms that split, then fusion (W3b) and graphs (W3a) are attacking the same target from two sides —
+both reduce the number of times the host has to build and issue a launch — and the choice between
+them turns on portability rather than on which one the profile favours.
 
 ## Testing and verification
 
