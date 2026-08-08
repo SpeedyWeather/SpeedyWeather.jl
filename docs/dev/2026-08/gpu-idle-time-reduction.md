@@ -795,13 +795,15 @@ the direction is not in doubt even if the last few percent are.
   CPU method explaining why it does *not* need `2` (`_transform_chunked!` splits unplanned `K`
   there instead of falling back).
 - `SpeedyWeather/test/GPU/fft_batch_plans.jl` (new) + `runtests.jl` include.
-- `CHANGELOG.md` — bullet added under `## Unreleased`, **PR number still `NNN`**.
+- `CHANGELOG.md` — bullet added under `## Unreleased`, PR [#1185].
 - `SpeedyWeather/test/GPU/modelbench/verify_batch_k2.jl` — rewritten (explicit batch sets both
   arms, call-site capture, alternated-order min-of-2 timing, post-fix confirmation pass).
 - `SpeedyWeather/test/GPU/modelbench/analyze_nsys.sh` — optional trace-prefix argument.
 - `SpeedyWeather/test/GPU/modelbench/submit_verify_k2.sh` (new) — H100 job.
 - `SpeedyWeather/test/GPU/modelbench/verify_batch_equivalence.jl` (new, 2026-08-08) — the
-  batched-vs-serial tolerance comparison. **Untested: written but never run.**
+  batched-vs-serial comparison. Run on the A40; result in finding W1.1 (bitwise identical).
+- `SpeedyWeather/test/GPU/modelbench/submit_phaseB.sh` — optional trace-prefix argument, plus a
+  `--cuda-graph-trace` granularity argument (see the caveat in finding W3.0).
 
 ### Files changed by W2
 
@@ -837,29 +839,40 @@ PR is opened.
 
 ## Known limitations
 
-- All measurements are CUDA-only (A40/H100); launch-overhead economics differ on Metal/AMDGPU
-  and the graph work (W3a) is CUDA-specific by construction. Fusion (W3b) is the
-  backend-portable half.
+- All measurements are CUDA-only (A40/H100); launch-overhead economics differ on Metal/AMDGPU.
+  W1 is backend-neutral (it plans an FFT batch size, nothing CUDA-specific), W2 likewise.
 - **Superseded:** the 1.4–1.7× W1 estimate was arithmetic from launch counts; the measurement
   came in at 1.91–2.27× because the serial path also allocates and copies per iteration.
-- The W1 measurement is A40-only so far; the H100 arm is queued. The A40 is a *shared login
-  node* — a stale Julia process from an earlier session was holding 2.6 GB of its memory during
-  these runs. The alternated-order min-of-2 protocol is there to blunt that, but the H100
-  numbers are the ones to trust for absolute ms/step.
-- Phase D (`ncu` kernel counters) remains blocked (`ERR_NVGPUCTRPERM`); irrelevant to
-  launch-bound work, but W3b fusion candidates cannot be roofline-verified until cluster
-  support enables counters.
+- **Superseded:** the "W1 is A40-only, the H100 arm is queued" note — both GPUs are measured for
+  W1, and W1+W2 is measured on the H100 at all four truncations. What remains partial is the
+  *post-fix* A40 Phase A, which covers only T31 and T63.
+- The A40 is a *shared login node*. A stale Julia process holding 2.6 GB was cleared on
+  2026-08-08, so the W1 A40 table was taken under contention and later A40 numbers were not.
+  The H100 numbers are the ones to trust for absolute ms/step.
+- **The 66–78 % GPU-busy figure (W3.1) comes from a `--cuda-graph-trace=node` trace, which nsys
+  documents as carrying "significant runtime overhead".** It is cross-checked against the
+  `graph`-granularity set on everything both can see, and against the native Phase A step time,
+  but it has not been confirmed by a second, profiler-free method. Since the entire re-scoping of
+  W3 rests on it, that confirmation is the first item in *Where to continue*.
+- Phase D (`ncu` kernel counters) remains blocked (`ERR_NVGPUCTRPERM`). This now matters more than
+  it did: with the step GPU-bound rather than launch-bound, the remaining questions (is the FFT
+  bandwidth- or occupancy-limited?) are exactly the ones counters answer.
 - `nlayers = 8` throughout; the layer sweep interacts with the batch-size set
-  (`default_transform_batch` is layer-derived) and should be re-checked once W1 defines the
-  final set.
+  (`default_transform_batch` is layer-derived) and should be re-checked now that W1 has fixed
+  that set.
 
 ## Future work
 
-- Whole-step CUDA graph (single replay per step) once W3 shows the remaining idle is spread
-  thinly across many phases — the end state of the graph route, gated on solving the
-  time-varying-scalar problem for parameterizations.
+- Whole-step CUDA graph (single replay per step). **Demoted by finding W3.1**: with 97 host
+  launches per step costing 0.30 ms of a 14.28 ms step at T255, the ceiling on collapsing them
+  all is ~2 %. Only worth revisiting if the transform work shrinks enough to make launch cost
+  matter again, and it would still be gated on the time-varying-scalar problem.
 - Overlap host and device work: with syncs removed (W2) the host could run `output!`/callback
-  logic while the device computes; only worth designing after W1–W3 show what idle remains.
+  logic while the device computes. This is now the more plausible half of the idle story, since
+  the residual 22–34 % is what the host spends between graph replays.
+- Roofline the transform once `ncu` counters are unblocked. The FFT is 44 % of GPU busy at T255
+  and the two Legendre kernels a further 19 %, so whether either is bandwidth- or
+  occupancy-limited decides what optimizing them is worth.
 - Fold the Phase A harness guards into `SpeedyWeather/benchmark/manual_benchmarking.jl`
   (already recommended by the layer-count investigation).
 
@@ -888,10 +901,14 @@ W0, W1, W2 and W4 are done and measured; the source changes are committed on
    two-GPU comparison complete.
 3. **Re-run the GPU suite.** `SpeedyWeather/test/GPU/runtests.jl` last passed on the A40 *before* W2
    and the progress-bar fix landed. Both touch `Feedback`, which every GPU run exercises.
-4. **Housekeeping before the PR:** re-check the `-DEV`/`+DEV` tags on `SpeedyWeather`
-   (`0.21.1+DEV`) — `Feedback.progress_bar_length` changed type from `Int` to
-   `Union{Int, Nothing}`, which is a (small) public API change and may argue for a minor bump
-   rather than `+DEV`. `SpeedyTransforms` is untouched by the final form of W1.
+4. **Version tags — checked, left alone, worth one look before the PR.** `SpeedyWeather` is at
+   `0.21.1+DEV` on *both* `main` and this branch, so the existing `+DEV` already covers the W1 and
+   W2 edits as minor/additive. The one arguable case is `Feedback.progress_bar_length` changing type
+   from `Int` to `Union{Int, Nothing}`, which by the letter of `CLAUDE.md` is a public API change and
+   would call for `0.22.0-DEV`. Left as `+DEV` because the branch already carries other
+   behaviour-changing work (the `SpeedLimitDrag` default change, the Legendre rewrite) under the same
+   tag, so bumping for this field alone would be inconsistent — but it is a call, not a fact.
+   `SpeedyTransforms` is untouched by the final form of W1 and needs nothing.
 5. **Not ours, but file it:** `SpeedyWeather/test/dynamics/dispatch.jl` fails in this checkout and
    passes in a fresh worktree of the same source. `SpeedyWeather/test/Manifest.toml` is gitignored,
    so the JET guard silently depends on whichever KernelAbstractions/ModelParameters versions a
