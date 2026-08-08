@@ -16,8 +16,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] Progress description"
     description::String = ""
 
-    "[OPTION] Progress bar length, nothing = full window width"
-    progress_bar_length::Int = 0
+    "[OPTION] Progress bar length in characters, `nothing` fits it to the terminal width, `0` shows no bar"
+    progress_bar_length::Union{Int, Nothing} = nothing
 
     "[OPTION] show speed (e.g. in simulated years per day) in progress meter?"
     showspeed::Bool = true
@@ -33,6 +33,9 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Show temperature range of simulation [˚C]"
     show_temperature_range::Bool = true
+
+    "[OPTION] Interval in time steps between NaN checks, and between the progress meter diagnostics (maximum speed, temperature range)"
+    interval::Int = 50
 
     "[DERIVED] struct containing everything progress related"
     progress_meter::ProgressMeter.Progress =
@@ -77,7 +80,7 @@ function initialize!(feedback::Feedback, variables::Variables, model::AbstractMo
         showspeed,
         desc,
         color = :blue,
-        barlen = feedback.progress_bar_length,
+        barlen = something(feedback.progress_bar_length, auto_progress_bar_length(feedback, desc)),
         barglyphs = ProgressMeter.BarGlyphs(" ━━  "),
         dt = feedback_dt,
     )
@@ -88,13 +91,21 @@ end
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
-    every_nsteps = feedback.progress_meter.core.check_iterations
-    (; counter) = feedback.progress_meter.core
+    (; counter, n, check_iterations, enabled) = feedback.progress_meter
+    interval = max(1, feedback.interval)
     FEEDBACK_TIME[] = vars.prognostic.clock.time
-    feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(vars)
-    feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(vars)
+
+    every_nsteps = enabled ? check_iterations : interval
+    if mod(counter, every_nsteps) == 0
+        feedback.show_umax && max_speed(vars)
+        feedback.show_temperature_range && temperature_range(vars)
+    end
+
     progress!(feedback)
-    feedback.debug && nan_detection!(feedback, vars, model)
+
+    last_step = counter == n - 1
+    feedback.debug && (mod(counter, interval) == 0 || last_step) &&
+        nan_detection!(feedback, vars, model)
     return nothing
 end
 
@@ -174,6 +185,31 @@ function progress_string(t, sec_per_iter, dt_in_sec, U, Tmin, Tmax)
     umax = U < 0 ? "" : @sprintf ", %3d m/s" U
     Trange = Tmax <= -300 ? "" : @sprintf ", [%4d, %4d] ˚C" Tmin Tmax
     return time * speed * umax * Trange
+end
+
+# Widest each part of `progress_string` above can get, used to size the progress bar so that the
+# two together fit on one line. Verified in test/output/feedback.jl against `progress_string` itself.
+const PROGRESS_DATE_WIDTH = 10      # "2000-03-01"
+const PROGRESS_SPEED_WIDTH = 22     # ", 6575.34 millenia/day"
+const PROGRESS_UMAX_WIDTH = 10      # ", 9999 m/s"
+const PROGRESS_TRANGE_WIDTH = 18    # ", [-1000, 1000] ˚C"
+const PROGRESS_ETA_WIDTH = 29       # ProgressMeter's own reservation for its percentage/time field
+
+"""$(TYPEDSIGNATURES)
+Progress bar length that leaves room on the line for the description, ProgressMeter's time/ETA
+field and the `progress_string` that SpeedyWeather appends. ProgressMeter's own automatic width
+(`barlen = nothing`) cannot be used for this: it reserves 14 characters for the speed field, while
+`progress_string` is up to $(PROGRESS_DATE_WIDTH + PROGRESS_SPEED_WIDTH + PROGRESS_UMAX_WIDTH + PROGRESS_TRANGE_WIDTH)
+characters wide, so it overflows the line and wraps the bar. Returns `0`, i.e. no bar, on terminals
+too narrow to fit one."""
+function auto_progress_bar_length(feedback::Feedback, desc::AbstractString, output::IO = stderr)
+    reserved = PROGRESS_ETA_WIDTH + length(desc)
+    if feedback.showspeed     # everything below is printed via ProgressMeter.speedstring
+        reserved += PROGRESS_DATE_WIDTH + PROGRESS_SPEED_WIDTH
+        feedback.show_umax && (reserved += PROGRESS_UMAX_WIDTH)
+        feedback.show_temperature_range && (reserved += PROGRESS_TRANGE_WIDTH)
+    end
+    return max(0, displaysize(output)[2] - reserved)
 end
 
 function max_speed(vars::Variables)
