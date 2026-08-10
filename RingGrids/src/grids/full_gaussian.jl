@@ -55,5 +55,7 @@ function get_lond(::Type{<:FullGaussianGrid}, nlat_half::Integer)
     return collect(range(0, 360 - 180 / nlon, step = 360 / nlon))
 end
 
+hasoffset(::Type{<:FullGaussianGrid}) = false   # first longitude point on 0˚
+
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)

@@ -10,6 +10,16 @@ function default_title(field::RingGrids.AbstractField)
     return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
 end
 
+function Makie.heatmap(
+        field::RingGrids.AbstractField;
+        title::String = default_title(field),
+        kwargs...   # pass on to Makie.heatmap
+    )
+    @warn "Field of size $(size(field)) provided, 2D horizontal Field{T, 1} expected, selecting first indices of additional dimensions."
+    inds = (Colon(), ntuple(_ -> 1, ndims(field) - 1)...)
+    return heatmap(RingGrids.field_view(field, inds...))
+end
+
 """
 $(TYPEDSIGNATURES)
 Defines Makie's `heatmap` function for a`field::AbstractField2D` via interpolation

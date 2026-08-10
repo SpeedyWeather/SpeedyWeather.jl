@@ -29,7 +29,7 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 @propagate_inbounds function parameterization!(ij, vars, ::TransparentShortwave, model)
 
     planet = model.planet
-    land_sea_mask = model.land_sea_mask.mask
+    land_sea_mask = model.land_sea_mask.land_fraction
 
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     land_fraction = land_sea_mask[ij]
@@ -165,8 +165,8 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     O₃_absorption = radiation.ozone_absorption
     (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
 
-    dTdt = vars.tendencies.grid.temperature
-    pₛ = vars.grid.pressure_prev[ij]
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, radiation)
+    pₛ = vars.parameterizations.surface_pressure[ij]
     nlayers = size(dTdt, 2)
     σ = model.geometry.σ_levels_full
     Δσ = model.geometry.σ_levels_thick
@@ -174,7 +174,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     albedo_ocean = vars.parameterizations.ocean.albedo[ij]
     albedo_land = vars.parameterizations.land.albedo[ij]
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     cₚ = model.atmosphere.heat_capacity
 
     # Full TOA downward flux; ozone absorption is handled inside the layer loop below.

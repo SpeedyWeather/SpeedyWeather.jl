@@ -3,7 +3,7 @@ Abstract super type for land-sea masks. Custom land-sea masks have to be defined
 
     CustomMask{NF, GridVariable2D} <: AbstractLandSeaMask
 
-and need to have at least a field called `mask::GridVariable2D` that uses a `GridVariable2D` as defined
+and need to have at least a field called `land_fraction::GridVariable2D` that uses a `GridVariable2D` as defined
 by the spectral grid object, so of correct size and with the number format `NF`.
 All `AbstractLandSeaMask` have a convenient generator function to be used like
 `mask = CustomMask(spectral_grid, option=argument)`, but you may add your own or customize by
@@ -13,7 +13,7 @@ that new mask
 
     initialize!(mask::CustomMask, model::PrimitiveEquation)
 
-which generally is used to tweak the mask.mask grid as you like, using
+which generally is used to tweak the mask.land_fraction grid as you like, using
 any other options you have included in `CustomMask` as fields or anything else (preferrably read-only,
 because this is only to initialize the land-sea mask, nothing else) from `model`. You can
 for example read something from file, set some values manually, or use coordinates from `model.geometry`.
@@ -53,12 +53,12 @@ end
 end
 
 
-# also allow for land_sea_mask struct to be passed on, use .mask in that case
+# also allow for land_sea_mask struct to be passed on, use .land_fraction in that case
 @propagate_inbounds mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
-    mask!(field, mask.mask, args...; kwargs...)
+    mask!(field, mask.land_fraction, args...; kwargs...)
 
-# adapt on GPU only the mask itself
-Adapt.adapt_structure(to, land_sea_mask::AbstractLandSeaMask) = (mask = adapt_structure(to, land_sea_mask.mask),)
+# adapt on GPU only the land_fraction field
+Adapt.adapt_structure(to, land_sea_mask::AbstractLandSeaMask) = (land_fraction = adapt_structure(to, land_sea_mask.land_fraction),)
 
 # make available when using SpeedyWeather
 export EarthLandSeaMask
@@ -91,7 +91,7 @@ $(TYPEDFIELDS)"""
 
     # FIELDS (to be initialized in initialize!)
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    mask::GridVariable2D
+    land_fraction::GridVariable2D
 end
 
 export LandSeaMask
@@ -102,16 +102,16 @@ $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, grid) = spectral_grid
-    mask = zeros(GridVariable2D, grid)
-    return L{NF, GridVariable2D}(; mask, kwargs...)
+    land_fraction = zeros(GridVariable2D, grid)
+    return L{NF, GridVariable2D}(; land_fraction, kwargs...)
 end
 
-# set mask with grid, scalar, function; just define path `mask.mask` to grid here
+# set mask with grid, scalar, function; just define path `mask.land_fraction` to grid here
 function set!(mask::AbstractLandSeaMask, args...; kwargs...)
-    set!(mask.mask, args...; kwargs...)
-    lo, hi = extrema(mask.mask)
+    set!(mask.land_fraction, args...; kwargs...)
+    lo, hi = extrema(mask.land_fraction)
     (lo < 0 || hi > 1) && @warn "Land-sea mask not in [0, 1] but in [$lo, $hi]. Clamping."
-    clamp!(mask.mask, 0, 1)
+    clamp!(mask.land_fraction, 0, 1)
     return nothing
 end
 
@@ -119,7 +119,17 @@ end
 $(TYPEDSIGNATURES)
 Reads a high-resolution land-sea mask from file and interpolates (grid-cell average)
 onto the model grid for a fractional sea mask."""
-function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
+initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation) = load_mask!(land_sea_mask)
+
+"""
+$(TYPEDSIGNATURES)
+
+Loads the land-sea mask from the path set in `land_sea_mask`, interpolates (grid-cell average) 
+onto the model grid for a fractional sea mask and saves it to the field `land_sea_mask.land_fraction`.
+"""
+function load_mask!(land_sea_mask::EarthLandSeaMask)
+
+    arch = architecture(land_sea_mask.land_fraction)
 
     # LOAD NETCDF FILE
     lsm_highres = get_asset(
@@ -132,19 +142,19 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     )
 
     # average onto grid cells of the model
-    cpu_mask = on_architecture(CPU(), land_sea_mask.mask)
+    cpu_mask = on_architecture(CPU(), land_sea_mask.land_fraction)
     RingGrids.grid_cell_average!(cpu_mask, lsm_highres)
-    land_sea_mask.mask .= on_architecture(model.spectral_grid.architecture, cpu_mask)
+    land_sea_mask.land_fraction .= on_architecture(arch, cpu_mask)
 
     if land_sea_mask.quantization > 0
         q = land_sea_mask.quantization
-        land_sea_mask.mask .= round.(land_sea_mask.mask ./ q) .* q
+        land_sea_mask.land_fraction .= round.(land_sea_mask.land_fraction ./ q) .* q
     end
 
-    lo, hi = extrema(land_sea_mask.mask)
+    lo, hi = extrema(land_sea_mask.land_fraction)
     if (lo < 0 || hi > 1)
         # @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
-        land_sea_mask.mask .= clamp.(land_sea_mask.mask, 0, 1)
+        land_sea_mask.land_fraction .= clamp.(land_sea_mask.land_fraction, 0, 1)
     end
     return nothing
 end
@@ -155,14 +165,14 @@ export AquaPlanetMask
 $(TYPEDFIELDS)"""
 @kwdef struct AquaPlanetMask{NF, GridVariable2D} <: AbstractLandSeaMask
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    mask::GridVariable2D
+    land_fraction::GridVariable2D
 end
 
 """
 $(TYPEDSIGNATURES)
 Sets all grid points to 0 = sea."""
 function initialize!(land_sea_mask::AquaPlanetMask, model::PrimitiveEquation)
-    land_sea_mask.mask .= 0    # set all to sea
+    land_sea_mask.land_fraction .= 0    # set all to sea
     return nothing
 end
 
@@ -172,13 +182,13 @@ export RockyPlanetMask
 $(TYPEDFIELDS)"""
 @kwdef struct RockyPlanetMask{NF, GridVariable2D} <: AbstractLandSeaMask
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    mask::GridVariable2D
+    land_fraction::GridVariable2D
 end
 
 """
 $(TYPEDSIGNATURES)
 Sets all grid points to 1 = land."""
 function initialize!(land_sea_mask::RockyPlanetMask, model::PrimitiveEquation)
-    land_sea_mask.mask .= 1    # set all to land
+    land_sea_mask.land_fraction .= 1    # set all to land
     return nothing
 end

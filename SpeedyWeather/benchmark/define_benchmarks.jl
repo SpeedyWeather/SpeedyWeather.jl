@@ -13,16 +13,32 @@ benchmarks[:benchmark200] = BenchmarkSuite(
     title = "Shallow water model, resolution",
     nruns = 7,
     model = fill(ShallowWaterModel, 7),
-    trunc = [31, 42, 63, 85, 127, 170, 255],
+    truncation = [32, 43, 64, 86, 128, 171, 256],
 )
 
 ## Primitive WET MODELS RESOLUTION
-benchmarks[:benchmark201] = BenchmarkSuite(
-    title = "Primitive wet model, resolution",
-    nruns = 6,
-    model = fill(PrimitiveWetModel, 6),
-    trunc = [31, 42, 63, 85, 127, 170],
-)
+# Resolution sweep: L=8 from T31 → T255, plus L=16 and L=24 at the four highest
+# truncations. Each configuration is run with the default (FFT + Legendre)
+# SpectralTransform and additionally with MatrixSpectralTransform — except for
+# T255 which is too large for the dense matrix transform (memory + speed).
+let truncations = [32, 43, 64, 86, 128, 171, 256, 86, 128, 171, 256, 86, 128, 171, 256],
+    nlayers  = [ 8,  8,  8,  8,   8,   8,   8, 16, 16,  16,  16, 24, 24, 24, 24]
+
+    matrix_idx = findall(t -> t < 150, truncations) # no matrix transform for T > 150 (it's too large)
+    truncations_matrix  = truncations[matrix_idx]
+    nlayers_matrix = nlayers[matrix_idx]
+
+    n_default = length(truncations)
+    n_matrix  = length(truncations_matrix)
+    benchmarks[:benchmark201] = BenchmarkSuite(
+        title = "Primitive wet model, resolution",
+        nruns = n_default + n_matrix,
+        model = fill(PrimitiveWetModel, n_default + n_matrix),
+        truncation = vcat(truncations, truncations_matrix),
+        nlayers = vcat(nlayers, nlayers_matrix),
+        spectral_transform = vcat(fill(:default, n_default), fill(:matrix, n_matrix)),
+    )
+end
 
 ## NUMBER FORMATS
 benchmarks[:benchmark300] = BenchmarkSuite(
@@ -35,7 +51,7 @@ benchmarks[:benchmark300] = BenchmarkSuite(
 benchmarks[:benchmark400] = BenchmarkSuite(
     title = "Grids",
     nruns = 6,
-    trunc = fill(63, 6),
+    truncation = fill(64, 6),
     Grid = [
         FullGaussianGrid, FullClenshawGrid, OctahedralGaussianGrid, OctahedralClenshawGrid,
         HEALPixGrid, OctaHEALPixGrid,

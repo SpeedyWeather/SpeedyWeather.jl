@@ -55,7 +55,7 @@ end
 
 function variables(::NoVegetation)
     return (
-        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end
@@ -184,8 +184,10 @@ function soil_moisture_availability!(
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    @boundscheck fields_match(vegetation_high, vegetation_low, soil_moisture_availability) || throws(BoundsError)
-    @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only = true) || throws(BoundsError)
+    @boundscheck fields_match(vegetation_high, vegetation_low, soil_moisture_availability) ||
+        throw(DimensionMismatch(vegetation_high, soil_moisture_availability))
+    @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only = true) ||
+        throw(DimensionMismatch(soil_moisture, soil_moisture_availability))
     @boundscheck size(soil_moisture, 2) >= 2                # defined for two layers
     @boundscheck size(soil_moisture_availability, 2) == 1   # 2D only
 
@@ -228,7 +230,7 @@ end
 
 function variables(::VegetationClimatology)
     return (
-        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         ParameterizationVariable(:vegetation_high, Grid2D(), desc = "Vegetation high cover", units = "1", namespace = :land),
         ParameterizationVariable(:vegetation_low, Grid2D(), desc = "Vegetation low cover", units = "1", namespace = :land),
         ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),

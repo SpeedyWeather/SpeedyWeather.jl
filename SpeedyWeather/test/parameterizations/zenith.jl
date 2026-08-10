@@ -19,3 +19,24 @@
         @test model.solar_zenith isa SolarZenithSeason
     end
 end
+
+@testset "cos_zenith!" begin
+    @testset for Z in (SolarZenith, SolarZenithSeason)
+        spectral_grid = SpectralGrid()
+        model = PrimitiveDryModel(spectral_grid; solar_zenith = Z(spectral_grid))
+
+        cos_zenith = zeros(Float32, spectral_grid.grid)
+
+        # June solstice: exercises polar day/night paths and acos clamp
+        SpeedyWeather.cos_zenith!(cos_zenith, model.solar_zenith, DateTime(2000, 6, 21), model.geometry)
+        @test all(cos_zenith .>= 0)
+        @test all(cos_zenith .<= 1)
+        @test any(cos_zenith .> 0)     # sun shines somewhere
+
+        # December solstice: sun in southern hemisphere
+        SpeedyWeather.cos_zenith!(cos_zenith, model.solar_zenith, DateTime(2000, 12, 21), model.geometry)
+        @test all(cos_zenith .>= 0)
+        @test all(cos_zenith .<= 1)
+        @test any(cos_zenith .> 0)     # sun shines somewhere
+    end
+end

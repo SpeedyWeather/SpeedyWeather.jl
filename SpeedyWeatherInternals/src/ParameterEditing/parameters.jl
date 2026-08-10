@@ -56,10 +56,10 @@ attributes(param::NumberParam) = getfield(param, :attrs)
 Extract parameters from the given `obj` as (possibly nested) named-tuple of `NumberParam`s or some other
 `AbstractParam` type. If `obj`
 """
-parameters(obj; kwargs...) = (;)
+parameters(obj; kwargs...) = parameters(NumberParam, obj; kwargs...)
 parameters(param::PT; kwargs...) where {PT <: AbstractParam} = parameters(PT, param; kwargs...)
 parameters(param::Union{Number, AbstractArray}; kwargs...) = parameters(NumberParam, param; kwargs...)
-parameters(::Type{PT}, obj; kwargs...) where {PT <: AbstractParam} = parameters(obj; kwargs...)
+parameters(::Type{PT}, obj; kwargs...) where {PT <: AbstractParam} = (;)
 parameters(::Type{PT}, param::AbstractParam; kwargs...) where {PT <: AbstractParam} = PT(merge(parent(param), kwargs))
 parameters(::Type{PT}, x::Union{Number, AbstractArray}; kwargs...) where {PT <: AbstractParam} = PT(x; kwargs...)
 
@@ -70,7 +70,7 @@ Convenience method that creates a model parameter from its property with the giv
 A parameter attribute `copmonenttype` is automatically added with value `T`.
 """
 parameterof(obj::T, ::Val{propname}; kwargs...) where {T, propname} = parameterof(NumberParam, obj, Val{propname}(); kwargs...)
-parameterof(::Type{PT}, obj::T, ::Val{propname}; kwargs...) where {PT <: AbstractParam, T, propname} = parameters(PT, getproperty(obj, propname); merge((; kwargs...), (componentttype = T,))...)
+parameterof(::Type{PT}, obj::T, ::Val{propname}; kwargs...) where {PT <: AbstractParam, T, propname} = parameters(PT, getproperty(obj, propname); merge((; kwargs...), (component_type = T,))...)
 
 # reconstruct
 
@@ -85,6 +85,7 @@ the nested structure must match that of `obj`. This function is used to reconstr
 @inline reconstruct(obj::NamedTuple{keys, V}, values::NamedTuple{keys, V}) where {keys, V <: Tuple} = values
 @inline reconstruct(obj, values::ParameterTable) = reconstruct(obj, stripparams(values))
 @inline reconstruct(obj, values::AbstractArray) = isempty(values) ? obj : error("Cannot reconstruct $(typeof(obj)) from non-empty array of type $(typeof(values))")
+@inline reconstruct(obj, ::NamedTuple{()}) = obj # return obj if named tuple is empty
 @generated function reconstruct(obj, values::Union{NamedTuple, ComponentArray})
     keysof(::Type{<:NamedTuple{keys}}) where {keys} = keys
     keysof(::Type{<:ComponentArray{T, N, A, Tuple{Axis{coords}}}}) where {T, N, A, coords} = keys(coords)

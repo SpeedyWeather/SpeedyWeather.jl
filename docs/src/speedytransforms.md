@@ -17,13 +17,21 @@ back to obtain the divergence in grid-point space. Examples are outlined in [Gra
 
 ## Notation: Spectral resolution
 
-There are different ways to describe the spectral resolution, the truncation wavenumber (e.g. T31),
-the maximum degree ``l`` and order ``m`` of the spherical harmonics (e.g. ``l_{max}=31``, ``m_{max} = 31``),
+There are different ways to describe the spectral resolution, the truncation wavenumber (e.g. T32),
+the maximum degree ``l`` and order ``m`` of the spherical harmonics (e.g. ``l_{max}=32``, ``m_{max} = 32``),
 or the size of the lower triangular matrix, e.g. 32x32. In this example, they are all equivalent.
-We often use the truncation, i.e. T31, for brevity but sometimes it is important to describe
+We often use the truncation, i.e. T32, for brevity but sometimes it is important to describe
 degree and order independently (see for example [One more degree for spectral fields](@ref)).
-Note also how truncation, degree and order are 0-based, but matrix sizes are 1-based.
+Note also how we use truncation, degree and order as 1-based to match matrix sizes and
+to end up with powers of two as typical resolutions, see [Available horizontal resolutions](@ref).
+In contrast, spherical harmonics are mathematically typically defined with 0-based indices,
+but throught SpeedyWeather world we moved to a 1-based system for consistency.
 
+!!! warning "SpeedyWeather uses 1-based wavenumbers"
+    SpeedyWeather and SpeedyTransform uses 1-based wavenumbers and spectral truncation throughout.
+    This is to match the Julia convention of 1-based indexing, to match wavenumbers and matrix
+    sizes and to end up with typical resolutions that are just powers of two. However, it is
+    in contrast to the typical mathematical definition for spherical harmonics that is 0-based.
 
 ## Example transform
 
@@ -42,7 +50,7 @@ to grid-point space. Note, the ``+1`` on both degree (first index) and order (se
 Create a `LowerTriangularMatrix` for T5 resolution, i.e. 6x6 matrix size
 
 ```@example speedytransforms
-alms = zeros(LowerTriangularMatrix{ComplexF64}, 6, 6)     # spectral coefficients T5
+alms = zeros(LowerTriangularMatrix{ComplexF64}, 6, 6)     # spectral coefficients T6
 alms[2, 2] = 1                                            # only l=1, m=1 harmonic
 alms
 ```
@@ -94,7 +102,7 @@ On such a coarse grid the transform error (absolute and relative) is about ``10^
 for higher resolution. The `transform` function will choose a corresponding
 grid-spectral resolution (see [Matching spectral and grid resolution](@ref)) following quadratic
 truncation, but you can always truncate/interpolate in spectral space with `spectral_truncation`,
-`spectral_interpolation` which takes `trunc` = ``l_{max} = m_{max}`` as second argument
+`spectral_interpolation` which takes `truncation` = ``l_{max} = m_{max}`` (1-based) as second argument
 ```@example speedytransforms
 spectral_truncation(alms, 2)
 ```
@@ -119,7 +127,7 @@ create a `SpectralTransform` is to start with a `SpectralGrid`, which already de
 which spectral resolution is supposed to be combined with a given grid.
 ```@example speedytransforms
 using SpeedyWeather
-spectral_grid = SpectralGrid(NF=Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(NF=Float32, truncation=6, Grid=OctahedralGaussianGrid, dealiasing=3)
 ```
 (We `using SpeedyWeather` here as `SpectralGrid` is exported therein).
 We also specify the number format `Float32` here to be used for the transform although this
@@ -199,8 +207,8 @@ grid = rand(FullClenshawGrid, 12)
 SpectralTransform(grid)
 ```
 
-where you can also provide spectral resolution `trunc` or `dealiasing`. You can also
-provide both a grid and a lower triangular matrix to describe both spaces
+where you can also provide spectral resolution `truncation` or `dealiasing`.
+You can also provide both a grid and a lower triangular matrix to describe both spaces
 
 ```@example speedytransforms
 SpectralTransform(grid, alms)
@@ -333,7 +341,7 @@ with 8 layers these are
 
 ```@example speedytransforms3
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=127, nlayers=8)
+spectral_grid = SpectralGrid(truncation=128, nlayers=8)
 SpectralTransform(spectral_grid)
 ```
 
@@ -360,7 +368,7 @@ only, not the first two...). But the power spectrum is always calculated along t
 first spherical-harmonic dimension. For example
 
 ```@example speedytransforms3
-alms = randn(LowerTriangularArray{Complex{Float32}}, 5, 5, 2)
+alms = randn(LowerTriangularArray{Complex{Float32}}, 6, 6, 2)
 power_spectrum(alms)
 ```
 returns the power spectrum for `[..., 1]` in the first column and `[..., 2]` in the second.
@@ -408,18 +416,20 @@ When working with SpeedyTransforms standalone, construct from a `Spectrum` and g
 ```@example speedytransforms4
 using RingGrids, LowerTriangularArrays, SpeedyTransforms
 
-spectrum = Spectrum(31)
-grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(31))
+spectrum = Spectrum(32)     # T32 resolution, 1-based spectral truncation, for 32x32 LowerTriangularMatrix
+grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(32))
 M = MatrixSpectralTransform(spectrum, grid; NF = Float32)
 ```
 
+Note the resolution parameter `32` is passed here as 1-based spectral truncation,
+see [Available horizontal resolutions](@ref), which we often call for brevity T32.
 When working at the SpeedyWeather level, pass a `SpectralGrid` directly — the same
 convenience constructor that `SpectralTransform` uses:
 
 ```@example speedytransforms5
 using SpeedyWeather
 
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 M_sg = MatrixSpectralTransform(spectral_grid)
 ```
 
@@ -493,7 +503,7 @@ compared to the Legendre polynomials of `SpectralTransform` which only store one
 ring at a time. The `show` output prints the total matrix memory:
 
 ```@example speedytransforms5
-spectral_grid = SpectralGrid(trunc=63, nlayers=8)
+spectral_grid = SpectralGrid(truncation=64, nlayers=8)
 MatrixSpectralTransform(spectral_grid)
 ```
 

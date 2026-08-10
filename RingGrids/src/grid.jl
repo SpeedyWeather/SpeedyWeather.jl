@@ -19,7 +19,7 @@ function Base.show(io::IO, grid::AbstractGrid)
     return nothing
 end
 
-## TYPES
+# TYPES
 grid_type(::Type{Grid}) where {Grid <: AbstractGrid} = nonparametric_type(Grid)
 full_grid_type(grid::AbstractGrid) = full_grid_type(typeof(grid))
 
@@ -94,7 +94,7 @@ function (::Type{Grid})(
     return Field(data_flat, grid)
 end
 
-## COORDINATES
+# COORDINATES
 
 """$(TYPEDSIGNATURES) Longitudes (degrees, 0-360˚E), latitudes (degrees, 90˚N to -90˚N) for
 every (horizontal) grid point in `grid` in ring order (0-360˚E then north to south)."""
@@ -159,8 +159,7 @@ end
 
 get_solid_angles(grid::AbstractGrid) = get_solid_angles(typeof(grid), grid.nlat_half)
 
-## ITERATOR
-
+# ITERATORS
 """$(TYPEDSIGNATURES)
 Vector{UnitRange} `rings` to loop over every ring of `grid`
 and then each grid point per ring. To be used like
@@ -268,6 +267,28 @@ end
 
 whichring(grid::AbstractGrid) = grid.whichring
 whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat_half, eachring(Grid, nlat_half))
+
+"""$(TYPEDSIGNATURES) First index and length of every ring in `grid` as two vectors
+on architecture `arch`, for use inside kernels where the CPU-only `grid.rings` is unavailable."""
+function eachring_on_architecture(arch, grid::AbstractGrid)
+    rings = eachring(grid)
+    return on_architecture(arch, first.(rings)), on_architecture(arch, length.(rings))
+end
+
+"""$(TYPEDSIGNATURES) True if the first longitude point on every ring of the grid is offset
+half a longitudinal grid spacing east of the 0˚ meridian, false if the first point lies on
+0˚ exactly. Defined per grid type; grids where only some rings have an offset (`HEALPixGrid`)
+only define the per-ring `hasoffset(Grid, nlat_half, j)`."""
+hasoffset(grid::AbstractGrid) = hasoffset(typeof(grid))
+
+"""$(TYPEDSIGNATURES) Like `hasoffset(grid)` but for ring `j`, for grids like `HEALPixGrid`
+where only some rings have a longitudinal offset."""
+hasoffset(Grid::Type{<:AbstractGrid}, nlat_half::Integer, j::Integer) = hasoffset(Grid)
+
+"""$(TYPEDSIGNATURES) The longitudinal offset of `grid` as passed to kernels: `hasoffset(grid)`
+as a scalar Bool for grids where it is identical on every ring, but a Bool vector (one per
+ring, on architecture `arch`) for grids like `HEALPixGrid` where it is ring-dependent."""
+offset_maybe_vector(arch, grid::AbstractGrid) = hasoffset(grid)
 
 # for architectures / adapt
 Architectures.ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) = ismatching(grid.architecture, array_type)

@@ -85,6 +85,8 @@ function get_lond_per_ring(Grid::Type{<:OctahedralClenshawGrid}, nlat_half::Inte
     return collect(0:(360 / nlon):(360 - 180 / nlon))
 end
 
+hasoffset(::Type{<:OctahedralClenshawGrid}) = false     # first longitude point on 0˚
+
 ## QUADRATURE
 get_quadrature_weights(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer) =
     clenshaw_curtis_weights(nlat_half)

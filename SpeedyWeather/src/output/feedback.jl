@@ -16,8 +16,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] Progress description"
     description::String = ""
 
-    "[OPTION] Progress bar length, nothing = full window width"
-    progress_bar_length::Int = 0
+    "[OPTION] Progress bar length in characters, `nothing` fits it to the terminal width, `0` shows no bar"
+    progress_bar_length::Union{Int, Nothing} = 0
 
     "[OPTION] show speed (e.g. in simulated years per day) in progress meter?"
     showspeed::Bool = true
@@ -33,6 +33,9 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Show temperature range of simulation [˚C]"
     show_temperature_range::Bool = true
+
+    "[OPTION] Interval in time steps between NaN checks, and between the progress meter diagnostics (maximum speed, temperature range)"
+    interval::Int = 50
 
     "[DERIVED] struct containing everything progress related"
     progress_meter::ProgressMeter.Progress =
@@ -51,13 +54,15 @@ end
 """
 $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
-function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
+function initialize!(feedback::Feedback, variables::Variables, model::AbstractModel)
+    (; clock) = variables.prognostic
+
     # set to false to recheck for NaNs
     feedback.nans_detected = false
 
     # hack: redefine element in global constant dt_in_sec
     # used to pass on the time step to ProgressMeter.speedstring
-    FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt_sec
+    FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt
     FEEDBACK_TIME[] = clock.time
 
     # reset those to default (-1 not shown)
@@ -70,7 +75,7 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     (; showspeed, description, verbose, feedback_dt) = feedback
     desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
     feedback.progress_meter = ProgressMeter.Progress(
-        clock.n_timesteps - 1;
+        clock.n_steps;          # use time stepper steps (regardless Δt) not time steps of size Δt
         enabled = verbose,
         showspeed,
         desc,
@@ -83,24 +88,29 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     return nothing
 end
 
-# fallback if feedback is set to nothing
-initialize!(::Nothing, clock::Clock, model::AbstractModel) = nothing
-
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
-function progress!(feedback::Feedback, vars::Variables)
-    every_nsteps = feedback.progress_meter.core.check_iterations
-    (; counter) = feedback.progress_meter.core
+function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
+    (; counter, n, check_iterations, enabled) = feedback.progress_meter
+    interval = max(1, feedback.interval)
     FEEDBACK_TIME[] = vars.prognostic.clock.time
-    feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(vars)
-    feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(vars)
+
+    every_nsteps = enabled ? check_iterations : interval
+    if mod(counter, every_nsteps) == 0
+        feedback.show_umax && max_speed(vars)
+        feedback.show_temperature_range && temperature_range(vars)
+    end
+
     progress!(feedback)
-    feedback.debug && nan_detection!(feedback, vars)
+
+    last_step = counter == n - 1
+    feedback.debug && (mod(counter, interval) == 0 || last_step) &&
+        nan_detection!(feedback, vars, model)
     return nothing
 end
 
 # fallback for feedback = nothing
-progress!(::Nothing, vars::Variables) = nothing
+progress!(::Nothing, vars::Variables, model::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -112,10 +122,11 @@ finalize!(::Nothing) = nothing
 
 """$(TYPEDSIGNATURES)
 Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
-function nan_detection!(feedback::Feedback, vars::Variables)
-    feedback.nans_detected && return nothing                        # escape immediately if nans already detected
-    i = feedback.progress_meter.counter                             # time step
-    GPUArrays.@allowscalar vor0 = vars.prognostic.vorticity[2, end, 2]    # only check 1-0 mode of surface vorticity
+function nan_detection!(feedback::Feedback, vars::Variables, model::AbstractModel)
+    feedback.nans_detected && return nothing        # escape immediately if nans already detected
+    i = feedback.progress_meter.counter             # time step
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, feedback)
+    GPUArrays.@allowscalar vor0 = vor[2, end]       # only check 1-0 mode of surface vorticity
 
     # just check first harmonic, spectral transform propagates NaNs globally anyway
     (; time) = vars.prognostic.clock                                # current time for feedback
@@ -274,7 +285,7 @@ function initialize!(progress_txt::ProgressTxt, vars, model)
     write(file, s * "\n")
     write(file, "Integrating:\n")
     write(file, "$SG\n")
-    write(file, "Time: $days days at Δt = $(L.Δt_sec)s\n")
+    write(file, "Time: $days days at Δt = $(L.Δt)s\n")
     model.output.active && write(file, "\nAll data will be stored in $run_path\n")
     model.output.active || write(file, "\nNo output will be written (output=false)\n")
     progress_txt.file = file

@@ -51,7 +51,7 @@ turbulent exchange of sensible heat between the ocean surface and the atmosphere
 based on temperature differences and wind speed. Uses bulk aerodynamic formulas
 with drag coefficients. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
-    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for heat fluxes over ocean"
@@ -78,11 +78,10 @@ variables(::SurfaceOceanHeatFlux) = (
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(ρ)
 
-    # TODO actually implement skin temperature?
-    SST = vars.prognostic.ocean.sea_surface_temperature[ij]
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, heat_flux)
     T = vars.parameterizations.surface_air_temperature[ij]
-    land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pressure_prev[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
 
     # drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
@@ -91,7 +90,7 @@ variables(::SurfaceOceanHeatFlux) = (
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from ocean if available (not NaN) otherwise zero flux
     # leave out *cₚ here but include below to avoid division
-    flux_ocean = ifelse(isfinite(SST), ρ * drag_ocean * V₀ * (SST - T), zero(SST))
+    flux_ocean = ρ * drag_ocean * V₀ * (SST[ij] - T)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     flux_ocean /= 1 + sea_ice_concentration / heat_flux.sea_ice_insulation
@@ -105,7 +104,8 @@ variables(::SurfaceOceanHeatFlux) = (
     vars.parameterizations.sensible_heat_flux[ij] = flux_ocean * cₚ        # [W/m²]
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.temperature[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, heat_flux)
+    dTdt[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -117,7 +117,7 @@ based on soil temperature differences and wind speed. Uses bulk aerodynamic
 formulas with drag coefficients that can account for surface roughness. 
 Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
-    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for heat fluxes over land"
@@ -139,14 +139,14 @@ variables(::SurfaceLandHeatFlux) = (
 
     surface = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
-    pₛ = vars.grid.pressure_prev[ij]                  # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]                # surface pressure [Pa]
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
 
     # TODO actually implement skin temperature?
-    T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]    # uppermost land layer with index 1
+    T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]      # uppermost land layer with index 1
     T = vars.parameterizations.surface_air_temperature[ij]
-    land_fraction = model.land_sea_mask.mask[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     snow_depth = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(T)
 
     # drag coefficient
@@ -169,7 +169,8 @@ variables(::SurfaceLandHeatFlux) = (
     vars.parameterizations.sensible_heat_flux[ij] += flux_land * cₚ    # [W/m²]
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.temperature[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, heat_flux)
+    dTdt[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
 
@@ -189,9 +190,9 @@ variables(::PrescribedOceanHeatFlux) = (
     ParameterizationVariable(:sensible_heat_flux, Grid2D(), desc = "Ocean sensible heat flux", units = "W/m^2", namespace = :ocean),
 )
 
-@propagate_inbounds function surface_heat_flux!(ij, vars, ::PrescribedOceanHeatFlux, model)
-    land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
+@propagate_inbounds function surface_heat_flux!(ij, vars, heat_flux::PrescribedOceanHeatFlux, model)
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
     surface = model.geometry.nlayers
 
@@ -208,7 +209,8 @@ variables(::PrescribedOceanHeatFlux) = (
 
     # accumulate with += into end=lowermost layer total flux
     flux_ocean /= cₚ                            # [W/m²] -> [K/s]
-    vars.tendencies.grid.temperature[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, heat_flux)
+    dTdt[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -228,11 +230,11 @@ variables(::PrescribedLandHeatFlux) = (
     ParameterizationVariable(:sensible_heat_flux, Grid2D(), desc = "Land sensible heat flux", units = "W/m^2", namespace = :land),
 )
 
-@propagate_inbounds function surface_heat_flux!(ij, vars, ::PrescribedLandHeatFlux, model)
-    land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pressure_prev[ij]                # surface pressure [Pa]
+@propagate_inbounds function surface_heat_flux!(ij, vars, heat_flux::PrescribedLandHeatFlux, model)
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
-    surface = model.geometry.nlayers             # indexing top to bottom
+    surface = model.geometry.nlayers                    # indexing top to bottom
 
     # read in a prescribed flux
     flux_land = vars.prognostic.land.sensible_heat_flux[ij]
@@ -247,6 +249,7 @@ variables(::PrescribedLandHeatFlux) = (
 
     # accumulate with += into end=lowermost layer total flux
     flux_land /= cₚ                             # [W/m²] -> [K/s]
-    vars.tendencies.grid.temperature[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, heat_flux)
+    dTdt[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end

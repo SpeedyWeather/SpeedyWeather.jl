@@ -13,13 +13,13 @@ using LinearAlgebra
 using CUDA
 using Statistics: mean
 using Enzyme
-import SpeedyWeather: ReactantDevice, first_timesteps!, later_timestep!, @maybe_jit
+import SpeedyWeather: ReactantDevice, time_step!, time_stepping!, @maybe_jit
 
 const SpeedyWeatherReactantExt = Base.get_extension(SpeedyWeather, :SpeedyWeatherReactantExt)
 
 # Configuration
 
-const TRUNC = 31            # spectral truncation
+const TRUNCATION = 32       # spectral truncation
 const NSTEPS = 10           # number of time steps to compare
 const RTOL = 1.0e-3         # relative tolerance for comparison
 const ATOL = 1.0e-8         # absolute tolerance for comparison

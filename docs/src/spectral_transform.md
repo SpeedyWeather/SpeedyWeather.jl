@@ -46,10 +46,10 @@ For an interactive visualisation of the spherical harmonics, see
 
 The synthesis (or inverse transform) takes the spectral coefficients ``a_{lm}`` and transforms them to grid-point values
 ``f(\phi, \theta)`` (for the sake of simplicity first regarded as continuous). The synthesis is a linear combination of
-the spherical harmonics ``Y_{lm}`` with non-zero coefficients.
+the spherical harmonics ``Y_{lm}`` with non-zero coefficients:
 
 ```math
-f(\phi, \theta) = \sum_{l=0}^{\infty} \sum_{m=-l}^l a_{lm} Y_{lm}(\phi, \theta)
+f(\phi, \theta) = \sum_{l=0}^{\infty} \sum_{m=-l}^l a_{lm} Y_{lm}(\phi, \theta).
 ```
 
 We obtain an approximation with a finite set of ``a_{l, m}`` by truncating the series in both degree ``l``
@@ -57,7 +57,8 @@ and order ``m`` somehow. Most commonly, a triangular truncation is applied, such
 after ``l = l_{max}`` are discarded. Triangular because the retained array of the coefficients ``a_{l, m}``
 looks like a triangle. Other truncations like rhomboidal have been studied[^Daley78] but are rarely used
 since. Choosing ``l_{max}`` also constrains ``m_{max}`` and determines the (horizontal) spectral resolution.
-In SpeedyWeather.jl this resolution as chosen as `trunc` when creating the [SpectralGrid](@ref).
+In SpeedyWeather.jl this resolution as chosen as `truncation` (1-based, i.e. `truncation = l_{max} + 1`)
+when creating the [SpectralGrid](@ref).
 
 For ``f`` being a real-valued there is a symmetry
 ```math
@@ -66,9 +67,10 @@ a_{l, -m} = (-1)^m a^*_{l, +m},
 meaning that the coefficients at ``-m`` and ``m`` are the same, but the sign of the real and imaginary component
 can be flipped, as denoted with the ``(-1)^m`` and the complex conjugate ``a_{l, m}^*``. As we are only dealing with
 real-valued fields anyway, we therefore never have to store the negative orders ``-m`` and end up with a lower
-triangular matrix of size ``(l_{max}+1) \times (m_{max}+1)`` or technically ``(T+1)^2`` where ``T`` is
-the truncation `trunc`. One is added here because the degree ``l`` and order ``m`` use 0-based indexing
-but sizes (and so is Julia's indexing) are 1-based.
+triangular matrix of size ``(l_{max}+1) \times (m_{max}+1)`` or technically ``(T+1)^2`` where ``T``
+is the 0-based truncation ``l_{max}``, corresponding to `truncation - 1` (`truncation` is the
+1-based keyword argument of [SpectralGrid](@ref)). One is added here because the degree ``l``
+and order ``m`` use 0-based indexing but sizes (and so is Julia's indexing) are 1-based.
 
 For correctness we want to mention here that vector quantities require one more degree ``l`` due to the recurrence
 relation in the [Meridional derivative](@ref). Hence for practical reasons *all* spectral fields are represented
@@ -82,17 +84,18 @@ rotate them around the Earth's axis, which, well, doesn't actually change a real
 
 Following the notation of [^Willmert2020] we can therefore write the truncated synthesis as
 ```math
-f(\phi, \theta) = \sum_{l=0}^{l_{max}} \sum_{m=0}^l (2-\delta_{m0}) a_{lm} Y_{lm}(\phi, \theta)
+f(\phi, \theta) = \sum_{l=0}^{l_{max}} \sum_{m=0}^l (2-\delta_{m0}) a_{lm} Y_{lm}(\phi, \theta).
 ```
+
 The ``(2-\delta_{m0})`` factor using the Kronecker ``\delta`` is used here because of the symmetry we have
 to count both the ``m, -m`` order pairs (hence the ``2``) except for the zonal harmonics which do not have
 a pair.
 
 Another symmetry arises from the fact that the spherical harmonics are either symmetric or anti-symmetric
 around the Equator. There is an even/odd combination of degrees and orders so that the sign flips like a
-checkerboard
+checkerboard: 
 ```math
-Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \theta)
+Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \theta).
 ```
 This means that one only has to compute the Legendre polynomials for one hemisphere and the other one
 follows with this equality.
@@ -102,20 +105,21 @@ follows with this equality.
 Starting in grid-point space we can transform a field ``f(\lambda, \theta)`` into the spectral space of the spherical harmonics by
 
 ```math
-a_{l, m} = \int_0^{2\pi} \int_{0}^\pi f(\phi, \theta) Y_{l, m}(\phi, \theta) \sin \theta d\theta d\phi
+a_{l, m} = \int_0^{2\pi} \int_{0}^\pi f(\phi, \theta) Y_{l, m}(\phi, \theta) \sin \theta d\theta d\phi.
 ```
+
 Note that this notation again uses colatitudes ``\theta``, for latitudes the ``\sin\theta`` becomes a ``\cos\theta`` and the
 bounds have to be changed accordingly to ``(-\frac{\pi}{2}, \frac{\pi}{2})``. A discretization with ``N``
 grid points at location ``(\phi_i, \theta_i)``, indexed by ``i`` can be written as [^Willmert2020]
 ```math
-\hat{a}_{l, m} = \sum_i f(\phi_i, \theta_i) Y_{l, m}(\phi_i, \theta_i) \sin \theta_i \Delta\theta \Delta\phi
+\hat{a}_{l, m} = \sum_i f(\phi_i, \theta_i) Y_{l, m}(\phi_i, \theta_i) \sin \theta_i \Delta\theta \Delta\phi.
 ```
 The hat on ``a`` just means that it is an approximation, or an estimate of the true ``a_{lm} \approx \hat{a}_{lm}``.
 We can essentially make use of the same symmetries as already discussed in [Synthesis](@ref synthesis).
 Splitting into the Fourier modes ``e^{im\phi}`` and the Legendre polynomials ``\lambda_l^m(\cos\theta)``
 (which are defined over ``[-1, 1]`` so the ``\cos\theta`` argument maps them to colatitudes) we have
 ```math
-\hat{a}_{l, m} = \sum_j \left[ \sum_i f(\phi_i, \theta_j) e^{-im\phi_i} \right] \lambda_{l, m}(\theta_j) \sin \theta_j \Delta\theta \Delta\phi
+\hat{a}_{l, m} = \sum_j \left[ \sum_i f(\phi_i, \theta_j) e^{-im\phi_i} \right] \lambda_{l, m}(\theta_j) \sin \theta_j \Delta\theta \Delta\phi.
 ```
 So the term in brackets can be separated out as long as the latitude ``\theta_j`` is constant,
 which motivates us to restrict the spectral transform to grids with iso-latitude rings, see [Grids](@ref).
@@ -199,29 +203,38 @@ corresponding coefficient matrix is of size 32x32.
 
 ## Available horizontal resolutions
 
-Technically, SpeedyWeather.jl supports arbitrarily chosen resolution parameter `trunc` when
+Technically, SpeedyWeather.jl supports an arbitrarily chosen resolution parameter `truncation` when
 creating the [SpectralGrid](@ref) that refers to the highest non-zero degree ``l_{max}``
-that is resolved in spectral space. SpeedyWeather.jl will always try to choose an
-easily-Fourier transformable[^FFT] size of the grid, but as we use
+that is resolved in spectral space, 1-based, i.e. `truncation = l_{max} + 1`. SpeedyWeather.jl will
+always try to choose an easily-Fourier transformable[^FFT] size of the grid, but as we use
 [FFTW.jl](https://github.com/JuliaMath/FFTW.jl) there is quite some flexibility without
 performance sacrifice. However, this has traditionally lead to typical resolutions that
 we also use for testing we therefore recommend to use.
 They are as follows with more details below
 
-| `trunc`       | nlon | nlat | ``\Delta x`` |
+!!! warning "Why is `truncation` 1-based?"
+    Spherical harmonics are mathematically 0-based, i.e. the highest degree resolved is
+    ``l_{max}``, and most other spectral models refer to the resolution this way too
+    (e.g. "T31" for ``l_{max}=31``). SpeedyWeather.jl's `truncation` keyword is 1-based
+    instead (`truncation = l_{max} + 1`) purely for user convenience: it lets you pick
+    resolutions as powers of 2 (e.g. `truncation=32` or `truncation=64`) rather than
+    having to remember to subtract one every time. For consistency, we may refer to a
+    resolution as e.g. T32 too, though that's equivalent to T31 for everyone else.
+
+| `truncation`  | nlon | nlat | ``\Delta x`` |
 | ------------- | ---- | ---- | ------------ |
-| 31 (default)  | 96   | 48   | 400 km       |
-| 42            | 128  | 64   | 312 km       |
-| 63            | 192  | 96   | 216 km       |
-| 85            | 256  | 128  | 165 km       |
-| 127           | 384  | 192  | 112 km       |
-| 170           | 512  | 256  | 85 km        |
-| 255           | 768  | 384  | 58 km        |
-| 341           | 1024 | 512  | 43 km        |
-| 511           | 1536 | 768  | 29 km        |
-| 682           | 2048 | 1024 | 22 km        |
-| 1024          | 3072 | 1536 | 14 km        |
-| 1365          | 4096 | 2048 | 11 km        |
+| 32 (default)  | 96   | 48   | 400 km       |
+| 43            | 128  | 64   | 312 km       |
+| 64            | 192  | 96   | 216 km       |
+| 86            | 256  | 128  | 165 km       |
+| 128           | 384  | 192  | 112 km       |
+| 171           | 512  | 256  | 85 km        |
+| 256           | 768  | 384  | 58 km        |
+| 342           | 1024 | 512  | 43 km        |
+| 512           | 1536 | 768  | 29 km        |
+| 683           | 2048 | 1024 | 22 km        |
+| 1025          | 3072 | 1536 | 14 km        |
+| 1366          | 4096 | 2048 | 11 km        |
 
 Some remarks on this table
 - This assumes the default quadratic truncation, you can always adapt the grid resolution via the `dealiasing` option, see [Matching spectral and grid resolution](@ref)
@@ -245,7 +258,7 @@ resolution
 with ``N`` number of grid points over a sphere with radius ``R``. However, we have
 to acknowledge that this usually gives higher resolution compared to other methods
 of estimating the effective resolution, see [^Randall2021] for a discussion. You may therefore
-need to be careful to make claims that, e.g. `trunc=85` can resolve the
+need to be careful to make claims that, e.g. `truncation=86` can resolve the
 atmospheric dynamics at a scale of 165km.
 
 ## Derivatives in spherical coordinates

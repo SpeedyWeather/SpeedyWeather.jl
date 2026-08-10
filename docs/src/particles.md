@@ -240,7 +240,7 @@ add!(model.callbacks, particle_tracker)
 
 which will give it a random key too in case you need to remove it again (more on this in
 [Callbacks](@ref)). If you now run the simulation the particle tracker is called on
-`particle_tracker.every_n_timesteps` and it continuously writes into `particle_tracker.netcdf_file`
+`particle_tracker.every_n_time_steps` and it continuously writes into `particle_tracker.netcdf_file`
 which is placed in the run folder similar to other [NetCDF output](@ref). For example,
 the run folder can be obtained after the simulation by `model.output.run_folder`.
 

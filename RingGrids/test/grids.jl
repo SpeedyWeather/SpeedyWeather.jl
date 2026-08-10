@@ -422,6 +422,12 @@ end
         @test (field2 .* field3)[:, 1, 1] == (field2[:, 1] .* field3[:, 1, 1])
         @test (field1 .* field2_2)[:, 1] == (field1 .* field2_2[:, 1])
         @test (field1 .* field2_2)[:, 2] == (field1 .* field2_2[:, 2])
+
+        # mixed-rank broadcast promotes to the higher rank, order-independent
+        # (a non-commutative BroadcastStyle rule would error or disagree here)
+        @test ndims(field1 .* field2_2) == 2
+        @test ndims(field2_2 .* field1) == 2
+        @test (field1 .* field2_2) == (field2_2 .* field1)
     end
 end
 
@@ -575,6 +581,12 @@ end
     end
 end
 
+@testset "Field unaliascopy" begin
+    field = rand(FullGaussianField, 4)
+    field_copy = Base.unaliascopy(field)
+    @test field_copy == field && field_copy.data !== field.data
+end
+
 @testset "nonparametric types" begin
     @test RingGrids.nonparametric_type(Array) == Array
     @test RingGrids.nonparametric_type(Array{Float32}) == Array
@@ -584,4 +596,55 @@ end
     @test RingGrids.nonparametric_type(SubArray{Float32, 1}) == SubArray
     @test RingGrids.nonparametric_type(SubArray{Float32, 1, Array}) == Array
     @test RingGrids.nonparametric_type(SubArray{Float32, 1, Array{Float32, 1}}) == Array
+end
+
+@testset "ArrayDimensions" begin
+    using SpeedyWeatherInternals.ArrayDimensions: XY, XYZ, XYT, XYZT, hastime, hasvertical
+
+    grid = FullGaussianGrid(4)
+
+    # default dims is XY (2D horizontal)
+    F2 = zeros(grid)
+    @test F2.dims isa XY
+    @test !hastime(F2)
+    @test !hasvertical(F2)
+
+    # explicit 3D horizontal + vertical
+    F3z = zeros(grid, XYZ(), 3)
+    @test F3z.dims isa XYZ
+    @test !hastime(F3z)
+    @test hasvertical(F3z)
+
+    # explicit 3D horizontal + time
+    F3t = zeros(grid, XYT(), 3)
+    @test F3t.dims isa XYT
+    @test hastime(F3t)
+    @test !hasvertical(F3t)
+
+    # explicit 4D horizontal + vertical + time
+    F4 = zeros(grid, XYZT(), 3, 2)
+    @test F4.dims isa XYZT
+    @test hastime(F4)
+    @test hasvertical(F4)
+
+    # dims are preserved through similar, zero, and field_view
+    F3z_sim = similar(F3z)
+    @test F3z_sim.dims isa XYZ
+
+    F3z_zero = zero(F3z)
+    @test F3z_zero.dims isa XYZ
+
+    F3z_view = field_view(F3z, :, 1)
+    @test F3z_view.dims isa XY
+
+    F3z_range_view = field_view(F3z, :, 1:2)
+    @test F3z_range_view.dims isa XYZ
+
+    # getindex with integer drops dims; range preserves
+    @test F3z[:, 1].dims isa XY
+    @test F3z[:, 1:2].dims isa XYZ
+
+    # 4D: two explicit non-horizontal indices
+    @test F4[:, 1:3, 1].dims isa XYZ   # drop time, keep vertical range
+    @test F4[:, 1, 1].dims isa XY      # drop both vertical and time
 end

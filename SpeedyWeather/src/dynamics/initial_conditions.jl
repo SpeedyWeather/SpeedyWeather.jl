@@ -144,7 +144,7 @@ function initialize!(
     )
 
     # Set the prognostic variable
-    return set!(vars, model; vorticity = ξ, lf = 1)
+    return set!(vars, model; vorticity = ξ)
 end
 
 @kernel function random_vorticity_kernel!(
@@ -174,8 +174,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] maximum speed [ms⁻¹]"
     max_speed::NF = 60
 
-    "[OPTION] Maximum wavenumber after truncation"
-    truncation::Int = 15
+    "[OPTION] Maximum wavenumber after truncation (1-based)"
+    truncation::Int = 14
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
     seed::S = 0
@@ -218,8 +218,8 @@ function initialize!(
     u_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
     v_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
 
-    u = 2A .* Field(u_data, grid) .- A
-    v = 2A .* Field(v_data, grid) .- A
+    u = Field(2A .* u_data .- A, grid)
+    v = Field(2A .* v_data .- A, grid)
 
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)
@@ -233,7 +233,7 @@ function initialize!(
 
     # repeat over vertical layers
     ξks = repeat(ξ, 1, nlayers)
-    set!(vars, model; vorticity = ξks, lf = 1)
+    set!(vars, model; vorticity = ξks)
 
     return nothing
 end
@@ -342,7 +342,7 @@ function initialize!(
     # compute the -∇²(u^2/2) term, add to div, divide by gravity
     RingGrids.scale_coslat!(u_grid)     # remove coslat scaling
     u_grid .*= radius                   # no radius scaling as we'll apply ∇⁻²(∇²) (would cancel)
-    @. u_grid = 1 // 2 * u_grid^2
+    u_grid = (1 // 2) .* u_grid .^2
     u²_half = transform!(u, u_grid, model.spectral_transform)
     ∇²!(div, u²_half, model.spectral_transform, flipsign = true, add = true)
     div .*= inv(gravity)
@@ -448,7 +448,7 @@ function initialize!(
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
 
     # apply those to set the initial conditions for vor, div
-    set!(vars, model; vorticity = vor_ic, divergence = div_ic, lf = 1, static_func = true)
+    set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true)
     return nothing
 end
 
@@ -475,7 +475,12 @@ Adapt.@adapt_structure JablonowskiVorticity
     r = radius * acos(X)
 
     # Eq (3), the unperturbed zonal wind
-    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(3 / 2) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+    # NOTE: `x^(3//2)` does NOT stay in Float32. Base computes a fractional power as
+    # exp2(e * log2(x)) and promotes to Float64 internally, so the kernel ends up needing
+    # Float64 log2/exp2, which AMDGPU cannot compile (GPUCompiler segfaults in check_ir!).
+    # cos is strictly positive here (η in [0, 1] gives cos in [0.39, 1]), so x*sqrt(x) is equivalent.
+    cosηᵥ = cos((η - η₀) * π / 2)
+    ζ = -4 * u₀ / radius * (cosηᵥ * sqrt(cosηᵥ)) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
 
     # Eq (12), the perturbation
     perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
@@ -554,14 +559,12 @@ function initialize!(
     haskey(vars.prognostic, :divergence) && set!(vars, geometry, divergence = 0)  # technically not needed, but set to zero for completeness
     haskey(vars.prognostic, :η) && set!(vars, geometry, η = η, static_func = false)
 
-    # filter low values below cutoff amplitude c
+    # filter low values below cutoff amplitude c (broadcast for GPU compatibility)
     vor = get_step(vars.prognostic.vorticity, 1)    # 1 = first leapfrog timestep
-    low_values = abs.(vor) .< c
-    vor[low_values] .= 0
+    @. vor = ifelse(abs(vor) < c, zero(vor), vor)
     if haskey(vars.prognostic, :η)
         η = get_step(vars.prognostic.η, 1)
-        low_value = abs.(η) .< c
-        η[low_value] .= 0
+        @. η = ifelse(abs(η) < c, zero(η), η)
     end
 
     return nothing
@@ -647,7 +650,7 @@ function initialize!(
         η₀, u₀, R_dry, aΩ
     )
 
-    set!(vars, model; temperature = temp_grid, lf = 1)
+    set!(vars, model; temperature = temp_grid)
 
     return nothing
 end
@@ -668,9 +671,12 @@ end
     η = σ_levels_full[k]
     ηᵥ = (η - η₀) * π * 1 // 2  # auxiliary variable for vertical coordinate
 
-    # Amplitudes with height
-    A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
-    A2 = 2u₀ * cos(ηᵥ)^(3 // 2)
+    # Amplitudes with height. NOTE: cos(ηᵥ)^(3//2) would pull a Float64 log2/exp2 into the
+    # kernel (see JablonowskiVorticity above), so reuse the sqrt that A1 already needs
+    cosηᵥ = cos(ηᵥ)
+    sqrt_cosηᵥ = sqrt(cosηᵥ)
+    A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt_cosηᵥ
+    A2 = 2u₀ * cosηᵥ * sqrt_cosηᵥ
 
     # Get latitude
     φij = φ[ij]
@@ -784,7 +790,7 @@ function initialize!(
     RΓg⁻¹ = R_dry * Γ / gravity         # for convenience
     ΓT₀⁻¹ = Γ / T₀
     @. lnp_grid = lnp₀ + log(1 - ΓT₀⁻¹ * orography) / RΓg⁻¹
-    set!(vars, model; pressure = lnp_grid, lf = 1)
+    set!(vars, model; pressure = lnp_grid)
     return nothing
 end
 
@@ -845,7 +851,7 @@ function initialize!(
         constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
         σ_levels_full, relhumid_ref, atmosphere,
     )
-    set!(vars, model; humidity = humid_grid, lf = 1)
+    set!(vars, model; humidity = humid_grid)
 
     return nothing
 end

@@ -47,7 +47,7 @@ end
 
 function variables(::SeasonalLandTemperature)
     return (
-        PrognosticVariable(:soil_temperature, Land3D(), namespace = :land),
+        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land),
     )
 end
 
@@ -153,7 +153,7 @@ timestep!(vars::Variables, land::ConstantLandTemperature, args...) = nothing
 
 function variables(::ConstantLandTemperature)
     return (
-        PrognosticVariable(:soil_temperature, Land3D(), namespace = :land),
+        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land),
     )
 end
 
@@ -176,7 +176,7 @@ LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothin
 
 function variables(::LandBucketTemperature)
     return (
-        PrognosticVariable(:soil_temperature, Land3D(), desc = "Soil temperature", units = "K", namespace = :land),
+        PrognosticVariable(:soil_temperature, LandXYZ(), desc = "Soil temperature", units = "K", namespace = :land),
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m²"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up", units = "W/m²", namespace = :land),
         ParameterizationVariable(:surface_longwave_down, Grid2D(), desc = "Surface longwave radiation down", units = "W/m²"),
@@ -223,9 +223,9 @@ function timestep!(
     soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture : nothing
     Lᵥ = latent_heat_condensation(model.atmosphere)
     Lᵢ = latent_heat_sublimation(model.atmosphere)
-    Δt = model.time_stepping.Δt_sec
+    (; Δt) = model.time_stepping                                # time step in [s]
 
-    (; mask) = model.land_sea_mask
+    (; land_fraction) = model.land_sea_mask
     (; thermodynamics, geometry) = model.land
 
     # Sum up flux F following Frierson et al. 2006, eq (1)
@@ -241,7 +241,7 @@ function timestep!(
     M = haskey(vars.parameterizations.land, :snow_melt_rate) ? vars.parameterizations.land.snow_melt_rate : nothing
 
     @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, S, horizontal_only = true) ||
-        throw(DimensionMismatch(soil_temperature, Rs))
+        throw(DimensionMismatch(soil_temperature, Rsd))
     @boundscheck size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
 
     λ = thermodynamics.heat_conductivity_dry_soil
@@ -256,7 +256,7 @@ function timestep!(
 
     launch!(
         architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
+        land_bucket_temperature_kernel!, soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
         params
     )
 
@@ -264,12 +264,12 @@ function timestep!(
 end
 
 @kernel inbounds = true function land_bucket_temperature_kernel!(
-        soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M, params
+        soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M, params
     )
 
     ij = @index(Global, Linear)
 
-    if mask[ij] > 0                         # at least partially land
+    if land_fraction[ij] > 0               # at least partially land
         (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
 
         # Cooling from snow melt rate, in [W/m²] = [J/kg] * [kg/m²/s]

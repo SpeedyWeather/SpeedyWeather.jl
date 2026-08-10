@@ -12,10 +12,11 @@
             nlayers = 1
         end
 
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = nlayers)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = nlayers)
         particle_advection = ParticleAdvection2D(spectral_grid, layer = 1, nparticles = 100)
 
         model = Model(spectral_grid; particle_advection)
+        model.feedback.verbose = false
 
         tmp_tracker_path = mktempdir(pwd(), prefix = "tmp_tracker_")  # Cleaned up when the process exits
         add!(model.callbacks, ParticleTracker(spectral_grid, path = tmp_tracker_path, filename = "particles.nc"))

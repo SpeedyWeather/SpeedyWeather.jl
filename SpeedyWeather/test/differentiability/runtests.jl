@@ -2,7 +2,7 @@
 # These tests are relatively expensive, and also not strictly necessary to perform at every commit, so they
 # are only part of the extended test set
 using SpeedyWeather
-using ComponentArrays
+using ComponentArrays, Random
 using EnzymeTestUtils, Enzyme, FiniteDifferences, StatsBase, Test
 
 import EnzymeTestUtils: test_approx
@@ -15,6 +15,9 @@ include("timestep_utils.jl")
 
 # TESTS
 include("speedy_transforms.jl")
+include("parameters.jl")
+include("forward_mode.jl")
+include("nested_ad.jl")
 include("barotropic.jl")
-#include("primitivewet.jl")
-include("timestepping.jl")
+include("primitivewet.jl")
+#include("timestepping.jl") # Don't run timestepping tests for now in CI, it takes to long and the forward vs reverse mode test is enough

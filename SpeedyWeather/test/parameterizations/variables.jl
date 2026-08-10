@@ -31,6 +31,7 @@
     @test ndims(vars.parameterizations.myvar_grid2d) == 1
     @test haskey(vars.parameterizations, :myvar_grid3d)
     @test ndims(vars.parameterizations.myvar_grid3d) == 2
+    @test size(vars.parameterizations.myvar_grid3d, 2) == 1     # Grid3D defaults to n=1, a singleton dimension
     @test haskey(vars.prognostic, :myvar_spectral2d)
     @test ndims(vars.prognostic.myvar_spectral2d) == 1
     @test haskey(vars.prognostic, :myvar_spectral3d)

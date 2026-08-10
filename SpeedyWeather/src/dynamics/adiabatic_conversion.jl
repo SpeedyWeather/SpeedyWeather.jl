@@ -31,6 +31,10 @@ function initialize!(
     σ_lnp_B_cpu = on_architecture(CPU(), σ_lnp_B)
 
     # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
+    # TODO: σ_lnp_A and σ_lnp_B are precomputed sigma-coordinate coefficients for the
+    # adiabatic conversion term. The log(σ_half) ratios and 1/Δσ factors assume p ∝ σ.
+    # Generalising to hybrid coordinates requires replacing σ ratios with pressure ratios
+    # at reference pₛ, making these coefficients pₛ-dependent and no longer constant.
     (; σ_levels_half, σ_levels_full, σ_levels_thick) = model.geometry
     σ_levels_half_cpu = on_architecture(CPU(), σ_levels_half)
     σ_levels_thick_cpu = on_architecture(CPU(), σ_levels_thick)

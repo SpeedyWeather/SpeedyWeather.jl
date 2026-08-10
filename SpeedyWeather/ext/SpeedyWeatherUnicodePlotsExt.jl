@@ -21,7 +21,7 @@ function UnicodePlots.heatmap(L::LowerTriangularMatrix{T}; mode::Function = abs)
     title = "$l×$m LowerTriangularMatrix{$T}"
 
     Lplot = similar(L, real(T))
-    for lm in eachharmonic(L)
+    for lm in eachindex(L)
         Lplot[lm] = mode(L[lm])
     end
     Lplot = Matrix(Lplot)
@@ -48,6 +48,16 @@ function UnicodePlots.heatmap(L::LowerTriangularMatrix{T}; mode::Function = abs)
     )
 
     return UnicodePlots.heatmap(Lplot; plot_kwargs...)
+end
+
+function UnicodePlots.heatmap(
+        field::RingGrids.AbstractField;
+        title::String = default_title(field),
+        kwargs...   # pass on to UnicodePlots.heatmap
+    )
+    @warn "Field of size $(size(field)) provided, 2D horizontal Field{T, 1} expected, selecting first indices of additional dimensions."
+    inds = (Colon(), ntuple(_ -> 1, ndims(field) - 1)...)
+    return heatmap(RingGrids.field_view(field, inds...); title, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -93,7 +103,7 @@ end
 
 # add a method for Simulation when the extension is loaded to trigger a unicodeplot after run!(simulation)
 function SpeedyWeather.unicodeplot(simulation::SpeedyWeather.AbstractSimulation)
-    vor = on_architecture(CPU(), simulation.variables.grid.vorticity[:, end])
+    vor = on_architecture(CPU(), get_step(simulation.variables.grid.vorticity)[:, end])
     return UnicodePlots.heatmap(vor, title = "Surface vorticity [1/s]")
 end
 

@@ -188,14 +188,14 @@ with
 - ``\tilde{\nu} = \nu^* R``, the scaled diffusion coefficient ``\nu^*``, which itself is normalized to a damping time scale, see [Normalization of diffusion](@ref).
 
 So scaling with the radius squared means we can use dimensionless operators, however, this comes at the
-cost of needing to deal with both a time step in seconds as well as a scaled time step in seconds per
-meter, which can be confusing. Furthermore, some constants like Coriolis or the diffusion coefficient
-need to be scaled too during initialization, which may be confusing too because values are not
-what users expect them to be. SpeedyWeather.jl follows the logic that the scaling to the prognostic
-variables is only applied just before the time integration and variables are unscaled for output
-and after the time integration finished. That way, the scaling is hidden as much as possible from
-the user. In hopefully many other cases it is clearly denoted that a variable or constant is
-*scaled*.
+cost of some constants like the diffusion coefficient needing to be scaled too during
+initialization, which may be confusing because values are not what users expect them to be.
+In general we try to scale as much as possible on the fly to hide it from the user.
+SpeedyWeather.jl follows the logic that the scaling to the prognostic variables is only applied just
+before the time integration and variables are unscaled for output and after the time integration
+finished. The scaled time step (seconds per meter) is applied on the fly within the time integration
+and is not exposed to the user. In hopefully many other cases it is clearly denoted that a variable
+or constant is *scaled*.
 
 ## References
 

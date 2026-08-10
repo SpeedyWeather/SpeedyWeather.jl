@@ -111,7 +111,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::LandSeaMaskOutput, simulation) =
-    simulation.model.land_sea_mask.mask
+    simulation.model.land_sea_mask.land_fraction
 
 LandOutput() = (
     SoilTemperatureOutput(),
@@ -122,3 +122,13 @@ LandOutput() = (
     SnowDepthOutput(),
     LandSeaMaskOutput(),
 )
+
+"""$(TYPEDSIGNATURES)
+Output variables for the state of a Terrarium land model in coupled
+Terrarium-SpeedyWeather simulations.
+Call as `TerrariumOutput(terrarium_model)` to create output variables for all
+prognostic and auxiliary variables of the Terrarium model, or as
+`TerrariumOutput(terrarium_model, :variable_name)` for a single one. Output
+variables are added to a model's output via `add!(model, TerrariumOutput(terrarium_model)...)`.
+Supported by `NetCDFOutput`, and by `ZarrOutput` once Zarr.jl is loaded."""
+function TerrariumOutput end

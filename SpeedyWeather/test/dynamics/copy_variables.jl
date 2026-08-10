@@ -1,7 +1,7 @@
 @testset "copy!(::Variables, ::Variables)" begin
 
     @testset "Barotropic" begin
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         model = BarotropicModel(spectral_grid)
         simulation = initialize!(model)
         run!(simulation, period = Day(1), output = false)
@@ -14,7 +14,8 @@
         @test vars_copy.prognostic.vorticity == vars.prognostic.vorticity
         # clock copied
         @test vars_copy.prognostic.clock.time == vars.prognostic.clock.time
-        @test vars_copy.prognostic.clock.timestep_counter == vars.prognostic.clock.timestep_counter
+        @test vars_copy.prognostic.clock.step_counter == vars.prognostic.clock.step_counter
+        @test vars_copy.prognostic.clock.time_step_counter == vars.prognostic.clock.time_step_counter
         # scalar Ref copied
         @test vars_copy.prognostic.scale[] == vars.prognostic.scale[]
 
@@ -32,7 +33,7 @@
     end
 
     @testset "ShallowWater" begin
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         model = ShallowWaterModel(spectral_grid)
         simulation = initialize!(model)
         run!(simulation, period = Day(1), output = false)
@@ -53,7 +54,7 @@
     end
 
     @testset "PrimitiveDry" begin
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 5)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 5)
         model = PrimitiveDryModel(spectral_grid)
         simulation = initialize!(model)
         run!(simulation, period = Day(1), output = false)
@@ -90,8 +91,9 @@
     end
 
     @testset "copy! returns dest" begin
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         model = BarotropicModel(spectral_grid)
+        model.feedback.verbose = false
         simulation = initialize!(model)
 
         vars = simulation.variables

@@ -64,8 +64,11 @@ and a new prognostic variable `my_prognostic_variable` for our parameterization.
 Depending on the scope you define this in you may need to add `SpeedyWeather.` in
 front of functions and types. The flux variable is defined as a two-dimensional
 variable on our grid, and the prognostic variable is defined as a spectral variable.
-Three-dimensional variables are also possible by using `Grid3D` and `Spectral3D` as `dims`
-(the 2nd argument).
+Three-dimensional variables are also possible by using `GridXYZ` and `SpectralXYZ` as `dims`
+(the 2nd argument) for a vertical dimension with the number of layers of the model, or
+`GridXYT(n)`/`SpectralXYT(n)` for a time/step dimension (of lenth `n = 1` by default).
+`Grid3D(n)` and `Spectral3D(n)` exist for a
+third dimension of length `n` (default 1) of unspecified meaning.
 
 These variables are then passed to the `parameterization!` function inside the `Variables` object.
 Additionally, `Variables` has several scratch arrays that you can reuse `vars.scratch.grid.a` and `.b`
@@ -120,7 +123,7 @@ all other arguments can then be passed on as keyword arguments with defaults
 defined. Creating the default convection parameterization for example would be
 ```@example parameterization
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 convection = BettsMillerConvection(spectral_grid, time_scale=Hour(4))
 ```
 Further keyword arguments can be added or omitted all together (using the default
@@ -250,7 +253,7 @@ Base.@propagate_inbounds function SpeedyWeather.albedo!(
     (; sea_ice_concentration) = vars.prognostic.ocean
     (; land_albedo, seaice_albedo, ocean_albedo) = scheme
 
-    if land_sea_mask.mask[ij] > 0.95 # if mostly land
+    if land_sea_mask.land_fraction[ij] > 0.95 # if mostly land
         albedo[ij] = land_albedo
     else # if ocean
         albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
@@ -274,7 +277,7 @@ Now, we can use our new parameterization in a model. We'll first demonstrate how
 replace the existing albedo:
 
 ```@example custom-parameterization
-spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+spectral_grid = SpectralGrid(truncation=32, nlayers = 8)
 albedo = SimpleAlbedo(spectral_grid)
 model = PrimitiveWetModel(spectral_grid; albedo=albedo)
 simulation = initialize!(model)
@@ -295,7 +298,7 @@ even though they are initialized and variables are created nevertheless
 model = PrimitiveWetModel(spectral_grid;
     custom_parameterization = SimpleAlbedo(spectral_grid),
     parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :shortwave_radiation,
-        :surface_condition, :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
+        :boundary_layer, :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
 
 simulation = initialize!(model)
 run!(simulation, period=Day(5)) # spin up the model a little

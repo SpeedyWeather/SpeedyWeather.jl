@@ -1,25 +1,15 @@
 name: Extended Tests
 on:
-  pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 jobs:
   correctness-test:
     name: Extended Differentiablity Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
-    # temporarily disabled
-    if: false
-    # don't run if any of these labels are present
-    # if: >
-    #   !(
-    #   contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
-    #   contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
-    #   contains(github.event.pull_request.labels.*.name, 'skip-enzyme-ci')
-    #   )
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 240
     permissions:
       actions: write
       contents: read
@@ -31,7 +21,7 @@ jobs:
         os:
           - ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - uses: julia-actions/setup-julia@v3
         with:
@@ -55,6 +45,6 @@ jobs:
       
       - name: Run Extended tests
         run: |
-          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/runtests.jl")
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/runtests.jl
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

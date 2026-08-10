@@ -3,10 +3,9 @@ abstract type AbstractDrag <: AbstractModelComponent end
 # function barrier for all drags to unpack model.drag
 function drag!(
         vars::Variables,
-        lf::Integer,
         model::AbstractModel,
     )
-    return drag!(vars, model.drag, lf, model)
+    return drag!(vars, model.drag, model)
 end
 
 # NO DRAG
@@ -37,12 +36,13 @@ $(TYPEDSIGNATURES)
 Precomputes the drag coefficients for the `LinearDrag` scheme."""
 function initialize!(drag::LinearDrag, model::PrimitiveEquation)
 
-    (; σ_levels_full) = model.geometry
     (; σb, time_scale, drag_coefs) = drag
-    kf = 1 / time_scale.value
+    (; nlayers) = model.geometry
+    coord = model.geometry.vertical_coordinates
+    kf = 1 / Second(time_scale).value
 
     # drag only below σb, lin increasing to kf at σ=1
-    @. drag_coefs = kf * max(0, (σ_levels_full - σb) / (1 - σb))
+    @. drag_coefs = kf * max(0, (sigma.(1:nlayers, coord) - σb) / (1 - σb))
     return nothing
 end
 
@@ -52,17 +52,15 @@ Compute tendency for boundary layer drag of a `column` and add to its tendencies
 function drag!(
         vars::Variables,
         drag::LinearDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    (; u, v) = vars.grid
-    Fu = vars.tendencies.grid.u
-    Fv = vars.tendencies.grid.v
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, drag)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, drag)
+    Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, drag)
+    Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, drag)
 
-    # include radius scaling
-    c = vars.prognostic.scale[]
-    @. Fu -= c * drag.drag_coefs' .* u
-    @. Fv -= c * drag.drag_coefs' .* v
+    @. Fu -= drag.drag_coefs' .* u
+    @. Fv -= drag.drag_coefs' .* v
 
     return nothing
 end
@@ -70,7 +68,7 @@ end
 export QuadraticDrag
 @parameterized @kwdef struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)    # TODO is this a good default?
+    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
@@ -89,46 +87,42 @@ and scaled by the radius as are the momentum equations."""
 function drag!(
         vars::Variables,
         scheme::QuadraticDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    k = size(vars.grid.u, 2)            # drag only on surface layer
-    u = field_view(vars.grid.u, :, k)
-    v = field_view(vars.grid.v, :, k)
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, scheme)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, scheme)
+    k = size(u, 2)            # drag only on surface layer
+    
+    Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
+    Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 
-    Fu = field_view(vars.tendencies.grid.u, :, k)
-    Fv = field_view(vars.tendencies.grid.v, :, k)
-
-    # total drag coefficient with radius scaling
-    # note that while the equations (with prognostic variable vorticity) are scaled
-    # with radius R squared, one R will go into the curl operator applied to forcing of u, v
-    # to yield a tendency for vorticity, so only one R is needed here in the drag coefficient scaling
-    c = scheme.drag / model.atmosphere.layer_thickness * diagn.scale[]
+    # total drag coefficient
+    c = scheme.drag / model.atmosphere.layer_thickness
 
     launch!(
-        architecture(Fu), LinearWorkOrder, size(Fu), quadratic_drag_kernel!,
-        Fu, Fv, u, v, c
+        architecture(Fu), LinearWorkOrder, (size(Fu, 1),), quadratic_drag_kernel!,
+        Fu, Fv, u, v, c, k
     )
     return nothing
 end
 
 @kernel inbounds = true function quadratic_drag_kernel!(
-        Fu, Fv, u, v, c
+        Fu, Fv, u, v, c, k
     )
     ij = @index(Global, Linear)
 
     # Calculate speed at surface layer k
-    speed = sqrt(u[ij]^2 + v[ij]^2)
+    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
 
     # Apply quadratic drag, -= as the tendencies already contain forcing
-    Fu[ij] -= c * speed * u[ij]
-    Fv[ij] -= c * speed * v[ij]
+    Fu[ij, k] -= c * speed * u[ij, k]
+    Fv[ij, k] -= c * speed * v[ij, k]
 end
 
 export SpeedLimitDrag
 @parameterized @kwdef struct SpeedLimitDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/m]"
-    @param drag::NF = 4.0e-7 (bounds = Nonnegative,)
+    @param drag::NF = 3.0e-6 (bounds = Nonnegative,)
 
     "[OPTION] Speed limit above which drag kicks in [m/s]"
     @param speed_limit::NF = 80 (bounds = Nonnegative,)
@@ -141,25 +135,25 @@ initialize!(::SpeedLimitDrag, ::AbstractModel) = nothing
 $(TYPEDSIGNATURES)
 Speed limit drag for the momentum equations.
 
-    Fu = -c*max(0, |(u, v)| - speed_limit)^2 * sign(u)
+    (Fu, Fv) = -c*max(0, |(u, v)| - speed_limit)^2 * (u, v)/|(u, v)|
 
 with `c` the drag coefficient [1/m] as defined in `drag::SpeedLimitDrag` and
 kicking in only above a certain speed limit. The drag is quadratic in the excess
-speed above the limit and acts to slow down the flow, hence the `sign(u)` term."""
+speed above the limit and antiparallel to the flow, so it only decelerates and
+never rotates it."""
 function drag!(
         vars::Variables,
         scheme::SpeedLimitDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    u = vars.grid.u
-    v = vars.grid.v
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, scheme)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, scheme)
 
-    Fu = vars.tendencies.grid.u
-    Fv = vars.tendencies.grid.v
+    Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
+    Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 
-    # total drag coefficient with radius scaling
-    c = scheme.drag * vars.prognostic.scale[]
+    # total drag coefficient
+    c = scheme.drag
     (; speed_limit) = scheme
 
     launch!(
@@ -174,13 +168,20 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    # Calculate speed
-    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
+    uij = u[ij, k]
+    vij = v[ij, k]
+    speed = sqrt(uij^2 + vij^2)
+    excess = max(0, speed - speed_limit)    # zero below the limit
 
-    # Apply speed limit drag, -= as the tendencies already contain forcing
-    U² = max(0, speed - speed_limit)^2
-    Fu[ij, k] -= c * U² * sign(u[ij, k])
-    Fv[ij, k] -= c * U² * sign(v[ij, k])
+    # -c*excess^2 * (u, v)/speed, i.e. antiparallel to the flow. Scaling the unit vector
+    # (u, v)/speed rather than (sign(u), sign(v)) keeps the drag opposite to the velocity;
+    # the latter points along the quadrant diagonal and is √2 too large for a 45° flow.
+    # excess > 0 implies speed > speed_limit >= 0, so the division is guarded.
+    scale = ifelse(excess > 0, c * excess^2 / speed, zero(speed))  # excess > 0 ? c * excess^2 / speed : zero(speed)
+
+    # -= as the tendencies already contain forcing
+    Fu[ij, k] -= scale * uij
+    Fv[ij, k] -= scale * vij
 end
 
 export LinearVorticityDrag
@@ -198,16 +199,11 @@ with c drag coefficient [1/s]."""
 function drag!(
         vars::Variables,
         drag::LinearVorticityDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    vor_tend = vars.tendencies.vorticity
-    vor = get_step(vars.prognostic.vorticity, lf)
-
-    # scale by radius (but only once, the second radius is in vor)
-    c = drag.c * vars.prognostic.scale[]
-    vor_tend .-= c * vor
-
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, drag)
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, drag)
+    vor_tend .-= drag.c * vor
     return nothing
 end
 
@@ -255,17 +251,14 @@ end
 function drag!(
         vars::Variables,
         drag::JetDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    vor = get_step(vars.prognostic.vorticity, lf)
-    vor_tend = vars.tendencies.vorticity
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, drag)
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, drag)
     (; ζ₀) = drag
 
-    # scale by radius as is vorticity
-    s = vars.prognostic.scale[]
-    r = s / drag.time_scale.value
-
+    # drag coefficient r as inverse time scale [1/s]
+    r = inv(drag.time_scale.value)
     k = size(vor, 2)   # drag only on surface layer
 
     # GPU kernel launch

@@ -23,10 +23,17 @@ import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 # SPEEDYWEATHER SUBMODULES
 import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
+export CPU, GPU, on_architecture, architecture                # export device functions
+export SpeedyWeatherInternals, Architectures, KernelLaunching
 
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.KernelLaunching
 import SpeedyWeatherInternals: Utils
+
+import SpeedyWeatherInternals.ArrayDimensions: ArrayDimensions, AbstractArrayDimensions,
+    hastime, hasvertical, Dimensions2D, Dimensions3D, Dimensions4D,
+    DimensionsWithTime, DimensionsWithVertical, DimensionsWithTimeAndVertical
+export ArrayDimensions
 
 # ABSTRACT GRIDS
 export AbstractGrid,
@@ -46,7 +53,8 @@ export OctahedralGaussianGrid,
     OctaminimalGaussianGrid
 
 # FIELDS (Data on grids)
-export AbstractField, AbstractField2D, AbstractField3D,
+export AbstractField, AbstractField2D, AbstractField3D, AbstractField4D,
+    AbstractFieldWithTime, AbstractFieldWithVertical, AbstractFieldWithTimeAndVertical,
     Field, Field2D, Field3D
 
 export FullGaussianField,
@@ -126,6 +134,8 @@ export interpolate,
 # STATISTICS
 export zonal_mean
 
+export unmasked_indices, copy_unmasked!
+
 # CONSTANTS
 const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
@@ -168,6 +178,7 @@ include("quadrature_weights.jl")
 include("interpolation.jl")
 include("vertices.jl")
 include("statistics.jl")
+include("copy_unmasked.jl")
 
 # ASSET DOWNLOADING
 export get_asset, load_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION

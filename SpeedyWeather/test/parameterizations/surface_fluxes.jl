@@ -3,12 +3,13 @@
         tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
         # prescribe ocean
-        spectral_grid = SpectralGrid(trunc = 31)
+        spectral_grid = SpectralGrid(truncation = 32)
         output = NetCDFOutput(spectral_grid, path = tmp_output_path)
         ocean_heat_flux = PrescribedOceanHeatFlux(spectral_grid)
         land_heat_flux = SurfaceLandHeatFlux(spectral_grid)
         surface_heat_flux = SurfaceHeatFlux(ocean = ocean_heat_flux, land = land_heat_flux)
         model = Model(spectral_grid; surface_heat_flux, output)
+        model.feedback.verbose = false
         add!(model, SpeedyWeather.SurfaceFluxesOutput())
 
         simulation = initialize!(model)
@@ -20,6 +21,7 @@
         land_heat_flux = PrescribedLandHeatFlux(spectral_grid)
         surface_heat_flux = SurfaceHeatFlux(ocean = ocean_heat_flux, land = land_heat_flux)
         model = Model(spectral_grid; surface_heat_flux, output)
+        model.feedback.verbose = false
         add!(model, SpeedyWeather.SurfaceFluxesOutput())
 
         simulation = initialize!(model)
@@ -32,12 +34,13 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     # prescribe ocean
-    spectral_grid = SpectralGrid(trunc = 31)
+    spectral_grid = SpectralGrid(truncation = 32)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
     humidity_flux_ocean = PrescribedOceanHumidityFlux(spectral_grid)
     humidity_flux_land = SurfaceLandHumidityFlux(spectral_grid)
     surface_humidity_flux = SurfaceHumidityFlux(ocean = humidity_flux_ocean, land = humidity_flux_land)
     model = PrimitiveWetModel(spectral_grid; surface_humidity_flux, output)
+    model.feedback.verbose = false
 
     simulation = initialize!(model)
     set!(simulation.variables.prognostic.ocean.surface_humidity_flux, (λ, ϕ) -> ϕ > 0 ? 5.0e-5 : 0, model.geometry)
@@ -48,6 +51,7 @@ end
     humidity_flux_land = PrescribedLandHumidityFlux(spectral_grid)
     surface_humidity_flux = SurfaceHumidityFlux(ocean = humidity_flux_ocean, land = humidity_flux_land)
     model = PrimitiveWetModel(spectral_grid; surface_humidity_flux, output)
+    model.feedback.verbose = false
 
     simulation = initialize!(model)
     set!(simulation.variables.prognostic.land.surface_humidity_flux, (λ, ϕ) -> ϕ > 0 ? 5.0e-5 : 0, model.geometry)

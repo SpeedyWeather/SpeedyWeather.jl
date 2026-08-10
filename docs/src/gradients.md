@@ -57,8 +57,8 @@ data `G` on the grid first
 using SpeedyWeather, CairoMakie
 
 # create some data with wave numbers 0,1,2,3,4
-trunc = 64                  # 1-based maximum degree of spherical harmonics
-L = randn(LowerTriangularMatrix{ComplexF32}, trunc, trunc)
+truncation = 64                  # 1-based maximum degree of spherical harmonics
+L = randn(LowerTriangularMatrix{ComplexF32}, truncation, truncation)
 SpeedyTransforms.spectral_truncation!(L, 5)  # remove higher wave numbers
 G = transform(L)
 heatmap(G, title="Some fake data G")        # requires `using CairoMakie`
@@ -109,7 +109,7 @@ SpeedyTransforms?
 
 Let us start by generating some data
 ```@example gradient
-spectral_grid = SpectralGrid(trunc=31, nlayers=1)
+spectral_grid = SpectralGrid(truncation=32, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = LinearVorticityDrag(spectral_grid)
 model = ShallowWaterModel(spectral_grid; forcing, drag)
@@ -120,9 +120,10 @@ nothing # hide
 
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
+See [Step dimension](@ref) for more explanation of how to read prognostic/tendency variables with an additional step dimension.
 ```@example gradient
-u = simulation.variables.grid.u[:, 1]   # [:, 1] for 1st layer
-v = simulation.variables.grid.v[:, 1]
+u = get_step(simulation.variables.grid.u)[:, 1]   # [:, 1] for 1st layer
+v = get_step(simulation.variables.grid.v)[:, 1]
 vor = curl(u, v, radius = model.planet.radius)
 nothing # hide
 ```
@@ -206,7 +207,7 @@ nothing # hide
 Which is the interface displacement assuming geostrophy.
 The actual interface displacement contains also ageostrophy
 ```@example gradient
-η_grid2 = simulation.variables.grid.η
+η_grid2 = get_step(simulation.variables.grid.η)
 heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
 nothing # hide

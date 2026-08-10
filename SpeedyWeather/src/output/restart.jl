@@ -44,7 +44,7 @@ function finalize!(
     restart.path = path     # update path in case it was empty before
 
     jldopen(joinpath(path, filename), "w"; compress) do f
-        f["variables.prognostic"] = vars.prognostic
+        f["variables.prognostic"] = materialize_views(vars.prognostic)
         f["version"] = restart.pkg_version
         f["description"] = "Restart file created by SpeedyWeather.jl"
     end

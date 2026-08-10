@@ -67,6 +67,8 @@ function get_lond_per_ring(Grid::Type{<:OctaminimalGaussianGrid}, nlat_half::Int
     return collect((180 / nlon):(360 / nlon):360)       # use HEALPix definition for longitudes
 end
 
+hasoffset(::Type{<:OctaminimalGaussianGrid}) = true     # first longitude point dlon/2 east of 0˚
+
 ## QUADRATURE
 get_quadrature_weights(::Type{<:OctaminimalGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)
 

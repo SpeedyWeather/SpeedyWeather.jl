@@ -3,7 +3,7 @@ export set!
 """
 $(TYPEDSIGNATURES)
 Sets new values for variables defined through keyword matching the keys in a NamedTuple.
-Spectral variables can be set at timestep index `lf`. If `add==true` they are added to the 
+Spectral variables can be set at timestep index `step`. If `add==true` they are added to the 
 current value instead. If a `AbstractSpectralTransform` S is provided, it is used when needed to set 
 the variable, otherwise it is recomputed. In case `u` and `v` are provied, actually the divergence
 and vorticity are set and `coslat_scaling_included` specficies whether or not the 1/cos(lat) 
@@ -22,12 +22,14 @@ The input may be:
 Specify the namespace as a symbol in case the `vars::NamedTuple` contains them, e.g.
 
     set!(vars, sea_surface_temperature = 1, namespace=:ocean)
-    
+   
+The keyword argument `step` specifies the step index to set, default is 1.
+For variables without a step dimension use `step = nothing` to skip the `get_step`.
 """
 function set!(
         vars::NamedTuple,
         geometry::Geometry;
-        lf::Integer = 1,
+        step = 1,
         add::Bool = false,
         spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing,
         coslat_scaling_included::Bool = false,
@@ -39,7 +41,7 @@ function set!(
     if :u in keys(kwargs) && :v in keys(kwargs)
         (; vorticity, divergence) = vars
         set_vordiv!(
-            get_step(vorticity, lf), get_step(divergence, lf), kwargs[:u], kwargs[:v],
+            get_step(vorticity, step), get_step(divergence, step), kwargs[:u], kwargs[:v],
             geometry, spectral_transform; add, coslat_scaling_included, static_func
         )
     elseif :u in keys(kwargs) || :v in keys(kwargs)
@@ -51,12 +53,12 @@ function set!(
         if varname in (:u, :v)  # already handled in special case above
             nothing
         elseif varname in keys(vars)
-            var = vars[varname] isa LowerTriangularArray ? get_step(vars[varname], lf) : vars[varname]
+            var = ArrayDimensions.hastime(vars[varname]) ? get_step(vars[varname], step) : vars[varname]
             set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
         elseif namespace in keys(vars)
             if varname in keys(vars[namespace])
-                var = vars[namespace][varname] isa LowerTriangularArray ?
-                    get_step(vars[namespace][varname], lf) : vars[namespace][varname]
+                var = ArrayDimensions.hastime(vars[namespace][varname]) ?
+                    get_step(vars[namespace][varname], step) : vars[namespace][varname]
                 set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
             else
                 # throw error if varname can't be found and print existing variables
@@ -145,8 +147,14 @@ function set!(
     # all elements are zero except for the 0,0 one
     var_new = zero(var)
 
-    for k in eachmatrix(var_new)
-        var_new[1, k] = norm_sphere * s
+    # set the [1, :] row in a GPU-safe way via a view on the underlying data
+    data = var_new.data
+    norm_s = convert(eltype(data), norm_sphere * s)
+    if ndims(data) == 1
+        # 1D LTA: data is a Vector, only one matrix, so a single element
+        view(data, 1:1) .= norm_s
+    else
+        view(data, 1, ntuple(_ -> :, ndims(data) - 1)...) .= norm_s
     end
 
     return set!(var, var_new, geometry, S; add, kwargs...)
