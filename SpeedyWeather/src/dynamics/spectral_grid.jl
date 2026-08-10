@@ -343,15 +343,17 @@ Default `transform_batch` for a `SpectralGrid`. Architecture-dependent because:
 - On CPU, batched FFT plans give negligible speedup, default: `[1, nlayers]` — matches the pre-multiplexing system.
 
 - On GPU, batched plans are essential, default:
-  `[1, nlayers, 2*nlayers, 4*nlayers + 1]` — covers single-layer (`1`), one variable (`L`),
-  U/V together (`2L`), and the prognostic batch (`4L + 1`),  6L+1 and 9L+1 (tendency batch)
+  `[1, 2, nlayers, 2*nlayers, 4*nlayers + 1]` — covers single-layer (`1`), the surface-pressure
+  gradient pair (`2`), one variable (`L`), U/V together (`2L`), and the prognostic batch
+  (`4L + 1`), 6L+1 and 9L+1 (tendency batch)
 """
 default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_transform_batch(typeof(arch), nlayers)
+# CPU needs no `2`: unplanned K > 1 is split by `_transform_chunked!` rather than falling back.
 default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]
 
 # TODO: planning both 6L+1 and 9L+1 is slightly wasteful (we only need one of them for wet and dry model respectively)
 default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) =
-    Int[1, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, 9 * nlayers + 1]
+    Int[1, 2, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, 9 * nlayers + 1]
 
 function variables(::SpeedyTransforms.AbstractSpectralTransform)
     return (
