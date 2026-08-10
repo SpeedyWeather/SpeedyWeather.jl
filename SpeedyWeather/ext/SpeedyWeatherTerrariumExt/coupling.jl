@@ -464,7 +464,7 @@ function SpeedyWeather.timestep!(
         state.clock, land_model, InputSources(NF),
         state, land.initializers,
     )
-    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt, show_progress = false)
+    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
 
     # Surface soil temperature from the bottom of the column (last z-index)
     vars.prognostic.land.soil_temperature[mask] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
