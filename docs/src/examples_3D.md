@@ -12,7 +12,7 @@ See also [Examples 2D](@ref Examples) for examples with the
 
 ```@example jablonowski
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc = 31, nlayers = 8, Grid=FullGaussianGrid, dealiasing = 3)
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 8, Grid=FullGaussianGrid, dealiasing = 3)
 
 orography = ZonalRidge(spectral_grid)
 initial_conditions = (;                             # collect initial conditions into NamedTuple (keys don't matter)
@@ -51,7 +51,7 @@ nothing # hide
 
 ```@example heldsuarez
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+spectral_grid = SpectralGrid(truncation=32, nlayers = 8)
 
 # construct model with only Held-Suarez forcing
 model = PrimitiveDryModel(
@@ -102,7 +102,7 @@ nothing # hide
 using SpeedyWeather
 
 # components
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 ocean = AquaPlanet(spectral_grid, temperature_equator=302, temperature_poles=273)
 land_sea_mask = AquaPlanetMask(spectral_grid)
 orography = NoOrography(spectral_grid)
@@ -203,7 +203,7 @@ And the comparison looks like
 using SpeedyWeather
 
 # components
-spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+spectral_grid = SpectralGrid(truncation=32, nlayers = 8)
 large_scale_condensation = ImplicitCondensation(spectral_grid, snow = false)
 convection = BettsMillerConvection(spectral_grid)
 

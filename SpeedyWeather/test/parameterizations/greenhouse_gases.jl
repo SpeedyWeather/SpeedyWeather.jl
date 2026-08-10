@@ -1,5 +1,5 @@
 @testset "Greenhouse gases: allocation" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
     @testset for CO2type in (CO2, ExponentialCO2)
         co2 = CO2type(spectral_grid)
@@ -17,7 +17,7 @@
 end
 
 @testset "Greenhouse gases: time stepping" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
     # ExponentialCO2 increases over time, so concentration after a few days > initial
     co2 = ExponentialCO2(spectral_grid; start = DateTime(1850))

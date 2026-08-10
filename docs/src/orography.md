@@ -49,7 +49,7 @@ Earth's orography can be created with (here we use a resolution of T85, about 16
 
 ```@example orography
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=85)
+spectral_grid = SpectralGrid(truncation=86)
 orography = EarthOrography(spectral_grid)
 ```
 
@@ -239,9 +239,9 @@ end
 
 # constructor
 function MyOrography(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
+    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, truncation) = spectral_grid
     orography   = zeros(GridVariable2D, nlat_half)
-    surface_geopotential = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    surface_geopotential = zeros(SpectralVariable2D, truncation+1, truncation)
     return MyOrography{NF, GridVariable2D, SpectralVariable2D}(;
         orography, surface_geopotential, kwargs...)
 end

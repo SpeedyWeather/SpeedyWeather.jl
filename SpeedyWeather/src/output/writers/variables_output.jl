@@ -80,6 +80,8 @@ function Base.show(io::IO, output::JLD2Output)
     return println(io, "└ interval: $(output.interval)")
 end
 
+dataset_type(::JLD2Output) = JLDFile
+
 """$(TYPEDSIGNATURES)
 Initialize JLD2 `output` by creating a JLD2 file.
 To be called just before the first timesteps."""

@@ -41,6 +41,7 @@ export OneBased, ZeroBased
 export lta_view
 export zero_last_degree!
 
+include("index_basis.jl")
 include("spectrum.jl")
 include("lower_triangular_array.jl")
 include("rotate_reverse.jl")

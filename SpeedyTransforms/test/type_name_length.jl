@@ -14,8 +14,8 @@
     PREFIX = length("arg.Const{") + length("}")     # what Enzyme wraps the type name in
 
     for Grid in (FullGaussianGrid, OctahedralGaussianGrid), NF in (Float32, Float64)
-        grid = Grid(SpeedyTransforms.get_nlat_half(31, 2))
-        S = SpectralTransform(Spectrum(31), grid; NF)
+        grid = Grid(SpeedyTransforms.get_nlat_half(32, 2))
+        S = SpectralTransform(Spectrum(32), grid; NF)
         value_name_length = length(string(typeof(S))) + PREFIX
         @test value_name_length < ENZYME_VALUE_NAME_CAP
         # surface how close we are, so a shrinking margin is visible before it becomes a failure

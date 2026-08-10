@@ -2,23 +2,23 @@
 
     nlayers = 8
     nlayers_soil = 2
-    trunc = 31
+    truncation = 32
     NF = Float64
     complex_NF = Complex{NF}
-    spectral_grid = SpectralGrid(; NF, trunc, nlayers)  # define resolution
-    model = PrimitiveWetModel(spectral_grid)            # construct model
-    simulation = initialize!(model)                     # initialize all model components
+    spectral_grid = SpectralGrid(; NF, truncation, nlayers)     # define resolution
+    model = PrimitiveWetModel(spectral_grid)                    # construct model
+    simulation = initialize!(model)                             # initialize all model components
 
     step = 2
 
     # test data
-    L = rand(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
+    L = rand(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
     L_grid = transform(L, model.spectral_transform)
 
-    L2 = rand(spectral_grid.SpectralVariable3D, trunc - 5, trunc - 6, nlayers)      # smaller
-    L2_trunc = SpeedyTransforms.spectral_truncation(L2, size(L, 1, ZeroBased, as = Matrix), size(L, 2, ZeroBased, as = Matrix))
-    L3 = rand(spectral_grid.SpectralVariable3D, trunc + 6, trunc + 5, nlayers)      # bigger
-    L3_trunc = SpeedyTransforms.spectral_truncation(L3, size(L, 1, ZeroBased, as = Matrix), size(L, 2, ZeroBased, as = Matrix))
+    L2 = rand(spectral_grid.SpectralVariable3D, truncation - 5, truncation - 6, nlayers)      # smaller
+    L2_trunc = SpeedyTransforms.spectral_truncation(L2, size(L, 1, as = Matrix), size(L, 2, as = Matrix))
+    L3 = rand(spectral_grid.SpectralVariable3D, truncation + 6, truncation + 5, nlayers)      # bigger
+    L3_trunc = SpeedyTransforms.spectral_truncation(L3, size(L, 1, as = Matrix), size(L, 2, as = Matrix))
 
     A = rand(NF, spectral_grid.grid, nlayers)                                   # same grid
     A_spec = transform(A, model.spectral_transform)
@@ -96,8 +96,8 @@
     @test all(prog_new.ocean.sea_surface_temperature .== 5)
 
     # vor_div, create u,v first in spectral space
-    u = randn(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
-    v = randn(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
+    u = randn(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
+    v = randn(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
 
     # set imaginary component of m=0 to 0 as the rotation of zonal modes is arbitrary
     SpeedyTransforms.zero_imaginary_zonal_modes!(u)

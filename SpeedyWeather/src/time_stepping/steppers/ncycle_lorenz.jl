@@ -39,10 +39,10 @@ mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
     variant::V
 
-    "[OPTION] Time step for T31, scale linearly with resolution"
-    Δt_at_T31::S
+    "[OPTION] Time step for T32 resolution, scale linearly with resolution"
+    Δt_at_T32::S
 
-    "[OPTION] Adjust `Δt_at_T31` with the `interval` to reach `interval` exactly"
+    "[OPTION] Adjust `Δt_at_T32` with the `interval` to reach `interval` exactly"
     adjust_with_output::B
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
@@ -86,16 +86,16 @@ function NCycleLorenz(
         spectral_grid::SpectralGrid;
         steps = 3,
         variant = NCycleLorenzA(),
-        Δt_at_T31 = Minute(30),
+        Δt_at_T32 = Minute(30),
         adjust_with_output = true,
     )
-    (; NF, trunc) = spectral_grid
+    (; NF, truncation) = spectral_grid
 
     # compute time step
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
     Δt::NF = Δt_millisec.value / 1000
 
-    return NCycleLorenz(steps, variant, Second(Δt_at_T31), adjust_with_output, Δt_millisec, Δt)
+    return NCycleLorenz(steps, variant, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt)
 end
 
 """$(TYPEDSIGNATURES)

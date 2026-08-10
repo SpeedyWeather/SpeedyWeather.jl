@@ -43,7 +43,7 @@ abstract type AbstractBenchmarkSuite end
     nruns::Int = 1
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
-    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    truncation::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNCATION, nruns)
     nlayers::Vector{Int} = default_nlayers(model)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
@@ -74,8 +74,8 @@ default_nlayers(models) = [default_nlayers(model) for model in models]
 # `multiplier` scales the (clamped) result — pass e.g. `10` for longer,
 # publication-ready runs with more robust timings; applied after the clamp so it
 # lengthens even the floored/ceilinged configs.
-n_timesteps(trunc, nlayers, multiplier = 1) =
-    round(Int, multiplier * clamp(round(Int, 4.0e9 / trunc^3 / nlayers^2), 50, 1200))
+n_timesteps(truncation, nlayers, multiplier = 1) =
+    round(Int, multiplier * clamp(round(Int, 4.0e9 / truncation^3 / nlayers^2), 50, 1200))
 
 function run_benchmark_suite!(suite::BenchmarkSuite)
     for i in 1:suite.nruns
@@ -83,7 +83,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         # unpack
         Model = suite.model[i]
         NF = suite.NF[i]
-        trunc = suite.trunc[i]
+        truncation = suite.truncation[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
         dynamics = suite.dynamics[i]
@@ -91,7 +91,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         transform_kind = suite.spectral_transform[i]
         architecture = suite.architecture
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
+        spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
 
         extra_components = resolve_model_kwargs(suite.model_kwargs[i], spectral_grid)
@@ -107,7 +107,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         simulation = initialize!(model)
         suite.memory[i] = Base.summarysize(simulation)
 
-        nsteps = n_timesteps(trunc, nlayers, suite.timestep_multiplier)
+        nsteps = n_timesteps(truncation, nlayers, suite.timestep_multiplier)
         period = Second(round(Int, model.time_stepping.Δt * (nsteps + 1)))
 
         # Warm up before timing: run a few steps so JIT compilation of the time
@@ -153,7 +153,7 @@ function write_results(md, suite::BenchmarkSuite)
 
     column_header = "| Model "
     column_header *= print_NF ? "| NF " : ""
-    column_header *= "| T "
+    column_header *= "| truncation "
     column_header *= "| L "
     column_header *= print_Grid ? "| Grid " : ""
     column_header *= print_nlat ? "| Rings " : ""
@@ -172,7 +172,7 @@ function write_results(md, suite::BenchmarkSuite)
 
         row = "| $(suite.model[i]) "
         row *= print_NF ? "| $(suite.NF[i]) " : ""
-        row *= "| $(suite.trunc[i]) "
+        row *= "| $(suite.truncation[i]) "
         row *= "| $(suite.nlayers[i]) "
         row *= print_Grid ? "| $(suite.Grid[i]) " : ""
         row *= print_nlat ? "| $(suite.nlat[i]) " : ""
@@ -197,7 +197,7 @@ abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end
     nruns::Int = 1
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
-    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    truncation::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNCATION, nruns)
     nlayers::Vector{Int} = default_nlayers(model)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
@@ -266,11 +266,11 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
 
         Model = suite.model[i]
         NF = suite.NF[i]
-        trunc = suite.trunc[i]
+        truncation = suite.truncation[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture = arch)
+        spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture = arch)
         suite.nlat[i] = spectral_grid.nlat
 
         model = build_model(Model, spectral_grid, arch)
@@ -330,7 +330,7 @@ function write_results(md, suite::AbstractBenchmarkSuiteTimed)
 
         title_row = "$(suite.model[i_run]) "
         title_row *= "| $(suite.NF[i_run]) "
-        title_row *= "| T$(suite.trunc[i_run]) "
+        title_row *= "| T$(suite.truncation[i_run] - 1) "
         title_row *= "L$(suite.nlayers[i_run]) "
         title_row *= "| $(suite.Grid[i_run]) "
         title_row *= "| $(suite.nlat[i_run]) Rings"

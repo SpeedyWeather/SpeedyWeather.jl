@@ -65,7 +65,7 @@ end
 @testset "Forward-mode reconstruct on $(nameof(MT))" for (MT, nlayers) in
         ((BarotropicModel, 1), (PrimitiveWetModel, 2))
 
-    spectral_grid = SpectralGrid(; trunc = 8, nlayers, NF = Float64)
+    spectral_grid = SpectralGrid(; truncation = 9, nlayers, NF = Float64)
     model = MT(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
     p = vec(parameters(model))
     @test length(p) > 0
@@ -93,7 +93,7 @@ end
 @testset "Reverse-mode reconstruct on $(nameof(MT))" for (MT, nlayers) in
         ((BarotropicModel, 1), (PrimitiveWetModel, 2))
 
-    spectral_grid = SpectralGrid(; trunc = 8, nlayers, NF = Float64)
+    spectral_grid = SpectralGrid(; truncation = 9, nlayers, NF = Float64)
     model = MT(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
     p = vec(parameters(model))
 
@@ -136,7 +136,7 @@ end
 # `Tracer` config, so neither rule may contribute a derivative — the differentiable tracer data is
 # reached separately via `vars.*.tracers[name]`.
 @testset "Tracer registry iterate rules" begin
-    spectral_grid = SpectralGrid(trunc = 8, nlayers = 1, NF = Float64)
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 1, NF = Float64)
     model = BarotropicModel(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
 
     # sum over the registry, scaled by an active parameter: the loop must not add any derivative of

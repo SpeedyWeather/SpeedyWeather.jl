@@ -27,7 +27,7 @@ The array summary includes the dimension tag in parentheses
 
 ```@example dimensions
 using SpeedyWeather
-spectrum = Spectrum(trunc=5)
+spectrum = Spectrum(truncation=6)
 L = rand(ComplexF32, spectrum, ArrayDimensions.LMZ(), 3)
 ```
 

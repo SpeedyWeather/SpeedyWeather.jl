@@ -9,7 +9,7 @@ const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 5
 println("Running Sensitivity Analyis with N = $N")
 savename_base = "new-sensitivity-$N"
 
-spectral_grid = SpectralGrid(trunc = 32, nlayers = 8)          # define resolution
+spectral_grid = SpectralGrid(truncation = 33, nlayers = 8)          # define resolution
 model = PrimitiveWetModel(; spectral_grid)                 # construct model
 simulation = initialize!(model)
 initialize!(simulation)

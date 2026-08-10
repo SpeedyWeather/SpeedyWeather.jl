@@ -11,7 +11,7 @@ function init_shortwave_state!(vars, model)
 end
 
 @testset "Shortwave radiation" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     @testset for SW in (Nothing, TransparentShortwave, OneBandShortwave, OneBandGreyShortwave)
         sw = SW(spectral_grid)
         model = PrimitiveWetModel(spectral_grid; shortwave_radiation = sw)
@@ -49,7 +49,7 @@ end
 end
 
 @testset "Shortwave radiation transmissivity" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     @testset for T in (TransparentShortwaveTransmissivity, BackgroundShortwaveTransmissivity)
         transmissivity = T(spectral_grid)
         sw = OneBandShortwave(spectral_grid; transmissivity = transmissivity)
@@ -72,7 +72,7 @@ end
 end
 
 @testset "Shortwave radiation clouds" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     @testset for C in (DiagnosticClouds, NoClouds)
         clouds = C(spectral_grid)
         sw = OneBandShortwave(spectral_grid; clouds = clouds)
