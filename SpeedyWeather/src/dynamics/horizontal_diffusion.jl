@@ -369,7 +369,7 @@ export SpectralFilter
     } <: AbstractHorizontalDiffusion
 
     # DIMENSIONS
-    "spectral resolution"
+    "spectral resolution (1-based)"
     truncation::IntType
 
     "number of vertical levels"
