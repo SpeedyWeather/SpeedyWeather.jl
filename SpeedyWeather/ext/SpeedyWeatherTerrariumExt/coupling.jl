@@ -278,7 +278,7 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.Abstr
     )
 end
 
-function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.AbstratSnow)
+function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.AbstractSnow)
     return (
         SpeedyWeather.PrognosticVariable(
             name = :snow_depth, dims = SpeedyWeather.Grid2D(),
