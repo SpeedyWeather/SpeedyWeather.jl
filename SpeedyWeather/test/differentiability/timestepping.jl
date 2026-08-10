@@ -4,7 +4,7 @@
         (PrimitiveWetModel,) # PrimitiveDryModel, ShallowWaterModel)
 
     # FiniteDifferences struggles with the NaN when we have a land-sea mask, so we test on AquaPlanets
-    spectral_grid = SpectralGrid(trunc = 8, nlayers = 1, NF = Float64)
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 1, NF = Float64)
     model = model_type(; spectral_grid)
     simulation = initialize!(model)
     initialize!(simulation)

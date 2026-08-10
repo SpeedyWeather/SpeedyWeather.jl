@@ -10,7 +10,7 @@ spectral_grid = SpectralGrid(Grid = FullGaussianGrid)
 The life of every SpeedyWeather.jl simulation starts with a `SpectralGrid` object which defines the
 resolution in spectral and in grid-point space. The generator `SpectralGrid()` can take as a keyword
 argument `Grid` which can be any of the grids described below. The resolution of the grid, however,
-is not directly chosen, but determined from the spectral resolution `trunc` and the `dealiasing`
+is not directly chosen, but determined from the spectral resolution `truncation` and the `dealiasing`
 factor. More in [SpectralGrid](@ref) and [Matching spectral and grid resolution](@ref).
 
 !!! info "RingGrids is a module too!"
@@ -120,17 +120,17 @@ a higher accuracy as more grid points are available within a given wavelength. U
 high truncation is therefore one way to avoid aliasing. A quick overview of how the grid resolution
 changes when `dealiasing` is passed onto `SpectralGrid` on the `FullGaussianGrid`
 
-| trunc | dealiasing | FullGaussianGrid size |
-| ----- | ---------- | --------------------- |
-| 31    | 1          | 64x32                 |
-| 31    | 2          | 96x48                 |
-| 31    | 3          | 128x64                |
-| 42    | 1          | 96x48                 |
-| 42    | 2          | 128x64                |
-| 42    | 3          | 192x96                |
-| ...   | ...        | ...                   |
+| truncation | dealiasing | FullGaussianGrid size |
+| ---------- | ---------- | --------------------- |
+| 32         | 1          | 64x32                 |
+| 32         | 2          | 96x48                 |
+| 32         | 3          | 128x64                |
+| 43         | 1          | 96x48                 |
+| 43         | 2          | 128x64                |
+| 43         | 3          | 192x96                |
+| ...        | ...        | ...                   |
 
-You will obtain this information every time you create a `SpectralGrid(; Grid, trunc, dealiasing)`.
+You will obtain this information every time you create a `SpectralGrid(; Grid, truncation, dealiasing)`.
 
 ## Interactively exploring the grids
 

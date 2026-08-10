@@ -1,8 +1,8 @@
 @testset "Periodic schedule" begin
     # especially T170 uses 337500 milliseconds time steps
     # not representable as seconds
-    for trunc in (31, 42, 63, 85, 127, 170, 255, 341)
-        spectral_grid = SpectralGrid(trunc = trunc, nlayers = 1)
+    for truncation in (32, 43, 64, 86, 128, 171, 256, 342)
+        spectral_grid = SpectralGrid(truncation = truncation, nlayers = 1)
         for TS in (Leapfrog, NCycleLorenz) 
             time_stepping = TS(spectral_grid)
 

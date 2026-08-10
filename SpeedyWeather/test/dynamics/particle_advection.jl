@@ -12,7 +12,7 @@
             nlayers = 1
         end
 
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = nlayers)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = nlayers)
         particle_advection = ParticleAdvection2D(spectral_grid, layer = 1, nparticles = 100)
 
         model = Model(spectral_grid; particle_advection)

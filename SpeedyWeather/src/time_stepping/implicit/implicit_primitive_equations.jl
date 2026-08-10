@@ -14,7 +14,7 @@ $(TYPEDFIELDS)"""
 
     # DIMENSIONS
     "[DERIVED] Spectral resolution"
-    trunc::IntType
+    truncation::IntType
 
     "[DERIVED] Number of vertical layers"
     nlayers::IntType
@@ -61,15 +61,15 @@ $(TYPEDFIELDS)"""
     S::MatrixType = zeros(NF, nlayers, nlayers)
 
     "[DERIVED] combined inverted operator: S = 1 - ξ²(RL + UW)"
-    S⁻¹::TensorType = zeros(NF, trunc + 2, nlayers, nlayers)
+    S⁻¹::TensorType = zeros(NF, truncation + 1, nlayers, nlayers)
 end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc)}(;
-        trunc, nlayers, kwargs...
+    (; NF, VectorType, MatrixType, TensorType, truncation, nlayers) = spectral_grid
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(truncation)}(;
+        truncation, nlayers, kwargs...
     )
 end
 
@@ -109,7 +109,7 @@ function initialize!(
 
     NF = eltype(temp_average)
 
-    (; trunc, nlayers) = implicit
+    (; truncation, nlayers) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
@@ -203,7 +203,7 @@ function initialize!(
     # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
     I = LinearAlgebra.I(nlayers)
-    @inbounds for l in 1:(trunc + 1)
+    @inbounds for l in 1:truncation     # 1-based degree
         eigenvalue = -l * (l - 1)       # 1-based, -l*(l+1) → -l*(l-1)
         S .= I .- ξ^2 * eigenvalue * (R * L .+ U * W')
 

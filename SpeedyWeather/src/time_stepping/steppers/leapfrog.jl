@@ -5,10 +5,10 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
 mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
-    "[OPTION] Time step for T31, scale linearly to spectral resolution `trunc`"
-    Δt_at_T31::S
+    "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
+    Δt_at_T32::S
 
-    "[OPTION] Adjust `Δt_at_T31` with the output `interval` to output exactly after integer time steps"
+    "[OPTION] Adjust `Δt_at_T32` with the output `interval` to output exactly after integer time steps"
     adjust_with_output::B
 
     "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"
@@ -170,19 +170,19 @@ Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(
         spectral_grid::SpectralGrid;
-        Δt_at_T31 = Minute(40),
+        Δt_at_T32 = Minute(40),
         adjust_with_output = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
     )
-    (; NF, trunc) = spectral_grid
+    (; NF, truncation) = spectral_grid
 
     # compute time step
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
     Δt::NF = Δt_millisec.value / 1000
 
     return Leapfrog(
-        Second(Δt_at_T31), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
+        Second(Δt_at_T32), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
     )
 end
 

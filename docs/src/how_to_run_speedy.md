@@ -47,21 +47,21 @@ grid is also stored in Float32. The resolution is therefore on average about 400
 In the vertical 8 levels are used, using [Sigma coordinates](@ref).
 
 The resolution of a SpeedyWeather.jl simulation is adjusted using the
-`trunc` argument, this defines the spectral resolution and the grid
+`truncation` argument, this defines the spectral resolution and the grid
 resolution is automatically adjusted to keep the aliasing between
 spectral and grid-point space constant (see [Matching spectral and grid resolution](@ref)).
 ```@example howto
-spectral_grid = SpectralGrid(trunc=85)
+spectral_grid = SpectralGrid(truncation=86)
 ```
-Typical values are 31, 42, 63, 85, 127, 170, ... although you can technically
+Typical values are 32, 43, 64, 86, 128, 171, ... although you can technically
 use any integer, see [Available horizontal resolutions](@ref) for details.
-Now with T85 (which is a common notation for `trunc=85`) the grid
+Now with T85 (which is a common notation for `truncation=86`) the grid
 is of higher resolution too. You may play with the `dealiasing` factor,
 a larger factor increases the grid resolution that is matched with a given
 spectral resolution. You don't choose the resolution of the grid directly,
 but using the `Grid` argument you can change its type (see [Grids](@ref))
 ```@example howto
-spectral_grid = SpectralGrid(trunc=85, dealiasing=3, Grid=HEALPixGrid)
+spectral_grid = SpectralGrid(truncation=86, dealiasing=3, Grid=HEALPixGrid)
 ```
 
 ## Vertical coordinates and resolution
@@ -106,18 +106,19 @@ model.time_stepping
 
 Model components often contain parameters from the `SpectralGrid` as they are needed
 to determine the size of arrays and other internal reasons. You should, in most cases,
-just ignore those. But the `Leapfrog` time stepper comes with `Δt_at_T31` which
+just ignore those. But the `Leapfrog` time stepper comes with `Δt_at_T32` which
 is the parameter used to scale the time step automatically. This means at a spectral
-resolution of T31 it would use 30min steps, at T63 it would be ~half that, 15min, etc.
+resolution of T32 it would use 30min steps, at T64 it would be ~half that, 15min, etc
+(see [Available horizontal resolutions](@ref) for our meaning of T32).
 Meaning that if you want to have a shorter or longer time step you can create a new
 `Leapfrog` time stepper. All time inputs are supposed to be given with the help of 
 `Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that (almost) every model component
 depends on a `SpectralGrid` as first argument.
 ```@example howto
-spectral_grid = SpectralGrid(trunc=63, nlayers=1)
-time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(15))
+spectral_grid = SpectralGrid(truncation=64, nlayers=1)
+time_stepping = Leapfrog(spectral_grid, Δt_at_T32=Minute(15))
 ```
-The actual time step at the given resolution (here T63) is then `Δt`.
+The actual time step at the given resolution (here T64) is then `Δt`.
 With this new `Leapfrog` time stepper constructed we can create a model by passing
 on the components (they are keyword arguments so either use `; time_stepping`
 for which the naming must match, or `time_stepping = my_time_stepping` with
@@ -153,7 +154,7 @@ the barotropic and shallow water models do not have any physical
 parameterizations. Conceptually you construct these different models with
 
 ```julia
-spectral_grid = SpectralGrid(trunc=..., ...)
+spectral_grid = SpectralGrid(truncation=..., ...)
 component1 = SomeComponent(spectral_grid, parameter1=..., ...)
 component2 = SomeOtherComponent(spectral_grid, parameter2=..., ...)
 model = BarotropicModel(spectral_grid; all_other_components..., ...)

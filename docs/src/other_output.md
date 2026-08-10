@@ -17,7 +17,7 @@ Its usage is similar to the NetCDF output above:
 
 ```@example output2
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=1)
+spectral_grid = SpectralGrid(truncation=32, nlayers=1)
 output = JLD2Output(interval=Hour(1))
 model = ShallowWaterModel(spectral_grid, output=output)
 model.output
@@ -35,7 +35,7 @@ It's also possible to output the `Variables` (or a subgroup of it) directly into
 
 ```@example output3
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=1)
+spectral_grid = SpectralGrid(truncation=32, nlayers=1)
 output = ArrayOutput(interval=Hour(1), groups=(:prognostic,))
 model = ShallowWaterModel(spectral_grid, output=output)
 model.output
@@ -54,7 +54,7 @@ After a succesfull `run!` the result is stored in `output.output`.
 using SpeedyWeather
 using Zarr     # this loads SpeedyWeatherZarrExt and enables ZarrOutput
 
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 output = ZarrOutput(spectral_grid, PrimitiveWet, interval=Hour(6))
 model = PrimitiveWetModel(spectral_grid; output)
 simulation = initialize!(model)
@@ -83,7 +83,7 @@ Two extra options are specific to `ZarrOutput`:
 ```julia
 using SpeedyWeather, Zarr
 
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 output = ZarrOutput(spectral_grid, PrimitiveWet;
     interval = Hour(1),
     time_chunk = 24,                        # bundle one day per chunk on the time axis
@@ -164,7 +164,7 @@ so all members resolve to the same run folder and store:
 using SpeedyWeather, Zarr
 
 # in each process, `member` is this process' ensemble index (1..ensemble_size)
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 output = ZarrOutput(spectral_grid, PrimitiveWet;
     ensemble_index = member,        # e.g. read from an environment variable / job array id
     ensemble_size = 10,

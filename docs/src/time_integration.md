@@ -137,14 +137,14 @@ SpeedyWeather chooses the time step automatically based on the resolution.
 A default time step of
 
 ```@example leapfrog
-time_stepping.Δt_at_T31
+time_stepping.Δt_at_T32
 ```
 
-is used at T31 (`trunc=31`) spectral resolution (see [Available horizontal resolutions](@ref))
+is used at T31 (`truncation=32`) spectral resolution (see [Available horizontal resolutions](@ref))
 which is then (almost) linearly scaled to higher (or lower) resolution. Creating a simulation
 at twice the resolution (T63) will approximately half the time step (20min if T31 runs at 40min).
 This is such that in most cases the user does need to know what time step is stable. But if
-you want a shorter time step the easiest is to choose `Δt_at_T31` (write `\Delta` then hit tab,
+you want a shorter time step the easiest is to choose `Δt_at_T32` (write `\Delta` then hit tab,
 works in the Julia REPL and other interfaces) relative to its default. If you half that time step
 you'll half the time step for all resolutions. The other "time steps" in `time_stepping` are
 explained in the docstring (`?Leapfrog`).

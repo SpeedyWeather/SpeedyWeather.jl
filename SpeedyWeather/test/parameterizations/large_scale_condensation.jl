@@ -1,5 +1,5 @@
 @testset "Large-scale condensation" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     @testset for r in (0.9, 0.95)
         @testset for snow in (true, false)
             @testset for reevaporation in (0, 10, 30)
