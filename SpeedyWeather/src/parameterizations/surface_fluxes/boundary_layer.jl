@@ -94,35 +94,35 @@ end
 Adapt.@adapt_structure BoundaryLayer
 function BoundaryLayer(
         SG::SpectralGrid;
-        surface_condition = SurfaceCondition(SG),
         neutral_wind_speed = NeutralWindSpeed(SG),
         surface_roughness = LearnedSurfaceRoughness(SG),
+        surface_condition = SurfaceCondition(SG),
         drag = BulkRichardsonDrag(SG),
     )
     return BoundaryLayer(surface_condition, neutral_wind_speed, surface_roughness, drag)
 end
 
 function initialize!(BL::BoundaryLayer)
-    initialize!(BL.surface_condition)
     initialize!(BL.neutral_wind_speed)
     initialize!(BL.surface_roughness)
+    initialize!(BL.surface_condition)
     initialize!(BL.drag)
     return nothing
 end
 
 # variables of boundary layer are the union of surface roughness and drag variables
 variables(BL::BoundaryLayer) = (
-    variables(BL.surface_condition)...,
     variables(BL.neutral_wind_speed)...,
     variables(BL.surface_roughness)...,
+    variables(BL.surface_condition)...,
     variables(BL.drag)...,
 )
 
 # just call the sub-paramterizations one after another
 @propagate_inbounds function parameterization!(ij, vars, BL::BoundaryLayer, model)
-    parameterization!(ij, vars, BL.surface_condition, model)
     parameterization!(ij, vars, BL.neutral_wind_speed, model)
     parameterization!(ij, vars, BL.surface_roughness, model)
+    parameterization!(ij, vars, BL.surface_condition, model)
     parameterization!(ij, vars, BL.drag, model)
     return nothing
 end
