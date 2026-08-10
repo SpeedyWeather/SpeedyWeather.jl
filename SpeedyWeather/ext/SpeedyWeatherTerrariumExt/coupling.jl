@@ -342,6 +342,11 @@ function SpeedyWeather.initialize!(
     if haskey(vars.prognostic.land, :snow_depth)
         RingGrids.copy_unmasked!(vars.prognostic.land.snow_depth, state.snow_water_equivalent, indices)
     end
+    # Push albedo only if present in Terrarium state (diagnostic albedo)
+    # TODO: implement haskey for Terrarium StateVariables
+    if hasproperty(state, :albedo)
+        RingGrids.copy_unmasked!(vars.parameterizations.land.albedo, state.albedo, indices)
+    end
     return nothing
 end
 
@@ -398,20 +403,25 @@ function SpeedyWeather.timestep!(
     # SpeedyWeather radiation / surface flux components see current values.
     # TODO: Use custom kernel to make the conversion from °C → K non-allocating here
     if haskey(vars.prognostic.land, :soil_temperature)
-        RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, interior(state.skin_temperature) .+ NF(273.15), indices)
+        # Speedy treats the uppermost soil layer as the "skin" (for now) so that's what we copy here
+        RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, @view(interior(state.skin_temperature)[:, 1, 1]) .+ NF(273.15), indices)
     end
     if haskey(vars.prognostic.land, :soil_moisture)
         RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, @view(interior(state.saturation_water_ice)[:, 1, end]), indices)
     end
     if haskey(vars.prognostic.land, :sensible_heat_flux)
-        RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, state.sensible_heat_flux, indices)
+        RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, @view(interior(state.sensible_heat_flux)[:, 1, 1]), indices)
     end
     if haskey(vars.prognostic.land, :surface_humidity_flux)
-        RingGrids.copy_unmasked!(vars.prognostic.land.surface_humidity_flux, state.latent_heat_flux, indices)
+        RingGrids.copy_unmasked!(vars.prognostic.land.surface_humidity_flux, @view(interior(state.latent_heat_flux)[:, 1, 1]), indices)
         vars.prognostic.land.surface_humidity_flux.data ./= consts.thermodynamics.latent_heat_vaporization
     end
     if haskey(vars.prognostic.land, :snow_depth)
-        RingGrids.copy_unmasked!(vars.prognostic.land.snow_depth, state.snow_water_equivalent, indices)
+        RingGrids.copy_unmasked!(vars.prognostic.land.snow_depth, @view(interior(state.snow_water_equivalent)[:, 1, 1]), indices)
+    end
+    # Push albedo only if present in Terrarium state (diagnostic albedo)
+    if hasproperty(state, :albedo)
+        RingGrids.copy_unmasked!(vars.parameterizations.land.albedo, @view(interior(state.albedo)[:, 1, 1]), indices)
     end
     return nothing
 end
