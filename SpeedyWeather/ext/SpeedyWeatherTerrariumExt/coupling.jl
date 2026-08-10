@@ -1,4 +1,3 @@
-
 """
 $(TYPEDSIGNATURES)
 
@@ -146,12 +145,14 @@ end
 @inline SpeedyWeather.RingGrids.copy_unmasked!(
     dest::Terrarium.Oceananigans.AbstractField,
     src::SpeedyWeather.AbstractField,
-    indices) = SpeedyWeather.RingGrids.copy_unmasked!(interior(dest), src, indices)
+    indices
+) = SpeedyWeather.RingGrids.copy_unmasked!(interior(dest), src, indices)
 
 @inline SpeedyWeather.RingGrids.copy_unmasked!(
-    dest::SpeedyWeather.AbstractField, 
+    dest::SpeedyWeather.AbstractField,
     src::Terrarium.Oceananigans.AbstractField,
-    indices) = SpeedyWeather.RingGrids.copy_unmasked!(dest, interior(src), indices)
+    indices
+) = SpeedyWeather.RingGrids.copy_unmasked!(dest, interior(src), indices)
 
 """$(TYPEDEF)
 
@@ -169,6 +170,7 @@ struct TerrariumLand{
         IV <: Tuple,
         IN <: NamedTuple,
         FL <: NamedTuple,
+        TT,
         MI,
     } <: AbstractTerrariumLandModel
     "SpeedyWeather spectral grid"
@@ -186,7 +188,7 @@ struct TerrariumLand{
     "Preconstructed Terrarium fields forwarded to `Terrarium.initialize`"
     fields::FL
     "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
-    Δt::NF
+    Δt::TT
     "Indices of the common land sea mask, used for allocation-free copying between SpeedyWeather and Terrarium"
     mask_indices::MI
     "Fallback soil temperature [K] for grid points outside the Terrarium land mask (ocean-only cells)"
@@ -206,7 +208,7 @@ function TerrariumLand(
         input_variables::Tuple = (),
         initializers::NamedTuple = (;),
         fields::NamedTuple = (;),
-        Δt::Real = 300,
+        Δt = Minute(5),
         ocean_temperature::Real = 285,
         ocean_moisture::Real = 0,
     ) where {NF}
@@ -219,9 +221,10 @@ function TerrariumLand(
     # `unmasked_indices` treats `true` as masked-out; `model.grid.mask` is `true` at land
     # points, so invert it to get the indices of the (unmasked) land columns.
     mask_indices = RingGrids.unmasked_indices(.!model.grid.mask)
+    Δt = isa(Δt, Number) ? NF(Δt) : Δt
     return TerrariumLand(
         spectral_grid, geometry, model,
-        boundary_conditions, input_variables, initializers, fields, NF(Δt), mask_indices,
+        boundary_conditions, input_variables, initializers, fields, Δt, mask_indices,
         NF(ocean_temperature), NF(ocean_moisture),
     )
 end
@@ -262,6 +265,11 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel)
         SpeedyWeather.PrognosticVariable(
             name = :soil_moisture, dims = SpeedyWeather.Grid2D(),
             units = "1", desc = "Soil moisture (saturation fraction) mirrored from Terrarium",
+            namespace = :land,
+        ),
+        SpeedyWeather.PrognosticVariable(
+            name = :snow_depth, dims = SpeedyWeather.Grid2D(),
+            units = "m", desc = "Snow depth water equivalent mirrored from Terrarium",
             namespace = :land,
         ),
     )
@@ -365,11 +373,8 @@ function SpeedyWeather.timestep!(
         RingGrids.copy_unmasked!(vars.prognostic.land.surface_humidity_flux, state.latent_heat_flux, indices)
         vars.prognostic.land.surface_humidity_flux.data ./= consts.thermodynamics.latent_heat_vaporization
     end
-    if haskey(vars.parameterizations, :surface_longwave_up)
-        RingGrids.copy_unmasked!(vars.parameterizations.surface_longwave_up, state.surface_longwave_up, indices)
-    end
-    if haskey(vars.parameterizations, :surface_shortwave_up)
-        RingGrids.copy_unmasked!(vars.parameterizations.surface_shortwave_up, state.surface_shortwave_up, indices)
+    if haskey(vars.prognostic.land, :snow_depth)
+        RingGrids.copy_unmasked!(vars.prognostic.land.snow_depth, state.snow_water_equivalent, indices)
     end
     return nothing
 end
