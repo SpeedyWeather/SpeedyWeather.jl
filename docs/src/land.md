@@ -39,7 +39,7 @@ The default `LandModel` in SpeedyWeather contains
 (at the moment other than 2 soil layers are not supported or experimental)
 
 ```@example land
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 geometry = LandGeometry(spectral_grid, nlayers=2) # that's also the default, therefore it's optional here
 land = LandModel(spectral_grid; geometry)
 ```
@@ -467,7 +467,7 @@ model = PrimitiveWetModel(
     land_sea_mask,
     surface_heat_flux     = SurfaceHeatFlux(spectral_grid, land = PrescribedLandHeatFlux()),
     surface_humidity_flux = SurfaceHumidityFlux(spectral_grid, land = PrescribedLandHumidityFlux()),
-    time_stepping         = Leapfrog(spectral_grid, Δt_at_T31 = Minute(15)),
+    time_stepping         = Leapfrog(spectral_grid, Δt_at_T32 = Minute(15)),
 )
 
 simulation = initialize!(model)

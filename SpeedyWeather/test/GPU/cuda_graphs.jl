@@ -8,7 +8,7 @@
     ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
     if ext !== nothing
         # CUDA-Graphs path is on by default (SpectralTransform's cuda_graphs = true)
-        spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = GPU())
+        spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = GPU())
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
 
@@ -50,7 +50,7 @@ end
 @testset "CUDA Graphs: per-step views of one buffer reuse a single graph" begin
     ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
     if ext !== nothing
-        spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = GPU())
+        spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = GPU())
         S = SpectralTransform(spectral_grid)
         nlayers = spectral_grid.nlayers
 
@@ -91,7 +91,7 @@ end
     ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
     if ext !== nothing
         ST = SpeedyWeather.SpeedyTransforms
-        spectral_grid = SpectralGrid(; trunc = 15, nlayers = 4, architecture = GPU())
+        spectral_grid = SpectralGrid(; truncation = 16, nlayers = 4, architecture = GPU())
         S = SpectralTransform(spectral_grid)
         nlayers = spectral_grid.nlayers
         specs = rand(ComplexF32, spectral_grid.spectrum, nlayers)

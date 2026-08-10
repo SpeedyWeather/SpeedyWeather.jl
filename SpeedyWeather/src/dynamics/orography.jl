@@ -234,7 +234,7 @@ function initialize!(
     transform!(surface_geopotential, orography, S)   # no *gravity yet
 
     if orog.smoothing                       # smooth orography in spectral space?
-        # get trunc=lmax from size of surface_geopotential
+        # get trunc=lmax 0-based from size of surface_geopotential
         trunc = (size(surface_geopotential, 1, as = Matrix) - 2)
         # degree of harmonics to be truncated
         truncation = round(Int, trunc * (1 - orog.smoothing_fraction))

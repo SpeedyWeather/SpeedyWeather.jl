@@ -1,4 +1,3 @@
-using LowerTriangularArrays
 using SpeedyWeatherInternals.ArrayDimensions: LM, LMZ, LMT, LMZT,
     DimensionsWithTime, DimensionsWithVertical, DimensionsWithTimeAndVertical
 

@@ -15,8 +15,8 @@ using SpeedyWeather.LowerTriangularArrays
 function test_variables_stability()
     # Create a spectral grid with standard parameters
     spectral_grid = SpectralGrid(
-        trunc = 31,                    # T31 spectral truncation
-        nlayers = 8,                   # 8 vertical levels
+        truncation = 32,                # T32 spectral truncation
+        nlayers = 8,                    # 8 vertical levels
     )
 
     # Initialize Variables
@@ -31,7 +31,7 @@ end
 println("Testing Variables initialization type stability...")
 println("\nTesting SpectralGrid constructor:")
 
-@code_warntype SpectralGrid(trunc = 20)
+@code_warntype SpectralGrid(truncation = 21)
 @code_warntype test_variables_stability()
 
 # Run the test functions to see if they work correctly

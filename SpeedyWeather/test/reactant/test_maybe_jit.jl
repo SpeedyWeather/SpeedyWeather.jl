@@ -35,9 +35,9 @@
     # -----------------------------------------------------------------------
 
     NF = Float32
-    trunc = TRUNC
-    spectrum = Spectrum(trunc)
-    grid = OctahedralGaussianGrid(SpeedyTransforms.get_nlat_half(trunc))
+    truncation = TRUNCATION
+    spectrum = Spectrum(truncation)
+    grid = OctahedralGaussianGrid(SpeedyTransforms.get_nlat_half(truncation))
     M_cpu = MatrixSpectralTransform(spectrum, grid; NF)
 
     # random spectral coefficients as input

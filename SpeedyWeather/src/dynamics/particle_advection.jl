@@ -51,7 +51,7 @@ end
 
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.trunc)}(; geometry, kwargs...)
+    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
 end
 
 function variables(P::ParticleAdvection2D)

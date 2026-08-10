@@ -27,7 +27,7 @@ end
 
 @testset "Differentiability: nested reverse-over-forward through transform!" begin
     NF = Float64
-    spectral_grid = SpectralGrid(trunc = 8, nlayers = 1, NF = NF)
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 1, NF = NF)
     S = SpectralTransform(spectral_grid)
 
     spec0 = zeros(Complex{NF}, spectral_grid.spectrum)

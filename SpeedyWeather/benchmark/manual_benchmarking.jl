@@ -134,7 +134,7 @@ function overview_data()
     # already renders missing/non-finite entries as "—".
     json_safe(x) = (x isa Number && isfinite(x)) ? x : nothing
     return Dict(
-        "trunc" => collect(suite.trunc),
+        "truncation" => collect(suite.truncation),
         "nlayers" => collect(suite.nlayers),
         "nlat" => collect(suite.nlat),
         "sypd" => map(json_safe, suite.SYPD),
@@ -207,7 +207,7 @@ function write_preamble(md)
     write(md, "### Explanation\n\n")
     write(md, "Abbreviations in the tables below are as follows; omitted columns use defaults.\n")
     write(md, "- NF: Number format, default: $(SpeedyWeather.DEFAULT_NF)\n")
-    write(md, "- T: Spectral resolution, maximum degree of spherical harmonics, default: T$(SpeedyWeather.DEFAULT_TRUNC)\n")
+    write(md, "- T: Spectral resolution, maximum degree of spherical harmonics (1-based), default: T$(SpeedyWeather.DEFAULT_TRUNCATION)\n")
     write(md, "- L: Number of vertical layers, default: $(SpeedyWeather.DEFAULT_NLAYERS) (for 3D models)\n")
     write(md, "- Grid: Horizontal grid, default: $(SpeedyWeather.DEFAULT_GRID)\n")
     write(md, "- Rings: Grid-point resolution, number of latitude rings pole to pole\n")
@@ -241,16 +241,16 @@ function write_overview(md, all_results, labels)
     write(md, "Empty cells mean the architecture has not yet been benchmarked or that suite was skipped. ")
     write(md, "Comparison figures across architectures are available on the documentation's `Benchmarks` page.\n\n")
 
-    # Pick the union of (trunc, nlayers, transform) rows from all archs.
+    # Pick the union of (truncation, nlayers, transform) rows from all archs.
     rows = Tuple{Int, Int, String}[]
     for label in labels
         ov = get(all_results[label], "overview", nothing)
         ov === nothing && continue
-        truncs = ov["trunc"]
+        truncations = ov["truncation"]
         nlayers = ov["nlayers"]
-        transforms = get(ov, "spectral_transform", fill("default", length(truncs)))
-        for i in eachindex(truncs)
-            r = (Int(truncs[i]), Int(nlayers[i]), String(transforms[i]))
+        transforms = get(ov, "spectral_transform", fill("default", length(truncations)))
+        for i in eachindex(truncations)
+            r = (Int(truncations[i]), Int(nlayers[i]), String(transforms[i]))
             r in rows || push!(rows, r)
         end
     end
@@ -268,12 +268,12 @@ function write_overview(md, all_results, labels)
             ov = get(all_results[label], "overview", nothing)
             cell = "—"
             if ov !== nothing
-                truncs = ov["trunc"]
+                truncations = ov["truncation"]
                 nlayers = ov["nlayers"]
                 sypd = ov["sypd"]
-                transforms = get(ov, "spectral_transform", fill("default", length(truncs)))
-                for i in eachindex(truncs)
-                    if Int(truncs[i]) == t && Int(nlayers[i]) == l && String(transforms[i]) == tr
+                transforms = get(ov, "spectral_transform", fill("default", length(truncations)))
+                for i in eachindex(truncations)
+                    if Int(truncations[i]) == t && Int(nlayers[i]) == l && String(transforms[i]) == tr
                         s = sypd[i]
                         cell = (s isa Number && isfinite(s)) ? format_sypd(s) : "—"
                         break
