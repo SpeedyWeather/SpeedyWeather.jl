@@ -475,7 +475,12 @@ Adapt.@adapt_structure JablonowskiVorticity
     r = radius * acos(X)
 
     # Eq (3), the unperturbed zonal wind
-    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(3 / 2) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+    # NOTE: `x^(3//2)` does NOT stay in Float32. Base computes a fractional power as
+    # exp2(e * log2(x)) and promotes to Float64 internally, so the kernel ends up needing
+    # Float64 log2/exp2, which AMDGPU cannot compile (GPUCompiler segfaults in check_ir!).
+    # cos is strictly positive here (η in [0, 1] gives cos in [0.39, 1]), so x*sqrt(x) is equivalent.
+    cosηᵥ = cos((η - η₀) * π / 2)
+    ζ = -4 * u₀ / radius * (cosηᵥ * sqrt(cosηᵥ)) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
 
     # Eq (12), the perturbation
     perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
@@ -666,9 +671,12 @@ end
     η = σ_levels_full[k]
     ηᵥ = (η - η₀) * π * 1 // 2  # auxiliary variable for vertical coordinate
 
-    # Amplitudes with height
-    A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
-    A2 = 2u₀ * cos(ηᵥ)^(3 // 2)
+    # Amplitudes with height. NOTE: cos(ηᵥ)^(3//2) would pull a Float64 log2/exp2 into the
+    # kernel (see JablonowskiVorticity above), so reuse the sqrt that A1 already needs
+    cosηᵥ = cos(ηᵥ)
+    sqrt_cosηᵥ = sqrt(cosηᵥ)
+    A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt_cosηᵥ
+    A2 = 2u₀ * cosηᵥ * sqrt_cosηᵥ
 
     # Get latitude
     φij = φ[ij]
