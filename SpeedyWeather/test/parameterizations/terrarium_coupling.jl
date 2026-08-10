@@ -105,8 +105,8 @@ end
 
     land = SpeedyWeather.LandModel(
         spectral_grid, soil_model;
+        inputs = Tair_input,
         boundary_conditions = bcs,
-        input_variables = Terrarium.variables(Tair_input),
         Δt = 300.0,
     )
     @test land isa AbstractTerrariumLandModel
