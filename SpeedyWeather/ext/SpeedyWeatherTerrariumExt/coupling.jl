@@ -27,9 +27,9 @@ function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars},
     # written there.
     return Terrarium.StateVariables(
         land.model;
+        inputs = land.inputs,
         clock = Terrarium.Clock(time = SpeedyWeather.DEFAULT_DATE),
         boundary_conditions = land.boundary_conditions,
-        input_variables = land.input_variables,
         fields = land.fields,
     )
 end
@@ -167,8 +167,8 @@ struct TerrariumLand{
         LG <: LandGeometry,
         TM <: Terrarium.AbstractModel{NF},
         BC <: NamedTuple,
-        IV <: Tuple,
-        IN <: NamedTuple,
+        IN <: Tuple,
+        IT <: NamedTuple,
         FL <: NamedTuple,
         TT,
         MI,
@@ -181,10 +181,10 @@ struct TerrariumLand{
     model::TM
     "Boundary conditions forwarded to `Terrarium.initialize`"
     boundary_conditions::BC
-    "Additional input variables forwarded to `Terrarium.initialize`"
-    input_variables::IV
+    "Terrarium `InputSource`s forwarded to `Terrarium.initialize`"
+    inputs::IN
     "Field initializers forwarded to the on-the-fly `ModelIntegrator`"
-    initializers::IN
+    initializers::IT
     "Preconstructed Terrarium fields forwarded to `Terrarium.initialize`"
     fields::FL
     "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
@@ -204,8 +204,8 @@ SpeedyWeather spectral grid."""
 function TerrariumLand(
         spectral_grid::SpectralGrid,
         model::Terrarium.AbstractModel{NF};
+        inputs::Terarium.InputSource = Terrairum.InputSources(NF),
         boundary_conditions::NamedTuple = (;),
-        input_variables::Tuple = (),
         initializers::NamedTuple = (;),
         fields::NamedTuple = (;),
         Δt = Minute(5),
@@ -224,7 +224,7 @@ function TerrariumLand(
     Δt = isa(Δt, Number) ? NF(Δt) : Δt
     return TerrariumLand(
         spectral_grid, geometry, model,
-        boundary_conditions, input_variables, initializers, fields, Δt, mask_indices,
+        boundary_conditions, inputs, initializers, fields, Δt, mask_indices,
         NF(ocean_temperature), NF(ocean_moisture),
     )
 end
