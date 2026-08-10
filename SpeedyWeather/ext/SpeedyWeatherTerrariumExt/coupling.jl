@@ -204,7 +204,7 @@ SpeedyWeather spectral grid."""
 function TerrariumLand(
         spectral_grid::SpectralGrid,
         model::Terrarium.AbstractModel{NF};
-        inputs::Terarium.InputSource = Terrairum.InputSources(NF),
+        inputs::Terrarium.InputSource = Terrarium.InputSources(NF),
         boundary_conditions::NamedTuple = (;),
         initializers::NamedTuple = (;),
         fields::NamedTuple = (;),
