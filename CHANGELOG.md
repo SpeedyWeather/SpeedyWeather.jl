@@ -2,7 +2,17 @@
 
 ## Unreleased
 
-- GPU CI is now run with Julia 1.12 [#1171](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1171)
+- CUDA GPU CI is now run with Julia 1.12 [#1171](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1171)
+- Fix the progress bar not being drawn: `Feedback.progress_bar_length` now defaults to `nothing` (fit to the terminal width) instead of `0` (no bar) [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
+- New `Feedback` option `interval` (default 50 time steps) that strides the NaN check and the progress meter's maximum-speed/temperature-range diagnostics [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
+- Plan the `K=2` FFT batch on GPU [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
+- Long integration CI with optimize 2, all other SpeedyWeather CI with optimize 0 [#1175](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1175)
+- Faster GPU Legendre transforms: coalesced memory access, no atomics, no scratch resets, 5-37x faster at T127-T511 [#1180](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1180)
+- Fix `SpeedLimitDrag` pointing along the quadrant diagonal instead of antiparallel to the flow (and being √2 too large for a 45° flow); default `drag` raised 4e-7 -> 3e-6 so the limiter actually binds, fixes previous high-resolution instabilities [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
+- Fix `set!(time_stepping, Δt=...)` inverting the resolution factor [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
+- Fix `SpectralFilter` implicit diffusion using twice the prognostic time step; docstring of `HyperDiffusion` corrected [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
+- Lower free convection gust constant [#1178](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1178)
+- Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
 - Revised extended differentiability tests [#1167](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1167)
 - Compatability with Terrarium 0.1.4 [#1157](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1157) [#1170](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1170)
