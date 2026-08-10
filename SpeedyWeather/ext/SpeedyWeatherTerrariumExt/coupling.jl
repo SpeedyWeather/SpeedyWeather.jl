@@ -55,7 +55,7 @@ on this abstract type:
   copies soil temperatures, moisture and surface fluxes back into the
   SpeedyWeather variables.
 """
-abstract type AbstractTerrariumLandModel <: SpeedyWeather.AbstractLand end
+abstract type AbstractTerrariumLandModel{NF, TM} <: SpeedyWeather.AbstractLand end
 
 @inline SpeedyWeather.get_nlayers(land::AbstractTerrariumLandModel) = land.geometry.nlayers
 
@@ -173,7 +173,7 @@ struct TerrariumLand{
         FL <: NamedTuple,
         TT,
         MI,
-    } <: AbstractTerrariumLandModel
+    } <: AbstractTerrariumLandModel{NF, TM}
     "SpeedyWeather spectral grid"
     spectral_grid::SpectralGrid
     "SpeedyWeather land geometry (a single effective surface layer)"
@@ -247,17 +247,27 @@ function TerrariumLand(
     )
 end
 
-function SpeedyWeather.variables(land_model::AbstractTerrariumLandModel)
+function SpeedyWeather.variables(land_model::AbstractTerrariumLandModel{NF, <:Terrarium.SoilModel}) where {NF}
     return (
         # The full Terrarium state, owned by SpeedyWeather's Variables tree.
         SpeedyWeather.PrognosticVariable(
             name = :terrarium, dims = TerrariumVars(),
             namespace = :land, desc = "Terrarium land state",
         ),
-        # Thin grid-side mirrors of surface soil temperature / moisture so the
+        # Thin grid-side mirrors of land state variables so the
         # rest of SpeedyWeather (longwave/shortwave radiation, surface fluxes,
         # output writers) can read them. They are kept in sync from the
         # Terrarium state inside `initialize!` and `timestep!`.
+        SpeedyWeather.variables(land_model, land_model.model.soil)...,
+    )
+end
+
+function SpeedyWeather.variables(land_model::AbstractTerrariumLandModel{NF, <:Terrarium.LandModel}) where {NF}
+    return (
+        SpeedyWeather.PrognosticVariable(
+            name = :terrarium, dims = TerrariumVars(),
+            namespace = :land, desc = "Terrarium land state",
+        ),
         SpeedyWeather.variables(land_model, land_model.model.soil)...,
         SpeedyWeather.variables(land_model, land_model.model.snow)...,
     )
