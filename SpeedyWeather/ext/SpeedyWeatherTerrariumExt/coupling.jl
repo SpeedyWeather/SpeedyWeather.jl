@@ -364,8 +364,8 @@ function SpeedyWeather.timestep!(
     # The Terrarium state itself is mutated in place above and remains in
     # `vars.prognostic.land.terrarium`; the soil mirrors are refreshed so
     # SpeedyWeather radiation / surface flux components see current values.
-    vars.prognostic.land.soil_temperature[mask] .= interior(state.skin_temperature) .+ NF(273.15)
-    vars.prognostic.land.soil_moisture[mask] .= @view interior(state.saturation_water_ice)[:, 1, end]
+    RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, state.skin_temperature + NF(273.15), indices)
+    RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, @view(interior(state.saturation_water_ice)[:, 1, end]), indices)
     if haskey(vars.prognostic.land, :sensible_heat_flux)
         RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, state.sensible_heat_flux, indices)
     end
