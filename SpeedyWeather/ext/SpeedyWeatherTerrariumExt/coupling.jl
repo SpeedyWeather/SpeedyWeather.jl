@@ -247,7 +247,7 @@ function TerrariumLand(
     )
 end
 
-function SpeedyWeather.variables(::AbstractTerrariumLandModel)
+function SpeedyWeather.variables(land_model::AbstractTerrariumLandModel)
     return (
         # The full Terrarium state, owned by SpeedyWeather's Variables tree.
         SpeedyWeather.PrognosticVariable(
@@ -258,6 +258,13 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel)
         # rest of SpeedyWeather (longwave/shortwave radiation, surface fluxes,
         # output writers) can read them. They are kept in sync from the
         # Terrarium state inside `initialize!` and `timestep!`.
+        SpeedyWeather.variables(land_model, land_model.model.soil)...,
+        SpeedyWeather.variables(land_model, land_model.model.snow)...,
+    )
+end
+
+function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.AbstractSoil)
+    return (
         SpeedyWeather.PrognosticVariable(
             name = :soil_temperature, dims = SpeedyWeather.Grid2D(),
             units = "K", desc = "Soil temperature mirrored from Terrarium",
@@ -268,6 +275,11 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel)
             units = "1", desc = "Soil moisture (saturation fraction) mirrored from Terrarium",
             namespace = :land,
         ),
+    )
+end
+
+function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.AbstratSnow)
+    return (
         SpeedyWeather.PrognosticVariable(
             name = :snow_depth, dims = SpeedyWeather.Grid2D(),
             units = "m", desc = "Snow depth water equivalent mirrored from Terrarium",
@@ -275,6 +287,8 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel)
         ),
     )
 end
+
+SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Nothing) = ()
 
 # wet land model
 function SpeedyWeather.initialize!(
@@ -309,8 +323,15 @@ function SpeedyWeather.initialize!(
 
     # fill ocean/non-Terrarium points with fallback values first, then seed the land columns
     fill_fallback!(vars, land)
-    RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, Tsoil, indices)
-    RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, sat, indices)
+    if haskey(vars.prognostic.land, :soil_temperature)
+        RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, Tsoil, indices)
+    end
+    if haskey(vars.prognostic.land, :soil_moisture)
+        RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, sat, indices)
+    end
+    if haskey(vars.prognostic.land, :snow_depth)
+        RingGrids.copy_unmasked!(vars.prognostic.land.snow_depth, state.snow_water_equivalent, indices)
+    end
     return nothing
 end
 
@@ -366,8 +387,12 @@ function SpeedyWeather.timestep!(
     # `vars.prognostic.land.terrarium`; the soil mirrors are refreshed so
     # SpeedyWeather radiation / surface flux components see current values.
     # TODO: Use custom kernel to make the conversion from °C → K non-allocating here
-    RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, interior(state.skin_temperature) .+ NF(273.15), indices)
-    RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, @view(interior(state.saturation_water_ice)[:, 1, end]), indices)
+    if haskey(vars.prognostic.land, :soil_temperature)
+        RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, interior(state.skin_temperature) .+ NF(273.15), indices)
+    end
+    if haskey(vars.prognostic.land, :soil_moisture)
+        RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, @view(interior(state.saturation_water_ice)[:, 1, end]), indices)
+    end
     if haskey(vars.prognostic.land, :sensible_heat_flux)
         RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, state.sensible_heat_flux, indices)
     end
@@ -389,7 +414,7 @@ function SpeedyWeather.initialize!(
     )
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
-    mask = land_mask(land)
+    indices = land.mask_indices
 
     # Sync the Terrarium clock's initial time with the SpeedyWeather clock,
     # which was set from the `time` kwarg of `initialize!(model; time=...)`.
@@ -400,7 +425,7 @@ function SpeedyWeather.initialize!(
 
     # fill ocean/non-Terrarium points with fallback values first, then seed the land columns
     fill_fallback!(vars, land)
-    vars.prognostic.land.soil_temperature[mask] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
+    RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, interior(state.skin_temperature) .+ NF(273.15), indices)
     return nothing
 end
 
