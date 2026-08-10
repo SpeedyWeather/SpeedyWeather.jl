@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- CUDA GPU CI is now run with Julia 1.12 [#1171](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1171)
 - Fix the progress bar not being drawn: `Feedback.progress_bar_length` now defaults to `nothing` (fit to the terminal width) instead of `0` (no bar) [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
 - New `Feedback` option `interval` (default 50 time steps) that strides the NaN check and the progress meter's maximum-speed/temperature-range diagnostics [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
 - Plan the `K=2` FFT batch on GPU [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
