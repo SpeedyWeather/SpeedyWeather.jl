@@ -95,7 +95,8 @@ function SpeedyWeather.animate(
     end
 
     # Check if the variable is 3D (has a vertical dimension)
-    is_3d = "layer" in dimnames(ds[variable])
+    var_dim_names = dimnames(ds[variable])
+    is_3d = "layer" in var_dim_names || "soil_layer" in var_dim_names
 
     # Create the figure
     fig = Figure(size = figure_size)
