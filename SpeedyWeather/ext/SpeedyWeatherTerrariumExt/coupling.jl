@@ -435,7 +435,7 @@ function SpeedyWeather.initialize!(
 
     # fill ocean/non-Terrarium points with fallback values first, then seed the land columns
     fill_fallback!(vars, land)
-    RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, interior(state.skin_temperature) .+ NF(273.15), indices)
+    RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15), indices)
     return nothing
 end
 
