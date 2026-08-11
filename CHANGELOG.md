@@ -2,10 +2,12 @@
 
 ## Unreleased
 
+## v0.22.0
+
+- [BREAKING] 1-based truncation as resolution parameter [#1177](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1177)
 - Update and fix bugs in SpeedyWeather + Terrarium coupling extension [#1188](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1188)
 - Adds `PrescribedAlbedo`, useful e.g. for coupling [#1186](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1186)
 - Fixes a `SpeedyWeather.animate` projection issue [#958](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/958)
-- [BREAKING] 1-based truncation as resolution parameter [#1177](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1177)
 - CUDA GPU CI is now run with Julia 1.12 [#1171](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1171)
 - Fix the progress bar not being drawn: `Feedback.progress_bar_length` now defaults to `nothing` (fit to the terminal width) instead of `0` (no bar) [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
 - New `Feedback` option `interval` (default 50 time steps) that strides the NaN check and the progress meter's maximum-speed/temperature-range diagnostics [#1185](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1185)
