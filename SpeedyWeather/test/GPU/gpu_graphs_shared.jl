@@ -3,10 +3,7 @@
 # hip_graphs.jl), so this is CUDA-only.
 # GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live inside the CUDA extension
 # module (SpeedyTransformsCUDAExt), not in the main SpeedyTransforms package — hence
-# accessed via `ext.` below, not `SpeedyTransforms.`. Keeping this code extension-local
-# (rather than shared via the main package) is deliberate: it broke Enzyme's CPU-only AD
-# tests when these methods existed in every Julia session regardless of which GPU backend
-# was loaded.
+# accessed via `ext.` below, not `SpeedyTransforms.`.
 
 function test_gpu_graphs(ext, prefix)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin

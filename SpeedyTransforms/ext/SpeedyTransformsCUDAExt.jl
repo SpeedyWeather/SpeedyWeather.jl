@@ -16,7 +16,7 @@ import SpeedyTransforms: SpectralTransform, _fourier_batched!
 import SpeedyTransforms.RingGrids: AbstractField
 
 import SpeedyWeatherInternals.KernelLaunching: launch!, ArrayWorkOrder
-import SpeedyWeatherInternals.Architectures: architecture, on_architecture
+import SpeedyWeatherInternals.Architectures: on_architecture
 
 # =====================================================================================
 # CUDA GRAPHS ACCELERATION OF THE BATCHED FOURIER TRANSFORM
@@ -46,11 +46,9 @@ import SpeedyWeatherInternals.Architectures: architecture, on_architecture
 # work as a view on a CuArray is again a CuArray and not a SubArray which causes problems here.
 #
 # The backend-agnostic parts of this (kernels, cache struct, allocation-free loops,
-# capture/replay control flow) live in gpu_graphs_common.jl, included below, so that a future
-# graph-capturing backend (e.g. a fixed HIP implementation for AMDGPU) only needs to supply
-# the small `GraphBackend` of capture/instantiate/launch/synchronize primitives at the bottom
-# of this file. See docs/dev/2026-08/gpu-graphs-common-interface.md for why that file is
-# `include()`-d here rather than shared via SpeedyTransforms/src/.
+# capture/replay control flow) live in gpu_graphs_common.jl, included below and shared with
+# SpeedyTransformsAMDGPUExt.jl; only the capture/instantiate/launch primitives differ per
+# backend (see `GraphBackend`).
 # =====================================================================================
 
 include("gpu_graphs_common.jl")

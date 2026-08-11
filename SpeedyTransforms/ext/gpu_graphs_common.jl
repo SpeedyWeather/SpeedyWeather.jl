@@ -1,16 +1,16 @@
 # =====================================================================================
 # BACKEND-AGNOSTIC GPU-GRAPHS MACHINERY FOR THE BATCHED FOURIER TRANSFORM
 #
-# `include()`-d by each graph-capturing backend extension (currently only
-# SpeedyTransformsCUDAExt.jl). See SpeedyTransformsCUDAExt.jl for the rationale of GPU-graphs
-# acceleration itself, and docs/dev/2026-08/gpu-graphs-common-interface.md for why this file
-# lives here — under SpeedyTransforms/ext/, `include()`-d from within an extension module —
-# rather than in SpeedyTransforms/src/: an earlier attempt at sharing this code from the main
-# package added extra methods of `_fourier_batched!`/`fft_plans` that existed in EVERY Julia
-# session regardless of which (if any) GPU extension was loaded, which broke Enzyme's static
-# activity analysis in the CPU-only differentiability tests. `include()`-ing from inside an
-# extension keeps this code invisible to a session that never loads that extension's trigger
-# package, exactly like a fully self-contained extension would be.
+# `include()`-d by each graph-capturing backend extension (currently SpeedyTransformsCUDAExt.jl
+# and SpeedyTransformsAMDGPUExt.jl). See SpeedyTransformsCUDAExt.jl for the rationale of
+# GPU-graphs acceleration itself.
+#
+# This file must stay under SpeedyTransforms/ext/ and be `include()`-d from within an
+# extension module, NOT moved to SpeedyTransforms/src/: the `_fourier_batched!` methods that
+# actually use this machinery live in each extension, and the main package loads
+# unconditionally in every Julia session — so if any of this were in src/ instead, those
+# methods would exist even in CPU-only sessions with no GPU backend loaded, which breaks
+# Enzyme's static activity analysis (see docs/dev/2026-08/gpu-graphs-common-interface.md).
 #
 # The only thing that differs between backends is the graph capture/instantiate/launch API
 # itself (e.g. `CUDA.capture`/`instantiate`/`launch` vs a HIP equivalent) and the graph-exec
