@@ -16,7 +16,7 @@
 end
 
 @testset "Vertical advection runs" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
     advection_schemes = (
         SpeedyWeather.WENOVerticalAdvection,

@@ -29,7 +29,7 @@
     end
 
     # replace the existing albedo with our custom albedo
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     albedo = SimpleAlbedo(spectral_grid)
     model = PrimitiveWetModel(spectral_grid; albedo = albedo)
     simulation = initialize!(model)

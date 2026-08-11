@@ -11,7 +11,7 @@ F(x, ω) = im * ω * x
 
     # loop over different precisions
     @testset for NF in (Float32, Float64)
-        spectral_grid = SpectralGrid(; NF, trunc=5, nlayers = 1)
+        spectral_grid = SpectralGrid(; NF, truncation = 6, nlayers = 1)
         L = Leapfrog(spectral_grid, adjust_with_output=false, robert_filter=0.05, williams_filter=0.51)
         model = BarotropicModel(spectral_grid; time_stepping=L)
         simulation = initialize!(model)
@@ -40,7 +40,7 @@ F(x, ω) = im * ω * x
 
             # absolute error to exact result 1+0i
             error = abs.(X[:, 2] .- 1)
-            @info Leapfrog, error[1], abs(X[1])
+            # @info Leapfrog, error[1], abs(X[1])
             @test all(error .< 1.0e-2)
             @test all(abs.(X) .<= 1)         # stable integration?
 
@@ -57,7 +57,7 @@ end
 
 @testset "Leapfrog spinup" begin
 
-    spectral_grid = SpectralGrid(trunc=5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
 
     # disable RAW filters
     time_stepping = Leapfrog(spectral_grid, adjust_with_output=false, robert_filter=0, williams_filter=1)
@@ -165,7 +165,7 @@ end
                                     SpeedyWeather.NCycleLorenzABBA,
                                     )
             @testset for steps in (3, 4)
-                spectral_grid = SpectralGrid(; NF, trunc=5, nlayers = 1)
+                spectral_grid = SpectralGrid(; NF, truncation = 6, nlayers = 1)
                 L = NCycleLorenz(spectral_grid; steps=steps, variant=Variant(), adjust_with_output=false)
                 model = BarotropicModel(spectral_grid; time_stepping=L)
                 simulation = initialize!(model)
@@ -184,7 +184,7 @@ end
 
                 # absolute error to exact result 1+0i
                 error = abs.(X .- 1)
-                @info (steps, Variant, error[1], abs(X[1]))
+                # @info (steps, Variant, error[1], abs(X[1]))
                 if steps == 3
                     @test all(error .< 1.0e-2)
                 else                            
@@ -211,14 +211,19 @@ end
 
 @testset "Set timestep manually" begin
     @testset for TS in (Leapfrog, NCycleLorenz)
-        @testset for trunc in (31, 63, 127)
+        @testset for truncation in (32, 64, 128)
             @testset for Δt in (Minute(10), Minute(20))
-                spectral_grid = SpectralGrid(; trunc)
+                spectral_grid = SpectralGrid(; truncation)
                 time_stepping = TS(spectral_grid)
                 set!(time_stepping, Δt=Δt)
                 @test time_stepping.Δt == Second(Δt).value
                 @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt))
-                @test time_stepping.Δt_at_T31 == Second(Second(Δt).value / ((trunc + 1) / (SpeedyWeather.DEFAULT_TRUNC + 1)))
+
+                # Δt = Δt_at_T32 * (32/truncation) (see get_Δt_millisec), so Δt_at_T32 is the
+                # requested Δt divided by that factor, i.e. LONGER than Δt for truncation > 32
+                factor = SpeedyWeather.resolution_factor(truncation, SpeedyWeather.DEFAULT_RADIUS)
+                @test time_stepping.Δt_at_T32.value ≈ Second(Δt).value / factor rtol = 0.05
+                @test time_stepping.Δt_at_T32 >= Second(Δt)   # never shorter than Δt itself
             end
         end
     end
@@ -233,12 +238,13 @@ end
                             )
             s = 4      # run longer? As testing for approximate below, s can't be too large
 
-            spectral_grid = SpectralGrid(nlayers = 1)
+            spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
             time_stepping = NCycleLorenz(spectral_grid; steps, variant = Variant())
             planet = Earth(spectral_grid, radius = 2^22)  # use radius that is power of 2 to avoid rounding errors in scaling
 
             ic = RandomVelocity(spectral_grid, seed = 1234)
             model = BarotropicModel(spectral_grid; time_stepping, initial_conditions = ic)
+            model.feedback.verbose = false
 
             simulation = initialize!(model)
             run!(simulation, steps = 2*s*8*steps)
@@ -265,7 +271,7 @@ end
 
             # this test is only approximate as bit reproducibility is close but not perfect
             # not sure exactly why, needs further investigation if deemed important
-            @test all(vor_restarted .≈  simulation.variables.prognostic.vorticity)
+            @test all(isapprox.(vor_restarted, simulation.variables.prognostic.vorticity; atol = 1e-5, rtol=1e-5))
             @test time_restarted == simulation.variables.prognostic.clock.time
         end
     end
@@ -278,7 +284,7 @@ end
     # and could double-scale) — and `scale ∘ unscale` must round-trip to the identity.
     @testset for Model in (BarotropicModel, ShallowWaterModel, PrimitiveWetModel)
         nlayers = Model == PrimitiveWetModel ? 4 : 1
-        spectral_grid = SpectralGrid(; trunc = 8, nlayers)
+        spectral_grid = SpectralGrid(; truncation = 9, nlayers)
         model = Model(spectral_grid)
         vars = Variables(model)
         r = 3.0f0

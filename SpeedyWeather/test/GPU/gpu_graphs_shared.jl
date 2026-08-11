@@ -8,7 +8,7 @@
 function test_gpu_graphs(ext, prefix)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
         if ext !== nothing
-            spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = SpeedyWeather.GPU())
+            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
             model = PrimitiveWetModel(spectral_grid)
             simulation = initialize!(model)
 
@@ -46,7 +46,7 @@ function test_gpu_graphs(ext, prefix)
     # new graph every step and grows without bound.
     @testset "$prefix Graphs: per-step views of one buffer reuse a single graph" begin
         if ext !== nothing
-            spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = SpeedyWeather.GPU())
+            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
             S = SpectralTransform(spectral_grid)
             nlayers = spectral_grid.nlayers
 
@@ -84,7 +84,7 @@ function test_gpu_graphs(ext, prefix)
     #     work twice — invisible for an overwriting loop, but a double-accumulate for `add=true`.
     @testset "$prefix Graphs: add=true accumulates exactly once and uses its own graph" begin
         if ext !== nothing
-            spectral_grid = SpectralGrid(; trunc = 15, nlayers = 4, architecture = SpeedyWeather.GPU())
+            spectral_grid = SpectralGrid(; truncation = 16, nlayers = 4, architecture = SpeedyWeather.GPU())
             S = SpectralTransform(spectral_grid)
             nlayers = spectral_grid.nlayers
             specs = rand(ComplexF32, spectral_grid.spectrum, nlayers)

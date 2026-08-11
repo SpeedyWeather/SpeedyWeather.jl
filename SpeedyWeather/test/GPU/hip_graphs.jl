@@ -4,7 +4,7 @@ ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPU
 
 @testset "HIP Graphs: not implemented, falls back to the generic path with a warning" begin
     if ext !== nothing
-        spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = SpeedyWeather.GPU())
+        spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
         field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
 
         S_off = SpectralTransform(spectral_grid; gpu_graphs = false)

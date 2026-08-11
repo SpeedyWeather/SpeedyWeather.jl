@@ -31,7 +31,7 @@ using SpeedyWeather
 
     # DIMENSIONS from SpectralGrid
     "Spectral resolution as max degree of spherical harmonics"
-    trunc::Int
+    truncation::Int
 
     "Number of latitude rings, used for latitudinal mask"
     nlat::Int
@@ -53,7 +53,7 @@ using SpeedyWeather
 
     # TO BE INITIALISED
     "Stochastic stirring term S"
-    S::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    S::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}}, truncation+1, truncation)
 
     "a = A*sqrt(1 - exp(-2dt/τ)), the noise factor times the stirring strength [1/s²]"
     a::Base.RefValue{NF} = Ref(zero(NF))
@@ -75,10 +75,10 @@ is a `LowerTriangularMatrix`, however we want its elements to be of number forma
 which is also the parametric type of `StochasticStirring{NF}`, this is done because it will
 allow us to use multiple dispatch not just based on `StochasticStirring` but also based on the
 number format. Neat. In order to allocate `S` with some default though we need to
-know the size of the matrix, which is given by the spectral resolution `trunc`.
-So in order to automatically allocate `S` based on the right size we add `trunc` as another
+know the size of the matrix, which is given by the spectral resolution `truncation` (1-based).
+So in order to automatically allocate `S` based on the right size we add `truncation` as another
 field, which does not have a default but will be initialised with the help of a `SpectralGrid`,
-as explained later. So once we call `StochasticStirring{NF}(trunc=31)` then `S` will automatically
+as explained later. So once we call `StochasticStirring{NF}(truncation=3)` then `S` will automatically
 have the right size.
 
 Then we also see in the definition of `S` that there are prefactors ``A[1-\exp(-2\tfrac{\Delta t}{\tau})]``
@@ -101,12 +101,12 @@ zero. For this we want to define a latitudinal mask `lat_mask` that is a vector 
 the number of latitude rings. Similar to `S`, we want to allocate it with zeros (or any other
 value for that matter), but then precompute this mask in the `initialize!` step. For this
 we need to know `nlat` at creation time meaning we add this field similar as to how we added
-`trunc`. This mask requires the parameters `latitude` (its position) and a `width` which
+`truncation`. This mask requires the parameters `latitude` (its position) and a `width` which
 are therefore also added to the definition of `StochasticStirring`.
 
 ## Custom forcing: generator function
 
-Cool. Now you could create our new `StochasticStirring` forcing with `StochasticStirring{Float64}(trunc=31, nlat=48)`,
+Cool. Now you could create our new `StochasticStirring` forcing with `StochasticStirring{Float64}(truncation=32, nlat=48)`,
 and the default values would be chosen as well as the correct size of the arrays `S` and `lat_mask` we need
 and in double precision Float64. Furthermore, note that because `StochasticStirring{NF}` is parametric
 on the number format `NF`, these arrays are also allocated with the correct number format that will
@@ -116,13 +116,13 @@ But in SpeedyWeather we typically use the [SpectralGrid](@ref) object to pass on
 the resolution (and number format) so we want a generator function like
 ```@example extend
 function StochasticStirring(SG::SpectralGrid; kwargs...)
-    (; trunc, nlat) = SG
-    return StochasticStirring{SG.NF}(; trunc, nlat, kwargs...)
+    (; truncation, nlat) = SG
+    return StochasticStirring{SG.NF}(; truncation, nlat, kwargs...)
 end
 ```
 Which allows us to do
 ```@example extend
-spectral_grid = SpectralGrid(trunc=42, nlayers=1)
+spectral_grid = SpectralGrid(truncation=43, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=30, decorrelation_time=Day(5))
 ```
 So the respective resolution parameters and the number format are just pulled from the `SpectralGrid`
@@ -346,7 +346,7 @@ modular interface that you can create instances of individual model components
 and just put them together as you like, and as long as you follow some rules.
 
 ```@example extend
-spectral_grid = SpectralGrid(trunc=85, nlayers=1)
+spectral_grid = SpectralGrid(truncation=86, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest(spectral_grid)
 model = BarotropicModel(spectral_grid; initial_conditions, forcing=stochastic_stirring)

@@ -7,19 +7,19 @@ nlayers_for_model(::Type{PrimitiveDryModel}) = 8
 nlayers_for_model(::Type{PrimitiveWetModel}) = 8
 
 """Create a CPU model of the given type."""
-function create_cpu_model(ModelType::Type; trunc = TRUNC, kwargs...)
+function create_cpu_model(ModelType::Type; truncation = TRUNCATION, kwargs...)
     nlayers = nlayers_for_model(ModelType)
-    spectral_grid = SpectralGrid(; nlayers, trunc)
+    spectral_grid = SpectralGrid(; nlayers, truncation)
     M = MatrixSpectralTransform(spectral_grid)
     initial_conditions = InitialConditions(spectral_grid, ModelType)
     return ModelType(spectral_grid; spectral_transform = M, feedback = nothing, initial_conditions, kwargs...)
 end
 
 """Create a Reactant model of the given type."""
-function create_reactant_model(ModelType::Type; trunc = TRUNC, kwargs...)
+function create_reactant_model(ModelType::Type; truncation = TRUNCATION, kwargs...)
     nlayers = nlayers_for_model(ModelType)
     arch = SpeedyWeather.ReactantDevice()
-    spectral_grid = SpectralGrid(; architecture = arch, nlayers, trunc)
+    spectral_grid = SpectralGrid(; architecture = arch, nlayers, truncation)
     M = MatrixSpectralTransform(spectral_grid)
     initial_conditions = InitialConditions(spectral_grid, ModelType)
     return ModelType(spectral_grid; spectral_transform = M, feedback = nothing, initial_conditions, kwargs...)

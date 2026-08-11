@@ -7,8 +7,8 @@ using SpeedyWeather: AbstractVariable, GridVariable, TendencyVariable, ScratchVa
     FusedParent, _assert_fuse_alignment
 
 # Helpers used by all testsets — build a model and unwrap a few useful pieces.
-function _testmodel(; trunc = 10, nlayers = 4)
-    sg = SpectralGrid(; trunc, nlayers)
+function _testmodel(; truncation = 11, nlayers = 4)
+    sg = SpectralGrid(; truncation, nlayers)
     return PrimitiveDryModel(sg)
 end
 

@@ -343,7 +343,7 @@ end
 
 @testset "Held-Suarez with varying layers and sigma spacing" begin
     for nlayers in (16, 24)     # don't test more layers regularly on CI but 64 should work too
-        spectral_grid = SpectralGrid(trunc = 31; nlayers)
+        spectral_grid = SpectralGrid(truncation = 32; nlayers)
 
         σ_half_configs = (
             ("default",   SpeedyWeather.sigma_half_spacing(nlayers)),

@@ -3,7 +3,7 @@ using JLD2
 @testset "JLD2 Output" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_jld2tests_")  # Cleaned up when the process exits
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
 
     # write-restart false is important to not mutate the final state in the simulation object
     output = JLD2Output(interval = Hour(6), path = tmp_output_path, id = "jld2-test", write_restart = false)
@@ -45,7 +45,7 @@ end
 @testset "JLD2 Output with group selection" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_jld2groups_")
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
 
     # only save prognostic and grid groups
     output = JLD2Output(
@@ -76,7 +76,7 @@ end
 end
 
 @testset "ArrayOutput" begin
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
 
     output = ArrayOutput(interval = Hour(6))
     model = BarotropicModel(; spectral_grid, output)
@@ -114,7 +114,7 @@ end
 end
 
 @testset "ArrayOutput with group selection" begin
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
 
     # only save prognostic group
     output = ArrayOutput(interval = Hour(6), groups = (:prognostic,))
