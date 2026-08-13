@@ -672,4 +672,26 @@ end
     @test F3 isa FullGaussianField
     @test F3.grid === grid
     @test size(F3, 3) == sum(1:N)
+
+    # Concatenate along two dimensions at once
+    F3 = cat(Fs..., dims = (2, 3))
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == N
+    @test size(F3, 3) == sum(1:N)
+    # also for array dims (reversed order for good measure)
+    F3 = cat(Fs..., dims = [3, 2])
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == N
+    @test size(F3, 3) == sum(1:N)
+
+    # Check singleton case for iterable dims
+    F3 = cat(F1, F2, dims = [2])
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == 3
+
+    # Check that concatenation along dimension 1 fails
+    @test_throws AssertionError cat(F1, F2, dims = 1)
 end
