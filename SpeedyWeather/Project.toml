@@ -33,7 +33,6 @@ SpeedyWeatherInternals = "34489162-d270-4603-8b96-37b04f830d73"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-cuFFT = "533571aa-0936-420e-b4be-9c66f5f626ca"
 
 [weakdeps]
 Browzarr = "d7a009df-479f-4526-be69-544662986fe6"
@@ -98,5 +97,4 @@ TOML = "1"
 Terrarium = "0.1.4"
 UnicodePlots = "3.3"
 Zarr = "0.9, 0.10"
-cuFFT = "6.2.1"
 julia = "1.10"

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions, so a future graph-capturing GPU backend only needs to supply its capture/instantiate/launch primitives; HIP graph capture stays disabled on AMDGPU (unchanged runtime behavior on both backends) [#TBD](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/TBD)
+- Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions, so a future graph-capturing GPU backend only needs to supply its capture/instantiate/launch primitives; HIP graph capture stays disabled on AMDGPU (unchanged runtime behavior on both backends) [#1147](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1147)
 - HIP graphs acceleration of the batched Fourier transform for AMDGPU was attempted (mirroring CUDA graphs from [#1109](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1109)) but is not implemented: ROCm's stream-capture validator does not reliably reject illegal-to-capture operations, so `gpu_graphs = true` now falls back to the unaccelerated path on AMDGPU with a one-time warning; rename `SpectralTransform` field `cuda_graphs` → `gpu_graphs`
 
 ## v0.22.0
