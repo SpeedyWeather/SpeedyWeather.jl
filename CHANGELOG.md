@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add implementation of `cat` for `RingGrids` `Field`s [#1192](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1192)
+
 ## v0.22.0
 
 - [BREAKING] 1-based truncation as resolution parameter [#1177](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1177)
