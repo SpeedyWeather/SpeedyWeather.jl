@@ -670,6 +670,6 @@ end
     Fs = [Field(grid, 1, i) for i in 1:N]
     F3 = cat(Fs..., dims = 3)
     @test F3 isa FullGaussianField
-    @test F3 === grid
-    @test size(F3, 3) == N
+    @test F3.grid === grid
+    @test size(F3, 3) == sum(1:N)
 end
