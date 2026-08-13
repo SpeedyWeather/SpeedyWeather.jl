@@ -571,8 +571,9 @@ function Base.cat(Fs::AbstractField...; dims)
     @assert length(Fs) > 0 "At least one Field must be provided to `cat`"
     @assert all(map(grids_match, Fs[1:(end - 1)], Fs[2:end])) "All concatenated Fields must have matching grids"
     @assert length(dims) < length(first(Fs)) "Too many `dims` specified"
+    # we let the standard implementation of `cat` handle the case where dims is greater than the number of axes
     length(dims) == 1 && @assert first(dims) > 1 "RingGrids Fields cannot be concatenated along the first axis"
-    length(dims) > 1 && @assert all(map(d -> 1 < d <= length(size(first(Fs))), dims))
+    length(dims) > 1 && @assert all(map(>(1), dims)) "RingGrids Fields cannot be concatenated along the first axis"
     data = map(F -> F.data, Fs)
     data_cat = cat(data...; dims)
     return Field(data_cat, first(Fs).grid)
