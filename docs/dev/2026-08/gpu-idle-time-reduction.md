@@ -584,6 +584,44 @@ so no `time()`, no device access, and `lock_if_threading` does not lock single-t
 `p.counter` is the clock that every `mod(counter, …)` above is taken against, so striding `next!`
 would stride the strides.
 
+### W1W2.2 — the official benchmark suite corroborates it independently (2026-08-08)
+
+The user re-ran `manual_benchmarking.jl gpu`, which updated the `gpu-nvidia` column of
+`SpeedyWeather/benchmark/README.md`. That harness is not the one used above — different timing
+protocol, different resolutions, SYPD instead of ms/step — so it is a genuinely independent check.
+The `PrimitiveWetModel` `L = 8` rows, LT+FFT:
+
+| T | SYPD before | SYPD after | speedup |
+|---:|---:|---:|---:|
+| 31  | 2219 | 5257 | 2.37× |
+| 42  | 1397 | 3132 | 2.24× |
+| 63  | 660  | 1260 | 1.91× |
+| 85  | 354  | 650  | 1.84× |
+| 127 | 155  | 264  | 1.70× |
+| 170 | 82   | 138  | 1.68× |
+| 255 | 33   | 52   | 1.58× |
+
+1.58–2.37×, with the same downward gradient in resolution, against the 1.67–2.45× this plan
+measured. Two harnesses agreeing to within their own noise conventions is as good as this gets.
+
+**Attribution caveat:** this run was taken on the branch tip, which carries more than W1 and W2 —
+notably the GPU Legendre rewrite ([#1180]) and the `SpeedLimitDrag` fix ([#1176]). The agreement
+with the isolated A/B of W1 (finding W1) and the isolated `nofeedback` gap of W2 (finding W1W2.1)
+is what pins those two contributions; the benchmark column is corroboration, not a second
+attribution.
+
+**The `L = 16`/`L = 24` rows moved the other way** (e.g. T255 L=24: 84 → 39 SYPD) and this is
+*not* a regression. It is the resolution of the separate investigation in
+`docs/dev/2026-08/layer-count-performance-anomaly.md`, which established that those configurations
+were going **unstable** and that the benchmark was counting blown-up runs as fast ones. The new
+column is monotonic in layer count at every truncation (T255: 52 / 45 / 39 for L = 8 / 16 / 24),
+which is what a physically sensible table looks like and what the old one never was. A plausible
+cause is [#1176] on this branch ("default `drag` raised … fixes previous high-resolution
+instabilities"), but **that is not established**: the benchmark harness still does not check
+`nans_detected`, which is recommendation 1 of that investigation, so the table cannot distinguish
+"now stable" from "unstable in a different way". Until that guard exists, read the new `L ≥ 16`
+rows as plausible rather than verified.
+
 ### W2.3 — the progress bar was never drawn: `barlen = 0`, not `nothing` (2026-08-08)
 
 Reported by the user mid-session while running a model on CPU: the progress meter printed its text
@@ -610,15 +648,16 @@ but never read anywhere in `src/`. Left alone, recorded here.
 
 Phase A (`bench_model.jl`, `nlayers = 8`, `Float32`, no output, every arm passing the
 `nans_detected` guard). H100 = SLURM job `1732490` → `reports/phaseA_gpu_w1w2.json`; A40 =
-login node, T31/T63 only → `reports/phaseA_gpu_w2b_a40.json`. Baselines are the pre-plan Phase A
-runs (`phaseA_gpu.json`, `phaseA_gpu_a40.json`) measured with the same harness:
+login node, T31/T63 in `reports/phaseA_gpu_w2b_a40.json` and T127/T255 in
+`reports/phaseA_gpu_w1w2_a40_hi.json`. Baselines are the pre-plan Phase A runs
+(`phaseA_gpu.json`, `phaseA_gpu_a40.json`) measured with the same harness:
 
 | trunc | H100 before | H100 after | speedup | A40 before | A40 after | speedup |
 |------:|------------:|-----------:|--------:|-----------:|----------:|--------:|
-| 31  | 2.760  | **1.126**  | **2.45×** | 3.590 | **1.277** | **2.81×** |
-| 63  | 5.120  | **2.138**  | **2.39×** | 6.256 | **2.386** | **2.62×** |
-| 127 | 10.485 | **4.777**  | **2.20×** | — | — | — |
-| 255 | 23.833 | **14.280** | **1.67×** | — | — | — |
+| 31  | 2.760  | **1.126**  | **2.45×** | 3.590  | **1.277**  | **2.81×** |
+| 63  | 5.120  | **2.138**  | **2.39×** | 6.256  | **2.386**  | **2.62×** |
+| 127 | 10.485 | **4.777**  | **2.20×** | 13.298 | **5.679**  | **2.34×** |
+| 255 | 23.833 | **14.280** | **1.67×** | 30.600 | **15.884** | **1.93×** |
 
 W2 is verified *within* the run rather than by dividing two harnesses: the `nofeedback` variant is
 the same model with `feedback = nothing`, so the gap between it and `default` **is** the feedback
@@ -628,8 +667,8 @@ cost, and it is what W2 was aimed at:
 |------:|----------------------------:|-------------:|-------------:|------------:|
 | 31  | 16.1 % | **3.0 %**  | 10.5 % | **1.0 %** |
 | 63  | 26.1 % | **−0.2 %** | 19.2 % | **0.9 %** |
-| 127 | 24.9 % | **−0.3 %** | — | — |
-| 255 | 14.0 % | **1.8 %**  | — | — |
+| 127 | 24.9 % | **−0.3 %** | 25.8 % | **0.9 %** |
+| 255 | 14.0 % | **1.8 %**  | 16.5 % | **0.1 %** |
 
 Negative entries are `nofeedback` measuring *slower* than `default` — i.e. the remaining cost is
 below the run-to-run noise of the harness, which is the intended end state. The stride therefore
@@ -721,10 +760,20 @@ from removing *all* of it has fallen from ~3.4× to ~1.36× at T255.
 
 Where the GPU time actually goes now (T255, of 10.465 ms busy):
 
+> **Corrected 2026-08-14 by finding M1.1 of
+> [`gpu-idle-time-reduction-handover.md`](gpu-idle-time-reduction-handover.md).** The header below
+> read "`dynamics` (includes the transforms it calls)". That is wrong: the NVTX ranges are **disjoint
+> siblings**, verified on the host timeline (`dynamics` ends at +7994 µs, `transform` starts at
+> +8210 µs of the same step). The `dynamics` row holds the two transforms called from
+> `dynamics_tendencies!`, the `transform` row the two from `transform.jl`. Neither row is a measure of
+> the FFT's cost — attribute by kernel *name*, not by range, and the answer is **cuFFT 69 % of GPU
+> busy at T255**, non-transform dynamics only 7.9 %. Every "44 %" for the FFT on this page is
+> superseded by that number.
+
 | phase | busy ms/step | share | kernels/step |
 |---|---:|---:|---:|
-| `dynamics` (includes the transforms it calls) | 5.574 | 53 % | 1414 |
-| `transform` | 4.552 | 44 % | 1387 |
+| `dynamics` (two of the four transforms, plus the dycore) | 5.574 | 53 % | 1414 |
+| `transform` (the other two transforms) | 4.552 | 44 % | 1387 |
 | `parameterizations` | 0.213 | 2 % | 7 |
 | everything else | 0.126 | 1 % | 35 |
 
@@ -740,7 +789,10 @@ cost that is now 0.30 ms/step of `cuLaunchKernelEx` at T255 — 2 % of the step.
 targets the `gpu_broadcast_kernel_*` family, which no longer appears anywhere near the top of the
 kernel table. The two candidates that the measurement actually points at are:
 
-- **the FFT itself** — 44 % of GPU busy at T255, spent in hundreds of ~1.4 µs cuFFT kernels per step.
+- **the FFT itself** — ~~44 %~~ **69 %** of GPU busy at T255 (corrected by M1.1; the 44 % came from
+  reading the `transform` NVTX row, and the kernel-name total over *all* cuFFT variants, not just the
+  four in the truncated table above, is 7.180 ms of 10.465 ms busy across 2730 kernels/step),
+  spent in thousands of ~2.6 µs cuFFT kernels per step.
   Worth checking whether the ring lengths driving the Bluestein path can be avoided (grid choice, or
   padding the transform length to a factorable one), and whether the per-ring plans can be merged
   further so cuFFT issues fewer, larger kernels;
@@ -779,11 +831,12 @@ the direction is not in doubt even if the last few percent are.
 | `SpeedyWeather/test/GPU/fft_batch_plans.jl` (new, A40) | **8/8 passed** as part of the full GPU suite below |
 | A/B timing, A40, T31–T255 | **done**, table above; every arm passed the `nans_detected` guard |
 | A/B timing, H100, T31–T255 | **done**, SLURM job `1731194` → `reports/verify_k2-1731194.log` |
-| full `SpeedyWeather/test/GPU/runtests.jl` (A40) | **passed**, exit 0, no failures across all 26 testsets |
+| full `SpeedyWeather/test/GPU/runtests.jl` (A40) | **passed twice**: once for W1, and re-run after W2 + the progress-bar fix landed — exit 0, 25/25 testsets, no failures |
 | CPU suite `SpeedyTransforms` | **passed**, exit 0 |
 | CPU suite `SpeedyWeather` | **one pre-existing failure, unrelated**: `dynamics/dispatch.jl` (the JET no-runtime-dispatch guard) fails, all other 50 testsets pass. Bisected by reverting *only* `feedback.jl` to the pre-W2 revision in the same environment — it still fails, and the JET report names only KernelAbstractions' CPU `__run`/`__thread_run` and `ModelParameters.withunits`, nothing in SpeedyWeather. It passes in a freshly-created worktree, so it is dependency-version-sensitive; `SpeedyWeather/test/Manifest.toml` is gitignored, so different checkouts of the same source disagree. Not caused by this plan; worth its own issue |
 | batched-vs-serial comparison | **done and stronger than required — bitwise identical**, finding W1.1 |
-| Phase A after W1+W2 (H100, T31–T255; A40, T31/T63) | **done**, finding W1W2.1 |
+| Phase A after W1+W2 (H100 and A40, all four truncations) | **done**, finding W1W2.1 |
+| independent check via `manual_benchmarking.jl gpu` | **done**, finding W1W2.2 — 1.58–2.37× on the `L = 8` rows, agreeing with the Phase A numbers |
 | Phase B/C re-profile after W1 | **done twice**: `graph` granularity (job `1732491`, finding W3.0) and `node` granularity (job `1732864`, finding W3.1). Only the second can see inside CUDA graphs |
 | W2 source change | **implemented**, findings W2.1/W2.2, CPU feedback tests 11/11 |
 | progress bar fix | **implemented**, finding W2.3, covered by the `"Progress bar length"` testset |
@@ -870,9 +923,9 @@ PR is opened.
 - Overlap host and device work: with syncs removed (W2) the host could run `output!`/callback
   logic while the device computes. This is now the more plausible half of the idle story, since
   the residual 22–34 % is what the host spends between graph replays.
-- Roofline the transform once `ncu` counters are unblocked. The FFT is 44 % of GPU busy at T255
-  and the two Legendre kernels a further 19 %, so whether either is bandwidth- or
-  occupancy-limited decides what optimizing them is worth.
+- Roofline the transform once `ncu` counters are unblocked. The FFT is ~~44 %~~ **69 %** of GPU busy
+  at T255 (corrected by M1.1) and the two Legendre kernels a further 19 %, so whether either is
+  bandwidth- or occupancy-limited decides what optimizing them is worth.
 - Fold the Phase A harness guards into `SpeedyWeather/benchmark/manual_benchmarking.jl`
   (already recommended by the layer-count investigation).
 
@@ -884,8 +937,10 @@ W0, W1, W2 and W4 are done and measured; the source changes are committed on
 1. **W3 needs a fresh decision, because finding W3.1 removed its premise.** The step is 66–78 %
    GPU-busy, so the whole remaining idle is worth at most ~1.36× at T255 and ~1.5× at T31, and both
    remedies the plan proposed (more CUDA graphs / elementwise fusion) aim at launch traffic that is
-   already down to 97 host launches per step. Where the time now is, at T255: cuFFT 44 % of GPU busy
-   spread over ~1400 small kernels per step, the two Legendre kernels 19 %, parameterizations 2 %.
+   already down to 97 host launches per step. Where the time now is, at T255: cuFFT ~~44 %~~ **69 %**
+   of GPU busy spread over **2730** small kernels per step (corrected by M1.1 — the 44 % was the
+   `transform` NVTX row, which holds only two of the step's four transforms), the two Legendre
+   kernels 19 %, everything that is not the spectral transform 7.9 %.
    Before building anything:
    - **check the busy fraction without a profiler.** `node` granularity carries "significant runtime
      overhead" by nsys's own documentation, and the whole re-scoping rests on that one number. CUDA
@@ -896,12 +951,12 @@ W0, W1, W2 and W4 are done and measured; the source changes are committed on
      lengths it cannot factor cheaply, and the lengths are the reduced grid's ring lengths, so a grid
      or padding choice may avoid it. The `preprocess`/`postprocess` kernel pairs (802 launches,
      1.12 ms/step) are the other visible overhead of issuing many short transforms.
-2. **Finish the A40 arm.** Post-fix Phase A on the A40 covers only T31 and T63
-   (`reports/phaseA_gpu_w2b_a40.json`). T127 and T255 are one login-node command and make the
-   two-GPU comparison complete.
-3. **Re-run the GPU suite.** `SpeedyWeather/test/GPU/runtests.jl` last passed on the A40 *before* W2
-   and the progress-bar fix landed. Both touch `Feedback`, which every GPU run exercises.
-4. **Version tags — checked, left alone, worth one look before the PR.** `SpeedyWeather` is at
+2. **Add the `nans_detected` guard to `manual_benchmarking.jl`.** This is recommendation 1 of
+   `layer-count-performance-anomaly.md` and it is now the thing standing between us and trusting the
+   checked-in benchmark table: the fresh GPU run's `L ≥ 16` rows *look* sensible for the first time
+   (finding W1W2.2), but without the guard the table still cannot distinguish a stable run from a
+   blown-up one. The Phase A harness (`bench_model.jl`) already has the guard and can be cribbed from.
+3. **Version tags — checked, left alone, worth one look before the PR.** `SpeedyWeather` is at
    `0.21.1+DEV` on *both* `main` and this branch, so the existing `+DEV` already covers the W1 and
    W2 edits as minor/additive. The one arguable case is `Feedback.progress_bar_length` changing type
    from `Int` to `Union{Int, Nothing}`, which by the letter of `CLAUDE.md` is a public API change and
@@ -909,7 +964,7 @@ W0, W1, W2 and W4 are done and measured; the source changes are committed on
    behaviour-changing work (the `SpeedLimitDrag` default change, the Legendre rewrite) under the same
    tag, so bumping for this field alone would be inconsistent — but it is a call, not a fact.
    `SpeedyTransforms` is untouched by the final form of W1 and needs nothing.
-5. **Not ours, but file it:** `SpeedyWeather/test/dynamics/dispatch.jl` fails in this checkout and
+4. **Not ours, but file it:** `SpeedyWeather/test/dynamics/dispatch.jl` fails in this checkout and
    passes in a fresh worktree of the same source. `SpeedyWeather/test/Manifest.toml` is gitignored,
    so the JET guard silently depends on whichever KernelAbstractions/ModelParameters versions a
    given checkout happens to have resolved. Either pin the manifest for that test or relax the
