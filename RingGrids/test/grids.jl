@@ -648,3 +648,28 @@ end
     @test F4[:, 1:3, 1].dims isa XYZ   # drop time, keep vertical range
     @test F4[:, 1, 1].dims isa XY      # drop both vertical and time
 end
+
+@testset "Field concatenation" begin
+    grid = FullGaussianGrid(4)
+
+    # Check that trivial case returns same Field
+    F1 = Field(grid, 1)
+    @test cat(F1, dims = 2) == F1
+
+    # Concatenate two fields
+    F1 = Field(grid, 1) .+ 1
+    F2 = Field(grid, 2) .+ 2
+    F3 = cat(F1, F2, dims = 2)
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == 3
+    @test all(F3[:, 1] .≈ F1[:, 1]) && all(F3[:, 2:3] .≈ F2[:, 1])
+
+    # Concatenate N fields along dimension 3
+    N = 5
+    Fs = [Field(grid, 1, i) for i in 1:N]
+    F3 = cat(Fs..., dims = 3)
+    @test F3 isa FullGaussianField
+    @test F3 === grid
+    @test size(F3, 3) == N
+end
