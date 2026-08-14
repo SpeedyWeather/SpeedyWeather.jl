@@ -33,7 +33,7 @@ You can create the default land-sea mask as follows
 
 ```@example landseamask
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 land_sea_mask = LandSeaMask(spectral_grid)
 ```
 

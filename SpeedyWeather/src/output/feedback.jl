@@ -16,8 +16,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] Progress description"
     description::String = ""
 
-    "[OPTION] Progress bar length, nothing = full window width"
-    progress_bar_length::Int = 0
+    "[OPTION] Progress bar length in characters, `nothing` fits it to the terminal width, `0` shows no bar"
+    progress_bar_length::Union{Int, Nothing} = 0
 
     "[OPTION] show speed (e.g. in simulated years per day) in progress meter?"
     showspeed::Bool = true
@@ -33,6 +33,9 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Show temperature range of simulation [˚C]"
     show_temperature_range::Bool = true
+
+    "[OPTION] Interval in time steps between NaN checks, and between the progress meter diagnostics (maximum speed, temperature range)"
+    interval::Int = 50
 
     "[DERIVED] struct containing everything progress related"
     progress_meter::ProgressMeter.Progress =
@@ -88,13 +91,21 @@ end
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
-    every_nsteps = feedback.progress_meter.core.check_iterations
-    (; counter) = feedback.progress_meter.core
+    (; counter, n, check_iterations, enabled) = feedback.progress_meter
+    interval = max(1, feedback.interval)
     FEEDBACK_TIME[] = vars.prognostic.clock.time
-    feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(vars)
-    feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(vars)
+
+    every_nsteps = enabled ? check_iterations : interval
+    if mod(counter, every_nsteps) == 0
+        feedback.show_umax && max_speed(vars)
+        feedback.show_temperature_range && temperature_range(vars)
+    end
+
     progress!(feedback)
-    feedback.debug && nan_detection!(feedback, vars, model)
+
+    last_step = counter == n - 1
+    feedback.debug && (mod(counter, interval) == 0 || last_step) &&
+        nan_detection!(feedback, vars, model)
     return nothing
 end
 

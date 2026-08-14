@@ -1,6 +1,6 @@
 @testset "Ocean and sea ice models" begin
 
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 5)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 5)
 
     # just test that these parameters can be set
     SlabOcean(spectral_grid)

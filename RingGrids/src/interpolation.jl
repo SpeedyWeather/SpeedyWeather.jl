@@ -18,6 +18,7 @@ struct GridGeometry{
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
     nlons::VectorIntType        # number of longitudinal points per ring
+    ring_starts::VectorIntType  # first flat index ij of each ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 
     # rings, GPU/architecture copy (if needed) of grid.rings
@@ -58,13 +59,18 @@ function GridGeometry(
     nlons = get_nlons(grid)                                 # number of longitude per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in eachring(grid)]   # offset of the first point from 0˚E
 
+    # first flat index ij of every ring, precomputed here so that the interpolation kernels
+    # can convert an in-ring index i to a flat index ij without indexing into rings (which
+    # would be dynamic indexing on GPU)
+    ring_starts = [first(ring) for ring in eachring(grid)]
+
     # vector type
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
     device_rings = on_architecture(architecture, grid.rings)
 
     return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings), typeof(nlat_half)}(
-        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, ring_starts, lon_offsets, device_rings
     )
 end
 
@@ -593,8 +599,8 @@ end
         λs,            # longitudes to interpolate onto
         lon_offsets,   # longitude offsets for each ring
         nlons,         # number of longitude points per ring
+        ring_starts,   # starting flat index for each ring
         nlat,          # number of latitude rings
-        rings          # ring indices
     )
     k = @index(Global, Linear)
 
@@ -610,8 +616,8 @@ end
         # and b the next grid point to the right, such that
         # λ ∈ [a, b); while in most cases i_a + 1 = i_b, across 0˚E this is not the case
         i_a, i_b, Δ = find_lon_indices(λ, lon_offsets[j], nlons[j])
-        ij_as[k] = rings[j][i_a]    # index ij for a
-        ij_bs[k] = rings[j][i_b]    # index ij for b
+        ij_as[k] = ring_starts[j] + i_a - 1    # convert to flat index
+        ij_bs[k] = ring_starts[j] + i_b - 1    # convert to flat index
         Δabs[k] = Δ                 # distance fraction of λ between a, b
     end
 
@@ -622,8 +628,8 @@ end
     else
         # as above but for one ring further down
         i_c, i_d, Δ = find_lon_indices(λ, lon_offsets[j + 1], nlons[j + 1])
-        ij_cs[k] = rings[j + 1][i_c]  # index ij for c
-        ij_ds[k] = rings[j + 1][i_d]  # index ij for d
+        ij_cs[k] = ring_starts[j + 1] + i_c - 1  # convert to flat index
+        ij_ds[k] = ring_starts[j + 1] + i_d - 1  # convert to flat index
         Δcds[k] = Δ                 # distance fraction of λ between c, d
     end
 end
@@ -643,8 +649,7 @@ function find_grid_indices!(
 
     (; js, ij_as, ij_bs, ij_cs, ij_ds) = locator
     (; Δabs, Δcds) = locator
-    (; nlons, lon_offsets, nlat) = geometry
-    (; rings) = geometry # architecture version (GPU if needed)
+    (; nlons, ring_starts, lon_offsets, nlat) = geometry
 
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
@@ -661,8 +666,8 @@ function find_grid_indices!(
         λs_converted,
         lon_offsets,
         nlons,
-        nlat,
-        rings
+        ring_starts,
+        nlat
     )
     return nothing
 end
@@ -675,7 +680,10 @@ end
 
     Δλ = convert(NF, 360) / nlon          # longitude spacing
     ix = (λ - λ₀) / Δλ                      # grid index i but with fractional part
-    i = floor(Int, ix)                  # 0-based grid index to the left
+    # unsafe_trunc(Int, floor(ix)) instead of floor(Int, ix): the latter carries an
+    # InexactError branch which boxes ix, requiring GPU-side allocation. AMDGPU rejects
+    # that at compile time. λ, λ₀ are bounded degrees so the conversion cannot overflow.
+    i = Base.unsafe_trunc(Int, floor(ix))   # 0-based grid index to the left
     Δ = ix - i                            # distance fraction from i to i+1
 
     # λ ∈ [λa, λb), i.e. a is the next grid point to the left, b to the right

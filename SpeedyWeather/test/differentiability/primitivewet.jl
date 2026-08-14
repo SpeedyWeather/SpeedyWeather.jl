@@ -99,7 +99,7 @@ _spinup(model) = initialize_with_spinup!(model, Day(1), Hour(6))
 # GROUP 1 — DYNAMICAL CORE (dynamics_only model, fast)
 #
 @testset "Differentiability: PrimitiveWet dynamics_tendencies!" begin
-    spectral_grid = SpectralGrid(trunc = 8, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
     model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
     simulation = _spinup(model)
     vars0 = deepcopy(simulation.variables)
@@ -112,7 +112,7 @@ _spinup(model) = initialize_with_spinup!(model, Day(1), Hour(6))
 end
 
 @testset "Differentiability: PrimitiveWet implicit_correction!" begin
-    spectral_grid = SpectralGrid(trunc = 8, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
     model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
     simulation = _spinup(model)
     vars0 = deepcopy(simulation.variables)
@@ -125,7 +125,7 @@ end
 end
 
 @testset "Differentiability: PrimitiveWet transform!(::Variables)" begin
-    spectral_grid = SpectralGrid(trunc = 8, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
     model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
     simulation = _spinup(model)
     vars0 = deepcopy(simulation.variables)

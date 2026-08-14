@@ -123,7 +123,7 @@ all other arguments can then be passed on as keyword arguments with defaults
 defined. Creating the default convection parameterization for example would be
 ```@example parameterization
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 convection = BettsMillerConvection(spectral_grid, time_scale=Hour(4))
 ```
 Further keyword arguments can be added or omitted all together (using the default
@@ -277,7 +277,7 @@ Now, we can use our new parameterization in a model. We'll first demonstrate how
 replace the existing albedo:
 
 ```@example custom-parameterization
-spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+spectral_grid = SpectralGrid(truncation=32, nlayers = 8)
 albedo = SimpleAlbedo(spectral_grid)
 model = PrimitiveWetModel(spectral_grid; albedo=albedo)
 simulation = initialize!(model)

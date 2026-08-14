@@ -443,8 +443,6 @@ end
         @test size(similar(L)) == size(L)
         @test eltype(L) == eltype(similar(L, eltype(L)))
 
-        # TODO: before this was (5, 7), but now it is (5, 5)
-        # why did we even do (5,7) in the first place?
         @test (5, 5) == size(similar(L, 5, 5), as = Matrix)
         @test (5, 5) == size(similar(L, (5, 5)), as = Matrix)
 
@@ -518,7 +516,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32)
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64)
-        L2T = LowerTriangularArrays.truncate(L2, size(L1, ZeroBased, as = Matrix)...)
+        L2T = LowerTriangularArrays.truncate(L2, size(L1, OneBased, as = Matrix)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -581,7 +579,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...)
-            L2T = LowerTriangularArrays.truncate(L2, (size(L1, ZeroBased, as = Matrix)[1:2])...)
+            L2T = LowerTriangularArrays.truncate(L2, (size(L1, OneBased, as = Matrix)[1:2])...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -650,7 +648,6 @@ end
         end
     end
 end
-
 
 @testset "GPU (JLArrays)" begin
     NF = Float32
@@ -727,7 +724,7 @@ end
     L1 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
     L2 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, 65, 64, idims...))
 
-    L2T = LowerTriangularArrays.truncate(L2, (size(L1, ZeroBased; as = Matrix)[1:2])...)
+    L2T = LowerTriangularArrays.truncate(L2, (size(L1, OneBased; as = Matrix)[1:2])...)
     L3 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
 
     copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
@@ -808,12 +805,12 @@ end
 
 @testset "Rotate" begin
     @testset for NF in (Float16, Float32, Float64)
-        @testset for trunc in (5, 10, 15)
+        @testset for truncation in (5, 10, 15)
             @testset for k in 0:3
                 if k == 0
-                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc)
+                    L = rand(LowerTriangularArray{Complex{NF}}, truncation, truncation)
                 else
-                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc, k)
+                    L = rand(LowerTriangularArray{Complex{NF}}, truncation, truncation, k)
                 end
 
                 L2 = deepcopy(L)
@@ -837,12 +834,12 @@ end
 
 @testset "Reverse" begin
     @testset for NF in (Float16, Float32, Float64)
-        @testset for trunc in (5, 10, 15)
+        @testset for truncation in (5, 10, 15)
             @testset for k in 0:3
                 if k == 0
-                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc)
+                    L = rand(LowerTriangularArray{Complex{NF}}, truncation, truncation)
                 else
-                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc, k)
+                    L = rand(LowerTriangularArray{Complex{NF}}, truncation, truncation, k)
                 end
 
                 L2 = reverse(L, dims = :lat)
@@ -867,9 +864,9 @@ end
 
 @testset "Spectrum" begin
     # truncation vs lmax, mmax constructors
-    @test Spectrum(5, 5) == Spectrum(4, one_degree_more = false)
-    @test Spectrum(5, 5) == Spectrum(trunc = 4, one_degree_more = false)
-    @test Spectrum(6, 5) == Spectrum(trunc = 4, one_degree_more = true)
+    @test Spectrum(5, 5) == Spectrum(5, one_degree_more = false)
+    @test Spectrum(5, 5) == Spectrum(truncation = 5, one_degree_more = false)
+    @test Spectrum(6, 5) == Spectrum(truncation = 5, one_degree_more = true)
 
     s = Spectrum(5, 5)
     L = rand(Float32, s)
@@ -961,15 +958,15 @@ end
             L = rand(LowerTriangularMatrix{NF}, lmax, mmax)
             L_original = deepcopy(L)
 
-            # Truncate to half the resolution (0-based)
-            ltrunc = lmax ÷ 2 - 1
-            mtrunc = mmax ÷ 2 - 1
+            # Truncate to half the resolution (1-based)
+            ltrunc = lmax ÷ 2
+            mtrunc = mmax ÷ 2
             LowerTriangularArrays.truncate!(L, ltrunc, mtrunc)
 
             # Check that coefficients beyond truncation are zero
             for m in 1:mmax
                 for l in m:lmax
-                    if l > ltrunc + 1 || m > mtrunc + 1  # +1 for 1-based indexing
+                    if l > ltrunc || m > mtrunc  # 1-based indexing
                         @test L[l, m] == 0
                     else
                         # Check that coefficients within truncation are unchanged
@@ -987,7 +984,7 @@ end
             for k in 1:nlayers
                 for m in 1:mmax
                     for l in m:lmax
-                        if l > ltrunc + 1 || m > mtrunc + 1
+                        if l > ltrunc || m > mtrunc
                             @test L3D[l, m, k] == 0
                         else
                             @test L3D[l, m, k] == L3D_original[l, m, k]
@@ -1000,13 +997,13 @@ end
             L_asym = rand(LowerTriangularMatrix{NF}, lmax, mmax)
             L_asym_original = deepcopy(L_asym)
 
-            ltrunc_asym = lmax - 2  # truncate only last degree
-            mtrunc_asym = mmax ÷ 2 - 1  # truncate half the orders
+            ltrunc_asym = lmax - 1  # truncate only last degree
+            mtrunc_asym = mmax ÷ 2  # truncate half the orders
             LowerTriangularArrays.truncate!(L_asym, ltrunc_asym, mtrunc_asym)
 
             for m in 1:mmax
                 for l in m:lmax
-                    if l > ltrunc_asym + 1 || m > mtrunc_asym + 1
+                    if l > ltrunc_asym || m > mtrunc_asym
                         @test L_asym[l, m] == 0
                     else
                         @test L_asym[l, m] == L_asym_original[l, m]
@@ -1020,7 +1017,7 @@ end
 @testset "ArrayDimensions" begin
     using SpeedyWeatherInternals.ArrayDimensions: LM, LMZ, LMT, LMZT, hastime, hasvertical
 
-    s = Spectrum(trunc = 5)
+    s = Spectrum(truncation = 6)
 
     # default dims is LM (2D spectral)
     L2 = zeros(LowerTriangularMatrix{Float32}, s)
@@ -1070,11 +1067,11 @@ end
     # dims are preserved through truncate and interpolate
     L3z_trunc = LowerTriangularArrays.truncate(L3z, 3)
     @test L3z_trunc.dims isa LMZ
-    @test size(L3z_trunc, ZeroBased, as = Matrix) == (3, 3, 3)
+    @test size(L3z_trunc, OneBased, as = Matrix) == (3, 3, 3)
 
     L3z_interp = LowerTriangularArrays.interpolate(L3z, 10)
     @test L3z_interp.dims isa LMZ
-    @test size(L3z_interp, ZeroBased, as = Matrix) == (10, 10, 3)
+    @test size(L3z_interp, OneBased, as = Matrix) == (10, 10, 3)
 
     L2_trunc = LowerTriangularArrays.truncate(L2, 3)
     @test L2_trunc.dims isa LM

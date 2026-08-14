@@ -46,7 +46,7 @@ One can add a new tracer to the `model` _before_ it is initialized to a `simulat
 
 ```@example tracers
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+spectral_grid = SpectralGrid(truncation=64, nlayers=1)
 model = ShallowWaterModel(spectral_grid)
 
 # add a tracer called :abc
@@ -154,7 +154,7 @@ Let us illustrate some tracer advection in practice
 
 ```@example tracers
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc = 85, nlayers = 1)
+spectral_grid = SpectralGrid(truncation=86, nlayers = 1)
 model = ShallowWaterModel(spectral_grid)
 add!(model, Tracer(:abc))
 simulation = initialize!(model)

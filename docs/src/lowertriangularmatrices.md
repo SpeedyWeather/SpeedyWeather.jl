@@ -359,7 +359,7 @@ with the same spectral discretization as follows:
 
 ```@example LowerTriangularArrays
 using SpeedyWeather    # SpectralGrid is not defined in LowerTriangularArrays
-SG = SpectralGrid(trunc=5)
+SG = SpectralGrid(truncation=6)
 L = rand(Float32, SG.spectrum)
 ```
 

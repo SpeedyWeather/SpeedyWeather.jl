@@ -4,7 +4,7 @@ import SpeedyWeather: array_type
     # test basic transfer of data and grids between CPU and GPU
     NF = Float32
     nlayers = 2
-    trunc = 32
+    truncation = 32
     nlat_half = 6
     Grid = FullGaussianGrid
 
@@ -25,7 +25,7 @@ import SpeedyWeather: array_type
     @test array_type(field_gpu) <: array_type(arch_gpu) <: CUDA.CuArray
     @test typeof(field_gpu.grid.architecture) <: typeof(arch_gpu) <: SpeedyWeather.GPU
 
-    spectrum_cpu = Spectrum(; trunc, architecture = arch_cpu)
+    spectrum_cpu = Spectrum(; truncation, architecture = arch_cpu)
 
     # transfering Spectrum
     spectrum_gpu = on_architecture(arch_gpu, spectrum_cpu)

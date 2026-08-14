@@ -1,5 +1,7 @@
 using SpeedyTransforms
-using RingGrids, LowerTriangularArrays
+using RingGrids
+using LowerTriangularArrays
+using JET
 using Test
 
 include("spectral_transform.jl")
