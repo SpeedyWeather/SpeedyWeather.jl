@@ -1,6 +1,6 @@
 module SpeedyTransformsAMDGPUExt
 
-import AMDGPU: AMDGPU, ROCArray, ROCBackend
+import AMDGPU: AMDGPU, ROCArray
 import AbstractFFTs
 import LinearAlgebra
 import LinearAlgebra: mul!
@@ -15,7 +15,7 @@ import SpeedyTransforms: SpectralTransform, _fourier_batched!
 import SpeedyTransforms.RingGrids: AbstractField
 
 import SpeedyWeatherInternals.KernelLaunching: launch!, ArrayWorkOrder
-import SpeedyWeatherInternals.Architectures: on_architecture
+import SpeedyWeatherInternals.Architectures: on_architecture, synchronize, ROCGPU
 
 # =====================================================================================
 # HIP GRAPHS ACCELERATION OF THE BATCHED FOURIER TRANSFORM — CAPTURE NOT ENABLED
@@ -60,7 +60,7 @@ const HIP_GRAPH_BACKEND = if _HIP_GRAPHS_AVAILABLE
         loop! -> AMDGPU.HIP.capture(loop!; throw_error = false),
         AMDGPU.HIP.instantiate,
         AMDGPU.HIP.launch,
-        () -> KernelAbstractions.synchronize(ROCBackend()),
+        ROCGPU(),
     )
 else
     nothing

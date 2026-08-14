@@ -16,7 +16,7 @@ import SpeedyTransforms: SpectralTransform, _fourier_batched!
 import SpeedyTransforms.RingGrids: AbstractField
 
 import SpeedyWeatherInternals.KernelLaunching: launch!, ArrayWorkOrder
-import SpeedyWeatherInternals.Architectures: on_architecture
+import SpeedyWeatherInternals.Architectures: on_architecture, synchronize, CUDAGPU
 
 # =====================================================================================
 # CUDA GRAPHS ACCELERATION OF THE BATCHED FOURIER TRANSFORM
@@ -53,14 +53,14 @@ import SpeedyWeatherInternals.Architectures: on_architecture
 
 include("gpu_graphs_common.jl")
 
-# The CUDA capture/instantiate/launch/synchronize primitives `run_graph!` needs; see
-# `GraphBackend` in gpu_graphs_common.jl. `capture` must not throw on an uncapturable region,
-# hence `throw_error = false`.
+# The CUDA capture/instantiate/launch primitives `run_graph!` needs, plus the architecture
+# used to `synchronize` before capture; see `GraphBackend` in gpu_graphs_common.jl. `capture`
+# must not throw on an uncapturable region, hence `throw_error = false`.
 const CUDA_GRAPH_BACKEND = GraphBackend(
     loop! -> capture(loop!; throw_error = false),
     instantiate,
     launch,
-    CUDA.synchronize,
+    CUDAGPU(),
 )
 
 # =====================================================================================

@@ -268,22 +268,23 @@ end
 # =====================================================================================
 
 """$(TYPEDSIGNATURES)
-Bundles the four backend-specific primitives `run_graph!` needs to capture and replay a GPU
+Bundles the backend-specific primitives `run_graph!` needs to capture and replay a GPU
 graph, so the control flow in `run_graph!` itself can stay backend-agnostic:
 
 - `capture(loop!)`: run `loop!` under stream capture and return the recorded graph, or
   `nothing` if capture failed/was invalidated (must not throw).
 - `instantiate(graph)`: turn a captured graph into an executable.
 - `launch(exec)`: replay an instantiated graph.
-- `synchronize()`: block until the device is idle (used once, before capture, so that
-  one-time warmup work happens outside the captured region).
+- `device`: the SpeedyWeather architecture (e.g. `CUDAGPU()`) whose device is synchronized
+  once before capture (via `synchronize(backend.device)`, as elsewhere in the codebase), so
+  that one-time warmup work happens outside the captured region.
 
-e.g. for CUDA: `GraphBackend(loop! -> CUDA.capture(loop!; throw_error = false), CUDA.instantiate, CUDA.launch, CUDA.synchronize)`."""
-struct GraphBackend{C, I, L, Y}
+e.g. for CUDA: `GraphBackend(loop! -> CUDA.capture(loop!; throw_error = false), CUDA.instantiate, CUDA.launch, CUDAGPU())`."""
+struct GraphBackend{C, I, L, D}
     capture::C
     instantiate::I
     launch::L
-    synchronize::Y
+    device::D
 end
 
 """$(TYPEDSIGNATURES)
@@ -312,7 +313,7 @@ function run_graph!(execs::AbstractDict, key, loop!::F, backend::GraphBackend) w
     # warm up so that one-time work (FFT plan init, kernel JIT, memory-pool growth) happens
     # OUTSIDE the capture, where it is allowed
     loop!()
-    backend.synchronize()
+    synchronize(backend.device)
 
     # do the capture
     graph = backend.capture(loop!)
