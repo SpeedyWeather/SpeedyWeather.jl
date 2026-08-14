@@ -4,7 +4,7 @@ using NCDatasets
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
     model = PrimitiveWetModel(spectral_grid; output)
     model.feedback.verbose = false

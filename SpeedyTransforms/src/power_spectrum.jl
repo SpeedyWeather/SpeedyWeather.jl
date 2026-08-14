@@ -8,20 +8,20 @@ function power_spectrum(
         normalize::Bool = true,
     )
 
-    lmax, mmax = size(spec, OneBased, as = Matrix)    # 1-based max degree l, order m
-    trunc = min(lmax, mmax)                         # consider only the triangle
+    lmax, mmax = size(spec, OneBased, as = Matrix)      # 1-based max degree l, order m
+    truncation = min(lmax, mmax)                        # consider only the triangle
     # ignore higher degrees if lmax > mmax
-    spectrum = zeros(real(eltype(spec)), trunc, size(spec)[2:end]...)
+    spectrum = zeros(real(eltype(spec)), truncation, size(spec)[2:end]...)
 
     @inbounds for k in eachmatrix(spec)
         # zonal modes m = 0, *1 as not mirrored at -m
-        for l in 1:trunc    # use flat/vector indexing
+        for l in 1:truncation    # use flat/vector indexing
             spectrum[l, k] = abs(spec[l, k])^2
         end
 
         # other modes m > 0 *2 as complex conj at -m
-        for m in 2:trunc
-            for l in m:trunc
+        for m in 2:truncation
+            for l in m:truncation
                 spectrum[l, k] += 2 * abs(spec[l, m, k])^2
             end
         end
@@ -30,7 +30,7 @@ function power_spectrum(
     # divide by number of orders m at l for normalization, "average power at l"
     if normalize
         @inbounds for k in eachmatrix(spec)
-            for l in 1:trunc            # 1-based degree, hence:
+            for l in 1:truncation                       # 1-based degree, hence:
                 spectrum[l, k] /= 2l - 1  # 1/(2l + 1) but l → l-1
             end
         end

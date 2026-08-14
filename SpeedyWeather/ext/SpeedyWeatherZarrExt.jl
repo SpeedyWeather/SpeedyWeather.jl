@@ -88,6 +88,9 @@ function ZarrOutput(
     return output
 end
 
+# to dispatch over the dataset type
+SpeedyWeather.dataset_type(::ZarrOutput) = Zarr.ZGroup
+
 """$(TYPEDSIGNATURES)
 Initialize `ZarrOutput` by creating a Zarr group on disk and storing the initial
 conditions of `vars`. Mirrors the layout of [`SpeedyWeather.NetCDFOutput`](@ref):
@@ -609,5 +612,9 @@ function Base.close(output::ZarrOutput)
     flush_partial_time_chunks!(output)
     return nothing
 end
+
+# Implemented in the GeoMakie extension, just define here how to load a zarr dataset
+SpeedyWeather.animate(::Type{<:Zarr.ZGroup}, path::String; kwargs...) =
+    animate(zopen(path); kwargs...)
 
 end # module
