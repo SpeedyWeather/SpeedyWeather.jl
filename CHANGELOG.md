@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- WhichTransform for default MatrixSpectralTransform on GPU at low resolution [#1194](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1194)
+
 ## v0.22.0
 
 - [BREAKING] 1-based truncation as resolution parameter [#1177](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1177)
