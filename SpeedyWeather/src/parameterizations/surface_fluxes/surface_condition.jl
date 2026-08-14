@@ -19,7 +19,7 @@ level wind speed using surface roughness. Fields are $(TYPEDFIELDS)"""
 
 end
 
-Adapt.@adapt_structure LearnedWindSlowdown
+Adapt.adapt_structure(to, obj::LearnedWindSlowdown{NF}) where {NF} = LearnedWindSlowdown{NF}()
 LearnedWindSlowdown(SG::SpectralGrid; kwargs...) = LearnedWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
