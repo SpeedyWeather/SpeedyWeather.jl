@@ -1,3 +1,5 @@
+export ConstantWindSlowdown, LearnedWindSlowdown, ConstantWindGust, BeljaarsWindGust, SurfaceCondition
+
 @parameterized @kwdef struct ConstantWindSlowdown{NF} <: AbstractParameterization
     "[OPTION] Ratio of near-surface wind to lowest-level wind [1]"
     @param wind_slowdown::NF = 0.95 (bounds = 0 .. 1,)
@@ -7,7 +9,7 @@ Adapt.@adapt_structure ConstantWindSlowdown
 ConstantWindSlowdown(SG::SpectralGrid; kwargs...) = ConstantWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::ConstantWindSlowdown, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::ConstantWindSlowdown, model)
+@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::ConstantWindSlowdown, model, U₁)
     return ws.wind_slowdown
 end
 
@@ -21,18 +23,55 @@ Adapt.@adapt_structure LearnedWindSlowdown
 LearnedWindSlowdown(SG::SpectralGrid; kwargs...) = LearnedWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::LearnedWindSlowdown, model)
-    g = model.planet.gravity
+@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::LearnedWindSlowdown, model, surface_condition,U₁)
+    (; gravity) = model.planet
     (; nlayers) = model.geometry
-
+    (; land_sea_mask, atmosphere, time_stepping) = model
+    cₚ = atmosphere.heat_capacity
     Φ₁ = vars.dynamics.geopotential[ij, nlayers]
     z_surf = model.orography.orography[ij]
+    land_fraction = land_sea_mask.land_fraction[ij]
 
-    z₁ = (Φ₁ / g) - z_surf
-    z₀ = vars.parameterizations.momentum_roughness[ij]
+    z₁ = (Φ₁ / gravity) - z_surf
+    z₀_raw_land = vars.parameterizations.land.momentum_roughness[ij]
+    z₀_raw_ocean = vars.parameterizations.ocean.momentum_roughness[ij]
 
-    # TODO: add multiplier based on profile from lowest model level to surface
-    slowdown = log(convert(typeof(z₀), 10) / z₀) / log(z₁ / z₀) # * φ
+    # Handle initialisation since z_₀ is not yet set
+    if !(z₀_raw_ocean > 0) || !(z₀_raw_land > 0)
+        # 0.1m typical for land, 0.0001m typical for ocean
+        z₀_land = convert(typeof(z₀_raw_land), 0.1)
+        z₀_ocean = convert(typeof(z₀_raw_ocean), 0.0001)
+    else
+        z₀_land = z₀_raw_land
+        z₀_ocean = z₀_raw_ocean
+    end
+
+    T₁ = get_prognostic_step(vars.grid.temperature, time_stepping, ws)[ij, nlayers]
+    q₁ = hasproperty(vars.grid, :humidity) ? 
+         get_prognostic_step(vars.grid.humidity, time_stepping, ws)[ij, nlayers] : zero(T₁)
+    
+    Tᵥ₁ = virtual_temperature(T₁, q₁, atmosphere)
+
+    T_skin_ocean = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepping, ws)[ij]
+    T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]
+    
+    pₛ = vars.parameterizations.surface_pressure[ij]
+    q_skin_land = saturation_humidity(T_skin_land, pₛ, atmosphere)
+    q_skin_ocean = saturation_humidity(T_skin_ocean, pₛ, atmosphere)
+    
+    Tᵥ_skin_land = virtual_temperature(T_skin_land, q_skin_land, atmosphere)
+    Tᵥ_skin_ocean = virtual_temperature(T_skin_ocean, q_skin_ocean, atmosphere)
+    Δθᵥ_land = (Tᵥ₁ + (gravity / cₚ) * z₁) - Tᵥ_skin_land
+    Δθᵥ_ocean = (Tᵥ₁ + (gravity / cₚ) * z₁) - Tᵥ_skin_ocean
+
+    log_z₀_ocean = log(z₀_ocean)
+    log_z₀_land = log(z₀_land)
+
+    sqrt_abs(x) = sqrt(abs(x))
+    ocean_slowdown = (((1.4852 - ((0.83675 - ((0.10807 * 0.45903) * log_z₀_ocean)) ^ log_z₀_ocean)) + (-0.13767 * exp((sqrt_abs(log_z₀_ocean) * log_z₀_ocean) + log(2.9248)))) - (-0.13038 * log_z₀_ocean)) * (((z₁ * ((exp(log(U₁ * 0.07611)) ^ -1.1987) + 0.97005)) - Δθᵥ_ocean) * 0.01083)
+    land_slowdown = -0.18860915 - ((sqrt_abs(exp(log_z₀_land * -0.7117916)) * (sqrt_abs(log_z₀_land) - exp(1.2022188))) * (U₁ ^ -0.99909467))
+
+    slowdown = ocean_slowdown * (1 - land_fraction) + land_slowdown * land_fraction
 
     return slowdown
 end
@@ -61,7 +100,7 @@ end
     @param C_H::NF = 1.0e-3
 
     "[OPTION] Minimum background gustiness [m/s]"
-    @param min_gust::NF = 0.5
+    @param min_gust::NF = 0.0
 end
 
 Adapt.@adapt_structure BeljaarsWindGust
@@ -91,8 +130,6 @@ initialize!(::BeljaarsWindGust, ::PrimitiveEquation) = nothing
 
     return gust
 end
-
-export SurfaceCondition
 
 """Surface condition parameterization that calculates near-surface atmospheric
 variables needed for surface flux calculations. Computes surface wind speed
@@ -161,7 +198,9 @@ end
     u_grid = get_prognostic_step(vars.grid.u, time_stepping, surface_condition)
     v_grid = get_prognostic_step(vars.grid.v, time_stepping, surface_condition)
 
-    wind_slowdown_ratio = calc_wind_slowdown(ij, vars, wind_slowdown, model)
+    U₁ = sqrt(muladd(u_grid[ij, nlayers], u_grid[ij, nlayers], v_grid[ij, nlayers]^2))
+
+    wind_slowdown_ratio = calc_wind_slowdown(ij, vars, wind_slowdown, model, surface_condition, U₁)
 
     uₛ = wind_slowdown_ratio * u_grid[ij, nlayers]
     vₛ = wind_slowdown_ratio * v_grid[ij, nlayers]
