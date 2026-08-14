@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Learned land and ocean surface roughness [1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+
 ## v0.22.0
 
 - [BREAKING] 1-based truncation as resolution parameter [#1177](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1177)

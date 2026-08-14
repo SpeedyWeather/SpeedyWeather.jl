@@ -350,6 +350,8 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
 
+    params = (; C₀⁻¹, Lᵥ)                              # pack into NamedTuple for kernel
+
     launch!(
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,
         dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params
