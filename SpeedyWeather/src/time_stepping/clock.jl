@@ -7,15 +7,27 @@ export Clock
 Clock struct keeps track of the model time, how many days to integrate for
 and how many time steps this takes.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Clock{DT, S, I, MS} <: AbstractClock
+@kwdef mutable struct Clock{DT, S, NF, I, MS} <: AbstractClock
     "current model time"
     time::DT = DEFAULT_DATE
 
     "start time of simulation"
     start::DT = DEFAULT_DATE
 
+    "Rotation time for daily cycle"
+    rotation_time::DT = time
+
+    "Orbit time for seasonal cycle"
+    orbit_time::DT = time
+
     "period to integrate for"
     period::S = Second(0)
+
+    "Dilation (relative speed wrt time) of rotation time for daily cycle, used for solar zenith calculations"
+    rotation_dilation::NF = 1f0
+
+    "Dilation (relative speed wrt time) of orbit time for seasonal cycle, used for solar zenith calculations"
+    orbit_dilation::NF = 1f0
 
     "Counting all steps the time stepper takes during simulation"
     step_counter::I = 0
@@ -50,15 +62,25 @@ function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt
     clock.step_counter += 1                     # always increased, counts time stepper steps
     clock.time_step_counter += increase_counter # spin up steps may not count for clock
+
+    # step the rotation and orbit time separately for solar zenith calculations
+    # using the dilation factors to speed up or slow down the rotation and orbit time relative to the model time
+    clock.rotation_time += Millisecond(round(Int, Millisecond(Δt).value * clock.rotation_dilation))
+    clock.orbit_time += Millisecond(round(Int, Millisecond(Δt).value * clock.orbit_dilation))
+
     return nothing
 end
 
 # copy! (converts on the fly for Reactant types to work as well)
-function Base.copy!(clock::Clock{DT, S, I, MS}, clock_old::Clock) where {DT, S, I, MS}
+function Base.copy!(clock::Clock{DT, S, NF, I, MS}, clock_old::Clock) where {DT, S, NF, I, MS}
     # explicitly convert to the new types too
     clock.time = convert(DT, clock_old.time)
     clock.start = convert(DT, clock_old.start)
+    clock.rotation_time = convert(DT, clock_old.rotation_time)
+    clock.orbit_time = convert(DT, clock_old.orbit_time)
     clock.period = convert(S, clock_old.period)
+    clock.rotation_dilation = convert(NF, clock_old.rotation_dilation)
+    clock.orbit_dilation = convert(NF, clock_old.orbit_dilation)
     clock.step_counter = convert(I, clock_old.step_counter)
     clock.time_step_counter = convert(I, clock_old.time_step_counter)
     clock.n_steps = convert(I, clock_old.n_steps)
@@ -69,6 +91,23 @@ end
 
 # for copy!(::Variables, ::Variables)
 _copy_entry!(dest::AbstractClock, src::AbstractClock) = copy!(dest, src)
+
+"""$(TYPEDSIGNATURES)
+Initialize the clock with the time step `Δt` from `time_stepping` and
+computes the time dilation given a `planet` with `length_of_day` and `length_of_year`."""
+function initialize!(clock::Clock, time_stepping::AbstractTimeStepper, planet::AbstractPlanet, args...)
+
+    # given a planet's length of day and year, we can compute the dilation factors for the rotation and orbit time
+    @assert planet.length_of_day.value != 0 "planet.length_of_day is 0 (rotating infinitely fast)," *
+        " choose Second(typemax(Int)) for a tidally locked planet or daily_cycle=false for average insulation." 
+    @assert planet.length_of_year.value != 0 "planet.length_of_year is 0 (orbiting infinitely fast)," *
+        " choose Second(typemax(Int)) for a seasonally locked planet or seasonal_cycle=false." 
+    clock.rotation_dilation = Second(EARTH_DAY).value / Second(planet.length_of_day).value
+    clock.orbit_dilation = Second(EARTH_YEAR).value / Second(planet.length_of_year).value
+
+    # now initialize rest of the clock as normal
+    return initialize!(clock, time_stepping, args...)
+end
 
 """$(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` and `period` to integrate for.
@@ -190,6 +229,11 @@ Dates.Month(x::AbstractFloat) = Day(30x)  # approximate
 Dates.Year(x::AbstractFloat) = Day(365x) # approximate
 Century(x::AbstractFloat) = Year(100x)
 Millenium(x::AbstractFloat) = Century(10x)
+
+Dates.Second(c::Dates.CompoundPeriod) = sum(Dates.Second.(c.periods))
+Dates.Minute(c::Dates.CompoundPeriod) = sum(Dates.Minute.(c.periods))
+Dates.Hour(c::Dates.CompoundPeriod) = sum(Dates.Hour.(c.periods))
+Dates.Day(c::Dates.CompoundPeriod) = sum(Dates.Day.(c.periods))
 
 # use Dates.second to round to integer seconds
 Dates.second(x::Dates.Nanosecond) = round(Int, x.value * 1.0e-9)
