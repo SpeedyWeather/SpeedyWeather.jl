@@ -147,6 +147,8 @@ end
 function set!(clock::Clock; time::DateTime, start::DateTime)
     clock.time = time
     clock.start = start
+    clock.rotation_time = time      # when time is explicitly set, synchronize orbit & rotation times too
+    clock.orbit_time = time         # after this they generally run apart 
     return clock
 end
 
