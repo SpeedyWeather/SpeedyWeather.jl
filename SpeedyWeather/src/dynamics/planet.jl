@@ -1,21 +1,21 @@
 abstract type AbstractPlanet <: AbstractModelComponent end
 
-const DEFAULT_RADIUS = 6.371e6
-const DEFAULT_ROTATION = 7.29e-5    # default angular frequency of Earth's rotation [1/s]
-const DEFAULT_GRAVITY = 9.81        # default gravitational acceleration on Earth [m/s²]
-
-const EARTH_DAY = Hour(24)
-const EARTH_YEAR = Day(365) + Hour(6)
+# EARTH DEFAULTS
+const DEFAULT_RADIUS = 6.371e6          # radius of planet [m]
+const DEFAULT_ROTATION = 7.29e-5        # angular frequency of Earth's rotation [1/s]
+const DEFAULT_GRAVITY = 9.81            # gravitational acceleration [m/s²]
+const EARTH_DAY = Hour(24)              # length of day
+const EARTH_YEAR = Day(365) + Hour(6)   # length of year
+const EARTH_EQUINOX = DateTime(2000, 3, 20)
+const AXIAL_TILT = 23.4
 
 export Earth
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Create a struct `Earth<:AbstractPlanet`, with the following physical/orbital
 characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
-$(TYPEDFIELDS)
-"""
+$(TYPEDFIELDS)"""
 @parameterized @kwdef struct Earth{NF, S, DT, B} <: AbstractPlanet
 
     "Earth's radius [m]"
@@ -40,13 +40,13 @@ $(TYPEDFIELDS)
     length_of_year::S = Second(EARTH_YEAR)
 
     "time of spring equinox (year irrelevant)"
-    equinox::DT = DateTime(2000, 3, 20)
+    equinox::DT = EARTH_EQUINOX
 
     "angle [˚] rotation axis tilt wrt to orbit"
-    @param axial_tilt::NF = 23.4 (bounds = -90 .. 90,)
+    @param axial_tilt::NF = AXIAL_TILT (bounds = -90 .. 90,)
 
     "Total solar irradiance at the distance of 1 AU [W/m²]"
-    @param solar_constant::NF = 1365 (bounds = Nonnegative,)
+    @param solar_constant::NF = 1365.0 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure Earth
