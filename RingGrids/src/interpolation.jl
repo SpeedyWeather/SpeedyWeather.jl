@@ -7,16 +7,18 @@ struct GridGeometry{
         VectorType,
         VectorIntType,
         VectorRange,
+        IntType,
     } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
 
-    nlat_half::Int              # number of latitude rings on one hemisphere (Eq. incl)
-    nlat::Int                   # total number of latitude rings
-    npoints::Int                # total number of grid points
+    nlat_half::IntType          # number of latitude rings on one hemisphere (Eq. incl)
+    nlat::IntType               # total number of latitude rings
+    npoints::IntType            # total number of grid points
     londs::VectorType           # longitudes of every grid point 0˚ to 360˚E
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
     nlons::VectorIntType        # number of longitudinal points per ring
+    ring_starts::VectorIntType  # first flat index ij of each ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 
     # rings, GPU/architecture copy (if needed) of grid.rings
@@ -57,13 +59,18 @@ function GridGeometry(
     nlons = get_nlons(grid)                                 # number of longitude per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in eachring(grid)]   # offset of the first point from 0˚E
 
+    # first flat index ij of every ring, precomputed here so that the interpolation kernels
+    # can convert an in-ring index i to a flat index ij without indexing into rings (which
+    # would be dynamic indexing on GPU)
+    ring_starts = [first(ring) for ring in eachring(grid)]
+
     # vector type
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
     device_rings = on_architecture(architecture, grid.rings)
 
-    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings)}(
-        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
+    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings), typeof(nlat_half)}(
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, ring_starts, lon_offsets, device_rings
     )
 end
 
@@ -80,9 +87,10 @@ between two latitude rings."""
 @kwdef struct AnvilLocator{
         VectorType,
         VectorIntType,
+        IntType,
     } <: AbstractLocator
 
-    npoints_output::Int            # number of points to interpolate onto (length of following vectors)
+    npoints_output::IntType            # number of points to interpolate onto (length of following vectors)
 
     # to the coordinates respective indices
     js::VectorIntType = zeros(Int, npoints_output)   # ring indices j such that [j, j+1) contains the point
@@ -99,6 +107,20 @@ end
 
 Adapt.@adapt_structure AnvilLocator
 
+function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLocator)
+    return AnvilLocator(
+        npoints_output = loc.npoints_output,
+        js = on_architecture(arch, loc.js),
+        ij_as = on_architecture(arch, loc.ij_as),
+        ij_bs = on_architecture(arch, loc.ij_bs),
+        ij_cs = on_architecture(arch, loc.ij_cs),
+        ij_ds = on_architecture(arch, loc.ij_ds),
+        Δys = on_architecture(arch, loc.Δys),
+        Δabs = on_architecture(arch, loc.Δabs),
+        Δcds = on_architecture(arch, loc.Δcds),
+    )
+end
+
 """
 $(TYPEDSIGNATURES)
 Zero generator function for the 4-point average AnvilLocator. Use `update_locator!` to
@@ -114,7 +136,7 @@ function (::Type{L})(
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    return L{VectorType, VectorIntType}(; npoints_output = npoints)
+    return L{VectorType, VectorIntType, typeof(npoints)}(; npoints_output = npoints)
 end
 
 # use Float32 as default for weights
@@ -162,8 +184,10 @@ Base.eltype(::AnvilInterpolator{NF}) where {NF} = NF
 grid_type(I::AnvilInterpolator) = typeof(I.geometry.grid)
 
 function Base.show(io::IO, L::AnvilInterpolator{NF}) where {NF}
-    println(io, "AnvilInterpolator{$NF} for $(L.geometry.grid)")
-    return print(io, "└ onto: $(L.locator.npoints_output) points")
+    NF_str = "{$NF}"
+    println(io, styled"{warning:AnvilInterpolator}{note:$NF_str} for $(L.geometry.grid)")
+    print(io, styled"└ {info:onto}: $(L.locator.npoints_output) points")
+    return nothing
 end
 
 # define to a <:AbstractInterpolator the corresponding Locator
@@ -315,15 +339,15 @@ end
 @kernel inbounds = true function _interpolate_kernel!(
         Aout,               # Out: interpolated values
         A,                  # gridded values to interpolate from
-        @Const(ij_as),      # indices of A to interpolate from
-        @Const(ij_bs),      # indices of A to interpolate from
-        @Const(ij_cs),      # indices of A to interpolate from
-        @Const(ij_ds),      # indices of A to interpolate from
-        @Const(Δabs),       # weights of A to interpolate from
-        @Const(Δcds),       # weights of A to interpolate from
-        @Const(Δys),        # weights of A to interpolate from
-        @Const(A_northpole),
-        @Const(A_southpole),
+        ij_as,      # indices of A to interpolate from
+        ij_bs,      # indices of A to interpolate from
+        ij_cs,      # indices of A to interpolate from
+        ij_ds,      # indices of A to interpolate from
+        Δabs,       # weights of A to interpolate from
+        Δcds,       # weights of A to interpolate from
+        Δys,        # weights of A to interpolate from
+        A_northpole,
+        A_southpole,
     )
 
     k = @index(Global, Linear)
@@ -471,14 +495,14 @@ function find_rings!(
 
     if ~unsafe
         θmin, θmax = extrema(θs)
-        @assert θmin >= -90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."
-        @assert θmax <= 90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."
+        @boundscheck θmin >= -90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."))
+        @boundscheck θmax <= 90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."))
 
         #TODO: currently we only check the latitudes of the grid we interpolate onto
         #TODO: as we only allow instances of Field to be the original grid, the latitudes below
         #TODO: should be okay anyway. Checking it on GPU is a bit more annoying...
 
-        @assert isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
+        @assert Utils.isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
         #@assert latd[1] == 90 "Latitudes latd are expected to contain 90˚N, the north pole."
 
         # Hack: for intervals between rings to be one-sided open [j, j+1) the last element in
@@ -499,8 +523,8 @@ DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
 @kernel inbounds = true function find_rings_kernel!(
         js,                # Out: ring indices j
         Δys,               # Out: distance fractions to ring further south
-        @Const(θs),        # latitudes to interpolate onto
-        @Const(latd)       # latitudes of the rings on the original grid
+        θs,        # latitudes to interpolate onto
+        latd       # latitudes of the rings on the original grid
     )
     k = @index(Global, Linear)
 
@@ -546,7 +570,7 @@ function find_rings_unsafe!(
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -556,6 +580,7 @@ function find_rings_unsafe!(
         θs,
         latd
     )
+    return nothing
 end
 
 # for testing only
@@ -567,15 +592,15 @@ function find_rings(θs::AbstractVector, latd::AbstractVector{NF}) where {NF}
 end
 
 @kernel inbounds = true function find_grid_indices_kernel!(
-        @Const(js),            # ring indices j
+        js,            # ring indices j
         ij_as, ij_bs,          # northern point indices
         ij_cs, ij_ds,          # southern point indices
         Δabs, Δcds,            # distance fractions
-        @Const(λs),            # longitudes to interpolate onto
-        @Const(lon_offsets),   # longitude offsets for each ring
-        @Const(nlons),         # number of longitude points per ring
-        @Const(nlat),          # number of latitude rings
-        @Const(rings)          # ring indices
+        λs,            # longitudes to interpolate onto
+        lon_offsets,   # longitude offsets for each ring
+        nlons,         # number of longitude points per ring
+        ring_starts,   # starting flat index for each ring
+        nlat,          # number of latitude rings
     )
     k = @index(Global, Linear)
 
@@ -591,8 +616,8 @@ end
         # and b the next grid point to the right, such that
         # λ ∈ [a, b); while in most cases i_a + 1 = i_b, across 0˚E this is not the case
         i_a, i_b, Δ = find_lon_indices(λ, lon_offsets[j], nlons[j])
-        ij_as[k] = rings[j][i_a]    # index ij for a
-        ij_bs[k] = rings[j][i_b]    # index ij for b
+        ij_as[k] = ring_starts[j] + i_a - 1    # convert to flat index
+        ij_bs[k] = ring_starts[j] + i_b - 1    # convert to flat index
         Δabs[k] = Δ                 # distance fraction of λ between a, b
     end
 
@@ -603,8 +628,8 @@ end
     else
         # as above but for one ring further down
         i_c, i_d, Δ = find_lon_indices(λ, lon_offsets[j + 1], nlons[j + 1])
-        ij_cs[k] = rings[j + 1][i_c]  # index ij for c
-        ij_ds[k] = rings[j + 1][i_d]  # index ij for d
+        ij_cs[k] = ring_starts[j + 1] + i_c - 1  # convert to flat index
+        ij_ds[k] = ring_starts[j + 1] + i_d - 1  # convert to flat index
         Δcds[k] = Δ                 # distance fraction of λ between c, d
     end
 end
@@ -624,13 +649,12 @@ function find_grid_indices!(
 
     (; js, ij_as, ij_bs, ij_cs, ij_ds) = locator
     (; Δabs, Δcds) = locator
-    (; nlons, lon_offsets, nlat) = geometry
-    (; rings) = geometry # architecture version (GPU if needed)
+    (; nlons, ring_starts, lon_offsets, nlat) = geometry
 
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -642,9 +666,10 @@ function find_grid_indices!(
         λs_converted,
         lon_offsets,
         nlons,
-        nlat,
-        rings
+        ring_starts,
+        nlat
     )
+    return nothing
 end
 
 @inline function find_lon_indices(
@@ -655,7 +680,10 @@ end
 
     Δλ = convert(NF, 360) / nlon          # longitude spacing
     ix = (λ - λ₀) / Δλ                      # grid index i but with fractional part
-    i = floor(Int, ix)                  # 0-based grid index to the left
+    # unsafe_trunc(Int, floor(ix)) instead of floor(Int, ix): the latter carries an
+    # InexactError branch which boxes ix, requiring GPU-side allocation. AMDGPU rejects
+    # that at compile time. λ, λ₀ are bounded degrees so the conversion cannot overflow.
+    i = Base.unsafe_trunc(Int, floor(ix))   # 0-based grid index to the left
     Δ = ix - i                            # distance fraction from i to i+1
 
     # λ ∈ [λa, λb), i.e. a is the next grid point to the left, b to the right

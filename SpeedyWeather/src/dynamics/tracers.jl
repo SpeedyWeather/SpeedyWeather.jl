@@ -6,13 +6,13 @@ export Tracer
 and define it as `active` (=true default). `active=false` will (temporarily)
 disable the time evolution of the tracer. Fields are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Tracer <: AbstractTracer
+@kwdef mutable struct Tracer{B} <: AbstractTracer
     name::Symbol
-    active::Bool = true
+    active::B = true
 end
 
 # method to create a tracer from a positional symbol
-Tracer(name::Symbol; kwargs...) = Tracer(; name, kwargs...)
+Tracer(name::Symbol; kwargs...) = Tracer{Bool}(; name, kwargs...)
 
 const TRACER_DICT = Dict{Symbol, Tracer}
 
@@ -53,3 +53,23 @@ deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers...
 
 # delete from tracer dictionary, identified by its `name::Symbol`
 Base.delete!(model::AbstractModel, tracer::Tracer) = delete!(model.tracers, tracer.name)
+
+function variables(T::Tracer, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
+    return (
+        PrognosticVariable(T.name, SpectralXYZT(ps), desc = "$(T.name)", namespace = :tracers),
+        GridVariable(T.name, GridXYZT(pg), desc = "$(T.name)", namespace = :tracers),
+        TendencyVariable(T.name, SpectralXYZT(ts), desc = "Tendency of $(T.name)", namespace = :tracers),
+        TendencyVariable(T.name, GridXYZT(tg), desc = "Tendency of $(T.name)", namespace = :grid_tracers),
+        ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
+    )
+end
+
+function variables(D::TRACER_DICT, model::AbstractModel)
+    return (variables(tracer, model) for tracer in values(D)) |> Iterators.flatten |> Tuple
+end

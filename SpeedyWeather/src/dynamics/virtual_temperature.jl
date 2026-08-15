@@ -4,14 +4,18 @@ Linear virtual temperature for `model::PrimitiveDry`: Just copy over
 arrays from `temp` to `temp_virt` at timestep `lf` in spectral space
 as humidity is zero in this `model`."""
 function linear_virtual_temperature!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
-        lf::Integer,
+        vars::Variables,
         model::PrimitiveDry,
     )
-    (; temp_virt) = diagn.dynamics
-    temp = get_step(progn.temp, lf)
-    return copyto!(temp_virt, temp)
+    Tᵥ = vars.dynamics.virtual_temperature
+
+    # For Leapfrog this term has to be evaluted on the previous time step
+    # as the implicit corrections will move it to the current as done for 
+    # all linear gravity-wave related terms, just denote this with `LinearDynamicalCore`
+    # here, the time stepper then decides which step to return
+    T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, LinearDynamicalCore())
+    Tᵥ .= T
+    return nothing
 end
 
 """
@@ -27,25 +31,29 @@ specific humidity q and
 
 in spectral space."""
 function linear_virtual_temperature!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
-        lf::Integer,
+        vars::Variables,
         model::PrimitiveEquation,
     )
-    (; temp_virt) = diagn.dynamics
+    Tᵥ = vars.dynamics.virtual_temperature
     μ = model.atmosphere.μ_virt_temp
-    (; temp_average) = diagn
-    temp = get_step(progn.temp, lf)
-    humid = get_step(progn.humid, lf)
+    Tₖ = vars.dynamics.average_temperature_profile
+
+    # For Leapfrog this term has to be evaluted on the previous time step
+    # as the implicit corrections will move it to the current as done for 
+    # all linear gravity-wave related terms, just denote this with `LinearDynamicalCore`
+    # here, the time stepper then decides which step to return
+    T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, LinearDynamicalCore())
+    q = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, LinearDynamicalCore())
 
     # TODO check that doing a non-linear virtual temperature in grid-point space
     # but a linear virtual temperature in spectral space to avoid another transform
     # does not cause any problems. Alternative do the transform or have a linear
     # virtual temperature in both grid and spectral space
-    # transform!(temp_virt, temp_virt_grid, diagn.dynamics.scratch_memory, S)
 
-    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (Tₖ and humid are different dimensions and array types)
-    return @. temp_virt.data = temp.data + (temp_average' * μ) * humid.data
+    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict
+    # (Tₖ and q are different dimensions and array types)
+    @. Tᵥ.data = T.data + (Tₖ' * μ) * q.data
+    return nothing
 end
 
 @inline virtual_temperature(T, q, A::AbstractWetAtmosphere) = virtual_temperature(T, q, A.μ_virt_temp)

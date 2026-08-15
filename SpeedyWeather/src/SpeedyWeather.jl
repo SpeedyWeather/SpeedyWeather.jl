@@ -2,6 +2,7 @@ module SpeedyWeather
 
 # STRUCTURE
 using DocStringExtensions
+using StyledStrings
 
 # NUMERICS
 import Primes
@@ -10,21 +11,25 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 export rotate, rotate!
 
 # GPU, PARALLEL
-import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
+import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 import GPUArrays: GPUArrays, @allowscalar
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays: @allowscalar
+import ReactantCore: @trace
+import Base: @propagate_inbounds
 
 using SpeedyWeatherInternals
 using SpeedyWeatherInternals.Architectures
+using SpeedyWeatherInternals.KernelLaunching
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
 export CPU, GPU, on_architecture, architecture                # export device functions
-export SpeedyWeatherInternals, Architectures
+export SpeedyWeatherInternals, Architectures, KernelLaunching, ArrayDimensions
 
 # INPUT OUTPUT
 import TOML
-import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
+import Dates: Dates, DateTime, TimePeriod, Period, Millisecond, Second, Minute, Hour, Day,
+    Week, Month, Year, value, year, month, day, hour, minute, second
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
@@ -33,27 +38,21 @@ import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
 
-# UTILITIES
-using DomainSets.IntervalSets
-import Base: @propagate_inbounds
-
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
 
-# export functions that have many cross-component methods
-export initialize!, finalize!
-
-# import utilities
+# UTILITIES
 export Utils
-using SpeedyWeatherInternals.Utils
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs
 
-# parameter handling
-using SpeedyWeatherInternals.SpeedyParameters
+# PARAMETER HANDLING
+using DomainSets.IntervalSets
+using SpeedyWeatherInternals.ParameterEditing
+import SpeedyWeatherInternals.ParameterEditing: parameters
+export ParameterTable, parameters, stripparams       # export user-facing parameter handling types and methods
 
-import SpeedyWeatherInternals.SpeedyParameters: parameters
-
-# export user-facing parameter handling types and methods
-export SpeedyParam, SpeedyParams, parameters, stripparams
+# Export heavily methoded functions
+export initialize!, finalize!
 
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
@@ -99,45 +98,49 @@ export zonal_mean
 using SpeedyTransforms
 
 export SpeedyTransforms, SpectralTransform
+export MatrixSpectralTransform
 export transform, transform!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+export laplace, inverse_laplace, laplace!, inverse_laplace!
+export gradient, gradient!
 export power_spectrum
 
-import SpeedyTransforms: prettymemory
+import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 
 # to be defined in GeoMakie extension
 export animate, globe
 function animate end
 
+# constructors to be defined in Terrarium extension
+export TerrariumOutput
+
 # abstract types
-include("models/abstract_models.jl")
 include("variables/abstract_types.jl")
-include("models/parameterizations.jl")
+include("models/abstract_models.jl")
+include("parameterizations/abstract_types.jl")
+include("time_stepping/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
-include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
+include("dynamics/vertical_coordinates.jl")
 include("dynamics/geometry.jl")
 include("dynamics/coriolis.jl")
 include("dynamics/planet.jl")
 include("dynamics/atmosphere.jl")
 include("dynamics/adiabatic_conversion.jl")
 include("dynamics/orography.jl")
-include("physics/land_sea_mask.jl")
+include("parameterizations/land_sea_mask.jl")
 
 # VARIABLES
+include("variables/dimensions.jl")
 include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
-include("dynamics/clock.jl")
-include("variables/prognostic_variables.jl")
+include("time_stepping/clock.jl")
 include("variables/set.jl")
-include("physics/define_column.jl")
-include("variables/diagnostic_variables.jl")
 
 # MODEL COMPONENTS
-include("dynamics/time_integration.jl")
 include("dynamics/forcing.jl")
 include("dynamics/drag.jl")
 include("dynamics/geopotential.jl")
@@ -145,52 +148,69 @@ include("dynamics/virtual_temperature.jl")
 include("dynamics/initial_conditions.jl")
 include("dynamics/horizontal_diffusion.jl")
 include("dynamics/vertical_advection.jl")
-include("dynamics/implicit.jl")
 include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
+include("dynamics/tendencies_sequential.jl")
 include("dynamics/hole_filling.jl")
 include("dynamics/particle_advection.jl")
 include("dynamics/random_process.jl")
 
+# TIME STEPPING
+include("time_stepping/time_integration.jl")
+include("time_stepping/steps.jl")
+include("time_stepping/steppers/general.jl")
+include("time_stepping/steppers/leapfrog.jl")
+include("time_stepping/steppers/ncycle_lorenz.jl")
+include("time_stepping/transform.jl")
+include("time_stepping/implicit/implicit_shallow_water.jl")
+include("time_stepping/implicit/implicit_primitive_equations.jl")
+
 # PARAMETERIZATIONS
-include("physics/albedo.jl")
-include("physics/tendencies.jl")
-include("physics/vertical_diffusion.jl")
-include("physics/large_scale_condensation.jl")
-include("physics/surface_fluxes/boundary_layer.jl")
-include("physics/surface_fluxes/surface_condition.jl")
-include("physics/surface_fluxes/momentum.jl")
-include("physics/surface_fluxes/heat.jl")
-include("physics/surface_fluxes/humidity.jl")
-include("physics/convection.jl")
-include("physics/radiation/zenith.jl")
-include("physics/radiation/shortwave_radiation.jl")
-include("physics/radiation/shortwave_transmissivity.jl")
-include("physics/radiation/clouds.jl")
-include("physics/radiation/longwave_radiation.jl")
-include("physics/radiation/longwave_transmissivity.jl")
-include("physics/stochastic_physics.jl")
+include("parameterizations/general.jl")
+include("parameterizations/albedo.jl")
+include("parameterizations/tendencies.jl")
+include("parameterizations/vertical_diffusion.jl")
+include("parameterizations/large_scale_condensation.jl")
+include("parameterizations/surface_fluxes/boundary_layer.jl")
+include("parameterizations/surface_fluxes/surface_roughness.jl")
+include("parameterizations/surface_fluxes/surface_condition.jl")
+include("parameterizations/surface_fluxes/momentum.jl")
+include("parameterizations/surface_fluxes/heat.jl")
+include("parameterizations/surface_fluxes/humidity.jl")
+include("parameterizations/convection.jl")
+include("parameterizations/radiation/zenith.jl")
+include("parameterizations/radiation/shortwave_radiation.jl")
+include("parameterizations/radiation/shortwave_transmissivity.jl")
+include("parameterizations/radiation/clouds.jl")
+include("parameterizations/radiation/longwave_radiation.jl")
+include("parameterizations/radiation/longwave_transmissivity.jl")
+include("parameterizations/radiation/greenhouse_gases.jl")
+include("parameterizations/stochastic_physics.jl")
 
 # OCEAN AND LAND
-include("physics/ocean.jl")
-include("physics/sea_ice.jl")
-include("physics/land/land.jl")
-include("physics/land/geometry.jl")
-include("physics/land/thermodynamics.jl")
-include("physics/land/temperature.jl")
-include("physics/land/soil_moisture.jl")
-include("physics/land/snow.jl")
-include("physics/land/vegetation.jl")
-include("physics/land/rivers.jl")
+include("parameterizations/ocean.jl")
+include("parameterizations/sea_ice.jl")
+include("parameterizations/land/land.jl")
+include("parameterizations/land/geometry.jl")
+include("parameterizations/land/thermodynamics.jl")
+include("parameterizations/land/soil_temperature.jl")
+include("parameterizations/land/soil_moisture.jl")
+include("parameterizations/land/snow.jl")
+include("parameterizations/land/vegetation.jl")
+include("parameterizations/land/rivers.jl")
 
 # OUTPUT
 include("output/schedule.jl")
 include("output/callbacks.jl")
 include("output/feedback.jl")
-include("output/netcdf_output.jl")
-include("output/restart_file.jl")
+include("output/writers/general.jl")
+include("output/writers/output_writer_core.jl")
+include("output/writers/netcdf_output.jl")
+include("output/writers/variables_output.jl")
+include("output/writers/zarr_output.jl")
+include("output/variables/output_variables.jl")
+include("output/restart.jl")
 include("output/particle_tracker.jl")
-include("output/jld2_output.jl")
 
 # MODELS
 include("models/simulation.jl")
@@ -198,6 +218,5 @@ include("models/barotropic.jl")
 include("models/shallow_water.jl")
 include("models/primitive_dry.jl")
 include("models/primitive_wet.jl")
-include("models/tree.jl")
 include("models/set.jl")
 end

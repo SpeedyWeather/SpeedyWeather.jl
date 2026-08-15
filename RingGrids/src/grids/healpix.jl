@@ -12,8 +12,8 @@ Equator. For more details see Górski et al. 2005, DOI:10.1086/427976.
 `whichring` is a precomputed vector of ring indices for each grid point ij, i.e. `whichring[ij]`
 gives the ring index j of grid point ij. Fields are
 $(TYPEDFIELDS)"""
-struct HEALPixGrid{A, V, W} <: AbstractReducedGrid{A}
-    nlat_half::Int                  # number of latitudes on one hemisphere
+struct HEALPixGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
+    nlat_half::IntType              # number of latitudes on one hemisphere
     architecture::A                 # information about device, CPU/GPU
     rings::V                        # precomputed ring indices
     whichring::W                    # precomputed ring index for each grid point ij
@@ -101,6 +101,27 @@ function get_lond_per_ring(Grid::Type{<:HEALPixGrid}, nlat_half::Integer, j::Int
     s = (j < nside) || (j >= 3nside) ? 1 : ((j - nside) % 2 + 1)
     lond = [180 / (nlon ÷ 2) * (i - s / 2) for i in 1:nlon]
     return lond
+end
+
+# rings with s=1 are offset by dlon/2 east of 0˚, rings with s=2 start on 0˚,
+# so hasoffset is only defined per ring for HEALPixGrid, not for the whole grid
+function hasoffset(::Type{<:HEALPixGrid}, nlat_half::Integer, j::Integer)
+    nside = nside_healpix(nlat_half)
+    s = (j < nside) || (j >= 3nside) ? 1 : ((j - nside) % 2 + 1)
+    return s == 1
+end
+
+hasoffset(::Type{<:HEALPixGrid}) = throw(
+    ArgumentError(
+        "HEALPixGrid has rings with and without longitudinal offset, " *
+            "use hasoffset(Grid, nlat_half, j) per ring instead."
+    )
+)
+
+# ring-dependent offset, so kernels need it as a vector with one Bool per ring
+function offset_maybe_vector(arch, grid::HEALPixGrid)
+    (; nlat_half) = grid
+    return on_architecture(arch, [hasoffset(HEALPixGrid, nlat_half, j) for j in 1:get_nlat(grid)])
 end
 
 ## INDEXING

@@ -1,17 +1,10 @@
 abstract type AbstractForcing <: AbstractModelComponent end
 
 # function barrier for all forcings to unpack model.forcing
-function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(diagn, progn, model.forcing, lf, model)
-end
+forcing!(vars::Variables, model::AbstractModel) = forcing!(vars, model.forcing, model)
 
-## NO FORCING
-forcing!(diagn, progn, forcing::Nothing, args...) = nothing
+# NO FORCING
+forcing!(vars, forcing::Nothing, args...) = nothing
 
 # JET STREAM FORCING
 export JetStreamForcing
@@ -60,16 +53,14 @@ function initialize!(
     )
 
     (; latitude, width, speed, time_scale, amplitude) = forcing
-    (; radius) = model.planet
 
     # Some constants similar to Galewsky 2004
-    θ₀ = (latitude - width) / 360 * 2π        # southern boundary of jet [radians]
-    θ₁ = (latitude + width) / 360 * 2π        # northern boundary of jet
-    eₙ = exp(-4 / (θ₁ - θ₀)^2)              # normalisation, so that speed is at max
-    A₀ = speed / eₙ / time_scale.value      # amplitude [m/s²] without lat dependency
-    A₀ *= radius                        # scale by radius as are the momentum equations
+    θ₀ = (latitude - width) / 360 * 2π          # southern boundary of jet [radians]
+    θ₁ = (latitude + width) / 360 * 2π          # northern boundary of jet
+    eₙ = exp(-4 / (θ₁ - θ₀)^2)                  # normalisation, so that speed is at max
+    A₀ = speed / eₙ / time_scale.value          # amplitude [m/s²] without lat dependency
 
-    (; nlat, colat) = model.geometry
+    (; colat) = model.geometry
     # latitude in radians, abs for north/south symmetry
     θ = @. abs(π / 2 - colat)
 
@@ -86,14 +77,8 @@ function initialize!(
 end
 
 # function barrier
-function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
-        forcing::JetStreamForcing,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(diagn, forcing)
+function forcing!(vars::Variables, forcing::JetStreamForcing, model::AbstractModel)
+    return forcing!(vars, forcing, model.time_stepping)
 end
 
 """$(TYPEDSIGNATURES)
@@ -101,20 +86,22 @@ Set for every latitude ring the tendency to the precomputed forcing
 in the momentum equations following the JetStreamForcing.
 The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
 function forcing!(
-        diagn::DiagnosticVariables,
-        forcing::JetStreamForcing
+        vars::Variables,
+        forcing::JetStreamForcing,
+        time_stepping::AbstractTimeStepper,
     )
 
-    Fu = diagn.tendencies.u_tend_grid
+    Fu = get_tendency_step(vars.tendencies.grid.u, time_stepping, forcing)
 
     (; amplitude, tapering) = forcing
     (; whichring) = Fu.grid
 
     arch = architecture(Fu)
-    return launch!(
+    launch!(
         arch, RingGridWorkOrder, size(Fu), jetstream_forcing_kernel!,
         Fu, amplitude, tapering, whichring
     )
+    return nothing
 end
 
 @kernel inbounds = true function jetstream_forcing_kernel!(
@@ -130,7 +117,6 @@ end
 
 export StochasticStirring
 @parameterized @kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
-
     "[OPTION] Stirring strength A [1/s²]"
     @param strength::NF = 2.0e-11
 
@@ -149,6 +135,13 @@ function StochasticStirring(SG::SpectralGrid; kwargs...)
     return StochasticStirring{SG.NF, SG.VectorType}(; lat_mask, kwargs...)
 end
 
+function variables(::StochasticStirring)
+    return (
+        ScratchVariable(:a_2D, Spectral2D(), desc = "scratch array", units = "?"),
+        ScratchVariable(:a_2D, Grid2D(), desc = "scratch array", units = "?", namespace = :grid),
+    )
+end
+
 function initialize!(
         forcing::StochasticStirring,
         model::AbstractModel
@@ -165,42 +158,39 @@ function initialize!(
     return nothing
 end
 
-function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
-        forcing::StochasticStirring,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(diagn, forcing, model.spectral_transform)
+function forcing!(vars::Variables, forcing::StochasticStirring, model::AbstractModel)
+    return forcing!(vars, forcing, model.spectral_transform, model.time_stepping)
 end
 
 
 function forcing!(
-        diagn::DiagnosticVariables,
+        vars::Variables,
         forcing::StochasticStirring,
-        spectral_transform::SpectralTransform
+        spectral_transform::SpectralTransform,
+        time_stepping::AbstractTimeStepper,
     )
     # get random values from random process
-    S_grid = diagn.grid.random_pattern
+    S_grid = vars.scratch.grid.a_2D
+    S_grid .= vars.grid.random_pattern  # copy to leave the random pattern unchanged
 
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
 
     # back to spectral space
-    S_masked = diagn.dynamics.a_2D
-    transform!(S_masked, S_grid, diagn.dynamics.scratch_memory, spectral_transform)
+    S_masked = vars.scratch.a_2D
+    transform!(S_masked, S_grid, vars.scratch.transform_memory, spectral_transform)
 
-    # scale by radius^2 as is the vorticity equation, and scale to forcing strength
-    S_masked .*= (diagn.scale[]^2 * forcing.strength)
+    # scale by radius as is vorticity, and scale to forcing strength
+    S_masked .*= (vars.prognostic.scale[] * forcing.strength)
 
     # force every layer
-    (; vor_tend) = diagn.tendencies
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, time_stepping, forcing)
     arch = architecture(vor_tend)
-    return launch!(
+    launch!(
         arch, SpectralWorkOrder, size(vor_tend), stochastic_stirring_kernel!,
         vor_tend, S_masked
     )
+    return nothing
 end
 
 # GPU kernel for adding 2D spectral field to each layer of 3D field
@@ -223,10 +213,10 @@ $(TYPEDFIELDS)
 """
 @parameterized @kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
     "[OPTION] Strength of forcing [1/s²]"
-    @param strength::NF = 1.5e-5
+    @param strength::NF = 2.0e-5 (bounds = Real,)
 
     "[OPTION] Wavenumber of forcing in meridional direction (pole to pole)"
-    @param wavenumber::NF = 8 (bounds = Positive,)
+    @param wavenumber::NF = 8 (bounds = Nonnegative,)
 end
 
 KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
@@ -234,18 +224,29 @@ KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
 initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 
 function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         forcing::KolmogorovFlow,
-        lf::Integer,
         model::AbstractModel,
     )
-    # scale by radius as is the vorticity equation
-    s = forcing.strength * diagn.scale[]
+    (; latds) = model.geometry
+    s = forcing.strength
     k = forcing.wavenumber
 
-    Fu = diagn.tendencies.u_tend_grid
-    return set!(Fu, (λ, θ, σ) -> s * sind(k * θ), model.geometry)
+    Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, forcing)
+    launch!(
+        architecture(Fu), RingGridWorkOrder, size(Fu), kolmogorov_flow_kernel!,
+        Fu, s, k, latds
+    )
+    return nothing
+end
+
+@kernel inbounds = true function kolmogorov_flow_kernel!(Fu, s, k, latds)
+    I = @index(Global, NTuple)
+    ij = I[1]
+    layer = I[2]
+    lat = latds[ij]
+
+    Fu[ij, layer] += s * sin(deg2rad(k * lat))
 end
 
 export HeldSuarez
@@ -273,9 +274,8 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] vertical temperature gradient [K]"
     Δθz::NF = 10
-
     "[DERIVED] log of sigma level per layer"
-    logσ::VectorType
+    log_σ::VectorType
 
     "[DERIVED] relaxation time scale per layer and latitude (inverse, 1/s)"
     temp_relax_freq::MatrixType
@@ -294,12 +294,12 @@ function HeldSuarez(SG::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, nlat, nlayers) = SG
 
     # allocate
-    logσ = on_architecture(SG.architecture, zeros(SG.NF, nlayers))
+    log_σ = on_architecture(SG.architecture, zeros(SG.NF, nlayers))
     temp_relax_freq = on_architecture(SG.architecture, zeros(SG.NF, nlayers, nlat))
     temp_equil_a = on_architecture(SG.architecture, zeros(SG.NF, nlat))
     temp_equil_b = on_architecture(SG.architecture, zeros(SG.NF, nlat))
 
-    return HeldSuarez{NF, VectorType, MatrixType}(; logσ, temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
+    return HeldSuarez{NF, VectorType, MatrixType}(; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -313,68 +313,73 @@ function initialize!(
     (; coslat, sinlat) = model.geometry
     σ = model.geometry.σ_levels_full
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
-    (; logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
-    p₀ = model.atmosphere.pressure_reference
+    (; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
+    p₀ = model.atmosphere.reference_pressure
 
     # slow relaxation everywhere, fast in the tropics
-    kₐ = 1 / relax_time_slow.value
-    kₛ = 1 / relax_time_fast.value
+    kₐ = 1 / Second(relax_time_slow).value
+    kₛ = 1 / Second(relax_time_fast).value
 
-    logσ .= log.(σ)               # precompute log(σ) for equilibrium temperature calculation
+    # Precompute log(σ) for each layer
+    @. log_σ = log(σ)
 
     # Held and Suarez equation 4
     temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(0, (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
 
-    # Held and Suarez equation 3, split into max(Tmin, (a - b*ln(p))*(p/p₀)^κ)
+    # Held and Suarez equation 3, split into max(Tmin, (a + b*ln(p))*(p/p₀)^κ)
     # precompute a, b to simplify online calculation
     @. temp_equil_a = Tmax - ΔTy * sinlat^2 + Δθz * log(p₀) * coslat^2
-    return @. temp_equil_b = -Δθz * coslat^2
+    @. temp_equil_b = -Δθz * coslat^2
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Apply temperature relaxation following Held and Suarez 1996, BAMS."""
 function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         forcing::HeldSuarez,
-        lf::Integer,
         model::AbstractModel,
     )
-    temp_grid = diagn.grid.temp_grid
-    pres_grid = diagn.grid.pres_grid
-    temp_tend_grid = diagn.tendencies.temp_tend_grid
+    temp = get_prognostic_step(vars.grid.temperature, model.time_stepping, forcing)
+    temp_tend = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, forcing)
+    
+    # logarithm of surface pressure
+    log_pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, forcing)
 
-    (; Tmin, logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
+    (; Tmin, log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     (; κ) = model.atmosphere
-    σ = model.geometry.σ_levels_full
-
-    (; whichring) = temp_grid.grid
-    return launch!(
-        architecture(temp_tend_grid), RingGridWorkOrder, size(temp_tend_grid), held_suarez_kernel!,
-        temp_tend_grid, temp_grid, pres_grid,
-        temp_relax_freq, temp_equil_a, temp_equil_b, logσ,
-        Tmin, κ, σ, whichring
+    p₀ = model.atmosphere.reference_pressure
+    (; whichring) = temp.grid
+    launch!(
+        architecture(temp_tend), RingGridWorkOrder, size(temp_tend), held_suarez_kernel!,
+        temp_tend, temp, log_pₛ,
+        temp_relax_freq, temp_equil_a, temp_equil_b,
+        Tmin, κ, p₀, log_σ, whichring
     )
+    return nothing
 end
 
 @kernel inbounds = true function held_suarez_kernel!(
-        temp_tend_grid,
-        temp_grid,
-        pres_grid,
-        @Const(temp_relax_freq),
-        @Const(temp_equil_a),
-        @Const(temp_equil_b),
-        @Const(logσ),
-        @Const(Tmin),
-        @Const(κ),
-        @Const(σ),
-        @Const(whichring),
+        temp_tend,
+        temp,
+        log_pₛ,
+        temp_relax_freq,
+        temp_equil_a,
+        temp_equil_b,
+        Tmin,
+        κ,
+        p₀,
+        log_σ,
+        whichring,
     )
     ij, k = @index(Global, NTuple)
     j = whichring[ij]                   # latitude ring index
-    kₜ = temp_relax_freq[k, j]           # (inverse) relaxation time scale
+    kₜ = temp_relax_freq[k, j]          # (inverse) relaxation time scale (scaled)
+
+    log_p = log_pₛ[ij] + log_σ[k]        # p/pₛ = σ but in log space
+    p = exp(log_p)                      # pressure [Pa]
 
     # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
-    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * logσ[k]) * σ[k]^κ)
-    temp_tend_grid[ij, k] -= kₜ * (temp_grid[ij, k] - Teq)  # Held and Suarez 1996, equation 2
+    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p) * (p / p₀)^κ)
+    temp_tend[ij, k] -= kₜ * (temp[ij, k] - Teq)  # Held and Suarez 1996, equation 2
 end

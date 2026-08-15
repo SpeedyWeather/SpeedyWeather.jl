@@ -14,7 +14,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::SoilTemperatureOutput, simulation) =
-    simulation.prognostic_variables.land.soil_temperature
+    simulation.variables.prognostic.land.soil_temperature
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -31,7 +31,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::SoilMoistureOutput, simulation) =
-    simulation.prognostic_variables.land.soil_moisture
+    simulation.variables.prognostic.land.soil_moisture
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -47,7 +47,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::SoilMoistureAvailabilityOutput, simulation) =
-    simulation.diagnostic_variables.physics.land.soil_moisture_availability
+    simulation.variables.parameterizations.land.soil_moisture_availability
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -63,7 +63,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::RiverRunoffOutput, simulation) =
-    simulation.diagnostic_variables.physics.land.river_runoff
+    simulation.variables.parameterizations.land.river_runoff
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -79,7 +79,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::SnowMeltOutput, simulation) =
-    simulation.diagnostic_variables.physics.land.snow_melt_rate
+    simulation.variables.parameterizations.land.snow_melt_rate
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -95,7 +95,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::SnowDepthOutput, simulation) =
-    simulation.prognostic_variables.land.snow_depth
+    simulation.variables.prognostic.land.snow_depth
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -111,7 +111,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::LandSeaMaskOutput, simulation) =
-    simulation.model.land_sea_mask.mask
+    simulation.model.land_sea_mask.land_fraction
 
 LandOutput() = (
     SoilTemperatureOutput(),
@@ -122,3 +122,13 @@ LandOutput() = (
     SnowDepthOutput(),
     LandSeaMaskOutput(),
 )
+
+"""$(TYPEDSIGNATURES)
+Output variables for the state of a Terrarium land model in coupled
+Terrarium-SpeedyWeather simulations.
+Call as `TerrariumOutput(terrarium_model)` to create output variables for all
+prognostic and auxiliary variables of the Terrarium model, or as
+`TerrariumOutput(terrarium_model, :variable_name)` for a single one. Output
+variables are added to a model's output via `add!(model, TerrariumOutput(terrarium_model)...)`.
+Supported by `NetCDFOutput`, and by `ZarrOutput` once Zarr.jl is loaded."""
+function TerrariumOutput end

@@ -21,8 +21,8 @@ Equator included) `rings` are the precomputed ring indices, the the example abov
 For efficient looping see `eachring` and `eachgrid`.
 Fields are
 $(TYPEDFIELDS)"""
-struct OctahedralClenshawGrid{A, V, W} <: AbstractReducedGrid{A}
-    nlat_half::Int                  # number of latitudes on one hemisphere
+struct OctahedralClenshawGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
+    nlat_half::IntType              # number of latitudes on one hemisphere
     architecture::A                 # information about device, CPU/GPU
     rings::V                        # precomputed ring indices
     whichring::W                    # precomputed ring index for each grid point ij
@@ -84,6 +84,8 @@ function get_lond_per_ring(Grid::Type{<:OctahedralClenshawGrid}, nlat_half::Inte
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
     return collect(0:(360 / nlon):(360 - 180 / nlon))
 end
+
+hasoffset(::Type{<:OctahedralClenshawGrid}) = false     # first longitude point on 0˚
 
 ## QUADRATURE
 get_quadrature_weights(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer) =

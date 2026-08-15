@@ -8,6 +8,54 @@ import FiniteDifferences: to_vec
 # This doesn't work out of the box with our data types, so we'll define those
 # conversions here.
 
+# --- Variables (fused) ---------------------------------------------------------------------------
+# The fused `Variables` store some prognostic/grid leaves as VIEWS into a shared parent buffer that
+# lives under `vars.fused.*`. FiniteDifferences' generic struct `to_vec` mishandles this: it (a)
+# vectorizes both the view and its parent (double-counting the same data) and (b) cannot reconstruct
+# the `SubArray`-typed view field (`convert(::SubArray, ::Array)` error inside `NamedTuple_from_vec`).
+# We mirror `Base.copy!(::Variables, ::Variables)`: vectorize only the non-view floating/complex
+# array leaves (the fuse parents are non-view and hold the shared data), and reconstruct in place on
+# a `deepcopy` template. `deepcopy` preserves the view→parent aliasing, so filling the parents
+# updates the aliasing views automatically; the views themselves are skipped.
+function FiniteDifferences.to_vec(vars::SpeedyWeather.Variables)
+    template = deepcopy(vars)
+    leaves = _fd_diff_leaves(vars)
+    vecs_backs = [FiniteDifferences.to_vec(leaf) for leaf in leaves]
+    lengths = Int[length(first(vb)) for vb in vecs_backs]
+    x_vec = isempty(vecs_backs) ? Float64[] : reduce(vcat, first.(vecs_backs))
+
+    function Variables_from_vec(v)
+        out = deepcopy(template)
+        outleaves = _fd_diff_leaves(out)
+        offset = 0
+        for (i, leaf) in enumerate(outleaves)
+            n = lengths[i]
+            copyto!(leaf, vecs_backs[i][2](v[(offset + 1):(offset + n)]))
+            offset += n
+        end
+        return out
+    end
+    return x_vec, Variables_from_vec
+end
+
+# Collect the differentiable (floating/complex) non-view array backing of a Variables tree, in the
+# same deterministic order for the original and any deepcopy. Skips view leaves (their data lives in
+# a fuse parent, which is itself collected) — see `SpeedyWeather.is_view_entry` and `copy!`.
+function _fd_diff_leaves(vars::SpeedyWeather.Variables)
+    acc = AbstractArray[]
+    for group in SpeedyWeather.ALL_VARIABLE_GROUPS
+        _fd_push_leaves!(acc, getfield(vars, group))
+    end
+    return acc
+end
+_fd_push_leaves!(acc, x::NamedTuple) = foreach(k -> _fd_push_leaves!(acc, getfield(x, k)), keys(x))
+_fd_push_leaves!(acc, x::SpeedyWeather.FusedParent) = _fd_push_leaves!(acc, x.parent)   # the fuse buffer
+_fd_push_leaves!(acc, x::LowerTriangularArray) = SpeedyWeather.is_view_entry(x) || push!(acc, x.data)
+_fd_push_leaves!(acc, x::SpeedyWeather.RingGrids.AbstractField) = SpeedyWeather.is_view_entry(x) || push!(acc, x.data)
+_fd_push_leaves!(acc, ::SubArray) = nothing
+_fd_push_leaves!(acc, x::AbstractArray) = eltype(x) <: Union{AbstractFloat, Complex} && push!(acc, x)
+_fd_push_leaves!(acc, x) = nothing
+
 # Vector{Particle} needs an extra modification because an empty vector yields Any[] with to_vec for Particle (which isn't the case for number types)
 function FiniteDifferences.to_vec(x::Vector{Particle{NF}}) where {NF}
     if isempty(x)
@@ -26,60 +74,9 @@ function FiniteDifferences.to_vec(x::Vector{Particle{NF}}) where {NF}
     end
 end
 
-# A version of the generic fallback from FiniteDifferences that excludes some of the fields
-# that we don't want to be varied for our big data structures
-# also replaces NaNs that are expected in land and ocean variables
-function FiniteDifferences.to_vec(x::T) where {T <: Union{PrognosticVariables, DiagnosticVariables, Tendencies, GridVariables, DynamicsVariables, ParticleVariables}}
+# TODO: We used to have an adaption here that replaced NaN's as FiniteDifferences can't deal with them, maybe we have to reintroduce it later
 
-    excluded_fields_pre, included_fields, excluded_fields_post = determine_included_fields(T)
-
-    val_vecs_and_backs = map(name -> to_vec(getfield(x, name)), included_fields)
-    vals = first.(val_vecs_and_backs)
-    backs = last.(val_vecs_and_backs)
-
-    vals_excluded_pre = map(name -> getfield(x, name), excluded_fields_pre)
-    vals_excluded_post = map(name -> getfield(x, name), excluded_fields_post)
-
-    v, vals_from_vec = to_vec(vals)
-    v = replace_NaN(x, v)
-
-    function structtype_from_vec(v::Vector{<:Real})
-        val_vecs = vals_from_vec(v)
-        values = map((b, v) -> b(v), backs, val_vecs)
-
-        return T(vals_excluded_pre..., values..., vals_excluded_post...)
-    end
-    return v, structtype_from_vec
-end
-
-function determine_included_fields(T::Type)
-    names = fieldnames(T)
-
-    included_field_types = Union{
-        SpeedyWeather.AbstractDiagnosticVariables,
-        SpeedyWeather.AbstractPrognosticVariables,
-        NTuple, Dict{Symbol, <:Tuple}, Dict{Symbol, <:AbstractArray}, AbstractArray,
-    }
-
-    excluded_fields_pre = []
-    included_fields = []
-    excluded_fields_post = []
-
-    for name in names
-        if fieldtype(T, name) <: included_field_types
-            push!(included_fields, name)
-        else
-            if isempty(included_fields)
-                push!(excluded_fields_pre, name)
-            else
-                push!(excluded_fields_post, name)
-            end
-        end
-    end
-
-    return excluded_fields_pre, included_fields, excluded_fields_post
-end
-
+#=
 # in the ocean and land variables we have NaNs, FiniteDifferences can't deal with those, so we replace them
 function replace_NaN(x_type::T, vec) where {T <: NamedTuple}
     nan_indices = isnan.(vec)
@@ -89,6 +86,7 @@ end
 
 # fallback, we really only want to replace the NaNs in ocean and land variables
 replace_NaN(type, vec) = vec
+=#
 
 # By default FiniteDifferences doesn't include this, even though Integers can't be varied.
 # there's an old GitHub issue and PR about this

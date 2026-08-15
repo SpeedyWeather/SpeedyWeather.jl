@@ -1,4 +1,4 @@
-## Gradient operators
+# Gradient operators
 
 [SpeedyTransforms](@ref) also includes many gradient operators to take derivatives in
 spherical harmonics. These are in particular ``\nabla, \nabla \cdot, \nabla \times,
@@ -36,9 +36,9 @@ expect the input velocity fields to be scaled by ``\cos^{-1}(\theta)``, i.e.
 
 ```math
 \begin{aligned}
-\hat{\nabla} \cdot (\cos^{-1}(\theta)\mathbf{u}) &= \frac{\partial u}{\partial \lambda} +
+\hat{\nabla} \cdot [\cos^{-1}(\theta)\mathbf{u}] &= \frac{\partial u}{\partial \lambda} +
 \cos\theta\frac{\partial v}{\partial \theta} = R\nabla \cdot \mathbf{u}, \\
-\hat{\nabla} \times (\cos^{-1}(\theta)\mathbf{u}) &= \frac{\partial v}{\partial \lambda} -
+\hat{\nabla} \times [\cos^{-1}(\theta)\mathbf{u}] &= \frac{\partial v}{\partial \lambda} -
 \cos\theta\frac{\partial u}{\partial \theta} = R\nabla \times \mathbf{u}.
 \end{aligned}
 ```
@@ -57,8 +57,8 @@ data `G` on the grid first
 using SpeedyWeather, CairoMakie
 
 # create some data with wave numbers 0,1,2,3,4
-trunc = 64                  # 1-based maximum degree of spherical harmonics
-L = randn(LowerTriangularMatrix{ComplexF32}, trunc, trunc)
+truncation = 64                  # 1-based maximum degree of spherical harmonics
+L = randn(LowerTriangularMatrix{ComplexF32}, truncation, truncation)
 SpeedyTransforms.spectral_truncation!(L, 5)  # remove higher wave numbers
 G = transform(L)
 heatmap(G, title="Some fake data G")        # requires `using CairoMakie`
@@ -109,20 +109,21 @@ SpeedyTransforms?
 
 Let us start by generating some data
 ```@example gradient
-spectral_grid = SpectralGrid(trunc=31, nlayers=1)
+spectral_grid = SpectralGrid(truncation=32, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = LinearVorticityDrag(spectral_grid)
 model = ShallowWaterModel(spectral_grid; forcing, drag)
-simulation = initialize!(model);
+simulation = initialize!(model)
 run!(simulation, period=Day(30))
 nothing # hide
 ```
 
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
+See [Step dimension](@ref) for more explanation of how to read prognostic/tendency variables with an additional step dimension.
 ```@example gradient
-u = simulation.diagnostic_variables.grid.u_grid[:, 1]   # [:, 1] for 1st layer
-v = simulation.diagnostic_variables.grid.v_grid[:, 1]
+u = get_step(simulation.variables.grid.u)[:, 1]   # [:, 1] for 1st layer
+v = get_step(simulation.variables.grid.v)[:, 1]
 vor = curl(u, v, radius = model.planet.radius)
 nothing # hide
 ```
@@ -206,7 +207,7 @@ nothing # hide
 Which is the interface displacement assuming geostrophy.
 The actual interface displacement contains also ageostrophy
 ```@example gradient
-η_grid2 = simulation.diagnostic_variables.grid.pres_grid
+η_grid2 = get_step(simulation.variables.grid.η)
 heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
 nothing # hide

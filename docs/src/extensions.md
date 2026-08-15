@@ -2,7 +2,7 @@
 
 Generally, SpeedyWeather is built in a very modular, extensible way.
 While that sounds fantastic in general, it does not save you from understanding
-its [modular logic](@ref logic) before you can extend SpeedyWeather.jl easily yourself.
+its [modular logic](@ref logic) before you can extend SpeedyWeather easily yourself.
 We highly recommend you to read the following sections if you would like to
 extend SpeedyWeather in some way, but it also gives you a good understanding
 of how we build SpeedyWeather in the first place. Because in the end there
@@ -86,27 +86,26 @@ that is called on _every_ step of the time integration. This new method
 for `forcing!` needs to have the following function signature
 ```@example extending
 function forcing!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
+    vars::Variables,
     forcing::MyForcing,
     model::AbstractModel,
     lf::Integer,
 )
     # whatever the forcing is supposed to do, in the end you want
     # to write into the tendency fields
-    diagn.tendencies.u_tend_grid = forcing.a
-    diagn.tendencies.v_tend_grid = forcing.a
-    diagn.tendencies.vor_tend = forcing.a
+    vars.tendencies.grid.u .= forcing.a
+    vars.tendencies.grid.v .= forcing.a
+    vars.tendencies.vorticity .= forcing.a
 end
 ```
-`DiagnosticVariables` is the type of the first argument, because it contains
-the tendencies you will want to change, so this is supposed to be read and write.
+`Variables` is the type of the first argument, because it contains
+both the tendencies you will want to change and the current state to read from.
 The other arguments should be treated read-only. You can make use of anything else
 in `model`, but often we unpack the model in a function barrier (which can help with
 type inference and therefore performance). But let's skip that detail for now.
 Generally, try to precompute what you can in
 `initialize!`. For the forcing you will need to force the velocities `u, v` in
-grid-point space or the vorticity `vor`, divergence `div` in spectral space.
+grid-point space or the vorticity `vorticity`, divergence `div` in spectral space.
 This is not a constrain in most applications we came across, but in case it
 is in yours please reach out.
 

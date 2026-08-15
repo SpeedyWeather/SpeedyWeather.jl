@@ -21,7 +21,7 @@ that only depends on latitude, applying a cosine squared between the
 Equator and the poles
 
 ```@example ocean
-spectral_grid = SpectralGrid(trunc=31)
+spectral_grid = SpectralGrid(truncation=32)
 ocean = AquaPlanet(spectral_grid)
 ```
 
@@ -54,7 +54,8 @@ where `;` just means that every argument that follows is a keyword argument.
 
 This will use the sea surface temperature climatology from 1 June but
 not change it thereafter. Note that because nothing happens in the ocean time step
-you can use `set!(simulation, sea_surface_temperature=...)` to modify the
+you can use `set!(simulation, sea_surface_temperature=..., namespace=:ocean)`
+(see [Setting variables](@ref)) to modify the
 sea surface temperatures further at any point after `initialize!`.
 
 ## Seasonal ocean climatology
@@ -77,7 +78,7 @@ model = PrimitiveWetModel(spectral_grid; ocean)
 nothing # hide
 ```
 
-The time of the year is determined by the clock in `prognostic_variables.clock`
+The time of the year is determined by the clock in `variables.prognostic.clock`
 such that `initialize!(model, time=DateTime(2000, 1, 1))` would interpolate
 the seasonal climatology onto the first of January.
 
@@ -98,8 +99,10 @@ ocean = SlabOcean(spectral_grid)
 
 `specific_heat_capacity`, `mixed_layer_depth` and `density` determine
 multiplicatively the effective heat capacity of the mixed layer
-``C_0``. Then the temporal evolution of sea surface temperature ``SST``
-is given by
+``C_0``. At initialization, sea surface temperature over (fully) land points is
+set to `land_temperature` (if `mask=true`), and additionally capped at the sea
+ice freezing temperature if `model.sea_ice` is a `ThermodynamicSeaIce`. Then the
+temporal evolution of sea surface temperature ``SST`` is given by
 
 
 ```math
@@ -142,3 +145,4 @@ add!(model, SpeedyWeather.OceanOutput())
 ```
 
 All output variable groups are defined as tuples which are implicitly splatted (`...`).
+For more information see [Output variables](@ref).

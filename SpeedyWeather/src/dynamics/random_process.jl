@@ -5,35 +5,27 @@ General transform for `random processes <: AbstractRandomProcess`.
 Takes the spectral `random_pattern` in the prognostic variables
 and transforms it to spectral space in `diagn.grid.random_pattern`."""
 function SpeedyTransforms.transform!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
-        lf::Integer,
+        vars::Variables,
         random_process::AbstractRandomProcess,
-        spectral_transform::SpectralTransform,
+        spectral_transform::AbstractSpectralTransform,
     )
-    grid = diagn.grid.random_pattern
-    spec = progn.random_pattern
-    transform!(grid, spec, diagn.dynamics.scratch_memory, spectral_transform)
+    pattern = vars.prognostic.random_pattern
+    pattern_grid = vars.grid.random_pattern
+    scratch_memory = vars.scratch.transform_memory
+    transform!(pattern_grid, pattern, scratch_memory, spectral_transform)
 
-    return if :clamp in fieldnames(typeof(random_process))
-        clamp!(grid, random_process.clamp...)
+    if :clamp in fieldnames(typeof(random_process))
+        lo, hi = random_process.clamp
+        @. pattern_grid = clamp(pattern_grid, lo, hi)
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 `random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
-function SpeedyTransforms.transform!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
-        lf::Integer,
-        random_process::Nothing,
-        spectral_transform::SpectralTransform,
-    )
-    return nothing
-end
-
-random_process!(progn::PrognosticVariables, process::Nothing) = nothing
+SpeedyTransforms.transform!(::Variables, ::Nothing, ::AbstractSpectralTransform) = nothing
+random_process!(::Variables, process::Nothing) = nothing
 
 export SpectralAR1Process
 
@@ -43,14 +35,14 @@ independently. Transformed after every time step to grid space with a
 `clamp` applied to limit extrema. For reproducability `seed` can be
 provided and an independent `random_number_generator` is used
 that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
-@kwdef struct SpectralAR1Process{NF, VectorType} <: AbstractRandomProcess
-    trunc::Int
+@kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType} <: AbstractRandomProcess
+    truncation::IntType
 
     "[OPTION] Time scale of the AR1 process"
     time_scale::Second = Hour(6)
 
-    "[OPTION] Wavenumber of the AR1 process"
-    wavenumber::Int = 12
+    "[OPTION] Wavenumber (0-based) of the AR1 process"
+    wavenumber::IntType = 12
 
     "[OPTION] Standard deviation of the AR1 process"
     standard_deviation::NF = 1 / 3
@@ -59,27 +51,39 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
     clamp::NTuple{2, NF} = (-1, 1)
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
-    seed::Int = 0
+    seed::S = 0
 
     "Independent random number generator for this random process"
-    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
+    random_number_generator::RNG = Random.Xoshiro(seed)
 
     "Precomputed auto-regressive factor [1], function of time scale and model time step"
     autoregressive_factor::Base.RefValue{NF} = Ref(zero(NF))
 
     "Precomputed noise factors [1] for every total wavenumber l"
-    noise_factors::VectorType = zeros(NF, trunc + 2)
+    noise_factors::VectorType = zeros(NF, truncation + 1)
 end
 
 # generator function
-SpectralAR1Process(SG::SpectralGrid; kwargs...) = SpectralAR1Process{SG.NF, SG.VectorType}(trunc = SG.trunc; kwargs...)
+function SpectralAR1Process(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    (; truncation) = SG
+    return SpectralAR1Process{SG.NF, SG.VectorType, SeedType, RNG, typeof(truncation)}(; truncation, kwargs...)
+end
+
+function variables(::SpectralAR1Process)
+    return (
+        PrognosticVariable(:random_pattern, Spectral2D(), desc = "Random pattern for the random process", units = "1"),
+        GridVariable(:random_pattern, Grid2D(), desc = "Random pattern for the random process", units = "1"),
+    )
+end
 
 function initialize!(
         process::SpectralAR1Process,
         model::AbstractModel,
     )
     # auto-regressive factor in the AR1 process
-    dt = model.time_stepping.Δt_sec         # in seconds
+    dt = model.time_stepping.Δt             # in seconds
     process.autoregressive_factor[] = exp(-dt / Second(process.time_scale).value)
 
     # noise factors per total wavenumber in the AR1 process
@@ -89,18 +93,16 @@ function initialize!(
 
     # ECMWF Tech Memorandum 598, Appendix 8, eq. 18
     # TODO *norm_sphere seems to be needed, maybe ECMWF uses another normalization of the harmonics?
-    F₀_denominator = 2 * sum([(2l + 1) * exp(-l * (l + 1) / (k * (k + 1))) for l in 1:process.trunc])
+    F₀_denominator = 2 * sum([(2l + 1) * exp(-l * (l + 1) / (k * (k + 1))) for l in 1:process.truncation])
     F₀ = sqrt(σ^2 * (1 - a^2) / F₀_denominator) * model.spectral_transform.norm_sphere
 
-    for l in eachindex(process.noise_factors)       # total wavenumber, but 1-based
-        eigenvalue = l * (l - 1)                        # (negative) eigenvalue l*(l+1) but 1-based l->l-1
-
-        # ECMWF Tech Memorandum 598, Appendix 8, eq. 17
-        process.noise_factors[l] = F₀ * exp(-eigenvalue / (2k * (k + 1)))
-    end
-
-    # set mean of random pattern to zero
-    process.noise_factors[1] = 0
+    # ECMWF Tech Memorandum 598, Appendix 8, eq. 17
+    # eigenvalue = l * (l - 1), 1-based l so l=1 (mean) gets factor 0 instead of F₀
+    NF = eltype(process.noise_factors)
+    ls = 1:length(process.noise_factors)
+    denom = NF(2k * (k + 1))
+    F₀_NF = NF(F₀)
+    @. process.noise_factors = ifelse(ls > 1, F₀_NF * exp(-ls * (ls - 1) / denom), zero(NF))
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = process.seed == 0 ? rand(UInt) : process.seed
@@ -109,29 +111,38 @@ function initialize!(
 end
 
 function random_process!(
-        progn::PrognosticVariables,
+        vars::Variables,
         process::SpectralAR1Process{NF},
     ) where {NF}
 
-    (; random_pattern) = progn
-    lmax, mmax = size(random_pattern, OneBased, as = Matrix)  # max degree l, order m of harmonics (1-based)
-
+    (; random_pattern) = vars.prognostic
     a = process.autoregressive_factor[]
     RNG = process.random_number_generator
     s = convert(NF, 2 / sqrt(2))              # to scale: std(real(randn(Complex))) = √2/2 to 1
 
-    lm = 0
-    return @inbounds for m in 1:mmax
-        for l in m:lmax
-            lm += 1
+    arch = architecture(random_pattern)
+    n = length(random_pattern)                # total number of harmonics
 
-            # draw from independent N(0,1) in real and imaginary parts
-            r = s * randn(RNG, Complex{NF})   # scale to unit variance in real/imaginary
-
-            # ECMWF Tech Memorandum 598, Appendix 8, eq. 14
-            ξ = process.noise_factors[l]
-            random_pattern[lm] *= a         # auto-regressive term
-            random_pattern[lm] += ξ * r       # noise term
-        end
+    # draw all complex normals on CPU through the seeded RNG to keep reproducibility,
+    # then transfer to the device in one go (GPU has no compatible Random.Xoshiro RNG)
+    r_cpu = Vector{Complex{NF}}(undef, n)
+    @inbounds for i in 1:n
+        r_cpu[i] = s * randn(RNG, Complex{NF})
     end
+    r = on_architecture(arch, r_cpu)
+
+    launch!(
+        arch, SpectralWorkOrder, size(random_pattern), spectral_ar1_kernel!,
+        random_pattern, r, process.noise_factors, random_pattern.spectrum.l_indices, a
+    )
+    return nothing
+end
+
+@kernel inbounds = true function spectral_ar1_kernel!(
+        random_pattern, r, noise_factors, l_indices, a
+    )
+    lm = @index(Global, Linear)
+    l = l_indices[lm]
+    ξ = noise_factors[l]
+    random_pattern[lm] = a * random_pattern[lm] + ξ * r[lm]
 end

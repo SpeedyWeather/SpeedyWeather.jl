@@ -22,7 +22,7 @@ for name in names
         end
 
         path(::$typename, simulation) =
-            simulation.diagnostic_variables.physics.$varname
+            simulation.variables.parameterizations.$varname
     end
 end
 
@@ -39,7 +39,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = DEFAULT_KEEPBITS
 end
 
-path(::AlbedoOutput, simulation) = simulation.diagnostic_variables.physics.albedo
+path(::AlbedoOutput, simulation) = simulation.variables.parameterizations.albedo
 
 RadiationOutput() = (
     OutgoingLongwaveRadiationOutput(),

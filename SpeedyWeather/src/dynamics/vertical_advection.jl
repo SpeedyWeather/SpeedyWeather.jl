@@ -1,4 +1,4 @@
-abstract type AbstractVerticalAdvection end
+abstract type AbstractVerticalAdvection <: AbstractModelComponent end
 abstract type VerticalAdvection{NF, B} <: AbstractVerticalAdvection end
 
 # Dispersive and diffusive advection schemes `NF` is the type, `B` the half-stencil size
@@ -14,69 +14,77 @@ CenteredVerticalAdvection(spectral_grid; order = 2) = CenteredVerticalAdvection{
 UpwindVerticalAdvection(spectral_grid; order = 5) = UpwindVerticalAdvection{spectral_grid.NF, (order + 1) ÷ 2}()
 WENOVerticalAdvection(spectral_grid) = WENOVerticalAdvection{spectral_grid.NF}()
 
-@inline retrieve_previous_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
-@inline retrieve_current_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid))
-
-@inline retrieve_time_step(::DiffusiveVerticalAdvection, variables, var) = retrieve_previous_time_step(variables, var)
-@inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = retrieve_current_time_step(variables, var)
-
 @inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, B}) where {NF, B}
     # creates allocation-free tuples for k-B:k+B but clamped into (1, nlayers)
     # e.g. (1, 1, 2), (1, 2, 3), (2, 3, 4) ... (for k=1, 2, 3; B=1)
     return ntuple(i -> clamp(i + k - B - 1, 1, nlayers), 2B + 1)
 end
 
-function vertical_advection!(
-        diagn::DiagnosticVariables,
-        model::PrimitiveEquation,
-    )
+function vertical_advection!(vars::Variables, model)
+
     Δσ = model.geometry.σ_levels_thick
     advection_scheme = model.vertical_advection
-    (; σ_tend) = diagn.dynamics
+    (; w) = vars.dynamics
 
-    for var in (:u, :v, :temp)
-        ξ_tend = getproperty(diagn.tendencies, Symbol(var, :_tend_grid))
-        ξ = retrieve_time_step(advection_scheme, diagn.grid, var)
-        _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
-    end
+    # unrolled over compile-time variable names (instead of a loop over runtime symbols)
+    # to avoid Union-typed variables which Enzyme cannot differentiate
+    vertical_advection!(Val(:u), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:v), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model)
 
-    if model isa PrimitiveWet   # advect humidity only with primitive wet core
-        ξ_tend = getproperty(diagn.tendencies, :humid_tend_grid)
-        ξ = retrieve_time_step(advection_scheme, diagn.grid, :humid)
-        _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
-    end
-
-    for tracer in values(model.tracers)
+    for (name, tracer) in model.tracers
         if tracer.active
-            ξ_tend = diagn.tendencies.tracers_tend_grid[tracer.name]
-            ξ = retrieve_time_step(advection_scheme, diagn.grid, :tracers)[tracer.name]
-            _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
+            ξ_tend = vars.tendencies.grid_tracers[name]
+            ξ = vars.grid.tracers[name]
+            s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
+            s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme, model)
+            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
         end
     end
-    return
+    return nothing
+end
+
+# var is a compile-time constant so that haskey and getproperty constant-fold to
+# concrete variables (type-stable, required for Enzyme differentiability)
+@inline function vertical_advection!(::Val{var}, vars::Variables, w, Δσ, advection_scheme, model) where {var}
+    haskey(vars.tendencies.grid, var) || return nothing
+    # Pass the full step-dimensioned fields plus the step index, rather than a `get_*_step`
+    # view. The stencil kernel reads ξ at many vertical offsets per point, and indexing a
+    # (`SubArray`-backed) view there is ~2x slower than indexing the contiguous parent array
+    # (the step folds into the index).
+    ξ_tend = vars.tendencies.grid[var]
+    ξ = vars.grid[var]
+    s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
+    s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme)
+    return _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
 end
 
 function _vertical_advection!(
-        ξ_tend::AbstractField,      # tendency of quantity ξ
-        σ_tend::AbstractField,      # vertical velocity at k+1/2
-        ξ::AbstractField,           # ξ
+        ξ_tend::AbstractField,      # tendency of quantity ξ (full, with step dimension)
+        s_tend::Integer,            # step of ξ_tend to write into
+        w::AbstractField,           # vertical velocity at k+1/2
+        ξ::AbstractField,           # ξ (full, with step dimension)
+        s_prog::Integer,            # step of ξ to advect
         Δσ,                         # layer thickness on σ levels
         adv::VerticalAdvection      # vertical advection scheme of order B
     )
-    grids_match(ξ_tend, σ_tend, ξ) || throw(DimensionMismatch(ξ_tend, σ_tend, ξ))
+    grids_match(ξ_tend, w, ξ) || throw(DimensionMismatch(ξ_tend, w, ξ))
 
     nlayers = size(ξ, 2)
     arch = architecture(ξ_tend)
 
-    return launch!(
-        arch, RingGridWorkOrder, size(ξ_tend),
+    # worksize is the horizontal × vertical iteration space (skip the step dimension)
+    launch!(
+        arch, RingGridWorkOrder, (size(ξ_tend, 1), size(ξ_tend, 2)),
         vertical_advection_kernel!,
-        ξ_tend, σ_tend, ξ, Δσ, nlayers, adv
+        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
     )
+    return nothing
 end
 
 @kernel inbounds = true function vertical_advection_kernel!(
-        ξ_tend, σ_tend, ξ, @Const(Δσ), @Const(nlayers), adv
+        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
     )
     ij, k = @index(Global, NTuple)
 
@@ -88,83 +96,90 @@ end
 
     k_stencil = retrieve_stencil(k, nlayers, adv)
 
-    σ̇⁻ = σ_tend[ij, k⁻]
-    σ̇⁺ = σ_tend[ij, k⁺]
+    w⁻ = w[ij, k⁻]
+    w⁺ = w[ij, k⁺]
 
-    ξᶠ⁺ = reconstructed_at_face(ξ, ij, k_stencil[2:end], σ̇⁺, adv)
-    ξᶠ⁻ = reconstructed_at_face(ξ, ij, k_stencil[1:(end - 1)], σ̇⁻, adv)
+    # `s_prog` selects which time step of the step-dimensioned ξ to advect; indexing the
+    # full array as ξ[ij, k, s_prog] keeps the contiguous parent (the constant step folds
+    # into the index), which is ~2x faster here than a `get_*_step` SubArray view would be.
+    # tail/front instead of [2:end]/[1:end-1] as tuple-range indexing is not type-stable
+    ξᶠ⁺ = reconstructed_at_face(ξ, ij, s_prog, Base.tail(k_stencil), w⁺, adv)
+    ξᶠ⁻ = reconstructed_at_face(ξ, ij, s_prog, Base.front(k_stencil), w⁻, adv)
 
     # -= as the tendencies already contain the parameterizations
-    ξ_tend[ij, k] -= Δσₖ⁻¹ * (σ̇⁺ * ξᶠ⁺ - σ̇⁻ * ξᶠ⁻ - ξ[ij, k] * (σ̇⁺ - σ̇⁻))
+    ξ_tend[ij, k,s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, s_prog] * (w⁺ - w⁻))
 end
 
+# reconstructed_at_face indexes ξ[ij, k[i], s]: `k` is the vertical stencil (tuple of
+# layer indices) and `s` selects the time step of the s-dimensioned field.
+
 # 1st order upwind
-@inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
     ifelse(
-    u > 0, ξ[ij, k[1]],
-    ξ[ij, k[2]]
+    u > 0, ξ[ij, k[1], s],
+    ξ[ij, k[2], s]
 )
 
 # 3rd order upwind
-@inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1]] + 5ξ[ij, k[2]] - ξ[ij, k[3]]) / 6,
-    (2ξ[ij, k[4]] + 5ξ[ij, k[3]] - ξ[ij, k[2]]) / 6
+    u > 0, (2ξ[ij, k[1], s] + 5ξ[ij, k[2], s] - ξ[ij, k[3], s]) * 1 // 6,
+    (2ξ[ij, k[4], s] + 5ξ[ij, k[3], s] - ξ[ij, k[2], s]) * 1 // 6
 )
 
 # 5th order upwind
-@inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1]] - 13ξ[ij, k[2]] + 47ξ[ij, k[3]] + 27ξ[ij, k[4]] - 3ξ[ij, k[5]]) / 60,
-    (2ξ[ij, k[6]] - 13ξ[ij, k[5]] + 47ξ[ij, k[4]] + 27ξ[ij, k[3]] - 3ξ[ij, k[2]]) / 60
+    u > 0, (2ξ[ij, k[1], s] - 13ξ[ij, k[2], s] + 47ξ[ij, k[3], s] + 27ξ[ij, k[4], s] - 3ξ[ij, k[5], s]) * 1 // 60,
+    (2ξ[ij, k[6], s] - 13ξ[ij, k[5], s] + 47ξ[ij, k[4], s] + 27ξ[ij, k[3], s] - 3ξ[ij, k[2], s]) * 1 // 60
 )
 
 # 2nd order centered
-@inline reconstructed_at_face(ξ, ij, k, u, ::CenteredVerticalAdvection{NF, 1}) where {NF} =
-    (ξ[ij, k[1]] + ξ[ij, k[2]]) / 2
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::CenteredVerticalAdvection{NF, 1}) where {NF} =
+    (ξ[ij, k[1], s] + ξ[ij, k[2], s]) * 1 // 2
 
 # 4th order centered
-@inline reconstructed_at_face(ξ, ij, k, u, ::CenteredVerticalAdvection{NF, 2}) where {NF} =
-    (-ξ[ij, k[1]] + 7ξ[ij, k[2]] + 7ξ[ij, k[3]] - ξ[ij, k[4]]) / 12
+@inline reconstructed_at_face(ξ, ij, s, k, u, ::CenteredVerticalAdvection{NF, 2}) where {NF} =
+    (-ξ[ij, k[1], s] + 7ξ[ij, k[2], s] + 7ξ[ij, k[3], s] - ξ[ij, k[4], s]) * 1 // 12
 
-const ε = 1.0e-6
-const d₀ = 3 / 10
-const d₁ = 3 / 5
-const d₂ = 1 / 10
+const ε = 1 // 1_000_000    # = 1e-6 but number format flexible
+const d₀ = 3 // 10
+const d₁ = 3 // 5
+const d₂ = 1 // 10
 
-@inline weight_β₀(S, NF) = NF(13 / 12) * (S[1] - 2S[2] + S[3])^2 + NF(1 / 4) * (3S[1] - 4S[2] + S[3])^2
-@inline weight_β₁(S, NF) = NF(13 / 12) * (S[1] - 2S[2] + S[3])^2 + NF(1 / 4) * (S[1] - S[3])^2
-@inline weight_β₂(S, NF) = NF(13 / 12) * (S[1] - 2S[2] + S[3])^2 + NF(1 / 4) * (S[1] - 4S[2] + 3S[3])^2
+@inline weight_β₀(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (3S[1] - 4S[2] + S[3])^2
+@inline weight_β₁(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (S[1] - S[3])^2
+@inline weight_β₂(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (S[1] - 4S[2] + 3S[3])^2
 
-@inline p₀(S) = (2S[1] + 5S[2] - S[3]) / 6 # downind stencil
-@inline p₁(S) = (-S[1] + 5S[2] + 2S[3]) / 6 # upwind stencil
-@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) / 6 # extrapolating stencil
+@inline p₀(S) = (2S[1] + 5S[2] - S[3]) * 1 // 6     # downind stencil
+@inline p₁(S) = (-S[1] + 5S[2] + 2S[3]) * 1 // 6    # upwind stencil
+@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) * 1 // 6   # extrapolating stencil
 
 @inline τ₅(β₀, β₁, β₂) = abs(β₂ - β₀)
 
-@inline function weno_reconstruction(S₀, S₁, S₂, NF)
-    β₀ = weight_β₀(S₀, NF)
-    β₁ = weight_β₁(S₁, NF)
-    β₂ = weight_β₂(S₂, NF)
+@inline function weno_reconstruction(S₀, S₁, S₂)
+    β₀ = weight_β₀(S₀)
+    β₁ = weight_β₁(S₁)
+    β₂ = weight_β₂(S₂)
 
-    w₀ = NF(d₀) * (1 + (τ₅(β₀, β₁, β₂) / (β₀ + NF(ε)))^2)
-    w₁ = NF(d₁) * (1 + (τ₅(β₀, β₁, β₂) / (β₁ + NF(ε)))^2)
-    w₂ = NF(d₂) * (1 + (τ₅(β₀, β₁, β₂) / (β₂ + NF(ε)))^2)
+    w₀ = d₀ * (1 + (τ₅(β₀, β₁, β₂) / (β₀ + ε))^2)
+    w₁ = d₁ * (1 + (τ₅(β₀, β₁, β₂) / (β₁ + ε))^2)
+    w₂ = d₂ * (1 + (τ₅(β₀, β₁, β₂) / (β₂ + ε))^2)
 
     w₀, w₁, w₂ = (w₀, w₁, w₂) ./ (w₀ + w₁ + w₂)
 
     return p₀(S₀) * w₀ + p₁(S₁) * w₁ + p₂(S₂) * w₂
 end
 
-@inline function reconstructed_at_face(ξ, ij, k, u, ::WENOVerticalAdvection{NF}) where {NF}
+@inline function reconstructed_at_face(ξ, ij, s, k, u, ::WENOVerticalAdvection)
     if u > 0
-        S₀ = (ξ[ij, k[3]], ξ[ij, k[4]], ξ[ij, k[5]])
-        S₁ = (ξ[ij, k[2]], ξ[ij, k[3]], ξ[ij, k[4]])
-        S₂ = (ξ[ij, k[1]], ξ[ij, k[2]], ξ[ij, k[3]])
+        S₀ = (ξ[ij, k[3], s], ξ[ij, k[4], s], ξ[ij, k[5], s])
+        S₁ = (ξ[ij, k[2], s], ξ[ij, k[3], s], ξ[ij, k[4], s])
+        S₂ = (ξ[ij, k[1], s], ξ[ij, k[2], s], ξ[ij, k[3], s])
     else
-        S₀ = (ξ[ij, k[4]], ξ[ij, k[3]], ξ[ij, k[2]])
-        S₁ = (ξ[ij, k[5]], ξ[ij, k[4]], ξ[ij, k[3]])
-        S₂ = (ξ[ij, k[6]], ξ[ij, k[5]], ξ[ij, k[4]])
+        S₀ = (ξ[ij, k[4], s], ξ[ij, k[3], s], ξ[ij, k[2], s])
+        S₁ = (ξ[ij, k[5], s], ξ[ij, k[4], s], ξ[ij, k[3], s])
+        S₂ = (ξ[ij, k[6], s], ξ[ij, k[5], s], ξ[ij, k[4], s])
     end
-    return weno_reconstruction(S₀, S₁, S₂, NF)
+    return weno_reconstruction(S₀, S₁, S₂)
 end

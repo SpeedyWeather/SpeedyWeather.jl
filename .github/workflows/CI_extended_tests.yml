@@ -1,29 +1,50 @@
-name: Extended Test
-# Weekly extended tests
+name: Extended Tests
 on:
-  schedule:
-    - cron: '0 2 * * 0'  # Daily at 2 AM UTC every Sunday
+  push:
+    branches:
+      - main
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 jobs:
-  test:
+  correctness-test:
+    name: Extended Differentiablity Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    permissions:
+      actions: write
+      contents: read
     strategy:
+      fail-fast: false
       matrix:
         version:
           - '1.10'
         os:
           - ubuntu-latest
-        arch:
-          - x64
     steps:
-      - uses: actions/checkout@v6
-      - uses: julia-actions/setup-julia@v2
+      - uses: actions/checkout@v7
+      
+      - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v2
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-        with:
-          test_args: 'extended_tests'
+      
+      - uses: julia-actions/cache@v3
+      
+      - name: Develop local packages
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/differentiability -e '
+            using Pkg
+            Pkg.develop([
+              PackageSpec(path="SpeedyWeatherInternals"),
+              PackageSpec(path="LowerTriangularArrays"),
+              PackageSpec(path="RingGrids"),
+              PackageSpec(path="SpeedyTransforms"),
+              PackageSpec(path="SpeedyWeather")
+            ])
+            Pkg.instantiate()
+          '
+      
+      - name: Run Extended tests
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/runtests.jl
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

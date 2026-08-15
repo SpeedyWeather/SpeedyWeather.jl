@@ -8,35 +8,52 @@ abstract type PrimitiveEquation <: AbstractModel end
 abstract type PrimitiveDry <: PrimitiveEquation end
 abstract type PrimitiveWet <: PrimitiveEquation end
 
+const TwoDModels = Union{<:Barotropic, <:ShallowWater}
+
 abstract type AbstractModelComponent end
 
 # any model component set to nothing needs no initialization or finalize!
-initialize!(::Nothing, ::AbstractModel) = nothing
+@inline initialize!(::Nothing, ::AbstractModel) = nothing
+@inline finalize!(::Nothing, ::AbstractModel) = nothing
 
-# allow for components that initialize variables to be nothing
-initialize!(p, d, ::Nothing, ::AbstractModel) = nothing
-# or sub parts of the prognostic variables; this makes land=nothing, ocean=nothing possible
-initialize!(psub, p, d, ::Nothing, ::AbstractModel) = nothing
-timestep!(p, d, ::Nothing, ::AbstractModel) = nothing
-finalize!(::Nothing, ::AbstractModel) = nothing
+# some model components (like particle advection or feedback) need variables to be passed on too
+# allow them to by nothing as well
+@inline initialize!(::Nothing, ::AbstractVariables, ::AbstractModel) = nothing
 
 # fallback for model components: nothing to initialize
-initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
-finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
+@inline initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
+@inline finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 
-# print all fields with type <: Number
-function Base.show(io::IO, P::AbstractModelComponent)
-    println(io, "$(typeof(P)) <: $(supertype(typeof(P)))")
-    keys = propertynames(P)
-    return print_fields(io, P, keys)
+# model components that are named tuples of other components,
+# e.g. `greenhouse_gases`, can just call `initialize!` on the elements of the named tuple
+function initialize!(nt::NamedTuple, model::AbstractModel)
+    for key in keys(nt)
+        initialize!(getfield(nt, key), model)
+    end
+    return nothing
 end
 
-"""$(TYPEDSIGNATURES)
-Returns true if the model `M` has a prognostic variable `var_name`, false otherwise.
-The default fallback is that all variables are included. """
-has(Model::Type{<:AbstractModel}, var_name::Symbol) = var_name in prognostic_variables(Model)
-has(model::AbstractModel, var_name) = has(typeof(model), var_name)
-prognostic_variables(model::AbstractModel) = prognostic_variables(typeof(model))
+# some components may need to be reinitialized, e.g. implicit with changing time step
+# fall back to nothing, models can implement their own reinitialize! method if needed
+@inline reinitialize!(model::AbstractModel, vars::AbstractVariables) = nothing
+@inline reinitialize!(::Nothing, ::AbstractModel, ::AbstractVariables) = nothing
+@inline reinitialize!(::AbstractModelComponent, ::AbstractModel, ::AbstractVariables) = nothing
+
+# ocean, land and sea ice are allowed to filter variables, i.e. apply some correction after time step update
+# define here only the fallback
+@inline Base.filter!(::AbstractVariables, ::AbstractModelComponent, ::AbstractModel) = nothing
+@inline Base.filter!(::AbstractVariables, ::Nothing, ::AbstractModel) = nothing
+
+function Base.show(io::IO, P::AbstractModelComponent; values = true)
+    type_str = split("$(typeof(P))", "{", limit = 2)
+    type_itself = type_str[1]
+    type_params = length(type_str) == 2 ? ("{" * type_str[2]) : ""
+    type_params_short = length(type_params) > 30 ? first(type_params, 30) * "...}" : type_params
+    println(io, styled"{warning:$type_itself}{note:$type_params_short}" * " <: $(supertype(typeof(P)))")
+    keys = propertynames(P)
+    print_fields(io, P, keys; values)
+    return nothing
+end
 
 # model class is the abstract supertype
 model_class(::Type{<:Barotropic}) = Barotropic
@@ -52,59 +69,31 @@ model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::AbstractModel) = model_type(typeof(model))
 
-initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...) =
+initialize!(model::AbstractModel, ps::Union{ComponentVector, ParameterTable}; kwargs...) =
     initialize!(reconstruct(model, ps); kwargs...)
 
+# pretty printing
 function Base.show(io::IO, M::AbstractModel)
     properties = propertynames(M)
     n = length(properties)
-    s = "$(model_type(M)) <: $(model_class(M))"
+    Msize = prettymemory(Base.summarysize(M))
+    s = styled"{warning:$(model_type(M))}" * "{...} <: $(model_class(M)) " * styled"{note:($Msize)}"
     n == 0 ? print(io, s) : println(io, s)
     for (i, key) in enumerate(properties)
         val = getfield(M, key)
         s = i == n ? "└" : "├"  # choose ending └ for last property
         p = i == n ? print : println
-        a = "$s $key: $(typeof(val))"
-        a = textwidth(a) > 100 ? string(a[1:97], "...") : a  # truncate long strings
-        p(io, a)
+        t = split("$(typeof(val))", "{", limit = 2)
+        t1 = t[1]
+        t2 = length(t) == 2 ? ("{" * t[2]) : ""
+        a = "$s " * styled"{info:$key}" * "::$t1" * styled"{note:$t2}"
+        a_short = textwidth(a) > 75 ? first(a, 75) * "..." : a
+        p(io, a_short)
     end
-    return
-end
-
-# Functions to get parameters and parameterization to
-# a) initialize variables
-"""$(TYPEDSIGNATURES)
-Extract the model components with parameters needed for the parameterizations
-as NamedTuple. These are the GPU-compatible components of the model."""
-@inline function get_model_parameters(model::PrimitiveEquation)
-    return NamedTuple{model.model_parameters}(map(field -> getfield(model, field), model.model_parameters))
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
-Extract the parameterizations from the model as NamedTuple.
-These are the GPU-compatible components of the model."""
-@generated function get_parameterizations(model::ModelType) where {ModelType <: PrimitiveEquation}
-    # Extract parameterization symbols from the type
-    params_type = fieldtype(ModelType, :params)
-    param_names = params_type.parameters[1]  # Extract tuple from Val{tuple}
-
-    # Generate literal field accesses for type stability
-    return :(NamedTuple{$param_names}(tuple($([:(model.$name) for name in param_names]...))))
-end
-
-# TODO: better name?
-"""$(TYPEDSIGNATURES)
-Extract the extra parameterizations from the model that are not part of the 
-column-based parameterizations, but define variables such as land and ocean."""
-@inline function get_extra_parameterizations(model::PrimitiveEquation)
-    return NamedTuple{model.extra_parameterizations}(map(field -> getfield(model, field), model.extra_parameterizations))
-end
-
-@inline get_parameterizations(model::Barotropic) = NamedTuple()
-@inline get_extra_parameterizations(model::Barotropic) = NamedTuple()
-
-@inline get_parameterizations(model::ShallowWater) = NamedTuple()
-@inline get_extra_parameterizations(model::ShallowWater) = NamedTuple()
-
-# default to 0 soil layers / no land model
-@inline get_soil_layers(model::AbstractModel) = 0
+Extract the number of soil layers from the model. The fallback is 0 soil layers, i.e. no land model."""
+@inline get_soil_layers(model::AbstractModel) = (hasproperty(model, :land) && !isnothing(model.land)) ? get_nlayers(model.land) : 0
+@inline get_nlayers(model::AbstractModel) = model.spectral_grid.nlayers

@@ -28,7 +28,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
-so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c>1."""
+so that the highest degree `truncation` is dampened by multiplication with c. Anti-diffusion for c>1."""
 function spectral_smoothing!(
         L::LowerTriangularArray,
         c::Real;
@@ -38,7 +38,8 @@ function spectral_smoothing!(
     lmax, mmax = size(L; as = Matrix)
 
     # normalize by largest eigenvalue by default, or wrt to given truncation
-    eigenvalue_norm = truncation == -1 ? -mmax * (mmax + 1) : -truncation * (truncation + 1)
+    # -l*(l+1) in 0-based becomes -l*(l-1) in 1-based
+    eigenvalue_norm = truncation == -1 ? -mmax * (mmax - 1) : -truncation * (truncation - 1)
 
     # Launch kernel
     launch!(
@@ -51,10 +52,10 @@ end
 
 @kernel function spectral_smoothing_kernel!(
         L,
-        @Const(c),
-        @Const(power),
-        @Const(eigenvalue_norm),
-        @Const(l_indices)
+        c,
+        power,
+        eigenvalue_norm,
+        l_indices
     )
     I = @index(Global, Cartesian)  # I[1] == lm, I[2] == k
 

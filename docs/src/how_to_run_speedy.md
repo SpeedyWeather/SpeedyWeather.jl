@@ -47,21 +47,21 @@ grid is also stored in Float32. The resolution is therefore on average about 400
 In the vertical 8 levels are used, using [Sigma coordinates](@ref).
 
 The resolution of a SpeedyWeather.jl simulation is adjusted using the
-`trunc` argument, this defines the spectral resolution and the grid
+`truncation` argument, this defines the spectral resolution and the grid
 resolution is automatically adjusted to keep the aliasing between
 spectral and grid-point space constant (see [Matching spectral and grid resolution](@ref)).
 ```@example howto
-spectral_grid = SpectralGrid(trunc=85)
+spectral_grid = SpectralGrid(truncation=86)
 ```
-Typical values are 31, 42, 63, 85, 127, 170, ... although you can technically
+Typical values are 32, 43, 64, 86, 128, 171, ... although you can technically
 use any integer, see [Available horizontal resolutions](@ref) for details.
-Now with T85 (which is a common notation for `trunc=85`) the grid
+Now with T85 (which is a common notation for `truncation=86`) the grid
 is of higher resolution too. You may play with the `dealiasing` factor,
 a larger factor increases the grid resolution that is matched with a given
 spectral resolution. You don't choose the resolution of the grid directly,
 but using the `Grid` argument you can change its type (see [Grids](@ref))
 ```@example howto
-spectral_grid = SpectralGrid(trunc=85, dealiasing=3, Grid=HEALPixGrid)
+spectral_grid = SpectralGrid(truncation=86, dealiasing=3, Grid=HEALPixGrid)
 ```
 
 ## Vertical coordinates and resolution
@@ -78,12 +78,10 @@ which have to be discretized in ``[0, 1]``
 ```@example howto
 vertical_coordinates = SigmaCoordinates(0:0.2:1)
 ```
-These are regularly spaced [Sigma coordinates](@ref), defined through their half levels.
-The cell centers or called full levels are marked with an ×.
-You have to provide this as an argument to `Geometry`,
-i.e. `Geometry(spectral_grid, vertical_coordinates=σ)` and pass this on to the
-model constructor if you want to use custom sigma coordinates. At the moment,
-other vertical coordinates are not supported.
+These are regularly spaced [Sigma coordinates](@ref sigma_coordinates_usage), defined through
+their half levels. The cell centers or full levels are marked with an ×. SpeedyWeather.jl also
+supports hybrid sigma-pressure coordinates — see [Vertical coordinates](@ref vertical_coordinates_page)
+for details and all available constructors.
 
 ## [Creating model components](@id create_model_components)
 
@@ -108,24 +106,22 @@ model.time_stepping
 
 Model components often contain parameters from the `SpectralGrid` as they are needed
 to determine the size of arrays and other internal reasons. You should, in most cases,
-just ignore those. But the `Leapfrog` time stepper comes with `Δt_at_T31` which
+just ignore those. But the `Leapfrog` time stepper comes with `Δt_at_T32` which
 is the parameter used to scale the time step automatically. This means at a spectral
-resolution of T31 it would use 30min steps, at T63 it would be ~half that, 15min, etc.
+resolution of T32 it would use 30min steps, at T64 it would be ~half that, 15min, etc
+(see [Available horizontal resolutions](@ref) for our meaning of T32).
 Meaning that if you want to have a shorter or longer time step you can create a new
 `Leapfrog` time stepper. All time inputs are supposed to be given with the help of 
 `Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that (almost) every model component
 depends on a `SpectralGrid` as first argument.
 ```@example howto
-spectral_grid = SpectralGrid(trunc=63, nlayers=1)
-time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(15))
+spectral_grid = SpectralGrid(truncation=64, nlayers=1)
+time_stepping = Leapfrog(spectral_grid, Δt_at_T32=Minute(15))
 ```
-The actual time step at the given resolution (here T63) is then `Δt_sec`, there's
-also `Δt` which is a scaled time step used internally, because SpeedyWeather.jl
-[scales the equations](@ref scaled_swm) with the radius of the Earth,
-but this is largely hidden (except here) from the user. With this new 
-`Leapfrog` time stepper constructed we can create a model by passing
+The actual time step at the given resolution (here T64) is then `Δt`.
+With this new `Leapfrog` time stepper constructed we can create a model by passing
 on the components (they are keyword arguments so either use `; time_stepping`
-for which the naming must match, or `time_stepping=my_time_stepping` with
+for which the naming must match, or `time_stepping = my_time_stepping` with
 any name)
 ```@example howto
 model = ShallowWaterModel(spectral_grid; time_stepping)
@@ -158,7 +154,7 @@ the barotropic and shallow water models do not have any physical
 parameterizations. Conceptually you construct these different models with
 
 ```julia
-spectral_grid = SpectralGrid(trunc=..., ...)
+spectral_grid = SpectralGrid(truncation=..., ...)
 component1 = SomeComponent(spectral_grid, parameter1=..., ...)
 component2 = SomeOtherComponent(spectral_grid, parameter2=..., ...)
 model = BarotropicModel(spectral_grid; all_other_components..., ...)
@@ -182,11 +178,11 @@ simulation = initialize!(model)
 and we have initialized the `ShallowWaterModel` we have defined earlier.
 As `initialize!(model)` also initializes the prognostic (and diagnostic)
 variables, it also initializes the clock in
-`simulation.prognostic_variables.clock`. To initialize with a specific
+`simulation.variables.prognostic.clock`. To initialize with a specific
 time, do
 ```@example howto
 simulation = initialize!(model, time=DateTime(2020,5,1))
-simulation.prognostic_variables.clock.time
+simulation.variables.prognostic.clock.time
 ```
 to set the time to 1st May, 2020 (but you can also do that manually).
 This time is used by components that depend on time, e.g. the solar
@@ -195,9 +191,9 @@ zenith angle calculation.
 After this step you can continue to tweak your model setup but note that
 some model components are immutable, or that your changes may not be
 propagated to other model components that rely on it. But you can, for
-example, change the output time step like so
+example, change the output interval like so
 ```@example howto
-simulation.model.output.output_dt = Second(3600)
+set!(model.output, model, interval=Hour(1))
 ```
 Now, if there's output, it will be every hour. Furthermore the initial
 conditions can be set with the `initial_conditions` model component
@@ -205,7 +201,7 @@ which are then set during `initialize!(::AbstractModel)`, but you can also
 change them now, before the model runs 
 ```@example howto
 # harmonic x layer x leapfrog steps
-simulation.prognostic_variables.vor[1, 1, 1] = 0
+simulation.variables.prognostic.vorticity[1, 1, 1] = 0
 ```
 So with this we have set the zero mode (first index) of vorticity of the first (and only)
 layer (second index) in the shallow water model to zero. Because the leapfrogging is a 2-step

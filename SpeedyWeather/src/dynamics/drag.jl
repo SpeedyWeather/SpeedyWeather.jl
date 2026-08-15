@@ -2,16 +2,14 @@ abstract type AbstractDrag <: AbstractModelComponent end
 
 # function barrier for all drags to unpack model.drag
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
-        lf::Integer,
+        vars::Variables,
         model::AbstractModel,
     )
-    return drag!(diagn, progn, model.drag, lf, model)
+    return drag!(vars, model.drag, model)
 end
 
 # NO DRAG
-drag!(diagn, progn, drag::Nothing, args...) = nothing
+drag!(vars, drag::Nothing, args...) = nothing
 
 export LinearDrag
 
@@ -38,12 +36,13 @@ $(TYPEDSIGNATURES)
 Precomputes the drag coefficients for the `LinearDrag` scheme."""
 function initialize!(drag::LinearDrag, model::PrimitiveEquation)
 
-    (; σ_levels_full) = model.geometry
     (; σb, time_scale, drag_coefs) = drag
-    kf = 1 / time_scale.value
+    (; nlayers) = model.geometry
+    coord = model.geometry.vertical_coordinates
+    kf = 1 / Second(time_scale).value
 
     # drag only below σb, lin increasing to kf at σ=1
-    @. drag_coefs = kf * max(0, (σ_levels_full - σb) / (1 - σb))
+    @. drag_coefs = kf * max(0, (sigma.(1:nlayers, coord) - σb) / (1 - σb))
     return nothing
 end
 
@@ -51,22 +50,17 @@ end
 $(TYPEDSIGNATURES)
 Compute tendency for boundary layer drag of a `column` and add to its tendencies fields"""
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         drag::LinearDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    u = diagn.grid.u_grid
-    v = diagn.grid.v_grid
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, drag)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, drag)
+    Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, drag)
+    Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, drag)
 
-    Fu = diagn.tendencies.u_tend_grid
-    Fv = diagn.tendencies.v_tend_grid
-
-    # include radius scaling
-    c = diagn.scale[]
-    @. Fu -= c * drag.drag_coefs' .* u
-    @. Fv -= c * drag.drag_coefs' .* v
+    @. Fu -= drag.drag_coefs' .* u
+    @. Fv -= drag.drag_coefs' .* v
 
     return nothing
 end
@@ -74,7 +68,7 @@ end
 export QuadraticDrag
 @parameterized @kwdef struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    @param drag::NF = 1e-5 (bounds = Nonnegative,)    # TODO is this a good default?
+    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
@@ -91,51 +85,47 @@ with `c_D` the non-dimensional drag coefficient as defined in `drag::QuadraticDr
 `c_D` and layer thickness `H` are precomputed in `initialize!(::QuadraticDrag, ::AbstractModel)`
 and scaled by the radius as are the momentum equations."""
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         scheme::QuadraticDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    k = diagn.nlayers   # only apply to surface layer
-    u = field_view(diagn.grid.u_grid, :, k)
-    v = field_view(diagn.grid.v_grid, :, k)
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, scheme)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, scheme)
+    k = size(u, 2)            # drag only on surface layer
+    
+    Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
+    Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 
-    Fu = field_view(diagn.tendencies.u_tend_grid, :, k)
-    Fv = field_view(diagn.tendencies.v_tend_grid, :, k)
+    # total drag coefficient
+    c = scheme.drag / model.atmosphere.layer_thickness
 
-    # total drag coefficient with radius scaling
-    # note that while the equations (with prognostic variable vorticity) are scaled
-    # with radius R squared, one R will go into the curl operator applied to forcing of u, v
-    # to yield a tendency for vorticity, so only one R is needed here in the drag coefficient scaling
-    c = scheme.drag / model.atmosphere.layer_thickness * diagn.scale[]
-
-    return launch!(
-        architecture(Fu), LinearWorkOrder, size(Fu), quadratic_drag_kernel!,
-        Fu, Fv, u, v, c
+    launch!(
+        architecture(Fu), LinearWorkOrder, (size(Fu, 1),), quadratic_drag_kernel!,
+        Fu, Fv, u, v, c, k
     )
+    return nothing
 end
 
 @kernel inbounds = true function quadratic_drag_kernel!(
-        Fu, Fv, u, v, @Const(c)
+        Fu, Fv, u, v, c, k
     )
     ij = @index(Global, Linear)
 
     # Calculate speed at surface layer k
-    speed = sqrt(u[ij]^2 + v[ij]^2)
+    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
 
     # Apply quadratic drag, -= as the tendencies already contain forcing
-    Fu[ij] -= c * speed * u[ij]
-    Fv[ij] -= c * speed * v[ij]
+    Fu[ij, k] -= c * speed * u[ij, k]
+    Fv[ij, k] -= c * speed * v[ij, k]
 end
 
 export SpeedLimitDrag
 @parameterized @kwdef struct SpeedLimitDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/m]"
-    @param drag::NF = 4e-7 (bounds = Nonnegative,)
+    @param drag::NF = 3.0e-6 (bounds = Nonnegative,)
 
     "[OPTION] Speed limit above which drag kicks in [m/s]"
-    @param speed_limit::NF = 80 (bounds = Nonnegative,) 
+    @param speed_limit::NF = 80 (bounds = Nonnegative,)
 end
 
 SpeedLimitDrag(SG::SpectralGrid; kwargs...) = SpeedLimitDrag{SG.NF}(; kwargs...)
@@ -145,26 +135,25 @@ initialize!(::SpeedLimitDrag, ::AbstractModel) = nothing
 $(TYPEDSIGNATURES)
 Speed limit drag for the momentum equations.
 
-    Fu = -c*max(0, |(u, v)| - speed_limit)^2 * sign(u)
+    (Fu, Fv) = -c*max(0, |(u, v)| - speed_limit)^2 * (u, v)/|(u, v)|
 
 with `c` the drag coefficient [1/m] as defined in `drag::SpeedLimitDrag` and
 kicking in only above a certain speed limit. The drag is quadratic in the excess
-speed above the limit and acts to slow down the flow, hence the `sign(u)` term."""
+speed above the limit and antiparallel to the flow, so it only decelerates and
+never rotates it."""
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         scheme::SpeedLimitDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    u = diagn.grid.u_grid
-    v = diagn.grid.v_grid
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, scheme)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, scheme)
 
-    Fu = diagn.tendencies.u_tend_grid
-    Fv = diagn.tendencies.v_tend_grid
+    Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
+    Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 
-    # total drag coefficient with radius scaling
-    c = scheme.drag * diagn.scale[]
+    # total drag coefficient
+    c = scheme.drag
     (; speed_limit) = scheme
 
     launch!(
@@ -179,43 +168,42 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    # Calculate speed
-    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
+    uij = u[ij, k]
+    vij = v[ij, k]
+    speed = sqrt(uij^2 + vij^2)
+    excess = max(0, speed - speed_limit)    # zero below the limit
 
-    # Apply speed limit drag, -= as the tendencies already contain forcing
-    U² = max(0, speed - speed_limit)^2
-    Fu[ij, k] -= c * U² * sign(u[ij, k])
-    Fv[ij, k] -= c * U² * sign(v[ij, k])
+    # -c*excess^2 * (u, v)/speed, i.e. antiparallel to the flow. Scaling the unit vector
+    # (u, v)/speed rather than (sign(u), sign(v)) keeps the drag opposite to the velocity;
+    # the latter points along the quadrant diagonal and is √2 too large for a 45° flow.
+    # excess > 0 implies speed > speed_limit >= 0, so the division is guarded.
+    scale = ifelse(excess > 0, c * excess^2 / speed, zero(speed))  # excess > 0 ? c * excess^2 / speed : zero(speed)
+
+    # -= as the tendencies already contain forcing
+    Fu[ij, k] -= scale * uij
+    Fv[ij, k] -= scale * vij
 end
 
 export LinearVorticityDrag
-@parameterized @kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
+@parameterized @kwdef struct LinearVorticityDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/s]"
     @param c::NF = 1.0e-7 (bounds = Nonnegative,)
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
-
 initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Linear drag for the vorticity equations of the form F = -cξ
 with c drag coefficient [1/s]."""
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         drag::LinearVorticityDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    (; vor_tend) = diagn.tendencies
-    vor = get_step(progn.vor, lf)
-
-    # scale by radius (but only once, the second radius is in vor)
-    c = drag.c * diagn.scale[]
-    vor_tend .-= c * vor
-
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, drag)
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, drag)
+    vor_tend .-= drag.c * vor
     return nothing
 end
 
@@ -261,32 +249,29 @@ function initialize!(drag::JetDrag, model::AbstractModel)
 end
 
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         drag::JetDrag,
-        lf::Integer,
         model::AbstractModel,
     )
-    vor = get_step(progn.vor, lf)
-    (; vor_tend) = diagn.tendencies
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, drag)
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, drag)
     (; ζ₀) = drag
 
-    # scale by radius as is vorticity
-    s = diagn.scale[]
-    r = s / drag.time_scale.value
-
-    k = diagn.nlayers   # drag only on surface layer
+    # drag coefficient r as inverse time scale [1/s]
+    r = inv(drag.time_scale.value)
+    k = size(vor, 2)   # drag only on surface layer
 
     # GPU kernel launch
-    arch = architecture(diagn.grid.u_grid)
-    return launch!(
+    arch = architecture(vars.grid.u)
+    launch!(
         arch, LinearWorkOrder, (size(vor_tend, 1),), jet_drag_kernel!,
         vor_tend, vor, ζ₀, r, k
     )
+    return nothing
 end
 
 @kernel inbounds = true function jet_drag_kernel!(
-        vor_tend, vor, ζ₀, @Const(r), @Const(k)
+        vor_tend, vor, ζ₀, r, k
     )
     lm = @index(Global, Linear)
     vor_tend[lm, k] -= r * (vor[lm, k] - ζ₀[lm])

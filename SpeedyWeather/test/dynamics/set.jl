@@ -1,24 +1,24 @@
-@testset "Test PrognosticVariables set!" begin
+@testset "Test Variables set!" begin
 
     nlayers = 8
     nlayers_soil = 2
-    trunc = 31
+    truncation = 32
     NF = Float64
     complex_NF = Complex{NF}
-    spectral_grid = SpectralGrid(; NF, trunc, nlayers)  # define resolution
-    model = PrimitiveWetModel(spectral_grid)            # construct model
-    simulation = initialize!(model)                     # initialize all model components
+    spectral_grid = SpectralGrid(; NF, truncation, nlayers)     # define resolution
+    model = PrimitiveWetModel(spectral_grid)                    # construct model
+    simulation = initialize!(model)                             # initialize all model components
 
-    lf = 2
+    step = 2
 
     # test data
-    L = rand(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
+    L = rand(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
     L_grid = transform(L, model.spectral_transform)
 
-    L2 = rand(spectral_grid.SpectralVariable3D, trunc - 5, trunc - 6, nlayers)      # smaller
-    L2_trunc = SpeedyTransforms.spectral_truncation(L2, size(L, 1, ZeroBased, as = Matrix), size(L, 2, ZeroBased, as = Matrix))
-    L3 = rand(spectral_grid.SpectralVariable3D, trunc + 6, trunc + 5, nlayers)      # bigger
-    L3_trunc = SpeedyTransforms.spectral_truncation(L3, size(L, 1, ZeroBased, as = Matrix), size(L, 2, ZeroBased, as = Matrix))
+    L2 = rand(spectral_grid.SpectralVariable3D, truncation - 5, truncation - 6, nlayers)      # smaller
+    L2_trunc = SpeedyTransforms.spectral_truncation(L2, size(L, 1, as = Matrix), size(L, 2, as = Matrix))
+    L3 = rand(spectral_grid.SpectralVariable3D, truncation + 6, truncation + 5, nlayers)      # bigger
+    L3_trunc = SpeedyTransforms.spectral_truncation(L3, size(L, 1, as = Matrix), size(L, 2, as = Matrix))
 
     A = rand(NF, spectral_grid.grid, nlayers)                                   # same grid
     A_spec = transform(A, model.spectral_transform)
@@ -27,68 +27,77 @@
 
     f(lon, lat, sig) = sind(lon) * cosd(lat) * (1 - sig)
 
-    prog_new = simulation.prognostic_variables
+    prog_new = simulation.variables.prognostic
     prog_old = deepcopy(prog_new)
 
     # set things ...
 
     # LTA
-    set!(simulation, vor = L, lf = lf)
-    @test get_step(prog_new.vor, lf) == L
+    set!(simulation, vorticity = L; step)
+    @test get_step(prog_new.vorticity, step) == L
 
-    set!(simulation, div = L, lf = lf; add = true)
-    @test get_step(prog_new.div, lf) == (get_step(prog_old.div, lf) .+ L)
+    set!(simulation, divergence = L; step, add = true)
+    @test get_step(prog_new.divergence, step) == (get_step(prog_old.divergence, step) .+ L)
 
-    set!(simulation, temp = L2, lf = lf)
-    @test get_step(prog_new.temp, lf) ≈ L2_trunc
+    set!(simulation, temperature = L2; step)
+    @test get_step(prog_new.temperature, step) ≈ L2_trunc
 
-    set!(simulation, humid = L3, lf = lf)
-    @test get_step(prog_new.humid, lf) ≈ L3_trunc
+    set!(simulation, humidity = L3; step)
+    @test get_step(prog_new.humidity, step) ≈ L3_trunc
 
-    set!(simulation, pres = L[:, 1], lf = lf)
-    @test get_step(prog_new.pres, lf) == L[:, 1]
+    set!(simulation, pressure = L[:, 1]; step)
+    @test get_step(prog_new.pressure, step) == L[:, 1]
 
-    set!(simulation, vor = A, lf = lf)
-    @test get_step(prog_new.vor, lf) == A_spec
+    set!(simulation, vorticity = A; step)
+    @test get_step(prog_new.vorticity, step) == A_spec
 
-    set!(simulation, vor = A, lf = lf, add = true)
-    @test get_step(prog_new.vor, lf) == (2 .* A_spec)
+    set!(simulation, vorticity = A; step, add = true)
+    @test get_step(prog_new.vorticity, step) == (2 .* A_spec)
 
     # grids
-    set!(simulation, sea_surface_temperature = A[:, 1], lf = lf)
-    @test prog_new.ocean.sea_surface_temperature == A[:, 1]
+    set!(simulation, sea_surface_temperature = A[:, 1]; namespace = :ocean)
+    @test prog_new.ocean.sea_surface_temperature[:, 1] == A[:, 1]
+    set!(simulation, sea_surface_temperature = A[:, 1]; step, namespace = :ocean)
+    @test prog_new.ocean.sea_surface_temperature[:, step] == A[:, 1]
 
-    set!(simulation, sea_ice_concentration = B[:, 1], lf = lf, add = true)
+    set!(simulation, sea_ice_concentration = B[:, 1]; step, namespace = :ocean, add = true)
     C = similar(A[:, 1])
     RingGrids.interpolate!(C, B[:, 1]; NF)
-    @test all(isapprox(prog_new.ocean.sea_ice_concentration, prog_old.ocean.sea_ice_concentration .+ C, atol = 1.0e-6))
+
+    sic_new = get_step(prog_new.ocean.sea_ice_concentration, step)
+    sic_old = get_step(prog_old.ocean.sea_ice_concentration, step)
+    @test all(isapprox(sic_new, sic_old .+ C, atol = 1.0e-6))
 
     Di = deepcopy(prog_new.land.soil_temperature)
     RingGrids.interpolate!(Di, D; NF)
-    set!(simulation, soil_temperature = D, lf = lf)
+    set!(simulation, soil_temperature = D, namespace = :land)
     @test prog_new.land.soil_temperature == Di
 
-    set!(simulation, soil_moisture = D, lf = lf)
+    set!(simulation, soil_moisture = D; namespace = :land)
     @test prog_new.land.soil_moisture == Di
 
     # numbers
-    set!(simulation, vor = Float32(3.0), lf = lf)
+    set!(simulation, vorticity = Float32(3.0); step)
     M3 = zeros(NF, spectral_grid.grid, nlayers) .+ 3    # same grid
     M3_spec = transform(M3, model.spectral_transform)
-    @test get_step(prog_new.vor, lf) ≈ M3_spec
+    @test get_step(prog_new.vorticity, step) ≈ M3_spec
 
-    set!(simulation, vor = Float32(3.0), lf = lf, add = true)
-    @test get_step(prog_new.vor, lf) ≈ (2 .* M3_spec)
+    set!(simulation, vorticity = Float32(3.0); step, add = true)
+    @test get_step(prog_new.vorticity, step) ≈ (2 .* M3_spec)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0))
-    @test all(prog_new.ocean.sea_surface_temperature .≈ 3.0)
+    set!(simulation, sea_surface_temperature = Float16(3.0), namespace = :ocean)
+    @test all(prog_new.ocean.sea_surface_temperature[:, 1] .≈ 3.0)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0), add = true)
-    @test all(prog_new.ocean.sea_surface_temperature .≈ 6.0)
+    set!(simulation, sea_surface_temperature = Float16(3.0), step = 1, add = true, namespace = :ocean)
+    @test all(prog_new.ocean.sea_surface_temperature[:, 1] .≈ 6.0)
+
+    set!(simulation, sea_surface_temperature = 5, step = 1, namespace = :ocean)
+    set!(simulation, sea_surface_temperature = 5, step = 2, namespace = :ocean)
+    @test all(prog_new.ocean.sea_surface_temperature .== 5)
 
     # vor_div, create u,v first in spectral space
-    u = randn(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
-    v = randn(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
+    u = randn(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
+    v = randn(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
 
     # set imaginary component of m=0 to 0 as the rotation of zonal modes is arbitrary
     SpeedyTransforms.zero_imaginary_zonal_modes!(u)
@@ -100,13 +109,13 @@
     u_grid = transform(u, model.spectral_transform)
     v_grid = transform(v, model.spectral_transform)
 
-    set!(simulation, u = u_grid, v = v_grid, coslat_scaling_included = false, lf = lf)
+    set!(simulation, u = u_grid, v = v_grid, coslat_scaling_included = false; step)
 
-    # now obtain U, V (scaled with coslat) from vor, div
+    # now obtain U, V (scaled with coslat) from vorticity, div
     U = similar(u)
     V = similar(v)
 
-    SpeedyTransforms.UV_from_vordiv!(U, V, get_step(prog_new.vor, lf), get_step(prog_new.div, lf), model.spectral_transform)
+    SpeedyTransforms.UV_from_vordiv!(U, V, get_step(prog_new.vorticity, step), get_step(prog_new.divergence, step), model.spectral_transform)
 
     # back to grid and unscale on the fly
     u_grid2 = transform(U, model.spectral_transform, unscale_coslat = true)
@@ -129,8 +138,13 @@
     end
     transform!(A_spec, A, model.spectral_transform)
 
-    set!(simulation, vor = f; lf)
-    @test get_step(prog_new.vor, lf) ≈ A_spec
+    set!(simulation, vorticity = f; step)
+    @test get_step(prog_new.vorticity, step) ≈ A_spec
+
+    # groups
+    # non-stepped variables need step = nothing
+    set!(simulation, geopotential = 1, group = :dynamics)
+    @test all(simulation.variables.dynamics.geopotential .== 1)
 end
 
 @testset "Set! grids" begin

@@ -40,8 +40,8 @@ i.e. `struct` or `mutable struct CustomCallback <: SpeedyWeather.AbstractCallbac
 ```@example callbacks
 using SpeedyWeather
 
-Base.@kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
-    timestep_counter::Int = 0
+@kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
+    time_step_counter::Int = 0
     maximum_surface_wind_speed::Vector{NF} = [0]
 end
 
@@ -49,7 +49,7 @@ end
 StormChaser(SG::SpectralGrid) = StormChaser{SG.NF}()
 ```
 
-We decide to have a field `timestep_counter` in the callback that allows us to track
+We decide to have a field `time_step_counter` in the callback that allows us to track
 the number of times the callback was called to create a time series of our highest
 surface wind speeds. The actual `maximum_surface_wind_speed` is then a vector
 of a given type `NF` (= number format), which is where we'll write into. Both
@@ -68,26 +68,26 @@ And we'll go through them one by one.
 ```@example callbacks
 function SpeedyWeather.initialize!(
     callback::StormChaser,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
-    # allocate recorder: number of time steps (incl initial conditions) in simulation
-    callback.maximum_surface_wind_speed = zeros(progn.clock.n_timesteps + 1)
+    # allocate recorder: number of steps (incl initial conditions) in simulation
+    callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_steps + 1)
 
     # where surface (=lowermost model layer) u, v on the grid are stored
-    u_grid = diagn.grid.u_grid[:, diagn.nlayers]
-    v_grid = diagn.grid.u_grid[:, diagn.nlayers]
+    nlayers = model.geometry.nlayers
+    u_grid = RingGrids.field_view(vars.grid.u, :, nlayers, 1)
+    v_grid = RingGrids.field_view(vars.grid.v, :, nlayers, 1)
 
     # maximum wind speed of initial conditions
     callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
 
     # (re)set counter to 1
-    callback.timestep_counter = 1
+    callback.time_step_counter = 1
 end
 ```
 The `initialize!` function has to be extended for the new callback `::StormChaser` as first
-argument, then followed by prognostic and diagnostic variables and model. For correct
+argument, then followed by `vars::Variables` (all model variables) and `model`. For correct
 multiple dispatch it is important to restrict the first argument to the new `StormChaser` type
 (to not call another callback instead), but the other type declarations are for clarity only.
 `initialize!(::AbstractCallback, args...)` is called once just before the main time loop,
@@ -117,28 +117,27 @@ Then we need to extend the `callback!` function as follows
 ```@example callbacks
 function SpeedyWeather.callback!(
     callback::StormChaser,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
-
     # increase counter
-    callback.timestep_counter += 1
-    i = callback.timestep_counter
+    callback.time_step_counter += 1
+    i = callback.time_step_counter
 
     # where surface (=lowermost model layer) u, v on the grid are stored
-    u_grid = diagn.grid.u_grid[:, diagn.nlayers]
-    v_grid = diagn.grid.u_grid[:, diagn.nlayers]
+    nlayers = model.geometry.nlayers
+    u_grid = RingGrids.field_view(vars.grid.u, :, nlayers, 1)
+    v_grid = RingGrids.field_view(vars.grid.v, :, nlayers, 1)
 
     # maximum wind speed at current time step
     callback.maximum_surface_wind_speed[i] = max_2norm(u_grid, v_grid)
 end
 ```
 The function signature for `callback!` is the same as for `initialize!`. You may
-access anything from `progn`, `diagn` or `model`, although for a purely diagnostic
+access anything from `vars` or `model`, although for a purely diagnostic
 callback this should be read-only. While you could change other model components like the
 land sea mask in `model.land_sea_mask` or orography etc. then you interfere with the
-simulation which is more advanced and will be discussed in Intrusive callbacks below.
+simulation which is more advanced and will be discussed in [Intrusive callbacks](@ref) below.
 
 Lastly, we extend the `finalize!` function which is called once after the last time step.
 This could be used, for example, to save the `maximum_surface_wind_speed` vector to
@@ -226,10 +225,10 @@ surface wind speeds in [m/s]. And the `:temperature` callback a time series of
 global mean surface temperatures in Kelvin on every time step while the model ran for 3 days.
 
 ```@example callbacks
-model.callbacks[:temperature].temp
+model.callbacks[:temperature].temperature
 ```
 
-## [Intrusive callbacks](@id intrusive_callbacks)
+## Intrusive callbacks
 
 In the sections above, callbacks were introduced as a tool to define custom
 diagnostics or simulation output. This is the simpler and recommended way of using
@@ -308,28 +307,27 @@ end
 
 function SpeedyWeather.initialize!(
     callback::MyScheduledCallback,
-    progn::PrognosticVariables,
+    vars::Variables,
     args...
 )
     # when initializing a scheduled callback also initialize its schedule!
-    initialize!(callback.schedule, progn.clock)
+    initialize!(callback.schedule, vars.prognostic.clock)
 
     # initialize other things in your callback here
 end
 
 function SpeedyWeather.callback!(
     callback::MyScheduledCallback,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
     # scheduled callbacks start with this line to execute only when scheduled!
     # else escape immediately
-    isscheduled(callback.schedule, progn.clock) || return nothing
+    isscheduled(callback.schedule, vars.prognostic.clock) || return nothing
 
     # Just print the North Pole surface temperature to screen
-    (;time) = progn.clock
-    temp_at_north_pole = diagn.grid.temp_grid[1,end]
+    (;time) = vars.prognostic.clock
+    temp_at_north_pole = vars.grid.temperature[1, end, 1]   # last 1: step index 1
 
     @info "North pole has a temperature of $temp_at_north_pole on $time."
 end
@@ -340,8 +338,8 @@ SpeedyWeather.finalize!(::MyScheduledCallback, args...) = nothing
 
 So in summary
 - add a field `schedule::Schedule` to your callback
-- add the line `initialize!(callback.schedule, progn.clock)` when initializing your callback
-- start your `callback!` method with `isscheduled(callback.schedule, progn.clock) || return nothing` to execute only when scheduled
+- add the line `initialize!(callback.schedule, vars.prognostic.clock)` when initializing your callback
+- start your `callback!` method with `isscheduled(callback.schedule, vars.prognostic.clock) || return nothing` to execute only when scheduled
 
 A `Schedule` is a field inside a callback as this allows you the set the callbacks
 desired schedule when creating it. In the example above we can create our callback
@@ -354,7 +352,7 @@ is no periodically reoccuring schedule, only `schedule.times` would include some
 for events that are scheduled. Now let's create a primitive equation model with that callback
 
 ```@example schedule
-spectral_grid = SpectralGrid(trunc=31, nlayers=5)
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 5)
 model = PrimitiveWetModel(spectral_grid)
 add!(model.callbacks, north_pole_temp_at_noon_jan9)
 

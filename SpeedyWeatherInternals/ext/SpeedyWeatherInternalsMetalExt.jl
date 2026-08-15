@@ -36,6 +36,9 @@ Architectures.on_architecture(::MtlGPU, a::SubArray{<:Any, <:Any, <:MtlArray}) =
 Architectures.on_architecture(::MtlGPU, a::SubArray{<:Any, <:Any, <:Array}) = MtlArray(a)
 Architectures.on_architecture(::MtlGPU, a::StepRangeLen) = a
 
+# convert Float64 arrays to Float32 first for Metal as F64 isn't supported
+Architectures.on_architecture(::MtlGPU, a::Array{Float64}) = MtlArray(Float32.(a))
+
 @inline Architectures.convert_to_device(::MtlGPU, args) = Metal.mtlconvert(args)
 @inline Architectures.convert_to_device(::MtlGPU, args::Tuple) = map(Metal.mtlconvert, args)
 end

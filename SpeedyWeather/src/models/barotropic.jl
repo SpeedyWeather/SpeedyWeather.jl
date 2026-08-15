@@ -48,7 +48,7 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS
-    time_stepping::TS = Leapfrog(spectral_grid)
+    time_stepping::TS = NCycleLorenz(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = nothing
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
@@ -59,15 +59,35 @@ $(TYPEDFIELDS)"""
     feedback::FB = Feedback()
 end
 
-prognostic_variables(::Type{<:Barotropic}) = (:vor,)
-default_concrete_model(::Type{Barotropic}) = BarotropicModel
+variables(model::Barotropic) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
-parameters(model::Barotropic; kwargs...) = SpeedyParams(
-    planet = parameters(model.planet; component = :planet, kwargs...),
-    atmosphere = parameters(model.atmosphere; component = :atmosphere, kwargs...),
-    forcing = parameters(model.forcing; component = :forcing, kwargs...),
-    drag = parameters(model.drag; component = :drag, kwargs...),
-)
+"""($TYPEDSIGNATURES) All variables needed for the barotropic model itself (components excluded)."""
+function variables(::Type{<:Barotropic}, nsteps = DEFAULT_NSTEPS)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
+    return (
+        PrognosticVariable(:clock, ClockDim(), desc = "Clock", units = "s"),
+        PrognosticVariable(:scale, ScalarDim(1), desc = "Scaling of vor and div in the dynamical core", units = "m"),
+        PrognosticVariable(:vorticity, SpectralXYZT(ps), desc = "Relative vorticity", units = "1/s", fuse = :prognostic),
+
+        TendencyVariable(:vorticity, SpectralXYZT(ts), desc = "Tendency of relative vorticity", units = "1/s²"), # tendencies are unfused as they are directly computed by a curl op
+        TendencyVariable(:vorticity, GridXYZT(tg), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²"),
+        TendencyVariable(:u, GridXYZT(tg), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²", fuse = :grid_tendencies),
+        TendencyVariable(:v, GridXYZT(tg), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²", fuse = :grid_tendencies),
+
+        DynamicsVariable(:u_tendency, SpectralXYZT(ts), desc = "Tendency of zonal wind", units = "m/s²", fuse = :spectral_tendencies),
+        DynamicsVariable(:v_tendency, SpectralXYZT(ts), desc = "Tendency of meridional wind", units = "m/s²", fuse = :spectral_tendencies),
+
+        GridVariable(:vorticity, GridXYZT(pg), desc = "Relative vorticity", units = "1/s", fuse = :grid),
+        GridVariable(:u, GridXYZT(pg), desc = "Zonal wind", units = "m/s", fuse = :uv_grid),
+        GridVariable(:v, GridXYZT(pg), desc = "Meridional wind", units = "m/s", fuse = :uv_grid),
+
+        ScratchVariable(:a, SpectralXYZ(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
+        ScratchVariable(:b, SpectralXYZ(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
+    )
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -81,6 +101,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
         SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
     # initialize components
+    arch = model.architecture
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
     initialize!(model.coriolis, model)
@@ -90,17 +111,15 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.random_process, model)
     initialize!(model.particle_advection, model)
 
-    # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(model)
-    diagnostic_variables = DiagnosticVariables(model)
-    # initialize particles (or other non-atmosphere prognostic variables)
-    initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
+    # allocate all variables
+    variables = Variables(model)
 
-    # set the initial conditions
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    (; clock) = prognostic_variables
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    # set the time first
+    (; clock) = variables.prognostic
+    set!(clock, time = time, start = time)
 
-    return Simulation(prognostic_variables, diagnostic_variables, model)
+    # now set initial conditions
+    initialize!(variables, model)
+
+    return Simulation(variables, model)
 end

@@ -17,45 +17,30 @@ function heuristic_workgroup(Wx, Wy, Wz)
 end
 
 # WORK ORDER TYPES FOR TYPE-BASED DISPATCH
-"""
-Abstract type for different work order patterns in kernel launching.
-"""
+"""Abstract type for different work order patterns in kernel launching."""
 abstract type AbstractWorkOrder end
 
-"""
-Work order for kernels over spectral number 'lm' and layers.
-"""
+"""Work order for kernels over spectral number 'lm' and layers."""
 struct SpectralWorkOrder <: AbstractWorkOrder end
 
-"""
-Work order for kernels over RingGrids 'ij' indices and layers.
-"""
+"""Work order for kernels over RingGrids 'ij' indices and layers."""
 struct RingGridWorkOrder <: AbstractWorkOrder end
 
-"""
-Work order for kernels over spectral number 'lm' and layers, excluding the lm=1 element.
-"""
+"""Work order for kernels over spectral number 'lm' and layers, excluding the lm=1 element."""
 struct SpectralInnerWorkOrder <: AbstractWorkOrder end
 
-"""
-Work order for kernels over the diagonal of a (m+1)×m or m×m LowerTriangularArray.
-"""
+"""Work order for kernels over the diagonal of a (m+1)×m or m×m LowerTriangularArray."""
 struct DiagonalWorkOrder <: AbstractWorkOrder end
 
-"""
-Work order for kernels over a regular 3D array.
-"""
-struct Array3DWorkOrder <: AbstractWorkOrder end
+"""Work order for kernels over a regular array preserving dimensionality."""
+struct ArrayWorkOrder <: AbstractWorkOrder end
 
-"""
-Work order for kernels over linear/eachindex iteration.
-"""
+"""Work order for kernels over linear/eachindex iteration."""
 struct LinearWorkOrder <: AbstractWorkOrder end
 
 # TYPE-BASED DISPATCH METHODS
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Returns the `workgroup` and `worksize` for launching a kernel with spectral work order.
 """
 function work_layout(::Type{SpectralWorkOrder}, worksize::NTuple{N, Int}) where {N}
@@ -63,8 +48,7 @@ function work_layout(::Type{SpectralWorkOrder}, worksize::NTuple{N, Int}) where 
     return workgroup, worksize
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Returns the `workgroup` and `worksize` for launching a kernel with ring grid work order.
 """
 function work_layout(::Type{RingGridWorkOrder}, worksize::NTuple{N, Int}) where {N}
@@ -72,8 +56,7 @@ function work_layout(::Type{RingGridWorkOrder}, worksize::NTuple{N, Int}) where 
     return workgroup, worksize
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Returns the `workgroup` and `worksize` for launching a kernel with spectral inner work order,
 excluding the lm=1 element.
 """
@@ -81,32 +64,28 @@ function work_layout(::Type{SpectralInnerWorkOrder}, worksize::NTuple{N, Int}) w
     return heuristic_workgroup(worksize[1] - 2, worksize[2:end]...), (worksize[1] - 2, worksize[2:end]...)
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Returns the `workgroup` and `worksize` for launching a kernel over the diagonal of a LowerTriangularArray.
 """
 function work_layout(::Type{DiagonalWorkOrder}, worksize::NTuple{N, Int}) where {N}
     return heuristic_workgroup(worksize[2], worksize[3:end]...), (worksize[2], worksize[3:end]...)
 end
 
+"""$(TYPEDSIGNATURES)
+Returns the `workgroup` and `worksize` for launching a kernel over all indices of a regular array preserving dimensionality.
 """
-$(TYPEDSIGNATURES)
-Returns the `workgroup` and `worksize` for launching a kernel over a regular 3D array.
-"""
-function work_layout(::Type{Array3DWorkOrder}, worksize::NTuple{N, Int}) where {N}
+function work_layout(::Type{ArrayWorkOrder}, worksize::NTuple{N, Int}) where {N}
     return heuristic_workgroup(worksize...), worksize
 end
 
-"""
-$(TYPEDSIGNATURES)
-Returns the `workgroup` and `worksize` for launching a kernel with linear iteration.
-"""
+"""$(TYPEDSIGNATURES)
+Returns the `workgroup` and `worksize` for launching a kernel with linear iteration,
+unravelling all indices into one linear index."""
 function work_layout(::Type{LinearWorkOrder}, worksize::NTuple{N, Int}) where {N}
     return heuristic_workgroup(prod(worksize)), (prod(worksize),)
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Configure `kernel!` to launch over the `dims` of `grid` on
 the architecture `arch`.
 
@@ -125,15 +104,12 @@ the architecture `arch`.
     return loop, worksize
 end
 
-"""
-launch!(arch, dims_type, worksize, kernel!, kernel_args...)
-
+"""$(TYPEDSIGNATURES)
 Launches `kernel!` with arguments `kernel_args`
 over the `dims_type` with `worksize` on the architecture `arch`.
 Kernels run on the default stream.
 
-See [configure_kernel](@ref) for more information.
-"""
+See [configure_kernel](@ref) for more information."""
 @inline launch!(args...; kwargs...) = _launch!(args...; kwargs...)
 
 # Inner interface for type-based dispatch (preferred)

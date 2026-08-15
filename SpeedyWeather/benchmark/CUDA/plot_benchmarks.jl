@@ -10,39 +10,38 @@ using CairoMakie
 include("benchmark_suite.jl")
 
 # Define the range of array sizes (N) to benchmark
-trunc_list = [15, 31, 63, 127, 255, 511, 1023]
+truncation_list = [16, 32, 64, 128, 256, 512, 1024]
 nlayers_list = [1, 8, 32, 64]
 float_types = [Float32]
 grid_list = [OctahedralGaussianGrid]
 
 # Single run_benchmarks function with device parameter
-function run_benchmarks(trunc_list, nlayers_list, float_types, device)
+function run_benchmarks(truncation_list, nlayers_list, float_types, device)
     results = Dict{String, Dict{DataType, Matrix{Float64}}}()
     Grid = grid_list[1]
 
     for NF in float_types
         # Initialize times matrices for each function
-        times_legendre_forward = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
-        times_legendre_backward = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
-        times_fourier_forward = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
-        times_fourier_backward = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
-        times_parameterization = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
-        times_dynamics = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
+        times_legendre_forward = Matrix{Float64}(undef, length(truncation_list), length(nlayers_list))
+        times_legendre_backward = Matrix{Float64}(undef, length(truncation_list), length(nlayers_list))
+        times_fourier_forward = Matrix{Float64}(undef, length(truncation_list), length(nlayers_list))
+        times_fourier_backward = Matrix{Float64}(undef, length(truncation_list), length(nlayers_list))
+        times_parameterization = Matrix{Float64}(undef, length(truncation_list), length(nlayers_list))
+        times_dynamics = Matrix{Float64}(undef, length(truncation_list), length(nlayers_list))
 
         for (j, nlayers) in enumerate(nlayers_list)
-            for (i, trunc) in enumerate(trunc_list)
+            for (i, truncation) in enumerate(truncation_list)
                 # Generate inputs
-                spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture = device)
+                spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture = device)
                 model = PrimitiveWetModel(spectral_grid)
                 simulation = initialize!(model)
 
-                progn, diagn, model = SpeedyWeather.unpack(simulation)
+                vars, model = SpeedyWeather.unpack(simulation)
                 S = model.spectral_transform
                 specs, grids = generate_random_inputs(spectral_grid)
                 lf = 2
-                # S, specs, grids = generate_random_inputs(N, nlayers, T, device)
 
-                println("Running benchmark for device=$device, trunc=$trunc, nlayers=$nlayers, NF=$NF")
+                println("Running benchmark for device=$device, truncation=$truncation, nlayers=$nlayers, NF=$NF")
                 println()
 
                 # Time forward legendre
@@ -62,11 +61,11 @@ function run_benchmarks(trunc_list, nlayers_list, float_types, device)
                 times_fourier_forward[i, j] = minimum(b).time
 
                 # Time parameterization
-                b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($diagn, $progn, $model)
+                b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($vars, $model)
                 times_parameterization[i, j] = minimum(b).time
 
                 # Time dynamics
-                b = @benchmark CUDA.@sync SpeedyWeather.dynamics_tendencies!($diagn, $progn, $lf, $model)
+                b = @benchmark CUDA.@sync SpeedyWeather.dynamics_tendencies!($vars, $lf, $model)
                 times_dynamics[i, j] = minimum(b).time
             end
         end
@@ -101,7 +100,7 @@ function plot_speedup(cpu_results, gpu_results, figx = 500, figy = 1000)
 
     # Create a subplot for each nlayers value
     for (j, nlayers) in enumerate(nlayers_list)
-        axes[j] = Axis(fig[1, j], xlabel = "Trunc (T)", title = "nlayers = $nlayers", yscale = log10)
+        axes[j] = Axis(fig[1, j], xlabel = "Truncation", title = "nlayers = $nlayers", yscale = log10)
         ax = axes[j]
 
         for (func_name, type_results) in cpu_results
@@ -109,13 +108,13 @@ function plot_speedup(cpu_results, gpu_results, figx = 500, figy = 1000)
                 gpu_times = gpu_results[func_name][T]
                 speedup = cpu_times ./ gpu_times
                 # Convert array_sizes and speedup to a vector of Point2 objects
-                points = [Point2(trunc_list[i], speedup[i, j]) for i in 1:length(trunc_list)]
+                points = [Point2(truncation_list[i], speedup[i, j]) for i in 1:length(truncation_list)]
                 lines!(ax, points, label = "$func_name", linewidth = 2)
             end
         end
 
         # Add a horizontal line for y = 1
-        max_size = maximum(trunc_list)
+        max_size = maximum(truncation_list)
         lines!(ax, [0, max_size], [1, 1], linestyle = :dot, color = :black, label = "y = 1")
 
         if j == n
@@ -141,7 +140,7 @@ function plot_times(cpu_results, gpu_results, figx = 500, figy = 1000)
 
     # Create a subplot for each nlayers value
     for (j, nlayers) in enumerate(nlayers_list)
-        axes[j] = Axis(fig[1, j], xlabel = "Trunc (T)", title = "nlayers = $nlayers", yscale = log10)
+        axes[j] = Axis(fig[1, j], xlabel = "Truncation", title = "nlayers = $nlayers", yscale = log10)
         ax = axes[j]
 
         for (i, (func_name, type_results)) in enumerate(cpu_results)
@@ -152,8 +151,8 @@ function plot_times(cpu_results, gpu_results, figx = 500, figy = 1000)
 
             cpu_times = cpu_results[func_name][Float32] ./ 1.0e9
             gpu_times = gpu_results[func_name][Float32] ./ 1.0e9
-            cpu_points = [Point2(trunc_list[i], cpu_times[i, j]) for i in 1:length(trunc_list)]
-            gpu_points = [Point2(trunc_list[i], gpu_times[i, j]) for i in 1:length(trunc_list)]
+            cpu_points = [Point2(truncation_list[i], cpu_times[i, j]) for i in 1:length(truncation_list)]
+            gpu_points = [Point2(truncation_list[i], gpu_times[i, j]) for i in 1:length(truncation_list)]
 
             # Convert array_sizes and speedup to a vector of Point2 objects
             lines!(
@@ -182,8 +181,8 @@ function plot_times(cpu_results, gpu_results, figx = 500, figy = 1000)
 end
 
 # Run benchmarks for CPU and GPU
-@show gpu_results = run_benchmarks(trunc_list, nlayers_list, float_types, SpeedyWeather.GPU())
-@show cpu_results = run_benchmarks(trunc_list, nlayers_list, float_types, SpeedyWeather.CPU())
+@show gpu_results = run_benchmarks(truncation_list, nlayers_list, float_types, SpeedyWeather.GPU())
+@show cpu_results = run_benchmarks(truncation_list, nlayers_list, float_types, SpeedyWeather.CPU())
 
 # Plot the results
 plot_speedup(cpu_results, gpu_results)

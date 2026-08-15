@@ -20,7 +20,7 @@ jobs:
       run:
         shell: bash
         working-directory: ./SpeedyWeather
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
       actions: write
       contents: read
@@ -28,18 +28,18 @@ jobs:
       matrix:
         version:
           - '1.10'
-          - '1.11'
+          - '1.12'
         os:
           - ubuntu-latest
         arch:
           - x64
     steps:
-      - uses: actions/checkout@v6
-      - uses: julia-actions/setup-julia@v2
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - name: Julia 1.10, add local packages as sources not supported yet
         shell: julia --color=yes --project=. {0}
         run: |
@@ -47,9 +47,10 @@ jobs:
           Pkg.develop([PackageSpec(; path) for path in ("../SpeedyWeatherInternals", "../LowerTriangularArrays", "../RingGrids", "../SpeedyTransforms")])
           Pkg.instantiate()
         if: ${{ matrix.version == '1.10' }}
-      - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:
+          optimize: 2               # default, use -O0 within ParallelTestRunner
+          test_args: '--verbose'    # this will also print compile time information via ParallelTestRunner.jl
           project: SpeedyWeather
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

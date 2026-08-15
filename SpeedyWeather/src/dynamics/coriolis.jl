@@ -5,7 +5,7 @@ export Coriolis
 """Model component holding the Coriolis parameter `f` on the model grid,
 a vector over the latitude rings. $(TYPEDFIELDS)"""
 @kwdef struct Coriolis{VectorType} <: AbstractCoriolis
-    "[DERIVED] Coriolis frequency [s^-1], scaled by radius as is vorticity = 2Ω*sin(lat)*radius"
+    "[DERIVED] Coriolis frequency [s^-1], = 2Ω*sin(lat)"
     f::VectorType
 end
 
@@ -15,11 +15,9 @@ Adapt.@adapt_structure Coriolis
 Coriolis(SG::SpectralGrid) = Coriolis(on_architecture(SG.architecture, zeros(SG.NF, SG.nlat)))
 
 function initialize!(coriolis::Coriolis, model::AbstractModel)
-    (; radius, rotation) = model.planet
+    (; rotation) = model.planet
     (; sinlat) = model.geometry
-
-    # =2Ωsin(lat) but scaled with radius as are the equations
-    coriolis.f .= 2rotation * sinlat * radius
+    coriolis.f .= 2rotation * sinlat
     return nothing
 end
 

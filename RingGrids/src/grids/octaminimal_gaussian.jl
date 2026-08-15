@@ -8,8 +8,8 @@ of total number of grid points over the `OctahedralGaussianGrid`, hence the name
 
 Fields are
 $(TYPEDFIELDS)"""
-struct OctaminimalGaussianGrid{A, V, W} <: AbstractReducedGrid{A}
-    nlat_half::Int                  # number of latitudes on one hemisphere
+struct OctaminimalGaussianGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
+    nlat_half::IntType              # number of latitudes on one hemisphere
     architecture::A                 # information about device, CPU/GPU
     rings::V                        # precomputed ring indices
     whichring::W                    # precomputed ring index for each grid point ij
@@ -66,6 +66,8 @@ function get_lond_per_ring(Grid::Type{<:OctaminimalGaussianGrid}, nlat_half::Int
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
     return collect((180 / nlon):(360 / nlon):360)       # use HEALPix definition for longitudes
 end
+
+hasoffset(::Type{<:OctaminimalGaussianGrid}) = true     # first longitude point dlon/2 east of 0˚
 
 ## QUADRATURE
 get_quadrature_weights(::Type{<:OctaminimalGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)

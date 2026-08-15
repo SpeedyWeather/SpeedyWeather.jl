@@ -1,0 +1,37 @@
+module ParameterEditing
+
+# STRUCTURE
+using DocStringExtensions
+
+# ARRAYS
+import ComponentArrays: ComponentArray, ComponentVector, Axis, labels, label2index, getaxes
+
+# UTILITIES
+import MacroTools
+import ModelParameters: ModelParameters, AbstractParam
+import ConstructionBase: constructorof, getproperties, setproperties
+
+# extend value from Dates so there's one unified function
+import Dates: value
+
+# DOMAINS
+import DomainSets: Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine, UnitInterval
+using DomainSets.IntervalSets
+export Unbounded, Positive, Nonnegative, Negative
+export ComponentVector
+
+# Domain aliases
+const Unbounded = RealLine()
+const Positive = PositiveRealLine()
+const Nonnegative = NonnegativeRealLine()
+const Negative = NegativeRealLine()
+
+# Parameter utilities
+export ParameterTable
+export @parameterized, parameters, parameterof, reconstruct, stripparams, attributes, bounds, description, value
+
+include("parameter_table.jl")
+include("parameters.jl")
+include("parameterized.jl")
+
+end

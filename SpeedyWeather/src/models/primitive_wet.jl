@@ -33,7 +33,6 @@ $(TYPEDFIELDS)"""
         AL,     # <:AbstractAlbedo,
         BL,     # <:AbstractBoundaryLayer,
         VD,     # <:AbstractVerticalDiffusion,
-        SC,     # <:AbstractSurfaceCondition,
         SM,     # <:AbstractSurfaceMomentumFlux,
         SH,     # <:AbstractSurfaceHeatFlux,
         HF,     # <:AbstractSurfaceHumidityFlux,
@@ -41,6 +40,7 @@ $(TYPEDFIELDS)"""
         CV,     # <:AbstractConvection,
         SW,     # <:AbstractShortwave,
         LW,     # <:AbstractLongwave,
+        GHG,    # NamedTuple of <:AbstractGreenhouseGas,
         SP,     # <:AbstractStochasticPhysics,
         CP,     # <:AbstractParameterization
         TS,     # <:AbstractTimeStepper,
@@ -53,7 +53,6 @@ $(TYPEDFIELDS)"""
         FB,     # <:AbstractFeedback,
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
-        TS3,    # <:Tuple{Symbol}
         PV,     # <:Val
     } <: PrimitiveWet
 
@@ -78,19 +77,18 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # BOUNDARY CONDITIONS
+    dynamics_only::Bool = false
     @component orography::OR = EarthOrography(spectral_grid)
     @component land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
     @component ocean::OC = SlabOcean(spectral_grid)
     @component sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
     @component land::LA = LandModel(spectral_grid)
-    @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
-    @component albedo::AL = DefaultAlbedo(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
-    physics::Bool = true
-    @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
+    @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    @component albedo::AL = OceanLandAlbedo(spectral_grid)
+    @component boundary_layer::BL = BoundaryLayer(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    @component surface_condition::SC = SurfaceCondition(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
@@ -98,6 +96,7 @@ $(TYPEDFIELDS)"""
     @component convection::CV = BettsMillerConvection(spectral_grid)
     @component shortwave_radiation::SW = OneBandShortwave(spectral_grid)
     @component longwave_radiation::LW = OneBandLongwave(spectral_grid)
+    @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
@@ -118,32 +117,53 @@ $(TYPEDFIELDS)"""
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
     # also determine order in which parameterizations are called
-    model_parameters::TS1 = (
+    core_components::TS1 = (
         :architecture, :time_stepping, :orography, :geopotential, :atmosphere,
         :planet, :geometry, :land_sea_mask,
     )
-    parameterizations::TS2 = (  # mixing and precipitation
-        :vertical_diffusion, :large_scale_condensation, :convection,
-
-        # radiation
-        :albedo, :shortwave_radiation, :longwave_radiation,
-
-        # surface fluxes
-        :boundary_layer_drag, :surface_condition,
-        :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux,
-
-        # perturbations
-        :stochastic_physics,
+    parameterizations::TS2 = (
+        :solar_zenith,              # external forcing
+        :vertical_diffusion,        # mixing and precipitation
+        :large_scale_condensation,
+        :convection,
+        :albedo,                    # radiation
+        :shortwave_radiation,
+        :longwave_radiation,
+        :boundary_layer,            # surface fluxes
+        :surface_momentum_flux,
+        :surface_heat_flux,
+        :surface_humidity_flux,
+        :stochastic_physics,        # perturbations
     )
-    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean, :sea_ice)
 
     # DERIVED
     # used to infer parameterizations at compile-time
     params::PV = Val(parameterizations)
 end
 
-prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
-default_concrete_model(::Type{PrimitiveWet}) = PrimitiveWetModel
+variables(model::PrimitiveWet) = variables(typeof(model), get_nsteps(model.time_stepping, model))
+
+"""($TYPEDSIGNATURES) All variables needed for the primitive wet model itself (components excluded)."""
+function variables(::Type{<:PrimitiveWet}, nsteps = DEFAULT_NSTEPS)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
+    return (
+        variables(PrimitiveDry, nsteps)...,
+
+        # Add humidity
+        PrognosticVariable(:humidity, SpectralXYZT(ps), desc = "Specific humidity", units = "kg/kg", fuse=:prognostic),
+        GridVariable(:humidity, GridXYZT(pg), desc = "Specific Humidity", units = "kg/kg", fuse=:grid),
+        TendencyVariable(:humidity, SpectralXYZT(ts), desc = "Tendency of specific humidity", units = "kg/kg/s", fuse = :spectral_tendencies),
+        TendencyVariable(:humidity, GridXYZT(tg), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s", fuse = :grid_tendencies),
+
+        DynamicsVariable(:uq, GridXYZT(tg), desc = "u*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vq, GridXYZT(tg), desc = "v*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:uq, SpectralXYZT(ts), desc = "u*humidity intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vq, SpectralXYZT(ts), desc = "v*humidity intermediate in spectral space", fuse = :spectral_tendencies),
+    )
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -174,51 +194,45 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.albedo, model)
 
     # parameterizations
-    initialize!(model.boundary_layer_drag, model)
+    initialize!(model.boundary_layer, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
-    initialize!(model.surface_condition, model)
+    initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.surface_humidity_flux, model)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
 
-    # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(model)
-    diagnostic_variables = DiagnosticVariables(model)
+    # allocate all variables
+    variables = Variables(model)
 
-    # initialize non-atmosphere prognostic variables
-    (; particles, ocean, land) = prognostic_variables
-    initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
-    initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
-    initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
+    # set the time first
+    (; clock) = variables.prognostic
+    set!(clock, time = time, start = time)
 
-    # set the initial conditions (may overwrite variables set in initialize! ocean/land)
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    (; clock) = prognostic_variables
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    # set all initial conditions for the ocean, sea ice, land then atmosphere
+    initialize!(variables, model)
 
-    # pack prognostic, diagnostic variables and model into a simulation
-    return Simulation(prognostic_variables, diagnostic_variables, model)
+    return Simulation(variables, model)
+end
+
+function reinitialize!(model::PrimitiveWetModel, vars::AbstractVariables)
+    reinitialize!(model.implicit, model, vars)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
-Extract the number of soil layers from the model."""
-@inline get_soil_layers(model::PrimitiveWetModel) = get_soil_layers(model.land)
-
-"""$(TYPEDSIGNATURES)
 A `model` is adapted to the GPU or CPU by wrapping some (but not all!)
-of its fields (determined by `model.model_parameters`) into a NamedTuple.
+of its fields (determined by `model.core_components`) into a NamedTuple.
 Importantly, while accessing fields `model.field` still works as usual,
 one cannot use multiple dispatch on the model as a whole, e.g. `::PrimitiveDry`
 will not work on GPU-adapted models."""
 function Adapt.adapt_structure(to, model::PrimitiveWetModel)
-    adapt_fields = model.model_parameters
+    adapt_fields = model.core_components
     return NamedTuple{adapt_fields}(
         adapt_structure(to, getfield(model, field)) for field in adapt_fields
     )

@@ -14,13 +14,14 @@ field = Field(grid, k...)
 column_field = transpose(field)
 ```
 """
-struct ColumnField{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
+struct ColumnField{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid, Dims} <: AbstractField{T, N, ArrayType, Grid, Dims}
     data::ArrayType
     grid::Grid
+    dims::Dims
 
-    function ColumnField(data, grid)
+    function ColumnField(data, grid, dims = default_column_field_dimensions(data))
         data_matches_grid(data, grid; horizontal_dim = 2) || throw(DimensionMismatch(data, grid))
-        return new{eltype(data), ndims(data), typeof(data), typeof(grid)}(data, grid)
+        return new{eltype(data), ndims(data), typeof(data), typeof(grid), typeof(dims)}(data, grid, dims)
     end
 end
 
@@ -36,10 +37,13 @@ ColumnField(grid::AbstractGrid, k...) = transpose(zeros(grid, k...))
 ColumnField(::Type{T}, grid::AbstractGrid, k...) where {T} = transpose(zeros(T, grid, k...))
 (::Type{<:ColumnField{T}})(data::AbstractArray, grid::AbstractGrid) where {T} = ColumnField(T.(data), grid)
 
+default_column_field_dimensions(::AbstractVector) = ArrayDimensions.XY()
+default_column_field_dimensions(::AbstractArray) = ArrayDimensions.ZXY()
+
 # TYPES
 Architectures.nonparametric_type(::Type{<:ColumnField}) = ColumnField
-grid_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = G
-Architectures.array_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = A
+grid_type(::Type{<:ColumnField{T, N, A, G}}) where {T, N, A, G} = G
+Architectures.array_type(::Type{<:ColumnField{T, N, A, G}}) where {T, N, A, G} = A
 
 # CONVERSION from Field
 LinearAlgebra.transpose(field::Field) = transpose_safe(field)
@@ -197,41 +201,9 @@ function (::Type{F})(
     return ColumnField(data, grid)
 end
 
-## Some ARITHMETICS with regular Fields
+# Some ARITHMETICS with regular Fields
 add!(field::Field, column_field::ColumnField) = field .+= transpose(column_field)
 add!(column_field::ColumnField, field::Field) = column_field .+= transpose(field)
-
-## BROADCASTING (main functionality defined in field.jl)
-
-# define broadcast style for ColumnField from its parameters
-Base.BroadcastStyle(::Type{F}) where {F <: ColumnField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
-    FieldStyle{N, nonparametric_type(Grid), true}()
-
-# allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
-# e.g. field1 + field2 creates a new field that share the grid of field1
-# 2 .+ field1 creates a new field that share the grid of field1
-function Base.similar(bc::Broadcasted{FieldStyle{N, Grid, true}}, ::Type{T}) where {N, Grid, T}
-    field = find_field(bc)
-    ArrayType_ = nonparametric_type(typeof(field.data))
-    new_data = ArrayType_{T}(undef, size(bc))
-    old_grid = field.grid
-    return ColumnField(new_data, old_grid)
-end
-
-# same as for FieldStyle but for constrain to ArrayType<:GPUArrays
-function Base.BroadcastStyle(
-        ::Type{F}
-    ) where {F <: ColumnField{T, N, ArrayType, Grid}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, Grid}
-    return FieldGPUStyle{N, Grid, true}()
-end
-
-function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid, true}}, ::Type{T}) where {N, Grid, T}
-    field = find_field(bc)
-    ArrayType_ = nonparametric_type(typeof(field.data))
-    new_data = ArrayType_{T}(undef, size(bc))
-    old_grid = field.grid
-    return ColumnField(new_data, old_grid)
-end
 
 function Architectures.on_architecture(arch, field::ColumnField{T, N, ArrayType, Grid}) where {T, N, ArrayType, Grid}
     adapted_data = on_architecture(arch, field.data)

@@ -1,85 +1,130 @@
-"""
-$(TYPEDSIGNATURES)
-Scale the variable `var` inside `progn` with scalar `scale`.
-"""
-@propagate_inbounds function scale!(
-        progn::PrognosticVariables,
-        var::Symbol,
-        scale::Real,
-    )
-    var = getfield(progn, var)
-    return var .*= scale
-end
-
-"""
-$(TYPEDSIGNATURES)
-Scale the variable `var` inside `diagn` with scalar `scale`.
-"""
-@propagate_inbounds function scale!(
-        diagn::DiagnosticVariables,
-        var::Symbol,
-        scale::Real,
-    )
-    variable = getfield(diagn.grid, var)
-    return variable .*= scale
-end
-
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
-@propagate_inbounds function scale!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
-        scale::Real
-    )
-
-    new_scale = scale / progn.scale[]     # undo previous scale and new scale in one go
-    scale!(progn, :vor, new_scale)
-    scale!(progn, :div, new_scale)
-    progn.scale[] = scale               # store scaling information
-    return diagn.scale[] = scale               # store scaling information
+@propagate_inbounds function scale_prognostic!(vars::Variables, scale::Real)
+    progn = vars.prognostic             # for convenience
+    new_scale = scale / progn.scale[]   # undo previous scale and new scale in one go
+    haskey(progn, :vorticity) && (progn.vorticity .*= new_scale)
+    haskey(progn, :divergence) && (progn.divergence .*= new_scale)
     # no need to actually scale the diagnostic variables as they will be
     # overwritten by the transform of the prognostic variables anyway
+    progn.scale[] = scale               # store scaling information
+    return vars
 end
 
-"""$(TYPEDSIGNATURES)
-Scale the tendencies inside `diagn` with scalar `scale`.
-Intended use to scale the tendencies of the parameterizations
-by the radius for the dynamical core."""
-@propagate_inbounds function scale!(ij, diagn::Tendencies, scale::Real)
-    return @inbounds for k in eachlayer(diagn.u_tend_grid)
-        diagn.u_tend_grid[ij, k] *= scale
-        diagn.v_tend_grid[ij, k] *= scale
-        diagn.temp_tend_grid[ij, k] *= scale
-        diagn.humid_tend_grid[ij, k] *= scale
+function scale_tendencies!(vars::Variables, model::AbstractModel)
+    scale = vars.prognostic.scale[]
+    (; tendencies) = vars
+    TS = model.time_stepping
+
+    # Scale each fused tendency parent exactly ONCE, then the standalone tendencies below.
+    # Fused tendencies (e.g. the grid u/v/temperature/humidity/pressure tendencies) are
+    # `SubArray` views into a shared fused parent buffer. Scaling them per-view would issue
+    # several in-place broadcasts into the same buffer, which Reactant mis-handles within a
+    # single compiled trace: multiple in-place updates to distinct views of one buffer corrupt
+    # the data (this broke the reactant correctness tests). Scaling the whole parent once (a
+    # single broadcast) is equivalent — the scale factor is uniform across members — and
+    # Reactant-safe. Non-tendency intermediates that share these parents (uT_anomaly, uq,
+    # kinetic_energy, the spectral u/v tendencies, …) are overwritten later in
+    # `grid_tendencies!`/`spectral_tendencies!` before being read, so scaling them is harmless.
+    haskey(vars.fused, :spectral_tendencies) &&
+        scale!(get_tendency_step(parent(vars.fused.spectral_tendencies), TS, DummyParameterization()), scale)
+    haskey(vars.fused, :grid_tendencies) &&
+        scale!(get_tendency_step(parent(vars.fused.grid_tendencies), TS, DummyParameterization()), scale)
+
+    # Scale the standalone (non-fused) tendencies individually — unrolled per name
+    _scale_tendencies_unrolled!(vars, TS, scale)
+    return nothing
+end
+
+# scale one standalone tendency; the fused-view members are skipped (their fuse parent is
+# scaled contiguously above). With a concrete `var` the `is_view_entry` check constant-folds.
+@inline function _scale_one_tendency!(var, TS, scale)
+    is_view_entry(var) || scale!(get_tendency_step(var, TS, DummyParameterization()), scale)
+    return nothing
+end
+
+@generated function _scale_tendencies_unrolled!(vars::Variables{Po, G, T}, TS, scale) where {Po, G, T}
+    calls = Expr[]
+    for name in _tendency_names(T)                  # spectral
+        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies, $(QuoteNode(name))), TS, scale)))
     end
+    for name in _tendency_and_uv_names(T)           # grid (+ u, v)
+        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies.grid, $(QuoteNode(name))), TS, scale)))
+    end
+    for name in _namespace_names(T, :tracers)       # grid tracers
+        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies.grid_tracers, $(QuoteNode(name))), TS, scale)))
+    end
+    return Expr(:block, calls..., :(return nothing))
 end
 
+function unscale_tendencies!(vars::Variables)
+    scale = vars.prognostic.scale[]
+    (; tendencies) = vars
+
+    # Mirror `scale_tendencies!`: unscale each fused tendency parent once, then the standalone
+    # tendencies individually (skipping fused members, which are views into the parents). This
+    # avoids multiple in-place broadcasts into a shared buffer, which Reactant mis-handles in a
+    # single compiled trace — see [`scale_tendencies!`](@ref) for details.
+    inv_scale = inv(scale)
+    haskey(vars.fused, :spectral_tendencies) && (parent(vars.fused.spectral_tendencies).data .*= inv_scale)
+    haskey(vars.fused, :grid_tendencies) && (parent(vars.fused.grid_tendencies).data .*= inv_scale)
+
+    # spectral
+    for varname in tendency_names(vars)
+        var = getfield(tendencies, varname)
+        is_view_entry(var) || unscale!(var, scale)
+    end
+
+    # grid
+    for varname in tendency_and_uv_names(vars)
+        var = getfield(tendencies.grid, varname)
+        is_view_entry(var) || unscale!(var, scale)
+    end
+
+    # tracers
+    for varname in tracer_tendency_names(vars)
+        var = getfield(tendencies.grid_tracers, varname)
+        is_view_entry(var) || unscale!(var, scale)
+    end
+    return nothing
+end
+
+
 """$(TYPEDSIGNATURES)
-Undo the radius-scaling of vorticity and divergence from `scale!(progn, scale::Real)`."""
-function unscale!(progn::PrognosticVariables)
+Undo the radius-scaling of vorticity and divergence from `scale_prognostic!(vars, scale::Real)`."""
+function unscale!(vars::Variables)
+    progn = vars.prognostic             # for convenience
     inv_scale = inv(progn.scale[])
-    scale!(progn, :vor, inv_scale)
-    scale!(progn, :div, inv_scale)
-    return progn.scale[] = 1                   # set scale back to 1=unscaled
+    haskey(progn, :vorticity) && (progn.vorticity .*= inv_scale)
+    haskey(progn, :divergence) && (progn.divergence .*= inv_scale)
+
+    # and the corresponding grid variables if they exist
+    haskey(vars.grid, :vorticity) && (vars.grid.vorticity .*= inv_scale)
+    haskey(vars.grid, :divergence) && (vars.grid.divergence .*= inv_scale)
+
+    # also unscale tendencies
+    unscale_tendencies!(vars)
+
+    progn.scale[] = 1                   # set scale back to 1=unscaled
+    return vars
 end
 
 """$(TYPEDSIGNATURES)
-Undo the radius-scaling of vorticity and divergence from `scale!(diagn, scale::Real)`."""
-function unscale!(diagn::DiagnosticVariables)
-    inv_scale = inv(diagn.scale[])
-    scale!(diagn, :vor_grid, inv_scale)
-    scale!(diagn, :div_grid, inv_scale)
-    return diagn.scale[] = 1                   # set scale back to 1=unscaled
-end
-
-"""
-$(TYPEDSIGNATURES)
-Undo the radius-scaling for any variable. Method used for netcdf output."""
-function unscale!(
-        variable::AbstractArray,
+Scale the variable `var` with scalar `scale`."""
+@inline function scale!(
+        variable::Union{LowerTriangularArray, AbstractField},
         scale::Real
     )
-    return variable ./= scale
+    variable.data .*= scale
+    return variable
+end
+
+"""$(TYPEDSIGNATURES)
+Undo the scaling of the variable `var` with scalar `scale`."""
+@inline function unscale!(
+        variable::Union{LowerTriangularArray, AbstractField},
+        scale::Real
+    )
+    return scale!(variable, inv(scale))
 end

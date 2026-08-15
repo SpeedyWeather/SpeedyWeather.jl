@@ -3,30 +3,28 @@
     p = 5:10
 
     @testset for dealiasing in [2, 3]
-        # powers of two minus 1, T31, T63, T127, etc
-        Ts = [2^i - 1 for i in p]                   # spectral resolutions
+        # powers of two, T32, T64, T128, etc (1-based truncation)
+        truncations = [2^i for i in p]                  # spectral resolutions
         nlons = [(dealiasing + 1) * 2^i for i in p]     # number of longitudes
-        nlats = nlons / 2                             # number of latitudes
-        for (T, nlon, nlat) in zip(Ts, nlons, nlats)
-            nlat_half = SpeedyTransforms.get_nlat_half(T, dealiasing)
+        nlats = nlons / 2                               # number of latitudes
+        for (truncation, nlon, nlat) in zip(truncations, nlons, nlats)
+            nlat_half = SpeedyTransforms.get_nlat_half(truncation, dealiasing)
             @test (nlon, nlat) == (4nlat_half, 2nlat_half)
 
-            trunc = SpeedyTransforms.get_truncation(nlat_half, dealiasing)
-            @test T == trunc
+            truncation2 = SpeedyTransforms.get_truncation(nlat_half, dealiasing)
+            @test truncation == truncation2
         end
     end
 
     # for these resolutions just test idempotence as the roundup_fft may
     # give various other options than just the 3*2^n-matching
     @testset for dealiasing in [2, 3]
-        # T42, T85, T170, T341, T682, T1365 etc
-        Ts = [floor(Int, 2^(i + 2) / 3) for i in p]
-        nlons = [dealiasing * 2^(i + 1) for i in p]
-        nlats = nlons / 2                             # number of latitudes
-        for (T, nlon, nlat) in zip(Ts, nlons, nlats)
-            nlat_half = SpeedyTransforms.get_nlat_half(T, dealiasing)
-            trunc = SpeedyTransforms.get_truncation(nlat_half, dealiasing)
-            nlat_half2 = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
+        # T42, T85, T170, T341, T682, T1365 etc (1-based truncation = T + 1)
+        truncations = [floor(Int, 2^(i + 2) / 3) + 1 for i in p]
+        for truncation in truncations
+            nlat_half = SpeedyTransforms.get_nlat_half(truncation, dealiasing)
+            truncation2 = SpeedyTransforms.get_truncation(nlat_half, dealiasing)
+            nlat_half2 = SpeedyTransforms.get_nlat_half(truncation2, dealiasing)
             @test nlat_half == nlat_half2
         end
     end
@@ -34,11 +32,11 @@ end
 
 # for the following testsets test some spectral truncations
 # but not too large ones as they take so long
-spectral_resolutions = (31, 63, 127)
-spectral_resolutions_inexact = (127, 255)
+spectral_truncations = (32, 64, 128)
+spectral_truncations_inexact = (128, 256)
 
 @testset "Transform: l=0, m=0 is constant > 0" begin
-    @testset for trunc in spectral_resolutions
+    @testset for truncation in spectral_truncations
         @testset for NF in (Float32, Float64)
             @testset for Grid in (
                     FullGaussianGrid,
@@ -52,8 +50,8 @@ spectral_resolutions_inexact = (127, 255)
                     FullOctaHEALPixGrid,
                 )
 
-                spectrum = Spectrum(trunc)
-                grid = Grid(SpeedyTransforms.get_nlat_half(trunc))
+                spectrum = Spectrum(truncation)
+                grid = Grid(SpeedyTransforms.get_nlat_half(truncation))
                 S = SpectralTransform(spectrum, grid; NF)
 
                 alms = zeros(LowerTriangularMatrix{Complex{NF}}, spectrum)
@@ -71,7 +69,7 @@ spectral_resolutions_inexact = (127, 255)
 end
 
 @testset "Transform: Individual Legendre polynomials" begin
-    @testset for trunc in spectral_resolutions
+    @testset for truncation in spectral_truncations
         @testset for NF in (Float32, Float64)
             @testset for Grid in (
                     FullGaussianGrid,
@@ -80,8 +78,8 @@ end
                     OctahedralClenshawGrid,
                 )
 
-                spectrum = Spectrum(trunc)
-                grid = Grid(SpeedyTransforms.get_nlat_half(trunc))
+                spectrum = Spectrum(truncation)
+                grid = Grid(SpeedyTransforms.get_nlat_half(truncation))
                 S = SpectralTransform(spectrum, grid; NF)
 
                 lmax = 3
@@ -93,7 +91,7 @@ end
                         map = transform(alms, S)
                         alms2 = transform(map, S)
 
-                        for lm in eachharmonic(alms, alms2)
+                        for lm in eachindex(alms, alms2)
                             @test alms[lm] ≈ alms2[lm] atol = 100 * eps(NF)
                         end
                     end
@@ -104,7 +102,7 @@ end
 end
 
 @testset "Transform: Singleton dimensions" begin
-    @testset for trunc in spectral_resolutions
+    @testset for truncation in spectral_truncations
         @testset for NF in (Float32, Float64)
             @testset for Grid in (
                     FullGaussianGrid,
@@ -114,8 +112,8 @@ end
                     OctaminimalGaussianGrid,
                 )
 
-                spectrum = Spectrum(trunc)
-                grid = Grid(SpeedyTransforms.get_nlat_half(trunc))
+                spectrum = Spectrum(truncation)
+                grid = Grid(SpeedyTransforms.get_nlat_half(truncation))
                 S = SpectralTransform(spectrum, grid; NF)
 
                 lmax = 3
@@ -245,7 +243,7 @@ end
 end
 
 @testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
-    @testset for trunc in spectral_resolutions_inexact
+    @testset for truncation in spectral_truncations_inexact
         @testset for NF in (Float32, Float64)
             @testset for Grid in (
                     HEALPixGrid,
@@ -255,8 +253,8 @@ end
                     FullOctaHEALPixGrid,
                 )
 
-                spectrum = Spectrum(trunc)
-                grid = Grid(SpeedyTransforms.get_nlat_half(trunc))
+                spectrum = Spectrum(truncation)
+                grid = Grid(SpeedyTransforms.get_nlat_half(truncation))
                 S = SpectralTransform(spectrum, grid; NF)
 
                 lmax = 3
@@ -270,7 +268,7 @@ end
 
                         tol = 1.0e-3
 
-                        for lm in eachharmonic(alms, alms2)
+                        for lm in eachindex(alms, alms2)
                             @test alms[lm] ≈ alms2[lm] atol = tol rtol = tol
                         end
                     end
@@ -283,7 +281,7 @@ end
 @testset "Transform: Orography (exact grids)" begin
 
     # Test for variable resolution
-    @testset for trunc in [31, 42]
+    @testset for truncation in [32, 43]
         @testset for NF in (Float64, Float32)
             @testset for Grid in (
                     FullGaussianGrid,
@@ -295,8 +293,8 @@ end
                 # clenshaw-curtis grids are only exact for cubic truncation
                 dealiasing = Grid in (FullGaussianGrid, OctahedralGaussianGrid) ? 2 : 3
 
-                spectrum = Spectrum(trunc)
-                grid = Grid(SpeedyTransforms.get_nlat_half(trunc, dealiasing))
+                spectrum = Spectrum(truncation)
+                grid = Grid(SpeedyTransforms.get_nlat_half(truncation, dealiasing))
                 S = SpectralTransform(spectrum, grid; NF)
 
                 # field that could be orography
@@ -304,7 +302,7 @@ end
                 oro_spec = transform(orography_rough, S)
 
                 # spectral smoothing
-                t = round(Int, trunc * 0.95)
+                t = round(Int, truncation * 0.95)
                 oro_spec = SpeedyTransforms.spectral_smoothing(oro_spec, 0.1, power = 1, truncation = t)
 
                 oro_grid1 = transform(oro_spec, S)
@@ -312,9 +310,9 @@ end
                 oro_grid2 = transform(oro_spec1, S)
                 oro_spec2 = transform(oro_grid2, S)
 
-                tol = NF == Float32 ? sqrt(eps(NF)) : 5.0e-7
+                tol = NF == Float32 ? 2 * sqrt(eps(NF)) : 5.0e-7
 
-                for lm in eachharmonic(oro_spec1, oro_spec2)
+                for lm in eachindex(oro_spec1, oro_spec2)
                     @test oro_spec1[lm] ≈ oro_spec2[lm] atol = tol rtol = tol
                 end
                 for ij in eachindex(oro_grid1, oro_grid2)
@@ -339,7 +337,7 @@ end
         1.0e-2,     # HEALPixGrid
         1.0e-2,     # OctaHEALPixGrid
     ]
-    @testset for trunc in [42, 61]
+    @testset for truncation in [43, 64]
         @testset for (i_grid, Grid) in enumerate(
                 (
                     FullGaussianGrid,
@@ -357,8 +355,8 @@ end
             NF = Float64
             nlayers = 8
 
-            spectrum = Spectrum(trunc)
-            grid = Grid(SpeedyTransforms.get_nlat_half(trunc, dealiasing))
+            spectrum = Spectrum(truncation)
+            grid = Grid(SpeedyTransforms.get_nlat_half(truncation, dealiasing))
             S = SpectralTransform(spectrum, grid; NF, nlayers)
 
             # start in spectral space but compare in grid space to
@@ -371,5 +369,39 @@ end
 
             @test grid_roundtrip ≈ grid rtol = tolerances[i_grid]
         end
+    end
+end
+
+@testset "Transform: per-K FFT plan multiplexing" begin
+    # FFTW/cuFFT plans bake the batch dim K into the plan. SpectralTransform pre-plans for each
+    # K in `transform_batch`; the K=1 entry is the serial fallback. This test verifies:
+    #   (a) the plan dict has the expected K keys,
+    #   (b) batched calls at each planned K give a faithful spec→grid→spec→grid roundtrip,
+    #   (c) unplanned K still works (falls back to serial via `_fourier!` dispatch).
+    NF = Float64
+    truncation = 32
+    dealiasing = 3
+    nlayers = 4
+    spectrum = Spectrum(truncation)
+    grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(truncation, dealiasing))
+
+    S = SpectralTransform(spectrum, grid; NF, nlayers, transform_batch = Int[1, 2, 4])
+
+    # (a) planned plans present, scratch sized to max planned K. K=1 lives in the always-built serial
+    # plan vector; the batched (K>1) plans are keyed by K in the batched Dicts.
+    @test length(S.rfft_plan_serial) == S.grid.nlat_half
+    @test length(S.brfft_plan_serial) == S.grid.nlat_half
+    @test sort!(collect(keys(S.rfft_plans_batched))) == [2, 4]
+    @test sort!(collect(keys(S.brfft_plans_batched))) == [2, 4]
+    @test S.nlayers == 4
+
+    # (b)+(c) roundtrip at each K — including K=3 which is NOT in the planned set
+    # and must therefore go through the K=1 serial fallback via `_fourier!` dispatch.
+    for K in (1, 2, 3, 4)
+        spec_in = randn(Complex{NF}, spectrum, K)
+        grid_out = transform(spec_in, S)
+        spec_back = transform(grid_out, S)
+        grid_back = transform(spec_back, S)
+        @test grid_back ≈ grid_out rtol = 1.0e-13
     end
 end

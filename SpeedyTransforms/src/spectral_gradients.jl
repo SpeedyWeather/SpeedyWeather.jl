@@ -10,31 +10,12 @@ Type for dispatching on kernel operations in spectral gradient calculations.
 """
 struct KernelOP{mode, flipsign, add} end
 
-# Curl operations (mode == true): a+b-c
-# Standard curl (no flipsign, no add)
-@inline (::KernelOP{true, false, false})(o, a, b, c) = a + b - c
-
-# Curl with flipsign (no add)
-@inline (::KernelOP{true, true, false})(o, a, b, c) = -(a + b - c)
-
-# Curl with add (no flipsign)
-@inline (::KernelOP{true, false, true})(o, a, b, c) = o + (a + b - c)
-
-# Curl with flipsign and add
-@inline (::KernelOP{true, true, true})(o, a, b, c) = o - (a + b - c)
-
-# Divergence operations (mode == false): a-b+c
-# Standard divergence (no flipsign, no add)
-@inline (::KernelOP{false, false, false})(o, a, b, c) = a - b + c
-
-# Divergence with flipsign (no add)
-@inline (::KernelOP{false, true, false})(o, a, b, c) = -(a - b + c)
-
-# Divergence with add (no flipsign)
-@inline (::KernelOP{false, false, true})(o, a, b, c) = o + (a - b + c)
-
-# Divergence with flipsign and add
-@inline (::KernelOP{false, true, true})(o, a, b, c) = o - (a - b + c)
+# `mode`, `flipsign` and `add` are type parameters, so the branches below are compile-time constants
+@inline function (::KernelOP{mode, flipsign, add})(o, a, b, c) where {mode, flipsign, add}
+    base = mode ? (a + b - c) : (a - b + c)     # curl : divergence
+    val = flipsign ? -base : base
+    return add ? o + val : val
+end
 
 
 """
@@ -50,14 +31,13 @@ function curl!(
         curl::LowerTriangularArray,
         u::LowerTriangularArray,
         v::LowerTriangularArray,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         flipsign::Bool = false,
         add::Bool = false,
         kwargs...,
     )
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
-    kernel = KernelOP{true, flipsign, add}()
-    return _divergence!(kernel, curl, v, u, S; kwargs...)      # flip u, v -> v, u
+    return _divergence!(Val(true), flipsign, add, curl, v, u, S; kwargs...)   # flip u, v -> v, u
 end
 
 """
@@ -72,14 +52,32 @@ function divergence!(
         div::LowerTriangularArray,
         u::LowerTriangularArray,
         v::LowerTriangularArray,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         flipsign::Bool = false,
         add::Bool = false,
         kwargs...,
     )
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel = KernelOP{false, flipsign, add}()
-    return _divergence!(kernel, div, u, v, S; kwargs...)
+    return _divergence!(Val(false), flipsign, add, div, u, v, S; kwargs...)
+end
+
+# `KernelOP` encodes `flipsign`/`add` as type parameters (the functors above dispatch on them inside the
+# kernel), but `curl!`/`divergence!` receive them as *runtime* `Bool`s — so `KernelOP{mode, flipsign, add}()`
+# would widen to the abstract `KernelOP{mode}` and force `_divergence!` through a runtime dispatch.
+# Manually union-split on the two Bools so each `_divergence!` call sees a CONCRETE `KernelOP`.
+# `mode` is passed as `Val` (a literal at both call sites) so it const-folds.
+@inline function _divergence!(
+        ::Val{mode}, flipsign::Bool, add::Bool,
+        div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray,
+        S::AbstractSpectralTransform; kwargs...,
+    ) where {mode}
+    return if flipsign
+        add ? _divergence!(KernelOP{mode, true, true}(), div, u, v, S; kwargs...) :
+              _divergence!(KernelOP{mode, true, false}(), div, u, v, S; kwargs...)
+    else
+        add ? _divergence!(KernelOP{mode, false, true}(), div, u, v, S; kwargs...) :
+              _divergence!(KernelOP{mode, false, false}(), div, u, v, S; kwargs...)
+    end
 end
 
 function _divergence!(
@@ -87,14 +85,14 @@ function _divergence!(
         div::LowerTriangularArray,
         u::LowerTriangularArray,
         v::LowerTriangularArray,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         radius = DEFAULT_RADIUS,
     )
-    (; grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2) = S
+    (; grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2) = S.gradients
 
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
 
-    launch!(architecture(div), SpectralWorkOrder, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2)
+    launch!(architecture(div), SpectralWorkOrder, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2, size(div, 1))
 
     # radius scaling if not unit sphere
     if radius != 1
@@ -104,11 +102,10 @@ function _divergence!(
     return div
 end
 
-@kernel inbounds = true function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2) where {mode, flipsign, add}
+@kernel inbounds = true function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2, lmmax) where {mode, flipsign, add}
 
     I = @index(Global, Cartesian)
     lm = I[1]
-    lmmax = size(div, 1)
     k = ndims(div) == 1 ? CartesianIndex() : I[2]
 
     if lm == 1
@@ -116,7 +113,11 @@ end
     elseif lm == lmmax
         div[I] = 0
     else
-        ∂u∂λ = im * grad_x_vordiv[lm] * u[I]
+        # ∂u/∂λ = i·m·u: multiply-by-imaginary is a 90° rotate + scale (2 real muls) rather than the
+        # generic 4-mul/2-add complex product the compiler emits for `im * m * u`.
+        z = u[I]
+        m = grad_x_vordiv[lm]
+        ∂u∂λ = Complex(-m * imag(z), m * real(z))
         ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm - 1, k]
         ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm + 1, k]
         div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
@@ -153,7 +154,7 @@ end
 function divergence(
         u::LowerTriangularArray,
         v::LowerTriangularArray,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         kwargs...
     )
     div = similar(u)
@@ -228,7 +229,7 @@ end
 function curl(
         u::LowerTriangularArray,
         v::LowerTriangularArray,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         kwargs...
     )
     vor = similar(u)
@@ -248,10 +249,10 @@ function UV_from_vor!(
         U::LowerTriangularArray,
         V::LowerTriangularArray,
         vor::LowerTriangularArray,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         radius = DEFAULT_RADIUS,
     )
-    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2) = S
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2) = S.gradients
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
     launch!(architecture(U), SpectralWorkOrder, size(U), _UV_from_vor_kernel!, U, V, vor, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
@@ -265,7 +266,7 @@ function UV_from_vor!(
     return U, V
 end
 
-@kernel inbounds = true function _UV_from_vor_kernel!(U, V, vor, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+@kernel inbounds = true function _UV_from_vor_kernel!(U, V, vor, l_indices, lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
@@ -310,10 +311,10 @@ function UV_from_vordiv!(
         V::LowerTriangularArray,
         vor::LowerTriangularArray,
         div::LowerTriangularArray,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         radius = DEFAULT_RADIUS,
     )
-    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2) = S
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2) = S.gradients
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
     launch!(architecture(U), SpectralWorkOrder, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
@@ -327,7 +328,7 @@ function UV_from_vordiv!(
     return U, V
 end
 
-@kernel inbounds = true function _UV_from_vordiv_kernel!(U, V, vor, div, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+@kernel inbounds = true function _UV_from_vordiv_kernel!(U, V, vor, div, l_indices, lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
@@ -383,23 +384,20 @@ Keyword arguments
 Default is `add=false`, `flipsign=false`, `inverse=false`. These options can be combined.
 """
 function ∇²!(
-        ∇²alms::LowerTriangularArray,   # Output: (inverse) Laplacian of alms
-        alms::LowerTriangularArray,     # Input: spectral coefficients
-        S::SpectralTransform;           # precomputed eigenvalues
-        add::Bool = false,                # add to output array or overwrite
-        flipsign::Bool = false,           # -∇² or ∇²
-        inverse::Bool = false,            # ∇⁻² or ∇²
-        radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+        ∇²alms::LowerTriangularArray,       # Output: (inverse) Laplacian of alms
+        alms::LowerTriangularArray,         # Input: spectral coefficients
+        S::AbstractSpectralTransform;       # precomputed eigenvalues
+        add::Bool = false,                  # add to output array or overwrite
+        flipsign::Bool = false,             # -∇² or ∇²
+        inverse::Bool = false,              # ∇⁻² or ∇²
+        radius = DEFAULT_RADIUS,            # scale with radius if provided, otherwise unit sphere
     )
     @boundscheck ismatching(S, ∇²alms) || throw(DimensionMismatch(S, ∇²alms))
 
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
 
-    kernel = flipsign ? (add ? (o, a) -> (o - a) : (o, a) -> -a) :
-        (add ? (o, a) -> (o + a) : (o, a) -> a)
-
-    launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
+    launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, add, flipsign, alms.spectrum.l_indices)
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -410,14 +408,16 @@ function ∇²!(
     return ∇²alms
 end
 
-@kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(l_indices))
+@kernel function ∇²_kernel!(∇²alms, alms, eigenvalues, add, flipsign, l_indices)
 
     I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
     # we use cartesian index instead of NTuple here
     # because this works for 2D and 3D matrices
     l = l_indices[I[1]]
 
-    ∇²alms[I] = kernel_func(∇²alms[I], alms[I] * eigenvalues[l])
+    a = alms[I] * eigenvalues[l]
+    a = flipsign ? -a : a
+    ∇²alms[I] = add ? ∇²alms[I] + a : a
 end
 
 """
@@ -426,8 +426,8 @@ Laplace operator ∇² applied to input `alms`, using precomputed eigenvalues fr
 Acts on the unit sphere, i.e. it omits 1/radius^2 scaling unless
 `radius` keyword argument is provided."""
 function ∇²(
-        alms::LowerTriangularArray,     # Input: spectral coefficients
-        S::SpectralTransform;           # precomputed eigenvalues
+        alms::LowerTriangularArray,             # Input: spectral coefficients
+        S::AbstractSpectralTransform;           # precomputed eigenvalues
         kwargs...,
     )
     ∇²alms = similar(alms)
@@ -448,8 +448,8 @@ InverseLaplace operator ∇⁻² applied to input `alms`, using precomputed
 eigenvalues from `S`. Acts on the unit sphere, i.e. it omits radius^2 scaling unless
 `radius` keyword argument is provided."""
 function ∇⁻²(
-        ∇²alms::LowerTriangularArray,   # Input: spectral coefficients
-        S::SpectralTransform;           # precomputed eigenvalues
+        ∇²alms::LowerTriangularArray,           # Input: spectral coefficients
+        S::AbstractSpectralTransform;           # precomputed eigenvalues
         kwargs...,
     )
     alms = similar(∇²alms)
@@ -466,11 +466,11 @@ Acts on the unit sphere, i.e. it omits radius^2 scaling unless
 
 """$(TYPEDSIGNATURES) Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
 function ∇⁻²!(
-        ∇⁻²alms::LowerTriangularArray,  # Output: inverse Laplacian of alms
-        alms::LowerTriangularArray,     # Input: spectral coefficients
-        S::SpectralTransform;           # precomputed eigenvalues
-        add::Bool = false,              # add to output array or overwrite
-        flipsign::Bool = false,         # -∇⁻² or ∇⁻²
+        ∇⁻²alms::LowerTriangularArray,          # Output: inverse Laplacian of alms
+        alms::LowerTriangularArray,             # Input: spectral coefficients
+        S::AbstractSpectralTransform;           # precomputed eigenvalues
+        add::Bool = false,                      # add to output array or overwrite
+        flipsign::Bool = false,                 # -∇⁻² or ∇⁻²
         kwargs...,
     )
     inverse = true
@@ -481,13 +481,13 @@ end
 in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
 on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
 function ∇!(
-        dpdx::LowerTriangularArray,     # Output: zonal gradient
-        dpdy::LowerTriangularArray,     # Output: meridional gradient
-        p::LowerTriangularArray,        # Input: spectral coefficients
-        S::SpectralTransform;           # includes precomputed arrays
-        radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+        dpdx::LowerTriangularArray,             # Output: zonal gradient
+        dpdy::LowerTriangularArray,             # Output: meridional gradient
+        p::LowerTriangularArray,                # Input: spectral coefficients
+        S::AbstractSpectralTransform;           # includes precomputed arrays
+        radius = DEFAULT_RADIUS,                # scale with radius if provided, otherwise unit sphere
     )
-    (; grad_y1, grad_y2) = S
+    (; grad_y1, grad_y2) = S.gradients
     (; m_indices) = p.spectrum
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
@@ -529,7 +529,7 @@ end
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
 using an existing `SpectralTransform` `S`. Acts on the unit sphere,
 i.e. it omits 1/radius scaling unless `radius` keyword argument is provided."""
-function ∇(p::LowerTriangularArray, S::SpectralTransform; kwargs...)
+function ∇(p::LowerTriangularArray, S::AbstractSpectralTransform; kwargs...)
     dpdx = similar(p)
     dpdy = similar(p)
     ∇!(dpdx, dpdy, p, S; kwargs...)
@@ -548,7 +548,7 @@ end
 Transform to spectral space, takes the gradient and unscales the 1/coslat
 scaling in the gradient. Acts on the unit-sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided. Makes use of an existing spectral transform `S`."""
-function ∇(field::AbstractField, S::SpectralTransform; kwargs...)
+function ∇(field::AbstractField, S::AbstractSpectralTransform; kwargs...)
     p = transform(field, S)
     dpdx, dpdy = ∇(p, S; kwargs...)
     dpdx_grid = transform(dpdx, S, unscale_coslat = true)
@@ -564,3 +564,11 @@ function ∇(field::AbstractField; kwargs...)
     S = SpectralTransform(field, one_more_degree = true)
     return ∇(field, S; kwargs...)
 end
+
+# for people that don't have unicode support on their keyboard
+laplace = ∇²
+laplace! = ∇²!
+inverse_laplace = ∇⁻²
+inverse_laplace! = ∇⁻²!
+gradient = ∇
+gradient! = ∇!

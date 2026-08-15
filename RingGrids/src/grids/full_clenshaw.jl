@@ -13,8 +13,8 @@ can share the same grid which just defines the discretization and the architectu
 The resolution parameter of the horizontal grid is `nlat_half` (number of latitude rings on one hemisphere,
 Equator included) and the ring indices are precomputed in `rings`.
 $(TYPEDFIELDS)"""
-struct FullClenshawGrid{A, V, W} <: AbstractFullGrid{A}
-    nlat_half::Int      # number of latitudes on one hemisphere
+struct FullClenshawGrid{A, V, W, IntType} <: AbstractFullGrid{A}
+    nlat_half::IntType  # number of latitudes on one hemisphere
     architecture::A     # information about device, CPU/GPU
     rings::V            # precomputed ring indices
     whichring::W        # precomputed ring index for each grid point ij
@@ -47,6 +47,7 @@ get_nlon(::Type{<:FullClenshawGrid}, nlat_half::Integer) = 4nlat_half
 ## COORDINATES
 get_latd(::Type{<:FullClenshawGrid}, nlat_half::Integer) = [90 - 90j / nlat_half for j in 1:(2nlat_half - 1)]
 get_lond(::Type{<:FullClenshawGrid}, nlat_half::Integer) = get_lond(FullGaussianGrid, nlat_half)
+hasoffset(::Type{<:FullClenshawGrid}) = false   # first longitude point on 0˚
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullClenshawGrid}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)

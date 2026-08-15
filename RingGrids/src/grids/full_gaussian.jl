@@ -14,8 +14,8 @@ can share the same grid which just defines the discretization and the architectu
 The resolution parameter of the horizontal grid is `nlat_half` (number of latitude rings on one hemisphere,
 Equator included) and the ring indices are precomputed in `rings`.
 $(TYPEDFIELDS)"""
-struct FullGaussianGrid{A, V, W} <: AbstractFullGrid{A}
-    nlat_half::Int              # number of latitudes on one hemisphere
+struct FullGaussianGrid{A, V, W, IntType} <: AbstractFullGrid{A}
+    nlat_half::IntType          # number of latitudes on one hemisphere
     architecture::A             # information about device, CPU/GPU
     rings::V                    # precomputed ring indices
     whichring::W                # precomputed ring index for each grid point ij
@@ -54,6 +54,8 @@ function get_lond(::Type{<:FullGaussianGrid}, nlat_half::Integer)
     nlon = get_nlon(FullGaussianGrid, nlat_half)
     return collect(range(0, 360 - 180 / nlon, step = 360 / nlon))
 end
+
+hasoffset(::Type{<:FullGaussianGrid}) = false   # first longitude point on 0˚
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)

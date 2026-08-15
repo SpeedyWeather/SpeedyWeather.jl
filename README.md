@@ -1,11 +1,17 @@
-# SpeedyWeather.jl <img src="docs/src/assets/logo.png" width="100" />
+# SpeedyWeather.jl <img src="docs/src/public/logo.png" width="100" />
 
-[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
-[![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6510139.svg)](https://doi.org/10.5281/zenodo.6510139)  
 [![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/)
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/)
 [![code style: runic](https://img.shields.io/badge/code_style-%E1%9A%B1%E1%9A%A2%E1%9A%BE%E1%9B%81%E1%9A%B2-black)](https://github.com/fredrikekre/Runic.jl)
+[![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6510139.svg)](https://doi.org/10.5281/zenodo.6510139)  
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeather.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeather.yml) 
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyTransforms.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyTransforms.yml)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_RingGrids.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_RingGridsyml) 
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_LowerTriangularArrays.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_LowerTriangularArrays.yml)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeatherInternals.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeatherInternals.yml)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Enzyme.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Enzyme.yml)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Reactant_Correctness.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Reactant_Correctness.yml)
 
 SpeedyWeather.jl is a global atmospheric model developed as a research playground
 with an everything-flexible attitude as long as it is speedy. Technically it is a climate model with simple,
@@ -73,10 +79,11 @@ On our TODO list are
 - Exoplanet support with more flexibility on the atmospheric composition
 - 3D particle advection
 
-Currently in development are
+Currently in development, but already (partially) available are
 
 - Single GPU and CPU multi-threading support via KernelAbstractions
 - Differentiability with Enzyme
+- MLIR/OpenXLA compilation with Reactant
 
 ## Contributing
 
@@ -89,28 +96,29 @@ about dos and don'ts. Just express your interest to contribute and we'll be happ
 ## Example use
 
 For a more comprehensive tutorial with several examples, see
-[Examples](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/examples_2D/) in the documentation.
+[Examples](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/examples_2D) in the documentation.
 The basic interface to SpeedyWeather.jl consist of 4 steps: define the grid,
 construct the model, initialize, run
 
 ```julia
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)   # define resolution
-model = PrimitiveWetModel(spectral_grid)            # construct model
-simulation = initialize!(model)                     # initialize all model components
-run!(simulation, period=Day(10), output=true)       # aaaand action!
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)  # define resolution
+model = PrimitiveWetModel(spectral_grid)                # construct model
+simulation = initialize!(model)                         # initialize all model components
+run!(simulation, period=Day(10), output=true)           # aaaand action!
 ```
 showing
 ```
-Weather is speedy: run 0001 100%|█████████| Time: 0:00:02 (1000.22 years/day)
+ run_0001 100% Time: 0:00:01 (2000-01-11, 1395.22 years/day,  90 m/s, [ -80,   35] ˚C)
 ```
 
-Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 1000 years per day.
+Hurray🥳 In a second we just simulated 10 days of the Earth's atmosphere at a speed of almost 1400 simulated years
+per wallclock day. Also printed is the model time, the maximum wind speed and the temperature range (on any layer).
 This simulation used a T31 spectral resolution on an
-[octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids/#Implemented-grids)
-(~400km resolution) solving the primitive equations on 8 vertical levels,
-storing [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/output/).
+[octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#OctahedralGaussianGrid)
+(~400km resolution) solving the primitive equations on 8 vertical layers,
+storing [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/output).
 
-More examples in the [How to run SpeedyWeather](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/how_to_run_speedy/)
+More examples in the [How to run SpeedyWeather](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/how_to_run_speedy)
 section of the [documentation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev).
 
 ## Interactive use
@@ -124,7 +132,8 @@ humidity
 
 ![speedyweather_pluto](https://github.com/user-attachments/assets/5d485015-8c28-4c44-9c2b-c3acdf335788)
 
-
+(Note that in SpeedyWeather v0.19 the variable paths have changed so the respective line
+now needs to be written as `q = get_step(simulation.variables.grid.humidity)[:, end]`)
 
 ## Gallery
 
@@ -136,7 +145,7 @@ and some simplified radiation (the daily cycle is visible)
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/614f04cf-5080-4c89-9fd6-35efd54103a7
 
 Relative vorticity in the shallow water model, simulated at T1023 spectral resolution (about 10km) on an
-[octahedral Clenshaw-Curtis grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids/#Implemented-grids)
+[octahedral Clenshaw-Curtis grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#OctahedralClenshawGrid)
 with more than 4 million grid points
 
 https://user-images.githubusercontent.com/25530332/190443050-d5b8d093-86c0-46c9-b515-8420059ac8dc.mp4
@@ -148,7 +157,7 @@ https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/95897b82-9b81-
 
 SpeedyWeather.jl can also solve the 2D barotropic vorticity equations on the sphere.
 Here, we use Float32 (single precision) at a resolution of T340 (40km) on
-an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids/#Implemented-grids).
+an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#OctahedralGaussianGrid).
 Forcing is a stochastic stirring on northern hemisphere mid-latitudes following Barnes and Hartmann, 2011.
 Map projection is orthographic centred on the north pole.
 
@@ -198,12 +207,12 @@ intermediate-complexity climate models as a conceptual launchpad for SpeedyWeath
 
 SpeedyWeather.jl defines several modules that are part of this repository, but also available to be used and installed as stand-alone packages: 
 
-- [__RingGrids__](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/),
+- [__RingGrids__](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/RingGrids),
 a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid)
 and interpolations between them
-- [__LowerTriangularArrays__](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/),
+- [__LowerTriangularArrays__](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/LowerTriangularArrays),
 a module that defines `LowerTriangularMatrix` used for the spherical harmonic coefficients
-- [__SpeedyTransforms__](https://speedyweather.github.io/SpeedyWeather.jl/dev/speedytransforms/), a module that defines
+- [__SpeedyTransforms__](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/SpeedyTransforms), a module that defines
 the spherical harmonic transform between spectral space (for which LowerTriangularArrays is used) and grid-point space
 (as defined by RingGrids).
 
@@ -212,9 +221,9 @@ These modules can also be used independently of SpeedyWeather. They are register
 (@v1.11) pkg> add RingGrids
 julia> using RingGrids
 ```
-check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/ringgrids/),
-[LowerTriangularArrays](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/lowertriangularmatrices/),
-[SpeedyTransforms](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/speedytransforms/).
+check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/ringgrids),
+[LowerTriangularArrays](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/lowertriangularmatrices),
+[SpeedyTransforms](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/speedytransforms).
 
 ## Installation
 
@@ -224,7 +233,7 @@ SpeedyWeather.jl is registered in Julia's registry, so open the package manager 
 ```
 which will install the [latest release]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/releases))
 and all dependencies automatically. For more information see the
-[Installation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/installation/) in the documentation.
+[Installation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/installation) in the documentation.
 Please use the current minor version of Julia,
 compatibilities with older versions are not guaranteed.
 
@@ -248,7 +257,7 @@ the lower resolutions but aim to provide the ability to also run the model very 
 at high resolution!
 
 For an overview of typical simulation speeds a user can expect under different model setups see
-[Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).
+[Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/SpeedyWeather/benchmark).
 
 ## Citing
 
@@ -274,10 +283,34 @@ The bibtex entry for the paper is:
 }
 ```
 
+
+If you are using the differentiability of our model, please cite additionally 
+
+Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615. https://doi.org/10.1029/2025MS005615
+
+with the bibtex entry 
+
+```bibtex 
+@article{DJ4EarthJAMES,
+    author = {Moses, William S. and Cheng, Gong and Churavy, Valentin and Gelbrecht, Maximilian and Klöwer, Milan and Kump, Joseph and Morlighem, Mathieu and Williamson, Sarah and Apte, Dhruv and Berg, Paul and Giordano, Mosè and Hill, Christopher and Loose, Nora and Montoison, Alexis and Narayanan, Sri Hari Krishna and Pal, Avik and Schanen, Michel and Silvestri, Simone and Wagner, Greg and Heimbach, Patrick},
+    title = {{DJ4Earth}: Differentiable, and Performance-Portable Earth System Modeling via Program Transformations},
+    journal = {Journal of Advances in Modeling Earth Systems},
+    volume = {18},
+    number = {5},
+    pages = {e2025MS005615},
+    keywords = {DJ4Earth, reverse-mode automatic differentiation, Earth system modeling, online learning, differentiable programming, hybrid data assimilation/machine learning},
+    doi = {https://doi.org/10.1029/2025MS005615},
+    url = {https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2025MS005615},
+    eprint = {https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/2025MS005615},
+    note = {e2025MS005615 2025MS005615},
+    year = {2026}
+}
+```
+
 ## Copyright and license
 
 Copyright (c) 2020 Milan Klöwer for SpeedyWeather.jl  
 Copyright (c) 2021 The SpeedyWeather.jl Contributors for SpeedyWeather.jl  
 Copyright (c) 2022 Fred Kucharski and Franco Molteni for SPEEDY parametrization schemes  
 
-Software licensed under the [MIT License](LICENSE.txt).
+Software licensed under the [EUPL-1.2 license](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/LICENSE).

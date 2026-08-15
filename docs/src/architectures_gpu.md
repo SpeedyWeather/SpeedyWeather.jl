@@ -8,7 +8,7 @@ Most of SpeedyWeather.jl supports GPU acceleration. All of our models can run GP
 ```julia
 using SpeedyWeather, CUDA # For AMD GPUs, replace `CUDA` with `AMDGPU`
 architecture = SpeedyWeather.GPU()
-spectral_grid = SpectralGrid(trunc=63, nlayers=8, architecture=architecture)           
+spectral_grid = SpectralGrid(truncation = 64, nlayers = 8, architecture = architecture)           
 
 model = PrimitiveWetModel(spectral_grid=spectral_grid)
 simulation = initialize!(model)
@@ -31,7 +31,7 @@ grid_gpu = on_architecture(arch_gpu, grid_cpu)
 field_cpu = rand(grid_cpu)
 field_gpu = on_architecture(arch_gpu, field_cpu)
 
-spectrum_cpu = Spectrum(trunc=41, architecture=arch_cpu)
+spectrum_cpu = Spectrum(truncation=43, architecture=arch_cpu)
 spectrum_gpu = on_architecture(arch_gpu, spectrum_cpu)
 
 spec_cpu = rand(spectrum_cpu)
@@ -44,6 +44,15 @@ Be aware that directly calling e.g. `CuArray`, `ROCArray` or `adapt` on the data
 
 Our implementation of the model using KernelAbstractions.jl, also enables an easy multithreading of the model on CPU. As soon as you start Julia with more than one thread (e.g. `julia --threads 4`) SpeedyWeather will make use of all threads available. 
 
-## Benchmarks 
+## Reactant Support 
 
-More to follow...
+!!! warning "Work in progress"
+    The Reactant support of SpeedyWeather.jl is still work in progress, incomplete and considered experimental.
+
+We are currently working on making SpeedyWeather.jl compatible with the MLIR/XLA optimizer Reactant.jl. If you want to try it out, use the `ReactantDevice` architecture and set your device within Reactant with `Reactant.set_default_backend`. As of now just a subset of our models and model components are compatible with it. If you want to use an up-to-date Reactant setup already now, it is best to inspect the setups we use in the CI in `SpeedyWeather/test/reactant/`. We will update this documentation once most models and configurations are actually working.
+
+## Benchmarks
+
+See the [Benchmarks](benchmarks.md) page for SYPD numbers across architectures
+(CPU, GPU, Reactant), one section per architecture, and comparison figures of
+the PrimitiveWet resolution sweep.
