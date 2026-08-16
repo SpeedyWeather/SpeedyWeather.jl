@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Resolve `trunc` deprecation warnings in the test suite [#XXXX](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/XXXX)
+- Resolve `trunc` deprecation warnings in the test suite [#1197](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1197)
 - Add implementation of `cat` for `RingGrids` `Field`s [#1192](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1192)
 
 ## v0.22.0
