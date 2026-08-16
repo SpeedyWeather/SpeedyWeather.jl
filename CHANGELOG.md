@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- This is a trivial change to run the failing buildkite runner on the main branch. Motivated by the failing runs for AMDGPU and Julia v1.11 in [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193) DO NOT MERGE THIS BRANCH!
 - Add implementation of `cat` for `RingGrids` `Field`s [#1192](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1192)
 
 ## v0.22.0
