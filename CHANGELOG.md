@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Orbit and rotation time for variable length of day/year [#984](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/984)
 - Add implementation of `cat` for `RingGrids` `Field`s [#1192](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1192)
 
 ## v0.22.0
