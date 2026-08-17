@@ -1,3 +1,5 @@
+using Dates
+
 @testset "SolarZenith" begin
     @testset for Z in (SolarZenith, SolarZenithSeason)
         spectral_grid = SpectralGrid()
@@ -118,6 +120,7 @@ end
     @testset for (length_of_day, length_of_year, rotation_dilation, orbit_dilation) in cases
         planet = Earth(spectral_grid; length_of_day, length_of_year)
         model = PrimitiveDryModel(spectral_grid; planet)
+        model.feedback.verbose = false
         simulation = initialize!(model, time = DateTime(2000, 1, 1))
         clock = simulation.variables.prognostic.clock
 
