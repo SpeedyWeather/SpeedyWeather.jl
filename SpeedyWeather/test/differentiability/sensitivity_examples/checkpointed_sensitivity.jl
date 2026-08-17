@@ -1,7 +1,16 @@
+# use Julia 1.10 for this 
+
 import Pkg
 Pkg.activate("SpeedyWeather/test/differentiability/sensitivity_examples")
 
 using SpeedyWeather, Enzyme, JLD2, Checkpointing
+
+# Enzyme runs the LLVM Attributor pass on Julia < 1.12
+# (`Enzyme.Compiler.RunAttributor = Ref(VERSION < v"1.12")`). Stepping the clock inside the
+# `@ad_checkpoint` loop sends the Attributor's AAPotentialValues analysis into unbounded
+# recursion (`AAPotentialValuesFloating::updateImpl` -> `getAssumedSimplified` -> ... -> itself),
+# which overflows the C++ stack and shows up as a segfault. Disabling the pass avoids it.
+Enzyme.Compiler.RunAttributor[] = false
 
 # Parse command line argument for N (number of timesteps)
 const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 5
@@ -25,7 +34,7 @@ function checkpointed_timesteps!(vars::Variables, model, N_steps, checkpoint_sch
 
     @ad_checkpoint checkpoint_scheme for _ in 1:N_steps
         SpeedyWeather.time_step!(vars, model.time_stepping, model)     # calculate tendencies and step forward
-        SpeedyWeather.time_step!(vars.prognostic.clock, model.time_stepping)                # then step the clock forward
+        SpeedyWeather.time_step!(vars.prognostic.clock, model.time_stepping)
     end
 
     return nothing
