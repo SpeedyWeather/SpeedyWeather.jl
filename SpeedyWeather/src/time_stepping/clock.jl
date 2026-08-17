@@ -58,6 +58,11 @@ on_architecture(::AbstractArchitecture, clock::Clock) = clock
 time_step!(clock::Clock, time_stepping::AbstractTimeStepper) =
     time_step!(clock, time_stepping.Δt_millisec)
 
+"""$(TYPEDSIGNATURES)
+Time step `Δt` dilated by `dilation`, rounded to whole milliseconds. Used to advance
+(or, on the leapfrog spin-up step, rewind) the rotation and orbit times."""
+dilate(Δt, dilation) = Millisecond(round(Int, Millisecond(Δt).value * dilation))
+
 function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt
     clock.step_counter += 1                     # always increased, counts time stepper steps
@@ -65,8 +70,8 @@ function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
 
     # step the rotation and orbit time separately for solar zenith calculations
     # using the dilation factors to speed up or slow down the rotation and orbit time relative to the model time
-    clock.rotation_time += Millisecond(round(Int, Millisecond(Δt).value * clock.rotation_dilation))
-    clock.orbit_time += Millisecond(round(Int, Millisecond(Δt).value * clock.orbit_dilation))
+    clock.rotation_time += dilate(Δt, clock.rotation_dilation)
+    clock.orbit_time += dilate(Δt, clock.orbit_dilation)
 
     return nothing
 end

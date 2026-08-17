@@ -28,8 +28,11 @@ is relative to the Earth calendar. The year angle `g` should reflect
 slower/faster seasons."""
 function (S::SinSolarDeclination)(g::NF) where {NF}
     axial_tilt = deg2rad(S.axial_tilt)
-    equinox = LENGTH_OF_DAY * Dates.dayofyear(S.equinox) / LENGTH_OF_YEAR
-    return axial_tilt * sin(g - 2 * (π * convert(NF, equinox)))
+    # phase of the equinox relative to the mean year (365.25 days), not the actual year length
+    # as in `year_angle`, so that the year of `S.equinox` is (up to the one day that a Feb-29
+    # shifts `dayofyear` by in leap years) irrelevant, as documented for `planet.equinox`
+    equinox = 2π * (Dates.dayofyear(S.equinox) - 1) * LENGTH_OF_DAY / LENGTH_OF_YEAR
+    return axial_tilt * sin(g - convert(NF, equinox))
 end
 
 """Coefficients to calculate the solar declination angle δ from
@@ -166,27 +169,28 @@ function initialize!(
 end
 
 """$(TYPEDSIGNATURES)
-Fraction of year as angle in radians [0...2π]. Always calculated relative to the
-Earth calendar, so LENGTH_OF_DAY, LENGTH_OF_YEAR are used as constants.
+Fraction of year as angle in radians, sawtooth from 0 at Jan-01T00:00 to 2π at the end
+of Dec-31, continuous across the New Year. The length of the year is the actual length of
+`time`'s year (365 or 366 days) so that no discontinuity arises for leap years.
+Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as a constant.
 This is because `Dates` functions assume an Earth calendar.
 Length of the seasonal cycle is instead controlled via a faster orbit time,
 see `Earth`."""
 function year_angle(::Type{T}, time::DateTime) where {T}
-    year2rad = T(2π) / LENGTH_OF_YEAR
-    sec_of_day = Dates.second(Dates.Time(time).instant)     # use secondofday?
-    return year2rad * (Dates.dayofyear(time) * LENGTH_OF_DAY + sec_of_day)
+    seconds_of_year = (Dates.dayofyear(time) - 1) * LENGTH_OF_DAY + secondofday(time)
+    seconds_in_year = Dates.daysinyear(time) * LENGTH_OF_DAY
+    return T(2π) * T(seconds_of_year / seconds_in_year)
 end
 
 """$(TYPEDSIGNATURES)
-Fraction of day in `time` as angle in radians [0...2π], noon to noon, at longitude `λ`.
+Fraction of day in `time` as angle in radians [-π...π], noon to noon, at longitude `λ`.
 Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as constant.
 This is because `Dates` functions assume an Earth date. Length of the daily cycle is instead
 controlled via a faster rotation time, see `Earth`."""
 function solar_hour_angle(::Type{T}, time::DateTime, λ=0) where {T}
     day2rad = T(2π) / LENGTH_OF_DAY
     noon_in_sec = LENGTH_OF_DAY ÷ 2
-    sec_of_day = Dates.second(Dates.Time(time).instant)     # use secondofday?
-    return (sec_of_day - noon_in_sec) * day2rad + convert(T, λ)
+    return (secondofday(time) - noon_in_sec) * day2rad + convert(T, λ)
 end
 
 """
