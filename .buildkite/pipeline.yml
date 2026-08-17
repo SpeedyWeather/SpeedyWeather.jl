@@ -20,11 +20,11 @@ steps:
     if: "!(build.pull_request.labels includes 'skip-ci' || build.pull_request.labels includes 'skip-gpu-ci')"
     timeout_in_minutes: 40
 
-  - label: "AMDGPU, Julia v1.11"
+  - label: "AMDGPU, Julia v1.12"
     matrix:
       setup:
         version:
-          - "1.11"
+          - "1.12"
     plugins:
       - JuliaCI/julia#v1:
           version: "{{matrix.version}}"
