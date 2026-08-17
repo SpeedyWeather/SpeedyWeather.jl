@@ -64,6 +64,6 @@ Returns the default dealising for the chosen grid. Defaults to 2 for Gaussian gr
 @inline default_dealiasing(Grid::Type{<:AbstractGrid}) = 3
 @inline default_dealiasing(Grid::Type{<:FullGaussianGrid}) = 2
 @inline default_dealiasing(Grid::Type{<:OctahedralGaussianGrid}) = 2
-@inline default_dealiasing(Grid::Type{<:OctomicGaussianGrid}) = 2
+@inline default_dealiasing(Grid::Type{<:OctaminimalGaussianGrid}) = 2
 
 @inline default_dealiasing(grid::AbstractGrid) = default_dealiasing(typeof(grid))
