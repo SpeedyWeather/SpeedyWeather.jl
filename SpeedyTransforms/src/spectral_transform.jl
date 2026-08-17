@@ -421,14 +421,6 @@ function Base.DimensionMismatch(S::AbstractSpectralTransform, F::AbstractField)
     return DimensionMismatch(s)
 end
 
-# DEALIASING; Gaussian = 2, all others = 3
-@inline default_dealiasing(Grid::Type{<:AbstractGrid}) = 3
-@inline default_dealiasing(Grid::Type{<:FullGaussianGrid}) = 2
-@inline default_dealiasing(Grid::Type{<:OctahedralGaussianGrid}) = 2
-@inline default_dealiasing(Grid::Type{<:OctomicGaussianGrid}) = 2
-
-@inline default_dealiasing(grid::AbstractGrid) = default_dealiasing(typeof(grid))
-
 # Layer size of scratch memory (north/south columns in `ScratchMemory`).
 # On CPU we typically use `nlayers` only (largest allocated plan and physical layers of the model)
 # On GPU we batch transforms much more, and need to use a scratch memory in 
