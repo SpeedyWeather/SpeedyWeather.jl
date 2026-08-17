@@ -1,3 +1,5 @@
+const DEFAULT_DEALIASING = 2.0
+
 """
 $(TYPEDSIGNATURES)
 For the spectral `truncation` (1-based, e.g. 32 for T32) return the
