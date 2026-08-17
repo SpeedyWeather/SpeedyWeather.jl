@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Orbit and rotation time for variable length of day/year [#984](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/984)
+- Work around an AMDGPU/LLVM miscompile of a triangular loop with dynamic bounds in the semi-implicit primitive-equation kernel [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
+- Resolve `trunc` deprecation warnings in the test suite [#1197](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1197)
 - Add implementation of `cat` for `RingGrids` `Field`s [#1192](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1192)
 
 ## v0.22.0
