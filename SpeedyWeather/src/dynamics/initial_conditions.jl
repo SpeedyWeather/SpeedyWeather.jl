@@ -472,7 +472,12 @@ Adapt.@adapt_structure JablonowskiVorticity
 
     # great circle distance to perturbation
     X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
-    r = radius * acos(X)
+    # @fastmath: X ∈ [0, 1] by construction (clamp above) so acos(X) is always in-domain, but
+    # the compiler can't prove that statically and keeps a DomainError throw path around every
+    # acos/sqrt call below. On AMDGPU that throw path shows up as a "Global hostcalls detected"
+    # kernel (a resident device-side exception-formatting thread) and, on some ROCm/AMDGPU.jl
+    # versions, as an outright InvalidIRError; @fastmath drops the domain check entirely.
+    r = @fastmath radius * acos(X)
 
     # Eq (3), the unperturbed zonal wind
     # NOTE: `x^(3//2)` does NOT stay in Float32. Base computes a fractional power as
@@ -480,10 +485,10 @@ Adapt.@adapt_structure JablonowskiVorticity
     # Float64 log2/exp2, which AMDGPU cannot compile (GPUCompiler segfaults in check_ir!).
     # cos is strictly positive here (η in [0, 1] gives cos in [0.39, 1]), so x*sqrt(x) is equivalent.
     cosηᵥ = cos((η - η₀) * π / 2)
-    ζ = -4 * u₀ / radius * (cosηᵥ * sqrt(cosηᵥ)) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+    ζ = @fastmath -4 * u₀ / radius * (cosηᵥ * sqrt(cosηᵥ)) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
 
     # Eq (12), the perturbation
-    perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
+    perturbation = @fastmath perturb_uₚ / radius * exp(-(r / R)^2) *
         (tand(φ) - 2 * (radius / R)^2 * acos(X) * (sinφc * cosd(φ) - cosφc * sind(φ) * cosd(λ - λc)) / sqrt(1 - X^2))
 
     return ζ + perturbation
@@ -508,10 +513,12 @@ Adapt.@adapt_structure JablonowskiDivergence
 
     # great circle distance to perturbation
     X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
-    r = radius * acos(X)
+    # @fastmath: see the matching comment in JablonowskiVorticity above -- X is provably in
+    # [0, 1] here too, so this just drops an unreachable-but-uneliminated DomainError path.
+    r = @fastmath radius * acos(X)
 
     # Eq (13)
-    return -2 * perturb_uₚ * radius / R^2 * exp(-(r / R)^2) * acos(X) / sqrt(1 - X^2) * cosφc * sind(λ - λc)
+    return @fastmath -2 * perturb_uₚ * radius / R^2 * exp(-(r / R)^2) * acos(X) / sqrt(1 - X^2) * cosφc * sind(λ - λc)
 end
 
 export RossbyHaurwitzWave

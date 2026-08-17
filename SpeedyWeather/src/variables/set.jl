@@ -230,7 +230,7 @@ function _set_function_3d!(var::AbstractField, f::Function, londs::AbstractVecto
     return var
 end
 
-@kernel function set_field_3d_kernel!(var, londs, latds, σ_levels_full, f, kernel_func)
+@kernel inbounds = true function set_field_3d_kernel!(var, londs, latds, σ_levels_full, f, kernel_func)
     ij, k = @index(Global, NTuple)
     var[ij, k] = kernel_func(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
 end

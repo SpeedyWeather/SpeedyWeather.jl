@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `@fastmath` the domain-checked `acos`/`sqrt` calls in `JablonowskiVorticity`/`JablonowskiDivergence` and add the missing `@kernel inbounds = true` to `set_field_3d_kernel!`, to remove unreachable-but-uneliminated `DomainError`/bounds-check throw paths that AMDGPU compiles into resident "hostcall" threads (and, on some ROCm/AMDGPU.jl versions, an `InvalidIRError`) [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
 - Work around an AMDGPU/LLVM miscompile of a triangular loop with dynamic bounds in the semi-implicit primitive-equation kernel [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
 - Resolve `trunc` deprecation warnings in the test suite [#1197](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1197)
 - Add implementation of `cat` for `RingGrids` `Field`s [#1192](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1192)
