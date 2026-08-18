@@ -30,7 +30,7 @@ With minimal code redundancies, it supports
 
 **Numerics and computing**
 - Different spatial grids (full and octahedral, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
-- Different resolutions (typically T16 to T1024 in spectral matched flexibly with various 800km to 10km grids)
+- Different resolutions (for example T16 to T1024 in spectral matched flexibly with various 800km to 10km grids)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
 - Fast on single CPUs (x86, arm) for laptop prototyping, live demos and education
 - GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs (Metal is WIP)
