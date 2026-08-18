@@ -309,7 +309,7 @@ SpectralTransform(grid::AbstractGrid, spectrum::AbstractSpectrum; kwargs...) =
 function SpectralTransform(
         grid::AbstractGrid;
         truncation::Integer = 0,                    # spectral truncation (1-based)
-        dealiasing::Real = DEFAULT_DEALIASING,      # dealiasing factor
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(grid),      # dealiasing factor
         one_more_degree::Bool = false,              # returns a square LowerTriangularMatrix by default
         kwargs...
     )
@@ -324,7 +324,7 @@ function SpectralTransform(
         spectrum::AbstractSpectrum;                     # spectral coefficients
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,      # grid type, e.g. FullGaussianGrid
         nlat_half::Integer = 0,                         # resolution parameter nlat_half
-        dealiasing::Real = DEFAULT_DEALIASING,          # dealiasing factor
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(Grid),          # dealiasing factor
         kwargs...
     )
     # get nlat_half from dealiasing if not provided

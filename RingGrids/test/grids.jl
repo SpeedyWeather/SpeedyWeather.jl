@@ -648,3 +648,50 @@ end
     @test F4[:, 1:3, 1].dims isa XYZ   # drop time, keep vertical range
     @test F4[:, 1, 1].dims isa XY      # drop both vertical and time
 end
+
+@testset "Field concatenation" begin
+    grid = FullGaussianGrid(4)
+
+    # Check that trivial case returns same Field
+    F1 = Field(grid, 1)
+    @test cat(F1, dims = 2) == F1
+
+    # Concatenate two fields
+    F1 = Field(grid, 1) .+ 1
+    F2 = Field(grid, 2) .+ 2
+    F3 = cat(F1, F2, dims = 2)
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == 3
+    @test all(F3[:, 1] .≈ F1[:, 1]) && all(F3[:, 2:3] .≈ F2[:, 1])
+
+    # Concatenate N fields along dimension 3
+    N = 5
+    Fs = [Field(grid, 1, i) for i in 1:N]
+    F3 = cat(Fs..., dims = 3)
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 3) == sum(1:N)
+
+    # Concatenate along two dimensions at once
+    F3 = cat(Fs..., dims = (2, 3))
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == N
+    @test size(F3, 3) == sum(1:N)
+    # also for array dims (reversed order for good measure)
+    F3 = cat(Fs..., dims = [3, 2])
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == N
+    @test size(F3, 3) == sum(1:N)
+
+    # Check singleton case for iterable dims
+    F3 = cat(F1, F2, dims = [2])
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == 3
+
+    # Check that concatenation along dimension 1 fails
+    @test_throws AssertionError cat(F1, F2, dims = 1)
+end
