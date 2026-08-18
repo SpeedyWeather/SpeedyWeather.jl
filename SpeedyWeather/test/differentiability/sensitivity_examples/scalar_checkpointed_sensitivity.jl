@@ -37,7 +37,7 @@ function checkpointed_timesteps!(vars::Variables, model, N_steps, checkpoint_sch
         SpeedyWeather.time_step!(vars.prognostic.clock, model.time_stepping)                # then step the clock forward
     end
 
-    return vars.grid.temperature[i_point, 8]
+    return vars.grid.temperature[i_point, 8, 2]
 end
 
 checkpoint_scheme = Revolve(N)
