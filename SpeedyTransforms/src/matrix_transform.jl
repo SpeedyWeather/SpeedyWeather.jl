@@ -170,6 +170,14 @@ function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2
     return nothing
 end
 
+"""3D Views need materializing on GPU."""
+function _as_matrix(x::AbstractArray)
+    ndims(x) == 2 && return x, false
+    n = size(x, 1)
+    parent(x) === x && return reshape(x, n, :), false
+    return reshape(copy(x), n, :), true
+end
+
 """$(TYPEDSIGNATURES)
 Spectral transform (grid to spectral space) from n-dimensional array `field` to an n-dimensional
 array `coeffs` of spherical harmonic coefficients. Uses precomputed dense transform matrices to
@@ -192,11 +200,11 @@ function transform!(                        # GRID TO SPECTRAL
     # Collapse any batch/layer dimensions into columns so the single dense matrix multiply also
     # works for n-dimensional (batched/fused) fields, not just 2D. This is not a batched matmul
     # (one matrix `M.forward` × many columns), so one big `mul!` (→ `BLAS.gemm!`) is both correct
-    # and optimal. `reshape` on a contiguous array is zero-copy and a no-op for genuinely 2D input,
-    # so the 2D path is unaffected; the result is written in place through the shared memory.
-    coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), :)
-    field_matrix = reshape(field.data, size(field.data, 1), :)
+    # and optimal. See `_as_matrix` for why views need materializing first on GPU.
+    field_matrix, _ = _as_matrix(field.data)                # read-only source, no writeback needed
+    coeffs_matrix, coeffs_materialized = _as_matrix(coeffs.data)
     @maybe_jit M.architecture LinearAlgebra.mul!(coeffs_matrix, M.forward, field_matrix)
+    coeffs_materialized && copyto!(coeffs.data, coeffs_matrix)
     return coeffs
 end
 
@@ -221,10 +229,11 @@ function transform!(                        # SPECTRAL TO GRID
     # Collapse any batch/layer dimensions into columns (see the grid→spectral transform above),
     # so the dense matrix multiply also works for n-dimensional (batched/fused) coefficients.
     # `scratch_memory` is sized (in spectral_grid.jl) to the largest batch a spectral→grid
-    # transform emits, so a column-view of the required width always fits.
+    # transform emits, so a column-view of the required width always fits. 
+    # We need to materialize 3D views due to GPU limitations with _as_matrix
     ncolumns = length(coeffs.data) ÷ size(coeffs.data, 1)
     coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), ncolumns)
-    field_matrix = reshape(field.data, size(field.data, 1), ncolumns)
+    field_matrix, field_materialized = _as_matrix(field.data)
     scratch = view(scratch_memory, :, 1:ncolumns)
 
     # the result is real-valued, therefore we can split the complex multiplication
@@ -234,6 +243,7 @@ function transform!(                        # SPECTRAL TO GRID
 
     scratch .= imag.(coeffs_matrix)
     @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_imag, scratch, -1, 1)
+    field_materialized && copyto!(field.data, field_matrix)
 
     if unscale_coslat
         @maybe_jit M.architecture RingGrids._scale_lat!(field, M.coslat⁻¹)

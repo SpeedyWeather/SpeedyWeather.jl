@@ -17,6 +17,54 @@
     @test L ≈ L2
 end
 
+@testset "GPU MatrixSpectralTransform: transform! on views into a larger backing array" begin
+    # `vars.grid.<var>`/`vars.prognostic.<var>` in a real model are commonly *views* into a larger
+    # shared/fused backing array, not top-level CuArrays. Regression test for a bug where
+    # `MatrixSpectralTransform.transform!`'s internal `reshape` wrapped such a view in a
+    # `Base.ReshapedArray` that caused an error
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8, architecture = GPU())
+    M = MatrixSpectralTransform(spectral_grid)
+    nlayers = spectral_grid.nlayers
+
+    # reference: plain top-level arrays, the path that always worked
+    coeffs_ref = randn(ComplexF32, spectral_grid.spectrum, nlayers)
+    field_ref = transform(coeffs_ref, M)
+
+    # the same coefficients, but embedded as a *view*
+    nbatch, batch_idx = 3, 2
+    layer_range = (nlayers + 1):(2nlayers)
+
+    coeffs_backing = zeros(ComplexF32, spectral_grid.spectrum, 2nlayers, nbatch)
+    coeffs_data = view(view(coeffs_backing.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(coeffs_data) !== coeffs_data      # guard: genuinely a nested view, not optimized away
+    coeffs_data .= coeffs_ref.data
+    coeffs_view = LowerTriangularArray(coeffs_data, spectral_grid.spectrum)
+
+    field_backing = zeros(Float32, spectral_grid.grid, 2nlayers, nbatch)
+    field_data = view(view(field_backing.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(field_data) !== field_data
+    field_view = Field(field_data, spectral_grid.grid)
+
+    # spectral -> grid, writing into a field view. Compare `.data` (transferred to CPU) rather
+    # than the `Field`/`LowerTriangularArray` wrappers directly: `isapprox` on those falls back to
+    # a generic, scalar-indexing `norm`, which errors on GPU regardless of correctness.
+    transform!(field_view, coeffs_view, M)
+    @test Array(field_view.data) ≈ Array(field_ref.data)
+    # the result actually landed in the shared backing buffer (a true view, not a detached copy)
+    @test Array(field_backing.data)[:, layer_range, batch_idx] ≈ Array(field_ref.data)
+
+    # grid -> spectral, writing into a coeffs view
+    coeffs_from_field_ref = transform(field_ref, M)
+    coeffs_backing2 = zeros(ComplexF32, spectral_grid.spectrum, 2nlayers, nbatch)
+    coeffs_data2 = view(view(coeffs_backing2.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(coeffs_data2) !== coeffs_data2
+    coeffs_view2 = LowerTriangularArray(coeffs_data2, spectral_grid.spectrum)
+
+    transform!(coeffs_view2, field_ref, M)
+    @test Array(coeffs_view2.data) ≈ Array(coeffs_from_field_ref.data)
+    @test Array(coeffs_backing2.data)[:, layer_range, batch_idx] ≈ Array(coeffs_from_field_ref.data)
+end
+
 spectral_resolutions = (32,) #, 63, 127)
 nlayers_list = (8,) # 8, 32]
 # TODO: at the moment only tests for even grids (no ring on equator) pass for some reason
