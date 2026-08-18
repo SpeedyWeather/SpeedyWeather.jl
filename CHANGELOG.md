@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix `Architectures.synchronize` being exported without a value bound, causing `UndefVarError` on `import` [#NNNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNNN)
 - Default dealiasing for non-Gaussian grids is now 3, fixing stability issues e.g. for HEALPix [#1198](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1198)
 - Work around an AMDGPU/LLVM miscompile of a triangular loop with dynamic bounds in the semi-implicit primitive-equation kernel [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
 - Resolve `trunc` deprecation warnings in the test suite [#1197](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1197)

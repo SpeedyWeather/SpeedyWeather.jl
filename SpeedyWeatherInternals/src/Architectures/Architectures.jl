@@ -1,6 +1,6 @@
 module Architectures
 
-import KernelAbstractions
+import KernelAbstractions: KernelAbstractions, synchronize
 
 export AbstractArchitecture, AbstractCPU
 export CPU, CPUStatic, GPU, ReactantDevice
@@ -163,5 +163,5 @@ on_architecture(::CPU, a::StepRangeLen) = a
 @inline convert_to_device(arch, args) = args
 @inline convert_to_device(::CPU, args) = args
 
-KernelAbstractions.synchronize(arch::AbstractArchitecture) = KernelAbstractions.synchronize(arch.device)
+synchronize(arch::AbstractArchitecture) = synchronize(arch.device)
 end
