@@ -32,12 +32,15 @@ end
 
 gpu_backend = load_gpu_package()
 
-# TEMPORARY: while pinning down the AMDGPU InvalidIRError (see
-# docs/dev/2026-08/amdgpu-vertical-integration-ci-failure.md), only the MRE
-# crash reproducer below is run so buildkite jobs stay fast and focused. All
-# other GPU test includes are disabled here on purpose -- restore them once
-# the crash is root-caused.
+# TEMPORARY: while pinning down the AMDGPU InvalidIRError, only the MRE crash
+# reproducer below is run so buildkite jobs stay fast and focused. All other
+# GPU test includes are disabled here on purpose -- restore them once the
+# crash is root-caused.
 include("mre_amdgpu_crash.jl")
+
+# Companion bisection tiers (tier4-tier8), added on top of the tier1-3 crash
+# reproducer above without modifying it -- see that file's header comment.
+include("mre_amdgpu_bisect.jl")
 
 # # KERNEL LAUNCHING AND UTILS
 # include("kernels_GPU.jl")
