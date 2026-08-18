@@ -1,17 +1,18 @@
-@testset "GPU spectral transform roundtrip " begin
-    spectral_grid = SpectralGrid(truncation = 42, nlayers = 8, architecture = GPU())
-    S = SpectralTransform(spectral_grid)
+
+@testset "GPU MatrixSpectralTransform roundtrip " begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8, architecture = GPU())
+    M = MatrixSpectralTransform(spectral_grid)
 
     # first roundtrip
     L = randn(ComplexF32, spectral_grid.spectrum, 8)
     field = zeros(Float32, spectral_grid.grid, 8)
-    transform!(field, L, S)
-    transform!(L, field, S)
+    transform!(field, L, M)
+    transform!(L, field, M)
 
     # 2nd roundtrip
     L2 = deepcopy(L)
-    transform!(field, L, S)
-    transform!(L, field, S)
+    transform!(field, L, M)
+    transform!(L, field, M)
 
     @test L ≈ L2
 end
