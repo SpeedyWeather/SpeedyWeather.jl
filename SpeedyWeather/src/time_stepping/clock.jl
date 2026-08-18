@@ -61,7 +61,8 @@ time_step!(clock::Clock, time_stepping::AbstractTimeStepper) =
 """$(TYPEDSIGNATURES)
 Time step `Δt` dilated by `dilation`, rounded to whole milliseconds. Used to advance
 (or, on the leapfrog spin-up step, rewind) the rotation and orbit times."""
-dilate(Δt, dilation) = Millisecond(round(Int, Millisecond(Δt).value * dilation))
+dilate(Δt::Millisecond, dilation) = Millisecond(round(Int, Δt.value * dilation))
+@inline dilate(Δt, dilation) = dilate(convert(Millisecond, Δt), dilation)
 
 function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt

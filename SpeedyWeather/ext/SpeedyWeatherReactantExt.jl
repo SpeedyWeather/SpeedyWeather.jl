@@ -61,4 +61,6 @@ SpeedyWeather.secondofday(dt::ReactantDatesExt.ReactantDateTime) = Dates.second(
 
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 
+SpeedyWeather.dilate(Δt::ReactantDatesExt.ReactantMillisecond{I}, dilation) where {I} = ReactantDatesExt.ReactantMillisecond{I}(round(I, Δt.value * dilation))
+
 end
