@@ -5,12 +5,8 @@
 # and SpeedyTransformsAMDGPUExt.jl). See SpeedyTransformsCUDAExt.jl for the rationale of
 # GPU-graphs acceleration itself.
 #
-# This file must stay under SpeedyTransforms/ext/ and be `include()`-d from within an
-# extension module, NOT moved to SpeedyTransforms/src/: the `_fourier_batched!` methods that
-# actually use this machinery live in each extension, and the main package loads
-# unconditionally in every Julia session — so if any of this were in src/ instead, those
-# methods would exist even in CPU-only sessions with no GPU backend loaded, which breaks
-# Enzyme's static activity analysis (see docs/dev/2026-08/gpu-graphs-common-interface.md).
+# TODO: This code ended up in src/ by accident once and reportedly broke Enzyme's CPU-only 
+# autodiff tests. Confirm and fix underlying issue.
 #
 # The only thing that differs between backends is the graph capture/instantiate/launch API
 # itself (e.g. `CUDA.capture`/`instantiate`/`launch` vs a HIP equivalent) and the graph-exec
