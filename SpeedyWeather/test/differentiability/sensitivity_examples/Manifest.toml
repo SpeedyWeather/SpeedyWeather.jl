@@ -71,9 +71,9 @@ version = "1.1.1"
 
 [[deps.ArrayInterface]]
 deps = ["Adapt", "LinearAlgebra"]
-git-tree-sha1 = "b79a0bd275c2036b3ab9ed42ddef6f5eb48e1902"
+git-tree-sha1 = "13f3b228c230ef0b4ecafd73c8ca9e99987ca692"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "7.29.0"
+version = "7.30.0"
 
     [deps.ArrayInterface.extensions]
     ArrayInterfaceAMDGPUExt = "AMDGPU"
@@ -496,9 +496,9 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[deps.GPUArrays]]
 deps = ["Adapt", "GPUArraysCore", "KernelAbstractions", "LLVM", "LinearAlgebra", "Printf", "Random", "Reexport", "ScopedValues", "Serialization", "SparseArrays", "Statistics"]
-git-tree-sha1 = "d9da1147842d01fca43d076310bbef82f4a671b2"
+git-tree-sha1 = "83a1749542c76d71755cfa869f0e539adbae54ed"
 uuid = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
-version = "11.5.10"
+version = "11.5.11"
 weakdeps = ["JLD2"]
 
     [deps.GPUArrays.extensions]
@@ -684,9 +684,9 @@ weakdeps = ["Serialization"]
     SerializationExt = ["Serialization"]
 
 [[deps.LaTeXStrings]]
-git-tree-sha1 = "dda21b8cbd6a6c40d9d02a73230f9d70fed6918c"
+git-tree-sha1 = "f88f3ccef05a6a72a0cf0ed417c8fd68530f4ab2"
 uuid = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
-version = "1.4.0"
+version = "1.4.1"
 
 [[deps.LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
@@ -1130,7 +1130,7 @@ weakdeps = ["ChainRulesCore"]
 deps = ["AbstractFFTs", "Adapt", "AssociatedLegendrePolynomials", "DocStringExtensions", "FFTW", "FastGaussQuadrature", "GPUArrays", "GenericFFT", "KernelAbstractions", "LinearAlgebra", "LowerTriangularArrays", "Primes", "Printf", "ProgressMeter", "RingGrids", "SpeedyWeatherInternals", "Statistics", "StyledStrings"]
 path = "../../../../SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-version = "0.2.0"
+version = "0.2.0+DEV"
 
     [deps.SpeedyTransforms.extensions]
     SpeedyTransformsAMDGPUExt = "AMDGPU"
@@ -1147,7 +1147,7 @@ version = "0.2.0"
 deps = ["AbstractFFTs", "Adapt", "AssociatedLegendrePolynomials", "BitInformation", "CodecZlib", "ComponentArrays", "Dates", "DocStringExtensions", "DomainSets", "FFTW", "FastGaussQuadrature", "GPUArrays", "GenericFFT", "JLD2", "KernelAbstractions", "LinearAlgebra", "LowerTriangularArrays", "NCDatasets", "Primes", "Printf", "ProgressMeter", "Random", "ReactantCore", "RingGrids", "SpeedyTransforms", "SpeedyWeatherInternals", "Statistics", "StyledStrings", "TOML"]
 path = "../../.."
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
-version = "0.22.0"
+version = "0.22.0+DEV"
 
     [deps.SpeedyWeather.extensions]
     SpeedyWeatherBrowzarrExt = "Browzarr"
