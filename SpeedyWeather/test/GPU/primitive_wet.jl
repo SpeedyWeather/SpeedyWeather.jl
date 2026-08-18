@@ -1,4 +1,4 @@
-@testset "GPU PrimitiveWetModel" begin
+@testset "GPU PrimitiveWetModel (with SpectralTransform)" begin
     arch = SpeedyWeather.GPU()
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_gpu_netcdf_")
 
