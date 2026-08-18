@@ -170,7 +170,8 @@ function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2
     return nothing
 end
 
-"""3D Views need materializing on GPU."""
+"""3D Views need materializing on GPU. For the PrimitiveWetModel this should never be hit as 
+all transforms actually act on fused variables."""
 function _as_matrix(x::AbstractArray)
     ndims(x) == 2 && return x, false
     n = size(x, 1)
