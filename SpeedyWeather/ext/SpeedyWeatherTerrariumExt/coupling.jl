@@ -388,11 +388,9 @@ function SpeedyWeather.timestep!(
     RingGrids.copy_unmasked!(inputs.surface_longwave_down, Rld, indices)
 
     # Constructing ModelIntegrator is allocation-free: it is an immutable struct
-    # of references so no data is copied.  `InputSources` is empty intentionally:
-    # we own the input-update cycle above (via set!) and do not want Terrarium's
-    # update_inputs! to overwrite those values during the substeps.
+    # of references so no data is copied.
     integrator = ModelIntegrator(
-        state.clock, tmodel, InputSources(NF),
+        state.clock, tmodel, land.inputs,
         state, land.initializers,
     )
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)

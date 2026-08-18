@@ -171,7 +171,7 @@ function SpectralGrid(;
         truncation::Int = DEFAULT_TRUNCATION,
         trunc::Union{Int, Nothing} = nothing,
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-        dealiasing::Real = 2,
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(Grid),
         nlayers::Int = DEFAULT_NLAYERS,
         transform_batch::AbstractVector{<:Integer} = default_transform_batch(architecture, nlayers),
     )
@@ -207,7 +207,7 @@ Initialize a SpectralGrid from a given grid.
 function SpectralGrid(
         grid::AbstractGrid;
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
-        dealiasing::Real = 2,
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(grid),
         nlayers::Int = DEFAULT_NLAYERS,
         transform_batch::AbstractVector{<:Integer} = default_transform_batch(grid.architecture, nlayers),
     )

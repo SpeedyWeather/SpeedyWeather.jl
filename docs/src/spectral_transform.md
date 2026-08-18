@@ -21,7 +21,10 @@ The spectral transform implemented by SpeedyWeather.jl follows largely Justin Wi
 [SphericalHarmonicTransforms.jl](https://github.com/jmert/SphericalHarmonicTransforms.jl) package and makes use of
 [AssociatedLegendrePolynomials.jl](https://github.com/jmert/AssociatedLegendrePolynomials.jl) and
 [FFTW.jl](https://github.com/JuliaMath/FFTW.jl) for the Fourier transform.
-Justin described his work in a Blog series [^Willmert2020].
+Justin described his work in a Blog series [^Willmert2020]. However, many changes have been
+made since the first versions of SpeedyWeather, particularly around GPU support, acceleration
+and flexible grids, but Justin Willmert's writings are nevertheless a good starting point
+to understand the underlying algorithms.
 
 ## Spherical harmonics
 
@@ -140,36 +143,41 @@ and order ``m`` as illustrated in the following image
 ```@raw html
 <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Rotating_spherical_harmonics.gif">
 ```
-Every row represents an order ``l \geq 0``, starting from ``l=0`` at the top.
-Every column represents an order ``m \geq 0``, starting from ``m=0`` on the left. The coefficients of these
-spherical harmonics are directly mapped into a matrix ``a_{lm}`` as 
+Every row represents an order ``l \geq 1``, starting from ``l=1`` at the top.
+Every column represents an order ``m \geq 1``, starting from ``m=1`` on the left.
+We use 1-based indexing, despite the mathematically typical 0-based indexing,
+see [Available horizontal resolutions](@ref).
+
+!!! info "1-based Array indices"
+    For a spectral field `a` due to Julia's 1-based indexing the coefficient ``a_{lm}`` (1-based) is obtained via `a[l, m]`.
+    This matches our definition throughout, but contrasts to the typical mathematical definition with 0-based ``l, m``,
+    which would be accessed via `a[l+1, m+1]`.
+
+The coefficients of these spherical harmonics are directly mapped into a matrix ``a_{lm}`` as 
 
 |     |``m``     |          |          |          |
 | :-: | :------: | :------: | :------: | :------: | 
-|``l``|``a_{00}``|          |          |          |
-|     |``a_{10}``|``a_{11}``|          |          |
-|     |``a_{20}``|``a_{12}``|``a_{22}``|          |
-|     |``a_{30}``|``a_{13}``|``a_{23}``|``a_{33}``|
+|``l``|``a_{11}``|          |          |          |
+|     |``a_{21}``|``a_{22}``|          |          |
+|     |``a_{31}``|``a_{23}``|``a_{33}``|          |
+|     |``a_{41}``|``a_{24}``|``a_{34}``|``a_{44}``|
 
 which is consistently extended for higher degrees and orders. Consequently, all spectral fields are lower-triangular matrices
 with complex entries. The upper triangle excluding the diagonal are zero. Note that internally vector fields
 include an additional degree, such that ``l_{max} = m_{max} + 1`` (see [Derivatives in spherical coordinates](@ref) for more information).
-The harmonics with ``a_{l0}`` (the first column) are also called _zonal_ harmonics as they are constant with longitude ``\phi``.
+The harmonics with ``a_{l1}`` (the first column) are also called _zonal_ harmonics as they are constant with longitude ``\phi``.
 The harmonics with ``a_{ll}`` (the main diagonal) are also called _sectoral_ harmonics as they essentially split the sphere
-into ``2l`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
+into ``2(l-1)`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
 
 For correctness it is mentioned here that SpeedyWeather.jl uses a `LowerTriangularMatrix` type to store
 the spherical harmonic coefficients. By doing so, the upper triangle is actually *not* explicitly stored
 and the data technically unravelled into a vector, but this is hidden as much as possible from the user.
 For more details see [`LowerTriangularArrays`](@ref lowertriangularmatrices).
 
-!!! info "Array indices"
-    For a spectral field `a` note that due to Julia's 1-based indexing the coefficient ``a_{lm}`` is obtained via
-    `a[l+1, m+1]`. Alternatively, we may index over 1-based `l`, `m` but a comment is usually added for clarification.
-
 [Fortran SPEEDY](https://users.ictp.it/~kucharsk/speedy-net.html) does not use the same spectral packing as
-SpeedyWeather.jl. The alternative packing ``l', m'`` therein uses ``l'=m`` and ``m'=l-m`` as summarized in the
-following table.
+SpeedyWeather.jl and also does not use 1-based indices and notation consistently throughout.
+The alternative packing ``l', m'`` therein uses ``l'=m`` and ``m'=l-m`` as summarized in the following table,
+(all 0-based).
 
 | degree ``l`` | order ``m`` |  ``l'=m`` |  ``m'=l-m`` |
 | :----------: | :---------: | :-------: | :---------: |
