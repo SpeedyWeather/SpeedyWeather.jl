@@ -25,7 +25,6 @@
 - Fix `set!(time_stepping, Δt=...)` inverting the resolution factor [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
 - Fix `SpectralFilter` implicit diffusion using twice the prognostic time step; docstring of `HyperDiffusion` corrected [#1176](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1176)
 - Lower free convection gust constant [#1178](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1178)
->>>>>>> origin/main
 - Add ocean neutral surface wind speed model [#1156](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1156)
 - Fix GPU inverse Legendre transform for single-layer spectral fields on GPU [#1173](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1173)
 - Revised extended differentiability tests [#1167](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1167)

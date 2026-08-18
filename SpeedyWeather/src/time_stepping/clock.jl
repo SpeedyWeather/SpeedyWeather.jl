@@ -25,7 +25,7 @@ $(TYPEDFIELDS)"""
 
     "Number of time stepper steps, regardless their step size"
     n_steps::I = 0
-    
+
     "Number of time steps of size Δt"
     n_time_steps::I = 0
 
@@ -196,14 +196,14 @@ Dates.second(x::Dates.Nanosecond) = round(Int, x.value * 1.0e-9)
 Dates.second(x::Dates.Microsecond) = round(Int, x.value * 1.0e-6)
 Dates.second(x::Dates.Millisecond) = round(Int, x.value * 1.0e-3)
 
-# defined to convert from floats to Second (which require ints by default) via rounding
+# defined to convert from floats to Second (which require integers by default) via rounding
 function Base.convert(::Type{Second}, x::AbstractFloat)
     xr = round(Int64, x)
     x == xr || @warn "Rounding and converting $x to $xr for integer seconds."
     return Second(xr)
 end
 
-# conversion rule that allows integers to be autmoatically converted into Seconds
+# conversion rule that allows integers to be automatically converted into Seconds
 function Base.convert(::Type{Second}, x::Integer)
     @warn "Input '$x' assumed to have units of seconds. Use Minute($x), Hour($x), or Day($x) otherwise."
     return Second(round(Int64, x))
