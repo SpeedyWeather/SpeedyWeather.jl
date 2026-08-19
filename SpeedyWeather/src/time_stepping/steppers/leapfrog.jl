@@ -208,7 +208,11 @@ function time_step!(clock::Clock, time_stepping::Leapfrog)
         time_step!(clock, Δt ÷ 2, increase_counter = false)
     elseif i == 1                   # second step: Leapfrog at Δt
         # subtract the Δt/2 again as otherwise the time can be 1ms off due to rounding
-        clock.time -= Δt ÷ 2
+        # rotation and orbit time are dilated, so rewind them by their dilated Δt/2
+        half_Δt = Δt ÷ 2
+        clock.time -= half_Δt
+        clock.rotation_time -= dilate(half_Δt, clock.rotation_dilation)
+        clock.orbit_time -= dilate(half_Δt, clock.orbit_dilation)
         time_step!(clock, Δt)
     else                            # later steps: Leapfrog at 2Δt but increase clock by Δt
         time_step!(clock, Δt)
