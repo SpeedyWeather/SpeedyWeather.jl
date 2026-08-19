@@ -13,63 +13,14 @@ import SpeedyTransforms: SpectralTransform, _fourier_batched!
 import SpeedyTransforms.RingGrids: AbstractField
 import SpeedyWeatherInternals.Architectures: architecture
 
+
 # =====================================================================================
-# METAL COMMAND-BUFFER-BATCHED FOURIER TRANSFORM
-#
-# The batched Fourier transform on a (reduced) grid applies one FFT per latitude ring
-# (≈ 2*nlat_half tiny FFTs). Metal's native FFT (Metal.jl, backed by MPSGraph) no longer
-# blocks on a per-call synchronize as of Metal.jl 1.10.1 (JuliaGPU/Metal.jl#872), but each
-# call to `_fft!` still builds and commits its OWN dedicated `MPSCommandBuffer`
-# (`Metal.MPS.MPSCommandBuffer(Metal.global_queue(Metal.device()))`), and constructing that
-# from Metal.jl's task-local *batched* queue forces a full flush of any pending batched
-# work first (`Base.cconvert` on `BatchedCommandQueue` calls `flush!`). So a `transform!`
-# call that fires ~2*nlat_half tiny per-ring FFTs still pays that command-buffer-creation
-# and flush cost once per ring — benchmarking confirms this: bumping to Metal.jl 1.10.2
-# alone (which removed the blocking synchronize) did not measurably improve `transform!`
-# performance, because the bottleneck was never the wait, it's the per-call submission
-# overhead.
-#
-# This override removes that overhead the direct way: every ring's FFT is `encode!`d onto
-# a shared `MPSCommandBuffer`, then `commit!`ed. Gather (grid -> per-ring buffer) and
-# scatter (per-ring buffer -> scratch) stay as plain GPU array copies — Metal.jl's
-# `BatchedCommandQueue` already auto-batches those (kernel launches and blit ops
-# accumulate into one command buffer and commit lazily), so they don't need manual
-# batching.
-#
-# Vertical layers are already batched for free within each ring's single FFT call: the FFT
-# plan's transform axis is the longitude dimension only ("region=1"), so MPSGraph treats
-# every other axis of the (nlon × nlayers) input, i.e. `nlayers`, as a free batch dimension
-# — one graph execution already covers every vertical level for that ring, nothing to gain
-# there.
-#
-# TWO STRATEGIES, both kept and selectable via `S.metal_merge_hemispheres`:
+# There are two strategies kept for now, due to differences in performance at different resolution ranges.
 #
 #   - `true` (default): north AND south are encoded onto ONE shared command buffer and
 #     committed once per `transform!` call ("north-south merge").
 #   - `false`: north and south are each encoded onto their OWN command buffer, committed
 #     separately ("unmerged") — the original, simpler design.
-#
-# Dense A/B benchmarking (nlayers=8) showed a genuine crossover, not noise:
-#   - trunc=32..197 (step 5, 34 points): merged wins 31/33 points, often by 10-20%.
-#   - trunc=200..300 (step 10, 11 points): unmerged wins 10/11 points, several by
-#     15-30% (e.g. trunc=230: 55.6ms merged vs 43.4ms unmerged; trunc=300: 71.8ms vs
-#     63.7ms).
-# Neither dominates everywhere, hence the toggle rather than a single hardcoded choice.
-# Default is `true` (merged) since most usage is expected at the lower end of that range.
-# A plausible mechanism for the crossover: at low nlat_half, one fewer command-buffer
-# flush (merged) wins; at high nlat_half, the larger single command buffer's construction/
-# encode cost (or lost host/device overlap between hemispheres — the GPU executing north's
-# buffer while the host builds south's gather/encode) starts to dominate instead. Not
-# fully root-caused; revisit if profiling ever explains it precisely.
-#
-# Explicit ring-length fusion (combining same-`nlon` rings, e.g. on HEALPix-type grids,
-# into a single larger MPSGraph call) was also tried but reverted: it requires FFT-ing
-# views into a larger shared buffer, and Metal.jl 1.10.2's FFT plans silently return zeros
-# when applied to a buffer view at a nonzero offset (confirmed in isolation; likely an
-# `MPSGraphTensorData` offset-handling bug, worth reporting upstream). It also wouldn't
-# have helped SpeedyWeather's default `OctahedralGaussianGrid`, where every ring already
-# has a distinct length. Each ring here therefore gets its own, independently-allocated
-# (zero-offset) buffer, reused call-to-call via a small per-`SpectralTransform` cache.
 # =====================================================================================
 
 """$(TYPEDSIGNATURES)
