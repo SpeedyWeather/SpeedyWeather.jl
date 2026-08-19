@@ -25,8 +25,6 @@ particle_advection!(vars, model) = particle_advection!(vars, model.particle_adve
 particle_advection!(vars, ::Nothing, ::AbstractModel) = nothing
 
 export ParticleAdvection2D
-
-export ParticleAdvection2D
 @kwdef struct ParticleAdvection2D{
         NF,
         GeometryType, # <: AbstractGridGeometry
@@ -54,6 +52,34 @@ function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
     return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
 end
 
+export ParticleAdvection3D
+
+# Continuous 3D particle advection: particles are tracked at their own σ coordinate.
+# σ_levels_full is read from model.geometry at runtime.
+@kwdef struct ParticleAdvection3D{
+        NF,
+        GeometryType, # <: AbstractGridGeometry
+        IntType,
+    } <: AbstractParticleAdvection
+
+    "[OPTION] Number of particles"
+    nparticles::IntType = 10
+
+    "[OPTION] Execute particle advection every n timesteps"
+    every_n_time_steps::IntType = 6
+
+    "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
+    Δt::Base.RefValue{NF} = Ref(zero(NF))
+
+    "[DERIVED] Interpolation geometry used during advection"
+    geometry::GeometryType
+end
+
+function ParticleAdvection3D(SG::SpectralGrid; kwargs...)
+    geometry = GridGeometry(SG.grid; NF = SG.NF)
+    return ParticleAdvection3D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
+end
+
 function variables(P::ParticleAdvection2D)
     (; nparticles) = P
     return (
@@ -63,6 +89,18 @@ function variables(P::ParticleAdvection2D)
         ParticleVariable(:v, VectorDim(nparticles), desc = "Meridional velocity at particle location", units = "m/s"),
         ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity in σ coordinate at particle location", units = "1"),
         ParticleVariable(:locator, LocatorDim(nparticles), desc = "Vertical σ coordinate of particle location", units = "1"),
+    )
+end
+
+function variables(P::ParticleAdvection3D)
+    (; nparticles) = P
+    return (
+        PrognosticVariable(:particles, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
+        ParticleVariable(:locations, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
+        ParticleVariable(:u, VectorDim(nparticles), desc = "Zonal velocity at particle location", units = "m/s"),
+        ParticleVariable(:v, VectorDim(nparticles), desc = "Meridional velocity at particle location", units = "m/s"),
+        ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity dσ/dt at particle location", units = "1/s"),
+        ParticleVariable(:locator, LocatorDim(nparticles), desc = "Horizontal interpolation locator", units = "1"),
     )
 end
 
@@ -82,6 +120,16 @@ function initialize!(
     return particle_advection
 end
 
+function initialize!(
+        particle_advection::ParticleAdvection3D,
+        model::AbstractModel,
+    )
+    (; every_n_time_steps) = particle_advection
+    particle_advection.Δt[] = every_n_time_steps * model.time_stepping.Δt
+    particle_advection.Δt[] *= (360 / 2π)
+    return particle_advection
+end
+
 """
 $(TYPEDSIGNATURES)
 Initialize particle locations uniformly in latitude, longitude and in the
@@ -91,6 +139,18 @@ function initialize!(
         particles::AbstractVector{P},
         vars::Variables,
         particle_advection::ParticleAdvection2D,
+        model::AbstractModel,
+    ) where {P <: Particle}
+    particles .= on_architecture(architecture(particles), rand(P, length(particles)))
+    return particles
+end
+
+"""$(TYPEDSIGNATURES)
+Initialize 3D particle locations: random in lon/lat (cos-distributed), uniform in σ."""
+function initialize!(
+        particles::AbstractVector{P},
+        vars::Variables,
+        particle_advection::ParticleAdvection3D,
         model::AbstractModel,
     ) where {P <: Particle}
     particles .= on_architecture(architecture(particles), rand(P, length(particles)))
@@ -148,6 +208,50 @@ end
     # modulo all particles here
     # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
     particles[i] = mod(set(particles[i]; σ = σ))
+    lons[i] = particles[i].lon
+    lats[i] = particles[i].lat
+end
+
+"""$(TYPEDSIGNATURES)
+Initialize 3D particle advection work arrays: interpolate u, v, w at each particle's
+initial 3D position to seed the Heun predictor for the first advection step."""
+function initialize!(
+        vars::Variables,
+        particles::AbstractVector{P},
+        particle_advection::ParticleAdvection3D,
+        model::AbstractModel,
+    ) where {P <: Particle}
+    length(particles) == 0 && return nothing
+    (; time_stepping) = model
+    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
+    u_3d = field_view(vars.grid.u, :, :, l)
+    v_3d = field_view(vars.grid.v, :, :, l)
+    w_3d = vars.dynamics.w
+    σ_levels_full = model.geometry.σ_levels_full
+    (; locator) = vars.particles
+    (; geometry) = particle_advection
+    lons = vars.particles.u
+    lats = vars.particles.v
+    launch!(
+        architecture(particles), LinearWorkOrder, (length(particles),),
+        _initialize_3D_particles_kernel!, particles, lons, lats
+    )
+    RingGrids.update_locator!(locator, geometry, lons, lats)
+    u0 = vars.particles.u
+    v0 = vars.particles.v
+    w0 = vars.particles.w
+    interpolate_3D!(u0, u_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_full)
+    return nothing
+end
+
+# Modulo particles and extract horizontal coordinates; σ is each particle's own
+@kernel inbounds = true function _initialize_3D_particles_kernel!(
+        particles, lons, lats
+    )
+    i = @index(Global, Linear)
+    particles[i] = mod(particles[i])
     lons[i] = particles[i].lon
     lats[i] = particles[i].lat
 end
@@ -227,6 +331,133 @@ function particle_advection!(
     return nothing
 end
 
+function particle_advection!(
+        vars::Variables,
+        particle_advection::ParticleAdvection3D,
+        model::AbstractModel,
+    )
+    (; particles, clock) = vars.prognostic
+    length(particles) == 0 && return nothing
+
+    (; locator) = vars.particles
+    (; geometry) = particle_advection
+    (; time_stepping) = model
+
+    n = particle_advection.every_n_time_steps
+    clock.time_step_counter % n == (n - 1) || return nothing
+
+    Δt = particle_advection.Δt[]
+    Δt_half = Δt / 2
+    Δt_vert = Δt * oftype(Δt, π / 180)  # convert [s*˚/m] → [s] for dσ = w[s⁻¹]*Δt_vert[s]
+    Δt_vert_half = Δt_vert / 2
+
+    u_old = vars.particles.u
+    v_old = vars.particles.v
+    w_old = vars.particles.w
+
+    lons = vars.particles.u
+    lats = vars.particles.v
+
+    # HEUN: PREDICTOR STEP with old velocities and current particle position
+    launch!(
+        architecture(u_old), LinearWorkOrder, (length(particles),),
+        predictor_step_3D_kernel!,
+        particles, vars.particles.locations, u_old, v_old, w_old, lons, lats,
+        Δt_half, Δt_vert_half,
+    )
+
+    # CORRECTOR STEP: interpolate new u, v, w at predicted locations
+    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
+    u_3d = field_view(vars.grid.u, :, :, l)
+    v_3d = field_view(vars.grid.v, :, :, l)
+    w_3d = vars.dynamics.w
+    σ_levels_full = model.geometry.σ_levels_full
+
+    RingGrids.update_locator!(locator, geometry, lons, lats)
+    u_new = vars.particles.u
+    v_new = vars.particles.v
+    w_new = vars.particles.w
+    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, σ_levels_full)
+    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, σ_levels_full)
+    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, σ_levels_full)
+
+    launch!(
+        architecture(u_new), LinearWorkOrder, (length(particles),),
+        corrector_step_3D_kernel!,
+        particles, u_new, v_new, w_new, lons, lats, Δt_half, Δt_vert_half,
+    )
+
+    # store new velocities at corrected position for next advection step
+    RingGrids.update_locator!(locator, geometry, lons, lats)
+    interpolate_3D!(u_new, u_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(v_new, v_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(w_new, w_3d, locator, geometry, particles, σ_levels_full)
+    return nothing
+end
+
+# σ outside [σ_levels_full[1], σ_levels_full[end]] is pinned, not extrapolated
+@inline function find_vertical_bracket(σ::NF, σ_levels_full) where NF
+    n = length(σ_levels_full)
+    k_lo = 1
+    for k in 1:(n - 1)
+        σ_levels_full[k] <= σ && (k_lo = k)
+    end
+    k_hi = k_lo + 1 
+    Δσ = σ_levels_full[k_hi] - σ_levels_full[k_lo]
+    α = clamp((σ - σ_levels_full[k_lo]) / Δσ, zero(NF), one(NF))
+    return k_lo, k_hi, α
+end
+
+# Vertically blended anvil interpolation at each particle's σ coordinate.
+function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels_full)
+    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, npoints_output) = locator
+    A_data = A.data
+    nlayers = size(A_data, 2)
+    rings = geometry.grid.rings             # CPU array, used only for pole averages
+    T = eltype(A_data)
+    north_vals_cpu = Vector{T}(undef, nlayers)
+    south_vals_cpu = Vector{T}(undef, nlayers)
+    for k in 1:nlayers
+        r = A_data[rings[1], k]; north_vals_cpu[k] = sum(r) / length(r)
+        r = A_data[rings[end], k]; south_vals_cpu[k] = sum(r) / length(r)
+    end
+    arch = architecture(Aout)
+    north_vals = on_architecture(arch, north_vals_cpu)
+    south_vals = on_architecture(arch, south_vals_cpu)
+    launch!(
+        arch, LinearWorkOrder, (npoints_output,),
+        _interpolate_3D_kernel!,
+        Aout, A_data, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
+        positions, σ_levels_full, north_vals, south_vals,
+    )
+    return Aout
+end
+
+@kernel inbounds = true function _interpolate_3D_kernel!(
+        Aout, A_data,
+        ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
+        positions, σ_levels_full, north_vals, south_vals,
+    )
+    i = @index(Global, Linear)
+    k_lo, k_hi, α = find_vertical_bracket(positions[i].σ, σ_levels_full)
+
+    a = ij_as[i] == 0 ? north_vals[k_lo] : A_data[ij_as[i], k_lo]
+    b = ij_as[i] == 0 ? north_vals[k_lo] : A_data[ij_bs[i], k_lo]
+    c = ij_cs[i] == -1 ? south_vals[k_lo] : A_data[ij_cs[i], k_lo]
+    d = ij_cs[i] == -1 ? south_vals[k_lo] : A_data[ij_ds[i], k_lo]
+    ab_lo = a + (b - a) * Δabs[i]
+    val_lo = ab_lo + (c + (d - c) * Δcds[i] - ab_lo) * Δys[i]
+
+    a = ij_as[i] == 0 ? north_vals[k_hi] : A_data[ij_as[i], k_hi]
+    b = ij_as[i] == 0 ? north_vals[k_hi] : A_data[ij_bs[i], k_hi]
+    c = ij_cs[i] == -1 ? south_vals[k_hi] : A_data[ij_cs[i], k_hi]
+    d = ij_cs[i] == -1 ? south_vals[k_hi] : A_data[ij_ds[i], k_hi]
+    ab_hi = a + (b - a) * Δabs[i]
+    val_hi = ab_hi + (c + (d - c) * Δcds[i] - ab_hi) * Δys[i]
+
+    Aout[i] = val_lo + (val_hi - val_lo) * α
+end
+
 @inline function advect_2D(
         particle::Particle{NF},                 # particle to advect
         u::NF,                                  # zonal velocity [m/s]
@@ -238,6 +469,20 @@ end
     coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
     dlon = u * dt / coslat                      # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
+end
+
+@inline function advect_3D(
+        particle::Particle{NF},
+        u::NF, v::NF, w::NF,
+        dt::NF,         # horizontal: [s*˚/m]
+        dt_vert::NF,    # vertical: [s]; dσ = w[s⁻¹] * dt_vert[s]
+    ) where {NF}
+
+    dlat = v * dt
+    coslat = max(cosd(particle.lat), eps(NF))
+    dlon = u * dt / coslat
+    dσ = w * dt_vert
+    return mod(move(particle, dlon, dlat, dσ))
 end
 
 # Kernel for predictor step in Heun's method
@@ -272,6 +517,33 @@ end
         particles[i] = advect_2D(particles[i], u_new[i], v_new[i], Δt_half)
 
         # reuse work arrays on the fly for new (correct) locations
+        lons[i] = particles[i].lon
+        lats[i] = particles[i].lat
+    end
+end
+
+# 3D predictor: first Heun half-step with old velocity + predict full-step location
+@kernel inbounds = true function predictor_step_3D_kernel!(
+        particles, locations, u_old, v_old, w_old, lons, lats, Δt_half, Δt_vert_half
+    )
+    i = @index(Global, Linear)
+
+    if isactive(particles[i])
+        particles[i]  = advect_3D(particles[i],  u_old[i], v_old[i], w_old[i], Δt_half, Δt_vert_half)
+        locations[i]  = advect_3D(particles[i],  u_old[i], v_old[i], w_old[i], Δt_half, Δt_vert_half)
+        lons[i] = locations[i].lon
+        lats[i] = locations[i].lat
+    end
+end
+
+# 3D corrector: second Heun half-step with new velocity at predicted location
+@kernel inbounds = true function corrector_step_3D_kernel!(
+        particles, u_new, v_new, w_new, lons, lats, Δt_half, Δt_vert_half
+    )
+    i = @index(Global, Linear)
+
+    if isactive(particles[i])
+        particles[i] = advect_3D(particles[i], u_new[i], v_new[i], w_new[i], Δt_half, Δt_vert_half)
         lons[i] = particles[i].lon
         lats[i] = particles[i].lat
     end
