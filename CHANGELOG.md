@@ -1,7 +1,8 @@
 # Changelog
 
 ## Unreleased
-- First implementation for FFTs using metal.jl [#1207](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1207)
+
+- First implementation for FFTs using Metal.jl [#1207](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1207)
 - Restrist Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
 - Orbit and rotation time for variable length of day/year [#984](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/984)
 - Default dealiasing for non-Gaussian grids is now 3, fixing stability issues e.g. for HEALPix [#1198](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1198)
