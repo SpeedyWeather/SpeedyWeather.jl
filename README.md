@@ -89,7 +89,7 @@ On our TODO list are
 
 Currently in development, but already (partially) available are
 
-- Better CPU multi-threading support via KernelAbstractions
+- Better CPU multi-threading support
 - MLIR/OpenXLA compilation with Reactant
 
 ## Contributing
