@@ -271,11 +271,13 @@ graph, so the control flow in `run_graph!` itself can stay backend-agnostic:
   `nothing` if capture failed/was invalidated (must not throw).
 - `instantiate(graph)`: turn a captured graph into an executable.
 - `launch(exec)`: replay an instantiated graph.
-- `device`: the SpeedyWeather architecture (e.g. `CUDAGPU()`) whose device is synchronized
-  once before capture (via `synchronize(backend.device)`, as elsewhere in the codebase), so
-  that one-time warmup work happens outside the captured region.
+- `device`: the SpeedyWeather architecture (e.g. `GPU(CUDA.CUDABackend())`) whose device is
+  synchronized once before capture (via `synchronize(backend.device)`, as elsewhere in the
+  codebase), so that one-time warmup work happens outside the captured region.
 
-e.g. for CUDA: `GraphBackend(loop! -> CUDA.capture(loop!; throw_error = false), CUDA.instantiate, CUDA.launch, CUDAGPU())`."""
+e.g. for CUDA: `GraphBackend(loop! -> CUDA.capture(loop!; throw_error = false), CUDA.instantiate, CUDA.launch, GPU(CUDA.CUDABackend()))`.
+"""
+
 struct GraphBackend{C, I, L, D}
     capture::C
     instantiate::I

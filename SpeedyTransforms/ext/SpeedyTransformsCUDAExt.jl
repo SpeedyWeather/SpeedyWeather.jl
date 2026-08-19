@@ -16,7 +16,7 @@ import SpeedyTransforms: SpectralTransform, _fourier_batched!
 import SpeedyTransforms.RingGrids: AbstractField
 
 import SpeedyWeatherInternals.KernelLaunching: launch!, ArrayWorkOrder
-import SpeedyWeatherInternals.Architectures: on_architecture, synchronize, CUDAGPU
+import SpeedyWeatherInternals.Architectures: on_architecture, GPU
 
 # =====================================================================================
 # CUDA GRAPHS ACCELERATION OF THE BATCHED FOURIER TRANSFORM
@@ -60,7 +60,7 @@ const CUDA_GRAPH_BACKEND = GraphBackend(
     loop! -> capture(loop!; throw_error = false),
     instantiate,
     launch,
-    CUDAGPU(),
+    GPU(CUDA.CUDABackend(always_inline = true)),
 )
 
 # =====================================================================================
