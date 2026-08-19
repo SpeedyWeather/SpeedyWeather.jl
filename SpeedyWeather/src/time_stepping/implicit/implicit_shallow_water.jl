@@ -55,7 +55,7 @@ function implicit_correction!(
     
     # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
     Δt = time_step(time_stepping, vars.prognostic.clock)       
-    ξ = implicit.centering * Δt
+    ξ = implicit.centering * Δt / vars.prognostic.scale[]   # scale time step on the fly
     
     # Get precomputed l_indices from the spectrum
     l_indices = div_tend.spectrum.l_indices
@@ -110,11 +110,13 @@ function implicit_correction!(
     # implicit timestep ξ = α*Δt, depending on centering (0.5 Crank Nicolson, 1 backward Euler)
     (; Δt) = time_stepping    
     w = weight_coefficient(time_stepping, vars.prognostic.clock)
-    ξ = w * implicit.centering * Δt
+    ξ = w * implicit.centering * Δt / vars.prognostic.scale[]
 
     # use Hotta et al. 2016 notation for current tendency F and previous (averaged) tendency G
-    F_div, G_div = get_steps(vars.tendencies.divergence)
-    F_η, G_η = get_steps(vars.tendencies.η)
+    F_div = get_step(vars.tendencies.divergence, 1)    # no tuple (get_steps) here: a tuple of step
+    G_div = get_step(vars.tendencies.divergence, 2)    # views breaks Enzyme on Julia >= 1.11
+    F_η = get_step(vars.tendencies.η, 1)
+    G_η = get_step(vars.tendencies.η, 2)
 
     H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
     g = model.planet.gravity                    # gravitational acceleration [m/s²]

@@ -53,14 +53,12 @@ function initialize!(
     )
 
     (; latitude, width, speed, time_scale, amplitude) = forcing
-    (; radius) = model.planet
 
     # Some constants similar to Galewsky 2004
     θ₀ = (latitude - width) / 360 * 2π          # southern boundary of jet [radians]
     θ₁ = (latitude + width) / 360 * 2π          # northern boundary of jet
     eₙ = exp(-4 / (θ₁ - θ₀)^2)                  # normalisation, so that speed is at max
     A₀ = speed / eₙ / time_scale.value          # amplitude [m/s²] without lat dependency
-    A₀ *= radius                                # scale by radius as are the momentum equations
 
     (; colat) = model.geometry
     # latitude in radians, abs for north/south symmetry
@@ -182,8 +180,8 @@ function forcing!(
     S_masked = vars.scratch.a_2D
     transform!(S_masked, S_grid, vars.scratch.transform_memory, spectral_transform)
 
-    # scale by radius^2 as is the vorticity equation, and scale to forcing strength
-    S_masked .*= (vars.prognostic.scale[]^2 * forcing.strength)
+    # scale by radius as is vorticity, and scale to forcing strength
+    S_masked .*= (vars.prognostic.scale[] * forcing.strength)
 
     # force every layer
     vor_tend = get_tendency_step(vars.tendencies.vorticity, time_stepping, forcing)
@@ -231,8 +229,7 @@ function forcing!(
         model::AbstractModel,
     )
     (; latds) = model.geometry
-    # scale by radius as is the vorticity equation
-    s = forcing.strength * vars.prognostic.scale[]
+    s = forcing.strength
     k = forcing.wavenumber
 
     Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, forcing)
@@ -318,7 +315,6 @@ function initialize!(
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
     (; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     p₀ = model.atmosphere.reference_pressure
-    (; radius) = model.planet
 
     # slow relaxation everywhere, fast in the tropics
     kₐ = 1 / Second(relax_time_slow).value
@@ -329,7 +325,6 @@ function initialize!(
 
     # Held and Suarez equation 4
     temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(0, (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
-    temp_relax_freq .*= radius  # scale by radius as is the temperature equation
 
     # Held and Suarez equation 3, split into max(Tmin, (a + b*ln(p))*(p/p₀)^κ)
     # precompute a, b to simplify online calculation
@@ -385,6 +380,6 @@ end
     p = exp(log_p)                      # pressure [Pa]
 
     # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
-    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p[ij]) * (p / p₀)^κ)
+    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p) * (p / p₀)^κ)
     temp_tend[ij, k] -= kₜ * (temp[ij, k] - Teq)  # Held and Suarez 1996, equation 2
 end

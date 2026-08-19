@@ -36,12 +36,12 @@ independently. Transformed after every time step to grid space with a
 provided and an independent `random_number_generator` is used
 that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
 @kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType} <: AbstractRandomProcess
-    trunc::IntType
+    truncation::IntType
 
     "[OPTION] Time scale of the AR1 process"
     time_scale::Second = Hour(6)
 
-    "[OPTION] Wavenumber of the AR1 process"
+    "[OPTION] Wavenumber (0-based) of the AR1 process"
     wavenumber::IntType = 12
 
     "[OPTION] Standard deviation of the AR1 process"
@@ -60,14 +60,15 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
     autoregressive_factor::Base.RefValue{NF} = Ref(zero(NF))
 
     "Precomputed noise factors [1] for every total wavenumber l"
-    noise_factors::VectorType = zeros(NF, trunc + 2)
+    noise_factors::VectorType = zeros(NF, truncation + 1)
 end
 
 # generator function
 function SpectralAR1Process(SG::SpectralGrid; kwargs...)
     RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
     SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
-    return SpectralAR1Process{SG.NF, SG.VectorType, SeedType, RNG, typeof(SG.trunc)}(trunc = SG.trunc; kwargs...)
+    (; truncation) = SG
+    return SpectralAR1Process{SG.NF, SG.VectorType, SeedType, RNG, typeof(truncation)}(; truncation, kwargs...)
 end
 
 function variables(::SpectralAR1Process)
@@ -82,7 +83,7 @@ function initialize!(
         model::AbstractModel,
     )
     # auto-regressive factor in the AR1 process
-    dt = model.time_stepping.Δt_sec         # in seconds
+    dt = model.time_stepping.Δt             # in seconds
     process.autoregressive_factor[] = exp(-dt / Second(process.time_scale).value)
 
     # noise factors per total wavenumber in the AR1 process
@@ -92,7 +93,7 @@ function initialize!(
 
     # ECMWF Tech Memorandum 598, Appendix 8, eq. 18
     # TODO *norm_sphere seems to be needed, maybe ECMWF uses another normalization of the harmonics?
-    F₀_denominator = 2 * sum([(2l + 1) * exp(-l * (l + 1) / (k * (k + 1))) for l in 1:process.trunc])
+    F₀_denominator = 2 * sum([(2l + 1) * exp(-l * (l + 1) / (k * (k + 1))) for l in 1:process.truncation])
     F₀ = sqrt(σ^2 * (1 - a^2) / F₀_denominator) * model.spectral_transform.norm_sphere
 
     # ECMWF Tech Memorandum 598, Appendix 8, eq. 17

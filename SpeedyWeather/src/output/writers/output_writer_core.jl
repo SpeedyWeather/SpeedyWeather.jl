@@ -69,7 +69,7 @@ function initialize!(
     # OUTPUT FREQUENCY, recalculate interval after rounding
     f = round(Int, Millisecond(output.interval).value / model.time_stepping.Δt_millisec.value)
     core.output_every_n_steps = max(1, f)
-    output.interval = Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt_sec))
+    output.interval = Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt))
 
     # RESET COUNTERS
     core.output_counter = 1             # start at 1 for writing the initial conditions

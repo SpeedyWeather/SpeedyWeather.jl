@@ -1,7 +1,16 @@
+# use Julia 1.10 for this 
+
 import Pkg
 Pkg.activate("SpeedyWeather/test/differentiability/sensitivity_examples")
 
 using SpeedyWeather, Enzyme, JLD2, Checkpointing
+
+# Enzyme runs the LLVM Attributor pass on Julia < 1.12
+# (`Enzyme.Compiler.RunAttributor = Ref(VERSION < v"1.12")`). Stepping the clock inside the
+# `@ad_checkpoint` loop sends the Attributor's AAPotentialValues analysis into unbounded
+# recursion (`AAPotentialValuesFloating::updateImpl` -> `getAssumedSimplified` -> ... -> itself),
+# which overflows the C++ stack and shows up as a segfault. Disabling the pass avoids it.
+Enzyme.Compiler.RunAttributor[] = false
 
 # Parse command line argument for N (number of timesteps)
 const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 5
@@ -9,7 +18,7 @@ const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 5
 println("Running Sensitivity Analyis with N = $N")
 savename_base = "new-sensitivity-$N"
 
-spectral_grid = SpectralGrid(trunc = 32, nlayers = 8)          # define resolution
+spectral_grid = SpectralGrid(truncation = 33, nlayers = 8)          # define resolution
 model = PrimitiveWetModel(; spectral_grid)                 # construct model
 simulation = initialize!(model)
 initialize!(simulation)
@@ -18,17 +27,14 @@ run!(simulation, period = Day(20))
 # do the scaling and init again because we need it for the timestepping when calling it manually
 initialize!(simulation, steps = N)
 
-(; prognostic_variables, diagnostic_variables, model) = simulation
-(; Δt, Δt_millisec) = model.time_stepping
-dt = 2Δt
+(; variables, model) = simulation
+vars = variables
 
-progn = prognostic_variables
-diagn = diagnostic_variables
-
-function checkpointed_timesteps!(progn::PrognosticVariables, diagn, model, N_steps, checkpoint_scheme::Scheme, lf1 = 2, lf2 = 2)
+function checkpointed_timesteps!(vars::Variables, model, N_steps, checkpoint_scheme::Scheme)
 
     @ad_checkpoint checkpoint_scheme for _ in 1:N_steps
-        SpeedyWeather.timestep!(progn, diagn, 2 * model.time_stepping.Δt, model, lf1, lf2)
+        SpeedyWeather.time_step!(vars, model.time_stepping, model)     # calculate tendencies and step forward
+        SpeedyWeather.time_step!(vars.prognostic.clock, model.time_stepping)
     end
 
     return nothing
@@ -37,16 +43,21 @@ end
 checkpoint_scheme = Revolve(N)
 
 # Temperature One-Hot
-d_progn = zero(progn)
-d_model = make_zero(model)
-d_diag = make_zero(diagn)
-d_diag.grid.temp_grid[443, 8] = 1
+dvars = make_zero(vars)
+dmodel = make_zero(model)
+dvars.grid.temperature[443, 8] = 1
 
-jldsave(string(savename_base, "temp-ic.jld2"); progn, diagn)
+# we need to materialize the views to be able to save them
+output_vars = SpeedyWeather.materialize_views(vars)
+jldsave(string(savename_base, "temp-ic.jld2"); output_vars)
+output_vars = nothing 
 
 println("Starting sensitivity computation...")
 
-@time autodiff(Enzyme.Reverse, checkpointed_timesteps!, Const, Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Duplicated(model, d_model), Const(N), Const(checkpoint_scheme))
+@time autodiff(Enzyme.Reverse, checkpointed_timesteps!, Const, Duplicated(vars, dvars), Duplicated(model, dmodel), Const(N), Const(checkpoint_scheme))
 
-jldsave(string(savename_base, "temp.jld2"); d_progn)
-jldsave(string(savename_base, "temp-fc.jld2"); progn, diagn)
+output_dvars = SpeedyWeather.materialize_views(dvars)
+jldsave(string(savename_base, "temp.jld2"); output_dvars)
+
+output_vars = SpeedyWeather.materialize_views(vars)
+jldsave(string(savename_base, "temp-fc.jld2"); vars)

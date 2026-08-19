@@ -1,7 +1,7 @@
 using Zarr, Dates
 
 @testset "ZarrOutput type and defaults" begin
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(spectral_grid)
     @test output isa SpeedyWeather.ZarrOutput
     @test output.active == false
@@ -12,7 +12,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_sw_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false,
@@ -53,7 +53,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_pw_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 4)
     output = ZarrOutput(
         spectral_grid, PrimitiveWet;
         path = tmp_output_path, write_restart = false,
@@ -89,7 +89,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_2dfrom3d_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 4)
     output = ZarrOutput(
         spectral_grid, PrimitiveWet;
         path = tmp_output_path, write_restart = false,
@@ -120,7 +120,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_add_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false,
@@ -151,7 +151,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_dims_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false,
@@ -185,7 +185,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_opt_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path,
@@ -205,11 +205,50 @@ end
     @test z_vor.metadata.compressor isa Zarr.BloscCompressor
 end
 
+@testset "ZarrOutput time_chunk write equivalence" begin
+    # Buffered, chunk-aligned writes (time_chunk > 1) must produce output identical
+    # to unbuffered per-slice writes (time_chunk == 1); only the write batching
+    # differs. The period is chosen so the number of output snapshots is NOT a
+    # multiple of time_chunk, exercising the trailing partial-chunk flush on close.
+    period = Day(2)
+    interval = Hour(6)      # => 9 output snapshots (IC + 8), not a multiple of 4
+    time_chunk = 4
+
+    function run_zarr_time_chunk(tc)
+        tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_eq_tc$(tc)_")
+        spectral_grid = SpectralGrid(truncation = 6, nlayers = 4)
+        output = ZarrOutput(
+            spectral_grid, PrimitiveDry;
+            path = tmp_output_path, write_restart = false,
+            interval, time_chunk = tc,
+        )
+        model = PrimitiveDryModel(spectral_grid; output)
+        simulation = initialize!(model)
+        run!(simulation, output = true; period)
+        return Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    end
+
+    g_ref = run_zarr_time_chunk(1)          # per-slice baseline
+    g_buf = run_zarr_time_chunk(time_chunk) # buffered chunk-aligned writes
+
+    # sanity check: the trailing partial chunk is genuinely exercised
+    @test length(g_buf["time"]) % time_chunk != 0
+
+    # every array (data variables and coordinates, including `time`) is identical;
+    # isequal compares NaN (fill values / uninitialised mslp at t=0) as equal
+    for name in keys(g_ref.arrays)
+        a_ref = g_ref[name][:]
+        a_buf = g_buf[name][:]
+        @test size(a_ref) == size(a_buf)
+        @test all(isequal.(a_ref, a_buf))
+    end
+end
+
 @testset "ZarrOutput spatial chunking" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_spatial_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 4)
     output = ZarrOutput(
         spectral_grid, PrimitiveDry;
         path = tmp_output_path, write_restart = false,
@@ -245,7 +284,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_clamp_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false,
@@ -263,11 +302,92 @@ end
     @test z_vor.metadata.chunks[3] == 1     # nlayers=1 ⇒ z clamped to 1
 end
 
+@testset "ZarrOutput ensemble members into one store" begin
+    # Emulate parallel ensemble members within a single process by running members
+    # 1..N sequentially: member 1 (creator) builds the shared store + readiness marker,
+    # members 2..N find the marker, open the existing store and write their own slice.
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_ensemble_")
+    period = Day(1)
+    ensemble_size = 3
+
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
+    initial_conditions = ZonalJet(spectral_grid)    # deterministic IC, identical for all members
+    store_path = ""
+    for member in 1:ensemble_size
+        output = ZarrOutput(
+            spectral_grid, ShallowWater;
+            path = tmp_output_path,
+            ensemble_index = member, ensemble_size = ensemble_size,
+        )
+        model = ShallowWaterModel(spectral_grid; output, initial_conditions)
+        simulation = initialize!(model)
+        run!(simulation, output = true; period)
+        @test simulation.model.feedback.nans_detected == false
+        # all members must resolve to the same shared run folder / store
+        member == 1 && (store_path = joinpath(model.output.run_path, model.output.filename))
+        @test joinpath(model.output.run_path, model.output.filename) == store_path
+    end
+
+    # side files: members run as parallel processes but share one run folder, so every
+    # member — including the creator (member 1) — gets a _member suffix so they don't
+    # clobber each other and share one consistent naming scheme
+    run_path = dirname(store_path)
+    for filename in ("parameters", "progress", "restart")
+        extension = filename == "restart" ? ".jld2" : ".txt"
+        for member in 1:ensemble_size
+            @test isfile(joinpath(run_path, filename * "_member$member" * extension))
+        end
+    end
+
+    # a writer member configured inconsistently with the creator's store errors early
+    output = ZarrOutput(
+        spectral_grid, ShallowWater;
+        path = tmp_output_path,
+        ensemble_index = 2, ensemble_size = ensemble_size + 1,  # ensemble size mismatch
+    )
+    model = ShallowWaterModel(spectral_grid; output, initial_conditions)
+    simulation = initialize!(model)
+    @test_throws ErrorException run!(simulation, output = true; period)
+
+    # metadata was consolidated by the creator for faster opening (xarray etc.)
+    @test isfile(joinpath(store_path, ".zmetadata"))
+
+    g = Zarr.zopen(store_path)
+
+    # ensemble coordinate exists and has length ensemble_size
+    @test haskey(g.arrays, "ensemble")
+    @test g["ensemble"][:] == collect(1:ensemble_size)
+
+    # a single shared time axis was written (only the creator writes it)
+    nlon = length(g["lon"][:])
+    nlat = length(g["lat"][:])
+    nt = length(g["time"][:])
+
+    # 3D variable gains a trailing ensemble axis; ensemble is first in row-major dims
+    z_vor = g["vor"]
+    @test ndims(z_vor) == 5
+    @test size(z_vor) == (nlon, nlat, spectral_grid.nlayers, nt, ensemble_size)
+    @test z_vor.attrs["_ARRAY_DIMENSIONS"] == ["ensemble", "time", "layer", "lat", "lon"]
+    # ensemble axis is chunked with size 1 so members write disjoint chunk files
+    @test z_vor.metadata.chunks[end] == 1
+
+    # every member wrote finite data into its own ensemble slice; since all members share
+    # the same deterministic IC and there's no stochastic physics in ShallowWater, every
+    # ensemble slice should be (approximately) identical
+    vor_1 = g["vor"][:, :, :, :, 1]
+    @test all(isfinite, vor_1)
+    for e in 2:ensemble_size
+        vor_e = g["vor"][:, :, :, :, e]
+        @test all(isfinite, vor_e)
+        @test vor_e ≈ vor_1
+    end
+end
+
 @testset "ZarrOutput second run! creates a new store" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_rerun_")
     period = Day(1)
 
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false, id = "rerun",

@@ -43,7 +43,7 @@ abstract type AbstractBenchmarkSuite end
     nruns::Int = 1
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
-    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    truncation::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNCATION, nruns)
     nlayers::Vector{Int} = default_nlayers(model)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
@@ -59,6 +59,9 @@ abstract type AbstractBenchmarkSuite end
     Δt::Vector{Float64} = fill(0.0, nruns)
     memory::Vector{Int} = fill(0, nruns)
     architecture::Any = SpeedyWeather.CPU()
+    # Scale factor on `n_timesteps` for the timed run; >1 lengthens every run for
+    # more robust (e.g. publication-ready) timings. Set globally by the driver.
+    timestep_multiplier::Real = 1
 end
 
 default_nlayers(::Type{<:Barotropic}) = 1
@@ -66,9 +69,13 @@ default_nlayers(::Type{<:ShallowWater}) = 1
 default_nlayers(::Type{<:PrimitiveEquation}) = 8
 default_nlayers(models) = [default_nlayers(model) for model in models]
 
-# this should return number of timesteps so that every simulation
-# only takes seconds
-n_timesteps(trunc, nlayers) = max(10, round(Int, 4.0e8 / trunc^3 / nlayers^2))
+# Number of timesteps for a timed run, chosen so every simulation takes a few
+# seconds. The step count is clamped between a floor and a ceiling:
+# `multiplier` scales the (clamped) result — pass e.g. `10` for longer,
+# publication-ready runs with more robust timings; applied after the clamp so it
+# lengthens even the floored/ceilinged configs.
+n_timesteps(truncation, nlayers, multiplier = 1) =
+    round(Int, multiplier * clamp(round(Int, 4.0e9 / truncation^3 / nlayers^2), 50, 1200))
 
 function run_benchmark_suite!(suite::BenchmarkSuite)
     for i in 1:suite.nruns
@@ -76,7 +83,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         # unpack
         Model = suite.model[i]
         NF = suite.NF[i]
-        trunc = suite.trunc[i]
+        truncation = suite.truncation[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
         dynamics = suite.dynamics[i]
@@ -84,7 +91,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         transform_kind = suite.spectral_transform[i]
         architecture = suite.architecture
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
+        spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
 
         extra_components = resolve_model_kwargs(suite.model_kwargs[i], spectral_grid)
@@ -100,8 +107,8 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         simulation = initialize!(model)
         suite.memory[i] = Base.summarysize(simulation)
 
-        nsteps = n_timesteps(trunc, nlayers)
-        period = Second(round(Int, model.time_stepping.Δt_sec * (nsteps + 1)))
+        nsteps = n_timesteps(truncation, nlayers, suite.timestep_multiplier)
+        period = Second(round(Int, model.time_stepping.Δt * (nsteps + 1)))
 
         # Warm up before timing: run a few steps so JIT compilation of the time
         # loop happens here rather than inside the timed run below. The timed run
@@ -112,18 +119,22 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         # reuses the compiled code). A handful of steps covers the Euler spin-up
         # plus regular steps. We then re-initialize so the timed run starts from
         # the same initial state as before.
-        warmup_period = Second(round(Int, model.time_stepping.Δt_sec * 3))
+        warmup_period = Second(round(Int, model.time_stepping.Δt * 3))
         run!(simulation; period = warmup_period)
         synchronize(architecture)
 
+        # Time the run with a real wallclock timer rather than the progress
+        # meter's `tlast - tinit`. The latter measures only up to the *last*
+        # progress-bar render (every `feedback_dt = 0.1 s`)
         simulation = initialize!(model)
+        t0 = time()
         run!(simulation; period)
         synchronize(architecture)
+        time_elapsed = time() - t0
 
-        time_elapsed = model.feedback.progress_meter.tlast - model.feedback.progress_meter.tinit
-        sypd = model.time_stepping.Δt_sec * nsteps / (time_elapsed * 365.25)
+        sypd = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
 
-        suite.Δt[i] = model.time_stepping.Δt_sec
+        suite.Δt[i] = model.time_stepping.Δt
         suite.SYPD[i] = sypd
     end
     return
@@ -142,7 +153,7 @@ function write_results(md, suite::BenchmarkSuite)
 
     column_header = "| Model "
     column_header *= print_NF ? "| NF " : ""
-    column_header *= "| T "
+    column_header *= "| truncation "
     column_header *= "| L "
     column_header *= print_Grid ? "| Grid " : ""
     column_header *= print_nlat ? "| Rings " : ""
@@ -161,7 +172,7 @@ function write_results(md, suite::BenchmarkSuite)
 
         row = "| $(suite.model[i]) "
         row *= print_NF ? "| $(suite.NF[i]) " : ""
-        row *= "| $(suite.trunc[i]) "
+        row *= "| $(suite.truncation[i]) "
         row *= "| $(suite.nlayers[i]) "
         row *= print_Grid ? "| $(suite.Grid[i]) " : ""
         row *= print_nlat ? "| $(suite.nlat[i]) " : ""
@@ -186,7 +197,7 @@ abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end
     nruns::Int = 1
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
-    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    truncation::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNCATION, nruns)
     nlayers::Vector{Int} = default_nlayers(model)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
@@ -210,10 +221,32 @@ function add_results!(suite::AbstractBenchmarkSuiteTimed, trial::BenchmarkTools.
     return suite
 end
 
+# Individual dynamics functions that are not GPU-compatible: each performs a
+# per-variable grid→spectral `transform!` on a non-contiguous view (a layer slot of
+# the fused tendency buffer). `reinterpret` of such a strided view is not GPU-safe,
+# so cuFFT falls back to a CPU path (StackOverflowError) and the Legendre kernel
+# fails to compile (InvalidIRError). The full model avoids this by transforming the
+# contiguous fused parent in one batched call, so these are only exercised in
+# isolation here. Skip them on GPU rather than triggering the (slow) failures.
+const GPU_INCOMPATIBLE_FUNCTIONS = Set([
+    "surface_pressure_tendency!",
+    "vordiv_tendencies!",
+    "temperature_tendency!",
+    "humidity_tendency!",
+    "bernoulli_potential!",
+])
+
 # Run one @benchmark and store the result. On failure, record NaN/0 and warn
 # (used for individual function benchmarks that may not be GPU-compatible).
 function safe_benchmark!(f, suite::AbstractBenchmarkSuiteTimed, i_run::Integer, i_func::Integer)
     name = suite.function_names[i_func]
+    if suite.architecture isa SpeedyWeather.GPU && name in GPU_INCOMPATIBLE_FUNCTIONS
+        @info "Skipping $name on $(suite.architecture): not GPU-compatible in isolation; recording N/A"
+        suite.time[i_run][i_func] = NaN
+        suite.memory[i_run][i_func] = 0
+        suite.allocs[i_run][i_func] = 0
+        return suite
+    end
     try
         trial = f()
         add_results!(suite, trial, i_run, i_func)
@@ -233,11 +266,11 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
 
         Model = suite.model[i]
         NF = suite.NF[i]
-        trunc = suite.trunc[i]
+        truncation = suite.truncation[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture = arch)
+        spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture = arch)
         suite.nlat[i] = spectral_grid.nlat
 
         model = build_model(Model, spectral_grid, arch)
@@ -297,7 +330,7 @@ function write_results(md, suite::AbstractBenchmarkSuiteTimed)
 
         title_row = "$(suite.model[i_run]) "
         title_row *= "| $(suite.NF[i_run]) "
-        title_row *= "| T$(suite.trunc[i_run]) "
+        title_row *= "| T$(suite.truncation[i_run] - 1) "
         title_row *= "L$(suite.nlayers[i_run]) "
         title_row *= "| $(suite.Grid[i_run]) "
         title_row *= "| $(suite.nlat[i_run]) Rings"

@@ -11,7 +11,7 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
 !!! info "Setup script to copy and paste"
     ```julia
     using SpeedyWeather
-    spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+    spectral_grid = SpectralGrid(truncation = 64, nlayers = 1)
     still_earth = Earth(spectral_grid, rotation=0)
     initial_conditions = RandomVelocity(spectral_grid)
     forcing = nothing
@@ -28,7 +28,7 @@ T63 (see [Available horizontal resolutions](@ref)) and `nlayers=1` vertical leve
 The `SpectralGrid` object will provide us with some more information
 ```@example barotropic_setup
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+spectral_grid = SpectralGrid(truncation=64, nlayers=1)
 ```
 Next step we create a planet that's like Earth but not rotating. As a convention,
 we always pass on the spectral grid object as the first argument to every other
@@ -77,7 +77,7 @@ with default settings. More options on output in [NetCDF output](@ref).
 !!! info "Setup script to copy and past"
     ```julia
     using SpeedyWeather
-    spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+    spectral_grid = SpectralGrid(truncation=64, nlayers=1)
     orography = NoOrography(spectral_grid)
     initial_conditions = ZonalJet(spectral_grid)
     model = ShallowWaterModel(spectral_grid; orography, initial_conditions)
@@ -90,7 +90,7 @@ water equations with and without mountains. As the shallow water system has also
 one level, we can reuse the `SpectralGrid` from Example 1.
 ```@example galewsky_setup
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+spectral_grid = SpectralGrid(truncation=64, nlayers=1)
 ```
 Now as a first simulation, we want to disable any orography, so we create a `NoOrography`
 ```@example galewsky_setup
@@ -228,7 +228,7 @@ Let's try it out! We create an `EarthOrography` struct like so
 
 ```@example galewsky_setup2
 using SpeedyWeather # hide
-spectral_grid = SpectralGrid(trunc=63, nlayers=1) # hide
+spectral_grid = SpectralGrid(truncation=64, nlayers=1) # hide
 initial_conditions = ZonalJet(spectral_grid) # hide
 orography = EarthOrography(spectral_grid)
 ```
@@ -278,7 +278,7 @@ probably not surprising!
 Setup script to copy and paste:
 ```@example jet_stream_setup
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+spectral_grid = SpectralGrid(truncation=64, nlayers=1)
 
 forcing = JetStreamForcing(spectral_grid, latitude=60)
 drag = LinearVorticityDrag(spectral_grid)
@@ -313,7 +313,7 @@ Setup script to copy and paste:
 using Random # hide
 Random.seed!(1234) # hide
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=127, nlayers=1)
+spectral_grid = SpectralGrid(truncation=128, nlayers=1)
 
 # model components
 implicit = ImplicitShallowWater(spectral_grid, centering=0.5)
@@ -347,7 +347,7 @@ model.atmosphere.layer_thickness
 so those waves are with an amplitude of 2000m quite strong.
 But the semi-implicit time integration can handle that even with fairly large time steps of
 ```@example gravity_wave_setup
-model.time_stepping.Δt_sec
+model.time_stepping.Δt
 ```
 seconds. Note that the gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s,
 given the speed of gravity waves we don't have to integrate for long.

@@ -31,3 +31,21 @@
         end
     end
 end
+
+@testset "Rotate n-dimensional fields" begin
+    @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid, HEALPixGrid)
+        grid = Grid(4)
+        @testset for trailing_dims in ((2,), (2, 3), (2, 3, 2))
+            field = rand(Float32, grid, trailing_dims...)
+            @testset for degree in (90, 180, 270)
+                rotated = rotate(field, degree)
+
+                # rotating all layers at once == rotating every 2D layer independently
+                for c in CartesianIndices(trailing_dims)
+                    layer = Field(field.data[:, c], grid)
+                    @test rotate(layer, degree) == Field(rotated.data[:, c], grid)
+                end
+            end
+        end
+    end
+end

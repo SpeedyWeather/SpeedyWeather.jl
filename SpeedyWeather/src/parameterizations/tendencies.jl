@@ -51,9 +51,6 @@ end
 
     # manually unroll loop over all parameterizations (NamedTuple iteration not GPU-compatible)
     column_parameterizations!(ij, vars, parameterizations, model)
-
-    # tendencies have to be scaled by the radius for the dynamical core
-    scale_tendencies!(ij, vars.tendencies.grid, model.planet.radius)
 end
 
 # Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
@@ -70,9 +67,6 @@ end
 # this yields a more contiguous memory access pattern on CPU
 function column_parameterizations_cpu!(vars, model)
     _column_parameterizations_cpu!(vars, get_parameterizations(model), model)
-
-    # tendencies have to be scaled by the radius for the dynamical core
-    @inbounds scale_tendencies!(vars.tendencies.grid, model.planet.radius)
     return nothing
 end
 
@@ -96,15 +90,18 @@ end
 """$(TYPEDSIGNATURES)
 Flux `flux` into surface layer with surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]
 converted to tendency [?/s]."""
-@propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
-    flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[end])
+@propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) = 
+    flux_to_tendency(flux, pₛ, model.geometry.nlayers, model)
 
 """$(TYPEDSIGNATURES)
 Flux `flux` into layer `k` of thickness `Δσ`  converted to tendency [?/s].
 Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
 @propagate_inbounds flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g / (pₛ * Δσ_k) * flux
-@propagate_inbounds flux_to_tendency(flux::Real, pₛ::Real, k::Int, model) =
-    flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[k])
+@propagate_inbounds function flux_to_tendency(flux::Real, pₛ::Real, k::Integer, model)
+    Δp = pressure_thickness(k, pₛ, model.geometry.vertical_coordinates)
+    g = model.planet.gravity
+    return g * flux / Δp
+end
 
 # hacky, temporary placement, and also modularize this?
 function reset_variables!(vars::Variables)

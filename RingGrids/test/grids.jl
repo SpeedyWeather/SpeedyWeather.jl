@@ -422,6 +422,12 @@ end
         @test (field2 .* field3)[:, 1, 1] == (field2[:, 1] .* field3[:, 1, 1])
         @test (field1 .* field2_2)[:, 1] == (field1 .* field2_2[:, 1])
         @test (field1 .* field2_2)[:, 2] == (field1 .* field2_2[:, 2])
+
+        # mixed-rank broadcast promotes to the higher rank, order-independent
+        # (a non-commutative BroadcastStyle rule would error or disagree here)
+        @test ndims(field1 .* field2_2) == 2
+        @test ndims(field2_2 .* field1) == 2
+        @test (field1 .* field2_2) == (field2_2 .* field1)
     end
 end
 
@@ -590,4 +596,102 @@ end
     @test RingGrids.nonparametric_type(SubArray{Float32, 1}) == SubArray
     @test RingGrids.nonparametric_type(SubArray{Float32, 1, Array}) == Array
     @test RingGrids.nonparametric_type(SubArray{Float32, 1, Array{Float32, 1}}) == Array
+end
+
+@testset "ArrayDimensions" begin
+    using SpeedyWeatherInternals.ArrayDimensions: XY, XYZ, XYT, XYZT, hastime, hasvertical
+
+    grid = FullGaussianGrid(4)
+
+    # default dims is XY (2D horizontal)
+    F2 = zeros(grid)
+    @test F2.dims isa XY
+    @test !hastime(F2)
+    @test !hasvertical(F2)
+
+    # explicit 3D horizontal + vertical
+    F3z = zeros(grid, XYZ(), 3)
+    @test F3z.dims isa XYZ
+    @test !hastime(F3z)
+    @test hasvertical(F3z)
+
+    # explicit 3D horizontal + time
+    F3t = zeros(grid, XYT(), 3)
+    @test F3t.dims isa XYT
+    @test hastime(F3t)
+    @test !hasvertical(F3t)
+
+    # explicit 4D horizontal + vertical + time
+    F4 = zeros(grid, XYZT(), 3, 2)
+    @test F4.dims isa XYZT
+    @test hastime(F4)
+    @test hasvertical(F4)
+
+    # dims are preserved through similar, zero, and field_view
+    F3z_sim = similar(F3z)
+    @test F3z_sim.dims isa XYZ
+
+    F3z_zero = zero(F3z)
+    @test F3z_zero.dims isa XYZ
+
+    F3z_view = field_view(F3z, :, 1)
+    @test F3z_view.dims isa XY
+
+    F3z_range_view = field_view(F3z, :, 1:2)
+    @test F3z_range_view.dims isa XYZ
+
+    # getindex with integer drops dims; range preserves
+    @test F3z[:, 1].dims isa XY
+    @test F3z[:, 1:2].dims isa XYZ
+
+    # 4D: two explicit non-horizontal indices
+    @test F4[:, 1:3, 1].dims isa XYZ   # drop time, keep vertical range
+    @test F4[:, 1, 1].dims isa XY      # drop both vertical and time
+end
+
+@testset "Field concatenation" begin
+    grid = FullGaussianGrid(4)
+
+    # Check that trivial case returns same Field
+    F1 = Field(grid, 1)
+    @test cat(F1, dims = 2) == F1
+
+    # Concatenate two fields
+    F1 = Field(grid, 1) .+ 1
+    F2 = Field(grid, 2) .+ 2
+    F3 = cat(F1, F2, dims = 2)
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == 3
+    @test all(F3[:, 1] .≈ F1[:, 1]) && all(F3[:, 2:3] .≈ F2[:, 1])
+
+    # Concatenate N fields along dimension 3
+    N = 5
+    Fs = [Field(grid, 1, i) for i in 1:N]
+    F3 = cat(Fs..., dims = 3)
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 3) == sum(1:N)
+
+    # Concatenate along two dimensions at once
+    F3 = cat(Fs..., dims = (2, 3))
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == N
+    @test size(F3, 3) == sum(1:N)
+    # also for array dims (reversed order for good measure)
+    F3 = cat(Fs..., dims = [3, 2])
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == N
+    @test size(F3, 3) == sum(1:N)
+
+    # Check singleton case for iterable dims
+    F3 = cat(F1, F2, dims = [2])
+    @test F3 isa FullGaussianField
+    @test F3.grid === grid
+    @test size(F3, 2) == 3
+
+    # Check that concatenation along dimension 1 fails
+    @test_throws AssertionError cat(F1, F2, dims = 1)
 end

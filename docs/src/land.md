@@ -39,7 +39,7 @@ The default `LandModel` in SpeedyWeather contains
 (at the moment other than 2 soil layers are not supported or experimental)
 
 ```@example land
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 geometry = LandGeometry(spectral_grid, nlayers=2) # that's also the default, therefore it's optional here
 land = LandModel(spectral_grid; geometry)
 ```
@@ -441,7 +441,7 @@ column_grid = Terrarium.ColumnRingGrid(
     Terrarium.CPU(), Float32,
     Terrarium.ExponentialSpacing(; N = Nz, Δz_min),
     ring_grid,
-    land_sea_mask.land_fraction .> 0
+    land_sea_mask,
 )
 
 # Soil column + initial state, matching `LandModel: Soil, no vegetation`
@@ -467,7 +467,7 @@ model = PrimitiveWetModel(
     land_sea_mask,
     surface_heat_flux     = SurfaceHeatFlux(spectral_grid, land = PrescribedLandHeatFlux()),
     surface_humidity_flux = SurfaceHumidityFlux(spectral_grid, land = PrescribedLandHumidityFlux()),
-    time_stepping         = Leapfrog(spectral_grid, Δt_at_T31 = Minute(15)),
+    time_stepping         = Leapfrog(spectral_grid, Δt_at_T32 = Minute(15)),
 )
 
 simulation = initialize!(model)
@@ -478,5 +478,39 @@ Terarrium's state variales are owned by SpeedyWeather's `Variables` and can be a
 
 ```@example terrarium
 simulation.variables.prognostic.land.terrarium
+```
+
+### Output of Terrarium variables
+
+Any variable of the Terrarium state (prognostic, auxiliary/diagnostic, or input)
+can be written to SpeedyWeather's output with `TerrariumOutput`. Its name,
+units, long name and dimensionality are derived automatically from Terrarium's
+variable metadata. Add all prognostic and auxiliary Terrarium variables with
+
+```@example terrarium
+add!(model, TerrariumOutput(terrarium_model)...)
+```
+
+or add a single variable (here renamed in the output file via `name`, any Terrarium
+variable name works, e.g. also `:saturation_water_ice` or `:sensible_heat_flux`) with
+
+```@example terrarium
+add!(model, TerrariumOutput(terrarium_model, :temperature, name = "soil_temperature"))
+nothing # hide
+```
+
+Then run the simulation with `run!(simulation, output = true)` as usual.
+3D (subsurface) variables like the soil `temperature` are written on an
+additional vertical dimension `soil_depth` with the depths of the
+Terrarium soil layer centres (in meters, positive down) as coordinates.
+Ocean grid points, where Terrarium does not simulate anything, are filled
+with NaN. Terrarium output variables are supported both with `NetCDFOutput`
+and, once Zarr.jl is loaded, with `ZarrOutput`:
+
+```julia
+using Zarr
+output = ZarrOutput(spectral_grid, PrimitiveWet)
+model = PrimitiveWetModel(spectral_grid; land, output, ...)
+add!(model, TerrariumOutput(terrarium_model)...)
 ```
 

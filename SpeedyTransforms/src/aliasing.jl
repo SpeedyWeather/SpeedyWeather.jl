@@ -2,42 +2,38 @@ const DEFAULT_DEALIASING = 2.0
 
 """
 $(TYPEDSIGNATURES)
-For the spectral truncation `trunc` (0-based, e.g. 31 for T31) return the
+For the spectral `truncation` (1-based, e.g. 32 for T32) return the
 grid resolution parameter `nlat_half` (number of latitude rings on one hemisphere
 including the Equator) following a dealiasing parameter (default 2)
 to match spectral and grid resolution."""
 function RingGrids.get_nlat_half(
-        trunc::Integer,
+        truncation::Integer,
         dealiasing::Real = DEFAULT_DEALIASING
     )
 
-    return roundup_fft(ceil(Int, ((1 + dealiasing) * trunc + 1) / 4))
+    return roundup_fft(ceil(Int, ((1 + dealiasing) * (truncation - 1) + 1) / 4))
 end
 
 # inverse of get_nlat_half to reobtain dealiasing
-get_dealiasing(trunc, nlat_half) = (4nlat_half) / (trunc + 1) - 1
+get_dealiasing(truncation, nlat_half) = (4nlat_half) / truncation - 1
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 For the grid resolution parameter `nlat_half` (e.g. 24 for a 48-ring FullGaussianGrid)
-return the spectral truncation `trunc` (max degree of spherical harmonics)
+return the spectral `truncation` (1-based, max degree of spherical harmonics)
 following a dealiasing parameter (default 2) to match spectral and grid resolution."""
 function get_truncation(
         nlat_half::Integer,
         dealiasing::Real = DEFAULT_DEALIASING
     )
 
-    return floor(Int, (4nlat_half - 1) / (dealiasing + 1))
+    return floor(Int, (4nlat_half - 1) / (dealiasing + 1)) + 1
 end
 
 # unpack nlat_half from provided grid
 get_truncation(grid::AbstractGrid, args...) = get_truncation(grid.nlat_half, args...)
 get_truncation(field::AbstractField, args...) = get_truncation(field.grid, args...)
 
-"""
-    m = roundup_fft(n::Int;
-                    small_primes::Vector{Int}=[2, 3, 5])
-
+"""$(TYPEDSIGNATURES)
 Returns an integer `m >= n` with only small prime factors 2, 3 (default, others can be specified
 with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of
 longitudes, m = 2^i * 3^j * 5^k >= n, with i, j, k >=0.
@@ -61,3 +57,13 @@ function roundup_fft(n::Integer; small_primes::Vector{T} = [2, 3, 5]) where {T <
     end
     return n - 2      # subtract unnecessary last += 2 addition
 end
+
+# DEALIASING; Gaussian = 2, all others = 3
+"""$(TYPEDSIGNATURES)
+Returns the default dealising for the chosen grid. Defaults to 2 for Gaussian grids and 3 for all other grids."""
+@inline default_dealiasing(Grid::Type{<:AbstractGrid}) = 3
+@inline default_dealiasing(Grid::Type{<:FullGaussianGrid}) = 2
+@inline default_dealiasing(Grid::Type{<:OctahedralGaussianGrid}) = 2
+@inline default_dealiasing(Grid::Type{<:OctaminimalGaussianGrid}) = 2
+
+@inline default_dealiasing(grid::AbstractGrid) = default_dealiasing(typeof(grid))

@@ -55,17 +55,21 @@ function output!(
     z_bottom = simulation.variables.scratch.grid.a_2D
     u_or_v10 = simulation.variables.scratch.grid.b_2D
 
-    # Compute z_bottom as z_surf + T_bottom * Δp_geopot / g, start with z_surf
+    # Compute z_bottom as z_surf + T_bottom * R/g * log(pₛ/p_full_bottom), start with z_surf
     z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
-    T = get_prognostic_step(simulation.variables.grid.temperature, simulation.model.time_stepping, output) 
+    T = get_prognostic_step(simulation.variables.grid.temperature, simulation.model.time_stepping, output)
     T_bottom = field_view(T, :, nlayers)
-    Δp_geopot = simulation.model.geopotential.Δp_geopot_full[end]
+    R_dry = simulation.model.atmosphere.R_dry
+    g = simulation.model.planet.gravity
+    coord = simulation.model.geometry.vertical_coordinates
+    pₛ = simulation.variables.parameterizations.surface_pressure
 
-    # accumulate the second term in
-    @. z_bottom += T_bottom * Δp_geopot / simulation.model.planet.gravity
+    # R/g * log(pₛ/p_full_bottom): for sigma coords this is constant (= Δp_geopot_full[end]/g);
+    # for hybrid it varies per grid point since p_full_bottom = A*p_ref + B*pₛ.
+    @. z_bottom += T_bottom * (R_dry / g) * log(pₛ / pressure(nlayers, pₛ, coord))
 
     # Compute u10, TODO should this be the same z₀ as in vertical diffusion or surface fluxes?
-    z₀ = simulation.model.vertical_diffusion.roughness_length
+    z₀ = simulation.variables.parameterizations.surface_roughness
 
     # include a max here as this will throw an error if the model blows up and have negative temperatures
     # if the max case is hit we divide by zero which yields inf so clearly flagged in any case
@@ -111,6 +115,7 @@ function output!(
 
     # reuse scratch array to avoid allocations
     Ts = simulation.variables.scratch.grid.a_2D
+    pN = simulation.variables.scratch.grid.b_2D
 
     # Retrieve T_bottom
     var = path_or_nothing(variable, simulation)
@@ -121,11 +126,13 @@ function output!(
 
     # Other parameters
     κ = simulation.model.atmosphere.κ
-    σ_bottom = simulation.model.geometry.σ_levels_full[end]
+    coord = simulation.model.geometry.vertical_coordinates
+    pₛ = simulation.variables.parameterizations.surface_pressure
+    pN .= pressure.(nlayers, pₛ, coord)
 
-    # Compute Ts assuming dry adiabatic profile
+    # Compute Ts assuming dry adiabatic profile: T_surf = T_bottom * (pₛ / p_bottom)^κ
     (; transform) = variable
-    @. Ts = transform(T_bottom * σ_bottom^(-κ))   # Convert to °C
+    @. Ts = transform(T_bottom * (pₛ / pN)^κ)   # Convert to °C
 
     # interpolate 2D/3D variables
     Ts_output = output.field2D

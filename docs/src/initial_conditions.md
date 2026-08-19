@@ -25,7 +25,7 @@ We define a `BarotropicModel` of some resolution without forcing and drag
 
 ```@example haurwitz
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+spectral_grid = SpectralGrid(truncation=64, nlayers=1)
 model = BarotropicModel(spectral_grid, forcing=nothing, drag=nothing)
 simulation = initialize!(model)
 ```
@@ -161,7 +161,7 @@ exactly that. With the following we can do a test run of the
 Rossby-Haurwitz wave in the shallow water model without any influences from orography.
 
 ```@example haurwitz
-spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+spectral_grid = SpectralGrid(truncation=64, nlayers=1)
 initial_conditions = RossbyHaurwitzWave(spectral_grid)
 orography = NoOrography(spectral_grid)
 forcing = nothing
@@ -196,22 +196,22 @@ The following shows how you can use `RossbyHaurwitzWave`
 in a `PrimitiveDryModel` (or `Wet`) but you probably
 also want to set initial conditions for temperature and pressure
 to not start at zero Kelvin and zero pressure. Also no orography,
-and let's switch off all physics parameterizations with `physics=false`.
+and let's switch off all physics parameterizations with `dynamics_only=true`.
 
 ```@example haurwitz
-spectral_grid = SpectralGrid(trunc=42, nlayers=8)
+spectral_grid = SpectralGrid(truncation=43, nlayers=8)
 initial_conditions = (;
                         vordiv=RossbyHaurwitzWave(spectral_grid),
                         temp=JablonowskiTemperature(spectral_grid),
                         pres=PressureOnOrography(spectral_grid))
 
 orography = NoOrography(spectral_grid)
-time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(30))   # 30min timestep scaled linearly
+time_stepping = Leapfrog(spectral_grid, Δt_at_T32=Minute(30))   # 30min timestep scaled linearly
 
 forcing = nothing
 drag = nothing
 
-model = PrimitiveDryModel(spectral_grid; time_stepping, initial_conditions, orography, forcing, drag, dynamics_only=false)
+model = PrimitiveDryModel(spectral_grid; time_stepping, initial_conditions, orography, forcing, drag, dynamics_only=true)
 simulation = initialize!(model)
 run!(simulation, period=Day(5))
 nothing # hide

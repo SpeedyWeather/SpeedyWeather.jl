@@ -31,6 +31,8 @@ stripparams(params::ParameterTable) = stripparams(unpack_params(params))
 
 # Base overrides for ParameterTable
 
+Base.isempty(ps::ParameterTable) = isempty(ModelParameters.params(ps))
+
 # parameter subsets
 Base.getindex(ps::ParameterTable, param_label::String) = getindex(ps, [param_label])
 @inline function Base.getindex(ps::ParameterTable, param_labels::Vector{String})

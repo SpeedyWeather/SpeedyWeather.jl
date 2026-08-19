@@ -31,7 +31,7 @@ using SpeedyWeather
 
     # DIMENSIONS from SpectralGrid
     "Spectral resolution as max degree of spherical harmonics"
-    trunc::Int
+    truncation::Int
 
     "Number of latitude rings, used for latitudinal mask"
     nlat::Int
@@ -53,7 +53,7 @@ using SpeedyWeather
 
     # TO BE INITIALISED
     "Stochastic stirring term S"
-    S::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    S::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}}, truncation+1, truncation)
 
     "a = A*sqrt(1 - exp(-2dt/τ)), the noise factor times the stirring strength [1/s²]"
     a::Base.RefValue{NF} = Ref(zero(NF))
@@ -75,10 +75,10 @@ is a `LowerTriangularMatrix`, however we want its elements to be of number forma
 which is also the parametric type of `StochasticStirring{NF}`, this is done because it will
 allow us to use multiple dispatch not just based on `StochasticStirring` but also based on the
 number format. Neat. In order to allocate `S` with some default though we need to
-know the size of the matrix, which is given by the spectral resolution `trunc`.
-So in order to automatically allocate `S` based on the right size we add `trunc` as another
+know the size of the matrix, which is given by the spectral resolution `truncation` (1-based).
+So in order to automatically allocate `S` based on the right size we add `truncation` as another
 field, which does not have a default but will be initialised with the help of a `SpectralGrid`,
-as explained later. So once we call `StochasticStirring{NF}(trunc=31)` then `S` will automatically
+as explained later. So once we call `StochasticStirring{NF}(truncation=3)` then `S` will automatically
 have the right size.
 
 Then we also see in the definition of `S` that there are prefactors ``A[1-\exp(-2\tfrac{\Delta t}{\tau})]``
@@ -101,12 +101,12 @@ zero. For this we want to define a latitudinal mask `lat_mask` that is a vector 
 the number of latitude rings. Similar to `S`, we want to allocate it with zeros (or any other
 value for that matter), but then precompute this mask in the `initialize!` step. For this
 we need to know `nlat` at creation time meaning we add this field similar as to how we added
-`trunc`. This mask requires the parameters `latitude` (its position) and a `width` which
+`truncation`. This mask requires the parameters `latitude` (its position) and a `width` which
 are therefore also added to the definition of `StochasticStirring`.
 
 ## Custom forcing: generator function
 
-Cool. Now you could create our new `StochasticStirring` forcing with `StochasticStirring{Float64}(trunc=31, nlat=48)`,
+Cool. Now you could create our new `StochasticStirring` forcing with `StochasticStirring{Float64}(truncation=32, nlat=48)`,
 and the default values would be chosen as well as the correct size of the arrays `S` and `lat_mask` we need
 and in double precision Float64. Furthermore, note that because `StochasticStirring{NF}` is parametric
 on the number format `NF`, these arrays are also allocated with the correct number format that will
@@ -116,13 +116,13 @@ But in SpeedyWeather we typically use the [SpectralGrid](@ref) object to pass on
 the resolution (and number format) so we want a generator function like
 ```@example extend
 function StochasticStirring(SG::SpectralGrid; kwargs...)
-    (; trunc, nlat) = SG
-    return StochasticStirring{SG.NF}(; trunc, nlat, kwargs...)
+    (; truncation, nlat) = SG
+    return StochasticStirring{SG.NF}(; truncation, nlat, kwargs...)
 end
 ```
 Which allows us to do
 ```@example extend
-spectral_grid = SpectralGrid(trunc=42, nlayers=1)
+spectral_grid = SpectralGrid(truncation=43, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=30, decorrelation_time=Day(5))
 ```
 So the respective resolution parameters and the number format are just pulled from the `SpectralGrid`
@@ -138,12 +138,11 @@ actually do
 function SpeedyWeather.initialize!( forcing::StochasticStirring,
                                     model::AbstractModel)
 
-    # precompute forcing strength, scale with radius^2 as is the vorticity equation
-    (; radius) = model.planet
-    A = radius^2 * forcing.strength
+    # precompute forcing strength, scale with radius as is the vorticity equation
+    A = forcing.strength * model.planet.radius
 
     # precompute noise and auto-regressive factor, packed in RefValue for mutability
-    dt = model.time_stepping.Δt_sec
+    dt = model.time_stepping.Δt                 # in seconds
     τ = forcing.decorrelation_time.value        # in seconds
     forcing.a[] = A*sqrt(1 - exp(-2dt/τ))
     forcing.b[] = exp(-dt/τ)
@@ -181,8 +180,11 @@ initialize or generally alter several model components in one, but that is not a
 and can easily lead to unexpected behaviour because of multiple dispatch.
 
 As a last note on `initialize!`, you can see that we scale the amplitude/strength `A`
-with the radius squared, this is because the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
-are scaled that way, so we have to scale `S` too.
+with the radius, this is because the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
+is scaled that way, so we have to scale `S` too. The scaling applied to the dynamical core
+is mostly hidden from the user but adding a forcing not proportional to vorticity is
+one of the few exceptions where we do need to apply the scaling manually.
+For more details see [Forcing scaling](@ref).
 
 ## Custom forcing: forcing! function
 
@@ -282,7 +284,7 @@ which we do by extending the `variables` function
 
 ```@example extend
 SpeedyWeather.variables(::StochasticStirring) = (
-    ScratchVariable(:a, SpeedyWeather.Grid3D(), namespace=:grid),
+    ScratchVariable(:a, SpeedyWeather.GridXYZ(), namespace=:grid),
 )
 ```
 
@@ -344,7 +346,7 @@ modular interface that you can create instances of individual model components
 and just put them together as you like, and as long as you follow some rules.
 
 ```@example extend
-spectral_grid = SpectralGrid(trunc=85, nlayers=1)
+spectral_grid = SpectralGrid(truncation=86, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest(spectral_grid)
 model = BarotropicModel(spectral_grid; initial_conditions, forcing=stochastic_stirring)
@@ -420,3 +422,54 @@ so this should have the normal units of m/s instead.
 Each of these tendencies will have an additional [Step dimension](@ref) and so
 you will need to view the right step with `get_tendency_step(tend, time_stepping, forcing)`
 which lets the time stepper decide.
+
+## Forcing scaling
+
+In SpeedyWeather all (atmospheric) prognostic equations are scaled with the radius ``R`` of the planet,
+see [Radius scaling](@ref scaling). We also use radius-scaled vorticity and divergence so these
+two equations are effectively scaled by ``R^2``. This scaling is mostly hidden from the user and
+is applied within the dynamical core such that as a user/developer you can mostly ignore this.
+The tendencies of parameterizations + forcing + drag are being scaled automatically within the dynamical core,
+so adding a custom term forcing the temperature you can simply write this to have units of Kelvin per second
+and do not worry about scaling.
+
+!!! info "Manual scaling only required for spectral forcing of vorticity or divergence"
+    Any tendency that's formulated as a parameterization, forcing or drag does not have to be scaled
+    unless you are forcing the vorticity or divergence equation directly (and not via ``u, v``).
+    The correct scaling is automatically applied within the dynamical core.
+    Only when forcing vorticity or divergence directly (and in spectral space) manual scaling may
+    apply, read on for the details.
+
+However, there is a few remaining situations where you do need to account for scaling which are discussed here.
+In brief, this only applies when you force the vorticity or divergence equation directly.
+And also then only when this forcing is not proportional to vorticity or divergence.
+To illustrate this compare two terms,
+
+```math
+\begin{aligned}
+\frac{\partial \zeta}{\partial t} &= F \qquad &(1)\\
+\frac{\partial \zeta}{\partial t} &= a\zeta \qquad &(2)
+\end{aligned}
+```
+
+now scale both equations with ``R^2`` one radius scaling is going into the time step ``t \to t/R = t^\star``,
+the other one into the variable itself ``\zeta \to \zeta R = \zeta^\star``, then we have
+
+```math
+\begin{aligned}
+\frac{\partial \zeta^\star}{\partial t^\star} &= R^2F = RF^\star \qquad &(1)\\
+\frac{\partial \zeta^\star}{\partial t^\star} &= (a\zeta^\star)^\star \qquad &(2)
+\end{aligned}
+```
+
+So the in the (1) case, one ``R`` is automatically applied when scaling the tendency (outside of the definition of that forcing)
+but the 2nd ``R`` is required to be applied within the formulation of the forcing itself.
+In the (2) case, one radius-scaling goes into the variable ``\zeta^\star`` (which is what the dynamical core uses), the 2nd radius-scaling
+is automatically applied when the tendencies enter the dynamical core. So a term of the form (2) can be written without worrying about scaling.
+The reason no radius scaling applies in (2) is that this term is linear/proportional to the vorticity (or divergence).
+Mathematically, this generalizes to
+
+- Forcing vorticity or divergence with a constant/non-linear term ``\propto \zeta^n`` where ``n \neq 1`` then manual scaling with ``R^{1-n}`` has to be applied
+
+Forcing vorticity with a constant (``n=0``) one has to scale that forcing with ``R`` manually (as shown above and for the `StochasticStirring`).
+If forcing with a quadratic term (``n=2``), manual scaling with ``1/R`` has to be applied, and for higher order terms similarly.

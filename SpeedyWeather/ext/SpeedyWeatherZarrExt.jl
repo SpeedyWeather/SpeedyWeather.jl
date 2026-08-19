@@ -10,13 +10,15 @@ import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     DEFAULT_OUTPUT_NF, DEFAULT_OUTPUT_INTERVAL, DEFAULT_MISSING_VALUE,
     DEFAULT_COMPRESSION_LEVEL, DEFAULT_KEEPBITS,
     Variables, Simulation, SpectralGrid, Field,
-    initialize!, finalize!, output!, write_array!, set!, add!, add_default!,
+    initialize!, finalize!, output!, write_array!, define_variable!, set!, add!, add_default!,
+    define_dimension!, vertical_dimension, get_nlayers, get_dimension_length, define_coordinate!,
     is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
     get_lond, get_latd, on_architecture, CPU,
-    AbstractFullGrid
+    AbstractFullGrid, path_or_nothing, run_folder_name
 
 import SpeedyWeather.RingGrids
 import SpeedyWeather: round!
+import SpeedyWeather.Printf
 import SpeedyWeather.Dates: Dates, DateTime, Period, Second, Millisecond
 
 # default Zarr compressor: BloscCompressor with the same default level we use
@@ -52,6 +54,7 @@ function ZarrOutput(
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
+    land_fraction = Field(output_NF, output_grid)
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
@@ -73,6 +76,7 @@ function ZarrOutput(
     output = ZarrOutput{F2, F3, Itp, DT, S, C, Z}(;
         interval = interval_sec,
         interpolator,
+        land_fraction,
         field2D,
         field3D,
         field3Dland,
@@ -84,11 +88,28 @@ function ZarrOutput(
     return output
 end
 
+# to dispatch over the dataset type
+SpeedyWeather.dataset_type(::ZarrOutput) = Zarr.ZGroup
+
 """$(TYPEDSIGNATURES)
 Initialize `ZarrOutput` by creating a Zarr group on disk and storing the initial
 conditions of `vars`. Mirrors the layout of [`SpeedyWeather.NetCDFOutput`](@ref):
 the store has dimensions `lon`, `lat`, `layer`, `soil_layer`, `time` plus one
-chunked array per output variable."""
+chunked array per output variable.
+
+When ensemble output is on (`output.ensemble_index > 0`) an additional `ensemble`
+dimension of length `ensemble_size` is added, chunked with size 1 so that each member
+writes disjoint chunk files. All members share a deterministic run folder and hence
+one store; member 1 (the *creator*) builds the store schema, coordinates and the shared
+`time` axis, then drops a readiness marker; members `2..ensemble_size` (the *writers*) wait
+for that marker, open the existing store and write only their own ensemble slice.
+Writer members never create Zarr arrays or coordinates (concurrent metadata writes from
+parallel processes would corrupt the store). Every member (creator included) writes its
+side files (parameters txt, progress txt, restart file) under member-specific filenames
+(`_member\$index` suffix) so they don't clobber each other. When rerunning an ensemble
+into the same run folder with `overwrite=true`, start the creator before (or together
+with) the writers: a writer launched against a leftover store from a previous run cannot
+distinguish its readiness marker from the current run's."""
 function initialize!(
         output::ZarrOutput,
         vars::Variables,
@@ -96,35 +117,143 @@ function initialize!(
     )
     output.active || return nothing
 
-    # only checked for models that have a land component
-    if hasfield(typeof(model), :land) && !isnothing(model.land)
+    # only checked for models that have a land component and output variables that
+    # actually use the soil vertical dimension (and its scratch field `field3Dland`)
+    if hasfield(typeof(model), :land) && !isnothing(model.land) &&
+            any(var -> is_land(var) && is3D(var), values(output.variables))
         @assert SpeedyWeather.get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
             " soil layers initialized for output, but $(SpeedyWeather.get_nlayers(model.land)) soil layers initialized for model." *
             " Please construct ZarrOutput with the same `nlayers_soil` as the model."
     end
 
-    # SHARED INITIALIZATION (run folder, output frequency, counters, callbacks)
-    initialize!(output.core, output, model)
+    ensemble = output.ensemble_index > 0
+    if ensemble
+        @assert 1 <= output.ensemble_index <= output.ensemble_size "ensemble_index=$(output.ensemble_index)" *
+            " must be in 1..ensemble_size=$(output.ensemble_size). Set ensemble_size to the total number of members."
+    end
+
+    # SHARED INITIALIZATION (output frequency, counters, callbacks). For ensemble output
+    # we manage the (shared, deterministic) run folder ourselves so that all members
+    # resolve to the same store path instead of auto-incrementing into separate folders.
+    initialize!(output.core, output, model; create_folder = !ensemble)
+    if ensemble
+        setup_ensemble_run_folder!(output)
+        # all members share one run folder but run as independent parallel processes:
+        # give the side-file callbacks (parameters/progress txt, restart file) of every
+        # member — including the creator (member 1) — unique filenames so they don't
+        # clobber each other's files and share one consistent naming scheme
+        set_ensemble_member_filenames!(model, output.ensemble_index)
+    end
 
     # Total number of output snapshots: IC + one per `output_every_n_steps`.
     n_outputs = vars.prognostic.clock.n_time_steps ÷ output.output_every_n_steps + 1
 
-    # CREATE ZARR GROUP (the Zarr store is a *directory*, not a single file)
+    # The Zarr store is a *directory*, not a single file.
     (; run_path, filename) = output
     store_path = joinpath(run_path, filename)
-    # remove a stale store at the same location when overwrite is on
+
+    # WRITER member (ensemble_index > 1): wait for the creator to build the store, then
+    # open it and write only this member's ensemble slice. The schema, coordinates and
+    # shared time axis are owned by the creator; a writer member must never create Zarr
+    # arrays or coordinates (`zcreate`, `write_coordinate!`, ...) because concurrent
+    # metadata writes from parallel processes corrupt the store. `zopen` only reads the
+    # metadata and slice-assignments below only touch this member's own chunk files
+    # (the ensemble axis is chunked with size 1).
+    if ensemble && output.ensemble_index != 1
+        wait_for_ensemble_store(output, store_path)
+        g = Zarr.zopen(store_path, "w")
+        output.zarr_group = g
+
+        # remove output variables not existent in simulation.variables (mirrors the
+        # creator, which prunes them with a warning before defining the store schema)
+        simulation = Simulation(vars, model)
+        nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
+        isempty(nonexisting_vars) || delete!(output, nonexisting_vars...)
+
+        # the creator's store must match this member's configuration, error early
+        # (and clearly) otherwise instead of writing into wrong time/ensemble slots
+        validate_ensemble_store(g, output, n_outputs)
+
+        for (key, var) in output.variables
+            output!(output, var, simulation)
+        end
+        return nothing
+    end
+
+    # CREATOR member (ensemble_index == 1) or non-ensemble output: build the full store.
+    # Remove a stale readiness marker + store first when overwrite is on.
+    ensemble && rm(ensemble_marker_path(output); force = true)
     output.overwrite && isdir(store_path) && rm(store_path; recursive = true)
 
     g = Zarr.zgroup(store_path)
     output.zarr_group = g
 
-    # Coordinate arrays. Zarr has no notion of "dimensions" the way NetCDF
-    # does — by convention we store the coordinate values as 1D arrays in
-    # the group and tag every variable with its `_ARRAY_DIMENSIONS` attribute,
-    # which is what Xarray/NetCDF-Zarr uses for dataset round-tripping.
+    # Coordinate arrays. Zarr has no notion of "dimensions" the way NetCDF does — by
+    # convention we store the coordinate values as 1D arrays in the group and tag every
+    # variable with its `_ARRAY_DIMENSIONS` attribute, which is what Xarray/NetCDF-Zarr
+    # uses for dataset round-tripping.
+    write_zarr_coordinates!(g, output, model)
+    if ensemble
+        write_coordinate!(
+            g, "ensemble", collect(1:output.ensemble_size);
+            attrs = Dict("units" => "1", "long_name" => "ensemble member", "_ARRAY_DIMENSIONS" => ["ensemble"])
+        )
+    end
+
+    # TIME: full-length, chunked by `output.time_chunk`.
+    (; startdate) = output
+    time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
+    Zarr.zcreate(
+        Float64, g, "time", n_outputs;
+        chunks = (max(output.time_chunk, 1),),
+        attrs = Dict(
+            "units" => time_string, "long_name" => "time",
+            "standard_name" => "time", "calendar" => "proleptic_gregorian",
+            "_ARRAY_DIMENSIONS" => ["time"]
+        ),
+    )
+    output!(output, vars.prognostic.clock.time)   # write initial time
+
+    # VARIABLES, remove output variables not existent in simulation.variables
+    simulation = Simulation(vars, model)
+    nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
+    if !isempty(nonexisting_vars)
+        @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
+    end
+    delete!(output, nonexisting_vars...)
+
+    # then define every output variable in the Zarr store and write initial conditions
+    for (key, var) in output.variables
+        define_variable!(g, output, var, n_outputs, eltype(output.field2D))
+        output!(output, var, simulation)
+    end
+
+    # calculate land fraction on output grid
+    if hasproperty(model, :land_sea_mask)
+        land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
+        RingGrids.interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
+    end
+
+    # consolidate the store metadata (.zmetadata) for faster opening with xarray etc.;
+    # the schema is complete at this point and all later writes (any ensemble member,
+    # any time step) only touch chunk files, so the consolidated view stays valid
+    Zarr.consolidate_metadata(g)
+
+    # readiness marker so writer members (ensemble_index > 1) may proceed
+    ensemble && touch(ensemble_marker_path(output))
+
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Write the spatial coordinate arrays (`lon`, `lat`, `layer`, `soil_layer`) into the Zarr
+group `g` for `output`, shared by the ensemble and non-ensemble store layouts.
+Must only ever be called by the ensemble creator (member 1) or a non-ensemble run."""
+function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::AbstractModel)
+    assert_ensemble_creator(output)
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
+    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
     soil_indices = collect(1:get_soil_layers(model))
 
     write_coordinate!(
@@ -143,27 +272,105 @@ function initialize!(
         g, "soil_layer", collect(soil_indices);
         attrs = Dict("units" => "1", "long_name" => "soil layer index", "_ARRAY_DIMENSIONS" => ["soil_layer"])
     )
+    return nothing
+end
 
-    # TIME: full-length, chunked by `output.time_chunk`.
-    (; startdate) = output
-    time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
-    Zarr.zcreate(
-        Float64, g, "time", n_outputs;
-        chunks = (max(output.time_chunk, 1),),
-        attrs = Dict(
-            "units" => time_string, "long_name" => "time",
-            "standard_name" => "time", "calendar" => "proleptic_gregorian",
-            "_ARRAY_DIMENSIONS" => ["time"]
-        ),
-    )
-    output!(output, vars.prognostic.clock.time)   # write initial time
+"""$(TYPEDSIGNATURES)
+Assert that `output` is allowed to create Zarr arrays/coordinates in the shared store:
+either non-ensemble output (`ensemble_index == 0`) or the ensemble creator (member 1).
+Writer members (`ensemble_index > 1`) run as parallel processes and must never write
+Zarr metadata — concurrent metadata writes corrupt the store."""
+function assert_ensemble_creator(output::ZarrOutput)
+    @assert output.ensemble_index <= 1 "ZarrOutput ensemble writer member " *
+        "$(output.ensemble_index) must not create Zarr arrays or coordinates; only the " *
+        "creator (ensemble_index == 1) builds the shared store schema."
+    return nothing
+end
 
-    # VARIABLES (pre-allocated to full length along the time axis)
-    for (key, var) in output.variables
-        define_variable!(g, output, var, n_outputs, eltype(output.field2D))
-        output!(output, var, Simulation(vars, model))
+"""$(TYPEDSIGNATURES)
+Path to the readiness marker file dropped by the ensemble creator (member 1) once the
+shared store schema, coordinates and time axis are in place."""
+ensemble_marker_path(output::ZarrOutput) = joinpath(output.run_path, ".zarr_ensemble_ready")
+
+"""$(TYPEDSIGNATURES)
+Give the side-file callbacks added by the output initialization (parameters txt,
+progress txt, restart file) of an ensemble `member` unique filenames with a
+`_member\$member` suffix, e.g. `progress_member2.txt`. All ensemble members share one
+run folder but run as independent parallel processes; with the default filenames every
+member would concurrently write the same `parameters.txt`, `progress.txt` and
+`restart.jld2`, garbling or corrupting them. Every member — including the creator
+(member 1) — gets the suffix so the whole ensemble shares one consistent naming scheme."""
+function set_ensemble_member_filenames!(model::AbstractModel, member::Integer)
+    for key in (:parameters_txt, :progress_txt, :variables_restart_file)
+        haskey(model.callbacks, key) || continue
+        callback = model.callbacks[key]
+        hasfield(typeof(callback), :filename) || continue
+        base, extension = splitext(callback.filename)
+        callback.filename = string(base, "_member", member, extension)
     end
+    return nothing
+end
 
+"""$(TYPEDSIGNATURES)
+Validate that the shared ensemble store `g` built by the creator (member 1) matches this
+writer member's configuration: same number of output time steps `n_outputs`, same
+ensemble size, and every output variable of this member defined. Errors otherwise —
+a mismatch means the members were launched with inconsistent options (e.g. different
+`period` or output `interval`, different output variables) or the readiness marker
+belonged to a stale store from a previous run into the same run folder."""
+function validate_ensemble_store(g::Zarr.ZGroup, output::ZarrOutput, n_outputs::Integer)
+    member = output.ensemble_index
+
+    n_time = get_dimension_length(g, "time")
+    n_time == n_outputs || error(
+        "ZarrOutput ensemble member $member: the shared store has $n_time output time " *
+            "steps but this member expects $n_outputs. All ensemble members must be run " *
+            "with the same simulation period, time step and output interval."
+    )
+
+    n_ensemble = get_dimension_length(g, "ensemble")
+    n_ensemble == output.ensemble_size || error(
+        "ZarrOutput ensemble member $member: the shared store has an ensemble dimension " *
+            "of $n_ensemble but this member expects ensemble_size=$(output.ensemble_size)."
+    )
+
+    undefined_vars = [var.name for var in values(output.variables) if !haskey(g, var.name)]
+    isempty(undefined_vars) || error(
+        "ZarrOutput ensemble member $member: variable(s) $(join(undefined_vars, ", ")) " *
+            "not defined in the shared store by the creator (member 1). Ensure all members " *
+            "use the same output variables and that the store is not left over from a previous run."
+    )
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Set a deterministic (non-auto-incrementing) run folder for an ensemble `output` so all
+members resolve to the same store path, and create it (idempotent, tolerant of concurrent
+creation by other members)."""
+function setup_ensemble_run_folder!(output::ZarrOutput)
+    fmt = Printf.Format("%0$(output.run_digits)d")
+    output.run_folder = run_folder_name(output.run_prefix, output.id, output.run_number; fmt)
+    run_path = joinpath(output.path, output.run_folder)
+    mkpath(run_path)    # idempotent; safe if another member created it first
+    output.run_path = run_path
+    return run_path
+end
+
+"""$(TYPEDSIGNATURES)
+Block until the ensemble creator (member 1) has written the readiness marker for the
+shared store at `store_path`, polling at 1s intervals and erroring after
+`output.ensemble_timeout` seconds."""
+function wait_for_ensemble_store(output::ZarrOutput, store_path::AbstractString)
+    marker = ensemble_marker_path(output)
+    t0 = time()
+    while !isfile(marker)
+        (time() - t0) > output.ensemble_timeout && error(
+            "ZarrOutput ensemble member $(output.ensemble_index) timed out after " *
+                "$(output.ensemble_timeout)s waiting for member 1 to create the shared store at " *
+                "$store_path. Ensure the member with ensemble_index=1 is running."
+        )
+        sleep(1)
+    end
     return nothing
 end
 
@@ -184,6 +391,22 @@ function write_coordinate!(g::Zarr.ZGroup, name::AbstractString, data::AbstractV
 end
 
 """$(TYPEDSIGNATURES)
+Length of the coordinate array `name` in the Zarr group `g` or `nothing` if not
+defined. Zarr-store equivalent of `get_dimension_length(::NCDataset, name)` so that
+custom output variables can define their own dimension in `define_dimension!`
+with one method for all output backends."""
+get_dimension_length(g::Zarr.ZGroup, name::String) = haskey(g, name) ? length(g[name]) : nothing
+
+"""$(TYPEDSIGNATURES)
+Define a coordinate in the Zarr group `g`: a 1D array `name` with `values` and
+`attribs` as attributes, tagged with its own `_ARRAY_DIMENSIONS`. Zarr-store
+equivalent of `define_coordinate!(::NCDataset, ...)` so that custom output
+variables can define their own dimension in `define_dimension!` with one
+method for all output backends."""
+define_coordinate!(g::Zarr.ZGroup, name::String, values::AbstractVector; attribs = Dict{String, String}()) =
+    write_coordinate!(g, name, values; attrs = merge(Dict{String, Any}("_ARRAY_DIMENSIONS" => [name]), attribs))
+
+"""$(TYPEDSIGNATURES)
 Define a Zarr array for output `var` in the Zarr group `g`. Shape and chunk
 shape are derived from `var.dims_xyzt` and the output grid; the time axis is
 pre-allocated to its final length `n_outputs`. Unwritten chunks read back as
@@ -195,12 +418,17 @@ function define_variable!(
         n_outputs::Int,
         output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
     )
+    assert_ensemble_creator(output)
+
+    # hook for custom output variables to define their own (vertical) dimension
+    define_dimension!(g, var)
+
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
 
     # Shape per dimension; `false` means the dimension is collapsed away.
     nlon = length(get_lond(output.field2D))
     nlat = length(get_latd(output.field2D))
-    nz = is_land(var) ? size(output.field3Dland, 2) : size(output.field3D, 2)
+    nz = get_nlayers(output, var)
     full_shape = (nlon, nlat, nz, n_outputs)
 
     # Spatial chunking: 0 (default) or any non-positive value ⇒ full extent.
@@ -210,17 +438,29 @@ function define_variable!(
     cy = output.lat_chunk > 0 ? min(output.lat_chunk, nlat) : nlat
     cz = output.vertical_chunk > 0 ? min(output.vertical_chunk, nz) : nz
     full_chunks = (cx, cy, cz, max(output.time_chunk, 1))
-    all_dims = is_land(var) ? ("lon", "lat", "soil_layer", "time") : ("lon", "lat", "layer", "time")
+
+    # the vertical dimension depends on the variable, e.g. "layer" or "soil_layer"
+    all_dims = ("lon", "lat", vertical_dimension(var), "time")
 
     # Pick out the active dims as flagged by var.dims_xyzt.
     active = var.dims_xyzt
     shape = Tuple(d for (d, on) in zip(full_shape, active) if on)
     chunks = Tuple(c for (c, on) in zip(full_chunks, active) if on)
+    dims = String[string(d) for (d, on) in zip(all_dims, active) if on]
+
+    # Ensemble output: append the ensemble axis as the outermost (last, Julia
+    # column-major) dimension, chunked with size 1 so members write disjoint chunk files.
+    if output.ensemble_index > 0
+        shape = (shape..., output.ensemble_size)
+        chunks = (chunks..., 1)
+        push!(dims, "ensemble")
+    end
+
     # Zarr stores shape/chunks in row-major (C order) but Julia arrays are
     # column-major; Zarr.jl reverses at the metadata boundary. The
     # `_ARRAY_DIMENSIONS` attribute (read by xarray/Xarray-Zarr) must therefore
-    # also be in row-major order — i.e. the reverse of our Julia-side dims.
-    dims = String[string(d) for (d, on) in zip(all_dims, active) if on]
+    # also be in row-major order — i.e. the reverse of our Julia-side dims. This puts
+    # `ensemble` first, matching the CF realization/ensemble convention.
     reverse!(dims)
 
     compressor = resolve_compressor(output.compressor)
@@ -248,22 +488,106 @@ function define_variable!(
 end
 
 """$(TYPEDSIGNATURES)
+Return `true` if writes for `output` should be buffered along the time dimension.
+Buffering only pays off when a Zarr chunk spans more than one time step
+(`time_chunk > 1`); with `time_chunk == 1` every time slice is already its own chunk
+and is written directly (see [`write_array!`](@ref))."""
+time_buffered(output::ZarrOutput) = output.time_chunk > 1
+
+"""$(TYPEDSIGNATURES)
 Write a single output time step for `variable` to the Zarr store in `output`.
-The generic [`output!`](@ref) handles interpolation, transforms and bitrounding;
-this method just performs the Zarr-specific store-side write."""
+
+A Zarr chunk is the atomic unit of (de)compression and I/O, so writing one time
+slice into a chunk that spans `time_chunk > 1` steps would force a read-modify-write
+of the whole chunk on every step. To avoid this, time-varying variables are buffered
+`time_chunk` slices deep (see `output.time_buffers`) and flushed one chunk at a time via
+[`flush_time_chunk!`](@ref); a chunk-aligned write is fulfilled by Zarr's
+single-chunk write operation with no read. Any remaning chunks in the buffer are flushed
+to disk on `close` (see [`flush_partial_time_chunks!`](@ref)).
+
+Buffering is skipped entirely (see [`time_buffered`](@ref)) for static, non-temporal
+variables and when `time_chunk == 1`: in these cases, [`write_slice!`](@ref) writes the
+data directly to disk."""
 function write_array!(
         output::ZarrOutput,
         variable::AbstractOutputVariable,
         field,
     )
+    data = parent_array(field)
+
+    # Skip buffering for static variables (written once at index 1) and when
+    # time_chunk == 1 (every time slice is its own chunk): write the slice directly.
+    if !hastime(variable) || !time_buffered(output)
+        i = hastime(variable) ? output.output_counter : 1
+        write_slice!(output, variable, data, i)
+        return nothing
+    end
+
+    # Buffered path: copy this slice into the variable's time buffer (lazily allocated
+    # to the chunk shape (spatial..., time_chunk)) at its offset within the current chunk.
+    time_chunk = output.time_chunk
+    i = output.output_counter
+    offset = mod1(i, time_chunk)    # 1..time_chunk position within the current chunk
+    buffer = get!(output.time_buffers, variable.name) do
+        Array{eltype(data)}(undef, size(data)..., time_chunk)
+    end
+    selectdim(buffer, ndims(buffer), offset) .= data
+
+    # A full chunk has been collected (this slice closes it, so it is chunk-aligned):
+    # flush the whole buffer in one chunk-aligned write.
+    offset == time_chunk && flush_time_chunk!(output, variable, buffer, i, time_chunk)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Write a single slice `data` for `variable` into its Zarr array at time index `i`
+(ignored for static variables). The ensemble slot, if any, is appended by
+[`get_indices`](@ref). This is the unbuffered write path used when
+[`time_buffered`](@ref) is `false`."""
+function write_slice!(output::ZarrOutput, variable::AbstractOutputVariable, data, i::Integer)
     z = output.zarr_group[variable.name]
-    if hastime(variable)
-        i = output.output_counter                # current write index
-        indices = get_indices(i, variable)
-        z[indices...] = parent_array(field)
+    z[get_indices(i, variable, output.ensemble_index)...] = data
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Write the `count` buffered time slices ending at time index `i_last` for `variable`
+from `buffer` to the Zarr store in `output` in a single write covering the time range
+`(i_last - count + 1):i_last`. A full-chunk flush (`count == time_chunk`) passes the
+buffer `Array` through so Zarr writes it directly."""
+function flush_time_chunk!(
+        output::ZarrOutput,
+        variable::AbstractOutputVariable,
+        buffer::AbstractArray,
+        i_last::Integer,
+        count::Integer,
+    )
+    t0 = i_last - count + 1
+    z = output.zarr_group[variable.name]
+    indices = get_indices(t0:i_last, variable, output.ensemble_index)
+    if count == size(buffer, ndims(buffer))
+        z[indices...] = buffer
     else
-        # static fields are only written once — just dump the array.
-        z[:] = parent_array(field)
+        z[indices...] = selectdim(buffer, ndims(buffer), 1:count)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Flush the trailing partial time chunk of every time-varying variable to the Zarr store
+in `output`, called on `close` after the run. All time-varying variables are written in
+lockstep every output step, so they share the same `output_counter`; when it is not a
+multiple of `time_chunk` the last `output_counter % time_chunk` slices are still buffered
+and are written here. A no-op when `time_chunk == 1` or the final chunk was already full."""
+function flush_partial_time_chunks!(output::ZarrOutput)
+    (!time_buffered(output) || isempty(output.time_buffers)) && return nothing
+    time_chunk = output.time_chunk
+    i = output.output_counter
+    remainder = i % time_chunk
+    remainder == 0 && return nothing    # last chunk already flushed by write_array!
+    for variable in values(output.variables)
+        haskey(output.time_buffers, variable.name) || continue
+        flush_time_chunk!(output, variable, output.time_buffers[variable.name], i, remainder)
     end
     return nothing
 end
@@ -271,6 +595,7 @@ end
 """$(TYPEDSIGNATURES)
 Write the current time `time::DateTime` to the Zarr store in `output`."""
 function output!(output::ZarrOutput, time::DateTime)
+    output.ensemble_index > 1 && return nothing
     i = output.output_counter
 
     (; startdate) = output
@@ -283,6 +608,13 @@ end
 """Pull out the parent (Array) of a Field for direct copy into a Zarr array."""
 parent_array(var) = Array(parent(var))
 
-Base.close(output::ZarrOutput) = nothing
+function Base.close(output::ZarrOutput)
+    flush_partial_time_chunks!(output)
+    return nothing
+end
+
+# Implemented in the GeoMakie extension, just define here how to load a zarr dataset
+SpeedyWeather.animate(::Type{<:Zarr.ZGroup}, path::String; kwargs...) =
+    animate(zopen(path); kwargs...)
 
 end # module

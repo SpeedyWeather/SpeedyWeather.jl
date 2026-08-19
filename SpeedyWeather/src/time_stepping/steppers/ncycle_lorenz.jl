@@ -39,23 +39,20 @@ mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
     variant::V
 
-    "[OPTION] Time step for T31, scale linearly with resolution"
-    Δt_at_T31::S
+    "[OPTION] Time step for T32 resolution, scale linearly with resolution"
+    Δt_at_T32::S
 
-    "[OPTION] Adjust `Δt_at_T31` with the `interval` to reach `interval` exactly"
+    "[OPTION] Adjust `Δt_at_T32` with the `interval` to reach `interval` exactly"
     adjust_with_output::B
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
     Δt_millisec::MS
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt_sec::NF
-
-    "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
 end
 
-Adapt.adapt_structure(to, L::NCycleLorenz) = Adapt.adapt_structure(to, NCycleLorenzCore(L.Δt_millisec, L.Δt_sec, L.Δt))
+Adapt.adapt_structure(to, L::NCycleLorenz) = Adapt.adapt_structure(to, NCycleLorenzCore(L.Δt_millisec, L.Δt))
 
 prognostic_steps(::NCycleLorenz) = 1
 tendency_grid_steps(::NCycleLorenz) = 1     # the grid tendencies are only for F though, the G term only needs storing in spectral space
@@ -78,7 +75,6 @@ end
 
 struct NCycleLorenzCore{NF, MS} <: AbstractNCycleLorenz
     Δt_millisec::MS
-    Δt_sec::NF
     Δt::NF
 end
 
@@ -90,18 +86,16 @@ function NCycleLorenz(
         spectral_grid::SpectralGrid;
         steps = 3,
         variant = NCycleLorenzA(),
-        Δt_at_T31 = Minute(30),
+        Δt_at_T32 = Minute(30),
         adjust_with_output = true,
-        radius = DEFAULT_RADIUS,
     )
-    (; NF, trunc) = spectral_grid
+    (; NF, truncation) = spectral_grid
 
     # compute time step
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
-    Δt_sec::NF = Δt_millisec.value / 1000
-    Δt::NF = Δt_sec / radius
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
+    Δt::NF = Δt_millisec.value / 1000
 
-    return NCycleLorenz(steps, variant, Second(Δt_at_T31), adjust_with_output, Δt_millisec, Δt_sec, Δt)
+    return NCycleLorenz(steps, variant, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt)
 end
 
 """$(TYPEDSIGNATURES)
@@ -155,15 +149,13 @@ function update_prognostic!(
         time_stepping::NCycleLorenz,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
+        scale::Real = 1,
     )
     (; Δt) = time_stepping
+    Δt /= oftype(Δt, scale)     # scale on the fly
     w = weight_coefficient(time_stepping, clock)
 
-    # with an implicit solver the tendency_average_kernel! has to be computed
-    # before the implicit solver, so the responsibility is left therein
-    # and execute the prognostic update here only, dispatched over the type of implicit
-    # without an implicit solver we compute both tendency average and update
-    # here in one kernel, notation following largely Hotta et al. 2016
+    # notation following largely Hotta et al. 2016
     F = get_step(tendency, 1)   # tendency of current time step (or weighted + implicitly corrected tendency)
     G = get_step(tendency, 2)   # accumulated weighted tendencies
 

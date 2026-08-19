@@ -79,6 +79,8 @@ function get_lond_per_ring(Grid::Type{<:OctahedralGaussianGrid}, nlat_half::Inte
     return collect(0:(360 / nlon):(360 - 180 / nlon))
 end
 
+hasoffset(::Type{<:OctahedralGaussianGrid}) = false     # first longitude point on 0˚
+
 ## QUADRATURE
 get_quadrature_weights(::Type{<:OctahedralGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)
 

@@ -185,7 +185,7 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
 end
 
 """Run all correctness tests for a given model type."""
-function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL, atol = ATOL, precompile = false)
+function test_model(ModelType::Type; truncation = TRUNCATION, nsteps = NSTEPS, rtol = RTOL, atol = ATOL, precompile = false)
     model_name = string(ModelType)
 
     println("="^60)
@@ -194,13 +194,13 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
 
     # Setup CPU model
     println("\n[1/3] Setting up CPU model...")
-    model_cpu = create_cpu_model(ModelType; trunc)
+    model_cpu = create_cpu_model(ModelType; truncation)
     simulation_cpu = initialize!(model_cpu)
-    println("  ✓ CPU model initialized (T$trunc)")
+    println("  ✓ CPU model initialized (T$(truncation - 1))")
 
     # Setup Reactant model
     println("\n[2/3] Setting up Reactant model...")
-    model_reactant = create_reactant_model(ModelType; trunc)
+    model_reactant = create_reactant_model(ModelType; truncation)
     simulation_reactant = initialize!(model_reactant)
     println("  ✓ Reactant model initialized")
 

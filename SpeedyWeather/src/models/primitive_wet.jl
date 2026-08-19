@@ -33,7 +33,6 @@ $(TYPEDFIELDS)"""
         AL,     # <:AbstractAlbedo,
         BL,     # <:AbstractBoundaryLayer,
         VD,     # <:AbstractVerticalDiffusion,
-        SC,     # <:AbstractSurfaceCondition,
         SM,     # <:AbstractSurfaceMomentumFlux,
         SH,     # <:AbstractSurfaceHeatFlux,
         HF,     # <:AbstractSurfaceHumidityFlux,
@@ -90,7 +89,6 @@ $(TYPEDFIELDS)"""
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer::BL = BoundaryLayer(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    @component surface_condition::SC = SurfaceCondition(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
@@ -132,7 +130,6 @@ $(TYPEDFIELDS)"""
         :shortwave_radiation,
         :longwave_radiation,
         :boundary_layer,            # surface fluxes
-        :surface_condition,
         :surface_momentum_flux,
         :surface_heat_flux,
         :surface_humidity_flux,
@@ -156,10 +153,15 @@ function variables(::Type{<:PrimitiveWet}, nsteps = DEFAULT_NSTEPS)
         variables(PrimitiveDry, nsteps)...,
 
         # Add humidity
-        PrognosticVariable(:humidity, Spectral4D(ps), desc = "Specific humidity", units = "kg/kg"),
-        GridVariable(:humidity, Grid4D(pg), desc = "Humidity", units = "kg/kg"),
-        TendencyVariable(:humidity, Spectral4D(ts), desc = "Tendency of specific humidity", units = "kg/kg/s"),
-        TendencyVariable(:humidity, Grid4D(ts), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s"),
+        PrognosticVariable(:humidity, SpectralXYZT(ps), desc = "Specific humidity", units = "kg/kg", fuse=:prognostic),
+        GridVariable(:humidity, GridXYZT(pg), desc = "Specific Humidity", units = "kg/kg", fuse=:grid),
+        TendencyVariable(:humidity, SpectralXYZT(ts), desc = "Tendency of specific humidity", units = "kg/kg/s", fuse = :spectral_tendencies),
+        TendencyVariable(:humidity, GridXYZT(tg), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s", fuse = :grid_tendencies),
+
+        DynamicsVariable(:uq, GridXYZT(tg), desc = "u*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vq, GridXYZT(tg), desc = "v*humidity intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:uq, SpectralXYZT(ts), desc = "u*humidity intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vq, SpectralXYZT(ts), desc = "v*humidity intermediate in spectral space", fuse = :spectral_tendencies),
     )
 end
 
@@ -199,7 +201,6 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
     initialize!(model.greenhouse_gases, model)
-    initialize!(model.surface_condition, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.surface_humidity_flux, model)
