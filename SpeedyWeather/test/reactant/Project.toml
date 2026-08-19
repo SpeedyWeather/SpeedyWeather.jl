@@ -10,4 +10,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 SpeedyWeather = {path = "../.."}
 
 [compat]
-Reactant = "0.2.279"
+Reactant = "=0.2.279"
