@@ -172,15 +172,20 @@ end
 
 """On the CPU a `reshape` of a view is a `Base.ReshapedArray` that LinearAlgebra still recognizes
 as a `StridedArray`, so `mul!` dispatches to BLAS without needing to materialize anything."""
-function _as_matrix(x::AbstractArray)
+function _as_matrix(x::AbstractArray, ::AbstractArchitecture)
     ndims(x) == 2 && return x, false
     return reshape(x, size(x, 1), :), false
 end
 
-"""On the GPU non-contigous views need materializing first. For the PrimitiveWetModel this should 
-never be hit as all transforms actually act on
-fused variables and/or contigous views (which aren't treated as views by CUDA.jl/AMDGPU.jl/..)."""
-function _as_matrix(x::AbstractGPUArray)
+"""On the GPU non-contiguous views need materializing first: reshaping a `SubArray` that GPUArrays
+could not collapse into a plain device array (e.g. a slice of a non-trailing dimension, as when a
+variable is a view into a larger fused buffer) produces a `Base.ReshapedArray` that CUBLAS's `mul!`
+cannot consume. Dispatch is on the architecture (not on `x::AbstractGPUArray`) because a `SubArray`
+wrapping a GPU array is a plain `Base.SubArray`, not a subtype of `AbstractGPUArray`, so it would
+otherwise silently fall through to the CPU method above. For the PrimitiveWetModel this should
+never be hit as all transforms actually act on fused variables and/or contiguous views (which
+aren't treated as views by CUDA.jl/AMDGPU.jl/..)."""
+function _as_matrix(x::AbstractArray, ::GPU)
     ndims(x) == 2 && return x, false
     n = size(x, 1)
     parent(x) === x && return reshape(x, n, :), false
@@ -210,8 +215,8 @@ function transform!(                        # GRID TO SPECTRAL
     # works for n-dimensional (batched/fused) fields, not just 2D. This is not a batched matmul
     # (one matrix `M.forward` × many columns), so one big `mul!` (→ `BLAS.gemm!`) is both correct
     # and optimal. See `_as_matrix` for why GPU non-contigous views need materializing first (CPU views don't).
-    field_matrix, _ = _as_matrix(field.data)                # read-only source, no writeback needed
-    coeffs_matrix, coeffs_materialized = _as_matrix(coeffs.data)
+    field_matrix, _ = _as_matrix(field.data, M.architecture)                # read-only source, no writeback needed
+    coeffs_matrix, coeffs_materialized = _as_matrix(coeffs.data, M.architecture)
     @maybe_jit M.architecture LinearAlgebra.mul!(coeffs_matrix, M.forward, field_matrix)
     coeffs_materialized && copyto!(coeffs.data, coeffs_matrix)
     return coeffs
@@ -241,7 +246,7 @@ function transform!(                        # SPECTRAL TO GRID
     # transform emits, so a column-view of the required width always fits.
     ncolumns = length(coeffs.data) ÷ size(coeffs.data, 1)
     coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), ncolumns)
-    field_matrix, field_materialized = _as_matrix(field.data)
+    field_matrix, field_materialized = _as_matrix(field.data, M.architecture)
     scratch = view(scratch_memory, :, 1:ncolumns)
 
     # the result is real-valued, therefore we can split the complex multiplication
