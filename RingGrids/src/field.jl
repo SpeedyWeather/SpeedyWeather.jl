@@ -566,6 +566,19 @@ Base.:(==)(F1::AbstractField, F2::AbstractField) = fields_match(F1, F2) && F1.da
 Base.all(F::AbstractField) = all(F.data)
 Base.any(F::AbstractField) = any(F.data)
 
+# concatenation
+function Base.cat(Fs::AbstractField...; dims)
+    @assert length(Fs) > 0 "At least one Field must be provided to `cat`"
+    @assert all(map(grids_match, Fs[1:(end - 1)], Fs[2:end])) "All concatenated Fields must have matching grids"
+    @assert length(dims) < length(first(Fs)) "Too many `dims` specified"
+    # we let the standard implementation of `cat` handle the case where dims is greater than the number of axes
+    length(dims) == 1 && @assert first(dims) > 1 "RingGrids Fields cannot be concatenated along the first axis"
+    length(dims) > 1 && @assert all(map(>(1), dims)) "RingGrids Fields cannot be concatenated along the first axis"
+    data = map(F -> F.data, Fs)
+    data_cat = cat(data...; dims)
+    return Field(data_cat, first(Fs).grid)
+end
+
 # reductions
 Base.minimum(F::AbstractField) = minimum(F.data)
 Base.maximum(F::AbstractField) = maximum(F.data)
@@ -607,9 +620,9 @@ Base.@propagate_inbounds field_view(field::AbstractField, c::Colon, i, args...) 
 Base.@propagate_inbounds field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid, field.dims)
 Base.@propagate_inbounds field_view(field::AbstractField, args...) = view(field, args...)   # fallback to normal view
 
-# needed for Enzyme 
+# needed for Enzyme
 Base.unaliascopy(A::Field) =
-       Field(Base.unaliascopy(A.data), A.grid, A.dims)
+    Field(Base.unaliascopy(A.data), A.grid, A.dims)
 
 # BROADCASTING
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting

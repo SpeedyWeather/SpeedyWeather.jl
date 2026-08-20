@@ -191,8 +191,8 @@ end
     NF = Float32
     @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid)
         @testset for nlayers in (1, 4)
-            spectral_grid_cpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid)
-            spectral_grid_gpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid, architecture = SpeedyWeather.GPU)
+            spectral_grid_cpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid)
+            spectral_grid_gpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid, architecture = SpeedyWeather.GPU)
             S_cpu = SpectralTransform(spectral_grid_cpu)
             S_gpu = SpectralTransform(spectral_grid_gpu)
             cpu_arch = S_cpu.architecture
@@ -252,8 +252,8 @@ end
     # forward kernel therefore reads its rings from a table rather than assuming their extent.
     @testset "non-monotonic Legendre shortcut" begin
         NF, nlayers, LegendreShortcut = Float32, 2, SpeedyTransforms.LegendreShortcutLinCubCoslat
-        spectral_grid_cpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid = HEALPixGrid)
-        spectral_grid_gpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid = HEALPixGrid, architecture = SpeedyWeather.GPU)
+        spectral_grid_cpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid = HEALPixGrid)
+        spectral_grid_gpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid = HEALPixGrid, architecture = SpeedyWeather.GPU)
         S_cpu = SpectralTransform(spectral_grid_cpu; LegendreShortcut)
         S_gpu = SpectralTransform(spectral_grid_gpu; LegendreShortcut)
         cpu_arch = S_cpu.architecture
@@ -328,11 +328,11 @@ end
 
             # reference: generic (allocating) GPU path, graphs disabled on this transform
             ext.clear_fourier_graph_cache!()
-            S_off = SpectralTransform(spectral_grid; cuda_graphs = false)
+            S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
             spec_off = transform(field, S_off)      # grid -> spectral
             grid_off = transform(coeffs, S_off)      # spectral -> grid
 
-            # CUDA-Graphs path (default, cuda_graphs = true)
+            # GPU-graphs path (default, gpu_graphs = true)
             ext.clear_fourier_graph_cache!()
             S_on = SpectralTransform(spectral_grid)
             spec_on = transform(field, S_on)
