@@ -235,6 +235,9 @@ end
     ) where {NF}
 
     dlat = v * dt                               # increment in latitude [˚N]
+    
+    # TODO: Replace `cos(deg2rad(particle.lat))` with `cosd(particle.lat)` once 
+    # JuliaGPU/AMDGPU.jl#1041 is merged/released and `cosd` is supported on AMD GPUs.
     coslat = max(cos(deg2rad(particle.lat)), eps(NF))   # prevents division by zero
     dlon = u * dt / coslat                      # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
