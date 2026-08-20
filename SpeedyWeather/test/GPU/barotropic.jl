@@ -1,8 +1,9 @@
 using JLD2
 
-@testset "GPU Barotropic" begin
+@testset "GPU Barotropic (with MatrixSpectralTransform)" begin
     spectral_grid = SpectralGrid(truncation = 33, nlayers = 1, architecture = SpeedyWeather.GPU())
-    model = BarotropicModel(spectral_grid = spectral_grid)
+    spectral_transform = MatrixSpectralTransform(spectral_grid)
+    model = BarotropicModel(spectral_grid; spectral_transform)
     simulation = initialize!(model)
     run!(simulation, steps = 4)
 
@@ -13,7 +14,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_gpu_jld2_")
     spectral_grid = SpectralGrid(truncation = 33, nlayers = 1, architecture = SpeedyWeather.GPU())
     output = JLD2Output(path = tmp_output_path, id = "gpu-jld2", write_restart = false)
-    model = BarotropicModel(; spectral_grid, output)
+    model = BarotropicModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, steps = 3, output = true)
 
@@ -33,7 +34,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_gpu_jld2_")
     spectral_grid = SpectralGrid(truncation = 33, nlayers = 1, architecture = SpeedyWeather.GPU())
     output = ArrayOutput()
-    model = BarotropicModel(; spectral_grid, output)
+    model = BarotropicModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, steps = 3, output = true)
 
