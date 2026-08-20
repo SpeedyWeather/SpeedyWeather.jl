@@ -424,16 +424,16 @@ end
 
 # Layer size of scratch memory (north/south columns in `ScratchMemory`).
 # On CPU we typically use `nlayers` only (largest allocated plan and physical layers of the model)
-# On GPU we batch transforms much more, and need to use a scratch memory in 
+# On GPU we batch transforms much more, and need to use a scratch memory in
 # accordance with the largest batch which is `nlayers` in this case and ISN'T equal to the physical layers of the model
 _scratch_nlayers(::AbstractCPU, ::Integer, planned_K::AbstractVector{<:Integer}) = maximum(planned_K)
 _scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:Integer}) = nlayers
 
-# Return true if a call with `K` layers should be split into chunks that are 
-# executed sequentially. 
-# Architecture-dispatched: 
+# Return true if a call with `K` layers should be split into chunks that are
+# executed sequentially.
+# Architecture-dispatched:
 # CPU chunks to avoid FFTW's alignment-mismatch on x86 (no problem on ARM)
-# GPU doesn't need any of that we have seperate plans for each K 
+# GPU doesn't need any of that we have seperate plans for each K
 @inline function _needs_chunking(K::Integer, S::SpectralTransform{NF, <:AbstractCPU}) where {NF}
     K > 1 || return false                            # K=1 always handled directly
     haskey(S.rfft_plans_batched, K) && return false  # K is directly planned, no chunking needed
@@ -446,7 +446,7 @@ end
 
 @inline _needs_chunking(::Integer, ::SpectralTransform) = false
 
-# Largest planned batch K ≤ K_total, excluding the K=1 fallback. Used to pick the chunk size. Typically this will just be the number of layers in the model. 
+# Largest planned batch K ≤ K_total, excluding the K=1 fallback. Used to pick the chunk size. Typically this will just be the number of layers in the model.
 @inline function _largest_planned_batch(K_total::Integer, S::SpectralTransform)
     best = 1
     for k in keys(S.rfft_plans_batched)
@@ -465,9 +465,9 @@ end
 # Why this matters on CPU: FFT plans bake their batch dim K into the plan, and on x86 the
 # scratch column-stride (= nfreq_max * sizeof(Complex{NF})) is generally not a multiple
 # of the SIMD width, so the K=1 plan can't be applied to columns other than column 1
-# without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
-# that path for the bulk of the layers and effectively restores the previous behavior before 
-# fusion/batching without performance penalties. 
+# without an alignment-mismatch error. Chunking with the sequential execution sidesteps
+# that path for the bulk of the layers and effectively restores the previous behavior before
+# fusion/batching without performance penalties.
 # Greedy chunk sizes: at each position take the largest planned batch that fits the remaining
 # layers (1 = the always-planned serial fallback when nothing larger fits)
 function _transform_chunked!(                       # SPECTRAL TO GRID

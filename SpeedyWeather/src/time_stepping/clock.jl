@@ -24,10 +24,10 @@ $(TYPEDFIELDS)"""
     period::S = Second(0)
 
     "Dilation (relative speed wrt time) of rotation time for daily cycle, used for solar zenith calculations"
-    rotation_dilation::NF = 1f0
+    rotation_dilation::NF = 1.0f0
 
     "Dilation (relative speed wrt time) of orbit time for seasonal cycle, used for solar zenith calculations"
-    orbit_dilation::NF = 1f0
+    orbit_dilation::NF = 1.0f0
 
     "Counting all steps the time stepper takes during simulation"
     step_counter::I = 0
@@ -105,9 +105,9 @@ function initialize!(clock::Clock, time_stepping::AbstractTimeStepper, planet::A
 
     # given a planet's length of day and year, we can compute the dilation factors for the rotation and orbit time
     @assert planet.length_of_day.value != 0 "planet.length_of_day is 0 (rotating infinitely fast)," *
-        " choose Second(typemax(Int)) for a tidally locked planet or daily_cycle=false for average insulation." 
+        " choose Second(typemax(Int)) for a tidally locked planet or daily_cycle=false for average insulation."
     @assert planet.length_of_year.value != 0 "planet.length_of_year is 0 (orbiting infinitely fast)," *
-        " choose Second(typemax(Int)) for a seasonally locked planet or seasonal_cycle=false." 
+        " choose Second(typemax(Int)) for a seasonally locked planet or seasonal_cycle=false."
     clock.rotation_dilation = Second(EARTH_DAY).value / Second(planet.length_of_day).value
     clock.orbit_dilation = Second(EARTH_YEAR).value / Second(planet.length_of_year).value
 
@@ -154,7 +154,7 @@ function set!(clock::Clock; time::DateTime, start::DateTime)
     clock.time = time
     clock.start = start
     clock.rotation_time = time      # when time is explicitly set, synchronize orbit & rotation times too
-    clock.orbit_time = time         # after this they generally run apart 
+    clock.orbit_time = time         # after this they generally run apart
     return clock
 end
 

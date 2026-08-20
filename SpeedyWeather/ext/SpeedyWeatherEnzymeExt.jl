@@ -18,7 +18,7 @@ function __init__()
     end
     return nothing
 end
-=# 
+=#
 
 ###
 # implement make_zero where the default one fails
@@ -63,7 +63,7 @@ _make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ColumnScratchMemory) =
 _make_zero_view!(x::Base.RefValue) = (x[] isa Number && (x[] = zero(x[])); nothing)
 _make_zero_view!(x) = nothing
 
-### 
+###
 # TODO
 # Enzyme FORWARD-mode rule for iterating the tracer registry
 #
