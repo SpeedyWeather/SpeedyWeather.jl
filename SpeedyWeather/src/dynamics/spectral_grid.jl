@@ -115,7 +115,7 @@ struct SpectralGrid{
 
     "[DERIVED] Type of grid variable in 4D (horizontal + 2 unspecified, flattened into 3D array)"
     GridVariable4D::Type{<:AbstractArray}
-    
+
     "[DERIVED] Type of grid variable in 4D (horizontal + vertical + time, flattened into 3D array)"
     GridVariableXYZT::Type{<:AbstractArray}
 
@@ -171,7 +171,7 @@ function SpectralGrid(;
         truncation::Int = DEFAULT_TRUNCATION,
         trunc::Union{Int, Nothing} = nothing,
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-        dealiasing::Real = 2,
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(Grid),
         nlayers::Int = DEFAULT_NLAYERS,
         transform_batch::AbstractVector{<:Integer} = default_transform_batch(architecture, nlayers),
     )
@@ -182,7 +182,7 @@ function SpectralGrid(;
     end
 
     if trunc !== nothing
-        Base.depwarn("`trunc` is deprecated, use `truncation` instead (note `truncation = trunc + 1`). So typical truncations are now 32, 64, 128, ...", :SpectralGrid, force=true)
+        Base.depwarn("`trunc` is deprecated, use `truncation` instead (note `truncation = trunc + 1`). So typical truncations are now 32, 64, 128, ...", :SpectralGrid, force = true)
         truncation = trunc + 1
     end
 
@@ -207,7 +207,7 @@ Initialize a SpectralGrid from a given grid.
 function SpectralGrid(
         grid::AbstractGrid;
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
-        dealiasing::Real = 2,
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(grid),
         nlayers::Int = DEFAULT_NLAYERS,
         transform_batch::AbstractVector{<:Integer} = default_transform_batch(grid.architecture, nlayers),
     )

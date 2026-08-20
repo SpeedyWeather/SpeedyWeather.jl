@@ -118,11 +118,18 @@ run!(simulation, period=Day(10))
 The GPU backend must be loaded first so that SpeedyWeather's extension modules
 register the correct array types (`CuArray`, `ROCArray`, `MtlArray`).
 
-GPU tests live in `SpeedyWeather/test/GPU/` and can be run with:
+GPU tests live in `SpeedyWeather/test/GPU/` and auto-detect the backend (`runtests.jl` tries
+`AMDGPU`, then `CUDA`, then `Metal`). Each backend has its own self-contained test environment
+under `SpeedyWeather/test/GPU/<Backend>/Project.toml` (with `SpeedyWeather` resolved via a
+`[sources]` path entry, transitively pulling in its monorepo siblings), so no manual
+`Pkg.develop`/`Pkg.add` is needed — just `instantiate` and run:
 
 ```bash
-julia --project=SpeedyWeather SpeedyWeather/test/GPU/runtests.jl
+julia --project=SpeedyWeather/test/GPU/CUDA -e 'using Pkg; Pkg.instantiate()'
+julia --project=SpeedyWeather/test/GPU/CUDA SpeedyWeather/test/GPU/runtests.jl
 ```
+
+Substitute `AMDGPU` or `MetalGPU` for the backend directory as appropriate.
 
 ## Time-Step Information Flow
 
