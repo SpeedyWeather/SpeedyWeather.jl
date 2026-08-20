@@ -235,7 +235,7 @@ sharing a non-empty `fuse` symbol (within the same namespace) share a single par
 buffer; their per-variable entries are views of that parent. Fused parents themselves
 live under `vars.fused.<fuse_symbol>`."""
 function Variables(model::AbstractModel)
-    all_vars = all_variables(model)     # one long tuple for all required variables of model and its components
+    all_vars = all_variables(model)     # one long vector of all required variables of model and its components
 
     # First pass (cross-type): allocate one parent per (namespace, fuse_symbol) group, spanning
     # all variable types. Returns a Dict keyed by (namespace, fuse) with values (parent, view-by-identifier).
@@ -522,7 +522,7 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
     return nothing
 end
 
-"""$(TYPEDSIGNATURES) Allocates all variables within a group given a tuple of variables
+"""$(TYPEDSIGNATURES) Allocates all variables within a group given a collection of variables
 expected to be `<: AbstractVariable` definitions. Determines the namespaces,
 allocates the arrays with zeros and collects them into NamedTuples. Members of a
 fuse group are returned as views of a shared parent (allocated via `build_fuse_parents`),
@@ -592,32 +592,33 @@ variables(name_component::Pair, model::AbstractModel) = variables(name_component
 
 """$(TYPEDSIGNATURES)
 Extracts all variables from the model by iterating over all components and collecting their variables.
-Return a tuple of all variables."""
+Returns a `Vector{AbstractVariable}`. Components define their variables as tuples (see `variables`),
+but they are collected into a vector here: the definitions are heterogeneous and only ever consumed
+by runtime loops, so keeping them in a tuple would force inference over a ~60-element heterogeneous
+tuple type in every downstream `filter`/`unique` without any benefit."""
 function all_variables(model::AbstractModel)
-    t = variables(model)                        # variables from the model itself
+    all_vars = AbstractVariable[]
+    append!(all_vars, variables(model))         # variables from the model itself
     for component in propertynames(model)       # iterate over all components of the model
         # pass on model as well to allow for cross-component information to be used to define required variables
-        vars = variables(getproperty(model, component), model)
-        if length(vars) > 0
-            t = tuple(t..., vars...)
-        end
+        append!(all_vars, variables(getproperty(model, component), model))
     end
-    return t
+    return all_vars
 end
 
-get_namespaces(variables::AbstractVariable...) = unique([v.namespace for v in variables])
+get_namespaces(variables) = unique([v.namespace for v in variables])
 
-"""$(TYPEDSIGNATURES) Filters a tuple of variables `vars` by `VariableTyple`,
+"""$(TYPEDSIGNATURES) Filters a collection of variables `vars` by `VariableType`,
 removes duplicates such that the variable path remains unique. Returns a
 dictionary of the variable definitions (but the arrays aren't allocated here but in `allocate`)"""
 function filter_variables(vars, VariableType)
     vars = filter(v -> v isa VariableType, vars)    # filter by variable type
     vars = unique(v -> identifier(v), vars)         # remove duplicates by identifier (group+namespace+name)
 
-    namespaces = get_namespaces(vars...)            # Split by namespace
-    group = Dict{Symbol, Tuple}()                   # assemble the variable group
+    namespaces = get_namespaces(vars)               # Split by namespace
+    group = Dict{Symbol, Vector{AbstractVariable}}()   # assemble the variable group
     for ns in namespaces
-        group[ns] = Tuple([v for v in vars if v.namespace == ns])
+        group[ns] = AbstractVariable[v for v in vars if v.namespace == ns]
     end
 
     return group
