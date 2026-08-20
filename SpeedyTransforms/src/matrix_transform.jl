@@ -177,12 +177,7 @@ function _as_matrix(x::AbstractArray, ::AbstractArchitecture)
     return reshape(x, size(x, 1), :), false
 end
 
-"""On the GPU non-contiguous views need materializing first: reshaping a `SubArray` that GPUArrays
-could not collapse into a plain device array (e.g. a slice of a non-trailing dimension, as when a
-variable is a view into a larger fused buffer) produces a `Base.ReshapedArray` that CUBLAS's `mul!`
-cannot consume. Dispatch is on the architecture (not on `x::AbstractGPUArray`) because a `SubArray`
-wrapping a GPU array is a plain `Base.SubArray`, not a subtype of `AbstractGPUArray`, so it would
-otherwise silently fall through to the CPU method above. For the PrimitiveWetModel this should
+"""On the GPU non-contiguous views need materializing first. For the PrimitiveWetModel this should
 never be hit as all transforms actually act on fused variables and/or contiguous views (which
 aren't treated as views by CUDA.jl/AMDGPU.jl/..)."""
 function _as_matrix(x::AbstractArray, ::GPU)
