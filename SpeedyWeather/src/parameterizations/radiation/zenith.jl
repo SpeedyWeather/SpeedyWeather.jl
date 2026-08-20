@@ -3,7 +3,7 @@ abstract type AbstractSolarTimeCorrection <: AbstractModelComponent end
 abstract type AbstractZenith <: AbstractModelComponent end
 
 # set these as constants as hour/year angle need them but
-# they should not be seen as variable as we 
+# they should not be seen as variable as we
 const LENGTH_OF_DAY = Second(EARTH_DAY).value
 const LENGTH_OF_YEAR = Second(EARTH_YEAR).value
 
@@ -110,11 +110,11 @@ given the parameters in model.planet. In both cases the seasonal cycle can
 be disabled, calculating the solar declination from the initial time
 instead of current (orbit) time."""
 function WhichZenith(
-    SG::SpectralGrid,
-    planet::AbstractPlanet;
-    solar_declination = SinSolarDeclination(planet), 
-    time_correction = SolarTimeCorrection(SG),
-)
+        SG::SpectralGrid,
+        planet::AbstractPlanet;
+        solar_declination = SinSolarDeclination(planet),
+        time_correction = SolarTimeCorrection(SG),
+    )
     Z = planet.daily_cycle ? SolarZenith : SolarZenithSeason
     return Z(SG; planet.seasonal_cycle, solar_declination, time_correction)
 end
@@ -141,10 +141,10 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Calculate seasonal cycle from this solar declination function."
     solar_declination::SD
-    
+
     "[DERIVED] Use this time, set via `initialize!(model, time=...), to hold seasonal cycle fixed."
     initial_time::RV = Ref(DEFAULT_DATE)
-    
+
     "[OPTION] Time correction for seasonal wobble of sunset/sunrise times"
     time_correction::STC
 end
@@ -152,7 +152,7 @@ end
 Adapt.@adapt_structure SolarZenith
 SolarZenith(SG::SpectralGrid; kwargs...) =
     SolarZenith(; solar_declination = SolarDeclination(SG), time_correction = SolarTimeCorrection(SG), kwargs...)
-Base.show(io::IO, Z::AbstractZenith) = show(io, Z, values=false)
+Base.show(io::IO, Z::AbstractZenith) = show(io, Z, values = false)
 
 function variables(::AbstractZenith)
     return (
@@ -187,7 +187,7 @@ Fraction of day in `time` as angle in radians [-π...π], noon to noon, at longi
 Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as constant.
 This is because `Dates` functions assume an Earth date. Length of the daily cycle is instead
 controlled via a faster rotation time, see `Earth`."""
-function solar_hour_angle(::Type{T}, time::DateTime, λ=0) where {T}
+function solar_hour_angle(::Type{T}, time::DateTime, λ = 0) where {T}
     day2rad = T(2π) / LENGTH_OF_DAY
     noon_in_sec = LENGTH_OF_DAY ÷ 2
     return (secondofday(time) - noon_in_sec) * day2rad + convert(T, λ)
@@ -243,7 +243,7 @@ end
 
     ij = @index(Global, Linear)
     j = whichring[ij]
-    
+
     sinδsinϕ = sinδ * sinlat[j]
     cosδcosϕ = cosδ * coslat[j]
     h = solar_hour_angle_0E + lons[ij]      # solar hour angle at longitude λ in radians
@@ -260,7 +260,7 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Calculate seasonal cycle from this solar declination function."
     solar_declination::SD
-    
+
     "[DERIVED] Use this time, set via `initialize!(model, time=...), to hold seasonal cycle fixed."
     initial_time::RV = Ref(DEFAULT_DATE)
 end
@@ -317,9 +317,13 @@ end
     NF = eltype(cos_zenith)
 
     ϕ = lat[j]
-    h₀ = NF(ifelse(2*(abs(δ) + abs(ϕ)) < π,     # polar day/night?
-        acos(clamp(-tan(ϕ) * tan(δ), -one(NF), one(NF))),  # length of day
-        ifelse(ϕ * δ > 0, π, 0)))               # polar day if signs are equal, otherwise polar night
+    h₀ = NF(
+        ifelse(
+            2 * (abs(δ) + abs(ϕ)) < π,     # polar day/night?
+            acos(clamp(-tan(ϕ) * tan(δ), -one(NF), one(NF))),  # length of day
+            ifelse(ϕ * δ > 0, π, 0)
+        )
+    )               # polar day if signs are equal, otherwise polar night
 
     sinϕ, cosϕ = sinlat[j], coslat[j]
     cos_zenith_j = h₀ * sinδ * sinϕ + cosδ * cosϕ * sin(h₀)

@@ -113,7 +113,7 @@ function initialize!(
     k = particle_advection.layer
     (; time_stepping) = model
 
-    # index the step dimension according to time stepper 
+    # index the step dimension according to time stepper
     l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
     u_grid = field_view(vars.grid.u, :, k, l)
     v_grid = field_view(vars.grid.v, :, k, l)

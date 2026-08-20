@@ -115,7 +115,7 @@ struct SpectralGrid{
 
     "[DERIVED] Type of grid variable in 4D (horizontal + 2 unspecified, flattened into 3D array)"
     GridVariable4D::Type{<:AbstractArray}
-    
+
     "[DERIVED] Type of grid variable in 4D (horizontal + vertical + time, flattened into 3D array)"
     GridVariableXYZT::Type{<:AbstractArray}
 
@@ -182,7 +182,7 @@ function SpectralGrid(;
     end
 
     if trunc !== nothing
-        Base.depwarn("`trunc` is deprecated, use `truncation` instead (note `truncation = trunc + 1`). So typical truncations are now 32, 64, 128, ...", :SpectralGrid, force=true)
+        Base.depwarn("`trunc` is deprecated, use `truncation` instead (note `truncation = trunc + 1`). So typical truncations are now 32, 64, 128, ...", :SpectralGrid, force = true)
         truncation = trunc + 1
     end
 

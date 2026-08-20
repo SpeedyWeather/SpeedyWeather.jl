@@ -19,7 +19,7 @@ initialize!(::ConstantLongwaveTransmissivity, ::AbstractModel) = nothing
     pₛ = vars.parameterizations.surface_pressure[ij]
 
     for k in 1:nlayers
-        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ   
+        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
         t[ij, k] = exp(-τ * Δσₖ)            # transmissivity through layer k
     end
     return t

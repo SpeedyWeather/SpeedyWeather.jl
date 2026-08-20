@@ -101,9 +101,13 @@ end
         push!(calls, :(copy_step_forward!(getfield(vars.prognostic, $(QuoteNode(name))))))
     end
     for namespace in (:tracers, :ocean, :land), name in _namespace_names(T, namespace)
-        push!(calls, :(copy_step_forward!(
-            getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name)))
-        )))
+        push!(
+            calls, :(
+                copy_step_forward!(
+                    getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name)))
+                )
+            )
+        )
     end
     return Expr(:block, calls..., :(return nothing))
 end

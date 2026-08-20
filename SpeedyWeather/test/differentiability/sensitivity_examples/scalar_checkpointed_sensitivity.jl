@@ -1,4 +1,4 @@
-# use Julia 1.10 for this 
+# use Julia 1.10 for this
 
 import Pkg
 Pkg.activate("SpeedyWeather/test/differentiability/sensitivity_examples")
@@ -32,7 +32,7 @@ vars = variables
 
 function checkpointed_timesteps!(vars::Variables, model, N_steps, checkpoint_scheme::Scheme)
 
-     @ad_checkpoint checkpoint_scheme for _ in 1:N_steps
+    @ad_checkpoint checkpoint_scheme for _ in 1:N_steps
         SpeedyWeather.time_step!(vars, model.time_stepping, model)     # calculate tendencies and step forward
         SpeedyWeather.time_step!(vars.prognostic.clock, model.time_stepping)                # then step the clock forward
     end
@@ -48,7 +48,7 @@ dmodel = make_zero(model)
 # we need to materialize the views to be able to save them
 output_vars = SpeedyWeather.materialize_views(vars)
 jldsave(string(savename_base, "temp-ic.jld2"); output_vars)
-output_vars = nothing 
+output_vars = nothing
 
 println("Starting sensitivity computation...")
 

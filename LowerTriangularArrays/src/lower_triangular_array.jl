@@ -10,7 +10,7 @@ triangular matrices."""
 struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum, Dims <: AbstractArrayDimensions} <: AbstractArray{T, N}
     data::ArrayType     # non-zero elements unravelled into an in which the lower triangle is flattened
     spectrum::S         # spectrum, that holds all spectral discretization information and the architecture the array is on
-    dims::Dims          # empty type just to declare what dimensions the 
+    dims::Dims          # empty type just to declare what dimensions the
 
     function LowerTriangularArray(data, spectrum, dims = ArrayDimensions.LM())
         data_matches_spectrum(data, spectrum) || throw(DimensionMismatch(data, spectrum))
@@ -813,9 +813,9 @@ Base.any(L::LowerTriangularArray) = any(L.data)
 
 Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.spectrum)
 
-# needed for Enzyme 
+# needed for Enzyme
 Base.unaliascopy(A::LowerTriangularArray) =
-       LowerTriangularArray(Base.unaliascopy(A.data), A.spectrum, A.dims)
+    LowerTriangularArray(Base.unaliascopy(A.data), A.spectrum, A.dims)
 
 # Views that return a LowerTriangularArray again (need to retain all horizontal grid points, hence `:, 1` for example)
 # view(array, :) unravels like array[:] does hence "::Colon, i, args..." used to enforce one argument after :
