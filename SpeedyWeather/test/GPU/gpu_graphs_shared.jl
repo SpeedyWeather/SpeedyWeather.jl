@@ -8,8 +8,11 @@
 function test_gpu_graphs(ext, prefix)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
         if ext !== nothing
+            # `WhichTransform` picks `MatrixSpectralTransform` (no FFT, no CUDA graphs) at this
+            # truncation on GPU, so force the FFT-based `SpectralTransform` explicitly — this
+            # test specifically exercises its CUDA-graphs acceleration.
             spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
-            model = PrimitiveWetModel(spectral_grid)
+            model = PrimitiveWetModel(spectral_grid; spectral_transform = SpectralTransform(spectral_grid))
             simulation = initialize!(model)
 
             ext.clear_fourier_graph_cache!()
