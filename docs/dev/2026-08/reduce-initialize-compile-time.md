@@ -1,6 +1,6 @@
 # Reducing compile time of `initialize!(model)`
 
-> Status: **in progress**. Change 2 implemented and verified (`Variables(model)` 7.6s → 4.6s). Changes 1 and 3 still outstanding.
+> Status: **in progress**. Changes 1 and 2 implemented and verified: total `initialize!` 34.0 s → 22.6 s. Change 3 (precompile workload) still outstanding.
 
 Date of initial draft: 2026-08-20
 
@@ -13,6 +13,9 @@ Base revision: f89bce984b028f4aa9f62622accc32aba157d6a8
 ## Revision log
 
 - 2026-08-20: initial draft.
+- 2026-08-20: implemented Change 1 (`set!` type erasure). Step 3 22.7 s → 13.8 s;
+  total `initialize!` 31.4 s → 22.6 s. Required a correction to the original design: erasing
+  the kwargs into a `Vector` of pairs was **not** sufficient on its own — see below.
 - 2026-08-20: implemented Change 2 (variable collection via `Vector` instead of `Tuple`).
   `Variables(model)` 7.62 s → 4.63 s (−39 %); total `initialize!` 34.0 s → 31.4 s.
   Verified all 113 allocated variable arrays are bitwise identical before/after.
@@ -154,7 +157,7 @@ There is currently **no `PrecompileTools` workload anywhere in the monorepo** �
 
 Three changes, in decreasing benefit-to-risk order.
 
-### Change 1 — type-erase the `set!` keyword loop (largest win, ~9 s)
+### Change 1 — type-erase the `set!` keyword loop (largest win, ~9 s) — **DONE**
 
 Give `set!` a non-kwarg, non-specializing core that takes the variables to set as a
 runtime `Vector{Pair{Symbol,Any}}` instead of a compile-time-unrolled `Pairs` type. The
@@ -188,9 +191,47 @@ Prototyped and measured against the current implementation:
 | `vorticity = field` | — | 0.79 s |
 | **total (5 signatures)** | **14.4 s** (4 sigs) | **5.5 s** (5 sigs) |
 
-The residual ~0.8 s per signature is the first-time inference of each *value* type through
-the per-variable `set!` → `transform!` chain, which is genuine work and is what
-precompilation (Change 3) can absorb.
+**Implemented, with a correction to the design.** Erasing the variables into a
+`Vector{Pair{Symbol,Any}}` was necessary but *not sufficient*. Two further steps were
+needed, each found by re-measuring after the previous one failed to move the number:
+
+1. **The options must be passed positionally, not as keywords.** The first attempt split
+   the kwargs into variables (erased to a vector) and options (splatted back out as
+   keywords). That left `set_variables!` with one specialization per distinct *option*
+   NamedTuple type, and the per-signature cost was unchanged at ~2.4 s. Collecting the
+   options into a concrete `SetOptions` struct passed positionally gives `set_variables!`
+   exactly one signature (confirmed: `Base.specializations` went from one-per-call-site
+   to 2).
+
+2. **`@nospecialize` on the kwargs at the outer boundary.** Even with (1), the cost stayed
+   at ~2.4 s. Snooping a single `set!` call showed 2.12 s sitting in the *kwargs wrapper of
+   the entry point itself* (`#set!#264`), whose body is three lines: Julia was inferring
+   `_set_pairs`/`_set_options` against the concrete kwargs type and constant-propagating
+   through them, so the erasure happened too late to help. Adding `@nospecialize` to the
+   `kwargs` of the three entry points and to the two helpers stops the specialization at
+   the boundary.
+
+Measured after all three steps (repeat signatures, i.e. the marginal cost of one more
+distinct `set!` call site):
+
+| signature | before | after |
+|-----------|--------|-------|
+| `temperature = field` (first call, compiles shared chain) | 3.53 s | 4.89 s |
+| `humidity = field` | 2.59 s | **0.43 s** |
+| `pressure = field` | 2.80 s | **0.73 s** |
+| `pressure = scalar` | 2.36 s | **0.51 s** |
+| `vorticity = field` | 2.25 s | **0.44 s** |
+
+The first call is now *more* expensive because it compiles the whole shared chain once;
+every subsequent distinct signature is ~5× cheaper. That is the intended trade: the cost is
+paid once rather than once per call site.
+
+Independent confirmation: the `set!` unit tests (`test/dynamics/set.jl`, 49 tests) dropped
+from **2m29s to 49s**.
+
+An `@nospecialize` note for future readers: it is load-bearing on the *entry points*, not
+just the helpers. Removing it from `set!(vars, model; kwargs...)` alone restores most of the
+original cost.
 
 Trade-off: the inner loop becomes dynamically dispatched. This is irrelevant here —
 `set!` is called ~10 times during setup and never in the time-stepping loop. Runtime after
@@ -273,11 +314,25 @@ Recommendation: land Changes 1 and 2 first and re-measure. They are pure wins wi
 precompile-time or image-size cost. Decide on Change 3 afterwards against the reduced
 baseline.
 
-### Expected result
+### Result (measured)
 
-Changes 1 + 2 should bring the cold `initialize!` from ~34 s to roughly **20–22 s**.
+| | before | after 2 | after 1 + 2 |
+|---|---|---|---|
+| 1. components | 3.0 s | 3.4 s | 3.6 s |
+| 2. `Variables(model)` | 7.6 s | 4.6 s | 4.5 s |
+| 3. initial conditions | 22.7 s | 23.1 s | **13.8 s** |
+| **total `initialize!`** | **34.0 s** | 31.4 s | **22.6 s** |
+
+Close to the 20–22 s estimate. All 113 allocated variable arrays remain bitwise identical
+to the pre-change baseline after both changes.
+
 Change 3 on top could take the default-`NF` path to a few seconds, at the cost of a
 longer `Pkg.precompile` and a larger image.
+
+**Measurement caveat:** compile-time numbers on this machine are very sensitive to CPU
+contention — an intermediate measurement taken while the test suite was running showed
+every step roughly doubled, including steps not touched by the change. Always re-measure on
+an idle machine before concluding anything.
 
 ## Testing and verification
 
@@ -306,8 +361,12 @@ the precompilation behaviour and the `NF=Float32` coverage in the docs.
 - Change 1 trades a small amount of runtime dispatch for compile time. Correct here
   because `set!` is a setup-path function, but the same trade would be wrong inside the
   time-stepping loop.
-- The ~0.8 s per-signature residual after Change 1 is inherent to first-inference of the
+- The ~0.4–0.7 s per-signature residual after Change 1 is inherent to first-inference of the
   transform stack and can only be removed by precompilation.
+- `SetOptions` fixes the set of `set!` options at the struct definition. A new option must
+  be added in three places: the struct, `SET_OPTIONS`, and both `_set_options` methods.
+  Forgetting `SET_OPTIONS` would silently reinterpret the option as a variable name and
+  produce a "not defined" warning rather than an error.
 
 ## Future work
 
