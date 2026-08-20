@@ -470,8 +470,15 @@ Adapt.@adapt_structure JablonowskiVorticity
 @inline function (J::JablonowskiVorticity)(λ, φ, η)
     (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
 
+    # convert to radians once, plain sin/cos/tan avoid AMDGPU hostcalls that
+    # Base's degree-trig functions (sind/cosd/tand) trigger via their exact
+    # argument reduction / NaN-Inf handling
+    φ_rad = deg2rad(φ)
+    sinφ, cosφ = sin(φ_rad), cos(φ_rad)
+    cosΔλ = cos(deg2rad(λ - λc))
+
     # great circle distance to perturbation
-    X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
+    X = clamp(sinφc * sinφ + cosφc * cosφ * cosΔλ, 0, 1)
     r = radius * acos(X)
 
     # Eq (3), the unperturbed zonal wind
@@ -480,11 +487,11 @@ Adapt.@adapt_structure JablonowskiVorticity
     # Float64 log2/exp2, which AMDGPU cannot compile (GPUCompiler segfaults in check_ir!).
     # cos is strictly positive here (η in [0, 1] gives cos in [0.39, 1]), so x*sqrt(x) is equivalent.
     cosηᵥ = cos((η - η₀) * π / 2)
-    ζ = -4 * u₀ / radius * (cosηᵥ * sqrt(cosηᵥ)) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+    ζ = -4 * u₀ / radius * (cosηᵥ * sqrt(cosηᵥ)) * sinφ * cosφ * (2 - 5sinφ^2)
 
     # Eq (12), the perturbation
     perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
-        (tand(φ) - 2 * (radius / R)^2 * acos(X) * (sinφc * cosd(φ) - cosφc * sind(φ) * cosd(λ - λc)) / sqrt(1 - X^2))
+        (tan(φ_rad) - 2 * (radius / R)^2 * acos(X) * (sinφc * cosφ - cosφc * sinφ * cosΔλ) / sqrt(1 - X^2))
 
     return ζ + perturbation
 end
@@ -506,12 +513,18 @@ Adapt.@adapt_structure JablonowskiDivergence
 @inline function (J::JablonowskiDivergence)(λ, φ, η)
     (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
 
+    # convert to radians once, plain sin/cos avoid AMDGPU hostcalls (see JablonowskiVorticity)
+    φ_rad = deg2rad(φ)
+    sinφ, cosφ = sin(φ_rad), cos(φ_rad)
+    Δλ_rad = deg2rad(λ - λc)
+    cosΔλ, sinΔλ = cos(Δλ_rad), sin(Δλ_rad)
+
     # great circle distance to perturbation
-    X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
+    X = clamp(sinφc * sinφ + cosφc * cosφ * cosΔλ, 0, 1)
     r = radius * acos(X)
 
     # Eq (13)
-    return -2 * perturb_uₚ * radius / R^2 * exp(-(r / R)^2) * acos(X) / sqrt(1 - X^2) * cosφc * sind(λ - λc)
+    return -2 * perturb_uₚ * radius / R^2 * exp(-(r / R)^2) * acos(X) / sqrt(1 - X^2) * cosφc * sinΔλ
 end
 
 export RossbyHaurwitzWave
@@ -679,9 +692,9 @@ end
     A2 = 2u₀ * cosηᵥ * sqrt_cosηᵥ
 
     # Get latitude
-    φij = φ[ij]
-    sinφ = sind(φij)
-    cosφ = cosd(φij)
+    φij = deg2rad(φ[ij])
+    sinφ = sin(φij)
+    cosφ = cos(φij)
 
     NF = eltype(temp_grid)
 

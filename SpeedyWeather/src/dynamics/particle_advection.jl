@@ -235,7 +235,7 @@ end
     ) where {NF}
 
     dlat = v * dt                               # increment in latitude [˚N]
-    coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
+    coslat = max(cos(deg2rad(particle.lat)), eps(NF))   # prevents division by zero
     dlon = u * dt / coslat                      # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
 end
