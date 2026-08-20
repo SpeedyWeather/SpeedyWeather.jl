@@ -11,6 +11,9 @@ struct Simulation{V, M <: AbstractModel} <: AbstractSimulation{M}
     model::M
 end
 
+"""($TYPEDSIGNATURES) Same as `initialize!(model)` which returns a `Simulation`."""
+Simulation(model::AbstractModel; kwargs...) = initialize!(model; kwargs...)
+
 function Base.show(io::IO, S::AbstractSimulation)
     vsize = prettymemory(_pretty_size(S.variables))
     Msize = prettymemory(Base.summarysize(S.model))
