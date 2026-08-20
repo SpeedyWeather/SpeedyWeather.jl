@@ -67,4 +67,8 @@ define that dimension, typically via [`get_dimension_length`](@ref) and
 define_dimension!(dest, variable::AbstractOutputVariable) = nothing
 
 """$(TYPEDSIGNATURES) Like `path` but returns `nothing` instead of throwing an error if the variable is not defined in the simulation."""
-path_or_nothing(variable::AbstractOutputVariable, simulation) = try path(variable, simulation) catch FieldError; nothing end
+path_or_nothing(variable::AbstractOutputVariable, simulation) = try
+    path(variable, simulation)
+catch FieldError
+    nothing
+end

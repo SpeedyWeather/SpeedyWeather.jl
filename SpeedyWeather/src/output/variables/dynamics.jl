@@ -177,7 +177,7 @@ function output!(
     else
         # reuse scratch array b which is free to be used for mslp after the virtual temperature calculation
         # set to zero as q=0 in dry atmosphere
-        simulation.variables.scratch.grid.b_2D .= 0     
+        simulation.variables.scratch.grid.b_2D .= 0
     end
     Tᵥ = simulation.variables.scratch.grid.a_2D
 

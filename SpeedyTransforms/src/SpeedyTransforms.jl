@@ -56,7 +56,7 @@ export spectral_truncation,
 # ANALYSIS
 export power_spectrum
 
-# UTILS 
+# UTILS
 export wrapped_view
 
 include("aliasing.jl")

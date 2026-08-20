@@ -1,7 +1,7 @@
 # High-level tests whether time stepping in all models is differentiable.
 
 @testset "Differentiability: Timestepping ($(nameof(model_type)))" for model_type in
-        (PrimitiveWetModel,) # PrimitiveDryModel, ShallowWaterModel)
+    (PrimitiveWetModel,) # PrimitiveDryModel, ShallowWaterModel)
 
     # FiniteDifferences struggles with the NaN when we have a land-sea mask, so we test on AquaPlanets
     spectral_grid = SpectralGrid(truncation = 9, nlayers = 1, NF = Float64)
