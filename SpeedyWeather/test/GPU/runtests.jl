@@ -68,8 +68,7 @@ elseif gpu_backend === :AMDGPU
 
     include("AMDGPU/architecture.jl")
 
-    # HIP graphs are not implemented (see SpeedyTransformsAMDGPUExt.jl); this only checks
-    # the fallback warning
+    # HIP-GRAPHS ACCELERATED FOURIER TRANSFORM (AMDGPU-only feature)
     include("hip_graphs.jl")
 
 elseif gpu_backend === :Metal
