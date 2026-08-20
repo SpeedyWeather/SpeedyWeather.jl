@@ -170,9 +170,17 @@ function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2
     return nothing
 end
 
-"""3D Views need materializing on GPU. For the PrimitiveWetModel this should never be hit as 
-all transforms actually act on fused variables."""
+"""On the CPU a `reshape` of a view is a `Base.ReshapedArray` that LinearAlgebra still recognizes
+as a `StridedArray`, so `mul!` dispatches to BLAS without needing to materialize anything."""
 function _as_matrix(x::AbstractArray)
+    ndims(x) == 2 && return x, false
+    return reshape(x, size(x, 1), :), false
+end
+
+"""On the GPU non-contigous views need materializing first. For the PrimitiveWetModel this should 
+never be hit as all transforms actually act on
+fused variables."""
+function _as_matrix(x::AbstractGPUArray)
     ndims(x) == 2 && return x, false
     n = size(x, 1)
     parent(x) === x && return reshape(x, n, :), false
@@ -201,7 +209,7 @@ function transform!(                        # GRID TO SPECTRAL
     # Collapse any batch/layer dimensions into columns so the single dense matrix multiply also
     # works for n-dimensional (batched/fused) fields, not just 2D. This is not a batched matmul
     # (one matrix `M.forward` × many columns), so one big `mul!` (→ `BLAS.gemm!`) is both correct
-    # and optimal. See `_as_matrix` for why views need materializing first on GPU.
+    # and optimal. See `_as_matrix` for why GPU non-contigous views need materializing first (CPU views don't).
     field_matrix, _ = _as_matrix(field.data)                # read-only source, no writeback needed
     coeffs_matrix, coeffs_materialized = _as_matrix(coeffs.data)
     @maybe_jit M.architecture LinearAlgebra.mul!(coeffs_matrix, M.forward, field_matrix)
@@ -230,8 +238,7 @@ function transform!(                        # SPECTRAL TO GRID
     # Collapse any batch/layer dimensions into columns (see the grid→spectral transform above),
     # so the dense matrix multiply also works for n-dimensional (batched/fused) coefficients.
     # `scratch_memory` is sized (in spectral_grid.jl) to the largest batch a spectral→grid
-    # transform emits, so a column-view of the required width always fits. 
-    # We need to materialize 3D views due to GPU limitations with _as_matrix
+    # transform emits, so a column-view of the required width always fits.
     ncolumns = length(coeffs.data) ÷ size(coeffs.data, 1)
     coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), ncolumns)
     field_matrix, field_materialized = _as_matrix(field.data)
