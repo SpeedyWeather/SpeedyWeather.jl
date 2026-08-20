@@ -226,8 +226,9 @@ function timestep!(
     )
     soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, land)
     soil_temperature_tendency = get_tendency_step(vars.tendencies.land.soil_temperature, model.time_stepping, land)
+    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? 
+        get_prognostic_step(vars.prognostic.land.soil_moisture, model.time_stepping, land) : nothing
 
-    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture : nothing
     Lᵥ = latent_heat_condensation(model.atmosphere)
     Lᵢ = latent_heat_sublimation(model.atmosphere)
 
