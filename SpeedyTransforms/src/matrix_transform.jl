@@ -179,7 +179,7 @@ end
 
 """On the GPU non-contigous views need materializing first. For the PrimitiveWetModel this should 
 never be hit as all transforms actually act on
-fused variables."""
+fused variables and/or contigous views (which aren't treated as views by CUDA.jl/AMDGPU.jl/..)."""
 function _as_matrix(x::AbstractGPUArray)
     ndims(x) == 2 && return x, false
     n = size(x, 1)
