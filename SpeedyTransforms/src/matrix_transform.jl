@@ -170,6 +170,23 @@ function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2
     return nothing
 end
 
+"""On the CPU a `reshape` of a view is a `Base.ReshapedArray` that LinearAlgebra still recognizes
+as a `StridedArray`, so `mul!` dispatches to BLAS without needing to materialize anything."""
+function _as_matrix(x::AbstractArray, ::AbstractArchitecture)
+    ndims(x) == 2 && return x, false
+    return reshape(x, size(x, 1), :), false
+end
+
+"""On the GPU non-contiguous views need materializing first. For the PrimitiveWetModel this should
+never be hit as all transforms actually act on fused variables and/or contiguous views (which
+aren't treated as views by CUDA.jl/AMDGPU.jl/..)."""
+function _as_matrix(x::AbstractArray, ::GPU)
+    ndims(x) == 2 && return x, false
+    n = size(x, 1)
+    parent(x) === x && return reshape(x, n, :), false
+    return reshape(copy(x), n, :), true
+end
+
 """$(TYPEDSIGNATURES)
 Spectral transform (grid to spectral space) from n-dimensional array `field` to an n-dimensional
 array `coeffs` of spherical harmonic coefficients. Uses precomputed dense transform matrices to
@@ -192,11 +209,11 @@ function transform!(                        # GRID TO SPECTRAL
     # Collapse any batch/layer dimensions into columns so the single dense matrix multiply also
     # works for n-dimensional (batched/fused) fields, not just 2D. This is not a batched matmul
     # (one matrix `M.forward` × many columns), so one big `mul!` (→ `BLAS.gemm!`) is both correct
-    # and optimal. `reshape` on a contiguous array is zero-copy and a no-op for genuinely 2D input,
-    # so the 2D path is unaffected; the result is written in place through the shared memory.
-    coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), :)
-    field_matrix = reshape(field.data, size(field.data, 1), :)
+    # and optimal. See `_as_matrix` for why GPU non-contigous views need materializing first (CPU views don't).
+    field_matrix, _ = _as_matrix(field.data, M.architecture)                # read-only source, no writeback needed
+    coeffs_matrix, coeffs_materialized = _as_matrix(coeffs.data, M.architecture)
     @maybe_jit M.architecture LinearAlgebra.mul!(coeffs_matrix, M.forward, field_matrix)
+    coeffs_materialized && copyto!(coeffs.data, coeffs_matrix)
     return coeffs
 end
 
@@ -224,7 +241,7 @@ function transform!(                        # SPECTRAL TO GRID
     # transform emits, so a column-view of the required width always fits.
     ncolumns = length(coeffs.data) ÷ size(coeffs.data, 1)
     coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), ncolumns)
-    field_matrix = reshape(field.data, size(field.data, 1), ncolumns)
+    field_matrix, field_materialized = _as_matrix(field.data, M.architecture)
     scratch = view(scratch_memory, :, 1:ncolumns)
 
     # the result is real-valued, therefore we can split the complex multiplication
@@ -234,6 +251,7 @@ function transform!(                        # SPECTRAL TO GRID
 
     scratch .= imag.(coeffs_matrix)
     @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_imag, scratch, -1, 1)
+    field_materialized && copyto!(field.data, field_matrix)
 
     if unscale_coslat
         @maybe_jit M.architecture RingGrids._scale_lat!(field, M.coslat⁻¹)
