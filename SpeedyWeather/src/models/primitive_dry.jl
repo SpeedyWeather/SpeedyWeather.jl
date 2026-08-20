@@ -152,10 +152,10 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         TendencyVariable(:divergence, GridXYZT(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
         TendencyVariable(:temperature, GridXYZT(tg), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :grid_tendencies),
         TendencyVariable(:pressure, GridXYT(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :grid_tendencies),
-        
-        GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse=:grid),
-        GridVariable(:temperature, GridXYZT(pg), desc = "Temperature", units = "K", fuse=:grid),
-        GridVariable(:pressure, GridXYT(pg), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse=:grid),
+
+        GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse = :grid),
+        GridVariable(:temperature, GridXYZT(pg), desc = "Temperature", units = "K", fuse = :grid),
+        GridVariable(:pressure, GridXYT(pg), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :grid),
         ParameterizationVariable(:surface_pressure, Grid2D(), desc = "Surface pressure", units = "Pa"),
 
         DynamicsVariable(:uT_anomaly, GridXYZT(tg), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),

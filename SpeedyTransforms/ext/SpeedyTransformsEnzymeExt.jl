@@ -148,7 +148,7 @@ end
 # Both the FFT and the full spectral transform are LINEAR in their input array, and `S` is fixed
 # geometry carrying no tangent. The forward-mode tangent of a linear map is therefore the map
 # itself applied to the tangent: run the primal on `.val`, then the identical call on each tangent
-# `.dval`. 
+# `.dval`.
 
 # `nlayer`-th tangent of an annotated argument, `nothing` for inactive (Const) arguments.
 # Homogeneous-tuple indexing keeps this type stable for width > 1.

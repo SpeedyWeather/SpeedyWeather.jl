@@ -103,7 +103,7 @@ ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.GridVariable2D}(zeros(SG.GridVa
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
 @propagate_inbounds albedo!(ij, albedo, vars, scheme::ManualAlbedo, model) = (albedo[ij] = scheme.albedo[ij])
 
-export PrescribedAlbedo 
+export PrescribedAlbedo
 
 """Prescribed albedo field, to be used with `set!`. In contrast to `ManualAlbedo` the albedo is not 
 hold in the struct and not copied into the diagnostic variables automatically. It's expected that the

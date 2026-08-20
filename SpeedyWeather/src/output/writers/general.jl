@@ -164,8 +164,8 @@ function output!(
     ts = simulation.model.time_stepping
 
     # decide on existence of step dimension by comparing dimensionality
-    has_step = (is3D(variable) && ndims(ori) == 3) ||   # 2D/3D variables have 1/2 array dimensions respectively 
-                (is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
+    has_step = (is3D(variable) && ndims(ori) == 3) ||   # 2D/3D variables have 1/2 array dimensions respectively
+        (is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
     ori = has_step ? get_prognostic_step(ori, ts, output) : ori
     raw = on_architecture(CPU(), ori)
     RingGrids.interpolate!(var, raw, output.interpolator)
