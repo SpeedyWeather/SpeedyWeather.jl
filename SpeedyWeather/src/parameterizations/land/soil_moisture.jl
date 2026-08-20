@@ -229,7 +229,7 @@ function timestep!(
     soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, model.time_stepping, soil)
     soil_moisture_tendency = get_tendency_step(vars.tendencies.land.soil_moisture, model.time_stepping, soil)
 
-    Δt = default_time_step(model.time_stepping)
+    Δt = time_step(model.time_stepping, vars.prognostic.clock)
     ρ = model.atmosphere.water_density
     (; land_fraction) = model.land_sea_mask
 
@@ -297,6 +297,7 @@ end
 # applied after the time stepping for any kind of "hacky" correction
 function Base.filter!(vars::Variables, ::LandBucketMoisture, model::PrimitiveEquation)    
     # clamp soil moisture in [0, 1], removes excess humidity in lower layer
+    # river runoff is computed in soil moisture kernel
     m = vars.prognostic.land.soil_moisture
     m .= max.(min.(m, 1), 0)
     return nothing
