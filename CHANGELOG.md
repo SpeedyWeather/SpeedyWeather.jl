@@ -4,6 +4,8 @@
 
 - Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions [#1147](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1147)
 - Restrist Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
+- Simulation(model) as Oceananigans-like interface [#1205](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1205)
+- Restrict Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
 - Orbit and rotation time for variable length of day/year [#984](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/984)
 - Default dealiasing for non-Gaussian grids is now 3, fixing stability issues e.g. for HEALPix [#1198](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1198)
 - Work around an AMDGPU/LLVM miscompile of a triangular loop with dynamic bounds in the semi-implicit primitive-equation kernel [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
