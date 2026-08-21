@@ -239,11 +239,26 @@ which_prognostic_step(var, ::AbstractLeapfrog, ::LinearDynamicalCore)           
 which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion)     = 1  # previous
 ```
 
-`get_step(var, i)` is the low-level accessor used by all of the above; for a variable with a step
-dimension it returns a view of step `i`.
+`get_step(var, i)` is the low-level accessor used by all of the above. Which array dimension is
+the step dimension is taken from the variable's dimension tag (see
+[Array dimensions](@ref array_dimensions)): `get_step` selects the dimension tagged as time `T`,
+so for a variable tagged `XYT`, `XYZT`, `LMT` or `LMZT` it returns a view of step `i`. A variable
+*without* a time tag (`XY`, `XYZ`, `LM`, `LMZ`) has no step dimension to select from — the full
+variable is returned as a view and `i` is ignored. Model components can therefore call it
+unconditionally, whether or not the variable they are handed has steps. `get_steps(var)` returns
+all steps as a tuple of views (a 1-tuple for a variable without a step dimension), and
+`get_steps(var, Val(N))` does the same with a compile-time length, which is what Enzyme needs.
+
+!!! note "Dispatching on the presence of a step dimension"
+    The `Dims`-bounded aliases (`AbstractFieldWithTime`, `LowerTriangularArrayWithTime`) are
+    convenient for `isa` tests, but they do *not* make a method signature more specific than the
+    unbounded type, so a pair of methods written against them is ambiguous and resolved by
+    definition order. Dispatch on the concrete dimension tags (`ArrayDimensions.LMT` etc.)
+    instead, as the `get_step` methods do.
 
 ````@docs; canonical=false
 get_step
+SpeedyWeather.get_steps
 ````
 
 When writing a new time stepper you implement the `*_steps` methods (how many steps to store), the
