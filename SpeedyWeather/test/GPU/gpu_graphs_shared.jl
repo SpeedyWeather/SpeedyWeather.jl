@@ -7,7 +7,7 @@ function test_gpu_graphs(ext, prefix)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
         if ext !== nothing
             spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
-            model = PrimitiveWetModel(spectral_grid)
+            model = PrimitiveWetModel(spectral_grid; spectral_transform = SpectralTransform(spectral_grid))
             simulation = initialize!(model)
 
             ext.clear_fourier_graph_cache!()
@@ -80,7 +80,7 @@ function test_gpu_graphs(ext, prefix)
     #  2. `run_graph!` warms up and then captures; capture only RECORDS (it does not execute), so
     #     the warmup alone produces the call's result. Launching the graph as well would apply the
     #     work twice — invisible for an overwriting loop, but a double-accumulate for `add=true`.
-    @testset "$prefix Graphs: add=true accumulates exactly once and uses its own graph" begin
+    return @testset "$prefix Graphs: add=true accumulates exactly once and uses its own graph" begin
         if ext !== nothing
             spectral_grid = SpectralGrid(; truncation = 16, nlayers = 4, architecture = SpeedyWeather.GPU())
             S = SpectralTransform(spectral_grid)

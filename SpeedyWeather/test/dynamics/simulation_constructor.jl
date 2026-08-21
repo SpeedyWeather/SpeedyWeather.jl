@@ -1,5 +1,5 @@
 @testset "Simulation(model) equals initialize!(model)" begin
-    spectral_grid = SpectralGrid(truncation=6, nlayers=1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
 
     # Simulation(model) is an alias for initialize!(model)
     model = BarotropicModel(spectral_grid)

@@ -5,7 +5,7 @@
 # and SpeedyTransformsAMDGPUExt.jl). See SpeedyTransformsCUDAExt.jl for the rationale of
 # GPU-graphs acceleration itself.
 #
-# TODO: This code ended up in src/ by accident once and reportedly broke Enzyme's CPU-only 
+# TODO: This code ended up in src/ by accident once and reportedly broke Enzyme's CPU-only
 # autodiff tests. Confirm and fix underlying issue.
 #
 # The only thing that differs between backends is the graph capture/instantiate/launch API
@@ -156,8 +156,8 @@ function build_cache(::Type{E}, S::SpectralTransform, nlayers::Integer) where {E
     dev(x) = on_architecture(arch, x)              # device-agnostic transfer (works for any GPU backend)
     packed_real = dev(zeros(NF, sum(block_real)))
     packed_complex = dev(zeros(Complex{NF}, sum(block_complex)))
-    real_view = [reshape(view(packed_real, real_offset[j] + 1:real_offset[j] + block_real[j]), nlons[j], nlayers) for j in 1:nlat_half]
-    complex_view = [reshape(view(packed_complex, complex_offset[j] + 1:complex_offset[j] + block_complex[j]), nfreqs[j], nlayers) for j in 1:nlat_half]
+    real_view = [reshape(view(packed_real, (real_offset[j] + 1):(real_offset[j] + block_real[j])), nlons[j], nlayers) for j in 1:nlat_half]
+    complex_view = [reshape(view(packed_complex, (complex_offset[j] + 1):(complex_offset[j] + block_complex[j])), nfreqs[j], nlayers) for j in 1:nlat_half]
 
     return GPUFourierGraphCache(
         packed_real, packed_complex, real_view, complex_view,

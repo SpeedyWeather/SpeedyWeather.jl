@@ -1,6 +1,6 @@
 # Function barrier for batched or serial transforms. FFTW/cuFFT plans bake the batch dim K
 # into the plan, so we look up a pre-planned bundle by K = size(field, 2) and fall back to
-# the serial path (K=1 plan, looped) when no batched plan exists for that K. The batch dim 
+# the serial path (K=1 plan, looped) when no batched plan exists for that K. The batch dim
 # K is the sum of number of vertical layers batched together in a single FFT plan.
 function _fourier!(f_north, f_south, field::AbstractField, S::SpectralTransform)
     K = size(field, 2)
@@ -141,9 +141,11 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     @boundscheck haskey(S.rfft_plans_batched, nlayers) || throw(DimensionMismatch(S, field))
     # scratch dim 2 is the per-call capacity (= max(planned_K) on CPU, nlayers elsewhere);
     # allow it to exceed nlayers so the bound passes for both full-K and chunked calls.
-    @boundscheck (size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
-                  size(f_north, 3) == nlat_half && size(f_north, 2) >= nlayers) ||
-                 throw(DimensionMismatch(S, field))
+    @boundscheck (
+        size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
+            size(f_north, 3) == nlat_half && size(f_north, 2) >= nlayers
+    ) ||
+        throw(DimensionMismatch(S, field))
 
     return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
@@ -181,9 +183,11 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     @assert eltype(field) == eltype(S) "Number format of grid $(eltype(field)) and SpectralTransform $(eltype(S)) need too match."
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, field))
-    @boundscheck (size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
-                  size(f_north, 3) == nlat_half && size(f_north, 2) >= nlayers) ||
-                 throw(DimensionMismatch(S, field))
+    @boundscheck (
+        size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
+            size(f_north, 3) == nlat_half && size(f_north, 2) >= nlayers
+    ) ||
+        throw(DimensionMismatch(S, field))
 
     return @inbounds for (k, k_grid) in zip(1:nlayers, eachlayer(field))
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
@@ -221,9 +225,11 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
 
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
     @boundscheck haskey(S.brfft_plans_batched, nlayers) || throw(DimensionMismatch(S, field))   # otherwise FFTW complains
-    @boundscheck (size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
-                  size(g_north, 3) == nlat_half && size(g_north, 2) >= nlayers) ||
-                 throw(DimensionMismatch(S, field))
+    @boundscheck (
+        size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
+            size(g_north, 3) == nlat_half && size(g_north, 2) >= nlayers
+    ) ||
+        throw(DimensionMismatch(S, field))
 
     return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
@@ -260,9 +266,11 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
 
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, field))     # otherwise FFTW complains
-    @boundscheck (size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
-                  size(g_north, 3) == nlat_half && size(g_north, 2) >= nlayers) ||
-                 throw(DimensionMismatch(S, field))
+    @boundscheck (
+        size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
+            size(g_north, 3) == nlat_half && size(g_north, 2) >= nlayers
+    ) ||
+        throw(DimensionMismatch(S, field))
 
     return @inbounds for (k, k_grid) in zip(1:nlayers, eachlayer(field))
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
@@ -309,15 +317,19 @@ function plan_FFTs(
     nfreqj(j) = nlons[j] ÷ 2 + 1
 
     # SERIAL (K=1, 1-D) plans — always built. Comprehensions give concretely-typed `Vector`s.
-    rfft_plan_serial = [AbstractFFTs.plan_rfft(view_only_on_cpu(fake_grid_data.data, rings[j], 1), 1)
-                        for j in 1:nlat_half]
-    brfft_plan_serial = [AbstractFFTs.plan_brfft(view_only_on_cpu(scratch_memory_north, 1:nfreqj(j), 1, j), nlons[j], 1)
-                         for j in 1:nlat_half]
+    rfft_plan_serial = [
+        AbstractFFTs.plan_rfft(view_only_on_cpu(fake_grid_data.data, rings[j], 1), 1)
+            for j in 1:nlat_half
+    ]
+    brfft_plan_serial = [
+        AbstractFFTs.plan_brfft(view_only_on_cpu(scratch_memory_north, 1:nfreqj(j), 1, j), nlons[j], 1)
+            for j in 1:nlat_half
+    ]
 
     # BATCHED (K>1, 2-D) plans — a `Dict{Int, Vector{P2}}` keyed by K with CONCRETE plan type P2.
     # The Dict value type is fixed up-front from a throwaway 2-column plan (a plan's Julia type depends
     # only on eltype/ndims/region, not on the array size), so the Dict stays concretely typed even when
-    # empty (nlayers==1). 
+    # empty (nlayers==1).
     NF_real = eltype(fake_grid_data.data)
     tmp_real = similar(fake_grid_data.data, NF_real, (nlons[1], 2))
     tmp_complex = similar(scratch_memory_north, Complex{NF_real}, (nfreqj(1), 2))
@@ -327,10 +339,14 @@ function plan_FFTs(
     brfft_plans_batched = Dict{Int, BVec}()
     for K in planned_K
         K > 1 || continue                          # K=1 handled by the serial plans above
-        rfft_plans_batched[K] = [AbstractFFTs.plan_rfft(view_only_on_cpu(fake_grid_data.data, rings[j], 1:K), 1)
-                                 for j in 1:nlat_half]
-        brfft_plans_batched[K] = [AbstractFFTs.plan_brfft(view_only_on_cpu(scratch_memory_north, 1:nfreqj(j), 1:K, j), nlons[j], 1)
-                                  for j in 1:nlat_half]
+        rfft_plans_batched[K] = [
+            AbstractFFTs.plan_rfft(view_only_on_cpu(fake_grid_data.data, rings[j], 1:K), 1)
+                for j in 1:nlat_half
+        ]
+        brfft_plans_batched[K] = [
+            AbstractFFTs.plan_brfft(view_only_on_cpu(scratch_memory_north, 1:nfreqj(j), 1:K, j), nlons[j], 1)
+                for j in 1:nlat_half
+        ]
     end
 
     return rfft_plan_serial, brfft_plan_serial, rfft_plans_batched, brfft_plans_batched
