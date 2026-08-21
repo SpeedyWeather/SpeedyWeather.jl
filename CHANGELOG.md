@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Enable HIP-graphs acceleration of the batched Fourier transform for AMDGPU, mirroring the existing CUDA-graphs implementation [#TODO](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/TODO)
+- Enable HIP-graphs acceleration of the batched Fourier transform for AMDGPU, mirroring the existing CUDA-graphs implementation [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
 - Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions [#1147](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1147)
 - Restrist Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
 - Simulation(model) as Oceananigans-like interface [#1205](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1205)
