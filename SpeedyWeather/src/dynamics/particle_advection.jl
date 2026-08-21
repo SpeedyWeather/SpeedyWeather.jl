@@ -40,9 +40,6 @@ export ParticleAdvection2D
     "[OPTION] Advect with velocities from this vertical layer index"
     layer::IntType = 1
 
-    "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
-    Δt::Base.RefValue{NF} = Ref(zero(NF))
-
     "[DERIVED] Interpolation geometry used during advection"
     geometry::GeometryType
 end
@@ -68,9 +65,6 @@ export ParticleAdvection3D
     "[OPTION] Execute particle advection every n timesteps"
     every_n_time_steps::IntType = 6
 
-    "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
-    Δt::Base.RefValue{NF} = Ref(zero(NF))
-
     "[DERIVED] Interpolation geometry used during advection"
     geometry::GeometryType
 end
@@ -80,55 +74,35 @@ function ParticleAdvection3D(SG::SpectralGrid; kwargs...)
     return ParticleAdvection3D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
 end
 
-function variables(P::ParticleAdvection2D)
-    (; nparticles) = P
+variables(P::AbstractParticleAdvection) = variables(typeof(P), P.nparticles)
+
+function variables(::Type{<:ParticleAdvection2D}, nparticles)
     return (
         PrognosticVariable(:particles, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
         ParticleVariable(:locations, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
+
         ParticleVariable(:u, VectorDim(nparticles), desc = "Zonal velocity at particle location", units = "m/s"),
         ParticleVariable(:v, VectorDim(nparticles), desc = "Meridional velocity at particle location", units = "m/s"),
-        ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity in σ coordinate at particle location", units = "1"),
         ParticleVariable(:locator, LocatorDim(nparticles), desc = "Vertical σ coordinate of particle location", units = "1"),
     )
 end
 
-function variables(P::ParticleAdvection3D)
-    (; nparticles) = P
+# same as 2D but add vertical velocity at particle location
+function variables(::Type{<:ParticleAdvection3D}, nparticles)
     return (
-        PrognosticVariable(:particles, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
-        ParticleVariable(:locations, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
-        ParticleVariable(:u, VectorDim(nparticles), desc = "Zonal velocity at particle location", units = "m/s"),
-        ParticleVariable(:v, VectorDim(nparticles), desc = "Meridional velocity at particle location", units = "m/s"),
+        variables(ParticleAdvection2D, nparticles)...,
         ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity dσ/dt at particle location", units = "1/s"),
-        ParticleVariable(:locator, LocatorDim(nparticles), desc = "Horizontal interpolation locator", units = "1"),
     )
 end
 
-function initialize!(
-        particle_advection::ParticleAdvection2D,
-        model::AbstractModel,
-    )
+function initialize!(particle_advection::ParticleAdvection2D, model::AbstractModel)
     (; nlayers) = model.spectral_grid
     (; layer) = particle_advection
     nlayers < layer && @warn "Particle advection on layer $layer on spectral grid with nlayers=$nlayers."
-
-    (; every_n_time_steps) = particle_advection
-    # Δt [˚*s/m] is scaled by radius to convert more easily from velocity [m/s]
-    # to [˚/s] for particle locations in degree
-    particle_advection.Δt[] = every_n_time_steps * model.time_stepping.Δt
-    particle_advection.Δt[] *= (360 / 2π)
-    return particle_advection
+   return nothing
 end
 
-function initialize!(
-        particle_advection::ParticleAdvection3D,
-        model::AbstractModel,
-    )
-    (; every_n_time_steps) = particle_advection
-    particle_advection.Δt[] = every_n_time_steps * model.time_stepping.Δt
-    particle_advection.Δt[] *= (360 / 2π)
-    return particle_advection
-end
+initialize!(::ParticleAdvection3D, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -138,19 +112,7 @@ an equal-area uniformity."""
 function initialize!(
         particles::AbstractVector{P},
         vars::Variables,
-        particle_advection::ParticleAdvection2D,
-        model::AbstractModel,
-    ) where {P <: Particle}
-    particles .= on_architecture(architecture(particles), rand(P, length(particles)))
-    return particles
-end
-
-"""$(TYPEDSIGNATURES)
-Initialize 3D particle locations: random in lon/lat (cos-distributed), uniform in σ."""
-function initialize!(
-        particles::AbstractVector{P},
-        vars::Variables,
-        particle_advection::ParticleAdvection3D,
+        particle_advection::AbstractParticleAdvection,
         model::AbstractModel,
     ) where {P <: Particle}
     particles .= on_architecture(architecture(particles), rand(P, length(particles)))
@@ -181,13 +143,13 @@ function initialize!(
     (; geometry) = particle_advection
 
     # interpolate initial velocity on initial locations
-    lons = vars.particles.u    # reuse u,v arrays as only used for u, v
-    lats = vars.particles.v    # after update_locator!
+    lons = vars.particles.u                     # reuse u,v arrays as only used for u, v
+    lats = vars.particles.v                     # after update_locator!
     σ = Vector(model.geometry.σ_levels_full)[k] # explicitly on CPU
 
     # modulo particles and extract their coordinates
     launch!(
-        architecture(particles), LinearWorkOrder, (length(particles),), _initialize_particles_kernel!,
+        architecture(particles), LinearWorkOrder, (length(particles),), _initialize_2D_particles_kernel!,
         particles, lons, lats, σ
     )
 
@@ -200,7 +162,8 @@ function initialize!(
 end
 
 # Kernel to modulo particles and extract their coordinates
-@kernel inbounds = true function _initialize_particles_kernel!(
+# set every particle to vertical σ provided
+@kernel inbounds = true function _initialize_2D_particles_kernel!(
         particles, lons, lats, σ
     )
     i = @index(Global, Linear)
@@ -221,25 +184,32 @@ function initialize!(
         particle_advection::ParticleAdvection3D,
         model::AbstractModel,
     ) where {P <: Particle}
+
     length(particles) == 0 && return nothing
+
+    # index step dimension according to time stepper
     (; time_stepping) = model
     l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
-    u_3d = field_view(vars.grid.u, :, :, l)
+    u_3d = field_view(vars.grid.u, :, :, l)     # prognostic variables have a step dimension
     v_3d = field_view(vars.grid.v, :, :, l)
-    w_3d = vars.dynamics.w
+    w_3d = vars.dynamics.w                      # vertical velocity is diagnostic in hydrostatic models
+
+    # interpolate initial velocity on initial locations
     σ_levels_full = model.geometry.σ_levels_full
     (; locator) = vars.particles
     (; geometry) = particle_advection
-    lons = vars.particles.u
-    lats = vars.particles.v
+    lons = vars.particles.u                     # reuse u,v arrays as only used for u, v
+    lats = vars.particles.v                     # after update_locator!
     launch!(
         architecture(particles), LinearWorkOrder, (length(particles),),
         _initialize_3D_particles_kernel!, particles, lons, lats
     )
+
     RingGrids.update_locator!(locator, geometry, lons, lats)
     u0 = vars.particles.u
     v0 = vars.particles.v
     w0 = vars.particles.w
+
     interpolate_3D!(u0, u_3d, locator, geometry, particles, σ_levels_full)
     interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full)
     interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_full)
@@ -277,15 +247,20 @@ function particle_advection!(
     # already contains u, v at i=8, 16, 24, etc as executed after `transform!`
     # even though the clock hasn't be step forward yet, this means time = time + Δt here
 
-    # should not be called on the 1st step in first_timesteps, which is excluded
-    # with a lf2 == 2 check before this function is called
+    # should not be called on the 1st Euler step of Leapfrog, which is excluded
+    # by using `clock.time_step_counter` (which doesn't count that spin up step)
+    # as long as `every_n_time_steps` > 1
 
     # escape immediately if advection not on this timestep
     n = particle_advection.every_n_time_steps
     clock.time_step_counter % n == (n - 1) || return nothing
+    NF = eltype(eltype(particles))      # number format used for particle locations
+    (; radius) = model.planet
 
     # HEUN: PREDICTOR STEP, use u, v at previous time step and location
-    Δt = particle_advection.Δt[]        # time step [s*˚/m]
+    # calculate time step on the fly
+    Δt = model.time_stepping.Δt                 # time step [s]
+    Δt *= n * convert(NF, 180 / (π * radius))   # scale to [s*°/m] to obtain [˚] when multiplied with velocity in [m/s]
     Δt_half = Δt / 2                    # /2 because Heun is average of Euler+corrected step
 
     u_old = vars.particles.u            # from previous time step and location
@@ -346,9 +321,13 @@ function particle_advection!(
     n = particle_advection.every_n_time_steps
     clock.time_step_counter % n == (n - 1) || return nothing
 
-    Δt = particle_advection.Δt[]
-    Δt_half = Δt / 2
-    Δt_vert = Δt * oftype(Δt, π / 180)  # convert [s*˚/m] → [s] for dσ = w[s⁻¹]*Δt_vert[s]
+    # Calculate time step on the fly
+    # horizontal time step, scale to [s*°/m] to obtain [˚] when multiplied with velocity in [m/s]
+    Δt = model.time_stepping.Δt * n * convert(NF, 180 / (π * radius))
+    Δt_half = Δt / 2            # /2 because Heun is average of Euler+corrected step
+
+    # vertical time step without the degree/radius conversion for dσ = w[s⁻¹]*Δt_vert[s]
+    Δt_vert = model.time_stepping.Δt * n
     Δt_vert_half = Δt_vert / 2
 
     u_old = vars.particles.u
@@ -396,13 +375,13 @@ function particle_advection!(
 end
 
 # σ outside [σ_levels_full[1], σ_levels_full[end]] is pinned, not extrapolated
-@inline function find_vertical_bracket(σ::NF, σ_levels_full) where NF
+@inline function find_vertical_bracket(σ::NF, σ_levels_full) where {NF}
     n = length(σ_levels_full)
     k_lo = 1
     for k in 1:(n - 1)
         σ_levels_full[k] <= σ && (k_lo = k)
     end
-    k_hi = k_lo + 1 
+    k_hi = k_lo + 1
     Δσ = σ_levels_full[k_hi] - σ_levels_full[k_lo]
     α = clamp((σ - σ_levels_full[k_lo]) / Δσ, zero(NF), one(NF))
     return k_lo, k_hi, α
@@ -462,26 +441,28 @@ end
         particle::Particle{NF},                 # particle to advect
         u::NF,                                  # zonal velocity [m/s]
         v::NF,                                  # meridional velocity [m/s]
-        dt::NF,                                 # scaled time step [s*˚/m]
+        Δt::NF,                                 # scaled time step [s*˚/m]
     ) where {NF}
 
-    dlat = v * dt                               # increment in latitude [˚N]
+    dlat = v * Δt                               # increment in latitude [˚N]
     coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
-    dlon = u * dt / coslat                      # increment in longitude [˚E]
+    dlon = u * Δt / coslat                      # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
 end
 
 @inline function advect_3D(
         particle::Particle{NF},
-        u::NF, v::NF, w::NF,
-        dt::NF,         # horizontal: [s*˚/m]
-        dt_vert::NF,    # vertical: [s]; dσ = w[s⁻¹] * dt_vert[s]
+        u::NF,
+        v::NF,
+        w::NF,
+        Δt::NF,         # horizontal: [s*˚/m]
+        Δt_vert::NF,    # vertical: [s]; dσ = w[s⁻¹] * dt_vert[s]
     ) where {NF}
 
-    dlat = v * dt
+    dlat = v * Δt
     coslat = max(cosd(particle.lat), eps(NF))
-    dlon = u * dt / coslat
-    dσ = w * dt_vert
+    dlon = u * Δt / coslat
+    dσ = w * Δt_vert
     return mod(move(particle, dlon, dlat, dσ))
 end
 
@@ -529,8 +510,8 @@ end
     i = @index(Global, Linear)
 
     if isactive(particles[i])
-        particles[i]  = advect_3D(particles[i],  u_old[i], v_old[i], w_old[i], Δt_half, Δt_vert_half)
-        locations[i]  = advect_3D(particles[i],  u_old[i], v_old[i], w_old[i], Δt_half, Δt_vert_half)
+        particles[i] = advect_3D(particles[i], u_old[i], v_old[i], w_old[i], Δt_half, Δt_vert_half)
+        locations[i] = advect_3D(particles[i], u_old[i], v_old[i], w_old[i], Δt_half, Δt_vert_half)
         lons[i] = locations[i].lon
         lats[i] = locations[i].lat
     end
