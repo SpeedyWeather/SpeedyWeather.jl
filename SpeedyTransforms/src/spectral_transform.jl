@@ -24,6 +24,7 @@ struct SpectralTransform{
         BRFFTSerialType,            # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D inverse plans)
         RFFTBatchedType,            # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D forward)
         BRFFTBatchedType,           # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D inverse)
+        B2,                         # <: Bool
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -102,6 +103,13 @@ struct SpectralTransform{
     # Only effective when the CUDA extension is loaded; ignored on CPU. On AMDGPU this is
     # always treated as the generic path, with a one-time warning if set to `true`.
     gpu_graphs::Bool
+
+    # METAL: MERGE HEMISPHERES
+    # toggle for merging the northern and southern hemisphere's per-ring FFTs into a
+    # single shared Metal command buffer/commit (`true`) instead of one commit per
+    # hemisphere (`false`).
+    metal_merge_hemispheres::B2
+
 end
 
 # eltype of a transform is the number format used within
@@ -123,6 +131,7 @@ function SpectralTransform(
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
         gpu_graphs::Bool = true,                                             # use GPU-graphs accelerated Fourier path (CUDA only; not implemented for AMDGPU)
+        metal_merge_hemispheres::Bool = true,     # merge north/south into one Metal command buffer (Metal only); faster at low-mid trunc, slower at high trunc    
     )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
     # per-layer fallback used by `_fourier_serial!`).
@@ -280,6 +289,7 @@ function SpectralTransform(
         typeof(brfft_plan_serial),
         typeof(rfft_plans_batched),
         typeof(brfft_plans_batched),
+        typeof(metal_merge_hemispheres),
     }(
         architecture,
         spectrum, nfreq_max,
@@ -298,6 +308,7 @@ function SpectralTransform(
         eigenvalues, eigenvalues⁻¹,
         gradients,
         gpu_graphs,
+        metal_merge_hemispheres,
     )
 end
 
@@ -543,7 +554,8 @@ function _transform_grid!(
     # Checked **before** the boundscheck below so chunking can handle K > S.nlayers
     K = size(field, 2)
     if _needs_chunking(K, S)
-        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat); return field
+        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
+        return field
     end
     return _transform_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
 end
@@ -602,7 +614,8 @@ function _transform_spec!(
     # see comment there.
     K = size(field, 2)
     if _needs_chunking(K, S)
-        _transform_chunked!(coeffs, field, scratch_memory, S); return coeffs
+        _transform_chunked!(coeffs, field, scratch_memory, S)
+        return coeffs
     end
     return _transform_nonchunked!(coeffs, field, scratch_memory, S)
 end
