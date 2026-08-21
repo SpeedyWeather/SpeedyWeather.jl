@@ -338,6 +338,17 @@ function (::Type{S})(
 end
 
 """$(TYPEDSIGNATURES)
+Chooses the transform based on resolution and architecture. For low-resolution
+GPU a MatrixSpectralTransform is returned, otherwise the SpectralTransform."""
+function WhichTransform(spectral_grid::SpectralGrid; kwargs...)
+    if (spectral_grid.truncation <= 64 && spectral_grid.architecture isa GPU) || spectral_grid.architecture isa ReactantDevice
+        return MatrixSpectralTransform(spectral_grid; kwargs...)
+    else
+        return SpectralTransform(spectral_grid; kwargs...)
+    end
+end
+
+"""$(TYPEDSIGNATURES)
 Default `transform_batch` for a `SpectralGrid`. Architecture-dependent because:
 
 - On CPU, batched FFT plans give negligible speedup, default: `[1, nlayers]` — matches the pre-multiplexing system.
