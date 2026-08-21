@@ -1,4 +1,10 @@
-import .SpeedyWeather: get_step, get_steps, nsteps, get_nsteps, DEFAULT_NSTEPS,
+# Resolve SpeedyWeather from wherever it is already loaded: `parentmodule(SpectralGrid)`
+# works whether the module was brought in as `using SpeedyWeather` (from the environment) or
+# as `using .SpeedyWeather` / `include`d into Main, and never triggers a second load of the
+# package. SpectralGrid is exported, so it is in scope via the `using` in runtests.jl.
+const SW = parentmodule(SpectralGrid)
+
+using .SW: get_step, get_steps, nsteps, get_nsteps, DEFAULT_NSTEPS,
     which_step, which_prognostic_step, which_tendency_step,
     get_prognostic_step, get_tendency_step,
     prognostic_steps, prognostic_grid_steps, prognostic_spectral_steps,
@@ -169,7 +175,7 @@ end
     for Model in (ShallowWaterModel, PrimitiveDryModel, PrimitiveWetModel)
         model = Model(spectral_grid, time_stepping = Leapfrog(spectral_grid))
         leapfrog = model.time_stepping
-        @test leapfrog isa SpeedyWeather.AbstractLeapfrog
+        @test leapfrog isa SW.AbstractLeapfrog
 
         nsteps = get_nsteps(leapfrog, model)
         @test nsteps.prognostic_spectral == 2
