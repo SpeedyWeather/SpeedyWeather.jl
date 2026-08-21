@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- WhichTransform for default MatrixSpectralTransform on GPU at low resolution [#1194](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1194)
 - Restructed GPU tests, and fixed an issue for which `MatrixSpectralTransform` failed on views [#1201](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1201)
 - Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions [#1147](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1147)
 - Restrist Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
