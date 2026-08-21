@@ -149,7 +149,7 @@ function initialize!(
 
     # modulo particles and extract their coordinates
     launch!(
-        architecture(particles), LinearWorkOrder, (length(particles),), _initialize_2D_particles_kernel!,
+        architecture(particles), LinearWorkOrder, (length(particles),), _initialize_particles_kernel!,
         particles, lons, lats, σ
     )
 
@@ -161,16 +161,20 @@ function initialize!(
     return nothing
 end
 
+# Helper for kernels, 2D: pin particle to fixed σ layer; 3D: leave σ unchanged
+prepare_particle(particle, σ::Real) = set(particle; σ = σ)
+prepare_particle(particle, ::Nothing) = particle
+
 # Kernel to modulo particles and extract their coordinates
 # set every particle to vertical σ provided
-@kernel inbounds = true function _initialize_2D_particles_kernel!(
+@kernel inbounds = true function _initialize_particles_kernel!(
         particles, lons, lats, σ
     )
     i = @index(Global, Linear)
 
     # modulo all particles here
     # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
-    particles[i] = mod(set(particles[i]; σ = σ))
+    particles[i] = mod(prepare_particle(particles[i], σ))
     lons[i] = particles[i].lon
     lats[i] = particles[i].lat
 end
@@ -202,7 +206,7 @@ function initialize!(
     lats = vars.particles.v                     # after update_locator!
     launch!(
         architecture(particles), LinearWorkOrder, (length(particles),),
-        _initialize_3D_particles_kernel!, particles, lons, lats
+        _initialize_particles_kernel!, particles, lons, lats, nothing
     )
 
     RingGrids.update_locator!(locator, geometry, lons, lats)
@@ -214,16 +218,6 @@ function initialize!(
     interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full)
     interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_full)
     return nothing
-end
-
-# Modulo particles and extract horizontal coordinates; σ is each particle's own
-@kernel inbounds = true function _initialize_3D_particles_kernel!(
-        particles, lons, lats
-    )
-    i = @index(Global, Linear)
-    particles[i] = mod(particles[i])
-    lons[i] = particles[i].lon
-    lats[i] = particles[i].lat
 end
 
 function particle_advection!(
@@ -320,6 +314,8 @@ function particle_advection!(
 
     n = particle_advection.every_n_time_steps
     clock.time_step_counter % n == (n - 1) || return nothing
+    NF = eltype(eltype(particles))
+    (; radius) = model.planet
 
     # Calculate time step on the fly
     # horizontal time step, scale to [s*°/m] to obtain [˚] when multiplied with velocity in [m/s]
