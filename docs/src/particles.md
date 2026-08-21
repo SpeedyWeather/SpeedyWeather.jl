@@ -306,3 +306,38 @@ nothing # hide
 
 For more advanced visualisations of the particle tracker see the
 [TravellingSailorProblem.jl](https://github.com/SpeedyWeather/TravellingSailorProblem.jl).
+
+## Backwards particle advection
+
+Particles can be advected backwards in time by setting `backwards=true` in
+[`ParticleAdvection2D`](@ref). This is useful for backtracking where particles
+came from given a known final state. Combined with `dynamics=false` on
+`BarotropicModel` or `ShallowWaterModel`, the velocity field is frozen in
+time — no dynamics are computed, only the particle positions are updated each
+step.
+
+A typical workflow is to first run the model forward to develop a flow field,
+then freeze it and trace particles backwards from their final locations:
+
+```@example backwards_particles
+using SpeedyWeather
+
+spectral_grid = SpectralGrid(nlayers=1)
+
+# Phase 1: run the dynamics forward to develop a flow field (no particles)
+model = BarotropicModel(spectral_grid)
+simulation = initialize!(model)
+run!(simulation, period=Day(5))
+
+# Phase 2: freeze that flow field and trace particles backwards
+particle_advection = ParticleAdvection2D(spectral_grid, nparticles=50, backwards=true)
+model_back = BarotropicModel(spectral_grid; particle_advection, dynamics=false)
+simulation_back = initialize!(model_back)
+
+# seed the frozen spectral state from the forward run's end state and update the grid
+simulation_back.variables.prognostic.vorticity .= simulation.variables.prognostic.vorticity
+transform!(simulation_back.variables, model_back)
+
+run!(simulation_back, period=Day(5))
+simulation_back.variables.particles.locations
+```

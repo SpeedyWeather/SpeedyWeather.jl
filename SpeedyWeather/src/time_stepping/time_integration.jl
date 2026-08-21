@@ -39,10 +39,12 @@ function time_step!(
     (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
     reset_tendencies!(vars, time_stepping)      # set the tendencies back to zero for accumulation
 
-    dynamics_tendencies!(vars, model)
-    diffusion_and_implicit!(vars, model)        # dispatch over time stepper and implicit so that the order can be changed
-    update_prognostic!(vars, model)             # step prognostic variables forward
-    transform!(vars, model)                     # new spectral state to grid
+    if model.dynamics
+        dynamics_tendencies!(vars, model)
+        diffusion_and_implicit!(vars, model)    # dispatch over time stepper and implicit so that the order can be changed
+        update_prognostic!(vars, model)         # step prognostic variables forward
+        transform!(vars, model)                 # new spectral state to grid
+    end
     particle_advection!(vars, model)            # TODO move up?
 
     return nothing
