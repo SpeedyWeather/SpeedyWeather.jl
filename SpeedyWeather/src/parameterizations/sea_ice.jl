@@ -58,7 +58,7 @@ function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::P
         vars.scratch.grid.a_2D
 
     # sea ice concentration written as \aleph yay!
-    dℵ = get_tendency_step(vars.tendencies.ocean.sea_ice_concentration, model.time_stepping, sea_ice_model)  
+    dℵ = get_tendency_step(vars.tendencies.ocean.sea_ice_concentration, model.time_stepping, sea_ice_model)
     sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, model.ocean)
     
     @boundscheck size(dsst) == size(dℵ) == size(sst) || throw(BoundsError)
@@ -87,7 +87,7 @@ end
         # ice-sst flux as a relaxation term wrt to freezing, with different melt/freeze rates
         # include 1/Δt here as SST below freezing is proportional to Δt
         dT = sst[ij] - T_freeze                     # uncorrected difference to freezing temperature
-        dsst[ij] -= min(dT, 0)/Δt                   # increase SST to freezing temperature
+        dsst[ij] -= min(dT, 0) / Δt                 # increase SST to freezing temperature
         F = -m * max(dT, 0) - f / Δt * min(dT, 0)   # melt if above freezing, freeze if below
         dℵ[ij] = F                                  # sea ice tendency
     end

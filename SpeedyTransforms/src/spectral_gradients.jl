@@ -73,10 +73,10 @@ end
     ) where {mode}
     return if flipsign
         add ? _divergence!(KernelOP{mode, true, true}(), div, u, v, S; kwargs...) :
-              _divergence!(KernelOP{mode, true, false}(), div, u, v, S; kwargs...)
+            _divergence!(KernelOP{mode, true, false}(), div, u, v, S; kwargs...)
     else
         add ? _divergence!(KernelOP{mode, false, true}(), div, u, v, S; kwargs...) :
-              _divergence!(KernelOP{mode, false, false}(), div, u, v, S; kwargs...)
+            _divergence!(KernelOP{mode, false, false}(), div, u, v, S; kwargs...)
     end
 end
 

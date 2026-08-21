@@ -342,7 +342,7 @@ function forcing!(
     )
     temp = get_prognostic_step(vars.grid.temperature, model.time_stepping, forcing)
     temp_tend = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, forcing)
-    
+
     # logarithm of surface pressure
     log_pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, forcing)
 
