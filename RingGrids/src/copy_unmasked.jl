@@ -44,7 +44,7 @@ the ring-grid `Field` `dst` at the positions given by `indices`. Grid points not
 by `indices` are left unchanged. `indices` is typically produced by [`unmasked_indices`](@ref)."""
 function copy_unmasked!(dst::AbstractField, src::AbstractArray, indices)
     arch = architecture(src)
-    
+
     @boundscheck size(indices, 1) == size(src, 1) || throw(BoundsError(indices, dst))
     @boundscheck size(src, 1) <= size(dst, 1) || throw(BoundsError(indices, dst))
 

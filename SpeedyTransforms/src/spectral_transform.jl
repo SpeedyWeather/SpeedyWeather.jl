@@ -96,11 +96,13 @@ struct SpectralTransform{
 
     gradients::GradientType                     # precomputed gradient and integration matrices
 
-    # CUDA GRAPHS
-    # toggle for the CUDA-Graphs accelerated batched Fourier transform (also gates the
-    # Metal fused-Fourier path, see SpeedyTransformsMetalExt.jl). Set to `false` to fall
-    # back to the generic (allocating) per-ring GPU loop. Meaningless for CPU.
-    cuda_graphs::Bool
+    # GPU GRAPHS (CUDA graphs only; HIP graphs for AMDGPU are not implemented)
+    # toggle for the GPU-graphs accelerated batched Fourier transform
+    # Set to `false` to fall back to the generic (allocating) per-ring GPU path.
+    # Only effective when the CUDA extension is loaded; ignored on CPU. On AMDGPU this is
+    # always treated as the generic path, with a one-time warning if set to `true`.
+    gpu_graphs::Bool
+
 end
 
 # eltype of a transform is the number format used within
@@ -279,6 +281,7 @@ function SpectralTransform(
         typeof(brfft_plan_serial),
         typeof(rfft_plans_batched),
         typeof(brfft_plans_batched),
+        typeof(metal_merge_hemispheres),
     }(
         architecture,
         spectrum, nfreq_max,
@@ -296,7 +299,8 @@ function SpectralTransform(
         solid_angles,
         eigenvalues, eigenvalues⁻¹,
         gradients,
-        cuda_graphs,
+        gpu_graphs,
+        metal_merge_hemispheres,
     )
 end
 
@@ -423,14 +427,14 @@ end
 
 # Layer size of scratch memory (north/south columns in `ScratchMemory`).
 # On CPU we typically use `nlayers` only (largest allocated plan and physical layers of the model)
-# On GPU we batch transforms much more, and need to use a scratch memory in 
+# On GPU we batch transforms much more, and need to use a scratch memory in
 # accordance with the largest batch which is `nlayers` in this case and ISN'T equal to the physical layers of the model
 _scratch_nlayers(::AbstractCPU, ::Integer, planned_K::AbstractVector{<:Integer}) = maximum(planned_K)
 _scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:Integer}) = nlayers
 
-# Return true if a call with `K` layers should be split into chunks that are 
-# executed sequentially. 
-# Architecture-dispatched: 
+# Return true if a call with `K` layers should be split into chunks that are
+# executed sequentially.
+# Architecture-dispatched:
 # CPU chunks to avoid FFTW's alignment-mismatch on x86 (no problem on ARM)
 # GPU doesn't need any of that we have seperate plans for each K 
 @inline function _needs_chunking(K::Integer, S::SpectralTransform{NF,<:AbstractCPU}) where {NF}
@@ -445,7 +449,7 @@ end
 
 @inline _needs_chunking(::Integer, ::SpectralTransform) = false
 
-# Largest planned batch K ≤ K_total, excluding the K=1 fallback. Used to pick the chunk size. Typically this will just be the number of layers in the model. 
+# Largest planned batch K ≤ K_total, excluding the K=1 fallback. Used to pick the chunk size. Typically this will just be the number of layers in the model.
 @inline function _largest_planned_batch(K_total::Integer, S::SpectralTransform)
     best = 1
     for k in keys(S.rfft_plans_batched)
@@ -464,9 +468,9 @@ end
 # Why this matters on CPU: FFT plans bake their batch dim K into the plan, and on x86 the
 # scratch column-stride (= nfreq_max * sizeof(Complex{NF})) is generally not a multiple
 # of the SIMD width, so the K=1 plan can't be applied to columns other than column 1
-# without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
-# that path for the bulk of the layers and effectively restores the previous behavior before 
-# fusion/batching without performance penalties. 
+# without an alignment-mismatch error. Chunking with the sequential execution sidesteps
+# that path for the bulk of the layers and effectively restores the previous behavior before
+# fusion/batching without performance penalties.
 # Greedy chunk sizes: at each position take the largest planned batch that fits the remaining
 # layers (1 = the always-planned serial fallback when nothing larger fits)
 function _transform_chunked!(                       # SPECTRAL TO GRID

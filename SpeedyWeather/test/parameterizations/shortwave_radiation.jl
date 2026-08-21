@@ -6,7 +6,7 @@ function init_shortwave_state!(vars, model)
     vars.parameterizations.rain_rate .= 0
     vars.parameterizations.ocean.albedo .= 0.5
     vars.parameterizations.land.albedo .= 0.3
-    vars.parameterizations.surface_pressure .= 1e5
+    vars.parameterizations.surface_pressure .= 1.0e5
     return nothing
 end
 
@@ -60,14 +60,14 @@ end
         vars = Variables(model)
         init_shortwave_state!(vars, model)
         vars.parameterizations.cos_zenith .= 1
-        
+
         clouds = SpeedyWeather.clouds!(1, vars, model.shortwave_radiation.clouds, model)
         t = SpeedyWeather.transmissivity!(1, vars, clouds, model.shortwave_radiation.transmissivity, model)
         for ij in 1:model.spectral_grid.npoints
             clouds = SpeedyWeather.clouds!(ij, vars, model.shortwave_radiation.clouds, model)
             t = SpeedyWeather.transmissivity!(ij, vars, clouds, model.shortwave_radiation.transmissivity, model)
         end
-        @test all(0 .< t.<= 1)
+        @test all(0 .< t .<= 1)
     end
 end
 

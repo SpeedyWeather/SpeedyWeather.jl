@@ -90,9 +90,11 @@ function _legendre!(
     # Scratch dim 2 is the per-call capacity (= max(planned_K) on CPU, S.nlayers elsewhere);
     # allow it to exceed nlayers so chunked/sliced callers (e.g. test scratches copied
     # from CPU) still pass.
-    @boundscheck (size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
-                  size(g_north, 3) == nlat_half && size(g_north, 2) >= nlayers) ||
-                 throw(DimensionMismatch(S, specs))
+    @boundscheck (
+        size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
+            size(g_north, 3) == nlat_half && size(g_north, 2) >= nlayers
+    ) ||
+        throw(DimensionMismatch(S, specs))
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, specs))
 
     # no need to reset g_north/g_south here: every frequency the Fourier transform reads is
@@ -172,9 +174,11 @@ function _legendre!(                        # GRID TO SPECTRAL
     nlayers = size(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck (size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
-                  size(f_north, 3) == S.grid.nlat_half && size(f_north, 2) >= nlayers) ||
-                 throw(DimensionMismatch(S, specs))
+    @boundscheck (
+        size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
+            size(f_north, 3) == S.grid.nlat_half && size(f_north, 2) >= nlayers
+    ) ||
+        throw(DimensionMismatch(S, specs))
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, specs))
 
 

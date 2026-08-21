@@ -11,6 +11,9 @@ struct Simulation{V, M <: AbstractModel} <: AbstractSimulation{M}
     model::M
 end
 
+"""($TYPEDSIGNATURES) Same as `initialize!(model)` which returns a `Simulation`."""
+Simulation(model::AbstractModel; kwargs...) = initialize!(model; kwargs...)
+
 function Base.show(io::IO, S::AbstractSimulation)
     vsize = prettymemory(_pretty_size(S.variables))
     Msize = prettymemory(Base.summarysize(S.model))
@@ -74,7 +77,7 @@ function initialize!(
 
     # SCALING we use vorticity*radius, divergence*radius in the dynamical core
     scale_prognostic!(variables, model.planet.radius)
-    
+
     # TRANSFORM variables from spectral to grid (= set the diagnostic variables in the correct initial state)
     transform!(variables, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays

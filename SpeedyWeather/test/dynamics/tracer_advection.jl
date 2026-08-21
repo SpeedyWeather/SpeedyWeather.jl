@@ -24,7 +24,7 @@
         @test length(simulation.variables.grid.tracers) == ntracers
         @test length(simulation.variables.tendencies.tracers) == ntracers       # spectral tracers
         @test length(simulation.variables.tendencies.grid_tracers) == ntracers  # grid tracers
-        
+
         @test ndims(simulation.variables.prognostic.tracers.abc) == 3           # horizontal x vertical x steps
         @test ndims(simulation.variables.tendencies.tracers.abc) == 3           # horizontal x vertical x steps
         @test ndims(simulation.variables.tendencies.grid_tracers.abc) == 3      # horizontal x vertical x steps
@@ -52,7 +52,7 @@ end
     @test model.tracers[:abc].active
 
     f = (λ, φ, σ) -> exp(-(λ - 180)^2 / 10^2)
-    set!(simulation,  abc = f, namespace = :tracers)
+    set!(simulation, abc = f, namespace = :tracers)
 
     run!(simulation, period = Day(0))
 
@@ -109,6 +109,6 @@ end
 
         # caused failures hence info above and weaken test to 95% of grid cells must be different
         # @test all(abc0 .!= abc1)
-        @test n/m > 0.95
+        @test n / m > 0.95
     end
 end
