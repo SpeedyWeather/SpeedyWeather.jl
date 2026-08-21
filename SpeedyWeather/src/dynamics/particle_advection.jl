@@ -374,12 +374,12 @@ end
 @inline function find_vertical_bracket(σ::NF, σ_levels_full) where {NF}
     n = length(σ_levels_full)
     k_lo = 1
-    for k in 1:(n - 1)
-        σ_levels_full[k] <= σ && (k_lo = k)
+    while k_lo < n - 1 && σ_levels_full[k_lo + 1] <= σ
+        k_lo += 1
     end
     k_hi = k_lo + 1
     Δσ = σ_levels_full[k_hi] - σ_levels_full[k_lo]
-    α = clamp((σ - σ_levels_full[k_lo]) / Δσ, zero(NF), one(NF))
+    α = clamp((σ - σ_levels_full[k_lo]) / Δσ, 0, 1)
     return k_lo, k_hi, α
 end
 
@@ -416,17 +416,13 @@ end
     i = @index(Global, Linear)
     k_lo, k_hi, α = find_vertical_bracket(positions[i].σ, σ_levels_full)
 
-    a = ij_as[i] == 0 ? north_vals[k_lo] : A_data[ij_as[i], k_lo]
-    b = ij_as[i] == 0 ? north_vals[k_lo] : A_data[ij_bs[i], k_lo]
-    c = ij_cs[i] == -1 ? south_vals[k_lo] : A_data[ij_cs[i], k_lo]
-    d = ij_cs[i] == -1 ? south_vals[k_lo] : A_data[ij_ds[i], k_lo]
+    a, b = ij_as[i] == 0 ? (north_vals[k_lo], north_vals[k_lo]) : (A_data[ij_as[i], k_lo], A_data[ij_bs[i], k_lo])
+    c, d = ij_cs[i] == -1 ? (south_vals[k_lo], south_vals[k_lo]) : (A_data[ij_cs[i], k_lo], A_data[ij_ds[i], k_lo])
     ab_lo = a + (b - a) * Δabs[i]
     val_lo = ab_lo + (c + (d - c) * Δcds[i] - ab_lo) * Δys[i]
 
-    a = ij_as[i] == 0 ? north_vals[k_hi] : A_data[ij_as[i], k_hi]
-    b = ij_as[i] == 0 ? north_vals[k_hi] : A_data[ij_bs[i], k_hi]
-    c = ij_cs[i] == -1 ? south_vals[k_hi] : A_data[ij_cs[i], k_hi]
-    d = ij_cs[i] == -1 ? south_vals[k_hi] : A_data[ij_ds[i], k_hi]
+    a, b = ij_as[i] == 0 ? (north_vals[k_hi], north_vals[k_hi]) : (A_data[ij_as[i], k_hi], A_data[ij_bs[i], k_hi])
+    c, d = ij_cs[i] == -1 ? (south_vals[k_hi], south_vals[k_hi]) : (A_data[ij_cs[i], k_hi], A_data[ij_ds[i], k_hi])
     ab_hi = a + (b - a) * Δabs[i]
     val_hi = ab_hi + (c + (d - c) * Δcds[i] - ab_hi) * Δys[i]
 
