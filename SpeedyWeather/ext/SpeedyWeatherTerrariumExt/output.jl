@@ -65,8 +65,12 @@ function terrarium_output_variable(
     )
     var_name = Terrarium.varname(descriptor)
     supported_variable(descriptor) ||
-        throw(ArgumentError("Terrarium variable $var_name on $(Terrarium.vardims(descriptor)) " *
-            "is not supported for output, only 2D (XY) and cell-centre 3D (XYZ) variables are."))
+        throw(
+        ArgumentError(
+            "Terrarium variable $var_name on $(Terrarium.vardims(descriptor)) " *
+                "is not supported for output, only 2D (XY) and cell-centre 3D (XYZ) variables are."
+        )
+    )
 
     units = Terrarium.varunits(descriptor)
     unit_string = string(units)
@@ -118,8 +122,12 @@ function SpeedyWeather.TerrariumOutput(
     )
     descriptors = variable_descriptors(model, inputs = true)
     haskey(descriptors, var_name) ||
-        throw(ArgumentError("Terrarium model has no variable $var_name, " *
-            "available are: $(join(keys(descriptors), ", "))"))
+        throw(
+        ArgumentError(
+            "Terrarium model has no variable $var_name, " *
+                "available are: $(join(keys(descriptors), ", "))"
+        )
+    )
     return terrarium_output_variable(model, descriptors[var_name]; kwargs...)
 end
 
@@ -233,8 +241,10 @@ function SpeedyWeather.define_dimension!(dest, variable::TerrariumOutputVariable
             )
         )
     elseif nlayers != variable.nlayers
-        error("Terrarium output variable $(variable.name) has $(variable.nlayers) soil layers, " *
-            "but the $SOIL_DEPTH_DIM_NAME dimension already has $nlayers.")
+        error(
+            "Terrarium output variable $(variable.name) has $(variable.nlayers) soil layers, " *
+                "but the $SOIL_DEPTH_DIM_NAME dimension already has $nlayers."
+        )
     end
     return nothing
 end

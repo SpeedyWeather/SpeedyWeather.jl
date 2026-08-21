@@ -39,7 +39,7 @@
     spectral_grid4 = SpectralGrid(nlayers = 4)
     σ4 = SigmaCoordinates(spectral_grid4)
     σh = Array(σ4.σ_half)
-    @test Array(σ4.σ_full) ≈ (σh[1:end-1] + σh[2:end]) / 2
+    @test Array(σ4.σ_full) ≈ (σh[1:(end - 1)] + σh[2:end]) / 2
 
     # σ_thickness sums to 1 (covers full atmosphere)
     @test sum(σ4.σ_thickness) ≈ 1
@@ -141,7 +141,7 @@ end
     # keyword args: transition
     # pure sigma: transition = σ -> 1  =>  A = 0, B = σ
     σ_half = SpeedyWeather.sigma_half_spacing(spectral_grid.nlayers)
-    σ_full = (σ_half[2:end] + σ_half[1:(end-1)]) / 2
+    σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
     S_sigma = SigmaPressureCoordinates(spectral_grid; transition = σ -> 1.0)
     @test all(Array(S_sigma.A_half) .≈ 0)
     @test all(Array(S_sigma.A_full) .≈ 0)
@@ -208,8 +208,8 @@ end
 
     # C¹ continuity: near-zero derivative at both thresholds
     ε = 1.0f-4
-    @test SpeedyWeather.cubic_transition(pressure_only_above + ε; pressure_only_above, σ_only_below) ≈ 0 atol = 1e-6
-    @test SpeedyWeather.cubic_transition(σ_only_below - ε; pressure_only_above, σ_only_below) ≈ 1 atol = 1e-2
+    @test SpeedyWeather.cubic_transition(pressure_only_above + ε; pressure_only_above, σ_only_below) ≈ 0 atol = 1.0e-6
+    @test SpeedyWeather.cubic_transition(σ_only_below - ε; pressure_only_above, σ_only_below) ≈ 1 atol = 1.0e-2
 
     # thresholds respected in the coordinate itself
     B_half = Array(H.B_half)
@@ -308,7 +308,7 @@ end
         for k in 1:nlayers
             # pressure_above / pressure_below bracket the full level
             p_above = SpeedyWeather.pressure_above(k, p_surf, coord)
-            p_full  = SpeedyWeather.pressure(k, p_surf, coord)
+            p_full = SpeedyWeather.pressure(k, p_surf, coord)
             p_below = SpeedyWeather.pressure_below(k, p_surf, coord)
             @test p_above <= p_full <= p_below
 
@@ -317,7 +317,7 @@ end
             @test Δp ≈ p_below - p_above
 
             # pressure_above and pressure_below are consistent with pressure_half
-            @test p_above ≈ SpeedyWeather.pressure_half(k,     p_surf, coord)
+            @test p_above ≈ SpeedyWeather.pressure_half(k, p_surf, coord)
             @test p_below ≈ SpeedyWeather.pressure_half(k + 1, p_surf, coord)
         end
 
@@ -346,15 +346,15 @@ end
         spectral_grid = SpectralGrid(truncation = 32; nlayers)
 
         σ_half_configs = (
-            ("default",   SpeedyWeather.sigma_half_spacing(nlayers)),
-            ("Frierson",  SpeedyWeather.sigma_half_spacing(nlayers, SpeedyWeather.frierson_profile)),
+            ("default", SpeedyWeather.sigma_half_spacing(nlayers)),
+            ("Frierson", SpeedyWeather.sigma_half_spacing(nlayers, SpeedyWeather.frierson_profile)),
         )
 
         for (label, σ_half) in σ_half_configs
             coords = (
-                ("SigmaCoordinates/$label",          SigmaCoordinates(spectral_grid, σ_half)),
+                ("SigmaCoordinates/$label", SigmaCoordinates(spectral_grid, σ_half)),
                 # like sigma only for now with A=0
-                ("SigmaPressureCoordinates/$label",  SigmaPressureCoordinates(spectral_grid, σ_half; transition = _ -> 1.0)),
+                ("SigmaPressureCoordinates/$label", SigmaPressureCoordinates(spectral_grid, σ_half; transition = _ -> 1.0)),
             )
 
             for (name, coord) in coords
@@ -362,9 +362,9 @@ end
                     @info "$name (nlayers=$nlayers)"
                     model = PrimitiveDryModel(
                         spectral_grid;
-                        geometry  = Geometry(spectral_grid; vertical_coordinates = coord),
-                        forcing   = HeldSuarez(spectral_grid),
-                        drag      = LinearDrag(spectral_grid),
+                        geometry = Geometry(spectral_grid; vertical_coordinates = coord),
+                        forcing = HeldSuarez(spectral_grid),
+                        drag = LinearDrag(spectral_grid),
                         dynamics_only = true,
                         orography = EarthOrography(spectral_grid),
                     )

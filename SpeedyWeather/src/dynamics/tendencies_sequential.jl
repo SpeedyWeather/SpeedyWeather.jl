@@ -1,8 +1,8 @@
-# SEQUENTIAL versions of the dynamical core tendency methods 
-# Currently the dycore on all architectures fuses the tendency computations, 
-# here we provide sequential implementations of the tendency methods. 
-# Those might be used for testing and debugging and potentially in the future 
-# for a more memory optimized CPU-version. 
+# SEQUENTIAL versions of the dynamical core tendency methods
+# Currently the dycore on all architectures fuses the tendency computations,
+# here we provide sequential implementations of the tendency methods.
+# Those might be used for testing and debugging and potentially in the future
+# for a more memory optimized CPU-version.
 
 
 """
@@ -70,9 +70,9 @@ function vordiv_tendencies!(
     vordiv_grid_tendencies!(vars, coriolis, atmosphere, geometry, implicit, time_stepping)
 
     u_tend_grid = get_tendency_step(vars.tendencies.grid.u, time_stepping, DynamicalCore())
-    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, time_stepping, DynamicalCore()) 
-    u_tend = get_tendency_step(vars.dynamics.u_tendency, time_stepping, DynamicalCore()) 
-    v_tend = get_tendency_step(vars.dynamics.v_tendency, time_stepping, DynamicalCore()) 
+    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, time_stepping, DynamicalCore())
+    u_tend = get_tendency_step(vars.dynamics.u_tendency, time_stepping, DynamicalCore())
+    v_tend = get_tendency_step(vars.dynamics.v_tendency, time_stepping, DynamicalCore())
     scratch_memory = vars.scratch.transform_memory
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
@@ -155,7 +155,7 @@ function horizontal_advection!(
         vars::Variables,
         model::AbstractModel;
         add::Bool = true,                   # add/overwrite A_tend_grid?
-    # Forwarded to `flux_divergence!`; defaults to the unfused scratch.{a,b} for unfused callers.
+        # Forwarded to `flux_divergence!`; defaults to the unfused scratch.{a,b} for unfused callers.
         uA = vars.scratch.a,
         vA = vars.scratch.b,
         uA_grid = vars.scratch.grid.a,
