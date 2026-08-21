@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Time stepping soil temperature and moisture [#1183](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1183)
+- Reformulate trigonometric functions to avoid hostcalls on AMDGPU - [#1210](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1210)
 
 ## v0.22.1
 
