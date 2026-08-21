@@ -65,13 +65,17 @@ export ParticleAdvection3D
     "[OPTION] Execute particle advection every n timesteps"
     every_n_time_steps::IntType = 6
 
+    "[DERIVED] Number of vertical layers, needed to size pole scratch arrays"
+    nlayers::IntType = 1
+
     "[DERIVED] Interpolation geometry used during advection"
     geometry::GeometryType
 end
 
 function ParticleAdvection3D(SG::SpectralGrid; kwargs...)
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection3D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
+    return ParticleAdvection3D{SG.NF, typeof(geometry), typeof(SG.truncation)}(;
+        geometry, nlayers = SG.nlayers, kwargs...)
 end
 
 variables(P::AbstractParticleAdvection) = variables(typeof(P), P.nparticles)
@@ -87,11 +91,14 @@ function variables(::Type{<:ParticleAdvection2D}, nparticles)
     )
 end
 
-# same as 2D but add vertical velocity at particle location
-function variables(::Type{<:ParticleAdvection3D}, nparticles)
+# same as 2D but also add vertical velocity and pole scratch arrays for 3D interpolation
+function variables(P::ParticleAdvection3D)
+    (; nparticles, nlayers) = P
     return (
         variables(ParticleAdvection2D, nparticles)...,
         ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity dσ/dt at particle location", units = "1/s"),
+        ScratchVariable(:north_pole_vals, VectorDim(nlayers), desc = "North pole ring averages for 3D interpolation"),
+        ScratchVariable(:south_pole_vals, VectorDim(nlayers), desc = "South pole ring averages for 3D interpolation"),
     )
 end
 
@@ -214,9 +221,9 @@ function initialize!(
     v0 = vars.particles.v
     w0 = vars.particles.w
 
-    interpolate_3D!(u0, u_3d, locator, geometry, particles, σ_levels_full)
-    interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full)
-    interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(u0, u_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
+    interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
+    interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
     return nothing
 end
 
@@ -352,9 +359,9 @@ function particle_advection!(
     u_new = vars.particles.u
     v_new = vars.particles.v
     w_new = vars.particles.w
-    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, σ_levels_full)
-    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, σ_levels_full)
-    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, σ_levels_full)
+    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
+    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
+    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
 
     launch!(
         architecture(u_new), LinearWorkOrder, (length(particles),),
@@ -364,9 +371,9 @@ function particle_advection!(
 
     # store new velocities at corrected position for next advection step
     RingGrids.update_locator!(locator, geometry, lons, lats)
-    interpolate_3D!(u_new, u_3d, locator, geometry, particles, σ_levels_full)
-    interpolate_3D!(v_new, v_3d, locator, geometry, particles, σ_levels_full)
-    interpolate_3D!(w_new, w_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(u_new, u_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
+    interpolate_3D!(v_new, v_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
+    interpolate_3D!(w_new, w_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
     return nothing
 end
 
@@ -384,21 +391,13 @@ end
 end
 
 # Vertically blended anvil interpolation at each particle's σ coordinate.
-function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels_full)
+function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels_full, north_vals, south_vals)
     (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, npoints_output) = locator
     A_data = A.data
-    nlayers = size(A_data, 2)
-    rings = geometry.grid.rings             # CPU array, used only for pole averages
-    T = eltype(A_data)
-    north_vals_cpu = Vector{T}(undef, nlayers)
-    south_vals_cpu = Vector{T}(undef, nlayers)
-    for k in 1:nlayers
-        r = A_data[rings[1], k]; north_vals_cpu[k] = sum(r) / length(r)
-        r = A_data[rings[end], k]; south_vals_cpu[k] = sum(r) / length(r)
-    end
     arch = architecture(Aout)
-    north_vals = on_architecture(arch, north_vals_cpu)
-    south_vals = on_architecture(arch, south_vals_cpu)
+    (; ring_starts, nlons, nlat) = geometry
+    launch!(arch, LinearWorkOrder, (size(A_data, 2),), _compute_pole_averages_kernel!,
+            north_vals, south_vals, A_data, ring_starts, nlons, nlat)
     launch!(
         arch, LinearWorkOrder, (npoints_output,),
         _interpolate_3D_kernel!,
@@ -406,6 +405,24 @@ function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels_full)
         positions, σ_levels_full, north_vals, south_vals,
     )
     return Aout
+end
+
+@kernel inbounds = true function _compute_pole_averages_kernel!(north_vals, south_vals, A_data, ring_starts, nlons, nlat)
+    k = @index(Global, Linear)
+    n_north = nlons[1]
+    rs_north = ring_starts[1]
+    north_sum = zero(eltype(north_vals))
+    for i in 0:(n_north - 1)
+        north_sum += A_data[rs_north + i, k]
+    end
+    north_vals[k] = north_sum / n_north
+    n_south = nlons[nlat]
+    rs_south = ring_starts[nlat]
+    south_sum = zero(eltype(south_vals))
+    for i in 0:(n_south - 1)
+        south_sum += A_data[rs_south + i, k]
+    end
+    south_vals[k] = south_sum / n_south
 end
 
 @kernel inbounds = true function _interpolate_3D_kernel!(
