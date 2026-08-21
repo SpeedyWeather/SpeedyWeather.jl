@@ -24,6 +24,10 @@ Base revision: f89bce984b028f4aa9f62622accc32aba157d6a8
   mechanism analogous to Mechanisms A and B — see "Profiling `run!`" below. Two small,
   isolated candidates identified (~1.4 s combined of 28.8 s); precompilation explicitly
   ruled out of scope for now.
+- 2026-08-21: simplified the Change 1 machinery after review feedback that it read as
+  convoluted. Removed `SET_OPTIONS`, its sync `@assert`, the duplicated second
+  `_set_options` method and the `_set_step` helper (net −19 lines) with no compile-time
+  cost. See "Simplification of the Change 1 machinery" below.
 
 ## Problem description
 
@@ -240,6 +244,50 @@ original cost.
 Trade-off: the inner loop becomes dynamically dispatched. This is irrelevant here —
 `set!` is called ~10 times during setup and never in the time-stepping loop. Runtime after
 warmup was 0.024 s for all of step 3; the dispatch overhead is far below that.
+
+#### Simplification of the Change 1 machinery
+
+The first implementation was reviewed as convoluted. Three of its four moving parts turned
+out to be incidental rather than load-bearing, and were removed on 2026-08-21 with **no
+measurable compile-time cost** (net −19 lines):
+
+- **`SET_OPTIONS` and its `@assert` — deleted.** The const duplicated
+  `fieldnames(SetOptions)` and needed an assertion to keep the two in sync. Replaced by
+  `is_option(name) = name in fieldnames(SetOptions)`. This removes the hazard recorded in
+  Known limitations below: a new option is now added in **one** place, the struct.
+- **The two `_set_options` methods — collapsed to one.** They differed only in whether
+  `spectral_transform` was taken from the model. Making `SetOptions` a `Base.@kwdef` struct
+  moves the defaults onto the struct, and a `defaults...` keyword handles the override:
+
+  ```julia
+  function _set_options(@nospecialize(kwargs); defaults...)
+      options = merge(NamedTuple(defaults), NamedTuple(k => v for (k, v) in kwargs if is_option(k)))
+      return SetOptions(; options...)
+  end
+  ```
+
+  Twelve lines of hand-written `get(kwargs, :field, default)` became four.
+- **`_set_step` — deleted.** `@kwdef`'s implicit `convert` to the declared
+  `Union{Nothing, Int}` field type does the same job. Verified equivalent for `2`, `2.0`,
+  `UInt8(2)`, `Int32(2)` and `nothing`.
+- **The u/v special case** dropped `varnames = map(first, ...)`, two `findfirst` closures
+  and two `has_*` flags in favour of one named `value_or_nothing` helper.
+
+**What was deliberately kept:** the `@nospecialize` on the entry points and the positional
+`SetOptions` struct. These are the two non-obvious pieces — removing either restores most of
+the original cost — so the comment explaining them stays in the source. They are the part a
+future reader is most likely to "simplify" away and silently lose ~9 s.
+
+Verification after simplification:
+
+| check | result |
+|-------|--------|
+| `test/dynamics/set.jl` | 49/49 pass, 48.7 s (vs 49 s before, 2m29s pre-Change-1) |
+| `test/dynamics/initial_conditions.jl` | all pass |
+| `Base.specializations(set_variables!)` | **3** — erasure intact, not one per call site |
+| marginal cost per new `set!` signature | 0.40–0.49 s (was 0.43–0.73 s) |
+| `initialize!` total | 22.0–22.2 s vs 21.9 s baseline — within noise |
+| Runic | clean |
 
 ### Change 2 — collect variable definitions into a `Vector`, not a `Tuple` (~3–4 s) — **DONE**
 
@@ -491,10 +539,10 @@ the precompilation behaviour and the `NF=Float32` coverage in the docs.
 - After Changes 1 and 2, `run!` (28.8 s) costs more than `initialize!` (21.9 s) in a cold
   session, and no structural fix was found for it — the cost is spread across the
   dynamical core rather than concentrated in a re-specialization pattern.
-- `SetOptions` fixes the set of `set!` options at the struct definition. A new option must
-  be added in three places: the struct, `SET_OPTIONS`, and both `_set_options` methods.
-  Forgetting `SET_OPTIONS` would silently reinterpret the option as a variable name and
-  produce a "not defined" warning rather than an error.
+- `SetOptions` fixes the set of `set!` options at the struct definition: a keyword that is
+  not one of its fields is treated as a variable to set, so a typo'd option produces a
+  "not defined" warning rather than an error. Adding a new option is a one-line change to
+  the struct since the 2026-08-21 simplification.
 
 ## Future work
 

@@ -35,63 +35,39 @@ function set!(
     return set_variables!(vars, geometry, _set_pairs(kwargs), _set_options(kwargs))
 end
 
-# Options of `set!` that control *how* variables are set; everything else in the kwargs is a
-# variable to set. Collected into a fully concrete `SetOptions` so that `set_variables!` has
-# exactly one signature.
-const SET_OPTIONS = (:step, :add, :spectral_transform, :coslat_scaling_included, :static_func, :namespace)
-
-# `step = nothing` is allowed to skip `get_step` for variables without a step dimension
-_set_step(step) = isnothing(step) ? nothing : Int(step)
+# Type-erase the keyword arguments of `set!` into a runtime `Vector` of `name => value` pairs
+# (the variables to set) plus a concrete `SetOptions` (how to set them). This is deliberate:
+# the `Base.Pairs` kwargs type encodes the keyword names AND the value types, so passing them
+# on makes `set_variables!` and everything it calls (`transform!`, the Legendre/FFT kernels,
+# ...) re-specialize for every distinct combination used at a call site. There are eight such
+# combinations among the initial conditions alone, each costing seconds of inference. The
+# options must be passed *positionally* as a concrete struct: splatting them back out as
+# keywords would reintroduce one specialization per distinct option NamedTuple and defeat the
+# erasure. `set!` is a setup-path function called a handful of times per simulation, so the
+# dynamic dispatch this introduces is irrelevant next to the compile time it saves.
 
 """$(TYPEDSIGNATURES) Options controlling how `set!` sets a variable, see `set!`."""
-struct SetOptions
-    step::Union{Nothing, Int}
-    add::Bool
-    spectral_transform::Union{Nothing, AbstractSpectralTransform}
-    coslat_scaling_included::Bool
-    static_func::Bool
-    namespace::Union{Nothing, Symbol}
+Base.@kwdef struct SetOptions
+    "Step index to set, `nothing` skips `get_step` for variables without a step dimension"
+    step::Union{Nothing, Int} = 1
+    add::Bool = false
+    spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing
+    coslat_scaling_included::Bool = false
+    static_func::Bool = true
+    namespace::Union{Nothing, Symbol} = nothing
 end
 
-# Type-erase the variables to set into a runtime Vector of pairs, and the options into a
-# concrete struct. This is deliberate: the `Base.Pairs` kwargs type encodes the keyword names
-# AND the value types, so passing them on makes `set_variables!` and everything it calls
-# (`transform!`, the Legendre/FFT kernels, ...) re-specialize for every distinct combination
-# used at a call site. There are eight such combinations among the initial conditions alone,
-# each costing seconds of inference. Note the options must be passed *positionally* as a
-# concrete struct: splatting them back out as keywords would reintroduce one specialization
-# per distinct option NamedTuple and defeat the erasure. `set!` is a setup-path function
-# called a handful of times per simulation, so the dynamic dispatch this introduces is
-# irrelevant next to the compile time it saves.
-function _set_pairs(@nospecialize(kwargs))
-    return Pair{Symbol, Any}[k => v for (k, v) in kwargs if !(k in SET_OPTIONS)]
-end
+# every keyword that is not an option is a variable to set
+is_option(name::Symbol) = name in fieldnames(SetOptions)
 
-function _set_options(@nospecialize(kwargs))
-    return SetOptions(
-        _set_step(get(kwargs, :step, 1)),
-        get(kwargs, :add, false),
-        get(kwargs, :spectral_transform, nothing),
-        get(kwargs, :coslat_scaling_included, false),
-        get(kwargs, :static_func, true),
-        get(kwargs, :namespace, nothing),
-    )
-end
+_set_pairs(@nospecialize(kwargs)) =
+    Pair{Symbol, Any}[k => v for (k, v) in kwargs if !is_option(k)]
 
-# guard the coupling between `SET_OPTIONS` and the `SetOptions` fields: adding an option to
-# one but not the other would silently reinterpret it as a variable name to set
-@assert Set(SET_OPTIONS) == Set(fieldnames(SetOptions)) "SET_OPTIONS and SetOptions fields must match"
-
-# as above but defaulting the spectral transform to the model's when not given explicitly
-function _set_options(@nospecialize(kwargs), spectral_transform::AbstractSpectralTransform)
-    return SetOptions(
-        _set_step(get(kwargs, :step, 1)),
-        get(kwargs, :add, false),
-        get(kwargs, :spectral_transform, spectral_transform),
-        get(kwargs, :coslat_scaling_included, false),
-        get(kwargs, :static_func, true),
-        get(kwargs, :namespace, nothing),
-    )
+# `defaults` lets callers that know the spectral transform (or any other option) supply it
+# without it having to be repeated at every call site
+function _set_options(@nospecialize(kwargs); defaults...)
+    options = merge(NamedTuple(defaults), NamedTuple(k => v for (k, v) in kwargs if is_option(k)))
+    return SetOptions(; options...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -105,20 +81,25 @@ function set_variables!(
         options::SetOptions,
     )
     (; step, add, spectral_transform, coslat_scaling_included, static_func, namespace) = options
-    varnames = map(first, vars_to_set)
+
+    # value for `name` among the variables to set, or `nothing` if not given
+    function value_or_nothing(name)
+        for (varname, value) in vars_to_set
+            varname === name && return value
+        end
+        return nothing
+    end
 
     # special case for u,v setting vor, div
-    has_u = :u in varnames
-    has_v = :v in varnames
-    if has_u && has_v
+    u = value_or_nothing(:u)
+    v = value_or_nothing(:v)
+    if !isnothing(u) && !isnothing(v)
         (; vorticity, divergence) = vars
-        u = vars_to_set[findfirst(p -> first(p) === :u, vars_to_set)].second
-        v = vars_to_set[findfirst(p -> first(p) === :v, vars_to_set)].second
         set_vordiv!(
             get_step(vorticity, step), get_step(divergence, step), u, v,
             geometry, spectral_transform; add, coslat_scaling_included, static_func
         )
-    elseif has_u || has_v
+    elseif !isnothing(u) || !isnothing(v)
         @warn "Only one of `u` and `v` provided, but both are needed to set `vor` and `div`. Skipping."
     end
 
@@ -462,13 +443,13 @@ Sets properties of the simuluation `S`. Convenience wrapper to call the other co
 seperately. See their documentation for possible `kwargs`. """
 function set!(S::AbstractSimulation; group::Symbol = :prognostic, kwargs...)
     @nospecialize kwargs
-    options = _set_options(kwargs, S.model.spectral_transform)
+    options = _set_options(kwargs; spectral_transform = S.model.spectral_transform)
     return set_variables!(getfield(S.variables, group), S.model.geometry, _set_pairs(kwargs), options)
 end
 
 function set!(vars::Variables, model::AbstractModel; group::Symbol = :prognostic, kwargs...)
     @nospecialize kwargs
     vars.prognostic.scale[] != 1 && @warn "Prognostic variables are scaled with $(vars.prognostic.scale[]), but `set!` assumes unscaled variables."
-    options = _set_options(kwargs, model.spectral_transform)
+    options = _set_options(kwargs; spectral_transform = model.spectral_transform)
     return set_variables!(getfield(vars, group), model.geometry, _set_pairs(kwargs), options)
 end
