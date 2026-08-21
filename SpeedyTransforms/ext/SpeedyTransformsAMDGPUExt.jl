@@ -28,17 +28,6 @@ import SpeedyWeatherInternals.Architectures: on_architecture, GPU
 # differ (`AMDGPU.HIP.capture`/`instantiate`/`launch` instead of `CUDA.capture`/`instantiate`/
 # `launch`).
 #
-# This was attempted twice before and abandoned both times: ROCm's stream-capture validator did
-# not reliably reject operations that are illegal to capture — some raised a catchable
-# HIPError, but others were silently accepted at capture time and only surfaced later as a GPU
-# memory access fault when the (corrupt) graph was replayed, confirmed on real hardware (LUMI).
-# See git history `0c114dfc..9bf79d4a` on this branch, and `docs/dev/2026-08/hip-graphs.md` for
-# the archaeology. ROCm has since shipped several stream-capture validation fixes (7.0.2, 7.1.0,
-# 7.2.1); this re-enables capture on the assumption those fixes address the earlier corruption.
-# If GPU memory-access faults or silently wrong results reappear under `gpu_graphs = true` on
-# AMDGPU, that upstream bug may not be fully fixed — set `gpu_graphs = false` on the affected
-# `SpectralTransform`/`SpectralGrid` as a workaround and report it.
-#
 # The backend-agnostic parts of this (kernels, cache struct, allocation-free loops,
 # capture/replay control flow) live in gpu_graphs_common.jl, included below and shared with
 # SpeedyTransformsCUDAExt.jl; only the capture/instantiate/launch primitives differ per backend
