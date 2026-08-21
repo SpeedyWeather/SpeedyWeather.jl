@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add 3D ParticleAdvection3d with vertical Heun advection [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
+
 ## v0.22.1
 
 - WhichTransform for default MatrixSpectralTransform on GPU at low resolution [#1194](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1194)
