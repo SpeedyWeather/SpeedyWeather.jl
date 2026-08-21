@@ -35,13 +35,36 @@ end
 
 """$(TYPEDSIGNATURES)
 Get all steps of a variable as a tuple of views (wrapped into the same type as the input variable)
-as defined by `get_step`. "Steps" refer to the last dimension, for prognostic variables
-e.g. used for the leapfrog time step."""
+as defined by `get_step`. "Steps" refer to the step dimension, i.e. the time dimension `T` in the
+variable's `ArrayDimensions` (e.g. `XYT`, `LMZT`), for prognostic variables e.g. used for the
+leapfrog time step. Variables without a time dimension have no steps to splat, so a 1-tuple
+holding the full variable (as a view, consistent with `get_step`) is returned."""
 get_steps
 
+# variables WITH a step dimension: splat the step dimension into a tuple, one view per step
+# variables WITHOUT one: nothing to splat, a single "step" that is the full variable as a view
+get_steps(var::Union{AbstractField, LowerTriangularArray}) = ntuple(step -> get_step(var, step), nsteps(var))
+
+# plain arrays (e.g. unwrapped inside GPU kernels) carry no dimension information, so the
+# last dimension is assumed to be the step dimension, as in `get_step`
 get_steps(var::AbstractArray{T, 1}) where {T} = (var,)
 get_steps(var::AbstractArray{T, 2}) where {T} = ntuple(step -> get_step(var, step), size(var, 2))
 get_steps(var::AbstractArray{T, 3}) where {T} = ntuple(step -> get_step(var, step), size(var, 3))
+
+"""$(TYPEDSIGNATURES)
+Number of steps of a variable, i.e. the length of its step dimension (the time dimension `T`
+in the variable's `ArrayDimensions`). Variables without a time dimension have a single step."""
+# dispatch on the concrete dimension types that have a time dimension, NOT on the
+# ...WithTime unions: their `Dims <: DimensionsWithTime` bound does not make the signature
+# more specific than the unbounded one, so the two would be ambiguous and resolved by
+# definition order rather than by the presence of a time dimension.
+@inline nsteps(var::AbstractField{T, 1, A, G, ArrayDimensions.XYT}) where {T, A, G} = size(var, ndims(var))
+@inline nsteps(var::AbstractField{T, 2, A, G, ArrayDimensions.XYT}) where {T, A, G} = size(var, ndims(var))
+@inline nsteps(var::AbstractField{T, 3, A, G, ArrayDimensions.XYZT}) where {T, A, G} = size(var, ndims(var))
+@inline nsteps(var::LowerTriangularArray{T, 2, A, S, ArrayDimensions.LMT}) where {T, A, S} = size(var, ndims(var))
+@inline nsteps(var::LowerTriangularArray{T, 3, A, S, ArrayDimensions.LMZT}) where {T, A, S} = size(var, ndims(var))
+@inline nsteps(::AbstractField) = 1
+@inline nsteps(::LowerTriangularArray) = 1
 
 """$(TYPEDSIGNATURES)
 Get the first `N` steps of a variable as a tuple of views with a COMPILE-TIME length,
@@ -56,54 +79,70 @@ get_steps(var::AbstractArray, ::Val{N}) where {N} = ntuple(step -> get_step(var,
 export get_step
 
 """$(TYPEDSIGNATURES)
-Select step dimension from variable, when no step as 2nd argument provided select las index
-as this typically presents the "current" step (and not any previous ones). But this depends
-on the time stepping a variable with step dimension was created for."""
-get_step(var) = get_step(var, size(var, ndims(var)))
+Select the step dimension from a variable, when no step is provided as 2nd argument select the
+last step as this typically represents the "current" step (and not any previous ones). But this
+depends on the time stepping a variable with step dimension was created for. Variables without a
+step dimension have a single step, so `get_step(var)` returns the full variable as a view."""
+get_step(var) = get_step(var, nsteps(var))
+
+# plain arrays carry no dimension information so the last dimension is assumed to be the step one
+get_step(var::AbstractArray) = get_step(var, size(var, ndims(var)))
 
 # Plain Arrays
 # Inside GPU kernels `Adapt.adapt_structure(to, field::AbstractField) = adapt(to, field.data)`
 # unwraps a Field to its bare device array, so `get_step` must also work on plain arrays
-# (otherwise the device-side MethodError aborts kernel compilation). Same semantics as the
-# Field/LowerTriangularArray methods below: `step` indexes the last dimension; for arrays
-# without an explicit step dimension `step` must be 1 (trailing singleton dimension).
+# (otherwise the device-side MethodError aborts kernel compilation). Without the dimension
+# information of a Field/LowerTriangularArray, `step` here always indexes the last dimension;
+# for arrays without an explicit step dimension `step` must be 1 (trailing singleton dimension).
 @inline get_step(var::AbstractArray{T, 1}, step::Integer) where {T} = view(var, :, step)
 @inline get_step(var::AbstractArray{T, 2}, step::Integer) where {T} = view(var, :, step)
 @inline get_step(var::AbstractArray{T, 3}, step::Integer) where {T} = view(var, :, :, step)
 
-# LowerTriangularArrays
-# for 2D spectral variables step can be 1 that'll be the ignored additional singleton dimension
-# otherwise an error is thrown
-@inline get_step(var::LowerTriangularArray{T, 1}, step::Integer) where {T} = lta_view(var, :, step)
+# LOWER TRIANGULAR ARRAYS
+# `step` always indexes the time dimension `T` in the variable's ArrayDimensions (LMT, LMZT).
+# Variables without a time dimension (LM, LMZ) have no step dimension to index into, so the
+# full array is returned as a view and `step` is ignored (it should be 1).
 
 """$(TYPEDSIGNATURES)
 Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables e.g. used for the leapfrog time step.
-This method is for a 2D spectral variable (horizontal only) with steps in the 3rd dimension."""
-@inline get_step(var::LowerTriangularArray{T, 2}, step::Integer) where {T} = lta_view(var, :, step)
+"step" refers to the time dimension `T` in the variable's `ArrayDimensions`, for prognostic
+variables e.g. used for the leapfrog time step. These methods are for spectral variables
+WITHOUT a time dimension (`LM`, `LMZ`), which have no step dimension to select from: the full
+array is returned as a view and `step` is ignored (it should be 1)."""
+@inline get_step(var::LowerTriangularArray{T, 1, A, S, ArrayDimensions.LM}, step::Integer) where {T, A, S} = lta_view(var, :)
+@inline get_step(var::LowerTriangularArray{T, 2, A, S, ArrayDimensions.LMZ}, step::Integer) where {T, A, S} = lta_view(var, :, :)
 
 """$(TYPEDSIGNATURES)
 Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables e.g. used for the leapfrog time step.
-This method is for a 3D spectral variable (horizontal + vertical) with steps in the 4rd dimension."""
-@inline get_step(var::LowerTriangularArray{T, 3}, step::Integer) where {T} = lta_view(var, :, :, step)
+"step" refers to the time dimension `T` in the variable's `ArrayDimensions`, for prognostic
+variables e.g. used for the leapfrog time step. These methods are for spectral variables WITH a
+time dimension (`LMT` horizontal + time, `LMZT` horizontal + vertical + time), whose last
+dimension is the step dimension."""
+@inline get_step(var::LowerTriangularArray{T, 2, A, S, ArrayDimensions.LMT}, step::Integer) where {T, A, S} = lta_view(var, :, step)
+@inline get_step(var::LowerTriangularArray{T, 3, A, S, ArrayDimensions.LMZT}, step::Integer) where {T, A, S} = lta_view(var, :, :, step)
 
 # FIELDS
-# for 2D fields step can be 1 that'll be the ignored additional singleton dimension
-# otherwise an error is thrown
-@inline get_step(var::AbstractField{T, 1}, step::Integer) where {T} = field_view(var, :, step)
+# same as for LowerTriangularArrays: `step` always indexes the time dimension `T` in the
+# variable's ArrayDimensions (XYT, XYZT), variables without one (XY, XYZ) return the full view.
 
 """$(TYPEDSIGNATURES)
-Get the i-th step of a 3D field as a view (wrapped into the same type as the input variable).
-"step" refers to the last dimension, for prognostic variables e.g. used for the leapfrog time step.
-This method is for a 2D field (horizontal only) with steps in the 3rd dimension."""
-@inline get_step(var::AbstractField{T, 2}, step::Integer) where {T} = field_view(var, :, step)
+Get the i-th step of a field as a view (wrapped into the same type as the input variable).
+"step" refers to the time dimension `T` in the variable's `ArrayDimensions`, for prognostic
+variables e.g. used for the leapfrog time step. These methods are for fields WITHOUT a time
+dimension (`XY`, `XYZ`), which have no step dimension to select from: the full array is
+returned as a view and `step` is ignored (it should be 1)."""
+@inline get_step(var::AbstractField{T, 1, A, G, ArrayDimensions.XY}, step::Integer) where {T, A, G} = field_view(var, :)
+@inline get_step(var::AbstractField{T, 2, A, G, ArrayDimensions.XYZ}, step::Integer) where {T, A, G} = field_view(var, :, :)
 
 """$(TYPEDSIGNATURES)
-Get the i-th step of a 4D field as a view (wrapped into the same type as the input variable).
-"step" refers to the last dimension, for prognostic variables e.g. used for the leapfrog time step.
-This method is for a 3D field (horizontal + vertical) with steps in the 4rd dimension."""
-@inline get_step(var::AbstractField{T, 3}, step::Integer) where {T} = field_view(var, :, :, step)
+Get the i-th step of a field as a view (wrapped into the same type as the input variable).
+"step" refers to the time dimension `T` in the variable's `ArrayDimensions`, for prognostic
+variables e.g. used for the leapfrog time step. These methods are for fields WITH a time
+dimension (`XYT` horizontal + time, `XYZT` horizontal + vertical + time), whose last dimension
+is the step dimension."""
+@inline get_step(var::AbstractField{T, 1, A, G, ArrayDimensions.XYT}, step::Integer) where {T, A, G} = field_view(var, :, step)
+@inline get_step(var::AbstractField{T, 2, A, G, ArrayDimensions.XYT}, step::Integer) where {T, A, G} = field_view(var, :, step)
+@inline get_step(var::AbstractField{T, 3, A, G, ArrayDimensions.XYZT}, step::Integer) where {T, A, G} = field_view(var, :, :, step)
 
 # anything that can decide which variable step to get
 const STEP_COMPONENT = Union{AbstractModelComponent, SpeedyTransforms.AbstractSpectralTransform}

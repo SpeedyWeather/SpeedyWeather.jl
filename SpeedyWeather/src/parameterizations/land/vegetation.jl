@@ -46,6 +46,8 @@ function soil_moisture_availability!(
     soil_moisture_top = field_view(soil_moisture, :, 1)
     (; soil_moisture_availability) = vars.parameterizations.land
 
+    @boundscheck size(soil_moisture_availability) == size(soil_moisture_top) || throw(BoundsError)
+
     # Fortran SPEEDY documentation eq. 51 with vegetation = 0
     W_cap = model.land.thermodynamics.field_capacity
     W_wilt = model.land.thermodynamics.wilting_point

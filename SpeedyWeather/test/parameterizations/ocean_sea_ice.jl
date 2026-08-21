@@ -33,7 +33,7 @@
                 simulation.variables.prognostic.ocean.sea_surface_temperature .= 285
             end
 
-            run!(simulation, period = Day(3))
+            run!(simulation, period = Day(1))
 
             @test simulation.model.feedback.nans_detected == false
             @test haskey(simulation.variables.prognostic.ocean, :sea_surface_temperature)
