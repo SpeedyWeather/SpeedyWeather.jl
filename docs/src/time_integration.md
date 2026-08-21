@@ -249,12 +249,13 @@ unconditionally, whether or not the variable they are handed has steps. `get_ste
 all steps as a tuple of views (a 1-tuple for a variable without a step dimension), and
 `get_steps(var, Val(N))` does the same with a compile-time length, which is what Enzyme needs.
 
-!!! note "Dispatching on the presence of a step dimension"
-    The `Dims`-bounded aliases (`AbstractFieldWithTime`, `LowerTriangularArrayWithTime`) are
-    convenient for `isa` tests, but they do *not* make a method signature more specific than the
-    unbounded type, so a pair of methods written against them is ambiguous and resolved by
-    definition order. Dispatch on the concrete dimension tags (`ArrayDimensions.LMT` etc.)
-    instead, as the `get_step` methods do.
+Dispatching on whether a variable has a step dimension at all is done with the
+`AbstractFieldWithTime` / `LowerTriangularArrayWithTime` aliases, as `nsteps` does:
+
+```julia
+nsteps(var::Union{AbstractFieldWithTime, LowerTriangularArrayWithTime}) = size(var, ndims(var))
+nsteps(::Union{AbstractField, LowerTriangularArray}) = 1
+```
 
 ````@docs; canonical=false
 get_step

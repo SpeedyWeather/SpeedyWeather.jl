@@ -54,17 +54,8 @@ get_steps(var::AbstractArray{T, 3}) where {T} = ntuple(step -> get_step(var, ste
 """$(TYPEDSIGNATURES)
 Number of steps of a variable, i.e. the length of its step dimension (the time dimension `T`
 in the variable's `ArrayDimensions`). Variables without a time dimension have a single step."""
-# dispatch on the concrete dimension types that have a time dimension, NOT on the
-# ...WithTime unions: their `Dims <: DimensionsWithTime` bound does not make the signature
-# more specific than the unbounded one, so the two would be ambiguous and resolved by
-# definition order rather than by the presence of a time dimension.
-@inline nsteps(var::AbstractField{T, 1, A, G, ArrayDimensions.XYT}) where {T, A, G} = size(var, ndims(var))
-@inline nsteps(var::AbstractField{T, 2, A, G, ArrayDimensions.XYT}) where {T, A, G} = size(var, ndims(var))
-@inline nsteps(var::AbstractField{T, 3, A, G, ArrayDimensions.XYZT}) where {T, A, G} = size(var, ndims(var))
-@inline nsteps(var::LowerTriangularArray{T, 2, A, S, ArrayDimensions.LMT}) where {T, A, S} = size(var, ndims(var))
-@inline nsteps(var::LowerTriangularArray{T, 3, A, S, ArrayDimensions.LMZT}) where {T, A, S} = size(var, ndims(var))
-@inline nsteps(::AbstractField) = 1
-@inline nsteps(::LowerTriangularArray) = 1
+@inline nsteps(var::Union{AbstractFieldWithTime, LowerTriangularArrayWithTime}) = size(var, ndims(var))
+@inline nsteps(::Union{AbstractField, LowerTriangularArray}) = 1
 
 """$(TYPEDSIGNATURES)
 Get the first `N` steps of a variable as a tuple of views with a COMPILE-TIME length,

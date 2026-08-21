@@ -67,16 +67,15 @@ ArrayDimensions.hasvertical(L), ArrayDimensions.hastime(L)
 or through dispatch on the tag types and their unions like
 `ArrayDimensions.DimensionsWithTime` and `ArrayDimensions.DimensionsWithVertical`.
 
-!!! warning "Dispatching on the `...WithTime`/`...WithVertical` aliases"
-    The array aliases bounded by these unions (`AbstractFieldWithTime`,
-    `LowerTriangularArrayWithTime`, …) are written as
-    `Field{T, N, A, G, Dims} where {..., Dims <: DimensionsWithTime}`. A tagged array *is* a
-    subtype of such an alias, so `isa` tests work as expected, but the bound does **not** make a
-    method signature more specific than the unbounded `Field`/`LowerTriangularArray`. A method
-    written against the alias and a fallback written against the plain type are therefore
-    ambiguous, and Julia resolves them by definition order rather than by the tag — silently
-    picking the fallback. When you need to dispatch on the presence of a dimension, dispatch on
-    the concrete tags (`ArrayDimensions.LMT`, `ArrayDimensions.XYZT`, …) instead.
+!!! note "Writing your own `...WithTime`-style alias"
+    These aliases are `where` clauses over the array type, e.g.
+    `Field{T, N, A, G, Dims} where {..., Dims <: DimensionsWithTime}`. If you write one yourself,
+    repeat *all* parameter bounds of the underlying type declaration. A `where` clause with looser
+    bounds than the declaration is not a subtype of it, so the alias would silently fail to
+    dispatch: a method on the alias and a fallback on the plain type end up unordered and Julia
+    picks by definition order rather than by the tag. `LowerTriangularArray` declares
+    `ArrayType <: AbstractArray{T, N}` and `S <: AbstractSpectrum`, so its aliases must spell those
+    out; `AbstractField` declares its parameters unbounded, so its aliases need not.
 
 The tags are preserved through `similar`, `zero`, views and broadcasting; indexing
 into a tagged dimension with an integer drops it accordingly, e.g. `L[:, 1]` of an

@@ -36,3 +36,29 @@ using SpeedyWeatherInternals.ArrayDimensions: LM, LMZ, LMT, LMZT,
     @test lta_lmzt isa LowerTriangularArrayWithVertical
     @test lta_lmzt isa LowerTriangularArrayWithTimeAndVertical
 end
+
+@testset "LowerTriangularArray: aliases are usable for dispatch" begin
+    # An `isa` test passes even for an alias that cannot dispatch, so check the subtype
+    # relation and actual method resolution too. The aliases must repeat the parameter bounds
+    # of the struct declaration (`ArrayType <: AbstractArray{T, N}`, `S <: AbstractSpectrum`);
+    # with looser bounds they are not subtypes of LowerTriangularArray and a method defined on
+    # them loses to the unbounded fallback, silently and depending on definition order.
+    for alias in (
+            LowerTriangularArrayWithTime,
+            LowerTriangularArrayWithVertical,
+            LowerTriangularArrayWithTimeAndVertical,
+        )
+        @test alias <: LowerTriangularArray
+    end
+
+    arch = LowerTriangularArrays.CPU()
+    spectrum = Spectrum(10, 10, architecture = arch)
+
+    has_time(::LowerTriangularArrayWithTime) = true
+    has_time(::LowerTriangularArray) = false
+
+    @test has_time(LowerTriangularArray(rand(ComplexF32, 55, 5), spectrum, LMT()))
+    @test has_time(LowerTriangularArray(rand(ComplexF32, 55, 5, 10), spectrum, LMZT()))
+    @test has_time(LowerTriangularArray(rand(ComplexF32, 55), spectrum, LM())) == false
+    @test has_time(LowerTriangularArray(rand(ComplexF32, 55, 5), spectrum, LMZ())) == false
+end
