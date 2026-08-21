@@ -68,13 +68,14 @@
     sic_old = get_step(prog_old.ocean.sea_ice_concentration, step)
     @test all(isapprox(sic_new, sic_old .+ C, atol = 1.0e-6))
 
-    Di = deepcopy(prog_new.land.soil_temperature)
+    lst = get_step(prog_new.land.soil_temperature, step)
+    Di = deepcopy(lst)
     RingGrids.interpolate!(Di, D; NF)
-    set!(simulation, soil_temperature = D, namespace = :land)
-    @test prog_new.land.soil_temperature == Di
+    set!(simulation, soil_temperature = D, namespace = :land; step)
+    @test lst == Di
 
     set!(simulation, soil_moisture = D; namespace = :land)
-    @test prog_new.land.soil_moisture == Di
+    @test get_step(prog_new.land.soil_moisture, 1) == Di
 
     # numbers
     set!(simulation, vorticity = Float32(3.0); step)

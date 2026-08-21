@@ -1,7 +1,7 @@
 # variable that AbstractOcean requires
-function variables(::AbstractOcean)
+function variables(::AbstractPrescribedOcean)
     return (
-        PrognosticVariable(:sea_surface_temperature, GridXYT(), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
+        PrognosticVariable(:sea_surface_temperature, GridXY(), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
     )
 end
 
@@ -17,7 +17,7 @@ export PrescribedOcean
 Prescribed ocean that declares the necessary allocations for the sea surface temperature,
 but all dynamics are expected to be externally set. Used for coupling to external ocean models.
 """
-struct PrescribedOcean <: AbstractOcean end
+struct PrescribedOcean <: AbstractPrescribedOcean end
 PrescribedOcean(::SpectralGrid) = PrescribedOcean() # added constructor, just to be consistent with call signatures
 initialize!(vars::Variables, ::PrescribedOcean, model) = nothing
 timestep!(vars::Variables, ::PrescribedOcean, model) = nothing
@@ -30,7 +30,7 @@ fields from file, and interpolates them in time on every time step
 and writes them to the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractOcean
+@kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractPrescribedOcean
     "Grid used for the model"
     grid::Grid
 
@@ -132,9 +132,9 @@ end
 @kernel inbounds = true function interpolate_monthly_climatology_kernel!(
         var, monthly, weight, this_month, next_month
     )
-    I = @index(Global, Cartesian)           # always launch over size(var)
-    ijk = ndims(monthly) == 2 ? I[1] : I    # if monthly is 2D, ignore vertical index
-    var[I] = (1 - weight) * monthly[ijk, this_month] + weight * monthly[ijk, next_month]
+    I = @index(Global, Cartesian)                       # always launch over size(var)
+    ijk = ndims(monthly) == 2 ? (I[1],) : (I[1], I[2])  # if monthly is 2D, ignore vertical index
+    var[I] = (1 - weight) * monthly[ijk..., this_month] + weight * monthly[ijk..., next_month]
 end
 
 # CONSTANT OCEAN CLIMATOLOGY
@@ -152,7 +152,7 @@ To be created like
 and the ocean time is set with `initialize!(model, time=time)`.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct ConstantOceanClimatology{NF} <: AbstractOcean
+@kwdef struct ConstantOceanClimatology{NF} <: AbstractPrescribedOcean
     "[OPTION] filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 
@@ -216,7 +216,7 @@ but vary in latitude following a coslat². To be created like
 
 Fields and options are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct AquaPlanet{NF} <: AbstractOcean
+@parameterized @kwdef struct AquaPlanet{NF} <: AbstractPrescribedOcean
     "[OPTION] Temperature on the Equator [K]"
     @param temperature_equator::NF = 302 (bounds = Positive,)
 
@@ -261,7 +261,7 @@ Tendencies are from net surface radiation and surface latent and sensible heat f
 The effective mixed-layer heat capacity is `specific_heat_capacity * mixed_layer_depth * density`.
 Initialised from seasonal SST climatology, with land points set to `land_temperature`.
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef mutable struct SlabOcean{NF} <: AbstractOcean
+@parameterized @kwdef mutable struct SlabOcean{NF} <: AbstractDynamicOcean
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
@@ -289,8 +289,8 @@ function variables(::SlabOcean, model::AbstractModel)
     pg = nsteps.prognostic_grid
     tg = nsteps.tendency_grid
     return (
-        PrognosticVariable(:sea_surface_temperature, GridXYT(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
-        TendencyVariable(:sea_surface_temperature, GridXYT(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),
+        PrognosticVariable(:sea_surface_temperature, OceanXYT(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
+        TendencyVariable(:sea_surface_temperature, OceanXYT(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),
 
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m^2"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
@@ -301,9 +301,6 @@ function variables(::SlabOcean, model::AbstractModel)
         ParameterizationVariable(:surface_sensible_heat_flux, Grid2D(), desc = "Surface sensible heat flux", units = "kg/s/m^2", namespace = :ocean),
     )
 end
-
-# leapfrog if possible
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::SlabOcean) = 2
 
 # nothing to initialize for SlabOcean model itself
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
@@ -349,6 +346,9 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     Rlu = vars.parameterizations.ocean.surface_longwave_up
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
+
+    @boundscheck size(dsst) == size(Rsd) == size(Rsu) == size(Rld) == size(Rlu) || throw(BoundsError)
+    @boundscheck size(dsst) == size(S) == size(H) || throw(BoundsError)
 
     launch!(
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,

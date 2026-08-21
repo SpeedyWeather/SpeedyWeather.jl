@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Time stepping soil temperature and moisture [#1183](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1183)
 - Reformulate trigonometric functions to avoid hostcalls on AMDGPU - [#1210](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1210)
 
 ## v0.22.1
@@ -9,7 +10,7 @@
 - WhichTransform for default MatrixSpectralTransform on GPU at low resolution [#1194](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1194)
 - Restructed GPU tests, and fixed an issue for which `MatrixSpectralTransform` failed on views [#1201](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1201)
 - Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions [#1147](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1147)
-- Restrist Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
+- Restrict Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
 - Simulation(model) as Oceananigans-like interface [#1205](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1205)
 - Orbit and rotation time for variable length of day/year [#984](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/984)
 - Default dealiasing for non-Gaussian grids is now 3, fixing stability issues e.g. for HEALPix [#1198](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1198)

@@ -239,11 +239,27 @@ which_prognostic_step(var, ::AbstractLeapfrog, ::LinearDynamicalCore)           
 which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion)     = 1  # previous
 ```
 
-`get_step(var, i)` is the low-level accessor used by all of the above; for a variable with a step
-dimension it returns a view of step `i`.
+`get_step(var, i)` is the low-level accessor used by all of the above. Which array dimension is
+the step dimension is taken from the variable's dimension tag (see
+[Array dimensions](@ref array_dimensions)): `get_step` selects the dimension tagged as time `T`,
+so for a variable tagged `XYT`, `XYZT`, `LMT` or `LMZT` it returns a view of step `i`. A variable
+*without* a time tag (`XY`, `XYZ`, `LM`, `LMZ`) has no step dimension to select from — the full
+variable is returned as a view and `i` is ignored. Model components can therefore call it
+unconditionally, whether or not the variable they are handed has steps. `get_steps(var)` returns
+all steps as a tuple of views (a 1-tuple for a variable without a step dimension), and
+`get_steps(var, Val(N))` does the same with a compile-time length, which is what Enzyme needs.
+
+Dispatching on whether a variable has a step dimension at all is done with the
+`AbstractFieldWithTime` / `LowerTriangularArrayWithTime` aliases, as `nsteps` does:
+
+```julia
+nsteps(var::Union{AbstractFieldWithTime, LowerTriangularArrayWithTime}) = size(var, ndims(var))
+nsteps(::Union{AbstractField, LowerTriangularArray}) = 1
+```
 
 ````@docs; canonical=false
 get_step
+SpeedyWeather.get_steps
 ````
 
 When writing a new time stepper you implement the `*_steps` methods (how many steps to store), the
