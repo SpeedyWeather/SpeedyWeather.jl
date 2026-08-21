@@ -1,11 +1,13 @@
 abstract type AbstractSoilMoisture <: AbstractLandComponent end
+abstract type AbstractDynamicSoilMoisture <: AbstractDynamicLandComponent end
+abstract type AbstractPrescribedSoilMoisture <: AbstractPrescribedLandComponent end
 
 export SeasonalSoilMoisture
 
 """SeasonalSoilMoisture model that prescribes soil moisture from a monthly climatology file.
 The soil moisture is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
+@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractPrescribedSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
@@ -143,7 +145,7 @@ export LandBucketMoisture
 """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@parameterized @kwdef struct LandBucketMoisture{NF} <: AbstractDynamicSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 

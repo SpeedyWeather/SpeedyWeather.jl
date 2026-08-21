@@ -1,4 +1,6 @@
 abstract type AbstractSnow <: AbstractLandComponent end
+abstract type AbstractDynamicSnow <: AbstractDynamicLandComponent end
+abstract type AbstractPrescribedSnow <: AbstractPrescribedLandComponent end
 
 export SnowModel    # maybe change for a more concise name later
 
@@ -9,7 +11,7 @@ from the diagnosed precipitation, melts once the top soil layer exceeds
 `melting_threshold`, and is capped at `snow_depth_cap` to limit infinite snow/ice accumulation
 over perennial ice caps and glaciers.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SnowModel{NF} <: AbstractSnow
+@parameterized @kwdef struct SnowModel{NF} <: AbstractDynamicSnow
     "[OPTION] Temperature threshold for snow melting [K]"
     @param melting_threshold::NF = 275 (bounds = Positive,)
 

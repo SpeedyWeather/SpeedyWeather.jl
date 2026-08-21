@@ -38,6 +38,9 @@ function soil_moisture_availability!(
         vegetation::NoVegetation,
         model::PrimitiveWet,
     )
+    # escape immediately if no soil moisture defined, then soil_moisture_availability stays 0
+    haskey(vars.prognostic.land, :soil_moisture) || return nothing
+
     # view on the top layer of soil moisture
     soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, model.time_stepping, vegetation)
     soil_moisture_top = field_view(soil_moisture, :, 1)
@@ -49,16 +52,14 @@ function soil_moisture_availability!(
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    soil_moisture_availability .= D_top * soil_moisture_top * W_cap /
-        (D_top * W_cap + D_root * (W_cap - W_wilt))
+    r = D_top * W_cap / (D_top * W_cap + D_root * (W_cap - W_wilt))
+    soil_moisture_availability .= r * soil_moisture_top
+
     return nothing
 end
 
-function variables(::NoVegetation, model::AbstractModel)
-    nsteps = get_nsteps(model.time_stepping, model)
-    pg = nsteps.prognostic_grid
+function variables(::NoVegetation)
     return (
-        PrognosticVariable(:soil_moisture, LandXYZT(pg), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         ParameterizationVariable(:soil_moisture_availability, GridXY(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end
@@ -109,18 +110,13 @@ function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing
     return VegetationClimatology{NF, GridVariable2D}(; high_cover, low_cover, kwargs...)
 end
 
-function variables(::VegetationClimatology, model::AbstractModel)
-    nsteps = get_nsteps(model.time_stepping, model)
-    pg = nsteps.prognostic_grid
+function variables(::VegetationClimatology)
     return (
-        PrognosticVariable(:soil_moisture, LandXYZT(pg), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-
         ParameterizationVariable(:vegetation_high, GridXY(), desc = "Vegetation high cover", units = "1", namespace = :land),
         ParameterizationVariable(:vegetation_low, GridXY(), desc = "Vegetation low cover", units = "1", namespace = :land),
         ParameterizationVariable(:soil_moisture_availability, GridXY(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end
-
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
 
@@ -188,6 +184,9 @@ function soil_moisture_availability!(
         vegetation::VegetationClimatology,
         model::PrimitiveWet,
     )
+    # escape immediately if no soil moisture defined, then soil_moisture_availability stays 0
+    haskey(vars.prognostic.land, :soil_moisture) || return nothing
+
     (; vegetation_high, vegetation_low, soil_moisture_availability) = vars.parameterizations.land
     soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, model.time_stepping, vegetation)
     (; low_veg_factor) = vegetation

@@ -1,11 +1,19 @@
 abstract type AbstractLandTemperature <: AbstractLandComponent end
+abstract type AbstractDynamicLandTemperature <: AbstractDynamicLandComponent end
+abstract type AbstractPrescribedLandTemperature <: AbstractPrescribedLandComponent end
+
+function variables(::AbstractPrescribedLandTemperature)
+    return (
+        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land, desc = "Soil temperature", units = "K"),
+    )
+end
 
 export SeasonalLandTemperature
 
 """SeasonalLandTemperature model that prescribes land surface temperature from a monthly climatology file.
 The temperature is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
+@kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractPrescribedLandTemperature
     "[OPTION] filename of land surface temperatures"
     file::String = "land_surface_temperature.nc"
 
@@ -43,12 +51,6 @@ function SeasonalLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothi
     (; NF, GridVariable3D, grid) = SG
     monthly_temperature = zeros(GridVariable3D, grid, 12)  # 12 months
     return SeasonalLandTemperature{NF, GridVariable3D}(; monthly_temperature, kwargs...)
-end
-
-function variables(::SeasonalLandTemperature)
-    return (
-        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land),
-    )
 end
 
 function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
@@ -126,7 +128,7 @@ end
 
 # CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
-@parameterized @kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
+@parameterized @kwdef struct ConstantLandTemperature{NF} <: AbstractPrescribedLandTemperature
     "[OPTION] Globally constant temperature"
     @param temperature::NF = 285 (bounds = Positive,)
 
@@ -151,17 +153,11 @@ end
 # temperature is constant so do nothing during land timestep
 timestep!(vars::Variables, land::ConstantLandTemperature, args...) = nothing
 
-function variables(::ConstantLandTemperature)
-    return (
-        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land),
-    )
-end
-
 export LandBucketTemperature
 
 """MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html).
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
+@kwdef struct LandBucketTemperature{NF} <: AbstractDynamicLandTemperature
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
 

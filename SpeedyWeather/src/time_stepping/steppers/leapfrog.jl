@@ -63,10 +63,15 @@ tendency_steps(::AbstractLeapfrog) = 1
 # Parameterizations should always be evaluated on the previous time step for Euler forward
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParameterization) = 1
 
-# use leapfrogging for ocean, sea ice and land components
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractOcean) = 2
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSeaIce) = 2
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractLandComponent) = 2
+# abstract ocean, sea ice or land components use 1 step (as not subject to time stepping, e.g. prescribed)
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractOcean) = 1
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSeaIce) = 1
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractLandComponent) = 1
+
+# dynamic models are then generally leapfrogged
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicOcean) = 2
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicSeaIce) = 2
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicLandComponent) = 2
 
 # particle advection using u, v at current not previous time step
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
