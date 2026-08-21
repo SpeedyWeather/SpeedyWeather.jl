@@ -45,12 +45,12 @@ function get_Δt_millisec(
 end
 
 """$(TYPEDSIGNATURES)
-Factor between the time step at T32 and the time step at resolution `trunc` on a planet of
+Factor between the time step at T32 and the time step at resolution `truncation` on a planet of
 `radius`, i.e. `Δt = Δt_at_T32 * resolution_factor`, matching [`get_Δt_millisec`](@ref)."""
 resolution_factor(truncation::Integer, radius::Real) =
     DEFAULT_TRUNCATION / truncation * radius / DEFAULT_RADIUS
 
-"""$(TYPEDSIGNATURES) Resolution factor of `model`, from its `trunc` and planetary radius."""
+"""$(TYPEDSIGNATURES) Resolution factor of `model`, from its truncation and planetary radius."""
 resolution_factor(model::AbstractModel) =
     resolution_factor(model.spectral_grid.truncation, model.planet.radius)
 

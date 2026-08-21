@@ -1,6 +1,6 @@
-# Reducing compile time of `initialize!(model)`
+# Reducing compile time of `initialize!(model)` and `run!(simulation)`
 
-> Status: **in progress**. Changes 1 and 2 implemented and verified: total `initialize!` 34.0 s → 22.6 s. Change 3 (precompile workload) still outstanding.
+> Status: **in progress**. Changes 1 and 2 implemented and verified: total `initialize!` 34.0 s → 22.6 s. Change 3 (precompile workload) still outstanding and currently out of scope. `run!` profiled 2026-08-21: no structural fix found, see "Profiling `run!`".
 
 Date of initial draft: 2026-08-20
 
@@ -20,6 +20,10 @@ Base revision: f89bce984b028f4aa9f62622accc32aba157d6a8
   `Variables(model)` 7.62 s → 4.63 s (−39 %); total `initialize!` 34.0 s → 31.4 s.
   Verified all 113 allocated variable arrays are bitwise identical before/after.
   Changes 1 and 3 deliberately left for separate commits.
+- 2026-08-21: profiled `run!(simulation)` on request (no changes made). Found no dominant
+  mechanism analogous to Mechanisms A and B — see "Profiling `run!`" below. Two small,
+  isolated candidates identified (~1.4 s combined of 28.8 s); precompilation explicitly
+  ruled out of scope for now.
 
 ## Problem description
 
@@ -334,6 +338,127 @@ contention — an intermediate measurement taken while the test suite was runnin
 every step roughly doubled, including steps not touched by the change. Always re-measure on
 an idle machine before concluding anything.
 
+## Profiling `run!(simulation)`
+
+Profiled 2026-08-21 on the branch state after Changes 1 and 2 (i.e. with `initialize!`
+already reduced to ~22 s). Investigation only — **no changes were made**, and
+precompilation was explicitly ruled out of scope.
+
+### Baseline
+
+Default `PrimitiveWetModel`, `truncation = 32`, `nlayers = 8`, `NF = Float32`,
+Julia 1.12.7, macOS aarch64, fresh session:
+
+| Step | Time | Compilation share |
+|------|------|-------------------|
+| `initialize!(model)` | 21.9 s | 98.8 % |
+| **first `run!(simulation, period = Day(1))`** | **28.8 s** | **99.4 %** |
+| second `run!` (same session) | 0.15 s | — |
+
+So after Changes 1 and 2, `run!` costs *more* than `initialize!` and is now the larger
+half of a cold-start simulation. Actual work in `run!` is 0.15 s; the rest is compilation.
+
+Note `run!` defaults to `output = false`, so the 28.8 s is the core path only. NetCDF
+output is a separate cost — see below.
+
+### Structural breakdown
+
+`@snoop_inference` over the first `run!`. Absolute numbers are inflated roughly 2.5× by
+snooping overhead (75.9 s attributed vs 28.8 s wall clock), so read them as proportions:
+
+```
+kwcall(run!)                                     75.9 s
+└─ #run!#1224                                    71.3 s
+   ├─ time_stepping!                             44.4 s
+   │  └─ time_step!(simulation, time_stepping)   39.9 s
+   │     ├─ time_step!(vars, ts, ::PrimitiveEquation)  30.8 s
+   │     │  ├─ dynamics_tendencies!              17.4 s
+   │     │  ├─ reset_tendencies!                  3.1 s
+   │     │  ├─ parameterization_tendencies!       2.1 s
+   │     │  ├─ update_prognostic!                 1.4 s
+   │     │  ├─ diffusion_and_implicit!            1.3 s
+   │     │  └─ land_timestep!                     1.1 s
+   │     ├─ progress!(feedback, vars, model)      3.0 s
+   │     └─ reinitialize!(::PrimitiveWetModel)    2.0 s
+   ├─ initialize!(simulation)                    20.2 s
+   └─ finalize!(simulation)                       2.3 s
+```
+
+By module: SpeedyWeather 18.8 s, SpeedyTransforms 2.6 s, KernelAbstractions 1.6 s,
+Base 1.6 s, Base.Broadcast 1.4 s.
+
+### Conclusion: no dominant mechanism
+
+Unlike `initialize!`, the `run!` profile is **flat**. There is no `set!`-style
+keyword-signature explosion and no oversized heterogeneous tuple. Specifically:
+
+- `dynamics_tendencies!` ([tendencies.jl:119](../../../SpeedyWeather/src/dynamics/tendencies.jl))
+  is the single largest entry at 17.4 s inclusive, of which **1.39 s is exclusive
+  self-inference of one method body**. That body is a long straight-line sequence of ~15
+  calls (pressure gradient, geopotential, vertical velocity/advection, grid tendencies,
+  batched transform, spectral tendencies, tracer advection). The cost is the size of the
+  dynamical core itself, not a structural defect. No refactor identified.
+- The column parameterizations are entirely flat — no individual `parameterization!`
+  method exceeds 0.1 s (largest: `BulkRichardsonDiffusion` 0.09 s, `OneBandLongwave`
+  0.06 s). Nothing to target.
+- `reset_tendencies!` (3.1 s) is a deliberate recursive tuple unroll, commented in
+  [tendencies.jl:1269](../../../SpeedyWeather/src/dynamics/tendencies.jl) as avoiding
+  Union-typed iteration that Enzyme cannot differentiate. Converting it to a runtime loop
+  the way Change 2 did would trade compile time against differentiability — not a free win,
+  and out of scope here.
+- The `Base.Iterators.Filter` entry (0.89 s over 8 specializations) that initially looked
+  like a Mechanism-B repeat turned out to be diffuse Base machinery reached via
+  `broadcast_unalias` → `unaliascopy(::LowerTriangularArray)`, not a SpeedyWeather
+  collection pattern.
+
+### Two small candidates (not implemented)
+
+Both are real and independently measured, but together worth only ~1.4 s of 28.8 s.
+
+**1. `ProgressMeter.next!` on a disabled meter — 0.40 s.**
+`Feedback.verbose` defaults to `isinteractive()`, so in scripts and CI the progress meter
+is disabled — yet `progress!(feedback::Feedback)` at
+[feedback.jl:91](../../../SpeedyWeather/src/output/feedback.jl) still calls
+`ProgressMeter.next!`, whose `enabled` check happens at *runtime*, inside the method. The
+kwarg method is compiled purely to bump a counter nobody displays.
+
+Measured in isolation: `ProgressMeter.next!` on a disabled `Progress` costs 0.40 s,
+100 % compilation. An A/B of the guarded version over the full `run!`:
+
+| | first `run!` |
+|---|---|
+| baseline | 29.19 s, 28.76 s |
+| with guard | 28.74 s, 28.64 s |
+
+i.e. ~0.3 s, consistent but marginal.
+
+**Correctness trap:** the obvious guard (`enabled || return nothing`) is **wrong**.
+`progress_meter.counter` is read by `progress!(feedback, vars, model)` to schedule
+`nan_detection!` and debug output ([feedback.jl:99–132](../../../SpeedyWeather/src/output/feedback.jl)),
+so it must still be incremented when the meter is off. Any fix has to bump the counter
+directly and skip only the display work.
+
+**2. `initialize!(implicit, ...)` — 1.05 s.**
+Reached via `reinitialize!(::PrimitiveWetModel, vars)` → `reinitialize!(::ImplicitPrimitiveEquation, ...)`
+on the first timestep. This is *not* redundant with `initialize!(model)`: the implicit
+solver is built lazily and guarded by `implicit.Δt[] == Δt`, so `initialize!(model)` never
+compiles it. It is genuine first-use cost with no obvious structural fix.
+
+### The NetCDF output path is a separate, larger cost
+
+`run!(..., output = true)` costs an **additional ~10.8 s** on top of the core path, and it
+is fully disjoint: a session that has already run `run!` without output still pays the
+full amount on the first output run.
+
+The top exclusive entry in the entire `run!` profile belongs to this path:
+`initialize!(::NetCDFOutput, vars, model)` at
+[netcdf_output.jl:147](../../../SpeedyWeather/src/output/writers/netcdf_output.jl),
+**2.46 s of exclusive self-inference** — again a long linear body, here of `defDim`/`defVar`
+calls into NCDatasets. Same shape as `dynamics_tendencies!`: big body, no hotspot.
+
+This is worth recording because any future precompilation work scoped to `initialize!` and
+a plain `run!` would leave this 10.8 s entirely uncovered for every user who writes output.
+
 ## Testing and verification
 
 - `set!` is widely used and user-facing; the existing `set!` tests must pass unchanged.
@@ -363,6 +488,9 @@ the precompilation behaviour and the `NF=Float32` coverage in the docs.
   time-stepping loop.
 - The ~0.4–0.7 s per-signature residual after Change 1 is inherent to first-inference of the
   transform stack and can only be removed by precompilation.
+- After Changes 1 and 2, `run!` (28.8 s) costs more than `initialize!` (21.9 s) in a cold
+  session, and no structural fix was found for it — the cost is spread across the
+  dynamical core rather than concentrated in a re-specialization pattern.
 - `SetOptions` fixes the set of `set!` options at the struct definition. A new option must
   be added in three places: the struct, `SET_OPTIONS`, and both `_set_options` methods.
   Forgetting `SET_OPTIONS` would silently reinterpret the option as a variable name and
@@ -375,3 +503,12 @@ the precompilation behaviour and the `NF=Float32` coverage in the docs.
   NetCDF/TOML/transform stack; worth revisiting if it dominates after these changes.
 - `grids_match` shows 16 specializations for 0.41 s — a small but easy candidate for
   `@nospecialize` on its varargs.
+- Guard `progress!(feedback::Feedback)` so a disabled progress meter does not compile
+  `ProgressMeter.next!` (~0.3–0.4 s). Must keep incrementing `progress_meter.counter` —
+  see the correctness trap noted under "Profiling `run!`".
+- The NetCDF output path costs ~10.8 s on first use, disjoint from the core `run!` path,
+  with 2.46 s of exclusive self-inference in `initialize!(::NetCDFOutput, ...)`. Untouched
+  by anything in this document and the largest single remaining block.
+- `reset_tendencies!` (3.1 s) could in principle move from a recursive tuple unroll to a
+  runtime loop as Change 2 did, but the unroll is deliberate — it avoids Union-typed
+  iteration that Enzyme cannot differentiate. Would need a differentiability check first.
