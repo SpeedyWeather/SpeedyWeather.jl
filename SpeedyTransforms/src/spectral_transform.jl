@@ -24,7 +24,6 @@ struct SpectralTransform{
     BRFFTSerialType,            # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D inverse plans)
     RFFTBatchedType,            # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D forward)
     BRFFTBatchedType,           # <: Dict{Int, <:Vector{<:AbstractFFTs.Plan}}  (K>1, 2-D inverse)
-    B2,                         # <: Bool
 } <: AbstractSpectralTransform{NF,AR}
 
     # Architecture
@@ -98,23 +97,10 @@ struct SpectralTransform{
     gradients::GradientType                     # precomputed gradient and integration matrices
 
     # CUDA GRAPHS
-    # toggle for the CUDA-Graphs accelerated batched Fourier transform
-    # Set to `false` to fall back to the generic (allocating) per-ring GPU
-    # Meaningless for non-CUDA architectures.
+    # toggle for the CUDA-Graphs accelerated batched Fourier transform (also gates the
+    # Metal fused-Fourier path, see SpeedyTransformsMetalExt.jl). Set to `false` to fall
+    # back to the generic (allocating) per-ring GPU loop. Meaningless for CPU.
     cuda_graphs::Bool
-
-    # METAL: MERGE HEMISPHERES
-    # toggle for merging the northern and southern hemisphere's per-ring FFTs into a
-    # single shared Metal command buffer/commit (`true`) instead of one commit per
-    # hemisphere (`false`).
-    metal_merge_hemispheres::B2
-
-    # METAL: FUSED FOURIER GRAPH
-    # toggle for fusing every ring's FFT (both hemispheres, one direction) into a single
-    # MPSGraph with one `encode!` dispatch per `transform!` call, instead of one `encode!`
-    # per ring. Supersedes `metal_merge_hemispheres` when `true` (that flag is then
-    # ignored). Meaningless for non-Metal architectures.
-    metal_fused_fourier::Bool
 end
 
 # eltype of a transform is the number format used within
@@ -136,8 +122,6 @@ function SpectralTransform(
     transform_batch::AbstractVector{<:Integer}=Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
     LegendreShortcut::Type{<:AbstractLegendreShortcut}=LegendreShortcutLinear,    # shorten Legendre loop over order m
     cuda_graphs::Bool=true,                                            # use CUDA-Graphs accelerated Fourier path (CUDA only)
-    metal_merge_hemispheres::Bool=true,     # merge north/south into one Metal command buffer (Metal only); faster at low-mid trunc, slower at high trunc
-    metal_fused_fourier::Bool=false,        # fuse every ring's FFT into one MPSGraph, one encode! per transform! call (Metal only); supersedes metal_merge_hemispheres
 )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
     # per-layer fallback used by `_fourier_serial!`).
@@ -295,7 +279,6 @@ function SpectralTransform(
         typeof(brfft_plan_serial),
         typeof(rfft_plans_batched),
         typeof(brfft_plans_batched),
-        typeof(metal_merge_hemispheres),
     }(
         architecture,
         spectrum, nfreq_max,
@@ -314,8 +297,6 @@ function SpectralTransform(
         eigenvalues, eigenvalues⁻¹,
         gradients,
         cuda_graphs,
-        metal_merge_hemispheres,
-        metal_fused_fourier,
     )
 end
 
