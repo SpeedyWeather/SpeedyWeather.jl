@@ -62,7 +62,10 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     # --- τ(k=1+1/2)                # half level below
 
     τ_above::NF = 0
-    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sind(θ)^2
+
+    # TODO: Replace `sin(deg2rad(θ))` with `sind(θ)` once JuliaGPU/AMDGPU.jl#1041 
+    # is merged/released and `sind` is supported on AMD GPUs.k
+    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sin(deg2rad(θ))^2
     for k in 1:nlayers              # loop over half levels below
         σₖ = pressure_below(k, pₛ, coord) / pₛ
         τ_below = τ₀ * (fₗ * σₖ + (1 - fₗ) * σₖ^4)
