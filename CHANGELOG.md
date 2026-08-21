@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add 3D ParticleAdvection3d with vertical Heun advection [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
+
 ## v0.22.0
 
 - [BREAKING] 1-based truncation as resolution parameter [#1177](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1177)
