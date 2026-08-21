@@ -1,19 +1,68 @@
-@testset "GPU spectral transform roundtrip " begin
-    spectral_grid = SpectralGrid(truncation = 42, nlayers = 8, architecture = GPU())
-    S = SpectralTransform(spectral_grid)
+
+@testset "GPU MatrixSpectralTransform roundtrip " begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8, architecture = GPU())
+    M = MatrixSpectralTransform(spectral_grid)
 
     # first roundtrip
     L = randn(ComplexF32, spectral_grid.spectrum, 8)
     field = zeros(Float32, spectral_grid.grid, 8)
-    transform!(field, L, S)
-    transform!(L, field, S)
+    transform!(field, L, M)
+    transform!(L, field, M)
 
     # 2nd roundtrip
     L2 = deepcopy(L)
-    transform!(field, L, S)
-    transform!(L, field, S)
+    transform!(field, L, M)
+    transform!(L, field, M)
 
     @test L ≈ L2
+end
+
+@testset "GPU MatrixSpectralTransform: transform! on views into a larger backing array" begin
+    # `vars.grid.<var>`/`vars.prognostic.<var>` in a real model are commonly *views* into a larger
+    # shared/fused backing array, not top-level CuArrays. Regression test for a bug where
+    # `MatrixSpectralTransform.transform!`'s internal `reshape` wrapped such a view in a
+    # `Base.ReshapedArray` that caused an error
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8, architecture = GPU())
+    M = MatrixSpectralTransform(spectral_grid)
+    nlayers = spectral_grid.nlayers
+
+    # reference: plain top-level arrays, the path that always worked
+    coeffs_ref = randn(ComplexF32, spectral_grid.spectrum, nlayers)
+    field_ref = transform(coeffs_ref, M)
+
+    # the same coefficients, but embedded as a *view*
+    nbatch, batch_idx = 3, 2
+    layer_range = (nlayers + 1):(2nlayers)
+
+    coeffs_backing = zeros(ComplexF32, spectral_grid.spectrum, 2nlayers, nbatch)
+    coeffs_data = view(view(coeffs_backing.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(coeffs_data) !== coeffs_data      # guard: genuinely a nested view, not optimized away
+    coeffs_data .= coeffs_ref.data
+    coeffs_view = LowerTriangularArray(coeffs_data, spectral_grid.spectrum)
+
+    field_backing = zeros(Float32, spectral_grid.grid, 2nlayers, nbatch)
+    field_data = view(view(field_backing.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(field_data) !== field_data
+    field_view = Field(field_data, spectral_grid.grid)
+
+    # spectral -> grid, writing into a field view. Compare `.data` (transferred to CPU) rather
+    # than the `Field`/`LowerTriangularArray` wrappers directly: `isapprox` on those falls back to
+    # a generic, scalar-indexing `norm`, which errors on GPU regardless of correctness.
+    transform!(field_view, coeffs_view, M)
+    @test Array(field_view.data) ≈ Array(field_ref.data)
+    # the result actually landed in the shared backing buffer (a true view, not a detached copy)
+    @test Array(field_backing.data)[:, layer_range, batch_idx] ≈ Array(field_ref.data)
+
+    # grid -> spectral, writing into a coeffs view
+    coeffs_from_field_ref = transform(field_ref, M)
+    coeffs_backing2 = zeros(ComplexF32, spectral_grid.spectrum, 2nlayers, nbatch)
+    coeffs_data2 = view(view(coeffs_backing2.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(coeffs_data2) !== coeffs_data2
+    coeffs_view2 = LowerTriangularArray(coeffs_data2, spectral_grid.spectrum)
+
+    transform!(coeffs_view2, field_ref, M)
+    @test Array(coeffs_view2.data) ≈ Array(coeffs_from_field_ref.data)
+    @test Array(coeffs_backing2.data)[:, layer_range, batch_idx] ≈ Array(coeffs_from_field_ref.data)
 end
 
 spectral_resolutions = (32,) #, 63, 127)
@@ -191,8 +240,8 @@ end
     NF = Float32
     @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid)
         @testset for nlayers in (1, 4)
-            spectral_grid_cpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid)
-            spectral_grid_gpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid, architecture = SpeedyWeather.GPU)
+            spectral_grid_cpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid)
+            spectral_grid_gpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid, architecture = SpeedyWeather.GPU)
             S_cpu = SpectralTransform(spectral_grid_cpu)
             S_gpu = SpectralTransform(spectral_grid_gpu)
             cpu_arch = S_cpu.architecture
@@ -252,8 +301,8 @@ end
     # forward kernel therefore reads its rings from a table rather than assuming their extent.
     @testset "non-monotonic Legendre shortcut" begin
         NF, nlayers, LegendreShortcut = Float32, 2, SpeedyTransforms.LegendreShortcutLinCubCoslat
-        spectral_grid_cpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid = HEALPixGrid)
-        spectral_grid_gpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid = HEALPixGrid, architecture = SpeedyWeather.GPU)
+        spectral_grid_cpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid = HEALPixGrid)
+        spectral_grid_gpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid = HEALPixGrid, architecture = SpeedyWeather.GPU)
         S_cpu = SpectralTransform(spectral_grid_cpu; LegendreShortcut)
         S_gpu = SpectralTransform(spectral_grid_gpu; LegendreShortcut)
         cpu_arch = S_cpu.architecture
@@ -328,11 +377,11 @@ end
 
             # reference: generic (allocating) GPU path, graphs disabled on this transform
             ext.clear_fourier_graph_cache!()
-            S_off = SpectralTransform(spectral_grid; cuda_graphs = false)
+            S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
             spec_off = transform(field, S_off)      # grid -> spectral
             grid_off = transform(coeffs, S_off)      # spectral -> grid
 
-            # CUDA-Graphs path (default, cuda_graphs = true)
+            # GPU-graphs path (default, gpu_graphs = true)
             ext.clear_fourier_graph_cache!()
             S_on = SpectralTransform(spectral_grid)
             spec_on = transform(field, S_on)

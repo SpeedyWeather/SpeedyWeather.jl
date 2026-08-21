@@ -115,7 +115,7 @@ struct SpectralGrid{
 
     "[DERIVED] Type of grid variable in 4D (horizontal + 2 unspecified, flattened into 3D array)"
     GridVariable4D::Type{<:AbstractArray}
-    
+
     "[DERIVED] Type of grid variable in 4D (horizontal + vertical + time, flattened into 3D array)"
     GridVariableXYZT::Type{<:AbstractArray}
 
@@ -171,7 +171,7 @@ function SpectralGrid(;
         truncation::Int = DEFAULT_TRUNCATION,
         trunc::Union{Int, Nothing} = nothing,
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-        dealiasing::Real = 2,
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(Grid),
         nlayers::Int = DEFAULT_NLAYERS,
         transform_batch::AbstractVector{<:Integer} = default_transform_batch(architecture, nlayers),
     )
@@ -182,7 +182,7 @@ function SpectralGrid(;
     end
 
     if trunc !== nothing
-        Base.depwarn("`trunc` is deprecated, use `truncation` instead (note `truncation = trunc + 1`). So typical truncations are now 32, 64, 128, ...", :SpectralGrid, force=true)
+        Base.depwarn("`trunc` is deprecated, use `truncation` instead (note `truncation = trunc + 1`). So typical truncations are now 32, 64, 128, ...", :SpectralGrid, force = true)
         truncation = trunc + 1
     end
 
@@ -207,7 +207,7 @@ Initialize a SpectralGrid from a given grid.
 function SpectralGrid(
         grid::AbstractGrid;
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
-        dealiasing::Real = 2,
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(grid),
         nlayers::Int = DEFAULT_NLAYERS,
         transform_batch::AbstractVector{<:Integer} = default_transform_batch(grid.architecture, nlayers),
     )
@@ -335,6 +335,17 @@ function (::Type{S})(
     # is independent — it just lists which Ks get a batched FFT plan.
     scratch_nlayers = max(maximum(transform_batch), 4 * nlayers + 1)
     return S(spectrum, grid; NF, nlayers = scratch_nlayers, transform_batch, kwargs...)
+end
+
+"""$(TYPEDSIGNATURES)
+Chooses the transform based on resolution and architecture. For low-resolution
+GPU a MatrixSpectralTransform is returned, otherwise the SpectralTransform."""
+function WhichTransform(spectral_grid::SpectralGrid; kwargs...)
+    if (spectral_grid.truncation <= 64 && spectral_grid.architecture isa GPU) || spectral_grid.architecture isa ReactantDevice
+        return MatrixSpectralTransform(spectral_grid; kwargs...)
+    else
+        return SpectralTransform(spectral_grid; kwargs...)
+    end
 end
 
 """$(TYPEDSIGNATURES)

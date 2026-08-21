@@ -86,7 +86,7 @@ function reinitialize!(
         vars::Variables,
     )
     (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    Δt = time_step(time_stepping, vars.prognostic.clock) 
+    Δt = time_step(time_stepping, vars.prognostic.clock)
     implicit.Δt[] == Δt && return nothing                   # if time step has not changed no need to reinitialize
     scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
     Tₖ = vars.dynamics.average_temperature_profile
@@ -246,10 +246,10 @@ function implicit_correction!(
     implicit.centering == 0 && return nothing
 
     (; S⁻¹, R, U, L, W, nlayers) = implicit
-    
+
     # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
     # dynamical core uses scaled time step, scale on the fly
-    Δt = time_step(time_stepping, vars.prognostic.clock)       
+    Δt = time_step(time_stepping, vars.prognostic.clock)
     ξ = implicit.centering * Δt / vars.prognostic.scale[]
 
     temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, implicit)
@@ -301,8 +301,13 @@ end
     for k in 1:nlayers
         # skip 1:k-1 as integration is surface to k
         geopotential_val = zero(eltype(geopotential))
-        for r in k:nlayers
+        # while loop instead of `for r in k:nlayers`: the triangular range with both
+        # endpoints dynamic miscompiles on AMDGPU/CDNA (gfx90a/gfx942), see
+        # https://github.com/JuliaGPU/AMDGPU.jl/issues/1015
+        r = k
+        while r <= nlayers
             geopotential_val += R[k, r] * temp_tend[lm, r]
+            r += 1
         end
         geopotential[lm, k] = geopotential_val
     end

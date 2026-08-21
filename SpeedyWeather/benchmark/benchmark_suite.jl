@@ -228,13 +228,15 @@ end
 # fails to compile (InvalidIRError). The full model avoids this by transforming the
 # contiguous fused parent in one batched call, so these are only exercised in
 # isolation here. Skip them on GPU rather than triggering the (slow) failures.
-const GPU_INCOMPATIBLE_FUNCTIONS = Set([
-    "surface_pressure_tendency!",
-    "vordiv_tendencies!",
-    "temperature_tendency!",
-    "humidity_tendency!",
-    "bernoulli_potential!",
-])
+const GPU_INCOMPATIBLE_FUNCTIONS = Set(
+    [
+        "surface_pressure_tendency!",
+        "vordiv_tendencies!",
+        "temperature_tendency!",
+        "humidity_tendency!",
+        "bernoulli_potential!",
+    ]
+)
 
 # Run one @benchmark and store the result. On failure, record NaN/0 and warn
 # (used for individual function benchmarks that may not be GPU-compatible).

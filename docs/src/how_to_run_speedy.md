@@ -188,6 +188,20 @@ to set the time to 1st May, 2020 (but you can also do that manually).
 This time is used by components that depend on time, e.g. the solar
 zenith angle calculation.
 
+!!! note "`Simulation(model)` as an alternative"
+    You can equivalently write
+    ```@example howto
+    simulation = Simulation(model)
+    ```
+    `Simulation(model)` and `initialize!(model)` do exactly the same thing
+    (including all keyword arguments like `time`), they just emphasise
+    different aspects: `initialize!` highlights that the model is mutated
+    in this step (hence the `!`), `Simulation` highlights that a
+    `Simulation` object is returned -- mirroring the user interface of
+    [Oceananigans.jl](https://github.com/CliMA/Oceananigans.jl).
+    Throughout this documentation we use `initialize!`, but pick whichever
+    you prefer.
+
 After this step you can continue to tweak your model setup but note that
 some model components are immutable, or that your changes may not be
 propagated to other model components that rely on it. But you can, for

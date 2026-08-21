@@ -123,6 +123,103 @@ as
 
 For details see Frierson et al. 2006 [^FH06].
 
+## [Solar zenith angle, length of day and year](@id zenith)
+
+The incoming solar radiation depends on the cosine of the solar zenith angle, which
+in turn depends on where the planet is in its daily rotation and in its orbit
+around the sun. Both are controlled through the planet
+
+```@example radiation
+using Dates
+spectral_grid = SpectralGrid(truncation=31, nlayers=8)
+planet = Earth(spectral_grid, length_of_day=Hour(24), length_of_year=Day(365)+Hour(6))
+```
+
+`length_of_day` is the time the planet takes for one rotation about its own axis
+(controlling the daily cycle) and `length_of_year` the time for one orbit around
+the sun (controlling the seasonal cycle). Both are `Dates` periods, so
+`Hour(24)`, `Day(1)` or `Second(86400)` are equivalent, and both are completely
+independent of the model's time step and of the simulation time you pass to
+`run!`. A planet with a 10-day-long day and an Earth-length year is just
+
+```@example radiation
+planet = Earth(spectral_grid, length_of_day=Day(10), length_of_year=Day(365))
+```
+
+### Orbit and rotation time
+
+Internally, SpeedyWeather does *not* stretch the calendar to achieve this.
+`Dates` is inherently tied to the Earth calendar: a "month" or a "leap year"
+only means something for Earth, and a 10-day-long day would make `DateTime`
+meaningless. Instead, the clock carries two additional times alongside the
+model time
+
+- `rotation_time` advances the daily cycle,
+- `orbit_time` advances the seasonal cycle.
+
+Both start synchronized with the model time and then run *faster, slower or even
+backwards* relative to it, at a rate set by the ratio of Earth's day/year to the
+planet's. So a day that is 10x longer than Earth's makes `rotation_time` tick at
+1/10 of the model time:
+
+```@example radiation
+planet = Earth(spectral_grid, length_of_day=Day(10), length_of_year=Day(365))
+model = PrimitiveWetModel(spectral_grid; planet)
+simulation = initialize!(model, time=DateTime(2000, 1, 1))
+run!(simulation, period=Day(1))
+
+clock = simulation.variables.prognostic.clock
+canonicalize(clock.rotation_time - clock.start)   # 2.4h of rotation in 1 day of model time
+```
+
+while the orbit time keeps up with the model time almost exactly, because this
+planet's year is only 6 hours shorter than Earth's:
+
+```@example radiation
+canonicalize(clock.orbit_time - clock.start)
+```
+
+The solar zenith angle is then computed from `rotation_time` and `orbit_time`,
+never from the model time directly. The year and hour angles that enter it always
+run continuously from 0 to 2π with no jump at midnight or at the New Year --
+including across leap years, where the length of the year is taken to be the
+actual length of that year (365 or 366 days).
+
+A negative `length_of_day` makes the planet rotate backwards, so the sun rises in
+the west. A very long one approximates a tidally locked planet:
+
+```@example radiation
+planet = Earth(spectral_grid, length_of_day=Second(typemax(Int)))
+```
+
+Zero is not allowed for either (that would be an infinitely fast rotation or
+orbit) and throws an error -- switch the respective cycle off instead, see below.
+
+### Switching the cycles off
+
+`daily_cycle` and `seasonal_cycle` control whether these cycles are resolved at all
+
+```@example radiation
+planet = Earth(spectral_grid, daily_cycle=false)
+model = PrimitiveWetModel(spectral_grid; planet)
+typeof(model.solar_zenith).name.name
+```
+
+With `daily_cycle=false` a `SolarZenithSeason` is used, which applies the
+daily *average* insolation and so ignores `rotation_time` entirely -- useful to
+avoid resolving a daily cycle you do not care about. With `seasonal_cycle=false`
+the season is instead held fixed at the initial time of the simulation.
+Note that these are independent of `length_of_day` and `length_of_year`: the
+lengths say how fast the cycles run, these switches say whether they run.
+
+### Other orbital parameters
+
+Two further planet parameters feed into the zenith angle: `axial_tilt` [˚], the
+tilt of the rotation axis with respect to the orbit, which sets the amplitude of
+the seasonal cycle, and `equinox`, the time of the spring equinox, which sets its
+phase (only the month and day matter, not the year). `solar_constant` [W/m²]
+scales the total incoming radiation.
+
 ## Shortwave radiation
 
 Currently implemented schemes:

@@ -79,7 +79,7 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
 
         for (kind, short, marker, linestyle) in (
                 ("default", "LT+FFT", :circle, :solid),
-                ("matrix",  "MT",     :diamond, :dash),
+                ("matrix", "MT", :diamond, :dash),
             )
             xs = Int[]
             ys = Float64[]
@@ -93,14 +93,17 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
             end
             isempty(xs) && continue
             order = sortperm(xs)
-            scatterlines!(ax, xs[order], ys[order];
+            scatterlines!(
+                ax, xs[order], ys[order];
                 color = color, marker = marker, linestyle = linestyle,
                 linewidth = 2, markersize = 10,
             )
-            push!(legend_elems, [
-                LineElement(color = color, linestyle = linestyle, linewidth = 2),
-                MarkerElement(color = color, marker = marker, markersize = 10),
-            ])
+            push!(
+                legend_elems, [
+                    LineElement(color = color, linestyle = linestyle, linewidth = 2),
+                    MarkerElement(color = color, marker = marker, markersize = 10),
+                ]
+            )
             push!(legend_labels, "$label ($short)")
             plotted_anything = true
         end
