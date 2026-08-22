@@ -147,7 +147,11 @@ end
 
     # modulo all particles here
     # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
-    particles[i] = mod(set(particles[i]; σ = σ))
+    # NB: avoid `set(particle; σ = σ)` here (keyword-argument dispatch triggers
+    # AMDGPU hostcalls, see `sind`/`cosd` note in `advect_2D` above); construct
+    # the updated particle positionally instead
+    particle = particles[i]
+    particles[i] = mod(typeof(particle)(particle.active, particle.lon, particle.lat, σ))
     lons[i] = particles[i].lon
     lats[i] = particles[i].lat
 end
