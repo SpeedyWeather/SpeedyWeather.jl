@@ -406,10 +406,12 @@ function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
             end
         end
     end
+    return ext !== nothing
 end
 
-test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt), "CUDA")
-test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt), "HIP")
+CUDA_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt), "CUDA")
+AMD_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt), "HIP")
+@test xor(CUDA_executed, AMD_executed) # only one should ever be executed on a given machine
 
 @testset "fourier_batched: compare backward pass to CPU" begin
     @testset for truncation in spectral_resolutions

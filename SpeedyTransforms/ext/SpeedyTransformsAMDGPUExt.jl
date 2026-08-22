@@ -70,7 +70,7 @@ function warn_gpu_graphs_unavailable()
 end
 
 # =====================================================================================
-# Method overrides: dispatch on ROCArray scratch (more specific than the generic
+# Method extension: dispatch on ROCArray scratch (more specific than the generic
 # AbstractArray{<:Complex,3} methods in fourier.jl)
 # =====================================================================================
 
@@ -85,14 +85,8 @@ function _fourier_batched!(
         S::SpectralTransform,
     )
     @assert eltype(field) == eltype(S) "Number format of grid $(eltype(field)) and SpectralTransform $(eltype(S)) need to match."
-    if !S.gpu_graphs
-        return Base.@invoke _fourier_batched!(
-            f_north::AbstractArray{<:Complex, 3}, f_south::AbstractArray{<:Complex, 3},
-            field::AbstractField, S::SpectralTransform,
-        )
-    end
-    if !_HIP_GRAPHS_AVAILABLE
-        warn_gpu_graphs_unavailable()
+    if !S.gpu_graphs || !_HIP_GRAPHS_AVAILABLE
+        !_HIP_GRAPHS_AVAILABLE && warn_gpu_graphs_unavailable()
         return Base.@invoke _fourier_batched!(
             f_north::AbstractArray{<:Complex, 3}, f_south::AbstractArray{<:Complex, 3},
             field::AbstractField, S::SpectralTransform,
@@ -116,14 +110,8 @@ function _fourier_batched!(
         S::SpectralTransform;
         add::Bool = false,          # accumulate onto `field` instead of overwriting? (Enzyme adjoint rule)
     )
-    if !S.gpu_graphs
-        return Base.@invoke _fourier_batched!(
-            field::AbstractField, g_north::AbstractArray{<:Complex, 3},
-            g_south::AbstractArray{<:Complex, 3}, S::SpectralTransform; add,
-        )
-    end
-    if !_HIP_GRAPHS_AVAILABLE
-        warn_gpu_graphs_unavailable()
+    if !S.gpu_graphs || !_HIP_GRAPHS_AVAILABLE
+        !_HIP_GRAPHS_AVAILABLE && warn_gpu_graphs_unavailable()
         return Base.@invoke _fourier_batched!(
             field::AbstractField, g_north::AbstractArray{<:Complex, 3},
             g_south::AbstractArray{<:Complex, 3}, S::SpectralTransform; add,
