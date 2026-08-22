@@ -1,9 +1,7 @@
-# Shared test logic for CUDA-graphs tests, called from cuda_graphs.jl.
-# HIP graphs are not implemented for AMDGPU (see SpeedyTransformsAMDGPUExt.jl and
-# hip_graphs.jl), so this is CUDA-only.
-# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live inside the CUDA extension
-# module (SpeedyTransformsCUDAExt), not in the main SpeedyTransforms package — hence
-# accessed via `ext.` below, not `SpeedyTransforms.`.
+# Shared test logic for GPU-graphs tests, called from cuda_graphs.jl and hip_graphs.jl.
+# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live inside the backend extension
+# module (SpeedyTransformsCUDAExt / SpeedyTransformsAMDGPUExt), not in the main SpeedyTransforms
+# package — hence accessed via `ext.` below, not `SpeedyTransforms.`.
 
 function test_gpu_graphs(ext, prefix)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin

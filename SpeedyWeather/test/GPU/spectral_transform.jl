@@ -365,47 +365,53 @@ end
     end
 end
 
-@testset "fourier_batched: CUDA Graphs equivalence and replay" begin
-    # the CUDA-Graphs acceleration lives in SpeedyTransformsCUDAExt; only test it when
-    # the CUDA backend (and hence the extension) is actually loaded
-    ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
-    if ext !== nothing
-        @testset for Grid in grid_list
-            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
-            field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
-            coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
+function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
+    @testset "fourier_batched: $prefix Graphs equivalence and replay" begin
+        # the GPU-Graphs acceleration lives in the backend extension; only test it when that
+        # backend (and hence the extension) is actually loaded
+        if ext !== nothing
+            @testset for Grid in grid_list
+                spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
+                field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
+                coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
 
-            # reference: generic (allocating) GPU path, graphs disabled on this transform
-            ext.clear_fourier_graph_cache!()
-            S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
-            spec_off = transform(field, S_off)      # grid -> spectral
-            grid_off = transform(coeffs, S_off)      # spectral -> grid
+                # reference: generic (allocating) GPU path, graphs disabled on this transform
+                ext.clear_fourier_graph_cache!()
+                S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
+                spec_off = transform(field, S_off)      # grid -> spectral
+                grid_off = transform(coeffs, S_off)      # spectral -> grid
 
-            # GPU-graphs path (default, gpu_graphs = true)
-            ext.clear_fourier_graph_cache!()
-            S_on = SpectralTransform(spectral_grid)
-            spec_on = transform(field, S_on)
-            grid_on = transform(coeffs, S_on)
+                # GPU-graphs path (default, gpu_graphs = true)
+                ext.clear_fourier_graph_cache!()
+                S_on = SpectralTransform(spectral_grid)
+                spec_on = transform(field, S_on)
+                grid_on = transform(coeffs, S_on)
 
-            # graphs path must match the generic path (forward differs only at the level
-            # of the non-deterministic atomic Legendre transform, hence the tolerance)
-            @test Array(spec_on.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
-            @test Array(grid_on.data) ≈ Array(grid_off.data) rtol = sqrt(eps(Float32))
+                # graphs path must match the generic path (forward differs only at the level
+                # of the non-deterministic atomic Legendre transform, hence the tolerance)
+                @test Array(spec_on.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
+                @test Array(grid_on.data) ≈ Array(grid_off.data) rtol = sqrt(eps(Float32))
 
-            # a graph was actually captured and cached
-            @test !isempty(ext.GRAPH_CACHES)
+                # a graph was actually captured and cached
+                @test !isempty(ext.GRAPH_CACHES)
 
-            # replaying into the same buffers across repeated calls stays correct
-            spec_repeat = similar(spec_on)
-            for _ in 1:3
-                transform!(spec_repeat, field, S_on)
+                # replaying into the same buffers across repeated calls stays correct
+                spec_repeat = similar(spec_on)
+                for _ in 1:3
+                    transform!(spec_repeat, field, S_on)
+                end
+                @test Array(spec_repeat.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
+
+                ext.clear_fourier_graph_cache!()
             end
-            @test Array(spec_repeat.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
-
-            ext.clear_fourier_graph_cache!()
         end
     end
+    return ext !== nothing
 end
+
+CUDA_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt), "CUDA")
+AMD_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt), "HIP")
+@test xor(CUDA_executed, AMD_executed) # only one should ever be executed on a given machine
 
 @testset "fourier_batched: compare backward pass to CPU" begin
     @testset for truncation in spectral_resolutions
