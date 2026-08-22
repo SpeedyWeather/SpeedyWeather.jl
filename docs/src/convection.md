@@ -81,9 +81,10 @@ The (absolute) temperature a lifted parcel has during ascent (following its pseu
 or moist, until reaching the level of zero buoyancy) is then taken as the reference temperature
 profile ``T_{ref}`` that the Betts-Miller convective parameterization relaxes towards as a first guess
 (with a following adjustment as discussed below). The humidity profile is taken as
-``q_{ref} = RH_{SBM}T_{ref}`` with a parameter ``RH_{SBM}`` (default ``RH_{SBM} = 0.7``)
+``q_{ref} = RH_{SBM}\,q^\star(T_{ref})`` with a parameter ``RH_{SBM}`` (default ``RH_{SBM} = 0.7``)
 of the scheme (Simplified Betts-Miller, SBM) that determines a constant relative humidity of
-the reference profile.
+the reference profile, applied to the saturation humidity ``q^\star`` evaluated at the reference
+temperature ``T_{ref}`` of that layer.
 
 An illustration of adiabat reference line is below
 
@@ -107,13 +108,13 @@ the resulting tendencies from this scheme. Those will be calculated in [Correcte
 
 Note that above the level of zero buoyancy no relaxation takes place ``\delta T = \delta q = 0``,
 or, equivalently ``T = T_{ref}``, ``q = q_{ref}`` there.
-Vertically integration from surface ``p_0`` to level of zero buoyancy in
-pressure coordinates ``p_{LZB}`` yields
+Vertically integration from the level of zero buoyancy ``p_{LZB}`` to the surface ``p_0`` (so that
+``dp > 0``, as ``p_{LZB} < p_0``) yields
 
 ```math
 \begin{aligned}
-P_q &= - \int_{p_0}^{p_{LZB}} \delta q \frac{dp}{g} \\
-P_T &= \int_{p_0}^{p_{LZB}} \frac{c_p}{L_v} \delta T \frac{dp}{g}
+P_q &= - \int_{p_{LZB}}^{p_0} \delta q \frac{dp}{g} \\
+P_T &= \int_{p_{LZB}}^{p_0} \frac{c_p}{L_v} \delta T \frac{dp}{g}
 \end{aligned}
 ```
 
@@ -166,11 +167,11 @@ determined during the calculation of the [Reference profiles](@ref).
 
 ```math
 \begin{aligned}
-\Delta q &= \int_{p_0}^{p_{LZB}} (q - q_{ref}) dp \\
-Q_{ref}  &= \int_{p_0}^{p_{LZB}} -q_{ref}~dp \\
+\Delta q &= \int_{p_{LZB}}^{p_0} (q - q_{ref}) dp \\
+Q_{ref}  &= \int_{p_{LZB}}^{p_0} -q_{ref}~dp \\
 f_q      &= 1 - \frac{\Delta q}{Q_{ref}} \\
 q_{ref, 2} &= f_q q_{ref} \\
-\Delta T &= -\frac{1}{\Delta p} \int_{p_0}^{p_{LZB}} (T - T_{ref}) dp \\
+\Delta T &= -\frac{1}{\Delta p} \int_{p_{LZB}}^{p_0} (T - T_{ref}) dp \\
 T_{ref,2} &= T_{ref} - \Delta T
 \end{aligned}
 ```
@@ -178,18 +179,18 @@ T_{ref,2} &= T_{ref} - \Delta T
 This scheme is non-precipitating (``P_q = 0``) as derived below. ``P_q`` follows from the vertical integral of the moisture tendency ``\delta q``, which in this scheme is a relaxation towards ``q_{\text{ref,2}}`` (see [Corrected relaxation](@ref)).
 
 ```math
-P_q = -\int_{p_0}^{p_{LZB}} \frac{\delta q}{g} \, dp = \int_{p_0}^{p_{LZB}} \frac{q - q_{\text{ref,2}}}{g \tau_{SBM}} dp
+P_q = -\int_{p_{LZB}}^{p_0} \frac{\delta q}{g} \, dp = \int_{p_{LZB}}^{p_0} \frac{q - q_{\text{ref,2}}}{g \tau_{SBM}} dp
 ```
 
 Inserting from above yields
 
 ```math
-P_q = \int_{p_0}^{p_{LZB}} \frac{q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} }{g \tau_{SBM}} dp = \frac{1}{g \tau_{SBM}} \int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
+P_q = \int_{p_{LZB}}^{p_0} \frac{q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} }{g \tau_{SBM}} dp = \frac{1}{g \tau_{SBM}} \int_{p_{LZB}}^{p_0} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
 ```
 
 The integral becomes
 ```math
-\Delta q + \frac{\Delta q}{Q_{\text{ref}}} \int_{p_0}^{p_{LZB}}q_{\text{ref}} dp = \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
+\Delta q + \frac{\Delta q}{Q_{\text{ref}}} \int_{p_{LZB}}^{p_0}q_{\text{ref}} dp = \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
 ```
 
 So this scheme is indeed non-precipitating, i.e. $P_q = 0$.
@@ -206,7 +207,7 @@ and [Shallow convection](@ref) we actually calculate tendencies from
 \end{aligned}
 ```
 
-with ``\tau_{SBM} = 2h`` as default.
+with ``\tau_{SBM} = 4h`` as default.
 
 ## Convective precipitation
 
@@ -215,11 +216,20 @@ The convective precipitation ``P`` results then from the vertical integration of
 similar to [Large-scale precipitation](@ref).
 
 ```math
-P = -\int \frac{\Delta t}{g \rho} \delta q dp
+P = -\int_{p_{LZB}}^{p_0} \frac{\Delta t}{g \rho} \delta q\,dp
 ```
 
-In the shallow convection case ``P=0`` due to the correction even though in
-the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
+Only layers with ``\delta q < 0`` (drying, i.e. condensation) contribute to this integral;
+layers that moisten (``\delta q > 0``) are clamped to zero rather than allowed to offset the
+total, since the scheme does not model reevaporation of falling convective rain. The result is
+additionally multiplied by a deep-convection indicator so that ``P = 0`` identically for shallow
+convection: with the ``\delta q \ge 0``-clamp in place, the qref correction's exact ``P_q = 0``
+result (derived in [Shallow convection](@ref)) is not automatically reproduced layer-by-layer, so
+the indicator is what actually enforces no precipitation in the shallow case, not merely a
+redundant restatement of it.
+
+In the shallow convection case ``P=0`` due to the correction (and the indicator above) even though
+in the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
 
 
 ## Dry convection
