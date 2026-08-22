@@ -35,6 +35,9 @@ gpu_backend = load_gpu_package()
 # KERNEL LAUNCHING AND UTILS
 include("kernels_GPU.jl")
 
+# BROADCASTING
+include("broadcasting.jl")
+
 # SPECTRAL TRANSFORMS
 include("spectral_transform.jl")
 
