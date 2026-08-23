@@ -14,6 +14,12 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
 
     "[OPTION] Entrainment profile mixing environmental air into the rising parcel"
     @component entrainment::Entrainment = NoEntrainment()
+
+    "[OPTION] Convert convective rain below freezing to snow?"
+    snow::Bool = true
+
+    "[OPTION] Temperature of the lowermost layer below which convective rain becomes snow [K]"
+    @param freezing_threshold::NF = 273.15 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure BettsMillerConvection
@@ -143,13 +149,26 @@ and relaxes current vertical profiles to the adjusted references."""
     rain_convection *= pₛΔt_gρ                  # convert to [m] of rain during Δt
     rain_convection = max(rain_convection, 0)   # ensure non-negative precipitation, rounding errors
 
+    # CONVECTIVE SNOW: below freezing, all convective rain falls as snow instead. Convective
+    # precipitation is deposited immediately (not fluxed through layers like large-scale
+    # precipitation), so a single check on the lowermost layer's temperature is sufficient,
+    # unlike the falling-flux melt cascade in large-scale condensation
+    snow_convection::NF = 0
+    let_it_snow = convection.snow
+    rain_convection, snow_convection = let_it_snow && temp[ij, nlayers] < convection.freezing_threshold ?
+        (snow_convection, rain_convection) : (rain_convection, snow_convection)
+
     # Store precipitation in diagnostic arrays
     vars.parameterizations.rain_convection[ij] += rain_convection            # accumulated rain [m] for output
+    vars.parameterizations.snow_convection[ij] += snow_convection            # accumulated snow [m] for output
     rain_rate_convection = rain_convection / Δt                     # instantaneous rate [m/s] for coupling
+    snow_rate_convection = snow_convection / Δt                     # instantaneous rate [m/s] for coupling
     vars.parameterizations.rain_rate_convection[ij] = rain_rate_convection   # instantaneous rate [m/s] for coupling
+    vars.parameterizations.snow_rate_convection[ij] = snow_rate_convection   # instantaneous rate [m/s] for coupling
 
-    # accumulate into total rain rate including large-scale condensation [m/s]
+    # accumulate into total rain/snow rate including large-scale condensation [m/s]
     vars.parameterizations.rain_rate[ij] += rain_rate_convection             # instantaneous rate [m/s] for coupling
+    vars.parameterizations.snow_rate[ij] += snow_rate_convection             # instantaneous rate [m/s] for coupling
 
     # clouds reach to top of convection
     vars.parameterizations.cloud_top[ij] = min(vars.parameterizations.cloud_top[ij], level_zero_buoyancy)
@@ -160,7 +179,10 @@ function variables(::BettsMillerConvection)
     return (
         ParameterizationVariable(:rain_convection, Grid2D(), desc = "Convective precipitation (accumulated)", units = "m"),
         ParameterizationVariable(:rain_rate_convection, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
+        ParameterizationVariable(:snow_convection, Grid2D(), desc = "Convective precipitation (snow, accumulated)", units = "m"),
+        ParameterizationVariable(:snow_rate_convection, Grid2D(), desc = "Convective snow rate", units = "m/s"),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
+        ParameterizationVariable(:snow_rate, Grid2D(), desc = "Snow rate (large-scale + convection)", units = "m/s"),
         ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
     )
 end

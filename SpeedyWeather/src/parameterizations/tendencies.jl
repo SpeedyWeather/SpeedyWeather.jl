@@ -109,6 +109,10 @@ function reset_variables!(vars::Variables)
     reset_variable!(vars.parameterizations, :cloud_top, nlayers + 1)   # reset to below top layer
     reset_variable!(vars.parameterizations, :rain_rate, 0)
     reset_variable!(vars.parameterizations, :snow_rate, 0)
+    # convection! only assigns these on the non-early-return (convecting) path, so without a
+    # reset a column that stops convecting would otherwise keep a stale rate from an earlier step
+    reset_variable!(vars.parameterizations, :rain_rate_convection, 0)
+    reset_variable!(vars.parameterizations, :snow_rate_convection, 0)
     reset_variable!(vars.parameterizations, :surface_humidity_flux, 0)
     reset_variable!(vars.parameterizations, :sensible_heat_flux, 0)
     return nothing

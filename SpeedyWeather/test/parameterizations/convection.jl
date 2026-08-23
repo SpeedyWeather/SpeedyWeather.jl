@@ -156,4 +156,42 @@
             end
         end
     end
+
+    @testset "Convective snow" begin
+        spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
+        model = PrimitiveWetModel(spectral_grid)  # snow = true by default
+        model.feedback.verbose = false
+        simulation = initialize!(model)
+        run!(simulation, steps = 20)   # spin up so some columns actually convect
+
+        vars = simulation.variables
+        @test model.convection.snow == true
+        @test haskey(vars.parameterizations, :snow_convection)
+        @test haskey(vars.parameterizations, :snow_rate_convection)
+        @test haskey(vars.parameterizations, :snow_rate)
+
+        # two isolated calls of convection! on the *same* atmospheric state (vars.grid is not
+        # mutated by convection!), with snow on vs off, so the comparison isn't confounded by
+        # chaotic divergence between separate model runs
+        convection_snow = model.convection
+        convection_no_snow = BettsMillerConvection(spectral_grid; snow = false)
+
+        vars.parameterizations.rain_convection .= 0
+        vars.parameterizations.snow_convection .= 0
+        SpeedyWeather._column_parameterizations_cpu!(vars, (convection = convection_snow,), model)
+        rain_on = copy(vars.parameterizations.rain_convection)
+        snow_on = copy(vars.parameterizations.snow_convection)
+
+        vars.parameterizations.rain_convection .= 0
+        vars.parameterizations.snow_convection .= 0
+        SpeedyWeather._column_parameterizations_cpu!(vars, (convection = convection_no_snow,), model)
+        rain_off = copy(vars.parameterizations.rain_convection)
+        snow_off = copy(vars.parameterizations.snow_convection)
+
+        @test all(snow_off .== 0)                    # snow = false: never snows
+        @test any(snow_on .> 0)                       # some (polar) column does snow by default
+        # snow only swaps rain <-> snow after rain_convection is fully computed, so the total
+        # is exactly conserved (not merely approximately) between the two configurations
+        @test rain_on .+ snow_on == rain_off
+    end
 end

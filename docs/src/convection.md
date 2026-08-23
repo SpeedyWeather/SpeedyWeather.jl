@@ -272,6 +272,18 @@ redundant restatement of it.
 In the shallow convection case ``P=0`` due to the correction (and the indicator above) even though
 in the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
 
+### Convective snow
+
+If the temperature of the lowermost model layer is below a `freezing_threshold` (default
+``273.15\,K``), all of ``P`` falls as snow instead of rain for that column and time step,
+controlled by the `snow` option (`true` by default). This is a single check on the layer the
+parcel starts its ascent from, unlike [Large-scale condensation](@ref)'s falling-flux melt
+cascade through intermediate layers: convective precipitation is generated and deposited within
+the same time step rather than fluxed layer by layer, so there is no intermediate layer for it
+to fall through and potentially melt in. The phase swap conserves total precipitation mass
+(rain + snow is unchanged, only the partitioning between the two is affected), and shallow
+convection produces neither since ``P = 0`` there regardless of temperature. With `snow = false`
+all convective precipitation is always rain, recovering the previous behaviour.
 
 ## Dry convection
 
