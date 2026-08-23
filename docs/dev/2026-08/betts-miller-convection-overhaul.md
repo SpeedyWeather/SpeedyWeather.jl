@@ -6,7 +6,9 @@
 > bisected to a compilation-heuristic sensitivity rather than a logic defect (see Testing and
 > verification / Known limitations) — noted in the PR description for maintainer input rather
 > than resolved unilaterally, per user decision. This PR supersedes #976 (entrainment, by
-> @nviebig) — commented on #976 linking here, per user decision.
+> @nviebig) — commented on #976 linking here, per user decision. Note: the comment's wording
+> floated closing #976 in favor of #1221 while explicitly asking @nviebig first — #976 was
+> **not** actually closed via the API, only commented on; closing it remains a human call.
 
 Date of initial draft: 2026-08-22
 
