@@ -1,12 +1,12 @@
 # Betts-Miller convection overhaul: branchless vertical loops, entrainment, convective snow
 
-> Status: **completed, with one open item** (pending PR open + push). All code, tests, docs, and
-> local verification done on branch `mc/convection`. The full `Pkg.test` run surfaces 2 JET
-> dispatch-check failures in unrelated `Barotropic`/dynamics-core code, bisected to a
-> compilation-heuristic sensitivity rather than a logic defect (see Testing and verification /
-> Known limitations) — flagged to the user rather than resolved unilaterally. Not yet
-> pushed/opened as a PR — awaiting user confirmation, since this also bundles a large
-> restructuring with a feature that supersedes another contributor's open PR (#976).
+> Status: **completed, with one open item**. Opened as
+> [PR #1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221). The full `Pkg.test`
+> run surfaces 2 JET dispatch-check failures in unrelated `Barotropic`/dynamics-core code,
+> bisected to a compilation-heuristic sensitivity rather than a logic defect (see Testing and
+> verification / Known limitations) — noted in the PR description for maintainer input rather
+> than resolved unilaterally, per user decision. This PR supersedes #976 (entrainment, by
+> @nviebig) — commented on #976 linking here, per user decision.
 
 Date of initial draft: 2026-08-22
 
