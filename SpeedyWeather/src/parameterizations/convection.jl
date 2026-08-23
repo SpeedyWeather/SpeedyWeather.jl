@@ -5,18 +5,22 @@ export BettsMillerConvection
 """The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct BettsMillerConvection{NF} <: AbstractConvection
+@parameterized @kwdef struct BettsMillerConvection{NF, Entrainment <: AbstractEntrainment} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
     "[OPTION] Relative humidity for reference profile [1]"
     @param relative_humidity::NF = 0.7
+
+    "[OPTION] Entrainment profile mixing environmental air into the rising parcel"
+    @component entrainment::Entrainment = NoEntrainment()
 end
 
 Adapt.@adapt_structure BettsMillerConvection
 
 # generator function
-BettsMillerConvection(SG::SpectralGrid; kwargs...) = BettsMillerConvection{SG.NF}(; kwargs...)
+BettsMillerConvection(SG::SpectralGrid; entrainment = NoEntrainment(), kwargs...) =
+    BettsMillerConvection{SG.NF, typeof(entrainment)}(; entrainment, kwargs...)
 initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -67,7 +71,7 @@ and relaxes current vertical profiles to the adjusted references."""
     # without needing to mask the loop range to level_zero_buoyancy:nlayers
     level_zero_buoyancy = pseudo_adiabat!(
         ij, temp_ref_profile, humid_ref_profile, temp, humid,
-        geopotential, pₛ, σ, atmosphere, convection.relative_humidity,
+        geopotential, pₛ, σ, atmosphere, convection.relative_humidity, convection.entrainment,
     )
 
     Pq::NF = 0        # precipitation due to drying
@@ -181,6 +185,7 @@ column then need no branch to skip those levels, they contribute zero on their o
         σ,
         atmosphere,
         relative_humidity,
+        entrainment,
     )
     NF = eltype(temp_ref_profile)             # number format
     nlayers = length(σ)                       # number of vertical layers
@@ -235,6 +240,16 @@ column then need no branch to skip those levels, they contribute zero on their o
             # new humidity equals to that saturation humidity
             humid_parcel = saturation_humidity(temp_parcel, σ[k] * pres, atmosphere)
             sat_humid = humid_parcel               # reused below for the reference humidity
+
+            if entraining(entrainment)             # compiled away entirely for NoEntrainment
+                # entrainment: mix the rising parcel with environmental air, diluting its
+                # buoyancy and moisture; sat_humid is recomputed at the mixed temperature so
+                # the reference humidity below stays consistent with the (now mixed) T_ref
+                ε = entrainment(σ[k])
+                temp_parcel = (1 - ε) * temp_parcel + ε * temp_environment[ij, k]
+                humid_parcel = (1 - ε) * humid_parcel + ε * humid_environment[ij, k]
+                sat_humid = saturation_humidity(temp_parcel, σ[k] * pres, atmosphere)
+            end
         else
             temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
             # sat_humid already holds saturation_humidity(temp_parcel_dry, σ[k]*pres, atmosphere)
@@ -268,15 +283,19 @@ The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct BettsMillerDryConvection{NF} <: AbstractConvection
+@parameterized @kwdef struct BettsMillerDryConvection{NF, Entrainment <: AbstractEntrainment} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
+
+    "[OPTION] Entrainment profile mixing environmental air into the rising parcel"
+    @component entrainment::Entrainment = NoEntrainment()
 end
 
-Adapt.adapt_structure(to, bmdc::BettsMillerDryConvection{NF}) where {NF} = BettsMillerDryConvection{NF}(adapt_structure(to, bmdc.time_scale))
+Adapt.@adapt_structure BettsMillerDryConvection
 
 # generator function
-BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection{SG.NF}(; kwargs...)
+BettsMillerDryConvection(SG::SpectralGrid; entrainment = NoEntrainment(), kwargs...) =
+    BettsMillerDryConvection{SG.NF, typeof(entrainment)}(; entrainment, kwargs...)
 initialize!(::BettsMillerDryConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -316,7 +335,8 @@ and relaxes current vertical profiles to the adjusted references."""
         temp,
         temp_parcel,
         σ,
-        atmosphere
+        atmosphere,
+        DBM.entrainment,
     )
 
     PT::NF = 0        # precipitation due to cooling
@@ -363,6 +383,7 @@ exactly: downstream loops over the full column then need no branch to skip those
         temp_parcel,
         σ,
         atmosphere,
+        entrainment,
     )
     NF = eltype(temp_ref_profile)
     (; κ) = atmosphere
@@ -384,6 +405,13 @@ exactly: downstream loops over the full column then need no branch to skip those
 
         # dry adiabatic ascent
         temp_parcel = temp_parcel * (σ[k] / σ[k + 1])^κ
+
+        if entraining(entrainment)          # compiled away entirely for NoEntrainment
+            # entrainment: mix the rising parcel with environmental air, diluting its buoyancy
+            ε = entrainment(σ[k])
+            temp_parcel = (1 - ε) * temp_parcel + ε * temp_environment[ij, k]
+        end
+
         temp_ref_profile[ij, k] = temp_parcel
 
         # check whether parcel is still buoyant wrt to environment

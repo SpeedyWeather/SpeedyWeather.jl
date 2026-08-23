@@ -90,6 +90,47 @@ An illustration of adiabat reference line is below
 
 ![image](https://github.com/user-attachments/assets/ea8d8a0b-20c5-47cc-88ff-47112eeeb200)
 
+## Entrainment
+
+A real convective plume mixes with the environmental air around it as it rises, which dilutes
+the parcel's temperature and moisture excess, reducing its buoyancy and moisture content and
+generally shallowing convection compared to the undiluted ascent described above. The scheme
+optionally applies this dilution at every level ``k`` during the ascent, after the dry or moist
+adiabatic step:
+
+```math
+\begin{aligned}
+T_p &\leftarrow (1 - \varepsilon_k) T_p + \varepsilon_k T_{e,k} \\
+q_p &\leftarrow (1 - \varepsilon_k) q_p + \varepsilon_k q_{e,k}
+\end{aligned}
+```
+
+with parcel temperature/humidity ``T_p, q_p``, environmental temperature/humidity at that level
+``T_{e,k}, q_{e,k}``, and an entrainment rate ``\varepsilon_k \in [0, 1]`` that can vary by level.
+Because ``\varepsilon_k`` is a mixing fraction *per model level* rather than a rate per unit
+height, the resulting profile depends on the vertical resolution (`nlayers`): the same
+`AbstractEntrainment` profile mixes in more environmental air over a coarser column, since each
+level spans a larger part of the atmosphere. In the moist branch of the ascent, mixing happens
+after condensation at that level, so the saturation adjustment (and thus the LZB and the
+associated ``T_{ref}, q_{ref}`` at that level) already reflects the diluted parcel; the latent
+heat implied by the change in ``q_p`` from mixing itself is not separately accounted for.
+
+Available profiles, selected via the `entrainment` option of [`BettsMillerConvection`](@ref) or
+[`BettsMillerDryConvection`](@ref):
+
+```@example convection
+subtypes(SpeedyWeather.AbstractEntrainment)
+```
+
+- `NoEntrainment` (the default): ``\varepsilon_k = 0`` everywhere, reproducing the scheme exactly
+  as described above with no dilution.
+- `LinearEntrainment`: ``\varepsilon_k`` ramps linearly from `surface_entrainment` at the surface
+  (``\sigma = 1``) to zero at `σ_entrainment`, and is zero above that level.
+- `ConstantEntrainment`: a single `entrainment_rate` applied at every level.
+
+Since `NoEntrainment` is the default, entrainment does not change any model's behaviour unless
+explicitly enabled, e.g. `BettsMillerConvection(spectral_grid; entrainment = LinearEntrainment(spectral_grid))`.
+
 ## First-guess relaxation
 
 With the [Reference profiles](@ref) ``T_{ref}, q_{ref}`` obtained, we relax the actual
