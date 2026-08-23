@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Convective rain in `BettsMillerConvection` now falls as snow below a configurable freezing threshold [#NNNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNNN)
+- Add entrainment profiles (`LinearEntrainment`, `ConstantEntrainment`) to Betts-Miller convection, wet and dry; supersedes and credits [#976](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/976) by @nviebig [#NNNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNNN)
+- Restructure Betts-Miller convection to branchless, full-range vertical loops for GPU; fix docs to match the code [#NNNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNNN)
 - Reformulate trigonometric functions to avoid hostcalls on AMDGPU - [#1210](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1210)
 
 ## v0.22.1

@@ -1,6 +1,12 @@
 # Betts-Miller convection overhaul: branchless vertical loops, entrainment, convective snow
 
-> Status: **in progress**. Plan approved; docs audit and code restructuring not yet started.
+> Status: **completed, with one open item** (pending PR open + push). All code, tests, docs, and
+> local verification done on branch `mc/convection`. The full `Pkg.test` run surfaces 2 JET
+> dispatch-check failures in unrelated `Barotropic`/dynamics-core code, bisected to a
+> compilation-heuristic sensitivity rather than a logic defect (see Testing and verification /
+> Known limitations) — flagged to the user rather than resolved unilaterally. Not yet
+> pushed/opened as a PR — awaiting user confirmation, since this also bundles a large
+> restructuring with a feature that supersedes another contributor's open PR (#976).
 
 Date of initial draft: 2026-08-22
 
@@ -29,6 +35,44 @@ Base revision: `557b38d5` (`mc/convection`, off `main`)
   should default to `NoEntrainment` (bit-identical to today) or PR #976's `LinearEntrainment(0.5)`
   (matches the PR, but changes model behavior for existing users) — was put to the user, who chose
   **`NoEntrainment`**. Plan approved as written; execution proceeds with Sonnet.
+- **2026-08-23, execution.** Two on-the-fly deviations from the written plan, both discovered via
+  the bit-identity gate doing its job:
+  - The dry scheme's planned `τ⁻¹` hoist (§2, "matching the wet scheme, minor fix") was dropped:
+    it changed `/DBM.time_scale.value` (division) into `inv(...)` then multiply, which is not
+    bit-identical in IEEE754 and also changed the working precision (explicit convert to `NF`
+    before the reciprocal vs. Julia's implicit `Float64` promotion in the original division).
+    Caught immediately by the bit-identity gate (~1e-5 to 1e-4 relative diffs after 200 steps);
+    reverted to the original per-level division to keep the restructuring commit exactly
+    bit-identical, as required.
+  - The planned "entrainment has an effect" test (comparing mean `cloud_top` between two
+    independent 20-step model runs, one per entrainment setting) was replaced: it failed on the
+    first run, with entrainment's mean `cloud_top` coming out *lower* (deeper clouds) than
+    without, opposite to the naive physical expectation. Diagnosis: two independent model runs
+    diverge chaotically from the first timestep regardless of entrainment, so comparing their
+    cloud-top statistics after only 20 steps isn't actually isolating entrainment's effect — it's
+    comparing two uncorrelated weather trajectories. Replaced with a direct, deterministic test:
+    call `pseudo_adiabat!` with and without entrainment on the *same* atmospheric snapshot and
+    assert the LZB with entrainment is never above (never a smaller layer index than) the LZB
+    without, for every column on a T15 grid — this is both a stronger and a cleaner test, and
+    passed on the first try once framed this way.
+  - Snow (commit 4) was, as anticipated in the plan's Q&A, confirmed *not* bit-identical to
+    `main` even with all other defaults held — expected, since `snow=true` is the requested
+    default-on behaviour, not an invisible refactor. Verified the divergence is confined to the
+    wet model (via land snow-depth/soil-moisture coupling) and that the dry model stays exact.
+  - Work paused before pushing/opening the PR: bundles a large restructuring with a feature that
+    explicitly supersedes another contributor's (@nviebig, #976) open PR, which felt like a
+    natural point to check in with the user rather than pushing autonomously.
+- **2026-08-23, full test suite + bisection.** `Pkg.test("SpeedyWeather")` surfaced 2 failures
+  (of 116,739) in `dynamics/dispatch.jl`'s JET dispatch checks, both passing on `main`. Bisected
+  by building a chain of `git worktree`s at each commit and layering each of commit 4's three
+  changed files (`convection.jl`, `entrainment.jl` — unmodified control, `precipitation.jl`,
+  `tendencies.jl`) individually onto the entrainment-only commit: none reproduces the failure
+  alone, only the full combination does, and the actual JET-flagged dispatch sites are 100% inside
+  `KernelAbstractions`/dynamics-core internals that `BarotropicModel` (no parameterizations at
+  all) exercises — conclusively not a logic bug in the snow/entrainment/restructuring code, most
+  likely a global compilation-heuristic sensitivity to the package's total type/method count.
+  Documented in Known limitations and Testing and verification rather than "fixed" by guessing at
+  `@inline` placements; flagged to the user as an open item before proceeding to push/open the PR.
 
 ## Problem description
 
@@ -258,15 +302,117 @@ existing `Convection × Model` sweep as-is):
 
 ## Summary of changes
 
-_To be filled in as work lands._
+Five commits on `mc/convection`, in order:
+
+1. **Docs audit fixes** (`docs/src/convection.md`, no code): `τ_SBM` default corrected 2h→4h,
+   `q_ref` formula corrected to include `q*(T_ref)`, integration-limit sign convention fixed for
+   `P_q`/`P_T`/`P`, the undocumented no-reevaporation clamp and the load-bearing role of the
+   deep-convection indicator documented. Code was already correct against Frierson 2007 — no
+   physics bugs found in the audit.
+2. **Branchless restructuring** (`SpeedyWeather/src/parameterizations/convection.jl`):
+   `pseudo_adiabat!`/`dry_adiabat!` now prefill the reference profiles with the environment
+   (replacing the NaN marker) and never touch levels above the level of zero buoyancy (LZB); the
+   wet scheme's separate humidity-reference fill loop is folded into the ascent. `convection!`'s
+   five (wet) / three (dry) dynamic-bound `level_zero_buoyancy:nlayers` loops become two (wet) /
+   two (dry) full-range `1:nlayers` loops with `ifelse`-masked corrections applied inline (never
+   written back to the scratch arrays). Verified bit-identical to pre-restructure `main` via an
+   exact (`==`) 200-step comparison of all prognostic fields, both `PrimitiveWetModel` and
+   `PrimitiveDryModel`. One deviation from the original plan: the dry scheme's
+   `/DBM.time_scale.value` was *not* hoisted into a precomputed `inv(...)` reciprocal as
+   initially planned (matching the wet scheme's style) — that turned out to change both the
+   floating-point operation (division → multiply-by-reciprocal) and working precision, breaking
+   bit-identity; reverted to keep this commit exactly bit-identical.
+3. **Entrainment** (`SpeedyWeather/src/parameterizations/entrainment.jl`, new file): ports PR
+   #976 (by @nviebig) onto the restructured code — `NoEntrainment`/`LinearEntrainment`/
+   `ConstantEntrainment`, added as an `entrainment` sub-component of `BettsMillerConvection` and
+   `BettsMillerDryConvection` (the latter promoted from a plain `struct` to `@parameterized
+   @kwdef` to support it). Default is `NoEntrainment` (user's decision, deviating from PR #976's
+   `LinearEntrainment(0.5)` default) — verified the 200-step bit-identity check still passes
+   exactly with entrainment wired in but defaulted off.
+4. **Convective snow** (`convection.jl`, `output/variables/precipitation.jl`,
+   `parameterizations/tendencies.jl`): new `snow`/`freezing_threshold` options on
+   `BettsMillerConvection` (default `snow = true`, `freezing_threshold = 273.15`); below that
+   threshold at the lowermost layer, convective rain is swapped for snow after `rain_convection`
+   is fully computed (mass-conserving, verified exactly (`==`) in a test). New
+   `snow_convection`/`snow_rate_convection` diagnostics and `ConvectiveSnowOutput`/
+   `ConvectiveSnowRateOutput` netCDF variables. Also fixed a latent bug found while auditing this
+   code: `reset_variables!` reset `rain_rate`/`snow_rate` but not `rain_rate_convection` (only
+   assigned on the convecting path), so a column that stopped convecting kept a stale rate; now
+   reset alongside the new `snow_rate_convection`. Since `snow = true` by default, this commit is
+   *not* bit-identical to `main` — verified this is the *expected*, intentional divergence: wet
+   model differs by O(1e-5 to 6e-2) depending on field after 200 steps wherever a column's
+   surface is below freezing (via land snow-depth/soil-moisture feedback), the dry model (no
+   precipitation) remains exactly bit-identical.
+5. **Housekeeping**: `CHANGELOG.md` (3 entries, PR number filled in once opened),
+   `SpeedyWeather/Project.toml` version `0.22.1` → `0.23.0-DEV`. All touched files are
+   Runic-clean (`runic --check` exit 0).
 
 ## Testing and verification
 
-_To be filled in as work lands._
+- `SpeedyWeather/test/parameterizations/convection.jl`: original `Convection × Model` sweep plus
+  five new testsets — entrainment functor unit tests, entrainment in a full model run (6
+  configs), entrainment's effect verified deterministically on a fixed atmospheric snapshot
+  (`lzb_with_entrainment >= lzb_without`, checked exhaustively across a T15 grid — not via
+  comparing two independently-run, chaotically-diverging simulations, which was tried first and
+  discarded as unreliable over a short run), reference-profile invariants (no NaNs, exact
+  equality to the environment above LZB) directly on `pseudo_adiabat!`/`dry_adiabat!`, and
+  convective snow (mass conservation, variable registration, `snow=false` recovers rain-only).
+  **1132/1132 pass** with `--check-bounds=yes`.
+- `SpeedyWeather/test/parameterizations/all_parametrizations.jl` (NaN-freedom across every
+  parameterization variable): **44/44 pass** (was 42 before the two new snow variables).
+- `SpeedyWeather/test/output/netcdf_output.jl` (exercises `PrecipitationOutput()`, now including
+  the two new convective-snow output types): all pass.
+- `SpeedyWeather/test/parameters.jl`, `SpeedyWeather/test/type_stability_test.jl` (excluded from
+  `Pkg.test`, run manually since new `@param`s and the `BettsMillerDryConvection`
+  `@parameterized` promotion touch them): pass.
+- Full `Pkg.test("SpeedyWeather")` with `--check-bounds=yes`: **116,737 / 116,739 pass.** The two
+  failures are both in `dynamics/dispatch.jl`'s JET `@test_opt` "free of runtime dispatch" checks
+  — one for `BarotropicModel`, one for `PrimitiveWetModel`. Both pass cleanly on unmodified `main`.
+  Root-caused by bisection (see revision log): neither of the four feature commits' *individual*
+  files (`convection.jl`, `entrainment.jl`, `precipitation.jl`, `tendencies.jl`) reproduces the
+  failure in isolation when layered onto the entrainment commit — only the *full combination* of
+  changes in the convective-snow commit does. The JET-flagged dispatch is 100% inside
+  `KernelAbstractions`/dynamics-core internals (`__thread_run`, spectral transform, horizontal
+  diffusion) that `BarotropicModel` uses — a model that has no parameterizations at all and never
+  touches convection, entrainment, or snow code. This points to a global Julia
+  compilation-heuristic sensitivity (added types/methods elsewhere in the package shifting
+  inference/specialization decisions in unrelated, marginal code — the same general class of
+  issue as the already-known `#1193` dynamic-loop-bound fragility) rather than a logic defect
+  introduced by this PR. **Flagged to the user rather than resolved** — see Known limitations.
+- Bit-identity gate (200 steps, `PrimitiveWetModel` + `PrimitiveDryModel`, `truncation=31,
+  nlayers=8`, exact `==` on all prognostic fields against pre-restructure `main`): **PASS** after
+  the restructuring commit, **PASS** after entrainment (default off), **intentional FAIL** after
+  the snow commit (see above) — expected and documented, not a regression.
+- Benchmarking (`/tmp/bench_convection.jl`, CPU, isolation vs combined-with-other-parameterizations
+  vs combined-without-convection, `T31/L8`, `T31/L16`, `T63/L8` — `T31/L32` and `T63/L16` dropped
+  from the sweep, both numerically unstable at the default timestep even on unmodified `main`,
+  unrelated to this work):
+
+  | Config | Arm | `main` (baseline) | `mc/convection` (restructured) |
+  |---|---|---|---|
+  | T31 L8  | isolation (A) | 1.087 ms | 1.018 ms |
+  | T31 L8  | combined (B)  | 5.969 ms | 5.872 ms |
+  | T31 L8  | B−C (convection in-situ) | 0.819 ms | 0.739 ms |
+  | T31 L16 | isolation (A) | 1.455 ms | 1.441 ms |
+  | T31 L16 | combined (B)  | 10.325 ms | 10.302 ms |
+  | T31 L16 | B−C | 1.092 ms | 1.050 ms |
+  | T63 L8  | isolation (A) | 3.612 ms | 3.402 ms |
+  | T63 L8  | combined (B)  | 20.435 ms | 20.170 ms |
+  | T63 L8  | B−C | 2.954 ms | 2.692 ms |
+
+  No CPU regression in any arm — a small (~2-10%) improvement throughout from fewer loop passes,
+  well inside the acceptance criterion (revert/report if >20% regression). All arms 0 allocations
+  before and after. No GPU hardware was available in this environment, so GPU numbers were not
+  collected; the CPU result is used as the primary local signal per the plan, with the branchless
+  structure itself (uniform trip counts, no dynamic-bound loops) being the intended GPU win,
+  consistent with the `#1193` precedent cited in the plan.
 
 ## Documentation changes
 
-_To be filled in as work lands._
+- `docs/src/convection.md`: five correctness fixes (§ above), new "Entrainment" section (physical
+  motivation, mixing equations, the three profiles, resolution-dependence caveat, `NoEntrainment`
+  default), new "Convective snow" subsection under "Convective precipitation" (threshold check,
+  mass conservation, contrast with the large-scale melt cascade, `snow=false` toggle).
 
 ## Known limitations
 
@@ -275,6 +421,18 @@ _To be filled in as work lands._
 - Entrainment mixing is applied in the saturated branch only (wet scheme), inherited from PR #976.
 - Convective snow uses a single lowest-layer temperature check, no falling-flux melt cascade
   (unlike large-scale precipitation).
+- **Open item, unresolved:** `SpeedyWeather/test/dynamics/dispatch.jl`'s JET "free of runtime
+  dispatch" checks fail for `BarotropicModel` and `PrimitiveWetModel` only once the full
+  convective-snow commit is present — not for any of its three changed files individually layered
+  onto the entrainment commit, and not for either of the first two commits alone. The dispatch
+  JET actually flags is entirely inside `KernelAbstractions`/dynamics-core internals unrelated to
+  convection (`__thread_run`, spectral transform, horizontal diffusion) — `BarotropicModel` has no
+  parameterizations and never runs `convection!`, `entrainment`, or the snow code at all. This
+  looks like a global compilation-heuristic sensitivity (added types/methods shifting inference
+  decisions in unrelated marginal code elsewhere in the same compiled package), similar in kind to
+  `#1193`, rather than an actual bug in the snow feature. Not resolved here — needs either a
+  maintainer call on whether this JET check's fragility is acceptable/pre-existing-prone, or
+  further Julia-compiler-level investigation that was out of scope for this session.
 
 ## Future work
 
