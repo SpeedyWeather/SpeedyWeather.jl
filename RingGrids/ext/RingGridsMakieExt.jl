@@ -61,6 +61,16 @@ end
 # Mutating heatmap variants
 # ============================================================================
 
+function Makie.heatmap!(pos::Makie.GridPosition, field::RingGrids.AbstractField2D; kwargs...)
+    full_field = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
+    return heatmap!(pos, full_field; kwargs...)
+end
+
+function Makie.heatmap!(pos::Makie.AbstractAxis, field::RingGrids.AbstractField2D; kwargs...)
+    full_field = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
+    return heatmap!(pos, full_field; kwargs...)
+end
+
 """
 $(TYPEDSIGNATURES)
 Mutating variant of `heatmap` for RingGrids `Field`s. Returns both the `Axis ` as well as the
