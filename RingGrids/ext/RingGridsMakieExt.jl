@@ -10,6 +10,10 @@ function default_title(field::RingGrids.AbstractField)
     return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
 end
 
+# ============================================================================
+# Non-mutating heatmap variants
+# ============================================================================
+
 function Makie.heatmap(
         field::RingGrids.AbstractField;
         title::String = default_title(field),
@@ -53,6 +57,10 @@ function Makie.heatmap(
     return fig
 end
 
+# ============================================================================
+# Mutating heatmap variants
+# ============================================================================
+
 """
 $(TYPEDSIGNATURES)
 Mutating variant of `heatmap` for RingGrids `Field`s. Returns both the `Axis ` as well as the
@@ -92,7 +100,7 @@ $(TYPEDSIGNATURES)
 Mutating variant of `heatmap` for RingGrids `Field`s that plots directly into an existing `Axis`.
 Returns the plotting object created by `Makie.heatmap!`.
 """
-function Makie.heatmap!(ax::Makie.Axis, field::RingGrids.AbstractFullField2D; kwargs...)
+function Makie.heatmap!(ax::Makie.AbstractAxis, field::RingGrids.AbstractFullField2D; kwargs...)
     mat = Matrix(field)                 # reshapes a full field into a matrix
     lond = RingGrids.get_lond(field)    # get lon, lat axes in degrees
     latd = RingGrids.get_latd(field)
