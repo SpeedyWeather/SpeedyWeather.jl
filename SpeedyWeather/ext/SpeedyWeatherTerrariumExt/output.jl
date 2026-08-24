@@ -148,8 +148,8 @@ function SpeedyWeather.TerrariumOutput(
         kwargs...
     )
     descriptors = variable_descriptors(model; prognostic, auxiliary, inputs)
-    supported = filter(supported_variable, values(descriptors))
-    return Tuple(terrarium_output_variable(model, descriptor; kwargs...) for descriptor in supported)
+    supported = filter(supported_variable, Tuple(values(descriptors)))
+    return map(descriptor -> terrarium_output_variable(model, descriptor; kwargs...), supported)
 end
 
 # convenience: construct directly from the SpeedyWeather land component
