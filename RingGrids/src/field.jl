@@ -697,6 +697,16 @@ FieldGPUStyle{1, Grid}(::Val{0}) where {Grid} = FieldGPUStyle{1, Grid}()
 FieldGPUStyle{2, Grid}(::Val{3}) where {Grid} = FieldGPUStyle{3, Grid}()
 FieldGPUStyle{3, Grid}(::Val{4}) where {Grid} = FieldGPUStyle{4, Grid}()
 
+# combine with any other GPU array style (e.g. plain CuArray, Adjoint/Transpose of one) choosing
+# the larger dimensionality, mirroring Base's AbstractArrayStyle-DefaultArrayStyle rule; without
+# this, mixing a Field with a bare GPU array falls back to Broadcast.Unknown() since their type
+# names differ, which silently triggers scalar indexing on the GPU array
+Base.BroadcastStyle(::FieldGPUStyle{N, Grid}, ::GPUArrays.AbstractGPUArrayStyle{M}) where {N, Grid, M} = FieldGPUStyle{N, Grid}(Val(max(N, M)))
+Base.BroadcastStyle(::GPUArrays.AbstractGPUArrayStyle{M}, ::FieldGPUStyle{N, Grid}) where {N, Grid, M} = FieldGPUStyle{N, Grid}(Val(max(N, M)))
+
+# disambiguate the two general rules above for the Field-Field case (same Grid, different N)
+Base.BroadcastStyle(::FieldGPUStyle{M, Grid}, ::FieldGPUStyle{N, Grid}) where {M, N, Grid} = FieldGPUStyle{M, Grid}(Val(max(M, N)))
+
 function KernelAbstractions.get_backend(
         field::F
     ) where {F <: AbstractField{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
