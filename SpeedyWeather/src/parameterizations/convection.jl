@@ -154,9 +154,12 @@ and relaxes current vertical profiles to the adjusted references."""
     # precipitation), so a single check on the lowermost layer's temperature is sufficient,
     # unlike the falling-flux melt cascade in large-scale condensation
     snow_convection::NF = 0
-    let_it_snow = convection.snow
-    rain_convection, snow_convection = let_it_snow && temp[ij, nlayers] < convection.freezing_threshold ?
-        (snow_convection, rain_convection) : (rain_convection, snow_convection)
+    freezing = convection.snow && temp[ij, nlayers] < convection.freezing_threshold
+    rain_convection, snow_convection = ifelse(
+        freezing,
+        (snow_convection, rain_convection),
+        (rain_convection, snow_convection),
+    )
 
     # Store precipitation in diagnostic arrays
     vars.parameterizations.rain_convection[ij] += rain_convection            # accumulated rain [m] for output
@@ -217,8 +220,7 @@ column then need no branch to skip those levels, they contribute zero on their o
     Lᵥ = atmosphere.latent_heat_condensation    # latent heat of vaporization
     cₚ = atmosphere.heat_capacity               # heat capacity
 
-    # prefill both reference profiles with the environment (branchless stand-in for the
-    # previous NaN reset); levels above the LZB are never touched again below
+    # levels above the LZB are never touched again below, so they stay at the environment
     for k in 1:nlayers
         temp_ref_profile[ij, k] = temp_environment[ij, k]
         humid_ref_profile[ij, k] = humid_environment[ij, k]
@@ -412,8 +414,7 @@ exactly: downstream loops over the full column then need no branch to skip those
 
     nlayers = length(σ)                     # number of vertical levels
 
-    # prefill with the environment (branchless stand-in for the previous NaN reset);
-    # levels above the LZB are never touched again below
+    # levels above the LZB are never touched again below, so they stay at the environment
     for k in 1:nlayers
         temp_ref_profile[ij, k] = temp_environment[ij, k]
     end

@@ -75,6 +75,16 @@ Base revision: `557b38d5` (`mc/convection`, off `main`)
   likely a global compilation-heuristic sensitivity to the package's total type/method count.
   Documented in Known limitations and Testing and verification rather than "fixed" by guessing at
   `@inline` placements; flagged to the user as an open item before proceeding to push/open the PR.
+- **2026-08-24, review pass.** Addressed @maximilian-gelbrecht's PR review: the convective-snow
+  branch selection (in `convection!`, previously a ternary) is now an explicit `ifelse` since it's
+  runtime-dependent and needs to stay branchless for Reactant; removed comments in `convection.jl`
+  (`pseudo_adiabat!`/`dry_adiabat!` prefill) and `tendencies.jl` (`reset_variables!`) that narrated
+  the diff against the prior implementation rather than the current code. Two other review threads
+  were discussion, not code changes, and answered inline: the docs sign-convention question (the
+  bounds-order flip *and* the sign both had to change together to match the code — confirmed by
+  tracing `Pq`/`PT` back to Frierson eq. (1)) and the ascent `while` loop's unavoidable dynamic trip
+  count (already called out in Known limitations above, distinct from the `#1193` hazard this PR
+  actually fixes, which was downstream loops using the LZB as a *loop bound*).
 
 ## Problem description
 
