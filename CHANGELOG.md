@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Move time-stepping mathematics from the Usage docs to a new Numerics page, and document previously-undocumented `NCycleLorenz` details (per-variant weights, tendency step split, diffusion/implicit ordering) [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
 - Fix GPU scalar indexing when a `Field` broadcasts against a bare GPU array (e.g. `LinearDrag` in the Held-Suarez example) [#1219](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1219)
 - Reformulate trigonometric functions to avoid hostcalls on AMDGPU - [#1210](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1210)
 
