@@ -4,6 +4,8 @@ using RingGrids
 using GeoMakie
 using RingGrids.DocStringExtensions
 
+import GeoMakie.Makie.GeometryBasics: Polygon, Point
+
 RingGrids.globe(grid::AbstractGrid; kwargs...) = globe(typeof(grid), grid.nlat_half; kwargs...)
 
 function default_title(Grid::Type{<:RingGrids.AbstractGrid}, nlat_half::Integer)
@@ -126,6 +128,7 @@ function RingGrids.globe!(
         transf = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
         ax = LScene(pos; show_axis = false, axis_kwargs...)
     else
+        transf = nothing
         ax = GeoAxis(
             pos;
             title,
@@ -204,8 +207,6 @@ end
 # ============================================================================
 # Helper functions for globe plotting
 # ============================================================================
-
-import GeoMakie.Makie.GeometryBasics: Polygon, Point
 
 """
     _plot_globe_grid!(ax, Grid, nlat_half; kwargs...)
