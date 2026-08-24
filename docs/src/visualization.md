@@ -4,22 +4,19 @@ SpeedyWeather.jl provides flexible visualization tools through its [RingGrids](h
 
 ## [Heatmap Plots](@id heatmap_plots)
 
-The `heatmap` function provides a convenient way to visualize 2D fields on the sphere. It automatically handles the transformation from the ring-based grid representation to a format suitable for plotting.
-
-### Basic Usage
+The `heatmap` function provides a convenient way to visualize 2D fields on the sphere.
 
 For full fields (which can be reshaped into matrices), creating a heatmap is straightforward:
 
-```@example heatmap_basic
+```@example visualization
 using SpeedyWeather
-using CairoMakie   # or GLMakie for interactive plots
+using CairoMakie, GeoMakie
+using Random: Xoshiro
 
-# Create a grid and field
+rng = Xoshiro(0)
 grid = FullGaussianGrid(24)
-field = randn(grid)
-
-# Plot with automatic figure creation
-fig = heatmap(field)
+field = randn(rng, grid)
+heatmap(field)
 ```
 
 The heatmap automatically:
@@ -29,139 +26,61 @@ The heatmap automatically:
 - Adds a colorbar
 - Generates a descriptive title
 
-### Reduced Grids
-
 For reduced grids (like `OctahedralGaussianGrid` or `HEALPixGrid`), the field is automatically interpolated to a full grid before plotting:
 
-```@example heatmap_reduced
-using SpeedyWeather
-using CairoMakie
-
-# Reduced grid
+```@example visualization
 grid = OctahedralGaussianGrid(24)
-field = randn(grid)
-
-# Automatic interpolation to full grid for plotting
-fig = heatmap(field)
+field = randn(rng, grid)
+heatmap(field)
 ```
 
-### Customizing Heatmaps
+You can also pass additional keyword arguments to customize the appearance:
 
-You can pass additional keyword arguments to customize the appearance:
-
-```@example heatmap_custom
-using SpeedyWeather
-using CairoMakie
-
+```@example visualization
 grid = FullGaussianGrid(24)
-field = randn(grid)
-
-fig = heatmap(
-    field;
-    colormap = :thermal,
-    colorrange = (-2, 2),
-    title = "Temperature Anomaly"
-)
+field = randn(rng, grid)
+heatmap(field; colormap = :thermal, colorrange = (-2, 2), title = "Temperature Anomaly")
 ```
 
-### Mutating Variants for Efficient Updates
+Mutating variants of `heatmap` are also provided which can be used to plot into an externally defined `Figure` or `Axis`:
 
-For animations or interactive applications where you need to update field data frequently, use the mutating variants `heatmap!`. These reuse the existing axis and only update the color data, which is much more efficient than creating new figures.
-
-#### Updating with a GridPosition
-
-```@example heatmap_mutating
-using SpeedyWeather
-using CairoMakie
-
-# Create initial figure and axis
+```@example visualization
+grid = FullGaussianGrid(24)
 fig = Figure(size = (800, 400))
-
-# First plot - creates the axis
-grid = FullGaussianGrid(24)
-field1 = randn(grid)
-ax, hm = heatmap!(fig[1, 1], field1; title = "Time step 1")
-
-# Update with new data - reuses the same axis
-field2 = randn(grid)
-heatmap!(fig[1, 1], field2; title = "Time step 2")
-
-# Or update directly with an existing axis
-field3 = randn(grid)
-hm = heatmap!(ax, field3; title = "Time step 3")
+field = randn(rng, grid)
+ax, hm = heatmap!(fig[1, 1], field; title = "Time step 1")
+field = randn(rng, grid)
+heatmap!(ax, field; title = "Time step 2")
+fig
 ```
 
-#### Return Values
-
-The mutating variants return useful objects:
+Note that the mutating `heatmap!` returns different types depending on the type of the first argument:
 - `heatmap!(pos::GridPosition, field; ...)` returns `(ax, hm)` where `ax` is the `Axis` and `hm` is the `HeatMap`
 - `heatmap!(ax::Axis, field; ...)` returns the `HeatMap` object
-
-This allows you to further customize the plot or extract the data later.
-
-#### Animation Example
-
-Here's an example of how to create an animation by updating field data:
-
-```@example heatmap_animation
-using SpeedyWeather
-using CairoMakie
-
-# Setup
-grid = FullGaussianGrid(24)
-fig = Figure(size = (800, 400))
-ax, hm = heatmap!(fig[1, 1], randn(grid); title = "Frame 1")
-
-# Update in a loop (would save frames in a real animation)
-for t in 1:10
-    field = randn(grid) * exp(-t * 0.1)
-    heatmap!(ax, field; title = "Frame $t")
-    # In practice: save(fig, "frame_$(lpad(t, 3, '0')).png")
-end
-```
 
 ## [Globe Plots](@id globe_plots)
 
 For interactive 3D visualizations, SpeedyWeather.jl provides `globe` plots through the GeoMakie extension. These work with both `GLMakie` (interactive) and `CairoMakie` (static).
 
-### Basic Globe Plots
+We can visualize the grid itself by passing the grid type and number of rings to `globe`:
 
-Visualize the grid structure itself:
-
-```@example globe_basic
-using SpeedyWeather
-using GLMakie, GeoMakie
-
-# Interactive globe showing grid points and faces
-globe(FullGaussianGrid, 24)
+```@example visualization
+globe(FullGaussianGrid, 24; interactive = false)
 ```
 
 Or plot data on the globe:
 
-```@example globe_field
-using SpeedyWeather
-using GLMakie, GeoMakie
-
+```@example visualization
 grid = FullGaussianGrid(24)
-field = randn(grid)
-
-# Plot field as colored polygons
-globe(field)
+field = randn(rng, grid)
+globe(field; interactive = false)
 ```
-
-### Customization Options
 
 The `globe` function accepts several keyword arguments:
 
-```@example globe_custom
-using SpeedyWeather
-using CairoMakie, GeoMakie
-
-grid = OctahedralGaussianGrid(24)
-
-# Static globe with custom options
+```@example visualization
 globe(
-    grid, 24;
+    OctahedralGaussianGrid, 24;
     interactive = false,
     title = "Octahedral Gaussian Grid",
     color = :blue,
@@ -181,124 +100,46 @@ Available options:
 - `coastlines::Bool` - Add coastlines
 - `background::Bool` - Add Earth background image
 
-### Mutating Globe Variants
+Like heatmaps, globe plots have mutating variants that allow :
 
-Like heatmaps, globe plots have mutating variants for efficient updates:
-
-```@example globe_mutating
-using SpeedyWeather
-using GLMakie, GeoMakie
-
-# Create initial globe
+```@example visualization
 fig = Figure(size = (800, 800))
-ax, objects = globe!(fig[1, 1], FullGaussianGrid, 24)
-
-# Update with field data
-grid = FullGaussianGrid(24)
-field = randn(grid)
-p = globe!(ax, field)
-
-# The return values give you access to the plotted objects
-# `objects` is a NamedTuple with keys: background, centers, faces, coastlines
-# `p` is the PolyPlot object for the field
+ax, plotdata = globe!(fig[1, 1], FullGaussianGrid, 24; interactive = false)
 ```
 
-#### Return Values
+`plotdata` is a NamedTuple with keys `:background`, `:centers`, `:faces`, and `:coastlines`.
 
-- `globe!(pos::GridPosition, Grid, nlat_half; ...)` returns `(ax, objects)` where `objects` contains the plotted elements
-- `globe!(pos::GridPosition, field; ...)` returns `(ax, poly_plot)`
-- `globe!(ax::Axis, Grid, nlat_half; ...)` returns `objects` NamedTuple
-- `globe!(ax::Axis, field; ...)` returns the `PolyPlot` object
+The mutating `globe!` also returns different values depending on the arguments:
+- `globe!(pos::GridPosition, Grid, nlat_half; ...)` returns `(ax, plotdata)` where `plotdata` contains the plotted elements
+- `globe!(pos::GridPosition, field; ...)` returns `(ax, poly)` where `poly` is a `Poly` plot
+- `globe!(ax::Axis, Grid, nlat_half; ...)` returns `plotdata` NamedTuple
+- `globe!(ax::Axis, field; ...)` returns the `Poly` plot object
 
-## [Visualizing Simulation Output](@id sim_visualization)
+## Multi-panel `Figure`s
 
-When running SpeedyWeather simulations, you'll typically want to visualize the output variables. Here's a complete example:
+The mutating functions like `heatmap!` are especially useful for composing multiple plots into a single `Figure`, since it returns both the `Axis` and `HeatMap` needed to share components across panels.
 
-```@example simulation_plot
-using SpeedyWeather
-using CairoMakie, GeoMakie
+```@example visualization
+grid = OctahedralGaussianGrid(48)
+u_field = randn(rng, grid)
+v_field = randn(rng, grid)
 
-# Setup a simple simulation
-arch = CPU()
-spectral_grid = SpectralGrid(truncation = 32, dealiasing = 3)
-model = PrimitiveDryModel(spectral_grid)
-simulation = initialize!(model)
-
-# Run for a few timesteps
-run!(simulation, period = Hour(6))
-
-# Extract and plot a variable
-vars = simulation.model.vars
-u_grid = vars.grid.u[:, 1]  # Surface zonal wind
-
-# Create a figure with both heatmap and globe
-fig = Figure(size = (1200, 400))
-
-# Heatmap view
-ax1, hm1 = heatmap!(fig[1, 1], u_grid; 
-    title = "Zonal Wind (Heatmap)",
-    colormap = :balance,
-    colorrange = (-50, 50)
-)
-
-# Globe view  
-ax2, p2 = globe!(fig[1, 2], RingGrids.Field(u_grid, spectral_grid.grid.grid);
-    title = "Zonal Wind (Globe)",
-    colormap = :balance
-)
-
+fig = Figure(size = (1000, 300))
+_, hm1 = heatmap!(fig[1, 1], u_field; title = "Zonal wind",     colormap = :balance, colorrange = (-3, 3))
+_, hm2 = heatmap!(fig[1, 2], v_field; title = "Meridional wind", colormap = :balance, colorrange = (-3, 3))
+Colorbar(fig[1, 3], hm, ticklabelsize = 10)
 resize_to_layout!(fig)
 ```
 
-## Working with Higher-Dimensional Fields
+## Tips
 
-Fields can have multiple vertical layers and/or time steps. The heatmap functions automatically select the first slice for additional dimensions:
+Use `heatmap!` and `globe!` when updating plots repeatedly—they skip figure and axis
+allocation. When interpolation from a reduced grid happens many times (e.g. in an animation
+loop), pre-interpolate once with `RingGrids.interpolate` and plot the resulting full field directly.
 
-```@example higher_dims
-using SpeedyWeather
-using CairoMakie
-
-grid = FullGaussianGrid(24)
-
-# 3D field (horizontal + 10 vertical layers)
-field_3d = randn(grid, 10)
-
-# Automatically selects the first layer
-fig = heatmap(field_3d)
-
-# To plot a specific layer, index it first
-fig = heatmap(field_3d[:, 5])  # 5th layer
-```
-
-For animations of simulation outputs over time, use the mutating variants with time-indexed slices:
-
-```@example time_animation
-using SpeedyWeather
-using CairoMakie
-
-grid = FullGaussianGrid(24)
-field_4d = randn(grid, 5)  # 5 time steps
-
-fig = Figure()
-ax, hm = heatmap!(fig[1, 1], field_4d[:, 1]; title = "t = 1")
-
-for t in 2:5
-    heatmap!(ax, field_4d[:, t]; title = "t = $t")
-end
-```
-
-## Performance Tips
-
-1. **Use mutating variants for updates**: When creating animations or updating plots interactively, always use `heatmap!` or `globe!` instead of the non-mutating versions.
-
-2. **Reuse figures**: Create a figure once and update its content rather than creating new figures in loops.
-
-3. **Choose the right backend**: 
-   - `GLMakie` for interactive exploration and 3D globes
-   - `CairoMakie` for publication-quality static images
-   - `UnicodePlots` for quick terminal visualization (limited functionality)
-
-4. **Reduced grids are interpolated**: Plotting reduced grids automatically interpolates to full grids. For very high resolutions, consider pre-interpolating if you're making many plots.
+For the Makie backend, `GLMakie` supports interactive zoom and rotation in 3D globe plots,
+`CairoMakie` produces static publication-quality figures, and `UnicodePlots` gives quick
+terminal previews.
 
 ## API Reference
 
