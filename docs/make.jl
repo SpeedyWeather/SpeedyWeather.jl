@@ -34,9 +34,10 @@ makedocs(
             "Analysis" => "analysis.md",
             "Variables" => "variables.md",
             "Models" => "models.md",
-            "Differentiability and Adjoint Model" => "differentiability.md",
             "NetCDF output" => "output.md",
             "Other output" => "other_output.md",
+            "Visualization" => "visualization.md",
+            "Differentiability and Adjoint Model" => "differentiability.md",
             "GPU and Architectures" => "architectures_gpu.md",
         ],
         "Advanced" => [
