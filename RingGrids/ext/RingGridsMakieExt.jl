@@ -50,7 +50,7 @@ function Makie.heatmap(
         kwargs...
     )
     fig = Figure(size = size, figure_padding = 10)
-    heatmap!(fig[1, 1], field; title, kwargs...)
+    hm = heatmap!(fig[1, 1], field; title, kwargs...)
     Colorbar(fig[1, 2], hm, ticklabelsize = 10)
     colsize!(fig.layout, 1, Aspect(1, 2.0))
     resize_to_layout!(fig)
