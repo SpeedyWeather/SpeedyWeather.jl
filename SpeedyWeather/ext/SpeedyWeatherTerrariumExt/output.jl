@@ -93,20 +93,22 @@ function terrarium_output_variable(
     )
 end
 
-# name-keyed NamedTuple of all top-level Terrarium variable descriptors of the
-# selected groups; prognostic variables take precedence over auxiliary and input
-# duplicates of the same name (as does `getproperty` on the Terrarium state)
+"""
+Return a name-keyed OrderedDict of all top-level Terrarium variable descriptors of the
+selected groups; prognostic variables take precedence over auxiliary and input
+duplicates of the same name (as does `getproperty` on the Terrarium state)
+"""
 function variable_descriptors(
         model::Terrarium.AbstractModel;
         prognostic::Bool = true,
         auxiliary::Bool = true,
         inputs::Bool = false,
     )
-    tvars = Terrarium.Variables(Terrarium.variables(model))
+    terrarium_vars = Terrarium.Variables(model)
     return merge(
-        inputs ? tvars.inputs : (;),
-        auxiliary ? tvars.auxiliary : (;),
-        prognostic ? tvars.prognostic : (;),
+        inputs ? terrarium_vars.inputs : empty(terrarium_vars.inputs),
+        auxiliary ? terrarium_vars.auxiliary : empty(terrarium_vars.auxiliary),
+        prognostic ? terrarium_vars.prognostic : empty(terrarium_vars.prognostic),
     )
 end
 
@@ -146,7 +148,7 @@ function SpeedyWeather.TerrariumOutput(
         kwargs...
     )
     descriptors = variable_descriptors(model; prognostic, auxiliary, inputs)
-    supported = filter(supported_variable, collect(descriptors))
+    supported = filter(supported_variable, values(descriptors))
     return Tuple(terrarium_output_variable(model, descriptor; kwargs...) for descriptor in supported)
 end
 
