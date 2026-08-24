@@ -217,7 +217,8 @@ that is resolved in spectral space, 1-based, i.e. `truncation = l_{max} + 1`. Sp
 always try to choose an easily-Fourier transformable[^FFT] size of the grid, but as we use
 [FFTW.jl](https://github.com/JuliaMath/FFTW.jl) there is quite some flexibility without
 performance sacrifice. However, this has traditionally lead to typical resolutions that
-we also use for testing we therefore recommend to use.
+we also use for testing we therefore recommend to use. See also
+[Notation: Spectral resolution](@ref) for how this resolution is denoted in practice.
 They are as follows with more details below
 
 !!! warning "Why is `truncation` 1-based?"

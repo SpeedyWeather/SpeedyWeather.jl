@@ -19,7 +19,7 @@ SpeedyWeather.jl to run the simulation you want.
 
 The life of every SpeedyWeather.jl simulation starts with a `SpectralGrid` object.
 A `SpectralGrid` defines the physical domain of the simulation and its discretization.
-This domain has to be a sphere because of the spherical harmonics, but it can have a different radius.
+This domain has to be a sphere because of the [spherical harmonics](@ref "Spherical harmonics"), but it can have a different radius.
 The discretization is for spectral, grid-point space and the vertical as this determines the size of many
 arrays for preallocation, for which also the number format is essential to know.
 That's why `SpectralGrid` is the beginning of every SpeedyWeather.jl simulation and that is why
@@ -44,7 +44,7 @@ This spectral resolution is combined with an
 This grid has 48 latitude rings, 20 longitude points around the poles
 and up to 96 longitude points around the Equator. Data on that
 grid is also stored in Float32. The resolution is therefore on average about 400km.
-In the vertical 8 levels are used, using [Sigma coordinates](@ref).
+In the vertical 8 levels are used, using [Sigma coordinates](@ref sigma_coordinates_usage).
 
 The resolution of a SpeedyWeather.jl simulation is adjusted using the
 `truncation` argument, this defines the spectral resolution and the grid
@@ -68,7 +68,7 @@ spectral_grid = SpectralGrid(truncation=86, dealiasing=3, Grid=HEALPixGrid)
 
 The number of vertical layers or levels (we use both terms often interchangeably)
 is determined through the `nlayers` argument. Especially for the
-`BarotropicModel` and the `ShallowWaterModel` you want to set this to
+[`BarotropicModel`](@ref) and the [`ShallowWaterModel`](@ref) you want to set this to
 ```@example howto
 spectral_grid = SpectralGrid(nlayers=1)
 ```
@@ -167,7 +167,7 @@ In the previous section the model was created, but this is conceptually
 just gathering all its components together. However, many components
 need to be initialized. This step is used to precompute arrays,
 load necessary data from file or to communicate those between components.
-Furthermore, prognostic and diagnostic variables are allocated.
+Furthermore, prognostic and diagnostic [variables](@ref "Variables") are allocated.
 It is (almost) all that needs to be done before the model can be run
 (exception being the output initialization). Many model components
 have a `initialize!` function associated with them that it executed here.
@@ -209,8 +209,8 @@ example, change the output interval like so
 ```@example howto
 set!(model.output, model, interval=Hour(1))
 ```
-Now, if there's output, it will be every hour. Furthermore the initial
-conditions can be set with the `initial_conditions` model component
+Now, if there's output, it will be every hour. Furthermore the [initial
+conditions](initial_conditions.md) can be set with the `initial_conditions` model component
 which are then set during `initialize!(::AbstractModel)`, but you can also
 change them now, before the model runs 
 ```@example howto

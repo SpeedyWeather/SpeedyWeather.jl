@@ -44,7 +44,7 @@ With "grid" we mean the discretization of space. Also called tesselation given t
 a space with polygons, we subdivide the sphere into grid cells, with vertices, faces and centres.
 In that sense, a grid does not contain any data it purely describes the location of grid cells.
 Grids in RingGrids are identified by their name, e.g.
-FullGaussianGrid, and a resolution parameter where we use `nlat_half` (the number of latitudes
+[`FullGaussianGrid`](@ref FullGaussianGrid), and a resolution parameter where we use `nlat_half` (the number of latitudes
 on one hemisphere, Equator included) for all grids. This is because some grids have an even number
 some an odd number number of latitudes so not all `nlat` are valid, but all `nlat_half` are.
 While an instance of a grid stores some precomputed arrays to facilitate faster indexing
@@ -322,7 +322,8 @@ retains the element type of `field`.
 
 Every time an interpolation like `interpolate(30.0, 10.0, field)` is called, several things happen, which
 are important to understand to know how to get the fastest interpolation out of this module in a given situation.
-Under the hood an interpolation takes three arguments
+This mirrors the advice to reuse a precomputed `SpectralTransform` wherever possible, see
+[Precomputed polynomials and allocated memory](@ref). Under the hood an interpolation takes three arguments
 
 - output array
 - input field

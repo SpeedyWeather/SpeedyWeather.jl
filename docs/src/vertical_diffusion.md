@@ -1,13 +1,13 @@
 # Vertical diffusion
 
 Vertical diffusion in SpeedyWeather.jl is implemented as a Laplacian in
-the vertical [Sigma coordinates](@ref) with a diffusion coefficient ``K``
+the vertical [Sigma coordinates](@ref sigma_coordinates_physics) with a diffusion coefficient ``K``
 that in general depends on space and time and is flow-aware, meaning
 it is recalculated on every time step depending on the vertical stability
 of the atmospheric column.
 
 Vertical diffusion can be applied to velocities ``u, v``, temperature ``T``
-(done via dry static energy, see below) and specific humidity ``q``.
+(done via dry static energy, see below) and [specific humidity](@ref "Humidity equation") ``q``.
 
 ## Implementations
 
@@ -20,7 +20,8 @@ subtypes(SpeedyWeather.AbstractVerticalDiffusion)
 ```
 
 You can always set `vertical_diffusion=nothing` which will disable all vertical diffusion.
-`BulkRichardsonDiffusion` is explained in the following.
+`BulkRichardsonDiffusion` is explained in the following. See [Parameterizations](@ref) for the
+general parameterization interface these implement.
 
 ## Laplacian in sigma coordinates
 
@@ -46,7 +47,8 @@ K\frac{\partial u}{\partial \sigma} \vert_{\sigma = 1} - K\frac{\partial u}{\par
 ```
 
 Discretising the diffusion operator ``\partial_\sigma K \partial_\sigma`` over ``N``
-vertical layers ``k = 1...N`` with ``u_k``, ``K_k`` on those layers at respective
+vertical layers ``k = 1...N`` (indexed as described in [Vertical coordinates](@ref vertical_coordinates_physics) and
+[Array dimensions](@ref array_dimensions)) with ``u_k``, ``K_k`` on those layers at respective
 coordinates ``\sigma_k`` that are generally not equally spaced using centred finite differences
 
 ```math
@@ -75,7 +77,7 @@ Ri = \frac{gz \left[ \Theta_v(z) - \Theta_v(z_N) \right]}{|v(z)|^2 \Theta_v(z_N)
 ```
 
 (see [Bulk Richardson-based drag coefficient](@ref) in comparison).
-Gravitational acceleration is ``g``, height ``z``, ``\Theta_v`` the virtual
+Gravitational acceleration is ``g``, height ``z`` (related to the [Geopotential](@ref) ``\Phi = gz``), ``\Theta_v`` the virtual
 potential temperature where we use the virtual dry static energy
 ``c_pT_v + gz`` with ``T_v`` the [Virtual temperature](@ref).
 The boundary layer height ``h`` (vertical index ``k_h``) is defined as the height

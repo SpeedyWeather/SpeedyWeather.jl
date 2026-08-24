@@ -74,7 +74,7 @@ stochastic_physics = StochasticallyPerturbedParameterizationTendencies(spectral_
 [anonymous function](https://docs.julialang.org/en/v1/manual/functions/#man-anonymous-functions)
 hence it looks like `var"#269#273" = #269` as the compiler assigns a "name")
 can be used to change vertically the amplitude of `r`, e.g
-`tapering = σ -> σ < 0.8 ? 1 : 1 - (σ - 0.8)/0.2` (in [Sigma coordinates](@ref)) could
+`tapering = σ -> σ < 0.8 ? 1 : 1 - (σ - 0.8)/0.2` (in [Sigma coordinates](@ref sigma_coordinates_physics)) could
 be passed on a (keyword) arugment to reduce the SPPT perturbation towards the surface.
 A tapering ``\tau(\sigma)`` is applied like ``(1 + \tau r)``, where ``r = r(\lambda, \varphi, t)``
 is a function of horizontal coordinates longitude ``\lambda``, latitude ``\varphi`` and time ``t`` only.

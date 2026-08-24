@@ -2,7 +2,7 @@
 
 Convection is the atmospheric process of rising motion because of positively
 buoyant air parcels compared to its surroundings. In hydrostatic models
-like the primitive equation model in SpeedyWeather.jl convection has to
+like the [primitive equation model](@ref primitive_equation_model) in SpeedyWeather.jl convection has to
 be parameterized as the vertical velocity is not a prognostic variable
 that depends on vertical stability but rather diagnosed to satisfy
 horizontal divergence. Convection can be shallow and non-precipitating
@@ -23,7 +23,8 @@ using InteractiveUtils # hide
 using SpeedyWeather
 subtypes(SpeedyWeather.AbstractConvection)
 ```
-which are described in the following.
+which are described in the following. See [Parameterizations](@ref) for the general
+parameterization interface these implement.
 
 ## [Simplified Betts-Miller convection](@id BettsMiller)
 
@@ -224,7 +225,7 @@ the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0``
 
 ## Dry convection
 
-In the primitive equation model with humidity the [Betts-Miller convection scheme](@ref BettsMiller)
+In the [primitive equation model](@ref primitive_equation_model) with humidity the [Betts-Miller convection scheme](@ref BettsMiller)
 as described above is defined. Without humidity, a dry version reduces to the
 [Shallow convection](@ref) case. The two different shallow convection schemes in
 Frierson 2007[^Frierson2007], the "shallower" shallow convection scheme and the "qref"

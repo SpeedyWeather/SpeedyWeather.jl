@@ -41,7 +41,8 @@ which are
 
 all orographies need to be created with `spectral_grid::SpectralGrid` as the first argument,
 so that the respective fields for `surface_geopotential`, i.e. ``\Phi_s`` and `orography`, i.e. ``H_b``
-can be allocated in the right size and number format.
+can be allocated in the right size and number format, following the general pattern for
+[Creating model components](@ref create_model_components).
 
 ## Earth's orography
 
@@ -223,7 +224,9 @@ then radians are returned and so we could have defined ``\sigma`` in terms of ra
 ## Defining a new orography type
 
 You can also define a new orography like we defined `ZonalRidge` or `EarthOrography`.
-The following explains what's necessary for this. The new `MyOrography` has to be defined as
+The following explains what's necessary for this, following the same modular logic
+as outlined in [Extending SpeedyWeather](@ref) (a [Custom land-sea mask](@ref) follows
+a very similar pattern). The new `MyOrography` has to be defined as
 (`mutable` or not, but always with `@kwdef`)
 
 ```@example orography

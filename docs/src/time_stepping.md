@@ -29,7 +29,8 @@ in its simplest form
 ```
 meaning we step from the previous time step ``i-1``, leapfrogging over the current time step``i``
 to the next time step ``i+1`` by evaluating the tendencies on the right-hand side ``RHS``
-at the current time step ``i``. The time stepping is done in spectral space.
+at the current time step ``i``. The time stepping is done in spectral space
+(see [LowerTriangularArrays](@ref lowertriangularmatrices) for how spectral coefficients are stored).
 Once the right-hand side ``RHS`` is evaluated, leapfrogging is a linear operation, meaning
 that its simply applied to every spectral coefficient ``\zeta_{lm}`` as one would evaluate
 it on every grid point in grid-point models.

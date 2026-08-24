@@ -6,7 +6,7 @@ the model, these are described below.
 ## JLD2 Output 
 
 As an alternative to the [NetCDF output](@ref), it is also possible to directly
-output the `Variables` (or one subgroup of it) to a JLD2 file.
+output the [`Variables`](@ref "Variables") (or one subgroup of it) to a JLD2 file.
 This might be interesting if you are really interested in the model internals,
 or also for some machine learning tasks. However, this option doesn't feature
 any possibilites to regrid or select variables, and it comes with the usual limitations
@@ -101,7 +101,8 @@ g["vor"][:, :, 1, :]     # vorticity, top layer, all time steps
 nothing #hide
 ```
 
-Custom output variables work exactly as with `NetCDFOutput`: subtype
+Custom output variables work exactly as with `NetCDFOutput`
+(see [Output variables](@ref) and [Customizing netCDF output](@ref)): subtype
 `AbstractOutputVariable`, implement `path(::MyOutputVariable, simulation)` to
 return the `AbstractField` to write, and `add!(output, MyOutputVariable())` it to the
 `ZarrOutput`. 
@@ -251,7 +252,7 @@ add!(model, :progress_txt => progress_txt)
 ## Restart files for variables
 
 `NetCDFOutput` also by default writes a restart file, containing the `simulation.variables.prognostic`
-that can be read back in with the `StartFromFile` initial conditions. Implemented as a callback
+(see [Prognostic variables](@ref)) that can be read back in with the `StartFromFile` initial conditions. Implemented as a callback
 `WriteVariablesRestartFile` can also be created independently of `NetCDFOutput`, e.g.
 
 ```@example output2
@@ -272,7 +273,7 @@ to write out specific model components and store them in a file see
 
 ## Model component restart file
 
-If you modified a model component (say by applying a custom orography) you can save this to file too.
+If you modified a model component (say by applying a [custom orography](orography.md)) you can save this to file too.
 
 ```@example output2
 orography = ManualOrography(spectral_grid)  # an orography that is untouched at initialize!

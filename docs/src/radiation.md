@@ -10,6 +10,8 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractLongwave)
 ```
 
+See [Parameterizations](@ref) for the general parameterization interface these implement.
+
 ## Uniform cooling
 
 Following Paulius and Garner[^PG06], the uniform cooling of the atmosphere
@@ -54,7 +56,7 @@ The flux ``F`` is converted to temperature tendencies at layer ``k`` via
 
 The term in parentheses is the absorbed flux in layer ``k`` of the upward
 flux from below at interface ``k+1/2`` (``k`` increases downwards, see
-[Vertical coordinates and resolution](@ref) and [Sigma coordinates](@ref)).
+[Vertical coordinates and resolution](@ref) and [Sigma coordinates](@ref sigma_coordinates_physics)).
 ``\Delta p = p_{k+1/2} - p_{k-1/2}`` is the pressure thickness of layer ``k``,
 gravity ``g`` and heat capacity ``c_p``.
 
@@ -140,7 +142,7 @@ planet = Earth(spectral_grid, length_of_day=Hour(24), length_of_year=Day(365)+Ho
 the sun (controlling the seasonal cycle). Both are `Dates` periods, so
 `Hour(24)`, `Day(1)` or `Second(86400)` are equivalent, and both are completely
 independent of the model's time step and of the simulation time you pass to
-`run!`. A planet with a 10-day-long day and an Earth-length year is just
+[`run!`](@ref run). A planet with a 10-day-long day and an Earth-length year is just
 
 ```@example radiation
 planet = Earth(spectral_grid, length_of_day=Day(10), length_of_year=Day(365))
@@ -256,7 +258,8 @@ are satisfied. The cloud cover (CLC) in a layer is then given by
 \mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \left(\frac{\mathrm{RH}_k - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right)\right]
 ```
 
-where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are large-scale and convective precipitation,
+where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are [large-scale](@ref "Large-scale precipitation")
+and [convective](@ref "Convective precipitation") precipitation,
 and $\mathrm{RH}_{cl}$ is a threshold.
 
 **Stratocumulus clouds:**
@@ -445,7 +448,7 @@ nothing # hide
 ## Greenhouse gases
 
 Greenhouse gas concentrations can be prescribed as time-varying scalar quantities and are
-tracked as prognostic variables. For example, an `ExponentialCO2`
+tracked as [prognostic variables](@ref "Prognostic variables"). For example, an `ExponentialCO2`
 concentration is fitted to the Keeling curve. To customise or add greenhouse gases, pass a
 `NamedTuple` of gas objects to `greenhouse_gases`. The key of the named tuple will be used for the variable name, so `co2 = ..., carbon_dioxide = ...` can co-exist.
 
