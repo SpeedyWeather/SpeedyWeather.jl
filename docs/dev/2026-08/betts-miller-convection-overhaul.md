@@ -85,6 +85,17 @@ Base revision: `557b38d5` (`mc/convection`, off `main`)
   tracing `Pq`/`PT` back to Frierson eq. (1)) and the ascent `while` loop's unavoidable dynamic trip
   count (already called out in Known limitations above, distinct from the `#1193` hazard this PR
   actually fixes, which was downstream loops using the LZB as a *loop bound*).
+- **2026-08-24, GPU profiling.** Max followed up asking for actual GPU profiling instead of the
+  "no GPU available" caveat in the CPU benchmark table. GPU hardware (1× NVIDIA L4) turned out to be
+  available in this environment. `ncu` (the tool that would directly show ascent-loop divergence)
+  is blocked by the driver's `RmProfilingAdminOnly` restriction — user has asked sysadmins for
+  access, pending. Ran `nsys` instead (works without the restricted counters): isolated the
+  `column_parameterizations_kernel!` convection-only launch and compared `main` vs. this branch at
+  the plan's three CPU-benchmark configs. Result, unexpectedly, is a *regression*: ~5% slower at
+  `nlayers=8` (both T31 and T63), ~0% at `nlayers=16` — opposite sign from the CPU numbers, and a
+  real GPU-side confirmation of the "full-range loops do more work for shallow-LZB columns" risk
+  this plan already flagged. Documented in a new "GPU profiling (nsys)" subsection and cross-referenced
+  from Known limitations; not fixed here, reported to the reviewer as a maintainer call.
 
 ## Problem description
 
@@ -415,9 +426,74 @@ Five commits on `mc/convection`, in order:
   No CPU regression in any arm — a small (~2-10%) improvement throughout from fewer loop passes,
   well inside the acceptance criterion (revert/report if >20% regression). All arms 0 allocations
   before and after. No GPU hardware was available in this environment, so GPU numbers were not
-  collected; the CPU result is used as the primary local signal per the plan, with the branchless
-  structure itself (uniform trip counts, no dynamic-bound loops) being the intended GPU win,
-  consistent with the `#1193` precedent cited in the plan.
+  collected at the time; the CPU result was used as the primary local signal per the plan, with the
+  branchless structure itself (uniform trip counts, no dynamic-bound loops) being the intended GPU
+  win, consistent with the `#1193` precedent cited in the plan. GPU hardware became available in a
+  later session — see "GPU profiling (nsys)" below, which complicates this picture.
+
+### GPU profiling (nsys)
+
+Added 2026-08-24 in response to @maximilian-gelbrecht's review ("Would be good to actually profile
+this on GPU"). One NVIDIA L4 (CUDA 13.0, driver 580.173.02) became available in this environment.
+
+**Tooling available:** both `nsys` (Nsight Systems) and `ncu` (Nsight Compute) are installed, but
+`ncu` — the tool that reports per-kernel hardware-counter metrics like warp/branch execution
+efficiency, i.e. what's actually needed to tell whether the ascent `while` loop specifically causes
+divergence — fails with `ERR_NVGPUCTRPERM`: the driver restricts GPU performance-counter access to
+root (`RmProfilingAdminOnly: 1`), and this session has no sudo. The user has asked the system admins
+for access; until then, only `nsys`'s coarser kernel-duration timeline is available (verified: it
+does not need the restricted counters, confirmed with a throwaway CUDA test program).
+
+**Method:** `column_parameterizations_kernel!` launched directly via `launch!(arch, LinearWorkOrder,
+(npoints,), column_parameterizations_kernel!, vars, (convection = model.convection,), model)` — the
+same isolation technique as the CPU benchmark, now via a direct kernel launch instead of the
+`_column_parameterizations_cpu!` internal. 100 spin-up steps first (so convection is actually
+active — confirmed via `n_convecting`, all columns convecting in every config below), then 3
+untimed warm-up launches, then 50 back-to-back timed launches, profiled with `nsys profile` and
+summarized with `nsys stats --report cuda_gpu_kern_sum`. This reports actual GPU-side kernel
+execution time from CUPTI activity records (kernel start → end on the device), not host-side Julia
+dispatch latency, so it's a fair per-launch comparison between branches. Script: `/tmp/bench_convection_gpu.jl`.
+One run per config (no repeated trials, given time cost — see caveat below), `main` at `9794037a`
+(pre-PR) vs. this branch:
+
+| Config  | `main` (ns) | `mc/convection` (ns) | Δ (ns) | Δ (%)  |
+|---------|-------------|-----------------------|--------|--------|
+| T31 L8  | 13,438.8 (σ=40.7)   | 14,104.7 (σ=38.0)   | +665.9 | **+4.96%** |
+| T31 L16 | 24,902.5 (σ=86.5)   | 24,958.7 (σ=100.7)  | +56.2  | +0.23% |
+| T63 L8  | 13,868.6 (σ=134.5)  | 14,531.5 (σ=223.0)  | +662.9 | **+4.78%** |
+
+**Finding:** at `nlayers=8` (both truncations), this branch's isolated-convection kernel is
+measurably ~5% *slower* on GPU than `main` — the opposite sign from the CPU numbers above. The
+absolute gap (~660ns) is nearly identical at T31L8 and T63L8 despite T63 having ~4× the grid
+points, which points to a fixed *per-thread* cost rather than a launch-overhead/occupancy artifact
+(those would scale with grid size). This is consistent with the exact risk this plan already flagged
+under §2 ("full-range loops do more work for shallow-LZB columns"): `main`'s dynamic re-loop over
+`level_zero_buoyancy:nlayers` does fewer iterations than `nlayers` whenever a column's convection is
+shallow, while this branch's full-range loops always run all `nlayers` iterations per thread
+regardless. At `nlayers=16` the gap nearly disappears (+0.23%, within the observed noise) — a
+plausible read is that at finer vertical resolution a typical LZB sits proportionally deeper into
+the column, so `main`'s old dynamic range was already close to the full range there too, leaving
+little headroom for it to "win"; not confirmed, just the most consistent explanation of the data.
+
+**Caveats:**
+- This measures the *whole* isolated-convection kernel (`pseudo_adiabat!`/`dry_adiabat!` — including
+  the ascent `while` loop — fused with the downstream tendency loops in `convection!`). `nsys`
+  reports only the aggregate per-launch kernel duration; it cannot attribute time to the `while`
+  loop specifically vs. the other loops. So this does *not* directly answer whether the ascent loop
+  itself is a divergence hotspot — that needs `ncu`'s branch/warp-efficiency counters, still pending
+  admin access.
+- Single run per config on a shared, multi-tenant machine — no repeated trials to quantify run-to-run
+  variance beyond the per-launch stddev `nsys` itself reports. The L8 deltas (~660ns) are large
+  relative to their stddevs (~3-5×), so likely real; the L16 delta (56ns vs. ~90ns stddev) is not
+  distinguishable from noise.
+- Not (yet) reflected in the CPU benchmark table above or the PR description's benchmark section —
+  this is a GPU-only regression at coarse vertical resolution; CPU numbers stand as measured.
+
+This is a real, GPU-observed downside of the branchless restructuring that the CPU-only benchmarking
+in this plan could not have caught, and is now flagged to the reviewer rather than resolved
+unilaterally — whether to pursue a fix (e.g. capping the full-range loop at some resolution-aware
+bound, or accepting the regression at coarse `nlayers` as the price of the `#1193` GPU-miscompile
+fix) is a maintainer call.
 
 ## Documentation changes
 
@@ -430,6 +506,10 @@ Five commits on `mc/convection`, in order:
 
 - The ascent `while buoyant && k > 1` loop in `pseudo_adiabat!`/`dry_adiabat!` keeps a per-column
   dynamic trip count — inherent to the algorithm (the LZB search), not addressed by this PR.
+  Whether it's specifically a warp-divergence hotspot is still open: `nsys` profiling (see "GPU
+  profiling" above) shows the *whole* isolated-convection kernel is ~5% slower on GPU than `main`
+  at `nlayers=8`, but attributing that to the ascent loop vs. the full-range downstream loops needs
+  `ncu`'s branch-efficiency counters, blocked on admin access as of this writing.
 - Entrainment mixing is applied in the saturated branch only (wet scheme), inherited from PR #976.
 - Convective snow uses a single lowest-layer temperature check, no falling-flux melt cascade
   (unlike large-scale precipitation).
