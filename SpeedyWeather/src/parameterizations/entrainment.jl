@@ -30,7 +30,7 @@ end
 
 Adapt.@adapt_structure LinearEntrainment
 LinearEntrainment(SG::SpectralGrid; kwargs...) = LinearEntrainment{SG.NF}(; kwargs...)
-LinearEntrainment(::Type{NF}; kwargs...) = LinearEntrainment{NF}(; kwargs...)
+LinearEntrainment(::Type{NF}; kwargs...) where {NF} = LinearEntrainment{NF}(; kwargs...)
 
 """$(TYPEDSIGNATURES) Entrainment rate at sigma level σ for the linear profile."""
 @inline (E::LinearEntrainment)(σ) = E.surface_entrainment * max(zero(σ), σ - E.σ_entrainment) / (1 - E.σ_entrainment)
@@ -44,7 +44,7 @@ end
 
 Adapt.@adapt_structure ConstantEntrainment
 ConstantEntrainment(SG::SpectralGrid; kwargs...) = ConstantEntrainment{SG.NF}(; kwargs...)
-ConstantEntrainment(::Type{NF}; kwargs...) = ConstantEntrainment{NF}(; kwargs...)
+ConstantEntrainment(::Type{NF}; kwargs...) where {NF} = ConstantEntrainment{NF}(; kwargs...)
 
 """$(TYPEDSIGNATURES) Entrainment rate at sigma level σ for the constant profile."""
 @inline (E::ConstantEntrainment)(σ) = E.entrainment_rate
