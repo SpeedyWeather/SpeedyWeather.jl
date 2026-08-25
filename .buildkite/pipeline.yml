@@ -1,25 +1,25 @@
 steps:
-  # - label: "CUDA, Julia v1.12"
-  #   matrix:
-  #     setup:
-  #       version:
-  #         - "1.12"
-  #   plugins:
-  #     - JuliaCI/julia#v1:
-  #         version: "{{matrix.version}}"
-  #   command: |
-  #     julia -e 'println("---- :julia: Instantiating project")
-  #               using Pkg
-  #               Pkg.develop(; path=joinpath(pwd(), "SpeedyWeather"))
-  #               Pkg.add(["CUDA", "Adapt", "KernelAbstractions", "Reactant", "JLD2"])'
-  #
-  #     julia -e 'println("+++ :julia: Running CUDA GPU tests")
-  #               include("SpeedyWeather/test/GPU/runtests.jl")'
-  #   agents:
-  #     queue: "cuda"
-  #   if: "!(build.pull_request.labels includes 'skip-ci' || build.pull_request.labels includes 'skip-gpu-ci')"
-  #   timeout_in_minutes: 40
-  #
+  - label: "CUDA, Julia v1.12"
+    matrix:
+      setup:
+        version:
+          - "1.12"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "{{matrix.version}}"
+    command: |
+      julia -e 'println("---- :julia: Instantiating project")
+                using Pkg
+                Pkg.develop(; path=joinpath(pwd(), "SpeedyWeather"))
+                Pkg.add(["CUDA", "Adapt", "KernelAbstractions", "Reactant", "JLD2"])'
+
+      julia -e 'println("+++ :julia: Running CUDA GPU tests")
+                include("SpeedyWeather/test/GPU/runtests.jl")'
+    agents:
+      queue: "cuda"
+    if: "!(build.pull_request.labels includes 'skip-ci' || build.pull_request.labels includes 'skip-gpu-ci')"
+    timeout_in_minutes: 40
+
   - label: "AMDGPU, Julia v1.12"
     matrix:
       setup:
