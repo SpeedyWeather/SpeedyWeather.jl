@@ -118,7 +118,7 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     P = precip_weight * sqrt(precip_term)
 
     # from convection or large-scale condensation
-    cloud_top_precipitation = vars.parameterizations.cloud_top[ij]       
+    cloud_top_precipitation = vars.parameterizations.cloud_top[ij]
     humidity_term_cloud_top::NF = 0
     cloud_top_humidity = nlayers + 1
 

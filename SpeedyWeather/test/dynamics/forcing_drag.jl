@@ -46,7 +46,7 @@ end
     # (Fu, Fv) = -c*max(0, |(u,v)| - speed_limit)^2 * (u,v)/|(u,v)|, i.e. it decelerates the
     # flow without rotating it. The previous (sign(u), sign(v)) form pointed along the quadrant
     # diagonal instead and was √2 too large for a 45° flow.
-    spectral_grid = SpectralGrid(trunc = 15, nlayers = 2)
+    spectral_grid = SpectralGrid(truncation = 16, nlayers = 2)
     c, speed_limit = 3.0e-6, 80.0
     drag = SpeedLimitDrag(spectral_grid; drag = c, speed_limit)
     model = PrimitiveDryModel(spectral_grid; drag)

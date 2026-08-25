@@ -100,19 +100,20 @@ Related: [Effective grid resolution](@ref) and [Available horizontal resolutions
 ## Matching spectral and grid resolution
 
 A given spectral resolution can be matched to a variety of grid resolutions. A _cubic_ grid, for example,
-combines a spectral truncation ``T`` with a grid resolution ``N`` (=`nlat_half`) such that ``T + 1 = N``.
-Using T31 and an O32 is therefore often abbreviated as Tco31 meaning that the spherical harmonics are
-truncated at ``l_{max}=31`` in combination with `N=32`, i.e. 64 latitude rings in total on an octahedral
-Gaussian grid. In SpeedyWeather.jl the choice of the order of truncation is controlled with the
+combines a spectral truncation ``T`` (1-based) with a grid resolution ``N`` (=`nlat_half`) such that ``T = N``.
+Using T32 and an O32 is therefore often abbreviated as Tco32 (or Tco31 with 0-based truncation)
+meaning that the spherical harmonics are truncated at ``l_{max}=32`` in combination with `N=32`,
+i.e. 64 latitude rings in total on an octahedral Gaussian grid.
+In SpeedyWeather.jl the choice of the order of truncation is controlled with the
 `dealiasing` parameter in the [SpectralGrid](@ref) construction.
 
 Let `J` be the total number of rings. Then we have
 
-- ``T \approx J`` for _linear_ truncation, i.e. `dealiasing = 1`
-- ``\frac{3}{2}T \approx J`` for _quadratic_ truncation, i.e. `dealiasing = 2`
-- ``2T \approx J`` for _cubic_ truncation, , i.e. `dealiasing = 3`
+- ``T = J`` for _linear_ truncation, i.e. `dealiasing = 1`
+- ``\frac{3}{2}T = J`` for _quadratic_ truncation, i.e. `dealiasing = 2`
+- ``2T = J`` for _cubic_ truncation, , i.e. `dealiasing = 3`
 
-and in general ``\frac{m+1}{2}T \approx J`` for _m-th_ order truncation. So the higher the truncation
+and in general ``\frac{m+1}{2}T = J`` for _m-th_ order truncation. So the higher the truncation
 order the more grid points are used in combination with the same spectral
 resolution. A higher truncation order therefore makes all grid-point calculations more expensive,
 but can represent products of terms on the grid (which will have higher wavenumber components) to

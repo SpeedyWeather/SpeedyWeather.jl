@@ -29,7 +29,7 @@ function _seed_prognostic!(shadow, vars0, seed) # seed only prognostic atmospher
 end
 
 @testset "Differentiability: forward vs reverse time_step! ($(nameof(MT)))" for (MT, nlayers) in
-        ((BarotropicModel, 1), (ShallowWaterModel, 1), (PrimitiveWetModel, 2))
+    ((BarotropicModel, 1), (ShallowWaterModel, 1), (PrimitiveWetModel, 2))
 
     spectral_grid = SpectralGrid(; truncation = 6, nlayers, NF = Float64)
     simulation = initialize!(MT(; spectral_grid))
