@@ -13,7 +13,7 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
     @param relative_humidity::NF = 0.7
 
     "[OPTION] Entrainment profile mixing environmental air into the rising parcel"
-    @component entrainment::Entrainment = NoEntrainment()
+    @component entrainment::Entrainment = LinearEntrainment(DEFAULT_NF)
 
     "[OPTION] Convert convective rain below freezing to snow?"
     snow::Bool = true
@@ -25,7 +25,7 @@ end
 Adapt.@adapt_structure BettsMillerConvection
 
 # generator function
-BettsMillerConvection(SG::SpectralGrid; entrainment = NoEntrainment(), kwargs...) =
+BettsMillerConvection(SG::SpectralGrid; entrainment = LinearEntrainment(SG), kwargs...) =
     BettsMillerConvection{SG.NF, typeof(entrainment)}(; entrainment, kwargs...)
 initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 

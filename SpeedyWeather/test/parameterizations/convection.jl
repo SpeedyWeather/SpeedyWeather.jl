@@ -34,14 +34,16 @@
                 @test (@inferred ne(σ)) == 0
             end
 
+            LinearEntrainment(NF)                   # constructor
             le = LinearEntrainment{NF}(; σ_entrainment = 0.5, surface_entrainment = 0.8)
-            @test le(NF(1)) ≈ NF(0.8)             # surface: full surface_entrainment
-            @test le(NF(0.5)) == 0                # at σ_entrainment: zero
-            @test le(NF(0.2)) == 0                # above σ_entrainment: zero
-            @test le(NF(0.75)) < le(NF(1))         # monotonically non-decreasing in σ
+            @test le(NF(1)) ≈ NF(0.8)               # surface: full surface_entrainment
+            @test le(NF(0.5)) == 0                  # at σ_entrainment: zero
+            @test le(NF(0.2)) == 0                  # above σ_entrainment: zero
+            @test le(NF(0.75)) < le(NF(1))          # monotonically non-decreasing in σ
             @test le(NF(0.5)) <= le(NF(0.75)) <= le(NF(1))
             @test (@inferred le(NF(0.8))) isa NF
 
+            ConstantEntrainment(NF)                 # constructor only
             ce = ConstantEntrainment{NF}(; entrainment_rate = 0.3)
             for σ in NF.((0, 0.3, 0.7, 1))
                 @test ce(σ) ≈ NF(0.3)
