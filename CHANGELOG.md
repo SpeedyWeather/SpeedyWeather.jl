@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Avoid `isodd(::AbstractFloat)`'s exact-integer-conversion fallback (an `InexactError` throw path) in `mod(::Particle)`, which triggered AMDGPU hostcalls [#TODO](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/TODO)
+- Avoid `isodd(::AbstractFloat)`'s exact-integer-conversion fallback (an `InexactError` throw path) in `mod(::Particle)`, which triggered AMDGPU hostcalls [#1220](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1220)
 - `SpectralTransform`'s `gpu_graphs` keyword now defaults per-backend via `default_gpu_graphs` (dispatching on the KernelAbstractions device) instead of a flat `true`; AMDGPU defaults to `false` pending HIP-graphs verification on non-datacenter hardware, CUDA is unaffected [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
 - Enable HIP-graphs acceleration of the batched Fourier transform for AMDGPU, mirroring the existing CUDA-graphs implementation [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
 - Update Terrarium output writer to work with v0.1.6 [#1224](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1224)
