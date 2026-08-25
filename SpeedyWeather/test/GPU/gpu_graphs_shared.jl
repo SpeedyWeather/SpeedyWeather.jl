@@ -7,7 +7,9 @@ function test_gpu_graphs(ext, prefix)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
         if ext !== nothing
             spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
-            model = PrimitiveWetModel(spectral_grid; spectral_transform = SpectralTransform(spectral_grid))
+            # gpu_graphs explicit: default is backend-dependent (see `default_gpu_graphs`), this
+            # test specifically exercises the graphs-enabled path
+            model = PrimitiveWetModel(spectral_grid; spectral_transform = SpectralTransform(spectral_grid; gpu_graphs = true))
             simulation = initialize!(model)
 
             ext.clear_fourier_graph_cache!()
@@ -45,7 +47,7 @@ function test_gpu_graphs(ext, prefix)
     @testset "$prefix Graphs: per-step views of one buffer reuse a single graph" begin
         if ext !== nothing
             spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
-            S = SpectralTransform(spectral_grid)
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
             nlayers = spectral_grid.nlayers
 
             gridded = rand(Float32, spectral_grid.grid, nlayers, 2)
@@ -83,7 +85,7 @@ function test_gpu_graphs(ext, prefix)
     return @testset "$prefix Graphs: add=true accumulates exactly once and uses its own graph" begin
         if ext !== nothing
             spectral_grid = SpectralGrid(; truncation = 16, nlayers = 4, architecture = SpeedyWeather.GPU())
-            S = SpectralTransform(spectral_grid)
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
             nlayers = spectral_grid.nlayers
             specs = rand(ComplexF32, spectral_grid.spectrum, nlayers)
             field = zeros(Float32, spectral_grid.grid, nlayers)

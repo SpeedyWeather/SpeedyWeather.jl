@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `SpectralTransform`'s `gpu_graphs` keyword now defaults per-backend via `default_gpu_graphs` (dispatching on the KernelAbstractions device) instead of a flat `true`; AMDGPU defaults to `false` pending HIP-graphs verification on non-datacenter hardware, CUDA is unaffected [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
 - Enable HIP-graphs acceleration of the batched Fourier transform for AMDGPU, mirroring the existing CUDA-graphs implementation [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
 - Reformulate trigonometric functions to avoid hostcalls on AMDGPU - [#1210](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1210)
 

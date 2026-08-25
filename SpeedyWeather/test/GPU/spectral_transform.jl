@@ -381,9 +381,10 @@ function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
                 spec_off = transform(field, S_off)      # grid -> spectral
                 grid_off = transform(coeffs, S_off)      # spectral -> grid
 
-                # GPU-graphs path (default, gpu_graphs = true)
+                # GPU-graphs path (explicitly enabled: default `gpu_graphs` is backend-dependent,
+                # e.g. `false` on AMDGPU — see `default_gpu_graphs` — so don't rely on it here)
                 ext.clear_fourier_graph_cache!()
-                S_on = SpectralTransform(spectral_grid)
+                S_on = SpectralTransform(spectral_grid; gpu_graphs = true)
                 spec_on = transform(field, S_on)
                 grid_on = transform(coeffs, S_on)
 
