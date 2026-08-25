@@ -32,7 +32,7 @@ steps:
       julia -e 'println("---- :julia: Instantiating project")
                 using Pkg
                 Pkg.develop(; path=joinpath(pwd(), "SpeedyWeather"))
-                Pkg.add(["AMDGPU", "Adapt", "KernelAbstractions"])
+                Pkg.add(["AMDGPU", "Adapt", "KernelAbstractions", "JLD2"])
                 Pkg.status()'
 
       julia -e 'println("+++ :julia: Running AMDGPU tests")
