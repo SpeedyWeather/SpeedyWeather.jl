@@ -8,12 +8,11 @@ steps:
       - JuliaCI/julia#v1:
           version: "{{matrix.version}}"
     command: |
-      julia -e 'println("---- :julia: Instantiating project")
+      julia --project=SpeedyWeather/test/GPU/CUDA -e 'println("---- :julia: Instantiating project")
                 using Pkg
-                Pkg.develop(; path=joinpath(pwd(), "SpeedyWeather"))
-                Pkg.add(["CUDA", "Adapt", "KernelAbstractions", "Reactant", "JLD2"])'
+                Pkg.instantiate()'
 
-      julia -e 'println("+++ :julia: Running CUDA GPU tests")
+      julia --project=SpeedyWeather/test/GPU/CUDA -e 'println("+++ :julia: Running CUDA GPU tests")
                 include("SpeedyWeather/test/GPU/runtests.jl")'
     agents:
       queue: "cuda"
