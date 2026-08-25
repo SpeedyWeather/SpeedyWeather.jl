@@ -11,11 +11,16 @@ using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-import SpeedyTransforms: SpectralTransform, _fourier_batched!
+import SpeedyTransforms: SpectralTransform, _fourier_batched!, default_gpu_graphs
 import SpeedyTransforms.RingGrids: AbstractField
 
 import SpeedyWeatherInternals.KernelLaunching: launch!, ArrayWorkOrder
 import SpeedyWeatherInternals.Architectures: on_architecture, GPU
+
+# HIP-graphs stability is so far only confirmed on datacenter/CDNA hardware (LUMI); default off
+# on AMDGPU until that's verified more broadly (e.g. the consumer RDNA cards buildkite currently
+# runs on) — pass `gpu_graphs = true` explicitly to opt in.
+default_gpu_graphs(::AMDGPU.ROCBackend) = false
 
 # =====================================================================================
 # HIP GRAPHS ACCELERATION OF THE BATCHED FOURIER TRANSFORM

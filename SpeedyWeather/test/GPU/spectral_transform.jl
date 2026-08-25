@@ -368,8 +368,12 @@ end
 function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
     @testset "fourier_batched: $prefix Graphs equivalence and replay" begin
         # the GPU-Graphs acceleration lives in the backend extension; only test it when that
-        # backend (and hence the extension) is actually loaded
-        if ext !== nothing
+        # backend (and hence the extension) is actually loaded, and when this backend's
+        # graphs-accelerated path is trusted enough to test (`default_gpu_graphs` — the same
+        # switch that governs the runtime default). To enable on AMDGPU (e.g. once run on trusted
+        # hardware like LUMI), edit `SpeedyTransforms/ext/SpeedyTransformsAMDGPUExt.jl` and change
+        # `default_gpu_graphs(::AMDGPU.ROCBackend) = false` to `= true`.
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(GPU())
             @testset for Grid in grid_list
                 spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
                 field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
@@ -381,9 +385,10 @@ function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
                 spec_off = transform(field, S_off)      # grid -> spectral
                 grid_off = transform(coeffs, S_off)      # spectral -> grid
 
-                # GPU-graphs path (default, gpu_graphs = true)
+                # GPU-graphs path (explicitly enabled: default `gpu_graphs` is backend-dependent,
+                # e.g. `false` on AMDGPU — see `default_gpu_graphs` — so don't rely on it here)
                 ext.clear_fourier_graph_cache!()
-                S_on = SpectralTransform(spectral_grid)
+                S_on = SpectralTransform(spectral_grid; gpu_graphs = true)
                 spec_on = transform(field, S_on)
                 grid_on = transform(coeffs, S_on)
 
