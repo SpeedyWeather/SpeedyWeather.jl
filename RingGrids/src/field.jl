@@ -123,7 +123,10 @@ matrix_size(field::AbstractField) = (matrix_size(field.grid)..., size(field)[2:e
 # simply propagate all indices forward
 Base.@propagate_inbounds Base.getindex(field::AbstractField, ijk...) = getindex(field.data, ijk...)
 Base.@propagate_inbounds Base.setindex!(field::AbstractField, x, ijk...) = setindex!(field.data, x, ijk...)
-Base.fill!(field::AbstractField, x) = fill!(field.data, x)
+Base.fill!(field::AbstractField, x) = Field(fill!(field.data, x), field.grid, field.dims)
+
+# defined explicitly as the generic AbstractArray fallback uses scalar indexing, which errors on GPU
+Base.clamp!(F::AbstractField, lo, hi) = Field(clamp!(F.data, lo, hi), F.grid, F.dims)
 
 # make [:, k...] not escape the Field
 @inline Base.getindex(field::AbstractField, col::Colon, k...) = Field(field.data[col, k...], field.grid, field.dims[col, k...])

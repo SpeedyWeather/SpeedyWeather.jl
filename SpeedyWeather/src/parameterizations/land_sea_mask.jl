@@ -110,8 +110,10 @@ end
 function set!(mask::AbstractLandSeaMask, args...; kwargs...)
     set!(mask.land_fraction, args...; kwargs...)
     lo, hi = extrema(mask.land_fraction)
-    (lo < 0 || hi > 1) && @warn "Land-sea mask not in [0, 1] but in [$lo, $hi]. Clamping."
-    clamp!(mask.land_fraction, 0, 1)
+    if lo < 0 || hi > 1
+        @warn "Land-sea mask not in [0, 1] but in [$lo, $hi]. Clamping."
+        clamp!(mask.land_fraction, 0, 1)
+    end
     return nothing
 end
 
