@@ -4,6 +4,12 @@
 
 - Move time-stepping mathematics from the Usage docs to a new Numerics page, and document previously-undocumented `NCycleLorenz` details (per-variant weights, tendency step split, diffusion/implicit ordering) [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
 - Add cross-reference links throughout the docs, and fix several pre-existing ambiguous/broken `@ref` targets found along the way [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
+- Remove Reactant compat restriction again [#1225](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1225)
+- Remove Reactant from SpeedyWeather/test/GPU/AMDGPU/Project.toml for AMDGPU compatibility with Julia v1.12 [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
+- Avoid `isodd(::AbstractFloat)`'s exact-integer-conversion fallback (an `InexactError` throw path) in `mod(::Particle)`, which triggered AMDGPU hostcalls [#1220](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1220)
+- `SpectralTransform`'s `gpu_graphs` keyword now defaults per-backend via `default_gpu_graphs` (dispatching on the KernelAbstractions device) instead of a flat `true`; AMDGPU defaults to `false` pending HIP-graphs verification on non-datacenter hardware, CUDA is unaffected [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
+- Enable HIP-graphs acceleration of the batched Fourier transform for AMDGPU, mirroring the existing CUDA-graphs implementation [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
+- Update Terrarium output writer to work with v0.1.6 [#1224](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1224)
 - Fix GPU scalar indexing when a `Field` broadcasts against a bare GPU array (e.g. `LinearDrag` in the Held-Suarez example) [#1219](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1219)
 - Reformulate trigonometric functions to avoid hostcalls on AMDGPU - [#1210](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1210)
 

@@ -1,15 +1,24 @@
-# Shared test logic for CUDA-graphs tests, called from cuda_graphs.jl.
-# HIP graphs are not implemented for AMDGPU (see SpeedyTransformsAMDGPUExt.jl and
-# hip_graphs.jl), so this is CUDA-only.
-# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live inside the CUDA extension
-# module (SpeedyTransformsCUDAExt), not in the main SpeedyTransforms package — hence
-# accessed via `ext.` below, not `SpeedyTransforms.`.
+# Shared test logic for GPU-graphs tests, called from cuda_graphs.jl and hip_graphs.jl.
+# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live inside the backend extension
+# module (SpeedyTransformsCUDAExt / SpeedyTransformsAMDGPUExt), not in the main SpeedyTransforms
+# package — hence accessed via `ext.` below, not `SpeedyTransforms.`.
+#
+# These tests only actually exercise the graphs-accelerated path when
+# `SpeedyTransforms.default_gpu_graphs` says this backend's GPU-graphs are trusted (currently:
+# `false` for AMDGPU — HIP graphs aren't confirmed stable outside datacenter/CDNA hardware yet).
+# That single method is the switch: to enable these tests (e.g. once run on trusted hardware like
+# LUMI), edit `SpeedyTransforms/ext/SpeedyTransformsAMDGPUExt.jl` and change
+# `default_gpu_graphs(::AMDGPU.ROCBackend) = false` to `= true`. This also flips the runtime
+# default for `SpectralTransform`'s `gpu_graphs` keyword on AMDGPU — that's intentional, it's the
+# same trust decision, not a separate toggle.
 
 function test_gpu_graphs(ext, prefix)
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
-        if ext !== nothing
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(SpeedyWeather.GPU())
             spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
-            model = PrimitiveWetModel(spectral_grid; spectral_transform = SpectralTransform(spectral_grid))
+            # gpu_graphs explicit: default is backend-dependent (see `default_gpu_graphs`), this
+            # test specifically exercises the graphs-enabled path
+            model = PrimitiveWetModel(spectral_grid; spectral_transform = SpectralTransform(spectral_grid; gpu_graphs = true))
             simulation = initialize!(model)
 
             ext.clear_fourier_graph_cache!()
@@ -45,9 +54,9 @@ function test_gpu_graphs(ext, prefix)
     # key on the stable device pointer — not the churning wrapper identity — or it captures a
     # new graph every step and grows without bound.
     @testset "$prefix Graphs: per-step views of one buffer reuse a single graph" begin
-        if ext !== nothing
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(SpeedyWeather.GPU())
             spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
-            S = SpectralTransform(spectral_grid)
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
             nlayers = spectral_grid.nlayers
 
             gridded = rand(Float32, spectral_grid.grid, nlayers, 2)
@@ -83,9 +92,9 @@ function test_gpu_graphs(ext, prefix)
     #     the warmup alone produces the call's result. Launching the graph as well would apply the
     #     work twice — invisible for an overwriting loop, but a double-accumulate for `add=true`.
     return @testset "$prefix Graphs: add=true accumulates exactly once and uses its own graph" begin
-        if ext !== nothing
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(SpeedyWeather.GPU())
             spectral_grid = SpectralGrid(; truncation = 16, nlayers = 4, architecture = SpeedyWeather.GPU())
-            S = SpectralTransform(spectral_grid)
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
             nlayers = spectral_grid.nlayers
             specs = rand(ComplexF32, spectral_grid.spectrum, nlayers)
             field = zeros(Float32, spectral_grid.grid, nlayers)
