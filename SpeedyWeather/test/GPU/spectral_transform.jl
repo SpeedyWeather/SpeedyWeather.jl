@@ -1,19 +1,68 @@
-@testset "GPU spectral transform roundtrip " begin
-    spectral_grid = SpectralGrid(truncation = 42, nlayers = 8, architecture = GPU())
-    S = SpectralTransform(spectral_grid)
+
+@testset "GPU MatrixSpectralTransform roundtrip " begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8, architecture = GPU())
+    M = MatrixSpectralTransform(spectral_grid)
 
     # first roundtrip
     L = randn(ComplexF32, spectral_grid.spectrum, 8)
     field = zeros(Float32, spectral_grid.grid, 8)
-    transform!(field, L, S)
-    transform!(L, field, S)
+    transform!(field, L, M)
+    transform!(L, field, M)
 
     # 2nd roundtrip
     L2 = deepcopy(L)
-    transform!(field, L, S)
-    transform!(L, field, S)
+    transform!(field, L, M)
+    transform!(L, field, M)
 
     @test L ≈ L2
+end
+
+@testset "GPU MatrixSpectralTransform: transform! on views into a larger backing array" begin
+    # `vars.grid.<var>`/`vars.prognostic.<var>` in a real model are commonly *views* into a larger
+    # shared/fused backing array, not top-level CuArrays. Regression test for a bug where
+    # `MatrixSpectralTransform.transform!`'s internal `reshape` wrapped such a view in a
+    # `Base.ReshapedArray` that caused an error
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8, architecture = GPU())
+    M = MatrixSpectralTransform(spectral_grid)
+    nlayers = spectral_grid.nlayers
+
+    # reference: plain top-level arrays, the path that always worked
+    coeffs_ref = randn(ComplexF32, spectral_grid.spectrum, nlayers)
+    field_ref = transform(coeffs_ref, M)
+
+    # the same coefficients, but embedded as a *view*
+    nbatch, batch_idx = 3, 2
+    layer_range = (nlayers + 1):(2nlayers)
+
+    coeffs_backing = zeros(ComplexF32, spectral_grid.spectrum, 2nlayers, nbatch)
+    coeffs_data = view(view(coeffs_backing.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(coeffs_data) !== coeffs_data      # guard: genuinely a nested view, not optimized away
+    coeffs_data .= coeffs_ref.data
+    coeffs_view = LowerTriangularArray(coeffs_data, spectral_grid.spectrum)
+
+    field_backing = zeros(Float32, spectral_grid.grid, 2nlayers, nbatch)
+    field_data = view(view(field_backing.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(field_data) !== field_data
+    field_view = Field(field_data, spectral_grid.grid)
+
+    # spectral -> grid, writing into a field view. Compare `.data` (transferred to CPU) rather
+    # than the `Field`/`LowerTriangularArray` wrappers directly: `isapprox` on those falls back to
+    # a generic, scalar-indexing `norm`, which errors on GPU regardless of correctness.
+    transform!(field_view, coeffs_view, M)
+    @test Array(field_view.data) ≈ Array(field_ref.data)
+    # the result actually landed in the shared backing buffer (a true view, not a detached copy)
+    @test Array(field_backing.data)[:, layer_range, batch_idx] ≈ Array(field_ref.data)
+
+    # grid -> spectral, writing into a coeffs view
+    coeffs_from_field_ref = transform(field_ref, M)
+    coeffs_backing2 = zeros(ComplexF32, spectral_grid.spectrum, 2nlayers, nbatch)
+    coeffs_data2 = view(view(coeffs_backing2.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(coeffs_data2) !== coeffs_data2
+    coeffs_view2 = LowerTriangularArray(coeffs_data2, spectral_grid.spectrum)
+
+    transform!(coeffs_view2, field_ref, M)
+    @test Array(coeffs_view2.data) ≈ Array(coeffs_from_field_ref.data)
+    @test Array(coeffs_backing2.data)[:, layer_range, batch_idx] ≈ Array(coeffs_from_field_ref.data)
 end
 
 spectral_resolutions = (32,) #, 63, 127)
@@ -316,47 +365,58 @@ end
     end
 end
 
-@testset "fourier_batched: CUDA Graphs equivalence and replay" begin
-    # the CUDA-Graphs acceleration lives in SpeedyTransformsCUDAExt; only test it when
-    # the CUDA backend (and hence the extension) is actually loaded
-    ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
-    if ext !== nothing
-        @testset for Grid in grid_list
-            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
-            field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
-            coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
+function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
+    @testset "fourier_batched: $prefix Graphs equivalence and replay" begin
+        # the GPU-Graphs acceleration lives in the backend extension; only test it when that
+        # backend (and hence the extension) is actually loaded, and when this backend's
+        # graphs-accelerated path is trusted enough to test (`default_gpu_graphs` — the same
+        # switch that governs the runtime default). To enable on AMDGPU (e.g. once run on trusted
+        # hardware like LUMI), edit `SpeedyTransforms/ext/SpeedyTransformsAMDGPUExt.jl` and change
+        # `default_gpu_graphs(::AMDGPU.ROCBackend) = false` to `= true`.
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(GPU())
+            @testset for Grid in grid_list
+                spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
+                field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
+                coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
 
-            # reference: generic (allocating) GPU path, graphs disabled on this transform
-            ext.clear_fourier_graph_cache!()
-            S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
-            spec_off = transform(field, S_off)      # grid -> spectral
-            grid_off = transform(coeffs, S_off)      # spectral -> grid
+                # reference: generic (allocating) GPU path, graphs disabled on this transform
+                ext.clear_fourier_graph_cache!()
+                S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
+                spec_off = transform(field, S_off)      # grid -> spectral
+                grid_off = transform(coeffs, S_off)      # spectral -> grid
 
-            # GPU-graphs path (default, gpu_graphs = true)
-            ext.clear_fourier_graph_cache!()
-            S_on = SpectralTransform(spectral_grid)
-            spec_on = transform(field, S_on)
-            grid_on = transform(coeffs, S_on)
+                # GPU-graphs path (explicitly enabled: default `gpu_graphs` is backend-dependent,
+                # e.g. `false` on AMDGPU — see `default_gpu_graphs` — so don't rely on it here)
+                ext.clear_fourier_graph_cache!()
+                S_on = SpectralTransform(spectral_grid; gpu_graphs = true)
+                spec_on = transform(field, S_on)
+                grid_on = transform(coeffs, S_on)
 
-            # graphs path must match the generic path (forward differs only at the level
-            # of the non-deterministic atomic Legendre transform, hence the tolerance)
-            @test Array(spec_on.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
-            @test Array(grid_on.data) ≈ Array(grid_off.data) rtol = sqrt(eps(Float32))
+                # graphs path must match the generic path (forward differs only at the level
+                # of the non-deterministic atomic Legendre transform, hence the tolerance)
+                @test Array(spec_on.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
+                @test Array(grid_on.data) ≈ Array(grid_off.data) rtol = sqrt(eps(Float32))
 
-            # a graph was actually captured and cached
-            @test !isempty(ext.GRAPH_CACHES)
+                # a graph was actually captured and cached
+                @test !isempty(ext.GRAPH_CACHES)
 
-            # replaying into the same buffers across repeated calls stays correct
-            spec_repeat = similar(spec_on)
-            for _ in 1:3
-                transform!(spec_repeat, field, S_on)
+                # replaying into the same buffers across repeated calls stays correct
+                spec_repeat = similar(spec_on)
+                for _ in 1:3
+                    transform!(spec_repeat, field, S_on)
+                end
+                @test Array(spec_repeat.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
+
+                ext.clear_fourier_graph_cache!()
             end
-            @test Array(spec_repeat.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
-
-            ext.clear_fourier_graph_cache!()
         end
     end
+    return ext !== nothing
 end
+
+CUDA_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt), "CUDA")
+AMD_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt), "HIP")
+@test xor(CUDA_executed, AMD_executed) # only one should ever be executed on a given machine
 
 @testset "fourier_batched: compare backward pass to CPU" begin
     @testset for truncation in spectral_resolutions

@@ -77,7 +77,7 @@ function initialize!(
 
     # SCALING we use vorticity*radius, divergence*radius in the dynamical core
     scale_prognostic!(variables, model.planet.radius)
-    
+
     # TRANSFORM variables from spectral to grid (= set the diagnostic variables in the correct initial state)
     transform!(variables, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays

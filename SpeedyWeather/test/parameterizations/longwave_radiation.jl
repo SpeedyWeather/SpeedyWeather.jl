@@ -25,7 +25,7 @@ end
         vars = Variables(model)
 
         # transmissivity depends on pressure thickness and thereofre surface pressure should be nonzero
-        vars.parameterizations.surface_pressure .= 1e5
+        vars.parameterizations.surface_pressure .= 1.0e5
         t = SpeedyWeather.transmissivity!(1, vars, model.longwave_radiation.transmissivity, model)
         for ij in 2:model.spectral_grid.npoints
             SpeedyWeather.transmissivity!(ij, vars, model.longwave_radiation.transmissivity, model)
