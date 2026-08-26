@@ -43,7 +43,7 @@ import SpeedyWeatherInternals.Architectures: on_architecture, GPU
 # and test on real hardware before trusting it.
 # =====================================================================================
 
-include("gpu_graphs_common.jl")
+include("../src/gpu_graphs_common.jl")
 
 # Probe for the high-level HIP graph API. AMDGPU.HIP exports these in newer versions; on
 # older installs only the raw C bindings (hipGraph_t, hipGraphExec_t, …) are present.

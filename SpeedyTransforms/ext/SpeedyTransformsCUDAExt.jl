@@ -51,7 +51,7 @@ import SpeedyWeatherInternals.Architectures: on_architecture, GPU
 # backend (see `GraphBackend`).
 # =====================================================================================
 
-include("gpu_graphs_common.jl")
+include("../src/gpu_graphs_common.jl")
 
 # The CUDA capture/instantiate/launch primitives `run_graph!` needs, plus the architecture
 # used to `synchronize` before capture; see `GraphBackend` in gpu_graphs_common.jl. `capture`

@@ -2,11 +2,8 @@
 # BACKEND-AGNOSTIC GPU-GRAPHS MACHINERY FOR THE BATCHED FOURIER TRANSFORM
 #
 # `include()`-d by each graph-capturing backend extension (currently SpeedyTransformsCUDAExt.jl
-# and SpeedyTransformsAMDGPUExt.jl). See SpeedyTransformsCUDAExt.jl for the rationale of
-# GPU-graphs acceleration itself.
-#
-# TODO: This code ended up in src/ by accident once and reportedly broke Enzyme's CPU-only 
-# autodiff tests. Confirm and fix underlying issue.
+# and SpeedyTransformsAMDGPUExt.jl) via a relative-path include, NOT by SpeedyTransforms.jl
+# itself. See SpeedyTransformsCUDAExt.jl for the rationale of GPU-graphs acceleration itself.
 #
 # The only thing that differs between backends is the graph capture/instantiate/launch API
 # itself (e.g. `CUDA.capture`/`instantiate`/`launch` vs a HIP equivalent) and the graph-exec
