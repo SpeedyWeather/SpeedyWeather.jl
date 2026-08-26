@@ -548,9 +548,16 @@ end
         field[:, 1, 2] = v
         @test field[:, 1, 2].data ≈ v.data
 
-        # fill
-        fill!(field, 2.0)
+        # fill! (returns a Field, not the bare underlying array)
+        filled = fill!(field, 2.0)
         @test all(field .== 2)
+        @test filled isa Field{NF, ndims, JLArray{NF, ndims}}
+
+        # clamp! (uses `field.data`'s clamp! to avoid scalar indexing on GPU)
+        field3 = on_architecture(jl_arch, randn(F{NF}, s...))
+        clamped = clamp!(field3, NF(-0.5), NF(0.5))
+        @test clamped isa Field{NF, ndims, JLArray{NF, ndims}}
+        @test all(-0.5 .<= clamped .<= 0.5)
     end
 end
 

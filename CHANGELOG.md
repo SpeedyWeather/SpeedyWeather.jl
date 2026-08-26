@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add GPU-safe `clamp!` and make `fill!` return a `Field` for `AbstractField`, and only clamp the land-sea mask when out of range [#1228](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1228)
 - Remove Reactant compat restriction again [#1225](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1225)
 - Remove Reactant from SpeedyWeather/test/GPU/AMDGPU/Project.toml for AMDGPU compatibility with Julia v1.12 [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
 - Avoid `isodd(::AbstractFloat)`'s exact-integer-conversion fallback (an `InexactError` throw path) in `mod(::Particle)`, which triggered AMDGPU hostcalls [#1220](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1220)
