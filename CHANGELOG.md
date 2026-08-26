@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Remove Reactant compat restriction again [#1225](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1225)
 - Remove Reactant from SpeedyWeather/test/GPU/AMDGPU/Project.toml for AMDGPU compatibility with Julia v1.12 [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
 - Avoid `isodd(::AbstractFloat)`'s exact-integer-conversion fallback (an `InexactError` throw path) in `mod(::Particle)`, which triggered AMDGPU hostcalls [#1220](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1220)
 - `SpectralTransform`'s `gpu_graphs` keyword now defaults per-backend via `default_gpu_graphs` (dispatching on the KernelAbstractions device) instead of a flat `true`; AMDGPU defaults to `false` pending HIP-graphs verification on non-datacenter hardware, CUDA is unaffected [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
