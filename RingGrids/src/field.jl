@@ -123,7 +123,10 @@ matrix_size(field::AbstractField) = (matrix_size(field.grid)..., size(field)[2:e
 # simply propagate all indices forward
 Base.@propagate_inbounds Base.getindex(field::AbstractField, ijk...) = getindex(field.data, ijk...)
 Base.@propagate_inbounds Base.setindex!(field::AbstractField, x, ijk...) = setindex!(field.data, x, ijk...)
-Base.fill!(field::AbstractField, x) = nonparametric_type(typeof(field))(fill!(field.data, x), field.grid, field.dims)
+function Base.fill!(field::AbstractField, x) 
+                  fill!(field.data, x)
+                  return field
+end 
 
 # defined explicitly as the generic AbstractArray fallback uses scalar indexing, which errors on GPU
 Base.clamp!(field::AbstractField, lo, hi) = nonparametric_type(typeof(field))(clamp!(field.data, lo, hi), field.grid, field.dims)
