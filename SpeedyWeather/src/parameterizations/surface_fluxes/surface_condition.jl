@@ -23,7 +23,7 @@ Adapt.adapt_structure(to, obj::LearnedWindSlowdown{NF}) where {NF} = LearnedWind
 LearnedWindSlowdown(SG::SpectralGrid; kwargs...) = LearnedWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::LearnedWindSlowdown, model, surface_condition,U₁)
+@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::LearnedWindSlowdown, model, surface_condition, U₁)
     (; gravity) = model.planet
     (; nlayers) = model.geometry
     (; land_sea_mask, atmosphere, time_stepping) = model
@@ -36,15 +36,9 @@ initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
     z₀_raw_land = vars.parameterizations.land.momentum_roughness[ij]
     z₀_raw_ocean = vars.parameterizations.ocean.momentum_roughness[ij]
 
-    # Handle initialisation since z_₀ is not yet set
-    if !(z₀_raw_ocean > 0) || !(z₀_raw_land > 0)
-        # 0.1m typical for land, 0.0001m typical for ocean
-        z₀_land = convert(typeof(z₀_raw_land), 0.1)
-        z₀_ocean = convert(typeof(z₀_raw_ocean), 0.0001)
-    else
-        z₀_land = z₀_raw_land
-        z₀_ocean = z₀_raw_ocean
-    end
+    # Handle initialisation independently for land and ocean masks
+    z₀_land = z₀_raw_land > 0 ? z₀_raw_land : convert(typeof(z₀_raw_land), 0.1)
+    z₀_ocean = z₀_raw_ocean > 0 ? z₀_raw_ocean : convert(typeof(z₀_raw_ocean), 0.0001)
 
     T₁ = get_prognostic_step(vars.grid.temperature, time_stepping, ws)[ij, nlayers]
     q₁ = hasproperty(vars.grid, :humidity) ? 
@@ -67,9 +61,13 @@ initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
     log_z₀_ocean = log(z₀_ocean)
     log_z₀_land = log(z₀_land)
 
+    T_grad_ocean = vars.parameterizations.surface_air_temperature[ij] - T_skin_ocean
+
     sqrt_abs(x) = sqrt(abs(x))
-    ocean_slowdown = (((1.4852 - ((0.83675 - ((0.10807 * 0.45903) * log_z₀_ocean)) ^ log_z₀_ocean)) + (-0.13767 * exp((sqrt_abs(log_z₀_ocean) * log_z₀_ocean) + log(2.9248)))) - (-0.13038 * log_z₀_ocean)) * (((z₁ * ((exp(log(U₁ * 0.07611)) ^ -1.1987) + 0.97005)) - Δθᵥ_ocean) * 0.01083)
-    land_slowdown = -0.18860915 - ((sqrt_abs(exp(log_z₀_land * -0.7117916)) * (sqrt_abs(log_z₀_land) - exp(1.2022188))) * (U₁ ^ -0.99909467))
+    ocean_slowdown = ((atan((log_z₀_ocean + ((log_z₀_ocean + log_z₀_ocean) + log_z₀_ocean)) + ((z₁ - exp(T_grad_ocean)) * 0.14511)) - 1.9883) * (-10.904 - log_z₀_ocean)) - signed_sqrt(0.34863 * (log_z₀_ocean - atan((Δθᵥ_ocean + -10.904) + (T_grad_ocean + U₁))))
+    land_slowdown = 4.2599 + ((1.9678 * atan(exp(((-11.839 - signed_sqrt(U₁)) - (signed_sqrt(Δθᵥ_land + (9.6687 + log_z₀_land)) - (Δθᵥ_land * ((Δθᵥ_land + (z₁ + Δθᵥ_land)) ^ -0.29968)))) - (log_z₀_land * 2.3145)))) * (10.215 + log_z₀_land))
+    # ocean_slowdown=0.5
+    # land_slowdown=0.5
 
     slowdown = ocean_slowdown * (1 - land_fraction) + land_slowdown * land_fraction
 
@@ -200,10 +198,10 @@ end
 
     U₁ = sqrt(muladd(u_grid[ij, nlayers], u_grid[ij, nlayers], v_grid[ij, nlayers]^2))
 
-    wind_slowdown_ratio = calc_wind_slowdown(ij, vars, wind_slowdown, model, surface_condition, U₁)
+    wind_slowdown = calc_wind_slowdown(ij, vars, wind_slowdown, model, surface_condition, U₁)
 
-    uₛ = wind_slowdown_ratio * u_grid[ij, nlayers]
-    vₛ = wind_slowdown_ratio * v_grid[ij, nlayers]
+    uₛ = wind_slowdown * u_grid[ij, nlayers]
+    vₛ = wind_slowdown * v_grid[ij, nlayers]
 
     gust = calc_wind_gust(ij, vars, wind_gust, model, surface_condition, pₛ, Tᵥ)
 
