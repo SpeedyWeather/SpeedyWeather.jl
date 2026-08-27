@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix a bug that stopped `StochasticallyPerturbedParameterizationTendencies` from working on GPU [#1230](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1230)
 - Add GPU-safe `clamp!` and make `fill!` return a `Field` for `AbstractField`, and only clamp the land-sea mask when out of range [#1228](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1228)
 - Remove Reactant compat restriction again [#1225](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1225)
 - Remove Reactant from SpeedyWeather/test/GPU/AMDGPU/Project.toml for AMDGPU compatibility with Julia v1.12 [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
