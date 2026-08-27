@@ -10,10 +10,13 @@ vertical sigma coordinate ``\sigma``, see [Sigma coordinates](@ref)) that are mo
 ```
 
 This equation applies in 2D, i.e. ``\mathbf{x} = (\lambda, \theta)`` and ``\mathbf{u} = (u, v)`` or
-in 3D, but at the moment only 2D advection is supported. In the [Primitive equation model](@ref primitive_equation_model)
-the vertical layer on which the advection takes place has to be specified. It is therefore not
-advected with the vertical velocity but maintains a constant pressure ratio compared to the
-surface pressure (``\sigma`` is constant).
+in 3D, i.e. ``\mathbf{x} = (\lambda, \theta, \sigma)`` and ``\mathbf{u} = (u, v, w)`` with ``w``
+the vertical velocity in ``\sigma`` coordinates. Both are supported, selected via
+[`ParticleAdvection2D`](@ref) or [`ParticleAdvection3D`](@ref) respectively, see
+[3D particle advection](@ref) below. With `ParticleAdvection2D` in the
+[Primitive equation model](@ref primitive_equation_model) the vertical layer on which the advection
+takes place has to be specified. Particles are therefore not advected with the vertical velocity
+but maintain a constant pressure ratio compared to the surface pressure (``\sigma`` is constant).
 
 ## Discretization of particle advection
 
@@ -100,6 +103,82 @@ cartesian coordinate system instead of the geodesics in spherical coordinates.
 However, for typical time steps of 1 hour and velocities not exceeding 100 m/s
 the error is not catastrophic and can be reduced with a shorter time step.
 We may switch to great circle calculations in future versions.
+
+## 3D particle advection
+
+In addition to being advected horizontally on a fixed model layer
+([`ParticleAdvection2D`](@ref)), particles can also be advected freely in the vertical
+([`ParticleAdvection3D`](@ref)). Instead of keeping ``\sigma`` fixed, a particle's ``\sigma``
+coordinate now evolves in time too, driven by the model's (diagnostic) vertical velocity, in
+exactly the same way as longitude and latitude evolve with ``u`` and ``v``. This is currently
+only available for the [Primitive equation model](@ref primitive_equation_model)s
+(`PrimitiveDryModel`, `PrimitiveWetModel`) as it requires a vertically-resolved, diagnosed
+vertical velocity; `BarotropicModel` and `ShallowWaterModel` have no such concept and continue
+to only support `ParticleAdvection2D`.
+
+### Vertical interpolation
+
+Wind is only known on the model's discrete ``\sigma`` levels, so a particle's continuous
+``\sigma`` position has to be translated into a vertical interpolation, similar to how longitude
+and latitude are translated into the horizontal (4-point "anvil") interpolation described above.
+This is done in two steps:
+
+1. Find the two neighbouring model levels that bracket the particle's ``\sigma``. If a particle
+   has drifted above the topmost or below the bottommost level, it is pinned to that level
+   instead of extrapolating beyond it.
+2. Interpolate horizontally onto each of these two levels separately, using exactly the same
+   4-point anvil interpolation as for `ParticleAdvection2D`, then linearly blend the two
+   resulting values by how far the particle's ``\sigma`` lies between the two levels.
+
+In short, 3D interpolation is the same horizontal interpolation done twice (once per bracketing
+level) and then blended vertically. Near the poles, where the anvil stencil has no meaningful
+neighbours, the same ring-average substitute as for the 2D case is used, just computed once for
+every model level instead of once for a single 2D field.
+
+### Flexibility and limitations: horizontal precompute versus vertical on the fly
+
+The horizontal and vertical directions are treated quite differently for performance reasons.
+Locating a particle within the horizontal grid ([`RingGrids.update_locator!`](@ref)) is relatively
+expensive, it searches through the rings of latitude and, within a ring, through its longitudes,
+so it is precomputed once per advection step and the resulting grid indices and interpolation
+weights are reused for every interpolation that follows (``u``, ``v``, ``w``, and both the
+predictor and the corrector half-step of Heun's method) until the particle's horizontal position
+is updated again. Locating a particle's vertical bracket, on the other hand, is cheap: a short
+scan through as few as a handful of ``\sigma`` levels, so it is simply recomputed on the fly every
+time a value is interpolated, with no separate precompute or storage step.
+
+This is a deliberate trade-off that assumes there are many fewer vertical levels than horizontal
+grid points, typically true (e.g. 8 vertical levels against many thousands of horizontal grid
+points). Some consequences:
+
+- Increasing the vertical resolution (`nlayers`) adds essentially no cost or storage to particle
+  advection beyond the ``\sigma`` level vector the model already needs, plus two small
+  per-level pole-average buffers (see [`RingGrids.AnvilLocator`](@ref)).
+- Because the same horizontal indices and weights are reused for both bracketing ``\sigma``
+  levels, horizontal and vertical motion are effectively decoupled: a particle moving only
+  vertically never triggers a new horizontal search.
+- As with the horizontal scheme, particles are pinned rather than extrapolated at the edges of
+  the ``\sigma`` range, so they cannot leave the atmosphere through the model top, or fall through
+  the surface; instead they continue to be advected along the topmost or bottommost level.
+
+### Interface example
+
+Using `ParticleAdvection3D` instead of `ParticleAdvection2D` is enough to switch a simulation
+from 2D to 3D particle advection; there is no `layer` keyword any more as particles are free to
+move to any layer
+
+```@example particle3d
+using SpeedyWeather
+spectral_grid = SpectralGrid(nlayers = 8)
+particle_advection = ParticleAdvection3D(spectral_grid, nparticles = 3)
+model = PrimitiveDryModel(spectral_grid; particle_advection)
+simulation = initialize!(model)
+run!(simulation, period = Day(2))
+simulation.variables.prognostic.particles
+```
+
+Every particle's `σ` field is now updated over time, whereas with `ParticleAdvection2D` it would
+have remained fixed at the `layer`-th value of `model.geometry.σ_levels_full`.
 
 ## Create a particle
 
