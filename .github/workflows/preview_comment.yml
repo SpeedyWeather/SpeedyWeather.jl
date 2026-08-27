@@ -1,0 +1,70 @@
+name: Preview comment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  comment:
+    name: Post preview URL
+    runs-on: ubuntu-latest
+    # Only run on PRs from the same repo (not forks)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract deploy repo from make.jl
+        id: deploy
+        run: |
+          # Looks for: deploy_repo = "github.com/owner/repo.git"
+          DEPLOY_REPO=$(grep -oP 'deploy_repo\s*=\s*"github\.com/\K[^"]+' docs/make.jl | sed 's/\.git$//' || true)
+
+          if [ -n "$DEPLOY_REPO" ]; then
+            echo "repo=$DEPLOY_REPO" >> "$GITHUB_OUTPUT"
+          else
+            # No cross-repo deployment found, fall back to the source repo
+            echo "repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment preview URL
+        uses: actions/github-script@v7
+        env:
+          DEPLOY_REPO: ${{ steps.deploy.outputs.repo }}
+        with:
+          script: |
+            const pr = context.issue.number;
+            const [deployOwner, deployRepoName] = process.env.DEPLOY_REPO.split("/");
+
+            const previewUrl = `https://${deployOwner}.github.io/${deployRepoName}/previews/PR${pr}/`;
+            const marker = "<!-- documenter-preview-comment -->";
+            const body = [
+              marker,
+              "### 📚 Documentation preview 🚀",
+              "",
+              `**Preview URL:** [${previewUrl}](${previewUrl})`,
+              "",
+              "> [!NOTE]",
+              "> The preview will be available once the documentation build completes successfully, and will reflect the last successful build for this PR.",
+            ].join("\n");
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr,
+            });
+
+            const existing = comments.find((c) => c.body?.includes(marker));
+
+            if (!existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr,
+                body,
+              });
+            }

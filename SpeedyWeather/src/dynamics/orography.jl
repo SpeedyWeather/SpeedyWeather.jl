@@ -134,8 +134,9 @@ end
 
 @kernel inbounds = true function zonal_ridge_orography_kernel!(orography, latds, A, RΩ, g⁻¹)
     ij, _ = @index(Global, NTuple)
-    sinφ = sind(latds[ij])
-    cosφ = cosd(latds[ij])
+    φ = deg2rad(latds[ij])
+    sinφ = sin(φ)
+    cosφ = cos(φ)
 
     # Jablonowski & Williamson, 2006, eq. (7)
     orography[ij] = g⁻¹ * A * (A * (-2 * sinφ^6 * (cosφ^2 + 1 / 3) + 10 / 63) + (8 / 5 * cosφ^3 * (sinφ^2 + 2 / 3) - π / 4) * RΩ)
