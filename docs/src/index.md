@@ -6,7 +6,7 @@ hero:
   name: "SpeedyWeather.jl"
   tagline: "An atmospheric model for research: friendly, interactive, extensible, and built for speed."
   image:
-    src: /logo.png
+    src: /logo.gif
     alt: SpeedyWeather
   actions:
     - theme: brand
