@@ -4,6 +4,8 @@
 
 - Move time-stepping mathematics from the Usage docs to a new Numerics page, and document previously-undocumented `NCycleLorenz` details (per-variant weights, tendency step split, diffusion/implicit ordering) [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
 - Add cross-reference links throughout the docs, and fix several pre-existing ambiguous/broken `@ref` targets found along the way [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
+- Fix a bug that stopped `StochasticallyPerturbedParameterizationTendencies` from working on GPU [#1230](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1230)
+- Add GPU-safe `clamp!` and make `fill!` return a `Field` for `AbstractField`, and only clamp the land-sea mask when out of range [#1228](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1228)
 - Remove Reactant compat restriction again [#1225](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1225)
 - Remove Reactant from SpeedyWeather/test/GPU/AMDGPU/Project.toml for AMDGPU compatibility with Julia v1.12 [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
 - Avoid `isodd(::AbstractFloat)`'s exact-integer-conversion fallback (an `InexactError` throw path) in `mod(::Particle)`, which triggered AMDGPU hostcalls [#1220](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1220)
