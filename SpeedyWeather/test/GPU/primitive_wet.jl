@@ -6,8 +6,9 @@
     spectral_grid = SpectralGrid(truncation = 33, nlayers = 8, architecture = arch)
     spectral_transform = SpectralTransform(spectral_grid)
     particle_advection = ParticleAdvection2D(spectral_grid, nparticles = 10, layer = 1)
+    sppt = StochasticallyPerturbedParameterizationTendencies(spectral_grid)
     output = NetCDFOutput(spectral_grid, PrimitiveWet, path = tmp_output_path, id = "gpu-netcdf")
-    model = PrimitiveWetModel(spectral_grid; spectral_transform, output, particle_advection)
+    model = PrimitiveWetModel(spectral_grid; spectral_transform, output, particle_advection, stochastic_physics = sppt)
     simulation = initialize!(model)
     run!(simulation, steps = 3, output = true)
 
