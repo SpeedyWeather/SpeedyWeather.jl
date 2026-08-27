@@ -1,7 +1,7 @@
 # Ocean models
 
 The following describes the currently implemented ocean models (for defining
-your own see [Custom ocean model](custom_ocean.md)),
+your own see [Custom ocean model](@ref)),
 some prescribed sea surface temperature (not dependent on the state
 of other variables) others are active (dependent on the atmospheric
 state). All but SlabOcean force the atmosphere, as the sea surface temperatures are

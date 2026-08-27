@@ -53,6 +53,6 @@ We are currently working on making SpeedyWeather.jl compatible with the MLIR/XLA
 
 ## Benchmarks
 
-See the [Benchmarks](benchmarks.md) page for SYPD numbers across architectures
+See the [Benchmarks](@ref benchmarks_page) page for SYPD numbers across architectures
 (CPU, GPU, Reactant), one section per architecture, and comparison figures of
 the PrimitiveWet resolution sweep.

@@ -19,11 +19,11 @@ in rainfall, or deposited on the ground. However, aerosols should be considered
 _active_ and not _passive_ if they influence the radiation and hence the temperature
 which couples the tracer equation above two-way with the other equations.
 Active or passive tracers are treated equally in SpeedyWeather. By default a
-tracer is passive, but if a [forcing](forcing_drag.md) or [parameterization](parameterizations.md) is defined that depends
+tracer is passive, but if a [forcing](@ref "Custom forcing and drag") or [parameterization](@ref "Parameterizations") is defined that depends
 on the tracer it becomes active, affecting the flow. A tracer definition
 in itself therefore does not make distinction between active or passive
 tracers but a forcing/parameterization definition can make existing tracers
-active. (See also [Particle advection](particles.md) for advecting individual
+active. (See also [Particle advection](@ref) for advecting individual
 particles instead of continuous tracer fields.)
 
 # Eulerian advection

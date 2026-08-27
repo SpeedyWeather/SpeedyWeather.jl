@@ -63,7 +63,7 @@ The correctness of gradients is tested in our CI in `SpeedyWeather/test/differen
 
 ## Parameter handling
 
-SpeedyWeather also provides automated parameter handling for all [models](models.md) and subcomponents via an extension of [ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl). Parameters can be automatically collected via the `parameters` method:
+SpeedyWeather also provides automated parameter handling for all [models](@ref "Models") and subcomponents via an extension of [ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl). Parameters can be automatically collected via the `parameters` method:
 
 ```julia
 spectral_grid = SpectralGrid(truncation=24, nlayers=1) 

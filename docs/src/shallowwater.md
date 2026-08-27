@@ -72,7 +72,7 @@ with ``\mathbf{u}_\perp = (v, -u)``.
 ## Algorithm
 
 0\. Start with initial conditions of relative vorticity ``\zeta_{lm}``, divergence ``D_{lm}``,
-and interface height ``\eta_{lm}`` in [spectral space](spectral_transform.md) and transform this model state to [grid-point space](grids.md):
+and interface height ``\eta_{lm}`` in [spectral space](@ref "Spherical Harmonic Transform") and transform this model state to [grid-point space](@ref "Grids"):
 - Invert the [Laplacian](@ref) of ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
 - Invert the [Laplacian](@ref) of ``D_{lm}`` to obtain the velocity potential ``\Phi_{lm}`` in spectral space
 - obtain velocities ``U_{lm} = (\cos(\theta)u)_{lm}, V_{lm} = (\cos(\theta)v)_{lm}`` from ``\nabla^\perp\Psi_{lm} + \nabla\Phi_{lm}``

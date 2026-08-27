@@ -61,7 +61,7 @@ model = BarotropicModel(spectral_grid)
 ## ShallowWaterModel
 
 The `ShallowWaterModel` is similar to the `BarotropicModel`, but it contains for example
-[orography](orography.md), that the `BarotropicModel` doesn't have.
+[orography](@ref "Orography"), that the `BarotropicModel` doesn't have.
 
 ```@example models
 spectral_grid = SpectralGrid(nlayers=1)     # 2D models require nlayers=1
@@ -82,7 +82,7 @@ model = PrimitiveDryModel(spectral_grid)
 ## PrimitiveWetModel
 
 The `PrimitiveWetModel` is the most complex model we currently have, hence its
-field tree is the longest, defining many components for the physics [parameterizations](parameterizations.md).
+field tree is the longest, defining many components for the physics [parameterizations](@ref "Parameterizations").
 
 ```@example models
 model = PrimitiveWetModel(spectral_grid)

@@ -230,7 +230,7 @@ with ``\gamma = 0.24`` the field capacity per meter soil and
 diffusion term of soil moisture between the two layers, acting on a time scale
 of ``\tau = 2~``days.
 
-At the moment (and generally if not coupled to an [ocean model](ocean.md)) the river runoff
+At the moment (and generally if not coupled to an [ocean model](@ref "Ocean models")) the river runoff
 lets water disappear. ``W_1, W_2`` are bounded by ``[0, 1]`` so that if
 more precipitation ``P`` (or in combination with negative evaporation ``E``,
 meaning condensation) occurs than the land can hold we compute the excess water

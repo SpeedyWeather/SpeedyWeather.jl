@@ -99,7 +99,7 @@ the division by the heat capacity to convert to a rate of temperature change.
 ## Bulk Richardson-based drag coefficient
 
 All surface fluxes depend on a dimensionless drag coefficient ``C`` which
-we calculate as a function of the bulk Richardson number ``Ri`` (see also [Vertical diffusion](vertical_diffusion.md)
+we calculate as a function of the bulk Richardson number ``Ri`` (see also [Vertical diffusion](@ref)
 for a similar Richardson-number-based diffusion coefficient) following
 Frierson, et al. 2006 [^Frierson2006] with some simplification as outlined below.
 We use the same drag coefficient for momentum, heat and moisture fluxes.
@@ -224,7 +224,7 @@ and surface pressure ``p_s``. The availability of soil water over land is repres
 
 following the Fortran SPEEDY documentation[^SPEEDY] which follows Viterbo and Beljiars 1995
 [^Viterbo95]. The variables (or spatially prescribed arrays) are water content in the top
-soil layer ``W_{top}`` and the root layer below ``W_{root}`` (see [Land soil moisture](land.md)
+soil layer ``W_{top}`` and the root layer below ``W_{root}`` (see [Land soil moisture](@ref)
 for how these are modelled) using the vegetation
 fraction ``f_{veg} = veg_{high} + 0.8 veg_{low}`` composed of a (dimensionless)
 high and low vegetation cover per grid cell ``veg_{high}, veg_{low}``.

@@ -1,6 +1,6 @@
 # Custom forcing and drag
 
-The following example is a bit more concrete than the [previous conceptual example](extensions.md),
+The following example is a bit more concrete than the [previous conceptual example](@ref "Extending SpeedyWeather"),
 but we try to add a few more details that are important, or you at least should
 be aware of it. In this example we want to add a `StochasticStirring` forcing
 as defined in [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2)

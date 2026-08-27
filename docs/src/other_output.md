@@ -273,7 +273,7 @@ to write out specific model components and store them in a file see
 
 ## Model component restart file
 
-If you modified a model component (say by applying a [custom orography](orography.md)) you can save this to file too.
+If you modified a model component (say by applying a [custom orography](@ref "Orography")) you can save this to file too.
 
 ```@example output2
 orography = ManualOrography(spectral_grid)  # an orography that is untouched at initialize!

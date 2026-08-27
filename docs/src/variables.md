@@ -52,8 +52,8 @@ The variables are model-specific, each model only allocates the variables it nee
 The prognostic variables in `variables.prognostic` are generally in spectral coefficients,
 `variables.grid` hold gridded variables, `variables.tendencies` the tendencies,
 `variables.dynamics` work arrays that are computed by the dynamical core. `variables.parameterizations`
-are those required by the [parameterizations](parameterizations.md) and `variables.particles` by
-[particle advection](particles.md).
+are those required by the [parameterizations](@ref "Parameterizations") and `variables.particles` by
+[particle advection](@ref "Particle advection").
 `variables.scratch` are scratch arrays: These can be used in any computation by should be considered
 in an undefined state, so write to it before you read from it. Any other component can leave this
 in any state. But you can use them to avoid allocations and hold intermediate results.

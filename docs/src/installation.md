@@ -27,7 +27,7 @@ julia> Pkg.add(url="https://github.com/SpeedyWeather/SpeedyWeather.jl", rev="mai
 `rev` (revision) refers to the `main` branch, and `subdir` is needed as we have structured
 SpeedyWeather as a monorepo with other packages living in the same repository
 (do `subdir="RingGrids"` for example if you want to install the latest unreleased version of
-the [RingGrids](ringgrids.md) package ...). In a similar manner, you can also install other branches than `main`,
+the [RingGrids](@ref) package ...). In a similar manner, you can also install other branches than `main`,
 e.g. from a specific pull request.
 
 In brief you can do the same as

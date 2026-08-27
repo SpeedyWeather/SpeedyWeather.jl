@@ -818,7 +818,7 @@ the `PrimitiveDryModel` humidity can be set to zero and respective steps skipped
 temperature ``T_{lm}``, humidity ``q_{lm}`` and the logarithm of surface pressure ``(\ln p_s)_{lm}``
 in spectral space. Variables ``\zeta, D, T, q`` are defined on all vertical levels, the logarithm
 of surface pressure only at the surface. Transform this model state to grid-point space,
-obtaining velocities is done as in the [shallow water model](shallowwater.md)
+obtaining velocities is done as in the [shallow water model](@ref shallow_water_model)
 
 - Invert the [Laplacian](@ref) of ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
 - Invert the [Laplacian](@ref) of ``D_{lm}`` to obtain the velocity potential ``\Phi_{lm}`` in spectral space

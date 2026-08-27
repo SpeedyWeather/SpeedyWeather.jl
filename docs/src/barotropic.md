@@ -66,8 +66,8 @@ in the [`BarotropicModel`](@ref "BarotropicModel"), as outlined in the following
 We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic
 vorticity equation. As an initial step
 
-0\. Start with initial conditions of ``\zeta_{lm}`` in [spectral space](spectral_transform.md) and
-transform this model state to [grid-point space](grids.md):
+0\. Start with initial conditions of ``\zeta_{lm}`` in [spectral space](@ref "Spherical Harmonic Transform") and
+transform this model state to [grid-point space](@ref "Grids"):
 - Invert the [Laplacian](@ref) of vorticity ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
 - obtain zonal velocity ``(\cos(\theta)u)_{lm}`` through a [Meridional derivative](@ref)
 - obtain meridional velocity ``(\cos(\theta)v)_{lm}`` through a [Zonal derivative](@ref)
