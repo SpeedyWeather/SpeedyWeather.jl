@@ -387,9 +387,11 @@ end
         Δt::NF,                                 # scaled time step [s*˚/m]
     ) where {NF}
 
-    dlat = v * Δt                               # increment in latitude [˚N]
-    coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
-    dlon = u * Δt / coslat                      # increment in longitude [˚E]
+    # TODO: Replace `cos(deg2rad(particle.lat))` with `cosd(particle.lat)` once
+    # `cosd` is supported on AMD GPUs.
+    dlat = v * Δt                                           # increment in latitude [˚N]
+    coslat = max(cos(deg2rad(particle.lat)), eps(NF))       # prevents division by zero
+    dlon = u * Δt / coslat                                  # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
 end
 
@@ -403,7 +405,7 @@ end
     ) where {NF}
 
     dlat = v * Δt
-    coslat = max(cosd(particle.lat), eps(NF))
+    coslat = max(cos(deg2rad(particle.lat)), eps(NF))
     dlon = u * Δt / coslat
     dσ = w * Δt_vert
     return mod(move(particle, dlon, dlat, dσ))

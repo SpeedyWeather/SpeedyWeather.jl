@@ -159,8 +159,8 @@ function AnvilLocator(
     )
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
-    north_pole_vals = zero(VectorType(undef, nlayers))
-    south_pole_vals = zero(VectorType(undef, nlayers))
+    north_pole_vals = on_architecture(architecture, zeros(NF, nlayers))
+    south_pole_vals = on_architecture(architecture, zeros(NF, nlayers))
     return AnvilLocator{VectorType, VectorIntType, typeof(npoints)}(;
         npoints_output = npoints, north_pole_vals, south_pole_vals)
 end
