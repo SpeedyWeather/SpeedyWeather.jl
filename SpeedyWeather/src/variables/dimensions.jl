@@ -160,6 +160,13 @@ allocate(::AbstractVariable{TransformScratchMemory}, model::AbstractModel) = mod
 end
 allocate(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.AnvilLocator(model.spectral_grid.NF, model.particle_advection.nparticles; architecture = model.spectral_grid.architecture)
 
+"""Dimension for particle locator with embedded vertical pole scratch for 3D interpolation."""
+@kwdef struct LocatorDim3D <: AbstractVariableDim
+    nparticles::Int = 1
+    nlayers::Int = 1
+end
+allocate(v::AbstractVariable{LocatorDim3D}, model::AbstractModel) = RingGrids.AnvilLocator(model.spectral_grid.NF, v.dims.nparticles, v.dims.nlayers; architecture = model.spectral_grid.architecture)
+
 # Variable fusion support
 # We may want to fuse a group of variables into a single parent variable to
 # optimize performance by batching transforms.

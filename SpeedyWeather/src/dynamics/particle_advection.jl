@@ -65,9 +65,6 @@ export ParticleAdvection3D
     "[OPTION] Execute particle advection every n timesteps"
     every_n_time_steps::IntType = 6
 
-    "[DERIVED] Number of vertical layers, needed to size pole scratch arrays"
-    nlayers::IntType = 1
-
     "[DERIVED] Interpolation geometry used during advection"
     geometry::GeometryType
 end
@@ -75,30 +72,36 @@ end
 function ParticleAdvection3D(SG::SpectralGrid; kwargs...)
     geometry = GridGeometry(SG.grid; NF = SG.NF)
     return ParticleAdvection3D{SG.NF, typeof(geometry), typeof(SG.truncation)}(;
-        geometry, nlayers = SG.nlayers, kwargs...)
+        geometry, kwargs...)
 end
 
 variables(P::AbstractParticleAdvection) = variables(typeof(P), P.nparticles)
 
-function variables(::Type{<:ParticleAdvection2D}, nparticles)
+# Common particle variables shared between 2D and 3D advection (no locator)
+function _common_particle_variables(nparticles)
     return (
         PrognosticVariable(:particles, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
         ParticleVariable(:locations, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
-
         ParticleVariable(:u, VectorDim(nparticles), desc = "Zonal velocity at particle location", units = "m/s"),
         ParticleVariable(:v, VectorDim(nparticles), desc = "Meridional velocity at particle location", units = "m/s"),
-        ParticleVariable(:locator, LocatorDim(nparticles), desc = "Vertical σ coordinate of particle location", units = "1"),
     )
 end
 
-# same as 2D but also add vertical velocity and pole scratch arrays for 3D interpolation
-function variables(P::ParticleAdvection3D)
-    (; nparticles, nlayers) = P
+function variables(::Type{<:ParticleAdvection2D}, nparticles)
     return (
-        variables(ParticleAdvection2D, nparticles)...,
+        _common_particle_variables(nparticles)...,
+        ParticleVariable(:locator, LocatorDim(nparticles), desc = "Particle locator for horizontal interpolation", units = "1"),
+    )
+end
+
+# 3D advection: same common variables but uses LocatorDim3D to embed pole scratch arrays
+function variables(P::ParticleAdvection3D, model::AbstractModel)
+    (; nparticles) = P
+    (; nlayers) = model.spectral_grid
+    return (
+        _common_particle_variables(nparticles)...,
+        ParticleVariable(:locator, LocatorDim3D(; nparticles, nlayers), desc = "Particle locator with embedded pole averages for 3D interpolation", units = "1"),
         ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity dσ/dt at particle location", units = "1/s"),
-        ScratchVariable(:north_pole_vals, VectorDim(nlayers), desc = "North pole ring averages for 3D interpolation"),
-        ScratchVariable(:south_pole_vals, VectorDim(nlayers), desc = "South pole ring averages for 3D interpolation"),
     )
 end
 
@@ -221,9 +224,9 @@ function initialize!(
     v0 = vars.particles.v
     w0 = vars.particles.w
 
-    interpolate_3D!(u0, u_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
-    interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
-    interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
+    interpolate_3D!(u0, u_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_full)
     return nothing
 end
 
@@ -359,9 +362,9 @@ function particle_advection!(
     u_new = vars.particles.u
     v_new = vars.particles.v
     w_new = vars.particles.w
-    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
-    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
-    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
+    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, σ_levels_full)
+    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, σ_levels_full)
+    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, σ_levels_full)
 
     launch!(
         architecture(u_new), LinearWorkOrder, (length(particles),),
@@ -371,79 +374,10 @@ function particle_advection!(
 
     # store new velocities at corrected position for next advection step
     RingGrids.update_locator!(locator, geometry, lons, lats)
-    interpolate_3D!(u_new, u_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
-    interpolate_3D!(v_new, v_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
-    interpolate_3D!(w_new, w_3d, locator, geometry, particles, σ_levels_full, vars.scratch.north_pole_vals, vars.scratch.south_pole_vals)
+    interpolate_3D!(u_new, u_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(v_new, v_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(w_new, w_3d, locator, geometry, particles, σ_levels_full)
     return nothing
-end
-
-# σ outside [σ_levels_full[1], σ_levels_full[end]] is pinned, not extrapolated
-@inline function find_vertical_bracket(σ::NF, σ_levels_full) where {NF}
-    n = length(σ_levels_full)
-    k_lo = 1
-    while k_lo < n - 1 && σ_levels_full[k_lo + 1] <= σ
-        k_lo += 1
-    end
-    k_hi = k_lo + 1
-    Δσ = σ_levels_full[k_hi] - σ_levels_full[k_lo]
-    α = clamp((σ - σ_levels_full[k_lo]) / Δσ, 0, 1)
-    return k_lo, k_hi, α
-end
-
-# Vertically blended anvil interpolation at each particle's σ coordinate.
-function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels_full, north_vals, south_vals)
-    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, npoints_output) = locator
-    A_data = A.data
-    arch = architecture(Aout)
-    (; ring_starts, nlons, nlat) = geometry
-    launch!(arch, LinearWorkOrder, (size(A_data, 2),), _compute_pole_averages_kernel!,
-            north_vals, south_vals, A_data, ring_starts, nlons, nlat)
-    launch!(
-        arch, LinearWorkOrder, (npoints_output,),
-        _interpolate_3D_kernel!,
-        Aout, A_data, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
-        positions, σ_levels_full, north_vals, south_vals,
-    )
-    return Aout
-end
-
-@kernel inbounds = true function _compute_pole_averages_kernel!(north_vals, south_vals, A_data, ring_starts, nlons, nlat)
-    k = @index(Global, Linear)
-    n_north = nlons[1]
-    rs_north = ring_starts[1]
-    north_sum = zero(eltype(north_vals))
-    for i in 0:(n_north - 1)
-        north_sum += A_data[rs_north + i, k]
-    end
-    north_vals[k] = north_sum / n_north
-    n_south = nlons[nlat]
-    rs_south = ring_starts[nlat]
-    south_sum = zero(eltype(south_vals))
-    for i in 0:(n_south - 1)
-        south_sum += A_data[rs_south + i, k]
-    end
-    south_vals[k] = south_sum / n_south
-end
-
-@kernel inbounds = true function _interpolate_3D_kernel!(
-        Aout, A_data,
-        ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
-        positions, σ_levels_full, north_vals, south_vals,
-    )
-    i = @index(Global, Linear)
-    k_lo, k_hi, α = find_vertical_bracket(positions[i].σ, σ_levels_full)
-
-    a, b = ij_as[i] == 0 ? (north_vals[k_lo], north_vals[k_lo]) : (A_data[ij_as[i], k_lo], A_data[ij_bs[i], k_lo])
-    c, d = ij_cs[i] == -1 ? (south_vals[k_lo], south_vals[k_lo]) : (A_data[ij_cs[i], k_lo], A_data[ij_ds[i], k_lo])
-    ab_lo = a + (b - a) * Δabs[i]
-    val_lo = ab_lo + (c + (d - c) * Δcds[i] - ab_lo) * Δys[i]
-
-    a, b = ij_as[i] == 0 ? (north_vals[k_hi], north_vals[k_hi]) : (A_data[ij_as[i], k_hi], A_data[ij_bs[i], k_hi])
-    c, d = ij_cs[i] == -1 ? (south_vals[k_hi], south_vals[k_hi]) : (A_data[ij_cs[i], k_hi], A_data[ij_ds[i], k_hi])
-    ab_hi = a + (b - a) * Δabs[i]
-    val_hi = ab_hi + (c + (d - c) * Δcds[i] - ab_hi) * Δys[i]
-
-    Aout[i] = val_lo + (val_hi - val_lo) * α
 end
 
 @inline function advect_2D(

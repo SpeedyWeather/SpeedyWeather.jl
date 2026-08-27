@@ -103,6 +103,10 @@ between two latitude rings."""
     Δys::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between rings
     Δabs::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between a, b
     Δcds::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between c, d
+
+    # optional pole averages per vertical layer for 3D interpolation; nothing for 2D
+    north_pole_vals::Union{Nothing, VectorType} = nothing
+    south_pole_vals::Union{Nothing, VectorType} = nothing
 end
 
 Adapt.@adapt_structure AnvilLocator
@@ -118,6 +122,8 @@ function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLoc
         Δys = on_architecture(arch, loc.Δys),
         Δabs = on_architecture(arch, loc.Δabs),
         Δcds = on_architecture(arch, loc.Δcds),
+        north_pole_vals = isnothing(loc.north_pole_vals) ? nothing : on_architecture(arch, loc.north_pole_vals),
+        south_pole_vals = isnothing(loc.south_pole_vals) ? nothing : on_architecture(arch, loc.south_pole_vals),
     )
 end
 
@@ -141,6 +147,23 @@ end
 
 # use Float32 as default for weights
 (::Type{L})(npoints::Integer; kwargs...) where {L <: AbstractLocator} = L(DEFAULT_NF, npoints; kwargs...)
+
+"""$(TYPEDSIGNATURES)
+Same as above but also allocates `north_pole_vals` and `south_pole_vals` of length `nlayers`
+for 3D vertically-blended interpolation."""
+function AnvilLocator(
+        NF::Type{<:AbstractFloat},
+        npoints::Integer,
+        nlayers::Integer;
+        architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE(),
+    )
+    VectorType = array_type(architecture, NF, 1)
+    VectorIntType = array_type(architecture, Int, 1)
+    north_pole_vals = zero(VectorType(undef, nlayers))
+    south_pole_vals = zero(VectorType(undef, nlayers))
+    return AnvilLocator{VectorType, VectorIntType, typeof(npoints)}(;
+        npoints_output = npoints, north_pole_vals, south_pole_vals)
+end
 
 function Base.show(io::IO, L::AnvilLocator)
     println(io, "$(typeof(L))")
