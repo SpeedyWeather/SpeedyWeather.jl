@@ -3,7 +3,9 @@ abstract type AbstractEntrainment <: AbstractParameterization end
 export NoEntrainment, LinearEntrainment, ConstantEntrainment
 
 """No entrainment: the rising parcel in the Betts-Miller convection scheme does not mix with
-its environment. This is the default, reproducing the scheme without entrainment."""
+its environment, reproducing the scheme without entrainment. The default for
+[`BettsMillerDryConvection`](@ref); [`BettsMillerConvection`](@ref) defaults to
+[`LinearEntrainment`](@ref) instead."""
 struct NoEntrainment <: AbstractEntrainment end
 NoEntrainment(::SpectralGrid; kwargs...) = NoEntrainment()
 Adapt.@adapt_structure NoEntrainment
@@ -22,7 +24,7 @@ at the surface (σ=1) to zero at `σ_entrainment`. Above (σ < σ_entrainment), 
 zero. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct LinearEntrainment{NF} <: AbstractEntrainment
     "[OPTION] Sigma level at which entrainment becomes zero [1]"
-    @param σ_entrainment::NF = 0.5 (bounds = 0 .. 1,)
+    @param σ_entrainment::NF = 0.5 (bounds = 0 .. 0.99,)
 
     "[OPTION] Entrainment rate at the surface [1]"
     @param surface_entrainment::NF = 0.5 (bounds = 0 .. 1,)

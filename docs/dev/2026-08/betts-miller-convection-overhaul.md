@@ -96,6 +96,26 @@ Base revision: `557b38d5` (`mc/convection`, off `main`)
   real GPU-side confirmation of the "full-range loops do more work for shallow-LZB columns" risk
   this plan already flagged. Documented in a new "GPU profiling (nsys)" subsection and cross-referenced
   from Known limitations; not fixed here, reported to the reviewer as a maintainer call.
+- **2026-08-25, @nviebig's review + entrainment default reconsidered.** Three review threads:
+  - @nviebig noticed `convection.jl`'s `BettsMillerConvection` (wet) default and generator
+    (then-lines 16, 28) already read `entrainment = LinearEntrainment(DEFAULT_NF)` /
+    `LinearEntrainment(SG)`, out of sync with the docs (still describing `NoEntrainment` as *the*
+    default). Milan confirmed this was a deliberate, just-made change (commit `3c66c60a`, "Make
+    LinearEntrainment default") reverting the wet scheme's default back to PR #976's original
+    `LinearEntrainment(surface_entrainment = 0.5, σ_entrainment = 0.5)`, and asked for the docs to
+    be brought in line rather than the code — `BettsMillerDryConvection` was deliberately left at
+    `NoEntrainment` (unchanged). Fixed here: `docs/src/convection.md`'s "Entrainment" section and
+    the `NoEntrainment`/`LinearEntrainment` docstrings in `entrainment.jl` now state the per-scheme
+    defaults explicitly instead of naming a single scheme-wide default.
+  - @nviebig flagged a division-by-zero: `σ_entrainment`'s stated bounds (`0 .. 1`) let a user set
+    `σ_entrainment = 1`, which zeroes the `LinearEntrainment` functor's `(1 - E.σ_entrainment)`
+    denominator. Milan and @nviebig agreed narrowing the documented bounds to `0 .. 0.99` is
+    "good enough" — fixed here (`entrainment.jl`). Note `bounds` in this codebase is
+    `ModelParameters.jl`-facing metadata (surfaced via `bounds(param)`, used for
+    documentation/perturbation tooling), not a construction-time assertion — it doesn't itself stop
+    `LinearEntrainment{NF}(; σ_entrainment = one(NF))` from being constructed and dividing by zero
+    at call time. Flagged as a residual gap rather than silently over-fixing beyond what the review
+    thread agreed to.
 
 ## Problem description
 
@@ -349,9 +369,12 @@ Five commits on `mc/convection`, in order:
    #976 (by @nviebig) onto the restructured code — `NoEntrainment`/`LinearEntrainment`/
    `ConstantEntrainment`, added as an `entrainment` sub-component of `BettsMillerConvection` and
    `BettsMillerDryConvection` (the latter promoted from a plain `struct` to `@parameterized
-   @kwdef` to support it). Default is `NoEntrainment` (user's decision, deviating from PR #976's
-   `LinearEntrainment(0.5)` default) — verified the 200-step bit-identity check still passes
-   exactly with entrainment wired in but defaulted off.
+   @kwdef` to support it). Initially defaulted to `NoEntrainment` throughout (user's decision,
+   deviating from PR #976's `LinearEntrainment(0.5)` default) — verified the 200-step bit-identity
+   check still passes exactly with entrainment wired in but defaulted off. Revised 2026-08-25 (see
+   Revision log): `BettsMillerConvection` (wet) now defaults to `LinearEntrainment` with
+   `surface_entrainment = σ_entrainment = 0.5`, matching PR #976; `BettsMillerDryConvection` still
+   defaults to `NoEntrainment`.
 4. **Convective snow** (`convection.jl`, `output/variables/precipitation.jl`,
    `parameterizations/tendencies.jl`): new `snow`/`freezing_threshold` options on
    `BettsMillerConvection` (default `snow = true`, `freezing_threshold = 273.15`); below that
@@ -498,9 +521,10 @@ fix) is a maintainer call.
 ## Documentation changes
 
 - `docs/src/convection.md`: five correctness fixes (§ above), new "Entrainment" section (physical
-  motivation, mixing equations, the three profiles, resolution-dependence caveat, `NoEntrainment`
-  default), new "Convective snow" subsection under "Convective precipitation" (threshold check,
-  mass conservation, contrast with the large-scale melt cascade, `snow=false` toggle).
+  motivation, mixing equations, the three profiles, resolution-dependence caveat, `LinearEntrainment`
+  as the wet-scheme default / `NoEntrainment` as the dry-scheme default — see Revision log), new
+  "Convective snow" subsection under "Convective precipitation" (threshold check, mass conservation,
+  contrast with the large-scale melt cascade, `snow=false` toggle).
 
 ## Known limitations
 

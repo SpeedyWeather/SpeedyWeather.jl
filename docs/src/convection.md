@@ -122,14 +122,18 @@ Available profiles, selected via the `entrainment` option of [`BettsMillerConvec
 subtypes(SpeedyWeather.AbstractEntrainment)
 ```
 
-- `NoEntrainment` (the default): ``\varepsilon_k = 0`` everywhere, reproducing the scheme exactly
-  as described above with no dilution.
-- `LinearEntrainment`: ``\varepsilon_k`` ramps linearly from `surface_entrainment` at the surface
-  (``\sigma = 1``) to zero at `σ_entrainment`, and is zero above that level.
+- `NoEntrainment` (the default for [`BettsMillerDryConvection`](@ref)): ``\varepsilon_k = 0``
+  everywhere, reproducing the scheme exactly as described above with no dilution.
+- `LinearEntrainment` (the default for [`BettsMillerConvection`](@ref), with
+  `surface_entrainment = 0.5` and `σ_entrainment = 0.5`): ``\varepsilon_k`` ramps linearly from
+  `surface_entrainment` at the surface (``\sigma = 1``) to zero at `σ_entrainment`, and is zero
+  above that level.
 - `ConstantEntrainment`: a single `entrainment_rate` applied at every level.
 
-Since `NoEntrainment` is the default, entrainment does not change any model's behaviour unless
-explicitly enabled, e.g. `BettsMillerConvection(spectral_grid; entrainment = LinearEntrainment(spectral_grid))`.
+The wet scheme therefore entrains by default; pass `entrainment = NoEntrainment()` to
+[`BettsMillerConvection`](@ref) to recover the undiluted scheme. The dry scheme defaults to
+`NoEntrainment` and can opt in the same way, e.g.
+`BettsMillerDryConvection(spectral_grid; entrainment = LinearEntrainment(spectral_grid))`.
 
 ## First-guess relaxation
 
