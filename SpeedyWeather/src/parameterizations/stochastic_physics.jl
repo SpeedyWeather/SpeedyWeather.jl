@@ -29,6 +29,16 @@ variables(::AbstractStochasticPhysics) = ()
 
 # precompute the taper
 function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, model::PrimitiveEquation)
+    # SPPT perturbs with vars.grid.random_pattern but doesn't define that variable itself, it has
+    # to come from another component, e.g. a random process. Check here, otherwise sppt! errors
+    # only later inside the column parameterizations (on GPU as an unsupported jl_f_getfield call)
+    has_random_pattern = any(all_variables(model)) do var
+        var isa GridVariable && var.name == :random_pattern && var.namespace == Symbol()
+    end
+    @assert has_random_pattern "StochasticallyPerturbedParameterizationTendencies requires a "*
+        "`random_pattern` grid variable, define a random process for the model, e.g. "*
+        "`random_process = SpectralAR1Process(spectral_grid)`."
+
     coord = model.geometry.vertical_coordinates
     nlayers = get_nlayers(coord)
     (; taper) = sppt
