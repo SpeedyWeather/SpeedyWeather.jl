@@ -27,13 +27,11 @@ see `_needs_chunking`."""
 @inline ensure_batched_plans!(S::SpectralTransform, K::Integer) = K > 1 && haskey(S.rfft_plans_batched, K)
 
 """$(TYPEDSIGNATURES)
-On GPU any `K` is worth a batched plan, `K = 1` included: the serial path applies `nlat*K`
-individual per-ring FFTs and, unlike `_fourier_batched!`, is not captured into a GPU graph, which
-costs an order of magnitude (single-layer models spend most of a time step there). Which `K` a
-model emits only follows from the model type, not from `nlayers` alone, so it is not generally
-known when the `SpectralGrid` (and with it `transform_batch`) is constructed. Hence plan a missing
-`K` on first use and cache it for all subsequent calls. Falls back to the serial path only if `K`
-exceeds the scratch memory capacity `S.nlayers`."""
+Can the batched Fourier path be used for a call with batch dim `K`? On GPU any `K` is worth a 
+batched plan, `K = 1` included. Which `K` a model emits only follows from the model type, 
+so it is not generally known when the `SpectralGrid` (and with it `transform_batch`) is constructed. 
+Hence plan a missing `K` on first use and cache it for all subsequent calls. Falls back to the serial 
+path only if `K` exceeds the scratch memory capacity `S.nlayers`."""
 @inline function ensure_batched_plans!(S::SpectralTransform{NF, <:GPU}, K::Integer) where {NF}
     haskey(S.rfft_plans_batched, K) && return true
     K <= S.nlayers || return false      # scratch memory too small for a batched call, go serial
