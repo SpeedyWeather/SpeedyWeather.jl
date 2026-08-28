@@ -206,6 +206,7 @@ function initialize!(
 
     # interpolate initial velocity on initial locations
     σ_levels_full = model.geometry.σ_levels_full
+    σ_levels_half = model.geometry.σ_levels_half
     (; locator) = vars.particles
     (; geometry) = particle_advection
     lons = vars.particles.u                     # reuse u,v arrays as only used for u, v
@@ -221,9 +222,9 @@ function initialize!(
     v0 = vars.particles.v
     w0 = vars.particles.w
 
-    interpolate_3D!(u0, u_3d, locator, geometry, particles, σ_levels_full)
-    interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full)
-    interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(u0, u_3d, locator, geometry, particles, σ_levels_full, Center())
+    interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full, Center())
+    interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_half, Face())
     return nothing
 end
 
@@ -364,14 +365,15 @@ function particle_advection!(
     v_3d = field_view(vars.grid.v, :, :, l)
     w_3d = vars.dynamics.w
     σ_levels_full = model.geometry.σ_levels_full
+    σ_levels_half = model.geometry.σ_levels_half
 
     RingGrids.update_locator!(locator, geometry, lons, lats)
     u_new = vars.particles.u
     v_new = vars.particles.v
     w_new = vars.particles.w
-    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, σ_levels_full)
-    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, σ_levels_full)
-    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, σ_levels_full)
+    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, σ_levels_full, Center())
+    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, σ_levels_full, Center())
+    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, σ_levels_half, Face())
 
     launch!(
         architecture(u_new), LinearWorkOrder, (length(particles),),
@@ -381,9 +383,9 @@ function particle_advection!(
 
     # store new velocities at corrected position for next advection step
     RingGrids.update_locator!(locator, geometry, lons, lats)
-    interpolate_3D!(u_new, u_3d, locator, geometry, particles, σ_levels_full)
-    interpolate_3D!(v_new, v_3d, locator, geometry, particles, σ_levels_full)
-    interpolate_3D!(w_new, w_3d, locator, geometry, particles, σ_levels_full)
+    interpolate_3D!(u_new, u_3d, locator, geometry, particles, σ_levels_full, Center())
+    interpolate_3D!(v_new, v_3d, locator, geometry, particles, σ_levels_full, Center())
+    interpolate_3D!(w_new, w_3d, locator, geometry, particles, σ_levels_half, Face())
     return nothing
 end
 

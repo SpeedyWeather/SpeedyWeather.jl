@@ -521,7 +521,10 @@ function find_rings!(
         #@assert latd[end] == -90-ϵ "Latitudes latd are expected to contain -90˚, the south pole."
     end
 
-    return find_rings_unsafe!(js, Δys, θs, latd, architecture)
+    # Convert θs to the target architecture (moves CPU Vector to GPU CuArray when on GPU)
+    θs_arch = on_architecture(architecture, θs)
+
+    return find_rings_unsafe!(js, Δys, θs_arch, latd, architecture)
 end
 
 DimensionMismatchArray(a::AbstractArray, b::AbstractArray) =
