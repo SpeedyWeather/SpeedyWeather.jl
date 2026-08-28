@@ -3,20 +3,17 @@ module SpeedyTransformsCUDAExt
 import CUDA: CUDA, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
 using cuFFT
 import AbstractFFTs
-import LinearAlgebra
-import LinearAlgebra: mul!
-using KernelAbstractions
 using DocStringExtensions
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-import SpeedyTransforms: SpectralTransform, _fourier_batched!
+import SpeedyTransforms: SpectralTransform, _fourier_batched!,
+    GraphBackend, get_cache, run_graph!, forward_loop!, inverse_loop!, graph_key
 import SpeedyTransforms.RingGrids: AbstractField
 
-import SpeedyWeatherInternals.KernelLaunching: launch!, ArrayWorkOrder
-import SpeedyWeatherInternals.Architectures: on_architecture, GPU
+import SpeedyWeatherInternals.Architectures: GPU
 
 # =====================================================================================
 # CUDA GRAPHS ACCELERATION OF THE BATCHED FOURIER TRANSFORM
@@ -46,12 +43,11 @@ import SpeedyWeatherInternals.Architectures: on_architecture, GPU
 # work as a view on a CuArray is again a CuArray and not a SubArray which causes problems here.
 #
 # The backend-agnostic parts of this (kernels, cache struct, allocation-free loops,
-# capture/replay control flow) live in gpu_graphs_common.jl, included below and shared with
-# SpeedyTransformsAMDGPUExt.jl; only the capture/instantiate/launch primitives differ per
-# backend (see `GraphBackend`).
+# capture/replay control flow, the `GraphBackend` struct itself) live in
+# `SpeedyTransforms/src/gpu_graphs_common.jl` and are compiled unconditionally as part of the
+# main package (imported above); only the capture/instantiate/launch primitives below, and the
+# `CuArray`-dispatched methods, are backend-specific and have to live in this extension.
 # =====================================================================================
-
-include("../src/gpu_graphs_common.jl")
 
 # The CUDA capture/instantiate/launch primitives `run_graph!` needs, plus the architecture
 # used to `synchronize` before capture; see `GraphBackend` in gpu_graphs_common.jl. `capture`
