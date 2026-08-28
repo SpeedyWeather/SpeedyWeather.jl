@@ -39,7 +39,7 @@ default_gpu_graphs(::AMDGPU.ROCBackend) = false
 # (see `GraphBackend`).
 # =====================================================================================
 
-include("gpu_graphs_common.jl")
+include("../src/gpu_graphs_common.jl")
 
 # Probe for the high-level HIP graph API. AMDGPU.HIP exports these in newer versions; on
 # older installs only the raw C bindings (hipGraph_t, hipGraphExec_t, …) are present, and

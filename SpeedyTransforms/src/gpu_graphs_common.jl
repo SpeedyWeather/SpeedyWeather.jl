@@ -5,8 +5,12 @@
 # and SpeedyTransformsAMDGPUExt.jl). See SpeedyTransformsCUDAExt.jl for the rationale of
 # GPU-graphs acceleration itself.
 #
-# TODO: This code ended up in src/ by accident once and reportedly broke Enzyme's CPU-only
-# autodiff tests. Confirm and fix underlying issue.
+# This file lives under src/ for organizational purposes, but must only ever be `include()`-d
+# from within the two extension modules above, never from SpeedyTransforms.jl directly:
+# `include()`-ing it there would compile its methods unconditionally into every session
+# (including CPU-only ones with no GPU backend loaded), which previously broke Enzyme's
+# static CPU-only autodiff analysis.
+# TODO: Confirm and fix Enzyme's CPU-only autodiff tests.
 #
 # The only thing that differs between backends is the graph capture/instantiate/launch API
 # itself (e.g. `CUDA.capture`/`instantiate`/`launch` vs a HIP equivalent) and the graph-exec
