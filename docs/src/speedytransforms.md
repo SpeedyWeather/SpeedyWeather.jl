@@ -407,7 +407,9 @@ The `MatrixSpectralTransform` is worth considering when:
 - **Using Reactant.** The current Reactant/XLA-based model execution in SpeedyWeather
   is limited to `MatrixSpectralTransform`, since XLA can compile a `GEMM` directly.
 - **GPU performance is critical.** On modern GPUs a single large matrix multiply
-  (cuBLAS / rocBLAS / MPS) is often faster than many smaller FFTs and Legendre loops.
+  (cuBLAS / rocBLAS / MPS) is often faster than many smaller FFTs and Legendre loops. For the
+  default `SpectralTransform` on GPU, see also [GPU Graphs](@ref) for accelerating the batched
+  Fourier transform instead.
 
 ### Construction
 
