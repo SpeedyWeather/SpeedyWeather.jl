@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Move the backend-agnostic GPU-graphs machinery (kernels, cache, capture/replay control flow) from `SpeedyTransforms/ext/gpu_graphs_common.jl` into `SpeedyTransforms/src/`, now compiled unconditionally as part of the main package rather than only when the CUDA/AMDGPU extension loads; only the `CuArray`/`ROCArray`-dispatched methods and backend wiring remain in the extensions. No change to `gpu_graphs`/`default_gpu_graphs` behavior. [#1232](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1232)
 - Document GPU graphs (CUDA/HIP) in `architectures_gpu.md`, including AMDGPU's current disabled-by-default status and how to opt in [#1233](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1233)
 - Fix a bug that stopped `StochasticallyPerturbedParameterizationTendencies` from working on GPU [#1230](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1230)
 - Add GPU-safe `clamp!` and make `fill!` return a `Field` for `AbstractField`, and only clamp the land-sea mask when out of range [#1228](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1228)
