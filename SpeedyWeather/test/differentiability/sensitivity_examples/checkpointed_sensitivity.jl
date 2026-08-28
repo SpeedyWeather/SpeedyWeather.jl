@@ -1,4 +1,4 @@
-# use Julia 1.10 for this 
+# use Julia 1.10 for this
 
 import Pkg
 Pkg.activate("SpeedyWeather/test/differentiability/sensitivity_examples")
@@ -50,7 +50,7 @@ dvars.grid.temperature[443, 8] = 1
 # we need to materialize the views to be able to save them
 output_vars = SpeedyWeather.materialize_views(vars)
 jldsave(string(savename_base, "temp-ic.jld2"); output_vars)
-output_vars = nothing 
+output_vars = nothing
 
 println("Starting sensitivity computation...")
 

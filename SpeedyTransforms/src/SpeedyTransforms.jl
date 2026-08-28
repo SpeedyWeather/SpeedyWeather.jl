@@ -16,7 +16,7 @@ import Primes
 # GPU
 import GPUArrays: GPUArrays, AbstractGPUArray
 import Adapt: Adapt, adapt, adapt_structure
-import KernelAbstractions: @kernel, @index, synchronize
+import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures
@@ -56,7 +56,7 @@ export spectral_truncation,
 # ANALYSIS
 export power_spectrum
 
-# UTILS 
+# UTILS
 export wrapped_view
 
 include("aliasing.jl")

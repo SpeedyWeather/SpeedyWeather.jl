@@ -310,9 +310,16 @@ end
         column_field_gpu[1, :] = gpu_vec
         @test column_field_gpu[1, :] ≈ gpu_vec
 
-        # Test fill!
-        fill!(column_field_gpu, NF(42))
+        # Test fill! (returns a ColumnField, not the bare underlying array)
+        filled = fill!(column_field_gpu, NF(42))
         @test all(Array(column_field_gpu) .== NF(42))
+        @test filled isa ColumnField{NF, 2, JLArray{NF, 2}}
+
+        # Test clamp! (uses `column_field.data`'s clamp! to avoid scalar indexing on GPU)
+        column_field_gpu3 = on_architecture(jl_arch, ColumnField(randn(NF, nlayers, npoints), grid))
+        clamped = clamp!(column_field_gpu3, NF(-0.5), NF(0.5))
+        @test clamped isa ColumnField{NF, 2, JLArray{NF, 2}}
+        @test all(-0.5 .<= Array(clamped) .<= 0.5)
     end
 end
 

@@ -10,7 +10,7 @@ Base.broadcastable(VC::AbstractVerticalCoordinates) = Ref(VC)
 Pressure [Pa] at the lower interface of full level `k` (half level k+½), given `surface_pressure` [Pa].
 Equivalent to `pressure_half(k+1, surface_pressure, coordinate)`."""
 @inline pressure_below(k::Integer, surface_pressure::Number, coordinate::AbstractVerticalCoordinates) =
-    pressure_half(k+1, surface_pressure, coordinate)
+    pressure_half(k + 1, surface_pressure, coordinate)
 
 """$(TYPEDSIGNATURES)
 Pressure [Pa] at the upper interface of full level `k` (half level k-½), given `surface_pressure` [Pa].
@@ -98,7 +98,7 @@ function sigma_okay(nlayers::Integer, σ_half::AbstractVector)
 
     @assert nlayers == (length(σ_half) - 1) "nlayers has to be length of σ_half - 1, $nlayers vs $(length(σ_half) - 1) given."
     @assert Utils.isincreasing(σ_half) "Vertical sigma coordinates are not increasing."
-    
+
     return true
 end
 
@@ -188,7 +188,7 @@ function SigmaPressureCoordinates(
     # hybrid coordinates defined via half layers
     B_half = @. σ_half * transition(σ_half)
     B_full = (B_half[2:end] + B_half[1:(end - 1)]) / 2
-    
+
     # do not reevalute the (possibly nonlinear) transition for full layers
     # average instead to have layer centres always at mid-pressure too
     A_half = @. σ_half * (1 - transition(σ_half))
@@ -208,7 +208,7 @@ function SigmaPressureCoordinates(
         spectral_grid::SpectralGrid,
         profile::Function;
         kwargs...
-    )   
+    )
     # also allow for function to be passed on, evaluate here
     σ_half_vector = sigma_half_spacing(spectral_grid.nlayers, profile)
     return SigmaPressureCoordinates(spectral_grid, σ_half_vector; kwargs...)
@@ -261,7 +261,7 @@ coefficients of the hybrid coordinate."""
     p_ref = coordinate.reference_pressure
     return A[k] * p_ref + B[k] * surface_pressure
 end
-    
+
 """$(TYPEDSIGNATURES)
 Pressure [Pa] at half level `k` given `surface_pressure` [Pa] and hybrid sigma-pressure `coordinate`.
 Half levels are indexed 1 (top of atmosphere) to nlayers+1 (surface).
@@ -302,7 +302,7 @@ function cubic_transition(σ; pressure_only_above = 0.2, σ_only_below = 0.8)
     # the actual cubic transition
     # values 3, 2 are fixed by f(0)=0, f(1)=1, f'(0)=0, f'(1)=0 on t ∈ [0,1]
     t = min(one(σ), max(zero(σ), (σ - pressure_only_above) / (σ_only_below - pressure_only_above)))
-    return t * t * (3 - 2t)   
+    return t * t * (3 - 2t)
 end
 
 """$(TYPEDSIGNATURES)

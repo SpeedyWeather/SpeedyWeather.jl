@@ -166,6 +166,13 @@ function allocate(v::AbstractVariable{LocatorDim}, model::AbstractModel)
     return RingGrids.AnvilLocator(NF, nparticles, nlayers; architecture)
 end
 
+"""Dimension for particle locator with embedded vertical pole scratch for 3D interpolation."""
+@kwdef struct LocatorDim3D <: AbstractVariableDim
+    nparticles::Int = 1
+    nlayers::Int = 1
+end
+allocate(v::AbstractVariable{LocatorDim3D}, model::AbstractModel) = RingGrids.AnvilLocator(model.spectral_grid.NF, v.dims.nparticles, v.dims.nlayers; architecture = model.spectral_grid.architecture)
+
 # Variable fusion support
 # We may want to fuse a group of variables into a single parent variable to
 # optimize performance by batching transforms.
@@ -215,8 +222,8 @@ fuse_family(::Spectral4D) = :spectral
 fuse_family(::SpectralXYZT) = :spectral
 fuse_family(d::AbstractVariableDim) = error(
     "Fusion is not supported for dim type $(typeof(d)). " *
-    "Supported dim types: Grid2D, Grid3D, GridXYZ, GridXYT, Grid4D, GridXYZT, " *
-    "Spectral2D, Spectral3D, SpectralXYZ, SpectralXYT, Spectral4D, SpectralXYZT."
+        "Supported dim types: Grid2D, Grid3D, GridXYZ, GridXYT, Grid4D, GridXYZT, " *
+        "Spectral2D, Spectral3D, SpectralXYZ, SpectralXYT, Spectral4D, SpectralXYZT."
 )
 
 # Whether a member's dim forces the parent to be 4D.
@@ -241,15 +248,15 @@ fuse_trailing_n(d::SpectralXYZT) = d.n
 # In a 4D parent every non-4D member collapses to 1 layer slot (it shares the trailing
 # dim with the 4D members); only 4D members keep `nlayers` slots.
 function fused_slots(d::AbstractVariableDim, model::AbstractModel; parent_is_4d::Bool = false)
-    if parent_is_4d
+    return if parent_is_4d
         is_fuse_4d(d) ? get_nlayers(model) : 1
     else
         is_fuse_2d(d) ? 1 :
-        d isa Spectral3D ? d.n :
-        d isa SpectralXYT ? d.n :
-        d isa Grid3D ? d.n :
-        d isa GridXYT ? d.n :
-        get_nlayers(model)
+            d isa Spectral3D ? d.n :
+            d isa SpectralXYT ? d.n :
+            d isa Grid3D ? d.n :
+            d isa GridXYT ? d.n :
+            get_nlayers(model)
     end
 end
 
@@ -288,13 +295,13 @@ function _fuse_rank_and_n(vars::AbstractVector{<:AbstractVariable})
     ns_set = unique(fuse_trailing_n(v.dims) for v in fourD_members)
     length(ns_set) == 1 || error(
         "Fuse group $(first(vars).fuse) has 4D members with mixed trailing-dim sizes $(collect(ns_set)). " *
-        "All 4D members of a fuse group must share the same `n`."
+            "All 4D members of a fuse group must share the same `n`."
     )
     for v in vars
         is_fuse_2d(v.dims) && error(
             "Fuse group: variable `$(v.name)` has dim $(typeof(v.dims)) but the group " *
-            "contains 4D members which force a 4D parent. 2D members cannot be fused into " *
-            "a 4D parent — give them their own fuse symbol."
+                "contains 4D members which force a 4D parent. 2D members cannot be fused into " *
+                "a 4D parent — give them their own fuse symbol."
         )
     end
     return (true, first(ns_set))

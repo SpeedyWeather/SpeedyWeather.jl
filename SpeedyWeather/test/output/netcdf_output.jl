@@ -142,7 +142,7 @@ end
     )
 
     # add tuples of output variables through various interfaces to model/output w/out splatting ...
-    add!(model, SpeedyWeather.PrecipitationOutput())            
+    add!(model, SpeedyWeather.PrecipitationOutput())
     add!(model, SpeedyWeather.PrecipitationOutput()...)
     add!(model.output, SpeedyWeather.PrecipitationOutput())
     add!(model.output, SpeedyWeather.PrecipitationOutput()...)

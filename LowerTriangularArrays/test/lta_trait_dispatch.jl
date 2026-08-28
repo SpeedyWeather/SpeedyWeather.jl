@@ -3,7 +3,7 @@ using SpeedyWeatherInternals.ArrayDimensions: LM, LMZ, LMT, LMZT,
 
 @testset "LowerTriangularArray: trait-based dispatch" begin
     arch = LowerTriangularArrays.CPU()
-    spectrum = Spectrum(10, 10, architecture=arch)
+    spectrum = Spectrum(10, 10, architecture = arch)
 
     # Create test arrays with different dimensions
     data_2d = rand(ComplexF32, 55)  # nonzeros for T=10, T=10

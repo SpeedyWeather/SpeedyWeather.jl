@@ -240,7 +240,7 @@ initialize!(::AquaPlanet, ::PrimitiveEquation) = nothing
 function initialize!(vars::Variables, ocean_model::AquaPlanet, model::PrimitiveEquation)
     sea_surface_temperature = get_step(vars.prognostic.ocean.sea_surface_temperature, 1)
     Te, Tp = ocean_model.temperature_equator, ocean_model.temperature_poles
-    sst(λ, φ) = (Te - Tp) * cosd(φ)^2 + Tp
+    sst(λ, φ) = (Te - Tp) * cos(deg2rad(φ))^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
 
     if ocean_model.mask
