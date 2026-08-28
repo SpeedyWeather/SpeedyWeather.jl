@@ -635,3 +635,54 @@ end
         end
     end
 end
+
+@testset "Lazy batched FFT planning on GPU" begin
+    # FFT plans bake the batch dim K into the plan, but which K a model emits follows from the
+    # model type, not from `nlayers` alone, so `transform_batch` cannot generally list them all
+    # at `SpectralGrid` construction. On GPU a missing K (K=1 included, where the serial path is
+    # neither batched nor GPU-graph captured) is therefore planned on first use. Verify that the
+    # plan appears and that the result is identical to the serial path it replaces.
+    architecture = GPU()
+    NF = Float32
+
+    @testset for K in (1, 3)
+        spectral_grid = SpectralGrid(; truncation = 21, nlayers = max(K, 2), architecture)
+        S = SpectralTransform(spectral_grid; transform_batch = Int[1, 2])
+        @test !haskey(S.rfft_plans_batched, K)          # not pre-planned
+
+        coeffs = rand(Complex{NF}, spectral_grid.spectrum, K)
+        field_serial = zeros(NF, spectral_grid.grid, K)
+        coeffs_serial = zeros(Complex{NF}, spectral_grid.spectrum, K)
+
+        # reference: the serial (per-ring, per-layer) path, called explicitly
+        SpeedyTransforms._legendre!(
+            S.scratch_memory.north, S.scratch_memory.south, coeffs, S.scratch_memory.column, S;
+            unscale_coslat = false,
+        )
+        SpeedyTransforms._fourier_serial!(field_serial, S.scratch_memory.north, S.scratch_memory.south, S)
+        SpeedyTransforms._fourier_serial!(S.scratch_memory.north, S.scratch_memory.south, field_serial, S)
+        SpeedyTransforms._legendre!(coeffs_serial, S.scratch_memory.north, S.scratch_memory.south, S.scratch_memory.column, S)
+
+        # `transform!` now plans K on the fly and takes the batched path
+        field = zeros(NF, spectral_grid.grid, K)
+        coeffs_back = zeros(Complex{NF}, spectral_grid.spectrum, K)
+        transform!(field, coeffs, S)
+        transform!(coeffs_back, field, S)
+
+        @test haskey(S.rfft_plans_batched, K)           # planned on first use
+        @test haskey(S.brfft_plans_batched, K)
+        @test field == field_serial                     # bit-identical, same FFTs in a batch
+        @test coeffs_back == coeffs_serial
+
+        # cached: a second call reuses the plan rather than planning again
+        plans = S.rfft_plans_batched[K]
+        transform!(field, coeffs, S)
+        @test S.rfft_plans_batched[K] === plans
+    end
+
+    # K beyond the scratch memory capacity cannot use the batched path and stays serial
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 2, architecture = architecture)
+    S = SpectralTransform(spectral_grid)
+    @test SpeedyTransforms.ensure_batched_plans!(S, S.nlayers + 1) == false
+    @test !haskey(S.rfft_plans_batched, S.nlayers + 1)
+end

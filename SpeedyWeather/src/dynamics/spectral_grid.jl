@@ -362,7 +362,10 @@ default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_
 # CPU needs no `2`: unplanned K > 1 is split by `_transform_chunked!` rather than falling back.
 default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]
 
-# TODO: planning both 6L+1 and 9L+1 is slightly wasteful (we only need one of them for wet and dry model respectively)
+# Planning both 6L+1 and 9L+1 is slightly wasteful (only one of them is used, by the wet and dry
+# model respectively) but harmless. Any K a model emits that is missing here (e.g. the dry model's
+# 3L+1 prognostic batch) is planned on first use by `SpeedyTransforms.ensure_batched_plans!`, so
+# this list is a hint that avoids planning during the first time step, not a requirement.
 default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) =
     Int[1, 2, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, 9 * nlayers + 1]
 
