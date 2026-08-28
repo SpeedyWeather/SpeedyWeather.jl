@@ -91,6 +91,7 @@ between two latitude rings."""
     } <: AbstractLocator
 
     npoints_output::IntType            # number of points to interpolate onto (length of following vectors)
+    nlayers::IntType = 1               # number of vertical layers; 1 for 2D (default), nlayers for 3D
 
     # to the coordinates respective indices
     js::VectorIntType = zeros(Int, npoints_output)   # ring indices j such that [j, j+1) contains the point
@@ -103,6 +104,10 @@ between two latitude rings."""
     Δys::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between rings
     Δabs::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between a, b
     Δcds::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between c, d
+
+    # pole ring averages per vertical layer for 3D interpolation
+    north_pole_average::VectorType = zero(VectorType(undef, nlayers))
+    south_pole_average::VectorType = zero(VectorType(undef, nlayers))
 end
 
 Adapt.@adapt_structure AnvilLocator
@@ -110,6 +115,7 @@ Adapt.@adapt_structure AnvilLocator
 function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLocator)
     return AnvilLocator(
         npoints_output = loc.npoints_output,
+        nlayers = loc.nlayers,
         js = on_architecture(arch, loc.js),
         ij_as = on_architecture(arch, loc.ij_as),
         ij_bs = on_architecture(arch, loc.ij_bs),
@@ -118,6 +124,8 @@ function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLoc
         Δys = on_architecture(arch, loc.Δys),
         Δabs = on_architecture(arch, loc.Δabs),
         Δcds = on_architecture(arch, loc.Δcds),
+        north_pole_average = on_architecture(arch, loc.north_pole_average),
+        south_pole_average = on_architecture(arch, loc.south_pole_average),
     )
 end
 
@@ -126,17 +134,19 @@ $(TYPEDSIGNATURES)
 Zero generator function for the 4-point average AnvilLocator. Use `update_locator!` to
 update the grid indices used for interpolation and their weights. The number format
 NF is the format used for the calculations within the interpolation, the input data
-and/or output data formats may differ."""
+and/or output data formats may differ. `nlayers = 1` (default) for 2D interpolation;
+set to the number of vertical layers for 3D vertically-blended interpolation."""
 function (::Type{L})(
         NF::Type{<:AbstractFloat},                                 # number format
-        npoints::Integer;
+        npoints::Integer,
+        nlayers::Integer = 1;
         architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE(), # architecture to use
     ) where {L <: AbstractLocator}
 
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    return L{VectorType, VectorIntType, typeof(npoints)}(; npoints_output = npoints)
+    return L{VectorType, VectorIntType, typeof(npoints)}(; npoints_output = npoints, nlayers)
 end
 
 # use Float32 as default for weights

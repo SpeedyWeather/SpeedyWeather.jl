@@ -76,21 +76,31 @@ end
 
 variables(P::AbstractParticleAdvection) = variables(typeof(P), P.nparticles)
 
-function variables(::Type{<:ParticleAdvection2D}, nparticles)
+# Common particle variables shared between 2D and 3D advection (no locator)
+function _common_particle_variables(nparticles)
     return (
         PrognosticVariable(:particles, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
         ParticleVariable(:locations, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
-
         ParticleVariable(:u, VectorDim(nparticles), desc = "Zonal velocity at particle location", units = "m/s"),
         ParticleVariable(:v, VectorDim(nparticles), desc = "Meridional velocity at particle location", units = "m/s"),
-        ParticleVariable(:locator, LocatorDim(nparticles), desc = "Vertical σ coordinate of particle location", units = "1"),
     )
 end
 
-# same as 2D but add vertical velocity at particle location
-function variables(::Type{<:ParticleAdvection3D}, nparticles)
+function variables(::Type{<:ParticleAdvection2D}, nparticles)
     return (
-        variables(ParticleAdvection2D, nparticles)...,
+        _common_particle_variables(nparticles)...,
+        ParticleVariable(:locator, LocatorDim(), desc = "Particle locator for horizontal interpolation", units = "1"),
+    )
+end
+
+# 3D advection: same common variables but uses LocatorDim with nlayers set,
+# embedding north/south_pole_average arrays in the locator (type-stable, avoids per-call allocation)
+function variables(P::ParticleAdvection3D, model::AbstractModel)
+    (; nparticles) = P
+    (; nlayers) = model.spectral_grid
+    return (
+        _common_particle_variables(nparticles)...,
+        ParticleVariable(:locator, LocatorDim(; nlayers), desc = "Particle locator with embedded pole averages for 3D interpolation", units = "1"),
         ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity dσ/dt at particle location", units = "1/s"),
     )
 end
@@ -321,6 +331,8 @@ function particle_advection!(
 
     n = particle_advection.every_n_time_steps
     clock.time_step_counter % n == (n - 1) || return nothing
+    NF = eltype(eltype(particles))
+    (; radius) = model.planet
 
     # Calculate time step on the fly
     # horizontal time step, scale to [s*°/m] to obtain [˚] when multiplied with velocity in [m/s]
@@ -375,69 +387,6 @@ function particle_advection!(
     return nothing
 end
 
-# σ outside [σ_levels_full[1], σ_levels_full[end]] is pinned, not extrapolated
-@inline function find_vertical_bracket(σ::NF, σ_levels_full) where {NF}
-    n = length(σ_levels_full)
-    k_lo = 1
-    for k in 1:(n - 1)
-        σ_levels_full[k] <= σ && (k_lo = k)
-    end
-    k_hi = k_lo + 1
-    Δσ = σ_levels_full[k_hi] - σ_levels_full[k_lo]
-    α = clamp((σ - σ_levels_full[k_lo]) / Δσ, zero(NF), one(NF))
-    return k_lo, k_hi, α
-end
-
-# Vertically blended anvil interpolation at each particle's σ coordinate.
-function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels_full)
-    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, npoints_output) = locator
-    A_data = A.data
-    nlayers = size(A_data, 2)
-    rings = geometry.grid.rings             # CPU array, used only for pole averages
-    T = eltype(A_data)
-    north_vals_cpu = Vector{T}(undef, nlayers)
-    south_vals_cpu = Vector{T}(undef, nlayers)
-    for k in 1:nlayers
-        r = A_data[rings[1], k]; north_vals_cpu[k] = sum(r) / length(r)
-        r = A_data[rings[end], k]; south_vals_cpu[k] = sum(r) / length(r)
-    end
-    arch = architecture(Aout)
-    north_vals = on_architecture(arch, north_vals_cpu)
-    south_vals = on_architecture(arch, south_vals_cpu)
-    launch!(
-        arch, LinearWorkOrder, (npoints_output,),
-        _interpolate_3D_kernel!,
-        Aout, A_data, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
-        positions, σ_levels_full, north_vals, south_vals,
-    )
-    return Aout
-end
-
-@kernel inbounds = true function _interpolate_3D_kernel!(
-        Aout, A_data,
-        ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
-        positions, σ_levels_full, north_vals, south_vals,
-    )
-    i = @index(Global, Linear)
-    k_lo, k_hi, α = find_vertical_bracket(positions[i].σ, σ_levels_full)
-
-    a = ij_as[i] == 0 ? north_vals[k_lo] : A_data[ij_as[i], k_lo]
-    b = ij_as[i] == 0 ? north_vals[k_lo] : A_data[ij_bs[i], k_lo]
-    c = ij_cs[i] == -1 ? south_vals[k_lo] : A_data[ij_cs[i], k_lo]
-    d = ij_cs[i] == -1 ? south_vals[k_lo] : A_data[ij_ds[i], k_lo]
-    ab_lo = a + (b - a) * Δabs[i]
-    val_lo = ab_lo + (c + (d - c) * Δcds[i] - ab_lo) * Δys[i]
-
-    a = ij_as[i] == 0 ? north_vals[k_hi] : A_data[ij_as[i], k_hi]
-    b = ij_as[i] == 0 ? north_vals[k_hi] : A_data[ij_bs[i], k_hi]
-    c = ij_cs[i] == -1 ? south_vals[k_hi] : A_data[ij_cs[i], k_hi]
-    d = ij_cs[i] == -1 ? south_vals[k_hi] : A_data[ij_ds[i], k_hi]
-    ab_hi = a + (b - a) * Δabs[i]
-    val_hi = ab_hi + (c + (d - c) * Δcds[i] - ab_hi) * Δys[i]
-
-    Aout[i] = val_lo + (val_hi - val_lo) * α
-end
-
 @inline function advect_2D(
         particle::Particle{NF},                 # particle to advect
         u::NF,                                  # zonal velocity [m/s]
@@ -445,9 +394,9 @@ end
         Δt::NF,                                 # scaled time step [s*˚/m]
     ) where {NF}
 
-    dlat = v * Δt                               # increment in latitude [˚N]
-    coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
-    dlon = u * Δt / coslat                      # increment in longitude [˚E]
+    dlat = v * Δt                                           # increment in latitude [˚N]
+    coslat = max(cos(deg2rad(particle.lat)), eps(NF))       # prevents division by zero
+    dlon = u * Δt / coslat                                  # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
 end
 
@@ -461,7 +410,7 @@ end
     ) where {NF}
 
     dlat = v * Δt
-    coslat = max(cosd(particle.lat), eps(NF))
+    coslat = max(cos(deg2rad(particle.lat)), eps(NF))
     dlon = u * Δt / coslat
     dσ = w * Δt_vert
     return mod(move(particle, dlon, dlat, dσ))
