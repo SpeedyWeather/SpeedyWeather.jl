@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Move `gpu_graphs_common.jl` from `SpeedyTransforms/ext/` to `SpeedyTransforms/src/` for organizational purposes. [#TODO](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/TODO)
+- Move `gpu_graphs_common.jl` from `SpeedyTransforms/ext/` to `SpeedyTransforms/src/` for organizational purposes. [#1232](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1232)
 - Fix a bug that stopped `StochasticallyPerturbedParameterizationTendencies` from working on GPU [#1230](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1230)
 - Add GPU-safe `clamp!` and make `fill!` return a `Field` for `AbstractField`, and only clamp the land-sea mask when out of range [#1228](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1228)
 - Remove Reactant compat restriction again [#1225](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1225)
