@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add ParticleAdvection3D via 3D interpolation [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
+- Document GPU graphs (CUDA/HIP) in `architectures_gpu.md`, including AMDGPU's current disabled-by-default status and how to opt in [#1233](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1233)
 - Fix a bug that stopped `StochasticallyPerturbedParameterizationTendencies` from working on GPU [#1230](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1230)
 - Add GPU-safe `clamp!` and make `fill!` return a `Field` for `AbstractField`, and only clamp the land-sea mask when out of range [#1228](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1228)
 - Remove Reactant compat restriction again [#1225](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1225)
