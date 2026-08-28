@@ -74,6 +74,11 @@ function GridGeometry(
     )
 end
 
+function Architectures.on_architecture(arch::AbstractArchitecture, geometry::GridGeometry)
+    NF = eltype(geometry.londs)
+    return GridGeometry(on_architecture(arch, geometry.grid); NF)
+end
+
 Base.show(io::IO, G::GridGeometry) = print(io, "GridGeometry for $(G.grid)")
 
 """Supertype of every Locator, which locates the indices on a grid to be used to perform an
@@ -666,6 +671,8 @@ function find_grid_indices!(
 
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
+    # Convert λs to the target architecture (and move to the target architecture if needed)
+    λs_arch = on_architecture(architecture, λs_converted)
 
     launch!(
         architecture,
@@ -676,7 +683,7 @@ function find_grid_indices!(
         ij_as, ij_bs,
         ij_cs, ij_ds,
         Δabs, Δcds,
-        λs_converted,
+        λs_arch,
         lon_offsets,
         nlons,
         ring_starts,

@@ -25,9 +25,11 @@ particle_advection!(vars, model) = particle_advection!(vars, model.particle_adve
 particle_advection!(vars, ::Nothing, ::AbstractModel) = nothing
 
 export ParticleAdvection2D
-@kwdef struct ParticleAdvection2D{
+# geometry is `mutable` and untyped by architecture (AbstractGridGeometry, not a parametric
+# GeometryType) so that `initialize!` can rebind it onto model.architecture in place, since
+# geometry is fixed at construction time (typically before model.architecture is known).
+@kwdef mutable struct ParticleAdvection2D{
         NF,
-        GeometryType, # <: AbstractGridGeometry
         IntType,
     } <: AbstractParticleAdvection
 
@@ -41,21 +43,21 @@ export ParticleAdvection2D
     layer::IntType = 1
 
     "[DERIVED] Interpolation geometry used during advection"
-    geometry::GeometryType
+    geometry::RingGrids.AbstractGridGeometry
 end
 
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
+    return ParticleAdvection2D{SG.NF, typeof(SG.truncation)}(; geometry, kwargs...)
 end
 
 export ParticleAdvection3D
 
 # Continuous 3D particle advection: particles are tracked at their own σ coordinate.
 # σ_levels_full is read from model.geometry at runtime.
-@kwdef struct ParticleAdvection3D{
+# geometry is `mutable` and untyped by architecture, see ParticleAdvection2D above.
+@kwdef mutable struct ParticleAdvection3D{
         NF,
-        GeometryType, # <: AbstractGridGeometry
         IntType,
     } <: AbstractParticleAdvection
 
@@ -66,12 +68,12 @@ export ParticleAdvection3D
     every_n_time_steps::IntType = 6
 
     "[DERIVED] Interpolation geometry used during advection"
-    geometry::GeometryType
+    geometry::RingGrids.AbstractGridGeometry
 end
 
 function ParticleAdvection3D(SG::SpectralGrid; kwargs...)
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection3D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
+    return ParticleAdvection3D{SG.NF, typeof(SG.truncation)}(; geometry, kwargs...)
 end
 
 variables(P::AbstractParticleAdvection) = variables(typeof(P), P.nparticles)
@@ -93,26 +95,40 @@ function variables(::Type{<:ParticleAdvection2D}, nparticles)
     )
 end
 
-# 3D advection: same common variables but uses LocatorDim with nlayers set,
-# embedding north/south_pole_average arrays in the locator (type-stable, avoids per-call allocation)
-function variables(P::ParticleAdvection3D, model::AbstractModel)
+# 3D advection: same common variables but LocatorDim's allocate() dispatches on
+# model.particle_advection isa ParticleAdvection3D to embed north/south_pole_average
+# arrays in the locator (type-stable, avoids per-call allocation)
+function variables(P::ParticleAdvection3D, ::AbstractModel)
     (; nparticles) = P
-    (; nlayers) = model.spectral_grid
     return (
         _common_particle_variables(nparticles)...,
-        ParticleVariable(:locator, LocatorDim(; nlayers), desc = "Particle locator with embedded pole averages for 3D interpolation", units = "1"),
+        ParticleVariable(:locator, LocatorDim(), desc = "Particle locator with embedded pole averages for 3D interpolation", units = "1"),
         ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity dσ/dt at particle location", units = "1/s"),
     )
+end
+
+# particle_advection.geometry is fixed at ParticleAdvection2D/3D construction time (typically
+# before model.architecture is known), so it may not match model.architecture. Rebind it onto the
+# model's architecture in place if needed (geometry is mutable for this reason).
+function _reconcile_architecture!(particle_advection::AbstractParticleAdvection, model::AbstractModel)
+    (; geometry) = particle_advection
+    ismatching(model.architecture, geometry.grid.architecture) && return particle_advection
+    particle_advection.geometry = on_architecture(model.architecture, geometry)
+    return particle_advection
 end
 
 function initialize!(particle_advection::ParticleAdvection2D, model::AbstractModel)
     (; nlayers) = model.spectral_grid
     (; layer) = particle_advection
     nlayers < layer && @warn "Particle advection on layer $layer on spectral grid with nlayers=$nlayers."
+    _reconcile_architecture!(particle_advection, model)
     return nothing
 end
 
-initialize!(::ParticleAdvection3D, ::AbstractModel) = nothing
+function initialize!(particle_advection::ParticleAdvection3D, model::AbstractModel)
+    _reconcile_architecture!(particle_advection, model)
+    return nothing
+end
 
 """
 $(TYPEDSIGNATURES)
