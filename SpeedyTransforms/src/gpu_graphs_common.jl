@@ -14,15 +14,6 @@
 # `_fourier_batched!(..., ::CuArray, ...)` / `::ROCArray` methods and the `CUDA_GRAPH_BACKEND`/
 # `HIP_GRAPH_BACKEND` instances. Those genuinely cannot compile without `CuArray`/`ROCArray`
 # etc. being defined, i.e. without the GPU package loaded.
-#
-# History: this file previously lived under ext/ (and later under src/ but still only
-# `include()`-d from within the extensions) specifically because an earlier version of this
-# code, compiled unconditionally, reportedly broke Enzyme's CPU-only autodiff tests. Making it
-# unconditional again here was verified against that exact scenario before landing: the CPU-only
-# Enzyme differentiability suite (`SpeedyWeather/test/differentiability/`) was run before and
-# after this change and produced byte-identical results both times (same single pre-existing,
-# unrelated failure in `spectral_gradients.jl`'s `∇²!`, nothing new) — see
-# docs/dev/2026-08/gpu-graphs-common-src-move.md for the full history and verification detail.
 # =====================================================================================
 
 """Maximum number of cached graphs per direction per `SpectralTransform`. Prevents
