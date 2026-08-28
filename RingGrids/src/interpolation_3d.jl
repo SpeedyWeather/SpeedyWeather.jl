@@ -45,10 +45,9 @@ end
 
 # Full-level (Center) interpolation kernel.
 @kernel inbounds = true function _interpolate_3D_kernel!(
-        Aout, A_data,
-        ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
-        positions, σ_levels, north_pole_average, south_pole_average,
+        Aout, A_data, locator, positions, σ_levels,
     )
+    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, north_pole_average, south_pole_average) = locator
     i = @index(Global, Linear)
     k_lo, k_hi, α = find_vertical_bracket(positions[i].σ, σ_levels)
 
@@ -76,10 +75,9 @@ end
 # (the face above k_lo). When k_data_lo == 0 the upper neighbour is the implicit
 # top BC → value is zero.
 @kernel inbounds = true function _interpolate_3D_face_kernel!(
-        Aout, A_data,
-        ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
-        positions, σ_levels, north_pole_average, south_pole_average,
+        Aout, A_data, locator, positions, σ_levels,
     )
+    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, north_pole_average, south_pole_average) = locator
     i = @index(Global, Linear)
     k_lo, k_hi, α = find_vertical_bracket(positions[i].σ, σ_levels)
 
@@ -120,8 +118,7 @@ stored in `locator.north_pole_average` and `locator.south_pole_average`
 (pre-allocated via the 3D `AnvilLocator` constructor) and reused across calls
 without CPU allocations. Pass `σ_levels_full` from `model.geometry`."""
 function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels, ::Center)
-    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, npoints_output) = locator
-    (; north_pole_average, south_pole_average) = locator
+    (; npoints_output, north_pole_average, south_pole_average) = locator
     A_data = A.data
     arch = architecture(Aout)
     (; ring_starts, nlons, nlat) = geometry
@@ -130,8 +127,7 @@ function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels, ::Cen
     launch!(
         arch, LinearWorkOrder, (npoints_output,),
         _interpolate_3D_kernel!,
-        Aout, A_data, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
-        positions, σ_levels, north_pole_average, south_pole_average,
+        Aout, A_data, locator, positions, σ_levels,
     )
     return Aout
 end
@@ -143,8 +139,7 @@ field stores the value at the lower face of layer k (σ at k+½). The top face (
 not stored and is implicitly zero by the kinematic boundary condition. Pass
 `σ_levels_half` from `model.geometry`."""
 function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels, ::Face)
-    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, npoints_output) = locator
-    (; north_pole_average, south_pole_average) = locator
+    (; npoints_output, north_pole_average, south_pole_average) = locator
     A_data = A.data
     arch = architecture(Aout)
     (; ring_starts, nlons, nlat) = geometry
@@ -153,8 +148,7 @@ function interpolate_3D!(Aout, A, locator, geometry, positions, σ_levels, ::Fac
     launch!(
         arch, LinearWorkOrder, (npoints_output,),
         _interpolate_3D_face_kernel!,
-        Aout, A_data, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys,
-        positions, σ_levels, north_pole_average, south_pole_average,
+        Aout, A_data, locator, positions, σ_levels,
     )
     return Aout
 end

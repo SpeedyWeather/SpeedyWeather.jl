@@ -526,10 +526,7 @@ function find_rings!(
         #@assert latd[end] == -90-ϵ "Latitudes latd are expected to contain -90˚, the south pole."
     end
 
-    # Convert θs to the target architecture (moves CPU Vector to GPU CuArray when on GPU)
-    θs_arch = on_architecture(architecture, θs)
-
-    return find_rings_unsafe!(js, Δys, θs_arch, latd, architecture)
+    return find_rings_unsafe!(js, Δys, θs, latd, architecture)
 end
 
 DimensionMismatchArray(a::AbstractArray, b::AbstractArray) =
@@ -671,8 +668,6 @@ function find_grid_indices!(
 
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
-    # Convert λs to the target architecture (and move to the target architecture if needed)
-    λs_arch = on_architecture(architecture, λs_converted)
 
     launch!(
         architecture,
@@ -683,7 +678,7 @@ function find_grid_indices!(
         ij_as, ij_bs,
         ij_cs, ij_ds,
         Δabs, Δcds,
-        λs_arch,
+        λs_converted,
         lon_offsets,
         nlons,
         ring_starts,
