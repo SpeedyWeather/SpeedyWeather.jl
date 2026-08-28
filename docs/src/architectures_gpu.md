@@ -18,7 +18,10 @@ run!(simulation, period=Day(10))
 ## GPU Graphs
 
 On GPU, the batched Fourier transform (part of the spectral transform) can be accelerated with
-GPU graphs (CUDA graphs / HIP graphs): the fused gather/FFT/scatter loop is captured once and
+GPU graphs (CUDA graphs / HIP graphs). With reduced ring grids used, rings / latitudes have different numbers of grid points per latitude. 
+This means that the Fourier transform can't be computed as just one large batched FFT. 
+Launching many FFTs for a single transform causes significant launch overheads on GPU. The GPU graphs eliminate that by capturing and replaying these launches. 
+The fused gather/FFT/scatter loop is captured once and
 replayed with a single launch on every subsequent call, instead of re-issuing many small
 kernel/FFT launches per step. This mainly helps at lower resolutions, where the transform is
 launch-bound rather than compute-bound.
