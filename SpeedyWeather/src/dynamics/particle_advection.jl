@@ -238,9 +238,9 @@ function initialize!(
     v0 = vars.particles.v
     w0 = vars.particles.w
 
-    interpolate_3D!(u0, u_3d, locator, geometry, particles, σ_levels_full, Center())
-    interpolate_3D!(v0, v_3d, locator, geometry, particles, σ_levels_full, Center())
-    interpolate_3D!(w0, w_3d, locator, geometry, particles, σ_levels_half, Face())
+    interpolate_3D!(u0, u_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
+    interpolate_3D!(v0, v_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
+    interpolate_3D!(w0, w_3d, locator, geometry, particles, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
     return nothing
 end
 
@@ -387,9 +387,9 @@ function particle_advection!(
     u_new = vars.particles.u
     v_new = vars.particles.v
     w_new = vars.particles.w
-    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, σ_levels_full, Center())
-    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, σ_levels_full, Center())
-    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, σ_levels_half, Face())
+    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, SigmaCenter(σ_levels_full))
+    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, SigmaCenter(σ_levels_full))
+    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
 
     launch!(
         architecture(u_new), LinearWorkOrder, (length(particles),),
@@ -399,9 +399,9 @@ function particle_advection!(
 
     # store new velocities at corrected position for next advection step
     RingGrids.update_locator!(locator, geometry, lons, lats)
-    interpolate_3D!(u_new, u_3d, locator, geometry, particles, σ_levels_full, Center())
-    interpolate_3D!(v_new, v_3d, locator, geometry, particles, σ_levels_full, Center())
-    interpolate_3D!(w_new, w_3d, locator, geometry, particles, σ_levels_half, Face())
+    interpolate_3D!(u_new, u_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
+    interpolate_3D!(v_new, v_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
+    interpolate_3D!(w_new, w_3d, locator, geometry, particles, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
     return nothing
 end
 
