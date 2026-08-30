@@ -190,6 +190,18 @@ Pressure thickness of full level `k`, divided by `surface_pressure` [Pa], forwar
     pressure_thickness_ratio(k, surface_pressure, geometry.vertical_coordinates)
 
 """$(TYPEDSIGNATURES)
+Pressure at full level `k`, divided by `surface_pressure` [Pa], forwarding to
+`geometry.vertical_coordinates`."""
+@inline pressure_ratio(k::Integer, surface_pressure::Number, geometry::Geometry) =
+    pressure_ratio(k, surface_pressure, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Pressure at half level `k`, divided by `surface_pressure` [Pa], forwarding to
+`geometry.vertical_coordinates`."""
+@inline pressure_ratio_half(k::Integer, surface_pressure::Number, geometry::Geometry) =
+    pressure_ratio_half(k, surface_pressure, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
 Sensitivity of the pressure at full level `k` to `surface_pressure`, ∂p_k/∂pₛ, forwarding to
 `geometry.vertical_coordinates`."""
 @inline pressure_sensitivity(k::Integer, geometry::Geometry) = pressure_sensitivity(k, geometry.vertical_coordinates)

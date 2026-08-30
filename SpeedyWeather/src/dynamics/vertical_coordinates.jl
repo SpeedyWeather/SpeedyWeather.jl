@@ -143,6 +143,19 @@ Pressure thickness of full level `k`, divided by `surface_pressure` [Pa], for si
     coordinate.σ_thickness[k]
 
 """$(TYPEDSIGNATURES)
+Pressure at full level `k`, divided by `surface_pressure` [Pa], for sigma `coordinate`.
+Equals σ_k for `SigmaCoordinates`, independent of `surface_pressure`. Prefer this over
+`pressure(k, pₛ, coordinate)/pₛ`, which is only equal up to rounding."""
+@inline pressure_ratio(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates) =
+    coordinate.σ_full[k]
+
+"""$(TYPEDSIGNATURES)
+Pressure at half level `k` (interface k-½), divided by `surface_pressure` [Pa], for sigma
+`coordinate`. Equals σ_half[k] for `SigmaCoordinates`, independent of `surface_pressure`."""
+@inline pressure_ratio_half(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates) =
+    coordinate.σ_half[k]
+
+"""$(TYPEDSIGNATURES)
 Sensitivity of the pressure at full level `k` to `surface_pressure`, ∂p_k/∂pₛ, for sigma
 `coordinate`. Equals σ_k for `SigmaCoordinates`."""
 @inline pressure_sensitivity(k::Integer, coordinate::SigmaCoordinates) = coordinate.σ_full[k]
@@ -340,6 +353,28 @@ sigma-pressure `coordinate`. This is δ_k = Δp_k/pₛ = ΔA_k * (reference_pres
     ΔB = coordinate.B_thickness
     p_ref = coordinate.reference_pressure
     return ΔA[k] * (p_ref / surface_pressure) + ΔB[k]
+end
+
+"""$(TYPEDSIGNATURES)
+Pressure at full level `k`, divided by `surface_pressure` [Pa], for hybrid sigma-pressure
+`coordinate`. This is `A_full[k] * (reference_pressure/surface_pressure) + B_full[k]`; equals
+σ_k for `SigmaCoordinates`, independent of `surface_pressure`."""
+@inline function pressure_ratio(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
+    A = coordinate.A_full
+    B = coordinate.B_full
+    p_ref = coordinate.reference_pressure
+    return A[k] * (p_ref / surface_pressure) + B[k]
+end
+
+"""$(TYPEDSIGNATURES)
+Pressure at half level `k` (interface k-½), divided by `surface_pressure` [Pa], for hybrid
+sigma-pressure `coordinate`. This is `A_half[k] * (reference_pressure/surface_pressure) +
+B_half[k]`; equals σ_half[k] for `SigmaCoordinates`, independent of `surface_pressure`."""
+@inline function pressure_ratio_half(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
+    A = coordinate.A_half
+    B = coordinate.B_half
+    p_ref = coordinate.reference_pressure
+    return A[k] * (p_ref / surface_pressure) + B[k]
 end
 
 """$(TYPEDSIGNATURES)
