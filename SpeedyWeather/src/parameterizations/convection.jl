@@ -214,11 +214,14 @@ set to NaN instead and should be skipped in the relaxation."""
         k -= 1                              # one level up
 
         if !saturated                       # if not saturated yet follow dry adiabat
-            # dry adiabatic ascent and saturation humidity of that temperature; uses actual
-            # pressures (not nominal σ) so the Poisson relation p^κ is exact for hybrid coordinates
+            # dry adiabatic ascent and saturation humidity of that temperature. The Poisson
+            # relation needs the pressure ratio p_k/p_k+1, taken via pressure_ratio (= p/pₛ) so
+            # that the pₛ cancels exactly rather than up to rounding, i.e. σ[k]/σ[k+1] for
+            # SigmaCoordinates. Layer k+1 sits below (closer to the surface).
             p_k = pressure(k, pres, coordinate)
-            p_below = pressure(k + 1, pres, coordinate)   # layer k+1 sits below (closer to the surface)
-            temp_parcel_dry = temp_parcel * (p_k / p_below)^κ
+            pressure_ratio_k = pressure_ratio(k, pres, coordinate)
+            pressure_ratio_below = pressure_ratio(k + 1, pres, coordinate)
+            temp_parcel_dry = temp_parcel * (pressure_ratio_k / pressure_ratio_below)^κ
             sat_humid = saturation_humidity(temp_parcel_dry, p_k, atmosphere)
 
             # set to saturated when the dry adiabatic ascent would reach saturation
@@ -381,11 +384,12 @@ set to NaN instead and should be skipped in the relaxation."""
     while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
 
-        # dry adiabatic ascent; uses actual pressures (not nominal σ) so the Poisson
-        # relation p^κ is exact for hybrid coordinates
-        p_k = pressure(k, pres, coordinate)
-        p_below = pressure(k + 1, pres, coordinate)   # layer k+1 sits below (closer to the surface)
-        temp_parcel = temp_parcel * (p_k / p_below)^κ
+        # dry adiabatic ascent. The Poisson relation needs the pressure ratio p_k/p_k+1, taken
+        # via pressure_ratio (= p/pₛ) so that the pₛ cancels exactly rather than up to rounding,
+        # i.e. σ[k]/σ[k+1] for SigmaCoordinates. Layer k+1 sits below (closer to the surface).
+        pressure_ratio_k = pressure_ratio(k, pres, coordinate)
+        pressure_ratio_below = pressure_ratio(k + 1, pres, coordinate)
+        temp_parcel = temp_parcel * (pressure_ratio_k / pressure_ratio_below)^κ
         temp_ref_profile[ij, k] = temp_parcel
 
         # check whether parcel is still buoyant wrt to environment
