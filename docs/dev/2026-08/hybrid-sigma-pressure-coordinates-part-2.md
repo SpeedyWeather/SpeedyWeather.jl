@@ -23,6 +23,15 @@ Base revision: 20467269399f40212fee413a545496226de999ca
 ## Revision log
 
 - 2026-08-30: initial draft.
+- 2026-08-30: confirmed the `NaN` bug empirically on `main` for `CubicSigmaPressureCoordinates(SpectralGrid())`
+  — `B_half = [0, 0, 0.0049, 0.077, …]`, so the geopotential constants come out as
+  `Δp_geopot_full = [NaN, 198.9, 181.2, …]` and `Δp_geopot_half = [Inf, 608.6, …]`.
+  Verified fixed after the `get_σ_*` change (all coefficients finite, nominal σ identical
+  across `SigmaCoordinates`, `SigmaPressureCoordinates(transition = _ -> 1)` and
+  `CubicSigmaPressureCoordinates`; `Σ_k pressure_thickness_ratio = 1` at pₛ = 1e5 and 8e4).
+- 2026-08-30: added task 10 — `SigmaPressureCoordinates` does not convert the A/B coefficients
+  back to `spectral_grid.NF`, so a `transition` returning `Float64` silently produces a
+  `Float64` coordinate inside a `Float32` model.
 
 ## Problem description
 
@@ -355,6 +364,15 @@ meant:
 
 Where a case genuinely needs a reformulation rather than a swap, leave a *specific* TODO
 naming what would have to change (not the generic one).
+
+### 10. Number format of the A/B coefficients
+
+`SigmaPressureCoordinates(spectral_grid, σ_half; transition)` converts `σ_half` to
+`spectral_grid.NF` but then builds `A_half`/`B_half` as `σ_half .* transition.(σ_half)`, so a
+`transition` returning `Float64` (e.g. the default `σ -> σ` applied to a `Float64` literal, or
+`cubic_transition` with `Float64` thresholds) yields `Float64` coefficient vectors inside a
+`Float32` model. Convert `A_half`, `B_half` (and hence the derived full/thickness vectors) back
+to `spectral_grid.NF` after evaluating the transition, and keep `reference_pressure` as it is.
 
 ## Testing and verification
 
