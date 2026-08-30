@@ -634,6 +634,9 @@ function initialize!(
     (; grid, nlayers) = model.spectral_grid
     (; radius, rotation, gravity) = model.planet
 
+    # Jablonowski-Williamson's η is the test case's own vertical coordinate definition
+    # (Jablonowski and Williamson, 2006), always the nominal σ regardless of the model's
+    # actual vertical coordinate — left as-is intentionally, not a hybrid-coordinate gap.
     (; σ_levels_full) = model.geometry
     σ_levels_full_cpu = on_architecture(CPU(), σ_levels_full)
     φ = model.geometry.latds
@@ -680,7 +683,8 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    # Jablonowski and Williamson use η for σ coordinates
+    # Jablonowski and Williamson use η for σ coordinates; nominal σ regardless of the
+    # model's actual vertical coordinate, this is the test case's own definition (see above)
     η = σ_levels_full[k]
     ηᵥ = (η - η₀) * π * 1 // 2  # auxiliary variable for vertical coordinate
 
@@ -846,7 +850,7 @@ function initialize!(
     haskey(vars.prognostic, :humidity) || warn_undefvar(vars, :humidity) && return nothing
 
     (; relhumid_ref) = IC
-    (; σ_levels_full) = model.geometry
+    coordinate = model.geometry.vertical_coordinates
     (; atmosphere) = model
 
     # get pressure [Pa] on grid
@@ -862,7 +866,7 @@ function initialize!(
     launch!(
         architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
         constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
-        σ_levels_full, relhumid_ref, atmosphere,
+        coordinate, relhumid_ref, atmosphere,
     )
     set!(vars, model; humidity = humid_grid)
 
@@ -873,14 +877,14 @@ end
         humid_grid,
         temp_grid,
         pres_grid,
-        σ_levels_full,
+        coordinate,
         relhumid_ref,
         atmosphere,
     )
     ij, k = @index(Global, NTuple)
 
-    # Compute pressure at this level
-    pₖ = σ_levels_full[k] * pres_grid[ij]
+    # Compute pressure at this level (actual pressure, not σ*pₛ, for hybrid coordinates)
+    pₖ = pressure(k, pres_grid[ij], coordinate)
     T = temp_grid[ij, k]
 
     # Set humidity as fraction of saturation

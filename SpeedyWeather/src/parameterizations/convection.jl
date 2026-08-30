@@ -33,13 +33,14 @@ and relaxes current vertical profiles to the adjusted references."""
 @propagate_inbounds function convection!(ij, vars, convection::BettsMillerConvection, model)
 
     (; geometry, planet, atmosphere, time_stepping) = model
-    # TODO: σ, σ_half, Δσ are used for buoyancy level detection and moisture flux
-    # calculations in the Betts-Miller scheme. These are baked into sigma-coordinate
-    # formulations and would need revisiting for hybrid coordinates.
-    σ = geometry.σ_levels_full
-    σ_half = geometry.σ_levels_half
-    Δσ = geometry.σ_levels_thick
-    nlayers = length(σ)
+    # Coordinate-agnostic: level detection and moisture/energy flux integrals go through the
+    # `pressure`/`pressure_half`/`pressure_thickness_ratio` interface, so this reduces exactly
+    # to the previous σ-coordinate formulation for `SigmaCoordinates`. The vertical placement
+    # of the convective adjustment (i.e. which levels count as "the column") remains a
+    # nominal-σ criterion (see `pseudo_adiabat!`/known limitations), only the pressures and
+    # mass weights used once that column is fixed are now exact for hybrid coordinates.
+    coordinate = geometry.vertical_coordinates
+    nlayers = geometry.nlayers
     (; Δt) = model.time_stepping                            # time step in [s]
 
     # use previous time step for more stable calculations
@@ -62,10 +63,10 @@ and relaxes current vertical profiles to the adjusted references."""
     humid_ref_profile = vars.scratch.grid.b     # specific humidity [kg/kg] profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
-    level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, atmosphere)
+    level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, coordinate, atmosphere)
 
     for k in level_zero_buoyancy:nlayers
-        qsat = saturation_humidity(temp_ref_profile[ij, k], pₛ * σ[k], atmosphere)
+        qsat = saturation_humidity(temp_ref_profile[ij, k], pressure(k, pₛ, coordinate), atmosphere)
         humid_ref_profile[ij, k] = qsat * convection.relative_humidity
     end
 
@@ -78,14 +79,16 @@ and relaxes current vertical profiles to the adjusted references."""
     for k in level_zero_buoyancy:nlayers
         # Frierson's equation (1)
         # δq = -(humid[ij, k] - humid_ref_profile[ij, k])/SBM.time_scale.value
-        # Pq -= δq*Δσ[k]/gravity
+        # Pq -= δq*Δp_k/(pₛ*gravity)
         #
         # δT = -(temp[ij, k] - temp_ref_profile[ij, k])/SBM.time_scale.value
-        # PT += δT*Δσ[k]/gravity*cₚ/Lᵥ
+        # PT += δT*Δp_k/(pₛ*gravity)*cₚ/Lᵥ
 
         # shorter form with same sign (τ, gravity, cₚ, Lᵥ all positive) to be reused
-        Pq += (humid[ij, k] - humid_ref_profile[ij, k]) * Δσ[k]
-        PT -= (temp[ij, k] - temp_ref_profile[ij, k]) * Δσ[k]
+        # Δp_k/pₛ (mass weight of layer k) replaces the σ-coordinate Δσ[k]
+        δ_k = pressure_thickness_ratio(k, pₛ, coordinate)
+        Pq += (humid[ij, k] - humid_ref_profile[ij, k]) * δ_k
+        PT -= (temp[ij, k] - temp_ref_profile[ij, k]) * δ_k
     end
 
     # ADJUST PROFILES FOLLOWING FRIERSON 2007
@@ -96,8 +99,10 @@ and relaxes current vertical profiles to the adjusted references."""
     no_convection = !(deep_convection || shallow_convection)
     no_convection && return nothing
 
-    # height of zero buoyancy level in σ coordinates
-    Δσ_lzb = σ_half[nlayers + 1] - σ_half[level_zero_buoyancy]
+    # mass fraction of the column from the level of zero buoyancy to the surface,
+    # Σ_{k=level_zero_buoyancy}^{nlayers} δ_k = (p_half[nlayers+1] - p_half[level_zero_buoyancy])/pₛ,
+    # which reduces exactly to σ_half[nlayers+1] - σ_half[level_zero_buoyancy] for SigmaCoordinates
+    Δσ_lzb = pressure_ratio_half(nlayers + 1, pₛ, coordinate) - pressure_ratio_half(level_zero_buoyancy, pₛ, coordinate)
 
     if deep_convection
 
@@ -114,11 +119,11 @@ and relaxes current vertical profiles to the adjusted references."""
         # precipitation is zero.
 
         for k in level_zero_buoyancy:nlayers
-            Qref -= humid_ref_profile[ij, k] * Δσ[k]  # eq (11) but in σ coordinates
+            Qref -= humid_ref_profile[ij, k] * pressure_thickness_ratio(k, pₛ, coordinate)  # eq (11), mass-weighted
         end
         fq = 1 - Pq / Qref                    # = 1 - Δq/Qref in eq (12) but we reuse Pq
 
-        ΔT = PT / Δσ_lzb                      # equation (14), reuse PT and in σ coordinates
+        ΔT = PT / Δσ_lzb                      # equation (14), reuse PT, mass-weighted (δ_k rather than Δσ_k)
         for k in level_zero_buoyancy:nlayers
             humid_ref_profile[ij, k] *= fq      # update humidity profile, eq (13)
             temp_ref_profile[ij, k] -= ΔT       # update temperature profile, eq (15)
@@ -136,7 +141,7 @@ and relaxes current vertical profiles to the adjusted references."""
         humid_tend[ij, k] -= δq
 
         # convective precipitation (rain), integrate dq\dt [(kg/kg)/s] vertically
-        rain = max(δq * Δσ[k], 0)       # only integrate excess humidity for precip (no reevaporation)
+        rain = max(δq * pressure_thickness_ratio(k, pₛ, coordinate), 0)   # only integrate excess humidity for precip (no reevaporation)
         rain_convection += rain         # integrate vertically, Formula 25, unit [m]
     end
 
@@ -181,11 +186,11 @@ set to NaN instead and should be skipped in the relaxation."""
         humid_environment,
         geopotential,
         pres,
-        σ,
+        coordinate,
         atmosphere
     )
     NF = eltype(temp_ref_profile)             # number format
-    nlayers = length(σ)                       # number of vertical layers
+    nlayers = get_nlayers(coordinate)         # number of vertical layers
 
     # thermodynamics
     (; κ, R_dry, R_vapor) = atmosphere
@@ -209,9 +214,12 @@ set to NaN instead and should be skipped in the relaxation."""
         k -= 1                              # one level up
 
         if !saturated                       # if not saturated yet follow dry adiabat
-            # dry adiabatic ascent and saturation humidity of that temperature
-            temp_parcel_dry = temp_parcel * (σ[k] / σ[k + 1])^κ
-            sat_humid = saturation_humidity(temp_parcel_dry, σ[k] * pres, atmosphere)
+            # dry adiabatic ascent and saturation humidity of that temperature; uses actual
+            # pressures (not nominal σ) so the Poisson relation p^κ is exact for hybrid coordinates
+            p_k = pressure(k, pres, coordinate)
+            p_below = pressure(k + 1, pres, coordinate)   # layer k+1 sits below (closer to the surface)
+            temp_parcel_dry = temp_parcel * (p_k / p_below)^κ
+            sat_humid = saturation_humidity(temp_parcel_dry, p_k, atmosphere)
 
             # set to saturated when the dry adiabatic ascent would reach saturation
             # then follow moist adiabat instead (see below)
@@ -230,7 +238,7 @@ set to NaN instead and should be skipped in the relaxation."""
 
             # at new (lower) temperature condensation occurs immediately
             # new humidity equals to that saturation humidity
-            humid_parcel = saturation_humidity(temp_parcel, σ[k] * pres, atmosphere)
+            humid_parcel = saturation_humidity(temp_parcel, pressure(k, pres, coordinate), atmosphere)
         else
             temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
         end
@@ -285,11 +293,13 @@ and relaxes current vertical profiles to the adjusted references."""
 @propagate_inbounds function convection!(ij, vars, DBM::BettsMillerDryConvection, model)
 
     (; geometry, atmosphere, time_stepping) = model
-    # TODO: same as above — σ, σ_half, Δσ baked into Betts-Miller dry convection scheme.
-    σ = geometry.σ_levels_full
-    σ_half = geometry.σ_levels_half
-    Δσ = geometry.σ_levels_thick
-    nlayers = length(σ)
+    # Coordinate-agnostic: as in the wet Betts-Miller scheme above, the flux integral and
+    # zero-buoyancy layer mass use `pressure_thickness_ratio`/`pressure_half`, and the dry
+    # adiabat in `dry_adiabat!` uses actual pressure ratios, so this reduces exactly to the
+    # previous σ-coordinate formulation for `SigmaCoordinates`.
+    coordinate = geometry.vertical_coordinates
+    nlayers = geometry.nlayers
+    pₛ = vars.parameterizations.surface_pressure[ij]        # surface pressure [Pa]
 
     # use previous time step for more stable calculations
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, DBM)
@@ -306,7 +316,8 @@ and relaxes current vertical profiles to the adjusted references."""
         ij, temp_ref_profile,
         temp,
         temp_parcel,
-        σ,
+        pₛ,
+        coordinate,
         atmosphere
     )
 
@@ -317,18 +328,20 @@ and relaxes current vertical profiles to the adjusted references."""
     for k in level_zero_buoyancy:nlayers
         # Frierson's equation (1)
         # δT = -(temp[ij, k] - temp_ref_profile[ij, k])/DBM.time_scale.value
-        # PT += δT*Δσ[k]/gravity*cₚ/Lᵥ
+        # PT += δT*Δp_k/(pₛ*gravity)*cₚ/Lᵥ
 
         # shorter form with same sign (τ, gravity, cₚ, Lᵥ all positive) to be reused
-        PT -= (temp[ij, k] - temp_ref_profile[ij, k]) * Δσ[k]
+        PT -= (temp[ij, k] - temp_ref_profile[ij, k]) * pressure_thickness_ratio(k, pₛ, coordinate)
     end
 
     # ADJUST PROFILES FOLLOWING FRIERSON 2007
     convection = PT > 0
     convection || return nothing            # escape immediately for no convection
 
-    # height of zero buoyancy level in σ coordinates
-    Δσ_lzb = σ_half[nlayers + 1] - σ_half[level_zero_buoyancy]
+    # mass fraction of the column from the level of zero buoyancy to the surface (see
+    # BettsMillerConvection above for the derivation); replaces the σ-coordinate
+    # σ_half[nlayers+1] - σ_half[level_zero_buoyancy]
+    Δσ_lzb = pressure_ratio_half(nlayers + 1, pₛ, coordinate) - pressure_ratio_half(level_zero_buoyancy, pₛ, coordinate)
     ΔT = PT / Δσ_lzb                          # eq (5) or (14) but reusing PT
     for k in level_zero_buoyancy:nlayers
         temp_ref_profile[ij, k] -= ΔT           # equation (6) or equation (15)
@@ -348,13 +361,14 @@ set to NaN instead and should be skipped in the relaxation."""
         temp_ref_profile,
         temp_environment,
         temp_parcel,
-        σ,
+        pres,
+        coordinate,
         atmosphere,
     )
     NF = eltype(temp_ref_profile)
     (; κ) = atmosphere
 
-    nlayers = length(σ)                     # number of vertical levels
+    nlayers = get_nlayers(coordinate)       # number of vertical levels
 
     for k in 1:nlayers
         temp_ref_profile[ij, k] = NaN       # reset profile from any previous calculation
@@ -367,8 +381,11 @@ set to NaN instead and should be skipped in the relaxation."""
     while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
 
-        # dry adiabatic ascent
-        temp_parcel = temp_parcel * (σ[k] / σ[k + 1])^κ
+        # dry adiabatic ascent; uses actual pressures (not nominal σ) so the Poisson
+        # relation p^κ is exact for hybrid coordinates
+        p_k = pressure(k, pres, coordinate)
+        p_below = pressure(k + 1, pres, coordinate)   # layer k+1 sits below (closer to the surface)
+        temp_parcel = temp_parcel * (p_k / p_below)^κ
         temp_ref_profile[ij, k] = temp_parcel
 
         # check whether parcel is still buoyant wrt to environment
@@ -441,7 +458,7 @@ end
     # Get latitude ring index and latitude
     j = model.geometry.whichring[ij]
     latd = model.geometry.latd[j]
-    σ = model.geometry.σ_levels_full
+    coordinate = model.geometry.vertical_coordinates
 
     Qmax = ifelse(abs(latd) < scheme.σθ, inv(convert(NF, Second(scheme.time_scale).value)), NF(0))
     p₀ = scheme.p₀ * 100     # hPa -> Pa
@@ -449,7 +466,7 @@ end
     cos²θ_term = scheme.lat_mask[j]
 
     for k in 1:nlayers
-        p = pₛ * σ[k]       # Pressure in Pa on layer k
+        p = pressure(k, pₛ, coordinate)       # Pressure in Pa on layer k
 
         # Lee and Kim, 2003, eq. 2
         temp_tend[ij, k] += Qmax * exp(-((p - p₀) / σₚ)^2 / 2) * cos²θ_term

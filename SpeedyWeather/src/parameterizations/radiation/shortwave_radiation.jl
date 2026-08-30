@@ -168,8 +168,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, radiation)
     pₛ = vars.parameterizations.surface_pressure[ij]
     nlayers = size(dTdt, 2)
-    σ = model.geometry.σ_levels_full
-    Δσ = model.geometry.σ_levels_thick
+    coordinate = model.geometry.vertical_coordinates
 
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     albedo_ocean = vars.parameterizations.ocean.albedo[ij]
@@ -193,8 +192,10 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
             D *= (1 - R)
         end
 
-        # 2. ozone absorption in stratosphere layers above σ₀, distribution scaled by layer thickness
-        O₃ = O₃_absorption * radiation.ozone_distribution(σ[k]) * Δσ[k]
+        # 2. ozone absorption in stratosphere layers above σ₀, distribution scaled by layer mass;
+        # ozone_distribution takes the nominal σ (pₛ-independent, still correct for hybrid
+        # coordinates), while the mass weight uses the actual pₛ-dependent layer thickness ratio
+        O₃ = O₃_absorption * radiation.ozone_distribution(sigma(k, coordinate)) * pressure_thickness_ratio(k, pₛ, coordinate)
 
         # 3. transmissivity of the layer
         D_out = (D - O₃ * D_toa) * t[ij, k]

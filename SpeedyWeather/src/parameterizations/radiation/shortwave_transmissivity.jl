@@ -29,7 +29,7 @@ initialize!(::ConstantShortwaveTransmissivity, ::AbstractModel) = nothing
     pₛ = vars.parameterizations.surface_pressure[ij]
 
     for k in 1:nlayers
-        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        Δσₖ = pressure_thickness_ratio(k, pₛ, coord)
         t[ij, k] = exp(-τ * Δσₖ)            # transmissivity through layer k
     end
     return t
@@ -133,7 +133,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
 
         # Compute differential optical depth with zenith correction
         # Normalize pressure to 1e5 Pa since absorptivities are per 1e5 Pa
-        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        Δσₖ = pressure_thickness_ratio(k, pₛ, coord)
         optical_depth = layer_absorptivity * Δσₖ * normalized_surface_pressure * zenith_factor
 
         # Transmissivity through layer k
