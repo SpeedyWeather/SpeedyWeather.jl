@@ -1,9 +1,11 @@
 # Hybrid sigma-pressure coordinates, part 2: the dynamical core
 
-> Status: **planned**. Generalises the sigma-coordinate dynamical core (mass-weighted vertical
-> integrals, vertical velocity, vertical advection, adiabatic conversion) to hybrid
-> sigma-pressure coordinates, and fixes the nominal-σ accessors that currently make
-> `SigmaPressureCoordinates` with a non-trivial transition produce `NaN` coefficients.
+> Status: **in progress**. Sections 1-8 and 10 (dynamical core generalisation and the
+> nominal-σ fix) and section 9 (parameterizations/forcings) are implemented; tests
+> (accessor identities, nominal-σ regression, mass consistency, hybrid-vs-sigma
+> backwards-compatibility of the dycore, and a short CubicSigmaPressureCoordinates +
+> Held-Suarez integration) and documentation are done. Remaining: final review and opening
+> the PR (see "Originating prompt").
 
 Date of initial draft: 2026-08-30
 
@@ -32,6 +34,31 @@ Base revision: 20467269399f40212fee413a545496226de999ca
 - 2026-08-30: added task 10 — `SigmaPressureCoordinates` does not convert the A/B coefficients
   back to `spectral_grid.NF`, so a `transition` returning `Float64` silently produces a
   `Float64` coordinate inside a `Float32` model.
+- 2026-08-30: tests and documentation (this pass). Fixed the two stale assertions in
+  `test/dynamics/vertical_coordinates.jl` that encoded the pre-fix behaviour (`get_σ_full`/
+  `get_σ_thickness` of `SigmaPressureCoordinates` equal to the raw `B` coefficients rather
+  than nominal σ = A + B), and added the accessor-identity, nominal-σ-regression and
+  weight-sum tests (items 1-3) to that file. Added
+  `test/dynamics/hybrid_coordinates_dycore.jl` with items 4-6: `dynamics_tendencies!`
+  backwards-compatibility between `SigmaCoordinates` and `SigmaPressureCoordinates(transition
+  = _ -> 1)` on an identical, physically-evolved state; mass-consistency of the layer
+  weights; and a `PrimitiveDryModel` + `CubicSigmaPressureCoordinates` + `HeldSuarez`
+  `run!(period = Day(1))` integration. The backwards-compatibility test needed two fixes
+  beyond what the plan anticipated, both artifacts of calling `dynamics_tendencies!` outside
+  `run!`'s time loop rather than dycore bugs: (1) `run!` unscales vorticity/divergence by
+  `1/radius` only once at the very end, so the copied post-`run!` state must be re-scaled
+  with `scale_prognostic!` before calling `dynamics_tendencies!` directly, matching what
+  `run!` does before its own time loop; (2) `model.implicit.temp_profile` (the temperature
+  linearisation reference used to split `T` into `T_k + T'`) is only computed once inside
+  `first_timesteps!`/`reinitialize!`, so a model that is only `initialize!`d and never
+  `run!` keeps it at its zero-allocated default — synced it from the sigma model before
+  comparing. Documented the hybrid dynamical core (three layer weights, exact vs. linearised
+  parts, performance) in `docs/src/vertical_coordinates.md`, generalised the continuity/
+  vertical-velocity/adiabatic-conversion equations in `docs/src/primitiveequation.md`, added
+  the `CHANGELOG.md` entries, and bumped `SpeedyWeather/Project.toml` to `0.23.0-DEV`.
+  Confirmed section 9 (parameterizations/forcings) landed concurrently
+  (`3bed667e`/`1fe290b1`/`464757f2`) and all touched test suites pass with
+  `--check-bounds=yes`.
 
 ## Problem description
 

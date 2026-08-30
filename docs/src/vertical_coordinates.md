@@ -64,15 +64,6 @@ nothing # hide
 
 ## [Hybrid sigma-pressure coordinates](@id hybrid_sigma_pressure_usage)
 
-!!! warning "Work in progress"
-    Hybrid sigma-pressure coordinates are implemented for the coordinate geometry,
-    the `pressure`, `pressure_thickness`, and `sigma` functions, and all
-    parameterizations, but **the dynamical core still uses the pure sigma formulation**
-    throughout (vertical advection, surface pressure tendency, geopotential, and adiabatic
-    conversion). See the TODO comments in those source files for details. Using
-    `SigmaPressureCoordinates` with a transition close to pure sigma (e.g. the default
-    ``f(\sigma) = \sigma``) therefore remains consistent with the dynamics.
-
 Pure sigma coordinates tilt sharply with orography even at high altitudes where
 terrain-following levels are not needed. Hybrid sigma-pressure coordinates solve this
 by blending constant-pressure surfaces near the model top with terrain-following sigma
@@ -163,7 +154,7 @@ nothing # hide
 
 ## Coordinate functions
 
-Three functions provide a coordinate-agnostic interface for evaluating the vertical
+Functions provide a coordinate-agnostic interface for evaluating the vertical
 coordinate at a given full level ``k``, working for both `SigmaCoordinates` and
 `SigmaPressureCoordinates`:
 
@@ -172,8 +163,91 @@ coordinate at a given full level ``k``, working for both `SigmaCoordinates` and
 | `SpeedyWeather.pressure(k, pₛ, coord)` | Pressure [Pa] at full level ``k`` |
 | `SpeedyWeather.pressure_thickness(k, pₛ, coord)` | Pressure thickness [Pa] of layer ``k`` |
 | `SpeedyWeather.sigma(k, coord)` | Nominal sigma level ``\sigma_k`` (surface-pressure independent) |
+| `sigma_half(k, coord)` | Nominal sigma level ``\sigma_{k-\tfrac{1}{2}}`` at half level ``k`` (surface-pressure independent) |
 
 For `SigmaCoordinates` these reduce to ``\sigma_k p_s``, ``\Delta\sigma_k p_s``, and
 ``\sigma_k`` respectively. For `SigmaPressureCoordinates` they use the full
-``A_k p_{\mathrm{ref}} + B_k p_s`` formula. Note that `sigma` always equals
-``A_k + B_k = \sigma_k`` regardless of the transition.
+``A_k p_{\mathrm{ref}} + B_k p_s`` formula. Note that `sigma` and `sigma_half` always equal
+``A_k + B_k = \sigma_k`` (respectively at half levels) regardless of the transition —
+this is what `Geometry` stores as `σ_levels_full`/`σ_levels_half`/`σ_levels_thick`
+(nominal sigma, ``p_s``-independent, **not** the ``B`` coefficients alone).
+
+A few further internal (documented but not exported) accessors return the
+``p_s``-dependent/-sensitivity quantities the dynamical core needs; see the next section.
+
+## What the dynamical core does with hybrid coordinates
+
+The guiding design principle is that `SigmaCoordinates` code paths stay byte-identical to
+before hybrid coordinates were introduced (same arrays, same kernels), while
+`SigmaPressureCoordinates` is reached through separate dispatch. This section explains what
+changes for the hybrid path, why, and at what cost. See Simmons and Burridge (1981) for the
+underlying continuous equations, generalised here to hybrid coordinates; the pure sigma case
+is `SigmaCoordinates`' existing implementation.
+
+### Three layer weights that collapse to ``\Delta\sigma_k``
+
+The dynamical core carries ``\ln p_s`` as the prognostic variable and therefore works with
+several per-layer quantities normalised by ``p_s``. For `SigmaCoordinates` all three below
+are the same constant ``\Delta \sigma_k``, which is why the (unmodified) sigma code path can
+use a single precomputed array throughout. For `SigmaPressureCoordinates` they are three
+genuinely different quantities:
+
+| weight | meaning | sigma limit | ``p_s``-dependent? |
+|---|---|---|---|
+| ``\delta_k(p_s) = \Delta p_k / p_s = \Delta A_k (p_{\mathrm{ref}}/p_s) + \Delta B_k`` | mass of layer ``k`` per unit ``p_s`` | ``\Delta\sigma_k`` | **yes** |
+| ``\Delta B_k = \partial \Delta p_k / \partial p_s`` | sensitivity of layer mass to ``p_s`` | ``\Delta\sigma_k`` | no |
+| ``B_{k+\tfrac{1}{2}} = \partial p_{k+\tfrac{1}{2}} / \partial p_s`` | sensitivity of interface pressure to ``p_s`` | ``\sigma_{k+\tfrac{1}{2}}`` | no |
+
+`SpeedyWeather.pressure_thickness_ratio(k, pₛ, coord)` returns ``\delta_k(p_s)``,
+`SpeedyWeather.pressure_thickness_sensitivity(k, coord)` returns ``\Delta B_k`` and
+`SpeedyWeather.pressure_sensitivity_half(k, coord)` returns ``B_{k-\tfrac{1}{2}}``
+(and `SpeedyWeather.pressure_sensitivity(k, coord)` returns ``B_k``). All four are `@inline`,
+allocation-free and reduce exactly to ``\Delta\sigma_k``/``\sigma_k`` for `SigmaCoordinates`.
+
+### Continuity, vertical velocity and adiabatic conversion in hybrid form
+
+Using ``\mathcal{D}_k`` for the layer divergence, the exact mass-flux divergence normalised
+by ``p_s`` is ``c_k = \delta_k(p_s)\mathcal{D}_k + \Delta B_k (\mathbf{u}_k \cdot \nabla \ln
+p_s)``, so that ``\partial_t \ln p_s = -\sum_k c_k``. The (spectral, ``\Delta\sigma_k``-weighted)
+vertical integral used for the semi-implicit terms differs from the exact, spatially-varying
+``\delta_k``-weighted one by ``\hat{C} = \sum_k (\delta_k(p_s) - \Delta\sigma_k)\mathcal{D}_k``,
+which SpeedyWeather.jl computes explicitly on the grid (`vars.dynamics.div_mean_correction`,
+identically zero for `SigmaCoordinates`) and adds to the surface pressure tendency. The
+vertical velocity `w` (what the sigma path calls ``\dot\sigma``) and the adiabatic conversion
+coefficients generalise analogously — see the corresponding notes in
+[Surface pressure tendency](@ref), [Vertical velocity](@ref) and [Temperature equation](@ref)
+of the primitive equation model documentation for the exact formulas. All of these reduce
+term by term to the existing sigma expressions when `transition = _ -> 1`.
+
+### What stays linearised, and why that is fine
+
+Two parts of the dynamical core are *not* generalised to the exact hybrid pressures, by
+deliberate scope decision:
+
+* **Geopotential integration constants.** The precomputed spectral constants
+  ``\Delta\Phi_k = R \ln(\sigma_{k+\tfrac{1}{2}}/\sigma_k)`` are the sigma form of
+  ``R\ln(p_{k+\tfrac{1}{2}}/p_k)``. In the pure-pressure limit (``B=0``) the ``p_{\mathrm{ref}}``
+  factors cancel in the ratio and the two expressions are *identical*; in the pure-sigma limit
+  (``A=0``) the ``p_s`` factors cancel and they are again *identical*. Only in the blend zone
+  is there a discrepancy, of order ``\Delta A \Delta B / \sigma^2 \cdot (p_s/p_{\mathrm{ref}} -
+  1)``. The exact, ``p_s``-dependent grid-space kernel is used for the grid geopotential (read
+  by the parameterizations), so this only affects the spectral geopotential used inside the
+  dynamical core itself.
+* **Semi-implicit operators** (``\mathbf{R}, \mathbf{L}, \mathbf{U}, \mathbf{W}``, see
+  [Semi-implicit time stepping](@ref implicit_primitive)) are the linearisation of the system
+  about a resting reference state. Linearising the hybrid weights about ``p_s = p_{\mathrm{ref}}``
+  gives ``\delta_k(p_{\mathrm{ref}}) = \Delta A_k + \Delta B_k = \Delta\sigma_k`` and
+  ``p_k(p_{\mathrm{ref}}) = \sigma_k p_{\mathrm{ref}}``. So with nominal ``\sigma`` in
+  `σ_levels_*` the existing sigma-coordinate operators *are* the correct linearisation of the
+  hybrid system — no reformulation is needed. As with every other nonlinearity in the
+  semi-implicit scheme, the residual between the linearised and the exact hybrid operator is
+  handled explicitly, though the correction is less well conditioned the further ``p_s``
+  departs from ``p_{\mathrm{ref}}``.
+
+### Performance
+
+The hybrid path costs a handful of extra `log`/`exp` evaluations per grid point and layer
+(vertical velocity, adiabatic conversion, the grid geopotential) plus one extra grid-space
+correction term for the surface pressure tendency; `SigmaCoordinates` performance is
+unchanged by construction, since its code paths are untouched (same arrays, same kernels, no
+extra transcendental function calls).
