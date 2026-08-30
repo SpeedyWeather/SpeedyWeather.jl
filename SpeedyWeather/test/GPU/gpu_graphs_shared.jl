@@ -1,7 +1,8 @@
 # Shared test logic for GPU-graphs tests, called from cuda_graphs.jl and hip_graphs.jl.
-# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live inside the backend extension
-# module (SpeedyTransformsCUDAExt / SpeedyTransformsAMDGPUExt), not in the main SpeedyTransforms
-# package — hence accessed via `ext.` below, not `SpeedyTransforms.`.
+# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live in the main SpeedyTransforms
+# package (they're backend-agnostic — see SpeedyTransforms/src/gpu_graphs_common.jl), hence
+# accessed via `SpeedyTransforms.` below. `ext` (the backend extension module, or `nothing` if
+# not loaded) is still used to gate these tests on the extension actually being loaded.
 #
 # These tests only actually exercise the graphs-accelerated path when
 # `SpeedyTransforms.default_gpu_graphs` says this backend's GPU-graphs are trusted (currently:
@@ -21,11 +22,11 @@ function test_gpu_graphs(ext, prefix)
             model = PrimitiveWetModel(spectral_grid; spectral_transform = SpectralTransform(spectral_grid; gpu_graphs = true))
             simulation = initialize!(model)
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
 
             function cache_stats()
                 maxlen = total = failed = 0
-                for c in values(ext.GRAPH_CACHES), execs in (c.forward_execs, c.inverse_execs)
+                for c in values(SpeedyTransforms.GRAPH_CACHES), execs in (c.forward_execs, c.inverse_execs)
                     maxlen = max(maxlen, length(execs))
                     total += length(execs)
                     failed += count(e -> e === nothing, values(execs))
@@ -42,9 +43,9 @@ function test_gpu_graphs(ext, prefix)
             @test s2.failed == 0                # nothing fell back to the un-captured direct loop
             @test s2.total == s1.total          # extra steps add no graphs → cache is bounded
             @test s1.total > 0                  # graphs were actually captured
-            @test s1.maxlen < ext.MAX_GRAPHS    # cache stays under the cap
+            @test s1.maxlen < SpeedyTransforms.MAX_GRAPHS    # cache stays under the cap
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
         end
     end
 
@@ -66,20 +67,20 @@ function test_gpu_graphs(ext, prefix)
             @test get_step(gridded, 2).data !== get_step(gridded, 2).data
 
             # inverse (spectral→grid) into a fresh step-2 view each call → only ONE graph captured
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
             for _ in 1:4
                 transform!(get_step(gridded, 2), specs, S)
             end
-            @test sum(length(c.inverse_execs) for c in values(ext.GRAPH_CACHES); init = 0) == 1
+            @test sum(length(c.inverse_execs) for c in values(SpeedyTransforms.GRAPH_CACHES); init = 0) == 1
 
             # forward (grid→spectral) from a fresh step-2 view each call → only ONE graph captured
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
             for _ in 1:4
                 transform!(specs, get_step(gridded, 2), S)
             end
-            @test sum(length(c.forward_execs) for c in values(ext.GRAPH_CACHES); init = 0) == 1
+            @test sum(length(c.forward_execs) for c in values(SpeedyTransforms.GRAPH_CACHES); init = 0) == 1
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
         end
     end
 
@@ -100,9 +101,9 @@ function test_gpu_graphs(ext, prefix)
             field = zeros(Float32, spectral_grid.grid, nlayers)
             scratch = S.scratch_memory
 
-            n_inverse() = sum(length(c.inverse_execs) for c in values(ext.GRAPH_CACHES); init = 0)
+            n_inverse() = sum(length(c.inverse_execs) for c in values(SpeedyTransforms.GRAPH_CACHES); init = 0)
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
             SpeedyTransforms._transform_grid!(field, specs, scratch, S, false)    # populate the fourier scratch
 
             SpeedyTransforms._fourier!(field, scratch.north, scratch.south, S)                # overwrite → reference
@@ -123,7 +124,7 @@ function test_gpu_graphs(ext, prefix)
             @test Array(field.data) ≈ 2 .* once
             @test n_inverse() == n_before
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
         end
     end
 end
