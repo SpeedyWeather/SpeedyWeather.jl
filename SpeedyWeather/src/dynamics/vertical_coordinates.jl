@@ -215,12 +215,17 @@ function SigmaPressureCoordinates(
     # σ_full = (σ_half[2:end] + σ_half[1:(end - 1)]) / 2
 
     # hybrid coordinates defined via half layers
-    B_half = @. σ_half * transition(σ_half)
+    # convert back to spectral_grid.NF: `transition` may return a wider type (e.g. the
+    # default `σ -> σ` on a Float64 literal, or a user transition using Float64 thresholds),
+    # which would otherwise silently promote A_half/B_half (and everything derived from them)
+    # to Float64 inside an otherwise Float32 model.
+    NF = spectral_grid.NF
+    B_half = convert.(NF, σ_half .* transition.(σ_half))
     B_full = (B_half[2:end] + B_half[1:(end - 1)]) / 2
 
     # do not reevalute the (possibly nonlinear) transition for full layers
     # average instead to have layer centres always at mid-pressure too
-    A_half = @. σ_half * (1 - transition(σ_half))
+    A_half = convert.(NF, σ_half .* (1 .- transition.(σ_half)))
     A_full = (A_half[2:end] + A_half[1:(end - 1)]) / 2
     # A_full = maximum.(0, σ_full - B_full)     # to avoid -0
     # A_half = maximum.(0, σ_half - B_half)

@@ -248,7 +248,15 @@ u, v are averaged in grid-point space, divergence in spectral space.
     vars::Variables,
     geometry::Geometry,
     time_stepping::AbstractTimeStepper,
-) = vertical_integration!(geometry.spectral_grid.architecture, vars, geometry, time_stepping)
+) = vertical_integration!(geometry.spectral_grid.architecture, vars, geometry, geometry.vertical_coordinates, time_stepping)
+
+# Three layer weights appear in the vertical integrals below (all reduce to the constant
+# Δσₖ for SigmaCoordinates, see docs/dev/2026-08/hybrid-sigma-pressure-coordinates-part-2.md):
+#   δₖ(pₛ)  = Δpₖ/pₛ    (pressure_thickness_ratio)         mass of layer k per unit pₛ
+#   ΔBₖ     = ∂Δpₖ/∂pₛ  (pressure_thickness_sensitivity)   sensitivity of layer mass to pₛ
+#   B_{k+½} = ∂p_{k+½}/∂pₛ (pressure_sensitivity_half)      sensitivity of interface pressure to pₛ
+# For SigmaCoordinates all three equal Δσₖ, which is why the sigma methods below use a
+# single precomputed array for all of them.
 
 # For the vertical integration and vertical average, the kernel version is unreasonably slow
 # on CPU, that's why we have two seperate versions for this function
@@ -256,12 +264,11 @@ function vertical_integration!(
         ::CPU,
         vars::Variables,
         geometry::Geometry,
+        ::SigmaCoordinates,
         time_stepping::AbstractTimeStepper,
     )
-    # TODO: σ_levels_thick is used here as the sigma-coordinate layer thickness Δσₖ for the
-    # Δσ-weighted vertical integrals (Simmons & Burridge 1981, eq. 3.12). Generalising to
-    # hybrid coordinates requires replacing Δσₖ with the actual pressure thickness divided
-    # by surface pressure, which varies in space and time.
+    # Δσₖ (σ_levels_thick) plays the role of all three layer weights above, see Simmons &
+    # Burridge 1981 eq. 3.12.
     (; σ_levels_thick, nlayers) = geometry
     (; dpres_dx, dpres_dy) = vars.dynamics      # zonal, meridional grad of log surface pressure
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
@@ -308,10 +315,11 @@ function vertical_integration!(
         ::GPU,
         vars::Variables,
         geometry::Geometry,
+        ::SigmaCoordinates,
         time_stepping::AbstractTimeStepper,
     )
 
-    # TODO: same as CPU version — Δσₖ weights baked into sigma-coordinate continuity equation.
+    # Δσₖ (σ_levels_thick) plays the role of all three layer weights, see the CPU method above.
     (; σ_levels_thick, nlayers) = geometry
     (; dpres_dx, dpres_dy) = vars.dynamics    # zonal, meridional grad of log surface pressure
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
@@ -407,6 +415,150 @@ end
     div_mean[lm] = div_sum
 end
 
+# HYBRID SIGMA-PRESSURE COORDINATES ------------------------------------------------------
+#
+# Same vertical integrals as above, but with the three layer weights (δₖ(pₛ), ΔBₖ, B_{k+½})
+# rather than the single Δσₖ. u_mean_grid, v_mean_grid are ΔBₖ-weighted; div_mean_grid and
+# div_sum_above are δₖ(pₛ)-weighted; pres_flux_sum_above = u_mean_grid·∇lnpₛ up to layer k-1
+# is therefore automatically ΔBₖ-weighted too. The spectral div_mean stays Δσₖ-weighted (the
+# weight δₖ varies in space and cannot be applied in spectral space); the difference
+# Σ_k (δₖ - Δσₖ) Dₖ = (p_ref/pₛ - 1) Σ_k ΔAₖ Dₖ is accumulated on the grid as
+# div_mean_correction and added to the surface pressure tendency in grid space
+# (surface_pressure_grid_tendency!). See docs/dev/2026-08/hybrid-sigma-pressure-coordinates-part-2.md.
+function vertical_integration!(
+        ::CPU,
+        vars::Variables,
+        geometry::Geometry,
+        coordinate::SigmaPressureCoordinates,
+        time_stepping::AbstractTimeStepper,
+    )
+    (; σ_levels_thick, nlayers) = geometry     # nominal Δσₖ, used only for the correction term
+    (; dpres_dx, dpres_dy, surface_pressure) = vars.dynamics
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
+    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
+    (; u_mean_grid, v_mean_grid, div_mean_grid, div_mean, div_mean_correction) = vars.dynamics
+    (; div_sum_above, pres_flux_sum_above) = vars.dynamics
+    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, LinearDynamicalCore())
+
+    fill!(u_mean_grid, 0)                   # reset accumulators from previous vertical average
+    fill!(v_mean_grid, 0)
+    fill!(div_mean_grid, 0)
+    fill!(div_mean_correction, 0)
+    fill!(div_mean, 0)
+
+    @inbounds for k in 1:nlayers    # integrate from top to bottom
+        Δσₖ = σ_levels_thick[k]
+        ΔBₖ = pressure_thickness_sensitivity(k, coordinate)
+
+        for ij in eachgridpoint(u_mean_grid, v_mean_grid, div_mean_grid)
+            pₛ = surface_pressure[ij]
+            δₖ = pressure_thickness_ratio(k, pₛ, coordinate)     # Δpₖ/pₛ, ΔAₖ*(p_ref/pₛ) + ΔBₖ
+
+            # sum from layers 1:k-1, before adding k-th layer (=0 for k=1, 0-initialised)
+            div_sum_above[ij, k] = div_mean_grid[ij]
+            pres_flux_sum_above[ij, k] = u_mean_grid[ij] * dpres_dx[ij] + v_mean_grid[ij] * dpres_dy[ij]
+
+            u_mean_grid[ij] += u[ij, k] * ΔBₖ
+            v_mean_grid[ij] += v[ij, k] * ΔBₖ
+            div_mean_grid[ij] += div_grid[ij, k] * δₖ
+
+            # Ĉ = Σ_k (δₖ - Δσₖ) Dₖ, the hybrid correction to the Δσ-weighted spectral div_mean
+            div_mean_correction[ij] += (δₖ - Δσₖ) * div_grid[ij, k]
+        end
+
+        # SPECTRAL SPACE: divergence, deliberately kept Δσₖ-weighted (see comment above)
+        for lm in eachindex(div_mean)
+            div_mean[lm] += div[lm, k] * Δσₖ
+        end
+    end
+    return nothing
+end
+
+function vertical_integration!(
+        ::GPU,
+        vars::Variables,
+        geometry::Geometry,
+        coordinate::SigmaPressureCoordinates,
+        time_stepping::AbstractTimeStepper,
+    )
+    (; σ_levels_thick, nlayers) = geometry
+    (; dpres_dx, dpres_dy, surface_pressure) = vars.dynamics
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
+    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
+    (; u_mean_grid, v_mean_grid, div_mean_grid, div_mean, div_mean_correction) = vars.dynamics
+    (; div_sum_above, pres_flux_sum_above) = vars.dynamics
+    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, LinearDynamicalCore())
+
+    fill!(u_mean_grid, 0)           # reset accumulators from previous vertical average
+    fill!(v_mean_grid, 0)
+    fill!(div_mean_grid, 0)
+    fill!(div_mean_correction, 0)
+    fill!(div_mean, 0)
+
+    arch = architecture(u_mean_grid)
+    launch!(
+        arch, RingGridWorkOrder, (size(u_mean_grid, 1),), _vertical_integration_hybrid_kernel!,
+        u_mean_grid, v_mean_grid, div_mean_grid, div_mean_correction, div_sum_above, pres_flux_sum_above,
+        u, v, div_grid, dpres_dx, dpres_dy, surface_pressure, σ_levels_thick, coordinate, nlayers
+    )
+
+    # SPECTRAL SPACE: divergence, deliberately kept Δσₖ-weighted (see comment above)
+    launch!(
+        arch, SpectralWorkOrder, (size(div_mean, 1),), _vertical_integration_spectral_kernel!,
+        div_mean, div, σ_levels_thick, nlayers
+    )
+
+    return nothing
+end
+
+@kernel inbounds = true function _vertical_integration_hybrid_kernel!(
+        u_mean_grid,            # Output: vertically averaged zonal velocity (ΔBₖ-weighted)
+        v_mean_grid,            # Output: vertically averaged meridional velocity (ΔBₖ-weighted)
+        div_mean_grid,          # Output: vertically averaged divergence (δₖ-weighted)
+        div_mean_correction,    # Output: Σ_k (δₖ - Δσₖ) Dₖ hybrid correction
+        div_sum_above,          # Output: sum of δₖ-weighted div from layers above
+        pres_flux_sum_above,    # Output: sum of ΔBₖ-weighted uv∇lnp from layers above
+        u_grid,                 # Input: zonal velocity
+        v_grid,                 # Input: meridional velocity
+        div_grid,               # Input: divergence
+        dpres_dx,               # Input: zonal gradient of log surface pressure
+        dpres_dy,               # Input: meridional gradient of log surface pressure
+        surface_pressure,       # Input: surface pressure [Pa] at the dycore time step
+        σ_levels_thick,         # Input: nominal Δσₖ (for the correction term only)
+        coordinate,             # Input: SigmaPressureCoordinates
+        nlayers,                # Input: number of layers
+    )
+    ij = @index(Global, Linear)  # global index: grid point ij
+
+    u_mean = zero(eltype(u_mean_grid))
+    v_mean = zero(eltype(v_mean_grid))
+    div_mean = zero(eltype(div_mean_grid))
+    div_correction = zero(eltype(div_mean_correction))
+
+    pₛ = surface_pressure[ij]
+
+    for k in 1:nlayers
+        Δσₖ = σ_levels_thick[k]
+        ΔBₖ = pressure_thickness_sensitivity(k, coordinate)
+        δₖ = pressure_thickness_ratio(k, pₛ, coordinate)
+
+        div_sum_above[ij, k] = div_mean
+        pres_flux_sum_above[ij, k] = u_mean * dpres_dx[ij] + v_mean * dpres_dy[ij]
+
+        u_mean += u_grid[ij, k] * ΔBₖ
+        v_mean += v_grid[ij, k] * ΔBₖ
+        div_mean += div_grid[ij, k] * δₖ
+        div_correction += (δₖ - Δσₖ) * div_grid[ij, k]
+    end
+
+    u_mean_grid[ij] = u_mean
+    v_mean_grid[ij] = v_mean
+    div_mean_grid[ij] = div_mean
+    div_mean_correction[ij] = div_correction
+end
+
 """$(TYPEDSIGNATURES)
 
 The tendency of the logarithm of surface pressure is computed as
@@ -427,7 +579,23 @@ function surface_pressure_grid_tendency!(vars::Variables, time_stepping::Abstrac
 end
 
 surface_pressure_grid_tendency!(vars::Variables, model::PrimitiveEquation) =
-    surface_pressure_grid_tendency!(vars, model.time_stepping)
+    surface_pressure_grid_tendency!(vars, model.time_stepping, model.geometry.vertical_coordinates)
+
+# sigma coordinates: no correction needed, div_mean (spectral) is already exactly Δσ-weighted
+surface_pressure_grid_tendency!(vars::Variables, time_stepping::AbstractTimeStepper, ::SigmaCoordinates) =
+    surface_pressure_grid_tendency!(vars, time_stepping)
+
+# hybrid: add the grid-space correction Ĉ = Σ_k (δ_k - Δσ_k) D_k (computed in
+# vertical_integration!) so that the final spectral pressure tendency (which subtracts the
+# Δσ-weighted div_mean, see surface_pressure_spectral_tendency!) ends up with the exact
+# δ_k-weighted mass divergence: ∂lnpₛ/∂t = -D̄_Δσ - ū·∇lnpₛ - Ĉ = -Σ_k c_k.
+function surface_pressure_grid_tendency!(vars::Variables, time_stepping::AbstractTimeStepper, ::SigmaPressureCoordinates)
+    surface_pressure_grid_tendency!(vars, time_stepping)
+    pres_tend_grid = get_tendency_step(vars.tendencies.grid.pressure, time_stepping, DynamicalCore())
+    (; div_mean_correction) = vars.dynamics
+    @. pres_tend_grid += div_mean_correction
+    return nothing
+end
 
 """$(TYPEDSIGNATURES)
 
@@ -460,9 +628,18 @@ function vertical_velocity!(
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
     )
-    # TODO: σ_levels_thick and σ_levels_half are used here to compute the sigma-coordinate
-    # vertical velocity σ̇ (Hoskins & Simmons 1975, eq. before 6). Generalising to hybrid
-    # coordinates requires a reformulation of the vertical velocity equation.
+    return vertical_velocity!(vars, geometry, geometry.vertical_coordinates, time_stepping)
+end
+
+function vertical_velocity!(
+        vars::Variables,
+        geometry::Geometry,
+        ::SigmaCoordinates,
+        time_stepping::AbstractTimeStepper,
+    )
+    # σ_levels_thick and σ_levels_half are the sigma-coordinate layer weights used to compute
+    # the sigma-coordinate vertical velocity σ̇ (Hoskins & Simmons 1975, eq. before 6). See
+    # the SigmaPressureCoordinates method below for the hybrid generalisation.
     (; σ_levels_thick, σ_levels_half, nlayers) = geometry
 
     # sum of Δσ-weighted div, uv∇lnp from 1:k-1
@@ -495,6 +672,70 @@ function vertical_velocity!(
     # set to zero for bottom layer then
     w.data[:, nlayers] .= 0
     return nothing
+end
+
+# HYBRID SIGMA-PRESSURE COORDINATES ------------------------------------------------------
+#
+# Generalises Hoskins & Simmons 1975 (just before eq. 6) with the layer weights of
+# vertical_integration!: w = M/pₛ at half level k+½ (k = 1 … nlayers-1) is
+#
+#   w[ij,k] = B_{k+½}(div_mean_grid + ūv̄∇lnp) - (div_sum_above + δ_k(pₛ)*D)
+#           - (pres_flux_sum_above + ΔB_k*pres_flux)
+#
+# with B_{k+½} = pressure_sensitivity_half(k+1, coordinate), δ_k(pₛ) = pressure_thickness_ratio,
+# ΔB_k = pressure_thickness_sensitivity. Reduces term by term to the sigma expression above
+# (B_{k+½} → σ_{k+½}, δ_k → Δσ_k, ΔB_k → Δσ_k).
+function vertical_velocity!(
+        vars::Variables,
+        geometry::Geometry,
+        coordinate::SigmaPressureCoordinates,
+        time_stepping::AbstractTimeStepper,
+    )
+    (; nlayers) = geometry
+    (; div_sum_above, pres_flux, pres_flux_sum_above) = vars.dynamics
+    (; div_mean_grid, surface_pressure) = vars.dynamics
+    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
+    (; w) = vars.dynamics
+
+    (; dpres_dx, dpres_dy, u_mean_grid, v_mean_grid) = vars.dynamics
+    ūv̄∇lnp = vars.scratch.grid.a_2D             # use scratch memory
+    @. ūv̄∇lnp = u_mean_grid * dpres_dx + v_mean_grid * dpres_dy
+
+    grids_match(w, div_sum_above, div_grid, pres_flux_sum_above, pres_flux) ||
+        throw(DimensionMismatch(w, div_sum_above, div_grid, pres_flux_sum_above, pres_flux))
+
+    arch = architecture(w)
+    launch!(
+        arch, RingGridWorkOrder, (size(w, 1), nlayers - 1), _vertical_velocity_hybrid_kernel!,
+        w, div_mean_grid, ūv̄∇lnp, div_sum_above, div_grid, pres_flux_sum_above, pres_flux,
+        surface_pressure, coordinate,
+    )
+
+    # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
+    w.data[:, nlayers] .= 0
+    return nothing
+end
+
+@kernel inbounds = true function _vertical_velocity_hybrid_kernel!(
+        w,                      # Output: vertical mass flux M/pₛ at k+1/2 (only k=1:nlayers-1 written)
+        div_mean_grid,          # Input: δ-weighted vertically averaged divergence
+        ūv̄∇lnp,                 # Input: u_mean_grid*dpres_dx + v_mean_grid*dpres_dy
+        div_sum_above,          # Input: sum of δ-weighted div from layers above
+        div_grid,               # Input: divergence
+        pres_flux_sum_above,    # Input: sum of ΔB-weighted pres_flux from layers above
+        pres_flux,              # Input: (u,v)⋅∇lnp
+        surface_pressure,       # Input: surface pressure [Pa] at the dycore time step
+        coordinate,             # Input: SigmaPressureCoordinates
+    )
+    ij, k = @index(Global, NTuple)
+    pₛ = surface_pressure[ij]
+    Bₖ₊½ = pressure_sensitivity_half(k + 1, coordinate)
+    δₖ = pressure_thickness_ratio(k, pₛ, coordinate)
+    ΔBₖ = pressure_thickness_sensitivity(k, coordinate)
+
+    w[ij, k] = Bₖ₊½ * (div_mean_grid[ij] + ūv̄∇lnp[ij]) -
+        (div_sum_above[ij, k] + δₖ * div_grid[ij, k]) -
+        (pres_flux_sum_above[ij, k] + ΔBₖ * pres_flux[ij, k])
 end
 
 """
@@ -703,7 +944,7 @@ Compute the gridded contribution to the temperature tendency:
 * adds the adiabatic + T'D terms to `temp_tend_grid` via `_temperature_tendency_kernel!`
 * writes `(uT_anomaly_grid, vT_anomaly_grid) = (u·T', v·T')` for the flux divergence."""
 function temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation)
-    (; adiabatic_conversion, atmosphere, implicit, time_stepping) = model
+    (; adiabatic_conversion, atmosphere, implicit, geometry, time_stepping) = model
     temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, DynamicalCore())
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
@@ -713,23 +954,52 @@ function temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation)
         get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) :
         fill!(vars.scratch.grid.a, 0)
 
-    (; pres_flux, pres_flux_sum_above, div_sum_above) = vars.dynamics
+    (; pres_flux, pres_flux_sum_above, div_sum_above, surface_pressure) = vars.dynamics
     (; temp_profile) = implicit
 
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    # Launch kernel to compute temperature tendency with adiabatic conversion
+    # Launch kernel to compute temperature tendency with adiabatic conversion; dispatches on
+    # the vertical coordinate so SigmaCoordinates keeps the cheap precomputed σ_lnp_A/σ_lnp_B
+    # kernel, while SigmaPressureCoordinates computes the coefficients per grid point (§8 of
+    # docs/dev/2026-08/hybrid-sigma-pressure-coordinates-part-2.md).
     arch = architecture(temp_tend_grid)
+    _temperature_tendency_launch!(
+        arch, geometry.vertical_coordinates, temp_tend_grid, temp, div_grid, humid,
+        div_sum_above, pres_flux_sum_above, pres_flux, temp_profile,
+        adiabatic_conversion, atmosphere, surface_pressure,
+    )
+
+    # write uT_anomaly_grid, vT_anomaly_grid (= u·T', v·T') for the flux divergence
+    flux_grid_divergence!(get_step(vars.dynamics.grid.uT_anomaly), get_step(vars.dynamics.grid.vT_anomaly), temp, vars, model)
+    return nothing
+end
+
+function _temperature_tendency_launch!(
+        arch, ::SigmaCoordinates, temp_tend_grid, temp, div_grid, humid,
+        div_sum_above, pres_flux_sum_above, pres_flux, temp_profile,
+        adiabatic_conversion, atmosphere, surface_pressure,
+    )
     launch!(
         arch, RingGridWorkOrder, size(temp_tend_grid), _temperature_tendency_kernel!,
         temp_tend_grid, temp, div_grid, humid, div_sum_above, pres_flux_sum_above,
         pres_flux, temp_profile, adiabatic_conversion.σ_lnp_A, adiabatic_conversion.σ_lnp_B, atmosphere
     )
+    return nothing
+end
 
-    # write uT_anomaly_grid, vT_anomaly_grid (= u·T', v·T') for the flux divergence
-    flux_grid_divergence!(get_step(vars.dynamics.grid.uT_anomaly), get_step(vars.dynamics.grid.vT_anomaly), temp, vars, model)
+function _temperature_tendency_launch!(
+        arch, coordinate::SigmaPressureCoordinates, temp_tend_grid, temp, div_grid, humid,
+        div_sum_above, pres_flux_sum_above, pres_flux, temp_profile,
+        adiabatic_conversion, atmosphere, surface_pressure,
+    )
+    launch!(
+        arch, RingGridWorkOrder, size(temp_tend_grid), _temperature_tendency_hybrid_kernel!,
+        temp_tend_grid, temp, div_grid, humid, div_sum_above, pres_flux_sum_above,
+        pres_flux, temp_profile, surface_pressure, coordinate, atmosphere
+    )
     return nothing
 end
 
@@ -787,6 +1057,65 @@ temperature_spectral_tendency!(vars::Variables, model::PrimitiveEquation) =
         σ_lnp_A_k * (div_sum_above[ij, k] + pres_flux_sum_above[ij, k]) +  # eq. 3.12 1st term
             σ_lnp_B_k * (div_grid[ij, k] + pres_flux[ij, k]) +             # eq. 3.12 2nd term
             pres_flux[ij, k]
+    )                                                        # eq. 3.13
+
+end
+
+# HYBRID SIGMA-PRESSURE COORDINATES ------------------------------------------------------
+#
+# Generalisation of the σ-coordinate kernel above: 𝒜_k, ℬ_k = -α_k and the (B_k pₛ/p_k)
+# factor are computed per grid point from actual pressures instead of being read from the
+# precomputed σ_lnp_A/σ_lnp_B (Simmons & Burridge 1981 eq. 3.12/3.13, generalised in
+# docs/dev/2026-08/hybrid-sigma-pressure-coordinates-part-2.md, "Adiabatic conversion").
+# Reduces term by term to the σ-coordinate expression above (δ_k → Δσ_k, ΔB_k/δ_k → 1,
+# B_k*pₛ/p_k → 1). Costs ~2 extra `log` per grid point per layer, hybrid path only.
+@kernel inbounds = true function _temperature_tendency_hybrid_kernel!(
+        temp_tend_grid,             # Input/Output: temperature tendency
+        temp_grid,                  # Input: temperature anomaly
+        div_grid,                   # Input: divergence
+        humid_grid,                 # Input: humidity
+        div_sum_above,              # Input: sum of δ-weighted div from layers above
+        pres_flux_sum_above,        # Input: sum of ΔB-weighted pres_flux from layers above
+        pres_flux,                  # Input: (u,v)⋅∇lnp term
+        temp_profile,               # Input: reference temperature profile
+        surface_pressure,           # Input: surface pressure [Pa] at the dycore time step
+        coordinate,                 # Input: SigmaPressureCoordinates
+        atmosphere,                 # Input: atmosphere for κ and μ_virt_temp
+    )
+
+    ij, k = @index(Global, NTuple)
+    Tₖ = temp_profile[k]    # average layer temperature from reference profile
+    pₛ = surface_pressure[ij]
+
+    p_above = pressure_above(k, pₛ, coordinate)              # p_{k-½}
+    p_below = pressure_below(k, pₛ, coordinate)              # p_{k+½}
+    p_k = pressure(k, pₛ, coordinate)
+    Δp_k = pressure_thickness(k, pₛ, coordinate)
+    δ_k = pressure_thickness_ratio(k, pₛ, coordinate)        # Δp_k/pₛ
+    ΔB_k = pressure_thickness_sensitivity(k, coordinate)     # ∂Δp_k/∂pₛ
+    B_k = pressure_sensitivity(k, coordinate)                # ∂p_k/∂pₛ
+
+    # guard on p_{k-½} > 0 (rather than k == 1) so a non-zero model top also works
+    if p_above > 0
+        log_ratio = log(p_below / p_above)
+        𝒜_k = -log_ratio / δ_k                # eq. 3.12, -1/δ_k*ln(p_k+1/2/p_k-1/2)
+        α_k = 1 - (p_above / Δp_k) * log_ratio
+    else
+        𝒜_k = zero(p_k)                       # sum above is empty at the model top
+        α_k = log(oftype(p_k, 2))             # eq. 3.19, p_{½} = 0
+    end
+    ℬ_k = -α_k                                # eq. 3.12 -αₖ
+
+    # Adiabatic conversion term following Simmons and Burridge 1981, hybrid sigma-pressure form
+    # += as tend already contains parameterizations + vertical advection
+    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ, humid_grid[ij, k], atmosphere)
+    (; κ) = atmosphere
+    temp_tend_grid[ij, k] +=
+        temp_grid[ij, k] * div_grid[ij, k] +                # +T'D term of hori advection
+        κ * Tᵥ * (                                          # +κTᵥ*Dlnp/Dt, adiabatic term
+        𝒜_k * (div_sum_above[ij, k] + pres_flux_sum_above[ij, k]) +           # eq. 3.12 1st term
+            ℬ_k * (div_grid[ij, k] + (ΔB_k / δ_k) * pres_flux[ij, k]) +       # eq. 3.12 2nd term
+            (B_k * pₛ / p_k) * pres_flux[ij, k]
     )                                                        # eq. 3.13
 
 end
