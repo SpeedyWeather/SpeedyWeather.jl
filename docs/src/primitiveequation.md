@@ -282,6 +282,24 @@ The surface pressure tendency can then be written as
 ```
 which is form used by SpeedyWeather.jl to calculate the tendency of (the logarithm of) surface pressure.
 
+!!! note "Hybrid sigma-pressure coordinates"
+    For [hybrid sigma-pressure coordinates](@ref hybrid_sigma_pressure_usage) the layer
+    mass ``\Delta p_k / p_s`` is no longer the constant ``\Delta \sigma_k`` but the
+    surface-pressure-dependent weight
+    ```math
+    \delta_k(p_s) = \frac{\Delta p_k}{p_s} = \Delta A_k \frac{p_{\mathrm{ref}}}{p_s} + \Delta B_k
+    ```
+    so the exact surface pressure tendency is ``\partial_t \ln p_s = -\sum_k \delta_k(p_s)
+    \mathcal{D}_k - \mathbf{\bar{u}} \cdot \nabla \ln p_s`` with ``\mathbf{\bar{u}}`` still
+    weighted by ``\Delta B_k`` (the part of the layer mass that does not depend on ``p_s``,
+    see [Vertical coordinates](@ref vertical_coordinates_page)). Because ``\delta_k`` varies
+    over the grid it cannot be applied to the spectral divergence directly; SpeedyWeather.jl
+    keeps the vertically-integrated *spectral* divergence ``\bar{\mathcal{D}}`` weighted by
+    the constant ``\Delta \sigma_k`` as below, and adds the grid-point correction
+    ``\hat{C} = \sum_k (\delta_k(p_s) - \Delta \sigma_k)\mathcal{D}_k = (p_{\mathrm{ref}}/p_s - 1)
+    \sum_k \Delta A_k \mathcal{D}_k`` separately. Since ``\Delta A_k \equiv 0`` for
+    `SigmaCoordinates`, ``\hat{C} \equiv 0`` there and every equation below is unchanged.
+
 As we will have ``\ln p_s`` available in spectral space at the beginning of a time step, the
 gradient can be easily computed (see [Derivatives in spherical coordinates](@ref)). However,
 we then need to transform both gradients to grid-point space for the scalar product with
@@ -333,9 +351,14 @@ In sigma coordinates, the vertical mass flux can be expressed as ``M = \dot{\sig
 !!! note "Sigma coordinate assumption"
     The advection equation below uses ``\Delta \sigma_k`` as the layer thickness and
     ``\dot{\sigma}`` as the vertical velocity. This is the pure sigma formulation. For
-    [hybrid sigma-pressure coordinates](@ref Hybrid-sigma-pressure-coordinates) the layer
-    thickness becomes ``\Delta p_k / p_s`` and the vertical velocity equation changes
-    accordingly.
+    [hybrid sigma-pressure coordinates](@ref hybrid_sigma_pressure_usage) the layer
+    thickness ``\Delta \sigma_k`` is replaced by ``\delta_k(p_s) = \Delta p_k / p_s``
+    (see the note in [Surface pressure tendency](@ref)) throughout the equations below,
+    while the mass flux ``M = w p_s`` (SpeedyWeather.jl calls the field `w`, kept for both
+    coordinate systems) and its equation in the next section generalise as described there.
+    This is exact: only the *value* of the layer-thickness weight changes between the two
+    coordinate systems, not the form of the advection operator, so `SigmaCoordinates` and
+    `SigmaPressureCoordinates` share the same vertical advection kernel.
 
 ```math
 \frac{\partial T_k}{\partial t} = -\nabla \cdot (\mathbf{u}_k T_k) - \frac{1}{\Delta \sigma_k} \left( \dot{\sigma}_{k+\frac{1}{2}} T_{k+\frac{1}{2}} - \dot{\sigma}_{k-\frac{1}{2}} T_{k-\frac{1}{2}} \right)
@@ -419,6 +442,21 @@ equation above, then we can also write
 See also Hoskins and Simmons, 1975[^HS75]. These vertical averages are the same as required by the
 [Surface pressure tendency](@ref) and in the [Temperature equation](@ref), they are therefore all calculated
 at once, storing the partial averages ``\overline{\mathbf{u}_k \cdot \nabla \ln p_s}`` and ``\bar{\mathcal{D}}_k`` on the fly.
+
+!!! note "Hybrid sigma-pressure coordinates"
+    For hybrid sigma-pressure coordinates ``M/p_s`` is no longer ``\dot{\sigma}`` in the strict
+    sense (``p`` is not proportional to ``p_s``), but SpeedyWeather.jl still calls the field
+    `w` and computes, for ``k = 1, \dots, N-1`` (``w_N = 0``),
+    ```math
+    w_{k+\tfrac{1}{2}} = B_{k+\tfrac{1}{2}}\left(\bar{\mathcal{D}} + \mathbf{\bar{u}} \cdot \nabla \ln p_s\right)
+    - \left(\bar{\mathcal{D}}_k + \delta_k(p_s)\mathcal{D}_k\right)
+    - \left(\overline{\mathbf{u}_k \cdot \nabla \ln p_s} + \Delta B_k\, \mathbf{u}_k \cdot \nabla \ln p_s\right)
+    ```
+    with ``B_{k+\tfrac{1}{2}} = \partial p_{k+\tfrac{1}{2}}/\partial p_s`` the interface
+    pressure sensitivity and ``\delta_k(p_s)``, ``\Delta B_k`` as in [Surface pressure
+    tendency](@ref). This reduces term by term to the equation above for `SigmaCoordinates`
+    (``B_{k+\tfrac{1}{2}} \to \sigma_{k+\tfrac{1}{2}}``, ``\delta_k, \Delta B_k \to
+    \Delta \sigma_k``).
 
 ## Pressure gradient
 
@@ -634,6 +672,24 @@ The ``\alpha_k, \beta_k`` are constants and can be precomputed. The surface pres
 ``\mathbf{u}_k \cdot \nabla \ln p_s`` has to be computed, so does the vertical sigma-weighted
 average from top to ``k-1``, which is done when computing other vertical averages for the
 [Surface pressure tendency](@ref).
+
+!!! note "Hybrid sigma-pressure coordinates"
+    For hybrid sigma-pressure coordinates ``\alpha_k, \beta_k`` are no longer constants:
+    they depend on the actual pressures ``p_{k\pm\tfrac{1}{2}}(p_s)`` and are evaluated per
+    grid point. Writing ``\mathcal{A}_k(p_s) = -\beta_k(p_s) = -\tfrac{1}{\delta_k(p_s)}
+    \ln(p_{k+\tfrac{1}{2}}/p_{k-\tfrac{1}{2}})`` (``\mathcal{A}_1 = 0``, since ``p_{\tfrac{1}{2}}
+    = 0``) and ``\mathcal{B}_k(p_s) = -\alpha_k(p_s)``, with ``\delta_k(p_s)`` as in
+    [Surface pressure tendency](@ref), the adiabatic conversion term generalises to
+    ```math
+    \left(\frac{D \ln p}{D t}\right)_k = \mathcal{A}_k \sum_{r=1}^{k-1}\delta_r(p_s)\,A_r
+    + \mathcal{B}_k \left(\mathcal{D}_k + \frac{\Delta B_k}{\delta_k(p_s)} \mathbf{u}_k \cdot
+    \nabla \ln p_s\right) + \frac{B_k p_s}{p_k} \mathbf{u}_k \cdot \nabla \ln p_s
+    ```
+    which reduces term by term to the sigma-coordinate expression above
+    (``\delta_k \to \Delta \sigma_k``, ``\Delta B_k/\delta_k \to 1``, ``B_k p_s/p_k \to 1``).
+    Since ``\mathcal{A}_k, \mathcal{B}_k`` now depend on ``p_s`` they must be evaluated per
+    grid point (costing an extra `log`/`exp` there) rather than precomputed once, on the
+    hybrid path only.
 
 ### Semi-implicit temperature equation
 

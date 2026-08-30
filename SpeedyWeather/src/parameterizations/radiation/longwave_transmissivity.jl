@@ -19,7 +19,7 @@ initialize!(::ConstantLongwaveTransmissivity, ::AbstractModel) = nothing
     pₛ = vars.parameterizations.surface_pressure[ij]
 
     for k in 1:nlayers
-        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        Δσₖ = pressure_thickness_ratio(k, pₛ, coord)
         t[ij, k] = exp(-τ * Δσₖ)            # transmissivity through layer k
     end
     return t
@@ -67,7 +67,7 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     # is merged/released and `sind` is supported on AMD GPUs.k
     τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sin(deg2rad(θ))^2
     for k in 1:nlayers              # loop over half levels below
-        σₖ = pressure_below(k, pₛ, coord) / pₛ
+        σₖ = pressure_ratio_half(k + 1, pₛ, coord)
         τ_below = τ₀ * (fₗ * σₖ + (1 - fₗ) * σₖ^4)
         t[ij, k] = exp(-(τ_below - τ_above))
         τ_above = τ_below

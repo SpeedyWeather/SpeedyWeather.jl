@@ -113,9 +113,12 @@ end
     @test S isa SigmaPressureCoordinates
     @test SpeedyWeather.get_nlayers(S) == 4
 
-    # get_σ_full and get_σ_thickness return the sigma-terrain-following (B) components
-    @test SpeedyWeather.get_σ_full(S) ≈ Array(S.B_full)
-    @test SpeedyWeather.get_σ_thickness(S) ≈ Array(S.B_thickness)
+    # get_σ_full and get_σ_thickness return the nominal sigma (A + B), pₛ-independent —
+    # NOT the B (sigma-terrain-following) coefficients alone, which is ∂p/∂pₛ. Prior to the
+    # fix, get_σ_* returned B alone, which is NaN/Inf-producing for hybrid coordinates near
+    # the model top where B → 0 (see docs/dev/2026-08/hybrid-sigma-pressure-coordinates-part-2.md).
+    @test SpeedyWeather.get_σ_full(S) ≈ Array(S.A_full .+ S.B_full)
+    @test SpeedyWeather.get_σ_thickness(S) ≈ Array(S.A_thickness .+ S.B_thickness)
 
     # with pure sigma (transition=1), get_σ_full and get_σ_thickness match SigmaCoordinates
     S_sigma = SigmaPressureCoordinates(spectral_grid; transition = _ -> 1.0)
@@ -379,4 +382,88 @@ end
             end
         end
     end
+end
+
+@testset "pressure_thickness_ratio, pressure_sensitivity accessor identities" begin
+    # Testing and verification item 1 of docs/dev/2026-08/hybrid-sigma-pressure-coordinates-part-2.md:
+    # for SigmaCoordinates and for the pure-sigma/pure-pressure limits of
+    # SigmaPressureCoordinates, the hybrid accessors must reduce exactly to the sigma
+    # expressions (or their pure-pressure counterparts), for arbitrary surface pressure.
+    nlayers = 6
+    spectral_grid = SpectralGrid(nlayers = nlayers)
+    σ_half = SpeedyWeather.sigma_half_spacing(nlayers)
+    σ = SigmaCoordinates(spectral_grid, σ_half)
+    Δσ = Array(σ.σ_thickness)
+    σ_full = Array(σ.σ_full)
+    surface_pressures = (0.7e5, 1.0e5, 1.3e5)
+
+    for pₛ in surface_pressures, k in 1:nlayers
+        @test SpeedyWeather.pressure_thickness_ratio(k, pₛ, σ) ≈ Δσ[k]
+        @test SpeedyWeather.pressure_sensitivity(k, σ) ≈ σ_full[k]
+        @test SpeedyWeather.pressure_thickness_sensitivity(k, σ) ≈ Δσ[k]
+    end
+
+    # pure sigma limit (transition ≡ 1): hybrid coordinate reduces exactly to the sigma
+    # expressions, independent of surface pressure
+    S_sigma = SigmaPressureCoordinates(spectral_grid, σ_half; transition = _ -> 1.0)
+    for pₛ in surface_pressures, k in 1:nlayers
+        @test SpeedyWeather.pressure_thickness_ratio(k, pₛ, S_sigma) ≈ Δσ[k]
+        @test SpeedyWeather.pressure_sensitivity(k, S_sigma) ≈ σ_full[k]
+        @test SpeedyWeather.pressure_thickness_sensitivity(k, S_sigma) ≈ Δσ[k]
+    end
+
+    # pure pressure limit (transition ≡ 0): δ_k = Δσ_k * p_ref/pₛ, sensitivities ≈ 0
+    S_pres = SigmaPressureCoordinates(spectral_grid, σ_half; transition = _ -> 0.0)
+    p_ref = S_pres.reference_pressure
+    for pₛ in surface_pressures, k in 1:nlayers
+        @test SpeedyWeather.pressure_thickness_ratio(k, pₛ, S_pres) ≈ Δσ[k] * (p_ref / pₛ)
+        @test SpeedyWeather.pressure_sensitivity(k, S_pres) ≈ 0 atol = 1.0e-6
+        @test SpeedyWeather.pressure_thickness_sensitivity(k, S_pres) ≈ 0 atol = 1.0e-6
+    end
+end
+
+@testset "Nominal sigma regression (the NaN bug)" begin
+    # Testing and verification item 2: get_σ_full/half/thickness of a
+    # CubicSigmaPressureCoordinates must equal the SigmaCoordinates values for the same
+    # σ_half (the fix), and the model components that consume σ_levels_* (geopotential,
+    # adiabatic conversion) must come out finite after initialize! — this is the regression
+    # test for the NaN bug documented in
+    # docs/dev/2026-08/hybrid-sigma-pressure-coordinates-part-2.md.
+    spectral_grid = SpectralGrid(nlayers = 8)
+    σ_half = SpeedyWeather.sigma_half_spacing(8)
+    σ = SigmaCoordinates(spectral_grid, σ_half)
+    H = CubicSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8)
+
+    @test SpeedyWeather.get_σ_half(H) ≈ Array(SpeedyWeather.get_σ_half(σ))
+    @test SpeedyWeather.get_σ_full(H) ≈ Array(SpeedyWeather.get_σ_full(σ))
+    @test SpeedyWeather.get_σ_thickness(H) ≈ Array(SpeedyWeather.get_σ_thickness(σ))
+
+    model = PrimitiveDryModel(spectral_grid; geometry = Geometry(spectral_grid; vertical_coordinates = H))
+    initialize!(model)
+    @test all(isfinite, Array(model.geopotential.Δp_geopot_full))
+    @test all(isfinite, Array(model.geopotential.Δp_geopot_half))
+    @test all(isfinite, Array(model.adiabatic_conversion.σ_lnp_A))
+    @test all(isfinite, Array(model.adiabatic_conversion.σ_lnp_B))
+end
+
+@testset "Mass-consistency weight sums" begin
+    # Testing and verification item 3: the three normalised layer weights all sum to a
+    # pₛ-independent constant (mass conservation of the coordinate definition itself),
+    # for both SigmaCoordinates and SigmaPressureCoordinates (any transition).
+    nlayers = 8
+    spectral_grid = SpectralGrid(nlayers = nlayers)
+    σ_half = SpeedyWeather.sigma_half_spacing(nlayers)
+    σ = SigmaCoordinates(spectral_grid, σ_half)
+    H = CubicSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8)
+
+    for coord in (σ, H)
+        for pₛ in (0.7e5, 1.0e5, 1.3e5)
+            @test sum(SpeedyWeather.pressure_thickness_ratio(k, pₛ, coord) for k in 1:nlayers) ≈ 1
+        end
+        @test sum(SpeedyWeather.pressure_thickness_sensitivity(k, coord) for k in 1:nlayers) ≈ 1
+    end
+
+    # Σ_k ΔA_k = 0 (only meaningful/non-trivial for the hybrid coordinate; ΔA ≡ 0 for
+    # SigmaCoordinates so this is trivially true there too)
+    @test sum(Array(H.A_thickness)) ≈ 0 atol = 1.0e-5
 end

@@ -49,23 +49,27 @@ function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquatio
     (; nlayers) = model.geometry
     nlayers == 1 && return nothing     # no diffusion for 1-layer model
 
-    # ∇² operator on σ levels like 1/Δσ² but for variable Δσ
+    # ∇² operator on nominal σ levels like 1/Δσ² but for variable Δσ
     # also includes a 1/2 so that the diffusion coefficients on full levels can be added
     # which is equivalent to interpolating them on half levels for a ∂σ (K ∂σ) formulation
-    # with σ-dependent diffusion coefficient K
-    # TODO: vertical diffusion coefficients are computed in sigma-coordinate space using
-    # σ[k] - σ[k±1] and σ_half spacings. Generalising to hybrid coordinates would require
-    # reformulating the ∂σ(K ∂σ) operator in terms of pressure.
-    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
-    σ_half = on_architecture(CPU(), model.geometry.σ_levels_half)
+    # with σ-dependent diffusion coefficient K.
+    # This stays a nominal-σ discretisation for hybrid coordinates too (going through
+    # `sigma`/`sigma_half` rather than reading `σ_levels_*` directly is coordinate-agnostic
+    # in the sense that the *nominal* σ is well-defined for any coordinate, see
+    # docs/dev/2026-08/hybrid-sigma-pressure-coordinates-part-2.md). A fully pressure-based
+    # ∂p(K ∂p) operator would need pₛ-dependent coefficients that vary with the grid-point
+    # surface pressure and could therefore not be precomputed once here at initialize! time.
+    coordinate = adapt(Array, model.geometry.vertical_coordinates)   # host copy for the scalar loop below
     ∇²_above = on_architecture(CPU(), diffusion.∇²_above)
     ∇²_below = on_architecture(CPU(), diffusion.∇²_below)
 
     for k in 1:nlayers
-        σ₋ = k <= 1 ? -Inf : σ[k - 1]   # sets the gradient across surface and top to 0
-        σ₊ = k >= nlayers ? Inf : σ[k + 1]   # = no flux boundary conditions
-        ∇²_above[k] = inv(2 * (σ[k] - σ₋) * (σ_half[k + 1] - σ_half[k]))
-        ∇²_below[k] = inv(2 * (σ₊ - σ[k]) * (σ_half[k + 1] - σ_half[k]))
+        σ₋ = k <= 1 ? -Inf : sigma(k - 1, coordinate)   # sets the gradient across surface and top to 0
+        σ₊ = k >= nlayers ? Inf : sigma(k + 1, coordinate)   # = no flux boundary conditions
+        σ_k = sigma(k, coordinate)
+        Δσ_k = sigma_half(k + 1, coordinate) - sigma_half(k, coordinate)
+        ∇²_above[k] = inv(2 * (σ_k - σ₋) * Δσ_k)
+        ∇²_below[k] = inv(2 * (σ₊ - σ_k) * Δσ_k)
     end
 
     arch = model.architecture
@@ -155,6 +159,10 @@ end
     T₀ = atmosphere.reference_temperature
     gravity = planet.gravity
     Δp_geopot_full = geopot.Δp_geopot_full
+    # Δp_geopot_full is precomputed from the nominal σ levels once at initialize! time (see
+    # Geopotential); for `SigmaPressureCoordinates` that is equivalent to evaluating it at
+    # pₛ = reference_pressure rather than the actual local surface pressure, so this height
+    # estimate is only approximate for hybrid coordinates away from p_ref.
     Z = T₀ * Δp_geopot_full[nlayers] / gravity
     logZ_z₀ = log(Z / z₀)
 
