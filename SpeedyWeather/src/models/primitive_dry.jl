@@ -175,6 +175,7 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         DynamicsVariable(:u_mean_grid, Grid2D(), desc = "Vertically integrated zonal velocity", units = "m/s"),
         DynamicsVariable(:v_mean_grid, Grid2D(), desc = "Vertically integrated meridional velocity", units = "m/s"),
         DynamicsVariable(:div_mean_grid, Grid2D(), desc = "Vertically integrated divergence", units = "1/s"),
+        DynamicsVariable(:surface_pressure, Grid2D(), desc = "Surface pressure at the dynamical core time step", units = "Pa"),
         DynamicsVariable(:div_mean, Spectral2D(), desc = "Vertically integrated divergence", units = "1/s"),
         DynamicsVariable(:div_sum_above, GridXYZ(), desc = "Partially vertically integrated divergence, top to layer above", units = "1/s"),
         DynamicsVariable(:pres_flux_sum_above, GridXYZ(), desc = "Partially vertically integrated pressure gradient flux, top to layer above"),

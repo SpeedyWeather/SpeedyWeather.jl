@@ -129,6 +129,9 @@ function dynamics_tendencies!(
     # calculate ∇ln(pₛ), then (u_k, v_k)⋅∇ln(p_s)
     pressure_gradient_flux!(vars, spectral_transform, time_stepping)
 
+    # grid-space pₛ at the dynamical core time step (no-op for SigmaCoordinates)
+    surface_pressure_grid!(vars, model)
+
     # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
     linear_virtual_temperature!(vars, model)
 
@@ -209,6 +212,27 @@ function pressure_gradient_flux!(
     # PRESSURE GRADIENT FLUX
     uv∇lnp .= u .* dpres_dx .+ v .* dpres_dy
 
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Compute the grid-space surface pressure `vars.dynamics.surface_pressure` at the dynamical
+core's time step. This exists because `vars.parameterizations.surface_pressure` is filled
+at Leapfrog step 1 (the previous time step, see `which_prognostic_step`), whereas the
+dynamical core reads the prognostic variables at step 2 (the current time step). Hybrid
+sigma-pressure coordinates need pₛ in grid space (not just its logarithm) to evaluate layer
+pressures via `pressure`/`pressure_half`/`pressure_thickness_ratio`; `SigmaCoordinates`
+never need pₛ explicitly (everything is expressed as a fraction of it), so this is a no-op
+on that path and costs nothing."""
+surface_pressure_grid!(vars::Variables, model::PrimitiveEquation) =
+    surface_pressure_grid!(vars, model.geometry.vertical_coordinates, model.time_stepping)
+
+# sigma coordinates never need pₛ in grid space in the dynamical core
+surface_pressure_grid!(::Variables, ::SigmaCoordinates, ::AbstractTimeStepper) = nothing
+
+function surface_pressure_grid!(vars::Variables, ::SigmaPressureCoordinates, time_stepping::AbstractTimeStepper)
+    log_pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, DynamicalCore())
+    vars.dynamics.surface_pressure .= exp.(log_pₛ)
     return nothing
 end
 

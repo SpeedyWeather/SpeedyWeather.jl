@@ -85,13 +85,19 @@ $(TYPEDFIELDS)
     vertical_coordinates::VC
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
-    "σ at half levels, σ_k+1/2"
+    "Nominal σ = A + B at half levels, σ_k+1/2, independent of surface pressure. Only the
+    mass weight of a layer interface for `SigmaCoordinates`; for hybrid sigma-pressure
+    coordinates use `pressure_sensitivity_half`/`pressure_thickness_ratio` instead."
     σ_levels_half::VectorType
 
-    "σ at full levels, σₖ"
+    "Nominal σ = A + B at full levels, σₖ, independent of surface pressure. Only the
+    mass weight of a layer for `SigmaCoordinates`; for hybrid sigma-pressure coordinates
+    use `pressure_thickness_ratio` instead."
     σ_levels_full::VectorType = (σ_levels_half[2:end] + σ_levels_half[1:(end - 1)]) / 2
 
-    "σ level thicknesses, σₖ₊₁ - σₖ"
+    "Nominal σ level thicknesses, σₖ₊₁ - σₖ, independent of surface pressure. Only the
+    mass weight of a layer for `SigmaCoordinates`; for hybrid sigma-pressure coordinates
+    use `pressure_thickness_ratio` instead."
     σ_levels_thick::VectorType = σ_levels_half[2:end] - σ_levels_half[1:(end - 1)]
 end
 
@@ -143,8 +149,59 @@ function initialize!(geometry::Geometry, model::AbstractModel)
     return geometry
 end
 
+"""$(TYPEDSIGNATURES)
+Pressure [Pa] at full level `k` given `surface_pressure` [Pa], forwarding to `geometry.vertical_coordinates`."""
 @inline pressure(k::Integer, surface_pressure::Number, geometry::Geometry) =
-    pressure(k, surface_pressure, geometry.vertical_coordinate)
+    pressure(k, surface_pressure, geometry.vertical_coordinates)
 
+"""$(TYPEDSIGNATURES)
+Pressure thickness [Pa] of full level `k` given `surface_pressure` [Pa], forwarding to `geometry.vertical_coordinates`."""
 @inline pressure_thickness(k::Integer, surface_pressure::Number, geometry::Geometry) =
-    pressure_thickness(k, surface_pressure, geometry.vertical_coordinate)
+    pressure_thickness(k, surface_pressure, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Pressure [Pa] at half level `k` given `surface_pressure` [Pa], forwarding to `geometry.vertical_coordinates`."""
+@inline pressure_half(k::Integer, surface_pressure::Number, geometry::Geometry) =
+    pressure_half(k, surface_pressure, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Pressure [Pa] at the upper interface of full level `k`, forwarding to `geometry.vertical_coordinates`."""
+@inline pressure_above(k::Integer, surface_pressure::Number, geometry::Geometry) =
+    pressure_above(k, surface_pressure, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Pressure [Pa] at the lower interface of full level `k`, forwarding to `geometry.vertical_coordinates`."""
+@inline pressure_below(k::Integer, surface_pressure::Number, geometry::Geometry) =
+    pressure_below(k, surface_pressure, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Sigma coordinate (fraction of surface pressure) at full level `k`, forwarding to `geometry.vertical_coordinates`."""
+@inline sigma(k::Integer, geometry::Geometry) = sigma(k, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Nominal sigma coordinate (fraction of surface pressure, pₛ-independent) at half level `k`,
+forwarding to `geometry.vertical_coordinates`."""
+@inline sigma_half(k::Integer, geometry::Geometry) = sigma_half(k, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Pressure thickness of full level `k`, divided by `surface_pressure` [Pa], forwarding to
+`geometry.vertical_coordinates`."""
+@inline pressure_thickness_ratio(k::Integer, surface_pressure::Number, geometry::Geometry) =
+    pressure_thickness_ratio(k, surface_pressure, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Sensitivity of the pressure at full level `k` to `surface_pressure`, ∂p_k/∂pₛ, forwarding to
+`geometry.vertical_coordinates`."""
+@inline pressure_sensitivity(k::Integer, geometry::Geometry) = pressure_sensitivity(k, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Sensitivity of the pressure at half level `k` to `surface_pressure`, ∂p_{k-½}/∂pₛ, forwarding
+to `geometry.vertical_coordinates`."""
+@inline pressure_sensitivity_half(k::Integer, geometry::Geometry) =
+    pressure_sensitivity_half(k, geometry.vertical_coordinates)
+
+"""$(TYPEDSIGNATURES)
+Sensitivity of the pressure thickness of full level `k` to `surface_pressure`, ∂Δp_k/∂pₛ,
+forwarding to `geometry.vertical_coordinates`."""
+@inline pressure_thickness_sensitivity(k::Integer, geometry::Geometry) =
+    pressure_thickness_sensitivity(k, geometry.vertical_coordinates)
