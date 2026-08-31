@@ -352,7 +352,7 @@ L = rand(Float32, spectrum)
 L = rand(ComplexF32, spectrum, 5)
 ```
 
-In SpeedyWeather.jl's model, the `Spectrum` is stored just once in the [SpectralGrid](@ref) type,
+In SpeedyWeather.jl's model, the `Spectrum` is stored just once in the [`SpectralGrid`](@ref) type,
 and all `LowerTriangularArray`s are created with the same `Spectrum`.
 Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s
 with the same spectral discretization as follows:
