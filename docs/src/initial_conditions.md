@@ -9,11 +9,13 @@ are three ways to do this
 3. Set the `initial_conditions` component of a model
 
 where 1 is a rather low-level and largely requires you to directly set the
-complex coefficients of the spherical harmonics (advanced!).
+complex coefficients of the [spherical harmonics](@ref "Spherical harmonics") (advanced!).
 So the `set!` function builds a convenient interface around 1 such that you
-don't have to know about details of grid or spectral space.
+don't have to know about details of grid or spectral space (see also
+[Setting variables](@ref) for more on `set!`).
 3 then collects method 1 or 2 (or a combination of both) into a single struct
-to "save" some initial conditions for one or several variables.
+to "save" some initial conditions for one or several variables, similar to the
+`initial_conditions` model component described in [Creating model components](@ref create_model_components).
 This lets you use predefined (inside SpeedyWeather or externally) initial conditions
 as easy as `initial_conditions = RossbyHaurwitzWave()`.
 Let us illustrate this with some examples where we will refer back those
@@ -40,7 +42,7 @@ current state of the prognostic variables:
 
 The Rossby-Haurwitz wave [Williamson1992](@citep) is defined as an initial condition for
 vorticity ``\zeta`` (which is the sole prognostic variable in the
-barotropic vorticity model) as
+[barotropic vorticity model](@ref barotropic_vorticity_model)) as
 
 ```math
 ζ(λ, θ) = 2ω \sin(θ) - K \sin(θ) \cos(θ)^m (m^2 + 3m + 2) \cos(m λ)
@@ -61,12 +63,12 @@ set!(simulation, vorticity=ζ, step=1)
 with only two difference from the mathematical notation. (1) SpeedyWeather's
 coordinates are in degrees, so we replaced ``\sin, \cos`` with `sind` and `cosd`;
 and (2) To generalise to vertical coordinates, the function `ζ(λ, θ, σ)` takes
-*exactly* three arguments, with `σ` denoting the vertical [Sigma coordinates](@ref).
+*exactly* three arguments, with `σ` denoting the vertical [Sigma coordinates](@ref sigma_coordinates_physics).
 This is important so that we can use the same definition of initial conditions
 for the 2D barotropic vorticity model also for the 3D primitive equations.
 Furthermore we explicitly set here step 1, as, depending on the time stepper,
 prognostic variables may have more than 1 step, see [Step dimension](@ref)
-for more details. Leapfrog for example has 2 steps but it's important to set
+for more details. [Leapfrog](@ref leapfrog) for example has 2 steps but it's important to set
 the initial conditions for step 1 here, not step 2.
 
 One may filter out low values of spectral vorticity with some cut-off amplitude
@@ -151,9 +153,9 @@ Rossby-Haurwitz wave, this value can be found in `model.planet.radius`
 and ``Ω`` and ``g`` are the rotation and the gravity constant of the planet,
 which are in `model.planet.rotation` and `model.planet.gravity`.
 
-The interface displacement ``\eta`` in SpeedyWeather's `ShallowWaterModel`
+The interface displacement ``\eta`` in SpeedyWeather's [`ShallowWaterModel`](@ref)
 is stored in the variable `pres` in analogy to the actual pressure in
-the `PrimitiveEquation` model. So we can set ``\eta`` using
+the [primitive equation](@ref primitive_equation_model) model. So we can set ``\eta`` using
 `set!(simulation, pres=η)` for an appropriate implementation of the above
 equations, similar to how `ζ(λ, θ, σ) =` is defined above.
 However, we also already defined `RossbyHaurwitzWave` to do
@@ -185,7 +187,7 @@ poles and the vorticity patches develop an internal structure.
 ## Rossby-Haurwitz wave in primitive equations
 
 You can use `set!` or the predefined `RossbyHaurwitzWave` also in other
-models. For the `BarotropicModel` or the `PrimitiveDryModel` (or `Wet`)
+models. For the [`BarotropicModel`](@ref) or the [`PrimitiveDryModel`](@ref) (or `Wet`)
 the definition for ``\eta`` is skipped. The barotropic model does not have
 a pressure variable, the primitive equation model uses the logarithm of surface
 pressure, which is incompatible with ``\eta`` being defined as an interface displacement.

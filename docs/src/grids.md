@@ -16,7 +16,9 @@ factor. More in [SpectralGrid](@ref) and [Matching spectral and grid resolution]
 !!! info "RingGrids is a module too!"
     While RingGrids is the underlying module that SpeedyWeather.jl uses for data structs
     on the sphere, the module can also be used independently of SpeedyWeather, for example
-    to interpolate between data on different grids. See [RingGrids](@ref)
+    to interpolate between data on different grids. See [RingGrids](@ref) for how to
+    create grids and fields in practice (this page instead gives the mathematical
+    background of the grids themselves).
 
 #### Ring-based equi-longitude grids
 
@@ -46,7 +48,7 @@ as the first point is not at 0˚E.
 
 ## Implemented grids
 
-All grids in SpeedyWeather.jl are a subtype of `AbstractGrid`, i.e. `<: AbstractGrid`. We further distinguish
+All grids in SpeedyWeather.jl are a subtype of `AbstractGrid`, i.e. `<: AbstractGrid` (see [Grid versus Field](@ref) for the distinction between a grid and data on a grid). We further distinguish
 between _full_, and _reduced_ grids. Full grids have the same number of longitude points on every latitude
 ring (i.e. points converge towards the poles) and reduced grids reduce the number of points towards the poles
 to have them more evenly spread out across the globe. More evenly does not necessarily mean that a grid is
@@ -102,7 +104,7 @@ Related: [Effective grid resolution](@ref) and [Available horizontal resolutions
 A given spectral resolution can be matched to a variety of grid resolutions. A _cubic_ grid, for example,
 combines a spectral truncation ``T`` (1-based) with a grid resolution ``N`` (=`nlat_half`) such that ``T = N``.
 Using T32 and an O32 is therefore often abbreviated as Tco32 (or Tco31 with 0-based truncation)
-meaning that the spherical harmonics are truncated at ``l_{max}=32`` in combination with `N=32`,
+meaning that the [spherical harmonics](@ref "Spherical harmonics") are truncated at ``l_{max}=32`` in combination with `N=32`,
 i.e. 64 latitude rings in total on an octahedral Gaussian grid.
 In SpeedyWeather.jl the choice of the order of truncation is controlled with the
 `dealiasing` parameter in the [SpectralGrid](@ref) construction.

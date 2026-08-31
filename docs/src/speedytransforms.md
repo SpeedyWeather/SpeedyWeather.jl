@@ -234,7 +234,7 @@ We have created `m` from some random data here in spectral space, truncated it a
 and applied `Matrix` to drop the grid information. You can ignore these steps
 and simply assume you have some data in some matrix.
 You hopefully know which grid this data comes on, let us assume it is a regular
-latitude-longitude grid, which we call the `FullClenshawGrid` (in analogy to the Gaussian grid based
+latitude-longitude grid, which we call the [`FullClenshawGrid`](@ref FullClenshawGrid) (in analogy to the Gaussian grid based
 on the Gaussian quadrature). Note that for the spectral transform this should not include the poles,
 so the 96x47 matrix size here corresponds to 23 latitudes north and south of the Equator respectively
 plus the equator (=47).

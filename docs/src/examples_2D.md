@@ -25,14 +25,14 @@ We want to use the barotropic model to simulate some free-decaying 2D turbulence
 on the sphere without rotation. We start by defining the `SpectralGrid` object.
 To have a resolution of about 200km, we choose a spectral resolution of
 T63 (see [Available horizontal resolutions](@ref)) and `nlayers=1` vertical levels.
-The `SpectralGrid` object will provide us with some more information
+The [`SpectralGrid`](@ref) object will provide us with some more information
 ```@example barotropic_setup
 using SpeedyWeather
 spectral_grid = SpectralGrid(truncation=64, nlayers=1)
 ```
 Next step we create a planet that's like Earth but not rotating. As a convention,
 we always pass on the spectral grid object as the first argument to every other
-model component we create.
+model component we create (see [Creating model components](@ref create_model_components)).
 ```@example barotropic_setup
 still_earth = Earth(spectral_grid, rotation=0)
 ```
@@ -52,7 +52,7 @@ forcing = nothing
 drag = nothing
 ```
 
-Now we want to construct a `BarotropicModel` with these simply by passing
+Now we want to construct a [`BarotropicModel`](@ref) with these simply by passing
 them as keyword arguments either with `key=argument` or just `; key` which matches
 the argument name with the keyword
 ```@example barotropic_setup

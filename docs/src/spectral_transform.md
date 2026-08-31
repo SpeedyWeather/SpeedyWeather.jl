@@ -219,6 +219,7 @@ always try to choose an easily Fourier-transformable size of the grid
 [FrigoJohnson2005](@citep) also provides efficient algorithms for a broad range of sizes.
 This has traditionally led to typical resolutions that
 we also use for testing we therefore recommend to use.
+See also [Notation: Spectral resolution](@ref) for how this resolution is denoted in practice.
 They are as follows with more details below
 
 !!! warning "Why is `truncation` 1-based?"
