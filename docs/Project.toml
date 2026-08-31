@@ -26,7 +26,7 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 [compat]
 CairoMakie = "0.12, 0.13, 0.14, 0.15"
 Documenter = "1.11"
-DocumenterCitations = "1"
+DocumenterCitations = "~1.4"
 DocumenterVitepress = "0.3"
 GeoMakie = "0.7.6"
 NCDatasets = "0.12, 0.13, 0.14"
