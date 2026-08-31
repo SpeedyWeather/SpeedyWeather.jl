@@ -78,13 +78,49 @@ about dos and don'ts. Just express your interest to contribute and we'll be happ
 ## Citing
 
 If you use SpeedyWeather.jl in research, teaching, or other activities, we would be grateful 
-if you could mention SpeedyWeather.jl and cite our paper in JOSS [SpeedyWeatherJOSS](@citep).
+if you could mention SpeedyWeather.jl and cite our paper in JOSS:
 
-The BibTeX entry is available under the key `SpeedyWeatherJOSS` in the
-[documentation bibliography](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/docs/src/references.bib).
+Klöwer et al., (2024). SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity and extensibility. _Journal of Open Source Software_, **9(98)**, 6323, doi:[10.21105/joss.06323](https://doi.org/10.21105/joss.06323).
 
-If you are using the differentiability of our model, please additionally cite
-[DJ4EarthJAMES](@citep), whose BibTeX key is `DJ4EarthJAMES`.
+The bibtex entry for the paper is:
+
+```bibtex
+@article{SpeedyWeatherJOSS,
+    doi = {10.21105/joss.06323},
+    url = {https://doi.org/10.21105/joss.06323},
+    year = {2024},
+    publisher = {The Open Journal},
+    volume = {9},
+    number = {98},
+    pages = {6323},
+    author = {Milan Klöwer and Maximilian Gelbrecht and Daisuke Hotta and Justin Willmert and Simone Silvestri and Gregory L. Wagner and Alistair White and Sam Hatfield and Tom Kimpson and Navid C. Constantinou and Chris Hill},
+    title = {{SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity and extensibility}},
+    journal = {Journal of Open Source Software}
+}
+```
+
+If you are using the differentiability of our model, please cite additionally 
+
+Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615. https://doi.org/10.1029/2025MS005615
+
+with the bibtex entry 
+
+```bibtex 
+@article{DJ4EarthJAMES,
+    author = {Moses, William S. and Cheng, Gong and Churavy, Valentin and Gelbrecht, Maximilian and Klöwer, Milan and Kump, Joseph and Morlighem, Mathieu and Williamson, Sarah and Apte, Dhruv and Berg, Paul and Giordano, Mosè and Hill, Christopher and Loose, Nora and Montoison, Alexis and Narayanan, Sri Hari Krishna and Pal, Avik and Schanen, Michel and Silvestri, Simone and Wagner, Greg and Heimbach, Patrick},
+    title = {DJ4Earth: Differentiable, and Performance-Portable Earth System Modeling via Program Transformations},
+    journal = {Journal of Advances in Modeling Earth Systems},
+    volume = {18},
+    number = {5},
+    pages = {e2025MS005615},
+    keywords = {DJ4Earth, reverse-mode automatic differentiation, Earth system modeling, online learning, differentiable programming, hybrid data assimilation/machine learning},
+    doi = {https://doi.org/10.1029/2025MS005615},
+    url = {https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2025MS005615},
+    eprint = {https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/2025MS005615},
+    note = {e2025MS005615 2025MS005615},
+    year = {2026}
+}
+```
 
 ## Funding
 
