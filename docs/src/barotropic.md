@@ -50,7 +50,7 @@ v &= \frac{1}{R\cos(\theta)} \frac{\partial \Psi}{\partial \phi} \\
 \end{aligned}
 ```
 
-which is described in [Derivatives in spherical coordinates](@ref). Using ``u`` and ``v`` we can then
+which is described in [Derivatives in spherical coordinates](@ref) and [Gradient operators](@ref). Using ``u`` and ``v`` we can then
 advect the absolute vorticity ``\zeta + f``. In order to avoid to calculate both the curl and the
 divergence of a flux we rewrite the barotropic vorticity equation as
 ```math
@@ -59,15 +59,15 @@ divergence of a flux we rewrite the barotropic vorticity equation as
 ```
 with ``\mathbf{u}_\perp = (v, -u)`` the rotated velocity vector, because
 ``-\nabla\cdot\mathbf{u} = \nabla \times \mathbf{u}_\perp``. This is the form that is solved
-in the `BarotropicModel`, as outlined in the following section.
+in the [`BarotropicModel`](@ref "BarotropicModel"), as outlined in the following section.
 
 ## Algorithm
 
 We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic
 vorticity equation. As an initial step
 
-0\. Start with initial conditions of ``\zeta_{lm}`` in spectral space and
-transform this model state to grid-point space:
+0\. Start with initial conditions of ``\zeta_{lm}`` in [spectral space](@ref "Spherical Harmonic Transform") and
+transform this model state to [grid-point space](@ref "Grids"):
 - Invert the [Laplacian](@ref) of vorticity ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
 - obtain zonal velocity ``(\cos(\theta)u)_{lm}`` through a [Meridional derivative](@ref)
 - obtain meridional velocity ``(\cos(\theta)v)_{lm}`` through a [Zonal derivative](@ref)
@@ -92,7 +92,7 @@ Now loop over
 
 In SpeedyWeather.jl we use hyperdiffusion through an ``n``-th power Laplacian ``(-1)^{n+1}\nabla^{2n}``
 (hyper when ``n>1``) which
-can be implemented as a multiplication of the spectral coefficients ``\Psi_{lm}`` with
+can be implemented as a multiplication of the [spectral coefficients](@ref lowertriangularmatrices) ``\Psi_{lm}`` with
 ``[-l(l+1)]^n R^{-2n}`` (see spectral [Laplacian](@ref)). It is therefore computationally not more
 expensive to apply hyperdiffusion over diffusion as the ``[-l(l+1)]^n R^{-2n}`` can be precomputed.
 Note the sign change ``(-1)^{n+1}`` here is such that the dissipative nature of the diffusion operator
@@ -127,7 +127,7 @@ d\zeta \to \frac{d\zeta + (-1)^{n+1}\nu\nabla^{2n}\zeta_{i-1}}{1 - 2\Delta t \nu
 which only depends on ``\zeta_{i-1}``. Now let ``D_\text{explicit} = (-1)^{n+1}\nu\nabla^{2n}`` be the explicit part and
 ``D_\text{implicit} = 1 - (-1)^{n+1} 2\Delta t \nu\nabla^{2n}`` the implicit part. Both parts can be precomputed and are
 ``D_\text{implicit} = 1 - 2\Delta t \nu\nabla^{2n}`` the implicit part. Both parts can be precomputed and are
-only an element-wise multiplication in spectral space. For every spectral harmonic ``l, m`` we do
+only an element-wise multiplication in spectral space. For every spectral harmonic ``l, m`` (see [Spherical harmonics](@ref)) we do
 ```math
 d\zeta \to D_\text{implicit}^{-1}[d\zeta + D_\text{explicit}\zeta_{i-1}].
 ```

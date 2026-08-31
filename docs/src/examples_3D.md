@@ -27,7 +27,7 @@ nothing # hide
 ```
 
 The Jablonowski-Williamson baroclinic wave test case[^JW06] using the
-[Primitive equation model](@ref primitive_equation_model) particularly the dry model,
+[Primitive equation model](@ref primitive_equation_model) particularly the [`PrimitiveDryModel`](@ref),
 as we switch off all parameterizations (and ocean, sea_ice and land) with `dynamics_only = true`.
 We want to use 8 vertical levels, and a lower resolution of T31 on a
 [full Gaussian grid](@ref FullGaussianGrid).
@@ -75,9 +75,9 @@ nothing # hide
 
 The code above defines the Held-Suarez forcing [^HS94] in terms of temperature relaxation
 and a linear drag term that is applied near the planetary boundary but switches off
-all other parameterizations in the primitive equation model without humidity.
+all other [parameterizations](@ref "Parameterizations") in the primitive equation model without humidity.
 One could also just switch off the boundary layer scheme which would also automatically turn off
-the surface fluxes (heat and momentum) as they aren't supposed to run with Held-Suarez forcing.
+the [surface fluxes](@ref "Surface fluxes") (heat and momentum) as they aren't supposed to run with Held-Suarez forcing.
 But to also avoid the calculation being run at all we use `dynamics_only = true`.
 The `forcing` and `drag` are considered to be terms of the dynamical core
 (regardless of which process they represent conceptually).
@@ -115,15 +115,15 @@ nothing # hide
 ```
 
 Here we have defined an aquaplanet simulation by
-- creating an `ocean::AquaPlanet`. This will use constant sea surface temperatures that only vary with latitude (and not with time).
-- creating a `land_sea_mask::AquaPlanetMask` this will use a land-sea mask with `false`=ocean everywhere.
-- creating an `orography::NoOrography` which will have no orography and zero surface geopotential.
+- creating an `ocean::AquaPlanet` (see [Aqua planet](@ref) in Ocean models). This will use constant sea surface temperatures that only vary with latitude (and not with time).
+- creating a `land_sea_mask::AquaPlanetMask` (see [`AquaPlanetMask`](@ref)) this will use a land-sea mask with `false`=ocean everywhere.
+- creating an `orography::NoOrography` which will have no [orography](@ref "Orography") and zero surface geopotential.
 
-All passed on to the model constructor for a `PrimitiveWetModel`, we have now a model with humidity
+All passed on to the model constructor for a [`PrimitiveWetModel`](@ref), we have now a model with humidity
 and physics parameterization as they are defined by default (typing `model` will give you an overview
 of its components). We could have change the `model.land` and `model.vegetation` components too,
 but given the land-sea masks masks those contributions to the surface fluxes anyway, this is not
-necessary. Note that neither sea surface temperature, land-sea mask
+necessary. Note that neither sea surface temperature, [land-sea mask](@ref "The land-sea mask")
 or orography have to agree. It is possible to have an ocean on top of a mountain.
 For an ocean grid-cell that is (partially) masked by the land-sea mask, its value will
 be (fractionally) ignored in the calculation of surface fluxes (potentially leading
@@ -132,7 +132,7 @@ to a zero flux depending on land surface temperatures).
 Now with the following we visualize the surface humidity after the 50 days of
 simulation. We use 50 days as without mountains it takes longer for the initial conditions to
 become unstable. The surface humidity shows small-scale patches in the tropics, which is a result
-of the convection scheme, causing updrafts and downdrafts in both humidity and temperature.
+of the [convection](@ref "Convection") scheme, causing updrafts and downdrafts in both humidity and temperature.
 
 ```@example aquaplanet
 using CairoMakie

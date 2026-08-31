@@ -114,7 +114,7 @@ normalization of the spherical harmonics that factor needs adjustment.
 We call this the _linear virtual temperature_ which is used for the geopotential
 calculation, see [#254](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/254).
 
-## Vertical coordinates
+## [Vertical coordinates](@id vertical_coordinates_physics)
 
 We start with some general considerations that apply when changing the vertical
 coordinate from height ``z`` to something else. Let ``\Psi(x, y, z, t)``
@@ -147,7 +147,7 @@ account for the fact that, at a given ``\eta``, ``z`` depends on ``x`` which is 
 dealt with using the univariate chain rule from above. We will make use of that
 for the [Pressure gradient](@ref).
 
-### Sigma coordinates
+### [Sigma coordinates](@id sigma_coordinates_physics)
 
 The problem with pure pressure coordinates is that they are not terrain-following.
 For example, the 1000 hPa level in the Earth's atmosphere cuts through mountains.
@@ -163,7 +163,8 @@ available constructors, and practical usage see [Vertical coordinates](@ref vert
     Pressure, sigma, or hybrid coordinates in the vertical range from lowest values at the top
     to highest values at the surface. Consistently, we also index the vertical dimension top to
     surface. This means that ``k=1`` is the top-most layer, and ``k=N_{lev}`` (or similar)
-    is the layer that sits directly above the surface.
+    is the layer that sits directly above the surface. See [Array dimensions](@ref array_dimensions)
+    for how this indexing maps onto the underlying arrays.
 
 Sigma coordinates use the fraction of surface pressure as the vertical coordinate
 ```math
@@ -184,7 +185,7 @@ Half levels ``\sigma_{k+\tfrac{1}{2}}`` are specified first and full levels obta
 \sigma_k = \frac{\sigma_{k+\tfrac{1}{2}} + \sigma_{k-\tfrac{1}{2}}}{2}
 ```
 
-### Hybrid sigma-pressure coordinates
+### [Hybrid sigma-pressure coordinates](@id hybrid_sigma_pressure_physics)
 
 Hybrid sigma-pressure coordinates blend constant-pressure surfaces near the model top
 with terrain-following sigma surfaces near the surface. The pressure at layer ``k`` is
@@ -224,7 +225,7 @@ through the ideal gas law with temperature. Given a vertical temperature profile
 ``T_v`` and the (constant) surface geopotential ``\Phi_s = gz_s`` where ``z_s``
 is the orography, we can integrate this equation from the surface to the top
 to obtain ``\Phi_k`` on every layer ``k``.
-The surface is at ``k = N+\tfrac{1}{2}`` (see [Vertical coordinates](@ref))
+The surface is at ``k = N+\tfrac{1}{2}`` (see [Vertical coordinates](@ref vertical_coordinates_physics))
 with ``N`` vertical levels. We can integrate the geopotential onto half levels as
 (``T_k^v`` is the virtual temperature at layer ``k``, the subscript ``v`` has been
 moved to be a superscript)
@@ -261,7 +262,7 @@ at the top to ``N`` at the surface layer this can be written as
 ```
 which can be thought of as a vertical integration of the pressure thickness-weighted divergence.
 In pure ``\sigma``-coordinates with ``\Delta p_k = \Delta \sigma_k p_s``
-(see [Sigma coordinates](@ref); for hybrid coordinates ``\Delta p_k = \Delta A_k p_{\mathrm{ref}} + \Delta B_k p_s``)
+(see [Sigma coordinates](@ref sigma_coordinates_physics); for hybrid coordinates ``\Delta p_k = \Delta A_k p_{\mathrm{ref}} + \Delta B_k p_s``)
 this becomes
 ```math
 \frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \Delta \sigma_k \nabla \cdot (\mathbf{u}_k p_s)
@@ -333,7 +334,7 @@ In sigma coordinates, the vertical mass flux can be expressed as ``M = \dot{\sig
 !!! note "Sigma coordinate assumption"
     The advection equation below uses ``\Delta \sigma_k`` as the layer thickness and
     ``\dot{\sigma}`` as the vertical velocity. This is the pure sigma formulation. For
-    [hybrid sigma-pressure coordinates](@ref Hybrid-sigma-pressure-coordinates) the layer
+    [hybrid sigma-pressure coordinates](@ref hybrid_sigma_pressure_physics) the layer
     thickness becomes ``\Delta p_k / p_s`` and the vertical velocity equation changes
     accordingly.
 
@@ -427,10 +428,11 @@ The pressure gradient term in the primitive equations is
 -\frac{1}{\rho}\nabla_z p
 ```
 with density ``\rho`` and pressure ``p``. The gradient here is taken at constant ``z`` hence the
-subscript. If we move to a pressure-based vertical coordinate system we will need to evaluate
+subscript (the discretized gradient operators ``\nabla`` are described in [Gradient operators](@ref)).
+If we move to a pressure-based vertical coordinate system we will need to evaluate
 gradients on constant levels of pressure though, i.e. ``\nabla_p``. There is, by definition,
 no gradient of pressure on constant levels of pressure, but we can use the chain rule (see
-[Vertical coordinates](@ref)) to rewrite this as (use only ``x`` but ``y`` is equivalent)
+[Vertical coordinates](@ref vertical_coordinates_physics)) to rewrite this as (use only ``x`` but ``y`` is equivalent)
 ```math
 0 = \left. \frac{\partial p}{\partial x} \right\vert_p =
 \left. \frac{\partial p}{\partial x} \right\vert_z +
@@ -447,7 +449,7 @@ Or, in terms of the geopotential ``\Phi = gz``
 which is the actual reason why we use pressure coordinates: As density ``\rho`` also depends on
 the pressure ``p`` the left-hand side means an implicit system when solving for pressure ``p``.
 To go from pressure to sigma coordinates we apply the chain rule from section
-[Vertical coordinates](@ref) again and obtain
+[Vertical coordinates](@ref vertical_coordinates_physics) again and obtain
 ```math
 \nabla_p \Phi = \nabla_\sigma \Phi - \frac{\partial \Phi}{\partial p}\nabla_\sigma p
 = \nabla_\sigma \Phi + \frac{1}{\rho}\nabla_\sigma p
@@ -459,7 +461,7 @@ but in combination with the dry gas constant ``R_d``
 \nabla_p \Phi = \nabla_\sigma \Phi + \frac{R_dT_v}{p} \nabla_\sigma p
 ```
 Combining the pressure in denominator and gradient to the logarithm and with
-``\nabla \ln p = \nabla \ln p_s`` in [Sigma coordinates](@ref) (the logarithm of
+``\nabla \ln p = \nabla \ln p_s`` in [Sigma coordinates](@ref sigma_coordinates_physics) (the logarithm of
 ``\sigma_k`` adds a constant that drops out in the gradient) we therefore
 have
 ```math
@@ -551,7 +553,7 @@ With ``()`` denoting spectral space and ``[]`` grid-point space, so that
 ``([])`` and ``[()]`` are the transforms in the respective directions.
 To avoid confusion with that notation, we write the tendency of humidity due
 to [Vertical advection](@ref) as ``W_q``. This equation is identical to a tracer equation,
-with ``\mathcal{P}_q`` denoting sources and sinks. Note that [Horizontal diffusion](@ref)
+with ``\mathcal{P}_q`` denoting sources and sinks. Note that [Horizontal diffusion](@ref horizontal_diffusion_primitive)
 should be applied to every advected variable.
 
 A very similar equation is solved for (absolute) temperature
@@ -726,6 +728,8 @@ back to the previous time step. For details see [Semi-implicit temperature equat
 
 The operators ``\mathbf{R, U, L, W}`` are all linear, meaning that we can apply them
 in spectral space to each spherical harmonic independently -- the vertical is coupled however.
+These per-harmonic coefficients are stored as a [`LowerTriangularArray`](@ref lowertriangularmatrices)
+with an extra vertical dimension, see [Array dimensions](@ref array_dimensions) for how the two are ordered.
 With ``N`` being the number of vertical levels and the prognostic variables like
 temperature for a given degree ``l`` and order ``m`` being a column vector in the vertical,
 ``T_{l, m} \in \mathbb{R}^N``, these operators have the following shapes
@@ -775,7 +779,7 @@ via
 The other tendencies ``\delta T`` and ``\delta \ln p_s`` are then obtained
 through insertion above. We may call the operator to be inverted ``\mathbf{S}``
 which is of size ``l_{max} \times N \times N``, hence for every degree ``l`` of
-the spherical harmonics (which the Laplace operator depends on) a
+the [spherical harmonics](@ref "Spherical harmonics") (which the Laplace operator depends on) a
 ``N \times N`` matrix coupling the ``N`` vertical levels. Furthermore, ``S`` depends
 - through ``\xi`` on the time step ``\Delta t``,
 - through ``\mathbf{R, W, L}`` on the vertical level spacing ``\Delta \sigma_k``
@@ -793,17 +797,17 @@ Then for every time step
 3. Compute the combined tendency ``G`` from the uncorrected tendencies ``G_\mathcal{D}``, ``G_T``, ``G_{\ln p_s}``.
 4. With the inverted operator get the corrected tendency for divergence, ``\delta \mathcal{D} = \mathbf{S}^{-1}G``.
 5. Obtain the corrected tendencies for temperature ``\delta T`` and surface pressure ``\delta \ln p_s`` from ``\delta \mathcal{D}``.
-6. Apply [Horizontal diffusion](@ref) (which is only mentioned here as it further updates the tendencies).
+6. Apply [Horizontal diffusion](@ref horizontal_diffusion_primitive) (which is only mentioned here as it further updates the tendencies).
 7. Use ``\delta \mathcal{D}``, ``\delta T`` and ``\delta \ln p_s`` in the [Leapfrog time integration](@ref leapfrog).
 
-## Horizontal diffusion
+## [Horizontal diffusion](@id horizontal_diffusion_primitive)
 
 Horizontal diffusion in the primitive equations is applied to vorticity ``\zeta``, divergence ``\mathcal{D}``,
 temperature ``T`` and humidity ``q``. In short, all variables that are advected.
 For the dry equations, ``q=0`` and no diffusion has to be applied.
 
 The horizontal diffusion is applied implicitly in spectral space, as already described in
-[Horizontal diffusion](@ref) for the barotropic vorticity equation.
+[Horizontal diffusion](@ref diffusion) for the barotropic vorticity equation.
 
 ## Algorithm
 
@@ -814,7 +818,7 @@ the `PrimitiveDryModel` humidity can be set to zero and respective steps skipped
 temperature ``T_{lm}``, humidity ``q_{lm}`` and the logarithm of surface pressure ``(\ln p_s)_{lm}``
 in spectral space. Variables ``\zeta, D, T, q`` are defined on all vertical levels, the logarithm
 of surface pressure only at the surface. Transform this model state to grid-point space,
-obtaining velocities is done as in the shallow water model
+obtaining velocities is done as in the [shallow water model](@ref shallow_water_model)
 
 - Invert the [Laplacian](@ref) of ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
 - Invert the [Laplacian](@ref) of ``D_{lm}`` to obtain the velocity potential ``\Phi_{lm}`` in spectral space

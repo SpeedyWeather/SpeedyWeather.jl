@@ -1,6 +1,6 @@
 # Custom forcing and drag
 
-The following example is a bit more concrete than the previous conceptual example,
+The following example is a bit more concrete than the [previous conceptual example](@ref "Extending SpeedyWeather"),
 but we try to add a few more details that are important, or you at least should
 be aware of it. In this example we want to add a `StochasticStirring` forcing
 as defined in [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2)
@@ -341,7 +341,7 @@ This calls the generator function from [Custom forcing: generator function](@ref
 Here we want to stir vorticity not at the default latitude of 45N, but on the southern
 hemisphere to illustrate how to pass on non-default parameters. We explicitly set the
 `initial_conditions` to rest and pass them as well as `forcing=stochastic_stirring`
-on to the `BarotropicModel` constructor. That's it! This is really the beauty of our
+on to the [`BarotropicModel`](@ref "BarotropicModel") constructor. That's it! This is really the beauty of our
 modular interface that you can create instances of individual model components
 and just put them together as you like, and as long as you follow some rules.
 

@@ -52,7 +52,7 @@ in the [Barotropic vorticity equation](@ref barotropic_vorticity_model)).
 ```
 With ``\nabla^\perp`` being the rotated gradient operator, in cartesian coordinates ``x, y``:
 ``\nabla^\perp = (-\partial_y, \partial_x)``. See [Derivatives in spherical coordinates](@ref)
-for further details. Especially because the inversion of the [Laplacian](@ref) and the
+and [Gradient operators](@ref) for further details. Especially because the inversion of the [Laplacian](@ref) and the
 gradients of ``\Psi, \Phi`` can be computed in a single pass, see
 [U, V from vorticity and divergence](@ref).
 
@@ -72,7 +72,7 @@ with ``\mathbf{u}_\perp = (v, -u)``.
 ## Algorithm
 
 0\. Start with initial conditions of relative vorticity ``\zeta_{lm}``, divergence ``D_{lm}``,
-and interface height ``\eta_{lm}`` in spectral space and transform this model state to grid-point space:
+and interface height ``\eta_{lm}`` in [spectral space](@ref "Spherical Harmonic Transform") and transform this model state to [grid-point space](@ref "Grids"):
 - Invert the [Laplacian](@ref) of ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
 - Invert the [Laplacian](@ref) of ``D_{lm}`` to obtain the velocity potential ``\Phi_{lm}`` in spectral space
 - obtain velocities ``U_{lm} = (\cos(\theta)u)_{lm}, V_{lm} = (\cos(\theta)v)_{lm}`` from ``\nabla^\perp\Psi_{lm} + \nabla\Phi_{lm}``
@@ -197,7 +197,7 @@ G_\mathcal{\eta} &= N_\eta - \xi H (\mathcal{D}_{i-1} - \mathcal{D}_i)
 \end{aligned}
 ```
 Inserting the second equation into the first, we can first solve for ``\delta \mathcal{D}``,
-and then for ``\delta \eta``. Reminder that we do this in spectral space to every harmonic
+and then for ``\delta \eta``. Reminder that we do this in spectral space to every [harmonic](@ref "Spherical harmonics")
 independently, so the Laplace operator ``\nabla^2 = -l(l+1)`` takes the form of its eigenvalue
 ``-l(l+1)`` (normalized to unit sphere, as are the [scaled shallow water equations](@ref scaled_swm))
 and its inversion is therefore just the inversion of this scalar.

@@ -2,7 +2,8 @@
 
 The surfaces fluxes in SpeedyWeather represent the exchange of momentum, heat,
 and humidity/moisture between ocean and land as surface into or out of
-the lowermost atmospheric layer. Surface fluxes of momentum represent
+the lowermost atmospheric layer (see [Vertical coordinates](@ref vertical_coordinates_physics) for how vertical
+layers are indexed). Surface fluxes of momentum represent
 a drag that the boundary layer wind experiences due to friction over more
 or less rough ground on land or over sea. Surface fluxes of heat represent
 a sensible heat flux from  a warmer or colder ocean or land into or out of
@@ -50,6 +51,8 @@ are handled through the `model.boundary_layer` where currently implemented are
 subtypes(SpeedyWeather.AbstractBoundaryLayer)
 ```
 
+See [Parameterizations](@ref) for the general parameterization interface these implement.
+
 ## Fluxes to tendencies
 
 In SpeedyWeather.jl, parameterizations can be defined either in terms of tendencies for a given
@@ -79,7 +82,7 @@ tendencies which are calculated from the absorbed fluxes of momentum ``u`` or ``
 ```math
 \frac{\partial u_k}{\partial t} = \frac{g \Delta F_k}{\Delta p_k}
 ```
-with gravity ``g`` and layer-thickness ``\Delta p_k`` (see [Sigma coordinates](@ref)) so that
+with gravity ``g`` and layer-thickness ``\Delta p_k`` (see [Sigma coordinates](@ref sigma_coordinates_physics)) so that
 the right-hand side divides the absorbed flux by the mass of layer ``k`` (per unit area).
 Tendencies for ``v, q`` equivalently with their respective absorbed fluxes.
 
@@ -96,7 +99,8 @@ the division by the heat capacity to convert to a rate of temperature change.
 ## Bulk Richardson-based drag coefficient
 
 All surface fluxes depend on a dimensionless drag coefficient ``C`` which
-we calculate as a function of the bulk Richardson number ``Ri`` following
+we calculate as a function of the bulk Richardson number ``Ri`` (see also [Vertical diffusion](@ref)
+for a similar Richardson-number-based diffusion coefficient) following
 Frierson, et al. 2006 [^Frierson2006] with some simplification as outlined below.
 We use the same drag coefficient for momentum, heat and moisture fluxes.
 The bulk Richardson number at the lowermost model layer ``k = N`` of height ``z_N`` is
@@ -220,7 +224,8 @@ and surface pressure ``p_s``. The availability of soil water over land is repres
 
 following the Fortran SPEEDY documentation[^SPEEDY] which follows Viterbo and Beljiars 1995
 [^Viterbo95]. The variables (or spatially prescribed arrays) are water content in the top
-soil layer ``W_{top}`` and the root layer below ``W_{root}`` using the vegetation
+soil layer ``W_{top}`` and the root layer below ``W_{root}`` (see [Land soil moisture](@ref)
+for how these are modelled) using the vegetation
 fraction ``f_{veg} = veg_{high} + 0.8 veg_{low}`` composed of a (dimensionless)
 high and low vegetation cover per grid cell ``veg_{high}, veg_{low}``.
 The constants are depth of top soil layer ``D_{top} = 20~cm``, depth of root layer

@@ -70,6 +70,7 @@ makedocs(
             "Spherical Harmonic Transform" => "spectral_transform.md",
             "SpeedyTransforms" => "speedytransforms.md",
             "Gradient operators" => "gradients.md",
+            "Time stepping" => "time_stepping.md",
         ],
         "API" => "api.md",
         "Benchmarks" => "benchmarks.md",
