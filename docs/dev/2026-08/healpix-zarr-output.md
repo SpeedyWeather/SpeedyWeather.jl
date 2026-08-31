@@ -23,10 +23,15 @@ Base revision: 20467269399f40212fee413a545496226de999ca
 - 2026-08-31: initial draft and implementation in one pass.
 - 2026-08-31: the out-of-suite check was reframed from cuHPX-first to **healpy**-first at the
   user's request (`write a test script with healpy instead`), and the directory renamed
-  `test/cuhpx/` -> `test/healpix_compat/`. healpy is the reference HEALPix implementation,
+  `test/cuhpx/` -> `healpix_compat/`. healpy is the reference HEALPix implementation,
   runs on CPU anywhere and can therefore actually be executed; cuHPX is CUDA-only and could
   not be run on the development machine. cuHPX coverage is retained as an optional
   auto-skipping section of the same script.
+- 2026-08-31: the check was moved out of the `test/` tree entirely, to
+  `SpeedyWeather/healpix_compat/` beside `benchmark/` (`don't actually add the
+  interoperability check to the unit tests, not even as a check`). `test/runtests.jl` needed
+  an exclusion regex while the directory sat under `test/`; with the move it needs nothing and
+  is unmodified.
 
 ## Problem description
 
@@ -133,11 +138,12 @@ Unit tests in `SpeedyWeather/test/output/healpix_output.jl`:
 6. **PrimitiveWet with soil layers** — the `soil_layer` vertical dimension and 2D-from-3D
    variables (`mslp`, `u10`, `tsurf`) that carry their own `output!` methods.
 
-The interoperability check is **not** part of the unit tests: it needs a Python environment
-with healpy. It lives in `SpeedyWeather/test/healpix_compat/` (excluded from `find_tests`
-discovery in `test/runtests.jl` alongside `GPU/`, `differentiability/` and `reactant/`) as a
-Julia writer script plus a Python checker, `check_healpy.py`, verifying against **healpy**,
-the reference HEALPix implementation:
+The interoperability check is **not** part of the unit tests, in any form: it needs a Python
+environment with healpy. It lives in `SpeedyWeather/healpix_compat/` — *outside* the `test/`
+tree, next to `benchmark/` — so the suite's `find_tests` discovery never sees it and
+`test/runtests.jl` is left completely untouched by this work. It is a Julia writer script
+plus a Python checker, `check_healpy.py`, verifying against **healpy**, the reference
+HEALPix implementation:
 
 - our `lat`/`lon`/`ring` equal `healpy.pix2ang` and `healpy.pix2ring` pixel for pixel;
 - the inverse closes — `healpy.ang2pix` on our own coordinates returns each cell's own
