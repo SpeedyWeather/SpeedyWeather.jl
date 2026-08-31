@@ -25,9 +25,16 @@ particle_advection!(vars, model) = particle_advection!(vars, model.particle_adve
 particle_advection!(vars, ::Nothing, ::AbstractModel) = nothing
 
 export ParticleAdvection2D
+
 # geometry is `mutable` and untyped by architecture (AbstractGridGeometry, not a parametric
 # GeometryType) so that `initialize!` can rebind it onto model.architecture in place, since
 # geometry is fixed at construction time (typically before model.architecture is known).
+"""
+$(TYPEDFIELDS)
+
+Particle advection on a fixed model layer: particles are advected horizontally with the
+velocity of a single, user-specified vertical layer, their σ coordinate stays constant.
+"""
 @kwdef mutable struct ParticleAdvection2D{
         NF,
         IntType,
@@ -53,9 +60,15 @@ end
 
 export ParticleAdvection3D
 
-# Continuous 3D particle advection: particles are tracked at their own σ coordinate.
 # σ_levels_full is read from model.geometry at runtime.
 # geometry is `mutable` and untyped by architecture, see ParticleAdvection2D above.
+"""
+$(TYPEDFIELDS)
+
+Continuous 3D particle advection: particles are tracked at their own σ coordinate, which
+evolves in time driven by the model's diagnosed vertical velocity, in addition to being
+advected horizontally.
+"""
 @kwdef mutable struct ParticleAdvection3D{
         NF,
         IntType,
