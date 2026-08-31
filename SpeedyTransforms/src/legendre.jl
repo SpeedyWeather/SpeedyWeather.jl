@@ -141,7 +141,7 @@ function _legendre!(                        # GRID TO SPECTRAL
     (; lmax, mmax) = S.spectrum             # 1-based max degree l, order m of spherical harmonics
     (; legendre_polynomials) = S            # precomputed Legendre polynomials
     (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 1-based
-    (; solid_angles, lon_offsets) = S
+    (; solid_angles_rotated) = S
     nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
 
     lmax = lmax - 1                           # 0-based max degree l of spherical harmonics
@@ -165,15 +165,14 @@ function _legendre!(                        # GRID TO SPECTRAL
     return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
 
-        # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
-        ΔΩ = solid_angles[j]                # = sinθ Δθ Δϕ, solid angle for a grid point
-
         lm = 1                              # single running index for spherical harmonics
         for m in 1:(mmax_truncation[j] + 1)   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
 
-            # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
-            o = lon_offsets[m, j]           # longitude offset rotation by multiplication with complex unit vector
-            ΔΩ_rotated = ΔΩ * conj(o)         # complex conjugate for rotation back to prime meridian
+            # SOLID ANGLE QUADRATURE WEIGHT (ΔΩ = sinθ Δθ Δϕ, the solid angle of a grid point on
+            # ring j) already rotated back to the prime meridian by the ring's longitude offset.
+            # Order-dependent, as the HEALPix grids need a different quadrature rule per order m,
+            # see `quadrature_weights`.
+            ΔΩ_rotated = solid_angles_rotated[m, j]
 
             # LEGENDRE TRANSFORM
             for k in nlayers

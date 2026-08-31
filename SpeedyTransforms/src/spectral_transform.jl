@@ -85,10 +85,13 @@ struct SpectralTransform{
     jm_indices::ArrayTypeIntMatrix              # (j, m, lm_offset, column length) per inverse-transform thread
     lm_indices::ArrayTypeIntMatrix              # (m, hemisphere sign, jm_indices row range) per forward-transform thread
 
-    # SOLID ANGLES ΔΩ FOR QUADRATURE
-    # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
-    # vector is pole to pole although only northern hemisphere required
-    solid_angles::VectorType                    # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
+    # SOLID ANGLES ΔΩ FOR QUADRATURE, PER ORDER m AND NORTHERN RING j, ROTATED BACK TO THE
+    # PRIME MERIDIAN, i.e. ΔΩ[m, j] * conj(lon_offsets[m, j]). This is exactly what the forward
+    # Legendre transform needs.
+    # Order-dependent because the HEALPix grids need a different quadrature rule per order m to
+    # make the transform exact; for grids whose latitudes already carry an exact rule (Gaussian,
+    # Clenshaw-Curtis) the magnitude is constant in m. See `quadrature_weights`.
+    solid_angles_rotated::MatrixComplexType     # = ΔΩ conj(o), ΔΩ = sinθ Δθ Δϕ per grid point
 
     # LAPLACE EIGENVALUES -l*(l+1) and their inverse, for ∇²/∇⁻².
     eigenvalues::VectorType
@@ -165,6 +168,19 @@ function SpectralTransform(
 
     # LEGENDRE SHORTCUT OVER ORDER M (0-based), truncate the loop over order m
     mmax_truncation = [LegendreShortcut(nlons[j], latd[j]) for j in 1:nlat_half]
+
+    # A ring with nlon_j longitudes has its Fourier bin m = nlon_j÷2 at the Nyquist frequency,
+    # where the real FFT pair carries only one of the two components (`brfft` drops the imaginary
+    # part, `rfft` returns it real). Such a ring contributes to only one of the real/imaginary
+    # parts of the coefficients at that order, so no single quadrature weight can be consistent
+    # for both and an exact transform is unreachable while the bin is retained. Drop it wherever
+    # the weights are fitted for exactness — on HEALPix polar-cap rings (nlon_j = 4j, at Nyquist
+    # for m = 2j) this happens on every ring. Other grids keep the bin: there the fit does not run,
+    # and dropping it would only remove contributions without refitting the weights.
+    if optimize_quadrature(grid)
+        mmax_truncation = [min(mmax_j, (nlons[j] - 1) ÷ 2) for (j, mmax_j) in enumerate(mmax_truncation)]
+    end
+
     mmax_truncation = min.(mmax_truncation, mmax - 1)   # only to mmax in any case (otherwise BoundsError)
 
     # NORMALIZATION
@@ -267,12 +283,22 @@ function SpectralTransform(
         end
     end
 
-    # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
+    # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or optimised per order)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
     # and sum up to 2 over all latitudes as ∫sin(θ)dθ = 2 over 0...π.
-    # Δϕ = 2π/nlon is the azimuth every grid point covers
-    solid_angles = get_solid_angles(grid)
+    # Δϕ = 2π/nlon is the azimuth every grid point covers.
+    # On the HEALPix grids the geometric (equal-area) angles are not a quadrature rule, so they are
+    # replaced order by order with weights that make the transform exact, see `quadrature_weights`.
+    solid_angles = quadrature_weights(
+        NF, grid, spectrum, legendre_polynomials, mmax_truncation,
+        nlons, nlat, get_solid_angles(grid)
+    )
+
+    # Fuse with the longitude offset rotation (complex conjugate: rotate back to the prime
+    # meridian) so the forward Legendre transform reads a single precomputed factor instead of
+    # multiplying the two at every (m, j).
+    solid_angles_rotated = solid_angles .* conj.(Complex{NF}.(lon_offsets))
 
     # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES + LAPLACE EIGENVALUES
     gradients = gradient_arrays(NF, spectrum)
@@ -307,7 +333,7 @@ function SpectralTransform(
         legendre_polynomials_transposed,
         scratch_memory,
         jm_index_size, jm_indices, lm_indices,
-        solid_angles,
+        solid_angles_rotated,
         eigenvalues, eigenvalues⁻¹,
         gradients,
         gpu_graphs,

@@ -61,6 +61,7 @@ export wrapped_view
 
 include("aliasing.jl")
 include("legendre_shortcuts.jl")
+include("quadrature.jl")
 include("scratch_memory.jl")
 include("gradient_arrays.jl")
 include("array_utils.jl")
