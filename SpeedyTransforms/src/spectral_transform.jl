@@ -96,11 +96,13 @@ struct SpectralTransform{
 
     gradients::GradientType                     # precomputed gradient and integration matrices
 
-    # GPU GRAPHS (CUDA graphs only; HIP graphs for AMDGPU are not implemented)
-    # toggle for the GPU-graphs accelerated batched Fourier transform
-    # Set to `false` to fall back to the generic (allocating) per-ring GPU path.
-    # Only effective when the CUDA extension is loaded; ignored on CPU. On AMDGPU this is
-    # always treated as the generic path, with a one-time warning if set to `true`.
+    # GPU GRAPHS (CUDA graphs and HIP graphs; see SpeedyTransformsCUDAExt.jl /
+    # SpeedyTransformsAMDGPUExt.jl) toggle for the GPU-graphs accelerated batched Fourier
+    # transform. Set to `false` to fall back to the generic (allocating) per-ring GPU path.
+    # Only effective when the CUDA or AMDGPU extension is loaded; ignored on CPU. On AMDGPU
+    # this falls back to the generic path, with a one-time warning, if the installed AMDGPU.jl
+    # is too old to expose the high-level HIP graph API. Defaults to `default_gpu_graphs`
+    # (backend-dependent, see below) rather than a flat `true`/`false`.
     gpu_graphs::Bool
 
 end
@@ -109,6 +111,17 @@ end
 Base.eltype(S::AbstractSpectralTransform{NF}) where {NF} = NF
 Architectures.array_type(S::AbstractSpectralTransform{NF, AR}) where {NF, AR} = array_type(AR)
 Architectures.nonparametric_type(::Type{<:SpectralTransform}) = SpectralTransform
+
+"""$(TYPEDSIGNATURES)
+Default value for the `gpu_graphs` keyword of [`SpectralTransform`](@ref), dispatching on the
+device wrapped by `architecture`. The fallback (`true`) covers CUDA and any other backend
+without a more specific method; extensions add their own method to opt a backend out of the
+default (e.g. `SpeedyTransformsAMDGPUExt.jl` for AMDGPU, since HIP-graphs stability is only
+confirmed so far on datacenter/CDNA hardware, not the consumer RDNA cards CI currently runs on).
+Explicitly passing `gpu_graphs = true/false` to `SpectralTransform` always overrides this."""
+default_gpu_graphs(architecture::AbstractArchitecture) = default_gpu_graphs(device(architecture))
+default_gpu_graphs(::KernelAbstractions.CPU) = false   # no graphs on CPU, be explicit
+default_gpu_graphs(backend) = true                     # fallback, e.g. CUDA
 
 """
 $(TYPEDSIGNATURES)
@@ -123,7 +136,7 @@ function SpectralTransform(
         nlayers::Integer = DEFAULT_NLAYERS,                                             # scratch size — max layer count any single transform call may carry
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
-        gpu_graphs::Bool = true,                                             # use GPU-graphs accelerated Fourier path (CUDA/Metal; AMDGPU falls back with a warning)
+        gpu_graphs::Bool = default_gpu_graphs(spectrum.architecture),               # use GPU-graphs accelerated Fourier path (CUDA, AMDGPU); backend-dependent default
     )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
     # per-layer fallback used by `_fourier_serial!`).

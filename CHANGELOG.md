@@ -2,13 +2,27 @@
 
 ## Unreleased
 
+- Move the backend-agnostic GPU-graphs machinery (kernels, cache, capture/replay control flow) from `SpeedyTransforms/ext/gpu_graphs_common.jl` into `SpeedyTransforms/src/`, now compiled unconditionally as part of the main package rather than only when the CUDA/AMDGPU extension loads; only the `CuArray`/`ROCArray`-dispatched methods and backend wiring remain in the extensions. No change to `gpu_graphs`/`default_gpu_graphs` behavior. [#1232](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1232)
+- Document GPU graphs (CUDA/HIP) in `architectures_gpu.md`, including AMDGPU's current disabled-by-default status and how to opt in [#1233](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1233)
+- Fix a bug that stopped `StochasticallyPerturbedParameterizationTendencies` from working on GPU [#1230](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1230)
+- Add GPU-safe `clamp!` and make `fill!` return a `Field` for `AbstractField`, and only clamp the land-sea mask when out of range [#1228](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1228)
+- Remove Reactant compat restriction again [#1225](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1225)
+- Remove Reactant from SpeedyWeather/test/GPU/AMDGPU/Project.toml for AMDGPU compatibility with Julia v1.12 [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
+- Avoid `isodd(::AbstractFloat)`'s exact-integer-conversion fallback (an `InexactError` throw path) in `mod(::Particle)`, which triggered AMDGPU hostcalls [#1220](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1220)
+- `SpectralTransform`'s `gpu_graphs` keyword now defaults per-backend via `default_gpu_graphs` (dispatching on the KernelAbstractions device) instead of a flat `true`; AMDGPU defaults to `false` pending HIP-graphs verification on non-datacenter hardware, CUDA is unaffected [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
+- Enable HIP-graphs acceleration of the batched Fourier transform for AMDGPU, mirroring the existing CUDA-graphs implementation [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
+- Update Terrarium output writer to work with v0.1.6 [#1224](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1224)
+- Fix GPU scalar indexing when a `Field` broadcasts against a bare GPU array (e.g. `LinearDrag` in the Held-Suarez example) [#1219](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1219)
+- Reformulate trigonometric functions to avoid hostcalls on AMDGPU - [#1210](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1210)
+
+## v0.22.1
+
 - First implementation for FFTs using Metal.jl [#1217](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1217)
 - WhichTransform for default MatrixSpectralTransform on GPU at low resolution [#1194](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1194)
 - Restructed GPU tests, and fixed an issue for which `MatrixSpectralTransform` failed on views [#1201](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1201)
 - Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions [#1147](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1147)
 - Restrist Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
 - Simulation(model) as Oceananigans-like interface [#1205](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1205)
-- Restrict Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
 - Orbit and rotation time for variable length of day/year [#984](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/984)
 - Default dealiasing for non-Gaussian grids is now 3, fixing stability issues e.g. for HEALPix [#1198](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1198)
 - Work around an AMDGPU/LLVM miscompile of a triangular loop with dynamic bounds in the semi-implicit primitive-equation kernel [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
