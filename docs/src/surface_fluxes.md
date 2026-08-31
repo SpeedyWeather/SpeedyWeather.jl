@@ -97,7 +97,7 @@ the division by the heat capacity to convert to a rate of temperature change.
 
 All surface fluxes depend on a dimensionless drag coefficient ``C`` which
 we calculate as a function of the bulk Richardson number ``Ri`` following
-Frierson, et al. 2006 [^Frierson2006] with some simplification as outlined below.
+[Frierson2006](@citet) with some simplification as outlined below.
 We use the same drag coefficient for momentum, heat and moisture fluxes.
 The bulk Richardson number at the lowermost model layer ``k = N`` of height ``z_N`` is
 
@@ -150,9 +150,11 @@ The surface momentum flux is calculated from the surface wind velocities
 u_s = f_w u_N, \quad v_s = f_w v_N
 ```
 
-meaning it is scaled down by ``f_w = 0.95`` (Fortran SPEEDY default, [^SPEEDY])
+meaning it is scaled down by ``f_w = 0.95`` (Fortran SPEEDY default;
+[KucharskiMolteniBracco2006](@citep))
 from the lowermost layer wind velocities ``u_N, v_N``. A wind speed scale
-accounting for gustiness with ``V_{gust} = 5~m/s`` (Fortran SPEEDY default, [^SPEEDY])
+accounting for gustiness with ``V_{gust} = 5~m/s`` (Fortran SPEEDY default;
+[KucharskiMolteniBracco2006](@citep))
 is then defined as
 
 ```math
@@ -218,8 +220,8 @@ and surface pressure ``p_s``. The availability of soil water over land is repres
     D_{top}W_{cap} + D_{root}(W_{cap} - W_{wil})}
 ```
 
-following the Fortran SPEEDY documentation[^SPEEDY] which follows Viterbo and Beljiars 1995
-[^Viterbo95]. The variables (or spatially prescribed arrays) are water content in the top
+following the Fortran SPEEDY documentation [KucharskiMolteniBracco2006](@citep),
+which follows [ViterboBeljaars1995](@citet). The variables (or spatially prescribed arrays) are water content in the top
 soil layer ``W_{top}`` and the root layer below ``W_{root}`` using the vegetation
 fraction ``f_{veg} = veg_{high} + 0.8 veg_{low}`` composed of a (dimensionless)
 high and low vegetation cover per grid cell ``veg_{high}, veg_{low}``.
@@ -264,11 +266,3 @@ you must still also define sea surface temperatures everywhere, otherwise the fl
 in those regions will be incorrect rather than simply zero.
 
 For more details see [The land-sea mask](@ref) implementation section.
-
-## References
-
-[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1).
-
-[^SPEEDY]: Franco Molteni and Fred Kucharski, 20??. Description of the ICTP AGCM (SPEEDY) Version 41. [https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf](https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
-
-[^Viterbo95]: Viterbo, P., and A. C. M. Beljaars, 1995: An Improved Land Surface Parameterization Scheme in the ECMWF Model and Its Validation. J. Climate, 8, 2716-2748, DOI:[10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2](https://doi.org/10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2).

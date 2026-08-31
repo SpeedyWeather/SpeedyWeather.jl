@@ -3,7 +3,7 @@
 The following example is a bit more concrete than the previous conceptual example,
 but we try to add a few more details that are important, or you at least should
 be aware of it. In this example we want to add a `StochasticStirring` forcing
-as defined in [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2)
+as defined in [Vallis2004](@citep).
 
 ```math
 \begin{aligned}
@@ -67,8 +67,7 @@ end
 ```
 
 So, first the scalar parameters, are added as fields of type `NF` (you could hardcode `Float64` too)
-with some default values as suggested in the
-[Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2) paper.
+with some default values as suggested in [Vallis2004](@citet).
 In order to be able to define the default values, we add the `@kwdef` macro
 before the `struct` definition. Then we need the term `S` as coefficients of the spherical harmonics, which
 is a `LowerTriangularMatrix`, however we want its elements to be of number format `NF`,
@@ -94,8 +93,7 @@ Depending on exactly what you would like to do, you can choose your way.
 Anyway, we decide to include `a, b` as `RefValue`s so that we can always access the scalar
 underneath with `a[]` and `b[]` and also change it with `a[] = 1` etc.
 
-Lastly, the [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2)
-paper also describes how the forcing is not supposed to be applied everywhere on the globe but only
+Lastly, [Vallis2004](@citet) also describes how the forcing is not supposed to be applied everywhere on the globe but only
 over a range of latitudes, meaning we want to scale down certain latitudes with a factor approaching
 zero. For this we want to define a latitudinal mask `lat_mask` that is a vector of length `nlat`,
 the number of latitude rings. Similar to `S`, we want to allocate it with zeros (or any other
@@ -219,7 +217,7 @@ so that multiple dispatch calls the correct method of `forcing!`. The third argu
 for the `BarotropicModel` for example, use `model::Barotropic` in that case.
 Or you could define two methods, one for `Barotropic` one for all other models with
 `AbstractModel` (not `Barotropic` as a more specific method is prioritised with multiple
-dispatch). 
+dispatch).
 
 As you can see, for now not much is actually happening inside this function,
 this is what is often called a function barrier, the only thing we do in here
@@ -228,7 +226,8 @@ You can omit this function barrier and jump straight to the definition below,
 but often this is done for performance and clarity reasons: `model` might have
 abstract fields which the compiler cannot optimize for, but unpacking them
 makes that possible. And it also tells you more clearly what a function depends on.
-So we define the actual `forcing!` function that's then called as follows
+Following [BarnesHartmann2011](@citet), Equation 2, we define the actual `forcing!`
+function that's then called as follows
 
 ```@example extend
 function forcing!(
@@ -244,7 +243,7 @@ function forcing!(
 
     (; S) = forcing
     for lm in eachindex(S)
-        # Barnes and Hartmann, 2011 Eq. 2
+        # uniformly distributed complex random number
         Qi = 2rand(Complex{NF}) - (1 + im)   # ~ [-1, 1] in complex
         S[lm] = a*Qi + b*S[lm]
     end

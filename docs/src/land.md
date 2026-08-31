@@ -295,8 +295,8 @@ in ``kg/m²/s``, where the `excess` term (negative for melting trying to remove 
 only appears when the naive tendency would overdraw the bucket.
 `snow_melt_rate` is zero over ocean points. Negative snow depth is clamped to zero (technically redundant given the conserving excess term above) and stored 
 as equivalent liquid water height, not physical snow thickness. The accumulation is 
-capped at 10m equivalent liquid water height, following how permanent snow area is treated 
-in [IFS Cycle 49r1](https://www.ecmwf.int/en/elibrary/81626-ifs-documentation-cy49r1-part-iv-physical-processes). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
+capped at 10m equivalent liquid water height, following how permanent snow area is treated
+in [IFSCycle49r1](@citep). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
 
 The snow budget links into other surface schemes:
 
@@ -513,4 +513,3 @@ output = ZarrOutput(spectral_grid, PrimitiveWet)
 model = PrimitiveWetModel(spectral_grid; land, output, ...)
 add!(model, TerrariumOutput(terrarium_model)...)
 ```
-
