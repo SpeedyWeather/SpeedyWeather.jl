@@ -43,7 +43,7 @@ For an interactive visualisation of the spherical harmonics, see
 !!! info "Latitudes versus colatitudes"
     The implementation of the spectral transforms in SpeedyWeather.jl uses colatitudes ``\theta = (0, \pi)``
     (0 at the north pole) but the dynamical core uses latitudes ``\theta = (-\pi/2, \pi/2)`` (``\pi/2`` at the north pole).
-    Note: We may also use latitudes in the spherical harmonic transform in the future for consistency. 
+    Note: We may also use latitudes in the spherical harmonic transform in the future for consistency.
 
 ## [Synthesis (spectral to grid)](@id synthesis)
 
@@ -83,7 +83,7 @@ sections ignore this and only discuss it again in [Meridional derivative](@ref).
 
 Another consequence of the symmetry mentioned above is that the zonal harmonics, meaning ``a_{l, m=0}`` have
 no imaginary component. Because these harmonics are zonally constant, a non-zero imaginary component would
-rotate them around the Earth's axis, which, well, doesn't actually change a real-valued field. 
+rotate them around the Earth's axis, which, well, doesn't actually change a real-valued field.
 
 Following the notation of [Willmert2020](@citep), we can therefore write the truncated synthesis as
 ```math
@@ -96,7 +96,7 @@ a pair.
 
 Another symmetry arises from the fact that the spherical harmonics are either symmetric or anti-symmetric
 around the Equator. There is an even/odd combination of degrees and orders so that the sign flips like a
-checkerboard: 
+checkerboard:
 ```math
 Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \theta).
 ```
@@ -153,10 +153,10 @@ see [Available horizontal resolutions](@ref).
     This matches our definition throughout, but contrasts to the typical mathematical definition with 0-based ``l, m``,
     which would be accessed via `a[l+1, m+1]`.
 
-The coefficients of these spherical harmonics are directly mapped into a matrix ``a_{lm}`` as 
+The coefficients of these spherical harmonics are directly mapped into a matrix ``a_{lm}`` as
 
 |     |``m``     |          |          |          |
-| :-: | :------: | :------: | :------: | :------: | 
+| :-: | :------: | :------: | :------: | :------: |
 |``l``|``a_{11}``|          |          |          |
 |     |``a_{21}``|``a_{22}``|          |          |
 |     |``a_{31}``|``a_{23}``|``a_{33}``|          |
@@ -194,7 +194,7 @@ This alternative packing uses the top-left triangle of a coefficient matrix, and
 stored at the following indices
 
 |      |``m'``    |          |          |          |
-| :--: | :-:      | :-------:| :-------:| :-------:| 
+| :--: | :-:      | :-------:| :-------:| :-------:|
 |``l'``|``a_{00}``|``a_{10}``|``a_{20}``|``a_{30}``|
 |      |``a_{11}``|``a_{21}``|``a_{31}``|          |
 |      |``a_{22}``|``a_{32}``|          |          |
@@ -266,7 +266,7 @@ resolution
 ```
 with ``N`` number of grid points over a sphere with radius ``R``. However, we have
 to acknowledge that this usually gives higher resolution compared to other methods
-of estimating the effective resolution; see [Randall2021](@citep) for a discussion. You may therefore
+of estimating the effective resolution; see [Randall2021](@citet) for a discussion. You may therefore
 need to be careful to make claims that, e.g. `truncation=86` can resolve the
 atmospheric dynamics at a scale of 165km.
 
@@ -293,7 +293,7 @@ and similar for the curl
 \frac{1}{R\cos\theta}\frac{\partial (u \cos\theta)}{\partial \theta}.
 ```
 
-The radius of the sphere (i.e. Earth) is ``R``. The zonal gradient scales with ``1/\cos(\theta)`` as the 
+The radius of the sphere (i.e. Earth) is ``R``. The zonal gradient scales with ``1/\cos(\theta)`` as the
 longitudes converge towards the poles (note that ``\theta`` describes latitudes here, definitions using colatitudes
 replace the ``\cos`` with a ``\sin``.)
 
@@ -374,7 +374,7 @@ at which point the recursion from above can be applied. Collecting terms proport
 (\cos(\theta)u)_{l, m} = -\frac{1}{R}(-(l-1)\epsilon_{l, m}\Psi_{l-1, m} + (l+2)\epsilon_{l+1, m}\Psi_{l+1, m})
 ```
 
-To obtain the coefficient of each spherical harmonic ``l, m`` of the meridional gradient of a spectral field, two 
+To obtain the coefficient of each spherical harmonic ``l, m`` of the meridional gradient of a spectral field, two
 coefficients at ``l-1, m`` and ``l+1, m`` have to be combined. This means that the coefficient of a gradient
 ``((\cos\theta) u)_{lm}`` is a linear combination of the coefficients of one higher and one lower degree
 ``\Psi_{l+1, m}, \Psi_{l-1, m}``. As the coefficient ``\Psi_{lm}`` with ``m<l`` are zero, the sectoral harmonics
@@ -382,7 +382,7 @@ coefficients at ``l-1, m`` and ``l+1, m`` have to be combined. This means that t
 the gradients require the ``l_{max}-1`` as well as the ``l_{max}+1`` harmonics. As a consequence
 vector quantities like velocity components ``u, v`` require one more degree ``l`` than scalar quantities like
 vorticity [Bourke1972](@citep). However, for easier compatibility all spectral fields in SpeedyWeather.jl use one more
-degree ``l``, but scalar quantities should not make use of it. Equivalently, the last degree ``l`` is 
+degree ``l``, but scalar quantities should not make use of it. Equivalently, the last degree ``l`` is
 set to zero before the time integration, which only advances scalar quantities.
 
 

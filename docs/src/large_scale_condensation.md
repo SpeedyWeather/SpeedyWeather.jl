@@ -76,7 +76,7 @@ And solving for ``\Delta q`` yields
 ```
 
 meaning that the implicit immediate condensation can be formulated as (see also
-[Frierson2006](@citep))
+[Frierson2006](@citet))
 
 ```math
 \begin{aligned}
@@ -89,7 +89,7 @@ With Euler forward time stepping this is great, but with our [leapfrog timestepp
 this is very dispersive (see [#445](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/445))
 although the implicit formulation is already much better.
 We therefore introduce a time step ``\Delta t_c`` which makes the implicit condensation not immediate
-anymore but over several time steps ``\Delta t`` of the leapfrogging.
+any more but over several time steps ``\Delta t`` of the leapfrogging.
 
 ```math
 \begin{aligned}

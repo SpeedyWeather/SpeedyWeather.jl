@@ -417,7 +417,7 @@ equation above, then we can also write
 - \overline{\mathbf{u}_k \cdot \nabla \ln p_s} - \bar{\mathcal{D}}_k
 + \sigma_{k+\tfrac{1}{2}}(-\mathbf{\bar{u}} \cdot \nabla \ln p_s - \bar{\mathcal{D}})
 ```
-See also [Hoskins1975](@citep). These vertical averages are the same as required by the
+See also [Hoskins1975](@citet). These vertical averages are the same as required by the
 [Surface pressure tendency](@ref) and in the [Temperature equation](@ref), they are therefore all calculated
 at once, storing the partial averages ``\overline{\mathbf{u}_k \cdot \nabla \ln p_s}`` and ``\bar{\mathcal{D}}_k`` on the fly.
 
