@@ -21,12 +21,11 @@ function healpix_nlat_half(model_nlat_half::Integer; nside = nothing, nlat_half 
 end
 
 """$(TYPEDSIGNATURES)
-Constructor for [`HEALPixOutput`](@ref) (extension version, available once `Zarr.jl` is
-loaded). Builds the output `HEALPixGrid` and the scratch fields to write from, and pre-fills
-`output.variables` with the defaults for `Model`.
+Constructor for [`HEALPixOutput`](@ref). Builds the output `HEALPixGrid` and the scratch fields 
+to write from, and pre-fills `output.variables` with the defaults for `Model`.
 
-The output resolution is given either as `nside`, as `nlat_half = 2nside`, or as a ready-made
-`output_grid::HEALPixGrid`, and defaults to the model grid's `nlat_half` (rounded up to the
+The output resolution is given either as `nside` (as defined e.g. by cuHPX), as `nlat_half = 2nside`, 
+or as a ready-made `output_grid::HEALPixGrid`, and defaults to the model grid's `nlat_half` (rounded up to the
 nearest even number, which `HEALPixGrid` requires). An interpolator onto that grid is only
 built when it is actually needed: if the model already runs on the very same HEALPix grid,
 `output.interpolator` stays `nothing` and the data is copied straight out, skipping
