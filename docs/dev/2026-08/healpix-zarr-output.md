@@ -27,6 +27,9 @@ Base revision: 20467269399f40212fee413a545496226de999ca
   runs on CPU anywhere and can therefore actually be executed; cuHPX is CUDA-only and could
   not be run on the development machine. cuHPX coverage is retained as an optional
   auto-skipping section of the same script.
+- 2026-08-31: added `check_cuhpx.py`, a deliberately minimal standalone GPU-node script
+  (`can you also try to write a very minimal test script that tests cuHPX compatability that
+  i can execute on a GPU node?`).
 - 2026-08-31: the check was moved out of the `test/` tree entirely, to
   `SpeedyWeather/healpix_compat/` beside `benchmark/` (`don't actually add the
   interoperability check to the unit tests, not even as a check`). `test/runtests.jl` needed
@@ -187,11 +190,22 @@ HEALPix implementation:
 An optional final section exercises cuHPX (`ring2nest` vs `healpy.reorder`, and
 `ring2flat`/`flat2ring` round-trips over all 8 conventions) and is reported as SKIPPED when
 cuHPX or a CUDA device is unavailable; `--strict` turns skips into failures for a GPU CI job.
+
+A second, deliberately minimal script `check_cuhpx.py` (~105 lines) sits beside it for
+running on a GPU node: numpy/zarr/torch/cuhpx only, healpy optional, one argument. It
+refuses non-12-face stores up front, then checks the `ring2nest` permutation, the
+`nest2ring∘ring2nest` round-trip and the `ring2flat`/`flat2ring` round-trips.
 cuHPX is GPU-only and its conversions are index permutations of exactly the RING convention
 verified above, so healpy conformance is what establishes cuHPX compatibility.
 
-**Verified:** checks 1-5 pass at nside=8 against healpy 1.20.0 (22 checks, exit 0). The
-cuHPX section has *not* been executed — no CUDA hardware was available.
+**Verified:** `check_healpy.py` checks 1-5 pass at nside=8 against healpy 1.20.0 (23 checks,
+exit 0). Neither script's cuHPX path has been executed against real cuHPX — no CUDA hardware
+was available. `check_cuhpx.py`'s own logic was instead verified against a numpy stand-in for
+`torch`/`cuhpx` driven by healpy: happy path exits 0, a deliberately broken stub is caught
+with 10 failures, an OctaHEALPix store is refused, a missing argument prints usage. Its calls
+were written against cuHPX's real positional signatures, read out of the cloned source
+(`ring2flat(data, origin, clockwise, nside)`; `nside` must be a power of two), and use
+`float64`, the dtype cuHPX's own test suite exercises.
 
 Two bugs were found only by actually running this, both now fixed: the writer script's
 `mktempdir` needed `cleanup=false` (Julia deleted the store on exit, before the checker could
