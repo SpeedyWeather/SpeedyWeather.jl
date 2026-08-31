@@ -369,8 +369,12 @@ stability problems, with a long model run at the configuration that previously f
   is 0.12 at every resolution), and it can be made exact.
 - Document the `slack ≥ nlat_half/16` rule and whichever of Option A / B is chosen.
 - `CHANGELOG.md` entry under `## Unreleased`.
-- Version bumps: `SpeedyTransforms` (new public behaviour → `0.3.0-DEV`), and `RingGrids` only if
-  the shortcut or weight helpers move there.
+- Version bumps: `SpeedyTransforms` `0.2.1` → `0.3.0-DEV` (the `solid_angles` field is replaced, so
+  this is breaking). `RingGrids` and `SpeedyWeather` are already at `+DEV` and need no further bump —
+  the only change to either is a docstring and a compat bound.
+- `SpeedyWeather/Project.toml` pins `SpeedyTransforms = "0.2"`, which no longer resolves against
+  `0.3.0-DEV`; raised to `"0.3"`. No `SpeedyWeather` source uses the changed API (`solid_angles`
+  appears nowhere outside `SpeedyTransforms`), so the bound is the only coupling.
 
 ## Known limitations
 
