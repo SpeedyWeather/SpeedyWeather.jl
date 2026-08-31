@@ -6,29 +6,41 @@ whatever boundary condition applies at the missing end of the vertical bracket, 
 never have to hardcode a boundary value."""
 abstract type AbstractVerticalStaggering end
 
-"""Fields located on full vertical levels (cell centers): u, v, T, etc. `sigma` is
-`σ_levels_full`; every bracket index maps directly onto a stored data layer, so there is
-no boundary condition to apply."""
+"""Fields located on full vertical levels (cell centers): u, v, T, etc. Every bracket
+index maps directly onto a stored data layer, so there is no boundary condition to
+apply. $(TYPEDFIELDS)"""
 struct SigmaCenter{V} <: AbstractVerticalStaggering
+    "σ_levels_full: one σ value per stored data layer"
     sigma::V
 end
 
+Adapt.@adapt_structure SigmaCenter
+
 """Fields located on half vertical levels (upper cell face, k-½). Layer `k` in the data
 stores the value at the face above full-level `k` (σ at k-½); the bottom face (σ=1,
-k=nlayers+½) is not stored and is replaced by `bottom_boundary_condition`."""
+k=nlayers+½) is not stored and is replaced by `bottom_boundary_condition`.
+$(TYPEDFIELDS)"""
 struct SigmaFaceAbove{V, T} <: AbstractVerticalStaggering
+    "σ_levels_half: one σ value per face, length nlayers+1"
     sigma::V
+    "Value substituted for the unstored bottom face (σ=1)"
     bottom_boundary_condition::T
 end
+
+Adapt.@adapt_structure SigmaFaceAbove
 
 """Fields located on half vertical levels (lower cell face, k+½), e.g. vertical velocity
 w. Layer `k` in the data stores the value at the face below full-level `k` (σ at k+½);
 the top face (σ=0, k=½) is not stored and is replaced by `top_boundary_condition`
-(typically zero, from the kinematic boundary condition w(σ=0) = 0)."""
+(typically zero, from the kinematic boundary condition w(σ=0) = 0). $(TYPEDFIELDS)"""
 struct SigmaFaceBelow{V, T} <: AbstractVerticalStaggering
+    "σ_levels_half: one σ value per face, length nlayers+1"
     sigma::V
+    "Value substituted for the unstored top face (σ=0)"
     top_boundary_condition::T
 end
+
+Adapt.@adapt_structure SigmaFaceBelow
 
 # data column index = bracket index k + shift(staggering); out-of-[1, nlayers] means
 # the value isn't stored and boundary(staggering) is substituted instead.

@@ -52,18 +52,6 @@ end
     model.feedback.verbose = false
     simulation = initialize!(model)
 
-    # NOTE (PR #1215): this currently fails to compile on GPU. AnvilLocator's new
-    # north_pole_vals/south_pole_vals fields are typed Union{Nothing, VectorType},
-    # which is never isbits regardless of the runtime value. Since vars.particles.locator
-    # sits inside Variables, and unrelated kernels (e.g. gpu_column_parameterizations_kernel!)
-    # take the whole vars object as an argument, this breaks GPU compilation for the whole
-    # time step, not just the interpolation kernel -- for any particle advection, 2D or 3D.
-    # Replace this try/catch + @test_broken with a plain run! call once fixed.
-    err = nothing
-    try
-        run!(simulation, steps = 1, output = false)
-    catch e
-        err = e
-    end
-    @test_broken err === nothing
+    @test_nowarn run!(simulation, steps = 1, output = false)
 end
+
