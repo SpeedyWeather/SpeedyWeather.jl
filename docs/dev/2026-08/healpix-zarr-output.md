@@ -191,10 +191,21 @@ An optional final section exercises cuHPX (`ring2nest` vs `healpy.reorder`, and
 `ring2flat`/`flat2ring` round-trips over all 8 conventions) and is reported as SKIPPED when
 cuHPX or a CUDA device is unavailable; `--strict` turns skips into failures for a GPU CI job.
 
-A second, deliberately minimal script `check_cuhpx.py` (~105 lines) sits beside it for
-running on a GPU node: numpy/zarr/torch/cuhpx only, healpy optional, one argument. It
-refuses non-12-face stores up front, then checks the `ring2nest` permutation, the
-`nest2ring∘ring2nest` round-trip and the `ring2flat`/`flat2ring` round-trips.
+A second, deliberately minimal script `check_cuhpx.py` (~155 lines) sits beside it for
+running on a GPU node: numpy/zarr/torch/cuhpx only, healpy optional, one argument. It refuses
+non-12-face stores up front, then checks the remapping (`ring2nest` permutation,
+`nest2ring∘ring2nest`, `ring2flat`/`flat2ring` over all 8 conventions) and, crucially, one
+**transform** test with cuHPX's spherical harmonic transform. The transform is what actually
+interprets the flat array as a field on the sphere, so it is the part that can catch a wrong
+cell ordering: it checks the monopole `a_00/√(4π)` against the area mean, that the power
+spectrum is red, that `iSHT∘SHT` is idempotent, and how much variance survives band-limiting.
+
+The field is normalised to zero mean and unit variance so the checks are unit-agnostic and
+cuHPX's own tolerances apply directly. Their HEALPix SHT is approximate quadrature —
+`rtol=0.01, atol=0.05` in their suite, on band-limited signals only, with the comment
+"roundtrip error is algorithm-limited, not precision-limited" — so the script never demands
+exact recovery of a raw model field, and the idempotence check allows 2× their atol because
+it projects a real field first.
 cuHPX is GPU-only and its conversions are index permutations of exactly the RING convention
 verified above, so healpy conformance is what establishes cuHPX compatibility.
 
@@ -206,6 +217,15 @@ with 10 failures, an OctaHEALPix store is refused, a missing argument prints usa
 were written against cuHPX's real positional signatures, read out of the cloned source
 (`ring2flat(data, origin, clockwise, nside)`; `nside` must be a power of two), and use
 `float64`, the dtype cuHPX's own test suite exercises.
+
+The transform section was validated with the stub's `SHT`/`iSHT` backed by real spherical
+harmonics (healpy `map2alm`/`alm2map`). On a good store all five transform checks pass
+(spectrum ratio 1336, idempotence max|Δ| 3.9e-2, corr 0.9992); on a deliberately
+cell-scrambled copy of that same store the two ordering-sensitive ones fail as intended
+(spectrum ratio 0.4, idempotence 2.4e-1). That experiment also showed the monopole and
+correlation checks are *not* ordering-sensitive — a permutation preserves the mean, and the
+correlation compares the projection against the field it was derived from — so both are
+labelled as such in the script and README rather than being mistaken for ordering evidence.
 
 Two bugs were found only by actually running this, both now fixed: the writer script's
 `mktempdir` needed `cleanup=false` (Julia deleted the store on exit, before the checker could
