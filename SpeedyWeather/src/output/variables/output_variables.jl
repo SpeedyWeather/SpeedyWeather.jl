@@ -38,6 +38,21 @@ get_indices(i, x::Val{true}, y::Val{true}, z::Val{true}, t::Val{false}) = (:, :,
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{true}) = (:, :, i)     # 2D + time
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{false}) = (:, :)       # 2D
 
+"""$(TYPEDSIGNATURES)
+Indices to write the output slice of `variable` at output step `i` into a store that keeps
+the horizontal dimension *unravelled* into a single flat dimension, as a `Field`'s `data`
+already is. The `x` and `y` flags of `variable.dims_xyzt` collapse into that one flat
+dimension, so a 3D+time variable is written as `(:, :, i)` where the equivalent
+[`get_indices`](@ref) for a rectangular `lon`/`lat` store gives `(:, :, :, i)`.
+Used by the flat [`HEALPixOutput`](@ref) backend."""
+get_flat_indices(i, variable::AbstractOutputVariable) =
+    get_flat_indices(i, Val(is3D(variable)), Val(hastime(variable)))
+
+get_flat_indices(i, z::Val{true}, t::Val{true}) = (:, :, i)     # 3D + time
+get_flat_indices(i, z::Val{true}, t::Val{false}) = (:, :)       # 3D
+get_flat_indices(i, z::Val{false}, t::Val{true}) = (:, i)       # 2D + time
+get_flat_indices(i, z::Val{false}, t::Val{false}) = (:,)        # 2D
+
 is2D(variable::AbstractOutputVariable) = ~variable.dims_xyzt[3]
 is3D(variable::AbstractOutputVariable) = variable.dims_xyzt[3]
 is_land(variable::AbstractOutputVariable) = hasproperty(variable, :is_land) ? variable.is_land : false

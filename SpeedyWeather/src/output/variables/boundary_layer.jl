@@ -78,7 +78,7 @@ function output!(
     # interpolate 2D/3D variables
     u_or_v10_output = output.field2D
     u_or_v10_grid = on_architecture(CPU(), u_or_v10)
-    RingGrids.interpolate!(u_or_v10_output, u_or_v10_grid, output.interpolator)
+    interpolate_output!(output, u_or_v10_output, u_or_v10_grid)
 
     if hasproperty(variable, :keepbits)     # round mantissabits for compression
         round!(u_or_v10_output, variable.keepbits)
@@ -137,7 +137,7 @@ function output!(
     # interpolate 2D/3D variables
     Ts_output = output.field2D
     Ts_grid = on_architecture(CPU(), Ts)
-    RingGrids.interpolate!(Ts_output, Ts_grid, output.interpolator)
+    interpolate_output!(output, Ts_output, Ts_grid)
 
     if hasproperty(variable, :keepbits)     # round mantissabits for compression
         round!(Ts_output, variable.keepbits)

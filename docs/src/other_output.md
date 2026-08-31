@@ -198,6 +198,97 @@ ds["temp"].mean("ensemble")     # ensemble mean
 Note that this ensemble layout is currently specific to `ZarrOutput`; the
 [`NetCDFOutput`](@ref) does not support concurrent multi-process writes. 
 
+## HEALPix Output
+
+[HEALPix](https://healpix.sourceforge.io) is an equal-area discretization of the sphere. However with its non-rectangular coordinates, it's not straight forward to save HEALPix grids in standard NetCDF files. Instead, `HEALPixOutput` writes
+  Zarr store on a [`HEALPixGrid`](@ref) keeping the horizontal dimension **flat** — one
+unravelled vector of `npix = 12nside²` cells, exactly as a `Field` stores its data — rather
+than interpolating onto a rectangular `lon`×`lat` grid the way [`NetCDFOutput`](@ref) and
+`ZarrOutput` do. Use it with:
+
+```@example healpix
+using SpeedyWeather
+using Zarr     # this loads SpeedyWeatherZarrExt and enables HEALPixOutput
+
+spectral_grid = SpectralGrid(truncation=31, nlayers=8)
+output = HEALPixOutput(spectral_grid, PrimitiveWet, nside=16, interval=Hour(6))
+model = PrimitiveWetModel(spectral_grid; output)
+simulation = initialize!(model)
+run!(simulation, period=Day(1), output=true)
+nothing #hide
+```
+
+The resolution is set with `nside`, equivalently `nlat_half = 2nside`, and defaults to the
+model grid's own `nlat_half` (rounded up to the nearest even number, which `HEALPixGrid`
+requires). All the file options of `ZarrOutput` (`path`, `id`, `overwrite`, `interval`,
+`variables`, `time_chunk`, `compressor`, …) behave identically; `lon_chunk`/`lat_chunk` are
+replaced by a single `cell_chunk` for the flat dimension.
+
+### Store layout
+
+| array | shape | `_ARRAY_DIMENSIONS` |
+|---|---|---|
+| 3D variable, e.g. `temp` | `(npix, nlayers, ntime)` | `["time", "layer", "cell"]` |
+| 2D variable, e.g. `mslp` | `(npix, ntime)` | `["time", "cell"]` |
+| `lat`, `lon`, `ring` | `(npix,)` | `["cell"]` |
+| `cell` | `(npix,)` | `["cell"]` |
+
+Alongside the data the store holds three flat vectors, one entry per cell, so that a consumer
+can place every data point on the sphere without knowing anything about SpeedyWeather's grids:
+
+- `lat`, `lon`: the coordinates of each cell in degrees north/east
+- `ring`: the latitude ring index of each cell, 1 (north) to `4nside-1` (south)
+
+```@example healpix
+g = Zarr.zopen(joinpath(output.run_path, output.filename))
+g["lat"][1:4], g["lon"][1:4], g["ring"][1:4]    # the 4 cells of the northernmost ring
+```
+
+### RING ordering and interoperability
+
+Cells are written in standard **HEALPix RING order**: cell `ij` (1-based, as in a `Field`)
+is RING pixel `ij-1` in the 0-based convention of healpy and
+[cuHPX](https://github.com/NVlabs/cuHPX), so no reordering is needed on either side. The
+store also carries `healpix_nside`, `healpix_npix` and `healpix_order` as global attributes:
+
+```python
+import xarray as xr, healpy as hp
+ds = xr.open_zarr("run_0001/output_healpix.zarr", consolidated=True)
+nside = ds.attrs["healpix_nside"]
+hp.mollview(ds["temp"].isel(time=-1, layer=-1).values, nest=False)   # RING map, plots directly
+```
+
+This conventions should be compatabile with `healpy` and `cuHPX`.  Note that while `HEALPixOutput`
+writes any even `nlat_half`, the NESTED and earth-2 flat layouts those tools convert to
+require `nside` to be a power of two.
+
+Mind the axis order when reading from Python: Zarr stores shape row-major while Julia is
+column-major, so a variable written as `(cell, layer, time)` from Julia is seen as
+`(time, layer, cell)` from Python — matching its `_ARRAY_DIMENSIONS` tag. A flat `(npix,)`
+map to hand to `healpy` is therefore `arr.reshape(-1, npix)[-1]`, and the `hp.mollview` call
+above works because `.isel(time=-1, layer=-1)` already reduces to the trailing `cell` axis.
+
+### Skipping the interpolation
+
+If the simulation already runs on the very HEALPix grid requested for output, no
+interpolation is needed and none is set up — `output.interpolator` stays `nothing` and the
+data is copied straight out of the model state:
+
+```@example healpix
+spectral_grid = SpectralGrid(truncation=31, nlayers=8, Grid=HEALPixGrid)
+output = HEALPixOutput(spectral_grid, PrimitiveWet)
+isnothing(output.interpolator)      # true, model and output share the grid
+```
+
+This saves both the per-output-step interpolation and the precomputation of the
+interpolator's stencil indices and weights, and makes the written data bit-identical to the
+model state (up to the number format and the `keepbits` mantissa rounding). Requesting a
+different `nside` than the model's resolution brings the interpolator back.
+
+````@docs; canonical=false
+HEALPixOutput
+````
+
 ## Parameter summary
 
 With `output=true` as an argument in the `run!(simulation)` call, the [NetCDFOutput](@ref) by default also
