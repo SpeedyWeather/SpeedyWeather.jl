@@ -142,7 +142,7 @@ planet = Earth(spectral_grid, length_of_day=Hour(24), length_of_year=Day(365)+Ho
 the sun (controlling the seasonal cycle). Both are `Dates` periods, so
 `Hour(24)`, `Day(1)` or `Second(86400)` are equivalent, and both are completely
 independent of the model's time step and of the simulation time you pass to
-[`run!`](@ref run). A planet with a 10-day-long day and an Earth-length year is just
+[`run!`](@ref). A planet with a 10-day-long day and an Earth-length year is just
 
 ```@example radiation
 planet = Earth(spectral_grid, length_of_day=Day(10), length_of_year=Day(365))

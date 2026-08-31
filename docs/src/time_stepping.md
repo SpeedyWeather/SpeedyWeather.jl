@@ -65,6 +65,12 @@ available so that 3. can start the leapfrogging without any offset from the intu
 The time step that is used to evaluate the tendencies is denoted with (T).
 It is always the time step furthest in time that is available.
 
+Before the time integration starts, the initial conditions -- which only occupy step ``i-1`` --
+are also copied into step ``i``. This is purely a bookkeeping convenience: it lets
+`which_prognostic_step` always return step ``i`` (2) as the one to evaluate the right-hand side on,
+without a special case for the very first (Euler) step where step ``i`` would otherwise not yet
+exist.
+
 The initial Euler step is not filtered, see [Robert-Asselin and Williams filter](@ref) below.
 On the first two steps (Euler, and the first leapfrog step) `Leapfrog`'s `update_prognostic!`
 therefore disables the filter weights (both are 0), and enables them for every step after that.
@@ -243,12 +249,20 @@ for every spectral coefficient (and vertical layer), with the implicit correctio
 Four weight variants are available, following the naming in Hotta et al. (2016), selected via the
 `variant` option:
 
-| Variant | Weight ``w_k`` for substep ``k = 1, \dots, N-1`` (``w_0 = 1``) | Notes |
-| ------- | --------------------------------------------------------------- | ----- |
-| `NCycleLorenzA` (default) | ``w_k = N / (N - k)`` | |
-| `NCycleLorenzB` | ``w_k = N / k`` | |
-| `NCycleLorenzAB` | alternates a full cycle of `A`, then a full cycle of `B` | 2 cycles per period |
-| `NCycleLorenzABBA` | sequence `A`, `B`, `B`, `A` | only for ``N=4``, 4th-order accurate |
+| Variant | Weight ``w_k`` for substep ``k = 1, \dots, N-1`` (``w_0 = 1``) | Steps per period | Notes |
+| ------- | --------------------------------------------------------------- | ----------------- | ----- |
+| `NCycleLorenzA` (default) | ``w_k = N / (N - k)`` | ``N`` | |
+| `NCycleLorenzB` | ``w_k = N / k`` | ``N`` | |
+| `NCycleLorenzAB` | alternates a full cycle of `A`, then a full cycle of `B` | ``2N`` | 2 cycles per period |
+| `NCycleLorenzABBA` | sequence `A`, `B`, `B`, `A` | ``4N`` | 4th-order accurate for ``N=4``; other ``N`` run but without that accuracy guarantee |
+
+"Steps per period" is the number of substeps after which the weight sequence repeats. These
+substeps can be interpreted in two ways: as sub-stages of a single step, the way a Runge-Kutta
+method would use them, where the full time step ``\Delta t`` is only completed once all substeps
+of a period have run; or as a multi-step method with changing weights that restarts every period,
+where every substep already advances the state by a full ``\Delta t`` (as in the update
+``x = x + \Delta t\,G`` above). SpeedyWeather.jl uses the latter, so the computational cost of the
+Lorenz N-cycle is independent of ``N`` but, like leapfrog, inversely proportional to ``\Delta t``.
 
 The cycle length ``N`` is set with `steps` (3 or 4 recommended, 4 is more stable). The current
 substep ``k`` is `current_substep(L, clock) = mod(clock.step_counter, L.steps)`, and the weight for

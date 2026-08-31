@@ -93,7 +93,7 @@ simulation.variables
 
 ## Setting variables
 
-The prognostic variables can be mutated (e.g. to set new [initial conditions](initial_conditions.md)) with the [`SpeedyWeather.set!`](@ref) function.
+The prognostic variables can be mutated (e.g. to set new [initial conditions](@ref "Initial conditions")) with the [`SpeedyWeather.set!`](@ref) function.
 Other variables can be set too but they might be overwritten such that your changes may have a different
 effect than you expect. You can specify `group` (default `=:prognostic`) and `namespace` (default `=nothing`)
 in `set!` to set variables, e.g.

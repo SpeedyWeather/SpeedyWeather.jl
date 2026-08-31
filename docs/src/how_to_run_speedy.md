@@ -210,7 +210,7 @@ example, change the output interval like so
 set!(model.output, model, interval=Hour(1))
 ```
 Now, if there's output, it will be every hour. Furthermore the [initial
-conditions](initial_conditions.md) can be set with the `initial_conditions` model component
+conditions](@ref "Initial conditions") can be set with the `initial_conditions` model component
 which are then set during `initialize!(::AbstractModel)`, but you can also
 change them now, before the model runs 
 ```@example howto
