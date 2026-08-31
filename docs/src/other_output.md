@@ -200,8 +200,8 @@ Note that this ensemble layout is currently specific to `ZarrOutput`; the
 
 ## HEALPix Output
 
-[HEALPix](https://healpix.sourceforge.io) is an equal-area discretization of the sphere. However with its non-rectangular coordinates, it's not straight forward to save HEALPix grids in standard NetCDF files. Instead, `HEALPixOutput` writes
-  Zarr store on a [`HEALPixGrid`](@ref) keeping the horizontal dimension **flat** — one
+[HEALPix](https://healpix.sourceforge.io) is an equal-area discretization of the sphere. However with its non-rectangular coordinates, it's not straight forward to save HEALPix grids in standard NetCDF files. Instead `HEALPixOutput` writes
+a Zarr store, keeping the horizontal dimension **flat** — one
 unravelled vector of `npix = 12nside²` cells, exactly as a `Field` stores its data — rather
 than interpolating onto a rectangular `lon`×`lat` grid the way [`NetCDFOutput`](@ref) and
 `ZarrOutput` do. Use it with:
@@ -218,9 +218,12 @@ run!(simulation, period=Day(1), output=true)
 nothing #hide
 ```
 
-The resolution is set with `nside`, equivalently `nlat_half = 2nside`, and defaults to the
-model grid's own `nlat_half` (rounded up to the nearest even number, which `HEALPixGrid`
-requires). All the file options of `ZarrOutput` (`path`, `id`, `overwrite`, `interval`,
+The resolution is set with `nside` (as in most HEALPix implementation like cuHPX), 
+equivalently `nlat_half = 2nside`, and defaults to the model grid's own `nlat_half` 
+(rounded up to the nearest even number, which `HEALPixGrid`
+requires). 
+
+All the other file options of `ZarrOutput` (`path`, `id`, `overwrite`, `interval`,
 `variables`, `time_chunk`, `compressor`, …) behave identically; `lon_chunk`/`lat_chunk` are
 replaced by a single `cell_chunk` for the flat dimension.
 
@@ -246,8 +249,8 @@ g["lat"][1:4], g["lon"][1:4], g["ring"][1:4]    # the 4 cells of the northernmos
 
 ### RING ordering and interoperability
 
-Cells are written in standard **HEALPix RING order**: cell `ij` (1-based, as in a `Field`)
-is RING pixel `ij-1` in the 0-based convention of healpy and
+Cells are written in standard **HEALPix RING order** of [cuHPX](https://github.com/NVlabs/cuHPX): 
+cell `ij` (1-based, as in a `Field`) is RING pixel `ij-1` in the 0-based convention of healpy and
 [cuHPX](https://github.com/NVlabs/cuHPX), so no reordering is needed on either side. The
 store also carries `healpix_nside`, `healpix_npix` and `healpix_order` as global attributes:
 
@@ -258,14 +261,14 @@ nside = ds.attrs["healpix_nside"]
 hp.mollview(ds["temp"].isel(time=-1, layer=-1).values, nest=False)   # RING map, plots directly
 ```
 
-This conventions should be compatabile with `healpy` and `cuHPX`.  Note that while `HEALPixOutput`
+These conventions should be compatabile with `healpy` and `cuHPX`.  Note that while `HEALPixOutput`
 writes any even `nlat_half`, the NESTED and earth-2 flat layouts those tools convert to
 require `nside` to be a power of two.
 
 Our `lat` is latitude in degrees **from the equator** and `lon` is in `[0, 360)`, which is
 exactly `healpy`'s `lonlat=True` convention. Mind that this is *not* healpy's default: with
 `lonlat=False` (the default) healpy uses **colatitude in radians from the north pole**, so
-convert with `theta = deg2rad(90 - lat)`, `phi = deg2rad(lon)`.
+convert with `theta = deg2rad(90 - lat)`, `phi = deg2rad(lon)` or use `lonlat=True`.
 
 Mind the axis order when reading from Python: Zarr stores shape row-major while Julia is
 column-major, so a variable written as `(cell, layer, time)` from Julia is seen as
@@ -276,8 +279,7 @@ above works because `.isel(time=-1, layer=-1)` already reduces to the trailing `
 ### OctaHEALPix output
 
 `HEALPixOutput` also writes the [`OctaHEALPixGrid`](@ref), a SpeedyWeather-specific member of
-the HEALPix family (4 faces, `4nlat_half²` points, no equatorial belt, and — unlike
-`HEALPixGrid` — any *odd* `nlat_half` is allowed). It is equal-area and ring-ordered and is
+the HEALPix family (4 faces, `4nlat_half²` points, no equatorial belt). It is
 written with **exactly the same store convention**: the same flat `cell` dimension, the same
 flat `lat`/`lon`/`ring` coordinate vectors, the same array shapes and `_ARRAY_DIMENSIONS`.
 
