@@ -103,6 +103,20 @@ ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.GridVariable2D}(zeros(SG.GridVa
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
 @propagate_inbounds albedo!(ij, albedo, vars, scheme::ManualAlbedo, model) = (albedo[ij] = scheme.albedo[ij])
 
+export PrescribedAlbedo
+
+"""Prescribed albedo field, to be used with `set!`. In contrast to `ManualAlbedo` the albedo is not 
+hold in the struct and not copied into the diagnostic variables automatically. It's expected that the
+albedo variable (e.g `vars.land.albedo`) is set externally at every time step.
+Defined so that the albedo can be prescribed externally e.g. when coupling the model. """
+struct PrescribedAlbedo <: AbstractAlbedo
+end
+
+Adapt.@adapt_structure PrescribedAlbedo
+PrescribedAlbedo(SG::SpectralGrid) = PrescribedAlbedo()
+initialize!(albedo::PrescribedAlbedo, model::PrimitiveEquation) = nothing
+@propagate_inbounds albedo!(ij, albedo, vars, scheme::PrescribedAlbedo, model) = nothing
+
 export AlbedoClimatology
 
 """Albedo climatology loaded from netcdf file. Fields are $(TYPEDFIELDS)"""

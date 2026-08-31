@@ -33,7 +33,6 @@ $(TYPEDFIELDS)"""
         AL,     # <:AbstractAlbedo,
         BL,     # <:AbstractBoundaryLayer,
         VD,     # <:AbstractVerticalDiffusion,
-        SC,     # <:AbstractSurfaceCondition,
         SM,     # <:AbstractSurfaceMomentumFlux,
         SH,     # <:AbstractSurfaceHeatFlux,
         CV,     # <:AbstractConvection,
@@ -87,7 +86,6 @@ $(TYPEDFIELDS)"""
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer::BL = BoundaryLayer(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    @component surface_condition::SC = SurfaceCondition(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
@@ -99,7 +97,7 @@ $(TYPEDFIELDS)"""
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
-    spectral_transform::ST = SpectralTransform(spectral_grid)
+    spectral_transform::ST = WhichTransform(spectral_grid)
     implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
@@ -124,7 +122,6 @@ $(TYPEDFIELDS)"""
         :shortwave_radiation,
         :longwave_radiation,
         :boundary_layer,            # surface fluxes
-        :surface_condition,
         :surface_momentum_flux,
         :surface_heat_flux,
         :stochastic_physics,        # perturbations
@@ -155,10 +152,10 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         TendencyVariable(:divergence, GridXYZT(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
         TendencyVariable(:temperature, GridXYZT(tg), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :grid_tendencies),
         TendencyVariable(:pressure, GridXYT(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :grid_tendencies),
-        
-        GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse=:grid),
-        GridVariable(:temperature, GridXYZT(pg), desc = "Temperature", units = "K", fuse=:grid),
-        GridVariable(:pressure, GridXYT(pg), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse=:grid),
+
+        GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse = :grid),
+        GridVariable(:temperature, GridXYZT(pg), desc = "Temperature", units = "K", fuse = :grid),
+        GridVariable(:pressure, GridXYT(pg), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :grid),
         ParameterizationVariable(:surface_pressure, Grid2D(), desc = "Surface pressure", units = "Pa"),
 
         DynamicsVariable(:uT_anomaly, GridXYZT(tg), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
@@ -227,7 +224,6 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
     initialize!(model.greenhouse_gases, model)
-    initialize!(model.surface_condition, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.stochastic_physics, model)

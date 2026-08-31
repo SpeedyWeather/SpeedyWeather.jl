@@ -92,7 +92,7 @@ function drag!(
     u = get_prognostic_step(vars.grid.u, model.time_stepping, scheme)
     v = get_prognostic_step(vars.grid.v, model.time_stepping, scheme)
     k = size(u, 2)            # drag only on surface layer
-    
+
     Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
     Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 
@@ -122,7 +122,7 @@ end
 export SpeedLimitDrag
 @parameterized @kwdef struct SpeedLimitDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/m]"
-    @param drag::NF = 4.0e-7 (bounds = Nonnegative,)
+    @param drag::NF = 3.0e-6 (bounds = Nonnegative,)
 
     "[OPTION] Speed limit above which drag kicks in [m/s]"
     @param speed_limit::NF = 80 (bounds = Nonnegative,)
@@ -135,11 +135,12 @@ initialize!(::SpeedLimitDrag, ::AbstractModel) = nothing
 $(TYPEDSIGNATURES)
 Speed limit drag for the momentum equations.
 
-    Fu = -c*max(0, |(u, v)| - speed_limit)^2 * sign(u)
+    (Fu, Fv) = -c*max(0, |(u, v)| - speed_limit)^2 * (u, v)/|(u, v)|
 
 with `c` the drag coefficient [1/m] as defined in `drag::SpeedLimitDrag` and
 kicking in only above a certain speed limit. The drag is quadratic in the excess
-speed above the limit and acts to slow down the flow, hence the `sign(u)` term."""
+speed above the limit and antiparallel to the flow, so it only decelerates and
+never rotates it."""
 function drag!(
         vars::Variables,
         scheme::SpeedLimitDrag,
@@ -167,13 +168,20 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    # Calculate speed
-    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
+    uij = u[ij, k]
+    vij = v[ij, k]
+    speed = sqrt(uij^2 + vij^2)
+    excess = max(0, speed - speed_limit)    # zero below the limit
 
-    # Apply speed limit drag, -= as the tendencies already contain forcing
-    U² = max(0, speed - speed_limit)^2
-    Fu[ij, k] -= c * U² * sign(u[ij, k])
-    Fv[ij, k] -= c * U² * sign(v[ij, k])
+    # -c*excess^2 * (u, v)/speed, i.e. antiparallel to the flow. Scaling the unit vector
+    # (u, v)/speed rather than (sign(u), sign(v)) keeps the drag opposite to the velocity;
+    # the latter points along the quadrant diagonal and is √2 too large for a 45° flow.
+    # excess > 0 implies speed > speed_limit >= 0, so the division is guarded.
+    scale = ifelse(excess > 0, c * excess^2 / speed, zero(speed))  # excess > 0 ? c * excess^2 / speed : zero(speed)
+
+    # -= as the tendencies already contain forcing
+    Fu[ij, k] -= scale * uij
+    Fv[ij, k] -= scale * vij
 end
 
 export LinearVorticityDrag

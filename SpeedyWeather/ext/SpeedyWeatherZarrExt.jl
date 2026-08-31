@@ -88,6 +88,9 @@ function ZarrOutput(
     return output
 end
 
+# to dispatch over the dataset type
+SpeedyWeather.dataset_type(::ZarrOutput) = Zarr.ZGroup
+
 """$(TYPEDSIGNATURES)
 Initialize `ZarrOutput` by creating a Zarr group on disk and storing the initial
 conditions of `vars`. Mirrors the layout of [`SpeedyWeather.NetCDFOutput`](@ref):
@@ -485,20 +488,107 @@ function define_variable!(
 end
 
 """$(TYPEDSIGNATURES)
+Return `true` if writes for `output` should be buffered along the time dimension.
+Buffering only pays off when a Zarr chunk spans more than one time step
+(`time_chunk > 1`); with `time_chunk == 1` every time slice is already its own chunk
+and is written directly (see [`write_array!`](@ref))."""
+time_buffered(output::ZarrOutput) = output.time_chunk > 1
+
+"""$(TYPEDSIGNATURES)
 Write a single output time step for `variable` to the Zarr store in `output`.
-The generic [`output!`](@ref) handles interpolation, transforms and bitrounding;
-this method just performs the Zarr-specific store-side write."""
+
+A Zarr chunk is the atomic unit of (de)compression and I/O, so writing one time
+slice into a chunk that spans `time_chunk > 1` steps would force a read-modify-write
+of the whole chunk on every step. To avoid this, time-varying variables are buffered
+`time_chunk` slices deep (see `output.time_buffers`) and flushed one chunk at a time via
+[`flush_time_chunk!`](@ref); a chunk-aligned write is fulfilled by Zarr's
+single-chunk write operation with no read. Any remaning chunks in the buffer are flushed
+to disk on `close` (see [`flush_partial_time_chunks!`](@ref)).
+
+Buffering is skipped entirely (see [`time_buffered`](@ref)) for static, non-temporal
+variables and when `time_chunk == 1`: in these cases, [`write_slice!`](@ref) writes the
+data directly to disk."""
 function write_array!(
         output::ZarrOutput,
         variable::AbstractOutputVariable,
         field,
     )
+    data = parent_array(field)
+
+    # Skip buffering for static variables (written once at index 1) and when
+    # time_chunk == 1 (every time slice is its own chunk): write the slice directly.
+    if !hastime(variable) || !time_buffered(output)
+        i = hastime(variable) ? output.output_counter : 1
+        write_slice!(output, variable, data, i)
+        return nothing
+    end
+
+    # Buffered path: copy this slice into the variable's time buffer (lazily allocated
+    # to the chunk shape (spatial..., time_chunk)) at its offset within the current chunk.
+    time_chunk = output.time_chunk
+    i = output.output_counter
+    offset = mod1(i, time_chunk)    # 1..time_chunk position within the current chunk
+    buffer = get!(output.time_buffers, variable.name) do
+        Array{eltype(data)}(undef, size(data)..., time_chunk)
+    end
+    selectdim(buffer, ndims(buffer), offset) .= data
+
+    # A full chunk has been collected (this slice closes it, so it is chunk-aligned):
+    # flush the whole buffer in one chunk-aligned write.
+    offset == time_chunk && flush_time_chunk!(output, variable, buffer, i, time_chunk)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Write a single slice `data` for `variable` into its Zarr array at time index `i`
+(ignored for static variables). The ensemble slot, if any, is appended by
+[`get_indices`](@ref). This is the unbuffered write path used when
+[`time_buffered`](@ref) is `false`."""
+function write_slice!(output::ZarrOutput, variable::AbstractOutputVariable, data, i::Integer)
     z = output.zarr_group[variable.name]
-    # time-varying variables index into the current time slot; static fields are written
-    # once (index 1 is ignored by get_indices). The ensemble slot, if any, is appended.
-    i = hastime(variable) ? output.output_counter : 1
-    indices = get_indices(i, variable, output.ensemble_index)
-    z[indices...] = parent_array(field)
+    z[get_indices(i, variable, output.ensemble_index)...] = data
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Write the `count` buffered time slices ending at time index `i_last` for `variable`
+from `buffer` to the Zarr store in `output` in a single write covering the time range
+`(i_last - count + 1):i_last`. A full-chunk flush (`count == time_chunk`) passes the
+buffer `Array` through so Zarr writes it directly."""
+function flush_time_chunk!(
+        output::ZarrOutput,
+        variable::AbstractOutputVariable,
+        buffer::AbstractArray,
+        i_last::Integer,
+        count::Integer,
+    )
+    t0 = i_last - count + 1
+    z = output.zarr_group[variable.name]
+    indices = get_indices(t0:i_last, variable, output.ensemble_index)
+    if count == size(buffer, ndims(buffer))
+        z[indices...] = buffer
+    else
+        z[indices...] = selectdim(buffer, ndims(buffer), 1:count)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Flush the trailing partial time chunk of every time-varying variable to the Zarr store
+in `output`, called on `close` after the run. All time-varying variables are written in
+lockstep every output step, so they share the same `output_counter`; when it is not a
+multiple of `time_chunk` the last `output_counter % time_chunk` slices are still buffered
+and are written here. A no-op when `time_chunk == 1` or the final chunk was already full."""
+function flush_partial_time_chunks!(output::ZarrOutput)
+    (!time_buffered(output) || isempty(output.time_buffers)) && return nothing
+    time_chunk = output.time_chunk
+    i = output.output_counter
+    remainder = i % time_chunk
+    remainder == 0 && return nothing    # last chunk already flushed by write_array!
+    for variable in values(output.variables)
+        haskey(output.time_buffers, variable.name) || continue
+        flush_time_chunk!(output, variable, output.time_buffers[variable.name], i, remainder)
+    end
     return nothing
 end
 
@@ -518,6 +608,13 @@ end
 """Pull out the parent (Array) of a Field for direct copy into a Zarr array."""
 parent_array(var) = Array(parent(var))
 
-Base.close(output::ZarrOutput) = nothing
+function Base.close(output::ZarrOutput)
+    flush_partial_time_chunks!(output)
+    return nothing
+end
+
+# Implemented in the GeoMakie extension, just define here how to load a zarr dataset
+SpeedyWeather.animate(::Type{<:Zarr.ZGroup}, path::String; kwargs...) =
+    animate(zopen(path); kwargs...)
 
 end # module

@@ -1,10 +1,10 @@
 # Nested Enzyme AD (reverse-over-forward) through the spectral transform.
 #
 # A Hutchinson trace estimate vᵀJv is a forward-mode JVP contracted to a scalar; differentiating it
-# w.r.t. a parameter is therefore a second derivative — reverse over forward. 
+# w.r.t. a parameter is therefore a second derivative — reverse over forward.
 # This test checks that nesting now COMPILES and is CORRECT.
 
-# Top-level (non-closure) function that we differentiate 
+# Top-level (non-closure) function that we differentiate
 function _nested_scalar!(out, coeffs, p, spec, grid, S)
     @inbounds for k in eachindex(parent(spec))
         parent(spec)[k] = p[1] * complex(coeffs[k], zero(eltype(coeffs)))
@@ -27,13 +27,13 @@ end
 
 @testset "Differentiability: nested reverse-over-forward through transform!" begin
     NF = Float64
-    spectral_grid = SpectralGrid(trunc = 8, nlayers = 1, NF = NF)
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 1, NF = NF)
     S = SpectralTransform(spectral_grid)
 
     spec0 = zeros(Complex{NF}, spectral_grid.spectrum)
     grid0 = zeros(NF, spectral_grid.grid)
     nc = length(parent(spec0))
-    coeffs = randn(MersenneTwister(2), NF, nc)
+    coeffs = randn(Random.MersenneTwister(2), NF, nc)
     v = ones(NF, nc)                        # forward-mode probe direction
 
     # OUTER reverse pass over the parameter p of the inner JVP — the nested case that used to fail.

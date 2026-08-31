@@ -10,7 +10,7 @@ triangular matrices."""
 struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum, Dims <: AbstractArrayDimensions} <: AbstractArray{T, N}
     data::ArrayType     # non-zero elements unravelled into an in which the lower triangle is flattened
     spectrum::S         # spectrum, that holds all spectral discretization information and the architecture the array is on
-    dims::Dims          # empty type just to declare what dimensions the 
+    dims::Dims          # empty type just to declare what dimensions the
 
     function LowerTriangularArray(data, spectrum, dims = ArrayDimensions.LM())
         data_matches_spectrum(data, spectrum) || throw(DimensionMismatch(data, spectrum))
@@ -45,24 +45,10 @@ function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer, dim
     return LowerTriangularArray(data, Spectrum(lmax, mmax, architecture = architecture(ArrayType)), dims)
 end
 
-
 # SIZE ETC
 """$(TYPEDSIGNATURES)
 Length of a `LowerTriangularArray` defined as number of non-zero elements."""
 Base.length(L::LowerTriangularArray) = length(L.data)
-
-# super type to be used for ZeroBased (0-based), OneBased (1-based) indexing of the spherical harmonics
-abstract type IndexBasis end
-
-"""Abstract type to dispatch for 0-based indexing of the spherical harmonic
-degree l and order m, i.e. l=m=0 is the mean, the zonal modes are m=0 etc.
-This indexing is more common in mathematics."""
-abstract type ZeroBased <: IndexBasis end
-
-"""Abstract type to dispatch for 1-based indexing of the spherical harmonic
-degree l and order m, i.e. l=m=1 is the mean, the zonal modes are m=1 etc.
-This indexing matches Julia's 1-based indexing for arrays."""
-abstract type OneBased <: IndexBasis end
 
 # get matrix size of LTA from its data array and lmax, mmax (number of rows and columns)
 matrix_size(data::AbstractArray, spectrum::AbstractSpectrum) = matrix_size(data, spectrum.lmax, spectrum.mmax)
@@ -827,9 +813,9 @@ Base.any(L::LowerTriangularArray) = any(L.data)
 
 Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.spectrum)
 
-# needed for Enzyme 
+# needed for Enzyme
 Base.unaliascopy(A::LowerTriangularArray) =
-       LowerTriangularArray(Base.unaliascopy(A.data), A.spectrum, A.dims)
+    LowerTriangularArray(Base.unaliascopy(A.data), A.spectrum, A.dims)
 
 # Views that return a LowerTriangularArray again (need to retain all horizontal grid points, hence `:, 1` for example)
 # view(array, :) unravels like array[:] does hence "::Colon, i, args..." used to enforce one argument after :

@@ -45,9 +45,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
                 # this is likely due to FiniteDifferences and not our EnzymeRules
                 # see comments in https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589
                 if !(Grid <: AbstractReducedGrid) & fd_tests[i_grid]
-                    trunc = 5
-                    spectrum = Spectrum(trunc, one_degree_more = true)
-                    grid = Grid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[i_grid]))
+                    truncation = 6
+                    spectrum = Spectrum(truncation, one_degree_more = true)
+                    grid = Grid(SpeedyTransforms.get_nlat_half(truncation, grid_dealiasing[i_grid]))
                     S = SpectralTransform(spectrum, grid)
                     field = rand(grid)
                     f_north = S.scratch_memory.north
@@ -80,9 +80,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
 
                 # same reduced-grid caveat as the reverse tests above
                 if !(Grid <: AbstractReducedGrid) & fd_tests[i_grid]
-                    trunc = 5
-                    spectrum = Spectrum(trunc, one_degree_more = true)
-                    grid = Grid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[i_grid]))
+                    truncation = 6
+                    spectrum = Spectrum(truncation, one_degree_more = true)
+                    grid = Grid(SpeedyTransforms.get_nlat_half(truncation, grid_dealiasing[i_grid]))
                     S = SpectralTransform(spectrum, grid)
                     field = rand(grid)
                     f_north = zero(S.scratch_memory.north)
@@ -114,9 +114,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
         # _fourier! rules already handle correctly. (Differentiating the chunk loop itself is
         # unsafe: Enzyme mis-builds the per-chunk view shadows — degenerate (0,1) shadow / GC
         # corruption on 1.10 — and reuses the last iteration's shadow for all chunks.)
-        trunc = 5
-        spectrum = Spectrum(trunc, one_degree_more = true)
-        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[1]))
+        truncation = 6
+        spectrum = Spectrum(truncation, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(truncation, grid_dealiasing[1]))
         NL = 4
         S_chunked = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1])
         S_batched = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1, NL])
@@ -298,9 +298,9 @@ fourier_synthesis!(field, f_north, f_south, S) =
     # survives a transform on a neighbouring slice, and that the transform's own slice still
     # pulls back correctly.
     @testset "reverse rules on view-backed (fused) arrays" begin
-        trunc = 5
-        spectrum = Spectrum(trunc, one_degree_more = true)
-        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[1]))
+        truncation = 6
+        spectrum = Spectrum(truncation, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(truncation, grid_dealiasing[1]))
         NL = 2
         S = SpectralTransform(spectrum, grid; NF = Float32, nlayers = NL, transform_batch = [1, NL])
 
@@ -342,6 +342,69 @@ fourier_synthesis!(field, f_north, f_south, S) =
             )
             @test wrapped_view(dspec, :, (NL + 1):2NL).data == marker   # neighbour untouched
             @test any(!iszero, wrapped_view(dgrid, :, 1:NL).data)       # own slice pulled back
+        end
+    end
+
+    @testset "reverse mode must not mutate the primal transform" begin
+        # The gradient operators destructure the coefficient arrays out of `S.gradients` and pass
+        # them as bare arrays into a kernel computing `grad_y_vordiv1[lm] * v[lm-1, k]`. Enzyme sees
+        # ordinary float arrays feeding a multiply and computes ∂L/∂coefficients — the accumulated
+        # delta matches the analytic coefficient gradient to ~1e-16. That gradient needs somewhere
+        # to go: given a shadow it lands there, but with no shadow it lands in the PRIMAL, and every
+        # later call with the same transform then silently uses corrupted coefficients.
+
+        spectrum = Spectrum(8, one_degree_more = true)
+        grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(8, grid_dealiasing[1]))
+        make_S() = SpectralTransform(spectrum, grid; NF = Float64, nlayers = 1)
+
+        u = rand(ComplexF64, spectrum, 1)
+        v = rand(ComplexF64, spectrum, 1)
+        reference = make_S()
+        coefficients(S) = copy(S.gradients.grad_y_vordiv1)
+
+        # a plain call, and forward mode, both leave the transform alone
+        let S = make_S(), out = zero(u)
+            SpeedyTransforms.curl!(out, u, v, S)
+            @test coefficients(S) == coefficients(reference)
+        end
+        # `set_runtime_activity` throughout: passing the transform without a shadow stores constant
+        # memory into a differentiable variable, which trips Enzyme's static activity analysis on
+        # Julia 1.12 (`EnzymeRuntimeActivityError`) — the same reason the tests further up use it.
+        let S = make_S(), out = zero(u), dout = zero(u)
+            autodiff(
+                set_runtime_activity(Forward), SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, fill!(zero(u), 1)), Duplicated(v, zero(v)), Const(S),
+            )
+            @test coefficients(S) == coefficients(reference)
+        end
+
+        # reverse mode with a real shadow: the coefficient gradient goes to the shadow, and the
+        # primal is left intact. This is the supported way to differentiate these operators.
+        let S = make_S(), dS = make_zero(make_S()), out = zero(u), dout = fill!(zero(u), 1)
+            du = zero(u); dv = zero(v)
+            autodiff(
+                set_runtime_activity(Reverse), SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, du), Duplicated(v, dv), Duplicated(S, dS),
+            )
+            @test coefficients(S) == coefficients(reference)      # primal untouched
+            @test any(!iszero, du.data)                            # and the real gradients still land
+        end
+
+        # ...and with runtime activity `Const(S)` is safe too. It is NOT safe under plain `Reverse`:
+        # static activity analysis then has nowhere to put ∂L/∂coefficients and writes it into the
+        # primal. Measured on Julia 1.10, `divergence!`, primal corrupted?
+        #
+        #     mode                     Const(S)   Duplicated(S, make_zero(S))
+        #     Reverse                  yes        no
+        #     set_runtime_activity     no         no
+        #
+        # so `set_runtime_activity` — not the argument annotation — is what makes this correct.
+        let S = make_S(), out = zero(u), dout = fill!(zero(u), 1)
+            autodiff(
+                set_runtime_activity(Reverse), SpeedyTransforms.curl!, Const, Duplicated(out, dout),
+                Duplicated(u, zero(u)), Duplicated(v, zero(v)), Const(S),
+            )
+            @test coefficients(S) == coefficients(reference)
         end
     end
 

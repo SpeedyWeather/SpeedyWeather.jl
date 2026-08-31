@@ -68,7 +68,7 @@ large-scale precipitation vertically for output."""
     humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, condensation)      # specific humidity tendency [kg/kg/s]
     nlayers = size(temp, 2)
 
-    # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])           
+    # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
     pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
     (; Δt) = time_stepping                              # time step [s]
     coord = geometry.vertical_coordinates

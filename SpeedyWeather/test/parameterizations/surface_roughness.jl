@@ -1,11 +1,12 @@
 @testset "ConstantSurfaceRoughness" begin
     @testset for Model in (PrimitiveWetModel, PrimitiveDryModel)
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
         # use non-default roughness lengths to make sure they are actually used
         z₀_land = 0.3
         z₀_ocean = 2.0e-4
-        surface_roughness = ConstantSurfaceRoughness(spectral_grid,
+        surface_roughness = ConstantSurfaceRoughness(
+            spectral_grid,
             roughness_length_land = z₀_land,
             roughness_length_ocean = z₀_ocean,
         )

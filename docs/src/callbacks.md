@@ -352,7 +352,7 @@ is no periodically reoccuring schedule, only `schedule.times` would include some
 for events that are scheduled. Now let's create a primitive equation model with that callback
 
 ```@example schedule
-spectral_grid = SpectralGrid(trunc=31, nlayers=5)
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 5)
 model = PrimitiveWetModel(spectral_grid)
 add!(model.callbacks, north_pole_temp_at_noon_jan9)
 

@@ -142,7 +142,7 @@ end
     )
 
     # add tuples of output variables through various interfaces to model/output w/out splatting ...
-    add!(model, SpeedyWeather.PrecipitationOutput())            
+    add!(model, SpeedyWeather.PrecipitationOutput())
     add!(model, SpeedyWeather.PrecipitationOutput()...)
     add!(model.output, SpeedyWeather.PrecipitationOutput())
     add!(model.output, SpeedyWeather.PrecipitationOutput()...)
@@ -271,7 +271,7 @@ end
     # at the moment, no error
     # 1kyrs simulation
     spectral_grid = SpectralGrid()
-    time_stepping = Leapfrog(spectral_grid, Δt_at_T31 = Day(3650))
+    time_stepping = Leapfrog(spectral_grid, Δt_at_T32 = Day(3650))
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "long-output-test", interval = Day(3650))
     model = PrimitiveDryModel(spectral_grid; output, time_stepping)
     model.feedback.verbose = false

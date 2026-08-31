@@ -174,8 +174,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] maximum speed [ms⁻¹]"
     max_speed::NF = 60
 
-    "[OPTION] Maximum wavenumber after truncation"
-    truncation::Int = 15
+    "[OPTION] Maximum wavenumber after truncation (1-based)"
+    truncation::Int = 14
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
     seed::S = 0
@@ -342,7 +342,7 @@ function initialize!(
     # compute the -∇²(u^2/2) term, add to div, divide by gravity
     RingGrids.scale_coslat!(u_grid)     # remove coslat scaling
     u_grid .*= radius                   # no radius scaling as we'll apply ∇⁻²(∇²) (would cancel)
-    u_grid = (1 // 2) .* u_grid .^2
+    u_grid = (1 // 2) .* u_grid .^ 2
     u²_half = transform!(u, u_grid, model.spectral_transform)
     ∇²!(div, u²_half, model.spectral_transform, flipsign = true, add = true)
     div .*= inv(gravity)
@@ -470,16 +470,28 @@ Adapt.@adapt_structure JablonowskiVorticity
 @inline function (J::JablonowskiVorticity)(λ, φ, η)
     (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
 
+    # convert to radians once, plain sin/cos/tan avoid AMDGPU hostcalls that
+    # Base's degree-trig functions (sind/cosd/tand) trigger via their exact
+    # argument reduction / NaN-Inf handling
+    φ_rad = deg2rad(φ)
+    sinφ, cosφ = sin(φ_rad), cos(φ_rad)
+    cosΔλ = cos(deg2rad(λ - λc))
+
     # great circle distance to perturbation
-    X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
+    X = clamp(sinφc * sinφ + cosφc * cosφ * cosΔλ, 0, 1)
     r = radius * acos(X)
 
     # Eq (3), the unperturbed zonal wind
-    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(3 / 2) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+    # NOTE: `x^(3//2)` does NOT stay in Float32. Base computes a fractional power as
+    # exp2(e * log2(x)) and promotes to Float64 internally, so the kernel ends up needing
+    # Float64 log2/exp2, which AMDGPU cannot compile (GPUCompiler segfaults in check_ir!).
+    # cos is strictly positive here (η in [0, 1] gives cos in [0.39, 1]), so x*sqrt(x) is equivalent.
+    cosηᵥ = cos((η - η₀) * π / 2)
+    ζ = -4 * u₀ / radius * (cosηᵥ * sqrt(cosηᵥ)) * sinφ * cosφ * (2 - 5sinφ^2)
 
     # Eq (12), the perturbation
     perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
-        (tand(φ) - 2 * (radius / R)^2 * acos(X) * (sinφc * cosd(φ) - cosφc * sind(φ) * cosd(λ - λc)) / sqrt(1 - X^2))
+        (tan(φ_rad) - 2 * (radius / R)^2 * acos(X) * (sinφc * cosφ - cosφc * sinφ * cosΔλ) / sqrt(1 - X^2))
 
     return ζ + perturbation
 end
@@ -501,12 +513,18 @@ Adapt.@adapt_structure JablonowskiDivergence
 @inline function (J::JablonowskiDivergence)(λ, φ, η)
     (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
 
+    # convert to radians once, plain sin/cos avoid AMDGPU hostcalls (see JablonowskiVorticity)
+    φ_rad = deg2rad(φ)
+    sinφ, cosφ = sin(φ_rad), cos(φ_rad)
+    Δλ_rad = deg2rad(λ - λc)
+    cosΔλ, sinΔλ = cos(Δλ_rad), sin(Δλ_rad)
+
     # great circle distance to perturbation
-    X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
+    X = clamp(sinφc * sinφ + cosφc * cosφ * cosΔλ, 0, 1)
     r = radius * acos(X)
 
     # Eq (13)
-    return -2 * perturb_uₚ * radius / R^2 * exp(-(r / R)^2) * acos(X) / sqrt(1 - X^2) * cosφc * sind(λ - λc)
+    return -2 * perturb_uₚ * radius / R^2 * exp(-(r / R)^2) * acos(X) / sqrt(1 - X^2) * cosφc * sinΔλ
 end
 
 export RossbyHaurwitzWave
@@ -666,14 +684,17 @@ end
     η = σ_levels_full[k]
     ηᵥ = (η - η₀) * π * 1 // 2  # auxiliary variable for vertical coordinate
 
-    # Amplitudes with height
-    A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
-    A2 = 2u₀ * cos(ηᵥ)^(3 // 2)
+    # Amplitudes with height. NOTE: cos(ηᵥ)^(3//2) would pull a Float64 log2/exp2 into the
+    # kernel (see JablonowskiVorticity above), so reuse the sqrt that A1 already needs
+    cosηᵥ = cos(ηᵥ)
+    sqrt_cosηᵥ = sqrt(cosηᵥ)
+    A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt_cosηᵥ
+    A2 = 2u₀ * cosηᵥ * sqrt_cosηᵥ
 
     # Get latitude
-    φij = φ[ij]
-    sinφ = sind(φij)
-    cosφ = cosd(φij)
+    φij = deg2rad(φ[ij])
+    sinφ = sin(φij)
+    cosφ = cos(φij)
 
     NF = eltype(temp_grid)
 

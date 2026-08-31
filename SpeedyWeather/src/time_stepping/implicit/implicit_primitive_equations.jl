@@ -14,7 +14,7 @@ $(TYPEDFIELDS)"""
 
     # DIMENSIONS
     "[DERIVED] Spectral resolution"
-    trunc::IntType
+    truncation::IntType
 
     "[DERIVED] Number of vertical layers"
     nlayers::IntType
@@ -61,15 +61,15 @@ $(TYPEDFIELDS)"""
     S::MatrixType = zeros(NF, nlayers, nlayers)
 
     "[DERIVED] combined inverted operator: S = 1 - ξ²(RL + UW)"
-    S⁻¹::TensorType = zeros(NF, trunc + 2, nlayers, nlayers)
+    S⁻¹::TensorType = zeros(NF, truncation + 1, nlayers, nlayers)
 end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc)}(;
-        trunc, nlayers, kwargs...
+    (; NF, VectorType, MatrixType, TensorType, truncation, nlayers) = spectral_grid
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(truncation)}(;
+        truncation, nlayers, kwargs...
     )
 end
 
@@ -86,7 +86,7 @@ function reinitialize!(
         vars::Variables,
     )
     (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    Δt = time_step(time_stepping, vars.prognostic.clock) 
+    Δt = time_step(time_stepping, vars.prognostic.clock)
     implicit.Δt[] == Δt && return nothing                   # if time step has not changed no need to reinitialize
     scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
     Tₖ = vars.dynamics.average_temperature_profile
@@ -109,7 +109,7 @@ function initialize!(
 
     NF = eltype(temp_average)
 
-    (; trunc, nlayers) = implicit
+    (; truncation, nlayers) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
@@ -203,7 +203,7 @@ function initialize!(
     # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
     I = LinearAlgebra.I(nlayers)
-    @inbounds for l in 1:(trunc + 1)
+    @inbounds for l in 1:truncation     # 1-based degree
         eigenvalue = -l * (l - 1)       # 1-based, -l*(l+1) → -l*(l-1)
         S .= I .- ξ^2 * eigenvalue * (R * L .+ U * W')
 
@@ -246,10 +246,10 @@ function implicit_correction!(
     implicit.centering == 0 && return nothing
 
     (; S⁻¹, R, U, L, W, nlayers) = implicit
-    
+
     # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
     # dynamical core uses scaled time step, scale on the fly
-    Δt = time_step(time_stepping, vars.prognostic.clock)       
+    Δt = time_step(time_stepping, vars.prognostic.clock)
     ξ = implicit.centering * Δt / vars.prognostic.scale[]
 
     # NOTE: the FULL arrays are handed to the kernel together with their step
@@ -320,9 +320,14 @@ end
     # scratch array, see the note at the launch site.
     geopotential = ntuple(Val(nlayers)) do k
         # skip 1:k-1 as integration is surface to k
-        geopotential_val = zero(eltype(temp_tend))
-        for r in k:nlayers
-            geopotential_val += R[k, r] * temp_tend[lm, r, temp_step]
+        geopotential_val = zero(eltype(geopotential))
+        # while loop instead of `for r in k:nlayers`: the triangular range with both
+        # endpoints dynamic miscompiles on AMDGPU/CDNA (gfx90a/gfx942), see
+        # https://github.com/JuliaGPU/AMDGPU.jl/issues/1015
+        r = k
+        while r <= nlayers
+            geopotential_val += R[k, r] * temp_tend[lm, r]
+            r += 1
         end
         geopotential_val
     end
@@ -358,5 +363,5 @@ end
     for k in 1:nlayers
         pres_correction += ξ * W[k] * div_tend[lm, k, div_step]
     end
-    pres_tend[lm, pres_step] += pres_correction
+    pres_tend[lm] += pres_correction
 end

@@ -63,9 +63,9 @@ end
 # (91 parameters vs 15), so it is what shows the rule removes the dependence on type size rather
 # than just raising a threshold.
 @testset "Forward-mode reconstruct on $(nameof(MT))" for (MT, nlayers) in
-        ((BarotropicModel, 1), (PrimitiveWetModel, 2))
+    ((BarotropicModel, 1), (PrimitiveWetModel, 2))
 
-    spectral_grid = SpectralGrid(; trunc = 8, nlayers, NF = Float64)
+    spectral_grid = SpectralGrid(; truncation = 9, nlayers, NF = Float64)
     model = MT(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
     p = vec(parameters(model))
     @test length(p) > 0
@@ -91,9 +91,9 @@ end
 end
 
 @testset "Reverse-mode reconstruct on $(nameof(MT))" for (MT, nlayers) in
-        ((BarotropicModel, 1), (PrimitiveWetModel, 2))
+    ((BarotropicModel, 1), (PrimitiveWetModel, 2))
 
-    spectral_grid = SpectralGrid(; trunc = 8, nlayers, NF = Float64)
+    spectral_grid = SpectralGrid(; truncation = 9, nlayers, NF = Float64)
     model = MT(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
     p = vec(parameters(model))
 
@@ -136,7 +136,7 @@ end
 # `Tracer` config, so neither rule may contribute a derivative — the differentiable tracer data is
 # reached separately via `vars.*.tracers[name]`.
 @testset "Tracer registry iterate rules" begin
-    spectral_grid = SpectralGrid(trunc = 8, nlayers = 1, NF = Float64)
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 1, NF = Float64)
     model = BarotropicModel(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
 
     # sum over the registry, scaled by an active parameter: the loop must not add any derivative of

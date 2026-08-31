@@ -7,8 +7,8 @@ using SpeedyWeather: AbstractVariable, GridVariable, TendencyVariable, ScratchVa
     FusedParent, _assert_fuse_alignment
 
 # Helpers used by all testsets — build a model and unwrap a few useful pieces.
-function _testmodel(; trunc = 10, nlayers = 4)
-    sg = SpectralGrid(; trunc, nlayers)
+function _testmodel(; truncation = 11, nlayers = 4)
+    sg = SpectralGrid(; truncation, nlayers)
     return PrimitiveDryModel(sg)
 end
 
@@ -111,7 +111,7 @@ end
     model = _testmodel(nlayers = 4)
     vars = AbstractVariable[
         PrognosticVariable(:a4, Grid4D(n = 3), namespace = :g, fuse = :m4),
-        TendencyVariable(:b3, GridXYZ(),      namespace = :g, fuse = :m4),
+        TendencyVariable(:b3, GridXYZ(), namespace = :g, fuse = :m4),
         PrognosticVariable(:c4, Grid4D(n = 3), namespace = :g, fuse = :m4),
     ]
     parent, views, slots = allocate_fused(vars, model)
@@ -139,7 +139,7 @@ end
     model = _testmodel(nlayers = 4)
     vars = AbstractVariable[
         PrognosticVariable(:a4, Spectral4D(n = 2), namespace = :s, fuse = :ms4),
-        DynamicsVariable(:b3,   SpectralXYZ(),     namespace = :s, fuse = :ms4),
+        DynamicsVariable(:b3, SpectralXYZ(), namespace = :s, fuse = :ms4),
     ]
     parent, views, slots = allocate_fused(vars, model)
     @test ndims(parent.data) == 3                       # LowerTriangularArray with 3D data
@@ -167,7 +167,7 @@ end
     model = _testmodel(nlayers = 4)
     bad = AbstractVariable[
         PrognosticVariable(:a4, Grid4D(n = 2), namespace = :x, fuse = :bad24),
-        GridVariable(:b2,       Grid2D(),      namespace = :x, fuse = :bad24),
+        GridVariable(:b2, Grid2D(), namespace = :x, fuse = :bad24),
     ]
     @test_throws ErrorException build_fuse_parents(bad, model)
 end
@@ -176,7 +176,7 @@ end
     model = _testmodel(nlayers = 4)
     vars = AbstractVariable[
         PrognosticVariable(:a4, Grid4D(n = 2), namespace = :g, fuse = :alias4),
-        TendencyVariable(:b3,   GridXYZ(),     namespace = :g, fuse = :alias4),
+        TendencyVariable(:b3, GridXYZ(), namespace = :g, fuse = :alias4),
     ]
     parent, views, _ = allocate_fused(vars, model)
     # Writing through the 3D-in-4D view should populate exactly slot 5 of the parent

@@ -3,17 +3,45 @@
 !!! warning "Work in progress"
     The GPU support of SpeedyWeather.jl is still work in progress and some parts of this documentation might not be always updated to the latest state. We will extend this documentation over time. Don't hesitate to contact us via GitHub issues or mail when you have questions or want to collaborate.
 
-Most of SpeedyWeather.jl supports GPU acceleration. All of our models can run GPUs, however as our development of this is still very recent, there still might be issues with the GPU models and do not consider them fully optimized yet. If you encounter any issues, please report them via GitHub issues. Our development focuses on CUDA GPUs, but other architectures are thinkable in the future as well, as our approach relies on the device agnostic `KernelAbstractions.jl`. An experimental port to AMD GPUs using the `AMDGPU` package is available but AMD-specific performance optimizations are not implemented yet. The SpeedyWeather.jl submodule `Architectures` encodes all the information of the device we run our models on. In order to initialize a model on a GPU, we need to load the `CUDA` or `AMDGPU` package and pass the architecture to the model constructor. For example, to initialize a barotropic model on a GPU, we can do the following:  
+Most of SpeedyWeather.jl supports GPU acceleration. All of our models can run GPUs, however as our development of this is still very recent, there still might be issues with the GPU models and do not consider them fully optimized yet. If you encounter any issues, please report them via GitHub issues. Our development focuses on CUDA GPUs, but other architectures are thinkable in the future as well, as our approach relies on the device agnostic `KernelAbstractions.jl`. An experimental port to AMD GPUs using the `AMDGPU` package is available; some AMD-specific performance optimizations exist (e.g. GPU graphs, see below) but are not enabled by default yet, pending broader hardware verification. The SpeedyWeather.jl submodule `Architectures` encodes all the information of the device we run our models on. In order to initialize a model on a GPU, we need to load the `CUDA` or `AMDGPU` package and pass the architecture to the model constructor. For example, to initialize a barotropic model on a GPU, we can do the following:  
 
 ```julia
 using SpeedyWeather, CUDA # For AMD GPUs, replace `CUDA` with `AMDGPU`
 architecture = SpeedyWeather.GPU()
-spectral_grid = SpectralGrid(trunc=63, nlayers=8, architecture=architecture)           
+spectral_grid = SpectralGrid(truncation = 64, nlayers = 8, architecture = architecture)           
 
 model = PrimitiveWetModel(spectral_grid=spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
 ```
+
+## GPU Graphs
+
+On GPU, the batched Fourier transform (part of the spectral transform) can be accelerated with
+GPU graphs (CUDA graphs / HIP graphs). With reduced ring grids used, rings / latitudes have different numbers of grid points per latitude. 
+This means that the Fourier transform can't be computed as just one large batched FFT. 
+Launching many FFTs for a single transform causes significant launch overheads on GPU. The GPU graphs eliminate that by capturing and replaying these launches. 
+The fused gather/FFT/scatter loop is captured once and
+replayed with a single launch on every subsequent call, instead of re-issuing many small
+kernel/FFT launches per step. This mainly helps at lower resolutions, where the transform is
+launch-bound rather than compute-bound.
+
+It is controlled by the `gpu_graphs` keyword of `SpectralTransform`, whose default is
+backend-dependent (`SpeedyTransforms.default_gpu_graphs`) rather than always on. Models don't
+expose `gpu_graphs` directly, so enable or disable it by constructing your own transform and
+passing it to the model:
+
+```julia
+spectral_transform = SpectralTransform(spectral_grid; gpu_graphs = true)
+model = PrimitiveWetModel(spectral_grid; spectral_transform)
+```
+
+On **CUDA**, GPU graphs are enabled by default.
+
+On **AMDGPU**, the HIP-graphs implementation mirrors the CUDA one but is **disabled by default**.
+It has been verified stable on datacenter/CDNA hardware (e.g. LUMI), but caused failures on the
+consumer RDNA cards our CI currently runs on, so it isn't trusted as a default yet. To try it
+explicitly on hardware you trust, pass `gpu_graphs = true` as shown above.
 
 ## Architectures Utilities 
 
@@ -31,7 +59,7 @@ grid_gpu = on_architecture(arch_gpu, grid_cpu)
 field_cpu = rand(grid_cpu)
 field_gpu = on_architecture(arch_gpu, field_cpu)
 
-spectrum_cpu = Spectrum(trunc=41, architecture=arch_cpu)
+spectrum_cpu = Spectrum(truncation=43, architecture=arch_cpu)
 spectrum_gpu = on_architecture(arch_gpu, spectrum_cpu)
 
 spec_cpu = rand(spectrum_cpu)

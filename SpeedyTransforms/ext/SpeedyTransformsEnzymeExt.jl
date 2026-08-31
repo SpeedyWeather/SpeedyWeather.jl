@@ -12,13 +12,19 @@ using SpeedyTransforms.LowerTriangularArrays
 
 import SpeedyTransforms: _fourier!, wrapped_view
 
-# The spectral transform `S` is fixed geometry (Legendre polynomials, quadrature weights, FFT
-# plans) and is never a differentiation target. Marking it inactive stops Enzyme from building a
-# shadow of the large `SpectralTransform` aggregate when it is loaded out of a `Duplicated`
-# (mutable) model — the "cannot deduce type of copy" type-analysis failure on Julia >= 1.11 that
-# otherwise requires `Enzyme.API.maxtypeoffset!`. The transform! adjoint rules below read only
-# `S.val`, so treating `S` as a constant everywhere is consistent.
-EnzymeRules.inactive_type(::Type{<:SpectralTransform}) = true
+# NOTE: differentiate the gradient operators with `set_runtime_activity(Reverse)`. They destructure
+# the coefficient arrays out of `S.gradients` and pass them as bare arrays into a kernel, so Enzyme
+# computes ∂L/∂coefficients regardless of how `S` is annotated. Under STATIC activity analysis that
+# gradient has nowhere to go and is written into the PRIMAL, silently corrupting every later call
+# with the same transform. Measured on Julia 1.10 for `divergence!` — primal corrupted?
+#
+#     mode                   Const(S)   Duplicated(S, make_zero(S))
+#     Reverse                yes        no
+#     set_runtime_activity   no         no
+#
+# so runtime activity is what makes this correct; the argument annotation alone is not enough.
+# `SpectralTransform` is also deliberately not declared `EnzymeRules.inactive_type`: that suppressed
+# the shadow without suppressing the accumulation, so it corrupted the primal under both annotations.
 
 # Rules for SpeedyTransforms
 
@@ -139,10 +145,10 @@ end
 
 ### FORWARD RULES
 #
-# Both the FFT and the full spectral transform are LINEAR in their input array, and `S` is inactive
-# geometry (see `inactive_type` above). The forward-mode tangent of a linear map is therefore the map
+# Both the FFT and the full spectral transform are LINEAR in their input array, and `S` is fixed
+# geometry carrying no tangent. The forward-mode tangent of a linear map is therefore the map
 # itself applied to the tangent: run the primal on `.val`, then the identical call on each tangent
-# `.dval`. 
+# `.dval`.
 
 # `nlayer`-th tangent of an annotated argument, `nothing` for inactive (Const) arguments.
 # Homogeneous-tuple indexing keeps this type stable for width > 1.

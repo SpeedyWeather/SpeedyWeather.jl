@@ -1,4 +1,3 @@
-
 """
 $(TYPEDSIGNATURES)
 
@@ -26,13 +25,14 @@ function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars},
     # DateTime; the actual initial datetime is synced from the SpeedyWeather clock
     # in `initialize!(vars, land, model)` once the user-provided `time` has been
     # written there.
-    return Terrarium.initialize(
+    integrator = Terrarium.initialize(
         land.model;
+        inputs = land.inputs,
         clock = Terrarium.Clock(time = SpeedyWeather.DEFAULT_DATE),
         boundary_conditions = land.boundary_conditions,
-        input_variables = land.input_variables,
         fields = land.fields,
     )
+    return integrator.state
 end
 
 """$(TYPEDEF)
@@ -55,7 +55,7 @@ on this abstract type:
   copies soil temperatures, moisture and surface fluxes back into the
   SpeedyWeather variables.
 """
-abstract type AbstractTerrariumLandModel <: SpeedyWeather.AbstractLand end
+abstract type AbstractTerrariumLandModel{NF, TM} <: SpeedyWeather.AbstractLand end
 
 @inline SpeedyWeather.get_nlayers(land::AbstractTerrariumLandModel) = land.geometry.nlayers
 
@@ -146,12 +146,14 @@ end
 @inline SpeedyWeather.RingGrids.copy_unmasked!(
     dest::Terrarium.Oceananigans.AbstractField,
     src::SpeedyWeather.AbstractField,
-    indices) = SpeedyWeather.RingGrids.copy_unmasked!(interior(dest), src, indices)
+    indices
+) = SpeedyWeather.RingGrids.copy_unmasked!(interior(dest), src, indices)
 
 @inline SpeedyWeather.RingGrids.copy_unmasked!(
-    dest::SpeedyWeather.AbstractField, 
+    dest::SpeedyWeather.AbstractField,
     src::Terrarium.Oceananigans.AbstractField,
-    indices) = SpeedyWeather.RingGrids.copy_unmasked!(dest, interior(src), indices)
+    indices
+) = SpeedyWeather.RingGrids.copy_unmasked!(dest, interior(src), indices)
 
 """$(TYPEDEF)
 
@@ -165,31 +167,29 @@ struct TerrariumLand{
         NF,
         LG <: LandGeometry,
         TM <: Terrarium.AbstractModel{NF},
-        TS <: Terrarium.AbstractTimeStepper,
         BC <: NamedTuple,
-        IV <: Tuple,
-        IN <: NamedTuple,
+        IN <: Terrarium.InputSource,
+        IT <: NamedTuple,
         FL <: NamedTuple,
+        TT,
         MI,
-    } <: AbstractTerrariumLandModel
+    } <: AbstractTerrariumLandModel{NF, TM}
     "SpeedyWeather spectral grid"
     spectral_grid::SpectralGrid
     "SpeedyWeather land geometry (a single effective surface layer)"
     geometry::LG
     "Underlying Terrarium land model"
     model::TM
-    "Terrarium time stepper used inside each SpeedyWeather step"
-    timestepper::TS
     "Boundary conditions forwarded to `Terrarium.initialize`"
     boundary_conditions::BC
-    "Additional input variables forwarded to `Terrarium.initialize`"
-    input_variables::IV
+    "Terrarium `InputSource`s forwarded to `Terrarium.initialize`"
+    inputs::IN
     "Field initializers forwarded to the on-the-fly `ModelIntegrator`"
-    initializers::IN
+    initializers::IT
     "Preconstructed Terrarium fields forwarded to `Terrarium.initialize`"
     fields::FL
     "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
-    Δt::NF
+    Δt::TT
     "Indices of the common land sea mask, used for allocation-free copying between SpeedyWeather and Terrarium"
     mask_indices::MI
     "Fallback soil temperature [K] for grid points outside the Terrarium land mask (ocean-only cells)"
@@ -205,12 +205,11 @@ SpeedyWeather spectral grid."""
 function TerrariumLand(
         spectral_grid::SpectralGrid,
         model::Terrarium.AbstractModel{NF};
-        timestepper::Terrarium.AbstractTimeStepper = ForwardEuler(NF),
+        inputs::Terrarium.InputSource = Terrarium.InputSources(NF),
         boundary_conditions::NamedTuple = (;),
-        input_variables::Tuple = (),
         initializers::NamedTuple = (;),
         fields::NamedTuple = (;),
-        Δt::Real = 300,
+        Δt = Minute(5),
         ocean_temperature::Real = 285,
         ocean_moisture::Real = 0,
     ) where {NF}
@@ -223,9 +222,10 @@ function TerrariumLand(
     # `unmasked_indices` treats `true` as masked-out; `model.grid.mask` is `true` at land
     # points, so invert it to get the indices of the (unmasked) land columns.
     mask_indices = RingGrids.unmasked_indices(.!model.grid.mask)
+    Δt = isa(Δt, Number) ? NF(Δt) : Δt
     return TerrariumLand(
-        spectral_grid, geometry, model, timestepper,
-        boundary_conditions, input_variables, initializers, fields, NF(Δt), mask_indices,
+        spectral_grid, geometry, model,
+        boundary_conditions, inputs, initializers, fields, Δt, mask_indices,
         NF(ocean_temperature), NF(ocean_moisture),
     )
 end
@@ -243,22 +243,38 @@ function TerrariumLand(
     spectral_grid = SpectralGrid(integrator.model.grid.rings; NF, spectral_grid_kwargs...)
     return TerrariumLand(
         spectral_grid, integrator.model;
-        timestepper = integrator.timestepper,
         initializers = integrator.initializers,
     )
 end
 
-function SpeedyWeather.variables(::AbstractTerrariumLandModel)
+function SpeedyWeather.variables(land_model::AbstractTerrariumLandModel{NF, <:Terrarium.SoilModel}) where {NF}
     return (
         # The full Terrarium state, owned by SpeedyWeather's Variables tree.
         SpeedyWeather.PrognosticVariable(
             name = :terrarium, dims = TerrariumVars(),
             namespace = :land, desc = "Terrarium land state",
         ),
-        # Thin grid-side mirrors of surface soil temperature / moisture so the
+        # Thin grid-side mirrors of land state variables so the
         # rest of SpeedyWeather (longwave/shortwave radiation, surface fluxes,
         # output writers) can read them. They are kept in sync from the
         # Terrarium state inside `initialize!` and `timestep!`.
+        SpeedyWeather.variables(land_model, land_model.model.soil)...,
+    )
+end
+
+function SpeedyWeather.variables(land_model::AbstractTerrariumLandModel{NF, <:Terrarium.LandModel}) where {NF}
+    return (
+        SpeedyWeather.PrognosticVariable(
+            name = :terrarium, dims = TerrariumVars(),
+            namespace = :land, desc = "Terrarium land state",
+        ),
+        SpeedyWeather.variables(land_model, land_model.model.soil)...,
+        SpeedyWeather.variables(land_model, land_model.model.snow)...,
+    )
+end
+
+function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.AbstractSoil)
+    return (
         SpeedyWeather.PrognosticVariable(
             name = :soil_temperature, dims = SpeedyWeather.Grid2D(),
             units = "K", desc = "Soil temperature mirrored from Terrarium",
@@ -272,6 +288,18 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel)
     )
 end
 
+function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.AbstractSnow)
+    return (
+        SpeedyWeather.PrognosticVariable(
+            name = :snow_depth, dims = SpeedyWeather.Grid2D(),
+            units = "m", desc = "Snow depth water equivalent mirrored from Terrarium",
+            namespace = :land,
+        ),
+    )
+end
+
+SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Nothing) = ()
+
 # wet land model
 function SpeedyWeather.initialize!(
         vars::Variables,
@@ -281,6 +309,7 @@ function SpeedyWeather.initialize!(
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
     mask = land_mask(land)
+    indices = land.mask_indices
 
     # Sync the Terrarium clock's initial time with the SpeedyWeather clock,
     # which was set from the `time` kwarg of `initialize!(model; time=...)`.
@@ -289,12 +318,12 @@ function SpeedyWeather.initialize!(
     # initialize the "ModelIntegrator"
     integrator = ModelIntegrator(
         state.clock, land.model, InputSources(NF),
-        state, land.initializers, land.timestepper,
+        state, land.initializers,
     )
     Terrarium.initialize!(integrator)
 
     Tsoil = interior(state.temperature)[:, 1, end] .+ NF(273.15)
-    sat = interior(state.saturation_water_ice)[:, 1, end]
+    sat = @view interior(state.saturation_water_ice)[:, 1, end]
 
     @assert length(mask) == length(vars.prognostic.land.soil_temperature) "Terrarium land mask (length = $(length(mask))) does not span the full SpeedyWeather ring grid (length = $(length(vars.prognostic.land.soil_temperature)))."
     @assert count(mask) == length(Tsoil) "Number of Terrarium land columns (length = $(length(Tsoil))) does not match the number of land points in the mask (count = $(count(mask)))."
@@ -304,8 +333,20 @@ function SpeedyWeather.initialize!(
 
     # fill ocean/non-Terrarium points with fallback values first, then seed the land columns
     fill_fallback!(vars, land)
-    vars.prognostic.land.soil_temperature[mask] .= Tsoil
-    vars.prognostic.land.soil_moisture[mask] .= sat
+    if haskey(vars.prognostic.land, :soil_temperature)
+        RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, Tsoil, indices)
+    end
+    if haskey(vars.prognostic.land, :soil_moisture)
+        RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, sat, indices)
+    end
+    if haskey(vars.prognostic.land, :snow_depth)
+        RingGrids.copy_unmasked!(vars.prognostic.land.snow_depth, state.snow_water_equivalent, indices)
+    end
+    # Push albedo only if present in Terrarium state (diagnostic albedo)
+    # TODO: implement haskey for Terrarium StateVariables
+    if hasproperty(state, :albedo)
+        RingGrids.copy_unmasked!(vars.parameterizations.land.albedo, state.albedo, indices)
+    end
     return nothing
 end
 
@@ -318,7 +359,6 @@ function SpeedyWeather.timestep!(
     tmodel = land.model
     consts = tmodel.constants
     NF = eltype(state)
-    mask = land_mask(land)
     indices = land.mask_indices
     nlayers = model.spectral_grid.nlayers
 
@@ -348,12 +388,10 @@ function SpeedyWeather.timestep!(
     RingGrids.copy_unmasked!(inputs.surface_longwave_down, Rld, indices)
 
     # Constructing ModelIntegrator is allocation-free: it is an immutable struct
-    # of references so no data is copied.  `InputSources` is empty intentionally:
-    # we own the input-update cycle above (via set!) and do not want Terrarium's
-    # update_inputs! to overwrite those values during the substeps.
+    # of references so no data is copied.
     integrator = ModelIntegrator(
-        state.clock, tmodel, InputSources(NF),
-        state, land.initializers, land.timestepper,
+        state.clock, tmodel, land.inputs,
+        state, land.initializers,
     )
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
 
@@ -361,20 +399,27 @@ function SpeedyWeather.timestep!(
     # The Terrarium state itself is mutated in place above and remains in
     # `vars.prognostic.land.terrarium`; the soil mirrors are refreshed so
     # SpeedyWeather radiation / surface flux components see current values.
-    vars.prognostic.land.soil_temperature[mask] .= interior(state.skin_temperature) .+ NF(273.15)
-    vars.prognostic.land.soil_moisture[mask] .= @view interior(state.saturation_water_ice)[:, 1, end]
+    # TODO: Use custom kernel to make the conversion from °C → K non-allocating here
+    if haskey(vars.prognostic.land, :soil_temperature)
+        # Speedy treats the uppermost soil layer as the "skin" (for now) so that's what we copy here
+        RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, @view(interior(state.skin_temperature)[:, 1, 1]) .+ NF(273.15), indices)
+    end
+    if haskey(vars.prognostic.land, :soil_moisture)
+        RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, @view(interior(state.saturation_water_ice)[:, 1, end]), indices)
+    end
     if haskey(vars.prognostic.land, :sensible_heat_flux)
-        RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, state.sensible_heat_flux, indices)
+        RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, @view(interior(state.sensible_heat_flux)[:, 1, 1]), indices)
     end
     if haskey(vars.prognostic.land, :surface_humidity_flux)
-        RingGrids.copy_unmasked!(vars.prognostic.land.surface_humidity_flux, state.latent_heat_flux, indices)
+        RingGrids.copy_unmasked!(vars.prognostic.land.surface_humidity_flux, @view(interior(state.latent_heat_flux)[:, 1, 1]), indices)
         vars.prognostic.land.surface_humidity_flux.data ./= consts.thermodynamics.latent_heat_vaporization
     end
-    if haskey(vars.parameterizations, :surface_longwave_up)
-        RingGrids.copy_unmasked!(vars.parameterizations.surface_longwave_up, state.surface_longwave_up, indices)
+    if haskey(vars.prognostic.land, :snow_depth)
+        RingGrids.copy_unmasked!(vars.prognostic.land.snow_depth, @view(interior(state.snow_water_equivalent)[:, 1, 1]), indices)
     end
-    if haskey(vars.parameterizations, :surface_shortwave_up)
-        RingGrids.copy_unmasked!(vars.parameterizations.surface_shortwave_up, state.surface_shortwave_up, indices)
+    # Push albedo only if present in Terrarium state (diagnostic albedo)
+    if hasproperty(state, :albedo)
+        RingGrids.copy_unmasked!(vars.parameterizations.land.albedo, @view(interior(state.albedo)[:, 1, 1]), indices)
     end
     return nothing
 end
@@ -387,7 +432,7 @@ function SpeedyWeather.initialize!(
     )
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
-    mask = land_mask(land)
+    indices = land.mask_indices
 
     # Sync the Terrarium clock's initial time with the SpeedyWeather clock,
     # which was set from the `time` kwarg of `initialize!(model; time=...)`.
@@ -398,7 +443,7 @@ function SpeedyWeather.initialize!(
 
     # fill ocean/non-Terrarium points with fallback values first, then seed the land columns
     fill_fallback!(vars, land)
-    vars.prognostic.land.soil_temperature[mask] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
+    RingGrids.copy_unmasked!(vars.prognostic.land.soil_temperature, @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15), indices)
     return nothing
 end
 
@@ -425,7 +470,7 @@ function SpeedyWeather.timestep!(
     # InputSources(NF) so SpeedyWeather owns the input-update cycle.
     integrator = ModelIntegrator(
         state.clock, land_model, InputSources(NF),
-        state, land.initializers, land.timestepper,
+        state, land.initializers,
     )
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
 

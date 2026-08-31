@@ -100,7 +100,7 @@ end
 """$(TYPEDSIGNATURES)
 Flux `flux` into surface layer with surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]
 converted to tendency [?/s]."""
-@propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) = 
+@propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
     flux_to_tendency(flux, pₛ, model.geometry.nlayers, model)
 
 """$(TYPEDSIGNATURES)

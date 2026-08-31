@@ -35,6 +35,9 @@ gpu_backend = load_gpu_package()
 # KERNEL LAUNCHING AND UTILS
 include("kernels_GPU.jl")
 
+# BROADCASTING
+include("broadcasting.jl")
+
 # SPECTRAL TRANSFORMS
 include("spectral_transform.jl")
 
@@ -52,6 +55,8 @@ include("barotropic.jl")
 include("shallowwater.jl")
 include("primitive_wet.jl")
 
+include("gpu_graphs_shared.jl")
+
 if gpu_backend === :CUDA
 
     include("CUDA/architecture.jl")
@@ -65,6 +70,9 @@ if gpu_backend === :CUDA
 elseif gpu_backend === :AMDGPU
 
     include("AMDGPU/architecture.jl")
+
+    # HIP-GRAPHS ACCELERATED FOURIER TRANSFORM (AMDGPU-only feature)
+    include("hip_graphs.jl")
 
 elseif gpu_backend === :Metal
     include("MetalGPU/metal.jl")

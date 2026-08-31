@@ -69,6 +69,8 @@ $(TYPEDFIELDS)"""
     const field3Dland::Field3D
 end
 
+dataset_type(::NetCDFOutput) = NCDataset
+
 """
 $(TYPEDSIGNATURES)
 Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
@@ -96,7 +98,7 @@ function NetCDFOutput(
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
 
-    land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction 
+    land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
     field3Dland = Field(output_NF, output_grid, nlayers_soil)

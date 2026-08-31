@@ -75,32 +75,35 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
         ov = get(all_results[label], "overview", nothing)
         ov === nothing && continue
         color = palette[mod1(j, length(palette))]
-        transforms = get(ov, "spectral_transform", fill("default", length(ov["trunc"])))
+        transforms = get(ov, "spectral_transform", fill("default", length(ov["truncation"])))
 
         for (kind, short, marker, linestyle) in (
                 ("default", "LT+FFT", :circle, :solid),
-                ("matrix",  "MT",     :diamond, :dash),
+                ("matrix", "MT", :diamond, :dash),
             )
             xs = Int[]
             ys = Float64[]
-            for i in eachindex(ov["trunc"])
+            for i in eachindex(ov["truncation"])
                 Int(ov["nlayers"][i]) == nlayers_target || continue
                 String(transforms[i]) == kind || continue
                 s = ov["sypd"][i]
                 (s isa Number && isfinite(s) && s > 0) || continue
-                push!(xs, Int(ov["trunc"][i]))
+                push!(xs, Int(ov["truncation"][i]))
                 push!(ys, Float64(s))
             end
             isempty(xs) && continue
             order = sortperm(xs)
-            scatterlines!(ax, xs[order], ys[order];
+            scatterlines!(
+                ax, xs[order], ys[order];
                 color = color, marker = marker, linestyle = linestyle,
                 linewidth = 2, markersize = 10,
             )
-            push!(legend_elems, [
-                LineElement(color = color, linestyle = linestyle, linewidth = 2),
-                MarkerElement(color = color, marker = marker, markersize = 10),
-            ])
+            push!(
+                legend_elems, [
+                    LineElement(color = color, linestyle = linestyle, linewidth = 2),
+                    MarkerElement(color = color, marker = marker, markersize = 10),
+                ]
+            )
             push!(legend_labels, "$label ($short)")
             plotted_anything = true
         end
@@ -120,9 +123,9 @@ function write_overview_table(io, all_results, labels)
     for label in labels
         ov = get(all_results[label], "overview", nothing)
         ov === nothing && continue
-        transforms = get(ov, "spectral_transform", fill("default", length(ov["trunc"])))
-        for i in eachindex(ov["trunc"])
-            r = (Int(ov["trunc"][i]), Int(ov["nlayers"][i]), String(transforms[i]))
+        transforms = get(ov, "spectral_transform", fill("default", length(ov["truncation"])))
+        for i in eachindex(ov["truncation"])
+            r = (Int(ov["truncation"][i]), Int(ov["nlayers"][i]), String(transforms[i]))
             r in rows || push!(rows, r)
         end
     end
@@ -139,9 +142,9 @@ function write_overview_table(io, all_results, labels)
             ov = get(all_results[label], "overview", nothing)
             cell = "—"
             if ov !== nothing
-                transforms = get(ov, "spectral_transform", fill("default", length(ov["trunc"])))
-                for i in eachindex(ov["trunc"])
-                    if Int(ov["trunc"][i]) == t && Int(ov["nlayers"][i]) == l && String(transforms[i]) == tr
+                transforms = get(ov, "spectral_transform", fill("default", length(ov["truncation"])))
+                for i in eachindex(ov["truncation"])
+                    if Int(ov["truncation"][i]) == t && Int(ov["nlayers"][i]) == l && String(transforms[i]) == tr
                         s = ov["sypd"][i]
                         cell = (s isa Number && isfinite(s)) ? format_sypd_cell(s) : "—"
                         break

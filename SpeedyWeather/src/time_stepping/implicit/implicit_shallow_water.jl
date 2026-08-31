@@ -52,11 +52,11 @@ function implicit_correction!(
 
     H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
     g = model.planet.gravity                    # gravitational acceleration [m/s²]
-    
+
     # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
-    Δt = time_step(time_stepping, vars.prognostic.clock)       
+    Δt = time_step(time_stepping, vars.prognostic.clock)
     ξ = implicit.centering * Δt / vars.prognostic.scale[]   # scale time step on the fly
-    
+
     # Get precomputed l_indices from the spectrum
     l_indices = div_tend.spectrum.l_indices
 
@@ -108,7 +108,7 @@ function implicit_correction!(
         model::ShallowWater
     )
     # implicit timestep ξ = α*Δt, depending on centering (0.5 Crank Nicolson, 1 backward Euler)
-    (; Δt) = time_stepping    
+    (; Δt) = time_stepping
     w = weight_coefficient(time_stepping, vars.prognostic.clock)
     ξ = w * implicit.centering * Δt / vars.prognostic.scale[]
 
@@ -120,7 +120,7 @@ function implicit_correction!(
 
     H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
     g = model.planet.gravity                    # gravitational acceleration [m/s²]
-        
+
     # Get precomputed l_indices from the spectrum
     (; l_indices) = F_div.spectrum
 
@@ -147,8 +147,8 @@ end
     ∇² = -l * (l - 1)
 
     # N-Cycle Lorenz tendency average to form the RHS of the solve
-    RHS_div = w*F_div[lm, k] + (1 - w)*G_div[lm, k]
-    RHS_η = w*F_η[lm] + (1 - w)*G_η[lm]
+    RHS_div = w * F_div[lm, k] + (1 - w) * G_div[lm, k]
+    RHS_η = w * F_η[lm] + (1 - w) * G_η[lm]
 
     # Implicit solve
     S⁻¹ = inv(1 - ξ^2 * H * g * ∇²)
@@ -157,6 +157,6 @@ end
 
     # Reobtain F_explicit + L_implicit by undoing the Lorenz tendency average
     # and store in F tendencies so it can be plugged into Lorenz time stepping as normal
-    F_div[lm, k] = (δdiv - (1 - w)*G_div[lm, k]) / w
-    F_η[lm, k] = (δη - (1 - w)*G_η[lm]) / w
+    F_div[lm, k] = (δdiv - (1 - w) * G_div[lm, k]) / w
+    F_η[lm, k] = (δη - (1 - w) * G_η[lm]) / w
 end

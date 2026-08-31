@@ -51,7 +51,7 @@ end
 
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.trunc)}(; geometry, kwargs...)
+    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
 end
 
 function variables(P::ParticleAdvection2D)
@@ -113,7 +113,7 @@ function initialize!(
     k = particle_advection.layer
     (; time_stepping) = model
 
-    # index the step dimension according to time stepper 
+    # index the step dimension according to time stepper
     l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
     u_grid = field_view(vars.grid.u, :, k, l)
     v_grid = field_view(vars.grid.v, :, k, l)
@@ -235,7 +235,10 @@ end
     ) where {NF}
 
     dlat = v * dt                               # increment in latitude [˚N]
-    coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
+    
+    # TODO: Replace `cos(deg2rad(particle.lat))` with `cosd(particle.lat)` once 
+    # JuliaGPU/AMDGPU.jl#1041 is merged/released and `cosd` is supported on AMD GPUs.
+    coslat = max(cos(deg2rad(particle.lat)), eps(NF))   # prevents division by zero
     dlon = u * dt / coslat                      # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
 end

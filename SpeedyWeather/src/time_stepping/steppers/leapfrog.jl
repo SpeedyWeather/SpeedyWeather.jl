@@ -5,10 +5,10 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
 mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
-    "[OPTION] Time step for T31, scale linearly to spectral resolution `trunc`"
-    Δt_at_T31::S
+    "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
+    Δt_at_T32::S
 
-    "[OPTION] Adjust `Δt_at_T31` with the output `interval` to output exactly after integer time steps"
+    "[OPTION] Adjust `Δt_at_T32` with the output `interval` to output exactly after integer time steps"
     adjust_with_output::B
 
     "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"
@@ -101,9 +101,13 @@ end
         push!(calls, :(copy_step_forward!(getfield(vars.prognostic, $(QuoteNode(name))))))
     end
     for namespace in (:tracers, :ocean, :land), name in _namespace_names(T, namespace)
-        push!(calls, :(copy_step_forward!(
-            getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name)))
-        )))
+        push!(
+            calls, :(
+                copy_step_forward!(
+                    getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name)))
+                )
+            )
+        )
     end
     return Expr(:block, calls..., :(return nothing))
 end
@@ -170,19 +174,19 @@ Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(
         spectral_grid::SpectralGrid;
-        Δt_at_T31 = Minute(40),
+        Δt_at_T32 = Minute(40),
         adjust_with_output = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
     )
-    (; NF, trunc) = spectral_grid
+    (; NF, truncation) = spectral_grid
 
     # compute time step
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
     Δt::NF = Δt_millisec.value / 1000
 
     return Leapfrog(
-        Second(Δt_at_T31), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
+        Second(Δt_at_T32), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
     )
 end
 
@@ -208,7 +212,11 @@ function time_step!(clock::Clock, time_stepping::Leapfrog)
         time_step!(clock, Δt ÷ 2, increase_counter = false)
     elseif i == 1                   # second step: Leapfrog at Δt
         # subtract the Δt/2 again as otherwise the time can be 1ms off due to rounding
-        clock.time -= Δt ÷ 2
+        # rotation and orbit time are dilated, so rewind them by their dilated Δt/2
+        half_Δt = Δt ÷ 2
+        clock.time -= half_Δt
+        clock.rotation_time -= dilate(half_Δt, clock.rotation_dilation)
+        clock.orbit_time -= dilate(half_Δt, clock.orbit_dilation)
         time_step!(clock, Δt)
     else                            # later steps: Leapfrog at 2Δt but increase clock by Δt
         time_step!(clock, Δt)

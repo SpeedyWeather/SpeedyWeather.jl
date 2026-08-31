@@ -80,6 +80,8 @@ function Base.show(io::IO, output::JLD2Output)
     return println(io, "└ interval: $(output.interval)")
 end
 
+dataset_type(::JLD2Output) = JLDFile
+
 """$(TYPEDSIGNATURES)
 Initialize JLD2 `output` by creating a JLD2 file.
 To be called just before the first timesteps."""
@@ -115,8 +117,8 @@ end
 materialize_views(x) = x
 materialize_views(nt::NamedTuple) = NamedTuple{keys(nt)}(map(materialize_views, values(nt)))
 materialize_views(vars::Variables) = isempty(vars.fused) ? vars : Variables(;
-    (k => materialize_views(getfield(vars, k)) for k in fieldnames(Variables))...
-)
+        (k => materialize_views(getfield(vars, k)) for k in fieldnames(Variables))...
+    )
 materialize_views(f::Field) = f.data isa SubArray ? Field(Array(f.data), f.grid) : f
 function materialize_views(L::LowerTriangularArray)
     return L.data isa SubArray ? LowerTriangularArray(Array(L.data), L.spectrum) : L
