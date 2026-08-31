@@ -21,7 +21,6 @@ makedocs(
     checkdocs = :exports,
     plugins = [bib],
     pages = [
-        "Home" => "index.md",
         "Usage" => [
             "Installation" => "installation.md",
             "How to run SpeedyWeather" => "how_to_run_speedy.md",
