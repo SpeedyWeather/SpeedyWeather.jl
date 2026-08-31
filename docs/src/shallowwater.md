@@ -6,8 +6,9 @@ A divergent flow affects the interface height which in turn can impose a pressur
 force onto the flow. The dynamics include advection, forces, dissipation, and continuity.
 
 The following description of the shallow water model largely follows the idealized models with
-spectral dynamics developed at the Geophysical Fluid Dynamics Laboratory[^1]:
-The Shallow Water Equations[^2].
+spectral dynamics developed at the Geophysical Fluid Dynamics Laboratory
+[GFDLIdealizedModels](@citep): The Shallow Water Equations
+[GFDLShallowWaterEquations](@citep).
 
 ## Shallow water equations
 
@@ -275,8 +276,3 @@ When adding (custom) forcing or drag terms, in most cases this scaling does not 
 manually but is done automatically within the dynamical core. But there are exceptions,
 see [Forcing scaling](@ref) for more details.
 
-
-## References
-
-[^1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
-[^2]: Geophysical Fluid Dynamics Laboratory, [The Shallow Water Equations](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/shallow.pdf).

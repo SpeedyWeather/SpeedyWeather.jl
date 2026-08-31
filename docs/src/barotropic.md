@@ -7,7 +7,8 @@ of the relative vorticity ``\zeta = \nabla \times \mathbf{u}``.
 
 The dynamical core presented here to solve the barotropic vorticity equations largely follows
 the idealized models with spectral dynamics developed at the
-Geophysical Fluid Dynamics Laboratory[^1]: A barotropic vorticity model[^2].
+Geophysical Fluid Dynamics Laboratory [GFDLIdealizedModels](@citep):
+a barotropic vorticity model [GFDLBarotropicVorticity](@citep).
 
 Many concepts of the [Shallow water model](@ref shallow_water_model) and the
 [Primitive equation model](@ref primitive_equation_model) are similar,
@@ -196,8 +197,3 @@ before the time integration and variables are unscaled for output and after the 
 finished. The scaled time step (seconds per meter) is applied on the fly within the time integration
 and is not exposed to the user. In hopefully many other cases it is clearly denoted that a variable
 or constant is *scaled*.
-
-## References
-
-[^1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
-[^2]: Geophysical Fluid Dynamics Laboratory, [The barotropic vorticity equation](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/barotropic.pdf).

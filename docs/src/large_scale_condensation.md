@@ -75,7 +75,8 @@ And solving for ``\Delta q`` yields
 \left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T} (T^i) \right] \Delta q = q^\star(T_i) - q_i
 ```
 
-meaning that the implicit immediate condensation can be formulated as (see also [^Frierson2006])
+meaning that the implicit immediate condensation can be formulated as (see also
+[Frierson2006](@citep))
 
 ```math
 \begin{aligned}
@@ -272,7 +273,3 @@ A schematic of the large-scale precipitation parameterization is illustrated bel
 
 
 
-
-## References
-
-[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566, DOI:[10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1).

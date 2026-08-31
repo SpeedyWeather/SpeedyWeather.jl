@@ -85,7 +85,7 @@ with default settings. More options on output in [NetCDF output](@ref).
     run!(simulation, period=Day(6))
     ```
 
-As a second example, let's investigate the Galewsky et al.[^G04] test case for the shallow
+As a second example, let's investigate the [Galewsky2004](@citet) test case for the shallow
 water equations with and without mountains. As the shallow water system has also only
 one level, we can reuse the `SpectralGrid` from Example 1.
 ```@example galewsky_setup
@@ -98,7 +98,7 @@ orography = NoOrography(spectral_grid)
 ```
 Although the orography is zero, you have to pass on `spectral_grid` so that it can
 still initialize zero-arrays of the correct size and element type. Awesome.
-This time the initial conditions should be set the the Galewsky et al.[^G04] zonal
+This time the initial conditions should be set to the [Galewsky2004](@citet) zonal
 jet, which is already defined as
 ```@example galewsky_setup
 initial_conditions = ZonalJet(spectral_grid)
@@ -374,7 +374,3 @@ is much thinner there. The pressure gradient is relative to ``z=0`` so in a flui
 at rest the mountains would just "reach into" the fluid, thinning the layer the higher
 the mountain. As the atmosphere here is not at rest the layer thickness is not perfectly
 (anti-)correlated with orography but almost so.
-
-## References
-
-[^G04]: Galewsky, Scott, Polvani, 2004. *An initial-value problem for testing numerical models of the global shallow-water equations*, Tellus A. DOI: [10.3402/tellusa.v56i5.14436](https://doi.org/10.3402/tellusa.v56i5.14436)
