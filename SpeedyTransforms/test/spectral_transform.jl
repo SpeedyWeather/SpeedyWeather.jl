@@ -324,50 +324,54 @@ end
 end
 
 @testset "Transform roundtrip accuracy" begin
-    # only Gaussian transforms are exact, that's why we need have different tolerenaces
-    # the tolerances below were just emperically found and are kept to ensure
-    # we don't introduce bugs
 
-    tolerances = [
+    grids = (
+        FullGaussianGrid,
+        FullClenshawGrid,
+        OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        OctaminimalGaussianGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid,
+        FullHEALPixGrid,
+        FullOctaHEALPixGrid,
+    )
+
+    tolerances_F64 = [
         1.0e-13,    # FullGaussianGrid
         1.0e-12,    # FullClenshawGrid
         1.0e-13,    # OctahedralGaussianGrid
         1.0e-12,    # OctahedralClenshawGrid
-        5.0e-4,     # OctaminimalGaussianGrid
-        1.0e-2,     # HEALPixGrid
-        1.0e-2,     # OctaHEALPixGrid
+        5.0e-4,     # OctaminimalGaussianGrid, the one grid here without an exact quadrature
+        1.0e-13,    # HEALPixGrid
+        1.0e-13,    # OctaHEALPixGrid
+        1.0e-13,    # FullHEALPixGrid
+        1.0e-13,    # FullOctaHEALPixGrid
     ]
+    tolerances_F32 = [ifelse(t > 1.0e-6, t, 1.0e-5) for t in tolerances_F64]
+
     @testset for truncation in [43, 64]
-        @testset for (i_grid, Grid) in enumerate(
-                (
-                    FullGaussianGrid,
-                    FullClenshawGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    OctaminimalGaussianGrid,
-                    HEALPixGrid,
-                    OctaHEALPixGrid,
-                )
-            )
+        @testset for NF in (Float64, Float32)
+            @testset for (i_grid, Grid) in enumerate(grids)
 
-            # TODO: other dealising for other grids?
-            dealiasing = 3
-            NF = Float64
-            nlayers = 8
+                dealiasing = max(3, SpeedyTransforms.default_dealiasing(Grid))
+                nlayers = 8
 
-            spectrum = Spectrum(truncation)
-            grid = Grid(SpeedyTransforms.get_nlat_half(truncation, dealiasing))
-            S = SpectralTransform(spectrum, grid; NF, nlayers)
+                spectrum = Spectrum(truncation)
+                grid = Grid(SpeedyTransforms.get_nlat_half(truncation, dealiasing))
+                S = SpectralTransform(spectrum, grid; NF, nlayers)
 
-            # start in spectral space but compare in grid space to
-            # avoid inaccuracies due to filtering out higher frequencies
-            spec = randn(Complex{NF}, spectrum, nlayers)
-            grid = transform(spec, S)
+                # start in spectral space but compare in grid space to
+                # avoid inaccuracies due to filtering out higher frequencies
+                spec = randn(Complex{NF}, spectrum, nlayers)
+                grid = transform(spec, S)
 
-            spec_roundtrip = transform(grid, S)
-            grid_roundtrip = transform(spec_roundtrip, S)
+                spec_roundtrip = transform(grid, S)
+                grid_roundtrip = transform(spec_roundtrip, S)
 
-            @test grid_roundtrip ≈ grid rtol = tolerances[i_grid]
+                tolerance = NF == Float64 ? tolerances_F64[i_grid] : tolerances_F32[i_grid]
+                @test grid_roundtrip ≈ grid rtol = tolerance
+            end
         end
     end
 end

@@ -1,8 +1,6 @@
-using Random
 using Logging
 
 @testset "Quadrature weights" begin
-
     HEALPix_grids = (HEALPixGrid, OctaHEALPixGrid, FullHEALPixGrid, FullOctaHEALPixGrid)
     exact_grids = (FullGaussianGrid, OctahedralGaussianGrid, FullClenshawGrid, OctahedralClenshawGrid)
 
@@ -14,30 +12,6 @@ using Logging
         dealiasing = SpeedyTransforms.default_dealiasing(Grid)
         grid = Grid(SpeedyTransforms.get_nlat_half(truncation, dealiasing))
         return SpectralTransform(Spectrum(truncation), grid; NF)
-    end
-
-    function random_real_field_coefficients(spectrum, NF; seed = 42)
-        Random.seed!(seed)
-        alms = randn(LowerTriangularMatrix{Complex{NF}}, spectrum)
-        m0 = LowerTriangularArrays.get_lm_range(1, spectrum.lmax - 1)
-        alms[m0] = complex.(real.(alms[m0]))    # a real field has real m=0 coefficients
-        return alms
-    end
-
-    @testset "HEALPix round-trip is exact at the default dealiasing" begin
-        @testset for Grid in HEALPix_grids
-            @testset for truncation in (32, 64)
-                @testset for NF in (Float32, Float64)
-                    S = default_transform(Grid, truncation, NF)
-                    alms = random_real_field_coefficients(S.spectrum, NF)
-                    alms2 = transform(transform(alms, S), S)
-                    # exact up to roundoff, not merely "close": the pre-existing equal-area
-                    # weights are off by ~5e-3 here, far above either tolerance
-                    tol = NF == Float64 ? 1.0e-10 : 1.0e-4
-                    @test maximum(abs, alms2 - alms) < tol
-                end
-            end
-        end
     end
 
     @testset "weights are positive and close to equal area" begin

@@ -319,11 +319,26 @@ Float32, the prototype reached 1.2·10⁻⁷ … 2.8·10⁻⁷ — Float32 round
 improvement. `‖T‖₂` becomes exactly 1, so the transform pair no longer injects energy. To be
 re-confirmed against the implementation.
 
-Unit tests added in `SpeedyTransforms/test/quadrature.jl` (23489 assertions, 3 s):
+Round-trip accuracy is asserted in the pre-existing `Transform roundtrip accuracy` testset in
+`SpeedyTransforms/test/spectral_transform.jl`, which this change extends rather than duplicates:
 
-- round-trip exactness for all four HEALPix grids at T32/T64 in Float32 and Float64, held to
-  `1e-10`/`1e-4` — tolerances the pre-existing equal-area weights (~5·10⁻³) miss by orders of
-  magnitude, so the test cannot pass by accident;
+- the hardcoded `dealiasing = 3` becomes `max(3, default_dealiasing(Grid))`. Dropping the override
+  outright would have *loosened* the Gaussian rows badly — at their own default of 2 the Legendre
+  shortcut drops polar rings and `OctahedralGaussianGrid` reaches only 2.6·10⁻⁸ against its 10⁻¹³
+  tolerance — so the Gaussian and Clenshaw rows keep exactly the footing they had and only the
+  HEALPix grids move to their 3.5;
+- the HEALPix tolerances drop from **10⁻² to 10⁻¹³**, the bound the Gaussian grids are held to;
+- `FullHEALPixGrid` and `FullOctaHEALPixGrid` join the grid list;
+- a `Float32` sweep is added, where every exact grid bottoms out at the same arithmetic noise floor
+  (~2·10⁻⁷ in this metric) and so shares one tolerance.
+
+The testset grows from 14 to 36 assertions. Its T43 rows were *already* exact at `dealiasing = 3`
+(`roundup_fft` bumps 43 to `nlat_half = 48`, giving slack 5) but were being held to 10⁻², 13 orders
+looser than the measurement; only the T64 rows ever needed that tolerance.
+
+Unit tests for the weights themselves in `SpeedyTransforms/test/quadrature.jl` (23475 assertions,
+~15 s), deliberately not re-testing the round trip:
+
 - every weight strictly positive and within `[QUADRATURE_MIN_RATIO, QUADRATURE_MAX_RATIO]` of the
   grid's geometric solid angle;
 - `Σ_j g_j = 4π` at `m = 0`, i.e. the global mean is exactly conserved;
