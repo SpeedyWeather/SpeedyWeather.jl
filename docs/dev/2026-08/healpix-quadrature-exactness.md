@@ -122,30 +122,68 @@ confirmed by probing the true operator with unit basis vectors: at `T16`, `‖T_
 `arXiv:2510.01785` (cuHPX, Cheng et al., *GPU-Accelerated Differentiable Spherical Harmonic
 Transforms on HEALPix Grids*) evaluates exactly this question in §IV-A. It compares equal, ring and
 pixel weights and finds ring weights best: *"reducing the round-trip error by nearly an order of
-magnitude compared to equal weighting"*, and adopts them as the default. Iterative refinement is
-listed in §V as **future work**, not implemented.
+magnitude compared to equal weighting"*, and *"adopts ring weights as the default"*. The weights
+are order-independent by construction — the paper's own definition is *"ring (all pixels in a ring
+share the same weight)"*.
 
-Those "ring weights" are the classical HEALPix ones (Górski et al. 2005, shipped as FITS tables and
-used by healpy/ducc). They solve a strictly weaker problem: they only require
+The paper does **not** discuss making the weights depend on the order `m`, anywhere. Every mention
+of weights in it uses `w_j`, indexed by ring alone — *"W is a diagonal matrix of quadrature
+weights"* — and §V ("Limitation & Future Work") proposes only three extensions: multi-GPU
+distributed transforms, using cuHPX as the core of a PDE solver, and iterative refinement.
+
+Their own comparison points at why. The three schemes they try vary the weights **spatially**, with
+strictly increasing degrees of freedom: equal (one value everywhere), ring (one per ring), pixel
+(one per pixel). The most spatially-resolved of the three is not the best — the reported ordering is
+equal < pixel < ring, i.e. *"pixel weights provide moderate improvement. Ring weights, however,
+provide the best results"*. Spatial freedom stops paying off. The axis never varied is the spectral
+one, and that is where the freedom is needed: the exactness condition is a separate constraint
+system per order `m`, so per-order weights are not *finer* weights than pixel weights, they are
+weights along a different axis.
+
+Two things to keep straight about what the paper does and does not say:
+
+- It never states where its ring weights come from. The presumption here — that they are the
+  classical HEALPix ones (Górski et al. 2005, shipped as FITS tables, used by healpy/ducc) — is an
+  inference from the standard meaning of the term and from the fact that cuHPX benchmarks against
+  healpy and ducc. It is not a quote. The comparison in the table below does not depend on it: the
+  row labelled "classical ring weights" is that scheme reimplemented and measured here, and stands
+  as the best-known order-independent ring weighting regardless of which variant cuHPX ships.
+- **Iterative refinement is not merely future work in that literature.** §II-A ("Standard Methods
+  in HEALPix Software") presents it with explicit equations (4) and (5) as what traditional CPU
+  libraries already do — *"This allows the system to be solved iteratively or via gradient descent,
+  with accuracy improved by increasing the number of iterations"* — and rejects it on cost:
+  *"its computational cost scales as O(ℓ³max), which quickly becomes prohibitive at high resolutions
+  (e.g., ℓmax ≳ 2000)"*. §V then revisits it as an extension cuHPX could explore. So the established
+  fallback for HEALPix inexactness is an O(ℓ³) iteration paid at **every transform**; per-order
+  weights buy exactness in a one-off precomputation and cost nothing per transform. That is the
+  sharper contrast, and the first draft of this document understated it.
+
+The classical ring weights solve a strictly weaker problem than the one above: they only require
 `Σ_j g_j λ_l0(μ_j) = 2√π δ_l0`, i.e. that the quadrature integrate every band-limited function
-exactly. That is the `m = 0, l' = 0` column of the condition above — one row per even degree
-instead of the full orthogonality system.
+exactly. That is the `m = 0, l' = 0` column of the condition — one row per even degree instead of
+the full orthogonality system.
 
 Reimplemented here and measured on the same footing:
 
 | | T32 | T64 | T128 | T256 |
 |---|---|---|---|---|
 | equal area (current) | 5.99·10⁻³ | 2.99·10⁻³ | 1.49·10⁻³ | 7.43·10⁻⁴ |
-| classical ring weights (healpy/cuHPX) | 4.56·10⁻³ | 2.26·10⁻³ | 1.13·10⁻³ | 5.64·10⁻⁴ |
+| classical ring weights (healpy/ducc) | 4.56·10⁻³ | 2.26·10⁻³ | 1.13·10⁻³ | 5.64·10⁻⁴ |
 | per-order weights (this plan) | 7.20·10⁻⁴ | 3.36·10⁻⁴ | 1.62·10⁻⁴ | 7.99·10⁻⁵ |
 
 (RMS of `T − I`; the per-order row here is the conservatively regularised variant, *not* the exact
-one.) The classical ring weights buy only 1.3× in this metric — cuHPX's "order of magnitude" is
-measured against a different baseline and a different norm. Per-order weights are **7× better than
-the classical ring weights** even before exploiting exactness.
+one.) The classical ring weights buy only 1.3× in this metric. That is not in conflict with cuHPX's
+"nearly an order of magnitude": the baseline is the same (equal weighting) but the quantity is not —
+they measure `‖f − iSHT(SHT(f))‖` on a map, in RMS and L∞, where this table measures the deviation
+of the round-trip *operator* from the identity over spectral coefficients. Per-order weights are
+**7× better than the classical ring weights** in this metric even before exploiting exactness.
 
-So: no, the paper has not implemented anything equivalent. It uses precomputed ring weights that are
-one weight per ring, order-independent, and fitted to a weaker condition.
+So: no, the paper has not implemented anything equivalent, and does not suggest it. It uses ring
+weights that are one weight per ring, order-independent, and fitted to a weaker condition. The
+per-order idea here comes from two properties of this codebase rather than from the literature: the
+Legendre shortcut already makes the set of contributing rings depend on `m`, so one weight per ring
+cannot be consistent across orders; and the exactness condition decouples by `m`, so each order is
+an independent, small, and exactly solvable problem.
 
 ## Summary of changes
 
@@ -357,5 +395,7 @@ stability problems, with a long model run at the configuration that previously f
 
 - The same machinery applies unchanged to any ring grid; it could replace `clenshaw_curtis_weights`
   and reduce the ring count needed for exactness on Clenshaw grids.
-- Iterative refinement (cuHPX §V) becomes unnecessary at the sanctioned truncations, but would be
-  the fallback if Option A/B is rejected and zero slack has to be supported.
+- Iterative refinement (cuHPX §II-A for the method, §V for the proposal) becomes unnecessary at the
+  sanctioned truncations, but would be the fallback if the dealiasing change is rejected and zero
+  slack has to be supported. It costs an extra analysis **and** synthesis per iteration, i.e. it is
+  paid on every transform, where the weights are a one-off precomputation.
