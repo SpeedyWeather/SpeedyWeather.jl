@@ -314,7 +314,7 @@ HEALPixOutput
 
 ## Parameter summary
 
-With `output=true` as an argument in the `run!(simulation)` call, the [NetCDFOutput](@ref) by default also
+With `output=true` as an argument in the `run!(simulation)` call, the [`NetCDFOutput`](@ref) by default also
 writes a parameter summary into `parameters.txt` in the same folder. This is implemented as
 a [Callbacks](@ref) (`<: SpeedyWeather.AbstractCallback`) and can be added independent of
 `NetCDFOutput` too. After `output=true` this callback is found here as `ParametersTxt`
