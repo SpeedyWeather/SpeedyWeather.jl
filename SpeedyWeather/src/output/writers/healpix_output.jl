@@ -1,16 +1,27 @@
 export HEALPixOutput
 
-"""Output writer that writes a SpeedyWeather simulation to a Zarr store on a
-[`HEALPixGrid`](@ref), keeping the horizontal dimension *flat* (unravelled into a
-single `cell` dimension) exactly as a `Field`'s data is.
-Data on any other grid is interpolated onto HEALPix; a simulation that already runs
-on the target HEALPix grid is written without interpolation.
+"""Output writer that writes a SpeedyWeather simulation to a Zarr store on an equal-area
+grid of the HEALPix family — a [`HEALPixGrid`](@ref) or an [`OctaHEALPixGrid`](@ref) —
+keeping the horizontal dimension *flat* (unravelled into a single `cell` dimension)
+exactly as a `Field`'s data is. Data on any other grid is interpolated onto the output
+grid; a simulation that already runs on it is written without interpolation.
 
 Alongside the variables the store holds one flat vector per cell with its latitude
-(`lat`), its longitude (`lon`) and its ring index (`ring`), so consumers need no
-knowledge of SpeedyWeather's grid machinery to place the data on the sphere. Cells
-are in HEALPix RING order, i.e. the flat index `ij` is the standard RING pixel index
-`ij - 1` (0-based) and the store can be read by healpy/cuHPX directly.
+(`lat`, ˚N from the equator), its longitude (`lon`, ˚E in `[0, 360)`) and its ring
+index (`ring`), so consumers need no knowledge of SpeedyWeather's grid machinery to
+place the data on the sphere. Cells run ring by ring from north to south.
+
+Both grids use this same store convention, but they are not equally portable:
+
+- on a `HEALPixGrid` the cell order *is* the standard HEALPix RING order, i.e. the flat
+  index `ij` is RING pixel `ij - 1` (0-based), and the store carries `healpix_nside`,
+  `healpix_npix` and `healpix_order` so healpy and cuHPX can read it directly. The
+  coordinates match healpy's `pix2ang(..., lonlat=true)`; healpy's *default* is
+  colatitude in radians, i.e. `θ = deg2rad(90 - lat)`.
+- an `OctaHEALPixGrid` is a SpeedyWeather-specific member of the HEALPix family (4 faces,
+  `4nlat_half²` points, no equatorial belt). It is equal-area and ring-ordered, but it is
+  *not* standard HEALPix and healpy/cuHPX cannot read it, so those stores deliberately
+  carry no `healpix_*` attributes.
 
 The actual implementation lives in the `SpeedyWeatherZarrExt` extension and is only
 available once `Zarr.jl` is loaded:
@@ -20,10 +31,13 @@ using Zarr
 using SpeedyWeather
 spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
 output = HEALPixOutput(spectral_grid, PrimitiveWet, nside = 16)
+
+# or on an OctaHEALPixGrid, which also takes odd nlat_half
+output = HEALPixOutput(spectral_grid, PrimitiveWet, output_grid = OctaHEALPixGrid(24))
 ```
 
 Type parameters: `Field2D`, `Field3D` are the scratch field types on the output
-HEALPix grid, `Interpolator` is the interpolator type (or `Nothing` when the model
+grid, `Interpolator` is the interpolator type (or `Nothing` when the model
 grid already is the output grid and interpolation is skipped), `DT` and `S` are the
 start-date and output-step types, `C` is the Zarr compressor type (or `Nothing` for
 the Zarr default), and `Z` is the Zarr group type once `initialize!` has been called
@@ -129,7 +143,7 @@ end
 
 """$(TYPEDSIGNATURES)
 `true` if `output` writes its data without interpolating, i.e. the simulation already
-runs on the output's HEALPix grid."""
+runs on the output's grid."""
 skips_interpolation(output::HEALPixOutput) = isnothing(output.interpolator)
 
 function Base.show(io::IO, output::HEALPixOutput{F}) where {F}
@@ -139,14 +153,17 @@ function Base.show(io::IO, output::HEALPixOutput{F}) where {F}
     active = output.active ? "active" : "inactive/uninitialized"
 
     grid = output.field2D.grid
+    grid_name = RingGrids.nonparametric_type(grid)
     nlat = get_nlat(grid)
-    nside = RingGrids.nside_healpix(grid.nlat_half)
     npix = get_npoints(grid)
+    # nside is only defined for a true HEALPixGrid, OctaHEALPix is parameterised by nlat_half
+    res = grid isa HEALPixGrid ? "nside=$(RingGrids.nside_healpix(grid.nlat_half))" :
+        "nlat_half=$(grid.nlat_half)"
 
     println(io, styled"{warning:HEALPixOutput}{note:$type_param_str}")
     println(io, styled"├ {info:status}: $active")
     println(io, styled"├ {info:write restart file} = $(output.write_restart) (if active)")
-    println(io, styled"├ {info:output grid} = $nlat-ring HEALPixGrid {note:(nside=$nside, $npix cells)}")
+    println(io, styled"├ {info:output grid} = $nlat-ring $grid_name {note:($res, $npix cells)}")
 
     if skips_interpolation(output)
         println(io, styled"├ {info:interpolation} = skipped (model already on this grid)")

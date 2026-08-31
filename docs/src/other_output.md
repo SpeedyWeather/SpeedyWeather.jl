@@ -262,11 +262,34 @@ This conventions should be compatabile with `healpy` and `cuHPX`.  Note that whi
 writes any even `nlat_half`, the NESTED and earth-2 flat layouts those tools convert to
 require `nside` to be a power of two.
 
+Our `lat` is latitude in degrees **from the equator** and `lon` is in `[0, 360)`, which is
+exactly `healpy`'s `lonlat=True` convention. Mind that this is *not* healpy's default: with
+`lonlat=False` (the default) healpy uses **colatitude in radians from the north pole**, so
+convert with `theta = deg2rad(90 - lat)`, `phi = deg2rad(lon)`.
+
 Mind the axis order when reading from Python: Zarr stores shape row-major while Julia is
 column-major, so a variable written as `(cell, layer, time)` from Julia is seen as
 `(time, layer, cell)` from Python — matching its `_ARRAY_DIMENSIONS` tag. A flat `(npix,)`
 map to hand to `healpy` is therefore `arr.reshape(-1, npix)[-1]`, and the `hp.mollview` call
 above works because `.isel(time=-1, layer=-1)` already reduces to the trailing `cell` axis.
+
+### OctaHEALPix output
+
+`HEALPixOutput` also writes the [`OctaHEALPixGrid`](@ref), a SpeedyWeather-specific member of
+the HEALPix family (4 faces, `4nlat_half²` points, no equatorial belt, and — unlike
+`HEALPixGrid` — any *odd* `nlat_half` is allowed). It is equal-area and ring-ordered and is
+written with **exactly the same store convention**: the same flat `cell` dimension, the same
+flat `lat`/`lon`/`ring` coordinate vectors, the same array shapes and `_ARRAY_DIMENSIONS`.
+
+```@example healpix
+output = HEALPixOutput(spectral_grid, PrimitiveWet, output_grid=OctaHEALPixGrid(24))
+output.field2D.grid
+```
+
+`healpy` and `cuHPX` implement only the standard HEALPix and **cannot** read an OctaHEALPix map.
+
+By default the output grid **follows the model's grid** when the simulation already runs on
+either supported grid, so both are written without interpolation.
 
 ### Skipping the interpolation
 

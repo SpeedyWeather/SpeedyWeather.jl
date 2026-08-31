@@ -67,7 +67,8 @@ when the simulation itself already runs on `HEALPixGrid`.
 
 `HEALPixOutput` (`SpeedyWeather/src/output/writers/healpix_output.jl`, implementation in
 `SpeedyWeather/ext/SpeedyWeatherZarrExt/healpix_output.jl`) — a Zarr-backed output writer whose
-output grid is a `HEALPixGrid` and whose arrays keep the flat horizontal dimension:
+output grid is a `HEALPixGrid` or an `OctaHEALPixGrid` and whose arrays keep the flat
+horizontal dimension:
 
 | array | shape (Julia, column-major) | `_ARRAY_DIMENSIONS` (row-major, xarray order) |
 |---|---|---|
@@ -81,7 +82,36 @@ cell (north to south) as taken from `grid.whichring`. `cell` is the flat index `
 exists so `lat`/`lon`/`ring` are well-formed non-dimension coordinates for xarray.
 
 Resolution is set with `nside` (or `nlat_half = 2·nside`), defaulting to the simulation's own
-`nlat_half` rounded up to the nearest even number (`HEALPixGrid` requires even `nlat_half`).
+`nlat_half` rounded up to the nearest even number (`HEALPixGrid` requires even `nlat_half`;
+`OctaHEALPixGrid` takes any).
+
+### Two grids, one store convention
+
+Both `HEALPixGrid` and `OctaHEALPixGrid` are equal-area and ring-ordered north to south, and
+both are written with an identical store layout — same flat `cell` dimension, same flat
+`lat`/`lon`/`ring` vectors, same shapes and `_ARRAY_DIMENSIONS`. They differ only in the
+advertised metadata, resolved by `healpix_store_attributes(grid)`:
+
+Both carry the *same* key set, so a reader needs no special-casing: `grid`, `npix`,
+`nlat_half`, `nrings`, `cell_ordering`, `equal_area`, plus `healpix_nside`, `healpix_npix`,
+`healpix_nfaces` and `healpix_order = "RING"`. `nside` is generalized to **the side length of
+one square face** so that the invariant `healpix_npix == healpix_nfaces * healpix_nside^2`
+holds for both — 12 faces and `nside = nlat_half ÷ 2` for `HEALPixGrid` (the usual
+`npix = 12nside²`), 4 faces and `nside = nlat_half` for `OctaHEALPixGrid` (`npix = 4nside²`).
+`healpix_order` is `"RING"` for both, since cells run ring by ring north to south either way.
+
+`healpix_nfaces` is therefore the discriminator, and it carries real weight: healpy and cuHPX
+implement only the 12-face tessellation, so a reader assuming 12 faces would compute
+`12nside²` and silently misread an OctaHEALPix store (at `nlat_half = 8`: 256 actual points
+vs. 192 assumed). OctaHEALPix stores additionally carry an explicit `note`, and
+`check_healpy.py` aborts on `healpix_nfaces != 12` rather than on a missing `healpix_nside`,
+which no longer discriminates.
+
+Grid selection (`healpix_output_grid`) is, in order of precedence: an explicit `output_grid`;
+`nside`, which always means `HEALPixGrid` since `nside` is a HEALPix-only parameter; otherwise
+the *model's own* grid type when it already runs on one of the two, and `HEALPixGrid` for
+everything else. That default is what lets both HEALPix and OctaHEALPix simulations skip the
+interpolation without the user asking for it.
 
 ### Interpolation skip
 
@@ -183,10 +213,12 @@ Python and the first from Julia. That asymmetry is now documented in `other_outp
   member validation) is not wired up for `HEALPixOutput`; `zarr_ensemble_index` returns 0.
   Adding it later is mechanical — the ensemble axis would append to the flat shape exactly as
   it does for the rectangular one.
-- **`HEALPixGrid` only.** `OctaHEALPixGrid` is a SpeedyWeather-specific variant, not standard
-  HEALPix, and is rejected by the constructor because cuHPX/healpy cannot read it.
-- **Even `nlat_half` only**, inherited from `RingGrids.nside_healpix`. Odd requests are rounded
-  up with an `@info`.
+- **`OctaHEALPixGrid` stores are not portable.** They are written on request, with the same
+  store convention *and* the same metadata key names, but healpy and cuHPX cannot read them.
+  Consumers must branch on `healpix_nfaces` (or `grid`); `check_healpy.py` does exactly that
+  and aborts with an explanation rather than cascading through meaningless failures.
+- **Even `nlat_half` only for `HEALPixGrid`**, inherited from `RingGrids.nside_healpix`; odd
+  requests are rounded up with an `@info`. `OctaHEALPixGrid` accepts any positive `nlat_half`.
 - The interpolation-skip check is on grid *type and resolution*, not architecture: a GPU
   simulation on `HEALPixGrid` still pays the `on_architecture(CPU(), …)` copy per output step,
   as every writer does.
