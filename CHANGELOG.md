@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Introduced optimized quadrature weigths for `HEALPixGrid` and `OctaHEALPixGrid` to massively improve transform exactness [#1240](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1240/)
 - Add `HEALPixOutput`, a Zarr output writer that writes onto a `HEALPixGrid` keeping the horizontal dimension flat [#1238](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1238)
 - Remove orphaned duplicate of kernel_launching.jl in Utils [#1237](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1237)
 - Move the backend-agnostic GPU-graphs machinery (kernels, cache, capture/replay control flow) from `SpeedyTransforms/ext/gpu_graphs_common.jl` into `SpeedyTransforms/src/`, now compiled unconditionally as part of the main package rather than only when the CUDA/AMDGPU extension loads; only the `CuArray`/`ROCArray`-dispatched methods and backend wiring remain in the extensions. No change to `gpu_graphs`/`default_gpu_graphs` behavior. [#1232](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1232)
