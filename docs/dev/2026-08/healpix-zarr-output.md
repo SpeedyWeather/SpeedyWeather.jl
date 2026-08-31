@@ -27,6 +27,10 @@ Base revision: 20467269399f40212fee413a545496226de999ca
   runs on CPU anywhere and can therefore actually be executed; cuHPX is CUDA-only and could
   not be run on the development machine. cuHPX coverage is retained as an optional
   auto-skipping section of the same script.
+- 2026-08-31: CI caught `string(::Type)` in the persisted `grid` attribute being
+  module-qualified depending on the printing context ("RingGrids.OctaHEALPixGrid" in the test
+  worker vs "OctaHEALPixGrid" locally). Switched to `nameof`, which is context-independent —
+  see Known limitations. Also added GPU tests to `test/GPU/barotropic.jl`.
 - 2026-08-31: added `check_cuhpx.py`, a deliberately minimal standalone GPU-node script
   (`can you also try to write a very minimal test script that tests cuHPX compatability that
   i can execute on a GPU node?`).
@@ -171,6 +175,22 @@ Unit tests in `SpeedyWeather/test/output/healpix_output.jl`:
 6. **PrimitiveWet with soil layers** — the `soil_layer` vertical dimension and 2D-from-3D
    variables (`mslp`, `u10`, `tsurf`) that carry their own `output!` methods.
 
+GPU tests in `SpeedyWeather/test/GPU/barotropic.jl` (run only by the GPU suite, which
+auto-detects CUDA/AMDGPU/Metal), following the pattern of the `JLD2Output`/`ArrayOutput` tests
+already there:
+
+1. **`HEALPixOutput` from a GPU model** — a `BarotropicModel` on `GPU()` written onto a
+   HEALPix grid, exercising the GPU→CPU transfer in the output path plus the interpolation.
+   Asserts the output grid and scratch fields live on the CPU, and that the store comes out
+   with the right flat shape and finite data.
+2. **Interpolation skipped on a GPU HEALPix model** — the model itself on `HEALPixGrid` on
+   GPU. `grids_match` compares grid type and `nlat_half` only, ignoring architecture, so no
+   interpolator is built and the write takes the plain `copyto!` branch *after* the GPU→CPU
+   transfer of the model field. This is the GPU-specific path worth guarding.
+
+`Zarr` was added to the `test/GPU/{CUDA,AMDGPU,MetalGPU}/Project.toml` environments, since
+`HEALPixOutput` lives behind the Zarr extension.
+
 The interoperability check is **not** part of the unit tests, in any form: it needs a Python
 environment with healpy. It lives in `SpeedyWeather/healpix_compat/` — *outside* the `test/`
 tree, next to `benchmark/` — so the suite's `find_tests` discovery never sees it and
@@ -256,6 +276,12 @@ Python and the first from Julia. That asymmetry is now documented in `other_outp
 - The interpolation-skip check is on grid *type and resolution*, not architecture: a GPU
   simulation on `HEALPixGrid` still pays the `on_architecture(CPU(), …)` copy per output step,
   as every writer does.
+
+- **Type names in metadata must go through `nameof`.** `string(::Type)` module-qualifies
+  depending on what is visible from the printing context, so it yielded `"OctaHEALPixGrid"`
+  in a plain REPL and `"RingGrids.OctaHEALPixGrid"` inside the CI test worker — a persisted,
+  machine-read attribute cannot depend on that. Any future attribute derived from a type name
+  should use `nameof` for the same reason.
 
 ## Future work
 

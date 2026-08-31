@@ -153,7 +153,7 @@ function Base.show(io::IO, output::HEALPixOutput{F}) where {F}
     active = output.active ? "active" : "inactive/uninitialized"
 
     grid = output.field2D.grid
-    grid_name = RingGrids.nonparametric_type(grid)
+    grid_name = nameof(RingGrids.nonparametric_type(grid))
     nlat = get_nlat(grid)
     npix = get_npoints(grid)
     # nside is only defined for a true HEALPixGrid, OctaHEALPix is parameterised by nlat_half

@@ -96,7 +96,7 @@ function healpix_store_attributes(grid::OUTPUT_HEALPIX_GRIDS)
         "nlat_half=$(grid.nlat_half): npix=$npix but nfaces*nside^2=$(nfaces * nside^2)."
 
     attrs = Dict{String, Any}(
-        "grid" => string(RingGrids.nonparametric_type(grid)),
+        "grid" => string(nameof(RingGrids.nonparametric_type(grid))),
         "npix" => npix,
         "nlat_half" => grid.nlat_half,
         "nrings" => get_nlat(grid),
@@ -288,7 +288,7 @@ the same for both supported grids; only the tessellation behind the coordinates 
 function write_healpix_coordinates!(g::Zarr.ZGroup, output::HEALPixOutput, model::AbstractModel)
     grid = output.field2D.grid
     npix = get_npoints(grid)
-    grid_name = string(RingGrids.nonparametric_type(grid))
+    grid_name = string(nameof(RingGrids.nonparametric_type(grid)))   # bare name, see above
 
     # flat coordinates of every grid point, in ring order (0-360˚E, then north to south)
     londs, latds = get_londlatds(grid)
