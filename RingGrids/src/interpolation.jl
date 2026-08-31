@@ -462,6 +462,14 @@ end
 # if only the grid type is provided, create a grid with nlat_half and architecture from the input field
 interpolate(Grid::Type{<:AbstractGrid}, A::Field; kwargs...) = interpolate(Grid(A.grid.nlat_half, architecture(A)), A; kwargs...)
 
+"""
+$(TYPEDSIGNATURES)
+Locate the interpolation points `(λs, θs)` on the grid described by `I.geometry`, updating
+`I.locator` in place with the ring indices and interpolation weights required by
+`interpolate!`. This is the precomputation step of the interpolation, separate from the
+per-value `interpolate!` call so that the (relatively expensive) locating can be reused
+across multiple interpolations onto the same points.
+"""
 update_locator!(
     I::AbstractInterpolator,    # GridGeometry and Locator
     λs::AbstractVector,         # longitudes to interpolate onto
