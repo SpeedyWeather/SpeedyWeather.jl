@@ -48,8 +48,9 @@ model.output
 ```
 which will now output every hour. It is important to pass on the new output writer `output` to the
 model constructor, otherwise it will not be part of your model and the default is used instead.
-Note that the choice of `interval` can affect the actual time step that is used for the model
-integration, which is explained in the following.
+Note that the choice of `interval` can affect the actual [time step](@ref time_stepping) that is used for the model
+integration, which is explained in the following (see also
+[Adjust with output](@ref) for the equivalent option on the time stepper itself).
 Example, we run the model at a resolution of T42 and the time step is going to be
 ```@example netcdf
 spectral_grid = SpectralGrid(truncation=43, nlayers=1)
@@ -104,7 +105,7 @@ very neatly hourly output in the NetCDF file!
 
 Say we want to run the model at a given horizontal resolution but want to output on another resolution,
 the `NetCDFOutput` takes as argument `output_grid::AbstractFullGrid`, any instance of a full grid
-can be provided here.
+can be provided here (see [Grids](@ref) for the available grid types).
 So for example `output_grid=FullClenshawGrid(48)` would interpolate onto a
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
@@ -117,7 +118,7 @@ latitude rings. You can check this by
 ```@example netcdf
 RingGrids.full_grid_type(OctahedralGaussianGrid)
 ```
-So the corresponding full grid of an `OctahedralGaussianGrid` is the `FullGaussianGrid` and the same resolution
+So the corresponding full grid of an [`OctahedralGaussianGrid`](@ref OctahedralGaussianGrid) is the [`FullGaussianGrid`](@ref FullGaussianGrid) and the same resolution
 `nlat_half` is chosen by default in the output writer (which you can change though as shown above).
 Overview of the corresponding full grids
 
@@ -290,7 +291,7 @@ NetCDFOutput
 
 ## Visualizing output
 
-The saved NetCDF files can be visualized with a wide range of tools, both in Julia, but also in other languages. In order to get a quick view into a NetCDF file, you can use command line tools like `ncview`. For actual visualizations in Julia, it's easy to use [NCDatasets.jl](https://github.com/JuliaGeo/NCDatasets.jl) for accessing the data and [GeoMakie.jl](https://github.com/JuliaGeo/GeoMakie.jl) for plotting it. For a standard animation we already provide the `animate` function within SpeedyWeather.jl's GeoMakie extension that makes it easy to animate a variable from a NetCDF output file or a `Simulation` object, as seen below:
+The saved NetCDF files can be visualized with a wide range of tools, both in Julia, but also in other languages. In order to get a quick view into a NetCDF file, you can use command line tools like `ncview`. For actual visualizations in Julia, it's easy to use [NCDatasets.jl](https://github.com/JuliaGeo/NCDatasets.jl) for accessing the data and [GeoMakie.jl](https://github.com/JuliaGeo/GeoMakie.jl) for plotting it. For a standard animation we already provide the `animate` function within SpeedyWeather.jl's GeoMakie [extension](@ref "Extensions") that makes it easy to animate a variable from a NetCDF output file or a [`Simulation`](@ref) object, as seen below:
 
 ```@example netcdf
 using SpeedyWeather, GeoMakie, CairoMakie
