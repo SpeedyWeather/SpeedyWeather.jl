@@ -13,7 +13,7 @@ under the hood.
 !!! info "SpeedyTransforms assumes a unit sphere"
     The gradient operators in SpeedyTransforms generally assume a sphere of radius ``R=1``.
     For the transforms themselves that does not make a difference, but the gradient operators
-    `divergence`, `curl`, `∇`, `∇²`, `∇⁻²` omit the radius scaling unless you provide the optional
+    `divergence`, `curl`, `∇`, `∇²`, `∇⁻²` omit the [radius scaling](@ref scaling) unless you provide the optional
     keyword `radius` (or you can do `./= radius` manually).
     Also note that meridional derivates in spectral space expect a ``\cos^{-1}(\theta)`` scaling.
     Details are always outlined in the respective docstrings, `?∇` for example.
