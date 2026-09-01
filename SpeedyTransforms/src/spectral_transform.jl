@@ -33,6 +33,7 @@ struct SpectralTransform{
     spectrum::SpectrumType          # spectral truncation
     nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} # Legendre shortcut for truncation of m loop
+    Quadrature::Type{<:AbstractQuadrature}      # quadrature scheme the weights were built with
     mmax_truncation::Vector{Int}    # Maximum order m to retain per latitude ring
 
     # GRID
@@ -138,6 +139,7 @@ function SpectralTransform(
         nlayers::Integer = DEFAULT_NLAYERS,                                             # scratch size — max layer count any single transform call may carry
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
+        Quadrature::Type{<:AbstractQuadrature} = default_quadrature(grid),              # how the latitude quadrature weights are built
         gpu_graphs::Bool = default_gpu_graphs(spectrum.architecture),               # use GPU-graphs accelerated Fourier path (CUDA, AMDGPU); backend-dependent default
     )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
@@ -173,11 +175,10 @@ function SpectralTransform(
     # where the real FFT pair carries only one of the two components (`brfft` drops the imaginary
     # part, `rfft` returns it real). Such a ring contributes to only one of the real/imaginary
     # parts of the coefficients at that order, so no single quadrature weight can be consistent
-    # for both and an exact transform is unreachable while the bin is retained. Drop it wherever
-    # the weights are fitted for exactness — on HEALPix polar-cap rings (nlon_j = 4j, at Nyquist
-    # for m = 2j) this happens on every ring. Other grids keep the bin: there the fit does not run,
-    # and dropping it would only remove contributions without refitting the weights.
-    if optimize_quadrature(grid)
+    # for both and an exact transform is unreachable while the bin is retained. Only the HEALPix
+    # grids reach it — their polar-cap rings have nlon_j = 4j and sit at Nyquist for m = 2j, on
+    # every ring — and dropping it there is a prerequisite for the per-order fit below.
+    if drop_nyquist(grid)
         mmax_truncation = [min(mmax_j, (nlons[j] - 1) ÷ 2) for (j, mmax_j) in enumerate(mmax_truncation)]
     end
 
@@ -291,7 +292,7 @@ function SpectralTransform(
     # On the HEALPix grids the geometric (equal-area) angles are not a quadrature rule, so they are
     # replaced order by order with weights that make the transform exact, see `quadrature_weights`.
     solid_angles = quadrature_weights(
-        NF, grid, spectrum, legendre_polynomials, mmax_truncation,
+        Quadrature, NF, grid, spectrum, legendre_polynomials, mmax_truncation,
         nlons, nlat, get_solid_angles(grid)
     )
 
@@ -322,7 +323,7 @@ function SpectralTransform(
     }(
         architecture,
         spectrum, nfreq_max,
-        LegendreShortcut, mmax_truncation,
+        LegendreShortcut, Quadrature, mmax_truncation,
         grid, nlayers,
         nlon_max, nlons, nlat, rings,
         coslat, coslat⁻¹, lon_offsets,

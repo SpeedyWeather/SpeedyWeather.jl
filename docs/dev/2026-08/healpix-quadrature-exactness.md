@@ -45,6 +45,13 @@ Base revision: `20467269` (drafted on `mg/healpix-exactness`)
   draft, but pulled forward because adding a type parameter broke the Enzyme value-name cap (see
   below). (iii) The fuse is done after rounding to `NF`, reproducing the kernel's original
   arithmetic exactly, so non-HEALPix output is bit-identical rather than merely equivalent.
+- **2026-09-01, "I also want to be able to reproduce the ring-weight from cuHPX as a baseline".**
+  The weights are now built by a selectable scheme, `SpectralTransform(...; Quadrature = ...)`:
+  `EqualAreaQuadrature` (the status quo), `RingQuadrature` (the classical HEALPix ring weights that
+  healpy, ducc and cuHPX use) and `PerOrderQuadrature` (the default on the HEALPix grids).
+  `healpix_quadrature/plot_exactness.jl` plots round-trip error against truncation for dealiasing
+  1.5 … 4.0, one panel per grid × scheme. Dropping a ring's Nyquist bin stays tied to the *grid*
+  rather than the scheme, so all three see the same rings and the comparison isolates the weights.
 - **2026-08-31, restriction to the solvable case.** The reduced formulation is equivalent to the
   full system only where a solution exists. Applying it as a least-squares fit below that made the
   `dealiasing = 2` HEALPix transforms *worse* (caught by the existing "inexact transforms" tests),
@@ -160,6 +167,11 @@ Two things to keep straight about what the paper does and does not say:
   fallback for HEALPix inexactness is an O(ℓ³) iteration paid at **every transform**; per-order
   weights buy exactness in a one-off precomputation and cost nothing per transform. That is the
   sharper contrast, and the first draft of this document understated it.
+
+`RingQuadrature` reproduces that baseline, so the comparison below is measured rather than argued.
+Two caveats on how faithful it is: the HEALPix package's tabulated weights depend on `nside` alone
+where these are fitted at the transform's own band limit, and cuHPX has no Legendre shortcut at all
+so its ring sets differ from SpeedyWeather's regardless of the weights.
 
 The classical ring weights solve a strictly weaker problem than the one above: they only require
 `Σ_j g_j λ_l0(μ_j) = 2√π δ_l0`, i.e. that the quadrature integrate every band-limited function
@@ -533,7 +545,19 @@ Measured round-trip error after the change, at each grid's default dealiasing:
 In Float32: 1.4·10⁻⁷ … 3.2·10⁻⁷, i.e. Float32 roundoff. `‖T‖₂` becomes 1, so the transform pair no
 longer injects energy.
 
-`healpix_quadrature/transform_error.jl` reproduces these numbers against the current code.
+`healpix_quadrature/transform_error.jl` reproduces these numbers against the current code, and
+`healpix_quadrature/plot_exactness.jl` sweeps dealiasing 1.5 … 3.5 across all three schemes. That
+sweep shows the cliff plainly — `HEALPixGrid` with per-order weights, relative L2:
+
+| dealiasing | 1.5 | 2.0 | 2.5 | 3.0 | 3.5 |
+|---|---|---|---|---|---|
+| T32 | 4.1·10⁻¹ | 2.7·10⁻¹ | 8.4·10⁻² | 7.1·10⁻³ | **8.1·10⁻¹⁶** |
+| T64 | 4.2·10⁻¹ | 2.5·10⁻¹ | 7.5·10⁻² | 3.5·10⁻³ | **1.4·10⁻¹⁵** |
+| T128 | 4.1·10⁻¹ | 2.5·10⁻¹ | 7.0·10⁻² | 9.6·10⁻⁴ | **2.6·10⁻¹⁵** |
+| T256 | 4.2·10⁻¹ | 2.6·10⁻¹ | 6.6·10⁻² | 5.0·10⁻⁴ | **4.9·10⁻¹⁵** |
+
+Equal-area and per-ring weights show no such cliff: both sit at 10⁻⁴–10⁻³ at every dealiasing and
+every truncation, and are nearly indistinguishable from each other.
 
 Still worth doing separately: confirm the premise that transform inexactness was behind the HEALPix
 stability problems, with a long model run at the configuration that previously failed soonest.

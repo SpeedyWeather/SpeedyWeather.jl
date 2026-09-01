@@ -8,6 +8,13 @@ using Logging
     # ΔΩ conj(lon_offset) (the rotation has unit modulus)
     solid_angles(S) = abs.(Array(S.solid_angles_rotated))
 
+    # total solid angle g_j of ring pair j (north + south), at order m; Σ_j g_j = 4π
+    function ring_totals(S, m = 1)
+        (; nlat, nlons) = S
+        ΔΩ = solid_angles(S)
+        return [((nlat - j + 1 == j) ? 1 : 2) * nlons[j] * ΔΩ[m, j] for j in 1:S.grid.nlat_half]
+    end
+
     function default_transform(Grid, truncation, NF)
         dealiasing = SpeedyTransforms.default_dealiasing(Grid)
         grid = Grid(SpeedyTransforms.get_nlat_half(truncation, dealiasing))
@@ -59,13 +66,75 @@ using Logging
         @testset for Grid in exact_grids
             @testset for NF in (Float32, Float64)
                 S = default_transform(Grid, 32, NF)
-                @test !SpeedyTransforms.optimize_quadrature(Grid)
+                @test SpeedyTransforms.default_quadrature(Grid) == SpeedyTransforms.EqualAreaQuadrature
                 ΔΩ = solid_angles(S)
                 geometric = RingGrids.get_solid_angles(S.grid)
                 for j in axes(ΔΩ, 2)
                     @test all(ΔΩ[m, j] ≈ NF(geometric[j]) for m in axes(ΔΩ, 1))
                 end
             end
+        end
+    end
+
+    @testset "quadrature schemes" begin
+        @testset for Grid in HEALPix_grids
+            @testset for truncation in (32, 64)
+                nlat_half = SpeedyTransforms.get_nlat_half(truncation, SpeedyTransforms.default_dealiasing(Grid))
+                spectrum = Spectrum(truncation)
+                geometric = RingGrids.get_solid_angles(Grid(nlat_half))
+
+                # EqualArea reproduces the grid's geometric solid angles exactly, at every order:
+                # this is the pre-existing behaviour and must stay bit-identical to it
+                S = SpectralTransform(spectrum, Grid(nlat_half); NF = Float64, Quadrature = SpeedyTransforms.EqualAreaQuadrature)
+                ΔΩ = solid_angles(S)
+                @test all(ΔΩ[m, j] ≈ geometric[j] for j in axes(ΔΩ, 2), m in axes(ΔΩ, 1))
+
+                # Ring weights are one weight per ring, identical at every order …
+                S = SpectralTransform(spectrum, Grid(nlat_half); NF = Float64, Quadrature = SpeedyTransforms.RingQuadrature)
+                ΔΩ = solid_angles(S)
+                @test all(ΔΩ[m, j] ≈ ΔΩ[1, j] for j in axes(ΔΩ, 2), m in axes(ΔΩ, 1))
+                @test all(>(0), ΔΩ)
+                @test ΔΩ != solid_angles(
+                    SpectralTransform(
+                        spectrum, Grid(nlat_half); NF = Float64,
+                        Quadrature = SpeedyTransforms.EqualAreaQuadrature
+                    )
+                )
+
+                # … fixed by their defining condition: the quadrature integrates every band-limited
+                # function exactly, Σ_j g_j λ_l0(μ_j) = 2√π δ_l0. Only even degrees are meaningful
+                # for a north+south ring total; odd ones cancel between the hemispheres.
+                λ₀ = Array(S.legendre_polynomials.data)[LowerTriangularArrays.get_lm_range(1, spectrum.lmax - 1), :]
+                integrals = (λ₀ * ring_totals(S))[1:2:end]
+                @test integrals[1] ≈ 2sqrt(π)                       # ∫Y₀₀ dΩ, i.e. Σ_j g_j = 4π
+                @test maximum(abs, integrals[2:end]) < 1.0e-12       # every higher degree integrates to 0
+
+                # the equal-area weights do NOT satisfy that, which is what the scheme fixes
+                S₀ = SpectralTransform(spectrum, Grid(nlat_half); NF = Float64, Quadrature = SpeedyTransforms.EqualAreaQuadrature)
+                @test maximum(abs, (λ₀ * ring_totals(S₀))[3:2:end]) > 1.0e-5
+            end
+        end
+
+        # Dropping the ring's Nyquist bin follows the grid, not the scheme, so all three schemes
+        # see the same rings and comparing them isolates the weights.
+        @testset for Grid in HEALPix_grids
+            @test SpeedyTransforms.drop_nyquist(Grid(SpeedyTransforms.get_nlat_half(32, 3.5)))
+        end
+        @testset for Grid in exact_grids
+            @test !SpeedyTransforms.drop_nyquist(Grid(SpeedyTransforms.get_nlat_half(32, 3.0)))
+        end
+        @testset for Grid in HEALPix_grids
+            truncations = [
+                SpectralTransform(
+                    Spectrum(32), Grid(SpeedyTransforms.get_nlat_half(32, 3.5));
+                    NF = Float64, Quadrature = Q
+                ).mmax_truncation
+                    for Q in (
+                        SpeedyTransforms.EqualAreaQuadrature, SpeedyTransforms.RingQuadrature,
+                        SpeedyTransforms.PerOrderQuadrature,
+                    )
+            ]
+            @test allequal(truncations)
         end
     end
 
