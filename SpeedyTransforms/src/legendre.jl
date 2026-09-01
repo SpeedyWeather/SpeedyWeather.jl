@@ -10,14 +10,14 @@ double-single arithmetic otherwise (see `ScaledLegendre`), so CPU and GPU agree.
 legendre_ring!(legendre::PrecomputedLegendre, j::Integer) = view(legendre.polynomials.data, :, j)
 
 function legendre_ring!(legendre::RecomputedLegendre, j::Integer)
-    (; lmax, ring, x, αhi, αlo, βhi, βlo, sectoral_hi, sectoral_lo, sectoral_scale) = legendre
+    (; lmax, ring, xhi, xlo, αhi, αlo, βhi, βlo, sectoral_hi, sectoral_lo, sectoral_scale) = legendre
     mmax = size(sectoral_hi, 2)
     lm_offset = 0
     @inbounds for m in 1:mmax
         ncolumn = lmax - m + 1
         out = view(ring, (lm_offset + 1):(lm_offset + ncolumn))
         ScaledLegendre.legendre_column!(
-            out, x[j],
+            out, xhi[j], xlo[j],
             αhi, αlo, βhi, βlo,
             lm_offset, ncolumn,
             sectoral_hi[j, m], sectoral_lo[j, m], sectoral_scale[j, m],

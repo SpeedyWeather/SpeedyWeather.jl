@@ -30,8 +30,8 @@ using DocStringExtensions
 export coeff_μ, coeff_α, coeff_β, coeff_ν,
     two_prod, two_sum, quick_two_sum, df_mul, df_add, df_mul_f,
     scale_shift, rescale_shift,
-    recursion_coefficients, sectoral_modes,
-    legendre_column!, legendre_recursion_step
+    recursion_coefficients, sectoral_modes, split_two_float,
+    legendre_column!, legendre_recursion_step, legendre_advance, legendre_value
 
 # ============================================================================================
 # RECURSION COEFFICIENTS (spherical-harmonic normalisation), 0-based degree l and order m.
@@ -328,80 +328,119 @@ doc), where the surrounding loop becomes a `while`/unrolled loop over threads in
 end
 
 """$(TYPEDSIGNATURES)
-Reference/CPU implementation of one Legendre column recursion (fixed order `m`, running over
-degree `l`), writing the *true* (unscaled) polynomial values into `out[1:ncolumn]`. Dispatches its
-arithmetic on `eltype(out)`: double-single (`Float32` hi/lo pairs, via `legendre_recursion_step`)
-for `Float32` output, plain `Float64` arithmetic for `Float64` output — carrying the coefficients
-and the running state in `Float32` alone is what produces the ~1e-2 errors documented in the
-design doc, so this is not an optional refinement.
+The true (unscaled) value of a running recursion state held as the pair `(ph, pl)`. Trivial, but
+named so that CPU loops and GPU kernels read the state the same way regardless of whether the pair
+is a genuine double-single split (`Float32`) or a value plus an always-zero low part (`Float64`)."""
+@inline legendre_value(ph::NF, pl::NF) where {NF} = ph + pl
 
-Arguments: `x` the evaluation point `cos(colat)` (as `Float64`, split internally); `αhi, αlo, βhi,
-βlo` the coefficient tables from `recursion_coefficients`; `lm_offset` the running index just
-before this column's first entry (so degree `l = m` is written to `out[1]`, and coefficient lookup
-for step `q` is `lm_offset + q + 1`, i.e. the coefficient belonging to the *next* value produced);
-`ncolumn` the number of degrees in this column (`lmax - m + 1`); `sectoral_hi, sectoral_lo, scale`
-the starting `λ_m^m` double-single pair and its extended-exponent scale from `sectoral_modes`.
+"""$(TYPEDSIGNATURES)
+Advance the scaled column recursion by one degree `l`, in `Float32` double-single arithmetic.
+Takes the recursion coefficients at this step as double-single pairs `(αh, αl)`, `(βh, βl)`, the
+evaluation point `(xh, xl)`, the running state `(p1h, p1l)` = `λ_{l-1}^m`, `(p2h, p2l)` =
+`λ_{l-2}^m` and the extended-exponent scale `s`; returns the shifted-along state
+`(p1h, p1l, p2h, p2l, s)` with the new `λ_l^m` in `p1` and the rescaling of `scale_shift` applied
+if the mantissa has grown back past `1` while `s > 0`.
+
+This is the single place the recursion's arithmetic is written down: `legendre_column!` below and
+the GPU kernels in `legendre_ka.jl` both step through a column with it, so the recomputed CPU and
+GPU transforms produce bit-identical polynomials. `@inline`, branch-free apart from the rescale
+test, and allocation-free, so it inlines into kernel registers."""
+@inline function legendre_advance(
+        αh::Float32, αl::Float32, βh::Float32, βl::Float32,
+        xh::Float32, xl::Float32,
+        p1h::Float32, p1l::Float32, p2h::Float32, p2l::Float32, s::Integer,
+    )
+    ph, pl = legendre_recursion_step(αh, αl, βh, βl, xh, xl, p1h, p1l, p2h, p2l)
+    p2h, p2l = p1h, p1l
+    p1h, p1l = ph, pl
+    if s > 0 && abs(p1h) > 1.0f0                       # rescale: exact, both running values and s
+        SMALL = rescale_shift(Float32)
+        p1h *= SMALL
+        p1l *= SMALL
+        p2h *= SMALL
+        p2l *= SMALL
+        s -= oneunit(s)
+    end
+    return p1h, p1l, p2h, p2l, s
+end
+
+"""$(TYPEDSIGNATURES)
+Advance the scaled column recursion by one degree `l` in plain `Float64`. Same interface as the
+`Float32` double-single method above so callers stay number-format agnostic; the low parts are
+exactly zero throughout (`split_two_float` produces `lo == 0` for `Float64`) and are carried only
+to keep the signature uniform. `Float64` needs no double-single arithmetic: the whole point of that
+machinery is to recover `Float64`-like accuracy from `Float32` hardware."""
+@inline function legendre_advance(
+        αh::Float64, αl::Float64, βh::Float64, βl::Float64,
+        xh::Float64, xl::Float64,
+        p1h::Float64, p1l::Float64, p2h::Float64, p2l::Float64, s::Integer,
+    )
+    p = (αh + αl) * (xh + xl) * p1h - (βh + βl) * p2h
+    p2h = p1h
+    p1h = p
+    if s > 0 && abs(p1h) > 1.0
+        SMALL = rescale_shift(Float64)
+        p1h *= SMALL
+        p2h *= SMALL
+        s -= oneunit(s)
+    end
+    return p1h, zero(Float64), p2h, zero(Float64), s
+end
+
+"""$(TYPEDSIGNATURES)
+Run one Legendre column recursion (fixed order `m`, running over degree `l`), writing the *true*
+(unscaled) polynomial values into `out[1:ncolumn]`. Used by the CPU transform (`legendre_ring!` in
+`legendre.jl`) and as the reference the GPU kernels are checked against; the arithmetic itself
+lives in `legendre_advance`, so all three agree by construction.
+
+Arguments: `(xh, xl)` the evaluation point `cos(colat)` as a double-single pair (the `x::Real`
+method below splits a scalar for you); `αhi, αlo, βhi, βlo` the coefficient tables from
+`recursion_coefficients`; `lm_offset` the running index just before this column's first entry (so
+degree `l = m` is written to `out[1]`, and the coefficient lookup at step `q` is `lm_offset + q +
+1`, i.e. the coefficient belonging to the *next* value produced — which is why
+`recursion_coefficients` pads its tables); `ncolumn` the number of degrees in this column
+(`lmax - m + 1`); `sectoral_hi, sectoral_lo, scale` the starting `λ_m^m` double-single pair and its
+extended-exponent scale from `sectoral_modes`.
 
 Writes zero wherever `scale` has not yet reached `0`: per the `scale_shift` invariant, that means
-the true value is below `Float32` epsilon relative to the `O(1)` values that appear later in the
-same column, so it is indistinguishable from zero at this working precision anyway."""
+the true value is below `eps(NF)` relative to the `O(1)` values that appear later in the same
+column, so it is indistinguishable from zero at this working precision anyway."""
 function legendre_column!(
-        out::AbstractVector{Float32}, x::Real,
-        αhi::AbstractVector{Float32}, αlo::AbstractVector{Float32},
-        βhi::AbstractVector{Float32}, βlo::AbstractVector{Float32},
+        out::AbstractVector{NF}, xh::NF, xl::NF,
+        αhi::AbstractVector{NF}, αlo::AbstractVector{NF},
+        βhi::AbstractVector{NF}, βlo::AbstractVector{NF},
         lm_offset::Integer, ncolumn::Integer,
-        sectoral_hi::Float32, sectoral_lo::Float32, scale::Integer,
-    )
-    x64 = Float64(x)
-    xh = Float32(x64)
-    xl = Float32(x64 - Float64(xh))
+        sectoral_hi::NF, sectoral_lo::NF, scale::Integer,
+    ) where {NF}
     p1h, p1l = sectoral_hi, sectoral_lo               # λ_{l-1}^m, starting at the sectoral mode
-    p2h, p2l = 0.0f0, 0.0f0                            # λ_{l-2}^m ≡ 0 above the sectoral mode
-    s = Int(scale)
-    SMALL = rescale_shift(Float32)
+    p2h, p2l = zero(NF), zero(NF)                      # λ_{l-2}^m ≡ 0 above the sectoral mode
+    s = Int32(scale)
     @inbounds for q in 1:ncolumn
-        out[q] = s == 0 ? p1h + p1l : 0.0f0
+        out[q] = s == 0 ? legendre_value(p1h, p1l) : zero(NF)
         i = lm_offset + q + 1
-        ph, pl = legendre_recursion_step(αhi[i], αlo[i], βhi[i], βlo[i], xh, xl, p1h, p1l, p2h, p2l)
-        p2h, p2l = p1h, p1l
-        p1h, p1l = ph, pl
-        if s > 0 && abs(p1h) > 1.0f0                   # rescale: exact, both running values and s
-            p1h *= SMALL
-            p1l *= SMALL
-            p2h *= SMALL
-            p2l *= SMALL
-            s -= 1
-        end
+        p1h, p1l, p2h, p2l, s = legendre_advance(
+            αhi[i], αlo[i], βhi[i], βlo[i], xh, xl, p1h, p1l, p2h, p2l, s,
+        )
     end
     return out
 end
 
+"""$(TYPEDSIGNATURES)
+`legendre_column!` for a single (not yet split) evaluation point `x`. Splits `x` into an `NF`
+double-single pair through `Float64` first: `cos(colat)` rounded to `Float32` alone carries a
+relative error of `eps(Float32)` into every value of the column, which the double-single recursion
+would otherwise have no way to recover from."""
 function legendre_column!(
-        out::AbstractVector{Float64}, x::Real,
-        αhi::AbstractVector{Float64}, αlo::AbstractVector{Float64},
-        βhi::AbstractVector{Float64}, βlo::AbstractVector{Float64},
+        out::AbstractVector{NF}, x::Real,
+        αhi::AbstractVector{NF}, αlo::AbstractVector{NF},
+        βhi::AbstractVector{NF}, βlo::AbstractVector{NF},
         lm_offset::Integer, ncolumn::Integer,
-        sectoral_hi::Float64, sectoral_lo::Float64, scale::Integer,
+        sectoral_hi::NF, sectoral_lo::NF, scale::Integer,
+    ) where {NF}
+    xh, xl = split_two_float(NF, Float64(x))
+    return legendre_column!(
+        out, xh, xl, αhi, αlo, βhi, βlo, lm_offset, ncolumn, sectoral_hi, sectoral_lo, scale,
     )
-    x64 = Float64(x)
-    p1 = sectoral_hi + sectoral_lo                     # lo is exactly 0 for Float64, kept for a
-    p2 = 0.0                                            # uniform interface with the Float32 method
-    s = Int(scale)
-    SMALL = rescale_shift(Float64)
-    @inbounds for q in 1:ncolumn
-        out[q] = s == 0 ? p1 : 0.0
-        i = lm_offset + q + 1
-        a = αhi[i] + αlo[i]
-        b = βhi[i] + βlo[i]
-        p = a * x64 * p1 - b * p2
-        p2, p1 = p1, p
-        if s > 0 && abs(p1) > 1.0
-            p1 *= SMALL
-            p2 *= SMALL
-            s -= 1
-        end
-    end
-    return out
 end
 
 end # module

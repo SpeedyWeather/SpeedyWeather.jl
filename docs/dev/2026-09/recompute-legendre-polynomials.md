@@ -1,11 +1,12 @@
 # Recompute the Legendre polynomials on the fly
 
 > Status: **in progress**, opened as a draft for discussion. The design is validated numerically
-> (see the accuracy table below); the `ScaledLegendre` module and its tests are done, the
-> `SpectralTransform` integration and the CPU recompute path are drafted, and the GPU recursion
-> kernels (section 4 and 5) are **not implemented yet** — `recompute_legendre = true` on a GPU
-> architecture currently throws. The full `SpeedyTransforms` test suite has not been run against
-> this branch yet.
+> (see the accuracy table below); the `ScaledLegendre` module and its tests are done, and the
+> `SpectralTransform` integration, the CPU recompute path and both GPU recursion kernels (sections
+> 4 and 5) are written. Not yet verified: the full `SpeedyTransforms` test suite has not been run
+> against this branch, and the GPU kernels have **never been run on a GPU** — no backend was
+> available in the session that wrote them, so they are known to compile as ordinary Julia and
+> nothing more.
 
 Date of initial draft: 2026-09-01
 
@@ -35,6 +36,20 @@ Base revision: c3f443af8c22aca1506ea2ec0ff553278a03c4d5
 - 2026-09-01: initial draft, after a numerical prototype on CPU established that plain `Float32`
   recursion is unusable, that extended-exponent scaling alone is not enough, and that
   double-single (`Float32` pair) arithmetic reaches the accuracy of the current precomputation.
+- 2026-09-01: GPU kernels (sections 4 and 5) implemented. Three changes to the plan along the way:
+  - The recursion arithmetic was factored into a single `ScaledLegendre.legendre_advance`, which
+    both `legendre_column!` (CPU) and the two GPU kernels now step through. The plan had them as
+    separate transcriptions of the same recurrence; sharing one `@inline` step makes the CPU and
+    GPU polynomials bit-identical by construction rather than by review.
+  - `RecomputedLegendre`'s `x` field became the pair `xhi`/`xlo`. Storing `cos(colat)` as a single
+    `Float32` injects a relative error of `eps(Float32)` at *every* recursion step, which is
+    exactly the error the double-single arithmetic exists to avoid — the prototype had used a
+    `Float64` evaluation point and the first draft of the struct silently dropped that.
+  - The forward transform reuses `forward_legendre_kernel!` with a new trailing `lm_offset`
+    argument (`0` for the precomputed path) rather than getting a kernel of its own, so the tile
+    and the precomputed table are read through identical indexing. The tile therefore keeps the
+    `(lm, j)` layout: that makes the recompute kernel's writes strided, which is the right trade
+    since the tile is written once per transform but read once per layer.
 
 ## Problem description
 

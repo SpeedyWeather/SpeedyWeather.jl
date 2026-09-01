@@ -55,12 +55,11 @@ end
     @test mem_r < mem_p / 2   # measured ~4x smaller at T63, leave margin
 end
 
-@testset "recompute_legendre: RecomputedLegendre on GPU throws (step 3 not implemented)" begin
-    # PrecomputedLegendre stays the only GPU-supported mode until step 3; simulate a GPU
-    # architecture without a real backend by checking the dispatch guard directly through the
-    # type system: SpectralTransform{NF, <:Architectures.GPU} is what legendre_ka.jl dispatches
-    # on, and the guard throws before touching any GPU-only array, so this is safe to check with
-    # `isa` on the constructed struct without a working GPU backend.
+@testset "recompute_legendre: CPU RecomputedLegendre allocates the ring scratch, not the GPU tile" begin
+    # `ring` (CPU) and `tile` (GPU) are mutually exclusive scratch buffers, see the struct docs:
+    # the CPU path recomputes one whole ring at a time into `ring`, the GPU forward transform one
+    # tile of orders at a time into `tile`. Checked here on CPU, where only `ring` may be present;
+    # the GPU side needs a backend and lives in the GPU test suite.
     arch = SpeedyTransforms.Architectures.CPU()
     truncation = 15
     Grid = FullGaussianGrid
@@ -73,6 +72,10 @@ end
     @test length(Sr.legendre.ring) == LowerTriangularArrays.nonzeros(spectrum)
     @test isempty(Sr.legendre.tile)
     @test isempty(Sr.legendre.tile_orders)
+    # cos(colat) is kept as a double-single pair, see the xhi/xlo field docs: `xhi` rounds it to
+    # Float32 and `xlo` carries the remainder, so |xlo| stays below eps(Float32) * |xhi|
+    @test length(Sr.legendre.xhi) == length(Sr.legendre.xlo) == nlat_half
+    @test all(abs.(Sr.legendre.xlo) .<= eps(Float32) .* abs.(Sr.legendre.xhi))
 end
 
 @testset "recompute_legendre: tile_order_blocks partitions 1:mmax exactly once, contiguously" begin

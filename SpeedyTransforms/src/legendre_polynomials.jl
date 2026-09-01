@@ -88,8 +88,12 @@ struct RecomputedLegendre{NF, VectorType, MatrixType, IntMatrixType, RingType} <
     sectoral_hi::MatrixType
     sectoral_lo::MatrixType
     sectoral_scale::IntMatrixType
-    "cos(colat), length nlat_half, in number format NF."
-    x::VectorType
+    "cos(colat) as a double-single pair, length nlat_half each, in number format NF. Split rather
+    than stored as a single NF value because it multiplies the running state at *every* recursion
+    step: rounding it to Float32 alone would inject a relative error of eps(Float32) that the
+    double-single arithmetic downstream cannot recover. `xlo` is exactly zero for NF == Float64."
+    xhi::VectorType
+    xlo::VectorType
     "CPU-only scratch: one recomputed ring (all columns) at a time, length nonzeros(spectrum) on
     CPU, length 0 on GPU."
     ring::RingType
@@ -114,10 +118,12 @@ function Architectures.on_architecture(arch::AbstractArchitecture, L::Recomputed
     sectoral_hi = on_architecture(arch, L.sectoral_hi)
     sectoral_lo = on_architecture(arch, L.sectoral_lo)
     sectoral_scale = on_architecture(arch, L.sectoral_scale)
-    x = on_architecture(arch, L.x)
+    xhi = on_architecture(arch, L.xhi)
+    xlo = on_architecture(arch, L.xlo)
     tile = on_architecture(arch, L.tile)
     return RecomputedLegendre{NF, typeof(αhi), typeof(sectoral_hi), typeof(sectoral_scale), typeof(L.ring)}(
-        L.lmax, αhi, αlo, βhi, βlo, sectoral_hi, sectoral_lo, sectoral_scale, x, L.ring, tile, L.tile_orders,
+        L.lmax, αhi, αlo, βhi, βlo, sectoral_hi, sectoral_lo, sectoral_scale,
+        xhi, xlo, L.ring, tile, L.tile_orders,
     )
 end
 
@@ -166,7 +172,11 @@ function RecomputedLegendre(
     # and only split into the NF double-single representation at the end, see ScaledLegendre.
     αhi, αlo, βhi, βlo = ScaledLegendre.recursion_coefficients(NF, lmax, mmax)
     sectoral_hi, sectoral_lo, sectoral_scale = ScaledLegendre.sectoral_modes(NF, cos_colat, mmax)
-    x = NF.(cos_colat)
+    xhi = zeros(NF, nlat_half)
+    xlo = zeros(NF, nlat_half)
+    for j in 1:nlat_half        # split through Float64, see the xhi/xlo field docs
+        xhi[j], xlo[j] = ScaledLegendre.split_two_float(NF, Float64(cos_colat[j]))
+    end
 
     on_gpu = architecture isa Architectures.GPU
 
@@ -188,7 +198,8 @@ function RecomputedLegendre(
     sectoral_hi_d = on_architecture(architecture, sectoral_hi)
     sectoral_lo_d = on_architecture(architecture, sectoral_lo)
     sectoral_scale_d = on_architecture(architecture, sectoral_scale)
-    x_d = on_architecture(architecture, x)
+    xhi_d = on_architecture(architecture, xhi)
+    xlo_d = on_architecture(architecture, xlo)
     tile_d = on_architecture(architecture, tile)
 
     return RecomputedLegendre{
@@ -197,7 +208,7 @@ function RecomputedLegendre(
         lmax,
         αhi_d, αlo_d, βhi_d, βlo_d,
         sectoral_hi_d, sectoral_lo_d, sectoral_scale_d,
-        x_d, ring, tile_d, tile_orders,
+        xhi_d, xlo_d, ring, tile_d, tile_orders,
     )
 end
 
