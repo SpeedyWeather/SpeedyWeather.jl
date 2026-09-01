@@ -272,14 +272,6 @@ function implicit_correction!(
 
     arch = architecture(temperature_tendency)
 
-    # Single kernel: All implicit correction steps for each spectral mode.
-    # NOTE: nlayers is passed as `Val` so that the vertical loops in the kernel have a
-    # COMPILE-TIME trip count, which the `ntuple`s holding the intermediate geopotential
-    # and G columns require. Those two intermediates used to be written to scratch arrays;
-    # keeping them in registers is what makes this kernel differentiable on Julia 1.12,
-    # where storing a ComplexF32 accumulator packs its real and imaginary halves into an
-    # i64 (`shl`/`or disjoint`) that Enzyme has no reverse rule for. Workaround for
-    # https://github.com/EnzymeAD/Enzyme.jl/issues/3411
     launch!(
         arch, LinearWorkOrder, (size(pressure_tendency, 1),),
         implicit_primitive_leapfrog_kernel!,

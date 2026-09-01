@@ -397,11 +397,7 @@ function ∇²!(
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
 
-    # Union-split the runtime Bools like `_divergence!` above so the kernel sees them as
-    # compile-time constants: runtime-`Bool` selects on the ComplexF32 (`flipsign ? -a : a`)
-    # make LLVM ≥ 18 (Julia 1.12) scalarize it into two Float32 halves repacked with
-    # `or disjoint`, which Enzyme (≤ 0.13.190) cannot differentiate. With the options as
-    # type parameters the branches fold and the kernel stays select-free.
+    # same approach as for _divergence! to ensure GPU capability and Enzyme compatibility 
     if flipsign
         add ? _∇²!(LaplaceOP{true, true}(), ∇²alms, alms, eigenvalues) :
             _∇²!(LaplaceOP{true, false}(), ∇²alms, alms, eigenvalues)
