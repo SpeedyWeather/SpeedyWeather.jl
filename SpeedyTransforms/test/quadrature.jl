@@ -1,4 +1,5 @@
 using Logging
+using LinearAlgebra
 
 @testset "Quadrature weights" begin
     HEALPix_grids = (HEALPixGrid, OctaHEALPixGrid, FullHEALPixGrid, FullOctaHEALPixGrid)
@@ -131,10 +132,106 @@ using Logging
                 ).mmax_truncation
                     for Q in (
                         SpeedyTransforms.EqualAreaQuadrature, SpeedyTransforms.RingQuadrature,
-                        SpeedyTransforms.PerOrderQuadrature,
+                        SpeedyTransforms.PerOrderQuadrature, SpeedyTransforms.ContractiveQuadrature,
                     )
             ]
             @test allequal(truncations)
+        end
+    end
+
+    @testset "ContractiveQuadrature makes analysis non-expansive" begin
+        # In the physical (solid-angle) norm on grid space the analysis operator at order m is
+        # A = Λ diag(g) diag(g⁰)^(-1/2), block diagonal in the parity of l-m. σmax(A) ≤ 1 means no
+        # grid field — in band or aliased above the truncation — can be analysed into more spectral
+        # energy than it had, which is the property PerOrderQuadrature gives up to gain exactness.
+        function analysis_norm(S)
+            (; nlat, nlons, mmax_truncation) = S
+            (; lmax, mmax) = S.spectrum
+            nlat_half = S.grid.nlat_half
+            λ = Array(S.legendre_polynomials.data)
+            ΔΩ = solid_angles(S)
+            multiplicity(j) = (nlat - j + 1 == j) ? 1 : 2
+            g⁰ = [multiplicity(j) * nlons[j] * Float64(RingGrids.get_solid_angles(S.grid)[j]) for j in 1:nlat_half]
+            σmax = 0.0
+            for m in 1:mmax
+                rings = [j for j in 1:nlat_half if mmax_truncation[j] + 1 >= m]
+                isempty(rings) && continue
+                Λ = Float64.(λ[LowerTriangularArrays.get_lm_range(m, lmax - 1), rings])
+                g = [multiplicity(j) * nlons[j] * Float64(ΔΩ[m, j]) for j in rings]
+                A = Λ * LinearAlgebra.Diagonal(g ./ sqrt.(g⁰[rings]))
+                for parity in (0, 1)
+                    block = @view A[(1 + parity):2:end, :]
+                    size(block, 1) == 0 && continue
+                    σmax = max(σmax, LinearAlgebra.opnorm(block))
+                end
+            end
+            return σmax
+        end
+
+        @testset for Grid in HEALPix_grids
+            @testset for truncation in (32, 64)
+                nlat_half = SpeedyTransforms.get_nlat_half(truncation, SpeedyTransforms.default_dealiasing(Grid))
+                spectrum = Spectrum(truncation)
+                transform(Q) = SpectralTransform(spectrum, Grid(nlat_half); NF = Float64, Quadrature = Q)
+
+                # the property the scheme exists for, to roundoff
+                @test analysis_norm(transform(SpeedyTransforms.ContractiveQuadrature)) <= 1 + 1.0e-12
+
+                # it is a strict improvement on both other HEALPix schemes, which amplify
+                @test analysis_norm(transform(SpeedyTransforms.EqualAreaQuadrature)) > 1 + 1.0e-6
+                @test analysis_norm(transform(SpeedyTransforms.PerOrderQuadrature)) > 1 + 1.0e-3
+
+                # weights stay positive and close to equal area. They no longer only shrink: the
+                # fit moves them either way, by up to ~9% at the sanctioned dealiasing, and the
+                # shrink that enforces ‖A‖ ≤ 1 is applied on top of that.
+                geometric = RingGrids.get_solid_angles(Grid(nlat_half))
+                ΔΩ = solid_angles(transform(SpeedyTransforms.ContractiveQuadrature))
+                @test all(>(0), ΔΩ)
+                for j in axes(ΔΩ, 2), m in axes(ΔΩ, 1)
+                    @test 0.9 <= ΔΩ[m, j] / geometric[j] <= 1.2
+                end
+            end
+        end
+
+        # The point of fitting rather than uniformly rescaling: at the sanctioned dealiasing the
+        # round trip must beat EqualAreaQuadrature, which the plain scalar shrink does not. Compared
+        # in grid space, as in the "Transform roundtrip accuracy" testset, because raw random
+        # coefficients carry components no real grid field can represent.
+        @testset "more accurate than equal area" begin
+            @testset for Grid in (HEALPixGrid, OctaHEALPixGrid)
+                @testset for truncation in (32, 64)
+                    nlat_half = SpeedyTransforms.get_nlat_half(
+                        truncation, SpeedyTransforms.default_dealiasing(Grid)
+                    )
+                    spectrum = Spectrum(truncation)
+                    spec = randn(Complex{Float64}, spectrum)
+
+                    function roundtrip_error(Quadrature)
+                        S = SpectralTransform(spectrum, Grid(nlat_half); NF = Float64, Quadrature)
+                        field = transform(spec, S)
+                        roundtrip = transform(transform(field, S), S)
+                        data, reference = Array(roundtrip.data), Array(field.data)
+                        return norm(data - reference) / norm(reference)
+                    end
+
+                    equal_area = roundtrip_error(SpeedyTransforms.EqualAreaQuadrature)
+                    contractive = roundtrip_error(SpeedyTransforms.ContractiveQuadrature)
+                    @test contractive < equal_area
+                end
+            end
+        end
+
+        # grids that already carry an exact quadrature rule are already non-expansive, so the scheme
+        # must leave their geometric solid angles untouched
+        @testset for Grid in exact_grids
+            nlat_half = SpeedyTransforms.get_nlat_half(32, SpeedyTransforms.default_dealiasing(Grid))
+            S = SpectralTransform(
+                Spectrum(32), Grid(nlat_half);
+                NF = Float64, Quadrature = SpeedyTransforms.ContractiveQuadrature
+            )
+            geometric = RingGrids.get_solid_angles(Grid(nlat_half))
+            ΔΩ = solid_angles(S)
+            @test all(ΔΩ[m, j] ≈ geometric[j] for j in axes(ΔΩ, 2), m in axes(ΔΩ, 1))
         end
     end
 
