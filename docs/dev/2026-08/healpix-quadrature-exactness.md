@@ -80,17 +80,20 @@ step is exact per ring, the condition decouples by order `m` and reads
 Σ_j  g_j · λ_lm(μ_j) · λ_l'm(μ_j)  =  δ_ll'        for all l, l' ≥ m up to lmax
 ```
 
-where `λ_lm` are the normalised associated Legendre polynomials, `μ_j = sin(lat_j)` and `g_j` is the
-total solid angle of ring pair `j` (north + south), with `Σ_j g_j = 4π`. In the code
-`g_j = nlon_j · solid_angles[j] · (2 unless j is the equator)`.
+throughout this document `l` and `m` are the 0-based degree and order, so `lmax = truncation − 1`,
+where `λ_lm` are the normalised associated Legendre polynomials, `μ_j = sin(lat_j)`, `δ_ll'` is the
+Kronecker delta and `g_j` is the total solid angle of ring pair `j` (north + south), with
+`Σ_j g_j = 4π`. The full derivation, and why this system is much smaller than its `O(n²)` rows
+suggest, is in "Per-order quadrature weights" below; what follows here is only what is needed to
+see that the problem is tractable.
 
 Two consequences matter:
 
 1. **The condition is linear in `g`.** Minimising `‖A∘S − I‖_F` over the weights is an ordinary
    linear least-squares problem, not a nonlinear optimisation.
 2. **It has far fewer independent conditions than it looks.** Substituting `x = μ²`, the products
-   `λ_lm λ_l'm` with `l + l'` even span `(1−x)^m ×` {polynomials of degree ≤ `lmax₀ − m` in `x`}.
-   So order `m` imposes only `n_m = lmax₀ − m + 1` independent conditions on the weights, and the
+   `λ_lm λ_l'm` with `l + l'` even span `(1−x)^m ×` {polynomials of degree ≤ `lmax − m` in `x`}.
+   So order `m` imposes only `n_m = lmax − m + 1` independent conditions on the weights, and the
    exactness problem is *solvable* whenever the number of contributing rings satisfies
    `|J_m| ≥ n_m`. For `m = 0` that is `nlat_half ≥ truncation`.
 
@@ -189,40 +192,198 @@ an independent, small, and exactly solvable problem.
 
 ### 1. Drop the Nyquist bin from the Legendre shortcut
 
-`LegendreShortcutLinear(nlon, latd) = nlon ÷ 2` → `(nlon - 1) ÷ 2`.
+`mmax_truncation[j]` is capped at `(nlons[j] - 1) ÷ 2` rather than `nlons[j] ÷ 2`, in the
+`SpectralTransform` constructor and only for grids whose weights are refitted
+(`optimize_quadrature(grid)`).
 
-On full and octahedral grids this changes nothing that matters: there `nlon ≫ 2·mmax` on the rings
-that carry weight, and where the shortcut does bite, `λ_lm ≈ 0` near the poles anyway (measured:
-`OctahedralGaussianGrid` stays at 2.5·10⁻¹⁴). On HEALPix it is a prerequisite for everything below.
+Why that bin has to go. Take one ring `j` with `n = nlons[j]` longitudes and look at its Nyquist
+order `m = n/2`.
 
-Note this change is **not** an improvement on its own — with equal-area weights it makes the HEALPix
-error marginally *worse* (5.70·10⁻³ → 5.99·10⁻³ at T32), because it removes contributions without
-re-fitting the weights. It only pays off together with step 2, so the two must land together.
+1. **The real FFT stores half a spectrum.** `rfft` of a real ring of length `n` returns
+   `nfreq = n÷2 + 1` coefficients `c_0 … c_{n/2}`; the rest are recovered from Hermitian symmetry,
+   `C_{n−m} = conj(C_m)`.
+
+2. **Two bins are their own conjugate partner.** For even `n`, both `m = 0` and `m = n/2` satisfy
+   `n − m ≡ m (mod n)`. Hermitian symmetry therefore *forces* `C_0` and `C_{n/2}` to be real — a
+   complex value in those bins does not describe a real ring at all.
+
+3. **So the inverse FFT discards their imaginary parts.** `brfft` computes
+
+   ```
+   x_i = Re(c_0) + 2 Σ_{m=1}^{n/2−1} [Re(c_m) cos(2πmi/n) − Im(c_m) sin(2πmi/n)] + (−1)^i Re(c_{n/2})
+   ```
+
+   in which `Im(c_{n/2})` simply never appears. Transforming back, `rfft(x)` returns `n·Re(c_{n/2})`
+   there. The round trip on the Nyquist bin is `c ↦ n·Re(c)` — a projection, not the identity.
+
+4. **But the transform does not work in the ring's own frame.** Ring `j` starts at longitude
+   `lon1_j`, and the transform rotates by `o = exp(i·m·lon1_j)` (`lon_offsets`) on the way out and
+   by `conj(o)` on the way back. The value actually sitting in the FFT bin is `o·F_m`, where
+   `F_m = Σ_l a_lm λ_lm(μ_j)` is the ring's Fourier coefficient referred to the prime meridian, and
+   step 3 keeps `Re(o·F_m)`. Rotating that back:
+
+   ```
+   conj(o) · Re(o F)  =  conj(o) · (o F + conj(o) conj(F)) / 2  =  (F + conj(o)² conj(F)) / 2
+   ```
+
+5. **On a HEALPix polar-cap ring the projection lands on the wrong component.** Those rings carry a
+   half-pixel offset, `lon1_j = π/n`, so at `m = n/2`
+
+   ```
+   o = exp(i · (n/2) · (π/n)) = exp(iπ/2) = i ,      conj(o)² = (−i)² = −1
+   ```
+
+   and the bracket collapses to `(F − conj F)/2 = i·Im(F)`. The ring contributes through `Im(F)`
+   only — precisely the component *orthogonal* to the `Re(F)` an unoffset ring would contribute.
+
+6. **The analysis therefore stops being complex-linear.** Split `a_lm = x_lm + i·y_lm`, so
+   `Re F = Σ_l λ_lm x_lm` and `Im F = Σ_l λ_lm y_lm`. An ordinary ring feeds both; an offset
+   Nyquist ring feeds only the `y` equations and an unoffset one only the `x` equations. The
+   round-trip operator at that order is thus two *different* real matrices — `T_re` acting on
+   `Re(a)`, `T_im` on `Im(a)` — differing by exactly that ring's rank-one term:
+
+   ```
+   T_re − T_im  =  ± g_j · λ_·m(μ_j) λ_·m(μ_j)ᵀ
+   ```
+
+7. **No choice of weight can reconcile them.** Exactness needs `T_re = T_im = I`, but their
+   difference is proportional to `g_j` and vanishes only for `g_j = 0` — that is, only if the ring
+   does not participate at that order. Dropping the bin *is* the fix; there is no weighting
+   alternative.
+
+8. **On HEALPix this fires on every polar-cap ring.** They have `n = 4j` longitudes while
+   `LegendreShortcutLinear` retains up to `m = n÷2 = 2j`, landing exactly on Nyquist for every
+   `j ≤ nside`. The equatorial belt has `n = 2·nlat_half` and Nyquist at `m = nlat_half`, which sits
+   above `mmax−1` at the sanctioned dealiasing, so belt rings are never affected.
+
+Measured directly by probing the true operator with unit basis vectors at T16: `‖T_re − T_im‖_∞` is
+2.1·10⁻² at `m = 2` (ring `j = 1`), 1.5·10⁻² at `m = 4` (`j = 2`), 9.2·10⁻³ at `m = 6` (`j = 3`) —
+and *exactly zero at every odd `m`*, since `n` is always even and no ring has an odd Nyquist order.
+That odd/even signature is what identified the mechanism.
+
+**Why this is gated per grid.** Dropping the bin removes a contribution, which only pays off if the
+weights are refitted afterwards. Applied globally it made `OctahedralGaussianGrid` at
+`dealiasing = 2` worse (T32: 1.5·10⁻¹⁰ → 2.4·10⁻¹⁰; T128: 5.7·10⁻⁷ → 8.5·10⁻⁷), so grids that keep
+their geometric weights keep the bin too. Even on HEALPix it is not an improvement by itself: with
+equal-area weights it makes the error marginally *worse* (5.70·10⁻³ → 5.99·10⁻³ at T32). It only
+pays off together with step 2, so the two must land together.
 
 ### 2. Per-order quadrature weights
 
 Replace the single `solid_angles[j]` with `solid_angles[m, j]`.
 
-The exactness system looks like it has `O(n_m²)` rows, but **the off-diagonal conditions are implied
-by the diagonal ones**. In `x = μ²` the products `λ_lm λ_l'm` (`l+l'` even) span
-`(1−x)^m ×` {polynomials of degree ≤ `n_m−1`}, and the diagonal products `λ_lm²` are already a
-triangular basis of that space. So the whole system collapses to `n_m` rows — *"integrate every
-`|Y_lm|²` exactly"*:
+#### What exactness actually asks of the weights
 
-```
-Σ_j  g_j · λ_lm(μ_j)²  =  1        for l = m … lmax
-```
+1. **Compose the two halves of the transform.** Synthesis puts `F_m(θ_j) = Σ_l a_lm λ_lm(μ_j)` into
+   ring `j`'s Fourier bin `m`; analysis reads that bin back and accumulates
+   `Σ_j ΔΩ_j conj(o_{m,j}) λ_lm(μ_j) ·` (bin `m` of ring `j`). With no aliasing and no Nyquist
+   pathology `rfft ∘ brfft = nlon_j · Id` on the retained bins, and the rotations cancel because
+   `conj(o)·o = 1`.
 
-Solve that `n_m × |J_m|` system for the minimum **relative** change from equal area, i.e. for
-`u = (g − g₀)/g₀` rather than for `g` (the weights span three orders of magnitude between polar and
-equatorial rings, so minimising `‖g − g₀‖` lets a polar ring swing past zero while barely moving the
-objective). This needs no regularisation parameter: the reduced system is well conditioned
-(`cond` 12–660 for `HEALPixGrid` at the target resolutions) and its minimum-norm solution is
-already the one we want.
+2. **Collect the per-ring factor.** The `nlon_j` from the FFT pair cancels the `1/nlon_j` inside
+   `ΔΩ_j = w_j · 2π/nlon_j`. What survives is a single number per ring — its total solid angle,
+   north and south together:
 
-Only the forward (grid → spectral) kernel reads these weights, in `legendre.jl:169` and
-`legendre_ka.jl:154`. The change is `ΔΩ = solid_angles[j]` (hoisted out of the `m` loop) →
-`ΔΩ = solid_angles[m, j]` (inside it). On GPU `m` is the fast dimension, matching `lon_offsets`
+   ```
+   g_j = nlon_j · ΔΩ_j · (2 for a north/south pair, 1 for the equator) ,      Σ_j g_j = 4π
+   ```
+
+3. **Read off the round-trip operator.** Order `m` round-trips through
+
+   ```
+   â_lm = Σ_l' T^m_{l,l'} a_l'm ,        T^m_{l,l'} = Σ_j g_j λ_lm(μ_j) λ_l'm(μ_j)
+   ```
+
+   which is **linear in `g`** — so fitting the weights is ordinary linear algebra, not a nonlinear
+   optimisation. Exactness is `T^m = I` at every order:
+
+   ```
+   Σ_j g_j λ_lm(μ_j) λ_l'm(μ_j) = δ_ll'          for all l, l' ≥ m
+   ```
+
+   which is just the discrete form of the continuous orthonormality `2π ∫ λ_lm λ_l'm dμ = δ_ll'`.
+   It asks the quadrature to integrate products of Legendre polynomials exactly — a statement about
+   the integration rule alone, not about the round trip. That is what makes this a legitimate fix
+   rather than a correction tuned to band-limited input: better weights improve the analysis of
+   *any* field, where a post-hoc correction of `T` would only help fields that came from synthesis.
+
+#### Why the system is far smaller than it looks
+
+4. **Half the conditions are automatic.** `λ_lm(−μ) = (−1)^{l+m} λ_lm(μ)`, so for `l+l'` odd the
+   northern and southern contributions cancel and the condition holds for *any* symmetric weights.
+   Only `l+l'` even is a real constraint.
+
+5. **The surviving products live in a small space.** Write `λ_lm(μ) = (1−μ²)^{m/2} p_{l−m}(μ)` with
+   `p_k` of degree `k` and parity `(−1)^k`. For `l+l'` even,
+
+   ```
+   λ_lm λ_l'm = (1−μ²)^m · p_{l−m}(μ) p_{l'−m}(μ)
+   ```
+
+   and `p_{l−m} p_{l'−m}` is an *even* polynomial of degree `(l−m)+(l'−m)`. Substituting `x = μ²`
+   it becomes a polynomial in `x` of degree `d = ((l−m)+(l'−m))/2`, with `0 ≤ d ≤ n_m − 1` where
+   `n_m = lmax − m + 1` is the number of degrees at order `m`. So every product lies in
+
+   ```
+   (1−x)^m · P_{n_m−1}(x) ,        dimension n_m
+   ```
+
+   The map `g ↦ T^m` factors through those `n_m` numbers: the system has at most `n_m` independent
+   rows, not `O(n_m²)`.
+
+6. **The diagonal products already span that space.** Take `l = l' = m + d`. Then
+   `λ_{m+d,m}² = (1−x)^m p_d(μ)²`, and `p_d²` has exact degree `d` in `x`. So
+   `{λ_{m+d,m}² : d = 0 … n_m−1}` is triangular in `x`-degree and therefore a basis. Satisfying the
+   diagonal conditions consequently *implies* all the off-diagonal ones, and the system collapses
+   to `n_m` rows — *"integrate every `|Y_lm|²` exactly"*:
+
+   ```
+   Σ_j  g_j · λ_lm(μ_j)²  =  1          for l = m … lmax
+   ```
+
+   The equivalence holds only where a solution exists. Below that — `|J_m| < n_m`, too few
+   contributing rings — satisfying the diagonal rows in a least-squares sense leaves the
+   off-diagonal ones unconstrained and can make the transform *worse*, which is why the code
+   declines to fit rather than fitting anyway in that case.
+
+#### Solving it
+
+7. **Count unknowns against equations.** `n_m` equations against `|J_m|` unknowns, the rings the
+   Legendre shortcut keeps at order `m`. A solution exists when `|J_m| ≥ n_m`; at `m = 0` that reads
+   `nlat_half ≥ truncation`, which is the binding case and drives the choice of dealiasing below.
+
+8. **Pick the solution closest to equal area — relatively.** With `|J_m| > n_m` the system is
+   underdetermined, so solve for the relative change `u = (g − g₀)/g₀` instead of for `g`:
+
+   ```
+   (Λ² · diag(g₀)) u = 1 − Λ² g₀ ,        Λ²[l, j] = λ_lm(μ_j)²
+   ```
+
+   taking the minimum-norm `‖u‖₂` via a thin SVD. Relative rather than absolute, because `g₀` spans
+   orders of magnitude between polar and equatorial rings: minimising `‖g − g₀‖` lets a polar ring
+   with tiny `g₀` swing far past zero while barely moving the objective.
+
+9. **No regularisation parameter is needed.** The reduced `n_m × |J_m|` system is well conditioned:
+   `cond` 12 to 39 for `HEALPixGrid` across the four target resolutions (up to 1·10⁵ for
+   `OctaHEALPixGrid` at T256). Forming the full `O(n_m²)`-row system and solving it through its
+   Gram matrix instead squares the conditioning — at `nlat_half = 288`, T256 that route returned
+   weights spanning `[−5.6, 6.9]` with 383 negative entries, where the reduced system lands inside
+   `[0.913, 1.174]` with none.
+
+10. **Two guards, because "solved" is not "exact".** A solution within
+    `[QUADRATURE_MIN_RATIO, QUADRATURE_MAX_RATIO]` of equal area is accepted; anything outside is
+    discarded in favour of the geometric weights, since an oscillating quadrature amplifies
+    grid-space noise and a negative weight breaks the reading of the analysis as an integral. And
+    because weights can sit *inside* those bounds while the solve still leaves a residual, the
+    residual is checked separately — without that check `OctaHEALPixGrid` at T512 returned weights
+    in `[0.119, 1.882]`, comfortably within bounds, for a transform that was not exact. Both paths
+    report through one warning naming the `nlat_half` that would be required.
+
+#### Implementation
+
+Only the forward (grid → spectral) kernel reads these weights — `_legendre!` in `legendre.jl` on
+CPU and `forward_legendre_kernel!` in `legendre_ka.jl` on GPU. The change is
+`ΔΩ = solid_angles[j]`, hoisted out of the `m` loop, becoming `ΔΩ = solid_angles[m, j]` inside it. On GPU `m` is the fast dimension, matching `lon_offsets`
 which is already indexed `[m, j]`, so access stays coalesced.
 
 The weights are stored **pre-multiplied by `conj(lon_offsets)`**, in a field named
@@ -236,12 +397,12 @@ adding a parameter for a separate real `[m, j]` array pushed the `SpectralTransf
 Memory: `mmax × nlat_half × Complex{NF}` replaces an `nlat`-element vector — 512 KB at T256 in
 Float32, against the ~250 MB of Legendre polynomials at that resolution. Negligible.
 
-Construction cost (Float64, laptop CPU, prototype), against the current `SpectralTransform`
-constructor: 0.0015 s at T32 (+181%), 0.011 s at T64 (+405%), 0.085 s at T128 (+663%), 1.08 s at
-T256 (+1120%). Absolutely small below T128 but a large *relative* increase, and ~1 s at T256 is
-noticeable. It scales as roughly `nlat_half³`. The prototype uses an SVD per order for the
-minimum-norm solve; since the reduced system is well conditioned a cheaper factorisation should
-recover most of that. T512+ may still want caching.
+Construction cost (Float64, laptop CPU), against the current `SpectralTransform` constructor:
+0.0015 s at T32 (+181%), 0.011 s at T64 (+405%), 0.085 s at T128 (+663%), 1.08 s at T256 (+1120%).
+Absolutely small below T128 but a large *relative* increase, and ~1 s at T256 is noticeable. It
+scales as roughly `nlat_half³`, dominated by one thin SVD per order. Since the reduced system is
+well conditioned, a cheaper factorisation should recover most of that; T512+ may still want
+caching. The transform itself is unaffected.
 
 ### 3. Keep `get_solid_angles` as-is
 
