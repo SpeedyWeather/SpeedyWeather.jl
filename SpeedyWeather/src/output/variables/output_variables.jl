@@ -10,6 +10,19 @@ include("ocean.jl")           # SeaSurfaceTemperatureOutput()
 include("tracers.jl")         # TracerOutput()
 include("boundary_layer.jl")  # BoundaryLayerOutput()
 
+# collect all together for conveneince
+AllOutputVariables() = (
+    DynamicsOutput()...,
+    PrecipitationOutput()...,
+    BoundaryOutput()...,
+    RadiationOutput()...,
+    RandomPatternOutput(),
+    SurfaceFluxesOutput()...,
+    LandOutput()...,
+    OceanOutput()...,
+    BoundaryLayerOutput()...,
+)
+
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
 
 """$(TYPEDSIGNATURES)

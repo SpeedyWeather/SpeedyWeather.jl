@@ -130,6 +130,17 @@ end
 
 Adapt.@adapt_structure OctaHEALPixGrid
 
+# quadrant of ij in ring order, TODO needed?
+function quadrant_ring(ij::Integer, grid::OctaHEALPixGrid)
+    j = RingGrids.whichring(grid)[ij]  # ring index j of ij
+    ring = eachring(grid)[j]           # ij indices of ring j
+    nlon = length(ring)                # number of grid points in ring
+    i = ij - ring[1]                   # 0-based index in ring
+    q = mod(4i ÷ nlon, 4)              # quadrant q, either 0, 1, 2, 3
+    iq = i - q * (nlon ÷ 4)                # 0-based index i relative to quadrant
+    return q + 1, iq + 1                   # convert to 1-based
+end
+
 """$TYPEDSIGNATURES
 Convert ring index ij to matrix indices row, column (r, c) and quadrant q. All 1-based.
 r=1, c=1, is at the north pole, r increases south-eastwards, c increases south-westwards.

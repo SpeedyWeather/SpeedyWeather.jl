@@ -1079,6 +1079,39 @@ end
 
 """
 $(TYPEDSIGNATURES)
+Vorticity flux tendency in the shallow water equations
+
+    ∂ζ/∂t = ∇×(u_tend, v_tend)
+    ∂D/∂t = ∇⋅(u_tend, v_tend)
+
+with
+
+    u_tend = Fᵤ + v*(ζ+f)
+    v_tend = Fᵥ - u*(ζ+f)
+
+with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
+vorticity ζ, coriolis f."""
+vorticity_flux!(vars::Variables, model::ShallowWater) =
+    vorticity_flux_curldiv!(vars, model, div = true, add = true)
+
+"""
+$(TYPEDSIGNATURES)
+Vorticity flux tendency in the barotropic vorticity equation
+
+    ∂ζ/∂t = ∇×(u_tend, v_tend)
+
+with
+
+    u_tend = Fᵤ + v*(ζ+f)
+    v_tend = Fᵥ - u*(ζ+f)
+
+with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
+vorticity ζ, coriolis f."""
+vorticity_flux!(vars::Variables, model::Barotropic) =
+    vorticity_flux_curldiv!(vars, model, div = false, add = true)
+
+"""
+$(TYPEDSIGNATURES)
 Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral space.
   1. computes the kinetic energy KE = ½(u²+v²) on the grid
   2. transforms KE to spectral space

@@ -175,6 +175,46 @@ function horizontal_advection!(
 end
 
 
+"""
+$(TYPEDSIGNATURES)
+
+SEQUENTIAL VERSION
+
+Compute the vorticity advection as the curl/div of the vorticity fluxes
+
+    ∂ζ/∂t = ∇×(u_tend, v_tend)
+    ∂D/∂t = ∇⋅(u_tend, v_tend)
+
+with
+
+    u_tend = Fᵤ + v*(ζ+f)
+    v_tend = Fᵥ - u*(ζ+f)
+
+with `Fᵤ, Fᵥ` from `u_tend_grid`/`v_tend_grid` that are assumed to be alread
+set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
+require the divergence tendency."""
+function vorticity_flux_curldiv!(
+        vars::Variables,
+        model::AbstractModel;
+        div::Bool = true,     # also calculate div of vor flux?
+        add::Bool = false,    # accumulate in vor/div tendencies?
+    )
+    vorticity_flux_grid_tendencies!(vars, model)
+
+    time_stepping = model.time_stepping
+    S = model.spectral_transform
+    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, time_stepping, DynamicalCore())
+    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, time_stepping, DynamicalCore())
+    u_tend = get_tendency_step(vars.dynamics.u_tendency, time_stepping, DynamicalCore())
+    v_tend = get_tendency_step(vars.dynamics.v_tendency, time_stepping, DynamicalCore())
+    scratch_memory = vars.scratch.transform_memory
+    transform!(u_tend, u_tend_grid, scratch_memory, S)
+    transform!(v_tend, v_tend_grid, scratch_memory, S)
+
+    vorticity_flux_spectral_tendencies!(vars, S, time_stepping; div, add)
+    return nothing
+end
+
 """$(TYPEDSIGNATURES)
 
 SEQUENTIAL VERSION

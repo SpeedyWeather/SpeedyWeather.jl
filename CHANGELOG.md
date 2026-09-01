@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Remove dead code: unused `get_2lm_range` [#1243](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1243)
 - Remove dead code: unused `vorticity_flux!`/`vorticity_flux_curldiv!`, `quadrant_ring`, `ring_order!`/`nested_order!`/`matrix_order!`, `get_2lm_range`, `AllOutputVariables`, and the `BernoulliPotential` dummy type [#1243](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1243)
 - Add a central, BibTeX-backed documentation bibliography with DocumenterCitations [#478](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/478)
 - Move time-stepping mathematics from the Usage docs to a new Numerics page, and document previously-undocumented `NCycleLorenz` details [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
