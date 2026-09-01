@@ -40,7 +40,7 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     println(io, styled"├ {info:Spectral}:     T$mmax, $(lmax)x$(mmax) LowerTriangularMatrix{note:\{Complex\{$NF\}\}}")
     println(io, styled"├ {info:Grid}:         Field{note:\{$NF\}}, $(RingGrids.get_nlat(grid))-ring $Grid")
     println(io, styled"├ {info:Truncation}:   dealiasing = $dealiasing {note:($truncation)}")
-    println(io, styled"├ {info:Legendre}:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
+    println(io, styled"├ {info:Legendre}:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut)), quadrature: $(S.Quadrature)")
     println(io, styled"├ {info:Architecture}: $architecture")
     print(io, styled"└ {info:Memory}:       for $nlayers layers {note:($memorysize_str)}")
     return nothing

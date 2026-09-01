@@ -33,6 +33,7 @@ struct SpectralTransform{
     spectrum::SpectrumType          # spectral truncation
     nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} # Legendre shortcut for truncation of m loop
+    Quadrature::Type{<:AbstractQuadrature}      # quadrature scheme the weights were built with
     mmax_truncation::Vector{Int}    # Maximum order m to retain per latitude ring
 
     # GRID
@@ -86,10 +87,13 @@ struct SpectralTransform{
     jm_indices::ArrayTypeIntMatrix              # (j, m, lm_offset, column length) per inverse-transform thread
     lm_indices::ArrayTypeIntMatrix              # (m, hemisphere sign, jm_indices row range) per forward-transform thread
 
-    # SOLID ANGLES ΔΩ FOR QUADRATURE
-    # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
-    # vector is pole to pole although only northern hemisphere required
-    solid_angles::VectorType                    # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
+    # SOLID ANGLES ΔΩ FOR QUADRATURE, PER ORDER m AND NORTHERN RING j, ROTATED BACK TO THE
+    # PRIME MERIDIAN, i.e. ΔΩ[m, j] * conj(lon_offsets[m, j]). This is exactly what the forward
+    # Legendre transform needs.
+    # Order-dependent because the HEALPix grids need a different quadrature rule per order m to
+    # make the transform exact; for grids whose latitudes already carry an exact rule (Gaussian,
+    # Clenshaw-Curtis) the magnitude is constant in m. See `quadrature_weights`.
+    solid_angles_rotated::MatrixComplexType     # = ΔΩ conj(o), ΔΩ = sinθ Δθ Δϕ per grid point
 
     # LAPLACE EIGENVALUES -l*(l+1) and their inverse, for ∇²/∇⁻².
     eigenvalues::VectorType
@@ -136,6 +140,7 @@ function SpectralTransform(
         nlayers::Integer = DEFAULT_NLAYERS,                                             # scratch size — max layer count any single transform call may carry
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
+        Quadrature::Type{<:AbstractQuadrature} = default_quadrature(grid),              # how the latitude quadrature weights are built
         gpu_graphs::Bool = default_gpu_graphs(spectrum.architecture),               # use GPU-graphs accelerated Fourier path (CUDA, AMDGPU); backend-dependent default
     )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
@@ -166,6 +171,18 @@ function SpectralTransform(
 
     # LEGENDRE SHORTCUT OVER ORDER M (0-based), truncate the loop over order m
     mmax_truncation = [LegendreShortcut(nlons[j], latd[j]) for j in 1:nlat_half]
+
+    # A ring with nlon_j longitudes has its Fourier bin m = nlon_j÷2 at the Nyquist frequency,
+    # where the real FFT pair carries only one of the two components (`brfft` drops the imaginary
+    # part, `rfft` returns it real). Such a ring contributes to only one of the real/imaginary
+    # parts of the coefficients at that order, so no single quadrature weight can be consistent
+    # for both and an exact transform is unreachable while the bin is retained. Only the HEALPix
+    # grids reach it — their polar-cap rings have nlon_j = 4j and sit at Nyquist for m = 2j, on
+    # every ring — and dropping it there is a prerequisite for the per-order fit below.
+    if drop_nyquist(grid)
+        mmax_truncation = [min(mmax_j, (nlons[j] - 1) ÷ 2) for (j, mmax_j) in enumerate(mmax_truncation)]
+    end
+
     mmax_truncation = min.(mmax_truncation, mmax - 1)   # only to mmax in any case (otherwise BoundsError)
 
     # NORMALIZATION
@@ -268,12 +285,22 @@ function SpectralTransform(
         end
     end
 
-    # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
+    # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or optimised per order)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
     # and sum up to 2 over all latitudes as ∫sin(θ)dθ = 2 over 0...π.
-    # Δϕ = 2π/nlon is the azimuth every grid point covers
-    solid_angles = get_solid_angles(grid)
+    # Δϕ = 2π/nlon is the azimuth every grid point covers.
+    # On the HEALPix grids the geometric (equal-area) angles are not a quadrature rule, so they are
+    # replaced order by order with weights that make the transform exact, see `quadrature_weights`.
+    solid_angles = quadrature_weights(
+        Quadrature, NF, grid, spectrum, legendre_polynomials, mmax_truncation,
+        nlons, nlat, get_solid_angles(grid)
+    )
+
+    # Fuse with the longitude offset rotation (complex conjugate: rotate back to the prime
+    # meridian) so the forward Legendre transform reads a single precomputed factor instead of
+    # multiplying the two at every (m, j).
+    solid_angles_rotated = solid_angles .* conj.(Complex{NF}.(lon_offsets))
 
     # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES + LAPLACE EIGENVALUES
     gradients = gradient_arrays(NF, spectrum)
@@ -297,7 +324,7 @@ function SpectralTransform(
     }(
         architecture,
         spectrum, nfreq_max,
-        LegendreShortcut, mmax_truncation,
+        LegendreShortcut, Quadrature, mmax_truncation,
         grid, nlayers,
         nlon_max, nlons, nlat, rings,
         coslat, coslat⁻¹, lon_offsets,
@@ -308,7 +335,7 @@ function SpectralTransform(
         legendre_polynomials_transposed,
         scratch_memory,
         jm_index_size, jm_indices, lm_indices,
-        solid_angles,
+        solid_angles_rotated,
         eigenvalues, eigenvalues⁻¹,
         gradients,
         gpu_graphs,

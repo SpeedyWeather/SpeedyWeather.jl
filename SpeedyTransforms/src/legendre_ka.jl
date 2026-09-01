@@ -133,8 +133,7 @@ end
         legendre_polynomials_data,  # input, Legendre polynomials
         f_north,                    # input, Fourier-transformed northern latitudes
         f_south,                    # input, southern latitudes
-        lon_offsets,                # input, longitude offset rotation per (m, j)
-        solid_angles,               # input, solid angles for each latitude
+        solid_angles_rotated,       # input, rotated solid angles per order m and ring j
         lm_indices,                 # precomputed (m, hemisphere sign, row range) per coefficient
         jm_indices,                 # precomputed (j, m, lm_offset, column length) per row
     )
@@ -149,9 +148,9 @@ end
     for r in lm_indices[lm, 3]:lm_indices[lm, 4]
         j = jm_indices[r, 1]
 
-        # SOLID ANGLE QUADRATURE WEIGHT (sinθ Δθ Δϕ) and LONGITUDE OFFSET, the complex
-        # conjugate rotating back to the prime meridian
-        ΔΩ_rotated = solid_angles[j] * conj(lon_offsets[m, j])
+        # SOLID ANGLE QUADRATURE WEIGHT (sinθ Δθ Δϕ), per order m and ring j, already rotated
+        # back to the prime meridian by the ring's longitude offset
+        ΔΩ_rotated = solid_angles_rotated[m, j]
 
         f = muladd_complex(hemisphere_sign, f_south[m, k, j], f_north[m, k, j])
         spec = muladd_complex(legendre_polynomials_data[lm, j], ΔΩ_rotated * f, spec)
@@ -169,7 +168,7 @@ function _legendre!(                        # GRID TO SPECTRAL
     ) where {NF}
     (; legendre_polynomials) = S            # precomputed Legendre polynomials
     (; lm_indices, jm_indices) = S          # coefficient indices precomputed for threads
-    (; solid_angles, lon_offsets) = S
+    (; solid_angles_rotated) = S
 
     nlayers = size(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
 
@@ -191,8 +190,7 @@ function _legendre!(                        # GRID TO SPECTRAL
         legendre_polynomials.data,
         f_north,
         f_south,
-        lon_offsets,
-        solid_angles,
+        solid_angles_rotated,
         lm_indices,
         jm_indices
     )

@@ -31,8 +31,13 @@ end
 The equal-area weights used for the HEALPix grids (original or OctaHEALPix) of size `nlat_half`.
 The weights are of length `nlat`, i.e. a vector for every latitude ring, pole to pole.
 `sum(equal_area_weights(nlat_half))` is always `2` as ``∫_0^π \\sin x dx = 2`` (colatitudes),
-or equivalently ``∫_{-π/2}^{π/2} \\cos x dx`` (latitudes). Integration (and therefore the
-spectral transform) is not exact with these grids but errors reduce for higher resolution."""
+or equivalently ``∫_{-π/2}^{π/2} \\cos x dx`` (latitudes).
+
+These are the *geometric* solid angles of an equal-area grid, not a quadrature rule. Integration
+with them is not exact, and the error does not converge away with resolution either: the spectral
+transform's round-trip operator stays a fixed distance from the identity. `SpeedyTransforms` does
+not weight the transform with them directly, it fits per-order quadrature weights starting from
+them, see `SpeedyTransforms.quadrature_weights`."""
 function equal_area_weights(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     nlat = get_nlat(Grid, nlat_half)
     npoints = get_npoints(Grid, nlat_half)

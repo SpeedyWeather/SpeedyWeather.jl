@@ -58,12 +58,23 @@ function roundup_fft(n::Integer; small_primes::Vector{T} = [2, 3, 5]) where {T <
     return n - 2      # subtract unnecessary last += 2 addition
 end
 
-# DEALIASING; Gaussian = 2, all others = 3
+# DEALIASING; Gaussian = 2, HEALPix = 3.5, all others = 3
 """$(TYPEDSIGNATURES)
-Returns the default dealising for the chosen grid. Defaults to 2 for Gaussian grids and 3 for all other grids."""
+Returns the default dealiasing for the chosen grid. Defaults to 2 for Gaussian grids, 3.5 for the
+HEALPix grids and 3 for all other grids.
+    
+NOTE, at high resolutiosn OctaHEALPixGrid actually needs 4."""
 @inline default_dealiasing(Grid::Type{<:AbstractGrid}) = 3
 @inline default_dealiasing(Grid::Type{<:FullGaussianGrid}) = 2
 @inline default_dealiasing(Grid::Type{<:OctahedralGaussianGrid}) = 2
 @inline default_dealiasing(Grid::Type{<:OctaminimalGaussianGrid}) = 2
+@inline default_dealiasing(
+    Grid::Type{
+        <:Union{
+            HEALPixGrid, OctaHEALPixGrid,
+            FullHEALPixGrid, FullOctaHEALPixGrid,
+        },
+    }
+) = 3.5
 
 @inline default_dealiasing(grid::AbstractGrid) = default_dealiasing(typeof(grid))

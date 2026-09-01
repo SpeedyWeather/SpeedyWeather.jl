@@ -255,6 +255,23 @@ end
 import SpeedyTransforms:
     _transform_grid!, _transform_spec!, _largest_planned_batch, _legendre!
 
+# The forward Legendre transform weights ring j at order m by the solid angle ΔΩ[m, j], which the
+# transform stores pre-multiplied by the unit-modulus longitude-offset rotation, so |·| recovers it.
+# The scratch memory is (freq x lvl x lat), so reshape to match, padding the frequency rows the
+# Legendre loop never reaches with a positive value (their contribution is zeroed by `scale`, but
+# the padding must not be zero as `spec2grid_pullback!` divides by it).
+function adjoint_solid_angles(S::SpectralTransform)
+    (; nlat_half) = S.grid
+    nfreq = maximum(rfft_plan.osz[1] for rfft_plan in S.rfft_plan_serial)
+    ΔΩ = abs.(Array(S.solid_angles_rotated))
+    mmax = min(size(ΔΩ, 1), nfreq)
+    dOmega = ones(eltype(ΔΩ), nfreq, 1, nlat_half)
+    for j in 1:nlat_half
+        dOmega[1:mmax, 1, j] = view(ΔΩ, 1:mmax, j)
+    end
+    return dOmega
+end
+
 # adjoint of spec→grid transform! w.r.t coeffs: field_bar → coeffs_bar (accumulates into coeffs_bar).
 # Allocation-free apart from the FFT plan outputs (inherent to the primal too): the freq-space
 # intermediates reuse the passed `scratch` (.north/.south/.column, which the forward pass no longer
@@ -265,7 +282,7 @@ function spec2grid_pullback!(coeffs_bar, field_bar, scratch, S; unscale_coslat::
     K = size(field_bar, 2)
     K_batched = _largest_planned_batch(K, S)
     scale = adjoint_scale(S)
-    dOmega = reshape(view(S.solid_angles, 1:nlat_half), 1, 1, :)
+    dOmega = adjoint_solid_angles(S)
     clat = reshape(view(S.coslat⁻¹, 1:nlat_half), 1, 1, :)
     c = 1
     while c <= K
@@ -298,7 +315,7 @@ function grid2spec_pullback!(field_bar, coeffs_bar, scratch, S)
     K = size(coeffs_bar, 2)
     K_batched = _largest_planned_batch(K, S)
     scale = adjoint_scale(S)
-    dOmega = reshape(view(S.solid_angles, 1:nlat_half), 1, 1, :)
+    dOmega = adjoint_solid_angles(S)
     c = 1
     while c <= K
         c_end = min(c + K_batched - 1, K)
