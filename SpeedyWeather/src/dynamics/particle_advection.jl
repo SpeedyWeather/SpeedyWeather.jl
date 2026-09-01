@@ -25,8 +25,6 @@ particle_advection!(vars, model) = particle_advection!(vars, model.particle_adve
 particle_advection!(vars, ::Nothing, ::AbstractModel) = nothing
 
 export ParticleAdvection2D
-
-export ParticleAdvection2D
 @kwdef struct ParticleAdvection2D{
         NF,
         GeometryType, # <: AbstractGridGeometry
@@ -41,6 +39,9 @@ export ParticleAdvection2D
 
     "[OPTION] Advect with velocities from this vertical layer index"
     layer::IntType = 1
+
+    "[OPTION] Advect backwards in time if true (for backtracking trajectories)"
+    backwards::Bool = false
 
     "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
     Δt::Base.RefValue{NF} = Ref(zero(NF))
@@ -181,8 +182,9 @@ function particle_advection!(
     clock.time_step_counter % n == (n - 1) || return nothing
 
     # HEUN: PREDICTOR STEP, use u, v at previous time step and location
-    Δt = particle_advection.Δt[]        # time step [s*˚/m]
-    Δt_half = Δt / 2                    # /2 because Heun is average of Euler+corrected step
+    # /2 because Heun is average of Euler+corrected step; flip sign for backwards advection
+    Δt_half = particle_advection.Δt[] / 2
+    Δt_half *= particle_advection.backwards ? -1 : 1
 
     u_old = vars.particles.u            # from previous time step and location
     v_old = vars.particles.v            # from previous time step and location
