@@ -174,7 +174,7 @@ the spherical harmonic coefficients. By doing so, the upper triangle is actually
 and the data technically unravelled into a vector, but this is hidden as much as possible from the user.
 For more details see [`LowerTriangularArrays`](@ref lowertriangularmatrices).
 
-[Fortran SPEEDY](https://users.ictp.it/~kucharsk/speedy-net.html) does not use the same spectral packing as
+[Fortran SPEEDY](@cite KucharskiMolteniBracco2006) does not use the same spectral packing as
 SpeedyWeather.jl and also does not use 1-based indices and notation consistently throughout.
 The alternative packing ``l', m'`` therein uses ``l'=m`` and ``m'=l-m`` as summarized in the following table,
 (all 0-based).
