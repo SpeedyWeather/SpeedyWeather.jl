@@ -44,7 +44,7 @@ With "grid" we mean the discretization of space. Also called tesselation given t
 a space with polygons, we subdivide the sphere into grid cells, with vertices, faces and centres.
 In that sense, a grid does not contain any data it purely describes the location of grid cells.
 Grids in RingGrids are identified by their name, e.g.
-FullGaussianGrid, and a resolution parameter where we use `nlat_half` (the number of latitudes
+[`FullGaussianGrid`](@ref FullGaussianGrid), and a resolution parameter where we use `nlat_half` (the number of latitudes
 on one hemisphere, Equator included) for all grids. This is because some grids have an even number
 some an odd number number of latitudes so not all `nlat` are valid, but all `nlat_half` are.
 While an instance of a grid stores some precomputed arrays to facilitate faster indexing
@@ -322,7 +322,8 @@ retains the element type of `field`.
 
 Every time an interpolation like `interpolate(30.0, 10.0, field)` is called, several things happen, which
 are important to understand to know how to get the fastest interpolation out of this module in a given situation.
-Under the hood an interpolation takes three arguments
+This mirrors the advice to reuse a precomputed `SpectralTransform` wherever possible, see
+[Precomputed polynomials and allocated memory](@ref). Under the hood an interpolation takes three arguments
 
 - output array
 - input field
@@ -464,7 +465,7 @@ HEALPix grids are also famous because of their hierarchial grid structure. While
 on the HEALPix grid that starts at 0˚ on the north pole and runs first east then south (the _ring_ order,
 efficient for spectral transforms) other orderings are possible. The so-called nested order is an
 order whereby 2x2 cells are indexed in the same patterns as the embedding 2x2 cells of 2x2 cells and so on.
-For a visualisation see [Gorski's HEALPix paper](https://iopscience.iop.org/article/10.1086/427976)
+For a visualisation see [Gorski2005](@citet)
 or [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887). We don't implement (yet?) nested
 order for the HEALPix grid but have defined the equivalent on the OctaHEALPixGrid, e.g.
 

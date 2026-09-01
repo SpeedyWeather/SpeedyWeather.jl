@@ -214,9 +214,24 @@ field = rand(Float32, spectral_grid.grid)
   and `using` it at the top of the test file. Do not consider a feature complete until its
   unit tests have been added and run successfully.
 
+**Which `--project` to use.** `SpeedyWeather/Project.toml` has only the package's own
+dependencies; the test-only ones (`JET`, `Enzyme`, `NCDatasets`, `CairoMakie`, `Terrarium`, …)
+live in `SpeedyWeather/test/Project.toml`. So:
+
+- `--project=SpeedyWeather` — only for a single test file that needs nothing beyond
+  `SpeedyWeather` and `Test`.
+- `--project=SpeedyWeather/test` — for anything else: files that `using` a test-only
+  dependency (e.g. `dynamics/dispatch.jl` needs `JET`), or running several test files by hand.
+  When in doubt use this one; it is a superset.
+
+`Pkg.test(...)` builds its own environment and works from either.
+
 ```bash
-# Single test file (fast — load Test manually, avoid full Pkg.test overhead)
+# Single test file with no test-only dependencies (fast — load Test manually, skip Pkg.test overhead)
 julia --project=SpeedyWeather --check-bounds=yes -e 'using Test, SpeedyWeather; include("SpeedyWeather/test/dynamics/vertical_coordinates.jl")'
+
+# Single test file that needs test-only dependencies, or several files at once
+julia --project=SpeedyWeather/test --check-bounds=yes -e 'using Test, SpeedyWeather; include("SpeedyWeather/test/dynamics/dispatch.jl")'
 
 # Main model tests
 julia --project=SpeedyWeather --check-bounds=yes -e 'using Pkg; Pkg.test("SpeedyWeather")'
@@ -228,7 +243,17 @@ julia --project=SpeedyWeather SpeedyWeather/test/runtests.jl extended_tests
 julia --project=RingGrids --check-bounds=yes -e 'using Pkg; Pkg.test("RingGrids")'
 ```
 
+Run these from the repository root — the `include` paths above are relative to it.
+
 Test subdirectories: `dynamics/`, `parameterizations/`, `output/`, `GPU/`, `differentiability/`.
+
+**Stale manifests.** `Manifest.toml` files are gitignored (except the deliberately pinned
+`SpeedyWeather/test/differentiability/sensitivity_examples/Manifest.toml`). If loading fails
+during precompilation of a *stdlib* — a symptom of a manifest resolved for an older Julia than
+the one on `PATH` — check `grep -m1 julia_version <env>/Manifest.toml` against
+`julia --version`, then regenerate: `rm <env>/Manifest.toml` and
+`julia --project=<env> -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'`. CI covers both
+Julia 1.10 and 1.12, so either is a valid target.
 
 ## Documentation
 
