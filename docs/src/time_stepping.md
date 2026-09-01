@@ -10,7 +10,7 @@ SpeedyWeather.jl supports several time integration schemes, selected by passing 
 - [`Leapfrog`](@ref leapfrog), a 2-step leapfrog scheme with a Robert-Asselin and Williams filter
   (the default for `ShallowWaterModel`, `PrimitiveDryModel` and `PrimitiveWetModel`), described below.
 - [`NCycleLorenz`](@ref ncycle), a family of semi-implicit Lorenz N-cycle schemes
-  (Hotta et al. 2016[^Hotta2016]; the default for `BarotropicModel`).
+  ([Hotta2016](@citep); the default for `BarotropicModel`).
 
 All schemes share a common framework (see [Time steppers and variable steps](@ref steps)) in which
 the time stepper decides, for every model component, which stored *step* of each variable to read
@@ -77,7 +77,8 @@ therefore disables the filter weights (both are 0), and enables them for every s
 
 ## Robert-Asselin and Williams filter
 
-The standard leapfrog time integration is often combined with a Robert-Asselin filter[^Robert66][^Asselin72]
+The standard leapfrog time integration is often combined with a Robert-Asselin filter
+[Robert1966, Asselin1972](@citep)
 to dampen a computational mode. The idea is to start with a standard leapfrog step to obtain
 the next time step ``i+1`` but then to correct the current time step ``i`` by applying a filter
 which dampens the computational mode. The filter looks like a discrete Laplacian in time
@@ -102,8 +103,8 @@ at the previous iteration, ``v_i, v_{i+1}`` are not filtered yet when applying
 the Laplacian. The filter parameter ``\nu`` is typically chosen between 0.01-0.2,
 with stronger filtering for higher values.
 
-Williams[^Williams2009] then proposed an additional filter step to regain accuracy
-that is otherwise lost with a strong Robert-Asselin filter[^Amezcua2011][^Williams2011].
+[Williams2009](@citet) then proposed an additional filter step to regain accuracy
+that is otherwise lost with a strong Robert-Asselin filter [Amezcua2011, Williams2011](@citep).
 Now let ``w`` be unfiltered, ``v`` be once filtered, and ``u`` twice filtered, then
 ```math
 \begin{aligned}
@@ -209,12 +210,12 @@ When writing a new time stepper you implement the `*_steps` methods (how many st
 Time steppers can also reorder how diffusion and the semi-implicit correction are applied via
 `diffusion_and_implicit!`: Leapfrog applies the implicit correction first, then horizontal
 diffusion, while the Lorenz N-cycle applies diffusion first, then the implicit correction
-(consistent with the ordering in Hotta et al. 2016[^Hotta2016]).
+(consistent with the ordering in [Hotta2016](@citet)).
 
 ## [Lorenz N-cycle](@id ncycle)
 
 The Lorenz N-cycle [`NCycleLorenz`](@ref) is a semi-implicit time integration following
-Hotta et al. (2016)[^Hotta2016]. Over a cycle of ``N`` substeps it advances the state ``x``,
+[Hotta2016](@citet). Over a cycle of ``N`` substeps it advances the state ``x``,
 per substep, as
 
 ```math
@@ -246,7 +247,7 @@ x &= x + \Delta t\,G
 for every spectral coefficient (and vertical layer), with the implicit correction applied to
 ``G`` beforehand by `diffusion_and_implicit!`.
 
-Four weight variants are available, following the naming in Hotta et al. (2016), selected via the
+Four weight variants are available, following the naming in [Hotta2016](@citet), selected via the
 `variant` option:
 
 | Variant | Weight ``w_k`` for substep ``k = 1, \dots, N-1`` (``w_0 = 1``) | Steps per period | Notes |
@@ -275,12 +276,3 @@ NCycleLorenzB
 NCycleLorenzAB
 NCycleLorenzABBA
 ````
-
-## References
-
-[^Robert66]: Robert, André. "The Integration of a Low Order Spectral Form of the Primitive Meteorological Equations." Journal of the Meteorological Society of Japan 44 (1966): 237-245.
-[^Asselin72]: ASSELIN, R., 1972: Frequency Filter for Time Integrations. Mon. Wea. Rev., 100, 487-490, doi:[10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2](https://doi.org/10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2.)
-[^Williams2009]: Williams, P. D., 2009: A Proposed Modification to the Robert-Asselin Time Filter. Mon. Wea. Rev., 137, 2538-2546, [10.1175/2009MWR2724.1](https://doi.org/10.1175/2009MWR2724.1).
-[^Amezcua2011]: Amezcua, J., E. Kalnay, and P. D. Williams, 2011: The Effects of the RAW Filter on the Climatology and Forecast Skill of the SPEEDY Model. Mon. Wea. Rev., 139, 608-619, doi:[10.1175/2010MWR3530.1](https://doi.org/10.1175/2010MWR3530.1).
-[^Williams2011]: Williams, P. D., 2011: The RAW Filter: An Improvement to the Robert-Asselin Filter in Semi-Implicit Integrations. Mon. Wea. Rev., 139, 1996-2007, doi:[10.1175/2010MWR3601.1](https://doi.org/10.1175/2010MWR3601.1).
-[^Hotta2016]: Hotta, D., E. Kalnay, and P. Ullrich, 2016: A Semi-Implicit Modification to the Lorenz N-Cycle Scheme and Its Application for Integration of Meteorological Equations. Mon. Wea. Rev., 144, 2215-2233, doi:[10.1175/MWR-D-15-0330.1](https://doi.org/10.1175/MWR-D-15-0330.1).

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a central, BibTeX-backed documentation bibliography with DocumenterCitations [#478](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/478)
 - Move time-stepping mathematics from the Usage docs to a new Numerics page, and document previously-undocumented `NCycleLorenz` details [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
 - Add cross-reference links throughout the docs, and fix several pre-existing ambiguous/broken `@ref` targets found along the way [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
 - Remove orphaned duplicate of kernel_launching.jl in Utils [#1237](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1237)

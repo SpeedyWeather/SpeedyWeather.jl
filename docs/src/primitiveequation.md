@@ -2,7 +2,8 @@
 
 The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) are a hydrostatic approximation
 of the compressible Navier-Stokes equations for an ideal gas on a rotating sphere. We largely follow
-the idealised spectral dynamical core developed by GFDL[^GFDL1] and documented therein[^GFDL2].
+the idealised spectral dynamical core developed by GFDL [GFDLIdealizedModels](@citep)
+and documented therein [GFDLSpectralDynamicalCore](@citep).
 
 The primitive equations solved by SpeedyWeather.jl for relative vorticity ``\zeta``, divergence ``\mathcal{D}``,
 logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidity ``q`` are
@@ -417,7 +418,7 @@ equation above, then we can also write
 - \overline{\mathbf{u}_k \cdot \nabla \ln p_s} - \bar{\mathcal{D}}_k
 + \sigma_{k+\tfrac{1}{2}}(-\mathbf{\bar{u}} \cdot \nabla \ln p_s - \bar{\mathcal{D}})
 ```
-See also Hoskins and Simmons, 1975[^HS75]. These vertical averages are the same as required by the
+See also [Hoskins1975](@citet). These vertical averages are the same as required by the
 [Surface pressure tendency](@ref) and in the [Temperature equation](@ref), they are therefore all calculated
 at once, storing the partial averages ``\overline{\mathbf{u}_k \cdot \nabla \ln p_s}`` and ``\bar{\mathcal{D}}_k`` on the fly.
 
@@ -563,7 +564,7 @@ as described in the following.
 
 The first law of thermodynamic states that the internal energy ``I`` is increased by
 the heat ``Q`` applied minus the work ``W`` done by the system. We neglect changes
-in chemical composition ([^Vallis], chapter 1.5). For an ideal gas, the internal
+in chemical composition (see chapter 1.5 of [Vallis2006](@citet)). For an ideal gas, the internal
 energy is ``c_vT`` with ``c_v`` the heat capacity at constant volume and temperature
 ``T``. The work done is ``pV``, with pressure ``p`` and the specific volume ``V``
 ```math
@@ -603,7 +604,7 @@ Similar to the [Humidity equation](@ref) we write the equation for (absolute) te
 T\mathcal{D} + \kappa T_v \frac{D \ln p}{Dt} \right]\right) -\nabla\cdot([\mathbf{u}T])
 ```
 ``W_T`` is the [Vertical advection](@ref) of temperature. We evaluate the adiabatic conversion
-term completely in grid-point space following Simmons and Burridge, 1981[^SB81] Equation 3.12 and 3.13.
+term completely in grid-point space following [Simmons1981](@citet), Equations 3.12 and 3.13.
 Leaving out the ``\kappa T_v`` for clarity, the term at level ``k`` is
 ```math
 \left(\frac{D \ln p}{D t}\right)_k = \mathbf{u}_k \cdot \nabla \ln p_k
@@ -665,7 +666,7 @@ the same as in the [Shallow water model](@ref implicit_swm), but
 
 The linear terms of the primitive equations follow a linearization around a state of rest without
 orography and a reference vertical temperature profile. The scheme described here largely follows
-Hoskins and Simmons [^HS75], which has also been used in Simmons and Burridge [^SB81].
+[Hoskins1975](@citet), which has also been used in [Simmons1981](@citet).
 
 As before, let ``\delta V = \tfrac{V_{i+1} - V_{i-1}}{2\Delta t}`` be the tendency we need for the Leapfrog
 time stepping. With the implicit time step ``\xi = 2\alpha\Delta t``, ``\alpha \in [\tfrac{1}{2}, 1]`` we have
@@ -863,11 +864,3 @@ and only when forcing vorticity or divergence directly it has to be applied manu
 see [Forcing scaling](@ref) for more details.
 
 Derivation of the scaled primitive equations will be added here.
-
-## References
-
-[^GFDL1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
-[^GFDL2]: Geophysical Fluid Dynamics Laboratory, [The Spectral Dynamical Core](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/spectral_core.pdf)
-[^Vallis]: GK Vallis, 2006. [Atmopsheric and Ocean Fluid Dynamics](http://vallisbook.org/), Cambridge University Press.
-[^SB81]: Simmons and Burridge, 1981. *An Energy and Angular-Momentum Conserving Vertical Finite-Difference Scheme and Hybrid Vertical Coordinates*, Monthly Weather Review. DOI: [10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2](https://doi.org/10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2).
-[^HS75]: Hoskins and Simmons, 1975. *A multi-layer spectral model and the semi-implicit method*, Quart. J. R. Met. Soc. DOI: [10.1002/qj.49710142918](https://doi.org/10.1002/qj.49710142918)

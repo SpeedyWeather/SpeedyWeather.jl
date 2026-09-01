@@ -40,7 +40,7 @@ the initial conditions will be set back to what is defined in `model.initial_con
 We will illustrate the `set!` function now that conveniently lets you (re)set the
 current state of the prognostic variables:
 
-The Rossby-Haurwitz wave[^Williamson92] is defined as an initial condition for
+The Rossby-Haurwitz wave [Williamson1992](@citep) is defined as an initial condition for
 vorticity ``\zeta`` (which is the sole prognostic variable in the
 [barotropic vorticity model](@ref barotropic_vorticity_model)) as
 
@@ -129,7 +129,7 @@ details.
 
 ## Rossby-Haurwitz wave in a ShallowWater model
 
-For the shallow water model Williamson et al., 1992[^Williamson92] also give
+For the shallow water model [Williamson1992](@citet) also give
 initial conditions for the prognostic variable height ``h = h_0 + \eta`` (equivalent to geopotential).
 The layer thickness is ``h_0`` and ``\eta`` is the interface displacement
 of that layer. SpeedyWeather however, uses as prognostic variable ``\eta``
@@ -235,7 +235,3 @@ nothing # hide
 As you can see the actual Rossby-Haurwitz wave is not as stable any more
 (because those initial conditions are not a stable solution of the primitive equations)
 and so the 3-day integration looks already different from the barotropic model!
-
-## References
-
-[^Williamson92]: DL Williamson, JB Drake, JJ Hack, R Jakob, PN Swarztrauber, 1992. *A standard test set for numerical approximations to the shallow water equations in spherical geometry*, **Journal of Computational Physics**, 102, 1, DOI: [10.1016/S0021-9991(05)80016-6](https://doi.org/10.1016/S0021-9991(05)80016-6)

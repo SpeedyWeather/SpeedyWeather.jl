@@ -465,7 +465,7 @@ HEALPix grids are also famous because of their hierarchial grid structure. While
 on the HEALPix grid that starts at 0˚ on the north pole and runs first east then south (the _ring_ order,
 efficient for spectral transforms) other orderings are possible. The so-called nested order is an
 order whereby 2x2 cells are indexed in the same patterns as the embedding 2x2 cells of 2x2 cells and so on.
-For a visualisation see [Gorski's HEALPix paper](https://iopscience.iop.org/article/10.1086/427976)
+For a visualisation see [Gorski2005](@citet)
 or [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887). We don't implement (yet?) nested
 order for the HEALPix grid but have defined the equivalent on the OctaHEALPixGrid, e.g.
 

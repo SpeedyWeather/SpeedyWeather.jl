@@ -26,7 +26,7 @@ run!(simulation, period = Day(9))
 nothing # hide
 ```
 
-The Jablonowski-Williamson baroclinic wave test case[^JW06] using the
+The Jablonowski-Williamson baroclinic wave test case [Jablonowski2006](@citep) using the
 [Primitive equation model](@ref primitive_equation_model) particularly the [`PrimitiveDryModel`](@ref),
 as we switch off all parameterizations (and ocean, sea_ice and land) with `dynamics_only = true`.
 We want to use 8 vertical levels, and a lower resolution of T31 on a
@@ -73,7 +73,7 @@ run!(simulation, period = Day(20))
 nothing # hide
 ```
 
-The code above defines the Held-Suarez forcing [^HS94] in terms of temperature relaxation
+The code above defines the Held-Suarez forcing [Held1994](@citep) in terms of temperature relaxation
 and a linear drag term that is applied near the planetary boundary but switches off
 all other [parameterizations](@ref "Parameterizations") in the primitive equation model without humidity.
 One could also just switch off the boundary layer scheme which would also automatically turn off
@@ -263,9 +263,3 @@ nothing # hide
 As the precipitation fields are accumulated meters over the integration period
 we divide by 6 hours to get a precipitation rate ``[m/s]``
 but then multiply with 1 hour and 1000 to get the typical precipitation unit of ``[mm/hr]``.
-
-## References
-
-[^JW06]: Jablonowski, C. and Williamson, D.L. (2006), A baroclinic instability test case for atmospheric model dynamical cores. Q.J.R. Meteorol. Soc., 132: 2943-2975. DOI:[10.1256/qj.06.12](https://doi.org/10.1256/qj.06.12)
-
-[^HS94]: Held, I. M. & Suarez, M. J. A Proposal for the Intercomparison of the Dynamical Cores of Atmospheric General Circulation Models. Bulletin of the American Meteorological Society 75, 1825-1830 (1994). DOI:[10.1175/1520-0477(1994)075<1825:APFTIO>2.0.CO;2](https://doi.org/10.1175/1520-0477(1994)075<1825:APFTIO>2.0.CO;2)

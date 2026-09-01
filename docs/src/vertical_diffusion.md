@@ -70,7 +70,7 @@ tendencies again at cell centres ``k``.
 ## Bulk Richardson-based diffusion coefficient
 
 We calculate the diffusion coefficient ``K`` based on the bulk Richardson number ``Ri``
-[^Frierson2006] which is computed as follows
+[Frierson2006](@citep), which is computed as follows
 
 ```math
 Ri = \frac{gz \left[ \Theta_v(z) - \Theta_v(z_N) \right]}{|v(z)|^2 \Theta_v(z_N)}
@@ -128,7 +128,3 @@ dry static energy ``SE = c_p T + gz``, i.e.
 where we just fold the heat capacity ``c_p`` into the diffusion coefficient ``K \to K/c_p``.
 The other variables are diffused straight-forwardly as
 ``\partial_t u = \partial_\sigma K \partial_\sigma u``, etc.
-
-## References
-
-[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1).

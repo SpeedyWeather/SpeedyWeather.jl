@@ -46,7 +46,7 @@ From a range:
 SigmaCoordinates(0:0.2:1)
 ```
 
-Frierson (2006) spacing with finer resolution near the surface and stratosphere:
+[Frierson2006](@citet) spacing with finer resolution near the surface and stratosphere:
 
 ```@example vertical_coordinates
 FriersonSigmaCoordinates(spectral_grid)
