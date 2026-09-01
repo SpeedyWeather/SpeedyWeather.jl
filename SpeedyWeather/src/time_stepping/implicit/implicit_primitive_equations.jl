@@ -320,13 +320,13 @@ end
     # scratch array, see the note at the launch site.
     geopotential = ntuple(Val(nlayers)) do k
         # skip 1:k-1 as integration is surface to k
-        geopotential_val = zero(eltype(geopotential))
+        geopotential_val = zero(eltype(temp_tend))
         # while loop instead of `for r in k:nlayers`: the triangular range with both
         # endpoints dynamic miscompiles on AMDGPU/CDNA (gfx90a/gfx942), see
         # https://github.com/JuliaGPU/AMDGPU.jl/issues/1015
         r = k
         while r <= nlayers
-            geopotential_val += R[k, r] * temp_tend[lm, r]
+            geopotential_val += R[k, r] * temp_tend[lm, r, temp_step]
             r += 1
         end
         geopotential_val
@@ -363,5 +363,5 @@ end
     for k in 1:nlayers
         pres_correction += ξ * W[k] * div_tend[lm, k, div_step]
     end
-    pres_tend[lm] += pres_correction
+    pres_tend[lm, pres_step] += pres_correction
 end

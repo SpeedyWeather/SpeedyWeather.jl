@@ -251,24 +251,27 @@ function timestep!(
     z₁ = geometry.layer_thickness[1]
     z₂ = geometry.layer_thickness[2]
     Δ = 2λ / (z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
-    
+
+    params = (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
+
     launch!(
         architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
         land_bucket_temperature_kernel!, soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
-        Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt
+        params
     )
 
     return nothing
 end
 
 @kernel inbounds = true function land_bucket_temperature_kernel!(
-        soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
-        Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt
+        soil_temperature, land_fraction, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M, params
     )
 
     ij = @index(Global, Linear)
 
     if land_fraction[ij] > 0               # at least partially land
+        (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
+
         # Cooling from snow melt rate, in [W/m²] = [J/kg] * [kg/m²/s]
         Q_melt = isnothing(M) ? zero(Lᵢ) : Lᵢ * M[ij]
 

@@ -226,14 +226,13 @@ function reinitialize!(model::PrimitiveWetModel, vars::AbstractVariables)
 end
 
 """$(TYPEDSIGNATURES)
-A `model` is adapted to the GPU or CPU by wrapping some (but not all!) of its fields into a
-NamedTuple: the `model.core_components`, plus every parameterization (so the column-parameterization
-kernel can reach each one as `model.\$name`) and `params` (the `Val` of parameterization names it
-unrolls over). Importantly, while accessing fields `model.field` still works as usual,
-one cannot use multiple dispatch on the model as a whole, e.g. `::PrimitiveWet`
-will not work on GPU-adapted models (it is a NamedTuple)."""
+A `model` is adapted to the GPU or CPU by wrapping some (but not all!)
+of its fields (determined by `model.core_components`) into a NamedTuple.
+Importantly, while accessing fields `model.field` still works as usual,
+one cannot use multiple dispatch on the model as a whole, e.g. `::PrimitiveDry`
+will not work on GPU-adapted models."""
 function Adapt.adapt_structure(to, model::PrimitiveWetModel)
-    adapt_fields = (model.core_components..., model.parameterizations..., :params)
+    adapt_fields = model.core_components
     return NamedTuple{adapt_fields}(
         adapt_structure(to, getfield(model, field)) for field in adapt_fields
     )
