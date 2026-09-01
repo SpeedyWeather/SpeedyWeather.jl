@@ -11,7 +11,7 @@ Here, the orography is used in meters above the surface which shortens
 
 In the [primitive equations](@ref primitive_equation_model) the orography enters
 the equations when computing the [Geopotential](@ref). So actually required here
-is the surface geopotential ``\Phi_s = gz_s`` where ``z_s``
+is the surface geopotential ``\Phi_s = gz_s``, where ``z_s``
 is the orography height in meters as used in the shallow-water equations too
 ``z_s = H_b``.
 However, the primitive equations require the orography in spectral
