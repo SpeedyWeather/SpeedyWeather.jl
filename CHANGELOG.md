@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recompute the Legendre polynomials on the fly instead of precomputing them, via a new `recompute_legendre` keyword of `SpectralTransform` and a new `SpeedyTransforms.ScaledLegendre` module, turning their `O(T³)` memory into `O(T²)` [#1244](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1244)
 - Lazy batching of FTT plans on GPU to increase performance of models other than the `PrimitiveWetModel` [#1234](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1234)
 - Remove dead code: unused `get_2lm_range` [#1243](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1243)
 - Add a central, BibTeX-backed documentation bibliography with DocumenterCitations [#478](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/478)
