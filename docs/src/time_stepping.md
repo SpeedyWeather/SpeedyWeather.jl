@@ -210,7 +210,7 @@ When writing a new time stepper you implement the `*_steps` methods (how many st
 Time steppers can also reorder how diffusion and the semi-implicit correction are applied via
 `diffusion_and_implicit!`: Leapfrog applies the implicit correction first, then horizontal
 diffusion, while the Lorenz N-cycle applies diffusion first, then the implicit correction
-(consistent with the ordering in Hotta et al. 2016[^Hotta2016]).
+(consistent with the ordering in [Hotta2016](@citet)).
 
 ## [Lorenz N-cycle](@id ncycle)
 
