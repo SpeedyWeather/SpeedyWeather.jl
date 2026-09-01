@@ -2,7 +2,7 @@
 
 Convection is the atmospheric process of rising motion because of positively
 buoyant air parcels compared to its surroundings. In hydrostatic models
-like the primitive equation model in SpeedyWeather.jl convection has to
+like the [primitive equation model](@ref primitive_equation_model) in SpeedyWeather.jl convection has to
 be parameterized as the vertical velocity is not a prognostic variable
 that depends on vertical stability but rather diagnosed to satisfy
 horizontal divergence. Convection can be shallow and non-precipitating
@@ -23,12 +23,13 @@ using InteractiveUtils # hide
 using SpeedyWeather
 subtypes(SpeedyWeather.AbstractConvection)
 ```
-which are described in the following.
+which are described in the following. See [Parameterizations](@ref) for the general
+parameterization interface these implement.
 
 ## [Simplified Betts-Miller convection](@id BettsMiller)
 
 We follow the simplification of the Betts-Miller convection scheme
-[^Betts1986][^BettsMiller1986] as studied by Frierson, 2007 [^Frierson2007].
+[Betts1986, BettsMiller1986](@citep) as studied by [Frierson2007](@citet).
 The central idea of this scheme is to represent the effect of
 convection as an adjustment towards a (pseudo-) moist adiabat
 reference profile and its associated humidity profile. Meaning that
@@ -144,7 +145,7 @@ This is illustrated in the following
 
 ## Deep convection
 
-Following Frierson, 2007 [^Frierson2007] in order to conserve enthalpy we correct
+Following [Frierson2007](@citet), in order to conserve enthalpy we correct
 the reference profile for temperature ``T_{ref} \to T_{ref, 2}`` so that ``P_T = P_q``.
 
 ```math
@@ -152,12 +153,12 @@ T_{ref, 2} = T_{ref} + \frac{1}{\Delta p c_p} \int_{p_0}^{p_{LZB}} \left[ c_p (T
 ```
 
 ``\Delta p`` is the pressure difference ``p_{LZB} - p_0``.
-The terms inside the integral are rearranged compared to Frierson, 2007 to show
+The terms inside the integral are rearranged compared to [Frierson2007](@citet) to show
 that the vertical integral in [First-guess relaxation](@ref) really only has to be computed once.
 
 ## Shallow convection
 
-In the following we describe the "qref" scheme from Frierson, 2007 which corrects
+In the following we describe the "qref" scheme from [Frierson2007](@citet), which corrects
 reference profiles for both temperature and humidity to guarantee that ``P_q = 0``,
 i.e. no precipitation during convection. In that sense, shallow convection is
 non-precipitating. Although shallow convection is supposed to be shallow
@@ -224,19 +225,11 @@ the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0``
 
 ## Dry convection
 
-In the primitive equation model with humidity the [Betts-Miller convection scheme](@ref BettsMiller)
+In the [primitive equation model](@ref primitive_equation_model) with humidity the [Betts-Miller convection scheme](@ref BettsMiller)
 as described above is defined. Without humidity, a dry version reduces to the
 [Shallow convection](@ref) case. The two different shallow convection schemes in
-Frierson 2007[^Frierson2007], the "shallower" shallow convection scheme and the "qref"
+[Frierson2007](@citet), the "shallower" shallow convection scheme and the "qref"
 (as implemented here in [Shallow convection](@ref)) in that case also reduce to
 the same formulation. The dry Betts-Miller convection scheme is the default
 in the primitive equation model without humidity.
 
-
-## References
-
-[^Betts1986]: Betts, A. K., 1986: A new convective adjustment scheme. Part I: Observational and theoretical basis. Quart. J. Roy. Meteor. Soc.,112, 677-691. DOI: [10.1002/qj.49711247307](https://doi.org/10.1002/qj.49711247307)
-
-[^BettsMiller1986]: Betts, A. K. and M. J. Miller, 1986: A new convective adjustment scheme. Part II: Single column tests using GATE wave, BOMEX, ATEX and Arctic air-mass data sets. Quart. J. Roy. Meteor. Soc.,112, 693-709. DOI: [10.1002/qj.49711247308](https://doi.org/10.1002/qj.49711247308)
-
-[^Frierson2007]: Frierson, D. M. W., 2007: The Dynamics of Idealized Convection Schemes and Their Effect on the Zonally Averaged Tropical Circulation. J. Atmos. Sci., 64, 1959-1976. DOI:[10.1175/JAS3935.1](https://doi.org/10.1175/JAS3935.1)

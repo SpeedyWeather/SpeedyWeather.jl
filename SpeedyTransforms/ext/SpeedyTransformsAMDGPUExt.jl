@@ -2,20 +2,17 @@ module SpeedyTransformsAMDGPUExt
 
 import AMDGPU: AMDGPU, ROCArray
 import AbstractFFTs
-import LinearAlgebra
-import LinearAlgebra: mul!
-using KernelAbstractions
 using DocStringExtensions
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-import SpeedyTransforms: SpectralTransform, _fourier_batched!, default_gpu_graphs
+import SpeedyTransforms: SpectralTransform, _fourier_batched!, default_gpu_graphs,
+    GraphBackend, get_cache, run_graph!, forward_loop!, inverse_loop!, graph_key
 import SpeedyTransforms.RingGrids: AbstractField
 
-import SpeedyWeatherInternals.KernelLaunching: launch!, ArrayWorkOrder
-import SpeedyWeatherInternals.Architectures: on_architecture, GPU
+import SpeedyWeatherInternals.Architectures: GPU
 
 # HIP-graphs stability is so far only confirmed on datacenter/CDNA hardware (LUMI); default off
 # on AMDGPU until that's verified more broadly (e.g. the consumer RDNA cards buildkite currently
@@ -34,12 +31,11 @@ default_gpu_graphs(::AMDGPU.ROCBackend) = false
 # `launch`).
 #
 # The backend-agnostic parts of this (kernels, cache struct, allocation-free loops,
-# capture/replay control flow) live in gpu_graphs_common.jl, included below and shared with
-# SpeedyTransformsCUDAExt.jl; only the capture/instantiate/launch primitives differ per backend
-# (see `GraphBackend`).
+# capture/replay control flow, the `GraphBackend` struct itself) live in
+# `SpeedyTransforms/src/gpu_graphs_common.jl` and are compiled unconditionally as part of the
+# main package (imported above); only the capture/instantiate/launch primitives below, and the
+# `ROCArray`-dispatched methods, are backend-specific and have to live in this extension.
 # =====================================================================================
-
-include("gpu_graphs_common.jl")
 
 # Probe for the high-level HIP graph API. AMDGPU.HIP exports these in newer versions; on
 # older installs only the raw C bindings (hipGraph_t, hipGraphExec_t, …) are present, and

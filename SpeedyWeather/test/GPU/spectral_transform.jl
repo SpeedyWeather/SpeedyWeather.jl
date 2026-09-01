@@ -367,9 +367,10 @@ end
 
 function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
     @testset "fourier_batched: $prefix Graphs equivalence and replay" begin
-        # the GPU-Graphs acceleration lives in the backend extension; only test it when that
-        # backend (and hence the extension) is actually loaded, and when this backend's
-        # graphs-accelerated path is trusted enough to test (`default_gpu_graphs` — the same
+        # the GPU-Graphs backend wiring (CuArray/ROCArray-dispatched methods) lives in the
+        # backend extension; only test it when that backend (and hence the extension) is
+        # actually loaded, and when this backend's graphs-accelerated path is trusted enough to
+        # test (`default_gpu_graphs` — the same
         # switch that governs the runtime default). To enable on AMDGPU (e.g. once run on trusted
         # hardware like LUMI), edit `SpeedyTransforms/ext/SpeedyTransformsAMDGPUExt.jl` and change
         # `default_gpu_graphs(::AMDGPU.ROCBackend) = false` to `= true`.
@@ -380,14 +381,14 @@ function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
                 coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
 
                 # reference: generic (allocating) GPU path, graphs disabled on this transform
-                ext.clear_fourier_graph_cache!()
+                SpeedyTransforms.clear_fourier_graph_cache!()
                 S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
                 spec_off = transform(field, S_off)      # grid -> spectral
                 grid_off = transform(coeffs, S_off)      # spectral -> grid
 
                 # GPU-graphs path (explicitly enabled: default `gpu_graphs` is backend-dependent,
                 # e.g. `false` on AMDGPU — see `default_gpu_graphs` — so don't rely on it here)
-                ext.clear_fourier_graph_cache!()
+                SpeedyTransforms.clear_fourier_graph_cache!()
                 S_on = SpectralTransform(spectral_grid; gpu_graphs = true)
                 spec_on = transform(field, S_on)
                 grid_on = transform(coeffs, S_on)
@@ -398,7 +399,7 @@ function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
                 @test Array(grid_on.data) ≈ Array(grid_off.data) rtol = sqrt(eps(Float32))
 
                 # a graph was actually captured and cached
-                @test !isempty(ext.GRAPH_CACHES)
+                @test !isempty(SpeedyTransforms.GRAPH_CACHES)
 
                 # replaying into the same buffers across repeated calls stays correct
                 spec_repeat = similar(spec_on)
@@ -407,7 +408,7 @@ function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
                 end
                 @test Array(spec_repeat.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
 
-                ext.clear_fourier_graph_cache!()
+                SpeedyTransforms.clear_fourier_graph_cache!()
             end
         end
     end

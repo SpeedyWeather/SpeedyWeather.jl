@@ -10,9 +10,11 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractLongwave)
 ```
 
+See [Parameterizations](@ref) for the general parameterization interface these implement.
+
 ## Uniform cooling
 
-Following Paulius and Garner[^PG06], the uniform cooling of the atmosphere
+Following [PauluisGarner2006](@citet), the uniform cooling of the atmosphere
 is defined as
 
 ```math
@@ -27,8 +29,8 @@ is present.
 
 ## Jeevanjee radiation
 
-Jeevanjee and Zhou [^JZ22] (eq. 2) define a longwave radiative flux ``F`` for atmospheric cooling
-as (following Seeley and Wordsworth [^SW23], eq. 1)
+[JeevanjeeZhou2022](@citet) (Eq. 2) define a longwave radiative flux ``F`` for atmospheric cooling
+as (following [SeeleyWordsworth2023](@citet), Eq. 1)
 
 ```math
 \frac{dF}{dT} = α (T_t - T)
@@ -54,14 +56,14 @@ The flux ``F`` is converted to temperature tendencies at layer ``k`` via
 
 The term in parentheses is the absorbed flux in layer ``k`` of the upward
 flux from below at interface ``k+1/2`` (``k`` increases downwards, see
-[Vertical coordinates and resolution](@ref) and [Sigma coordinates](@ref)).
+[Vertical coordinates and resolution](@ref) and [Sigma coordinates](@ref sigma_coordinates_physics)).
 ``\Delta p = p_{k+1/2} - p_{k-1/2}`` is the pressure thickness of layer ``k``,
 gravity ``g`` and heat capacity ``c_p``.
 
 ## OneBandLongwave
 
 Solves the standard two-stream approximation to calculate longwave radiative fluxes
-up ``U`` and down ``D`` following Frierson et al. 2006 [^FH06].
+up ``U`` and down ``D`` following [Frierson2006](@citet).
 
 ```math
 \frac{dU}{d\tau} = (U - B), \qquad \frac{dD}{d\tau} = (B - D)
@@ -99,7 +101,7 @@ model = PrimitiveWetModel(spectral_grid; longwave_radiation)
 model.longwave_radiation
 ```
 
-The transmissivity is defined as in Frierson et al. 2006 [^FH06]
+The transmissivity is defined as in [Frierson2006](@citet)
 using the following parameters
 
 ```@example radiation
@@ -121,7 +123,7 @@ as
 \tau = \tau_0 \left[ f_l \left( \frac{p}{p_s} \right) + (1 - f_l) \left( \frac{p}{p_s} \right)^4 \right]
 ```
 
-For details see Frierson et al. 2006 [^FH06].
+For details see [Frierson2006](@citet).
 
 ## [Solar zenith angle, length of day and year](@id zenith)
 
@@ -140,7 +142,7 @@ planet = Earth(spectral_grid, length_of_day=Hour(24), length_of_year=Day(365)+Ho
 the sun (controlling the seasonal cycle). Both are `Dates` periods, so
 `Hour(24)`, `Day(1)` or `Second(86400)` are equivalent, and both are completely
 independent of the model's time step and of the simulation time you pass to
-`run!`. A planet with a 10-day-long day and an Earth-length year is just
+[`run!`](@ref). A planet with a 10-day-long day and an Earth-length year is just
 
 ```@example radiation
 planet = Earth(spectral_grid, length_of_day=Day(10), length_of_year=Day(365))
@@ -232,7 +234,7 @@ subtypes(SpeedyWeather.AbstractShortwave)
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
 The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization,
-including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use
+including diagnostic cloud effects following [KucharskiMolteniBracco2006](@citep). For dry models without water vapor, use
 `OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent
 transmissivity ``t=1``.
 
@@ -256,7 +258,8 @@ are satisfied. The cloud cover (CLC) in a layer is then given by
 \mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \left(\frac{\mathrm{RH}_k - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right)\right]
 ```
 
-where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are large-scale and convective precipitation,
+where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are [large-scale](@ref "Large-scale precipitation")
+and [convective](@ref "Convective precipitation") precipitation,
 and $\mathrm{RH}_{cl}$ is a threshold.
 
 **Stratocumulus clouds:**
@@ -445,7 +448,7 @@ nothing # hide
 ## Greenhouse gases
 
 Greenhouse gas concentrations can be prescribed as time-varying scalar quantities and are
-tracked as prognostic variables. For example, an `ExponentialCO2`
+tracked as [prognostic variables](@ref "Prognostic variables"). For example, an `ExponentialCO2`
 concentration is fitted to the Keeling curve. To customise or add greenhouse gases, pass a
 `NamedTuple` of gas objects to `greenhouse_gases`. The key of the named tuple will be used for the variable name, so `co2 = ..., carbon_dioxide = ...` can co-exist.
 
@@ -475,15 +478,3 @@ custom trajectory.
     etc.) have not yet been updated to use them. Changing CO2 therefore has no effect
     on the radiative fluxes or temperature tendencies at this stage. This is work in
     progress.
-
-## References
-
-[^PG06]: Paulius and Garner, 2006. JAS. DOI:[10.1175/JAS3705.1](https://doi.org/10.1175/JAS3705.1)
-
-[^SW23]: Seeley, J. T. & Wordsworth, R. D. Moist Convection Is Most Vigorous at Intermediate Atmospheric Humidity. Planet. Sci. J. 4, 34 (2023). DOI:[10.3847/PSJ/acb0cb](https://doi.org/10.3847/PSJ/acb0cb)
-
-[^JZ22]: Jeevanjee, N. & Zhou, L. On the Resolution‐Dependence of Anvil Cloud Fraction and Precipitation Efficiency in Radiative‐Convective Equilibrium. J Adv Model Earth Syst 14, e2021MS002759 (2022). DOI:[10.1029/2021MS002759](https://doi.org/10.1029/2021MS002759)
-
-[^KMB06]: Kucharski, F., Molteni, F., & Bracco, A. SPEEDY: A simplified atmospheric general circulation model. ICTP, Trieste, Italy. Appendix A: Model Equations and Parameters (2006). [PDF](https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
-
-[^FH06]: Frierson DMW, IM Held, P Zurita-Gotor. A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale (2006). Journal of the Atmospheric Sciences 63:10. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1)
