@@ -2,7 +2,7 @@ using JLD2
 using Zarr
 
 @testset "GPU Barotropic (with MatrixSpectralTransform)" begin
-    spectral_grid = SpectralGrid(truncation = 33, nlayers = 1, architecture = SpeedyWeather.GPU())
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1, architecture = SpeedyWeather.GPU())
     spectral_transform = MatrixSpectralTransform(spectral_grid)
     model = BarotropicModel(spectral_grid; spectral_transform)
     simulation = initialize!(model)
@@ -13,7 +13,7 @@ end
 
 @testset "GPU Barotropic with JLD2Output" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_gpu_jld2_")
-    spectral_grid = SpectralGrid(truncation = 33, nlayers = 1, architecture = SpeedyWeather.GPU())
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1, architecture = SpeedyWeather.GPU())
     output = JLD2Output(path = tmp_output_path, id = "gpu-jld2", write_restart = false)
     model = BarotropicModel(spectral_grid; output)
     simulation = initialize!(model)
@@ -33,7 +33,7 @@ end
 
 @testset "GPU Barotropic with ArrayOutput" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_gpu_jld2_")
-    spectral_grid = SpectralGrid(truncation = 33, nlayers = 1, architecture = SpeedyWeather.GPU())
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1, architecture = SpeedyWeather.GPU())
     output = ArrayOutput()
     model = BarotropicModel(spectral_grid; output)
     simulation = initialize!(model)
@@ -57,7 +57,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_gpu_healpix_skip_")
 
     spectral_grid = SpectralGrid(
-        truncation = 33, nlayers = 1, Grid = HEALPixGrid,
+        truncation = 32, nlayers = 1, Grid = HEALPixGrid,
         architecture = SpeedyWeather.GPU(),
     )
     output = HEALPixOutput(
