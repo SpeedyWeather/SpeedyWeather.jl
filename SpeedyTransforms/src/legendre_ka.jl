@@ -81,7 +81,11 @@ function _legendre!(
     ) where {NF}
 
     (; nlat_half) = S.grid              # dimensions
-    (; legendre_polynomials_transposed) = S     # precomputed Legendre polynomials, (j, lm)
+    S.legendre isa RecomputedLegendre && throw(ArgumentError(
+        "recompute_legendre = true is not yet supported on GPU (the recomputed GPU kernels are " *
+            "step 3 of docs/dev/2026-09/recompute-legendre-polynomials.md); use recompute_legendre = false."
+    ))
+    legendre_polynomials_transposed = S.legendre.polynomials_transposed  # precomputed Legendre polynomials, (j, lm)
     (; jm_indices) = S                  # (j, m) loop indices precomputed for threads
     (; coslat⁻¹, lon_offsets) = S
     nlayers = size(specs, 2)            # get number of layers of specs for fewer layers than precomputed in S
@@ -167,7 +171,11 @@ function _legendre!(                        # GRID TO SPECTRAL
         scratch_memory::ColumnScratchMemory,    # scratch memory (not used here, but for CPU _legendre!)
         S::SpectralTransform{NF, <:Architectures.GPU},        # precomputed transform
     ) where {NF}
-    (; legendre_polynomials) = S            # precomputed Legendre polynomials
+    S.legendre isa RecomputedLegendre && throw(ArgumentError(
+        "recompute_legendre = true is not yet supported on GPU (the recomputed GPU kernels are " *
+            "step 3 of docs/dev/2026-09/recompute-legendre-polynomials.md); use recompute_legendre = false."
+    ))
+    legendre_polynomials = S.legendre.polynomials   # precomputed Legendre polynomials
     (; lm_indices, jm_indices) = S          # coefficient indices precomputed for threads
     (; solid_angles, lon_offsets) = S
 

@@ -17,7 +17,7 @@ struct SpectralTransform{
         VectorType,                 # <: ArrayType{NF, 1},
         ArrayTypeIntMatrix,         # <: ArrayType{Int32, 2}
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
-        LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}, ...},
+        LegendrePolynomialsType,    # <: AbstractLegendrePolynomials{NF}, precomputed or recomputed
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
         GradientType,               # <: Gradients struct
         RFFTSerialType,             # <: Vector{<:AbstractFFTs.Plan}  (K=1, 1-D forward plans)
@@ -65,15 +65,13 @@ struct SpectralTransform{
     rfft_plans_batched::RFFTBatchedType  # grid → spectral (forward), K>1 per-ring 2-D plans, keyed by K
     brfft_plans_batched::BRFFTBatchedType # spectral → grid (inverse), K>1 per-ring 2-D plans, keyed by K
 
-    # LEGENDRE POLYNOMIALS, for all latitudes, precomputed
-    legendre_polynomials::LowerTriangularArrayType
-    # ... and transposed to (latitude ring, harmonic), flattened so that it needs no type
-    # parameter of its own; index it as [(lm - 1) * nlat_half + j].
-    # The GPU transforms read the polynomials along opposite axes -- the inverse has
-    # neighbouring threads on neighbouring rings, the forward on neighbouring harmonics -- and no
-    # single layout is coalesced for both, so the GPU keeps this second copy.
-    # Empty on CPU, which only uses the layout above.
-    legendre_polynomials_transposed::VectorType
+    # LEGENDRE POLYNOMIALS, for all latitudes, either precomputed and stored (`PrecomputedLegendre`,
+    # today's default) or recomputed on the fly from the ScaledLegendre recursion
+    # (`RecomputedLegendre`, `recompute_legendre = true`), see legendre_polynomials.jl. Every
+    # reader downstream goes through `legendre_ring!` (CPU, legendre.jl) or reads the
+    # `PrecomputedLegendre` fields directly (GPU, legendre_ka.jl -- the GPU recomputed kernels are
+    # a later step).
+    legendre::LegendrePolynomialsType
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
@@ -128,7 +126,15 @@ $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct. With `NF` the number format,
 `Grid` the grid type `<:AbstractGrid` and spectral truncation `lmax, mmax` this function sets up
 necessary constants for the spetral transform. Also plans the Fourier transforms, retrieves the colatitudes,
-and preallocates the Legendre polynomials and quadrature weights."""
+and preallocates the Legendre polynomials and quadrature weights.
+
+`recompute_legendre = false` (the default) precomputes and stores the Legendre polynomials as
+today; `recompute_legendre = true` instead recomputes them on the fly from recursion coefficients
+and starting values that are `O(nonzeros(spectrum) + nlat_half * mmax)` rather than
+`O(nonzeros(spectrum) * nlat_half)`, trading memory for a recursion inside the transform (see
+`docs/dev/2026-09/recompute-legendre-polynomials.md`). On GPU the recomputed path currently only
+covers construction, not the transform kernels themselves (a later step) — using it there throws
+an `ArgumentError`."""
 function SpectralTransform(
         spectrum::AbstractSpectrum,                     # Spectral truncation
         grid::AbstractGrid;                             # grid used and resolution, e.g. FullGaussianGrid
@@ -137,6 +143,7 @@ function SpectralTransform(
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
         gpu_graphs::Bool = default_gpu_graphs(spectrum.architecture),               # use GPU-graphs accelerated Fourier path (CUDA, AMDGPU); backend-dependent default
+        recompute_legendre::Bool = false,                                          # recompute Legendre polynomials on the fly instead of precomputing/storing them
     )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
     # per-layer fallback used by `_fourier_serial!`).
@@ -177,19 +184,11 @@ function SpectralTransform(
     lon1s = [lons[rings[j].start] for j in 1:nlat_half]     # pick lons at first index for each ring
     lon_offsets = [cispi(m * lon1 / π) for m in 0:(mmax - 1), lon1 in lon1s]
 
-    # PRECOMPUTE LEGENDRE POLYNOMIALS
-    legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum, nlat_half)
-    legendre_polynomials_j = zeros(NF, lmax, mmax)          # temporary for one latitude
-    for j in 1:nlat_half                                    # only one hemisphere due to symmetry
-        Legendre.λlm!(legendre_polynomials_j, lmax - 1, mmax - 1, cos_colat[j])     # precompute l, m 0-based
-        legendre_polynomials[:, j] = LowerTriangularArray(legendre_polynomials_j)   # store
-    end
-
-    # TRANSPOSED COPY OF THE LEGENDRE POLYNOMIALS FOR THE GPU INVERSE TRANSFORM, see the struct
-    # field. Costs as much memory again as the polynomials themselves, so only built on GPU.
-    legendre_polynomials_transposed = architecture isa Architectures.GPU ?
-        vec(permutedims(legendre_polynomials.data)) :
-        on_architecture(architecture, zeros(NF, 0))
+    # LEGENDRE POLYNOMIALS, precomputed and stored or recomputed on the fly, see
+    # legendre_polynomials.jl. `false` (the default) reproduces today's behaviour bit-for-bit.
+    legendre = recompute_legendre ?
+        RecomputedLegendre(NF, spectrum, grid, cos_colat, architecture) :
+        PrecomputedLegendre(NF, spectrum, grid, cos_colat, architecture)
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # CPU always chunks unplanned K down to the largest planned batch, so scratch only needs
@@ -287,7 +286,7 @@ function SpectralTransform(
         array_type(architecture, NF, 1),
         array_type(architecture, Int32, 2),
         array_type(architecture, Complex{NF}, 2),
-        typeof(legendre_polynomials),
+        typeof(legendre),
         typeof(scratch_memory),
         typeof(gradients),
         typeof(rfft_plan_serial),
@@ -304,8 +303,7 @@ function SpectralTransform(
         norm_sphere,
         rfft_plan_serial, brfft_plan_serial,
         rfft_plans_batched, brfft_plans_batched,
-        legendre_polynomials,
-        legendre_polynomials_transposed,
+        legendre,
         scratch_memory,
         jm_index_size, jm_indices, lm_indices,
         solid_angles,

@@ -1,3 +1,32 @@
+"""$(TYPEDSIGNATURES)
+Return the Legendre polynomials for latitude ring `j`, as a vector indexed by the running `lm`
+index (all orders `m`, all degrees `l`, one ring). For `PrecomputedLegendre` this is a `view` into
+the precomputed table; for `RecomputedLegendre` it fills the struct's `ring` scratch vector by
+recomputing every column (looping over orders `m`) via `ScaledLegendre.legendre_column!` and
+returns it. Meant to be hoisted to the top of the `j` loop in the CPU `_legendre!` methods below,
+so the recursion for `RecomputedLegendre` is amortised over every order and every layer of one
+ring — one recursion pass per ring per transform, run in `Float64` when `NF == Float64` and in
+double-single arithmetic otherwise (see `ScaledLegendre`), so CPU and GPU agree."""
+legendre_ring!(legendre::PrecomputedLegendre, j::Integer) = view(legendre.polynomials.data, :, j)
+
+function legendre_ring!(legendre::RecomputedLegendre, j::Integer)
+    (; lmax, ring, x, αhi, αlo, βhi, βlo, sectoral_hi, sectoral_lo, sectoral_scale) = legendre
+    mmax = size(sectoral_hi, 2)
+    lm_offset = 0
+    @inbounds for m in 1:mmax
+        ncolumn = lmax - m + 1
+        out = view(ring, (lm_offset + 1):(lm_offset + ncolumn))
+        ScaledLegendre.legendre_column!(
+            out, x[j],
+            αhi, αlo, βhi, βlo,
+            lm_offset, ncolumn,
+            sectoral_hi[j, m], sectoral_lo[j, m], sectoral_scale[j, m],
+        )
+        lm_offset += ncolumn
+    end
+    return ring
+end
+
 # (inverse) legendre transform kernel, called from _legendre!
 @inline function _fused_oddeven_matvec!(
         north::AbstractVector,      # output, accumulator vector, northern latitudes
@@ -45,7 +74,7 @@ function _legendre!(
     )
     (; nlat_half) = S.grid                  # dimensions
     (; lmax, mmax) = S.spectrum            # 1-based max degree l, order m of spherical harmonics
-    (; legendre_polynomials) = S            # precomputed Legendre polynomials
+    legendre = S.legendre                   # precomputed or recomputed Legendre polynomials
     (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 1-based
     (; coslat⁻¹, lon_offsets) = S
     nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
@@ -69,6 +98,8 @@ function _legendre!(
         g_north[:, nlayers, j] .= 0       # reset scratch memory
         g_south[:, nlayers, j] .= 0       # reset scratch memory
 
+        legendre_j = legendre_ring!(legendre, j)  # precomputed view or recomputed ring, amortised over m, k
+
         # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
         lm = 1                              # single running index for non-zero l, m indices
         for m in 1:(mmax_truncation[j] + 1)   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
@@ -76,7 +107,7 @@ function _legendre!(
 
             # view on lower triangular column, but batched in vertical
             spec_view = view(specs.data, lm:lm_end, :)
-            legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
+            legendre_view = view(legendre_j, lm:lm_end)
 
             # dot product but split into even and odd harmonics on the fly for better performance
             # function is 1-based (odd, even, odd, ...) but here use 0-based indexing to name
@@ -139,7 +170,7 @@ function _legendre!(                        # GRID TO SPECTRAL
     (; nlat) = S                            # dimensions
     (; nlat_half) = S.grid
     (; lmax, mmax) = S.spectrum             # 1-based max degree l, order m of spherical harmonics
-    (; legendre_polynomials) = S            # precomputed Legendre polynomials
+    legendre = S.legendre                   # precomputed or recomputed Legendre polynomials
     (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 1-based
     (; solid_angles, lon_offsets) = S
     nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
@@ -168,6 +199,8 @@ function _legendre!(                        # GRID TO SPECTRAL
         # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
         ΔΩ = solid_angles[j]                # = sinθ Δθ Δϕ, solid angle for a grid point
 
+        legendre_j = legendre_ring!(legendre, j)  # precomputed view or recomputed ring, amortised over m, k
+
         lm = 1                              # single running index for spherical harmonics
         for m in 1:(mmax_truncation[j] + 1)   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
 
@@ -185,7 +218,7 @@ function _legendre!(                        # GRID TO SPECTRAL
             # integration over l = m:lmax+1
             lm_end = lm + lmax - m + 1                      # last index in column m
             spec_view = view(specs.data, lm:lm_end, :)
-            legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
+            legendre_view = view(legendre_j, lm:lm_end)
 
             _fused_oddeven_outer_product_accumulate!(spec_view, legendre_view, even, odd)
 
