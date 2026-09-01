@@ -375,13 +375,6 @@ get_lm_range(m, lmax) = lm2i(2 * m - 1, m, lmax):lm2i(lmax + m, m, lmax)
 
 """
 $(TYPEDSIGNATURES)
-range of the doubled running indices 2lm in a l-column (degrees of spherical harmonics)
-given the column index m (order of harmonics)
-"""
-get_2lm_range(m, lmax) = (2 * lm2i(2 * m - 1, m, lmax) - 1):(2 * lm2i(lmax + m, m, lmax))
-
-"""
-$(TYPEDSIGNATURES)
 Converts the linear index `i` in the lower triangle into a pair `(l, m)` of indices
 of the matrix in column-major form. (Formula taken from
 Angeletti et al, 2019, https://hal.science/hal-02047514/document)
