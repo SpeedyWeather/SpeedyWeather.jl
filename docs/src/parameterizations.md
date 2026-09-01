@@ -66,7 +66,7 @@ front of functions and types. The flux variable is defined as a two-dimensional
 variable on our grid, and the prognostic variable is defined as a spectral variable.
 Three-dimensional variables are also possible by using `GridXYZ` and `SpectralXYZ` as `dims`
 (the 2nd argument) for a vertical dimension with the number of layers of the model, or
-`GridXYT(n)`/`SpectralXYT(n)` for a time/step dimension (of lenth `n = 1` by default).
+`GridXYT(n)`/`SpectralXYT(n)` for a [time/step dimension](@ref "Step dimension") (of lenth `n = 1` by default).
 `Grid3D(n)` and `Spectral3D(n)` exist for a
 third dimension of length `n` (default 1) of unspecified meaning.
 

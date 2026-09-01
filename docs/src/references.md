@@ -1,0 +1,4 @@
+# [References](@id references)
+
+```@bibliography
+```
