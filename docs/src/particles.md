@@ -2,7 +2,7 @@
 
 All SpeedyWeather.jl models support particle advection. Particles are objects without mass or volume
 at a location ``\mathbf{x} = (\lambda, \theta, \sigma)`` (longitude ``\lambda``, latitude ``\theta``,
-vertical sigma coordinate ``\sigma``, see [Sigma coordinates](@ref)) that are moved with the wind
+vertical sigma coordinate ``\sigma``, see [Sigma coordinates](@ref sigma_coordinates_physics)) that are moved with the wind
 ``\mathbf{u}(\mathbf{x})`` at that location. The location of the ``p``-th particle changes as follows
 
 ```math
@@ -16,7 +16,8 @@ the vertical velocity in ``\sigma`` coordinates. Both are supported, selected vi
 [3D particle advection](@ref) below. With `ParticleAdvection2D` in the
 [Primitive equation model](@ref primitive_equation_model) the vertical layer on which the advection
 takes place has to be specified. Particles are therefore not advected with the vertical velocity
-but maintain a constant pressure ratio compared to the surface pressure (``\sigma`` is constant).
+but maintain a constant pressure ratio compared to the surface pressure (``\sigma`` is constant). 
+(See also [Tracer advection](@ref) for advecting continuous fields instead of individual particles.)
 
 ## Discretization of particle advection
 
