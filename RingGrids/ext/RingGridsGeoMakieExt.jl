@@ -82,10 +82,10 @@ function RingGrids.globe!(
         axis_kwargs = (;),
     )
     if interactive
-        transf = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
+        transform = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
         ax = LScene(pos; show_axis = false, axis_kwargs...)
     else
-        transf = nothing
+        transform = nothing
         ax = GeoAxis(
             pos;
             title,
@@ -95,7 +95,7 @@ function RingGrids.globe!(
     end
 
     plotdata = _plot_globe_grid!(
-        ax, Grid, nlat_half; interactive, color, faces, centers, coastlines, background, transf
+        ax, Grid, nlat_half; interactive, color, faces, centers, coastlines, background, transform
     )
 
     # Makie setup
@@ -126,10 +126,10 @@ function RingGrids.globe!(
         axis_kwargs = (;),
     )
     if interactive
-        transf = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
+        transform = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
         ax = LScene(pos; show_axis = false, axis_kwargs...)
     else
-        transf = nothing
+        transform = nothing
         ax = GeoAxis(
             pos;
             title,
@@ -138,7 +138,7 @@ function RingGrids.globe!(
         )
     end
 
-    p = _plot_globe_field!(ax, field; interactive, colormap, coastlines, transf)
+    p = _plot_globe_field!(ax, field; interactive, colormap, coastlines, transform)
 
     # Makie setup
     if interactive
@@ -170,13 +170,13 @@ function RingGrids.globe!(
         background::Bool = true,
     )
     if interactive
-        transf = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
+        transform = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
     else
-        transf = nothing
+        transform = nothing
     end
 
     plotdata = _plot_globe_grid!(
-        ax, Grid, nlat_half; interactive, color, faces, centers, coastlines, background, transf
+        ax, Grid, nlat_half; interactive, color, faces, centers, coastlines, background, transform
     )
 
     return plotdata
@@ -195,12 +195,12 @@ function RingGrids.globe!(
         coastlines::Bool = true,
     )
     if interactive
-        transf = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
+        transform = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
     else
-        transf = nothing
+        transform = nothing
     end
 
-    p = _plot_globe_field!(ax, field; interactive, colormap, coastlines, transf)
+    p = _plot_globe_field!(ax, field; interactive, colormap, coastlines, transform)
 
     return p
 end
@@ -225,14 +225,14 @@ function _plot_globe_grid!(
         centers::Bool,
         coastlines::Bool,
         background::Bool,
-        transf,
+        transform,
     )
     plotdata = NamedTuple()
 
     # background image
     if background
         bg = meshimage!(ax, -180 .. 180, -90 .. 90, rotr90(GeoMakie.earth()); npoints = 100, z_level = -10_000)
-        interactive && (bg.transformation.transform_func[] = transf)
+        interactive && (bg.transformation.transform_func[] = transform)
         plotdata = merge(plotdata, (; background = bg))
     end
 
@@ -240,7 +240,7 @@ function _plot_globe_grid!(
     if centers
         londs, latds = RingGrids.get_londlatds(Grid, nlat_half)
         c = scatter!(ax, londs, latds, markersize = 5; color)
-        interactive && (c.transformation.transform_func[] = transf)
+        interactive && (c.transformation.transform_func[] = transform)
         plotdata = merge(plotdata, (; centers = c))
     end
 
@@ -249,14 +249,14 @@ function _plot_globe_grid!(
         # add nan after every face to avoid lines linking grid cells
         grid_faces = RingGrids.get_gridcell_polygons(Grid, nlat_half, add_nan = true)
         f = lines!(ax, vec(grid_faces); color)
-        interactive && (f.transformation.transform_func[] = transf)
+        interactive && (f.transformation.transform_func[] = transform)
         plotdata = merge(plotdata, (; faces = f))
     end
 
     # coastlines
     if coastlines
         cl = lines!(GeoMakie.coastlines(50); color, linewidth = 1)
-        interactive && (cl.transformation.transform_func[] = transf)
+        interactive && (cl.transformation.transform_func[] = transform)
         plotdata = merge(plotdata, (; coastlines = cl))
     end
 
@@ -274,16 +274,16 @@ function _plot_globe_field!(
         interactive::Bool,
         colormap,
         coastlines::Bool,
-        transf,
+        transform,
     )
     faces = RingGrids.get_gridcell_polygons(field.grid)
     polygons = [Polygon(Point.(faces[:, ij])) for ij in axes(faces, 2)]
     ply = poly!(ax, polygons, color = field.data; colormap)
-    interactive && (ply.transformation.transform_func[] = transf)
+    interactive && (ply.transformation.transform_func[] = transform)
 
     if coastlines
         c = lines!(GeoMakie.coastlines(50); color = :white, linewidth = 1, alpha = 0.7)
-        interactive && (c.transformation.transform_func[] = transf)
+        interactive && (c.transformation.transform_func[] = transform)
     end
 
     return ply
