@@ -27,8 +27,12 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.12'          
+          # >= 1.11 needed for the [sources] entry in the test Project.toml
+          - '1.12'
         os:
+          # Metal requires Apple silicon. GitHub-hosted macOS runners are VMs that only
+          # expose a paravirtualized GPU; Metal.jl supports those from macOS 15 and
+          # Metal.jl v1.10 onwards, so do not pin this back to macos-14.
           - macos-latest
         arch:
           - aarch64
@@ -41,10 +45,6 @@ jobs:
           arch: ${{ matrix.arch }}
 
       - uses: julia-actions/cache@v3
-
-      # SpeedyWeather is resolved via the [sources] path entry in
-      # SpeedyWeather/test/GPU/MetalGPU/Project.toml, which transitively pulls in
-      # its monorepo siblings, so no Pkg.develop is needed here
       - name: Instantiate Metal test environment
         shell: julia --color=yes --project=SpeedyWeather/test/GPU/MetalGPU {0}
         run: |
