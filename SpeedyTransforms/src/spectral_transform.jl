@@ -58,7 +58,8 @@ struct SpectralTransform{
     # types and cannot share one container). FFTW/cuFFT plans bake K into the plan at construction.
     # The serial plans are the per-layer fallback (used by `_fourier_serial!`), always present. Hot K
     # values (batched dycore transforms, prognostic spec→grid, U/V) are pre-planned in the batched
-    # Dicts, keyed by K; everything else falls back to the serial plans in a loop.
+    # Dicts, keyed by K; everything else falls back to the serial plans in a loop (CPU) or is planned
+    # on first use and cached in these Dicts (GPU, see `ensure_batched_plans!`).
     rfft_plan_serial::RFFTSerialType     # grid → spectral (forward), K=1 per-ring 1-D plans
     brfft_plan_serial::BRFFTSerialType   # spectral → grid (inverse), K=1 per-ring 1-D plans
     rfft_plans_batched::RFFTBatchedType  # grid → spectral (forward), K>1 per-ring 2-D plans, keyed by K

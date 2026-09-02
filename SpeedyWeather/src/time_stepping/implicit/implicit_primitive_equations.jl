@@ -10,6 +10,7 @@ $(TYPEDFIELDS)"""
         MatrixType,
         TensorType,
         IntType,
+        NLAYERS,        # nlayers as a type parameter, see `nlayers_val` below
     } <: AbstractImplicit
 
     # DIMENSIONS
@@ -18,6 +19,9 @@ $(TYPEDFIELDS)"""
 
     "[DERIVED] Number of vertical layers"
     nlayers::IntType
+
+    "[DERIVED] `nlayers` as a `Val` so that the vertical loops are more type stable"
+    nlayers_val::Val{NLAYERS} = Val(nlayers)
 
     # PARAMETERS
     "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
@@ -68,7 +72,7 @@ end
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, TensorType, truncation, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(truncation)}(;
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(truncation), nlayers}(;
         truncation, nlayers, kwargs...
     )
 end
@@ -245,33 +249,39 @@ function implicit_correction!(
     # escape immediately if explicit
     implicit.centering == 0 && return nothing
 
-    (; S⁻¹, R, U, L, W, nlayers) = implicit
+    (; S⁻¹, R, U, L, W, nlayers_val) = implicit
 
     # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
     # dynamical core uses scaled time step, scale on the fly
     Δt = time_step(time_stepping, vars.prognostic.clock)
     ξ = implicit.centering * Δt / vars.prognostic.scale[]
 
-    temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, implicit)
-    pres_tend = get_tendency_step(vars.tendencies.pressure, time_stepping, implicit)
-    div_tend = get_tendency_step(vars.tendencies.divergence, time_stepping, implicit)
-    div_old = get_step(vars.prognostic.divergence, 1)  # no tuple (get_steps) here: a tuple of step
-    div_new = get_step(vars.prognostic.divergence, 2)  # views breaks Enzyme on Julia >= 1.11
-    G = vars.scratch.a                  # reuse work arrays, used for combined tendency G
-    geopotential = vars.scratch.b       # used for geopotential
-    geopotential .= 0
+    # NOTE: the FULL arrays are handed to the kernel together with their step
+    # indices, and the step dimension is indexed inside the kernel. Taking
+    # `get_step`/`get_tendency_step` views here instead makes Enzyme's type
+    # analysis give up on Julia 1.12 (`EnzymeNoTypeError` in `lta_view`), because
+    # these variables are themselves already views into a fused parent, so the
+    # step accessor would build a view of a view.
+    temperature_tendency = vars.tendencies.temperature
+    pressure_tendency = vars.tendencies.pressure
+    divergence_tendency = vars.tendencies.divergence
+    divergence = vars.prognostic.divergence
+
+    temp_step = which_tendency_step(temperature_tendency, time_stepping, implicit)
+    pres_step = which_tendency_step(pressure_tendency, time_stepping, implicit)
+    div_step = which_tendency_step(divergence_tendency, time_stepping, implicit)
 
     # Get precomputed l_indices from the spectrum
-    l_indices = temp_tend.spectrum.l_indices
+    l_indices = temperature_tendency.spectrum.l_indices
 
-    arch = architecture(temp_tend)
+    arch = architecture(temperature_tendency)
 
-    # Single kernel: All implicit correction steps for each spectral mode
     launch!(
-        arch, LinearWorkOrder, (size(pres_tend, 1),),
+        arch, LinearWorkOrder, (size(pressure_tendency, 1),),
         implicit_primitive_leapfrog_kernel!,
-        temp_tend, pres_tend, div_tend, G, geopotential,
-        div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers
+        temperature_tendency, pressure_tendency, divergence_tendency,
+        divergence, temp_step, pres_step, div_step,
+        S⁻¹, R, U, L, W, l_indices, ξ, nlayers_val
     )
 
     return nothing
@@ -279,10 +289,11 @@ end
 
 # Single kernel that does all steps for one spectral mode
 @kernel inbounds = true function implicit_primitive_leapfrog_kernel!(
-        temp_tend, pres_tend, div_tend, G, geopotential,
-        div_old, div_new, S⁻¹, R, U, L, W, l_indices,
-        ξ, nlayers
-    )
+        temp_tend, pres_tend, div_tend,
+        divergence, temp_step, pres_step, div_step,
+        S⁻¹, R, U, L, W, l_indices,
+        ξ, ::Val{nlayers}
+    ) where {nlayers}
     lm = @index(Global, Linear)
 
     # Get degree l for this spectral mode
@@ -293,43 +304,43 @@ end
     for k in 1:nlayers
         temp_tend_val = zero(eltype(temp_tend))
         for r in 1:nlayers
-            temp_tend_val += L[k, r] * (div_old[lm, r] - div_new[lm, r])
+            temp_tend_val += L[k, r] * (divergence[lm, r, 1] - divergence[lm, r, 2])
         end
-        temp_tend[lm, k] += temp_tend_val
-    end
-
-    for k in 1:nlayers
-        # skip 1:k-1 as integration is surface to k
-        geopotential_val = zero(eltype(geopotential))
-        # while loop instead of `for r in k:nlayers`: the triangular range with both
-        # endpoints dynamic miscompiles on AMDGPU/CDNA (gfx90a/gfx942), see
-        # https://github.com/JuliaGPU/AMDGPU.jl/issues/1015
-        r = k
-        while r <= nlayers
-            geopotential_val += R[k, r] * temp_tend[lm, r]
-            r += 1
-        end
-        geopotential[lm, k] = geopotential_val
+        temp_tend[lm, k, temp_step] += temp_tend_val
     end
 
     eigenvalue = -l * (l - 1)  # 1-based, -l*(l+1) → -l*(l-1)
 
     # Step 2: Calculate the ξ*R*G_T term, vertical integration of geopotential
-    # (excl ξ, this is done in step 3)
+    # (excl ξ, this is done in step 3). Held in an `ntuple` (registers) rather than a
+    # scratch array, see the note at the launch site.
+    geopotential = ntuple(Val(nlayers)) do k
+        # skip 1:k-1 as integration is surface to k
+        geopotential_val = zero(eltype(temp_tend))
+        # while loop instead of `for r in k:nlayers`: the triangular range with both
+        # endpoints dynamic miscompiles on AMDGPU/CDNA (gfx90a/gfx942), see
+        # https://github.com/JuliaGPU/AMDGPU.jl/issues/1015
+        r = k
+        while r <= nlayers
+            geopotential_val += R[k, r] * temp_tend[lm, r, temp_step]
+            r += 1
+        end
+        geopotential_val
+    end
 
     # Step 3: Calculate the G = G_D + ξRG_T + ξUG_lnps terms
     # ∇² not part of U so *eigenvalues here
-    for k in 1:nlayers
-        G[lm, k] = div_tend[lm, k] + ξ * eigenvalue * (U[k] * pres_tend[lm] + geopotential[lm, k])
+    G = ntuple(Val(nlayers)) do k
+        div_tend[lm, k, div_step] + ξ * eigenvalue * (U[k] * pres_tend[lm, pres_step] + geopotential[k])
     end
 
     # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
     for k in 1:nlayers
         div_val = zero(eltype(div_tend))
         for r in 1:nlayers
-            div_val += S⁻¹[l, k, r] * G[lm, r]
+            div_val += S⁻¹[l, k, r] * G[r]
         end
-        div_tend[lm, k] = div_val
+        div_tend[lm, k, div_step] = div_val
     end
 
     # Step 5: Semi implicit corrections for temperature and pressure
@@ -338,15 +349,15 @@ end
     for k in 1:nlayers
         temp_correction = zero(eltype(temp_tend))
         for r in 1:nlayers
-            temp_correction += ξ * L[k, r] * div_tend[lm, r]
+            temp_correction += ξ * L[k, r] * div_tend[lm, r, div_step]
         end
-        temp_tend[lm, k] += temp_correction
+        temp_tend[lm, k, temp_step] += temp_correction
     end
 
     # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
     pres_correction = zero(eltype(pres_tend))
     for k in 1:nlayers
-        pres_correction += ξ * W[k] * div_tend[lm, k]
+        pres_correction += ξ * W[k] * div_tend[lm, k, div_step]
     end
-    pres_tend[lm] += pres_correction
+    pres_tend[lm, pres_step] += pres_correction
 end
