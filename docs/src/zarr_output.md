@@ -222,7 +222,7 @@ nside = ds.attrs["healpix_nside"]
 
 hp.mollview(ds["temp"].isel(time=-1, layer=7).values, nest=False,
             flip="geo", rot=(180, 0, 0),
-            unit=ds["temp"].attrs["units"], min=-50.4, max=22.4)
+            unit=ds["temp"].attrs["units"])
 # surface layer = 7 (0-indexed), rotation and flip so that it aligns with Julia CairoMakie 
 hp.graticule()                        # optional lat/lon grid
 plt.savefig("hpy-mollview.png", dpi=150, bbox_inches="tight")
