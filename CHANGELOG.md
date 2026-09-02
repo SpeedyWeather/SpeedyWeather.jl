@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- GitHub Actions Checkout v7 [#1242](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1242)
 - Add a central, BibTeX-backed documentation bibliography with DocumenterCitations [#478](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/478)
 - Move time-stepping mathematics from the Usage docs to a new Numerics page, and document previously-undocumented `NCycleLorenz` details [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
 - Add cross-reference links throughout the docs, and fix several pre-existing ambiguous/broken `@ref` targets found along the way [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
