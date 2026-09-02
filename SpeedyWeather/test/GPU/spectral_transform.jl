@@ -687,3 +687,110 @@ end
     @test SpeedyTransforms.ensure_batched_plans!(S, S.nlayers + 1) == false
     @test !haskey(S.rfft_plans_batched, S.nlayers + 1)
 end
+
+using LinearAlgebra: norm
+using Random: seed!
+
+@testset "HEALPix quadrature weights on GPU" begin
+    # The forward Legendre kernel reads one `Complex{NF}` element `solid_angles_rotated[m, j]`
+    # where it previously read a real `solid_angles[j]` times `conj(lon_offsets[m, j])`. The
+    # weights themselves are fitted on the host and only then moved to the device, so both halves
+    # need checking: that the transfer is lossless, and that the kernel reading them agrees with
+    # the CPU loop.
+    HEALPix_grids = (HEALPixGrid, OctaHEALPixGrid)
+    quadratures = (
+        SpeedyTransforms.EqualAreaQuadrature,
+        SpeedyTransforms.RingQuadrature,
+        SpeedyTransforms.PerOrderQuadrature,
+        SpeedyTransforms.ContractiveQuadrature,
+    )
+    cpu_arch, gpu_arch = SpeedyWeather.CPU(), SpeedyWeather.GPU()
+    truncation = 32
+
+    # a CPU/GPU pair of transforms on the same grid, at the grid's default dealiasing
+    function transform_pair(Grid, NF, Quadrature)
+        nlat_half = SpeedyTransforms.get_nlat_half(truncation, SpeedyTransforms.default_dealiasing(Grid))
+        S_cpu = SpectralTransform(
+            Spectrum(truncation, architecture = cpu_arch), Grid(nlat_half, cpu_arch);
+            NF, nlayers = 2, Quadrature
+        )
+        S_gpu = SpectralTransform(
+            Spectrum(truncation, architecture = gpu_arch), Grid(nlat_half, gpu_arch);
+            NF, nlayers = 2, Quadrature
+        )
+        return S_cpu, S_gpu
+    end
+
+    # a random band-limited field; m = 0 coefficients are real for a real-valued grid field
+    function random_coefficients(S, NF)
+        a = randn(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
+        m0 = LowerTriangularArrays.get_lm_range(1, S.spectrum.lmax - 1)
+        a[m0] = complex.(real.(a[m0]))
+        return a
+    end
+
+    @testset "weights survive the host to device transfer" begin
+        @testset for Grid in HEALPix_grids
+            @testset for NF in (Float32, Float64)
+                @testset for Quadrature in quadratures
+                    S_cpu, S_gpu = transform_pair(Grid, NF, Quadrature)
+                    # bit-identical, not just ≈: the weights are computed in Float64 and rounded
+                    # to NF on the host, the device only ever sees the rounded numbers
+                    @test S_cpu.solid_angles_rotated == Array(S_gpu.solid_angles_rotated)
+                    @test eltype(S_gpu.solid_angles_rotated) == Complex{NF}
+                    # the rings each order is summed over must match too, or the comparison
+                    # below would be between two different quadratures
+                    @test S_cpu.mmax_truncation == S_gpu.mmax_truncation
+                    @test S_cpu.Quadrature == S_gpu.Quadrature == Quadrature
+                end
+            end
+        end
+    end
+
+    @testset "forward transform agrees with CPU" begin
+        @testset for Grid in HEALPix_grids
+            @testset for NF in (Float32, Float64)
+                @testset for Quadrature in quadratures
+                    S_cpu, S_gpu = transform_pair(Grid, NF, Quadrature)
+                    seed!(7)
+                    a = random_coefficients(S_cpu, NF)
+
+                    # synthesis is untouched by the quadrature, so start both from the same
+                    # grid field and compare only the analysis (grid to spectral) direction
+                    field_cpu = transform(a, S_cpu)
+                    field_gpu = on_architecture(gpu_arch, field_cpu)
+                    back_cpu = transform(field_cpu, S_cpu)
+                    back_gpu = on_architecture(cpu_arch, transform(field_gpu, S_gpu))
+                    @test norm(back_gpu - back_cpu) / norm(back_cpu) < 20eps(NF)
+                end
+            end
+        end
+    end
+
+    @testset "round trip is exact on GPU with per-order weights" begin
+        # the accuracy claim of `PerOrderQuadrature`, asserted on the device: spectral to grid and
+        # back is the identity to roundoff, and the round trip neither gains nor loses energy
+        @testset for Grid in HEALPix_grids
+            @testset for NF in (Float32, Float64)
+                S_cpu, S_gpu = transform_pair(Grid, NF, SpeedyTransforms.PerOrderQuadrature)
+                seed!(7)
+                a = random_coefficients(S_cpu, NF)
+                a_gpu = on_architecture(gpu_arch, a)
+                a2 = on_architecture(cpu_arch, transform(transform(a_gpu, S_gpu), S_gpu))
+                @test norm(a2 - a) / norm(a) < 20eps(NF)
+                @test norm(a2) / norm(a) ≈ 1 atol = 20eps(NF)
+            end
+        end
+
+        # and the contrast: with the equal-area weights the same round trip is off by ~5·10⁻³,
+        # so the test above is measuring the quadrature and not a tolerance that passes anyway
+        @testset for Grid in HEALPix_grids
+            S_cpu, S_gpu = transform_pair(Grid, Float64, SpeedyTransforms.EqualAreaQuadrature)
+            seed!(7)
+            a = random_coefficients(S_cpu, Float64)
+            a_gpu = on_architecture(gpu_arch, a)
+            a2 = on_architecture(cpu_arch, transform(transform(a_gpu, S_gpu), S_gpu))
+            @test norm(a2 - a) / norm(a) > 1.0e-3
+        end
+    end
+end
