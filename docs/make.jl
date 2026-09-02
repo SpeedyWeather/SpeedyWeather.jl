@@ -1,9 +1,12 @@
 using Documenter
+using DocumenterCitations
 using DocumenterVitepress
 using SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms, SpeedyWeather
 
 # Auto-generate the Benchmarks page from the JSON results before makedocs runs.
 include(joinpath(@__DIR__, "generate_benchmarks_page.jl"))
+
+bib = CitationBibliography(joinpath(@__DIR__, "src", "references.bib"); style = :authoryear)
 
 makedocs(
     format = DocumenterVitepress.MarkdownVitepress(
@@ -16,8 +19,8 @@ makedocs(
     authors = "M Klöwer and SpeedyWeather contributors",
     modules = [SpeedyWeather, SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms],
     checkdocs = :exports,
+    plugins = [bib],
     pages = [
-        "Home" => "index.md",
         "Usage" => [
             "Installation" => "installation.md",
             "How to run SpeedyWeather" => "how_to_run_speedy.md",
@@ -35,6 +38,7 @@ makedocs(
             "Variables" => "variables.md",
             "Models" => "models.md",
             "NetCDF output" => "output.md",
+            "Zarr output" => "zarr_output.md",
             "Other output" => "other_output.md",
             "Visualization" => "visualization.md",
             "Differentiability and Adjoint Model" => "differentiability.md",
@@ -71,8 +75,10 @@ makedocs(
             "Spherical Harmonic Transform" => "spectral_transform.md",
             "SpeedyTransforms" => "speedytransforms.md",
             "Gradient operators" => "gradients.md",
+            "Time stepping" => "time_stepping.md",
         ],
         "API" => "api.md",
+        "References" => "references.md",
         "Benchmarks" => "benchmarks.md",
     ]
 )

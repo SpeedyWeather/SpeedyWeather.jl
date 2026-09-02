@@ -3,7 +3,8 @@
 SpeedyWeather implements a dynamical variables system. This means there is no central list
 of all variables being allocated by every model and every model component can declare
 a set of variables as being required which will then be allocated when the
-model is initialized.
+model is initialized. (For the top-level container these variables end up in, see
+[The `Variables` struct](@ref).)
 
 In most cases you are advised to use and reuse as much as possible the variables
 required, including scratch arrays you can always write to (but don't read from them
@@ -93,7 +94,8 @@ tendency to the prognostic variables for some time steppers but not for others.
 
 ## Time stepped variables
 
-The prognostic variables _can but do not have to_ be subject to time stepping as defined in `model.time_stepping`.
+The prognostic variables _can but do not have to_ be subject to time stepping as defined in `model.time_stepping`
+(for the mechanics of the time stepper itself see [Time steppers and variable steps](@ref steps)).
 In the examples above, one likely want temperature to be time stepped but the random pattern
 should not in the same way as the time stepping is different (discrete vs continuous).
 So a random pattern is prognostic but the random processes should determine its temporal evolution,
@@ -136,7 +138,8 @@ end
 ## Variable dimensions
 
 Variable dimensions are being used to declare the type
-(and explicitly or implicitly also the size and element type) of a variable required.
+(and explicitly or implicitly also the size and element type) of a variable required
+(see also [Array dimensions](@ref array_dimensions) for how these dimensions are laid out).
 For example, `Grid2D` is a variable dimension declaring it to be of the grid as in
 `spectral_grid` but only 2D with no additional e.g. vertical dimension.
 

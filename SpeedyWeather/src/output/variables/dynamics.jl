@@ -192,7 +192,7 @@ function output!(
     # interpolate 2D/3D variables
     mslp_output = output.field2D
     mslp_grid = on_architecture(CPU(), mslp)
-    RingGrids.interpolate!(mslp_output, mslp_grid, output.interpolator)
+    interpolate_output!(output, mslp_output, mslp_grid)
 
     if hasproperty(variable, :keepbits)                 # round mantissabits for compression
         round!(mslp_output, variable.keepbits)
