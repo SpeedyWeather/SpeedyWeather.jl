@@ -22,6 +22,7 @@
 # Writes <output>/<tag>.jld2 with the diagnostics time series and the run's outcome.
 
 using CUDA
+using Random
 using SpeedyWeather
 using SpeedyWeather.SpeedyTransforms
 using JLD2
@@ -70,6 +71,12 @@ netcdf = argument("netcdf", "false") == "true"
 # every Nth record, keep the surface vorticity coefficients so two runs on the same spectrum
 # (B vs D, say) can be differenced directly; 0 disables
 snapshot_every = argument("snapshot_every", 0)
+# > 0 seeds a tiny perturbation of the initial vorticity, so the same case can be run as an
+# ensemble. Single failure times are not comparable across cases — the configurations differ by far
+# more than roundoff, so their trajectories decorrelate within weeks and a blow-up time is one draw
+# from a distribution. Replicates are what make an ordering meaningful.
+seed = argument("seed", 0)
+perturbation = argument("perturbation", 1.0e-6)
 
 haskey(CASES, case) || error("unknown case $case, expected one of $(sort(collect(keys(CASES))))")
 (; dealiasing, Quadrature) = CASES[case]
@@ -78,6 +85,7 @@ period = days > 0 ? Day(days) : Year(years)
 tag = days > 0 ?
     @sprintf("%s_%s_T%d_diff%dh_%dd", case, string(nameof(Grid)), truncation, diffusion_hours, days) :
     @sprintf("%s_%s_T%d_diff%dh_%dy", case, string(nameof(Grid)), truncation, diffusion_hours, years)
+seed > 0 && (tag *= @sprintf("_seed%d", seed))
 mkpath(output_directory)
 
 # ---------------------------------------------------------------------------------------------
@@ -117,6 +125,17 @@ flush(stdout)
 
 simulation = initialize!(model)
 
+if seed > 0
+    # relative perturbation of the initial vorticity, one ensemble member per seed
+    vorticity = simulation.variables.prognostic.vorticity
+    host = on_architecture(SpeedyWeather.CPU(), vorticity)
+    Random.seed!(seed)
+    scale = maximum(abs, host.data)
+    host.data .+= (perturbation * scale) .* randn(eltype(host.data), size(host.data))
+    copyto!(vorticity.data, on_architecture(architecture, host).data)
+    println("perturbed initial vorticity, seed $seed, relative amplitude $perturbation")
+end
+
 # ---------------------------------------------------------------------------------------------
 # run
 
@@ -136,6 +155,7 @@ jldsave(
     joinpath(output_directory, tag * ".jld2");
     case, grid = string(nameof(Grid)), truncation, nlayers, dealiasing,
     quadrature = string(nameof(Quadrature)), diffusion_hours, period = string(period),
+    seed, perturbation,
     nlat_half = spectral_grid.grid.nlat_half, NF = string(spectral_grid.NF),
     timestep_seconds = Dates.value(Second(clock.Δt)),
     finished, diverged_at, elapsed, records...,

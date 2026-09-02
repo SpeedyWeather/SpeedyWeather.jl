@@ -8,6 +8,14 @@
 # and the Step 2 diffusion sweep:
 #   ./healpix_quadrature/submit_matrix.sh HEALPixGrid 128 10 1 4 24 96
 #
+# Two environment variables narrow or widen the matrix:
+#   CASES="B D"    which cases to run (default: all five)
+#   SEEDS="1 2 3"  extra ensemble members per case, each a tiny perturbation of the initial
+#                  vorticity (default: none, i.e. the unperturbed member only). A single blow-up
+#                  time is one draw from a distribution — the cases differ by far more than
+#                  roundoff, so their trajectories decorrelate within weeks — and replicates are
+#                  what make an ordering of failure times mean anything.
+#
 # Cases A…E are described in run_case.jl.
 
 set -euo pipefail
@@ -20,16 +28,24 @@ shift 3 || true
 DIFFUSIONS=("$@")
 [ ${#DIFFUSIONS[@]} -eq 0 ] && DIFFUSIONS=(4)
 
-CASES=(A B C D E)
+read -r -a CASES <<< "${CASES:-A B C D E}"
+read -r -a SEEDS <<< "${SEEDS:-}"
 OUTPUT="$REPO/healpix_quadrature/runs"
 mkdir -p "$OUTPUT" "$REPO/healpix_quadrature/logs"
 
 # one line per job, read back by index inside the array task
-JOBLIST="$OUTPUT/joblist_${GRID}_T${TRUNC}_${YEARS}y.txt"
+JOBLIST="$OUTPUT/joblist_${GRID}_T${TRUNC}_${YEARS}y_$(date +%H%M%S).txt"
 : > "$JOBLIST"
 for diffusion in "${DIFFUSIONS[@]}"; do
     for case in "${CASES[@]}"; do
-        echo "case=$case grid=$GRID trunc=$TRUNC years=$YEARS diffusion_hours=$diffusion" >> "$JOBLIST"
+        BASE="case=$case grid=$GRID trunc=$TRUNC years=$YEARS diffusion_hours=$diffusion"
+        if [ ${#SEEDS[@]} -eq 0 ]; then
+            echo "$BASE" >> "$JOBLIST"
+        else
+            for seed in "${SEEDS[@]}"; do
+                echo "$BASE seed=$seed" >> "$JOBLIST"
+            done
+        fi
     done
 done
 N=$(wc -l < "$JOBLIST")
