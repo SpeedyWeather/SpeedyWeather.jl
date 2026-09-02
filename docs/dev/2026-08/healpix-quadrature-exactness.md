@@ -65,6 +65,13 @@ Base revision: `20467269` (drafted on `mg/healpix-exactness`)
   shallow water, primitive dry and primitive wet — and was not supported. The document's framing
   was corrected from a stability fix to an accuracy result. Also corrects two operator norms quoted
   earlier at `dealiasing = 3` without saying so.
+- **2026-09-02, "execute the plan, to Verifying `PerOrderQuadrature` on a GPU node".** Step 0 run
+  and passing on an A40: the weights transfer bit-identically, the GPU forward transform agrees
+  with the CPU loop to roundoff, the round trip is exact on the device, and the changed inner-loop
+  read costs nothing measurable. Risks 3, 4 and 6 were settled at the same time and are struck out
+  below. Two earlier jobs turned out to be exactly the failing configuration the plan asked for, so
+  Steps 1-3 were merged into one matrix at that configuration rather than run as a broad sweep. See
+  "Results".
 - **2026-08-31, restriction to the solvable case.** The reduced formulation is equivalent to the
   full system only where a solution exists. Applying it as a least-squares fit below that made the
   `dealiasing = 2` HEALPix transforms *worse* (caught by the existing "inexact transforms" tests),
@@ -614,66 +621,107 @@ needs long integrations at the target resolutions, which is a GPU job. Nothing b
 
 ### What could still go wrong
 
-Concrete, from the implementation rather than from imagination:
+Concrete, from the implementation rather than from imagination. Struck-out items were settled on
+2026-09-02; see "Results".
 
-1. **The GPU path has never executed this change.** `forward_legendre_kernel!` now reads one
+1. ~~**The GPU path has never executed this change.**~~ `forward_legendre_kernel!` now reads one
    `Complex{NF}` element `solid_angles_rotated[m, j]` where it read a real `solid_angles[j]` plus
-   `conj(lon_offsets[m, j])`. Correct on CPU; unverified on GPU. Everything else is moot until this
-   is checked.
+   `conj(lon_offsets[m, j])`. **Settled**: verified on an A40, see Step 0 below.
 2. **`Σ_j g_j = 4π` now only holds at `m = 0`.** With equal-area weights the ring totals summed to
-   `4π` at every order trivially. Per-order they do not — measured `4.7·10⁻⁵` relative deviation at
-   `m = 1`, `4.1·10⁻⁵` at `m = 16` (`HEALPixGrid` T64). This is *correct* — only the `l = m = 0`
-   condition constrains the total, and the global mean stays exact to `1.3·10⁻¹⁵` — but it is a real
-   behavioural change, and quadratic invariants (energy, enstrophy, angular momentum) draw on all
-   orders. Their drift is the thing to watch.
-3. **The weights are no longer smooth in `m`.** Each order is fitted independently, so nothing
-   forces `g^{(m)}` and `g^{(m+1)}` to be close. Nonlinear terms couple orders, so a ragged weight
-   spectrum could imprint a systematic pattern. Worth plotting `g^{(m)}_j` against `m` before
-   running anything long.
-4. **Weights stray up to 18% from equal area.** Grid-space noise is therefore weighted differently
-   than before, by up to that factor, which changes how gridpoint-scale noise projects onto the
-   spectrum.
+   `4π` at every order trivially. Per-order they do not — measured `5.6·10⁻⁵` maximum relative
+   deviation over all orders on `HEALPixGrid` T64, `4.1·10⁻⁵` on `OctaHEALPixGrid`. This is
+   *correct* — only the `l = m = 0` condition constrains the total, and the global mean stays exact
+   to storage roundoff — but it is a real behavioural change, and quadratic invariants (energy,
+   enstrophy, angular momentum) draw on all orders. Their drift is the thing to watch, and it is
+   what `QuadratureDiagnostics` records. Worth noting that `ContractiveQuadrature` misses `4π` at
+   *every* order including `m = 0`, by `1.5·10⁻³` — by construction, since it does not aim to be
+   exact — so the global mean is not conserved under it the way it is under the other three.
+3. ~~**The weights are no longer smooth in `m`.**~~ **Settled, and the opposite of the concern.**
+   `healpix_quadrature/plot_weights.jl` plots `g^{(m)}_j / ΔΩ_j` for every ring against `m`. The
+   per-order weights vary smoothly and depart from equal area only at low order, `m ≲ 8`,
+   converging to within a fraction of a percent of equal area for the rest of the spectrum. There
+   is no ragged weight spectrum for the nonlinear terms to imprint.
+4. ~~**Weights stray up to 18% from equal area.**~~ **Settled, and much more localised than
+   stated.** The ±18% is reached only at `m ≤ 5`; over the great majority of orders the weights sit
+   within a fraction of a percent of equal area. Gridpoint-scale noise — which lives at high `m` —
+   is therefore weighted essentially as before.
 5. **The margin is thin at high resolution.** At `nlat_half = 288`, `OctaHEALPixGrid` has only 2
    degrees of slack and the fit's condition number reaches `10⁵`. A resolution *near* but not on a
    sanctioned grid could land in the degenerate regime. The residual check warns, but a run started
-   in batch may have that warning scroll past.
-6. **Float32.** The weights are fitted in Float64 and stored as `NF`. Verified fine at T32/T128;
-   unverified at T256 in a long integration.
+   in batch may have that warning scroll past. Narrowed but not eliminated: the model path carries
+   one degree more than the standalone spectrum the CPU study used (`SpectralGrid(truncation = n)`
+   gives `lmax = n + 1`, `mmax = n`, for the meridional gradient recursion), which costs one degree
+   of slack at every order — and the round trip is still exact at all four sanctioned resolutions,
+   in both number formats. Resolutions *off* the sanctioned list remain untested.
+6. ~~**Float32.**~~ **Settled.** On the model path, both grids, the round trip is at Float32
+   roundoff at every target resolution — `1.5·10⁻⁷` (T32) rising to `3.2·10⁻⁷` (T256), against
+   `7·10⁻¹⁶ … 3·10⁻¹⁵` in Float64 — with the round-trip gain at or just below 1 in every case.
+   T256 in particular is fine.
 
 ### Step 0 — GPU correctness, before any physics
 
-Prerequisite. Add to `SpeedyWeather/test/GPU/spectral_transform.jl`:
+Prerequisite, **done**. `SpeedyWeather/test/GPU/spectral_transform.jl` gained a
+"HEALPix quadrature weights on GPU" testset covering `HEALPixGrid`/`OctaHEALPixGrid` at the default
+dealiasing, all four quadrature schemes, Float32 and Float64:
 
-- CPU vs GPU agreement of the forward transform on `HEALPixGrid`/`OctaHEALPixGrid` at the default
-  dealiasing, all three quadrature schemes, Float32 and Float64;
-- `Array(gpu_transform.solid_angles_rotated) ≈ cpu_transform.solid_angles_rotated`, i.e. the weights
-  survive the host→device transfer intact;
-- the existing round-trip exactness assertions, run on GPU.
+- the weights survive the host→device transfer *bit-identically* (`==`, not `≈` — they are fitted
+  in Float64 and rounded to `NF` on the host, so the device only ever sees the rounded numbers),
+  and `mmax_truncation` matches, so the CPU/GPU comparison is between the same quadrature;
+- CPU vs GPU agreement of the forward transform;
+- the round-trip exactness assertions, run on GPU, with an equal-area contrast case so the
+  tolerance is not one that passes regardless.
 
 ```bash
 julia --project=SpeedyWeather/test/GPU/CUDA -e 'using Pkg; Pkg.instantiate()'
 julia --project=SpeedyWeather/test/GPU/CUDA SpeedyWeather/test/GPU/runtests.jl
 ```
 
-Also worth a forward-transform benchmark on GPU: the `[m, j]` read replaces a broadcast scalar, so
-the access pattern in the kernel's inner loop changed. `m` is the fast dimension and matches
-`lon_offsets`, so it should stay coalesced — but that is an argument, not a measurement.
+90 new assertions, all passing on an A40 (CUDA 13.3, Julia 1.12.2), and the rest of the file with
+them.
+
+### A configuration that actually fails
+
+The CPU study's closing remark — "the configurations above were chosen here, not taken from a run
+that actually failed; if such a configuration exists it would be a better test than any of these" —
+turned out to be answerable from runs already on disk. Jobs `1980117` and `1980317`, both
+`healpix-run.jl` (`PrimitiveWetModel`, `HEALPixGrid`, T128, Float32, GPU, 10 years, default
+settings) on 2026-08-31 after the per-order implementation was in the working tree, **both diverged
+at the identical step 273201, 2005-03-12T05:20**, i.e. after 5.2 simulated years. Deterministic, and
+reproducible in about half an hour of A40 time.
+
+That is the configuration the experiment should be run at, and it makes the question sharp: does
+case D fail where the status quo survives, or does the status quo fail there too? Nothing about the
+divergence identifies the quadrature as the cause — the run has only ever been done in one
+configuration.
 
 ### Step 1 — separate the three changes
 
 Three things changed at once, and the third is much the largest in model terms:
 
-| | quadrature weights | Nyquist bin | grid |
-|---|---|---|---|
-| A: `dealiasing = 3`, `EqualAreaQuadrature` | old | kept | old |
-| B: `dealiasing = 3.5`, `EqualAreaQuadrature` | old | kept | **new, +27% points** |
-| C: `dealiasing = 3.5`, `RingQuadrature` | ring | kept | new |
-| D: `dealiasing = 3.5`, `PerOrderQuadrature` | **new** | **dropped** | new |
+| | quadrature weights | grid |
+|---|---|---|
+| A: `dealiasing = 3`, `EqualAreaQuadrature` | old | old, `nlat_half = 128` at T128 |
+| B: `dealiasing = 3.5`, `EqualAreaQuadrature` | old | **new, +27% points**, `nlat_half = 144` |
+| C: `dealiasing = 3.5`, `RingQuadrature` | ring | new |
+| D: `dealiasing = 3.5`, `PerOrderQuadrature` | **new** | new |
+| E: `dealiasing = 3.5`, `ContractiveQuadrature` | **new** | new |
 
 A→B isolates the resolution change, which also changes the timestep through the CFL condition and
-is the most likely source of any behavioural difference. B→D isolates what this PR actually does to
-the transform. C is the external baseline. Running D alone and comparing against A conflates all
-three and will not answer anything.
+is the most likely source of any behavioural difference. B→{C,D,E} isolates what this PR actually
+does to the transform. C is the external baseline (healpy/ducc/cuHPX). Running D alone and
+comparing against A conflates both changes and will not answer anything.
+
+The first draft of this table carried a "Nyquist bin" column, on the assumption that dropping each
+ring's Nyquist bin was part of case D. It is not: the implementation ties `drop_nyquist` to the
+*grid*, not to the scheme, precisely so that all schemes see the same rings and the comparison
+isolates the weights. It is therefore on in every case above, and the column has been removed.
+
+Case E was not in the first draft — `ContractiveQuadrature` did not exist yet — but it belongs in
+the matrix, since it is the one scheme that deliberately gives up exactness for `‖A‖ ≤ 1`.
+
+`healpix_quadrature/run_case.jl` runs one cell of this matrix,
+`healpix_quadrature/submit_matrix.sh` submits it as a SLURM array, and
+`healpix_quadrature/analyse_runs.jl` summarises the results.
 
 ### Step 2 — sensitise by weakening hyperdiffusion
 
@@ -700,15 +748,17 @@ accumulates: a 1%/year drift is invisible in the CPU runs above and obvious over
 ### What to measure
 
 Blow-up is the least informative signal, and the CPU runs showed it does not discriminate. In
-descending order of sensitivity:
+descending order of sensitivity — all of this is implemented as `QuadratureDiagnostics` in
+`healpix_quadrature/diagnostics.jl`, recorded once a simulated day:
 
-1. **Spectral tail.** `SpeedyTransforms.power_spectrum` on vorticity, logged periodically. Energy
-   piling up at the truncation limit is the earliest sign of an ill-behaved transform, visible long
+1. **Spectral tail.** `SpeedyTransforms.power_spectrum` on vorticity, layer-summed. Energy piling
+   up at the truncation limit is the earliest sign of an ill-behaved transform, visible long
    before anything diverges. A shallowing or upturning tail is the thing to look for.
-2. **Conserved quantities.** Global mass and mean surface pressure (exact at `m = 0`, so any drift
-   is a genuine bug), total energy, enstrophy, angular momentum. Add as an `AbstractCallback`
-   following `GlobalSurfaceTemperatureCallback` in `output/callbacks.jl`.
-3. **Extrema over time**: `max|vorticity|`, `max|w|`, `min` surface pressure.
+2. **Conserved quantities.** The `l = m = 0` coefficient of `ln(pₛ)` — the mode the quadrature
+   constrains exactly, so any drift there is a genuine bug rather than a property of the flow —
+   plus global mass `∫pₛ dΩ/4π`, kinetic energy, enstrophy and relative angular momentum, which
+   draw on all orders and are the ones risk 2 puts at stake.
+3. **Extrema over time**: `max|vorticity|`, `max|w|`, `min` surface pressure, `max` humidity.
 4. **Divergence of two runs from the same initial state**, A vs D, as a function of time. Expected
    to grow at the Lyapunov rate of the flow, not faster; faster means one of them is being forced.
 
@@ -723,10 +773,13 @@ descending order of sensitivity:
 
 ### Cost
 
-Step 0 is minutes. Step 2 is the expensive one: 4 cases × 3 diffusion strengths × 2 grids at T128
-is 24 runs. Calibrate from one short T128 run before committing to the matrix, and prune — the A–D
-comparison at a single resolution and diffusion strength is already the decisive one. Step 3 is
-better run as a couple of long jobs than a wide sweep.
+Step 0 is minutes. The A–E matrix at the failing configuration — `HEALPixGrid` T128,
+`PrimitiveWetModel`, Float32, 10 years, default diffusion — is 5 jobs of roughly an hour of A40
+time each, measured from the two runs that already diverged there (32 and 55 minutes to reach
+5.2 years, with 6-hourly NetCDF output). That is cheap enough that Steps 1 and 3 collapse into one
+batch, and the Step 2 diffusion sweep can be aimed by its results rather than run blind: since case
+D already fails at the *default* diffusion, the informative sweep runs in both directions —
+stronger (1, 2 h) to find where each scheme survives, and weaker (24, 96 h) to rank them.
 
 ## Documentation changes
 
