@@ -67,6 +67,9 @@ days = argument("days", 0)          # non-zero overrides `years`, for calibratio
 output_directory = argument("output", joinpath(@__DIR__, "runs"))
 record_every_days = argument("record_days", 1)
 netcdf = argument("netcdf", "false") == "true"
+# every Nth record, keep the surface vorticity coefficients so two runs on the same spectrum
+# (B vs D, say) can be differenced directly; 0 disables
+snapshot_every = argument("snapshot_every", 0)
 
 haskey(CASES, case) || error("unknown case $case, expected one of $(sort(collect(keys(CASES))))")
 (; dealiasing, Quadrature) = CASES[case]
@@ -97,7 +100,9 @@ else
     PrimitiveWetModel(spectral_grid; spectral_transform, horizontal_diffusion)
 end
 
-diagnostics = QuadratureDiagnostics(spectral_grid; schedule = Schedule(every = Day(record_every_days)))
+diagnostics = QuadratureDiagnostics(
+    spectral_grid; schedule = Schedule(every = Day(record_every_days)), snapshot_every
+)
 add!(model, :quadrature_diagnostics => diagnostics)
 
 println("=" ^ 90)

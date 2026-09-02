@@ -83,6 +83,16 @@ Base.@kwdef mutable struct QuadratureDiagnostics{NF, FieldType} <: AbstractCallb
 
     "vorticity power spectrum, one column per record, summed over layers"
     spectrum::Vector{Vector{Float64}} = Vector{Float64}[]
+
+    "[OPTION] also keep the surface-layer vorticity coefficients every `snapshot_every` records,
+    so two runs on the same spectrum can be differenced directly. 0 disables."
+    snapshot_every::Int = 0
+
+    "surface-layer vorticity coefficients, one column per snapshot"
+    snapshots::Vector{Vector{ComplexF64}} = Vector{ComplexF64}[]
+
+    "times the snapshots were taken at"
+    snapshot_time::Vector{DateTime} = DateTime[]
 end
 
 function QuadratureDiagnostics(spectral_grid::SpectralGrid; kwargs...)
@@ -109,6 +119,7 @@ function initialize!(callback::QuadratureDiagnostics, vars, model)
     end
     empty!(callback.time); sizehint!(callback.time, n)
     empty!(callback.spectrum); sizehint!(callback.spectrum, n)
+    empty!(callback.snapshots); empty!(callback.snapshot_time)
     record!(callback, vars, model)                  # record the initial conditions
     return nothing
 end
@@ -148,6 +159,12 @@ function record!(callback::QuadratureDiagnostics, vars, model)
 
     power = SpeedyTransforms.power_spectrum(vorticity_host, normalize = false)
     push!(callback.spectrum, Float64.(vec(sum(power .* Δσ', dims = 2))))
+
+    if callback.snapshot_every > 0 &&
+            (length(callback.time) - 1) % callback.snapshot_every == 0
+        push!(callback.snapshots, ComplexF64.(vec(vorticity_host.data[:, end])))
+        push!(callback.snapshot_time, vars.prognostic.clock.time)
+    end
 
     power_divergence = SpeedyTransforms.power_spectrum(divergence_host, normalize = false)
     enstrophy = 0.5 * sum(Float64.(power) .* Δσ')
@@ -196,5 +213,7 @@ function as_namedtuple(callback::QuadratureDiagnostics)
         min_pressure = callback.min_pressure,
         max_humidity = callback.max_humidity,
         spectrum,
+        snapshot_time = callback.snapshot_time,
+        snapshots = isempty(callback.snapshots) ? zeros(ComplexF64, 0, 0) : reduce(hcat, callback.snapshots),
     )
 end
