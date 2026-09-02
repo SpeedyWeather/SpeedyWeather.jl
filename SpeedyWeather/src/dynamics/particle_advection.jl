@@ -47,6 +47,9 @@ velocity of a single, user-specified vertical layer, their σ coordinate stays c
     "[OPTION] Advect with velocities from this vertical layer index"
     layer::IntType = 1
 
+    "[OPTION] Advect backwards in time if true (for backtracking trajectories)"
+    backwards::Bool = false
+
     "[DERIVED] Interpolation geometry used during advection"
     geometry::GeometryType
 end
@@ -77,6 +80,9 @@ advected horizontally.
 
     "[OPTION] Execute particle advection every n timesteps"
     every_n_time_steps::IntType = 6
+
+    "[OPTION] Advect backwards in time if true (for backtracking trajectories)"
+    backwards::Bool = false
 
     "[DERIVED] Interpolation geometry used during advection"
     geometry::GeometryType
@@ -170,10 +176,10 @@ function initialize!(
     lats = vars.particles.v                     # after update_locator!
     σ = Vector(model.geometry.σ_levels_full)[k] # explicitly on CPU
 
-    # modulo particles and extract their coordinates
+    # modulo particles and extract their coordinates; pin every particle's σ to the layer's level
     launch!(
-        architecture(particles), LinearWorkOrder, (length(particles),), _initialize_2D_particles_kernel!,
-        particles, lons, lats, σ
+        architecture(particles), LinearWorkOrder, (length(particles),), _initialize_particles_kernel!,
+        particles, lons, lats, p -> set(p; σ = σ)
     )
 
     RingGrids.update_locator!(locator, geometry, lons, lats)
@@ -182,20 +188,6 @@ function initialize!(
     interpolate!(u0, u_grid, locator, geometry)
     interpolate!(v0, v_grid, locator, geometry)
     return nothing
-end
-
-# Kernel to modulo particles and extract their coordinates
-# set every particle to vertical σ provided
-@kernel inbounds = true function _initialize_2D_particles_kernel!(
-        particles, lons, lats, σ
-    )
-    i = @index(Global, Linear)
-
-    # modulo all particles here
-    # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
-    particles[i] = mod(set(particles[i]; σ = σ))
-    lons[i] = particles[i].lon
-    lats[i] = particles[i].lat
 end
 
 """$(TYPEDSIGNATURES)
@@ -227,7 +219,7 @@ function initialize!(
 
     launch!(
         architecture(particles), LinearWorkOrder, (length(particles),),
-        _initialize_3D_particles_kernel!, particles, lons, lats
+        _initialize_particles_kernel!, particles, lons, lats, identity
     )
 
     RingGrids.update_locator!(locator, geometry, lons, lats)
@@ -235,18 +227,22 @@ function initialize!(
     v0 = vars.particles.v
     w0 = vars.particles.w
 
+    # u, v sit on full (center) levels; w sits on half levels, storing the lower face
+    # (k+½) with an implicit zero at the top boundary (σ=0, kinematic condition)
     interpolate_3D!(u0, u_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
     interpolate_3D!(v0, v_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
     interpolate_3D!(w0, w_3d, locator, geometry, particles, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
     return nothing
 end
 
-# Modulo particles and extract horizontal coordinates; σ is each particle's own
-@kernel inbounds = true function _initialize_3D_particles_kernel!(
-        particles, lons, lats
-    )
+# Modulo particles and extract horizontal coordinates. `f` is applied to each particle
+# before moduloing: `identity` keeps its own σ (3D advection), `p -> set(p; σ)` pins σ to a
+# fixed layer (2D advection) — passing the function in avoids two near-identical kernels.
+@kernel inbounds = true function _initialize_particles_kernel!(
+        particles, lons, lats, f::F,
+    ) where {F}
     i = @index(Global, Linear)
-    particles[i] = mod(particles[i])
+    particles[i] = mod(f(particles[i]))
     lons[i] = particles[i].lon
     lats[i] = particles[i].lat
 end
@@ -287,6 +283,7 @@ function particle_advection!(
     Δt = model.time_stepping.Δt                 # time step [s]
     Δt *= n * convert(NF, 180 / (π * radius))   # scale to [s*°/m] to obtain [˚] when multiplied with velocity in [m/s]
     Δt_half = Δt / 2                    # /2 because Heun is average of Euler+corrected step
+    particle_advection.backwards && (Δt_half *= -1)   # trace trajectories backwards in time
 
     u_old = vars.particles.u            # from previous time step and location
     v_old = vars.particles.v            # from previous time step and location
@@ -357,6 +354,12 @@ function particle_advection!(
     Δt_vert = model.time_stepping.Δt * n
     Δt_vert_half = Δt_vert / 2
 
+    # trace trajectories backwards in time: reverse both horizontal and vertical motion
+    if particle_advection.backwards
+        Δt_half *= -1
+        Δt_vert_half *= -1
+    end
+
     u_old = vars.particles.u
     v_old = vars.particles.v
     w_old = vars.particles.w
@@ -384,6 +387,7 @@ function particle_advection!(
     u_new = vars.particles.u
     v_new = vars.particles.v
     w_new = vars.particles.w
+    # u, v on full (center) levels; w on half levels (lower face, implicit zero at σ=0)
     interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, SigmaCenter(σ_levels_full))
     interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, SigmaCenter(σ_levels_full))
     interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
@@ -395,6 +399,7 @@ function particle_advection!(
     )
 
     # store new velocities at corrected position for next advection step
+    # (u, v center levels; w half levels)
     RingGrids.update_locator!(locator, geometry, lons, lats)
     interpolate_3D!(u_new, u_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
     interpolate_3D!(v_new, v_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
