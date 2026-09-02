@@ -209,7 +209,24 @@ g["lat"][1:4], g["lon"][1:4], g["ring"][1:4]    # the 4 cells of the northernmos
 Cells are written in standard **HEALPix RING order** of [cuHPX](https://github.com/NVlabs/cuHPX): 
 cell `ij` (1-based, as in a `Field`) is RING pixel `ij-1` in the 0-based convention of healpy and
 [cuHPX](https://github.com/NVlabs/cuHPX), so no reordering is needed on either side. The
-store also carries `healpix_nside`, `healpix_npix` and `healpix_order` as global attributes:
+store also carries `healpix_nside`, `healpix_npix` and `healpix_order` as global attributes.
+
+These conventions should be compatabile with `healpy` and `cuHPX`.  Note that while `HEALPixOutput`
+writes any even `nlat_half`, the NESTED and earth-2 flat layouts those tools convert to
+require `nside` to be a power of two.
+
+Our `lat` is latitude in degrees **from the equator** and `lon` is in `[0, 360)`, which is
+exactly `healpy`'s `lonlat=True` convention. Mind that this is *not* healpy's default: with
+`lonlat=False` (the default) healpy uses **colatitude in radians from the north pole**, so
+convert with `theta = deg2rad(90 - lat)`, `phi = deg2rad(lon)` or use `lonlat=True`.
+
+Mind the axis order when reading from Python: Zarr stores shape row-major while Julia is
+column-major, so a variable written as `(cell, layer, time)` from Julia is seen as
+`(time, layer, cell)` from Python — matching its `_ARRAY_DIMENSIONS` tag. A flat `(npix,)`
+map to hand to `healpy` is therefore `arr.reshape(-1, npix)[-1]`, and the `hp.mollview` call
+above works because `.isel(time=-1, layer=-1)` already reduces to the trailing `cell` axis.
+
+Here's an example script that loads a store and plots it with `healpy`:
 
 ```python
 import matplotlib 
@@ -229,20 +246,7 @@ plt.savefig("hpy-mollview.png", dpi=150, bbox_inches="tight")
 plt.close()
 ```
 
-These conventions should be compatabile with `healpy` and `cuHPX`.  Note that while `HEALPixOutput`
-writes any even `nlat_half`, the NESTED and earth-2 flat layouts those tools convert to
-require `nside` to be a power of two.
-
-Our `lat` is latitude in degrees **from the equator** and `lon` is in `[0, 360)`, which is
-exactly `healpy`'s `lonlat=True` convention. Mind that this is *not* healpy's default: with
-`lonlat=False` (the default) healpy uses **colatitude in radians from the north pole**, so
-convert with `theta = deg2rad(90 - lat)`, `phi = deg2rad(lon)` or use `lonlat=True`.
-
-Mind the axis order when reading from Python: Zarr stores shape row-major while Julia is
-column-major, so a variable written as `(cell, layer, time)` from Julia is seen as
-`(time, layer, cell)` from Python — matching its `_ARRAY_DIMENSIONS` tag. A flat `(npix,)`
-map to hand to `healpy` is therefore `arr.reshape(-1, npix)[-1]`, and the `hp.mollview` call
-above works because `.isel(time=-1, layer=-1)` already reduces to the trailing `cell` axis.
+Be aware that by default SpeedyWeather.jl's Makie extension together with Makie itself interpolate the data, so the output of this script might still look relatively different on first sight to directly plotting the data in Julia. 
 
 ### OctaHEALPix output
 
