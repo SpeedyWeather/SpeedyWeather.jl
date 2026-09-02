@@ -5,14 +5,15 @@ SpeedyWeather.jl is written with differentiability in mind. This means that our 
 !!! warning "Work in progress"
     The differentiability of SpeedyWeather.jl is still work in progress and some parts of this documentation might be not be always updated to the latest state. We will extend this documentation over time. Don't hesitate to contact us via GitHub issues or mail when you have questions or want to collaborate.
 
-For the differentiability of our model we rely on [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl). If you've used Enzyme before, just go ahead and try to differentiate the model! It should work. We have checked the correctness of the gradients extensively against a finite differences differentiation with [FiniteDifferences.jl](https://github.com/JuliaDiff/FiniteDifferences.jl/). In the following we present a simple example how we can take the gradient of a single timestep of the primitive equation model with respect to one of the model parameter.
+For the differentiability of our model we rely on [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl). If you've used Enzyme before, just go ahead and try to differentiate the model! It should work. We have checked the correctness of the gradients extensively against a finite differences differentiation with [FiniteDifferences.jl](https://github.com/JuliaDiff/FiniteDifferences.jl/). In the following we present a simple example how we can take the gradient of a single timestep of the [primitive equation model](@ref primitive_equation_model) with respect to one of the model parameter.
 
 !!! warning "Enzyme with Julia 1.11"
     Currently there are still some issues with Enzyme in Julia 1.11/1.12, we recommend to use Julia 1.10 for the following
 
 ## Differentiating through a single timestep
 
-First we initialize the model as usual:
+First we initialize the model as usual (see [Time stepping](@ref time_stepping) for
+background on the time integration scheme used internally):
 
 ```julia
 using SpeedyWeather, Enzyme
@@ -24,7 +25,7 @@ initialize!(simulation)
 run!(simulation, period=Day(10)) # spin-up the model a bit
 ```
 
-Then, we get all variables we need from our `simulation`
+Then, we get all [variables](@ref "Variables") we need from our `simulation`
 
 ```julia
 (; variables, model) = simulation
@@ -54,7 +55,7 @@ dmodel.planet.gravity
 
 ## Differentiating longer trajectories and checkpointing 
 
-In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/SpeedyWeather/test/differentiability/sensitivity_examples/).
+In a very similar fashion as for the [single timestep](@ref "Differentiating through a single timestep"), we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/SpeedyWeather/test/differentiability/sensitivity_examples/).
 
 ## Correctness 
 
@@ -62,7 +63,7 @@ The correctness of gradients is tested in our CI in `SpeedyWeather/test/differen
 
 ## Parameter handling
 
-SpeedyWeather also provides automated parameter handling for all models and subcomponents via an extension of [ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl). Parameters can be automatically collected via the `parameters` method:
+SpeedyWeather also provides automated parameter handling for all [models](@ref "Models") and subcomponents via an extension of [ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl). Parameters can be automatically collected via the `parameters` method:
 
 ```julia
 spectral_grid = SpectralGrid(truncation=24, nlayers=1) 

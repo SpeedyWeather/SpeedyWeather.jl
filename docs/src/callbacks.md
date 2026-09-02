@@ -8,7 +8,7 @@ we currently do not implement other callsites.
 
 Callbacks are mainly introduced for diagnostic purposes, meaning that they do not influence
 the simulation, and access the prognostic variables and the model components in a read-only
-fashion. However, a callback is not strictly prevented from changing prognostic or diagnostic
+fashion (see also [Online diagnostics](@ref) for a concrete callback-based example). However, a callback is not strictly prevented from changing prognostic or diagnostic
 variables or the model. For example, you may define a callback that changes the orography
 during the simulation. In general, one has to keep the general order of executions during a
 time step in mind (valid for all models)
