@@ -212,10 +212,21 @@ cell `ij` (1-based, as in a `Field`) is RING pixel `ij-1` in the 0-based convent
 store also carries `healpix_nside`, `healpix_npix` and `healpix_order` as global attributes:
 
 ```python
-import xarray as xr, healpy as hp
-ds = xr.open_zarr("run_0001/output_healpix.zarr", consolidated=True)
+import matplotlib 
+import matplotlib.pyplot as plt
+import xarray as xr # also needs zarr installed
+import healpy as hp 
+
+ds = xr.open_zarr("../run_0004/output_healpix.zarr", consolidated=True)
 nside = ds.attrs["healpix_nside"]
-hp.mollview(ds["temp"].isel(time=-1, layer=-1).values, nest=False)   # RING map, plots directly
+
+hp.mollview(ds["temp"].isel(time=-1, layer=7).values, nest=False,
+            flip="geo", rot=(180, 0, 0),
+            unit=ds["temp"].attrs["units"], min=-50.4, max=22.4)
+# surface layer = 7 (0-indexed), rotation and flip so that it aligns with Julia CairoMakie 
+hp.graticule()                        # optional lat/lon grid
+plt.savefig("hpy-mollview.png", dpi=150, bbox_inches="tight")
+plt.close()
 ```
 
 These conventions should be compatabile with `healpy` and `cuHPX`.  Note that while `HEALPixOutput`
