@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- GitHub Actions github-script v9 [#1241](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1241)
 - GitHub Actions Checkout v7 [#1242](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1242)
 - Lazy batching of FTT plans on GPU to increase performance of models other than the `PrimitiveWetModel` [#1234](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1234)
 - Remove dead code: unused `get_2lm_range` [#1243](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1243)
