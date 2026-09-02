@@ -19,10 +19,6 @@ function default_title(field::RingGrids.AbstractField)
     return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
 end
 
-# ============================================================================
-# Non-mutating globe variants
-# ============================================================================
-
 """
 $(TYPEDSIGNATURES)
 Create a 3D interactive globe plot of the grid `Grid` at resolution `nlat_half` displaying
@@ -58,10 +54,6 @@ function RingGrids.globe(
     globe!(fig[1, 1], field; interactive, title, colormap, coastlines)
     return fig
 end
-
-# ============================================================================
-# Mutating globe variants
-# ============================================================================
 
 """
 $(TYPEDSIGNATURES)
@@ -204,10 +196,6 @@ function RingGrids.globe!(
 
     return p
 end
-
-# ============================================================================
-# Helper functions for globe plotting
-# ============================================================================
 
 """
     _plot_globe_grid!(ax, Grid, nlat_half; kwargs...)

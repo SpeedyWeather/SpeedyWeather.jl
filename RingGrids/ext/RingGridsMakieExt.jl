@@ -10,10 +10,6 @@ function default_title(field::RingGrids.AbstractField)
     return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
 end
 
-# ============================================================================
-# Non-mutating heatmap variants
-# ============================================================================
-
 function Makie.heatmap(
         field::RingGrids.AbstractField;
         title::String = default_title(field),
@@ -56,10 +52,6 @@ function Makie.heatmap(
     resize_to_layout!(fig)
     return fig
 end
-
-# ============================================================================
-# Mutating heatmap variants
-# ============================================================================
 
 function Makie.heatmap!(pos::Makie.GridPosition, field::RingGrids.AbstractField2D; kwargs...)
     full_field = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
