@@ -15,7 +15,8 @@ import SpeedyWeather: ZarrOutput, HEALPixOutput, AbstractZarrOutput,
     define_dimension!, vertical_dimension, get_nlayers, get_dimension_length, define_coordinate!,
     is3D, is_land, hastime, get_indices, get_flat_indices, scale!, get_soil_layers,
     get_lond, get_latd, get_npoints, get_nlat, on_architecture, CPU,
-    AbstractFullGrid, path_or_nothing, run_folder_name
+    AbstractFullGrid, path_or_nothing, exists_in_simulation, warn_nonexisting_variables,
+    run_folder_name
 
 import SpeedyWeather.RingGrids
 import SpeedyWeather.RingGrids: HEALPixGrid, get_londlatds, whichring, grids_match

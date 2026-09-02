@@ -134,16 +134,16 @@ function initialize!(
         g = Zarr.zopen(store_path, "w")
         output.zarr_group = g
 
-        # remove output variables not existent in simulation.variables (mirrors the
-        # creator, which prunes them with a warning before defining the store schema)
+        # skip output variables not existent in simulation.variables, exactly as the
+        # creator does when it defines the store schema
         simulation = Simulation(vars, model)
-        prune_nonexisting_variables!(output, simulation; warn = false)
 
         # the creator's store must match this member's configuration, error early
         # (and clearly) otherwise instead of writing into wrong time/ensemble slots
-        validate_ensemble_store(g, output, n_outputs)
+        validate_ensemble_store(g, output, n_outputs, simulation)
 
         for (key, var) in output.variables
+            exists_in_simulation(var, simulation) || continue
             output!(output, var, simulation)
         end
         return nothing
@@ -173,12 +173,14 @@ function initialize!(
     create_time_axis!(g, output, n_outputs)
     output!(output, vars.prognostic.clock.time)   # write initial time
 
-    # VARIABLES, remove output variables not existent in simulation.variables
+    # VARIABLES: define every output variable in the Zarr store and write initial
+    # conditions, skipping any that don't exist in the simulation — the same check the
+    # generic `output!` makes at write time, applied here so a skipped variable doesn't
+    # leave an all-fill_value phantom array behind
     simulation = Simulation(vars, model)
-    prune_nonexisting_variables!(output, simulation)
-
-    # then define every output variable in the Zarr store and write initial conditions
+    warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
+        exists_in_simulation(var, simulation) || continue
         define_variable!(g, output, var, n_outputs, eltype(output.field2D))
         output!(output, var, simulation)
     end
@@ -273,7 +275,9 @@ ensemble size, and every output variable of this member defined. Errors otherwis
 a mismatch means the members were launched with inconsistent options (e.g. different
 `period` or output `interval`, different output variables) or the readiness marker
 belonged to a stale store from a previous run into the same run folder."""
-function validate_ensemble_store(g::Zarr.ZGroup, output::ZarrOutput, n_outputs::Integer)
+function validate_ensemble_store(
+        g::Zarr.ZGroup, output::ZarrOutput, n_outputs::Integer, simulation::AbstractSimulation
+    )
     member = output.ensemble_index
 
     n_time = get_dimension_length(g, "time")
@@ -289,7 +293,12 @@ function validate_ensemble_store(g::Zarr.ZGroup, output::ZarrOutput, n_outputs::
             "of $n_ensemble but this member expects ensemble_size=$(output.ensemble_size)."
     )
 
-    undefined_vars = [var.name for var in values(output.variables) if !haskey(g, var.name)]
+    # only variables this member will actually write need to exist in the shared store;
+    # ones missing from the simulation are skipped by creator and writers alike
+    undefined_vars = [
+        var.name for var in values(output.variables)
+            if exists_in_simulation(var, simulation) && !haskey(g, var.name)
+    ]
     isempty(undefined_vars) || error(
         "ZarrOutput ensemble member $member: variable(s) $(join(undefined_vars, ", ")) " *
             "not defined in the shared store by the creator (member 1). Ensure all members " *

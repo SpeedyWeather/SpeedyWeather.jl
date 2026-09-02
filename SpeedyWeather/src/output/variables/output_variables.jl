@@ -81,6 +81,28 @@ define that dimension, typically via [`get_dimension_length`](@ref) and
 [`define_coordinate!`](@ref) so that one method covers all output backends."""
 define_dimension!(dest, variable::AbstractOutputVariable) = nothing
 
+"""$(TYPEDSIGNATURES)
+`true` if `variable` exists in `simulation` and can therefore be written out. This is the
+same `path_or_nothing` check the generic [`output!`](@ref) applies at write time, exposed so
+that output writers can apply it at *schema-definition* time too: a variable that is skipped
+by `output!` but still defined in the file/store would otherwise be left behind as an
+all-`missing_value` phantom array. Variables can be absent when the `Model` type an output
+writer was constructed with declares defaults the actual model doesn't have, e.g. a
+`PrimitiveWet` output attached to a `BarotropicModel` has no temp/humid/mslp."""
+exists_in_simulation(variable::AbstractOutputVariable, simulation) =
+    !isnothing(path_or_nothing(variable, simulation))
+
+"""$(TYPEDSIGNATURES)
+Warn once about the output variables of `output` that don't exist in `simulation` and will
+therefore be skipped, both in the file/store schema and on every output step."""
+function warn_nonexisting_variables(output::AbstractOutput, simulation)
+    skipped = [key for (key, var) in output.variables if !exists_in_simulation(var, simulation)]
+    isempty(skipped) || @warn "Some output.variables do not exist in simulation, skipping: " *
+        "$(join(skipped, ", ")). This usually means the output writer was constructed with a " *
+        "different Model type than the model it is attached to."
+    return nothing
+end
+
 """$(TYPEDSIGNATURES) Like `path` but returns `nothing` instead of throwing an error if the variable is not defined in the simulation."""
 path_or_nothing(variable::AbstractOutputVariable, simulation) = try
     path(variable, simulation)

@@ -246,12 +246,14 @@ function initialize!(
     create_time_axis!(g, output, n_outputs)
     output!(output, vars.prognostic.clock.time)   # write initial time
 
-    # VARIABLES, remove output variables not existent in simulation.variables
+    # VARIABLES: define every output variable in the Zarr store and write initial
+    # conditions, skipping any that don't exist in the simulation — the same check the
+    # generic `output!` makes at write time, applied here so a skipped variable doesn't
+    # leave an all-fill_value phantom array behind
     simulation = Simulation(vars, model)
-    prune_nonexisting_variables!(output, simulation)
-
-    # then define every output variable in the Zarr store and write initial conditions
+    warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
+        exists_in_simulation(var, simulation) || continue
         define_variable!(g, output, var, n_outputs, eltype(output.field2D))
         output!(output, var, simulation)
     end

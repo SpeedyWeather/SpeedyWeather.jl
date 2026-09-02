@@ -92,18 +92,6 @@ function assert_soil_layers(output::AbstractZarrOutput, model::AbstractModel)
 end
 
 """$(TYPEDSIGNATURES)
-Remove all variables from `output.variables` that don't exist in `simulation`, warning
-about them unless `warn=false`. Returns `output`."""
-function prune_nonexisting_variables!(output::AbstractZarrOutput, simulation::AbstractSimulation; warn::Bool = true)
-    nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
-    if !isempty(nonexisting_vars) && warn
-        @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
-    end
-    delete!(output, nonexisting_vars...)
-    return output
-end
-
-"""$(TYPEDSIGNATURES)
 Create the Zarr array for output `var` in group `g` with the given Julia-order `shape` and
 `chunks` and the row-major `dims` for its `_ARRAY_DIMENSIONS` attribute (Zarr stores
 shape/chunks in row-major C order but Julia arrays are column-major, and Zarr.jl reverses
