@@ -128,6 +128,7 @@ export AbstractInterpolator,
 
 export interpolate,
     interpolate!,
+    interpolate_3D!,
     update_locator,
     update_locator!
 
@@ -176,6 +177,7 @@ include("grids/octaminimal_gaussian.jl")
 # INTEGRATION AND INTERPOLATION
 include("quadrature_weights.jl")
 include("interpolation.jl")
+include("interpolation_3d.jl")
 include("vertices.jl")
 include("statistics.jl")
 include("copy_unmasked.jl")
