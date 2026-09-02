@@ -10,6 +10,7 @@
 #
 # Two environment variables narrow or widen the matrix:
 #   CASES="B D"    which cases to run (default: all five)
+#   TIME="12:00:00" SLURM wall-clock limit (default 06:00:00; T256 needs more)
 #   SEEDS="1 2 3"  extra ensemble members per case, each a tiny perturbation of the initial
 #                  vorticity (default: none, i.e. the unperturbed member only). A single blow-up
 #                  time is one draw from a distribution — the cases differ by far more than
@@ -59,7 +60,7 @@ sbatch --array="1-${N}%5" <<EOF
 #SBATCH --partition=gpu
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
-#SBATCH --time=06:00:00
+#SBATCH --time=${TIME:-06:00:00}
 #SBATCH --output=$REPO/healpix_quadrature/logs/quad-%A_%a.log
 #SBATCH --error=$REPO/healpix_quadrature/logs/quad-%A_%a.log
 
