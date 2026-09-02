@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Several problems Enzyme compat with 1.12 fixed, but no full end-to-end differentiability yet [#1163](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1163)
 - Add `HEALPixOutput`, a Zarr output writer that writes onto a `HEALPixGrid` keeping the horizontal dimension flat [#1238](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1238)
 - GitHub Actions github-script v9 [#1241](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1241)
 - GitHub Actions Checkout v7 [#1242](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1242)
