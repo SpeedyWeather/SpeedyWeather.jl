@@ -4,6 +4,10 @@
 > HEALPix grids drops from ~5·10⁻³ to roundoff (10⁻¹⁵ in Float64, 10⁻⁷ in Float32) with every
 > quadrature weight strictly positive and within ±18% of equal area. Grids with an exact quadrature
 > rule are bit-identical to before and the forward transform is no slower.
+>
+> This is an **accuracy** result. The stability motivation it started from was tested and not
+> supported: no configuration tried here is destabilised by the inexact transform. See
+> "The stability motivation".
 
 Date of initial draft: 2026-08-31
 
@@ -52,6 +56,15 @@ Base revision: `20467269` (drafted on `mg/healpix-exactness`)
   `healpix_quadrature/plot_exactness.jl` plots round-trip error against truncation for dealiasing
   1.5 … 4.0, one panel per grid × scheme. Dropping a ring's Nyquist bin stays tied to the *grid*
   rather than the scheme, so all three see the same rings and the comparison isolates the weights.
+- **2026-09-01, "how can we do experiments on a GPU node to determine possible stability problems
+  of the PerOrderQuadrature".** Added "Verifying `PerOrderQuadrature` on a GPU node": the risks the
+  CPU work does not cover, a GPU-correctness prerequisite, and an experiment design that separates
+  the weight change from the dealiasing change and sensitises by weakening hyperdiffusion. Not run.
+- **2026-09-01, "how can a transform that is supposedly exact break stability".** The stability
+  premise was tested directly — 24 shallow-water runs of 360 days plus vorticity trajectories for
+  shallow water, primitive dry and primitive wet — and was not supported. The document's framing
+  was corrected from a stability fix to an accuracy result. Also corrects two operator norms quoted
+  earlier at `dealiasing = 3` without saying so.
 - **2026-08-31, restriction to the solvable case.** The reduced formulation is equivalent to the
   full system only where a solution exists. Applying it as a least-squares fit below that made the
   `dealiasing = 2` HEALPix transforms *worse* (caught by the existing "inexact transforms" tests),
@@ -71,9 +84,14 @@ round-trip (Float64, random band-limited field, default `dealiasing = 3`):
 | `HEALPixGrid` | 7.5·10⁻³ | 3.7·10⁻³ | 9.8·10⁻⁴ | 5.5·10⁻⁴ |
 | `OctaHEALPixGrid` | 5.8·10⁻³ | 2.8·10⁻³ | 8.2·10⁻⁴ | 4.7·10⁻⁴ |
 
-The worst-case amplification is the more relevant number for model stability: the round-trip
-operator deviates from the identity by `‖T − I‖₂ = 0.12` at *every* resolution — it does not
-converge away — and `‖T‖₂ = 1.005 > 1`, i.e. the transform pair injects energy.
+The operator norms tell the same story and do not converge away with resolution. At the new default
+`dealiasing = 3.5`, `HEALPixGrid`: `‖T − I‖₂ = 0.094` and `‖T‖₂ = 1.0029 > 1` — the transform pair
+has a direction it amplifies. (At `dealiasing = 3` those are 0.12 and 1.005.)
+
+That `‖T‖₂ > 1` was the original motivation: a spectral dynamical core's linear waves are
+marginally stable, so a systematic operator perturbation applied every step is the kind of thing
+that can turn neutral oscillation into growth. **That motivation did not survive testing** — see
+"The stability motivation" below. The exactness result stands on its own as an accuracy result.
 
 ## Background
 
@@ -559,8 +577,156 @@ sweep shows the cliff plainly — `HEALPixGrid` with per-order weights, relative
 Equal-area and per-ring weights show no such cliff: both sit at 10⁻⁴–10⁻³ at every dealiasing and
 every truncation, and are nearly indistinguishable from each other.
 
-Still worth doing separately: confirm the premise that transform inexactness was behind the HEALPix
-stability problems, with a long model run at the configuration that previously failed soonest.
+### The stability motivation
+
+The premise this work started from — that transform inexactness was behind the HEALPix stability
+problems — was tested and **is not supported**.
+
+Same grid, same truncation, same initial conditions; only the quadrature differs.
+
+- **24 `ShallowWaterModel` runs of 360 days**: `HEALPixGrid` and `OctaHEALPixGrid` × T31/T42 ×
+  dealiasing 3.0/3.5 × all three schemes. Every one survived. Peak `|vorticity|` agreed to ~10%
+  across schemes and not systematically in the fix's favour — equal area beat per-order in two of
+  the four grid/truncation combinations.
+- **Trajectories rather than survival**, `HEALPixGrid` T31 at dealiasing 3.5, since slow growth
+  would not show up as a failure. Shallow water over 720 days *decays* (last/first = 0.63 equal
+  area, 0.68 per order); `PrimitiveDryModel` and `PrimitiveWetModel` over 180 days rise to a
+  plateau and fall back (1.37/1.41 and 1.17/1.23). No growth in any of them, and the schemes track
+  each other within a few percent.
+- Per-order comes out marginally *higher* in every trajectory, consistent with the inexact
+  quadrature acting as a weak spurious damping that the exact one removes. That is the opposite of
+  a stability improvement.
+
+`RingQuadrature` is the sharpest counter-example to the mechanism: its `‖T‖₂ − 1` is an order of
+magnitude larger than equal area's (+3.4·10⁻² against +2.9·10⁻³, `HEALPixGrid` T32), and it
+destabilised nothing either.
+
+So the amplification is real in the operator and does not translate into observable model behaviour
+at these settings. **This change should be described as an accuracy result, not a stability fix.**
+The configurations above were chosen here, not taken from a run that actually failed; if such a
+configuration exists it would be a better test than any of these.
+
+## Verifying `PerOrderQuadrature` on a GPU node
+
+The CPU work above answered "does the inexact transform destabilise the model" (no). The remaining
+question is the opposite one: **does the new scheme introduce a stability problem of its own?** That
+needs long integrations at the target resolutions, which is a GPU job. Nothing below has been run.
+
+### What could still go wrong
+
+Concrete, from the implementation rather than from imagination:
+
+1. **The GPU path has never executed this change.** `forward_legendre_kernel!` now reads one
+   `Complex{NF}` element `solid_angles_rotated[m, j]` where it read a real `solid_angles[j]` plus
+   `conj(lon_offsets[m, j])`. Correct on CPU; unverified on GPU. Everything else is moot until this
+   is checked.
+2. **`Σ_j g_j = 4π` now only holds at `m = 0`.** With equal-area weights the ring totals summed to
+   `4π` at every order trivially. Per-order they do not — measured `4.7·10⁻⁵` relative deviation at
+   `m = 1`, `4.1·10⁻⁵` at `m = 16` (`HEALPixGrid` T64). This is *correct* — only the `l = m = 0`
+   condition constrains the total, and the global mean stays exact to `1.3·10⁻¹⁵` — but it is a real
+   behavioural change, and quadratic invariants (energy, enstrophy, angular momentum) draw on all
+   orders. Their drift is the thing to watch.
+3. **The weights are no longer smooth in `m`.** Each order is fitted independently, so nothing
+   forces `g^{(m)}` and `g^{(m+1)}` to be close. Nonlinear terms couple orders, so a ragged weight
+   spectrum could imprint a systematic pattern. Worth plotting `g^{(m)}_j` against `m` before
+   running anything long.
+4. **Weights stray up to 18% from equal area.** Grid-space noise is therefore weighted differently
+   than before, by up to that factor, which changes how gridpoint-scale noise projects onto the
+   spectrum.
+5. **The margin is thin at high resolution.** At `nlat_half = 288`, `OctaHEALPixGrid` has only 2
+   degrees of slack and the fit's condition number reaches `10⁵`. A resolution *near* but not on a
+   sanctioned grid could land in the degenerate regime. The residual check warns, but a run started
+   in batch may have that warning scroll past.
+6. **Float32.** The weights are fitted in Float64 and stored as `NF`. Verified fine at T32/T128;
+   unverified at T256 in a long integration.
+
+### Step 0 — GPU correctness, before any physics
+
+Prerequisite. Add to `SpeedyWeather/test/GPU/spectral_transform.jl`:
+
+- CPU vs GPU agreement of the forward transform on `HEALPixGrid`/`OctaHEALPixGrid` at the default
+  dealiasing, all three quadrature schemes, Float32 and Float64;
+- `Array(gpu_transform.solid_angles_rotated) ≈ cpu_transform.solid_angles_rotated`, i.e. the weights
+  survive the host→device transfer intact;
+- the existing round-trip exactness assertions, run on GPU.
+
+```bash
+julia --project=SpeedyWeather/test/GPU/CUDA -e 'using Pkg; Pkg.instantiate()'
+julia --project=SpeedyWeather/test/GPU/CUDA SpeedyWeather/test/GPU/runtests.jl
+```
+
+Also worth a forward-transform benchmark on GPU: the `[m, j]` read replaces a broadcast scalar, so
+the access pattern in the kernel's inner loop changed. `m` is the fast dimension and matches
+`lon_offsets`, so it should stay coalesced — but that is an argument, not a measurement.
+
+### Step 1 — separate the three changes
+
+Three things changed at once, and the third is much the largest in model terms:
+
+| | quadrature weights | Nyquist bin | grid |
+|---|---|---|---|
+| A: `dealiasing = 3`, `EqualAreaQuadrature` | old | kept | old |
+| B: `dealiasing = 3.5`, `EqualAreaQuadrature` | old | kept | **new, +27% points** |
+| C: `dealiasing = 3.5`, `RingQuadrature` | ring | kept | new |
+| D: `dealiasing = 3.5`, `PerOrderQuadrature` | **new** | **dropped** | new |
+
+A→B isolates the resolution change, which also changes the timestep through the CFL condition and
+is the most likely source of any behavioural difference. B→D isolates what this PR actually does to
+the transform. C is the external baseline. Running D alone and comparing against A conflates all
+three and will not answer anything.
+
+### Step 2 — sensitise by weakening hyperdiffusion
+
+The CPU runs showed every scheme surviving with default diffusion, which is the expected outcome if
+diffusion masks the difference — and therefore a weak test. Repeat the A–D matrix with diffusion
+deliberately turned down so any latent difference has room to show:
+
+```julia
+diffusion = HyperDiffusion(spectral_grid, time_scale = Hour(96))   # default is Hour(4)
+model = PrimitiveWetModel(spectral_grid; spectral_transform, horizontal_diffusion = diffusion)
+```
+
+Sweep `time_scale` over 4, 24, 96 hours. The useful signal is not "does it blow up" but **at what
+diffusion strength does each scheme first fail**. If per-order fails at a *weaker* diffusion than
+equal area, it is more robust; if earlier, this PR has introduced a problem. A tie is the expected
+and acceptable outcome.
+
+### Step 3 — long runs at the target resolutions
+
+`PrimitiveWetModel`, Float32, on `HEALPixGrid` and `OctaHEALPixGrid` at T32/T64/T128/T256, cases A
+and D at minimum, 5–10 simulated years. Long enough that a growth rate too slow to see in 180 days
+accumulates: a 1%/year drift is invisible in the CPU runs above and obvious over a decade.
+
+### What to measure
+
+Blow-up is the least informative signal, and the CPU runs showed it does not discriminate. In
+descending order of sensitivity:
+
+1. **Spectral tail.** `SpeedyTransforms.power_spectrum` on vorticity, logged periodically. Energy
+   piling up at the truncation limit is the earliest sign of an ill-behaved transform, visible long
+   before anything diverges. A shallowing or upturning tail is the thing to look for.
+2. **Conserved quantities.** Global mass and mean surface pressure (exact at `m = 0`, so any drift
+   is a genuine bug), total energy, enstrophy, angular momentum. Add as an `AbstractCallback`
+   following `GlobalSurfaceTemperatureCallback` in `output/callbacks.jl`.
+3. **Extrema over time**: `max|vorticity|`, `max|w|`, `min` surface pressure.
+4. **Divergence of two runs from the same initial state**, A vs D, as a function of time. Expected
+   to grow at the Lyapunov rate of the flow, not faster; faster means one of them is being forced.
+
+### What would count as a problem
+
+- Any drift in global mass or the `l = m = 0` mode beyond roundoff — that would be a bug, since
+  that mode is exactly constrained;
+- per-order failing at a *stronger* diffusion than equal area in the Step 2 sweep;
+- a spectral tail that rises relative to case B (same grid, old weights);
+- non-monotone behaviour across resolutions, i.e. T128 fine but T256 not — that would point at the
+  thin fitting margin in risk 5.
+
+### Cost
+
+Step 0 is minutes. Step 2 is the expensive one: 4 cases × 3 diffusion strengths × 2 grids at T128
+is 24 runs. Calibrate from one short T128 run before committing to the matrix, and prune — the A–D
+comparison at a single resolution and diffusion strength is already the decisive one. Step 3 is
+better run as a couple of long jobs than a wide sweep.
 
 ## Documentation changes
 
