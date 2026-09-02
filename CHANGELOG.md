@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Add `HEALPixOutput`, a Zarr output writer that writes onto a `HEALPixGrid` keeping the horizontal dimension flat [#1238](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1238)
+- GitHub Actions github-script v9 [#1241](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1241)
+- GitHub Actions Checkout v7 [#1242](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1242)
 - Lazy batching of FTT plans on GPU to increase performance of models other than the `PrimitiveWetModel` [#1234](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1234)
 - Remove dead code: unused `get_2lm_range` [#1243](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1243)
 - Add a central, BibTeX-backed documentation bibliography with DocumenterCitations [#478](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/478)
