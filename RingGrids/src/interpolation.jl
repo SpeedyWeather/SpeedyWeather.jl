@@ -74,11 +74,6 @@ function GridGeometry(
     )
 end
 
-function Architectures.on_architecture(arch::AbstractArchitecture, geometry::GridGeometry)
-    NF = eltype(geometry.londs)
-    return GridGeometry(on_architecture(arch, geometry.grid); NF)
-end
-
 Base.show(io::IO, G::GridGeometry) = print(io, "GridGeometry for $(G.grid)")
 
 """Supertype of every Locator, which locates the indices on a grid to be used to perform an

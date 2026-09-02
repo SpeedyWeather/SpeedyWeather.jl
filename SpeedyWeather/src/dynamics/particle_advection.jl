@@ -26,17 +26,15 @@ particle_advection!(vars, ::Nothing, ::AbstractModel) = nothing
 
 export ParticleAdvection2D
 
-# geometry is `mutable` and untyped by architecture (AbstractGridGeometry, not a parametric
-# GeometryType) so that `initialize!` can rebind it onto model.architecture in place, since
-# geometry is fixed at construction time (typically before model.architecture is known).
 """
 $(TYPEDFIELDS)
 
 Particle advection on a fixed model layer: particles are advected horizontally with the
 velocity of a single, user-specified vertical layer, their σ coordinate stays constant.
 """
-@kwdef mutable struct ParticleAdvection2D{
+@kwdef struct ParticleAdvection2D{
         NF,
+        GeometryType,
         IntType,
     } <: AbstractParticleAdvection
 
@@ -50,18 +48,17 @@ velocity of a single, user-specified vertical layer, their σ coordinate stays c
     layer::IntType = 1
 
     "[DERIVED] Interpolation geometry used during advection"
-    geometry::RingGrids.AbstractGridGeometry
+    geometry::GeometryType
 end
 
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection2D{SG.NF, typeof(SG.truncation)}(; geometry, kwargs...)
+    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
 end
 
 export ParticleAdvection3D
 
 # σ_levels_full is read from model.geometry at runtime.
-# geometry is `mutable` and untyped by architecture, see ParticleAdvection2D above.
 """
 $(TYPEDFIELDS)
 
@@ -69,8 +66,9 @@ Continuous 3D particle advection: particles are tracked at their own σ coordina
 evolves in time driven by the model's diagnosed vertical velocity, in addition to being
 advected horizontally.
 """
-@kwdef mutable struct ParticleAdvection3D{
+@kwdef struct ParticleAdvection3D{
         NF,
+        GeometryType,
         IntType,
     } <: AbstractParticleAdvection
 
@@ -81,12 +79,12 @@ advected horizontally.
     every_n_time_steps::IntType = 6
 
     "[DERIVED] Interpolation geometry used during advection"
-    geometry::RingGrids.AbstractGridGeometry
+    geometry::GeometryType
 end
 
 function ParticleAdvection3D(SG::SpectralGrid; kwargs...)
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection3D{SG.NF, typeof(SG.truncation)}(; geometry, kwargs...)
+    return ParticleAdvection3D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
 end
 
 variables(P::AbstractParticleAdvection) = variables(typeof(P), P.nparticles)
@@ -120,28 +118,14 @@ function variables(P::ParticleAdvection3D, ::AbstractModel)
     )
 end
 
-# particle_advection.geometry is fixed at ParticleAdvection2D/3D construction time (typically
-# before model.architecture is known), so it may not match model.architecture. Rebind it onto the
-# model's architecture in place if needed (geometry is mutable for this reason).
-function _reconcile_architecture!(particle_advection::AbstractParticleAdvection, model::AbstractModel)
-    (; geometry) = particle_advection
-    ismatching(model.architecture, geometry.grid.architecture) && return particle_advection
-    particle_advection.geometry = on_architecture(model.architecture, geometry)
-    return particle_advection
-end
-
 function initialize!(particle_advection::ParticleAdvection2D, model::AbstractModel)
     (; nlayers) = model.spectral_grid
     (; layer) = particle_advection
     nlayers < layer && @warn "Particle advection on layer $layer on spectral grid with nlayers=$nlayers."
-    _reconcile_architecture!(particle_advection, model)
     return nothing
 end
 
-function initialize!(particle_advection::ParticleAdvection3D, model::AbstractModel)
-    _reconcile_architecture!(particle_advection, model)
-    return nothing
-end
+initialize!(::ParticleAdvection3D, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -304,7 +288,7 @@ function particle_advection!(
     Δt *= n * convert(NF, 180 / (π * radius))   # scale to [s*°/m] to obtain [˚] when multiplied with velocity in [m/s]
     Δt_half = Δt / 2                    # /2 because Heun is average of Euler+corrected step
 
-    u_old = vars.particles.u            # from previous time step and locationq
+    u_old = vars.particles.u            # from previous time step and location
     v_old = vars.particles.v            # from previous time step and location
 
     # HACK: reuse u, v arrays (old velocity) on the fly for interpolation
@@ -426,6 +410,9 @@ end
     ) where {NF}
 
     dlat = v * Δt                                           # increment in latitude [˚N]
+
+    # TODO: Replace `cos(deg2rad(particle.lat))` with `cosd(particle.lat)` once
+    # JuliaGPU/AMDGPU.jl#1041 is merged/released and `cosd` is supported on AMD GPUs.
     coslat = max(cos(deg2rad(particle.lat)), eps(NF))       # prevents division by zero
     dlon = u * Δt / coslat                                  # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
