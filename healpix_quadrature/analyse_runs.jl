@@ -85,6 +85,24 @@ for run in sort(runs, by = r -> (r.grid, r.truncation, r.diffusion_hours, r.case
 end
 
 # ---------------------------------------------------------------------------------------------
+# failure times per case. A blow-up time is one draw from a distribution, so a single run per case
+# cannot rank the schemes; this is the only statement the ensemble supports.
+
+failure_years(run) = isnothing(run.diverged_at) ? NaN :
+    (run.diverged_at - first(run.time)).value / (1000 * 3600 * 24 * 365.25)
+
+println("\nFailure time by case, over the ensemble members available")
+@printf("%-28s %-8s %-9s %-9s %-9s %s\n", "case", "members", "mean", "std", "min", "max")
+for case in sort(unique(r.case for r in runs))
+    times = filter(isfinite, [failure_years(r) for r in runs if r.case == case])
+    isempty(times) && continue
+    @printf(
+        "%-28s %-8d %-9.2f %-9.2f %-9.2f %.2f\n", CASE_LABELS[case], length(times),
+        mean(times), length(times) > 1 ? std(times) : NaN, minimum(times), maximum(times)
+    )
+end
+
+# ---------------------------------------------------------------------------------------------
 # figures, one per (grid, truncation, diffusion) group
 
 for group_key in unique([(r.grid, r.truncation, r.diffusion_hours) for r in runs])

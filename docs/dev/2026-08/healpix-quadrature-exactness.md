@@ -8,6 +8,10 @@
 > This is an **accuracy** result. The stability motivation it started from was tested and not
 > supported: no configuration tried here is destabilised by the inexact transform. See
 > "The stability motivation".
+>
+> The converse — that the new scheme might destabilise something itself — was tested on GPU and is
+> also not supported: the one `HEALPixGrid` T128 configuration that does blow up blows up
+> identically under the pre-PR status quo. See "Results".
 
 Date of initial draft: 2026-08-31
 
@@ -725,6 +729,10 @@ the matrix, since it is the one scheme that deliberately gives up exactness for 
 
 ### Step 2 — sensitise by weakening hyperdiffusion
 
+> Not run, and the design below needs inverting first — every scheme already fails at the *default*
+> diffusion in the configuration used, so weakening it further cannot discriminate. See
+> "What is still open".
+
 The CPU runs showed every scheme surviving with default diffusion, which is the expected outcome if
 diffusion masks the difference — and therefore a weak test. Repeat the A–D matrix with diffusion
 deliberately turned down so any latent difference has room to show:
@@ -740,6 +748,9 @@ equal area, it is more robust; if earlier, this PR has introduced a problem. A t
 and acceptable outcome.
 
 ### Step 3 — long runs at the target resolutions
+
+> Run at `HEALPixGrid` T128 only, as an 11-run matrix including 4-member ensembles for cases B and
+> D. See "Results"; the other grid and the other three resolutions remain untested.
 
 `PrimitiveWetModel`, Float32, on `HEALPixGrid` and `OctaHEALPixGrid` at T32/T64/T128/T256, cases A
 and D at minimum, 5–10 simulated years. Long enough that a growth rate too slow to see in 180 days
@@ -780,6 +791,166 @@ time each, measured from the two runs that already diverged there (32 and 55 min
 batch, and the Step 2 diffusion sweep can be aimed by its results rather than run blind: since case
 D already fails at the *default* diffusion, the informative sweep runs in both directions —
 stronger (1, 2 h) to find where each scheme survives, and weaker (24, 96 h) to rank them.
+
+## Results
+
+Run on 2026-09-02, one NVIDIA A40 per job, CUDA 13.3, Julia 1.12.2, `SpeedyWeather 0.22.1+DEV`.
+
+### Step 0 — the GPU path is correct
+
+`HEALPixGrid`/`OctaHEALPixGrid` at the default dealiasing, T32, all four schemes, both number
+formats. 90 assertions, all passing, and the rest of `SpeedyWeather/test/GPU/runtests.jl` with them.
+
+- **The weights transfer intact.** `S_cpu.solid_angles_rotated == Array(S_gpu.solid_angles_rotated)`
+  holds bit-for-bit in every combination, and `mmax_truncation` matches, so the comparisons below
+  are between the same quadrature on both devices.
+- **The forward transform agrees with the CPU loop**, relative L2 over the coefficients:
+  `2.2 … 2.9·10⁻¹⁶` in Float64 and `1.4 … 1.6·10⁻⁷` in Float32, i.e. arithmetic noise, on both
+  grids and under all four schemes.
+- **The round trip is exact on the device.** Spectral → grid → spectral of a random band-limited
+  field, relative L2 and the round-trip gain:
+
+| | Float64 | Float32 | gain |
+|---|---|---|---|
+| `HEALPixGrid`, per order | 7.1·10⁻¹⁶ | 1.46·10⁻⁷ | 1.0000000 |
+| `OctaHEALPixGrid`, per order | 7.0·10⁻¹⁶ | 1.50·10⁻⁷ | 1.0000000 |
+| `HEALPixGrid`, equal area | 5.6·10⁻³ | 5.6·10⁻³ | 0.9997851 |
+| `OctaHEALPixGrid`, equal area | 4.1·10⁻³ | 4.1·10⁻³ | 0.9998390 |
+
+  The equal-area rows are the contrast case, in the test as well as here: without them the
+  tolerance would pass whether or not the weights had made it to the device.
+
+**The changed inner-loop read costs nothing.** Forward and inverse transform on GPU, `nlayers = 8`,
+Float32, minimum of 30 timed calls, per-order against equal area on the same grid — the two schemes
+produce identically shaped arrays, so this isolates the values from the access pattern:
+
+| grid | T32 | T64 | T128 | T256 |
+|---|---|---|---|---|
+| `HEALPixGrid` forward, equal area / per order [ms] | 0.199 / 0.199 | 0.402 / 0.402 | 1.105 / 1.107 | 2.820 / 2.821 |
+| `OctaHEALPixGrid` forward, equal area / per order [ms] | 0.223 / 0.223 | 0.539 / 0.536 | 1.489 / 1.487 | 3.976 / 3.983 |
+| `OctahedralGaussianGrid` forward, for scale [ms] | 0.143 | 0.342 | 0.874 | 2.377 |
+
+Every pair agrees to better than 0.5%, i.e. to the timing noise. The HEALPix grids are slower than
+`OctahedralGaussianGrid` at the same truncation, but that is the 27% larger `nlat_half` the higher
+dealiasing brings, not the weights.
+
+### The weights themselves
+
+`healpix_quadrature/plot_weights.jl`, T64. Two things the plan asked to look at before running
+anything long:
+
+- **Smoothness in `m`.** The per-order weights vary smoothly and depart from equal area only at low
+  order: they reach `0.91 … 1.18` around `m ≤ 5`, converge by `m ≈ 8`, and sit within a fraction of
+  a percent of equal area over the rest of the spectrum. There is no ragged weight spectrum, and
+  the ±18% quoted in risk 4 is a low-order phenomenon, not a property of the whole set — so
+  gridpoint-scale noise, which lives at high `m`, is weighted essentially as before.
+- **Ring totals against 4π.** Maximum relative deviation over all orders: equal area `3·10⁻⁸`
+  (roundoff, as it must be), per ring `6·10⁻⁸`, per order `5.6·10⁻⁵` on `HEALPixGrid` and
+  `4.1·10⁻⁵` on `OctaHEALPixGrid`, contractive `1.5·10⁻³`. Per order misses `4π` away from `m = 0`,
+  as expected and as risk 2 anticipated, and hits it at `m = 0`.
+
+**`ContractiveQuadrature` does not conserve the global mean**, and this is worth stating separately
+because it is a defect of case E rather than of what the PR ships. Analysing a constant field of 1
+at T128 in Float64 recovers a global mean of:
+
+| | equal area | per ring | per order | contractive |
+|---|---|---|---|---|
+| `HEALPixGrid` | 1 − 1.1·10⁻¹⁶ | 1 − 2.2·10⁻¹⁶ | 1 + 4.4·10⁻¹⁶ | **1 − 1.47·10⁻³** |
+| `OctaHEALPixGrid` | 1 + 2.2·10⁻¹⁶ | 1 + 0 | 1 + 2.2·10⁻¹⁶ | **1 − 9.16·10⁻⁴** |
+
+In the model this is amplified by the choice of prognostic variable: the analysis is applied to
+`ln(pₛ) ≈ 11.485`, so a `1.47·10⁻³` *relative* loss on the `m = 0` amplitude is a shift of `0.0169`
+in the log, i.e. **1.7% in surface pressure**. That is exactly what the runs show — case E starts
+and stays at a global mean `pₛ` of 95870 Pa where every other case sits at 97500 Pa — and it is a
+one-off offset at initialisation, not a drift.
+
+### Steps 1–3 — the A–E matrix at the failing configuration
+
+`PrimitiveWetModel`, `HEALPixGrid`, T128, Float32, 10 years, default hyperdiffusion (4 h), on GPU.
+Cases B and D were additionally run as 4-member ensembles (the unperturbed member plus three
+`1·10⁻⁶` relative perturbations of the initial vorticity). 11 runs, about 30 minutes of A40 time
+each. Drifts and the spectral tail are read at year 2, common to every run and well before any of
+them turns.
+
+| case | seed | survived | failed at | years | Δ `lnpₛ₀₀` | Δ mass | tail @ 2 y |
+|---|---|---|---|---|---|---|---|
+| A dealias 3.0, equal area | 0 | **no** | 2005-05-20 | 5.38 | +0.00e+00 | +3.5e-04 | 1.04e-02 |
+| B dealias 3.5, equal area | 0 | **no** | 2005-03-26 | 5.23 | +0.00e+00 | +5.0e-04 | 1.14e-02 |
+| B | 1 | **no** | 2004-11-20 | 4.89 | +0.00e+00 | +3.5e-04 | 8.72e-03 |
+| B | 2 | **no** | 2005-04-16 | 5.29 | +0.00e+00 | +3.7e-04 | 7.65e-03 |
+| B | 3 | **no** | 2006-01-25 | 6.07 | +0.00e+00 | +4.3e-04 | 9.55e-03 |
+| C dealias 3.5, per ring | 0 | **no** | 2005-02-17 | 5.13 | +0.00e+00 | +4.2e-04 | 8.30e-03 |
+| D dealias 3.5, per order | 0 | **no** | 2004-07-27 | 4.57 | +0.00e+00 | +5.3e-04 | 7.61e-03 |
+| D | 1 | **no** | 2004-10-02 | 4.75 | +0.00e+00 | +4.6e-04 | 1.04e-02 |
+| D | 2 | **no** | 2005-08-20 | 5.63 | +0.00e+00 | +4.3e-04 | 5.55e-03 |
+| D | 3 | **no** | 2004-07-13 | 4.53 | +0.00e+00 | +6.0e-04 | 1.03e-02 |
+| E dealias 3.5, contractive | 0 | **no** | 2005-03-29 | 5.24 | +0.00e+00 | +4.5e-04 | 4.44e-03 |
+
+**1. The failure is the pre-existing one, not the quadrature.** Case A is the status quo — the old
+grid and the old weights, i.e. the configuration this PR replaces — and it fails too, at 5.4 years.
+So does every other scheme. Until the runs turn, all eleven trajectories are superimposed in
+enstrophy, kinetic energy, angular momentum and global mean `pₛ`; kinetic energy, enstrophy and
+angular momentum then all begin to climb together from about year 4 in every case, angular momentum
+roughly doubling before the run dies. That is the runaway equatorial superrotation already
+diagnosed in
+[2026-08-31-healpix-superrotation-blowup.md](2026-08-31-healpix-superrotation-blowup.md), on the
+same grid family and at a comparable point in the run, and that analysis found it unfixable by any
+of 14 hyperdiffusion settings. The two runs that motivated this experiment were case D; had case A
+been run alongside them at the time, it would have failed too.
+
+**2. The failure times do not rank the schemes.** With 4 members each, B is 5.37 ± 0.50 years and D
+is 4.87 ± 0.52. The ranges overlap (B 4.89 … 6.07, D 4.53 … 5.63); the difference of means is 0.50
+years against a standard error of 0.36, `t ≈ 1.4` on 6 degrees of freedom. That is not a detectable
+difference, and it is what the single-run picture (A 5.38, B 5.23, C 5.13, D 4.57, E 5.24) would
+have suggested had it been over-read: these configurations differ by far more than roundoff, so
+their trajectories decorrelate within weeks and each failure time is one draw from a distribution
+whose spread is itself over a year. A mean shift of half a year cannot be excluded at this sample
+size; a shift large enough to matter next to "the status quo fails here too" can.
+
+**3. The exactly constrained mode does not drift at all.** `Δ lnpₛ₀₀` is `+0.00e+00` — not small,
+*exactly* zero in Float32 — in all eleven runs, over 4.5 to 6 simulated years. That is the plan's
+first failure criterion, and the sharpest one, since the `l = m = 0` mode is the one the quadrature
+pins exactly and any drift there would be a bug rather than a property of the flow. Global mass
+drifts by `3.5 … 6.0·10⁻⁴` with no pattern by scheme.
+
+**4. The spectral tail does not rise.** The fraction of vorticity power in the top 10% of degrees at
+year 2 averages `9.3·10⁻³` over B's four members and `8.5·10⁻³` over D's, with within-case spreads
+(B `7.7 … 11.4·10⁻³`, D `5.6 … 10.4·10⁻³`) that swamp the difference. Read from the unperturbed
+runs alone, D looked 33% *below* B — the ensemble shows that too was scatter. The plan's criterion
+was a tail that *rises* relative to case B; it does not.
+
+### Verdict
+
+The three things the plan set out to check come out as follows.
+
+- **Does the GPU path work?** Yes, verified and now covered by tests.
+- **Does `PerOrderQuadrature` introduce a stability problem of its own?** No evidence of one. The
+  one configuration known to fail fails identically without it, the conserved quantities behave the
+  same, and the spectral tail does not rise. Not run: the diffusion sweep, other resolutions,
+  `OctaHEALPixGrid`, and the A-vs-D separation-growth measurement — see below.
+- **Does it fix a stability problem?** No, and the CPU study already said as much. This remains an
+  accuracy result.
+
+One incidental finding is worth acting on independently of this PR: `ContractiveQuadrature` costs
+1.7% of the global surface-pressure mass at initialisation, for the reason given above. It is not
+the default and not what the PR ships, but a scheme that shifts the model's mass by that much
+should say so, or be corrected at `m = 0`.
+
+### What is still open
+
+- **The diffusion sweep (Step 2) was not run.** Its original design — weaken the diffusion until
+  runs fail — cannot discriminate here, because every scheme already fails at the *default*
+  diffusion. The informative version runs the other way: strengthen it (1 h, 2 h) until runs survive
+  10 years, and compare drift and spectral tails on trajectories that complete. Ten more jobs.
+- **Only `HEALPixGrid` T128 was tested.** `OctaHEALPixGrid`, and T32/T64/T256, are untested in a
+  long integration. The plan's fourth failure criterion — non-monotone behaviour across resolutions,
+  T128 fine but T256 not, which would point at the thin fitting margin of risk 5 — is therefore
+  unaddressed.
+- **The A-vs-D separation growth** (the plan's fourth measurement) was not computed.
+  `run_case.jl` now has `snapshot_every`, which keeps the surface vorticity coefficients
+  periodically so two runs on the same spectrum can be differenced directly, but no run has used it.
+- **Ensembles exist only for B and D.** A, C and E are single realisations and their failure times
+  should not be compared with anything.
 
 ## Documentation changes
 
