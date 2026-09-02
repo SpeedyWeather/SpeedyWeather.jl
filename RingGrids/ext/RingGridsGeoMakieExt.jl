@@ -85,6 +85,7 @@ function RingGrids.globe!(
         transf = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
         ax = LScene(pos; show_axis = false, axis_kwargs...)
     else
+        transf = nothing
         ax = GeoAxis(
             pos;
             title,
