@@ -13,6 +13,9 @@ import SpeedyTransforms: SpectralTransform, _fourier_batched!
 import SpeedyTransforms.RingGrids: AbstractField
 import SpeedyWeatherInternals.Architectures: architecture
 
+# Dissable gpu_graphs for debugging with Metal GPU CI pipeline
+import SpeedyTransforms: SpectralTransform, _fourier_batched!, default_gpu_graphs
+default_gpu_graphs(::Metal.MetalBackend) = false
 
 # =====================================================================================
 # Single-graph Fourier, north+south combined per ring: north ring j and its mirrored
