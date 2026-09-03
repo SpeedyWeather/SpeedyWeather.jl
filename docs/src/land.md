@@ -323,6 +323,49 @@ The total albedo is higher over already brighter areas (low vegetation cover)
 and lower over darker areas. This somewhat reflects that in forests the
 snow cover is broken up and snow lies in between trees.
 
+### Snow on sea ice
+
+By default snow only lies on land; over the ocean it is assumed to melt on contact with the water.
+That is right for open ocean but not over sea ice, where snow accumulates and substantially
+brightens and insulates the surface. Setting the `sea_ice_snow` flag enables a second snow bucket
+over sea ice
+
+```julia
+snow = SnowModel(spectral_grid, sea_ice_snow=true)
+land = LandModel(spectral_grid; snow)
+model = PrimitiveWetModel(spectral_grid; land)
+```
+
+which adds the prognostic variable `variables.prognostic.ocean.snow_depth`, again in equivalent
+liquid water height. It is a depth **per unit sea ice area**, not a grid-cell mean, so accumulation
+is not weighted by the sea ice concentration ``ℵ`` while all its effects below are. The budget is
+
+```math
+\frac{dS}{dt} = P - M, \qquad M = \min\left(\frac{S}{\Delta t},\ \text{sea\_ice\_melt\_factor} \cdot \max(T_s - \text{melting\_threshold},\ 0)\right)
+```
+
+with the snow fall rate ``P`` as over land and the surface air temperature ``T_s``. Unlike the land
+budget, the melt is a degree-day-style function of air temperature rather than a closed surface
+energy balance, because there is no prognostic sea ice surface temperature to build one from.
+The bucket is capped at `snow_depth_cap` as over land.
+
+When the sea ice retreats the snow it carried goes with it: once ``ℵ`` drops below
+`sea_ice_threshold` (0.01 by default) the bucket is emptied. The melt water is not routed into an
+ocean freshwater budget, which the model does not track, so this snow sink does not conserve mass.
+
+Snow on sea ice then feeds into three places, in each case weighted by ``ℵ`` so that the effect
+vanishes over open ocean:
+
+- `OceanSeaIceAlbedo` adds ``ℵ σₛ albedo_{snow}`` on top of the ocean/ice mixture, using the same
+  snow-cover schemes as over land, clamped so the total albedo cannot exceed 1.
+- `SurfaceOceanHeatFlux` damps the sensible heat flux by a further factor
+  ``1 + ℵ S / \text{snow\_insulation\_depth}``.
+- `SurfaceOceanHumidityFlux` damps the evaporative flux the same way.
+
+Note that snow does not currently insulate the sea ice *itself*: the insulation acts on the
+atmosphere-surface fluxes only and does not enter the [Sea ice](@ref) growth and melt budget, so
+snow cover cannot yet help ice survive a warm season.
+
 ## Albedo
 
 Albedo is the surface reflectivity to downward solar shortwave radiation.

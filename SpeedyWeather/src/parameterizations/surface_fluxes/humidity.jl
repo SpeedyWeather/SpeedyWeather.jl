@@ -59,6 +59,9 @@ export SurfaceOceanHumidityFlux
 
     "[OPTION] Sea ice insulating surface humidity fluxes [1]"
     @param sea_ice_insulation::NF = 0.01 (bounds = 0 .. 1,)
+
+    "[OPTION] Snow insulation depth [m], e-folding depth controlling how snow on sea ice insulates surface humidity fluxes"
+    @param snow_insulation_depth::NF = 0.05 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
@@ -97,6 +100,12 @@ variables(::SurfaceOceanHumidityFlux) = (
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     flux_ocean /= 1 + sea_ice_concentration / humidity_flux.sea_ice_insulation
+
+    # snow on sea ice insulates further, weighted by the ice fraction it lies on so that it
+    # vanishes over open ocean. Snow depth is stored as a depth per sea ice area.
+    snow_depth_ocean = haskey(vars.prognostic.ocean, :snow_depth) ?
+        vars.prognostic.ocean.snow_depth[ij] : zero(SST[ij])
+    flux_ocean /= 1 + sea_ice_concentration * snow_depth_ocean / humidity_flux.snow_insulation_depth
 
     # store without weighting by land fraction for coupling
     vars.parameterizations.ocean.surface_humidity_flux[ij] = flux_ocean
