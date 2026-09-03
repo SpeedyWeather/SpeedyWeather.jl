@@ -673,8 +673,12 @@ end
 
         @test haskey(S.rfft_plans_batched, K)           # planned on first use
         @test haskey(S.brfft_plans_batched, K)
-        @test field == field_serial                     # bit-identical, same FFTs in a batch
-        @test coeffs_back == coeffs_serial
+        # the batched and serial FFT paths agree numerically; on CUDA/AMD they are also
+        # bit-identical (same plan, just batched), but on Metal a batched vs a K=1 MPS FFT
+        # accumulate differently, so compare with a tolerance. `Array(...)` moves the data to the
+        # host: `==`/`≈` on the GPU wrappers falls back to scalar indexing, which errors.
+        @test Array(field.data) ≈ Array(field_serial.data)
+        @test Array(coeffs_back.data) ≈ Array(coeffs_serial.data)
 
         # cached: a second call reuses the plan rather than planning again
         plans = S.rfft_plans_batched[K]
