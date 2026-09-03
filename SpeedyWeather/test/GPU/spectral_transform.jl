@@ -417,7 +417,8 @@ end
 
 CUDA_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt), "CUDA")
 AMD_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt), "HIP")
-@test xor(CUDA_executed, AMD_executed) # only one should ever be executed on a given machine
+Metal_executed = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsMetalExt) !== nothing
+@test count((CUDA_executed, AMD_executed, Metal_executed)) == 1 # exactly one GPU backend extension per machine
 
 @testset "fourier_batched: compare backward pass to CPU" begin
     @testset for truncation in spectral_resolutions
