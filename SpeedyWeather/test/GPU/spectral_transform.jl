@@ -673,10 +673,9 @@ end
 
         @test haskey(S.rfft_plans_batched, K)           # planned on first use
         @test haskey(S.brfft_plans_batched, K)
-        # the batched and serial FFT paths agree numerically; on CUDA/AMD they are also
-        # bit-identical (same plan, just batched), but on Metal a batched vs a K=1 MPS FFT
-        # accumulate differently, so compare with a tolerance. `Array(...)` moves the data to the
-        # host: `==`/`≈` on the GPU wrappers falls back to scalar indexing, which errors.
+        # batched path vs the serial path it replaces. `Array(...)` moves to the host: comparing
+        # the GPU wrappers directly falls back to scalar indexing, which errors. `≈` rather than
+        # `==` as the batched and serial K=1 plans need not agree to the last bit.
         @test Array(field.data) ≈ Array(field_serial.data)
         @test Array(coeffs_back.data) ≈ Array(coeffs_serial.data)
 
