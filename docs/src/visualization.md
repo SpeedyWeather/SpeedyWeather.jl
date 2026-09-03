@@ -11,11 +11,11 @@ For full fields (which can be reshaped into matrices), creating a heatmap is str
 ```@example visualization
 using SpeedyWeather
 using CairoMakie, GeoMakie
-using Random: Xoshiro
+import Random
+Random.seed!(1234)
 
-rng = Xoshiro(0)
 grid = FullGaussianGrid(24)
-field = randn(rng, grid)
+field = randn(grid)
 heatmap(field)
 ```
 
@@ -30,7 +30,7 @@ For reduced grids (like `OctahedralGaussianGrid` or `HEALPixGrid`), the field is
 
 ```@example visualization
 grid = OctahedralGaussianGrid(24)
-field = randn(rng, grid)
+field = randn(grid)
 heatmap(field)
 ```
 
@@ -38,7 +38,7 @@ You can also pass additional keyword arguments to customize the appearance:
 
 ```@example visualization
 grid = FullGaussianGrid(24)
-field = randn(rng, grid)
+field = randn(grid)
 heatmap(field; colormap = :thermal, colorrange = (-2, 2), title = "Temperature Anomaly")
 ```
 
@@ -47,9 +47,9 @@ Mutating variants of `heatmap` are also provided which can be used to plot into 
 ```@example visualization
 grid = FullGaussianGrid(24)
 fig = Figure(size = (800, 400))
-field = randn(rng, grid)
+field = randn(grid)
 ax, hm = heatmap!(fig[1, 1], field; title = "Time step 1")
-field = randn(rng, grid)
+field = randn(grid)
 heatmap!(ax, field; title = "Time step 2")
 fig
 ```
@@ -72,7 +72,7 @@ Or plot data on the globe:
 
 ```@example visualization
 grid = FullGaussianGrid(24)
-field = randn(rng, grid)
+field = randn(grid)
 globe(field; interactive = false)
 ```
 
@@ -121,8 +121,8 @@ The mutating functions like `heatmap!` are especially useful for composing multi
 
 ```@example visualization
 grid = OctahedralGaussianGrid(48)
-u_field = randn(rng, grid)
-v_field = randn(rng, grid)
+u_field = randn(grid)
+v_field = randn(grid)
 
 fig = Figure(size = (1000, 300))
 _, hm1 = heatmap!(fig[1, 1], u_field; title = "Zonal wind",     colormap = :balance, colorrange = (-3, 3))
