@@ -59,6 +59,9 @@ with drag coefficients. Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Sea ice insulating surface heat fluxes [1]"
     @param sea_ice_insulation::NF = 0.01 (bounds = Positive,)
+
+    "[OPTION] Snow insulation depth [m], e-folding depth controlling how snow on sea ice insulates surface heat fluxes"
+    @param snow_insulation_depth::NF = 0.05 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure SurfaceOceanHeatFlux
@@ -94,6 +97,12 @@ variables(::SurfaceOceanHeatFlux) = (
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     flux_ocean /= 1 + sea_ice_concentration / heat_flux.sea_ice_insulation
+
+    # snow on sea ice insulates further, weighted by the ice fraction it lies on so that it
+    # vanishes over open ocean. Snow depth is stored as a depth per sea ice area.
+    snow_depth_ocean = haskey(vars.prognostic.ocean, :snow_depth) ?
+        vars.prognostic.ocean.snow_depth[ij] : zero(ρ)
+    flux_ocean /= 1 + sea_ice_concentration * snow_depth_ocean / heat_flux.snow_insulation_depth
 
     # store without weighting by land fraction for coupling [W/m²]
     vars.parameterizations.ocean.sensible_heat_flux[ij] = flux_ocean * cₚ  # to store ocean flux separately too

@@ -172,32 +172,7 @@ end
 
 @propagate_inbounds albedo!(ij, albedo, vars, scheme::AlbedoClimatology, model) = (albedo[ij] = scheme.albedo[ij])
 
-# OceanSeaIceAlbedo
-export OceanSeaIceAlbedo
-
-"""Albedo that scales linearly between ocean and ice albedo depending on sea ice concentration.
-Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct OceanSeaIceAlbedo{NF} <: AbstractAlbedo
-    "[OPTION] Albedo over open ocean [1]"
-    @param albedo_ocean::NF = 0.06 (bounds = 0 .. 1,)
-
-    "[OPTION] Albedo over sea ice at concentration=1 [1]"
-    @param albedo_ice::NF = 0.6 (bounds = 0 .. 1,)
-end
-
-Adapt.@adapt_structure OceanSeaIceAlbedo
-OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(; kwargs...)
-initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
-
-@propagate_inbounds function albedo!(ij, albedo, vars, scheme::OceanSeaIceAlbedo, model)
-    (; albedo_ocean, albedo_ice) = scheme
-    NF = eltype(albedo)
-    ℵ = haskey(vars.prognostic.ocean, :sea_ice_concentration) ? vars.prognostic.ocean.sea_ice_concentration[ij] : zero(NF)
-
-    # set ocean albedo linearly between ocean and ice depending on sea ice concentration
-    return albedo[ij] = albedo_ocean + ℵ * (albedo_ice - albedo_ocean)
-end
-
+# snow cover schemes, shared by the ocean (snow on sea ice) and land albedos below
 abstract type AbstractSnowCover end
 
 export LinearSnowCover, SaturatingSnowCover
@@ -214,6 +189,57 @@ Adapt.@adapt_structure SaturatingSnowCover
 
 """$(TYPEDSIGNATURES) Snow cover fraction for the saturating scheme."""
 @inline (::SaturatingSnowCover)(snow_depth, scale) = snow_depth / (snow_depth + scale)
+
+# OceanSeaIceAlbedo
+export OceanSeaIceAlbedo
+
+"""Albedo that scales linearly between ocean and ice albedo depending on sea ice concentration,
+with an additional contribution from snow lying on the sea ice (see `SnowModel`'s `sea_ice_snow`).
+Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct OceanSeaIceAlbedo{NF, Scheme <: AbstractSnowCover} <: AbstractAlbedo
+    "[OPTION] Albedo over open ocean [1]"
+    @param albedo_ocean::NF = 0.06 (bounds = 0 .. 1,)
+
+    "[OPTION] Albedo over sea ice at concentration=1 [1]"
+    @param albedo_ice::NF = 0.6 (bounds = 0 .. 1,)
+
+    "[OPTION] Albedo of snow on sea ice [1], additive to sea ice"
+    @param albedo_snow::NF = 0.4 (bounds = 0 .. 1,)
+
+    "[OPTION] Conversion from snow depth to snow cover [m]"
+    @param snow_depth_scale::NF = 0.05 (bounds = Positive,)
+
+    "[OPTION] Snow cover-albedo scheme"
+    @param snow_cover::Scheme = SaturatingSnowCover() (group = :snow_cover,)
+end
+
+Adapt.@adapt_structure OceanSeaIceAlbedo
+OceanSeaIceAlbedo(SG::SpectralGrid; snow_cover = SaturatingSnowCover(), kwargs...) =
+    OceanSeaIceAlbedo{SG.NF, typeof(snow_cover)}(; snow_cover, kwargs...)
+initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
+
+@propagate_inbounds function albedo!(ij, albedo, vars, scheme::OceanSeaIceAlbedo, model)
+    (; albedo_ocean, albedo_ice) = scheme
+    NF = eltype(albedo)
+    ℵ = haskey(vars.prognostic.ocean, :sea_ice_concentration) ? vars.prognostic.ocean.sea_ice_concentration[ij] : zero(NF)
+
+    # set ocean albedo linearly between ocean and ice depending on sea ice concentration
+    albedo[ij] = albedo_ocean + ℵ * (albedo_ice - albedo_ocean)
+
+    # add snow lying on the sea ice, weighted by the ice fraction it sits on so that it
+    # vanishes over open ocean. Snow depth is stored as a depth per sea ice area.
+    if haskey(vars.prognostic.ocean, :snow_depth)
+        (; albedo_snow, snow_depth_scale) = scheme
+        snow_depth = vars.prognostic.ocean.snow_depth[ij]
+
+        # compute snow-cover fraction using the chosen scheme, as over land
+        snow_cover = scheme.snow_cover(snow_depth, snow_depth_scale)
+
+        # clamp to 1 so that albedo_ice + albedo_snow > 1 cannot give an unphysical albedo
+        albedo[ij] = min(albedo[ij] + ℵ * snow_cover * albedo_snow, one(NF))
+    end
+    return nothing
+end
 
 # LandSnowAlbedo
 export LandSnowAlbedo
