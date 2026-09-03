@@ -253,8 +253,8 @@ end
             # INVERSE, spectral coefficients -> Fourier coefficients per ring
             g_north_cpu, g_south_cpu = zero(S_cpu.scratch_memory.north), zero(S_cpu.scratch_memory.south)
             g_north_gpu, g_south_gpu = S_gpu.scratch_memory.north, S_gpu.scratch_memory.south
-            fill!(g_north_gpu, NaN)
-            fill!(g_south_gpu, NaN)
+            fill!(g_north_gpu, Complex{NF}(NaN))   # NaN is Float64; Metal has no Float64 → cast to the array eltype
+            fill!(g_south_gpu, Complex{NF}(NaN))
             SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, specs_cpu, S_cpu.scratch_memory.column, S_cpu)
             SpeedyTransforms._legendre!(g_north_gpu, g_south_gpu, specs_gpu, S_gpu.scratch_memory.column, S_gpu)
             g_north_test = on_architecture(cpu_arch, g_north_gpu)
