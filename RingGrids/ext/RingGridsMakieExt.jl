@@ -23,7 +23,8 @@ end
 """
 $(TYPEDSIGNATURES)
 Defines Makie's `heatmap` function for a`field::AbstractField2D` via interpolation
-to `::AbstractFullField2D` (which can be reshaped into a matrix.)"""
+to `::AbstractFullField2D` (which can be reshaped into a matrix.)
+"""
 function Makie.heatmap(
         field::RingGrids.AbstractField2D;
         title::String = default_title(field),
@@ -36,38 +37,77 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Defines Makie's `heatmap` function for a `field::AbstractFullField2D` which can be reshaped into a matrix."""
+Defines Makie's `heatmap` function for a `field::AbstractFullField2D` which can be reshaped into a matrix.
+"""
 function Makie.heatmap(
         field::RingGrids.AbstractFullField2D;
         title::String = default_title(field),
         size = (600, 300),
         kwargs...
     )
+    fig = Figure(size = size, figure_padding = 10)
+    _, hm = heatmap!(fig[1, 1], field; title, kwargs...)
+    Colorbar(fig[1, 2], hm, ticklabelsize = 10)
+    colsize!(fig.layout, 1, Aspect(1, 2.0))
+    resize_to_layout!(fig)
+    return fig
+end
 
+function Makie.heatmap!(pos::Makie.GridPosition, field::RingGrids.AbstractField2D; kwargs...)
+    full_field = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
+    return heatmap!(pos, full_field; kwargs...)
+end
+
+function Makie.heatmap!(pos::Makie.AbstractAxis, field::RingGrids.AbstractField2D; kwargs...)
+    full_field = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
+    return heatmap!(pos, full_field; kwargs...)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Mutating variant of `heatmap` for RingGrids `Field`s. Returns both the `Axis ` as well as the
+plotting object returned by `Makie.heatmap!`.
+"""
+function Makie.heatmap!(
+        pos::Makie.GridPosition,
+        field::RingGrids.AbstractFullField2D;
+        title::String = default_title(field),
+        aspect = 2,
+        titlesize = 10,
+        xticklabelsize = 10,
+        yticklabelsize = 10,
+        axis_kwargs = (;),
+        kwargs...
+    )
+    ax = Axis(
+        pos;
+        aspect,             # 0-360˚E -90-90˚N maps have an aspect of 2:1
+        title,
+        titlesize,
+        xticklabelsize,
+        yticklabelsize,
+        xticks = 0:60:360,      # label 0˚E, 60˚E, 120˚E, ...
+        yticks = -60:30:60,     # label -60˚N, -30˚N, 0˚N, ...
+        xtickformat = values -> ["$(round(Int, value))˚E" for value in values],
+        ytickformat = values -> ["$(round(Int, value))˚N" for value in values],
+        axis_kwargs...
+    )
+    hm = heatmap!(ax, field; kwargs...)
+    return ax, hm
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Mutating variant of `heatmap` for RingGrids `Field`s that plots directly into an existing `Axis`.
+Returns the plotting object created by `Makie.heatmap!`.
+"""
+function Makie.heatmap!(ax::Makie.AbstractAxis, field::RingGrids.AbstractFullField2D; kwargs...)
     mat = Matrix(field)                 # reshapes a full field into a matrix
     lond = RingGrids.get_lond(field)    # get lon, lat axes in degrees
     latd = RingGrids.get_latd(field)
-
-    fig = Figure(size = size, figure_padding = 10)
-    ax = Axis(
-        fig[1, 1],
-        aspect = 2,             # 0-360˚E -90-90˚N maps have an aspect of 2:1
-        title = title,
-        titlesize = 10,
-        xticks = 0:60:360,      # label 0˚E, 60˚E, 120˚E, ...
-        yticks = -60:30:60,     # label -60˚N, -30˚N, 0˚N, ...
-        xticklabelsize = 10,
-        yticklabelsize = 10,
-        xtickformat = values -> ["$(round(Int, value))˚E" for value in values],
-        ytickformat = values -> ["$(round(Int, value))˚N" for value in values],
-    )
-
     hm = heatmap!(ax, lond, latd, mat; kwargs...)
-    Colorbar(fig[1, 2], hm, ticklabelsize = 10)
-    colsize!(fig.layout, 1, Aspect(1, 2.0))
-
-    resize_to_layout!(fig)
-    return fig
+    return hm
 end
 
 end # module

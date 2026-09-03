@@ -142,8 +142,9 @@ const DEFAULT_ARRAYTYPE = Array
 const DEFAULT_ARCHITECTURE = CPU
 
 # to be defined in GeoMakie extension
-export globe
+export globe, globe!
 function globe end
+function globe! end
 
 include("utility_functions.jl")
 
