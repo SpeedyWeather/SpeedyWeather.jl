@@ -41,10 +41,12 @@ function spectral_smoothing!(
     # -l*(l+1) in 0-based becomes -l*(l-1) in 1-based
     eigenvalue_norm = truncation == -1 ? -mmax * (mmax - 1) : -truncation * (truncation - 1)
 
-    # Launch kernel
+    # Launch kernel — pass every scalar as NF so the kernel has no Int/Float64 arithmetic
+    # (a GPU without Float64, e.g. Metal, can't compile it otherwise)
+    NF = real(eltype(L))
     launch!(
         architecture(L), SpectralWorkOrder, size(L), spectral_smoothing_kernel!,
-        L, c, power, eigenvalue_norm, L.spectrum.l_indices,
+        L, NF(c), NF(power), NF(eigenvalue_norm), L.spectrum.l_indices,
     )
 
     return L
@@ -66,6 +68,7 @@ end
     eigenvalue_normalised = -l * (l - 1) / eigenvalue_norm
 
     # Apply smoothing: for eigenvalue_norm < largest eigenvalue the factor becomes negative
-    # set to zero in that case
-    L[I] *= max(1 - (1 - c) * eigenvalue_normalised^power, 0)
+    # set to zero in that case. `@fastmath` for the `^`: a real exponent otherwise routes through
+    # Base's `Float64` `pow_body`, which does not compile on GPUs without Float64 (Metal)
+    L[I] *= max(1 - (1 - c) * (@fastmath eigenvalue_normalised^power), 0)
 end
