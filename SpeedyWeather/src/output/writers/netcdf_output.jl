@@ -193,16 +193,14 @@ function initialize!(
     defVar(dataset, "layer", σ, ("layer",), attrib = Dict("units" => "1", "long_name" => "sigma layer"))
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
-    # VARIABLES, remove output variables not existent in simulation.variables
+    # VARIABLES: define every output variable in the netCDF file and write initial
+    # conditions, skipping any that don't exist in the simulation — the same check the
+    # generic `output!` makes at write time, applied here so a skipped variable doesn't
+    # leave an all-_FillValue phantom variable behind
     simulation = Simulation(vars, model)
-    nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
-    if !isempty(nonexisting_vars)
-        @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
-    end
-    delete!(output, nonexisting_vars...)
-
-    # then define every output variable in the netCDF file and write initial conditions
+    warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
+        exists_in_simulation(var, simulation) || continue
         define_variable!(dataset, var, eltype(output.field2D))
         output!(output, var, simulation)
     end
@@ -210,7 +208,7 @@ function initialize!(
     # calculate land fraction on output grid
     if hasproperty(model, :land_sea_mask)
         land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
-        interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
+        interpolate_output!(output, output.land_fraction, land_fraction_cpu)
     end
 
     return nothing
