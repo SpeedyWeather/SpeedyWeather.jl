@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Optional snow accumulation on sea ice affecting albedo and surface flux insulation, enabled with `SnowModel(..., sea_ice_snow=true)` [#1245](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1245)
+- Optional snow accumulation on sea ice affecting albedo and surface flux insulation, enabled with `SnowModel(..., sea_ice_snow=true)` [#1245](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1246)
 - Several problems Enzyme compat with 1.12 fixed, but no full end-to-end differentiability yet [#1163](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1163)
 - Add `HEALPixOutput`, a Zarr output writer that writes onto a `HEALPixGrid` keeping the horizontal dimension flat [#1238](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1238)
 - GitHub Actions github-script v9 [#1241](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1241)
