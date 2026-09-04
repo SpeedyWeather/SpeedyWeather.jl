@@ -49,6 +49,7 @@ export FullGaussianGrid,
 export OctahedralGaussianGrid,
     OctahedralClenshawGrid,
     HEALPixGrid,
+    HEALPixPaddedGrid,
     OctaHEALPixGrid,
     OctaminimalGaussianGrid
 
@@ -64,6 +65,7 @@ export FullGaussianField,
     OctahedralGaussianField,
     OctahedralClenshawField,
     HEALPixField,
+    HEALPixPaddedField,
     OctaHEALPixField,
     OctaminimalGaussianField
 
@@ -172,6 +174,7 @@ include("grids/octahedral_clenshaw.jl")
 include("grids/healpix.jl")
 include("grids/octahealpix.jl")
 include("grids/octaminimal_gaussian.jl")
+include("grids/healpix_padded.jl")
 
 # INTEGRATION AND INTERPOLATION
 include("quadrature_weights.jl")

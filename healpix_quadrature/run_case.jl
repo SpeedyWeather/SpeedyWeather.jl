@@ -2,14 +2,17 @@
 # docs/dev/2026-08/healpix-quadrature-exactness.md, "Verifying `PerOrderQuadrature` on a GPU node".
 #
 # Three things changed at once in this PR — the grid (dealiasing 3 -> 3.5), the quadrature weights,
-# and the Nyquist bin — and the grid change is much the largest in model terms because it also
-# changes the timestep through the CFL condition. The cases below separate them:
+# and the Nyquist bin — and the grid change is the largest in model terms, since it changes the
+# number of grid points the nonlinear terms are evaluated on by 27%. (It does *not* change the
+# timestep: `Leapfrog` scales `Δt` with `truncation` alone, see `get_Δt_millisec`, so every case
+# here takes the same number of steps. An earlier version of this comment said otherwise.) The
+# cases below separate them:
 #
 #   A  dealiasing 3.0   EqualAreaQuadrature    old grid, old weights (the status quo)
 #   B  dealiasing 3.5   EqualAreaQuadrature    new grid, old weights
 #   C  dealiasing 3.5   RingQuadrature         new grid, classical HEALPix weights (healpy/ducc/cuHPX)
 #   D  dealiasing 3.5   PerOrderQuadrature     new grid, new weights (what this PR ships)
-#   E  dealiasing 3.5   ContractiveQuadrature  new grid, non-expansive weights
+#   E  dealiasing 3.5   DenseQuadrature        new grid, latitude-dense alias-free analysis
 #
 # A->B isolates the resolution change, B->{C,D,E} isolates the weights. Dropping each ring's
 # Nyquist bin follows the *grid* in the implementation rather than the scheme, so it is on in every
@@ -49,13 +52,22 @@ const CASES = Dict(
     "B" => (dealiasing = 3.5, Quadrature = SpeedyTransforms.EqualAreaQuadrature),
     "C" => (dealiasing = 3.5, Quadrature = SpeedyTransforms.RingQuadrature),
     "D" => (dealiasing = 3.5, Quadrature = SpeedyTransforms.PerOrderQuadrature),
-    "E" => (dealiasing = 3.5, Quadrature = SpeedyTransforms.ContractiveQuadrature),
+    "E" => (dealiasing = 3.5, Quadrature = SpeedyTransforms.DenseQuadrature),
 )
 
 const GRIDS = Dict(
     "HEALPixGrid" => HEALPixGrid,
     "OctaHEALPixGrid" => OctaHEALPixGrid,
     "OctahedralGaussianGrid" => OctahedralGaussianGrid,
+    # Negative control for the polar-truncation hypothesis (healpix_quadrature/polar_truncation.jl):
+    # exact Gaussian latitude quadrature, but 4, 8, 12, ... longitudes on the cap rings, i.e. the
+    # same polar truncation loss as the HEALPix family. If this superrotates like HEALPix, latitude
+    # quadrature is not the cause.
+    "OctaminimalGaussianGrid" => OctaminimalGaussianGrid,
+    # Positive test for the same hypothesis: HEALPix latitudes, HEALPix belt, HEALPix ring areas,
+    # but 16 extra longitudes on every polar-cap ring, so the caps can hold the orders the fields
+    # actually carry there. +3.6% grid points at nlat_half = 144.
+    "HEALPixPaddedGrid" => HEALPixPaddedGrid,
 )
 
 case = argument("case", "D")
@@ -81,11 +93,22 @@ perturbation = argument("perturbation", 1.0e-6)
 haskey(CASES, case) || error("unknown case $case, expected one of $(sort(collect(keys(CASES))))")
 (; dealiasing, Quadrature) = CASES[case]
 
+# The case's dealiasing can be overridden, which is how the alias-controlled grid is tested.
+# HEALPix at the shipped 3.5 satisfies neither condition for alias-free quadratic terms: the
+# latitude quadrature would need `nlat_half ≥ 1.5·T` (194 at T128, against 144) to be exact on a
+# product, and the widest ring would need `nlon ≥ 3T+1 = 385` (against 288) for nothing to fold
+# into `m = 0`. Both are met at dealiasing 5.5, `nlat_half = 216`. See
+# healpix_quadrature/aliasing.jl for the measurements and the plan's aliasing section for why this
+# is the candidate mechanism for the superrotation runaway.
+const CASE_DEALIASING = dealiasing
+dealiasing = argument("dealiasing", dealiasing)
+
 period = days > 0 ? Day(days) : Year(years)
 tag = days > 0 ?
     @sprintf("%s_%s_T%d_diff%dh_%dd", case, string(nameof(Grid)), truncation, diffusion_hours, days) :
     @sprintf("%s_%s_T%d_diff%dh_%dy", case, string(nameof(Grid)), truncation, diffusion_hours, years)
 seed > 0 && (tag *= @sprintf("_seed%d", seed))
+dealiasing == CASE_DEALIASING || (tag *= @sprintf("_dealias%.1f", dealiasing))
 mkpath(output_directory)
 
 # ---------------------------------------------------------------------------------------------

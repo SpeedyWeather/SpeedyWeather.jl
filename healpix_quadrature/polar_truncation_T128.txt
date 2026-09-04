@@ -1,0 +1,326 @@
+Precompiling packages...
+  15080.2 ms  ✓ SpeedyWeather
+  1 dependency successfully precompiled in 19 seconds. 211 already precompiled.
+T = 128, Float64. Ring-mean errors of the analysed product of two band-limited fields.
+
+
+######## coefficient slope (1+l)^-1.0 ########
+  [validation vs transform, ring 64: max abs diff 1.9e-14, field rms 0.82]
+
+== HEALPixGrid d3.5  (nlat_half = 144, rms exact ring mean = 1.192e-01)
+  ring   nlon   lat      total err   trunc loss    fold      |rel|
+     1      4   89.35  -5.958e-05  -5.958e-05  -3.469e-18  5.0e-04
+     2      8   88.70  -3.367e-04  -3.367e-04  -2.776e-17  2.8e-03
+     3     12   88.05  +3.949e-05  +3.949e-05  +8.327e-17  3.3e-04
+     4     16   87.40  +2.726e-05  +2.726e-05  -2.776e-17  2.3e-04
+     5     20   86.75  -2.805e-06  -2.805e-06  +3.469e-17  2.4e-05
+     6     24   86.10  -1.305e-06  -1.305e-06  -4.857e-17  1.1e-05
+     7     28   85.45  +5.203e-07  +5.203e-07  +2.082e-17  4.4e-06
+     8     32   84.80  +3.359e-08  +3.359e-08  -1.249e-16  2.8e-07
+    12     48   82.20  +4.873e-09  +4.873e-09  -2.498e-16  4.1e-08
+    16     64   79.59  -1.286e-09  -1.286e-09  +0.000e+00  1.1e-08
+    24     96   74.36  -9.043e-13  -9.045e-13  +1.978e-16  7.6e-12
+    32    128   69.09  +1.457e-16  +2.776e-17  +1.180e-16  1.2e-15
+    48    192   58.41  -1.665e-16  +0.000e+00  -1.665e-16  1.4e-15
+    64    256   47.44  -3.469e-16  +0.000e+00  -3.469e-16  2.9e-15
+    96    288   26.39  -4.510e-16  +0.000e+00  -4.510e-16  3.8e-15
+   144    288    0.00  +1.249e-16  +0.000e+00  +1.249e-16  1.0e-15
+  global-mean error Σ w_j e_j = -2.235e-08  (relative to global mean of product -4.883e-02: 4.6e-07)
+  zonal error left if the innermost N rings (each hemisphere) had NO error:
+    N =  0:  rms zonal-mean error 4.094e-06  (100.0% of all-ring value 4.094e-06), |Σ w e| = 2.23e-08
+    N =  1:  rms zonal-mean error 4.066e-06  (99.3% of all-ring value 4.094e-06), |Σ w e| = 1.88e-08
+    N =  2:  rms zonal-mean error 7.910e-07  (19.3% of all-ring value 4.094e-06), |Σ w e| = 1.15e-08
+    N =  4:  rms zonal-mean error 2.231e-07  (5.4% of all-ring value 4.094e-06), |Σ w e| = 6.57e-09
+    N =  8:  rms zonal-mean error 1.584e-08  (0.4% of all-ring value 4.094e-06), |Σ w e| = 4.73e-10
+    N = 16:  rms zonal-mean error 1.887e-11  (0.0% of all-ring value 4.094e-06), |Σ w e| = 3.08e-13
+    N = 32:  rms zonal-mean error 3.367e-16  (0.0% of all-ring value 4.094e-06), |Σ w e| = 1.41e-17
+  through the transform: relative error of the zonal-mean coefficients, all l / l <= 10,
+  with the innermost N rings (per hemisphere) removed from the analysis; and 1/sigma_min of the
+  m = 0 analysis block (even, odd parity) on the remaining rings:
+    N =  0:  all l 2.13e-05   l<=10 3.22e-06   1/sigma_min = 1.050 / 1.050
+    N =  2:  all l 5.93e-06   l<=10 1.45e-06   1/sigma_min = 5.444 / 5.595
+    N =  4:  all l 1.67e-06   l<=10 6.04e-07   1/sigma_min = 86.785 / 92.110
+    N =  6:  all l 1.45e-07   l<=10 7.78e-08   1/sigma_min = 1703.455 / 1864.417
+    N =  8:  all l 1.14e-07   l<=10 5.11e-08   1/sigma_min = 36055.675 / 40695.483
+    N = 12:  all l 3.07e-09   l<=10 1.15e-09   1/sigma_min = 18438835.401 / 22146762.322
+    N = 16:  all l 1.19e-10   l<=10 4.48e-11   1/sigma_min = 10850188461.402 / 13887445768.535
+  [validation vs transform, ring 64: max abs diff 1.4e-14, field rms 0.69]
+
+== OctaHEALPixGrid d3.5  (nlat_half = 144, rms exact ring mean = 1.192e-01)
+  ring   nlon   lat      total err   trunc loss    fold      |rel|
+     1      4   89.44  -5.860e-06  -5.860e-06  +1.041e-17  4.9e-05
+     2      8   88.87  -1.284e-04  -1.284e-04  -4.163e-17  1.1e-03
+     3     12   88.31  +9.062e-06  +9.062e-06  +5.551e-17  7.6e-05
+     4     16   87.75  +4.336e-06  +4.336e-06  +0.000e+00  3.6e-05
+     5     20   87.19  -2.461e-07  -2.461e-07  +5.551e-17  2.1e-06
+     6     24   86.62  -7.926e-08  -7.926e-08  -6.245e-17  6.6e-07
+     7     28   86.06  +2.313e-08  +2.313e-08  -6.939e-18  1.9e-07
+     8     32   85.50  +8.945e-11  +8.945e-11  +4.163e-17  7.5e-10
+    12     48   83.24  +3.437e-11  +3.437e-11  -1.665e-16  2.9e-10
+    16     64   80.99  -1.143e-12  -1.143e-12  +1.943e-16  9.6e-12
+    24     96   76.46  -9.368e-17  -2.082e-17  -7.286e-17  7.9e-16
+    32    128   71.92  +3.140e-16  +0.000e+00  +3.140e-16  2.6e-15
+    48    192   62.73  -4.163e-17  +0.000e+00  -4.163e-17  3.5e-16
+    64    256   53.37  -3.886e-16  +0.000e+00  -3.886e-16  3.3e-15
+    96    384   33.75  +1.318e-16  +0.000e+00  +1.318e-16  1.1e-15
+   144    576    0.00  -1.665e-16  +0.000e+00  -1.665e-16  1.4e-15
+  global-mean error Σ w_j e_j = -4.864e-09  (relative to global mean of product -4.883e-02: 1.0e-07)
+  zonal error left if the innermost N rings (each hemisphere) had NO error:
+    N =  0:  rms zonal-mean error 1.353e-06  (100.0% of all-ring value 1.353e-06), |Σ w e| = 4.86e-09
+    N =  1:  rms zonal-mean error 1.341e-06  (99.2% of all-ring value 1.353e-06), |Σ w e| = 5.77e-09
+    N =  2:  rms zonal-mean error 1.397e-07  (10.3% of all-ring value 1.353e-06), |Σ w e| = 2.34e-09
+    N =  4:  rms zonal-mean error 1.738e-08  (1.3% of all-ring value 1.353e-06), |Σ w e| = 4.48e-10
+    N =  8:  rms zonal-mean error 2.177e-10  (0.0% of all-ring value 1.353e-06), |Σ w e| = 5.18e-12
+    N = 16:  rms zonal-mean error 9.862e-15  (0.0% of all-ring value 1.353e-06), |Σ w e| = 2.08e-16
+    N = 32:  rms zonal-mean error 3.430e-16  (0.0% of all-ring value 1.353e-06), |Σ w e| = 2.87e-17
+  through the transform: relative error of the zonal-mean coefficients, all l / l <= 10,
+  with the innermost N rings (per hemisphere) removed from the analysis; and 1/sigma_min of the
+  m = 0 analysis block (even, odd parity) on the remaining rings:
+    N =  0:  all l 7.13e-06   l<=10 1.17e-06   1/sigma_min = 1.036 / 1.037
+    N =  2:  all l 9.08e-07   l<=10 2.21e-07   1/sigma_min = 3.531 / 3.604
+    N =  4:  all l 1.16e-07   l<=10 3.91e-08   1/sigma_min = 32.942 / 34.526
+    N =  6:  all l 3.07e-09   l<=10 1.36e-09   1/sigma_min = 389.598 / 418.560
+    N =  8:  all l 1.42e-09   l<=10 5.72e-10   1/sigma_min = 4966.776 / 5468.734
+    N = 12:  all l 7.05e-12   l<=10 2.64e-12   1/sigma_min = 906436.633 / 1048527.601
+    N = 16:  all l 5.67e-14   l<=10 2.18e-14   1/sigma_min = 183857482.136 / 223570360.114
+  [validation vs transform, ring 60: max abs diff 1.8e-14, field rms 0.65]
+
+== OctahedralGaussianGrid d2  (nlat_half = 96, rms exact ring mean = 1.192e-01)
+  ring   nlon   lat      total err   trunc loss    fold      |rel|
+     1     20   89.28  -5.204e-18  +0.000e+00  -5.204e-18  4.4e-17
+     2     24   88.36  -3.286e-14  -1.554e-15  -3.131e-14  2.8e-13
+     3     28   87.42  +1.637e-12  +1.990e-14  +1.617e-12  1.4e-11
+     4     32   86.49  -1.808e-12  -7.521e-14  -1.732e-12  1.5e-11
+     5     36   85.56  +9.925e-11  +5.257e-12  +9.400e-11  8.3e-10
+     6     40   84.62  +5.482e-10  +1.968e-11  +5.285e-10  4.6e-09
+     7     44   83.69  +6.166e-10  +7.758e-12  +6.089e-10  5.2e-09
+     8     48   82.75  +2.441e-09  +1.856e-10  +2.256e-09  2.0e-08
+    12     64   79.01  -4.084e-09  +1.990e-09  -6.074e-09  3.4e-08
+    16     80   75.27  -5.703e-09  +6.514e-09  -1.222e-08  4.8e-08
+    24    112   67.79  +8.132e-09  -9.834e-09  +1.797e-08  6.8e-08
+    32    144   60.31  -2.079e-08  -2.702e-09  -1.809e-08  1.7e-07
+    48    208   45.35  -8.633e-14  -1.027e-13  +1.633e-14  7.2e-13
+    64    272   30.39  -7.095e-16  +0.000e+00  -7.095e-16  6.0e-15
+    96    400    0.47  -9.714e-16  +0.000e+00  -9.714e-16  8.1e-15
+    96    400    0.47  -9.714e-16  +0.000e+00  -9.714e-16  8.1e-15
+  global-mean error Σ w_j e_j = +4.879e-10  (relative to global mean of product -4.883e-02: 1.0e-08)
+  zonal error left if the innermost N rings (each hemisphere) had NO error:
+    N =  0:  rms zonal-mean error 1.091e-08  (100.0% of all-ring value 1.091e-08), |Σ w e| = 4.88e-10
+    N =  1:  rms zonal-mean error 1.091e-08  (100.0% of all-ring value 1.091e-08), |Σ w e| = 4.88e-10
+    N =  2:  rms zonal-mean error 1.091e-08  (100.0% of all-ring value 1.091e-08), |Σ w e| = 4.88e-10
+    N =  4:  rms zonal-mean error 1.091e-08  (100.0% of all-ring value 1.091e-08), |Σ w e| = 4.88e-10
+    N =  8:  rms zonal-mean error 1.091e-08  (100.0% of all-ring value 1.091e-08), |Σ w e| = 4.85e-10
+    N = 16:  rms zonal-mean error 1.077e-08  (98.8% of all-ring value 1.091e-08), |Σ w e| = 4.97e-10
+    N = 32:  rms zonal-mean error 6.558e-10  (6.0% of all-ring value 1.091e-08), |Σ w e| = 5.23e-11
+  through the transform: relative error of the zonal-mean coefficients, all l / l <= 10,
+  with the innermost N rings (per hemisphere) removed from the analysis; and 1/sigma_min of the
+  m = 0 analysis block (even, odd parity) on the remaining rings:
+    N =  0:  all l 8.75e-08   l<=10 2.40e-08   1/sigma_min = 1.000 / 1.000
+    N =  2:  all l 8.75e-08   l<=10 2.40e-08   1/sigma_min = 21.662 / 22.907
+    N =  4:  all l 8.75e-08   l<=10 2.40e-08   1/sigma_min = 2668.696 / 3014.969
+    N =  6:  all l 8.75e-08   l<=10 2.40e-08   1/sigma_min = 409228.098 / 494098.186
+    N =  8:  all l 8.75e-08   l<=10 2.42e-08   1/sigma_min = 70127992.748 / 90619949.848
+    N = 12:  all l 8.73e-08   l<=10 2.37e-08   1/sigma_min = 2750189644081.298 / 4098790212388.545
+    N = 16:  all l 8.64e-08   l<=10 2.36e-08   1/sigma_min = 5669664635027954.000 / 4974127866309783.000
+  [validation vs transform, ring 64: max abs diff 2.2e-14, field rms 0.72]
+
+== OctaminimalGaussianGrid d2  (nlat_half = 96, rms exact ring mean = 1.192e-01)
+  ring   nlon   lat      total err   trunc loss    fold      |rel|
+     1      4   89.28  +5.412e-04  -5.341e-04  +1.075e-03  4.5e-03
+     2      8   88.36  -1.624e-03  +5.331e-05  -1.678e-03  1.4e-02
+     3     12   87.42  -9.582e-04  -3.185e-05  -9.263e-04  8.0e-03
+     4     16   86.49  -2.549e-04  -3.814e-04  +1.265e-04  2.1e-03
+     5     20   85.56  -4.716e-04  +2.342e-05  -4.950e-04  4.0e-03
+     6     24   84.62  +1.165e-04  -2.530e-04  +3.695e-04  9.8e-04
+     7     28   83.69  -2.440e-04  +5.727e-05  -3.012e-04  2.0e-03
+     8     32   82.75  +2.255e-05  +1.853e-04  -1.628e-04  1.9e-04
+    12     48   79.01  -6.048e-04  +1.773e-05  -6.226e-04  5.1e-03
+    16     64   75.27  +1.830e-04  +1.775e-04  +5.548e-06  1.5e-03
+    24     96   67.79  -1.563e-04  -9.818e-06  -1.465e-04  1.3e-03
+    32    128   60.31  +8.817e-06  +5.154e-05  -4.272e-05  7.4e-05
+    48    192   45.35  -5.050e-09  +2.145e-08  -2.650e-08  4.2e-08
+    64    256   30.39  +4.441e-16  +0.000e+00  +4.441e-16  3.7e-15
+    96    384    0.47  +4.163e-16  +0.000e+00  +4.163e-16  3.5e-15
+    96    384    0.47  +4.163e-16  +0.000e+00  +4.163e-16  3.5e-15
+  global-mean error Σ w_j e_j = -5.957e-06  (relative to global mean of product -4.883e-02: 1.2e-04)
+  zonal error left if the innermost N rings (each hemisphere) had NO error:
+    N =  0:  rms zonal-mean error 1.034e-04  (100.0% of all-ring value 1.034e-04), |Σ w e| = 5.96e-06
+    N =  1:  rms zonal-mean error 1.031e-04  (99.8% of all-ring value 1.034e-04), |Σ w e| = 6.06e-06
+    N =  2:  rms zonal-mean error 9.518e-05  (92.1% of all-ring value 1.034e-04), |Σ w e| = 5.20e-06
+    N =  4:  rms zonal-mean error 9.267e-05  (89.7% of all-ring value 1.034e-04), |Σ w e| = 4.44e-06
+    N =  8:  rms zonal-mean error 7.431e-05  (71.9% of all-ring value 1.034e-04), |Σ w e| = 3.72e-06
+    N = 16:  rms zonal-mean error 4.548e-05  (44.0% of all-ring value 1.034e-04), |Σ w e| = 1.33e-06
+    N = 32:  rms zonal-mean error 5.560e-06  (5.4% of all-ring value 1.034e-04), |Σ w e| = 6.45e-07
+  through the transform: relative error of the zonal-mean coefficients, all l / l <= 10,
+  with the innermost N rings (per hemisphere) removed from the analysis; and 1/sigma_min of the
+  m = 0 analysis block (even, odd parity) on the remaining rings:
+    N =  0:  all l 7.44e-04   l<=10 2.77e-04   1/sigma_min = 1.000 / 1.000
+    N =  2:  all l 6.78e-04   l<=10 2.25e-04   1/sigma_min = 21.662 / 22.907
+    N =  4:  all l 6.59e-04   l<=10 1.71e-04   1/sigma_min = 2668.696 / 3014.969
+    N =  6:  all l 5.68e-04   l<=10 2.10e-04   1/sigma_min = 409228.098 / 494098.186
+    N =  8:  all l 5.37e-04   l<=10 1.35e-04   1/sigma_min = 70127992.799 / 90619949.398
+    N = 12:  all l 4.17e-04   l<=10 1.03e-04   1/sigma_min = 2749442429971.786 / 4099363861014.719
+    N = 16:  all l 3.20e-04   l<=10 7.46e-05   1/sigma_min = 4474058956152140.500 / 5508693972672620.000
+  [validation vs transform, ring 64: max abs diff 2.5e-14, field rms 0.81]
+
+== OctaminimalGaussianGrid d3.5  (nlat_half = 144, rms exact ring mean = 1.192e-01)
+  ring   nlon   lat      total err   trunc loss    fold      |rel|
+     1      4   89.52  +1.586e-04  -5.426e-05  +2.129e-04  1.3e-03
+     2      8   88.90  -1.277e-04  +1.310e-06  -1.291e-04  1.1e-03
+     3     12   88.28  -2.242e-05  -8.265e-07  -2.159e-05  1.9e-04
+     4     16   87.66  -1.121e-06  -1.469e-06  +3.481e-07  9.4e-06
+     5     20   87.03  -1.137e-06  +1.116e-07  -1.249e-06  9.5e-06
+     6     24   86.41  +4.842e-07  -1.683e-07  +6.524e-07  4.1e-06
+     7     28   85.79  -2.356e-07  +8.948e-09  -2.445e-07  2.0e-06
+     8     32   85.16  +3.387e-09  +2.200e-09  +1.187e-09  2.8e-08
+    12     48   82.67  -3.171e-09  +2.886e-10  -3.460e-09  2.7e-08
+    16     64   80.17  +4.506e-11  +7.666e-12  +3.740e-11  3.8e-10
+    24     96   75.18  -1.701e-14  -1.527e-16  -1.685e-14  1.4e-13
+    32    128   70.19  -1.388e-17  +0.000e+00  -1.388e-17  1.2e-16
+    48    192   60.21  -4.094e-16  +0.000e+00  -4.094e-16  3.4e-15
+    64    256   50.23  +1.318e-16  +0.000e+00  +1.318e-16  1.1e-15
+    96    384   30.26  -3.487e-16  +0.000e+00  -3.487e-16  2.9e-15
+   144    576    0.31  -2.220e-16  +0.000e+00  -2.220e-16  1.9e-15
+  global-mean error Σ w_j e_j = -2.299e-08  (relative to global mean of product -4.883e-02: 4.7e-07)
+  zonal error left if the innermost N rings (each hemisphere) had NO error:
+    N =  0:  rms zonal-mean error 2.431e-06  (100.0% of all-ring value 2.431e-06), |Σ w e| = 2.30e-08
+    N =  1:  rms zonal-mean error 2.054e-06  (84.5% of all-ring value 2.431e-06), |Σ w e| = 3.51e-08
+    N =  2:  rms zonal-mean error 3.997e-07  (16.4% of all-ring value 2.431e-06), |Σ w e| = 6.16e-09
+    N =  4:  rms zonal-mean error 1.262e-07  (5.2% of all-ring value 2.431e-06), |Σ w e| = 1.17e-09
+    N =  8:  rms zonal-mean error 1.217e-09  (0.1% of all-ring value 2.431e-06), |Σ w e| = 5.27e-11
+    N = 16:  rms zonal-mean error 1.256e-12  (0.0% of all-ring value 2.431e-06), |Σ w e| = 1.00e-14
+    N = 32:  rms zonal-mean error 3.439e-16  (0.0% of all-ring value 2.431e-06), |Σ w e| = 2.57e-17
+  through the transform: relative error of the zonal-mean coefficients, all l / l <= 10,
+  with the innermost N rings (per hemisphere) removed from the analysis; and 1/sigma_min of the
+  m = 0 analysis block (even, odd parity) on the remaining rings:
+    N =  0:  all l 8.28e-06   l<=10 1.77e-06   1/sigma_min = 1.000 / 1.000
+    N =  2:  all l 2.18e-06   l<=10 4.96e-07   1/sigma_min = 3.609 / 3.686
+    N =  4:  all l 5.99e-07   l<=10 1.49e-07   1/sigma_min = 45.849 / 48.294
+    N =  6:  all l 7.38e-08   l<=10 3.00e-08   1/sigma_min = 758.264 / 822.042
+    N =  8:  all l 8.61e-09   l<=10 3.92e-09   1/sigma_min = 13589.863 / 15161.762
+    N = 12:  all l 3.01e-10   l<=10 1.03e-10   1/sigma_min = 4939966.469 / 5838623.649
+    N = 16:  all l 6.39e-12   l<=10 2.29e-12   1/sigma_min = 2011928297.913 / 2521024207.592
+  [validation vs transform, ring 60: max abs diff 2.5e-14, field rms 0.81]
+
+== HEALPixPaddedGrid d3.5  (nlat_half = 144, rms exact ring mean = 1.192e-01)
+  ring   nlon   lat      total err   trunc loss    fold      |rel|
+     1     20   89.35  +8.674e-18  +0.000e+00  +8.674e-18  7.3e-17
+     2     24   88.70  +1.943e-16  -2.776e-17  +2.220e-16  1.6e-15
+     3     28   88.05  -9.992e-16  +2.776e-17  -1.027e-15  8.4e-15
+     4     32   87.40  +4.718e-16  +0.000e+00  +4.718e-16  4.0e-15
+     5     36   86.75  -3.560e-15  +1.180e-16  -3.678e-15  3.0e-14
+     6     40   86.10  -6.613e-15  +1.110e-16  -6.724e-15  5.5e-14
+     7     44   85.45  -2.782e-15  +0.000e+00  -2.782e-15  2.3e-14
+     8     48   84.80  -3.011e-15  +1.665e-16  -3.178e-15  2.5e-14
+    12     64   82.20  +1.665e-16  +2.776e-17  +1.388e-16  1.4e-15
+    16     80   79.59  +5.551e-17  +0.000e+00  +5.551e-17  4.7e-16
+    24    112   74.36  -3.227e-16  +0.000e+00  -3.227e-16  2.7e-15
+    32    144   69.09  +2.429e-16  +0.000e+00  +2.429e-16  2.0e-15
+    48    208   58.41  -3.192e-16  +0.000e+00  -3.192e-16  2.7e-15
+    64    272   47.44  +3.886e-16  +0.000e+00  +3.886e-16  3.3e-15
+    96    288   26.39  -4.510e-16  +0.000e+00  -4.510e-16  3.8e-15
+   144    288    0.00  +1.249e-16  +0.000e+00  +1.249e-16  1.0e-15
+  global-mean error Σ w_j e_j = +2.438e-17  (relative to global mean of product -4.883e-02: 5.0e-16)
+  zonal error left if the innermost N rings (each hemisphere) had NO error:
+    N =  0:  rms zonal-mean error 4.158e-16  (100.0% of all-ring value 4.158e-16), |Σ w e| = 2.44e-17
+    N =  1:  rms zonal-mean error 4.158e-16  (100.0% of all-ring value 4.158e-16), |Σ w e| = 2.44e-17
+    N =  2:  rms zonal-mean error 4.158e-16  (100.0% of all-ring value 4.158e-16), |Σ w e| = 2.44e-17
+    N =  4:  rms zonal-mean error 4.135e-16  (99.4% of all-ring value 4.158e-16), |Σ w e| = 2.51e-17
+    N =  8:  rms zonal-mean error 3.597e-16  (86.5% of all-ring value 4.158e-16), |Σ w e| = 3.18e-17
+    N = 16:  rms zonal-mean error 3.413e-16  (82.1% of all-ring value 4.158e-16), |Σ w e| = 3.22e-17
+    N = 32:  rms zonal-mean error 3.335e-16  (80.2% of all-ring value 4.158e-16), |Σ w e| = 2.76e-17
+  through the transform: relative error of the zonal-mean coefficients, all l / l <= 10,
+  with the innermost N rings (per hemisphere) removed from the analysis; and 1/sigma_min of the
+  m = 0 analysis block (even, odd parity) on the remaining rings:
+    N =  0:  all l 2.58e-15   l<=10 1.14e-15   1/sigma_min = 1.050 / 1.050
+    N =  2:  all l 2.58e-15   l<=10 1.14e-15   1/sigma_min = 5.444 / 5.595
+    N =  4:  all l 2.58e-15   l<=10 1.11e-15   1/sigma_min = 86.785 / 92.110
+    N =  6:  all l 2.31e-15   l<=10 9.44e-16   1/sigma_min = 1703.455 / 1864.417
+    N =  8:  all l 2.15e-15   l<=10 9.73e-16   1/sigma_min = 36055.675 / 40695.483
+    N = 12:  all l 2.11e-15   l<=10 9.45e-16   1/sigma_min = 18438835.326 / 22146762.362
+    N = 16:  all l 2.11e-15   l<=10 9.43e-16   1/sigma_min = 10850197271.818 / 13887441907.576
+
+-- hypothetical: same HEALPix latitudes, every ring below 3T+1 longitudes padded by +16 --
+  [validation vs transform, ring 64: max abs diff 1.9e-14, field rms 0.82]
+
+== HEALPixGrid d3.5, rings +16 longitudes  (nlat_half = 144, rms exact ring mean = 1.192e-01)
+  ring   nlon   lat      total err   trunc loss    fold      |rel|
+     1      4   89.35  +7.047e-19  +0.000e+00  +7.047e-19  5.9e-18
+     2      8   88.70  -5.551e-17  -5.551e-17  +0.000e+00  4.7e-16
+     3     12   88.05  +4.163e-16  +4.718e-16  -5.551e-17  3.5e-15
+     4     16   87.40  -8.327e-17  -8.327e-17  +0.000e+00  7.0e-16
+     5     20   86.75  +7.543e-15  +7.494e-15  +4.857e-17  6.3e-14
+     6     24   86.10  +6.887e-15  +6.804e-15  +8.327e-17  5.8e-14
+     7     28   85.45  +1.003e-14  +9.916e-15  +1.180e-16  8.4e-14
+     8     32   84.80  +9.853e-16  +9.992e-16  -1.388e-17  8.3e-15
+    12     48   82.20  -5.551e-16  -5.551e-16  +0.000e+00  4.7e-15
+    16     64   79.59  -2.776e-17  +2.776e-17  -5.551e-17  2.3e-16
+    24     96   74.36  +2.880e-16  +0.000e+00  +2.880e-16  2.4e-15
+    32    128   69.09  +4.025e-16  +0.000e+00  +4.025e-16  3.4e-15
+    48    192   58.41  +5.551e-17  +0.000e+00  +5.551e-17  4.7e-16
+    64    256   47.44  -1.665e-16  +0.000e+00  -1.665e-16  1.4e-15
+    96    288   26.39  -8.743e-16  +0.000e+00  -8.743e-16  7.3e-15
+   144    288    0.00  +2.359e-16  +0.000e+00  +2.359e-16  2.0e-15
+  global-mean error Σ w_j e_j = +5.134e-17  (relative to global mean of product -4.883e-02: 1.1e-15)
+  zonal error left if the innermost N rings (each hemisphere) had NO error:
+    N =  0:  rms zonal-mean error 5.374e-16  (100.0% of all-ring value 5.374e-16), |Σ w e| = 5.13e-17
+    N =  1:  rms zonal-mean error 5.374e-16  (100.0% of all-ring value 5.374e-16), |Σ w e| = 5.13e-17
+    N =  2:  rms zonal-mean error 5.374e-16  (100.0% of all-ring value 5.374e-16), |Σ w e| = 5.14e-17
+    N =  4:  rms zonal-mean error 5.356e-16  (99.7% of all-ring value 5.374e-16), |Σ w e| = 5.20e-17
+    N =  8:  rms zonal-mean error 4.279e-16  (79.6% of all-ring value 5.374e-16), |Σ w e| = 4.62e-17
+    N = 16:  rms zonal-mean error 4.135e-16  (76.9% of all-ring value 5.374e-16), |Σ w e| = 4.91e-17
+    N = 32:  rms zonal-mean error 4.082e-16  (76.0% of all-ring value 5.374e-16), |Σ w e| = 4.73e-17
+
+-- hypothetical: +8 longitudes --
+  [validation vs transform, ring 64: max abs diff 1.9e-14, field rms 0.82]
+
+== HEALPixGrid d3.5, rings +8 longitudes  (nlat_half = 144, rms exact ring mean = 1.192e-01)
+  ring   nlon   lat      total err   trunc loss    fold      |rel|
+     1      4   89.35  +1.907e-10  +1.907e-10  +5.204e-18  1.6e-09
+     2      8   88.70  +1.616e-09  +1.616e-09  -2.776e-17  1.4e-08
+     3     12   88.05  -3.251e-10  -3.251e-10  +1.110e-16  2.7e-09
+     4     16   87.40  -3.219e-10  -3.219e-10  +8.327e-17  2.7e-09
+     5     20   86.75  +2.433e-10  +2.433e-10  +1.318e-16  2.0e-09
+     6     24   86.10  -5.723e-12  -5.723e-12  +7.286e-17  4.8e-11
+     7     28   85.45  +3.910e-10  +3.910e-10  -2.082e-17  3.3e-09
+     8     32   84.80  +1.763e-10  +1.763e-10  -9.714e-17  1.5e-09
+    12     48   82.20  -9.491e-12  -9.492e-12  +8.327e-17  8.0e-11
+    16     64   79.59  -8.299e-15  -8.549e-15  +2.498e-16  7.0e-14
+    24     96   74.36  +1.006e-16  -1.388e-17  +1.145e-16  8.4e-16
+    32    128   69.09  +1.874e-16  +0.000e+00  +1.874e-16  1.6e-15
+    48    192   58.41  +2.220e-16  +0.000e+00  +2.220e-16  1.9e-15
+    64    256   47.44  +1.943e-16  +0.000e+00  +1.943e-16  1.6e-15
+    96    288   26.39  +7.910e-16  +0.000e+00  +7.910e-16  6.6e-15
+   144    288    0.00  -3.469e-16  +0.000e+00  -3.469e-16  2.9e-15
+  global-mean error Σ w_j e_j = -6.659e-13  (relative to global mean of product -4.883e-02: 1.4e-11)
+  zonal error left if the innermost N rings (each hemisphere) had NO error:
+    N =  0:  rms zonal-mean error 5.150e-11  (100.0% of all-ring value 5.150e-11), |Σ w e| = 6.66e-13
+    N =  4:  rms zonal-mean error 1.303e-11  (25.3% of all-ring value 5.150e-11), |Σ w e| = 2.28e-13
+    N =  8:  rms zonal-mean error 4.372e-12  (8.5% of all-ring value 5.150e-11), |Σ w e| = 1.64e-14
+
+-- same field twice (u·u-like, sign of the error is systematic) --
+  [validation vs transform, ring 64: max abs diff 1.9e-14, field rms 0.82]
+
+== HEALPixGrid d3.5, a·a  (nlat_half = 144, rms exact ring mean = 6.994e-01)
+  ring   nlon   lat      total err   trunc loss    fold      |rel|
+     1      4   89.35  -1.386e-03  -1.386e-03  +6.939e-18  2.0e-03
+     2      8   88.70  -1.728e-03  -1.728e-03  +8.327e-17  2.5e-03
+     3     12   88.05  -1.470e-04  -1.470e-04  +2.220e-16  2.1e-04
+     4     16   87.40  -5.847e-05  -5.847e-05  -1.110e-16  8.4e-05
+     5     20   86.75  -9.998e-06  -9.998e-06  +4.441e-16  1.4e-05
+     6     24   86.10  -5.540e-06  -5.540e-06  +0.000e+00  7.9e-06
+     7     28   85.45  -5.876e-07  -5.876e-07  +2.220e-16  8.4e-07
+     8     32   84.80  -1.167e-07  -1.167e-07  +2.220e-16  1.7e-07
+    12     48   82.20  -3.767e-08  -3.767e-08  +2.220e-16  5.4e-08
+    16     64   79.59  -4.123e-09  -4.123e-09  -3.331e-16  5.9e-09
+    24     96   74.36  -1.718e-12  -1.718e-12  -2.220e-16  2.5e-12
+    32    128   69.09  -7.772e-16  -4.441e-16  -3.331e-16  1.1e-15
+    48    192   58.41  -1.110e-16  +0.000e+00  -1.110e-16  1.6e-16
+    64    256   47.44  +0.000e+00  +0.000e+00  +0.000e+00  0.0e+00
+    96    288   26.39  +7.772e-16  +0.000e+00  +7.772e-16  1.1e-15
+   144    288    0.00  +6.661e-16  +0.000e+00  +6.661e-16  9.5e-16
+  global-mean error Σ w_j e_j = -7.894e-07  (relative to global mean of product 6.803e-01: 1.2e-06)
+  zonal error left if the innermost N rings (each hemisphere) had NO error:
+    N =  0:  rms zonal-mean error 4.701e-05  (100.0% of all-ring value 4.701e-05), |Σ w e| = 7.89e-07
+    N =  4:  rms zonal-mean error 5.763e-07  (1.2% of all-ring value 4.701e-05), |Σ w e| = 2.26e-08
+    N =  8:  rms zonal-mean error 2.211e-08  (0.0% of all-ring value 4.701e-05), |Σ w e| = 1.14e-09

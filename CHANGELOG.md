@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `HEALPixPaddedGrid`, a HEALPix variant with extra longitude points on the polar-cap rings, removing the polar truncation loss that destabilises long HEALPix integrations [#1240](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1240)
+- Add `DenseQuadrature`, a latitude-dense analysis operator for the HEALPix grids that is alias-free in latitude, and rename `legendre_polynomials_transposed` to `legendre_synthesis` [#1240](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1240)
 - Order-dependent, optimized quadrature weights for `HEALPixGrid` and `OctaHEALPixGrid`, improving transform exactness [#1240](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1240)
 - Lazy batching of FTT plans on GPU to increase performance of models other than the `PrimitiveWetModel` [#1234](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1234)
 - Remove dead code: unused `get_2lm_range` [#1243](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1243)

@@ -86,7 +86,7 @@ export ColumnField, ColumnField2D, ColumnField3D, ColumnField4D,
 export FullClenshawGrid, FullGaussianGrid,
     FullHEALPixGrid, FullOctaHEALPixGrid,
     OctahedralGaussianGrid, OctahedralClenshawGrid,
-    HEALPixGrid, OctaHEALPixGrid,
+    HEALPixGrid, OctaHEALPixGrid, HEALPixPaddedGrid,
     OctaminimalGaussianGrid
 
 export eachring, eachlayer, eachgridpoint

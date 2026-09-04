@@ -71,7 +71,7 @@ NOTE, at high resolutiosn OctaHEALPixGrid actually needs 4."""
 @inline default_dealiasing(
     Grid::Type{
         <:Union{
-            HEALPixGrid, OctaHEALPixGrid,
+            HEALPixGrid, OctaHEALPixGrid, HEALPixPaddedGrid,
             FullHEALPixGrid, FullOctaHEALPixGrid,
         },
     }
