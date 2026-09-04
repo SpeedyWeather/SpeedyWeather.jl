@@ -1,7 +1,7 @@
 # Variables
 
 At the top of SpeedyWeather's type tree sits the `Simulation`, containing
-`Variables` and model (e.g. `BarotropicModel`), which in itself contains
+`Variables` and model (e.g. [`BarotropicModel`](@ref)), which in itself contains
 model components with their own fields and so on, see [Models](@ref).
 
 The variables are split into
@@ -52,7 +52,8 @@ The variables are model-specific, each model only allocates the variables it nee
 The prognostic variables in `variables.prognostic` are generally in spectral coefficients,
 `variables.grid` hold gridded variables, `variables.tendencies` the tendencies,
 `variables.dynamics` work arrays that are computed by the dynamical core. `variables.parameterizations`
-are those required by the parameterizations and `variables.particles` by the particle advection.
+are those required by the [parameterizations](@ref "Parameterizations") and `variables.particles` by
+[particle advection](@ref "Particle advection").
 `variables.scratch` are scratch arrays: These can be used in any computation by should be considered
 in an undefined state, so write to it before you read from it. Any other component can leave this
 in any state. But you can use them to avoid allocations and hold intermediate results.
@@ -92,7 +93,7 @@ simulation.variables
 
 ## Setting variables
 
-The prognostic variables can be mutated (e.g. to set new initial conditions) with the [`SpeedyWeather.set!`](@ref) function.
+The prognostic variables can be mutated (e.g. to set new [initial conditions](@ref "Initial conditions")) with the [`SpeedyWeather.set!`](@ref) function.
 Other variables can be set too but they might be overwritten such that your changes may have a different
 effect than you expect. You can specify `group` (default `=:prognostic`) and `namespace` (default `=nothing`)
 in `set!` to set variables, e.g.
@@ -107,7 +108,7 @@ For another example, see [Set tracers](@ref).
 
 As you'll notice when inspecting `simulation.variables` is that many prognostic and tendency variables
 will have one more dimension than you may think they should have. This is the step dimension as
-many time stepping schemes require either several steps in the prognostic variables (think Leapfrog)
+many time stepping schemes require either several steps in the prognostic variables (think [Leapfrog](@ref leapfrog))
 or several tendency steps (think multi-step methods). In many cases this additional dimension
 will just be a trailing singleton dimension, but rather than dropping it by hand use
 [`get_step`](@ref) which knows which dimension is the step dimension (see below).

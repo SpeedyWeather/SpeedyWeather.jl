@@ -3,6 +3,28 @@
 ## Unreleased
 
 - Time stepping soil temperature and moisture [#1183](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1183)
+- `rand` and `randn` for fields and `LowerTriangularArray`s accept a random number generator as optional first argument [#1247](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1247)
+- Several problems Enzyme compat with 1.12 fixed, but no full end-to-end differentiability yet [#1163](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1163)
+- Add `HEALPixOutput`, a Zarr output writer that writes onto a `HEALPixGrid` keeping the horizontal dimension flat [#1238](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1238)
+- GitHub Actions github-script v9 [#1241](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1241)
+- GitHub Actions Checkout v7 [#1242](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1242)
+- Lazy batching of FTT plans on GPU to increase performance of models other than the `PrimitiveWetModel` [#1234](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1234)
+- Remove dead code: unused `get_2lm_range` [#1243](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1243)
+- Add a central, BibTeX-backed documentation bibliography with DocumenterCitations [#478](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/478)
+- Move time-stepping mathematics from the Usage docs to a new Numerics page, and document previously-undocumented `NCycleLorenz` details [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
+- Add cross-reference links throughout the docs, and fix several pre-existing ambiguous/broken `@ref` targets found along the way [#1222](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1222)
+- Remove orphaned duplicate of kernel_launching.jl in Utils [#1237](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1237)
+- Move the backend-agnostic GPU-graphs machinery (kernels, cache, capture/replay control flow) from `SpeedyTransforms/ext/gpu_graphs_common.jl` into `SpeedyTransforms/src/` [#1232](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1232)
+- Document GPU graphs (CUDA/HIP) in `architectures_gpu.md`, including AMDGPU's current disabled-by-default status and how to opt in [#1233](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1233)
+- Fix a bug that stopped `StochasticallyPerturbedParameterizationTendencies` from working on GPU [#1230](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1230)
+- Add GPU-safe `clamp!` and make `fill!` return a `Field` for `AbstractField`, and only clamp the land-sea mask when out of range [#1228](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1228)
+- Remove Reactant compat restriction again [#1225](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1225)
+- Remove Reactant from SpeedyWeather/test/GPU/AMDGPU/Project.toml for AMDGPU compatibility with Julia v1.12 [#1193](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1193)
+- Avoid `isodd(::AbstractFloat)`'s exact-integer-conversion fallback (an `InexactError` throw path) in `mod(::Particle)`, which triggered AMDGPU hostcalls [#1220](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1220)
+- `SpectralTransform`'s `gpu_graphs` keyword now defaults per-backend via `default_gpu_graphs` (dispatching on the KernelAbstractions device) instead of a flat `true`; AMDGPU defaults to `false` pending HIP-graphs verification on non-datacenter hardware, CUDA is unaffected [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
+- Enable HIP-graphs acceleration of the batched Fourier transform for AMDGPU, mirroring the existing CUDA-graphs implementation [#1218](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1218)
+- Update Terrarium output writer to work with v0.1.6 [#1224](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1224)
+- Fix GPU scalar indexing when a `Field` broadcasts against a bare GPU array (e.g. `LinearDrag` in the Held-Suarez example) [#1219](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1219)
 - Reformulate trigonometric functions to avoid hostcalls on AMDGPU - [#1210](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1210)
 
 ## v0.22.1

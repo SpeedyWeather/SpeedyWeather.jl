@@ -91,6 +91,20 @@ function add_default!(
     return add!(variables, HumidityOutput())
 end
 
+"""$(TYPEDSIGNATURES)
+Move `src` (a field on the model grid, on CPU) onto the output grid of `output`, writing
+into `dest`. Interpolates with `output.interpolator`, or copies straight over when
+`output.interpolator === nothing`, i.e. when the output grid already is the model grid and
+`output` was constructed without an interpolator (see [`HEALPixOutput`](@ref) for a
+simulation that already runs on the output's HEALPix grid)."""
+function interpolate_output!(output::AbstractOutput, dest::AbstractField, src::AbstractField)
+    isnothing(output.interpolator) || return RingGrids.interpolate!(dest, src, output.interpolator)
+
+    # No interpolator: the output grid is the model grid, copy straight over 
+    fields_match(dest, src) || throw(DimensionMismatch(dest, src))
+    return copyto!(dest.data, src.data)
+end
+
 function set!(output::AbstractOutput; active, reset_path = true)
     output.active = active
     if reset_path
@@ -168,7 +182,7 @@ function output!(
         (is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
     ori = has_step ? get_prognostic_step(ori, ts, output) : ori
     raw = on_architecture(CPU(), ori)
-    RingGrids.interpolate!(var, raw, output.interpolator)
+    interpolate_output!(output, var, raw)
 
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)

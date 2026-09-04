@@ -7,11 +7,12 @@ condensation nuclei, which grow, become heavy and eventually fall out
 as precipitation. This process is never actually representable at the resolution
 of global (or even regional) atmospheric models as typical cloud droplets
 have a size of micrometers. Atmospheric models therefore rely on large-scale
-quantities such as specific humidity, pressure and temperature within a
+quantities such as [specific humidity](@ref "Humidity equation"), pressure and temperature within a
 given grid cell, even though there might be considerable variability of
 these quantities within the area covered by that grid cell.
 Higher resolution would use more grid cells within the same area,
-resolving more variability that averaged out at lower resolution.
+resolving more variability that averaged out at lower resolution. See also [Convection](@ref) for
+the related (deep and shallow) convective precipitation parameterization.
 
 ## Condensation implementations
 
@@ -23,7 +24,8 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractCondensation)
 ```
 
-which are described in the following.
+which are described in the following. See [Parameterizations](@ref) for the general
+parameterization interface these implement.
 
 ## Explicit large-scale condensation
 
@@ -75,7 +77,8 @@ And solving for ``\Delta q`` yields
 \left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T} (T^i) \right] \Delta q = q^\star(T_i) - q_i
 ```
 
-meaning that the implicit immediate condensation can be formulated as (see also [^Frierson2006])
+meaning that the implicit immediate condensation can be formulated as (see also
+[Frierson2006](@citet))
 
 ```math
 \begin{aligned}
@@ -88,7 +91,7 @@ With Euler forward time stepping this is great, but with our [leapfrog timestepp
 this is very dispersive (see [#445](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/445))
 although the implicit formulation is already much better.
 We therefore introduce a time step ``\Delta t_c`` which makes the implicit condensation not immediate
-anymore but over several time steps ``\Delta t`` of the leapfrogging.
+any more but over several time steps ``\Delta t`` of the leapfrogging.
 
 ```math
 \begin{aligned}
@@ -127,7 +130,8 @@ as follows
 
 Reevaporation is a process that requires to compute the downward rain water flux ``F_r``
 iteratively from the top layer to the bottom layer, we therefore start with ``F_r = 0``
-at the top of the atmosphere. We will use it in units of ``m/s``, that is the rainfall rate.
+at the top of the atmosphere (layers are indexed top to bottom, see [Vertical coordinates](@ref vertical_coordinates_physics)
+and [Array dimensions](@ref array_dimensions)). We will use it in units of ``m/s``, that is the rainfall rate.
 But you also may use ``kg/m^2/s`` the mass flux of rain water per second.
 Which would need to be divided by the water density ``\rho`` to convert into a rain
 rate in ``m/s``, or then multiply with the time step ``\Delta t`` and to get
@@ -152,7 +156,7 @@ and ``q=0`` evaporation would be immediate, i.e. when the humidity in the layer 
 but ``c`` is chosen to be on the order of  one over the saturation humidity then all
 rain water would evaporate. We add a ``\min(..., 1)`` to avoid evaporating more rain water
 than is available. We then convert ``F_e`` into a humidity tendency by division with
-``\Delta p/(\Delta t g \rho)``, layer pressure thickness ``\Delta p``, gravity ``g``,
+``\Delta p/(\Delta t g \rho)``, layer pressure thickness ``\Delta p`` (see [Sigma coordinates](@ref sigma_coordinates_physics)), gravity ``g``,
 but this depends on the units you use for the rain water flux.
 Since reevaporation takes the same latent heat (though opposite sign) as condensation,
 this tendency has to be substracted from the large-scale condensation tendency but the
@@ -272,7 +276,3 @@ A schematic of the large-scale precipitation parameterization is illustrated bel
 
 
 
-
-## References
-
-[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566, DOI:[10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1).
