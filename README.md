@@ -293,7 +293,7 @@ The bibtex entry for the paper is:
 
 If you are using the differentiability of our model, please cite additionally 
 
-Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615. https://doi.org/10.1029/2025MS005615
+> Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615. https://doi.org/10.1029/2025MS005615
 
 with the bibtex entry 
 
