@@ -2,10 +2,20 @@
 @propagate_inbounds sea_ice_timestep!(vars::Variables, model::PrimitiveEquation) =
     timestep!(vars, model.sea_ice, model)
 
-function variables(::AbstractSeaIce)
+function variables(::AbstractPrescribedSeaIce)
     return (
-        # all prognostic variables need a step dimension, by default use only one
-        PrognosticVariable(:sea_ice_concentration, Grid3D(1), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
+        # prescribed sea ice has no step dimension as its not time stepped
+        PrognosticVariable(:sea_ice_concentration, GridXY(), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
+    )
+end
+
+function variables(::AbstractDynamicSeaIce, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, model)
+    pg = nsteps.prognostic_grid
+    tg = nsteps.tendency_grid
+    return (
+        PrognosticVariable(:sea_ice_concentration, OceanXYT(pg), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
+        TendencyVariable(:sea_ice_concentration, OceanXYT(tg), namespace = :ocean, desc = "Tendency of sea ice concentration", units = "1/s"),
     )
 end
 
@@ -13,7 +23,7 @@ export PrescribedSeaIce
 
 """Prescribed sea ice that declares the necessary allocations for the sea ice concentration,
 but all dynamics are expected to be externally set. Used for coupling to external sea ice models."""
-struct PrescribedSeaIce <: AbstractSeaIce end
+struct PrescribedSeaIce <: AbstractPrescribedSeaIce end
 PrescribedSeaIce(::SpectralGrid) = PrescribedSeaIce() # added constructor, just to be consistent with call signatures
 initialize!(vars::Variables, ::PrescribedSeaIce, model) = nothing
 timestep!(vars::Variables, ::PrescribedSeaIce, model) = nothing
@@ -23,7 +33,7 @@ export ThermodynamicSeaIce
 """Thermodynamic sea ice model using sea ice concentration as
 prognostic variable, also modifies sea surface temperature as
 cooling below freezing grows sea ice. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractSeaIce
+@parameterized @kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractDynamicSeaIce
     "[OPTION] Freezing temperature of sea water [K]"
     @param freezing_temperature::NF = 273.15 - 1.8 (bounds = Positive,)
 
@@ -38,33 +48,22 @@ ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(; 
 initialize!(::ThermodynamicSeaIce, ::AbstractModel) = nothing
 initialize!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation) = nothing
 
-function variables(::ThermodynamicSeaIce, model::AbstractModel)
-    nsteps = get_nsteps(model.time_stepping, model)
-    pg = nsteps.prognostic_grid
-    tg = nsteps.tendency_grid
-    return (
-        PrognosticVariable(:sea_ice_concentration, GridXYT(pg), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
-        TendencyVariable(:sea_ice_concentration, GridXYT(tg), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
-    )
-end
-
-# leapfrog when possible
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::ThermodynamicSeaIce) = 2
-
 function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation)
     # escape immediately if there is no sea surface temperature
     haskey(vars.prognostic.ocean, :sea_surface_temperature) || return nothing
 
     # if ocean does not have an SST tendency use scratch array to write into the void
     dsst = haskey(vars.tendencies.ocean, :sea_surface_temperature) ?
-        get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, model.time_stepping, sea_ice_model) :
+        get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, model.time_stepping, model.ocean) :
         vars.scratch.grid.a_2D
 
     # sea ice concentration written as \aleph yay!
     dℵ = get_tendency_step(vars.tendencies.ocean.sea_ice_concentration, model.time_stepping, sea_ice_model)
     sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, model.ocean)
+    
+    @boundscheck size(dsst) == size(dℵ) == size(sst) || throw(BoundsError)
 
-    (; Δt) = model.time_stepping
+    Δt = time_step(model.time_stepping, vars.prognostic.clock)
     (; land_fraction) = model.land_sea_mask
 
     m = sea_ice_model.melt_rate             # melt rate [m²/m²/s/K]
@@ -88,7 +87,7 @@ end
         # ice-sst flux as a relaxation term wrt to freezing, with different melt/freeze rates
         # include 1/Δt here as SST below freezing is proportional to Δt
         dT = sst[ij] - T_freeze                     # uncorrected difference to freezing temperature
-        dsst[ij] -= min(dT, 0) / Δt                   # increase SST to freezing temperature
+        dsst[ij] -= min(dT, 0) / Δt                 # increase SST to freezing temperature
         F = -m * max(dT, 0) - f / Δt * min(dT, 0)   # melt if above freezing, freeze if below
         dℵ[ij] = F                                  # sea ice tendency
     end

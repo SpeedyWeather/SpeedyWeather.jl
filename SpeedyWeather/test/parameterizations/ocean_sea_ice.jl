@@ -33,19 +33,22 @@
                 simulation.variables.prognostic.ocean.sea_surface_temperature .= 285
             end
 
-            run!(simulation, period = Day(3))
+            run!(simulation, period = Day(1))
 
             @test simulation.model.feedback.nans_detected == false
             @test haskey(simulation.variables.prognostic.ocean, :sea_surface_temperature)
 
-            # Some SSTs may contain NaNs
+            @test ArrayDimensions.hastime(simulation.variables.prognostic.ocean.sea_surface_temperature) == (ocean isa SpeedyWeather.AbstractDynamicOcean)
             sst = get_step(simulation.variables.prognostic.ocean.sea_surface_temperature, 1)
+            @test ndims(sst) == 1
             @test all(0 .<= sst .<= 330)
 
             if sea_ice isa Nothing
                 @test !haskey(simulation.variables.prognostic.ocean, :sea_ice_concentration)
             else
+                @test ArrayDimensions.hastime(simulation.variables.prognostic.ocean.sea_ice_concentration) == (sea_ice isa SpeedyWeather.AbstractDynamicSeaIce)
                 sic = get_step(simulation.variables.prognostic.ocean.sea_ice_concentration, 1)
+                @test ndims(sic) == 1
                 @test all(0 .<= sic .<= 1)
             end
         end

@@ -135,7 +135,8 @@ variables(::SurfaceLandHumidityFlux) = (
 @propagate_inbounds function surface_humidity_flux!(ij, vars, humidity_flux::SurfaceLandHumidityFlux, model)
 
     # TODO use a skin temperature?
-    T = vars.prognostic.land.soil_temperature[ij, 1]  # uppermost land layer with index 1
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, humidity_flux)
+    T = soil_temperature[ij, 1]  # uppermost land layer with index 1
     snow_depth = vars.prognostic.land.snow_depth[ij]
     α = vars.parameterizations.land.soil_moisture_availability[ij]
 
