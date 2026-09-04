@@ -105,6 +105,7 @@ struct SpectralTransform{
     # is too old to expose the high-level HIP graph API. Defaults to `default_gpu_graphs`
     # (backend-dependent, see below) rather than a flat `true`/`false`.
     gpu_graphs::Bool
+
 end
 
 # eltype of a transform is the number format used within
@@ -557,7 +558,8 @@ function _transform_grid!(
     # Checked **before** the boundscheck below so chunking can handle K > S.nlayers
     K = size(field, 2)
     if _needs_chunking(K, S)
-        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat); return field
+        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
+        return field
     end
     return _transform_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
 end
@@ -616,7 +618,8 @@ function _transform_spec!(
     # see comment there.
     K = size(field, 2)
     if _needs_chunking(K, S)
-        _transform_chunked!(coeffs, field, scratch_memory, S); return coeffs
+        _transform_chunked!(coeffs, field, scratch_memory, S)
+        return coeffs
     end
     return _transform_nonchunked!(coeffs, field, scratch_memory, S)
 end
