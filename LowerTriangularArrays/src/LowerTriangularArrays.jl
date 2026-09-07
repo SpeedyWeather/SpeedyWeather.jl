@@ -6,6 +6,7 @@ using StyledStrings
 
 # NUMERICS
 import LinearAlgebra: Transpose, tril!
+import Random
 
 # GPU
 import Adapt: Adapt, adapt
