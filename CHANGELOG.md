@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix the Reactant clock not advancing, adjust to recent new Reactant version [#1249](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1249)
+- Enzyme differentiability tested with Julia 1.11 as well [#1249](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1249)
 - Fix citation formatting in README.md and docs landing page [#1248](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1248)
 - `rand` and `randn` for fields and `LowerTriangularArray`s accept a random number generator as optional first argument [#1247](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1247)
 - Several problems Enzyme compat with 1.12 fixed, but no full end-to-end differentiability yet [#1163](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1163)
