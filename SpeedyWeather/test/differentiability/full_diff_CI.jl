@@ -1,5 +1,3 @@
-# Enzyme and Julia 1.11 still has some problems, and the test below is broken
-# in Julia 1.11
 import Pkg
 Pkg.activate(@__DIR__)
 using SpeedyWeather, Enzyme, FiniteDifferences, Test
