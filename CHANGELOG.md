@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix Terrarium 3D GPU Fields not being copied to host [#1250](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1250)
 - Fix the Reactant clock not advancing, adjust to recent new Reactant version [#1249](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1249)
 - Enzyme differentiability tested with Julia 1.11 as well [#1249](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1249)
 - Fix citation formatting in README.md and docs landing page [#1248](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1248)
