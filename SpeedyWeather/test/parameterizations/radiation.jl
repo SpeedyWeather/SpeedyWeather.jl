@@ -51,8 +51,9 @@ end
             @test vars_separate.tendencies.grid.temperature == vars_bundled.tendencies.grid.temperature
             @test same(vars_separate.parameterizations, vars_bundled.parameterizations)
 
-            # and the tendency is non-trivial unless both streams are off
-            if !(SW === Nothing && LW === Nothing)
+            # and the tendency is non-trivial when a longwave scheme is present
+            # (a transparent shortwave alone leaves the temperature untouched)
+            if LW !== Nothing
                 @test any(!=(0), vars_bundled.tendencies.grid.temperature)
             end
         end

@@ -1,7 +1,8 @@
 # One `radiation` model component bundling shortwave and longwave
 
-> Status: **in progress**. Plan drafted and implementation started in the same session at the
-> user's request; the plan still needs human sign-off before merging.
+> Status: **in progress**. Implemented on `mg/numericalradiation`; unit tests and the whole-model
+> bitwise comparison against the base revision pass on CPU. Awaiting human review/sign-off, GPU test
+> run, PR number for the changelog, and the benchmark check.
 
 Date of initial draft: 2026-09-11
 
@@ -26,6 +27,11 @@ Base revision: `1ef2a0e2` (`mg/numericalradiation`, on top of v0.22.1)
 
 ## Revision log
 
+- **2026-09-11, tests run.** `test/parameterizations/{radiation,longwave_radiation,shortwave_radiation,stochastic_physics}.jl`
+  with `--check-bounds=yes --depwarn=yes`: bit-identity holds for the full 4×5 scheme matrix in
+  Float32 and the default pair in Float64. One assertion of mine was wrong, not the code: a
+  transparent shortwave with `longwave = nothing` correctly leaves the temperature tendency at
+  zero; the "non-trivial tendency" check now only applies when a longwave scheme is present.
 - **2026-09-11, "just keep those definitions in variables(::AbstractLongwave) and
   variables(::AbstractShortwave)".** Removed the `shortwave_variables()`/`longwave_variables()`
   helpers and the `variables(::AbstractRadiation)` union default again; the corresponding test
