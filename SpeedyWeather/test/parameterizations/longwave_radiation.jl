@@ -1,15 +1,15 @@
 @testset "Longwave radiation" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     @testset for LW in (Nothing, UniformCooling, JeevanjeeRadiation, OneBandGreyLongwave, OneBandLongwave)
-        longwave_radiation = LW(spectral_grid)
-        model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+        longwave = LW(spectral_grid)
+        model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
 
-        initialize!(model.longwave_radiation, model)
+        initialize!(model.radiation, model)
 
         vars = Variables(model)
 
         ij = rand(1:model.spectral_grid.npoints)
-        SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
+        SpeedyWeather.parameterization!(ij, vars, model.radiation.longwave, model)
     end
 end
 
@@ -19,16 +19,18 @@ end
     @testset for T in (FriersonLongwaveTransmissivity, TransparentLongwaveTransmissivity)
         transmissivity = T(spectral_grid)
         longwave_radiation = OneBandLongwave(spectral_grid; transmissivity)
-        model = PrimitiveWetModel(spectral_grid; longwave_radiation)
-        initialize!(model.longwave_radiation, model)
+        # deprecated keyword still accepted (wrapped into model.radiation.longwave)
+        model = @test_deprecated PrimitiveWetModel(spectral_grid; longwave_radiation)
+        @test model.radiation.longwave === longwave_radiation
+        initialize!(model.radiation, model)
 
         vars = Variables(model)
 
         # transmissivity depends on pressure thickness and thereofre surface pressure should be nonzero
         vars.parameterizations.surface_pressure .= 1.0e5
-        t = SpeedyWeather.transmissivity!(1, vars, model.longwave_radiation.transmissivity, model)
+        t = SpeedyWeather.transmissivity!(1, vars, model.radiation.longwave.transmissivity, model)
         for ij in 2:model.spectral_grid.npoints
-            SpeedyWeather.transmissivity!(ij, vars, model.longwave_radiation.transmissivity, model)
+            SpeedyWeather.transmissivity!(ij, vars, model.radiation.longwave.transmissivity, model)
         end
 
         @test all(0 .< t .<= 1)

@@ -1,5 +1,28 @@
 # Radiation
 
+## Radiation as one model component
+
+Shortwave and longwave radiation are bundled into a single model component `model.radiation`.
+The default is [`Radiation`](@ref), which holds a `shortwave` and a `longwave` scheme and calls
+them in that order for every grid column
+
+```@example radiation
+using SpeedyWeather
+spectral_grid = SpectralGrid()
+radiation = Radiation(spectral_grid; shortwave = OneBandShortwave(spectral_grid), longwave = OneBandLongwave(spectral_grid))
+model = PrimitiveWetModel(spectral_grid; radiation)
+model.radiation
+```
+
+Either stream can be `nothing` to switch it off, e.g. `Radiation(spectral_grid; shortwave = nothing)`.
+The individual schemes are accessed as `model.radiation.shortwave` and `model.radiation.longwave`.
+A radiation scheme that computes both streams at once (for example a correlated-k scheme that
+shares its gas optics between shortwave and longwave) subtypes `SpeedyWeather.AbstractRadiation`
+directly, implements `parameterization!(ij, vars, scheme, model)` for both streams, declares its
+variables via `variables(::MyRadiation)` (the standard radiation diagnostics such as `outgoing_longwave`
+and `surface_shortwave_down` are those of `variables(::AbstractShortwave)` and `variables(::AbstractLongwave)`),
+and is passed as `radiation = MyRadiation(spectral_grid)`.
+
 ## Longwave radiation implementations
 
 Currently implemented is
@@ -96,9 +119,9 @@ To be used like (currently the default anyway)
 
 ```@example radiation
 spectral_grid = SpectralGrid()
-longwave_radiation = OneBandLongwave(spectral_grid)
-model = PrimitiveWetModel(spectral_grid; longwave_radiation)
-model.longwave_radiation
+longwave = OneBandLongwave(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+model.radiation.longwave
 ```
 
 The transmissivity is defined as in [Frierson2006](@citet)
@@ -340,7 +363,7 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 ```@example radiation
 using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(truncation=32, nlayers=8)
-model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
+model = PrimitiveWetModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave=OneBandShortwave(spectral_grid)))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
@@ -369,7 +392,7 @@ Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `Tra
 ```@example radiation
 using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(truncation=32, nlayers=8)
-model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
+model = PrimitiveDryModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave=OneBandGreyShortwave(spectral_grid), longwave=OneBandGreyLongwave(spectral_grid)))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
@@ -434,7 +457,7 @@ using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid()
 sw_no_sc = OneBandShortwave(spectral_grid, clouds = DiagnosticClouds(spectral_grid; use_stratocumulus=false))
 
-model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
+model = PrimitiveWetModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave=sw_no_sc))
 sim = initialize!(model)
 run!(sim, period=Day(5))
 ssrd = sim.variables.parameterizations.surface_shortwave_down
