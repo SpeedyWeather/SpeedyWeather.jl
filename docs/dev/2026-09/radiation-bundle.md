@@ -27,6 +27,13 @@ Base revision: `1ef2a0e2` (`mg/numericalradiation`, on top of v0.22.1)
 
 ## Revision log
 
+- **2026-09-11, docs build.** The `docs/` environment was not instantiated (`DocumenterCitations` in
+  `Project.toml` but absent from `Manifest.toml`), so `julia --project=docs docs/make.jl` aborted at
+  `using DocumenterCitations` before reaching any page. Fixed with `Pkg.resolve()` + `Pkg.instantiate()`;
+  an environment issue, not a consequence of this change. The radiation examples of `docs/src/radiation.md`
+  and the `:radiation` tuple in `docs/src/parameterizations.md` were additionally checked by running them
+  standalone. `Radiation` needs no `@docs` block: `docs/src/api.md` pulls in all of `SpeedyWeather` via
+  `@autodocs`, which satisfies both `checkdocs = :exports` and the ``[`Radiation`](@ref)`` link.
 - **2026-09-11, tests run.** `test/parameterizations/{radiation,longwave_radiation,shortwave_radiation,stochastic_physics}.jl`
   with `--check-bounds=yes --depwarn=yes`: bit-identity holds for the full 4×5 scheme matrix in
   Float32 and the default pair in Float64. One assertion of mine was wrong, not the code: a
