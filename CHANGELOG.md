@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Bundle shortwave and longwave radiation into one model component `model.radiation = Radiation(shortwave, longwave)`, replacing the `shortwave_radiation` and `longwave_radiation` fields (the old keywords and `parameterizations` symbols are still accepted with a deprecation warning) [#TBD](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/TBD)
+- Documentation CI builds with Julia 1.12 [#1255](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1255)
 - Fix Terrarium 3D GPU Fields not being copied to host [#1250](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1250)
 - Fix the Reactant clock not advancing, adjust to recent new Reactant version [#1249](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1249)
 - Enzyme differentiability tested with Julia 1.11 as well [#1249](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1249)
