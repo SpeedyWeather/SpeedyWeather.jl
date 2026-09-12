@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `∇²`, `∇⁻²` can now be called with fields (gridded data) directly [#1253](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1253)
 - Documentation CI builds with Julia 1.12 [#1255](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1255)
 - Fix Terrarium 3D GPU Fields not being copied to host [#1250](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1250)
 - Fix the Reactant clock not advancing, adjust to recent new Reactant version [#1249](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1249)

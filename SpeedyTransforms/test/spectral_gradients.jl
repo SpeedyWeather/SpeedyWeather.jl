@@ -303,6 +303,53 @@ end
     end
 end
 
+@testset "(Inverse) Laplace operator on fields" begin
+
+    @testset for NF in (Float32, Float64)
+        @testset for nlayers in (1, 2)
+
+            grid = FullGaussianGrid(24)
+            S = SpectralTransform(zeros(NF, grid, nlayers))
+
+            # band-limited field so it is exactly representable on the grid
+            alms = randn(Complex{NF}, S.spectrum, nlayers)
+            SpeedyTransforms.spectral_truncation!(alms, 10)
+            alms[1, :] .= 0                     # 0-mode is set to zero by ∇⁻²
+            field = transform(alms, S)
+
+            # grid methods return a field on the same grid
+            ∇²field = ∇²(field, S)
+            ∇⁻²field = ∇⁻²(field, S)
+            @test ∇²field isa typeof(field)
+            @test ∇⁻²field isa typeof(field)
+            @test size(∇²field) == size(field)
+
+            # identical to transforming, applying in spectral space and transforming back
+            @test ∇²field ≈ transform(∇²(transform(field, S), S), S)
+            @test ∇⁻²field ≈ transform(∇⁻²(transform(field, S), S), S)
+
+            # ∇⁻²(∇²) = 1 and ∇²(∇⁻²) = 1 (0-mode removed above)
+            @test ∇⁻²(∇²(field, S), S) ≈ field
+            @test ∇²(∇⁻²(field, S), S) ≈ field
+
+            # radius scaling: ∇² omits 1/R², ∇⁻² omits R²
+            R = NF(6.371e6)
+            @test ∇²(field, S, radius = R) ≈ ∇²field ./ R^2
+            @test ∇⁻²(field, S, radius = R) ≈ ∇⁻²field .* R^2
+
+            # without a provided SpectralTransform the transform is precomputed internally
+            @test ∇²(field) ≈ ∇²field
+            @test ∇⁻²(field) ≈ ∇⁻²field
+
+            # input is not modified
+            field_copy = copy(field)
+            ∇²(field, S)
+            ∇⁻²(field, S)
+            @test field == field_copy
+        end
+    end
+end
+
 @testset "∇×∇=0 and ∇⋅∇=∇²" begin
     @testset for nlayers in (1, 2)
         @testset for NF in (Float32, Float64)
