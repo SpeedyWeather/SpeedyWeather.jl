@@ -202,15 +202,16 @@ R = model.planet.radius
 η_grid = transform(η, S)
 nothing # hide
 ```
-Because `fζ_g` is a field on the grid, you can also hand it to `∇⁻²` directly, which
-transforms to spectral space, inverts the Laplacian and transforms back for you
+Note the manual scaling with the radius ``R^2`` here. Because `fζ_g` is a field on the
+grid, you can also hand it to `∇⁻²` directly, which transforms to spectral space,
+inverts the Laplacian and transforms back for you, with the `radius` keyword argument
+taking care of the scaling
 
 ```@example gradient
-η_grid2 = SpeedyTransforms.∇⁻²(fζ_g, S, radius=R)
-η_grid ≈ η_grid2
+η_grid_direct = SpeedyTransforms.∇⁻²(fζ_g, S, radius=R)
+η_grid ≈ η_grid_direct
 ```
-using the `radius` keyword argument instead of the manual ``R^2`` scaling.
-Note the manual scaling with the radius ``R^2`` here. We now compare the results
+We now compare the results
 ```@example gradient
 using CairoMakie
 heatmap(η_grid, title="Geostrophic interface displacement η [m]")
