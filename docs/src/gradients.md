@@ -5,10 +5,17 @@ spherical harmonics. These are in particular ``\nabla, \nabla \cdot, \nabla \tim
 \nabla^2, \nabla^{-2}``. We call them `divergence`, `curl`, `∇`, `∇²`, `∇⁻²`
 (as well as their in-place versions with `!`) within the limits of unicode characters
 and Julia syntax. These functions are defined for inputs being spectral coefficients
-(i.e. `LowerTriangularMatrix`) or gridded fields (i.e. `<:AbstractGrid`) and
+(i.e. `LowerTriangularArray`) or gridded fields (i.e. `<:AbstractField`) and
 also allow as an additional argument a spectral transform object
 (see [SpectralTransform](@ref SpectralTransform)) which avoids recalculating it
 under the hood.
+
+The gradient operators act in spectral space, so the methods taking a field transform
+to spectral space internally. For `∇²`, `∇⁻²` the result is transformed back, meaning
+they map a field to a field, while `divergence` and `curl` return the spectral
+coefficients (transform them back yourself if you want them on the grid).
+Note that a field is only representable up to the truncation of the spectral transform
+used, so `∇²(field)` also truncates whatever is not representable.
 
 !!! info "SpeedyTransforms assumes a unit sphere"
     The gradient operators in SpeedyTransforms generally assume a sphere of radius ``R=1``.
@@ -195,6 +202,14 @@ R = model.planet.radius
 η_grid = transform(η, S)
 nothing # hide
 ```
+Because `fζ_g` is a field on the grid, you can also hand it to `∇⁻²` directly, which
+transforms to spectral space, inverts the Laplacian and transforms back for you
+
+```@example gradient
+η_grid2 = SpeedyTransforms.∇⁻²(fζ_g, S, radius=R)
+η_grid ≈ η_grid2
+```
+using the `radius` keyword argument instead of the manual ``R^2`` scaling.
 Note the manual scaling with the radius ``R^2`` here. We now compare the results
 ```@example gradient
 using CairoMakie

@@ -491,6 +491,46 @@ Acts on the unit sphere, i.e. it omits radius^2 scaling unless
 `radius` keyword argument is provided."""
 ∇⁻²(∇²alms::LowerTriangularArray; kwargs...) = ∇⁻²(∇²alms, SpectralTransform(∇²alms); kwargs...)
 
+"""
+$(TYPEDSIGNATURES)
+Laplace operator ∇² applied to `field` on the grid. Transforms to spectral space,
+applies the Laplacian there (where it is a multiplication with the eigenvalues
+-l(l+1)) and transforms back to the grid. Acts on the unit sphere, i.e. it omits
+1/radius^2 scaling unless the `radius` keyword argument is provided.
+Makes use of an existing spectral transform `S`."""
+function ∇²(field::AbstractField, S::AbstractSpectralTransform; kwargs...)
+    alms = transform(field, S)
+    ∇²!(alms, alms, S; add = false, flipsign = false, inverse = false, kwargs...)
+    return transform(alms, S)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Laplace operator ∇² applied to `field` on the grid. Transforms to spectral space,
+applies the Laplacian there and transforms back to the grid. Acts on the unit sphere,
+i.e. it omits 1/radius^2 scaling unless the `radius` keyword argument is provided."""
+∇²(field::AbstractField; kwargs...) = ∇²(field, SpectralTransform(field); kwargs...)
+
+"""
+$(TYPEDSIGNATURES)
+Inverse Laplace operator ∇⁻² applied to `field` on the grid. Transforms to spectral
+space, applies the inverse Laplacian there and transforms back to the grid. Acts on
+the unit sphere, i.e. it omits radius^2 scaling unless the `radius` keyword argument
+is provided. Makes use of an existing spectral transform `S`."""
+function ∇⁻²(field::AbstractField, S::AbstractSpectralTransform; kwargs...)
+    alms = transform(field, S)
+    ∇⁻²!(alms, alms, S; add = false, flipsign = false, kwargs...)
+    return transform(alms, S)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Inverse Laplace operator ∇⁻² applied to `field` on the grid. Transforms to spectral
+space, applies the inverse Laplacian there and transforms back to the grid. Acts on
+the unit sphere, i.e. it omits radius^2 scaling unless the `radius` keyword argument
+is provided."""
+∇⁻²(field::AbstractField; kwargs...) = ∇⁻²(field, SpectralTransform(field); kwargs...)
+
 """$(TYPEDSIGNATURES) Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
 function ∇⁻²!(
         ∇⁻²alms::LowerTriangularArray,          # Output: inverse Laplacian of alms
