@@ -1,5 +1,12 @@
 export ZarrOutput
 
+"""Supertype of all output writers that write into a Zarr store. Subtypes share the
+time-chunk buffering, the time axis and the coordinate helpers implemented in the
+`SpeedyWeatherZarrExt` extension and must have the fields `zarr_group`, `time_buffers`,
+`time_chunk`, `compressor` and `variables`. Concrete subtypes are [`ZarrOutput`](@ref)
+(rectangular `lon`/`lat` layout) and [`HEALPixOutput`](@ref) (flat HEALPix layout)."""
+abstract type AbstractZarrOutput <: AbstractOutput end
+
 """Output writer that writes a SpeedyWeather simulation to a Zarr store. Mirrors the
 behaviour of [`NetCDFOutput`](@ref) but writes a chunked, optionally compressed Zarr
 hierarchy on disk. The actual implementation lives in the `SpeedyWeatherZarrExt`
@@ -23,7 +30,7 @@ the Zarr group type once `initialize!` has been called (`Nothing` before)."""
         S,
         C,
         Z,
-    } <: AbstractOutput
+    } <: AbstractZarrOutput
 
     # FILE OPTIONS
     active::Bool = false

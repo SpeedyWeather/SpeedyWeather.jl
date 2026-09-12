@@ -1,10 +1,10 @@
 # Function barrier for batched or serial transforms. FFTW/cuFFT plans bake the batch dim K
-# into the plan, so we look up a pre-planned bundle by K = size(field, 2) and fall back to
-# the serial path (K=1 plan, looped) when no batched plan exists for that K. The batch dim
-# K is the sum of number of vertical layers batched together in a single FFT plan.
+# into the plan, so we look up a pre-planned bundle by K = size(field, 2) and either plan the
+# missing K on the fly (GPU) or fall back to the serial path (K=1 plan, looped) when no batched
+# plan exists for that K (CPU), see `ensure_batched_plans!`. The batch dim K is the sum of number
+# of vertical layers batched together in a single FFT plan.
 function _fourier!(f_north, f_south, field::AbstractField, S::SpectralTransform)
-    K = size(field, 2)
-    if K > 1 && haskey(S.rfft_plans_batched, K)
+    if ensure_batched_plans!(S, size(field, 2))
         return _fourier_batched!(f_north, f_south, field, S)
     else
         return _fourier_serial!(f_north, f_south, field, S)
@@ -12,12 +12,31 @@ function _fourier!(f_north, f_south, field::AbstractField, S::SpectralTransform)
 end
 
 function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform; add::Bool = false)
-    K = size(field, 2)
-    if K > 1 && haskey(S.brfft_plans_batched, K)
+    if ensure_batched_plans!(S, size(field, 2))
         return _fourier_batched!(field, f_north, f_south, S; add)
     else
         return _fourier_serial!(field, f_north, f_south, S; add)
     end
+end
+
+"""$(TYPEDSIGNATURES)
+Can the batched Fourier path be used for a call with batch dim `K`? On CPU only if `K > 1` was
+pre-planned (`transform_batch`): an unplanned `K` is split by `_transform_chunked!` into planned
+chunks, and routing `K = 1` through a batched plan would hit FFTW's alignment mismatch on x86,
+see `_needs_chunking`."""
+@inline ensure_batched_plans!(S::SpectralTransform, K::Integer) = K > 1 && haskey(S.rfft_plans_batched, K)
+
+"""$(TYPEDSIGNATURES)
+Can the batched Fourier path be used for a call with batch dim `K`? On GPU any `K` is worth a 
+batched plan, `K = 1` included. Which `K` a model emits only follows from the model type, 
+so it is not generally known when the `SpectralGrid` (and with it `transform_batch`) is constructed. 
+Hence plan a missing `K` on first use and cache it for all subsequent calls. Falls back to the serial 
+path only if `K` exceeds the scratch memory capacity `S.nlayers`."""
+@inline function ensure_batched_plans!(S::SpectralTransform{NF, <:GPU}, K::Integer) where {NF}
+    haskey(S.rfft_plans_batched, K) && return true
+    K <= S.nlayers || return false      # scratch memory too small for a batched call, go serial
+    plan_batched_FFTs!(S, K)
+    return true
 end
 
 """$(TYPEDSIGNATURES)
@@ -339,15 +358,52 @@ function plan_FFTs(
     brfft_plans_batched = Dict{Int, BVec}()
     for K in planned_K
         K > 1 || continue                          # K=1 handled by the serial plans above
-        rfft_plans_batched[K] = [
-            AbstractFFTs.plan_rfft(view_only_on_cpu(fake_grid_data.data, rings[j], 1:K), 1)
-                for j in 1:nlat_half
-        ]
-        brfft_plans_batched[K] = [
-            AbstractFFTs.plan_brfft(view_only_on_cpu(scratch_memory_north, 1:nfreqj(j), 1:K, j), nlons[j], 1)
-                for j in 1:nlat_half
-        ]
+        plan_batched_FFTs!(
+            rfft_plans_batched, brfft_plans_batched, K,
+            fake_grid_data, scratch_memory_north, rings, nlons,
+        )
     end
 
     return rfft_plan_serial, brfft_plan_serial, rfft_plans_batched, brfft_plans_batched
+end
+
+"""$(TYPEDSIGNATURES)
+Build the per-ring batched (2-D, batch dim `K`) forward and inverse FFT plans and store them under
+the key `K` in `rfft_plans_batched`/`brfft_plans_batched`. Only the array type, size and alignment
+of `fake_grid_data` and `scratch_memory_north` matter, not their values; both need at least `K`
+columns in their batch dimension."""
+function plan_batched_FFTs!(
+        rfft_plans_batched::Dict{Int},
+        brfft_plans_batched::Dict{Int},
+        K::Integer,
+        fake_grid_data::AbstractField,
+        scratch_memory_north::AbstractArray{<:Complex},
+        rings,
+        nlons::Vector{<:Int},
+    )
+    nlat_half = length(nlons)
+    nfreqj(j) = nlons[j] ÷ 2 + 1
+
+    rfft_plans_batched[K] = [
+        AbstractFFTs.plan_rfft(view_only_on_cpu(fake_grid_data.data, rings[j], 1:K), 1)
+            for j in 1:nlat_half
+    ]
+    brfft_plans_batched[K] = [
+        AbstractFFTs.plan_brfft(view_only_on_cpu(scratch_memory_north, 1:nfreqj(j), 1:K, j), nlons[j], 1)
+            for j in 1:nlat_half
+    ]
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Plan the batched FFTs for batch dim `K` on an already constructed `SpectralTransform` and cache
+them in it, so that later calls with that `K` take the batched path, see
+[`ensure_batched_plans!`](@ref)."""
+function plan_batched_FFTs!(S::SpectralTransform{NF}, K::Integer) where {NF}
+    fake_grid_data = on_architecture(S.architecture, zeros(NF, S.grid, K))
+    plan_batched_FFTs!(
+        S.rfft_plans_batched, S.brfft_plans_batched, K,
+        fake_grid_data, S.scratch_memory.north, S.rings, S.nlons,
+    )
+    return S
 end
