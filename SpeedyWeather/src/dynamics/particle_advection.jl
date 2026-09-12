@@ -190,6 +190,10 @@ function initialize!(
     return nothing
 end
 
+# `vars.dynamics.w` is radius*σ̇ as vor, div stay radius-scaled throughout `run!`. Particles move
+# in physical coordinates, the vertical counterpart of the 180/(π*radius) factor for u, v below.
+@inline unscale_vertical_velocity!(w, radius) = (w ./= radius)   # radius*σ̇ -> σ̇ [1/s]
+
 """$(TYPEDSIGNATURES)
 Initialize 3D particle advection work arrays: interpolate u, v, w at each particle's
 initial 3D position to seed the Heun predictor for the first advection step."""
@@ -204,6 +208,7 @@ function initialize!(
 
     # index step dimension according to time stepper
     (; time_stepping) = model
+    (; radius) = model.planet
     l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
     u_3d = field_view(vars.grid.u, :, :, l)     # prognostic variables have a step dimension
     v_3d = field_view(vars.grid.v, :, :, l)
@@ -232,6 +237,7 @@ function initialize!(
     interpolate_3D!(u0, u_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
     interpolate_3D!(v0, v_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
     interpolate_3D!(w0, w_3d, locator, geometry, particles, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
+    unscale_vertical_velocity!(w0, radius)
     return nothing
 end
 
@@ -391,6 +397,7 @@ function particle_advection!(
     interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, SigmaCenter(σ_levels_full))
     interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, SigmaCenter(σ_levels_full))
     interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
+    unscale_vertical_velocity!(w_new, radius)
 
     launch!(
         architecture(u_new), LinearWorkOrder, (length(particles),),
@@ -404,6 +411,7 @@ function particle_advection!(
     interpolate_3D!(u_new, u_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
     interpolate_3D!(v_new, v_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
     interpolate_3D!(w_new, w_3d, locator, geometry, particles, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
+    unscale_vertical_velocity!(w_new, radius)
     return nothing
 end
 
