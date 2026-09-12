@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@v7
       - name: Setup Julia
         uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
       - name: Load Julia packages from cache
         id: julia-cache
         uses: julia-actions/cache@v3
