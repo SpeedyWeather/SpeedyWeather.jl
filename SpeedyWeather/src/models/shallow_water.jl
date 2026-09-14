@@ -33,6 +33,7 @@ Fields, representing model components, are $(TYPEDFIELDS)"""
     architecture::AR = spectral_grid.architecture
 
     # DYNAMICS
+    dynamics::Bool = true
     @component geometry::GE = Geometry(spectral_grid)
     @component planet::PL = Earth(spectral_grid)
     @component atmosphere::AT = EarthDryAtmosphere(spectral_grid)
