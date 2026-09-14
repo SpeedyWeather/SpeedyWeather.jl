@@ -167,6 +167,7 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
         version = albedo.version
     )
 
+    a = on_architecture(model.architecture, a)
     return interpolate!(albedo.albedo, a)
 end
 
