@@ -1,5 +1,6 @@
 export LinearInPressure, LinearInLogPressure
-export ConstantExtrapolation, DryAdiabaticExtrapolation, SubsurfaceMask
+export ConstantExtrapolation, DryAdiabaticExtrapolation
+export SubsurfaceMask
 
 # VERTICAL INTERPOLATION METHODS
 
