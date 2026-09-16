@@ -214,6 +214,11 @@ Fields are: $(TYPEDFIELDS)"""
     shuffle::Bool = true
     keepbits::Int = 10
     transform::F = (x) -> x - 273.15     # K to ˚C
+
+    "[OPTION] how to extrapolate below the lowest model level when written on pressure
+    levels, dry-adiabatic descent so that e.g. 1000 hPa below the lowest model level is
+    sensible. Only used with `PressureLevels`, see [`AbstractVerticalExtrapolation`](@ref)"
+    extrapolation::AbstractVerticalExtrapolation = DryAdiabaticExtrapolation()
 end
 
 path(::TemperatureOutput, simulation) = simulation.variables.grid.temperature

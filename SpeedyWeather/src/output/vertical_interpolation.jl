@@ -1,8 +1,3 @@
-export interpolate_pressure_levels!
-export LinearInPressure, LinearInLogPressure
-export ConstantExtrapolation, DryAdiabaticExtrapolation
-export SubsurfaceMask
-
 # VERTICAL INTERPOLATION METHODS
 
 """Supertype of methods to interpolate between two model levels, used by
@@ -38,7 +33,7 @@ struct ConstantExtrapolation <: AbstractVerticalExtrapolation end
 to obtain e.g. a 1000 hPa temperature below a model level that sits above it.
 Same adiabat as used for the mean sea-level pressure output. Fields are $(TYPEDFIELDS)"""
 @kwdef struct DryAdiabaticExtrapolation{NF} <: AbstractVerticalExtrapolation
-    "[OPTION] adiabatic exponent κ = R_dry/cₚ, to be set to `model.atmosphere.κ`"
+    "[DERIVED] adiabatic exponent κ = R_dry/cₚ, set from the model's atmosphere at initialize!"
     κ::NF = 2 / 7
 end
 

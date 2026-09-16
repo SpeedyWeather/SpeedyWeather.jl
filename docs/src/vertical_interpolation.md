@@ -11,11 +11,11 @@ interpolate from the model's vertical levels onto pressure levels.
 
 ## Interpolating a field onto pressure levels
 
-[`interpolate_pressure_levels!`](@ref) interpolates a field on model levels onto pressure
+`SpeedyWeather.interpolate_pressure_levels!` interpolates a field on model levels onto pressure
 levels, writing into an output field that you allocate yourself
 
 ```julia
-interpolate_pressure_levels!(
+SpeedyWeather.interpolate_pressure_levels!(
     out_field,          # OUTPUT: (horizontal, npressure)
     in_field,           # INPUT: (horizontal, nlayers) on model levels
     surface_pressure,   # INPUT: (horizontal,) surface pressure [Pa]
@@ -59,7 +59,7 @@ or linear in the logarithm of pressure
 w = \frac{\log(p/p_1)}{\log(p_2/p_1)} \qquad \text{(\texttt{LinearInLogPressure})}
 ```
 
-`LinearInLogPressure` is the default as most variables vary more linearly with
+`SpeedyWeather.LinearInLogPressure` is the default as most variables vary more linearly with
 ``\log p`` than with ``p``.
 
 ## Extrapolation beyond the model levels
@@ -70,12 +70,12 @@ because the lowest full model level is not the surface: a level below the lowest
 level can still be above ground (`p < pₛ`), or genuinely below ground (`p > pₛ`).
 The following are available
 
-- [`ConstantExtrapolation`](@ref) (default) holds the outer-most model level constant.
-- [`DryAdiabaticExtrapolation`](@ref) descends dry-adiabatically below the lowest model
+- `ConstantExtrapolation` (default) holds the outer-most model level constant.
+- `DryAdiabaticExtrapolation` descends dry-adiabatically below the lowest model
   level, ``T(p) = T_\text{bottom} (p/p_\text{bottom})^\kappa``, which is what you want for
   a temperature at, say, 1000 hPa below a lowest model level that sits above it. It is the
   same adiabat that the mean sea-level pressure output uses.
-- [`SubsurfaceMask`](@ref) masks everything below the surface with a `missing_value`
+- `SubsurfaceMask` masks everything below the surface with a `missing_value`
   (`NaN` by default) and uses another extrapolation between the lowest model level and the
   surface.
 
@@ -108,7 +108,7 @@ allocate an output field for the pressure levels of interest, and interpolate
 p = spectral_grid.NF[850e2, 500e2, 200e2]       # pressure levels in Pa
 temp_p = zeros(spectral_grid.NF, spectral_grid.grid, length(p))
 
-interpolate_pressure_levels!(temp_p, temp, pₛ, p, model.geometry.vertical_coordinates)
+SpeedyWeather.interpolate_pressure_levels!(temp_p, temp, pₛ, p, model.geometry.vertical_coordinates)
 [sum(temp_p[:, k]) / length(pₛ) for k in eachindex(p)]   # mean temperature [K] per level
 ```
 
@@ -120,17 +120,24 @@ surface
 p = spectral_grid.NF[1000e2]
 temp_1000 = zeros(spectral_grid.NF, spectral_grid.grid, length(p))
 
-interpolate_pressure_levels!(
+SpeedyWeather.interpolate_pressure_levels!(
     temp_1000, temp, pₛ, p, model.geometry.vertical_coordinates,
-    LinearInLogPressure(),
-    SubsurfaceMask(above_surface = DryAdiabaticExtrapolation(model.atmosphere.κ)),
+    SpeedyWeather.LinearInLogPressure(),
+    SpeedyWeather.SubsurfaceMask(
+        above_surface = SpeedyWeather.DryAdiabaticExtrapolation(model.atmosphere.κ),
+    ),
 )
 count(isnan, temp_1000), length(pₛ)     # masked points of total
 ```
 
 ## Output on pressure levels
 
-Writing output on pressure levels instead of model levels is not wired into the output
-writers yet, so for now the interpolation has to be called manually as above. The
-integration is planned as a `levels` keyword argument to the output writers, see
-[`NetCDFOutput`](@ref).
+You normally don't need to call any of this yourself: every output writer takes a `levels`
+keyword argument to write its 3D variables on pressure levels instead of model levels
+
+```julia
+output = NetCDFOutput(spectral_grid, PrimitiveWet, levels = PressureLevels([850, 500, 200] .* 100))
+```
+
+See [Output levels](@ref output_levels) for the details, including how a variable chooses
+its extrapolation below the lowest model level.

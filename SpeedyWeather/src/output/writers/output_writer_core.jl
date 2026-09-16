@@ -74,6 +74,13 @@ function initialize!(
     # RESET COUNTERS
     core.output_counter = 1             # start at 1 for writing the initial conditions
 
+    # VERTICAL OUTPUT LEVELS, allocate scratch fields for e.g. PressureLevels and take
+    # κ for any dry-adiabatic extrapolation from the model's atmosphere
+    if hasproperty(output, :levels)
+        initialize!(output.levels, model)
+        sync_extrapolations!(output, model)
+    end
+
     # CALLBACKS
     output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
     output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())

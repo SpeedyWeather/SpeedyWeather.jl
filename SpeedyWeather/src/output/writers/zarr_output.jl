@@ -78,6 +78,10 @@ the Zarr group type once `initialize!` has been called (`Nothing` before)."""
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
 
+    "[OPTION] vertical levels to write 3D atmospheric variables on, `ModelLevels()` (default)
+    or `PressureLevels()`, see [`AbstractOutputLevels`](@ref)"
+    levels::AbstractOutputLevels = ModelLevels()
+
     "[OPTION] number of time steps per chunk along the time dimension"
     time_chunk::Int = 1
 

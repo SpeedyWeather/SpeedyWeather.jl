@@ -1,4 +1,6 @@
 import SpeedyWeather: interpolate_pressure_levels!, pressure
+import SpeedyWeather: LinearInPressure, LinearInLogPressure
+import SpeedyWeather: ConstantExtrapolation, DryAdiabaticExtrapolation, SubsurfaceMask
 
 # a field that is an exact function f of pressure, so that interpolating it onto pressure
 # levels can be checked against f evaluated at those levels

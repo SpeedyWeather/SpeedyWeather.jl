@@ -17,6 +17,7 @@ function ZarrOutput(
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
         compressor = nothing,
+        levels::SpeedyWeather.AbstractOutputLevels = SpeedyWeather.ModelLevels(),
         kwargs...
     )
 
@@ -27,10 +28,9 @@ function ZarrOutput(
     interpolator = RingGrids.interpolator(output_grid, input_grid, NF = DEFAULT_OUTPUT_NF)
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
-    (; nlayers) = SG
     land_fraction = Field(output_NF, output_grid)
     field2D = Field(output_NF, output_grid)
-    field3D = Field(output_NF, output_grid, nlayers)
+    field3D = Field(output_NF, output_grid, SpeedyWeather.get_nlayers(levels, SG))
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     # Concrete type parameters: pick the compressor's type (defaulting to
@@ -49,6 +49,7 @@ function ZarrOutput(
 
     output = ZarrOutput{F2, F3, Itp, DT, S, C, Z}(;
         interval = interval_sec,
+        levels,
         interpolator,
         land_fraction,
         field2D,
@@ -210,7 +211,6 @@ function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::Abst
     assert_ensemble_creator(output)
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
     soil_indices = collect(1:get_soil_layers(model))
 
     write_coordinate!(
@@ -221,10 +221,7 @@ function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::Abst
         g, "lat", collect(latd);
         attrs = Dict("units" => "degrees_north", "long_name" => "latitude", "_ARRAY_DIMENSIONS" => ["lat"])
     )
-    write_coordinate!(
-        g, "layer", collect(σ);
-        attrs = Dict("units" => "1", "long_name" => "sigma layer", "_ARRAY_DIMENSIONS" => ["layer"])
-    )
+    define_vertical_coordinate!(g, output.levels, model)     # sigma or pressure levels
     write_coordinate!(
         g, "soil_layer", collect(soil_indices);
         attrs = Dict("units" => "1", "long_name" => "soil layer index", "_ARRAY_DIMENSIONS" => ["soil_layer"])
@@ -371,8 +368,9 @@ function define_variable!(
     cz = output.vertical_chunk > 0 ? min(output.vertical_chunk, nz) : nz
     full_chunks = (cx, cy, cz, max(output.time_chunk, 1))
 
-    # the vertical dimension depends on the variable, e.g. "layer" or "soil_layer"
-    all_dims = ("lon", "lat", vertical_dimension(var), "time")
+    # the vertical dimension depends on the variable and the output's levels,
+    # e.g. "layer", "pressure" or "soil_layer"
+    all_dims = ("lon", "lat", vertical_dimension(output, var), "time")
 
     # Pick out the active dims as flagged by var.dims_xyzt.
     active = var.dims_xyzt
