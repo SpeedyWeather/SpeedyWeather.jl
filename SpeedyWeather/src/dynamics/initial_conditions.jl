@@ -163,7 +163,9 @@ end
     l = l_indices[lm]
 
     # Skip zonal modes (m=0, which are the first lmax harmonics)
-    ξ[I] = ifelse(lm > lmax & l <= max_wavenumber, amplitude * l^power * random_values[I], 0)
+    # `@fastmath` for the `^`: `l^power` with a real exponent otherwise routes through
+    # Float64 pow_body even when power is NF, which Metal's GPU compiler rejects
+    ξ[I] = ifelse(lm > lmax & l <= max_wavenumber, amplitude * @fastmath(l^power) * random_values[I], 0)
 end
 
 export RandomVelocity
