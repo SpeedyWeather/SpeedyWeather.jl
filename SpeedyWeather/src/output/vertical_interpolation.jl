@@ -1,3 +1,4 @@
+export interpolate_pressure_levels!
 export LinearInPressure, LinearInLogPressure
 export ConstantExtrapolation, DryAdiabaticExtrapolation
 export SubsurfaceMask
