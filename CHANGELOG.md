@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Documentation for the vertical interpolation onto pressure levels, export `interpolate_pressure_levels!` [#1257](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1257)
 - Vertical interpolation from the model's (sigma or hybrid) levels onto pressure levels, CPU/GPU, with interpolation linear in p or log(p) and configurable extrapolation [#1256](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1256)
 - Documentation CI builds with Julia 1.12 [#1255](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1255)
 - Fix Terrarium 3D GPU Fields not being copied to host [#1250](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1250)
