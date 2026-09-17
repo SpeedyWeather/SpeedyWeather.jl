@@ -192,7 +192,7 @@ end
 
 # `vars.dynamics.w` is radius*σ̇ as vor, div stay radius-scaled throughout `run!`. Particles move
 # in physical coordinates, the vertical counterpart of the 180/(π*radius) factor for u, v below.
-@inline unscale_vertical_velocity!(w, radius) = (w ./= radius)   # radius*σ̇ -> σ̇ [1/s]
+@inline unscale_vertical_velocity!(w, radius) = (w .*= inv(radius))   # radius*σ̇ -> σ̇ [1/s]
 
 """$(TYPEDSIGNATURES)
 Initialize 3D particle advection work arrays: interpolate u, v, w at each particle's
