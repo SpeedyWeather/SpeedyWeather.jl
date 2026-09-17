@@ -32,32 +32,30 @@ end
 
 gpu_backend = load_gpu_package()
 
-# TEMPORARILY commented out to save CI time while iterating on the Metal gpu_graphs
-# synchronization fix in metal_graphs.jl -- restore before merging.
-# # KERNEL LAUNCHING AND UTILS
-# include("kernels_GPU.jl")
-#
-# # BROADCASTING
-# include("broadcasting.jl")
-#
-# # SPECTRAL TRANSFORMS
-# include("spectral_transform.jl")
-#
-# # INTERPOLATION OF RINGGRIDS
-# include("interpolate.jl")
-#
-# # SET FUNCTIONS, GPU SPECIFIC
-# include("set.jl")
-#
-# # VERTICAL, GPU SPECIFIC
-# include("vertical_integration.jl")
-#
-# # FULL MODELS
-# include("barotropic.jl")
-# include("shallowwater.jl")
-# include("primitive_wet.jl")
-#
-# include("gpu_graphs_shared.jl")
+# KERNEL LAUNCHING AND UTILS
+include("kernels_GPU.jl")
+
+# BROADCASTING
+include("broadcasting.jl")
+
+# SPECTRAL TRANSFORMS
+include("spectral_transform.jl")
+
+# INTERPOLATION OF RINGGRIDS
+include("interpolate.jl")
+
+# SET FUNCTIONS, GPU SPECIFIC
+include("set.jl")
+
+# VERTICAL, GPU SPECIFIC
+include("vertical_integration.jl")
+
+# FULL MODELS
+include("barotropic.jl")
+include("shallowwater.jl")
+include("primitive_wet.jl")
+
+include("gpu_graphs_shared.jl")
 
 if gpu_backend === :CUDA
 
@@ -77,8 +75,7 @@ elseif gpu_backend === :AMDGPU
     include("hip_graphs.jl")
 
 elseif gpu_backend === :Metal
-    # TEMPORARILY commented out to save CI time -- restore before merging.
-    # include("MetalGPU/metal.jl")
+    include("MetalGPU/metal.jl")
 
     # MPSGRAPH-FUSED BATCHED FOURIER TRANSFORM (Metal-only feature, currently disabled by
     # default -- see metal_graphs.jl for why these tests don't gate on that default)
