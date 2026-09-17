@@ -10,6 +10,7 @@ abstract type AbstractOutputLayers <: AbstractModelComponent end
 """Write 3D variables on the model's vertical layers, sigma or hybrid sigma-pressure
 depending on `model.geometry.vertical_coordinates`. Default for all output writers."""
 struct ModelLayers <: AbstractOutputLayers end
+ModelLayers(::SpectralGrid) = ModelLayers()
 
 """Pressure [Pa] of the layers that `PressureLayers` interpolates onto by default."""
 const DEFAULT_PRESSURE_LAYERS = Float32[100, 200, 500, 850, 1000] .* 100

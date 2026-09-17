@@ -175,9 +175,13 @@ function Base.show(io::IO, output::HEALPixOutput{F}) where {F}
         println(io, styled"├ {info:interpolation} = skipped (model already on this grid)")
     else
         interp_type_str = string(typeof(output.interpolator))
-        interp_type_str_short = length(interp_type_str) > 70 ? string(first(interp_type_str, 70), "...}") : interp_type_str
+        interp_type_str_short = length(interp_type_str) > 64 ? string(first(interp_type_str, 64), "...}") : interp_type_str
         println(io, styled"├ {info:interpolator}::$interp_type_str_short")
     end
+
+    layers_type_str = string(typeof(output.layers))
+    layers_type_str_short = length(layers_type_str) > 70 ? string(first(layers_type_str, 70), "...}") : layers_type_str
+    println(io, styled"├ {info:layers}::$layers_type_str_short")
 
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, styled"├ {info:interval} = $(output.interval)")
