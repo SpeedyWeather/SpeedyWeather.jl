@@ -145,7 +145,7 @@ function HEALPixOutput(
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
         compressor = nothing,
-        levels::SpeedyWeather.AbstractOutputLevels = SpeedyWeather.ModelLevels(),
+        layers::SpeedyWeather.AbstractOutputLayers = SpeedyWeather.ModelLayers(),
         kwargs...
     )
 
@@ -169,7 +169,7 @@ function HEALPixOutput(
     # CREATE HEALPIX FIELDS TO WRITE OUT FROM
     land_fraction = Field(output_NF, output_grid)
     field2D = Field(output_NF, output_grid)
-    field3D = Field(output_NF, output_grid, SpeedyWeather.get_nlayers(levels, SG))
+    field3D = Field(output_NF, output_grid, SpeedyWeather.get_nlayers(layers, SG))
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     # Concrete type parameters, see the ZarrOutput constructor for the compressor/group ones.
@@ -184,10 +184,11 @@ function HEALPixOutput(
     F2 = typeof(field2D)
     F3 = typeof(field3D)
     Itp = typeof(interpolator)
+    L = typeof(layers)
 
-    output = HEALPixOutput{F2, F3, Itp, DT, S, C, Z}(;
+    output = HEALPixOutput{F2, F3, Itp, DT, S, C, Z, L}(;
         interval = interval_sec,
-        levels,
+        layers,
         interpolator,
         land_fraction,
         field2D,
@@ -330,7 +331,7 @@ function write_healpix_coordinates!(g::Zarr.ZGroup, output::HEALPixOutput, model
             "long_name" => "latitude ring index of the cell, 1 (north) to $(get_nlat(grid)) (south)",
         )
     )
-    define_vertical_coordinate!(g, output.levels, model)     # sigma or pressure levels
+    define_vertical_coordinate!(g, output.layers, model)     # sigma or pressure layers
     write_coordinate!(
         g, "soil_layer", collect(soil_indices);
         attrs = Dict("units" => "1", "long_name" => "soil layer index", "_ARRAY_DIMENSIONS" => ["soil_layer"])
@@ -370,9 +371,9 @@ function define_variable!(
     cz = output.vertical_chunk > 0 ? min(output.vertical_chunk, nz) : nz
     full_chunks = (cc, cz, max(output.time_chunk, 1))
 
-    # the vertical dimension depends on the variable and the output's levels,
+    # the vertical dimension depends on the variable and the output's layers,
     # e.g. "layer", "pressure" or "soil_layer"
-    all_dims = ("cell", vertical_dimension(output, var), "time")
+    all_dims = ("cell", vertical_dimension_name(output, var), "time")
 
     # pick out the active dims: cell is always on (asserted above), the vertical and time
     # ones follow the variable's z/t flags

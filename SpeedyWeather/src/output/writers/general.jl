@@ -182,9 +182,9 @@ function output!(
         (is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
     ori = has_step ? get_prognostic_step(ori, ts, output) : ori
 
-    # interpolate onto the output's vertical levels (no-op on ModelLevels), on the model
+    # interpolate onto the output's vertical layers (no-op on ModelLayers), on the model
     # grid and the model's architecture, i.e. before the horizontal interpolation
-    ori = interpolate_levels!(output_levels(output), ori, variable, simulation)
+    ori = interpolate_layers!(output_layers(output), ori, variable, simulation)
 
     raw = on_architecture(CPU(), ori)
     interpolate_output!(output, var, raw)

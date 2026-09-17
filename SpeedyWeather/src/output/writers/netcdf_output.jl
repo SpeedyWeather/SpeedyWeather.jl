@@ -9,6 +9,7 @@ $(TYPEDFIELDS)"""
         Interpolator,
         DT,
         S,
+        Layers,
     } <: AbstractOutput
 
     # FILE OPTIONS
@@ -57,9 +58,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
 
-    "[OPTION] vertical levels to write 3D atmospheric variables on, `ModelLevels()` (default)
-    or `PressureLevels()`, see [`AbstractOutputLevels`](@ref)"
-    levels::AbstractOutputLevels = ModelLevels()
+    "[OPTION] vertical layers to write 3D atmospheric variables on, `ModelLayers()` (default)
+    or `PressureLayers(spectral_grid)`, see [`AbstractOutputLayers`](@ref)"
+    layers::Layers = ModelLayers()
 
     # the netcdf file to be written into, will be created
     netcdf_file::Union{NCDataset, Nothing} = nothing
@@ -90,7 +91,7 @@ function NetCDFOutput(
         output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),  # only needed for dispatch
-        levels::AbstractOutputLevels = ModelLevels(),        # needed to size field3D
+        layers::AbstractOutputLayers = ModelLayers(),        # needed to size field3D
         kwargs...
     )
 
@@ -103,12 +104,12 @@ function NetCDFOutput(
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction
     field2D = Field(output_NF, output_grid)
-    field3D = Field(output_NF, output_grid, get_nlayers(levels, SG))
+    field3D = Field(output_NF, output_grid, get_nlayers(layers, SG))
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     output = NetCDFOutput(;
         interval = Second(interval),    # convert to seconds for dispatch
-        levels,
+        layers,
         interpolator,
         land_fraction,
         field2D,
@@ -193,7 +194,7 @@ function initialize!(
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib = Dict("units" => "degrees_north", "long_name" => "latitude"))
-    define_vertical_coordinate!(dataset, output.levels, model)      # sigma or pressure levels
+    define_vertical_coordinate!(dataset, output.layers, model)      # sigma or pressure layers
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
     # VARIABLES: define every output variable in the netCDF file and write initial
@@ -204,7 +205,7 @@ function initialize!(
     warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
         exists_in_simulation(var, simulation) || continue
-        define_variable!(dataset, var, eltype(output.field2D), vertical_dim = vertical_dimension(output, var))
+        define_variable!(dataset, var, eltype(output.field2D), vertical_dim_name = vertical_dimension_name(output, var))
         output!(output, var, simulation)
     end
 
@@ -223,7 +224,7 @@ function define_variable!(
         dataset::NCDataset,
         var::AbstractOutputVariable,
         output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF;
-        vertical_dim::String = vertical_dimension(var),
+        vertical_dim_name::String = vertical_dimension_name(var),
     )
     # hook for custom output variables to define their own (vertical) dimension
     define_dimension!(dataset, var)
@@ -231,9 +232,9 @@ function define_variable!(
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
     attributes = Dict("long_name" => var.long_name, "units" => var.unit, "_FillValue" => output_NF(missing_value))
 
-    # the vertical dimension depends on the variable and the output's levels,
+    # the vertical dimension depends on the variable and the output's layers,
     # e.g. "layer", "pressure" or "soil_layer"
-    all_dims = ("lon", "lat", vertical_dim, "time")
+    all_dims = ("lon", "lat", vertical_dim_name, "time")
     dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
     # pick defaults for compression if not defined

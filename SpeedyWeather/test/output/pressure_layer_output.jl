@@ -1,36 +1,37 @@
 using NCDatasets, Dates
 
-@testset "Output on pressure levels" begin
+@testset "Output on pressure layers" begin
 
-    @testset "PressureLevels construction" begin
+    @testset "PressureLayers construction" begin
         spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
 
-        levels = SpeedyWeather.PressureLevels()
-        @test SpeedyWeather.get_nlayers(levels, spectral_grid) == length(levels.pressure)
-        @test SpeedyWeather.vertical_dimension(levels) == "pressure"
-        @test SpeedyWeather.vertical_dimension(SpeedyWeather.ModelLevels()) == "layer"
+        layers = SpeedyWeather.PressureLayers(spectral_grid)
+        @test SpeedyWeather.get_nlayers(layers, spectral_grid) == length(layers.pressure)
+        @test SpeedyWeather.vertical_dimension_name(layers) == "pressure"
+        @test SpeedyWeather.vertical_dimension_name(SpeedyWeather.ModelLayers()) == "layer"
 
-        # model levels is the default and sizes the 3D scratch field with nlayers
+        # pressure and scratch field are allocated in the model's number format on construction
+        @test eltype(layers.pressure) == spectral_grid.NF
+        @test size(layers.scratch) == (SpeedyWeather.get_npoints(spectral_grid.grid), length(layers.pressure))
+
+        # model layers is the default and sizes the 3D scratch field with nlayers
         output = NetCDFOutput(spectral_grid, PrimitiveWet)
-        @test output.levels isa SpeedyWeather.ModelLevels
+        @test output.layers isa SpeedyWeather.ModelLayers
         @test size(output.field3D, 2) == spectral_grid.nlayers
 
-        # pressure levels size it with the number of pressure levels instead
+        # pressure layers size it with the number of pressure layers instead
         p = [850, 500, 200] .* 100.0
-        output = NetCDFOutput(spectral_grid, PrimitiveWet, levels = SpeedyWeather.PressureLevels(p))
+        output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = SpeedyWeather.PressureLayers(spectral_grid, p))
         @test size(output.field3D, 2) == length(p)
         @test size(output.field3Dland, 2) == SpeedyWeather.DEFAULT_NLAYERS_SOIL   # unaffected
 
-        # non-monotonic pressure levels are rejected at initialize!
-        model = PrimitiveWetModel(spectral_grid)
-        levels = SpeedyWeather.PressureLevels([500, 200, 850] .* 100.0)
-        @test_throws AssertionError SpeedyWeather.initialize!(levels, model)
-        levels = SpeedyWeather.PressureLevels([-500, 200] .* 100.0)
-        @test_throws AssertionError SpeedyWeather.initialize!(levels, model)
+        # non-monotonic or negative pressure layers are rejected at construction
+        @test_throws AssertionError SpeedyWeather.PressureLayers(spectral_grid, [500, 200, 850] .* 100.0)
+        @test_throws AssertionError SpeedyWeather.PressureLayers(spectral_grid, [-500, 200] .* 100.0)
     end
 
     @testset "Extrapolation defaults" begin
-        # temperature descends dry-adiabatically below the lowest model level,
+        # temperature descends dry-adiabatically below the lowest model layer,
         # everything else is constant
         @test SpeedyWeather.output_extrapolation(SpeedyWeather.TemperatureOutput()) isa
             SpeedyWeather.DryAdiabaticExtrapolation
@@ -40,20 +41,24 @@ using NCDatasets, Dates
 
         # κ is taken from the model's atmosphere at initialize!
         spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
-        output = NetCDFOutput(spectral_grid, PrimitiveWet, levels = SpeedyWeather.PressureLevels())
+        output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = SpeedyWeather.PressureLayers(spectral_grid))
         model = PrimitiveWetModel(spectral_grid; output)
         SpeedyWeather.sync_extrapolations!(output, model)
         @test output.variables[:temp].extrapolation.κ == model.atmosphere.κ
-        @test output.variables[:temp].extrapolation.κ isa spectral_grid.NF
 
         # a mask keeps its inner extrapolation synced too
-        output.variables[:temp].extrapolation =
-            SpeedyWeather.SubsurfaceMask(above_surface = SpeedyWeather.DryAdiabaticExtrapolation())
+        add!(
+            output, SpeedyWeather.TemperatureOutput(
+                extrapolation = SpeedyWeather.SubsurfaceMask(
+                    above_surface = SpeedyWeather.DryAdiabaticExtrapolation(),
+                ),
+            ),
+        )
         SpeedyWeather.sync_extrapolations!(output, model)
         @test output.variables[:temp].extrapolation.above_surface.κ == model.atmosphere.κ
     end
 
-    @testset "NetCDFOutput on pressure levels" begin
+    @testset "NetCDFOutput on pressure layers" begin
         # full grid model so that the horizontal interpolation onto the (full) output grid
         # is an exact copy, which lets us compare the file against the interpolation directly
         spectral_grid = SpectralGrid(truncation = 15, nlayers = 8, Grid = FullGaussianGrid)
@@ -63,7 +68,7 @@ using NCDatasets, Dates
         output = NetCDFOutput(
             spectral_grid, PrimitiveWet,
             path = mktempdir(), write_restart = false, interval = Hour(6),
-            levels = SpeedyWeather.PressureLevels(p),
+            layers = SpeedyWeather.PressureLayers(spectral_grid, p),
         )
         # no bitrounding and soil output so that the comparison below is exact
         add!(output, SpeedyWeather.TemperatureOutput(keepbits = 23), SpeedyWeather.SoilTemperatureOutput())
@@ -95,9 +100,10 @@ using NCDatasets, Dates
             )
             pₛ = simulation.variables.parameterizations.surface_pressure
             reference = zeros(NF, spectral_grid.grid, length(p))
-            SpeedyWeather.interpolate_pressure_levels!(
-                reference, temp, pₛ, NF.(p), model.geometry.vertical_coordinates,
-                model.output.levels.interpolation,
+            SpeedyWeather.interpolate_pressure_layers!(
+                reference, temp, pₛ, model.output.layers.pressure,
+                model.geometry.vertical_coordinates,
+                model.output.layers.interpolation,
                 model.output.variables[:temp].extrapolation,
             )
 
@@ -112,7 +118,7 @@ using NCDatasets, Dates
         end
     end
 
-    @testset "Model levels unchanged by default" begin
+    @testset "Model layers unchanged by default" begin
         spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
         output = NetCDFOutput(
             spectral_grid, PrimitiveWet,

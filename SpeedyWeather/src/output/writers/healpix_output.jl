@@ -40,8 +40,9 @@ Type parameters: `Field2D`, `Field3D` are the scratch field types on the output
 grid, `Interpolator` is the interpolator type (or `Nothing` when the model
 grid already is the output grid and interpolation is skipped), `DT` and `S` are the
 start-date and output-step types, `C` is the Zarr compressor type (or `Nothing` for
-the Zarr default), and `Z` is the Zarr group type once `initialize!` has been called
-(`Nothing` before). Fields are $(TYPEDFIELDS)"""
+the Zarr default), `Z` is the Zarr group type once `initialize!` has been called
+(`Nothing` before) and `Layers` the type of the vertical output layers.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct HEALPixOutput{
         Field2D,
         Field3D,
@@ -50,6 +51,7 @@ the Zarr default), and `Z` is the Zarr group type once `initialize!` has been ca
         S,
         C,
         Z,
+        Layers,
     } <: AbstractZarrOutput
 
     # FILE OPTIONS
@@ -98,9 +100,9 @@ the Zarr default), and `Z` is the Zarr group type once `initialize!` has been ca
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
 
-    "[OPTION] vertical levels to write 3D atmospheric variables on, `ModelLevels()` (default)
-    or `PressureLevels()`, see [`AbstractOutputLevels`](@ref)"
-    levels::AbstractOutputLevels = ModelLevels()
+    "[OPTION] vertical layers to write 3D atmospheric variables on, `ModelLayers()` (default)
+    or `PressureLayers(spectral_grid)`, see [`AbstractOutputLayers`](@ref)"
+    layers::Layers = ModelLayers()
 
     "[OPTION] number of time steps per chunk along the time dimension"
     time_chunk::Int = 1

@@ -404,13 +404,13 @@ end
     @test all(isfinite, g["mslp"][:, 2:end])
 end
 
-@testset "HEALPixOutput on pressure levels" begin
+@testset "HEALPixOutput on pressure layers" begin
     spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
     p = [700, 300] .* 100.0
     output = HEALPixOutput(
         spectral_grid, PrimitiveWet,
         path = mktempdir(), write_restart = false, interval = Hour(6),
-        levels = SpeedyWeather.PressureLevels(p),
+        layers = SpeedyWeather.PressureLayers(spectral_grid, p),
     )
     model = PrimitiveWetModel(spectral_grid; output)
     simulation = initialize!(model)
