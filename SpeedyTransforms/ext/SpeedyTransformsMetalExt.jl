@@ -2,6 +2,7 @@ module SpeedyTransformsMetalExt
 
 import Metal: Metal, MtlArray
 import AbstractFFTs
+import KernelAbstractions
 import LinearAlgebra
 using DocStringExtensions
 
@@ -173,6 +174,15 @@ function forward_loop_fused!(buf::MetalFourierBufferCache, fused::MetalFourierGr
         Metal.ObjectiveC.nil, Metal.MPSGraphs.default_exec_desc()
     )
     Metal.commit!(cmdbuf)
+    # `commit!` submits the command buffer asynchronously; the `copyto!` calls below read
+    # `ring_complex_both` right back out, but nothing guarantees they're ordered after this
+    # command buffer unless we wait for it explicitly (they may go through a different
+    # internal queue/stream than `queue`). Without this, the read-back can race the GPU
+    # still writing the FFT result, giving plausible-but-wrong values -- suspected cause of
+    # https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1217 gpu_graphs forward-only failures.
+    # `synchronize` is the same backend-agnostic KernelAbstractions call used elsewhere in this
+    # codebase (see `Architectures.jl`); it waits for all outstanding work on this device/queue.
+    KernelAbstractions.synchronize(S.architecture)
 
     @inbounds for j in 1:nlat_half
         nfreq = nlons[j] ÷ 2 + 1
@@ -212,6 +222,9 @@ function inverse_loop_fused!(buf::MetalFourierBufferCache, fused::MetalFourierGr
         Metal.ObjectiveC.nil, Metal.MPSGraphs.default_exec_desc()
     )
     Metal.commit!(cmdbuf)
+    # see the matching comment in `forward_loop_fused!` -- same missing-synchronization risk
+    # before reading `ring_real_both` back out.
+    KernelAbstractions.synchronize(S.architecture)
 
     @inbounds for j in 1:nlat_half
         dest = view(field.data, rings[j], :)

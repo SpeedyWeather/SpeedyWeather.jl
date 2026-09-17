@@ -12,6 +12,11 @@
 # so they always run `gpu_graphs = true` explicitly when the Metal extension is loaded.
 
 function test_metal_graphs(ext)
+    # Standalone grid list (not `grid_list` from spectral_transform.jl -- that file is commented
+    # out of runtests.jl right now to save CI time while iterating on the synchronization fix
+    # below; restore the `include` and drop this once other Metal GPU tests are re-enabled).
+    grid_list = [FullGaussianGrid, OctahedralGaussianGrid, OctahedralClenshawGrid]
+
     @testset "Metal Graphs: fourier_batched equivalence (gpu_graphs on vs off)" begin
         if ext !== nothing
             @testset for Grid in grid_list
