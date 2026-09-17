@@ -16,3 +16,18 @@
     @test simulation.model.feedback.nans_detected == false
     @test isfile(joinpath(output.run_path, output.filename))
 end
+
+@testset "GPU PrimitiveWetModel (default construction, WhichTransform)" begin
+    # No component overrides: at the default truncation this lets `WhichTransform`
+    # pick `MatrixSpectralTransform` (as it does for any truncation <= 64 on GPU),
+    # unlike the testset above which forces `SpectralTransform` explicitly. This is
+    # the path a plain `PrimitiveWetModel(spectral_grid)` on GPU actually takes.
+    arch = SpeedyWeather.GPU()
+    spectral_grid = SpectralGrid(architecture = arch)
+    model = PrimitiveWetModel(spectral_grid)
+    @test model.spectral_transform isa SpeedyWeather.SpeedyTransforms.MatrixSpectralTransform
+    simulation = initialize!(model)
+    run!(simulation, steps = 3)
+
+    @test simulation.model.feedback.nans_detected == false
+end
