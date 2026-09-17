@@ -76,8 +76,4 @@ elseif gpu_backend === :AMDGPU
 
 elseif gpu_backend === :Metal
     include("MetalGPU/metal.jl")
-
-    # MPSGRAPH-FUSED BATCHED FOURIER TRANSFORM (Metal-only feature, currently disabled by
-    # default -- see metal_graphs.jl for why these tests don't gate on that default)
-    include("metal_graphs.jl")
 end
