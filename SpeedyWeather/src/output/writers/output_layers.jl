@@ -12,7 +12,7 @@ depending on `model.geometry.vertical_coordinates`. Default for all output write
 struct ModelLayers <: AbstractOutputLayers end
 
 """Pressure [Pa] of the layers that `PressureLayers` interpolates onto by default."""
-const DEFAULT_PRESSURE_LAYERS = [50, 100, 200, 300, 500, 700, 850, 925, 1000] .* 100.0
+const DEFAULT_PRESSURE_LAYERS = Float32[100, 200, 500, 850, 1000] .* 100
 
 """Write 3D atmospheric variables interpolated onto `pressure` layers [Pa] instead of the
 model's vertical layers, see [Vertical interpolation onto pressure layers](@ref
@@ -54,7 +54,7 @@ function PressureLayers(
     return PressureLayers(
         on_architecture(SG.architecture, NF.(pressure)),
         interpolation,
-        Field(NF, grid, length(pressure)),      # on the model grid, not the output grid
+        Field(NF, grid, ArrayDimensions.XYZ(), length(pressure)),      # on the model grid, not the output grid
     )
 end
 
@@ -62,14 +62,13 @@ end
 PressureLayers(SG::SpectralGrid, pressure::AbstractVector; kwargs...) =
     PressureLayers(SG; pressure, kwargs...)
 
-function Base.show(io::IO, layers::PressureLayers)
+# custom show function to have the unit printing with hPa
+function Base.show(io::IO, layers::PressureLayers{V}) where V
     pressure = on_architecture(CPU(), layers.pressure) ./ 100
-    println(io, styled"{warning:PressureLayers}")
+    println(io, styled"{warning:PressureLayers}", "{$V, ...}")
     println(io, styled"├ {info:pressure} = $pressure hPa")
     return print(io, styled"└ {info:interpolation}::$(typeof(layers.interpolation))")
 end
-
-Base.show(io::IO, ::ModelLayers) = print(io, styled"{warning:ModelLayers}")
 
 """$(TYPEDSIGNATURES)
 Number of vertical layers that 3D atmospheric variables are written on, used by the output
