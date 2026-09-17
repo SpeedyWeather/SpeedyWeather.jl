@@ -26,7 +26,7 @@ end
     spectral_grid = SpectralGrid(architecture = arch)
     model = PrimitiveWetModel(spectral_grid)
     @test model.spectral_transform isa SpeedyWeather.SpeedyTransforms.MatrixSpectralTransform
-    simulation = initialize!(model)
+    simulation = Simulation(model)
     run!(simulation, steps = 3)
 
     @test simulation.model.feedback.nans_detected == false
