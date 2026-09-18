@@ -204,7 +204,7 @@ end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct TemperatureOutput{F} <: AbstractOutputVariable
+@kwdef mutable struct TemperatureOutput{F, E} <: AbstractOutputVariable
     name::String = "temp"
     unit::String = "degC"
     long_name::String = "temperature"
@@ -214,6 +214,11 @@ Fields are: $(TYPEDFIELDS)"""
     shuffle::Bool = true
     keepbits::Int = 10
     transform::F = (x) -> x - 273.15     # K to ˚C
+
+    "[OPTION] how to extrapolate below the lowest model layer when written on pressure
+    layers, dry-adiabatic descent so that e.g. 1000 hPa below the lowest model layer is
+    sensible. Only used with `PressureLayers`, see [`AbstractVerticalExtrapolation`](@ref)"
+    extrapolation::E = DryAdiabaticExtrapolation()
 end
 
 path(::TemperatureOutput, simulation) = simulation.variables.grid.temperature
