@@ -33,7 +33,7 @@ With minimal code redundancies, it supports
 - Different resolutions (for example T16 to T1024 in spectral matched flexibly with various 800km to 10km grids)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
 - Fast on single CPUs (x86, arm) for laptop prototyping, live demos and education
-- GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs (Metal is WIP)
+- GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs, with Metal support for Apple Silicon
 - Automatic differentiation via Enzyme.jl for sensitivity analysis, parameter calibration and ML-physics hybrid modelling (limited to Julia 1.10 and 1.11 currently) 
 - A very fast and flexible spherical harmonics transform library SpeedyTransforms.jl for CPU and GPU
 

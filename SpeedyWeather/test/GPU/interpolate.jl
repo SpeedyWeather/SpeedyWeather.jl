@@ -29,7 +29,10 @@
     @test interp_cpu.locator.ij_bs == on_architecture(cpu_arch, interp.locator.ij_bs)
     @test interp_cpu.locator.ij_cs == on_architecture(cpu_arch, interp.locator.ij_cs)
     @test interp_cpu.locator.ij_ds == on_architecture(cpu_arch, interp.locator.ij_ds)
-    @test interp_cpu.locator.Δys == on_architecture(cpu_arch, interp.locator.Δys)
-    @test interp_cpu.locator.Δabs == on_architecture(cpu_arch, interp.locator.Δabs)
-    @test interp_cpu.locator.Δcds == on_architecture(cpu_arch, interp.locator.Δcds)
+    # integer indices (above) must match exactly; the float weights are computed from ring
+    # latitudes, which are Float64 on CPU but Float32 on Metal, so compare them approximately
+    ε = sqrt(eps(Float32))
+    @test interp_cpu.locator.Δys ≈ on_architecture(cpu_arch, interp.locator.Δys) rtol = ε atol = ε
+    @test interp_cpu.locator.Δabs ≈ on_architecture(cpu_arch, interp.locator.Δabs) rtol = ε atol = ε
+    @test interp_cpu.locator.Δcds ≈ on_architecture(cpu_arch, interp.locator.Δcds) rtol = ε atol = ε
 end

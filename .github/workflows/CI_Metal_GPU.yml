@@ -1,0 +1,71 @@
+name: Metal GPU
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  test:
+    name: Metal GPU - Julia v${{ matrix.version }}, ${{ matrix.os }}
+    # don't run if any of these labels are present
+    if: >
+      !(
+      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-gpu-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-metal-ci')
+      )
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          # >= 1.11 needed for the [sources] entry in the test Project.toml
+          - '1.12'
+        os:
+          # Metal requires Apple silicon. GitHub-hosted macOS runners are VMs that only
+          # expose a paravirtualized GPU; Metal.jl supports those from macOS 15 and
+          # Metal.jl v1.10 onwards, so do not pin this back to macos-14.
+          - macos-latest
+        arch:
+          - aarch64
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+
+      - uses: julia-actions/cache@v3
+      - name: Instantiate Metal test environment
+        shell: julia --color=yes --project=SpeedyWeather/test/GPU/MetalGPU {0}
+        run: |
+          using Pkg
+          Pkg.instantiate()
+
+      # fail early and legibly if the runner image has no usable (paravirtual) GPU
+      - name: Report Metal device
+        shell: julia --color=yes --project=SpeedyWeather/test/GPU/MetalGPU {0}
+        run: |
+          using Metal
+          try
+              Metal.versioninfo()
+          catch err
+              @warn "Metal.versioninfo() failed" exception = err
+          end
+          Metal.functional() ||
+              error("No functional Metal device on this runner, see the Metal.jl output above")
+
+      - name: Run Metal GPU tests
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/GPU/MetalGPU SpeedyWeather/test/GPU/runtests.jl
+        env:
+          GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

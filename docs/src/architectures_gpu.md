@@ -12,12 +12,16 @@ Our development focuses on CUDA GPUs, but other architectures are thinkable in t
 as our approach relies on the device agnostic `KernelAbstractions.jl`. An experimental port to AMD
 GPUs using the `AMDGPU` package is available; some AMD-specific performance optimizations exist
 (e.g. GPU graphs, see below) but are not enabled by default yet, pending broader hardware verification.
+There is also support for Apple's `Metal` package, letting you run SpeedyWeather.jl on the GPU of
+Apple Silicon Macs; this is convenient for local development and small experiments, but Metal has
+no double-precision (Float64) support, so use `NF = Float32` (the default) throughout when using it.
 The SpeedyWeather.jl submodule `Architectures` encodes all the information of the device we run our models on.
-In order to initialize a model on a GPU, we need to load the `CUDA` or `AMDGPU` package and pass the architecture
-to the model constructor. For example, to initialize a barotropic model on a GPU, we can do the following:  
+In order to initialize a model on a GPU, we need to load the `CUDA`, `AMDGPU`, or `Metal` package and
+pass the architecture to the model constructor. For example, to initialize a barotropic model on a
+GPU, we can do the following:  
 
 ```julia
-using SpeedyWeather, CUDA # For AMD GPUs, replace `CUDA` with `AMDGPU`
+using SpeedyWeather, CUDA # For AMD GPUs use `AMDGPU`, for Apple Silicon use `Metal`
 architecture = SpeedyWeather.GPU()
 spectral_grid = SpectralGrid(truncation = 64, nlayers = 8, architecture = architecture)           
 
@@ -56,6 +60,10 @@ It has been verified stable on datacenter/CDNA hardware (e.g. LUMI), but caused 
 consumer RDNA cards our CI currently runs on, so it isn't trusted as a default yet. To try it
 explicitly on hardware you trust, pass `gpu_graphs = true` as shown above.
 
+On **Metal**, `gpu_graphs` is **disabled by default** and not currently supported; the Fourier
+transform instead batches north/south ring pairs into single Metal Performance Shaders Graph
+(`MPSGraph`) calls to reduce CPU/GPU communication overhead.
+
 ## Architectures Utilities 
 
 In order to easily transfer our structures between CPU (e.g. for plotting and output) and GPU,
@@ -63,7 +71,7 @@ we have the following utilities that can make use of the `architecture` object d
 and the `on_architecture` function, e.g. as follows: 
 
 ```julia
-using SpeedyWeather, CUDA # For AMD GPUs, replace `CUDA` with `AMDGPU`
+using SpeedyWeather, CUDA # For AMD GPUs use `AMDGPU`, for Apple Silicon use `Metal`
 nlat_half = 6
 arch_cpu = SpeedyWeather.CPU()
 arch_gpu = SpeedyWeather.GPU()
@@ -81,7 +89,7 @@ spec_cpu = rand(spectrum_cpu)
 spec_gpu = on_architecture(arch_gpu, spec_cpu)
 ```
 
-Be aware that directly calling e.g. `CuArray`, `ROCArray` or `adapt` on the data structres
+Be aware that directly calling e.g. `CuArray`, `ROCArray`, `MtlArray` or `adapt` on the data structres
 is not recommended, as it can lead to unexpected behavior, e.g. mismatching internal architecture
 representations when launching kernels and other operations. Please use the `on_architecture`
 function instead for all transfer between devices. See also the [GPU](@ref) section of
