@@ -190,6 +190,7 @@ include("parameterizations/stochastic_physics.jl")
 # OCEAN AND LAND
 include("parameterizations/ocean.jl")
 include("parameterizations/sea_ice.jl")
+include("parameterizations/ml_seaice.jl")
 include("parameterizations/land/land.jl")
 include("parameterizations/land/geometry.jl")
 include("parameterizations/land/thermodynamics.jl")
