@@ -110,7 +110,9 @@ function _apply_serial_fft!(
     k_grid = eachlayer(field)[k]     # Precomputed ring index (as a Cartesian index)
 
     if not_equator
-        view(f_out, 1:nfreq, k, j) .= rfft_plan * view(field.data, ilons, k_grid)
+        # `view_only_on_cpu` materialises the ring on GPU: the GPU FFT libraries (Metal in
+        # particular) mishandle a strided/offset view as FFT input, see `_apply_batched_fft!`
+        view(f_out, 1:nfreq, k, j) .= rfft_plan * view_only_on_cpu(field.data, ilons, k_grid)
     else
         fill!(view(f_out, 1:nfreq, k, j), 0)
     end
@@ -134,7 +136,9 @@ function _apply_serial_fft!(
 
     if not_equator
         dest = view(field.data, ilons, k_grid)
-        rhs = brfft_plan * view(g_in, 1:nfreq, k, j)
+        # `view_only_on_cpu` materialises the input on GPU: the GPU FFT libraries (Metal in
+        # particular) mishandle a strided/offset view as FFT input, see `_apply_batched_fft!`
+        rhs = brfft_plan * view_only_on_cpu(g_in, 1:nfreq, k, j)
         add ? (dest .+= rhs) : (dest .= rhs)
     end
     return nothing
