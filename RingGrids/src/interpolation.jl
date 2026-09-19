@@ -463,29 +463,7 @@ function interpolate!(
     return _interpolate!(Aout, A.data, locator, geometry, architecture(A))  # use .data to trigger dispatch for method above
 end
 
-# version for 3D fields, batched into a single launch over all layers
-interpolate!(
-    Aout::Field3D,      # Out: grid to interpolate onto
-    A::Field3D,         # In: gridded data to interpolate from
-    interpolator::AbstractInterpolator,
-) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
-
-function interpolate!(
-        Aout::Field3D,   # Out: grid to interpolate onto
-        A::Field3D,      # In: gridded data to interpolate from
-        locator::AbstractLocator,
-        geometry::AbstractGridGeometry,
-    )
-    # if fields match just copy data over (eltypes might differ)
-    fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
-
-    # .data of a Field3D is a matrix, so the batched method applies directly
-    _interpolate!(Aout.data, A.data, locator, geometry, architecture(A))
-    return Aout
-end
-
-# version for 4D+ fields, looping over the trailing dimensions
+# version for 3D+ fields
 interpolate!(
     Aout::Field,        # Out: grid to interpolate onto
     A::Field,           # In: gridded data to interpolate from
@@ -502,8 +480,21 @@ function interpolate!(
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
 
-    for k in eachlayer(Aout, A, vertical_only = true)
-        _interpolate!(view(Aout.data, :, k), view(A.data, :, k), locator, geometry, architecture(A))
+    # Interpolate every layer in a single launch by collapsing the trailing dimensions into
+    # one. That reshape is O(1) for dense data only, so anything else (e.g. a field wrapping
+    # a non-contiguous view) would end up in a slower wrapper type and keeps the layer loop.
+    if Aout.data isa DenseArray && A.data isa DenseArray
+        _interpolate!(
+            reshape(Aout.data, size(Aout.data, 1), :),
+            reshape(A.data, size(A.data, 1), :),
+            locator,
+            geometry,
+            architecture(A),
+        )
+    else
+        for k in eachlayer(Aout, A, vertical_only = true)
+            _interpolate!(view(Aout.data, :, k), view(A.data, :, k), locator, geometry, architecture(A))
+        end
     end
     return Aout                             # return the field wrapped around the interpolated data
 end
