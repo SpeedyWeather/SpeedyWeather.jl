@@ -20,6 +20,44 @@ Initialize an `AbstractParameterization`. This is called once at when calling in
 The default behaviour is to return `nothing`."""
 initialize!(parameterization::AbstractParameterization, model::AbstractModel) = nothing
 
+"""
+    Parameterization(spectral_grid::SpectralGrid, scheme; kwargs...)
+
+Create a SpeedyWeather parameterization from `scheme`, a parameterization defined
+in another package. That package does not have to depend on SpeedyWeather, instead
+it adds a method to `Parameterization` in its SpeedyWeather extension, e.g.
+
+```julia
+# in the main code of ExternalPackage, no SpeedyWeather dependency
+struct ExternalLongwave
+    ...
+end
+
+# in ExternalPackageSpeedyWeatherExt
+struct SpeedyExternalLongwave{NF} <: SpeedyWeather.AbstractLongwave
+    ...
+end
+
+SpeedyWeather.Parameterization(spectral_grid::SpectralGrid, scheme::ExternalLongwave; kwargs...) =
+    SpeedyExternalLongwave(spectral_grid, scheme; kwargs...)
+```
+
+which is then used as
+
+```julia
+using SpeedyWeather, ExternalPackage
+spectral_grid = SpectralGrid()
+longwave_radiation = Parameterization(spectral_grid, ExternalLongwave())
+model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+```
+
+Types defined in extensions cannot be exported, so this avoids having to access
+them via `Base.get_extension`. Parameterizations that are already
+an `AbstractParameterization` are returned unchanged."""
+function Parameterization end
+
+Parameterization(::SpectralGrid, parameterization::AbstractParameterization) = parameterization
+
 """$(TYPEDSIGNATURES)
 Extract the parameterizations from the model as NamedTuple.
 These are the GPU-compatible components of the model."""
