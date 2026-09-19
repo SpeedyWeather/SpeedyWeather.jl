@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `Parameterization` function stub for packages to define SpeedyWeather parameterizations in extensions [#1261](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1261)
 - CI with Julia v1.13 [#1258](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1258)
 - Vertical interpolation from the model's (sigma or hybrid) levels onto pressure levels, CPU/GPU, with interpolation linear in p or log(p) and configurable extrapolation [#1256](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1256)
 - Documentation CI builds with Julia 1.12 [#1255](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1255)
