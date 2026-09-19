@@ -63,15 +63,12 @@ tendency_steps(::AbstractLeapfrog) = 1
 # Parameterizations should always be evaluated on the previous time step for Euler forward
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParameterization) = 1
 
-# abstract ocean, sea ice or land components use 1 step (as not subject to time stepping, e.g. prescribed)
+# ocean, sea ice or land components use the 1st step: prescribed ones have no step dimension,
+# dynamic ones are Euler forward stepped (see `update_prognostic_surface!`) so that both steps
+# always hold the current state
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractOcean) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSeaIce) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractLandComponent) = 1
-
-# dynamic models are then generally leapfrogged
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicOcean) = 2
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicSeaIce) = 2
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicLandComponent) = 2
 
 # particle advection using u, v at current not previous time step
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
@@ -288,4 +285,36 @@ end
     update = old - 2var_lf[lmk] + new
     var_old[lmk] = var_lf[lmk] + w1 * update
     var_new[lmk] = new - w2 * update
+end
+
+"""$(TYPEDSIGNATURES)
+Time step [s] of the Euler forward step for ocean, sea ice and land with leapfrog.
+Δt/2 on the first two time steps (the first Euler step and the first leapfrog step
+each only advance the clock by Δt/2), Δt afterwards. See `update_prognostic_surface!`."""
+surface_time_step(L::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, L.Δt / 2, L.Δt)
+
+"""$(TYPEDSIGNATURES)
+With leapfrog, ocean, sea ice and land variables are stepped with Euler forward over `Δt`
+(not leapfrogged over `2Δt`) from the current state, which is written into both steps so that
+both always hold the current state. Their tendencies are computed from surface fluxes
+evaluated at the previous (=current) step and include stiff relaxation terms (e.g. the
+sensible heat flux feedback on the soil temperature) that would be unstable over `2Δt`."""
+function update_prognostic_surface!(
+        var::AbstractArray,
+        tendency::AbstractArray,
+        clock::Clock,
+        time_stepping::Leapfrog,
+        implicit,
+        model::AbstractModel,
+    )
+    Δt = surface_time_step(time_stepping, clock)
+    var_old = get_step(var, 1)
+    var_new = get_step(var, 2)
+    var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
+
+    @boundscheck size(var_old) == size(var_new) == size(var_tend) || throw(BoundsError())
+
+    var_old .+= Δt .* var_tend      # Euler forward from the current state
+    var_new .= var_old              # both steps hold the current state
+    return nothing
 end

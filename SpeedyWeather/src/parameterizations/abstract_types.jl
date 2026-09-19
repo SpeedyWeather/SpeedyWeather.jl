@@ -10,8 +10,8 @@ abstract type AbstractDynamicOcean <: AbstractOcean end
 abstract type AbstractPrescribedOcean <: AbstractOcean end
 
 abstract type AbstractSeaIce <: AbstractModelComponent end
-abstract type AbstractDynamicSeaIce <: AbstractModelComponent end
-abstract type AbstractPrescribedSeaIce <: AbstractModelComponent end
+abstract type AbstractDynamicSeaIce <: AbstractSeaIce end
+abstract type AbstractPrescribedSeaIce <: AbstractSeaIce end
 
 """Abstract supertype for all land models. Custom land models should subtype `AbstractWetLand`
 or `AbstractDryLand` and implement `initialize!`, `timestep!`, and optionally `variables` and `filter!`."""
@@ -21,8 +21,6 @@ abstract type AbstractLand <: AbstractModelComponent end
 snow, vegetation, rivers). Each component implements `initialize!`, `timestep!`, and optionally
 `variables` and `filter!`."""
 abstract type AbstractLandComponent <: AbstractModelComponent end
-abstract type AbstractDynamicLandComponent <: AbstractModelComponent end
-abstract type AbstractPrescribedLandComponent <: AbstractModelComponent end
 
 """Abstract land model type that includes hydrological processes (soil moisture, snow,
 vegetation, rivers). Intended for use with `PrimitiveWet`. The default concrete type is `LandModel`."""

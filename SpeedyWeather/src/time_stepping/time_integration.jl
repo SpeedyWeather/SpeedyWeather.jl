@@ -169,7 +169,7 @@ end
     for namespace in (:ocean, :land), name in _namespace_names(T, namespace)
         push!(
             calls, :(
-                update_prognostic!(
+                update_prognostic_surface!(
                     getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name))),
                     getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),
                     clock, time_stepping, implicit, model,   # no scale: ocean/land use the unscaled time step

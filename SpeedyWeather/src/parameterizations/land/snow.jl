@@ -1,6 +1,6 @@
 abstract type AbstractSnow <: AbstractLandComponent end
-abstract type AbstractDynamicSnow <: AbstractDynamicLandComponent end
-abstract type AbstractPrescribedSnow <: AbstractPrescribedLandComponent end
+abstract type AbstractDynamicSnow <: AbstractSnow end
+abstract type AbstractPrescribedSnow <: AbstractSnow end
 
 export SnowModel    # maybe change for a more concise name later
 
@@ -24,14 +24,10 @@ Adapt.@adapt_structure SnowModel
 # generator function
 SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF}(; kwargs...)
 
-function variables(::SnowModel, model::AbstractModel)
-    nsteps = get_nsteps(model.time_stepping, model)
-    pg = nsteps.prognostic_grid
-    tg = nsteps.tendency_grid
+# snow reads but doesn't define soil_temperature, whose dimensions are defined by the land temperature model
+function variables(::SnowModel)
     return (
         PrognosticVariable(:snow_depth, GridXY(), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
-        PrognosticVariable(:soil_temperature, LandXYZT(pg), desc = "Soil temperature", units = "K", namespace = :land),
-
         ParameterizationVariable(:snow_melt_rate, Grid2D(), namespace = :land, units = "kg/m²/s", desc = "Snow melt rate"),
     )
 end
