@@ -168,7 +168,7 @@ Adapt.@adapt_structure OneBandLongwave
 function OneBandLongwave(
         SG::SpectralGrid;
         transmissivity = FriersonLongwaveTransmissivity(SG),
-        radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
+        radiative_transfer = OneBandLongwaveRadiativeTransfer(SG, stratospheric_emissivity = 0.05),
     )
     return OneBandLongwave(transmissivity, radiative_transfer)
 end
@@ -203,6 +203,11 @@ export OneBandLongwaveRadiativeTransfer
 
 """Radiative transfer solver for OneBandLongwave radiation scheme.
 Computes longwave radiative transfer with upward and downward beams including surface fluxes.
+Optionally with an additional stratospheric emission directly to space following the
+stratospheric correction in Fortran SPEEDY (`epslw`): the stratosphere [0, `stratosphere_pressure`]
+emits `stratospheric_emissivity * σT⁴`, distributed on the layers by their pressure overlap,
+representing emission in the centre of the CO₂ band that a grey scheme with a transparent
+stratosphere lacks, and needed to balance stratospheric ozone heating.
 Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct OneBandLongwaveRadiativeTransfer{NF} <: AbstractLongwaveRadiativeTransfer
     "[OPTION] Emissivity for surface flux over ocean [1]"
@@ -210,6 +215,12 @@ Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Emissivity for surface flux over land [1]"
     @param emissivity_land::NF = 0.98 (bounds = 0 .. 1,)
+
+    "[OPTION] Additional emissivity of the stratosphere, emitting directly to space (SPEEDY epslw) [1]"
+    @param stratospheric_emissivity::NF = 0 (bounds = 0 .. 1,)
+
+    "[OPTION] Lower boundary of the stratosphere for the stratospheric emission (SPEEDY σ = 0.14 at 1000 hPa) [Pa]"
+    stratosphere_pressure::NF = 14000
 end
 
 Adapt.@adapt_structure OneBandLongwaveRadiativeTransfer
@@ -263,6 +274,21 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     t = transmissivity[ij, 1]
     U = U * t + (1 - t) * σ * T[ij, 1]^4
     dTdt[ij, 1] -= flux_to_tendency(U / cₚ, pₛ, 1, model)               # out of layer 1
+
+    # Additional stratospheric emission directly to space, distributed by pressure overlap
+    ϵ_strat = longwave.stratospheric_emissivity
+    p_strat = longwave.stratosphere_pressure
+    coord = model.geometry.vertical_coordinates
+    if ϵ_strat > 0
+        for k in 1:nlayers
+            p_top = pressure_above(k, pₛ, coord)
+            p_top >= p_strat && break                                   # below the stratosphere
+            overlap = (min(pressure_below(k, pₛ, coord), p_strat) - p_top) / p_strat
+            E = ϵ_strat * overlap * σ * T[ij, k]^4
+            dTdt[ij, k] -= flux_to_tendency(E / cₚ, pₛ, k, model)
+            U += E
+        end
+    end
     vars.parameterizations.outgoing_longwave[ij] = U
 
     # DOWNWARD BEAM

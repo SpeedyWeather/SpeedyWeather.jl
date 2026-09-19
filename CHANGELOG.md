@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
 - CI with Julia v1.13 [#1258](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1258)
 - Vertical interpolation from the model's (sigma or hybrid) levels onto pressure levels, CPU/GPU, with interpolation linear in p or log(p) and configurable extrapolation [#1256](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1256)
 - Documentation CI builds with Julia 1.12 [#1255](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1255)

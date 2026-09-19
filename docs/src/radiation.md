@@ -92,6 +92,21 @@ Note that the sign change in the differential formulation with optical
 depth only occurs because the optical depth as vertical coordinate
 strictly increases towards the surface.
 
+**Stratospheric emission.** A grey scheme with an optical depth that increases like ``\sigma^4``
+has an almost transparent stratosphere, which can hardly emit and therefore cannot balance
+stratospheric ozone heating (see [`TwoBandShortwave`](@ref "TwoBandShortwave: Two-band shortwave radiation with diagnostic clouds and ozone")).
+Following the stratospheric correction in Fortran SPEEDY, the stratosphere ``p < p_s`` (`stratosphere_pressure`,
+default 140 hPa) additionally emits ``\epsilon_s \sigma T_k^4`` directly to space
+
+```math
+E_k = \epsilon_s \frac{\Delta p_k^s}{p_s} \sigma T_k^4
+```
+
+with ``\Delta p_k^s`` the pressure overlap of layer ``k`` with the stratosphere and
+``\epsilon_s`` = `stratospheric_emissivity` (0.05 for `OneBandLongwave`, 0 for `OneBandGreyLongwave`).
+This emission cools the stratospheric layers and is added to the outgoing longwave radiation.
+It represents emission in the centre of the CO₂ band, which a single grey band lacks.
+
 To be used like (currently the default anyway)
 
 ```@example radiation
@@ -231,6 +246,51 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractShortwave)
 ```
 
+## TwoBandShortwave: Two-band shortwave radiation with diagnostic clouds and ozone
+
+`TwoBandShortwave` is the default shortwave radiation in `PrimitiveWetModel` and follows Fortran SPEEDY
+[Molteni2003](@citep) as in [speedy.f90](https://github.com/samhatfield/speedy.f90). It uses the same
+diagnostic clouds as `OneBandShortwave` (see below), but splits the incoming solar radiation into two bands
+
+- a visible band (95%, `1 - near_infrared_fraction`) that is absorbed by ozone in the stratosphere,
+  by dry air, aerosols, water vapor and clouds, reflected by clouds at the top of the cloud-top layer,
+  by stratocumulus clouds at the top of the boundary layer and by the surface albedo,
+- a near-infrared band (5%, `near_infrared_fraction`) that is only absorbed by water vapor
+  (strongly, `absorptivity_water_vapor_near_infrared`). It bypasses the cloud reflection and
+  is fully absorbed at the surface, i.e. not reflected by the surface albedo.
+
+The transmissivities of both bands are computed by `TwoBandShortwaveTransmissivity` with
+the same zenith angle correction factor ``\mu`` as `BackgroundShortwaveTransmissivity` below,
+but with separate absorptivities for the visible and the near-infrared band. Clouds absorb from
+the cloud top down to the cloud base, so never in the boundary layer.
+
+**Ozone:**
+The ozone absorption is a separate component, `SeasonalOzone` (default) or `NoOzone`.
+`SeasonalOzone` absorbs a fraction of the top-of-atmosphere shortwave flux ``F_0`` in the upper
+(``p < 50`` hPa) and lower (``50 < p < 140`` hPa) stratosphere
+
+```math
+\Delta F^{O_3}_\text{upper} = \frac{1}{2}\epsilon \, \mu F_0, \quad
+\Delta F^{O_3}_\text{lower} = 0.4\epsilon \left(1 + \max\left(0, -\frac{\delta}{|\delta_{\max}|}\right)\sin\phi + 1.8 P_2(\sin\phi)\right) \mu F_0
+```
+
+with ``\epsilon = 0.02``, latitude ``\phi`` and the second Legendre polynomial ``P_2(x) = (3x^2-1)/2``.
+The seasonal cycle uses the solar declination ``\delta`` of the [solar zenith angle](@ref zenith)
+normalized by the planet's `axial_tilt` ``\delta_{\max}``, so it is synchronized with the planet's
+orbit (`length_of_year`, `equinox`, `axial_tilt`, `seasonal_cycle`). For Earth,
+``-\delta/\delta_{\max} = \cos\alpha`` with ``\alpha`` the angle of the year from the northern
+winter solstice as in SPEEDY.
+There is more ozone absorption towards the poles and in the northern hemisphere during its winter.
+The absorption is distributed across model layers by their overlap with these pressure intervals,
+so that stratospheric heating rates don't increase over high orography where the upper σ-layers are thinner.
+
+```@example radiation
+spectral_grid = SpectralGrid(truncation=31, nlayers=8)
+shortwave_radiation = TwoBandShortwave(spectral_grid, ozone=NoOzone(spectral_grid))
+model = PrimitiveWetModel(spectral_grid; shortwave_radiation)
+model.shortwave_radiation
+```
+
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
 The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization,
@@ -245,25 +305,31 @@ transmissivity ``t=1``.
 
 **Cloud diagnosis:**
 Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column.
-The cloud base is set at the interface between the lowest two model layers, and the cloud top is the
-highest layer where both
+Clouds only form in the free troposphere: layers between the tropopause (``\sigma \geq`` `σ_tropopause`,
+default 0.14) and the top of the boundary layer (``\sigma \leq`` `σ_boundary_layer`, default 0.9).
+These σ-boundaries are the half levels of Fortran SPEEDY's 8 layers, where the top two layers are the
+stratosphere and the lowest is the boundary layer, and they generalize this to any number of layers.
+Clouds never reach the surface layer. The cloud base is the lowest layer above the boundary layer.
+Among all free-tropospheric layers with $Q_k > Q_{cl}$ (this threshold does not apply to the
+cloud base layer, as in SPEEDY) the one with the largest relative humidity $\mathrm{RH}_{\max}$ is found.
+The cloud top is the higher (smaller ``k``) of this layer and the top of convection or large-scale
+condensation, restricted to the free troposphere.
+The cloud cover (CLC) is then given by
 
 ```math
-\mathrm{RH}_k > \mathrm{RH}_{cl} \quad \text{and} \quad Q_k > Q_{cl}
-```
-
-are satisfied. The cloud cover (CLC) in a layer is then given by
-
-```math
-\mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \left(\frac{\mathrm{RH}_k - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right)\right]
+\mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \frac{\mathrm{RH}_{\max} - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right]
 ```
 
 where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are [large-scale](@ref "Large-scale precipitation")
-and [convective](@ref "Convective precipitation") precipitation,
-and $\mathrm{RH}_{cl}$ is a threshold.
+and [convective](@ref "Convective precipitation") precipitation (rain and snow),
+and $\mathrm{RH}_{cl}$ is a threshold. Precipitation is in mm/day.
 
 **Stratocumulus clouds:**
-Stratocumulus cloud cover over oceans is parameterized based on boundary layer static stability (GSEN):
+Stratocumulus cloud cover over oceans is parameterized based on boundary layer static stability
+``\mathrm{GSE}_N = (s_{b} - s_N)/(\Phi_{b} - \Phi_N)``, the vertical gradient of dry static energy
+``s = c_pT + \Phi`` between the cloud base layer ``b`` and the surface layer ``N`` (the lowest two layers
+with 8 layers) normalized by their geopotential difference
+(0 for a dry adiabatic, 1 for an isothermal lower atmosphere):
 
 ```math
 \mathrm{CLS} = F_{ST} \max(\mathrm{CLS}_{\max} - \mathrm{CLC}, 0)
@@ -275,10 +341,11 @@ with
 F_{ST} = \max\left(0, \min\left(1, \frac{\mathrm{GSE}_N - \mathrm{GSES}_0}{\mathrm{GSES}_1 - \mathrm{GSES}_0}\right)\right)
 ```
 
-Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be proportional to the surface relative humidity:
+Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be proportional to the surface relative humidity
+with a minimum cover $\mathrm{CLS}_{\min,L}$ (`stratocumulus_cover_min_land`):
 
 ```math
-\mathrm{CLS}_L = \mathrm{CLS} \cdot \mathrm{RH}_N
+\mathrm{CLS}_L = \max(\mathrm{CLS}, \mathrm{CLS}_{\min,L}) \cdot \mathrm{RH}_N
 ```
 where $\mathrm{RH}_N$ is the surface (lowest model layer) relative humidity.
 
