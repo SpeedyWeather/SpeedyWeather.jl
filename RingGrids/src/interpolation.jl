@@ -358,6 +358,77 @@ end
     Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
 end
 
+# batched version: all layers in a single launch, sharing the locator's indices and weights
+function _interpolate!(
+        Aout::AbstractMatrix,               # Out: interpolated values, (npoints_output, nlayers)
+        A::AbstractMatrix,                  # gridded values to interpolate from, (npoints, nlayers)
+        locator::AnvilLocator,
+        geometry::GridGeometry,
+        architecture::AbstractArchitecture
+    )
+    (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
+    (; npoints) = geometry
+    (; rings) = geometry.grid # CPU version even on GPU
+
+    nlayers = size(A, 2)
+
+    # as in the single-layer method, but the layer dimensions must agree too
+    @boundscheck size(Aout, 1) == length(ij_as) || throw(DimensionMismatchArray(Aout, ij_as))
+    @boundscheck size(A, 1) == npoints ||
+        throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(size(A, 1)) points)."))
+    @boundscheck size(Aout, 2) == nlayers ||
+        throw(DimensionMismatch("Output has $(size(Aout, 2)) layers but input has $nlayers."))
+
+    A_northpole, A_southpole = average_on_poles(A, rings)
+
+    @boundscheck extrema_in(ij_as, 0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_bs, 0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_cs, -1, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_ds, -1, npoints) || throw(BoundsError)
+
+    launch!(
+        architecture,
+        ArrayWorkOrder,
+        (npoints_output, nlayers),
+        _interpolate_batched_kernel!,
+        Aout,
+        A,
+        ij_as,
+        ij_bs,
+        ij_cs,
+        ij_ds,
+        Δabs,
+        Δcds,
+        Δys,
+        A_northpole,
+        A_southpole,
+    )
+
+    return Aout
+end
+
+@kernel inbounds = true function _interpolate_batched_kernel!(
+        Aout,        # Out: interpolated values
+        A,           # gridded values to interpolate from
+        ij_as,       # indices of A to interpolate from
+        ij_bs,       # indices of A to interpolate from
+        ij_cs,       # indices of A to interpolate from
+        ij_ds,       # indices of A to interpolate from
+        Δabs,        # weights of A to interpolate from
+        Δcds,        # weights of A to interpolate from
+        Δys,         # weights of A to interpolate from
+        A_northpole, # per-layer, unlike the single-layer kernel's scalars
+        A_southpole,
+    )
+
+    k, l = @index(Global, NTuple)
+
+    a, b = ij_as[k] == 0 ? (A_northpole[l], A_northpole[l]) : (A[ij_as[k], l], A[ij_bs[k], l])
+    c, d = ij_cs[k] == -1 ? (A_southpole[l], A_southpole[l]) : (A[ij_cs[k], l], A[ij_ds[k], l])
+
+    Aout[k, l] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
+end
+
 # version for 2D fields
 interpolate!(
     Aout::Field,
@@ -392,7 +463,29 @@ function interpolate!(
     return _interpolate!(Aout, A.data, locator, geometry, architecture(A))  # use .data to trigger dispatch for method above
 end
 
-# version for 3D+ fields
+# version for 3D fields, batched into a single launch over all layers
+interpolate!(
+    Aout::Field3D,      # Out: grid to interpolate onto
+    A::Field3D,         # In: gridded data to interpolate from
+    interpolator::AbstractInterpolator,
+) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
+
+function interpolate!(
+        Aout::Field3D,   # Out: grid to interpolate onto
+        A::Field3D,      # In: gridded data to interpolate from
+        locator::AbstractLocator,
+        geometry::AbstractGridGeometry,
+    )
+    # if fields match just copy data over (eltypes might differ)
+    fields_match(Aout, A) && return copyto!(Aout.data, A.data)
+    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
+
+    # .data of a Field3D is a matrix, so the batched method applies directly
+    _interpolate!(Aout.data, A.data, locator, geometry, architecture(A))
+    return Aout
+end
+
+# version for 4D+ fields, looping over the trailing dimensions
 interpolate!(
     Aout::Field,        # Out: grid to interpolate onto
     A::Field,           # In: gridded data to interpolate from
@@ -713,6 +806,27 @@ to return the same number format `NF`."""
     A_northpole = mean(A[rings[1]])    # average of all grid points around the north pole
     A_southpole = mean(A[rings[end]])  # same for south pole
     return round(NF, A_northpole), round(NF, A_southpole)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Method for a layered `A`, returning a vector of pole averages, one per layer, for the batched
+interpolation kernel. Indexing rather than viewing matches the single-layer methods above: it
+allocates, but a view would trigger scalar indexing on GPU."""
+@inline function average_on_poles(A::AbstractMatrix{NF}, rings) where {NF <: AbstractFloat}
+    A_northpole = vec(mean(A[rings[1], :], dims = 1))    # per layer, around the north pole
+    A_southpole = vec(mean(A[rings[end], :], dims = 1))  # same for south pole
+    return A_northpole, A_southpole
+end
+
+"""
+$(TYPEDSIGNATURES)
+Method for a layered `A::AbstractMatrix{T<:Integer}` which rounds the averaged values
+to return the same number format `NF`."""
+@inline function average_on_poles(A::AbstractMatrix{NF}, rings) where {NF <: Integer}
+    A_northpole = vec(mean(A[rings[1], :], dims = 1))
+    A_southpole = vec(mean(A[rings[end], :], dims = 1))
+    return round.(NF, A_northpole), round.(NF, A_southpole)
 end
 
 """
