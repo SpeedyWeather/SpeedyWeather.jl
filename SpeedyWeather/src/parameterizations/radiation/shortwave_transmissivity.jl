@@ -91,7 +91,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
         absorptivity_dry_air, absorptivity_aerosol, absorptivity_water_vapor,
         absorptivity_cloud_base, absorptivity_cloud_limit,
     ) = transmissivity
-    (; cloud_top, cloud_cover) = clouds
+    (; cloud_top, cloud_base, cloud_cover) = clouds
 
     humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, transmissivity)
     cos_zenith = vars.parameterizations.cos_zenith[ij]
@@ -107,7 +107,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     zenith_factor = 1 + azen * (1 - cos_zenith)^nzen
 
     # Cloud absorption term based on cloud base humidity (SPEEDY logic)
-    q_base = nlayers > 1 ? humid[ij, nlayers - 1] : humid[ij, nlayers]
+    q_base = humid[ij, cloud_base]
     cloud_absorptivity_term = min(
         absorptivity_cloud_base * q_base,
         absorptivity_cloud_limit
@@ -126,8 +126,8 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
                 absorptivity_water_vapor * q
         )
 
-        # Add cloud absorption below the final cloud top
-        if k >= cloud_top
+        # Add cloud absorption from cloud top to cloud base
+        if cloud_top <= k <= cloud_base
             layer_absorptivity += cloud_absorptivity_term * cloud_cover
         end
 
@@ -186,8 +186,8 @@ initialize!(::TwoBandShortwaveTransmissivity, ::AbstractModel) = nothing
 
 """$(TYPEDSIGNATURES)
 Transmissivities of the visible and near-infrared band for every layer in column `ij`, written
-into scratch arrays. Clouds absorb in the visible band from the cloud top down to the layer above
-the surface layer. Returns a NamedTuple `(; visible, near_infrared, zenith_factor)`."""
+into scratch arrays. Clouds absorb in the visible band from the cloud top down to the cloud base,
+the lowest layer above the boundary layer. Returns a NamedTuple `(; visible, near_infrared, zenith_factor)`."""
 @propagate_inbounds function transmissivity!(
         ij,
         vars,
@@ -200,7 +200,7 @@ the surface layer. Returns a NamedTuple `(; visible, near_infrared, zenith_facto
     t_nir = vars.scratch.grid.b
     NF = eltype(t_vis)
 
-    (; cloud_top, cloud_cover) = clouds
+    (; cloud_top, cloud_base, cloud_cover) = clouds
     humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, transmissivity)
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     nlayers = size(t_vis, 2)
@@ -211,8 +211,8 @@ the surface layer. Returns a NamedTuple `(; visible, near_infrared, zenith_facto
     # Zenith angle correction factor for the slant path
     zenith_factor = 1 + transmissivity.zenith_amplitude * (1 - cos_zenith)^transmissivity.zenith_exponent
 
-    # Cloud absorptivity from humidity at cloud base, taken as the layer above the surface layer
-    q_base = humid[ij, max(1, nlayers - 1)]
+    # Cloud absorptivity from humidity in the cloud base layer (lowest layer above the boundary layer)
+    q_base = humid[ij, cloud_base]
     cloud_absorptivity = cloud_cover * min(
         transmissivity.absorptivity_cloud_base * q_base,
         transmissivity.absorptivity_cloud_limit,
@@ -226,8 +226,8 @@ the surface layer. Returns a NamedTuple `(; visible, near_infrared, zenith_facto
             transmissivity.absorptivity_aerosol * aerosol_factor +
             transmissivity.absorptivity_water_vapor * q
 
-        # clouds absorb from cloud top down to (excluding) the surface layer
-        if cloud_top <= k < nlayers
+        # clouds absorb from cloud top down to the cloud base, never in the boundary layer
+        if cloud_top <= k <= cloud_base
             absorptivity_visible += cloud_absorptivity
         end
 

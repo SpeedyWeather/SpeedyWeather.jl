@@ -239,7 +239,7 @@ diagnostic clouds as `OneBandShortwave` (see below), but splits the incoming sol
 
 - a visible band (95%, `1 - near_infrared_fraction`) that is absorbed by ozone in the stratosphere,
   by dry air, aerosols, water vapor and clouds, reflected by clouds at the top of the cloud-top layer,
-  by stratocumulus clouds at the top of the surface layer and by the surface albedo,
+  by stratocumulus clouds at the top of the boundary layer and by the surface albedo,
 - a near-infrared band (5%, `near_infrared_fraction`) that is only absorbed by water vapor
   (strongly, `absorptivity_water_vapor_near_infrared`). It bypasses the cloud reflection and
   is fully absorbed at the surface, i.e. not reflected by the surface albedo.
@@ -247,7 +247,7 @@ diagnostic clouds as `OneBandShortwave` (see below), but splits the incoming sol
 The transmissivities of both bands are computed by `TwoBandShortwaveTransmissivity` with
 the same zenith angle correction factor ``\mu`` as `BackgroundShortwaveTransmissivity` below,
 but with separate absorptivities for the visible and the near-infrared band. Clouds absorb from
-the cloud top down to the layer above the surface layer.
+the cloud top down to the cloud base, so never in the boundary layer.
 
 **Ozone:**
 The ozone absorption is a separate component, `SeasonalOzone` (default) or `NoOzone`.
@@ -289,10 +289,15 @@ transmissivity ``t=1``.
 
 **Cloud diagnosis:**
 Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column.
-The cloud base is set at the interface between the lowest two model layers. Among all layers above the
-surface layer with $Q_k > Q_{cl}$ (this threshold does not apply to the layer directly above the surface
-layer, as in SPEEDY) the one with the largest relative humidity $\mathrm{RH}_{\max}$ is found,
-the cloud top is the higher (smaller ``k``) of this layer and the top of convection or large-scale condensation.
+Clouds only form in the free troposphere: layers between the tropopause (``\sigma \geq`` `σ_tropopause`,
+default 0.14) and the top of the boundary layer (``\sigma \leq`` `σ_boundary_layer`, default 0.9).
+These σ-boundaries are the half levels of Fortran SPEEDY's 8 layers, where the top two layers are the
+stratosphere and the lowest is the boundary layer, and they generalize this to any number of layers.
+Clouds never reach the surface layer. The cloud base is the lowest layer above the boundary layer.
+Among all free-tropospheric layers with $Q_k > Q_{cl}$ (this threshold does not apply to the
+cloud base layer, as in SPEEDY) the one with the largest relative humidity $\mathrm{RH}_{\max}$ is found.
+The cloud top is the higher (smaller ``k``) of this layer and the top of convection or large-scale
+condensation, restricted to the free troposphere.
 The cloud cover (CLC) is then given by
 
 ```math
@@ -305,8 +310,9 @@ and $\mathrm{RH}_{cl}$ is a threshold. Precipitation is in mm/day.
 
 **Stratocumulus clouds:**
 Stratocumulus cloud cover over oceans is parameterized based on boundary layer static stability
-``\mathrm{GSE}_N = (s_{N-1} - s_N)/(\Phi_{N-1} - \Phi_N)``, the vertical gradient of dry static energy
-``s = c_pT + \Phi`` between the lowest two layers normalized by their geopotential difference
+``\mathrm{GSE}_N = (s_{b} - s_N)/(\Phi_{b} - \Phi_N)``, the vertical gradient of dry static energy
+``s = c_pT + \Phi`` between the cloud base layer ``b`` and the surface layer ``N`` (the lowest two layers
+with 8 layers) normalized by their geopotential difference
 (0 for a dry adiabatic, 1 for an isothermal lower atmosphere):
 
 ```math

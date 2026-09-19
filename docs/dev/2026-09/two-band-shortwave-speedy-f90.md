@@ -43,6 +43,20 @@ Base revision: `35d764b6` (`main`)
   (speedy.f90 exempts it), so there were no humidity clouds in cold polar air; 6. snowfall was
   missing from the precipitation term. The remaining differences come from the model climate,
   see "Cloud comparison" below.
+- **2026-09-19.** Generalized from speedy.f90's fixed 8 layers to any number of layers
+  (prompt: "Speedy.f90 is hardcoded to 8 layers, the lowermost is the planetary boundary layer,
+  the top two are stratosphere. We want to generalise this to any amount of layers. [...] I think
+  it is reasonable to assume certain processes never go to the surface [...] Have a check that we
+  indeed generalise in a reasonable way"). The remaining layer-index assumptions (`nlayers - 1`
+  as cloud base, `nlayers` as boundary layer) are replaced by two σ-boundaries in
+  `DiagnosticClouds`: `σ_tropopause = 0.14` and `σ_boundary_layer = 0.9`, speedy.f90's half
+  levels between its stratosphere and troposphere and between its free troposphere and boundary
+  layer. `free_troposphere_layers` returns `layer_top:cloud_base`, and `clouds!` now also returns
+  `cloud_base`. Clouds (humidity search, cloud top from convection/condensation, cloud absorption
+  in both transmissivities) stay within the free troposphere and never reach the surface layer.
+  Stratocumulus stability is the Δs/ΔΦ between the cloud base and the surface layer, and
+  stratocumulus reflects at the top of the boundary layer. Nothing changes for 8 equally spaced
+  layers, except that layer 1 (σ = 0.06) is no longer searched for clouds (it never had any).
 - **2026-09-19.** Version of `SpeedyWeather` bumped to `0.23.0-DEV` (new public types,
   changed default).
 
@@ -101,7 +115,8 @@ Bugs found in our `DiagnosticClouds`:
 - `TwoBandShortwaveRadiativeTransfer`: reflection at the top of the cloud-top layer and the
   top of the surface layer. Visible-only surface reflection and upward beam.
 - `DiagnosticClouds`: fixes 1–6 above, and `cloud_albedo` 0.6 → 0.43. This also affects
-  `OneBandShortwave`.
+  `OneBandShortwave`. The layers are defined by σ (`σ_tropopause`, `σ_boundary_layer`) instead of
+  speedy.f90's fixed layer indices, so the scheme works for any number of layers.
 
 ## Testing and verification
 
@@ -110,6 +125,13 @@ Bugs found in our `DiagnosticClouds`:
   (non-negative, zero below σ_lower, column total = upper + lower, pole > equator), and for the
   ozone seasonal cycle following the orbit (NH > SH in January, symmetric in July, symmetric
   for zero tilt and flipped for negative tilt, shifted with the equinox).
+- `free_troposphere_layers` is tested for 1–64 layers: the cloud layers stay within the σ-boundaries
+  and never include the surface layer (for more than one layer), and 8 layers map to layers 2–7.
+- Vertical resolution (T31, Δt = 20 min, same diagnostics as below): planetary albedo 0.334 / 0.314 /
+  0.317, cloud cover 0.68 / 0.64 / 0.66, stratocumulus 0.029 / 0.027 / 0.018, atmospheric
+  absorption 54 / 60 / 63 W/m² for 8 / 16 / 32 layers. Cloud tops stayed within layers 3–14 (L16)
+  and 5–29 (L32). T21 with ≥16 layers blows up at time step 51, but it does so on `main` too,
+  so that is unrelated to this PR.
 - Global-mean shortwave budget: T31 with 8 layers from 1 January, area-weighted mean over
   days 35–40. speedy.f90 was built locally with an added diagnostic print.
 
@@ -169,6 +191,10 @@ With the algorithms now matching, the remaining differences come from the model 
   do reflect near-IR.
 
 ## Future work
+
+- The σ-boundaries are fixed. A diagnosed boundary layer height (e.g. from `BulkRichardsonDiffusion`)
+  or tropopause could replace them, but that would couple clouds to other components.
+- T21 with ≥16 layers is unstable, which is unrelated to radiation (see testing).
 
 - Tune the RH thresholds or cloud albedo against observed global-mean budgets.
 - Longwave cloud effects (speedy.f90 `ablcl1`, `ablcl2`) are not implemented in our longwave

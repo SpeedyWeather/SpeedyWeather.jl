@@ -187,3 +187,24 @@ end
     vars.parameterizations.snow_rate .= 1 / (86400 * 1000)     # 1 mm/day
     @test SpeedyWeather.clouds!(ij, vars, clouds, model).cloud_cover ≈ clouds.precipitation_weight
 end
+
+@testset "Free troposphere layers for any vertical resolution" begin
+    for nlayers in (1, 2, 3, 4, 8, 16, 32, 64)
+        spectral_grid = SpectralGrid(truncation = 21, nlayers = nlayers)
+        model = PrimitiveWetModel(spectral_grid)
+        clouds = model.shortwave_radiation.clouds
+        layer_top, cloud_base = SpeedyWeather.free_troposphere_layers(clouds, model)
+        σ = model.geometry.σ_levels_full
+
+        @test 1 <= layer_top <= cloud_base <= nlayers
+        nlayers > 1 && @test cloud_base < nlayers       # clouds never in the surface layer
+
+        # σ boundaries are respected unless that would leave no layer for clouds
+        if nlayers >= 4
+            @test σ[layer_top] >= clouds.σ_tropopause
+            @test σ[cloud_base] <= clouds.σ_boundary_layer
+            @test σ[cloud_base + 1] > clouds.σ_boundary_layer || cloud_base == nlayers - 1
+        end
+        nlayers == 8 && @test (layer_top, cloud_base) == (2, 7)
+    end
+end

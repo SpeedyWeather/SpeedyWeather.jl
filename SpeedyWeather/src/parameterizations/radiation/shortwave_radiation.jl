@@ -243,7 +243,7 @@ A two-band shortwave radiation scheme with diagnostic clouds and ozone following
 Fortran SPEEDY (Molteni, 2003; speedy.f90). A visible band (1 - `near_infrared_fraction`
 of the incoming solar radiation) is absorbed by ozone in the stratosphere and by dry air,
 aerosols, water vapor and clouds in the troposphere, reflected by clouds at the cloud top,
-by stratocumulus clouds at the top of the surface layer and by the surface albedo.
+by stratocumulus clouds at the top of the boundary layer and by the surface albedo.
 A near-infrared band is only absorbed by water vapor, bypassing cloud reflection,
 and fully absorbed at the surface. Fields are
 
@@ -316,7 +316,7 @@ initialize!(::TwoBandShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES)
 Two-band shortwave radiative transfer. Visible band: ozone absorption, reflection by clouds
-at the top of the cloud-top layer and by stratocumulus at the top of the surface layer,
+at the top of the cloud-top layer and by stratocumulus at the top of the boundary layer,
 absorption with transmissivity `t.visible`, surface albedo reflection and absorption of the
 upward beam. Near-infrared band: absorption with transmissivity `t.near_infrared` only,
 no reflection by clouds or the surface."""
@@ -329,7 +329,7 @@ no reflection by clouds or the surface."""
         radiation::TwoBandShortwaveRadiativeTransfer,
         model,
     )
-    (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
+    (; cloud_cover, cloud_top, cloud_base, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
     (; visible, near_infrared, zenith_factor) = t
 
     dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, radiation)
@@ -349,7 +349,8 @@ no reflection by clouds or the surface."""
 
     # DOWNWARD BEAM
     U_cloud = zero(D)               # reflected by clouds at top of cloud-top layer
-    U_stratocumulus = zero(D)       # reflected by stratocumulus at top of surface layer
+    U_stratocumulus = zero(D)       # reflected by stratocumulus at top of the boundary layer
+    boundary_layer_top = cloud_base + 1     # first layer in the boundary layer
 
     for k in 1:nlayers
         # 1. reflection (visible only) at the top of layer k
@@ -357,7 +358,7 @@ no reflection by clouds or the surface."""
             U_cloud = D * cloud_albedo * cloud_cover
             D -= U_cloud
         end
-        if k == nlayers
+        if k == boundary_layer_top
             U_stratocumulus = D * stratocumulus_albedo * stratocumulus_cover
             D -= U_stratocumulus
         end
@@ -392,7 +393,7 @@ no reflection by clouds or the surface."""
         U_out = U * visible[ij, k]
         dTdt[ij, k] += flux_to_tendency((U - U_out) / cₚ, pₛ, k, model)
         U_out += ifelse(k == cloud_top, U_cloud, zero(U))
-        U_out += ifelse(k == nlayers, U_stratocumulus, zero(U))
+        U_out += ifelse(k == boundary_layer_top, U_stratocumulus, zero(U))
         U = U_out
     end
 
