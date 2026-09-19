@@ -42,20 +42,23 @@ export DiagnosticClouds
     "[OPTION] Cap on precip contributing to cloud cover [mm/day]"
     @param precipitation_max::NF = 10 (bounds = Positive,)
 
-    "[OPTION] Cloud albedo for visible band at CLC=1 [1]"
-    @param cloud_albedo::NF = 0.6 (bounds = 0 .. 1,)
+    "[OPTION] Cloud albedo for visible band at CLC=1 (SPEEDY albcl) [1]"
+    @param cloud_albedo::NF = 0.43 (bounds = 0 .. 1,)
 
     "[OPTION] Stratocumulus cloud albedo (surface reflection/absorption) [1]"
     @param stratocumulus_albedo::NF = 0.5 (bounds = 0 .. 1,)
 
-    "[OPTION] Static stability lower threshold for stratocumulus (GSEN, called GSES0 in the paper) [J/kg]"
+    "[OPTION] Static stability lower threshold for stratocumulus, as dry static energy gradient Δs/ΔΦ (GSES0 in SPEEDY) [1]"
     @param stratocumulus_stability_min::NF = 0.25 (bounds = Nonnegative,)
 
-    "[OPTION] Static stability upper threshold for stratocumulus (GSEN, called GSES1 in the paper) [J/kg]"
+    "[OPTION] Static stability upper threshold for stratocumulus, as dry static energy gradient Δs/ΔΦ (GSES1 in SPEEDY) [1]"
     @param stratocumulus_stability_max::NF = 0.4 (bounds = Nonnegative,)
 
     "[OPTION] Maximum stratocumulus cloud cover (called CLSMAX in the paper) [1]"
     @param stratocumulus_cover_max::NF = 0.6 (bounds = 0 .. 1,)
+
+    "[OPTION] Minimum stratocumulus cloud cover over land (for surface RH = 1, called CLSMINL in SPEEDY) [1]"
+    @param stratocumulus_cover_min_land::NF = 0.15 (bounds = 0 .. 1,)
 
     "[OPTION] Enable stratocumulus cloud parameterization?"
     use_stratocumulus::Bool = true
@@ -111,55 +114,59 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     stab_max = clouds.stratocumulus_stability_max
     cover_max = clouds.stratocumulus_cover_max
     cloud_factor = clouds.stratocumulus_cloud_factor
+    cover_min_land = clouds.stratocumulus_cover_min_land
 
     # Precipitation contribution (rain rate is in m/s)
     rain_rate = vars.parameterizations.rain_rate[ij]
-    precip_term = min(precip_max, (86400 * rain_rate) / 1000)   # convert to mm/day
+    precip_term = min(precip_max, max(0, rain_rate) * 86400 * 1000)   # convert m/s to mm/day
     P = precip_weight * sqrt(precip_term)
 
     # from convection or large-scale condensation
     cloud_top_precipitation = vars.parameterizations.cloud_top[ij]
-    humidity_term_cloud_top::NF = 0
-    cloud_top_humidity = nlayers + 1
 
-    # Find cloud top from RH threshold
+    # Find the layer of maximum relative humidity above the surface layer (with q > q_min),
+    # cloud cover is a quadratic function of that maximum, the cloud top is its layer
+    rh_excess_max::NF = 0
+    cloud_top_humidity = nlayers + 1
     for k in 1:(nlayers - 1)
         humidity_k = humid[ij, k]
         pₖ = pressure(k, pₛ, vertical_coordinates)
         qsat = saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
         if humidity_k > q_min && qsat > 0
-            relative_humidity_k = humidity_k / qsat
-
-            if relative_humidity_k >= rh_min
-                rh_norm = max(0, (relative_humidity_k - rh_min) / (rh_max - rh_min))
-                humidity_term_cloud_top = min(1, rh_norm)^2
-                cloud_top_humidity = min(k, cloud_top_humidity)
+            rh_excess = humidity_k / qsat - rh_min
+            if rh_excess > rh_excess_max
+                rh_excess_max = rh_excess
+                cloud_top_humidity = k
             end
         end
     end
+    humidity_term = min(1, rh_excess_max / (rh_max - rh_min))^2
 
     # Combined cloud cover
-    cloud_cover = min(1, P + humidity_term_cloud_top)
+    cloud_cover = min(1, P + humidity_term)
     cloud_top = min(cloud_top_humidity, cloud_top_precipitation)
     vars.parameterizations.cloud_top[ij] = cloud_top
 
     # Stratocumulus parameterization
     stratocumulus_cover::NF = 0         # fallback for no stratocumulus
-    if clouds.use_stratocumulus
-        # Vertical difference of dry static energy near surface
-        surface = nlayers               # surface index
-        above = max(1, nlayers - 1)     # layer above surface, max for 1 layer case, yields GSEN=0
-        G = (cₚ * temp[ij, surface] + geopotential[ij, surface]) -
-            (cₚ * temp[ij, above] + geopotential[ij, above])
+    if clouds.use_stratocumulus && nlayers > 1
+        # Static stability as vertical gradient of dry static energy s = cₚT + Φ
+        # between the surface layer and the layer above, normalized by the geopotential
+        # difference, i.e. GSE = Δs/ΔΦ = 1 + cₚΔT/ΔΦ, 0 for dry adiabatic, 1 for isothermal
+        surface = nlayers
+        above = nlayers - 1
+        ΔΦ = geopotential[ij, above] - geopotential[ij, surface]
+        Δs = cₚ * (temp[ij, above] - temp[ij, surface]) + ΔΦ
+        GSE = ΔΦ > 0 ? Δs / ΔΦ : zero(NF)
 
         # normalized static stability factor
-        static_stability = clamp((G - stab_min) / (stab_max - stab_min), 0, 1)
+        static_stability = clamp((GSE - stab_min) / (stab_max - stab_min), 0, 1)
 
         stratocumulus_cover_ocean = static_stability * max(cover_max - cloud_factor * cloud_cover, 0)
         pN = pressure(surface, pₛ, vertical_coordinates)
         qsat_surface = saturation_humidity(temp[ij, surface], pN, model.atmosphere)
         rh_surface = humid[ij, surface] / qsat_surface      # relative humidity at surface
-        stratocumulus_cover_land = stratocumulus_cover_ocean * rh_surface
+        stratocumulus_cover_land = max(stratocumulus_cover_ocean, cover_min_land) * rh_surface
 
         stratocumulus_cover =
             (1 - land_fraction) * stratocumulus_cover_ocean +
