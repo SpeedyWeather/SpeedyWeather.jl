@@ -116,6 +116,19 @@ Base revision: `557b38d5` (`mc/convection`, off `main`)
     `LinearEntrainment{NF}(; σ_entrainment = one(NF))` from being constructed and dividing by zero
     at call time. Flagged as a residual gap rather than silently over-fixing beyond what the review
     thread agreed to.
+- **2026-09-19, ncu profiling + single-pass ascent.** `ncu` access landed (via sudo, on 2× NVIDIA
+  L40), so Max's question whether the buoyancy/LZB ascent loop can be improved could be answered
+  with hardware counters. Finding: the ascent loop's dynamic trip count is *not* the problem
+  (divergence is already 3.7× lower than on `main`); the kernel is latency-bound on global memory,
+  and the environment *prefill* loop added by this PR (copying `temp`/`humid` into the reference
+  profiles before the ascent) was the single biggest cost. Replaced prefill + `while` loop with one
+  fixed-trip pass `for k in nlayers-1:-1:1` that computes the parcel only while buoyant and writes
+  each level exactly once (parcel or environment via `ifelse`), in both `pseudo_adiabat!` and
+  `dry_adiabat!`. Bitwise identical to the previous commit (100 steps, wet + dry, with and without
+  entrainment), ~15-20% faster on GPU, now also faster than `main`. Also found and fixed that
+  `BettsMillerDryConvection` could not be adapted to GPU (`@adapt_structure` can't infer the
+  field-less `NF` parameter; `main` had a hand-written method) — `PrimitiveDryModel` on GPU failed
+  at construction on this branch; new "Adapt" test. See "GPU profiling (ncu)" below.
 
 ## Problem description
 
@@ -518,6 +531,48 @@ unilaterally — whether to pursue a fix (e.g. capping the full-range loop at so
 bound, or accepting the regression at coarse `nlayers` as the price of the `#1193` GPU-miscompile
 fix) is a maintainer call.
 
+### GPU profiling (ncu)
+
+Added 2026-09-19. `ncu` 2025.3.1 via sudo on an NVIDIA L40 (142 SMs). Isolated convection kernel
+as in the nsys section (`column_parameterizations_kernel!` with only `convection`, after 100
+spin-up steps), `--set full` on one launch, `main` (merge-base `3959dfa4`) vs. this branch before
+this change (`8622ab42`), T31 L8, T31 L16, T127 L8. Scripts and reports were kept outside the repo.
+
+**What ncu shows** (T127 L8, `NoEntrainment`; T31 is similar):
+- Not enough parallelism: one thread per column gives ~2 active warps per scheduler out of 12
+  (T127: 40k columns on a GPU that holds 218k resident threads; T31: 13 blocks on 142 SMs),
+  and only ~0.25 warps are eligible per cycle. The kernel is latency-bound: T127 takes about as
+  long as T31 despite 13× the columns.
+- Stalls are dominated by *long scoreboard* (45% of samples), i.e. waiting on global memory
+  loads, not by arithmetic or divergence.
+- Divergence was already reduced by the branchless restructuring: divergent branch targets
+  11.2k (`main`) → 3.1k, active threads per warp 77% → 84%. The ascent loop's dynamic trip count
+  is not a hotspot.
+- The environment prefill loop in `pseudo_adiabat!` alone accounted for 21% of stall samples;
+  this branch did 24% more global loads and 20% more stores than `main`, which in a latency-bound
+  kernel outweighed the divergence savings — the cause of the ~5% nsys regression above.
+- Memory access is already coalesced (~3.3 of an ideal 4 sectors/request), no register spilling.
+- ~15% of stalls are constant-cache misses reading kernel arguments (the full `vars`/`model`);
+  structural, shared by all fused column-parameterization kernels.
+
+**Fix:** single fixed-trip pass over the column, see Revision log. Device time per launch
+(CUPTI via `CUDA.@profile`, median of 50 launches, 256 threads/block, boost clocks):
+
+| Config | `main` | before (`8622ab42`) | after |
+|---|---|---|---|
+| wet T31 L8, no entrainment | 11.68 µs | 12.64 µs | 10.73 µs (−15%) |
+| wet T127 L8, no entrainment | 13.11 µs | 13.35 µs | 11.21 µs (−16%) |
+| wet T31 L16, no entrainment | — | 22.65 µs | 18.12 µs (−20%) |
+| wet T31 L8, `LinearEntrainment` (default) | — | 14.07 µs | 11.92 µs (−15%) |
+| dry T31 L8 | — | 5.72 µs* | 5.25 µs (−8%) |
+| dry T127 L8 | — | 6.20 µs* | 5.72 µs (−8%) |
+
+\* with the `BettsMillerDryConvection` Adapt fix applied, as `PrimitiveDryModel` could not be
+constructed on GPU before it.
+Further measured but not included: precomputing `σ^κ` per level (column-independent, currently a
+`powf` per level and column) gains another 2-4% but changes rounding; smaller workgroups (32-128
+instead of 256 for `LinearWorkOrder`) gain up to ~4% but affect every kernel.
+
 ## Documentation changes
 
 - `docs/src/convection.md`: five correctness fixes (§ above), new "Entrainment" section (physical
@@ -528,12 +583,10 @@ fix) is a maintainer call.
 
 ## Known limitations
 
-- The ascent `while buoyant && k > 1` loop in `pseudo_adiabat!`/`dry_adiabat!` keeps a per-column
-  dynamic trip count — inherent to the algorithm (the LZB search), not addressed by this PR.
-  Whether it's specifically a warp-divergence hotspot is still open: `nsys` profiling (see "GPU
-  profiling" above) shows the *whole* isolated-convection kernel is ~5% slower on GPU than `main`
-  at `nlayers=8`, but attributing that to the ascent loop vs. the full-range downstream loops needs
-  `ncu`'s branch-efficiency counters, blocked on admin access as of this writing.
+- The parcel ascent still stops computing at the LZB (`if buoyant` inside the now fixed-trip loop),
+  so threads in a warp with different LZBs diverge there. ncu shows this is minor (see "GPU
+  profiling (ncu)"); the kernel is limited by memory latency and by one-thread-per-column
+  parallelism instead.
 - Entrainment mixing is applied in the saturated branch only (wet scheme), inherited from PR #976.
 - Convective snow uses a single lowest-layer temperature check, no falling-flux melt cascade
   (unlike large-scale precipitation).
@@ -552,6 +605,8 @@ fix) is a maintainer call.
 
 ## Future work
 
-- If GPU profiling later shows the ascent while-loop is still a divergence hotspot, a follow-up
-  plan could explore always-ascend-to-top-and-mask strategies.
+- More parallelism per column (several threads per column for the level-independent loops) is
+  the only change that addresses the kernel's main limitation, but is a redesign of the fused
+  column-parameterization kernel.
+- Precompute `σ^κ` per level; pass fewer/smaller kernel arguments (constant-cache misses).
 - Extending entrainment mixing to the dry-ascent branch of the wet scheme's pseudo-adiabat.

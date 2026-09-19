@@ -52,6 +52,21 @@
         end
     end
 
+    @testset "Adapt" begin
+        # adapt is what moves the model to GPU, NF has to survive it even if no field uses it
+        spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
+        for entrainment in (NoEntrainment(), LinearEntrainment(spectral_grid))
+            for convection in (
+                    BettsMillerConvection(spectral_grid; entrainment),
+                    BettsMillerDryConvection(spectral_grid; entrainment),
+                )
+                adapted = SpeedyWeather.Adapt.adapt(Array, convection)
+                @test typeof(adapted) == typeof(convection)
+                @test adapted.entrainment == convection.entrainment
+            end
+        end
+    end
+
     @testset "Entrainment in a model" begin
         spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
         for entrainment in (NoEntrainment(), LinearEntrainment(spectral_grid), ConstantEntrainment(spectral_grid))

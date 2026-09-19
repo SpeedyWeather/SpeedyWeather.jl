@@ -220,12 +220,6 @@ column then need no branch to skip those levels, they contribute zero on their o
     Lᵥ = atmosphere.latent_heat_condensation    # latent heat of vaporization
     cₚ = atmosphere.heat_capacity               # heat capacity
 
-    # levels above the LZB are never touched again below, so they stay at the environment
-    for k in 1:nlayers
-        temp_ref_profile[ij, k] = temp_environment[ij, k]
-        humid_ref_profile[ij, k] = humid_environment[ij, k]
-    end
-
     temp_parcel::NF = temp_environment[ij, nlayers]     # start at surface with environment temperature [K]
     humid_parcel::NF = humid_environment[ij, nlayers]   # and humidity [kg/kg]
     temp_ref_profile[ij, nlayers] = temp_parcel     # start profile at surface with parcel temperature
@@ -234,69 +228,72 @@ column then need no branch to skip those levels, they contribute zero on their o
 
     saturated::Bool = false           # did the parcel reach saturation yet?
     buoyant::Bool = true              # is the parcel still buoyant?
-    k::Int = nlayers                  # layer index top to surface
     temp_virt_parcel::NF = virtual_temperature(temp_parcel, humid_parcel, atmosphere)
+    level_zero_buoyancy::Int = 1      # in case the parcel is buoyant till the top
 
-    while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
-        k -= 1                              # one level up
+    # single pass over the column with a fixed trip count (no while loop, see #1193): the parcel
+    # ascent is only computed while buoyant, every level is written exactly once, either with
+    # the ascent or with the environment above the LZB, so that T - T_ref = q - q_ref = 0 there
+    for k in (nlayers - 1):-1:1             # one level up at a time, surface to top
+        temp_env = temp_environment[ij, k]
+        humid_env = humid_environment[ij, k]
 
-        if !saturated                       # if not saturated yet follow dry adiabat
-            # dry adiabatic ascent and saturation humidity of that temperature
-            temp_parcel_dry = temp_parcel * (σ[k] / σ[k + 1])^κ
-            sat_humid = saturation_humidity(temp_parcel_dry, σ[k] * pres, atmosphere)
+        if buoyant                          # calculate moist adiabat while buoyant till top
+            if !saturated                   # if not saturated yet follow dry adiabat
+                # dry adiabatic ascent and saturation humidity of that temperature
+                temp_parcel_dry = temp_parcel * (σ[k] / σ[k + 1])^κ
+                sat_humid = saturation_humidity(temp_parcel_dry, σ[k] * pres, atmosphere)
 
-            # set to saturated when the dry adiabatic ascent would reach saturation
-            # then follow moist adiabat instead (see below)
-            saturated = humid_parcel >= sat_humid
-        end
-
-        if saturated
-            # calculate moist/pseudo adiabatic lapse rate, dT/dΦ = -Γ/cp
-            T, Tᵥ, q = temp_parcel, temp_virt_parcel, humid_parcel  # for brevity
-            A = q * Lᵥ / ((1 - q)^2 * R_dry)
-            B = q * Lᵥ^2 / ((1 - q)^2 * cₚ * R_vapor)
-            Γ = (1 + A / Tᵥ) / (1 + B / T^2)
-
-            ΔΦ = geopotential[ij, k] - geopotential[ij, k + 1]        # vertical gradient in geopotential
-            temp_parcel = temp_parcel - ΔΦ / cₚ * Γ                     # new temperature of parcel at k
-
-            # at new (lower) temperature condensation occurs immediately
-            # new humidity equals to that saturation humidity
-            humid_parcel = saturation_humidity(temp_parcel, σ[k] * pres, atmosphere)
-            sat_humid = humid_parcel               # reused below for the reference humidity
-
-            if entraining(entrainment)             # compiled away entirely for NoEntrainment
-                # entrainment: mix the rising parcel with environmental air, diluting its
-                # buoyancy and moisture; sat_humid is recomputed at the mixed temperature so
-                # the reference humidity below stays consistent with the (now mixed) T_ref
-                ε = entrainment(σ[k])
-                temp_parcel = (1 - ε) * temp_parcel + ε * temp_environment[ij, k]
-                humid_parcel = (1 - ε) * humid_parcel + ε * humid_environment[ij, k]
-                sat_humid = saturation_humidity(temp_parcel, σ[k] * pres, atmosphere)
+                # set to saturated when the dry adiabatic ascent would reach saturation
+                # then follow moist adiabat instead (see below)
+                saturated = humid_parcel >= sat_humid
             end
-        else
-            temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
-            # sat_humid already holds saturation_humidity(temp_parcel_dry, σ[k]*pres, atmosphere)
+
+            if saturated
+                # calculate moist/pseudo adiabatic lapse rate, dT/dΦ = -Γ/cp
+                T, Tᵥ, q = temp_parcel, temp_virt_parcel, humid_parcel  # for brevity
+                A = q * Lᵥ / ((1 - q)^2 * R_dry)
+                B = q * Lᵥ^2 / ((1 - q)^2 * cₚ * R_vapor)
+                Γ = (1 + A / Tᵥ) / (1 + B / T^2)
+
+                ΔΦ = geopotential[ij, k] - geopotential[ij, k + 1]        # vertical gradient in geopotential
+                temp_parcel = temp_parcel - ΔΦ / cₚ * Γ                     # new temperature of parcel at k
+
+                # at new (lower) temperature condensation occurs immediately
+                # new humidity equals to that saturation humidity
+                humid_parcel = saturation_humidity(temp_parcel, σ[k] * pres, atmosphere)
+                sat_humid = humid_parcel               # reused below for the reference humidity
+
+                if entraining(entrainment)             # compiled away entirely for NoEntrainment
+                    # entrainment: mix the rising parcel with environmental air, diluting its
+                    # buoyancy and moisture; sat_humid is recomputed at the mixed temperature so
+                    # the reference humidity below stays consistent with the (now mixed) T_ref
+                    ε = entrainment(σ[k])
+                    temp_parcel = (1 - ε) * temp_parcel + ε * temp_env
+                    humid_parcel = (1 - ε) * humid_parcel + ε * humid_env
+                    sat_humid = saturation_humidity(temp_parcel, σ[k] * pres, atmosphere)
+                end
+            else
+                temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
+                # sat_humid already holds saturation_humidity(temp_parcel_dry, σ[k]*pres, atmosphere)
+            end
+
+            # check whether parcel is still buoyant wrt to environment
+            # use virtual temperature as it's equivalent to density
+            temp_virt_parcel = virtual_temperature(temp_parcel, humid_parcel, atmosphere)
+            buoyant = temp_virt_parcel > virtual_temperature(temp_env, humid_env, atmosphere)
+
+            # the LZB is the last buoyant level, i.e. one below the level buoyancy was lost
+            level_zero_buoyancy = ifelse(buoyant, k, k + 1)
         end
 
         # use dry/moist adiabatic ascent for reference profile, and its saturation humidity
-        # (already computed above in both branches) scaled by RH for the humidity reference
-        temp_ref_profile[ij, k] = temp_parcel
-        humid_ref_profile[ij, k] = relative_humidity * sat_humid
-
-        # check whether parcel is still buoyant wrt to environment
-        # use virtual temperature as it's equivalent to density
-        temp_virt_parcel = virtual_temperature(temp_parcel, humid_parcel, atmosphere)         # virtual temperature of parcel
-        buoyant = temp_virt_parcel > virtual_temperature(temp_environment[ij, k], humid_environment[ij, k], atmosphere)
+        # (already computed above in both branches) scaled by RH for the humidity reference;
+        # the environment at and above the level buoyancy was lost (replaces the previous NaN marker)
+        temp_ref_profile[ij, k] = ifelse(buoyant, temp_parcel, temp_env)
+        humid_ref_profile[ij, k] = ifelse(buoyant, relative_humidity * sat_humid, humid_env)
     end
 
-    # if parcel isn't buoyant anymore restore the environment at the level buoyancy was lost
-    # (replaces the previous NaN marker)
-    temp_ref_profile[ij, k] = ifelse(buoyant, temp_ref_profile[ij, k], temp_environment[ij, k])
-    humid_ref_profile[ij, k] = ifelse(buoyant, humid_ref_profile[ij, k], humid_environment[ij, k])
-
-    # level of zero buoyancy is reached when the loop stops, but in case it's at the top it's still buoyant
-    level_zero_buoyancy = k + (1 - buoyant)
     return level_zero_buoyancy
 end
 
@@ -315,7 +312,11 @@ $(TYPEDFIELDS)"""
     @component entrainment::Entrainment = NoEntrainment()
 end
 
-Adapt.@adapt_structure BettsMillerDryConvection
+# NF isn't used by any field so it can't be inferred by Adapt.@adapt_structure, pass it explicitly
+function Adapt.adapt_structure(to, convection::BettsMillerDryConvection{NF}) where {NF}
+    entrainment = adapt_structure(to, convection.entrainment)
+    return BettsMillerDryConvection{NF, typeof(entrainment)}(convection.time_scale, entrainment)
+end
 
 # generator function
 BettsMillerDryConvection(SG::SpectralGrid; entrainment = NoEntrainment(), kwargs...) =
@@ -414,39 +415,37 @@ exactly: downstream loops over the full column then need no branch to skip those
 
     nlayers = length(σ)                     # number of vertical levels
 
-    # levels above the LZB are never touched again below, so they stay at the environment
-    for k in 1:nlayers
-        temp_ref_profile[ij, k] = temp_environment[ij, k]
-    end
     temp_ref_profile[ij, nlayers] = temp_parcel    # start profile at surface with parcel temperature
 
     buoyant::Bool = true                    # is the parcel still buoyant?
-    k::Int = nlayers                        # layer index top to surface
+    level_zero_buoyancy::Int = 1            # in case the parcel is buoyant till the top
 
-    while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
-        k -= 1                              # one level up
+    # single pass over the column with a fixed trip count (no while loop, see #1193), every level
+    # is written exactly once, with the environment above the LZB so that T - T_ref = 0 there
+    for k in (nlayers - 1):-1:1             # one level up at a time, surface to top
+        temp_env = temp_environment[ij, k]
 
-        # dry adiabatic ascent
-        temp_parcel = temp_parcel * (σ[k] / σ[k + 1])^κ
+        if buoyant                          # calculate dry adiabat while buoyant till top
+            # dry adiabatic ascent
+            temp_parcel = temp_parcel * (σ[k] / σ[k + 1])^κ
 
-        if entraining(entrainment)          # compiled away entirely for NoEntrainment
-            # entrainment: mix the rising parcel with environmental air, diluting its buoyancy
-            ε = entrainment(σ[k])
-            temp_parcel = (1 - ε) * temp_parcel + ε * temp_environment[ij, k]
+            if entraining(entrainment)      # compiled away entirely for NoEntrainment
+                # entrainment: mix the rising parcel with environmental air, diluting its buoyancy
+                ε = entrainment(σ[k])
+                temp_parcel = (1 - ε) * temp_parcel + ε * temp_env
+            end
+
+            # check whether parcel is still buoyant wrt to environment
+            buoyant = temp_parcel > temp_env
+
+            # the LZB is the last buoyant level, i.e. one below the level buoyancy was lost
+            level_zero_buoyancy = ifelse(buoyant, k, k + 1)
         end
 
-        temp_ref_profile[ij, k] = temp_parcel
-
-        # check whether parcel is still buoyant wrt to environment
-        buoyant = temp_parcel > temp_environment[ij, k]
+        # environment at and above the level buoyancy was lost (replaces the previous NaN marker)
+        temp_ref_profile[ij, k] = ifelse(buoyant, temp_parcel, temp_env)
     end
 
-    # if parcel isn't buoyant anymore restore the environment at the level buoyancy was lost
-    # (replaces the previous NaN marker)
-    temp_ref_profile[ij, k] = ifelse(buoyant, temp_ref_profile[ij, k], temp_environment[ij, k])
-
-    # level of zero buoyancy is reached when the loop stops, but in case it's at the top it's still buoyant
-    level_zero_buoyancy = k + (1 - buoyant)
     return level_zero_buoyancy
 end
 
