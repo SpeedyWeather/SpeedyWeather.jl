@@ -92,6 +92,21 @@ Note that the sign change in the differential formulation with optical
 depth only occurs because the optical depth as vertical coordinate
 strictly increases towards the surface.
 
+**Stratospheric emission.** A grey scheme with an optical depth that increases like ``\sigma^4``
+has an almost transparent stratosphere, which can hardly emit and therefore cannot balance
+stratospheric ozone heating (see [`TwoBandShortwave`](@ref "TwoBandShortwave: Two-band shortwave radiation with diagnostic clouds and ozone")).
+Following the stratospheric correction in Fortran SPEEDY, the stratosphere ``p < p_s`` (`stratosphere_pressure`,
+default 140 hPa) additionally emits ``\epsilon_s \sigma T_k^4`` directly to space
+
+```math
+E_k = \epsilon_s \frac{\Delta p_k^s}{p_s} \sigma T_k^4
+```
+
+with ``\Delta p_k^s`` the pressure overlap of layer ``k`` with the stratosphere and
+``\epsilon_s`` = `stratospheric_emissivity` (0.05 for `OneBandLongwave`, 0 for `OneBandGreyLongwave`).
+This emission cools the stratospheric layers and is added to the outgoing longwave radiation.
+It represents emission in the centre of the CO₂ band, which a single grey band lacks.
+
 To be used like (currently the default anyway)
 
 ```@example radiation

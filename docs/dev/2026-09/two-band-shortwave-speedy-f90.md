@@ -69,6 +69,16 @@ Base revision: `35d764b6` (`main`)
   (265 K on `main`). Cause 2: the default `FriersonLongwaveTransmissivity` gives the top layer an
   optical depth of ≈0.02 at the poles, so it can hardly emit. speedy.f90 has a CO₂ band and a
   stratospheric correction term in its longwave scheme for this.
+- **2026-09-19.** Stratospheric longwave emission added in this PR (user decision, chosen over
+  weakening the ozone to `main`'s strength and adding longwave in a follow-up PR). Following
+  speedy.f90's stratospheric correction (`epslw = 0.05`), `OneBandLongwaveRadiativeTransfer` gets
+  `stratospheric_emissivity` (0.05 for `OneBandLongwave`, 0 for `OneBandGreyLongwave`) and
+  `stratosphere_pressure = 14000` Pa. The stratosphere emits `ε σT_k⁴` directly to space,
+  distributed by pressure overlap like the ozone. speedy.f90's polar-night term (`stratz`) is not
+  included because it relies on daily-mean insolation. Result: the 1-year CI test passes locally,
+  and the top layer peaks at 258 K (August) instead of 310 K (`main`: 265 K). Over days 35–40 from
+  1 January, net TOA is +3.3 W/m² vs +33.4 W/m² on `main` (OLR 235 vs 243, OSR 125 vs 86), with
+  top-layer T mean/min/max 217/190/232 K vs 220/194/231 K on `main`.
 - **2026-09-19.** Version of `SpeedyWeather` bumped to `0.23.0-DEV` (new public types,
   changed default).
 
@@ -188,6 +198,8 @@ With the algorithms now matching, the remaining differences come from the model 
 
 ## Documentation changes
 
+- `docs/src/radiation.md`: stratospheric emission in the `OneBandLongwave` section.
+
 - `docs/src/radiation.md`: new `TwoBandShortwave` section with the ozone formula. The cloud
   diagnosis description now covers max RH, the GSE definition and the land stratocumulus minimum.
 - `docs/src/references.bib`: added Molteni (2003).
@@ -200,8 +212,8 @@ With the algorithms now matching, the remaining differences come from the model 
 - Instantaneous zenith angle with a diurnal cycle, whereas speedy.f90 uses daily means. Ozone
   is distributed by pressure instead of speedy.f90's pₛ/p₀ scaling (same heating rates, but the
   ozone column is kept over high orography).
-- Our longwave cannot balance speedy.f90-strength ozone heating in the polar summer stratosphere
-  (top layer up to 310 K), see revision log.
+- The stratospheric longwave emission is a single-parameter correction (as in speedy.f90), not a
+  proper CO₂ band. speedy.f90's polar-night cooling term is not included.
 - The near-IR band is not reflected by the surface (as in speedy.f90), although real surfaces
   do reflect near-IR.
 
