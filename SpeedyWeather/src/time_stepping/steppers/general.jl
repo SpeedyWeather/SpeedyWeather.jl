@@ -5,6 +5,18 @@ spin_up_steps(::AbstractTimeStepper) = 0
 default_time_step(L::AbstractTimeStepper) = L.Δt
 
 """$(TYPEDSIGNATURES)
+Time step the ocean, sea ice and land variables (those in the `:ocean` and `:land` namespaces).
+Defaults to the same `update_prognostic!` as the atmosphere, but time steppers can extend this
+to integrate the surface with a different scheme, e.g. `Leapfrog` uses Euler forward."""
+update_prognostic_surface!(var, tendency, clock, time_stepping::AbstractTimeStepper, implicit, model) =
+    update_prognostic!(var, tendency, clock, time_stepping, implicit, model)
+
+"""$(TYPEDSIGNATURES)
+Time step [s] over which ocean, sea ice and land tendencies are applied in
+`update_prognostic_surface!`. Defaults to the `default_time_step` of the time stepper."""
+surface_time_step(time_stepping::AbstractTimeStepper, clock) = default_time_step(time_stepping)
+
+"""$(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T32` is always scaled with the resolution `truncation` 
 of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T32` is additionally 
 adjusted to the closest divisor of `interval` so that the output time axis is keeping

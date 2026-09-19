@@ -2,9 +2,9 @@
 @propagate_inbounds sea_ice_timestep!(vars::Variables, model::PrimitiveEquation) =
     timestep!(vars, model.sea_ice, model)
 
-function variables(::AbstractPrescribedSeaIce)
+function variables(::AbstractSeaIce)
     return (
-        # prescribed sea ice has no step dimension as its not time stepped
+        # prescribed sea ice has no step dimension as its not time stepped, dynamic sea ice defines it with one
         PrognosticVariable(:sea_ice_concentration, GridXY(), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
     )
 end
@@ -61,9 +61,9 @@ function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::P
     dℵ = get_tendency_step(vars.tendencies.ocean.sea_ice_concentration, model.time_stepping, sea_ice_model)
     sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, model.ocean)
     
-    @boundscheck size(dsst) == size(dℵ) == size(sst) || throw(BoundsError)
+    @boundscheck size(dsst) == size(dℵ) == size(sst) || throw(BoundsError())
 
-    Δt = time_step(model.time_stepping, vars.prognostic.clock)
+    Δt = surface_time_step(model.time_stepping, vars.prognostic.clock)
     (; land_fraction) = model.land_sea_mask
 
     m = sea_ice_model.melt_rate             # melt rate [m²/m²/s/K]

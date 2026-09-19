@@ -1,5 +1,5 @@
-# variable that AbstractOcean requires
-function variables(::AbstractPrescribedOcean)
+# variable that AbstractOcean requires, dynamic oceans should define it with a time dimension
+function variables(::AbstractOcean)
     return (
         PrognosticVariable(:sea_surface_temperature, GridXY(), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
     )
@@ -347,8 +347,8 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
 
-    @boundscheck size(dsst) == size(Rsd) == size(Rsu) == size(Rld) == size(Rlu) || throw(BoundsError)
-    @boundscheck size(dsst) == size(S) == size(H) || throw(BoundsError)
+    @boundscheck size(dsst) == size(Rsd) == size(Rsu) == size(Rld) == size(Rlu) || throw(BoundsError())
+    @boundscheck size(dsst) == size(S) == size(H) || throw(BoundsError())
 
     launch!(
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,

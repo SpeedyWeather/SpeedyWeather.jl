@@ -1,6 +1,6 @@
 abstract type AbstractLandTemperature <: AbstractLandComponent end
-abstract type AbstractDynamicLandTemperature <: AbstractDynamicLandComponent end
-abstract type AbstractPrescribedLandTemperature <: AbstractPrescribedLandComponent end
+abstract type AbstractDynamicLandTemperature <: AbstractLandTemperature end
+abstract type AbstractPrescribedLandTemperature <: AbstractLandTemperature end
 
 function variables(::AbstractPrescribedLandTemperature)
     return (
@@ -226,7 +226,7 @@ function timestep!(
         get_prognostic_step(vars.prognostic.land.soil_moisture, model.time_stepping, land) : nothing
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
-    Lᵢ = latent_heat_sublimation(model.atmosphere)
+    Lᵢ = latent_heat_fusion(model.atmosphere)
 
     (; land_fraction) = model.land_sea_mask
     (; thermodynamics, geometry) = model.land
