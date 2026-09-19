@@ -252,7 +252,7 @@ the cloud top down to the cloud base, so never in the boundary layer.
 **Ozone:**
 The ozone absorption is a separate component, `SeasonalOzone` (default) or `NoOzone`.
 `SeasonalOzone` absorbs a fraction of the top-of-atmosphere shortwave flux ``F_0`` in the upper
-(``\sigma < 0.05``) and lower (``0.05 < \sigma < 0.14``) stratosphere
+(``p < 50`` hPa) and lower (``50 < p < 140`` hPa) stratosphere
 
 ```math
 \Delta F^{O_3}_\text{upper} = \frac{1}{2}\epsilon \, \mu F_0, \quad
@@ -266,7 +266,8 @@ orbit (`length_of_year`, `equinox`, `axial_tilt`, `seasonal_cycle`). For Earth,
 ``-\delta/\delta_{\max} = \cos\alpha`` with ``\alpha`` the angle of the year from the northern
 winter solstice as in SPEEDY.
 There is more ozone absorption towards the poles and in the northern hemisphere during its winter.
-The absorption is distributed across model layers by their overlap with these ``\sigma``-intervals.
+The absorption is distributed across model layers by their overlap with these pressure intervals,
+so that stratospheric heating rates don't increase over high orography where the upper σ-layers are thinner.
 
 ```@example radiation
 spectral_grid = SpectralGrid(truncation=31, nlayers=8)

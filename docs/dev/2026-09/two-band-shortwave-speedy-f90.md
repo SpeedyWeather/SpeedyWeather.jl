@@ -57,6 +57,18 @@ Base revision: `35d764b6` (`main`)
   Stratocumulus stability is the Δs/ΔΦ between the cloud base and the surface layer, and
   stratocumulus reflects at the top of the boundary layer. Nothing changes for 8 equally spaced
   layers, except that layer 1 (σ = 0.06) is no longer searched for clouds (it never had any).
+- **2026-09-19.** CI failure (prompt: "Some CI on github failed, can you have a look?"):
+  `long_integrations/default_primitive_wet` (1 year, Julia 1.13) hit NaNs at step 7651 (31 July).
+  This reproduces locally, while `main` passes the same test. The top layer over Greenland
+  overheated (312 K) before the blow-up. Cause 1: ozone was distributed by σ, so over high
+  orography the thinner top σ-layer took the full ozone absorption (≈45% higher heating rate at
+  pₛ = 700 hPa). speedy.f90 avoids this by scaling with pₛ/p₀. Fix: ozone is now distributed by
+  pressure overlap with [0, 50 hPa] and [50, 140 hPa] (`pressure_upper`, `pressure_lower` replace
+  `σ_upper`, `σ_lower`). Heating rates no longer depend on pₛ, and the ozone column is retained.
+  After the fix the CI test passes locally, but the top layer still reaches 310 K in August
+  (265 K on `main`). Cause 2: the default `FriersonLongwaveTransmissivity` gives the top layer an
+  optical depth of ≈0.02 at the poles, so it can hardly emit. speedy.f90 has a CO₂ band and a
+  stratospheric correction term in its longwave scheme for this.
 - **2026-09-19.** Version of `SpeedyWeather` bumped to `0.23.0-DEV` (new public types,
   changed default).
 
@@ -186,7 +198,10 @@ With the algorithms now matching, the remaining differences come from the model 
   climate (see "Cloud comparison"). The planetary albedo is slightly too high and atmospheric
   absorption too low.
 - Instantaneous zenith angle with a diurnal cycle, whereas speedy.f90 uses daily means. Ozone
-  is not scaled by pₛ/p₀ as in speedy.f90.
+  is distributed by pressure instead of speedy.f90's pₛ/p₀ scaling (same heating rates, but the
+  ozone column is kept over high orography).
+- Our longwave cannot balance speedy.f90-strength ozone heating in the polar summer stratosphere
+  (top layer up to 310 K), see revision log.
 - The near-IR band is not reflected by the surface (as in speedy.f90), although real surfaces
   do reflect near-IR.
 

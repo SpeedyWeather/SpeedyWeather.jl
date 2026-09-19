@@ -31,8 +31,10 @@ planet's axial tilt δₘₐₓ, so it is synchronized with the orbit (`length_o
 More ozone absorption therefore in high latitudes and in the northern hemisphere during
 its winter half-year. The absorbed flux is further multiplied
 by the zenith angle correction factor of the shortwave transmissivity. The absorption is
-distributed on the model layers following their overlap with the σ-intervals
-[0, `σ_upper`] and [`σ_upper`, `σ_lower`]. Fields are
+distributed on the model layers following their overlap in pressure with the upper
+[0, `pressure_upper`] and lower [`pressure_upper`, `pressure_lower`] stratosphere, so that the
+heating rate does not depend on surface pressure (e.g. over high orography) and the full ozone
+absorption is retained for any surface pressure > `pressure_lower`. Fields are
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SeasonalOzone{NF} <: AbstractOzone
     "[OPTION] Reference fraction of TOA shortwave flux absorbed by ozone (SPEEDY epssw) [1]"
@@ -50,11 +52,11 @@ $(TYPEDFIELDS)"""
     "[OPTION] Amplitude of the equator-to-pole contrast of lower stratospheric ozone (SPEEDY coz2) [1]"
     @param latitudinal_amplitude::NF = 1.8 (bounds = Nonnegative,)
 
-    "[OPTION] Lower σ boundary of the upper stratosphere [1]"
-    σ_upper::NF = 0.05
+    "[OPTION] Lower boundary of the upper stratosphere (SPEEDY σ = 0.05 at 1000 hPa) [Pa]"
+    pressure_upper::NF = 5000
 
-    "[OPTION] Lower σ boundary of the lower stratosphere [1]"
-    σ_lower::NF = 0.14
+    "[OPTION] Lower boundary of the lower stratosphere (SPEEDY σ = 0.14 at 1000 hPa) [Pa]"
+    pressure_lower::NF = 14000
 end
 
 Adapt.@adapt_structure SeasonalOzone
@@ -97,15 +99,17 @@ end
 """$(TYPEDSIGNATURES)
 Fraction of the top-of-atmosphere shortwave flux absorbed by ozone in layer `k`
 (before zenith angle correction), distributing the upper and lower stratospheric
-absorption by the overlap of layer `k` with the respective σ-intervals."""
+absorption by the overlap in pressure of layer `k` with the respective pressure intervals."""
 @propagate_inbounds function ozone_absorption(ij, k, vars, ozone::SeasonalOzone, model)
-    σ_half = model.geometry.σ_levels_half
-    σ_top, σ_bottom = σ_half[k], σ_half[k + 1]
-    (; σ_upper, σ_lower) = ozone
+    pₛ = vars.parameterizations.surface_pressure[ij]
+    coordinates = model.geometry.vertical_coordinates
+    p_top = pressure_above(k, pₛ, coordinates)
+    p_bottom = pressure_below(k, pₛ, coordinates)
+    (; pressure_upper, pressure_lower) = ozone
 
-    # fractions of upper [0, σ_upper] and lower [σ_upper, σ_lower] stratosphere in layer k
-    upper_overlap = max(0, min(σ_bottom, σ_upper) - σ_top) / σ_upper
-    lower_overlap = max(0, min(σ_bottom, σ_lower) - max(σ_top, σ_upper)) / (σ_lower - σ_upper)
+    # fractions of upper [0, pressure_upper] and lower [pressure_upper, pressure_lower] stratosphere in layer k
+    upper_overlap = max(0, min(p_bottom, pressure_upper) - p_top) / pressure_upper
+    lower_overlap = max(0, min(p_bottom, pressure_lower) - max(p_top, pressure_upper)) / (pressure_lower - pressure_upper)
 
     upper = ozone.absorption * ozone.upper_fraction
     lower = vars.parameterizations.ozone_absorption_lower[ij]

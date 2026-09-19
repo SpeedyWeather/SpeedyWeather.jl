@@ -120,10 +120,10 @@ end
         model = PrimitiveWetModel(spectral_grid; shortwave_radiation = sw)
         simulation = initialize!(model)
         vars = simulation.variables
+        vars.parameterizations.surface_pressure .= 1.0e5
         SpeedyWeather.parameterization!(vars, model.shortwave_radiation, model)
 
         nlayers = spectral_grid.nlayers
-        σ_half = model.geometry.σ_levels_half
         absorption = [SpeedyWeather.ozone_absorption(ij, k, vars, ozone, model) for ij in 1:spectral_grid.npoints, k in 1:nlayers]
         @test all(0 .<= absorption .< 1)
 
@@ -131,7 +131,10 @@ end
             @test all(absorption .== 0)
         else
             # only absorbed in the stratosphere, total is upper + lower stratosphere
-            @test all(all(absorption[:, k] .== 0) for k in 1:nlayers if σ_half[k] >= ozone.σ_lower)
+            pₛ = vars.parameterizations.surface_pressure
+            coordinates = model.geometry.vertical_coordinates
+            p_top = [SpeedyWeather.pressure_above(k, pₛ[ij], coordinates) for ij in 1:spectral_grid.npoints, k in 1:nlayers]
+            @test all(absorption[p_top .>= ozone.pressure_lower] .== 0)
             lower = vars.parameterizations.ozone_absorption_lower.data
             @test vec(sum(absorption, dims = 2)) ≈ ozone.absorption * ozone.upper_fraction .+ lower
 
@@ -207,4 +210,26 @@ end
         end
         nlayers == 8 && @test (layer_top, cloud_base) == (2, 7)
     end
+end
+
+@testset "Ozone heating independent of surface pressure" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8)
+    ozone = SeasonalOzone(spectral_grid)
+    model = PrimitiveWetModel(spectral_grid; shortwave_radiation = TwoBandShortwave(spectral_grid; ozone))
+    simulation = initialize!(model)
+    vars = simulation.variables
+    SpeedyWeather.parameterization!(vars, model.shortwave_radiation, model)
+    coordinates = model.geometry.vertical_coordinates
+
+    # absorption per layer pressure thickness (∝ heating rate) in the top layer and column total
+    ij = 1
+    column(pₛ) = (
+        vars.parameterizations.surface_pressure[ij] = pₛ;
+        [SpeedyWeather.ozone_absorption(ij, k, vars, ozone, model) for k in 1:spectral_grid.nlayers]
+    )
+    heating(a, pₛ) = a[1] / SpeedyWeather.pressure_thickness(1, pₛ, coordinates)
+
+    sea_level, mountain = column(100000), column(70000)
+    @test sum(sea_level) ≈ sum(mountain)                                   # same ozone column
+    @test heating(mountain, 70000) <= 1.1 * heating(sea_level, 100000)     # not concentrated in thinner layers
 end
