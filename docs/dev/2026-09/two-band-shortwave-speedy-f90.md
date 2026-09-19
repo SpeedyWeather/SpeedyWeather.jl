@@ -37,6 +37,12 @@ Base revision: `35d764b6` (`main`)
   `axial_tilt` and `seasonal_cycle`. Removed the `solstice_offset` field. New helpers
   `year_angle(NF, zenith, orbit_time)` and `solar_declination(NF, zenith, orbit_time)` are
   shared with the zenith calculation.
+- **2026-09-19.** Cloud scheme compared with speedy.f90 by zonal means of every cloud term
+  (prompt: "Can you also compare the cloud scheme similarly?"). This found two more
+  algorithmic differences, now fixed: 5. the q > q_min threshold was also applied to layer N−1
+  (speedy.f90 exempts it), so there were no humidity clouds in cold polar air; 6. snowfall was
+  missing from the precipitation term. The remaining differences come from the model climate,
+  see "Cloud comparison" below.
 - **2026-09-19.** Version of `SpeedyWeather` bumped to `0.23.0-DEV` (new public types,
   changed default).
 
@@ -76,6 +82,10 @@ Bugs found in our `DiagnosticClouds`:
 3. The RH term used the lowest qualifying layer, while the cloud top was the highest one.
    speedy.f90 uses the maximum RH, with the cloud top at the same level.
 4. The land stratocumulus minimum (`clsminl = 0.15`) was missing.
+5. The specific humidity threshold was also applied to the layer directly above the surface
+   layer. speedy.f90 always considers that layer, so ours had no humidity clouds wherever
+   q < 0.2 g/kg (13% of columns, mostly polar). Arctic cloud cover was 0.37 vs 0.63.
+6. Precipitation only included rain. speedy.f90 uses all precipitation, so snow is now included.
 
 ## Summary of changes
 
@@ -90,7 +100,7 @@ Bugs found in our `DiagnosticClouds`:
   [0.05, 0.14], so it works for any vertical resolution.
 - `TwoBandShortwaveRadiativeTransfer`: reflection at the top of the cloud-top layer and the
   top of the surface layer. Visible-only surface reflection and upward beam.
-- `DiagnosticClouds`: fixes 1–4 above, and `cloud_albedo` 0.6 → 0.43. This also affects
+- `DiagnosticClouds`: fixes 1–6 above, and `cloud_albedo` 0.6 → 0.43. This also affects
   `OneBandShortwave`.
 
 ## Testing and verification
@@ -107,8 +117,40 @@ Bugs found in our `DiagnosticClouds`:
 |---|---|---|---|---|
 | speedy.f90 | 0.306 | 208 | 62 | 0.59 |
 | main `OneBandShortwave` | 0.238 | 233 | 69 | 0.31 |
-| `TwoBandShortwave` | 0.340 | 209 | 53 | 0.69 |
+| `TwoBandShortwave` | 0.342 | 209 | 53 | 0.70 |
 | `OneBandShortwave` (fixed clouds) | 0.314 | 209 | 63 | 0.61 |
+
+### Cloud comparison
+
+Zonal means (area-weighted over latitude bands) of all cloud terms, T31 with 8 layers, days
+35–40 from 1 January, shown as speedy.f90 / SpeedyWeather after fixes 1–6. `cltop` is the cloud
+top layer index (N+1 = no cloud top), `GSE` is the stratocumulus stability Δs/ΔΦ, and
+`P mm/d` is rain + snow.
+
+| band | cloudc | clstr | Pterm | RHterm | cltop | RH(N-1) | P mm/d | GSE |
+|---|---|---|---|---|---|---|---|---|
+| -90..-60 | 0.60 / 0.51 | 0.06 / 0.03 | 0.08 / 0.10 | 0.54 / 0.42 | 6.22 / 5.45 | 0.77 / 0.67 | 0.51 / 0.54 | 0.62 / 0.14 |
+| -60..-30 | 0.67 / 0.71 | 0.03 / 0.01 | 0.13 / 0.25 | 0.59 / 0.51 | 5.95 / 4.43 | 0.81 / 0.72 | 1.86 / 2.65 | 0.45 / 0.25 |
+| -30..-10 | 0.53 / 0.66 | 0.06 / 0.04 | 0.11 / 0.13 | 0.44 / 0.56 | 4.85 / 3.48 | 0.74 / 0.68 | 3.84 / 1.17 | 0.35 / 0.27 |
+| -10..10 | 0.57 / 0.77 | 0.06 / 0.04 | 0.10 / 0.18 | 0.51 / 0.66 | 5.38 / 3.19 | 0.76 / 0.72 | 5.18 / 1.79 | 0.37 / 0.32 |
+| 10..30 | 0.48 / 0.67 | 0.05 / 0.03 | 0.07 / 0.18 | 0.43 / 0.52 | 6.06 / 3.64 | 0.67 / 0.61 | 1.89 / 1.76 | 0.32 / 0.25 |
+| 30..60 | 0.66 / 0.54 | 0.08 / 0.04 | 0.15 / 0.16 | 0.59 / 0.44 | 5.86 / 5.18 | 0.77 / 0.62 | 2.17 / 1.62 | 0.47 / 0.12 |
+| 60..90 | 0.63 / 0.66 | 0.10 / 0.05 | 0.09 / 0.06 | 0.57 / 0.62 | 6.06 / 5.41 | 0.80 / 0.81 | 0.59 / 0.23 | 0.85 / 0.42 |
+| -90..90 | 0.59 / 0.66 | 0.06 / 0.03 | 0.11 / 0.16 | 0.52 / 0.54 | 5.70 / 4.21 | 0.76 / 0.68 | 2.68 / 1.62 | 0.44 / 0.25 |
+
+With the algorithms now matching, the remaining differences come from the model climate:
+
+- **Tropics and subtropics are too cloudy** (0.77 vs 0.57 at ±10°). The relative humidity
+  maximum is in layer 3 (σ ≈ 0.31) in 70% of tropical columns, and cloud tops are much higher
+  (3.2 vs 5.4). Our upper tropical troposphere is more humid than in speedy.f90, likely because
+  Betts–Miller convection relaxes towards a humid reference profile, whereas speedy.f90 uses
+  mass-flux convection.
+- **Mid-latitudes are not cloudy enough** (0.54 vs 0.66 at 30–60°N). Relative humidity in the
+  layer above the surface layer is lower (0.62 vs 0.77).
+- **Stratocumulus is about half** (0.03 vs 0.06) because the lower troposphere is less stable
+  (GSE 0.25 vs 0.44, and 0.42 vs 0.85 in the Arctic), which points to the boundary layer and
+  vertical diffusion.
+- **Tropical precipitation is low** (1.8 vs 5.2 mm/day at ±10°), which is worth a separate look.
 
 ## Documentation changes
 
@@ -118,8 +160,9 @@ Bugs found in our `DiagnosticClouds`:
 
 ## Known limitations
 
-- Cloud cover (0.69) is higher than in speedy.f90 (0.59) because of a different humidity
-  climate. The planetary albedo is slightly too high and atmospheric absorption too low.
+- Cloud cover (0.70) is higher than in speedy.f90 (0.59) because of a different humidity
+  climate (see "Cloud comparison"). The planetary albedo is slightly too high and atmospheric
+  absorption too low.
 - Instantaneous zenith angle with a diurnal cycle, whereas speedy.f90 uses daily means. Ozone
   is not scaled by pₛ/p₀ as in speedy.f90.
 - The near-IR band is not reflected by the surface (as in speedy.f90), although real surfaces

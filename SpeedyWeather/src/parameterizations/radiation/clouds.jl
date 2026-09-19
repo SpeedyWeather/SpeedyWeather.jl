@@ -116,23 +116,25 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     cloud_factor = clouds.stratocumulus_cloud_factor
     cover_min_land = clouds.stratocumulus_cover_min_land
 
-    # Precipitation contribution (rain rate is in m/s)
-    rain_rate = vars.parameterizations.rain_rate[ij]
-    precip_term = min(precip_max, max(0, rain_rate) * 86400 * 1000)   # convert m/s to mm/day
+    # Precipitation contribution from rain and snow (both in m/s)
+    precip_rate = vars.parameterizations.rain_rate[ij] + snow_rate(ij, vars)
+    precip_term = min(precip_max, max(0, precip_rate) * 86400 * 1000)   # convert m/s to mm/day
     P = precip_weight * sqrt(precip_term)
 
     # from convection or large-scale condensation
     cloud_top_precipitation = vars.parameterizations.cloud_top[ij]
 
-    # Find the layer of maximum relative humidity above the surface layer (with q > q_min),
-    # cloud cover is a quadratic function of that maximum, the cloud top is its layer
+    # Find the layer of maximum relative humidity above the surface layer (with q > q_min,
+    # except for the layer directly above the surface layer as in SPEEDY, so that clouds can
+    # also form in cold and dry polar air), cloud cover is a quadratic function of that
+    # maximum, the cloud top is its layer
     rh_excess_max::NF = 0
     cloud_top_humidity = nlayers + 1
     for k in 1:(nlayers - 1)
         humidity_k = humid[ij, k]
         pₖ = pressure(k, pₛ, vertical_coordinates)
         qsat = saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
-        if humidity_k > q_min && qsat > 0
+        if (humidity_k > q_min || k == nlayers - 1) && qsat > 0
             rh_excess = humidity_k / qsat - rh_min
             if rh_excess > rh_excess_max
                 rh_excess_max = rh_excess
@@ -175,3 +177,8 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
 
     return (; cloud_cover, cloud_top, stratocumulus_cover)
 end
+
+# snow rate [m/s] if defined (e.g. by large-scale condensation), zero otherwise
+@propagate_inbounds snow_rate(ij, vars) = _snow_rate(ij, vars.parameterizations)
+@propagate_inbounds _snow_rate(ij, parameterizations::NamedTuple) =
+    haskey(parameterizations, :snow_rate) ? parameterizations.snow_rate[ij] : zero(eltype(parameterizations.rain_rate))

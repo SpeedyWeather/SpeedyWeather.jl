@@ -290,7 +290,8 @@ transmissivity ``t=1``.
 **Cloud diagnosis:**
 Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column.
 The cloud base is set at the interface between the lowest two model layers. Among all layers above the
-surface layer with $Q_k > Q_{cl}$ the one with the largest relative humidity $\mathrm{RH}_{\max}$ is found,
+surface layer with $Q_k > Q_{cl}$ (this threshold does not apply to the layer directly above the surface
+layer, as in SPEEDY) the one with the largest relative humidity $\mathrm{RH}_{\max}$ is found,
 the cloud top is the higher (smaller ``k``) of this layer and the top of convection or large-scale condensation.
 The cloud cover (CLC) is then given by
 
@@ -299,7 +300,7 @@ The cloud cover (CLC) is then given by
 ```
 
 where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are [large-scale](@ref "Large-scale precipitation")
-and [convective](@ref "Convective precipitation") precipitation,
+and [convective](@ref "Convective precipitation") precipitation (rain and snow),
 and $\mathrm{RH}_{cl}$ is a threshold. Precipitation is in mm/day.
 
 **Stratocumulus clouds:**

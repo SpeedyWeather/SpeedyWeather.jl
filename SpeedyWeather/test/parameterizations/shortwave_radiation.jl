@@ -163,3 +163,27 @@ end
     # seasons follow the planet's equinox, shifted by half a year here
     @test north_south_ratio(DateTime(2000, 7, 1), equinox = DateTime(2000, 9, 20)) > 1
 end
+
+@testset "Diagnostic clouds in cold, dry air and from snow" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    clouds = model.shortwave_radiation.clouds
+    vars = Variables(model)
+    init_shortwave_state!(vars, model)
+    nlayers = spectral_grid.nlayers
+    ij = 1
+
+    # cold air with humidity below the q threshold but RH > threshold: clouds form above the surface layer
+    vars.grid.temperature .= 240
+    vars.grid.humidity .= clouds.specific_humidity_threshold_min / 2
+    state = SpeedyWeather.clouds!(ij, vars, clouds, model)
+    @test state.cloud_cover > 0
+    @test state.cloud_top == nlayers - 1
+
+    # completely dry air, snow alone creates clouds
+    vars.grid.humidity .= 0
+    vars.parameterizations.cloud_top .= nlayers + 1
+    @test SpeedyWeather.clouds!(ij, vars, clouds, model).cloud_cover == 0
+    vars.parameterizations.snow_rate .= 1 / (86400 * 1000)     # 1 mm/day
+    @test SpeedyWeather.clouds!(ij, vars, clouds, model).cloud_cover ≈ clouds.precipitation_weight
+end
