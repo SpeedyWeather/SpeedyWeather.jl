@@ -27,6 +27,16 @@ Base revision: `35d764b6` (`main`)
 - **2026-09-19.** Cloud albedo reset from 0.6 to speedy.f90's 0.43. Once the cloud cover
   bugs were fixed, 0.6 gave a planetary albedo of 0.48. 0.6 had been compensating for the
   too-low cloud cover.
+- **2026-09-19.** Ozone seasonal cycle synchronized with the solar zenith angle
+  (prompt: "The ozone seasonal cycle seems to hardcode Earth. The zenith angle calculation we
+  have is now completely flexible, can the seasonal cycles be synced somehow?"). The SPEEDY
+  factor `max(0, cos α)`, with α the year angle from the northern winter solstice (hardcoded as
+  Jan 1 + 10 days on a 365-day year), is replaced by `max(0, -δ/|δₘₐₓ|)` with the solar
+  declination δ from `model.solar_zenith` and δₘₐₓ the planet's `axial_tilt`. This is identical
+  for Earth's sinusoidal declination, but it now follows `length_of_year`, `equinox`,
+  `axial_tilt` and `seasonal_cycle`. Removed the `solstice_offset` field. New helpers
+  `year_angle(NF, zenith, orbit_time)` and `solar_declination(NF, zenith, orbit_time)` are
+  shared with the zenith calculation.
 - **2026-09-19.** Version of `SpeedyWeather` bumped to `0.23.0-DEV` (new public types,
   changed default).
 
@@ -48,7 +58,7 @@ speedy.f90 (`source/shortwave_radiation.f90`, `mod_radcon.f90`, `physics.f90`):
 - **Ozone**: `epssw = 0.02` of the TOA flux. `0.5ε` is absorbed in the upper stratosphere
   (layer 1). `0.4ε(1 + max(0, cos α) sin φ + 1.8 P₂(sin φ))` is absorbed in the lower
   stratosphere (layer 2), where α is the year angle from the northern winter solstice. Both are
-  multiplied by the zenith correction factor.
+  multiplied by the zenith correction factor. The seasonal phase is hardcoded for Earth.
 - **Clouds**: cloud cover is `wpcl √min(10, P[mm/day]) + min(1, (RHmax − 0.3)/0.7)²`. RHmax is
   the maximum over tropospheric layers with q > 0.2 g/kg, and the cloud top is at that level
   (or the precipitation top if higher). Cloud albedo is 0.43. Clouds absorb in the visible
@@ -87,7 +97,9 @@ Bugs found in our `DiagnosticClouds`:
 
 - `test/parameterizations/shortwave_radiation.jl` has new testsets for the two-band
   transmissivity (both bands in (0, 1], near-IR more strongly absorbed) and for ozone
-  (non-negative, zero below σ_lower, column total = upper + lower, pole > equator).
+  (non-negative, zero below σ_lower, column total = upper + lower, pole > equator), and for the
+  ozone seasonal cycle following the orbit (NH > SH in January, symmetric in July, symmetric
+  for zero tilt and flipped for negative tilt, shifted with the equinox).
 - Global-mean shortwave budget: T31 with 8 layers from 1 January, area-weighted mean over
   days 35–40. speedy.f90 was built locally with an added diagnostic print.
 

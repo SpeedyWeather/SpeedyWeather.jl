@@ -21,11 +21,15 @@ A fraction of the top-of-atmosphere (TOA) shortwave flux is absorbed in two stra
 layers: The upper stratosphere absorbs `upper_fraction * absorption` everywhere, the lower
 stratosphere absorbs a fraction that depends on latitude ϕ and season
 
-    lower_fraction * absorption * (1 + a_s * max(0, cos(α)) * sin(ϕ) + a_ϕ * (3/2 sin²(ϕ) - 1/2))
+    lower_fraction * absorption * (1 + a_s * max(0, -δ/|δₘₐₓ|) * sin(ϕ) + a_ϕ * (3/2 sin²(ϕ) - 1/2))
 
-with α the angle of the year, 0 at the northern winter solstice, `a_s = seasonal_amplitude`
-and `a_ϕ = latitudinal_amplitude`. More ozone absorption therefore in high latitudes and in
-the winter hemisphere during northern hemisphere winter. The absorbed flux is further multiplied
+with `a_s = seasonal_amplitude` and `a_ϕ = latitudinal_amplitude`. The seasonal cycle follows
+the solar declination δ of the solar zenith angle (`model.solar_zenith`) normalized by the
+planet's axial tilt δₘₐₓ, so it is synchronized with the orbit (`length_of_year`, `equinox`,
+`axial_tilt`, `seasonal_cycle`) of the planet. For Earth's sinusoidal declination
+`-δ/δₘₐₓ = cos(α)` with α the angle of the year from the northern winter solstice as in SPEEDY.
+More ozone absorption therefore in high latitudes and in the northern hemisphere during
+its winter half-year. The absorbed flux is further multiplied
 by the zenith angle correction factor of the shortwave transmissivity. The absorption is
 distributed on the model layers following their overlap with the σ-intervals
 [0, `σ_upper`] and [`σ_upper`, `σ_lower`]. Fields are
@@ -46,9 +50,6 @@ $(TYPEDFIELDS)"""
     "[OPTION] Amplitude of the equator-to-pole contrast of lower stratospheric ozone (SPEEDY coz2) [1]"
     @param latitudinal_amplitude::NF = 1.8 (bounds = Nonnegative,)
 
-    "[OPTION] Days from the northern winter solstice to Jan 1 for the phase of the seasonal cycle [days]"
-    solstice_offset::NF = 10
-
     "[OPTION] Lower σ boundary of the upper stratosphere [1]"
     σ_upper::NF = 0.05
 
@@ -65,20 +66,18 @@ variables(::SeasonalOzone) = (
 )
 
 """$(TYPEDSIGNATURES)
-Update the latitude- and season-dependent ozone absorption in the lower stratosphere.
-Uses the orbit time, or the initial time if the seasonal cycle of the solar zenith angle is disabled."""
+Update the latitude- and season-dependent ozone absorption in the lower stratosphere,
+with the seasonal cycle synchronized to the solar declination of `model.solar_zenith`."""
 function ozone_absorption!(vars, ozone::SeasonalOzone, model)
     field = vars.parameterizations.ozone_absorption_lower
     NF = eltype(field)
 
-    (; orbit_time) = vars.prognostic.clock
-    zenith = model.solar_zenith
-    seasonal_cycle = hasproperty(zenith, :seasonal_cycle) ? zenith.seasonal_cycle : true
-    time_of_year = seasonal_cycle ? orbit_time : zenith.initial_time[]
-
-    # angle of year, 0 at northern winter solstice
-    α = year_angle(NF, time_of_year) + NF(2π) * ozone.solstice_offset / 365
-    seasonal_term = ozone.seasonal_amplitude * max(0, cos(α))
+    # seasonal cycle synchronized with the solar declination δ, normalized by the axial tilt,
+    # 0 for the northern summer half-year, 1 at the northern winter solstice
+    δ = solar_declination(NF, model.solar_zenith, vars.prognostic.clock.orbit_time)
+    δₘₐₓ = abs(deg2rad(convert(NF, model.planet.axial_tilt)))
+    northern_winter = δₘₐₓ > 0 ? clamp(-δ / δₘₐₓ, 0, 1) : zero(NF)
+    seasonal_term = ozone.seasonal_amplitude * northern_winter
     lower = ozone.absorption * ozone.lower_fraction
 
     launch!(

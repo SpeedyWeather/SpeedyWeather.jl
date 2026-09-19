@@ -140,3 +140,26 @@ end
         end
     end
 end
+
+@testset "Ozone seasonal cycle synchronized with solar declination" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+
+    # ratio of lower stratospheric ozone absorption in the northernmost over southernmost ring
+    function north_south_ratio(time; kwargs...)
+        planet = Earth(spectral_grid; kwargs...)
+        model = PrimitiveWetModel(spectral_grid; planet, shortwave_radiation = TwoBandShortwave(spectral_grid))
+        simulation = initialize!(model; time)
+        vars = simulation.variables
+        SpeedyWeather.parameterization!(vars, model.shortwave_radiation, model)
+        lower = vars.parameterizations.ozone_absorption_lower
+        return lower[1] / lower[end]
+    end
+
+    @test north_south_ratio(DateTime(2000, 1, 1)) > 1                   # northern winter
+    @test north_south_ratio(DateTime(2000, 7, 1)) ≈ 1                   # northern summer, symmetric
+    @test north_south_ratio(DateTime(2000, 1, 1), axial_tilt = 0) ≈ 1   # no seasons without tilt
+    @test north_south_ratio(DateTime(2000, 1, 1), axial_tilt = -23.4) ≈ 1   # flipped seasons
+
+    # seasons follow the planet's equinox, shifted by half a year here
+    @test north_south_ratio(DateTime(2000, 7, 1), equinox = DateTime(2000, 9, 20)) > 1
+end

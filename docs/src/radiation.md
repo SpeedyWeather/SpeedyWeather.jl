@@ -256,11 +256,15 @@ The ozone absorption is a separate component, `SeasonalOzone` (default) or `NoOz
 
 ```math
 \Delta F^{O_3}_\text{upper} = \frac{1}{2}\epsilon \, \mu F_0, \quad
-\Delta F^{O_3}_\text{lower} = 0.4\epsilon \left(1 + \max(0, \cos\alpha)\sin\phi + 1.8 P_2(\sin\phi)\right) \mu F_0
+\Delta F^{O_3}_\text{lower} = 0.4\epsilon \left(1 + \max\left(0, -\frac{\delta}{|\delta_{\max}|}\right)\sin\phi + 1.8 P_2(\sin\phi)\right) \mu F_0
 ```
 
-with ``\epsilon = 0.02``, the angle of the year ``\alpha`` which is 0 at the northern winter solstice,
-latitude ``\phi`` and the second Legendre polynomial ``P_2(x) = (3x^2-1)/2``.
+with ``\epsilon = 0.02``, latitude ``\phi`` and the second Legendre polynomial ``P_2(x) = (3x^2-1)/2``.
+The seasonal cycle uses the solar declination ``\delta`` of the [solar zenith angle](@ref zenith)
+normalized by the planet's `axial_tilt` ``\delta_{\max}``, so it is synchronized with the planet's
+orbit (`length_of_year`, `equinox`, `axial_tilt`, `seasonal_cycle`). For Earth,
+``-\delta/\delta_{\max} = \cos\alpha`` with ``\alpha`` the angle of the year from the northern
+winter solstice as in SPEEDY.
 There is more ozone absorption towards the poles and in the northern hemisphere during its winter.
 The absorption is distributed across model layers by their overlap with these ``\sigma``-intervals.
 
