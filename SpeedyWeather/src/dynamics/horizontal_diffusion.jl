@@ -60,6 +60,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] linearly scale towards power_stratosphere above this σ"
     tapering_σ::NF = 0.2
 
+    "[OPTION] use the exact exponential (ETD1) instead of backward Euler for the implicit part"
+    exponential::Bool = false
+
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
     expl::MatrixType = zeros(NF, truncation + 1, nlayers)       # explicit part
     impl::MatrixType = ones(NF, truncation + 1, nlayers)        # implicit part
@@ -122,7 +125,8 @@ function initialize!(
         arch, ArrayWorkOrder, worksize, _initialize_hyperdiffusion_kernel!,
         ∇²ⁿ, ∇²ⁿ_implicit, ∇²ⁿ_div, ∇²ⁿ_div_implicit, σ_levels_full,
         truncation, NF(power), NF(power_stratosphere), NF(tapering_σ),
-        NF(time_scale), NF(time_scale_div), NF(Δt), NF(largest_eigenvalue)
+        NF(time_scale), NF(time_scale_div), NF(Δt), NF(largest_eigenvalue),
+        diffusion.exponential
     )
 
     return nothing
@@ -141,7 +145,8 @@ end
         time_scale,
         time_scale_div,
         Δt,
-        largest_eigenvalue
+        largest_eigenvalue,
+        exponential,
     )
     l_plus_1, k = @index(Global, NTuple)  # l+1 index (1-based), layer index
 
@@ -170,10 +175,33 @@ end
         ∇²ⁿ[l_plus_1, k] = @fastmath -eigenvalue_norm^power / time_scale
         ∇²ⁿ_div[l_plus_1, k] = @fastmath -eigenvalue_norm^p / time_scale_div
 
-        # and implicit part of the diffusion (= 1/(1-Δtν∇²ⁿ))
-        ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - Δt * ∇²ⁿ[l_plus_1, k])
-        ∇²ⁿ_div_implicit[l_plus_1, k] = 1 / (1 - Δt * ∇²ⁿ_div[l_plus_1, k])
+        # and implicit part of the diffusion, either backward Euler 1/(1-Δtν∇²ⁿ) or, for
+        # `exponential`, the exact φ₁(Δtν∇²ⁿ) making the whole step an exponential integrator
+        ∇²ⁿ_implicit[l_plus_1, k] = implicit_factor(Δt * ∇²ⁿ[l_plus_1, k], exponential)
+        ∇²ⁿ_div_implicit[l_plus_1, k] = implicit_factor(Δt * ∇²ⁿ_div[l_plus_1, k], exponential)
     end
+end
+
+"""$(TYPEDSIGNATURES)
+Implicit damping factor for the `(tendency + expl*var) * impl` form of the horizontal diffusion,
+followed by `var += Δt*tendency`. With `exponential = false` this is backward Euler, `1/(1-z)`,
+the [0/1] Padé approximant of `exp(z)`. With `exponential = true` it is `φ₁(z) = (exp(z)-1)/z`,
+which makes the combined step exact for the (diagonal, purely damping) diffusion operator:
+
+    var += Δt*(tendency + ∇²ⁿ*var)*φ₁(z)  ⟹  var*exp(z) + Δt*φ₁(z)*tendency
+
+i.e. ETD1. Verify with `tendency = 0`: `var*(1 + z*φ₁(z)) = var*exp(z)`."""
+@inline implicit_factor(z, exponential::Bool) = ifelse(exponential, φ₁(z), 1 / (1 - z))
+
+"""$(TYPEDSIGNATURES)
+The first order exponential integrator function `φ₁(z) = (exp(z)-1)/z` with `φ₁(0) = 1`.
+Evaluated by its series expansion `1 + z/2 + z²/6` for small `|z|` where the direct form
+suffers catastrophic cancellation (and division by zero at `z=0`)."""
+@inline function φ₁(z::NF) where {NF}
+    # cutoff where the 3-term series and the direct form are equally accurate, ~eps^(1/3)
+    return abs(z) < cbrt(eps(NF)) ?
+        1 + z * (NF(1 // 2) + z * NF(1 // 6)) :
+        expm1(z) / z
 end
 
 """$(TYPEDSIGNATURES)

@@ -1013,12 +1013,24 @@ function vorticity_flux_grid_tendencies!(
     (; whichring) = u_tend_grid.grid
 
     arch = architecture(u_tend_grid)
+
+    # 1 for Eulerian time steppers, 0 for semi-Lagrangian ones where the advection of
+    # absolute vorticity is done by the trajectory shift instead of this flux term.
+    advection = convert(eltype(u_tend_grid), advection_factor(time_stepping))
+
     launch!(
         architecture(u), RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
-        u_tend_grid, v_tend_grid, u, v, vor, f, scale, coslat⁻¹, whichring
+        u_tend_grid, v_tend_grid, u, v, vor, f, scale, coslat⁻¹, whichring, advection
     )
     return nothing
 end
+
+"""$(TYPEDSIGNATURES)
+Whether the vorticity flux term `(v, -u)(ζ+f)` contributes to the tendencies, as a multiplicative
+factor. Eulerian time steppers advect through this flux (factor 1); semi-Lagrangian time steppers
+advect by shifting the field to its departure points instead and switch the flux off (factor 0),
+which leaves `vorticity_flux_grid_tendencies!` computing only the `coslat⁻¹`-scaled forcing."""
+@inline advection_factor(::AbstractTimeStepper) = 1
 
 """$(TYPEDSIGNATURES)
 
@@ -1059,7 +1071,7 @@ function vorticity_flux_spectral_tendencies!(
 end
 
 @kernel inbounds = true function _vorticity_flux_kernel!(
-        u_tend_grid, v_tend_grid, u, v, vor, f, scale, coslat⁻¹, whichring
+        u_tend_grid, v_tend_grid, u, v, vor, f, scale, coslat⁻¹, whichring, advection
     )
     # Get indices
     ij, k = @index(Global, NTuple)
@@ -1072,9 +1084,10 @@ end
     # Calculate absolute vorticity, scale f as is vorticity too on the fly
     ω = vor[ij, k] + f_j
 
-    # Update tendencies
-    u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v[ij, k] * ω) * coslat⁻¹j
-    v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u[ij, k] * ω) * coslat⁻¹j
+    # Update tendencies, `advection` is 0 for semi-Lagrangian time steppers which
+    # advect by trajectory shift, leaving only the coslat⁻¹-scaled forcing here
+    u_tend_grid[ij, k] = (u_tend_grid[ij, k] + advection * v[ij, k] * ω) * coslat⁻¹j
+    v_tend_grid[ij, k] = (v_tend_grid[ij, k] - advection * u[ij, k] * ω) * coslat⁻¹j
 end
 
 """
