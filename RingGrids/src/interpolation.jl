@@ -207,7 +207,7 @@ Locator(::Type{<:AnvilInterpolator}) = AnvilLocator
 # generator with NF default based on geometry and locator
 function AnvilInterpolator(
         geometry::AbstractGridGeometry,
-        locator::AbstractLocator;
+        locator::AnvilLocator;
         NF = DEFAULT_NF
     )
     return AnvilInterpolator{NF, typeof(geometry), typeof(locator)}(geometry, locator)

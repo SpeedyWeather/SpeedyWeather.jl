@@ -179,21 +179,29 @@ end
     # cubic is the default, since bilinear-class interpolation damps the transported field
     # every time step (see RingGrids/test/interpolation_cubic.jl)
     default_stepper = SemiLagrangian(spectral_grid)
-    @test default_stepper.interpolator isa RingGrids.CubicInterpolator
+    @test default_stepper.Locator === RingGrids.CubicLocator
 
     # the trajectory only has to place the departure point, so it defaults to the cheap one:
     # the damping that matters accumulates on the transported field, not on the winds
-    @test default_stepper.trajectory_interpolator isa RingGrids.AnvilInterpolator
+    @test default_stepper.TrajectoryLocator === RingGrids.AnvilLocator
+
+    # the geometry is constant and stays in the model, the locators vary and live in Variables
+    @test default_stepper.geometry isa RingGrids.GridGeometry
+    @test !any(
+        f -> fieldtype(typeof(default_stepper), f) <: RingGrids.AbstractLocator,
+        fieldnames(typeof(default_stepper))
+    )
 
     for Interpolator in (RingGrids.CubicInterpolator, RingGrids.AnvilInterpolator)
         time_stepping = SemiLagrangian(spectral_grid; Interpolator)
-        @test time_stepping.interpolator isa Interpolator
+        @test time_stepping.Locator === RingGrids.Locator(Interpolator)
 
         model = BarotropicModel(
             spectral_grid; time_stepping,
             forcing = nothing, drag = nothing, random_process = nothing,
         )
         simulation = initialize!(model)
+        @test simulation.variables.dynamics.semi_lagrangian.locator isa RingGrids.Locator(Interpolator)
         set!(simulation, vorticity = (lon, lat, σ) -> 1.0e-5 * exp(-((lon - 180)^2 + lat^2) / 200))
         run!(simulation, period = Hour(6))
         @test all(isfinite, simulation.variables.grid.vorticity)
@@ -219,8 +227,13 @@ end
     # both interpolators are independently selectable
     for Interpolator in (C, A), TrajectoryInterpolator in (C, A)
         time_stepping = SemiLagrangian(spectral_grid; Interpolator, TrajectoryInterpolator)
-        @test time_stepping.interpolator isa Interpolator
-        @test time_stepping.trajectory_interpolator isa TrajectoryInterpolator
+        model = BarotropicModel(
+            spectral_grid; time_stepping,
+            forcing = nothing, drag = nothing, random_process = nothing,
+        )
+        sl = initialize!(model).variables.dynamics.semi_lagrangian
+        @test sl.locator isa RingGrids.Locator(Interpolator)
+        @test sl.trajectory_locator isa RingGrids.Locator(TrajectoryInterpolator)
     end
 
     # a cheap trajectory interpolator must not change the answer much: it only places the
@@ -239,4 +252,127 @@ end
         @test all(lon -> 0 <= lon < 360, departure_lond)
         @test all(lat -> -90 <= lat <= 90, departure_latd)
     end
+end
+
+@testset "SemiLagrangian: trajectory winds combine in a common frame" begin
+    # `u, v` are components in the *local* east/north frame. Averaging the arrival and departure
+    # winds componentwise is only valid where the two frames coincide; the mismatch is the
+    # meridian convergence and is O(1) next to the poles, where it made the fixed-point iteration
+    # diverge instead of converge. Both winds are therefore mapped to 3D Cartesian first.
+    cv = SpeedyWeather.cartesian_velocity
+
+    # a purely zonal wind at two points half a polar ring apart points in nearly opposite
+    # directions in 3D, even though both have the same (u, v) = (50, 0)
+    Va = cv(0.0, 89.0, 50.0, 0.0)
+    Vd = cv(180.0, 89.0, 50.0, 0.0)
+    @test Va[1] ≈ -Vd[1] atol = 1.0e-10
+    @test Va[2] ≈ -Vd[2] atol = 1.0e-10
+    # componentwise the mean would be (50, 0), in the common frame it is ~zero
+    @test maximum(abs, (Va .+ Vd) ./ 2) < 1.0e-10
+
+    # the Cartesian velocity is tangent to the sphere: V ⟂ r
+    for (lond, latd, u, v) in ((0.0, 0.0, 30.0, -20.0), (73.0, 89.5, -40.0, 10.0), (250.0, -60.0, 5.0, 5.0))
+        r = (cosd(latd) * cosd(lond), cosd(latd) * sind(lond), sind(latd))
+        V = cv(lond, latd, u, v)
+        @test abs(sum(V .* r)) < 1.0e-12
+        @test sqrt(sum(abs2, V)) ≈ sqrt(u^2 + v^2)        # and norm-preserving
+    end
+end
+
+@testset "SemiLagrangian: trajectory covers the full time step" begin
+    # x_d = x_a - Δt (V(x_a) + V(x_d))/2: the mean wind already carries the 1/2, so the
+    # displacement must be the full Δt. Halving it once made the scheme advect at half speed.
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 1)
+    time_stepping = SemiLagrangian(spectral_grid)
+    model = BarotropicModel(
+        spectral_grid; time_stepping,
+        forcing = nothing, drag = nothing, random_process = nothing,
+    )
+    simulation = initialize!(model)
+    vars = simulation.variables
+
+    # a uniform zonal wind: every trapezoidal iterate is exact, so the departure point is
+    # exactly one `displace` of -Δt away from the arrival point
+    U = 50.0f0
+    for step in (1, 2)
+        fill!(SpeedyWeather.field_view(vars.grid.u, :, 1, step).data, U)
+        fill!(SpeedyWeather.field_view(vars.grid.v, :, 1, step).data, 0)
+    end
+    SpeedyWeather.departure_points!(vars, time_stepping, model)
+
+    Δt_r = time_stepping.Δt_trajectory[]
+    sl = vars.dynamics.semi_lagrangian
+    londs, latds = model.geometry.londs, model.geometry.latds
+
+    # Compare in 3D to sidestep the longitude wrap. Restricted to |lat| <= 45˚: a uniform (u, v)
+    # is not a great-circle flow, so arrival and departure frames genuinely disagree, and the
+    # reference below is only exact where they coincide. The residual grows smoothly with
+    # latitude (9e-5 at 15˚, 2.7e-4 at 45˚, 7e-3 at the pole).
+    p(lond, latd) = (cosd(latd) * cosd(lond), cosd(latd) * sind(lond), sind(latd))
+    worst, halved = 0.0, 0.0
+    for ij in eachindex(londs)
+        abs(latds[ij]) <= 45 || continue
+        arrived = p(sl.departure_lond[ij], sl.departure_latd[ij])
+        worst = max(worst, maximum(abs, p(SpeedyWeather.displace(londs[ij], latds[ij], U, 0.0f0, -Δt_r)...) .- arrived))
+        halved = max(halved, maximum(abs, p(SpeedyWeather.displace(londs[ij], latds[ij], U, 0.0f0, -Δt_r / 2)...) .- arrived))
+    end
+    @test worst < 1.0e-3
+
+    # and the tolerance is tight enough to catch a trajectory of the wrong length
+    @test halved > 20 * worst
+end
+
+@testset "SemiLagrangian: previous wind is the previous step, not the current one" begin
+    # `move_prognostic_grid_variables_back!` has to run *before* the transforms overwrite the
+    # current grid step. Called afterwards it copies the new wind onto the previous one, so
+    # 3/2 uⁿ - 1/2 uⁿ⁻¹ silently collapses to uⁿ and the Rossby term becomes forward Euler.
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 1)
+    time_stepping = SemiLagrangian(spectral_grid)
+    model = BarotropicModel(
+        spectral_grid; time_stepping,
+        forcing = nothing, drag = nothing, random_process = nothing,
+    )
+    simulation = initialize!(model)
+    set!(simulation, vorticity = (lon, lat, σ) -> 1.0e-5 * exp(-((lon - 180)^2 + lat^2) / 200))
+    run!(simulation, period = Hour(6))
+
+    u = simulation.variables.grid.u
+    u_old = view(u.data, :, 1, 1)
+    u_new = view(u.data, :, 1, 2)
+    @test u_old != u_new                                    # the two steps must differ
+    @test maximum(abs, u_new .- u_old) > 1.0e-4 * maximum(abs, u_new)
+
+    # and the extrapolated wind must actually extrapolate, i.e. leave the 1-step interval
+    SpeedyWeather.extrapolate_winds!(simulation.variables, time_stepping, model)
+    sl = simulation.variables.dynamics.semi_lagrangian
+    @test maximum(abs, sl.u_star .- u_new) > 0
+end
+
+@testset "SemiLagrangian: Rossby waves do not amplify" begin
+    # The trajectory carries the Rossby term through f(x_d) - f(x_a), so the time level of the
+    # trajectory wind *is* the time discretisation of the Rossby wave. With the SETTLS
+    # extrapolation this is AB2-like and near-neutral; with the wind at tⁿ it is forward Euler
+    # and unconditionally unstable. Free decay of a small-amplitude m=2, n=3 mode, no forcing,
+    # no drag, negligible diffusion.
+    function amplification(; extrapolate_winds)
+        spectral_grid = SpectralGrid(truncation = 31, nlayers = 1)
+        time_stepping = SemiLagrangian(spectral_grid; extrapolate_winds)
+        model = BarotropicModel(
+            spectral_grid; time_stepping,
+            forcing = nothing, drag = nothing, random_process = nothing,
+            horizontal_diffusion = HyperDiffusion(spectral_grid, time_scale = Day(10000)),
+        )
+        simulation = initialize!(model)
+        set!(simulation, vorticity = (λ, φ, σ) -> 1.0e-6 * cosd(φ)^2 * sind(φ) * cosd(2λ))
+        e0 = Float64(sum(abs2, simulation.variables.prognostic.vorticity))
+        run!(simulation, period = Day(2))
+        e1 = Float64(sum(abs2, simulation.variables.prognostic.vorticity))
+        return sqrt(e1 / e0)
+    end
+
+    # over 2 days the wave must keep its amplitude to within a per cent
+    @test 0.99 < amplification(extrapolate_winds = true) < 1.01
+
+    # and the un-extrapolated variant is the forward-Euler case it is documented to be: unstable
+    @test amplification(extrapolate_winds = false) > 1.05
 end

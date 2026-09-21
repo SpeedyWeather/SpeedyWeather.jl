@@ -4,8 +4,8 @@ export SemiLagrangian
 
 Transport is done by shifting absolute vorticity `ζ+f` to the departure points of the backward
 trajectories (`dynamics/semi_lagrangian.jl`) rather than through the vorticity flux, removing the
-advective CFL restriction. The remaining terms are added as a forward Euler step on the transported state, using whatever
-`model.horizontal_diffusion` does for the damping:
+advective CFL restriction. The remaining terms are added as a forward Euler step on the transported
+state, using whatever `model.horizontal_diffusion` does for the damping:
 
     ζⁿ⁺¹ = ζ* + Δt (S + ∇²ⁿζ*) * impl,    ζ* = ζⁿ shifted to the departure points
 
@@ -15,22 +15,32 @@ component's business — with `HyperDiffusion(..., exponential=true)` the dampin
 stable and both are `O(Δt²)`-accurate, which is the same order as the Lie–Trotter splitting error
 between transport and diffusion, so neither is required by the scheme.
 
+`extrapolate_winds` is not optional in practice. The trajectory carries the Rossby term through
+`f(x_d) - f(x_a)`, so the time level of the trajectory wind is the time discretisation of the
+Rossby wave: with the wind at `tⁿ` this is forward Euler, which is unconditionally unstable for the
+oscillatory Rossby modes (measured amplification `1 + (ωΔt)²/2` per step). The `3/2 uⁿ - 1/2 uⁿ⁻¹`
+extrapolation centres the wind on `tⁿ⁺¹ᐟ²` and makes the scheme AB2-like, `1 + O((ωΔt)⁴)`.
+
 Only `BarotropicModel` is supported.
 $(TYPEDFIELDS)"""
-mutable struct SemiLagrangian{NF, S, B, MS, IP, TP} <: AbstractSemiLagrangian
+mutable struct SemiLagrangian{NF, S, B, MS, G, L, TL} <: AbstractSemiLagrangian
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
     "[OPTION] Adjust `Δt_at_T32` with the output `interval` to output exactly after integer time steps"
     adjust_with_output::B
 
-    """[OPTION] Fixed-point iterations for the backward trajectory, 2 is usually enough. The first
-    needs no interpolation (the first guess is the arrival point, where the wind is known), so
-    `n_iterations = 2` costs one locator update and two wind interpolations, not two of each."""
+    "[OPTION] Fixed-point iterations for the backward trajectory, 2 is usually enough"
     n_iterations::Int
 
-    "[OPTION] Extrapolate the trajectory wind in time as 3/2 uⁿ - 1/2 uⁿ⁻¹ (SETTLS-style)"
+    "[OPTION] Extrapolate the trajectory wind as 3/2 uⁿ - 1/2 uⁿ⁻¹, required for stability"
     extrapolate_winds::Bool
+
+    "[OPTION] Locator type for the transported field, e.g. `RingGrids.CubicLocator`"
+    Locator::L
+
+    "[OPTION] Locator type for the trajectory winds, e.g. `RingGrids.AnvilLocator`"
+    TrajectoryLocator::TL
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
     Δt_millisec::MS
@@ -41,16 +51,8 @@ mutable struct SemiLagrangian{NF, S, B, MS, IP, TP} <: AbstractSemiLagrangian
     "[DERIVED] Δt/radius [s/m], the great-circle angle per unit velocity, see `trajectory_time_step`"
     Δt_trajectory::Base.RefValue{NF}
 
-    """[DERIVED] Interpolator (grid geometry + locator) used to evaluate fields at departure points.
-    Defaults to `CubicInterpolator`; `AnvilInterpolator` is the cheaper but much more damping
-    alternative (11% amplitude loss over 100 repeated half-cell shifts against 0.1% for cubic)."""
-    interpolator::IP
-
-    """[DERIVED] Interpolator used for the winds during the backward trajectory. Only has to place
-    the departure point, so the cheap `AnvilInterpolator` is the default: interpolation damping
-    accumulates on the transported field, not on winds that are rebuilt from the spectral state
-    every step."""
-    trajectory_interpolator::TP
+    "[DERIVED] Interpolation geometry of the model grid, shared by both locators"
+    geometry::G
 end
 
 """$(TYPEDSIGNATURES)
@@ -69,21 +71,24 @@ function SemiLagrangian(
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
     Δt::NF = Δt_millisec.value / 1000
 
-    # one interpolation target per grid point: the departure point of the trajectory arriving there
-    npoints = RingGrids.get_npoints(grid)
-    interpolator = RingGrids.interpolator(grid, npoints; Interpolator, NF)
-    trajectory_interpolator = RingGrids.interpolator(grid, npoints; Interpolator = TrajectoryInterpolator, NF)
+    # the geometry is a property of the grid and constant in time, so it lives here; the locators
+    # are rewritten every time step and live in `Variables`, see `variables` below
+    geometry = RingGrids.GridGeometry(grid; NF)
+    Locator = RingGrids.Locator(Interpolator)
+    TrajectoryLocator = RingGrids.Locator(TrajectoryInterpolator)
 
-    return SemiLagrangian{NF, Second, Bool, Millisecond, typeof(interpolator), typeof(trajectory_interpolator)}(
+    return SemiLagrangian{NF, Second, Bool, Millisecond, typeof(geometry), typeof(Locator), typeof(TrajectoryLocator)}(
         Second(Δt_at_T32), adjust_with_output, n_iterations, extrapolate_winds,
-        Δt_millisec, Δt, Ref(zero(NF)), interpolator, trajectory_interpolator,
+        Locator, TrajectoryLocator, Δt_millisec, Δt, Ref(zero(NF)), geometry,
     )
 end
 
 function initialize!(L::SemiLagrangian, model::AbstractModel)
-    model isa Barotropic || throw(ArgumentError(
+    model isa Barotropic || throw(
+        ArgumentError(
             "SemiLagrangian time stepping is currently only implemented for BarotropicModel, got $(typeof(model))."
-        ))
+        )
+    )
 
     calculate_Δt!(L, model)
     L.Δt_trajectory[] = trajectory_time_step(L.Δt, model.planet.radius)
@@ -115,10 +120,23 @@ tendency_steps(::AbstractSemiLagrangian) = 1
 Work arrays for the departure point search and the trajectory shift. The departure point
 coordinates and the winds there are `Grid2D` and not bare vectors: there is exactly one departure
 point per grid point, so entry `ij` is the departure point of the trajectory *arriving* at grid
-cell `ij`. The arrival coordinates themselves are not stored, they are `model.geometry.londs/latds`."""
+cell `ij`. The arrival coordinates themselves are not stored, they are `model.geometry.londs/latds`.
+
+The two locators live here rather than in the time stepper because they are rewritten every time
+step, while the interpolation `geometry` they are used with is constant and stays in the stepper."""
 function variables(L::SemiLagrangian, model::AbstractModel)
     ns = :semi_lagrangian
+    # one interpolation target per grid point: the departure point of the trajectory arriving there
+    npoints = RingGrids.get_npoints(model.spectral_grid.grid)
     return (
+        DynamicsVariable(
+            :locator, LocatorDim{L.Locator}(npoints), namespace = ns,
+            desc = "Interpolation stencil on the departure points", units = "1"
+        ),
+        DynamicsVariable(
+            :trajectory_locator, LocatorDim{L.TrajectoryLocator}(npoints), namespace = ns,
+            desc = "Interpolation stencil for the trajectory winds", units = "1"
+        ),
         DynamicsVariable(:departure_lond, Grid2D(), namespace = ns, desc = "Departure point longitude", units = "˚E"),
         DynamicsVariable(:departure_latd, Grid2D(), namespace = ns, desc = "Departure point latitude", units = "˚N"),
         DynamicsVariable(:departure_u, Grid2D(), namespace = ns, desc = "Zonal wind at departure point", units = "m/s"),

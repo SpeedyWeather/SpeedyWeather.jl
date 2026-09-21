@@ -14,8 +14,24 @@ Scale a time step [s] for use in [`displace`](@ref): `u*Δt/radius` is the great
 trajectory_time_step(Δt, radius) = Δt / radius
 
 """$(TYPEDSIGNATURES)
-Displace a point at `(lond, latd)` [˚E, ˚N] by velocities `u, v` [m/s] over the scaled time step
-`Δt_over_radius` [s/m] from [`trajectory_time_step`](@ref), along a great circle.
+Velocities `u, v` [m/s] at `(lond, latd)` [˚E, ˚N] as a 3D Cartesian vector, tangent to the unit
+sphere by construction. `u, v` are components in the *local* east/north frame, which rotates from
+point to point, so two velocities at different points can only be combined (averaged, differenced)
+after mapping them into this common frame — see [`departure_points!`](@ref)."""
+@inline function cartesian_velocity(lond, latd, u, v)
+    sinλ, cosλ = sincos(deg2rad(lond))
+    sinφ, cosφ = sincos(deg2rad(latd))
+
+    # east = (-sinλ, cosλ, 0), north = (-sinφcosλ, -sinφsinλ, cosφ)
+    Vx = -u * sinλ - v * sinφ * cosλ
+    Vy = u * cosλ - v * sinφ * sinλ
+    Vz = v * cosφ
+    return Vx, Vy, Vz
+end
+
+"""$(TYPEDSIGNATURES)
+Displace a point at `(lond, latd)` [˚E, ˚N] by the 3D Cartesian velocity `V` [m/s] over the scaled
+time step `Δt_over_radius` [s/m] from [`trajectory_time_step`](@ref), along a great circle.
 
 Done in 3D Cartesian coordinates on the unit sphere rather than by incrementing longitude and
 latitude. The lat/lon form needs `dlon = u*Δt/(radius*cos(lat))`, which is singular at the poles:
@@ -25,19 +41,17 @@ bears no relation to the actual trajectory. The Cartesian form has no coordinate
 exact for solid-body rotation, and follows the great circle rather than a rhumb-like path.
 
 Backward trajectories are obtained by passing a negative `Δt_over_radius`."""
-@inline function displace(lond::NF, latd::NF, u, v, Δt_over_radius) where {NF}
+@inline function displace(lond::NF, latd::NF, Vx, Vy, Vz, Δt_over_radius) where {NF}
     sinλ, cosλ = sincos(deg2rad(lond))
     sinφ, cosφ = sincos(deg2rad(latd))
+    rx, ry, rz = cosφ * cosλ, cosφ * sinλ, sinφ     # position on the unit sphere
 
-    # position on the unit sphere and the local east/north unit vectors there
-    rx, ry, rz = cosφ * cosλ, cosφ * sinλ, sinφ
-    ex, ey = -sinλ, cosλ                        # east, ez = 0
-    nx, ny, nz = -sinφ * cosλ, -sinφ * sinλ, cosφ   # north
-
-    # velocity as a 3D vector, tangent to the sphere by construction
-    Vx = u * ex + v * nx
-    Vy = u * ey + v * ny
-    Vz = v * nz                                 # u * ez = 0
+    # remove any radial component: a mean of velocities tangent at two *different* points is not
+    # itself tangent at either, and the rotation below is only a rotation for V ⟂ r
+    Vr = Vx * rx + Vy * ry + Vz * rz
+    Vx -= Vr * rx
+    Vy -= Vr * ry
+    Vz -= Vr * rz
 
     speed = sqrt(Vx^2 + Vy^2 + Vz^2)
     α = speed * Δt_over_radius                  # great-circle angle swept [rad], signed
@@ -46,14 +60,22 @@ Backward trajectories are obtained by passing a negative `Δt_over_radius`."""
     #   r_new = r*cos(α) + V̂*sin(α),  V̂ = V/speed
     # `sin(α)/speed` is written out so the speed → 0 limit (= Δt_over_radius) stays finite
     scale = ifelse(speed > eps(NF), sin(α) / speed, Δt_over_radius)
-    dx = rx * cos(α) + Vx * scale
-    dy = ry * cos(α) + Vy * scale
-    dz = rz * cos(α) + Vz * scale
+    cosα = cos(α)
+    dx = rx * cosα + Vx * scale
+    dy = ry * cosα + Vy * scale
+    dz = rz * cosα + Vz * scale
 
     # back to degrees; asin puts latitude in [-90, 90] and the mod longitude in [0, 360)
     latd_new = rad2deg(asin(clamp(dz, -one(NF), one(NF))))
     lond_new = mod(rad2deg(atan(dy, dx)), 360)
     return lond_new, latd_new
+end
+
+"""$(TYPEDSIGNATURES)
+Displace a point by the local-frame velocities `u, v` [m/s], see [`cartesian_velocity`](@ref)."""
+@inline function displace(lond::NF, latd::NF, u, v, Δt_over_radius) where {NF}
+    Vx, Vy, Vz = cartesian_velocity(lond, latd, u, v)
+    return displace(lond, latd, Vx, Vy, Vz, Δt_over_radius)
 end
 
 """$(TYPEDSIGNATURES)
@@ -63,14 +85,19 @@ Solves `x_d = x_a - Δt/2 (u*(x_a) + u*(x_d))` (the trapezoidal, or "iterated ba
 trajectory) by fixed-point iteration, starting from `x_d = x_a`. `u*` is the wind extrapolated to
 the midpoint in time, see [`extrapolate_winds!`](@ref). Each iteration relocates the interpolation
 stencil (`update_locator!`) and interpolates `u*, v*` onto the current estimate of the departure
-points. The first guess needs no interpolation at all (the departure point starts at the arrival
-point, where the wind is already known) and the winds at the final departure points are never read,
-so the cost is `n_iterations - 1` locator updates plus `2*(n_iterations - 1)` interpolations — for
-the default `n_iterations = 2` that is one of each pair, not two.
+points. The two winds entering the mean are mapped to a common 3D Cartesian frame first, see
+[`cartesian_velocity`](@ref): `u, v` are components in the local east/north frame, and adding
+them across two different points is otherwise wrong by the meridian convergence — which grows
+towards the poles until the iteration diverges rather than converges.
 
-These use `trajectory_interpolator`, which only has to be accurate enough to place the departure
-point; the damping that matters accumulates on the transported field, interpolated once per step by
-`semi_lagrangian_transport!` with the more expensive `interpolator`.
+The first guess needs no interpolation at all (the departure point starts at the arrival point,
+where the wind is already known) and the winds at the final departure points are never read, so the
+cost is `n_iterations - 1` locator updates plus `2*(n_iterations - 1)` interpolations — for the
+default `n_iterations = 2` that is one of each pair, not two.
+
+These use `trajectory_locator`, which only has to be accurate enough to place the departure point;
+the damping that matters accumulates on the transported field, interpolated once per step by
+`semi_lagrangian_transport!` with the more expensive `locator`.
 
 The arrival points are the grid points, taken straight from `model.geometry`."""
 function departure_points!(
@@ -78,12 +105,12 @@ function departure_points!(
         time_stepping::AbstractSemiLagrangian,
         model::AbstractModel,
     )
-    (; locator, geometry) = time_stepping.trajectory_interpolator
-    (; n_iterations) = time_stepping
+    (; geometry, n_iterations) = time_stepping
     Δt_over_radius = time_stepping.Δt_trajectory[]
 
     sl = vars.dynamics.semi_lagrangian
     (; departure_lond, departure_latd, departure_u, departure_v, u_star, v_star) = sl
+    locator = sl.trajectory_locator
 
     # the (possibly time-extrapolated) wind that defines the trajectories
     extrapolate_winds!(vars, time_stepping, model)
@@ -94,8 +121,10 @@ function departure_points!(
     npoints = length(departure_lond)
 
     # First guess for the departure point is the arrival point, where the wind is just `u_star` at
-    # the grid point: interpolating there would be the identity. So seed the departure winds
-    # directly rather than paying a locator update and two interpolations to recompute them.
+    # the grid point: interpolating there would be the identity. So seed the departure point and
+    # the winds there directly rather than paying a locator update and two interpolations.
+    copyto!(departure_lond.data, arrival_lond)
+    copyto!(departure_latd.data, arrival_latd)
     copyto!(departure_u.data, u_star.data)
     copyto!(departure_v.data, v_star.data)
 
@@ -127,12 +156,24 @@ end
     )
     ij = @index(Global, Linear)
 
-    # trapezoidal rule: mean of the wind at the arrival and (current estimate of the) departure
-    # point. Backward in time, hence the minus sign folded into -Δt_over_radius/2.
-    u_mean = (u_arrival[ij] + departure_u[ij]) / 2
-    v_mean = (v_arrival[ij] + departure_v[ij]) / 2
+    lond_a, latd_a = arrival_lond[ij], arrival_latd[ij]
+    lond_d, latd_d = departure_lond[ij], departure_latd[ij]
 
-    lond, latd = displace(arrival_lond[ij], arrival_latd[ij], u_mean, v_mean, -Δt_over_radius / 2)
+    # trapezoidal rule: mean of the wind at the arrival and (current estimate of the) departure
+    # point. The two live in different local east/north frames, so they are mapped to a common
+    # 3D Cartesian frame before being averaged — adding the components directly is only valid if
+    # the frames coincide, and the mismatch is the meridian convergence, O(Δλ sinφ), which is
+    # small in midlatitudes but O(1) next to the poles where a trajectory spans a large Δλ.
+    Vax, Vay, Vaz = cartesian_velocity(lond_a, latd_a, u_arrival[ij], v_arrival[ij])
+    Vdx, Vdy, Vdz = cartesian_velocity(lond_d, latd_d, departure_u[ij], departure_v[ij])
+
+    Vx = (Vax + Vdx) / 2
+    Vy = (Vay + Vdy) / 2
+    Vz = (Vaz + Vdz) / 2
+
+    # the mean wind is already the 1/2 in x_d = x_a - Δt/2 (V(x_a) + V(x_d)), so the full time
+    # step is used here; backward in time, hence the minus sign
+    lond, latd = displace(lond_a, latd_a, Vx, Vy, Vz, -Δt_over_radius)
     departure_lond[ij] = lond
     departure_latd[ij] = latd
 end
@@ -140,8 +181,11 @@ end
 """$(TYPEDSIGNATURES)
 Fill `u_star, v_star` with the wind used to define the trajectories, extrapolated to the middle of
 the time step. With `extrapolate_winds = true` this is the SETTLS-style `3/2 uⁿ - 1/2 uⁿ⁻¹`, second
-order in time for a two-time-level scheme; otherwise just `uⁿ`, which is first order but avoids the
-weakly-stable extrapolation.
+order in time for a two-time-level scheme; otherwise just `uⁿ`, which is first order.
+
+This is not a free choice: the trajectory carries the Rossby term via `f(x_d) - f(x_a)`, so a wind
+at `tⁿ` makes that term forward Euler and hence unconditionally unstable. `extrapolate_winds =
+false` is a diagnostic only, it blows up within days at a 1 h time step.
 
 No special case for the first time step: `move_prognostic_grid_variables_back!` is called by the
 barotropic `transform!` with `initialize=true`, so `uⁿ⁻¹ = uⁿ` going into the first step and the
@@ -176,19 +220,20 @@ point, giving the transported relative vorticity `ζ*` on the grid. `f` is scale
 `vars.grid.vorticity` again before the closing `transform!` of the time step overwrites it from
 the new spectral state.
 
-`departure_points!` must have run first to fill the departure points; the field interpolator's own
+`departure_points!` must have run first to fill the departure points; the field locator's own
 stencil is located here, as it is generally a different (higher order) one than the trajectory's."""
 function semi_lagrangian_transport!(
         vars::Variables,
         time_stepping::AbstractSemiLagrangian,
         model::AbstractModel,
     )
-    (; locator, geometry) = time_stepping.interpolator
+    (; geometry) = time_stepping
     (; f) = model.coriolis
     scale = vars.prognostic.scale[]
 
     sl = vars.dynamics.semi_lagrangian
     vorticity_departure = sl.vorticity_departure
+    locator = sl.locator
 
     # locate the field stencil on the departure points found by `departure_points!`
     RingGrids.update_locator!(locator, geometry, sl.departure_lond.data, sl.departure_latd.data)

@@ -130,6 +130,91 @@ Base revision: 35d764b6a9029b32399bb536906ce17732de118d
   systematically worse.
 
 
+- **2026-09-21 (sixth review round).** milankl: *"can you double check that the great circle
+  calculation is correct? Because I still see velocities blow up towards the poles, negative
+  -500m/s near the north pole, 500m/s near the south pole, quickly growing there from 0 over 30
+  days"*, plus comments on the cubic locator storage, the interpolator constructor constraint,
+  where the interpolator should live, and field docstring length.
+
+  The great-circle calculation itself is correct — `displace` agrees with the independent
+  direct-geodesic formula to 1e-12 at every latitude except exactly ±90˚, where the local
+  east/north frame is undefined and the two conventions differ in longitude only. But the review
+  uncovered **three genuine bugs**, two of which were cancelling each other:
+
+  1. **Trajectory winds were averaged across mismatched frames.** `u, v` are components in the
+     *local* east/north frame. `_departure_point_kernel!` averaged the arrival and departure winds
+     componentwise, which is only valid where the two frames coincide. The mismatch is the
+     meridian convergence, O(Δλ sinφ) — negligible in midlatitudes, O(1) next to the poles, where
+     a trajectory spans a large Δλ. This made the fixed-point iteration *diverge*: at T31/30d the
+     polar ring-mean `u` was +218/-222 m/s at `n_iterations = 2` and -8800/+8766 at
+     `n_iterations = 4`. Both winds are now mapped to a common 3D Cartesian frame
+     (`cartesian_velocity`) before averaging, and `displace` projects the mean back onto the
+     tangent plane. This is the reported symptom.
+
+  2. **The trajectory was half the correct length.** The trapezoidal rule is
+     `x_d = x_a - Δt (V(x_a) + V(x_d))/2`. The kernel formed the mean `(V_a + V_d)/2` and then
+     *also* halved the time step, applying `Δt/4 (V_a + V_d)`. Measured against the exact
+     trajectory for a uniform wind, the departure points sat at a ratio of 0.5000 at every
+     latitude; the docstring already stated the correct formula.
+
+  3. **SETTLS was a silent no-op.** `move_prognostic_grid_variables_back!` was called at the *end*
+     of the barotropic `transform!`, after the current grid step had already been overwritten, so
+     step 1 was copied from the *new* state and `u_old == u_new`. `3/2 uⁿ - 1/2 uⁿ⁻¹` therefore
+     reduced to `uⁿ` exactly. It is now called before the transforms, and only afterwards on
+     `initialize`, where there is no previous step yet.
+
+  Bug 3 is why the scheme was unstable, and bug 2 was partly masking it by shortening every
+  trajectory. The mechanism: the trajectory carries the Rossby term through `f(x_d) - f(x_a)`, so
+  **the time level of the trajectory wind is the time discretisation of the Rossby wave**. With
+  the wind at `tⁿ` it is forward Euler, unconditionally unstable on the imaginary axis. Measured
+  amplification per step for a small-amplitude m=2, n=3 mode (free decay, no forcing, no drag,
+  negligible diffusion):
+
+  | Δt | measured, wind at tⁿ | `1 + (ωΔt)²/2` | measured, SETTLS |
+  |---|---|---|---|
+  | 60 min | 1.0038185 | 1.003827 | 1.0000468 |
+  | 30 min | 1.0009562 | 1.000957 | 1.0000049 |
+  | 15 min | 1.0002394 | 1.000239 | 1.0000007 |
+
+  The middle column uses ω = 2Ωm/(n(n+1)) = Ω/3 for this mode; forward Euler is confirmed to
+  within 3e-6. With SETTLS working, growth drops by 82x at 60 min and the scaling changes from
+  Δt² to ≈Δt⁴, the AB2-like behaviour the extrapolation is supposed to give. `extrapolate_winds`
+  is therefore not an optional refinement and is documented as such; `extrapolate_winds = false`
+  is a diagnostic that blows up within days.
+
+  End-to-end at T31, RMS wind over 60 days (`KolmogorovFlow` forcing + `LinearVorticityDrag`,
+  and an unforced free-decay control):
+
+  | | day 10 | day 20 | day 30 | day 40 | day 50 | day 60 |
+  |---|---|---|---|---|---|---|
+  | Leapfrog, forced | 17.4 | 21.9 | 24.8 | 27.4 | 29.3 | 30.6 |
+  | SL, forced (before) | 677 | 685 | 642 | 587 | 569 | 547 |
+  | SL, forced (after) | 14.3 | 18.5 | 21.4 | 22.3 | 22.6 | 24.7 |
+  | Leapfrog, free decay | 13.1 | 12.9 | 12.6 | 12.7 | 12.6 | 12.5 |
+  | SL, free decay (before) | 747 | 719 | 724 | 709 | 701 | 696 |
+  | SL, free decay (after) | 11.8 | 11.5 | 11.5 | 12.3 | 13.9 | 16.7 |
+
+  Polar ring-mean `u` at T31/30d is now -15.2/+12.3 m/s against Leapfrog's +2.1/-1.7, and global
+  max|u| 44.9 against Leapfrog's 54.1 — the semi-Lagrangian run is now quieter than the Eulerian
+  one rather than 8x louder. This also retracts the earlier hypothesis in this log that the
+  120-180min KE excess was SETTLS instability: SETTLS was never running, and the excess was the
+  forward-Euler Rossby term.
+
+  The four other review points:
+
+  - `CubicLocator.ijs`/`weights` are now `NSTENCIL_CUBIC x npoints_output` matrices rather than
+    flat vectors with a stride, so the kernel indexes `[s, k]` and each point's stencil is one
+    contiguous column. `RingGrids.extrema_in` was widened from `AbstractVector` to `AbstractArray`
+    for the bounds check.
+  - `CubicInterpolator(geometry, locator)` now requires a `CubicLocator`; `AnvilInterpolator` was
+    equally unconstrained and now requires an `AnvilLocator`.
+  - The locators moved from the time stepper into `Variables`, following the particle-advection
+    split: `geometry` is a property of the grid and constant, so it stays in the stepper, while
+    the locators are rewritten every step and are now `DynamicsVariable`s under the
+    `:semi_lagrangian` namespace. `LocatorDim` was generalised from hardcoding `AnvilLocator` and
+    `model.particle_advection.nparticles` to a type parameter and its own `n`.
+  - Field docstrings in `SemiLagrangian` reduced to one line each.
+
 ## Problem description
 
 Transport in SpeedyWeather is Eulerian and spectral. For `BarotropicModel`,
@@ -351,16 +436,25 @@ need a section, and `HyperDiffusion`'s new `exponential` option needs documentin
 
 ## Known limitations
 
-- **Interpolation order.** `AnvilInterpolator` is the only interpolator and is bilinear-class. SL
-  with bilinear interpolation is strongly damping, which is poor for a barotropic vorticity problem
-  where enstrophy conservation is the point. This is expected to dominate the error budget and is the
-  most likely follow-up work item.
+- **Rossby waves are only weakly damped, not neutral.** With SETTLS the trajectory wind makes the
+  Rossby term AB2-like, which is still weakly unstable on the imaginary axis: amplification
+  1 + 4.7e-5 per step at Δt = 60 min against forward Euler's 1 + 3.8e-3. Hyperdiffusion absorbs it
+  at the resolutions tested, but free decay does creep up over 60 days (11.8 -> 16.7 m/s RMS at
+  T31 against Leapfrog's 13.1 -> 12.5). A genuinely centred trajectory wind would need a
+  predictor-corrector pass — recompute `u` from the provisional `ζⁿ⁺¹`, average with `uⁿ`, redo
+  the trajectory — at roughly double the cost per step. Not attempted here.
+- **`extrapolate_winds = false` is unstable**, not a cheaper first-order option. It is kept as a
+  diagnostic and documented as such.
 - **Not conservative.** SL is not conservative, and the grid↔spectral round trip adds to the drift.
 - **Tracers remain Eulerian.** `tracer_advection!` is untouched, so tracers still use the spectral
   flux form and keep their CFL limit. Inconsistent with the vorticity transport; deliberate for a
   first pass.
 - **Cost.** `update_locator!` over `npoints(grid)` points every iteration of every step, plus one
-  extra grid→spectral transform, are real costs the Eulerian core does not pay. Unmeasured.
+  extra grid→spectral transform, are real costs the Eulerian core does not pay. Measured at T128:
+  1.09x Eulerian throughput at a 4x longer time step, see the fifth revision log entry.
+- **Stencil memory.** `CubicLocator` stores 16 indices and 16 weights per output point, ~7.7 MB at
+  T128. Leaner layouts are possible (the four ring offsets and one Δ per ring would do) at the
+  cost of recomputing the Lagrange weights inside the interpolation kernel.
 - **Barotropic only.** `ShallowWater` and `PrimitiveEquation` fall back to their existing steppers;
   constructing them with `SemiLagrangian` is not supported.
 - **No GPU verification.** Kernels are written with `KernelAbstractions` and should be device-

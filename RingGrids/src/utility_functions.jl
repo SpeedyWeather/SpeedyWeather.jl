@@ -1,6 +1,7 @@
 """$(TYPEDSIGNATURES)
-For every element vᵢ in v does a<=vi<=b hold?"""
-function extrema_in(v::AbstractVector, a::Real, b::Real)
+For every element vᵢ in v does a<=vi<=b hold? Any array shape, as locators may store their
+stencil indices as a matrix of one column per interpolation point."""
+function extrema_in(v::AbstractArray, a::Real, b::Real)
     vmin, vmax = extrema(v)
     return (vmin >= a) && (vmax <= b)
 end

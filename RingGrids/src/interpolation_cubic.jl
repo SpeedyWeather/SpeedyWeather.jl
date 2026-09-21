@@ -23,13 +23,15 @@ gracefully to quadratic and then linear rather than extrapolating."""
 export CubicInterpolator
 
 """Contains the 16-point stencil and its weights for [`CubicInterpolator`](@ref).
-The stencil is stored flat with stride `NSTENCIL_CUBIC`: entry `s` of output point `k` lives at
-`(k-1)*NSTENCIL_CUBIC + s`. Slot `s = 4(r-1) + p` is longitude point `p ∈ 1:4` on ring slot
-`r ∈ 1:4`, where ring slot `r` is grid ring `js + r - 2`.
+The stencil is stored as `NSTENCIL_CUBIC × npoints_output`, so column `k` is the whole stencil of
+output point `k` and is contiguous. Row `s = 4(r-1) + p` is longitude point `p ∈ 1:4` on ring slot
+`r ∈ 1:4`, where ring slot `r` is grid ring `js[k] + r - 2`.
 $(TYPEDFIELDS)"""
 @kwdef struct CubicLocator{
         VectorType,
         VectorIntType,
+        MatrixType,
+        MatrixIntType,
         IntType,
     } <: AbstractLocator
 
@@ -42,11 +44,29 @@ $(TYPEDFIELDS)"""
     "distance fractions between rings j and j+1, as for every ring-based locator"
     Δys::VectorType = zero(VectorType(undef, npoints_output))
 
-    "flat indices ij of the 16 stencil points, 0 = north pole, -1 = south pole"
-    ijs::VectorIntType = zeros(Int, NSTENCIL_CUBIC * npoints_output)
+    "grid indices ij of the stencil points, 0 = north pole, -1 = south pole"
+    ijs::MatrixIntType = zeros(Int, NSTENCIL_CUBIC, npoints_output)
 
-    "combined latitude*longitude weight of each of the 16 stencil points, summing to 1"
-    weights::VectorType = zero(VectorType(undef, NSTENCIL_CUBIC * npoints_output))
+    "combined latitude*longitude weight of each stencil point, every column summing to 1"
+    weights::MatrixType = zero(MatrixType(undef, NSTENCIL_CUBIC, npoints_output))
+end
+
+"""$(TYPEDSIGNATURES)
+Zero generator for `CubicLocator`, as the generic `AbstractLocator` one but with the 2D arrays
+for the stencil. Use `update_locator!` to fill in the indices and weights."""
+function (::Type{CubicLocator})(
+        NF::Type{<:AbstractFloat},
+        npoints::Integer;
+        architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE(),
+    )
+    VectorType = array_type(architecture, NF, 1)
+    VectorIntType = array_type(architecture, Int, 1)
+    MatrixType = array_type(architecture, NF, 2)
+    MatrixIntType = array_type(architecture, Int, 2)
+
+    return CubicLocator{VectorType, VectorIntType, MatrixType, MatrixIntType, typeof(npoints)}(
+        ; npoints_output = npoints
+    )
 end
 
 """4 longitude points on each of 4 rings."""
@@ -102,7 +122,7 @@ end
 # generator with NF default based on geometry and locator, mirroring AnvilInterpolator
 function CubicInterpolator(
         geometry::AbstractGridGeometry,
-        locator::AbstractLocator;
+        locator::CubicLocator;
         NF = DEFAULT_NF
     )
     return CubicInterpolator{NF, typeof(geometry), typeof(locator)}(geometry, locator)
@@ -156,8 +176,8 @@ point every time step, so this is the hot path."""
 end
 
 """$(TYPEDSIGNATURES)
-Write one ring slot's 4 stencil entries: indices into `ijs` and weights into `weights` at offset
-`off`. `jr` is the ring number, `wlat` its latitude weight. Rings outside `[1, nlat]` are the poles
+Write one ring slot's 4 stencil entries into rows `off+1:off+4` of column `k` of `ijs`/`weights`.
+`jr` is the ring number, `wlat` its latitude weight. Rings outside `[1, nlat]` are the poles
 and carry a single value, flagged 0 (north) / -1 (south) with the whole latitude weight on the
 first entry.
 
@@ -165,21 +185,21 @@ The longitude wrap is done with `ifelse` rather than `mod`, which would be an in
 stencil point (16 per grid point per time step). `i0 ∈ [0, nlon)` so a single conditional add or
 subtract is enough, given `nlon >= 4`."""
 @inline function write_ring_stencil!(
-        ijs, weights, off, jr, wlat, λ,
+        ijs, weights, off, k, jr, wlat, λ,
         lon_offsets, nlons, ring_starts, nlat,
     )
     NF = eltype(weights)
 
     if (jr < 1) | (jr > nlat)
         pole = ifelse(jr < 1, 0, -1)
-        ijs[off + 1] = pole
-        ijs[off + 2] = pole
-        ijs[off + 3] = pole
-        ijs[off + 4] = pole
-        weights[off + 1] = wlat
-        weights[off + 2] = zero(NF)
-        weights[off + 3] = zero(NF)
-        weights[off + 4] = zero(NF)
+        ijs[off + 1, k] = pole
+        ijs[off + 2, k] = pole
+        ijs[off + 3, k] = pole
+        ijs[off + 4, k] = pole
+        weights[off + 1, k] = wlat
+        weights[off + 2, k] = zero(NF)
+        weights[off + 3, k] = zero(NF)
+        weights[off + 4, k] = zero(NF)
     else
         nlon = nlons[jr]
         start = ring_starts[jr]
@@ -191,14 +211,14 @@ subtract is enough, given `nlon >= 4`."""
         ip = i0 + 1; ip = ifelse(ip >= nlon, ip - nlon, ip)
         iq = i0 + 2; iq = ifelse(iq >= nlon, iq - nlon, iq)
 
-        ijs[off + 1] = start + im
-        ijs[off + 2] = start + i0
-        ijs[off + 3] = start + ip
-        ijs[off + 4] = start + iq
-        weights[off + 1] = wlat * c1
-        weights[off + 2] = wlat * c2
-        weights[off + 3] = wlat * c3
-        weights[off + 4] = wlat * c4
+        ijs[off + 1, k] = start + im
+        ijs[off + 2, k] = start + i0
+        ijs[off + 3, k] = start + ip
+        ijs[off + 4, k] = start + iq
+        weights[off + 1, k] = wlat * c1
+        weights[off + 2, k] = wlat * c2
+        weights[off + 3, k] = wlat * c3
+        weights[off + 4, k] = wlat * c4
     end
     return nothing
 end
@@ -266,11 +286,10 @@ end
 
     w1, w2, w3, w4 = lagrange_weights_4(θ, y1, y2, y3, y4, v1, true, true, v4)
 
-    base = (k - 1) * NSTENCIL_CUBIC
-    write_ring_stencil!(ijs, weights, base, j - 1, w1, λ, lon_offsets, nlons, ring_starts, nlat)
-    write_ring_stencil!(ijs, weights, base + 4, j, w2, λ, lon_offsets, nlons, ring_starts, nlat)
-    write_ring_stencil!(ijs, weights, base + 8, j + 1, w3, λ, lon_offsets, nlons, ring_starts, nlat)
-    write_ring_stencil!(ijs, weights, base + 12, j + 2, w4, λ, lon_offsets, nlons, ring_starts, nlat)
+    write_ring_stencil!(ijs, weights, 0, k, j - 1, w1, λ, lon_offsets, nlons, ring_starts, nlat)
+    write_ring_stencil!(ijs, weights, 4, k, j, w2, λ, lon_offsets, nlons, ring_starts, nlat)
+    write_ring_stencil!(ijs, weights, 8, k, j + 1, w3, λ, lon_offsets, nlons, ring_starts, nlat)
+    write_ring_stencil!(ijs, weights, 12, k, j + 2, w4, λ, lon_offsets, nlons, ring_starts, nlat)
 end
 
 # the actual interpolation: a plain 16-term weighted sum
@@ -308,18 +327,17 @@ end
     )
     k = @index(Global, Linear)
 
-    base = (k - 1) * NSTENCIL_CUBIC
     sum = zero(eltype(Aout))
 
     for s in 1:NSTENCIL_CUBIC
-        ij = ijs[base + s]
+        ij = ijs[s, k]
         # 0 and -1 are the pole flags, see CubicLocator; clamp keeps the read in bounds so the
         # branch does not have to guard the indexing itself
         value = ifelse(
             ij == 0, A_northpole,
             ifelse(ij == -1, A_southpole, A[max(ij, 1)])
         )
-        sum += weights[base + s] * value
+        sum += weights[s, k] * value
     end
 
     Aout[k] = sum
