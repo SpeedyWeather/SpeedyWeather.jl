@@ -4,40 +4,40 @@ export SemiLagrangian
 
 Transport is done by shifting absolute vorticity `ζ+f` to the departure points of the backward
 trajectories (`dynamics/semi_lagrangian.jl`) rather than through the vorticity flux, removing the
-advective CFL restriction. The remaining terms are integrated as an exponential integrator (ETD1):
-sources explicitly, hyperdiffusion exactly through `φ₁`. One step is
+advective CFL restriction. The remaining terms are added as a forward Euler step on the transported state, using whatever
+`model.horizontal_diffusion` does for the damping:
 
-    ζⁿ⁺¹ = exp(z) ζ* + Δt φ₁(z) S,    z = Δt∇²ⁿ,  ζ* = ζⁿ shifted to the departure points
+    ζⁿ⁺¹ = ζ* + Δt (S + ∇²ⁿζ*) * impl,    ζ* = ζⁿ shifted to the departure points
 
-with `S` the source tendency (curl of the forcing, drag). This is a Lie–Trotter split of two
-operators each handled exactly; the splitting error is `O(Δt²)` as the two do not commute.
+with `S` the source tendency (curl of the forcing, drag). Diffusion is entirely the diffusion
+component's business — with `HyperDiffusion(..., exponential=true)` the damping factor is the exact
+`exp(Δt∇²ⁿ)` and this becomes ETD1, with the default backward Euler it is `1/(1-Δt∇²ⁿ)`. Both are
+stable and both are `O(Δt²)`-accurate, which is the same order as the Lie–Trotter splitting error
+between transport and diffusion, so neither is required by the scheme.
 
 Only `BarotropicModel` is supported.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct SemiLagrangian{NF, S, B, MS, IP} <: AbstractSemiLagrangian
+mutable struct SemiLagrangian{NF, S, B, MS, IP} <: AbstractSemiLagrangian
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
-    Δt_at_T32::S = Minute(60)       # larger than Leapfrog's default: no advective CFL limit
+    Δt_at_T32::S
 
     "[OPTION] Adjust `Δt_at_T32` with the output `interval` to output exactly after integer time steps"
-    adjust_with_output::B = true
+    adjust_with_output::B
 
     "[OPTION] Fixed-point iterations for the backward trajectory, 2 is usually enough"
-    n_iterations::Int = 2
+    n_iterations::Int
 
     "[OPTION] Extrapolate the trajectory wind in time as 3/2 uⁿ - 1/2 uⁿ⁻¹ (SETTLS-style)"
-    extrapolate_winds::Bool = true
-
-    "[OPTION] Use the exact exponential (ETD1) for hyperdiffusion, set on `model.horizontal_diffusion`"
-    exponential_diffusion::Bool = true
+    extrapolate_winds::Bool
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
-    Δt_millisec::MS = Millisecond(0)
+    Δt_millisec::MS
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt::NF = 0
+    Δt::NF
 
-    "[DERIVED] Δt scaled to convert [m/s] into [˚], see `trajectory_time_step`"
-    Δt_trajectory::Base.RefValue{NF} = Ref(zero(NF))
+    "[DERIVED] Δt/radius [s/m], the great-circle angle per unit velocity, see `trajectory_time_step`"
+    Δt_trajectory::Base.RefValue{NF}
 
     "[DERIVED] Interpolator (grid geometry + locator) used to evaluate fields at departure points"
     interpolator::IP
@@ -45,21 +45,26 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator function for `SemiLagrangian` using `spectral_grid` for resolution."""
-function SemiLagrangian(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, grid) = spectral_grid
+function SemiLagrangian(
+        spectral_grid::SpectralGrid;
+        Δt_at_T32 = Minute(60),         # larger than Leapfrog's default: no advective CFL limit
+        adjust_with_output = true,
+        n_iterations = 2,
+        extrapolate_winds = true,
+    )
+    (; NF, truncation, grid) = spectral_grid
+
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
+    Δt::NF = Δt_millisec.value / 1000
 
     # one interpolation target per grid point: the departure point of the trajectory arriving there
     npoints = RingGrids.get_npoints(grid)
     interpolator = RingGrids.AnvilInterpolator(grid, npoints; NF)
 
-    L = SemiLagrangian{NF, Second, Bool, Millisecond, typeof(interpolator)}(; interpolator, kwargs...)
-
-    # Δt_at_T32 may have come in as any Period, calculate_Δt! fills the derived fields properly
-    L.Δt_millisec = get_Δt_millisec(
-        Second(L.Δt_at_T32), spectral_grid.truncation, DEFAULT_RADIUS, L.adjust_with_output
+    return SemiLagrangian{NF, Second, Bool, Millisecond, typeof(interpolator)}(
+        Second(Δt_at_T32), adjust_with_output, n_iterations, extrapolate_winds,
+        Δt_millisec, Δt, Ref(zero(NF)), interpolator,
     )
-    L.Δt = L.Δt_millisec.value / 1000
-    return L
 end
 
 function initialize!(L::SemiLagrangian, model::AbstractModel)
@@ -69,14 +74,6 @@ function initialize!(L::SemiLagrangian, model::AbstractModel)
 
     calculate_Δt!(L, model)
     L.Δt_trajectory[] = trajectory_time_step(L.Δt, model.planet.radius)
-
-    # The ETD1 update below is only exact for the diffusion if `impl` holds φ₁ rather than the
-    # backward-Euler factor. `initialize!(model.time_stepping, ...)` runs before
-    # `initialize!(model.horizontal_diffusion, ...)` in `initialize!(::Barotropic)`, so setting
-    # the flag here still takes effect when the diffusion arrays are precomputed.
-    if L.exponential_diffusion && hasproperty(model.horizontal_diffusion, :exponential)
-        model.horizontal_diffusion.exponential = true
-    end
     return nothing
 end
 
@@ -137,8 +134,7 @@ One semi-Lagrangian time step for the barotropic model.
 
 The ordering matters: `semi_lagrangian_transport!` writes the transported state `ζ*` into
 `vars.prognostic.vorticity` *before* `horizontal_diffusion!` reads it, so the diffusion's
-`(tendency + expl*var)*impl` form picks up the already-transported field and the closing Euler
-update becomes exactly `ζⁿ⁺¹ = exp(z)ζ* + Δt φ₁(z) S`."""
+`(tendency + expl*var)*impl` form picks up the already-transported field rather than the old one."""
 function time_step!(
         vars::Variables,
         time_stepping::AbstractSemiLagrangian,
@@ -162,7 +158,7 @@ function time_step!(
         vars.scratch.transform_memory, model.spectral_transform
     )
 
-    # DIFFUSION + SOURCES, as an ETD1 step on the transported state
+    # DIFFUSION + SOURCES on the transported state
     horizontal_diffusion!(vars, model)
     update_prognostic!(vars, model)
 
@@ -173,7 +169,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Forward Euler on the spectral state. Correct here because the transport is already baked into the
-state by the trajectory shift and the diffusion into `φ₁` by `horizontal_diffusion!`."""
+state by the trajectory shift and the damping into the tendency by `horizontal_diffusion!`."""
 function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,

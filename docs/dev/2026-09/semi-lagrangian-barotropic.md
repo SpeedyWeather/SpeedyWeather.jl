@@ -55,6 +55,36 @@ Base revision: 35d764b6a9029b32399bb536906ce17732de118d
   `HyperDiffusion` (agreed it is generally better, but it changes results for every existing
   simulation so it wants its own PR), and turning `f` into a `Field` instead of a latitude vector
   (agreed, but it touches `Coriolis` everywhere — see Future work).
+- **2026-09-21** (second review round):
+  - **Trajectories moved to 3D Cartesian great circles.** The lat/lon form needs
+    `dlon = u*Δt/(radius*cos(lat))`, singular at the poles. On T128 the outermost ring is at
+    89.28˚N where `cos(lat) = 0.0125`, so a 50 m/s wind over a 45 min step gave a **97˚ longitude
+    jump in one step** — the departure point near the poles was meaningless. The Cartesian form has
+    no coordinate singularity and is exact for solid-body rotation.
+  - **Diffusion fully decoupled from the time stepper.** `SemiLagrangian` no longer has an
+    `exponential_diffusion` option and no longer mutates `model.horizontal_diffusion`. ETD1 is a
+    property of the diffusion component, not of the scheme: the Lie–Trotter splitting error between
+    transport and diffusion is `O(Δt²)`, the same order as the difference between `φ₁(z)` and
+    `1/(1-z)`, so making the damping factor exact improves a constant, not the order. The earlier
+    framing ("ETD1 needs `exponential=true`") overstated it.
+  - `@kwdef` reverted to a plain mutable struct plus generator, matching the other time steppers.
+
+  Measured at T128, 30 days, default `KolmogorovFlow` forcing (statistical steady state, so these
+  reflect the forcing/dissipation balance rather than pure decay, but the forcing is identical):
+
+  | configuration | enstrophy | KE |
+  |---|---|---|
+  | Eulerian `NCycleLorenz` 30min | 4.055e-5 | 2.851e7 |
+  | SL 60min, default diffusion | 3.582e-5 | 2.354e7 |
+  | SL 60min, `time_scale=Hour(100)` | 3.742e-5 | 2.494e7 |
+  | SL 60min, `n_iterations=4` | 3.854e-5 | 2.493e7 |
+  | SL 180min, default diffusion | 2.764e-5 | 6.506e7 |
+
+  Two things to read off: weakening the diffusion 25× recovers only ~4% of enstrophy, confirming
+  the damping is the interpolation and not the diffusion; and `n_iterations=4` recovers ~7%, so
+  trajectory error contributes more than expected. The 180min KE is 2.3× the Eulerian value, which
+  looks like the SETTLS extrapolation going unstable at long steps — to be checked with
+  `extrapolate_winds=false`.
 
 ## Problem description
 

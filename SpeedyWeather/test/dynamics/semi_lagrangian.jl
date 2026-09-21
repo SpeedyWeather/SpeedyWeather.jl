@@ -45,18 +45,44 @@ end
     # zero velocity leaves a point where it is
     @test all(displace(120.0f0, 30.0f0, 0.0f0, 0.0f0, 1.0f0) .≈ (120.0f0, 30.0f0))
 
-    # Δt_deg converts [m/s] to [˚]: u*Δt/radius*180/π
+    # eastward at the equator: the great-circle angle is u*Δt/radius
     radius = 6.371e6
-    Δt_deg = Float32(SpeedyWeather.trajectory_time_step(3600.0, radius))
+    Δt_r = Float32(SpeedyWeather.trajectory_time_step(3600.0, radius))
     u = 10.0f0      # m/s eastward for an hour at the equator
 
-    lond, latd = displace(0.0f0, 0.0f0, u, 0.0f0, Δt_deg)
+    lond, latd = displace(0.0f0, 0.0f0, u, 0.0f0, Δt_r)
     @test latd ≈ 0 atol = 1.0f-5
     @test lond ≈ Float32(u * 3600 / radius * 180 / π) rtol = 1.0f-4
 
     # longitudes wrap into [0, 360)
-    lond, latd = displace(359.0f0, 0.0f0, 1000.0f0, 0.0f0, Δt_deg)
+    lond, latd = displace(359.0f0, 0.0f0, 1000.0f0, 0.0f0, Δt_r)
     @test 0 <= lond < 360
+
+    # NO POLE SINGULARITY. The lat/lon form needs dlon = u*Δt/(radius*cos(lat)), which blows up
+    # at high latitude: at 89.28˚N (T128 outermost ring) cos(lat) = 0.0125, so a 50 m/s wind over
+    # 45 min would give a 97˚ longitude jump. The Cartesian form must stay on the sphere.
+    Δt_45min = Float32(SpeedyWeather.trajectory_time_step(2700.0, radius))
+    lond, latd = displace(0.0f0, 89.28f0, 50.0f0, 0.0f0, Δt_45min)
+    @test -90 <= latd <= 90
+    @test 0 <= lond < 360
+    # a purely zonal wind at 89.28˚N sweeps a great circle, which *must* carry it over the pole
+    # rather than around a latitude circle; either way the displacement is bounded by u*Δt/radius
+    angular_distance = acosd(
+        clamp(
+            sind(89.28f0) * sind(latd) + cosd(89.28f0) * cosd(latd) * cosd(lond - 0.0f0),
+            -1.0f0, 1.0f0
+        )
+    )
+    @test angular_distance ≈ rad2deg(50 * 2700 / radius) rtol = 1.0f-3
+
+    # Exact round trip along the equator, where a zonal wind stays zonal and the local east
+    # vector is parallel-transported, so (u, v) mean the same thing at both ends. Away from the
+    # equator the local frame rotates along the path, so a round trip with the *same* (u, v)
+    # components is not expected to close exactly — that is geometry, not an error.
+    lon1, lat1 = displace(35.0f0, 0.0f0, 30.0f0, 0.0f0, Δt_45min)
+    lon0, lat0 = displace(lon1, lat1, 30.0f0, 0.0f0, -Δt_45min)
+    @test lon0 ≈ 35.0f0 atol = 1.0f-4
+    @test lat0 ≈ 0.0f0 atol = 1.0f-4
 end
 
 @testset "SemiLagrangian: step structure" begin
@@ -82,8 +108,9 @@ end
     # departure points are grid fields, one per arrival grid cell
     @test vars.dynamics.semi_lagrangian.departure_lond isa RingGrids.AbstractField
 
-    # opted into the exponential diffusion
-    @test model.horizontal_diffusion.exponential
+    # the time stepper must NOT reach into the diffusion component: that choice belongs to
+    # HyperDiffusion alone, and SemiLagrangian works with either damping factor
+    @test model.horizontal_diffusion.exponential == false
 end
 
 @testset "SemiLagrangian: barotropic model runs" begin

@@ -9,26 +9,51 @@ trajectory integration, and shifting absolute vorticity onto them via `RingGrids
 The time stepper that drives it lives in `time_stepping/steppers/semi_lagrangian.jl`."""
 
 """$(TYPEDSIGNATURES)
-Convert a velocity in [m/s] and a time step in [s] into an angular displacement in [˚] on a
-planet of `radius` [m]: `u*Δt` is a distance in [m], `/radius` makes it an angle in [rad],
-`*180/π` converts to degrees. Stored on the time stepper so kernels take a single scalar."""
-trajectory_time_step(Δt, radius) = Δt / radius * (180 / π)
+Scale a time step [s] for use in [`displace`](@ref): `u*Δt/radius` is the great-circle angle
+[rad] a point at velocity `u` [m/s] sweeps in time `Δt` on a planet of `radius` [m]."""
+trajectory_time_step(Δt, radius) = Δt / radius
 
 """$(TYPEDSIGNATURES)
 Displace a point at `(lond, latd)` [˚E, ˚N] by velocities `u, v` [m/s] over the scaled time step
-`Δt_deg` [˚*s/m] from [`trajectory_time_step`](@ref). Goes through `Particle` to reuse its tested
-pole-crossing logic in `move` (crossing a pole flips the longitude by 180˚) and the `mod` wrapping
-back into [0, 360˚E), [-90, 90˚N]. `Particle` is `isbits` and `move`/`mod` are `@inline`, so the
-round trip compiles away entirely (0 allocations, inferred `Tuple{NF, NF}`)."""
-@inline function displace(lond::NF, latd::NF, u, v, Δt_deg) where {NF}
-    dlat = v * Δt_deg
+`Δt_over_radius` [s/m] from [`trajectory_time_step`](@ref), along a great circle.
 
-    # TODO: `cos(deg2rad(...))` rather than `cosd` to match `advect_2D`, see JuliaGPU/AMDGPU.jl#1041
-    coslat = max(cos(deg2rad(latd)), eps(NF))   # prevents division by zero at the poles
-    dlon = u * Δt_deg / coslat
+Done in 3D Cartesian coordinates on the unit sphere rather than by incrementing longitude and
+latitude. The lat/lon form needs `dlon = u*Δt/(radius*cos(lat))`, which is singular at the poles:
+on an octahedral Gaussian T128 grid the outermost ring sits at 89.28˚N where `cos(lat) = 0.0125`,
+so a 50 m/s wind over a 45 min step gives a 97˚ longitude jump — a straight line in (lon, lat) that
+bears no relation to the actual trajectory. The Cartesian form has no coordinate singularity, is
+exact for solid-body rotation, and follows the great circle rather than a rhumb-like path.
 
-    particle = mod(move(Particle{NF}(lond, latd), dlon, dlat))
-    return particle.lon, particle.lat
+Backward trajectories are obtained by passing a negative `Δt_over_radius`."""
+@inline function displace(lond::NF, latd::NF, u, v, Δt_over_radius) where {NF}
+    sinλ, cosλ = sincos(deg2rad(lond))
+    sinφ, cosφ = sincos(deg2rad(latd))
+
+    # position on the unit sphere and the local east/north unit vectors there
+    rx, ry, rz = cosφ * cosλ, cosφ * sinλ, sinφ
+    ex, ey = -sinλ, cosλ                        # east, ez = 0
+    nx, ny, nz = -sinφ * cosλ, -sinφ * sinλ, cosφ   # north
+
+    # velocity as a 3D vector, tangent to the sphere by construction
+    Vx = u * ex + v * nx
+    Vy = u * ey + v * ny
+    Vz = v * nz                                 # u * ez = 0
+
+    speed = sqrt(Vx^2 + Vy^2 + Vz^2)
+    α = speed * Δt_over_radius                  # great-circle angle swept [rad], signed
+
+    # rotate r by α along the great circle spanned by r and V:
+    #   r_new = r*cos(α) + V̂*sin(α),  V̂ = V/speed
+    # `sin(α)/speed` is written out so the speed → 0 limit (= Δt_over_radius) stays finite
+    scale = ifelse(speed > eps(NF), sin(α) / speed, Δt_over_radius)
+    dx = rx * cos(α) + Vx * scale
+    dy = ry * cos(α) + Vy * scale
+    dz = rz * cos(α) + Vz * scale
+
+    # back to degrees; asin puts latitude in [-90, 90] and the mod longitude in [0, 360)
+    latd_new = rad2deg(asin(clamp(dz, -one(NF), one(NF))))
+    lond_new = mod(rad2deg(atan(dy, dx)), 360)
+    return lond_new, latd_new
 end
 
 """$(TYPEDSIGNATURES)
@@ -48,7 +73,7 @@ function departure_points!(
     )
     (; locator, geometry) = time_stepping.interpolator
     (; n_iterations) = time_stepping
-    Δt_deg = time_stepping.Δt_trajectory[]
+    Δt_over_radius = time_stepping.Δt_trajectory[]
 
     sl = vars.dynamics.semi_lagrangian
     (; departure_lond, departure_latd, departure_u, departure_v, u_star, v_star) = sl
@@ -77,7 +102,7 @@ function departure_points!(
         launch!(
             arch, LinearWorkOrder, (npoints,), _departure_point_kernel!,
             departure_lond.data, departure_latd.data, arrival_lond, arrival_latd,
-            u_star.data, v_star.data, departure_u.data, departure_v.data, Δt_deg
+            u_star.data, v_star.data, departure_u.data, departure_v.data, Δt_over_radius
         )
     end
     return nothing
@@ -85,16 +110,16 @@ end
 
 @kernel inbounds = true function _departure_point_kernel!(
         departure_lond, departure_latd, @Const(arrival_lond), @Const(arrival_latd),
-        @Const(u_arrival), @Const(v_arrival), @Const(departure_u), @Const(departure_v), Δt_deg
+        @Const(u_arrival), @Const(v_arrival), @Const(departure_u), @Const(departure_v), Δt_over_radius
     )
     ij = @index(Global, Linear)
 
     # trapezoidal rule: mean of the wind at the arrival and (current estimate of the) departure
-    # point. Backward in time, hence the minus sign folded into -Δt_deg/2.
+    # point. Backward in time, hence the minus sign folded into -Δt_over_radius/2.
     u_mean = (u_arrival[ij] + departure_u[ij]) / 2
     v_mean = (v_arrival[ij] + departure_v[ij]) / 2
 
-    lond, latd = displace(arrival_lond[ij], arrival_latd[ij], u_mean, v_mean, -Δt_deg / 2)
+    lond, latd = displace(arrival_lond[ij], arrival_latd[ij], u_mean, v_mean, -Δt_over_radius / 2)
     departure_lond[ij] = lond
     departure_latd[ij] = latd
 end
