@@ -85,6 +85,19 @@ Base revision: 35d764b6a9029b32399bb536906ce17732de118d
   trajectory error contributes more than expected. The 180min KE is 2.3× the Eulerian value, which
   looks like the SETTLS extrapolation going unstable at long steps — to be checked with
   `extrapolate_winds=false`.
+- **2026-09-21** (third round): added `CubicInterpolator` to RingGrids and made the interpolation
+  machinery interpolator-flexible. Measured in isolation on an octahedral Gaussian grid, shifting a
+  smooth field by a third of a grid cell 100 times (what semi-Lagrangian does every step):
+  bilinear-class `AnvilInterpolator` retains **88.7%** of the amplitude, `CubicInterpolator`
+  **99.87%**. Off-grid RMS error on a smooth field is 114x lower. `SemiLagrangian` now takes an
+  `Interpolator` keyword and defaults to cubic.
+
+  Flexibility fixes needed to get there: `find_grid_indices!` claimed `::AbstractLocator` but
+  destructured Anvil-specific fields, so it now dispatches on the concrete locator; the
+  `Interpolator(grid, npoints)` constructor is generic over `AbstractInterpolator` via `Locator(I)`
+  and `nonparametric_type`; and the `AbstractLocator` contract (`npoints_output`, `js`, `Δys` filled
+  generically by `find_rings!`, everything else the locator's own business) is now documented.
+
 
 ## Problem description
 

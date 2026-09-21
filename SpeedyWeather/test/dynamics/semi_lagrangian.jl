@@ -172,3 +172,26 @@ end
     # the Particle round trip in `displace` must not allocate, it runs per grid point per iteration
     @test Base.return_types(SpeedyWeather.displace, NTuple{5, Float32}) == [Tuple{Float32, Float32}]
 end
+
+@testset "SemiLagrangian: interpolator is selectable" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 1)
+
+    # cubic is the default, since bilinear-class interpolation damps the transported field
+    # every time step (see RingGrids/test/interpolation_cubic.jl)
+    default_stepper = SemiLagrangian(spectral_grid)
+    @test default_stepper.interpolator isa RingGrids.CubicInterpolator
+
+    for Interpolator in (RingGrids.CubicInterpolator, RingGrids.AnvilInterpolator)
+        time_stepping = SemiLagrangian(spectral_grid; Interpolator)
+        @test time_stepping.interpolator isa Interpolator
+
+        model = BarotropicModel(
+            spectral_grid; time_stepping,
+            forcing = nothing, drag = nothing, random_process = nothing,
+        )
+        simulation = initialize!(model)
+        set!(simulation, vorticity = (lon, lat, σ) -> 1.0e-5 * exp(-((lon - 180)^2 + lat^2) / 200))
+        run!(simulation, period = Hour(6))
+        @test all(isfinite, simulation.variables.grid.vorticity)
+    end
+end

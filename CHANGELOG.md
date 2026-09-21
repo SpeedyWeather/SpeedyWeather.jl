@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `CubicInterpolator`, a 16-point cubic interpolator for RingGrids, and interpolator-flexible interpolation machinery [#1266](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1266)
 - Semi-Lagrangian time stepping for the barotropic model, and an exponential (ETD1) option for hyperdiffusion [#1266](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1266)
 - CI with Julia v1.13 [#1258](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1258)
 - Vertical interpolation from the model's (sigma or hybrid) levels onto pressure levels, CPU/GPU, with interpolation linear in p or log(p) and configurable extrapolation [#1256](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1256)

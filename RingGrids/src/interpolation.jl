@@ -77,8 +77,19 @@ end
 Base.show(io::IO, G::GridGeometry) = print(io, "GridGeometry for $(G.grid)")
 
 """Supertype of every Locator, which locates the indices on a grid to be used to perform an
-interpolation. E.g. AnvilLocator uses a 4-point stencil for every new coordinate to interpolate
-onto. Higher order stencils can be implemented by defining OtherLocator <: AbstractLocactor."""
+interpolation. E.g. `AnvilLocator` uses a 4-point stencil for every new coordinate to interpolate
+onto, `CubicLocator` a 16-point one. Higher order stencils can be implemented by defining
+`OtherLocator <: AbstractLocator`.
+
+Every ring-based locator must provide
+
+- `npoints_output`, the number of points interpolated onto,
+- `js`, the ring index `j` with the point's latitude in `[latd[j], latd[j+1])`, and
+- `Δys`, the fractional distance between those two rings,
+
+as these are filled generically by [`find_rings!`](@ref). Everything else — which grid points the
+stencil reads and with which weights — is the locator's own business, filled by its
+[`find_grid_indices!`](@ref) method and consumed by its [`_interpolate!`](@ref) method."""
 abstract type AbstractLocator end
 
 """Contains arrays that locates grid points of a given field to be uses in an interpolation
@@ -202,18 +213,24 @@ function AnvilInterpolator(
     return AnvilInterpolator{NF, typeof(geometry), typeof(locator)}(geometry, locator)
 end
 
-# generator from grid and npoints
-function AnvilInterpolator(
+# generator from grid and npoints, generic over the interpolator: the matching locator comes
+# from `Locator(I)` and every interpolator is parameterised as I{NF, Geometry, Locator}
+function (::Type{I})(
         grid::AbstractGrid,
         npoints::Integer;       # number of points to interpolate onto
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
-    )
+    ) where {I <: AbstractInterpolator}
     geometry = GridGeometry(grid; NF)        # general coordinates and indices for grid
-    locator = AnvilLocator(NF, npoints; architecture = grid.architecture)  # preallocate work arrays for interpolation
+    locator = Locator(I)(NF, npoints; architecture = grid.architecture)  # preallocate work arrays
 
     # assemble geometry and locator to interpolator
-    return AnvilInterpolator(geometry, locator; NF)
+    return nonparametric_type(I){NF, typeof(geometry), typeof(locator)}(geometry, locator)
 end
+
+"""$(TYPEDSIGNATURES)
+The unparameterised type of an interpolator, e.g. `AnvilInterpolator` for
+`AnvilInterpolator{Float32, ...}`, so that generic constructors can re-parameterise it."""
+nonparametric_type(::Type{<:AnvilInterpolator}) = AnvilInterpolator
 
 # generator that allocates a grid from Grid and nlat_half, TODO needed?
 function (::Type{I})(
@@ -635,13 +652,19 @@ end
 end
 
 find_grid_indices!(
-    I::AnvilInterpolator,        # update indices arrays
+    I::AbstractInterpolator,     # update indices arrays
     λs::AbstractArray,           # based on new longitudes λ
     architecture::AbstractArchitecture = architecture(λs)
 ) = find_grid_indices!(I.locator, I.geometry, λs, architecture)
 
+"""$(TYPEDSIGNATURES)
+Fill the longitude-dependent part of a locator's stencil: which grid points to read and with
+which weights. Dispatches on the concrete locator, as the stencil shape is exactly what
+distinguishes one interpolator from another. Together with [`find_rings!`](@ref), which fills the
+`js`/`Δys` every ring-based locator is required to have, this is what [`update_locator!`](@ref)
+calls. Implement this (and [`_interpolate!`](@ref)) to add a new interpolator."""
 function find_grid_indices!(
-        locator::AbstractLocator,   # update indices arrays
+        locator::AnvilLocator,      # update indices arrays
         geometry::AbstractGridGeometry,
         λs::AbstractArray,           # based on new longitudes λ
         architecture::AbstractArchitecture = architecture(λs)

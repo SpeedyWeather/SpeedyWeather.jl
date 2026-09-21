@@ -125,6 +125,7 @@ export AbstractInterpolator,
     AbstractLocator,
     AnvilLocator,
     AnvilInterpolator,
+    CubicInterpolator,
     DEFAULT_INTERPOLATOR
 
 export interpolate,
@@ -177,6 +178,7 @@ include("grids/octaminimal_gaussian.jl")
 # INTEGRATION AND INTERPOLATION
 include("quadrature_weights.jl")
 include("interpolation.jl")
+include("interpolation_cubic.jl")
 include("vertices.jl")
 include("statistics.jl")
 include("copy_unmasked.jl")
