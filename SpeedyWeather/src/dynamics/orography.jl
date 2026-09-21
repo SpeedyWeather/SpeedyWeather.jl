@@ -228,6 +228,7 @@ function initialize!(
     )
 
     orography_highres = on_architecture(S.architecture, field)
+    synchronize(S.architecture)
 
     # Interpolate/coarsen to desired resolution
     interpolate!(orography, orography_highres)
