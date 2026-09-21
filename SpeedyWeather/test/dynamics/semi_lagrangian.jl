@@ -181,6 +181,10 @@ end
     default_stepper = SemiLagrangian(spectral_grid)
     @test default_stepper.interpolator isa RingGrids.CubicInterpolator
 
+    # the trajectory only has to place the departure point, so it defaults to the cheap one:
+    # the damping that matters accumulates on the transported field, not on the winds
+    @test default_stepper.trajectory_interpolator isa RingGrids.AnvilInterpolator
+
     for Interpolator in (RingGrids.CubicInterpolator, RingGrids.AnvilInterpolator)
         time_stepping = SemiLagrangian(spectral_grid; Interpolator)
         @test time_stepping.interpolator isa Interpolator
@@ -193,5 +197,46 @@ end
         set!(simulation, vorticity = (lon, lat, σ) -> 1.0e-5 * exp(-((lon - 180)^2 + lat^2) / 200))
         run!(simulation, period = Hour(6))
         @test all(isfinite, simulation.variables.grid.vorticity)
+    end
+end
+
+@testset "SemiLagrangian: trajectory interpolator and iteration count" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 1)
+    C, A = RingGrids.CubicInterpolator, RingGrids.AnvilInterpolator
+
+    function run6h(; kwargs...)
+        time_stepping = SemiLagrangian(spectral_grid; kwargs...)
+        model = BarotropicModel(
+            spectral_grid; time_stepping,
+            forcing = nothing, drag = nothing, random_process = nothing,
+        )
+        simulation = initialize!(model)
+        set!(simulation, vorticity = (lon, lat, σ) -> 1.0e-5 * exp(-((lon - 180)^2 + lat^2) / 200))
+        run!(simulation, period = Hour(6))
+        return simulation.variables
+    end
+
+    # both interpolators are independently selectable
+    for Interpolator in (C, A), TrajectoryInterpolator in (C, A)
+        time_stepping = SemiLagrangian(spectral_grid; Interpolator, TrajectoryInterpolator)
+        @test time_stepping.interpolator isa Interpolator
+        @test time_stepping.trajectory_interpolator isa TrajectoryInterpolator
+    end
+
+    # a cheap trajectory interpolator must not change the answer much: it only places the
+    # departure point, and the winds are rebuilt from the spectral state every step anyway
+    vars_cheap = run6h(Interpolator = C, TrajectoryInterpolator = A)
+    vars_full = run6h(Interpolator = C, TrajectoryInterpolator = C)
+    @test maximum(abs, vars_cheap.grid.vorticity .- vars_full.grid.vorticity) <
+        0.05 * maximum(abs, vars_full.grid.vorticity)
+
+    # the trajectory loop skips the redundant first interpolation (departure = arrival, where the
+    # wind is already known), so n_iterations = 1 is a valid Euler-backward trajectory
+    for n_iterations in (1, 2, 4)
+        vars = run6h(; n_iterations)
+        @test all(isfinite, vars.grid.vorticity)
+        (; departure_lond, departure_latd) = vars.dynamics.semi_lagrangian
+        @test all(lon -> 0 <= lon < 360, departure_lond)
+        @test all(lat -> -90 <= lat <= 90, departure_latd)
     end
 end

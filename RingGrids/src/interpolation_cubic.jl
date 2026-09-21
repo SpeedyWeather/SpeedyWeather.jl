@@ -125,28 +125,82 @@ sum to 1."""
 end
 
 """$(TYPEDSIGNATURES)
-Lagrange basis weight of node `i` among up to four nodes `y1..y4` evaluated at `y`, with `valid`
-flagging which nodes take part. Nodes that are flagged out are skipped in both the numerator and
-the denominator, so the weights over the remaining nodes still sum to 1 and the interpolation
-degrades from cubic to quadratic to linear near the poles instead of extrapolating.
+All four latitude Lagrange weights at `y` over nodes `y1..y4`, with `v1..v4` flagging which nodes
+take part. Invalid nodes are skipped in both numerator and denominator (their factors are replaced
+by 1 and their own weight set to 0), so the weights over the remaining nodes still sum to 1 and the
+interpolation degrades cubic → quadratic → linear near the poles instead of extrapolating.
 
-Written branch-free over the four nodes so it compiles for GPU."""
-@inline function lagrange_weight(
-        y, i::Integer,
-        y1, y2, y3, y4,
-        v1::Bool, v2::Bool, v3::Bool, v4::Bool,
+Computed in one pass: 4 divisions and a handful of `ifelse`, rather than calling a per-node helper
+that re-selects its node with nested `ifelse` chains. `find_grid_indices!` runs over every grid
+point every time step, so this is the hot path."""
+@inline function lagrange_weights_4(y, y1, y2, y3, y4, v1::Bool, v2::Bool, v3::Bool, v4::Bool)
+    one_ = one(y)
+
+    # distances to the target, neutralised to 1 for nodes that do not take part
+    d1 = ifelse(v1, y - y1, one_)
+    d2 = ifelse(v2, y - y2, one_)
+    d3 = ifelse(v3, y - y3, one_)
+    d4 = ifelse(v4, y - y4, one_)
+
+    # node separations, likewise neutralised (never zero for valid pairs: ring latitudes differ)
+    a12 = ifelse(v2, y1 - y2, one_); a13 = ifelse(v3, y1 - y3, one_); a14 = ifelse(v4, y1 - y4, one_)
+    a21 = ifelse(v1, y2 - y1, one_); a23 = ifelse(v3, y2 - y3, one_); a24 = ifelse(v4, y2 - y4, one_)
+    a31 = ifelse(v1, y3 - y1, one_); a32 = ifelse(v2, y3 - y2, one_); a34 = ifelse(v4, y3 - y4, one_)
+    a41 = ifelse(v1, y4 - y1, one_); a42 = ifelse(v2, y4 - y2, one_); a43 = ifelse(v3, y4 - y3, one_)
+
+    w1 = ifelse(v1, (d2 * d3 * d4) / (a12 * a13 * a14), zero(y))
+    w2 = ifelse(v2, (d1 * d3 * d4) / (a21 * a23 * a24), zero(y))
+    w3 = ifelse(v3, (d1 * d2 * d4) / (a31 * a32 * a34), zero(y))
+    w4 = ifelse(v4, (d1 * d2 * d3) / (a41 * a42 * a43), zero(y))
+    return w1, w2, w3, w4
+end
+
+"""$(TYPEDSIGNATURES)
+Write one ring slot's 4 stencil entries: indices into `ijs` and weights into `weights` at offset
+`off`. `jr` is the ring number, `wlat` its latitude weight. Rings outside `[1, nlat]` are the poles
+and carry a single value, flagged 0 (north) / -1 (south) with the whole latitude weight on the
+first entry.
+
+The longitude wrap is done with `ifelse` rather than `mod`, which would be an integer division per
+stencil point (16 per grid point per time step). `i0 ∈ [0, nlon)` so a single conditional add or
+subtract is enough, given `nlon >= 4`."""
+@inline function write_ring_stencil!(
+        ijs, weights, off, jr, wlat, λ,
+        lon_offsets, nlons, ring_starts, nlat,
     )
-    yi = ifelse(i == 1, y1, ifelse(i == 2, y2, ifelse(i == 3, y3, y4)))
-    vi = ifelse(i == 1, v1, ifelse(i == 2, v2, ifelse(i == 3, v3, v4)))
-    w = one(y)
+    NF = eltype(weights)
 
-    # multiply in (y - ym)/(yi - ym) for every other valid node m
-    w *= ifelse(v1 & (i != 1), (y - y1) / (yi - y1), one(y))
-    w *= ifelse(v2 & (i != 2), (y - y2) / (yi - y2), one(y))
-    w *= ifelse(v3 & (i != 3), (y - y3) / (yi - y3), one(y))
-    w *= ifelse(v4 & (i != 4), (y - y4) / (yi - y4), one(y))
+    if (jr < 1) | (jr > nlat)
+        pole = ifelse(jr < 1, 0, -1)
+        ijs[off + 1] = pole
+        ijs[off + 2] = pole
+        ijs[off + 3] = pole
+        ijs[off + 4] = pole
+        weights[off + 1] = wlat
+        weights[off + 2] = zero(NF)
+        weights[off + 3] = zero(NF)
+        weights[off + 4] = zero(NF)
+    else
+        nlon = nlons[jr]
+        start = ring_starts[jr]
+        i_a, _, Δ = find_lon_indices(λ, lon_offsets[jr], nlon)
+        c1, c2, c3, c4 = cubic_lagrange_weights(NF(Δ))
 
-    return ifelse(vi, w, zero(y))
+        i0 = i_a - 1                     # 0-based in-ring index of stencil offset 0, ∈ [0, nlon)
+        im = i0 - 1; im = ifelse(im < 0, im + nlon, im)
+        ip = i0 + 1; ip = ifelse(ip >= nlon, ip - nlon, ip)
+        iq = i0 + 2; iq = ifelse(iq >= nlon, iq - nlon, iq)
+
+        ijs[off + 1] = start + im
+        ijs[off + 2] = start + i0
+        ijs[off + 3] = start + ip
+        ijs[off + 4] = start + iq
+        weights[off + 1] = wlat * c1
+        weights[off + 2] = wlat * c2
+        weights[off + 3] = wlat * c3
+        weights[off + 4] = wlat * c4
+    end
+    return nothing
 end
 
 function find_grid_indices!(
@@ -192,64 +246,31 @@ end
 
     j = js[k]           # θ ∈ [latd[j], latd[j+1]) in ring numbering, 0 = north of ring 1
     λ = λs[k]
-    NF = eltype(weights)
 
     # Reconstruct the target latitude from the ring fraction. `latd` includes the poles, so ring r
     # has latitude latd[r+1], and find_rings! defined Δy = (latd[j] - θ)/(latd[j] - latd[j+1]).
     θ = latd[j + 1] + Δys[k] * (latd[j + 2] - latd[j + 1])
 
     # THE FOUR RING SLOTS j-1, j, j+1, j+2. Ring 0 is the north pole and ring nlat+1 the south
-    # pole, both carrying the ring-average value; anything outside [0, nlat+1] is unusable.
-    j1 = j - 1
-    j2 = j
-    j3 = j + 1
-    j4 = j + 2
-
-    v1 = (j1 >= 0) & (j1 <= nlat + 1)
-    v2 = (j2 >= 0) & (j2 <= nlat + 1)
-    v3 = (j3 >= 0) & (j3 <= nlat + 1)
-    v4 = (j4 >= 0) & (j4 <= nlat + 1)
+    # pole, both carrying the ring-average value. With j ∈ [0, nlat] the middle two slots are
+    # always in [0, nlat+1] and only the outer two can fall off the end.
+    v1 = j >= 1
+    v4 = j <= nlat - 1
 
     # latitudes of the four slots, clamped so the reads stay in bounds (invalid slots carry
     # weight 0 anyway, but the index still has to be legal)
-    y1 = latd[clamp(j1 + 1, 1, nlat + 2)]
-    y2 = latd[clamp(j2 + 1, 1, nlat + 2)]
-    y3 = latd[clamp(j3 + 1, 1, nlat + 2)]
-    y4 = latd[clamp(j4 + 1, 1, nlat + 2)]
+    y1 = latd[clamp(j, 1, nlat + 2)]
+    y2 = latd[j + 1]
+    y3 = latd[j + 2]
+    y4 = latd[clamp(j + 3, 1, nlat + 2)]
+
+    w1, w2, w3, w4 = lagrange_weights_4(θ, y1, y2, y3, y4, v1, true, true, v4)
 
     base = (k - 1) * NSTENCIL_CUBIC
-
-    for r in 1:4
-        jr = j + r - 2                       # ring number of this slot
-        wlat = lagrange_weight(θ, r, y1, y2, y3, y4, v1, v2, v3, v4)
-
-        if (jr < 1) | (jr > nlat)
-            # pole slot (or invalid): a single value, so all of the latitude weight goes on the
-            # first stencil entry with the pole flag index, the other three are switched off.
-            # 0 flags the north pole, -1 the south, matching AnvilLocator's convention.
-            pole_flag = ifelse(jr < 1, 0, -1)
-            for p in 1:4
-                ijs[base + 4 * (r - 1) + p] = pole_flag
-                weights[base + 4 * (r - 1) + p] = ifelse(p == 1, wlat, zero(NF))
-            end
-        else
-            # real ring: 4 consecutive longitude points, cubic Lagrange on uniform spacing
-            i_a, _, Δ = find_lon_indices(λ, lon_offsets[jr], nlons[jr])
-            w0, w1, w2, w3 = cubic_lagrange_weights(NF(Δ))
-
-            nlon = nlons[jr]
-            start = ring_starts[jr]
-            i0 = i_a - 1                     # 0-based in-ring index of stencil offset 0
-
-            for p in 1:4
-                # offsets -1, 0, 1, 2 around i0, wrapped periodically around the ring
-                i = mod(i0 + p - 2, nlon)
-                ijs[base + 4 * (r - 1) + p] = start + i
-                w = ifelse(p == 1, w0, ifelse(p == 2, w1, ifelse(p == 3, w2, w3)))
-                weights[base + 4 * (r - 1) + p] = wlat * w
-            end
-        end
-    end
+    write_ring_stencil!(ijs, weights, base, j - 1, w1, λ, lon_offsets, nlons, ring_starts, nlat)
+    write_ring_stencil!(ijs, weights, base + 4, j, w2, λ, lon_offsets, nlons, ring_starts, nlat)
+    write_ring_stencil!(ijs, weights, base + 8, j + 1, w3, λ, lon_offsets, nlons, ring_starts, nlat)
+    write_ring_stencil!(ijs, weights, base + 12, j + 2, w4, λ, lon_offsets, nlons, ring_starts, nlat)
 end
 
 # the actual interpolation: a plain 16-term weighted sum

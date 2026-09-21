@@ -63,7 +63,14 @@ Solves `x_d = x_a - Δt/2 (u*(x_a) + u*(x_d))` (the trapezoidal, or "iterated ba
 trajectory) by fixed-point iteration, starting from `x_d = x_a`. `u*` is the wind extrapolated to
 the midpoint in time, see [`extrapolate_winds!`](@ref). Each iteration relocates the interpolation
 stencil (`update_locator!`) and interpolates `u*, v*` onto the current estimate of the departure
-points, so the cost is `n_iterations` locator updates plus `2*n_iterations` interpolations.
+points. The first guess needs no interpolation at all (the departure point starts at the arrival
+point, where the wind is already known) and the winds at the final departure points are never read,
+so the cost is `n_iterations - 1` locator updates plus `2*(n_iterations - 1)` interpolations — for
+the default `n_iterations = 2` that is one of each pair, not two.
+
+These use `trajectory_interpolator`, which only has to be accurate enough to place the departure
+point; the damping that matters accumulates on the transported field, interpolated once per step by
+`semi_lagrangian_transport!` with the more expensive `interpolator`.
 
 The arrival points are the grid points, taken straight from `model.geometry`."""
 function departure_points!(
@@ -71,7 +78,7 @@ function departure_points!(
         time_stepping::AbstractSemiLagrangian,
         model::AbstractModel,
     )
-    (; locator, geometry) = time_stepping.interpolator
+    (; locator, geometry) = time_stepping.trajectory_interpolator
     (; n_iterations) = time_stepping
     Δt_over_radius = time_stepping.Δt_trajectory[]
 
@@ -86,24 +93,30 @@ function departure_points!(
     arch = architecture(departure_lond)
     npoints = length(departure_lond)
 
-    # first guess: departure point = arrival point
-    copyto!(departure_lond.data, arrival_lond)
-    copyto!(departure_latd.data, arrival_latd)
+    # First guess for the departure point is the arrival point, where the wind is just `u_star` at
+    # the grid point: interpolating there would be the identity. So seed the departure winds
+    # directly rather than paying a locator update and two interpolations to recompute them.
+    copyto!(departure_u.data, u_star.data)
+    copyto!(departure_v.data, v_star.data)
 
-    for _ in 1:n_iterations
-        # relocate the interpolation stencil onto the current departure point estimate.
-        # NOTE: `.data` (a vector) throughout here and below, because
-        # `interpolate!(::Field, ::Field2D, ...)` short-circuits to a plain `copyto!` when the two
-        # fields share a grid — which they do, the departure points just are not the grid points.
-        RingGrids.update_locator!(locator, geometry, departure_lond.data, departure_latd.data)
-        RingGrids.interpolate!(departure_u.data, u_star, locator, geometry)
-        RingGrids.interpolate!(departure_v.data, v_star, locator, geometry)
-
+    for iteration in 1:n_iterations
         launch!(
             arch, LinearWorkOrder, (npoints,), _departure_point_kernel!,
             departure_lond.data, departure_latd.data, arrival_lond, arrival_latd,
             u_star.data, v_star.data, departure_u.data, departure_v.data, Δt_over_radius
         )
+
+        # the winds at the *final* departure points are never read — the next thing that happens
+        # is the tracer shift, which needs the points, not the winds — so skip the last refresh
+        iteration == n_iterations && break
+
+        # relocate the trajectory stencil onto the current departure point estimate.
+        # NOTE: `.data` (a vector) throughout, because `interpolate!(::Field, ::Field2D, ...)`
+        # short-circuits to a plain `copyto!` when the two fields share a grid — which they do,
+        # the departure points just are not the grid points.
+        RingGrids.update_locator!(locator, geometry, departure_lond.data, departure_latd.data)
+        RingGrids.interpolate!(departure_u.data, u_star, locator, geometry)
+        RingGrids.interpolate!(departure_v.data, v_star, locator, geometry)
     end
     return nothing
 end
@@ -163,8 +176,8 @@ point, giving the transported relative vorticity `ζ*` on the grid. `f` is scale
 `vars.grid.vorticity` again before the closing `transform!` of the time step overwrites it from
 the new spectral state.
 
-`departure_points!` must have run first: the locator still holds the departure-point stencil from
-its last iteration, so no further `update_locator!` is needed here."""
+`departure_points!` must have run first to fill the departure points; the field interpolator's own
+stencil is located here, as it is generally a different (higher order) one than the trajectory's."""
 function semi_lagrangian_transport!(
         vars::Variables,
         time_stepping::AbstractSemiLagrangian,
@@ -174,7 +187,11 @@ function semi_lagrangian_transport!(
     (; f) = model.coriolis
     scale = vars.prognostic.scale[]
 
-    vorticity_departure = vars.dynamics.semi_lagrangian.vorticity_departure
+    sl = vars.dynamics.semi_lagrangian
+    vorticity_departure = sl.vorticity_departure
+
+    # locate the field stencil on the departure points found by `departure_points!`
+    RingGrids.update_locator!(locator, geometry, sl.departure_lond.data, sl.departure_latd.data)
     vor = field_view(vars.grid.vorticity, :, 1, 2)      # current grid vorticity
     (; whichring) = vor.grid
     arch = architecture(vor)

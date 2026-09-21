@@ -17,14 +17,16 @@ between transport and diffusion, so neither is required by the scheme.
 
 Only `BarotropicModel` is supported.
 $(TYPEDFIELDS)"""
-mutable struct SemiLagrangian{NF, S, B, MS, IP} <: AbstractSemiLagrangian
+mutable struct SemiLagrangian{NF, S, B, MS, IP, TP} <: AbstractSemiLagrangian
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
     "[OPTION] Adjust `Δt_at_T32` with the output `interval` to output exactly after integer time steps"
     adjust_with_output::B
 
-    "[OPTION] Fixed-point iterations for the backward trajectory, 2 is usually enough"
+    """[OPTION] Fixed-point iterations for the backward trajectory, 2 is usually enough. The first
+    needs no interpolation (the first guess is the arrival point, where the wind is known), so
+    `n_iterations = 2` costs one locator update and two wind interpolations, not two of each."""
     n_iterations::Int
 
     "[OPTION] Extrapolate the trajectory wind in time as 3/2 uⁿ - 1/2 uⁿ⁻¹ (SETTLS-style)"
@@ -43,6 +45,12 @@ mutable struct SemiLagrangian{NF, S, B, MS, IP} <: AbstractSemiLagrangian
     Defaults to `CubicInterpolator`; `AnvilInterpolator` is the cheaper but much more damping
     alternative (11% amplitude loss over 100 repeated half-cell shifts against 0.1% for cubic)."""
     interpolator::IP
+
+    """[DERIVED] Interpolator used for the winds during the backward trajectory. Only has to place
+    the departure point, so the cheap `AnvilInterpolator` is the default: interpolation damping
+    accumulates on the transported field, not on winds that are rebuilt from the spectral state
+    every step."""
+    trajectory_interpolator::TP
 end
 
 """$(TYPEDSIGNATURES)
@@ -54,6 +62,7 @@ function SemiLagrangian(
         n_iterations = 2,
         extrapolate_winds = true,
         Interpolator = RingGrids.CubicInterpolator,
+        TrajectoryInterpolator = RingGrids.AnvilInterpolator,
     )
     (; NF, truncation, grid) = spectral_grid
 
@@ -63,10 +72,11 @@ function SemiLagrangian(
     # one interpolation target per grid point: the departure point of the trajectory arriving there
     npoints = RingGrids.get_npoints(grid)
     interpolator = RingGrids.interpolator(grid, npoints; Interpolator, NF)
+    trajectory_interpolator = RingGrids.interpolator(grid, npoints; Interpolator = TrajectoryInterpolator, NF)
 
-    return SemiLagrangian{NF, Second, Bool, Millisecond, typeof(interpolator)}(
+    return SemiLagrangian{NF, Second, Bool, Millisecond, typeof(interpolator), typeof(trajectory_interpolator)}(
         Second(Δt_at_T32), adjust_with_output, n_iterations, extrapolate_winds,
-        Δt_millisec, Δt, Ref(zero(NF)), interpolator,
+        Δt_millisec, Δt, Ref(zero(NF)), interpolator, trajectory_interpolator,
     )
 end
 

@@ -98,6 +98,37 @@ Base revision: 35d764b6a9029b32399bb536906ce17732de118d
   and `nonparametric_type`; and the `AbstractLocator` contract (`npoints_output`, `js`, `Δys` filled
   generically by `find_rings!`, everything else the locator's own business) is now documented.
 
+- **2026-09-21** (fourth round): cubic interpolation worked but cost ~2.3x Eulerian. Profiling at
+  T128 showed the cost was **not** the interpolation but the locator update: `find_grid_indices!`
+  was 6.79 ms against `interpolate!` at 1.03 ms and `find_rings!` at 0.56 ms. Three fixes:
+
+  1. `find_cubic_indices_kernel!` rewritten — the four latitude weights are computed in one pass
+     instead of four calls to a per-node helper doing nested `ifelse` selection (40 `ifelse` and 16
+     divisions per point, down to ~12 and 4), the ring loop is unrolled, and the longitude wrap uses
+     `ifelse` rather than `mod` (16 integer divisions per point removed). 6.79 → 4.08 ms.
+  2. The first trajectory iteration was redundant: the first guess for the departure point *is* the
+     arrival point, where the wind is already known, so the locator update and two interpolations
+     were recomputing `u_star`. Seed the departure winds directly instead. The winds at the *final*
+     departure points are never read either, so that refresh is skipped too. `n_iterations = 2` now
+     costs one locator update and two wind interpolations rather than two of each.
+  3. Split the interpolators: `trajectory_interpolator` (default `AnvilInterpolator`) places the
+     departure point, `interpolator` (default `CubicInterpolator`) shifts the transported field. Only
+     the latter's damping accumulates — the winds are rebuilt from the spectral state every step.
+
+  Measured at T128 (same machine, relative to Eulerian `NCycleLorenz` at 30min):
+
+  | configuration | SYPD | vs Eulerian |
+  |---|---|---|
+  | Eulerian `NCycleLorenz` 30min | 213.3 | 1.00x |
+  | SL 120min, cubic field / anvil trajectory | 232.4 | **1.09x** |
+  | SL 120min, cubic everywhere | 188.0 | 0.88x |
+  | SL 120min, anvil everywhere | 277.1 | 1.30x |
+
+  Accuracy is unaffected by the cheap trajectory interpolator: at T128/30d, enstrophy 5.288e-5
+  (cubic field / anvil trajectory) against 5.073e-5 (cubic everywhere) at 60min, and 5.093e-5
+  against 5.159e-5 at 120min — within the scatter of a forced statistical steady state, and not
+  systematically worse.
+
 
 ## Problem description
 
