@@ -87,9 +87,9 @@ Every ring-based locator must provide
 - `js`, the ring index `j` with the point's latitude in `[latd[j], latd[j+1])`, and
 - `Δys`, the fractional distance between those two rings,
 
-as these are filled generically by [`find_rings!`](@ref). Everything else — which grid points the
+as these are filled generically by `find_rings!`. Everything else — which grid points the
 stencil reads and with which weights — is the locator's own business, filled by its
-[`find_grid_indices!`](@ref) method and consumed by its [`_interpolate!`](@ref) method."""
+[`find_grid_indices!`](@ref) method and consumed by its `_interpolate!` method."""
 abstract type AbstractLocator end
 
 """Contains arrays that locates grid points of a given field to be uses in an interpolation
@@ -660,9 +660,9 @@ find_grid_indices!(
 """$(TYPEDSIGNATURES)
 Fill the longitude-dependent part of a locator's stencil: which grid points to read and with
 which weights. Dispatches on the concrete locator, as the stencil shape is exactly what
-distinguishes one interpolator from another. Together with [`find_rings!`](@ref), which fills the
-`js`/`Δys` every ring-based locator is required to have, this is what [`update_locator!`](@ref)
-calls. Implement this (and [`_interpolate!`](@ref)) to add a new interpolator."""
+distinguishes one interpolator from another. Together with `find_rings!`, which fills the
+`js`/`Δys` every ring-based locator is required to have, this is what `update_locator!`
+calls. Implement this (and `_interpolate!`) to add a new interpolator."""
 function find_grid_indices!(
         locator::AnvilLocator,      # update indices arrays
         geometry::AbstractGridGeometry,
