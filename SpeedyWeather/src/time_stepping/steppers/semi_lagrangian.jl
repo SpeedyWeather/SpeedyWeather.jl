@@ -14,69 +14,52 @@ operators each handled exactly; the splitting error is `O(Δt²)` as the two do 
 
 Only `BarotropicModel` is supported.
 $(TYPEDFIELDS)"""
-mutable struct SemiLagrangian{NF, S, B, MS, IP, VT} <: AbstractSemiLagrangian
+@kwdef mutable struct SemiLagrangian{NF, S, B, MS, IP} <: AbstractSemiLagrangian
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
-    Δt_at_T32::S
+    Δt_at_T32::S = Minute(60)       # larger than Leapfrog's default: no advective CFL limit
 
     "[OPTION] Adjust `Δt_at_T32` with the output `interval` to output exactly after integer time steps"
-    adjust_with_output::B
+    adjust_with_output::B = true
 
     "[OPTION] Fixed-point iterations for the backward trajectory, 2 is usually enough"
-    n_iterations::Int
+    n_iterations::Int = 2
 
     "[OPTION] Extrapolate the trajectory wind in time as 3/2 uⁿ - 1/2 uⁿ⁻¹ (SETTLS-style)"
-    extrapolate_winds::Bool
+    extrapolate_winds::Bool = true
 
     "[OPTION] Use the exact exponential (ETD1) for hyperdiffusion, set on `model.horizontal_diffusion`"
-    exponential_diffusion::Bool
+    exponential_diffusion::Bool = true
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
-    Δt_millisec::MS
+    Δt_millisec::MS = Millisecond(0)
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt::NF
+    Δt::NF = 0
 
     "[DERIVED] Δt scaled to convert [m/s] into [˚], see `trajectory_time_step`"
-    Δt_trajectory::Base.RefValue{NF}
+    Δt_trajectory::Base.RefValue{NF} = Ref(zero(NF))
 
     "[DERIVED] Interpolator (grid geometry + locator) used to evaluate fields at departure points"
     interpolator::IP
-
-    "[DERIVED] Longitudes [˚E] of the arrival points, i.e. of the grid points"
-    arrival_lond::VT
-
-    "[DERIVED] Latitudes [˚N] of the arrival points, i.e. of the grid points"
-    arrival_latd::VT
 end
 
 """$(TYPEDSIGNATURES)
 Generator function for `SemiLagrangian` using `spectral_grid` for resolution."""
-function SemiLagrangian(
-        spectral_grid::SpectralGrid;
-        Δt_at_T32 = Minute(60),         # larger than Leapfrog's default: no advective CFL limit
-        adjust_with_output = true,
-        n_iterations = 2,
-        extrapolate_winds = true,
-        exponential_diffusion = true,
-    )
-    (; NF, truncation, grid) = spectral_grid
-
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
-    Δt::NF = Δt_millisec.value / 1000
+function SemiLagrangian(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, grid) = spectral_grid
 
     # one interpolation target per grid point: the departure point of the trajectory arriving there
     npoints = RingGrids.get_npoints(grid)
     interpolator = RingGrids.AnvilInterpolator(grid, npoints; NF)
 
-    londs, latds = RingGrids.get_londlatds(grid)
-    arrival_lond = on_architecture(architecture(grid), NF.(londs))
-    arrival_latd = on_architecture(architecture(grid), NF.(latds))
+    L = SemiLagrangian{NF, Second, Bool, Millisecond, typeof(interpolator)}(; interpolator, kwargs...)
 
-    return SemiLagrangian{NF, Second, Bool, Millisecond, typeof(interpolator), typeof(arrival_lond)}(
-        Second(Δt_at_T32), adjust_with_output, n_iterations, extrapolate_winds,
-        exponential_diffusion, Δt_millisec, Δt, Ref(zero(NF)),
-        interpolator, arrival_lond, arrival_latd,
+    # Δt_at_T32 may have come in as any Period, calculate_Δt! fills the derived fields properly
+    L.Δt_millisec = get_Δt_millisec(
+        Second(L.Δt_at_T32), spectral_grid.truncation, DEFAULT_RADIUS, L.adjust_with_output
     )
+    L.Δt = L.Δt_millisec.value / 1000
+    return L
 end
 
 function initialize!(L::SemiLagrangian, model::AbstractModel)
@@ -105,10 +88,12 @@ prognostic_grid_steps(::AbstractSemiLagrangian, ::Barotropic) = 2
 tendency_steps(::AbstractSemiLagrangian) = 1
 
 # WHICH STEP TO READ WHEN
-# spectral variables have a single step
-@inline which_prognostic_step(var, ::AbstractSemiLagrangian, ::STEP_COMPONENT) = 1
-# grid variables have two, the 2nd is the current one (the 1st is the previous time step)
-@inline which_prognostic_step(var::AbstractField, ::AbstractSemiLagrangian, ::STEP_COMPONENT) = 2
+# spectral variables have a single step, grid variables two with the 2nd the current one
+# (the 1st holds the previous time step for the wind extrapolation)
+@inline which_prognostic_step(var, ::AbstractSemiLagrangian, ::AbstractModelComponent) = 1
+@inline which_prognostic_step(var, ::AbstractSemiLagrangian, ::SpeedyTransforms.AbstractSpectralTransform) = 1
+@inline which_prognostic_step(var::AbstractField, ::AbstractSemiLagrangian, ::AbstractModelComponent) = 2
+@inline which_prognostic_step(var::AbstractField, ::AbstractSemiLagrangian, ::SpeedyTransforms.AbstractSpectralTransform) = 2
 
 # the whole point: the trajectory shift replaces the vorticity flux
 @inline advection_factor(::AbstractSemiLagrangian) = 0
@@ -116,26 +101,28 @@ tendency_steps(::AbstractSemiLagrangian) = 1
 # diffusion is applied to the transported state, not corrected implicitly alongside
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Nothing, ::AbstractSemiLagrangian) = true
 
-"""$(TYPEDSIGNATURES) Work arrays for the departure point search and the trajectory shift."""
+"""$(TYPEDSIGNATURES)
+Work arrays for the departure point search and the trajectory shift. The departure point
+coordinates and the winds there are `Grid2D` and not bare vectors: there is exactly one departure
+point per grid point, so entry `ij` is the departure point of the trajectory *arriving* at grid
+cell `ij`. The arrival coordinates themselves are not stored, they are `model.geometry.londs/latds`."""
 function variables(L::SemiLagrangian, model::AbstractModel)
-    npoints = RingGrids.get_npoints(model.spectral_grid.grid)
     ns = :semi_lagrangian
     return (
-        ScratchVariable(:departure_lond, VectorDim(npoints), namespace = ns, desc = "Departure point longitude", units = "˚E"),
-        ScratchVariable(:departure_latd, VectorDim(npoints), namespace = ns, desc = "Departure point latitude", units = "˚N"),
-        ScratchVariable(:departure_u, VectorDim(npoints), namespace = ns, desc = "Zonal wind at departure point", units = "m/s"),
-        ScratchVariable(:departure_v, VectorDim(npoints), namespace = ns, desc = "Meridional wind at departure point", units = "m/s"),
-        ScratchVariable(:u_star, Grid2D(), namespace = ns, desc = "Time-extrapolated zonal wind for trajectories", units = "m/s"),
-        ScratchVariable(:v_star, Grid2D(), namespace = ns, desc = "Time-extrapolated meridional wind for trajectories", units = "m/s"),
-        ScratchVariable(:absolute_vorticity, Grid2D(), namespace = ns, desc = "Absolute vorticity ζ+f", units = "1/s"),
-        ScratchVariable(:vorticity_departure, Grid2D(), namespace = ns, desc = "Vorticity shifted to departure points", units = "1/s"),
+        DynamicsVariable(:departure_lond, Grid2D(), namespace = ns, desc = "Departure point longitude", units = "˚E"),
+        DynamicsVariable(:departure_latd, Grid2D(), namespace = ns, desc = "Departure point latitude", units = "˚N"),
+        DynamicsVariable(:departure_u, Grid2D(), namespace = ns, desc = "Zonal wind at departure point", units = "m/s"),
+        DynamicsVariable(:departure_v, Grid2D(), namespace = ns, desc = "Meridional wind at departure point", units = "m/s"),
+        DynamicsVariable(:u_star, Grid2D(), namespace = ns, desc = "Time-extrapolated zonal wind for trajectories", units = "m/s"),
+        DynamicsVariable(:v_star, Grid2D(), namespace = ns, desc = "Time-extrapolated meridional wind for trajectories", units = "m/s"),
+        DynamicsVariable(:vorticity_departure, Grid2D(), namespace = ns, desc = "Vorticity shifted to departure points", units = "1/s"),
     )
 end
 
 """$(TYPEDSIGNATURES)
 Retain the current grid `u, v` (step 2) as the previous ones (step 1) for the next step's wind
-extrapolation. The barotropic `transform!` does not call this hook (its default is a no-op and
-`Leapfrog` uses a single grid step in 2D), so the semi-Lagrangian step calls it itself."""
+extrapolation. Called from the barotropic `transform!`, both to initialize (so that step 1 is a
+copy of step 2 rather than zeros before the first step) and at the start of every later step."""
 function move_prognostic_grid_variables_back!(
         vars::Variables,
         ::AbstractSemiLagrangian,
@@ -168,13 +155,10 @@ function time_step!(
     departure_points!(vars, time_stepping, model)
     semi_lagrangian_transport!(vars, time_stepping, model)
 
-    # retain the current grid u, v as the previous ones before `transform!` overwrites them
-    move_prognostic_grid_variables_back!(vars, time_stepping, model)
-
     # ζ* back to spectral, overwriting the prognostic state
-    vorticity = get_step(vars.prognostic.vorticity, 1)
+    vorticity = get_prognostic_step(vars.prognostic.vorticity, time_stepping, DynamicalCore(), model)
     transform!(
-        vorticity, vars.scratch.semi_lagrangian.vorticity_departure,
+        vorticity, vars.dynamics.semi_lagrangian.vorticity_departure,
         vars.scratch.transform_memory, model.spectral_transform
     )
 

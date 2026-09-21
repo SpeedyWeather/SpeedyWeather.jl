@@ -45,6 +45,12 @@ function SpeedyTransforms.transform!(
         tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
     end
 
+    # Retain the current grid u, v as the previous ones for time steppers that need them
+    # (semi-Lagrangian for the wind extrapolation). No-op by default and for Leapfrog, which
+    # keeps a single grid step in 2D. On `initialize` this makes step 1 a copy of step 2
+    # rather than zeros, so the first time step has a consistent "previous" wind.
+    move_prognostic_grid_variables_back!(vars, time_stepping, model)
+
     # transform random pattern for random process unless random_process=nothing
     transform!(vars, model.random_process, S)
 

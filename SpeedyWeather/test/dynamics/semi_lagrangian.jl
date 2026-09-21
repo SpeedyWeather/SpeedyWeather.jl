@@ -77,7 +77,10 @@ end
 
     @test size(vars.prognostic.vorticity, 3) == 1   # spectral: 1 step
     @test size(vars.grid.u, 3) == 2                 # grid: 2 steps
-    @test haskey(vars.scratch, :semi_lagrangian)
+    @test haskey(vars.dynamics, :semi_lagrangian)
+
+    # departure points are grid fields, one per arrival grid cell
+    @test vars.dynamics.semi_lagrangian.departure_lond isa RingGrids.AbstractField
 
     # opted into the exponential diffusion
     @test model.horizontal_diffusion.exponential
@@ -100,7 +103,7 @@ end
     @test all(isfinite, vars.grid.u)
 
     # departure points stay on the sphere
-    (; departure_lond, departure_latd) = vars.scratch.semi_lagrangian
+    (; departure_lond, departure_latd) = vars.dynamics.semi_lagrangian
     @test all(lon -> 0 <= lon < 360, departure_lond)
     @test all(lat -> -90 <= lat <= 90, departure_latd)
 
@@ -112,4 +115,33 @@ end
     spectral_grid = SpectralGrid(truncation = 31, nlayers = 4)
     model = PrimitiveDryModel(spectral_grid, time_stepping = SemiLagrangian(spectral_grid))
     @test_throws ArgumentError initialize!(model)
+end
+
+@testset "SemiLagrangian: previous grid step initialized" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 1)
+    model = BarotropicModel(
+        spectral_grid,
+        time_stepping = SemiLagrangian(spectral_grid),
+        forcing = nothing, drag = nothing, random_process = nothing,
+    )
+    simulation = initialize!(model)
+    set!(simulation, vorticity = (lon, lat, σ) -> 1.0e-5 * exp(-((lon - 180)^2 + lat^2) / 200))
+    SpeedyWeather.transform!(simulation.variables, model, initialize = true)
+
+    # step 1 (previous) must be a copy of step 2 (current) after initialization, otherwise the
+    # SETTLS extrapolation 3/2 uⁿ - 1/2 uⁿ⁻¹ would read zeros on the first step
+    u = simulation.variables.grid.u
+    @test view(u.data, :, 1, 1) == view(u.data, :, 1, 2)
+    @test maximum(abs, view(u.data, :, 1, 1)) > 0
+
+    # Leapfrog on a 2D model keeps one grid step, the hook must be a no-op there
+    model_lf = BarotropicModel(spectral_grid)
+    sim_lf = initialize!(model_lf)
+    @test size(sim_lf.variables.grid.u, 3) == 1
+    @test SpeedyWeather.transform!(sim_lf.variables, model_lf, initialize = true) === nothing
+end
+
+@testset "SemiLagrangian: displace compiles away" begin
+    # the Particle round trip in `displace` must not allocate, it runs per grid point per iteration
+    @test Base.return_types(SpeedyWeather.displace, NTuple{5, Float32}) == [Tuple{Float32, Float32}]
 end

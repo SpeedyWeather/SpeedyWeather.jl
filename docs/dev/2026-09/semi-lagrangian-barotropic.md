@@ -32,6 +32,29 @@ Base revision: 35d764b6a9029b32399bb536906ce17732de118d
 - **2026-09-20** — Asked whether SL is compatible with `NCycleLorenz`. Answer: no, not for the
   transport term (see "Why not NCycleLorenz" below). Decision: implement a dedicated two-time-level
   `SemiLagrangian` stepper.
+- **2026-09-21** — Review of PR #1266. Changes made in response:
+  - Departure point coordinates and winds there are `Grid2D` `DynamicsVariable`s rather than bare
+    `VectorDim` `ScratchVariable`s — there is exactly one departure point per grid point, so entry
+    `ij` is the departure point of the trajectory *arriving* at cell `ij`.
+  - Arrival coordinates are no longer stored on the stepper, they are `model.geometry.londs/latds`.
+  - `SemiLagrangian` is `@kwdef` with the option defaults on the type.
+  - `ζ+f` is formed in place in `vars.grid.vorticity` instead of in a dedicated array (nothing reads
+    it again before the closing `transform!` overwrites it), removing one grid allocation.
+  - `get_step(..., 1)` for the spectral vorticity replaced by `get_prognostic_step(..., DynamicalCore())`.
+  - `STEP_COMPONENT` in the `which_prognostic_step` signatures spelled out as `AbstractModelComponent`
+    and `AbstractSpectralTransform`.
+  - The first-step special case in `extrapolate_winds!` is gone. The barotropic `transform!` now calls
+    the existing `move_prognostic_grid_variables_back!` hook (no-op by default, and an explicit no-op
+    for `Leapfrog` on 2D models which keeps a single grid step), so `uⁿ⁻¹ = uⁿ` going into the first
+    step. Previously step 1 held *zeros*, not a copy of step 2, so the guard was load-bearing; this
+    is the cleaner fix.
+  - Verified `displace` does not allocate: `Particle` is `isbits`, `move`/`mod` are `@inline`, and
+    the round trip infers `Tuple{NF, NF}` with 0 allocations over a 10⁴-point loop.
+
+  Not changed, with reasoning in the PR thread: making `exponential` the *default* for
+  `HyperDiffusion` (agreed it is generally better, but it changes results for every existing
+  simulation so it wants its own PR), and turning `f` into a `Field` instead of a latitude vector
+  (agreed, but it touches `Coriolis` everywhere — see Future work).
 
 ## Problem description
 
@@ -276,3 +299,9 @@ need a section, and `HyperDiffusion`'s new `exponential` option needs documentin
 - Semi-Lagrangian tracer transport sharing the same departure points — nearly free once the
   trajectories exist, and removes the tracer/vorticity inconsistency.
 - A conservative (SLICE/CSLAM-style) cell-integrated variant if conservation turns out to matter.
+- Make `Coriolis.f` a `Field` rather than a latitude vector, so `ζ+f` is a plain broadcast
+  `vor .+ scale*f` instead of needing a `whichring` lookup in a kernel. Duplicates `f` across
+  longitudes but is unlikely to matter for performance, and would simplify several call sites
+  beyond this one.
+- Flip `HyperDiffusion.exponential` to `true` by default once it has been validated against the
+  existing test suite — it is strictly more accurate at identical cost, but changes results.

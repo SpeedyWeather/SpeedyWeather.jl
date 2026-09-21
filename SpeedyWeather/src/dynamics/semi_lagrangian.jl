@@ -18,7 +18,8 @@ trajectory_time_step(Δt, radius) = Δt / radius * (180 / π)
 Displace a point at `(lond, latd)` [˚E, ˚N] by velocities `u, v` [m/s] over the scaled time step
 `Δt_deg` [˚*s/m] from [`trajectory_time_step`](@ref). Goes through `Particle` to reuse its tested
 pole-crossing logic in `move` (crossing a pole flips the longitude by 180˚) and the `mod` wrapping
-back into [0, 360˚E), [-90, 90˚N]."""
+back into [0, 360˚E), [-90, 90˚N]. `Particle` is `isbits` and `move`/`mod` are `@inline`, so the
+round trip compiles away entirely (0 allocations, inferred `Tuple{NF, NF}`)."""
 @inline function displace(lond::NF, latd::NF, u, v, Δt_deg) where {NF}
     dlat = v * Δt_deg
 
@@ -37,7 +38,9 @@ Solves `x_d = x_a - Δt/2 (u*(x_a) + u*(x_d))` (the trapezoidal, or "iterated ba
 trajectory) by fixed-point iteration, starting from `x_d = x_a`. `u*` is the wind extrapolated to
 the midpoint in time, see [`extrapolate_winds!`](@ref). Each iteration relocates the interpolation
 stencil (`update_locator!`) and interpolates `u*, v*` onto the current estimate of the departure
-points, so the cost is `n_iterations` locator updates plus `2*n_iterations` interpolations."""
+points, so the cost is `n_iterations` locator updates plus `2*n_iterations` interpolations.
+
+The arrival points are the grid points, taken straight from `model.geometry`."""
 function departure_points!(
         vars::Variables,
         time_stepping::AbstractSemiLagrangian,
@@ -47,35 +50,34 @@ function departure_points!(
     (; n_iterations) = time_stepping
     Δt_deg = time_stepping.Δt_trajectory[]
 
-    sl = vars.scratch.semi_lagrangian
-    (; departure_lond, departure_latd, departure_u, departure_v) = sl
+    sl = vars.dynamics.semi_lagrangian
+    (; departure_lond, departure_latd, departure_u, departure_v, u_star, v_star) = sl
 
     # the (possibly time-extrapolated) wind that defines the trajectories
-    u_star = sl.u_star
-    v_star = sl.v_star
     extrapolate_winds!(vars, time_stepping, model)
 
     # arrival points are the grid points themselves
-    arrival_lond, arrival_latd = time_stepping.arrival_lond, time_stepping.arrival_latd
+    arrival_lond, arrival_latd = model.geometry.londs, model.geometry.latds
     arch = architecture(departure_lond)
     npoints = length(departure_lond)
 
     # first guess: departure point = arrival point
-    copyto!(departure_lond, arrival_lond)
-    copyto!(departure_latd, arrival_latd)
+    copyto!(departure_lond.data, arrival_lond)
+    copyto!(departure_latd.data, arrival_latd)
 
     for _ in 1:n_iterations
-        # relocate the interpolation stencil onto the current departure point estimate
-        RingGrids.update_locator!(locator, geometry, departure_lond, departure_latd)
-
-        # output is a plain vector, hitting `interpolate!(::AbstractVector, ::Field2D, ...)`
-        RingGrids.interpolate!(departure_u, u_star, locator, geometry)
-        RingGrids.interpolate!(departure_v, v_star, locator, geometry)
+        # relocate the interpolation stencil onto the current departure point estimate.
+        # NOTE: `.data` (a vector) throughout here and below, because
+        # `interpolate!(::Field, ::Field2D, ...)` short-circuits to a plain `copyto!` when the two
+        # fields share a grid — which they do, the departure points just are not the grid points.
+        RingGrids.update_locator!(locator, geometry, departure_lond.data, departure_latd.data)
+        RingGrids.interpolate!(departure_u.data, u_star, locator, geometry)
+        RingGrids.interpolate!(departure_v.data, v_star, locator, geometry)
 
         launch!(
             arch, LinearWorkOrder, (npoints,), _departure_point_kernel!,
-            departure_lond, departure_latd, arrival_lond, arrival_latd,
-            u_star.data, v_star.data, departure_u, departure_v, Δt_deg
+            departure_lond.data, departure_latd.data, arrival_lond, arrival_latd,
+            u_star.data, v_star.data, departure_u.data, departure_v.data, Δt_deg
         )
     end
     return nothing
@@ -101,14 +103,17 @@ end
 Fill `u_star, v_star` with the wind used to define the trajectories, extrapolated to the middle of
 the time step. With `extrapolate_winds = true` this is the SETTLS-style `3/2 uⁿ - 1/2 uⁿ⁻¹`, second
 order in time for a two-time-level scheme; otherwise just `uⁿ`, which is first order but avoids the
-weakly-stable extrapolation. Falls back to `uⁿ` while `uⁿ⁻¹` is not yet available (first step)."""
+weakly-stable extrapolation.
+
+No special case for the first time step: `move_prognostic_grid_variables_back!` is called by the
+barotropic `transform!` with `initialize=true`, so `uⁿ⁻¹ = uⁿ` going into the first step and the
+extrapolation reduces to `uⁿ` on its own."""
 function extrapolate_winds!(
         vars::Variables,
         time_stepping::AbstractSemiLagrangian,
         model::AbstractModel,
     )
-    sl = vars.scratch.semi_lagrangian
-    (; clock) = vars.prognostic
+    sl = vars.dynamics.semi_lagrangian
 
     # grid u, v carry 2 steps for this time stepper: 1 = previous, 2 = current
     u_new = field_view(vars.grid.u, :, 1, 2)
@@ -116,10 +121,8 @@ function extrapolate_winds!(
     u_old = field_view(vars.grid.u, :, 1, 1)
     v_old = field_view(vars.grid.v, :, 1, 1)
 
-    # no previous step available on the very first time step
-    extrapolate = time_stepping.extrapolate_winds && clock.step_counter > 0
-    w = extrapolate ? 3 // 2 : 1
-    w_old = extrapolate ? -1 // 2 : 0
+    NF = eltype(sl.u_star)
+    w, w_old = time_stepping.extrapolate_winds ? (NF(3 // 2), NF(-1 // 2)) : (one(NF), zero(NF))
 
     @. sl.u_star = w * u_new + w_old * u_old
     @. sl.v_star = w * v_new + w_old * v_old
@@ -130,6 +133,10 @@ end
 Shift absolute vorticity `ζ + f` to the departure points and subtract `f` again at the arrival
 point, giving the transported relative vorticity `ζ*` on the grid. `f` is scaled by the same
 `scale` as the (radius-scaled) prognostic vorticity, exactly as `_vorticity_flux_kernel!` does.
+
+`ζ + f` is formed in place in the grid vorticity rather than in a dedicated array: nothing reads
+`vars.grid.vorticity` again before the closing `transform!` of the time step overwrites it from
+the new spectral state.
 
 `departure_points!` must have run first: the locator still holds the departure-point stencil from
 its last iteration, so no further `update_locator!` is needed here."""
@@ -142,37 +149,32 @@ function semi_lagrangian_transport!(
     (; f) = model.coriolis
     scale = vars.prognostic.scale[]
 
-    sl = vars.scratch.semi_lagrangian
-    absolute_vorticity = sl.absolute_vorticity
-    vorticity_departure = sl.vorticity_departure
-
+    vorticity_departure = vars.dynamics.semi_lagrangian.vorticity_departure
     vor = field_view(vars.grid.vorticity, :, 1, 2)      # current grid vorticity
     (; whichring) = vor.grid
     arch = architecture(vor)
 
-    # ζ + f on the grid, with f scaled on the fly as vorticity is
+    # ζ += f in place, f scaled on the fly as vorticity is
     launch!(
-        arch, LinearWorkOrder, size(absolute_vorticity), _add_coriolis_kernel!,
-        absolute_vorticity.data, vor.data, f, scale, whichring, true
+        arch, LinearWorkOrder, size(vor), _add_coriolis_kernel!,
+        vor.data, f, scale, whichring, true
     )
 
-    # Shift to the departure points. NOTE: `.data` (a vector) and not the Field itself, because
-    # `interpolate!(::Field, ::Field2D, ...)` short-circuits to a plain `copyto!` when the two
-    # fields share a grid — which they do here, the departure points just are not the grid points.
-    RingGrids.interpolate!(vorticity_departure.data, absolute_vorticity, locator, geometry)
+    # shift to the departure points, `.data` to hit the vector method (see departure_points!)
+    RingGrids.interpolate!(vorticity_departure.data, vor, locator, geometry)
 
     # and subtract f again at the arrival point
     launch!(
         arch, LinearWorkOrder, size(vorticity_departure), _add_coriolis_kernel!,
-        vorticity_departure.data, vorticity_departure.data, f, scale, whichring, false
+        vorticity_departure.data, f, scale, whichring, false
     )
     return nothing
 end
 
 @kernel inbounds = true function _add_coriolis_kernel!(
-        out, @Const(vor), @Const(f), scale, @Const(whichring), add::Bool
+        vor, @Const(f), scale, @Const(whichring), add::Bool
     )
     ij = @index(Global, Linear)
     j = whichring[ij]
-    out[ij] = vor[ij] + ifelse(add, f[j] * scale, -f[j] * scale)
+    vor[ij] = vor[ij] + ifelse(add, f[j] * scale, -f[j] * scale)
 end

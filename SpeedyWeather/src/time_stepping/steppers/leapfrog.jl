@@ -134,6 +134,10 @@ function move_prognostic_grid_variables_back!(
     return nothing
 end
 
+# Barotropic/ShallowWater keep a single grid step under Leapfrog, so there is no previous
+# step to move anything back into. Explicit no-op: the 2D `transform!`s call the hook too.
+move_prognostic_grid_variables_back!(::Variables, ::AbstractLeapfrog, ::TwoDModels) = nothing
+
 # copy step 2 -> step 1 for one variable (retain current step as the previous one);
 @inline function copy_step_back!(var)
     var_old = get_step(var, 1)
