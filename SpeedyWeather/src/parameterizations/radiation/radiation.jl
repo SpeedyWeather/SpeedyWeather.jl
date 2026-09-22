@@ -1,12 +1,11 @@
 export Radiation
 
 """Radiation scheme bundling a `shortwave` and a `longwave` scheme into one model component
-`model.radiation`. Inside the fused column kernel the shortwave scheme is called first, then the
-longwave scheme, exactly as the two previously separate components were. Either can be `nothing`
-to disable that stream. A radiation scheme that computes both streams at once (e.g. a
+`Radiaton`. Inside the fused column kernel the shortwave scheme is called first, then the
+longwave scheme. Either can be `nothing` to disable that stream. A radiation scheme that computes both streams at once (e.g. a
 correlated-k scheme sharing gas optics) subtypes `AbstractRadiation` directly instead, declares
-its variables (e.g. `variables(::MyRadiation) = (variables(OneBandShortwave(SG))..., variables(OneBandLongwave(SG))...)`
-for the standard diagnostics) and is passed as `radiation = MyRadiation(...)`. Fields are $(TYPEDFIELDS)"""
+its variables and `parameterization!` as any other parameterization. 
+Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct Radiation{SW, LW} <: AbstractRadiation
     "[OPTION] Shortwave radiation scheme, `<: AbstractShortwave` or `nothing`"
     @component shortwave::SW
