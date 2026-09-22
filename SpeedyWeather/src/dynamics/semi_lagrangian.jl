@@ -45,9 +45,16 @@ Backward trajectories are obtained by passing a negative `Δt_over_radius`."""
     sinλ, cosλ = sincos(deg2rad(lond))
     sinφ, cosφ = sincos(deg2rad(latd))
     rx, ry, rz = cosφ * cosλ, cosφ * sinλ, sinφ     # position on the unit sphere
+    return rotate_along_great_circle(rx, ry, rz, Vx, Vy, Vz, Δt_over_radius)
+end
 
-    # remove any radial component: a mean of velocities tangent at two *different* points is not
-    # itself tangent at either, and the rotation below is only a rotation for V ⟂ r
+"""$(TYPEDSIGNATURES)
+Rotate the unit-sphere position `r` by the angle `|V| Δt_over_radius` along the great circle
+spanned by `r` and `V`, returning `(lond, latd)` [˚E, ˚N]. The velocity does not have to be
+tangent at `r`: its radial component is removed first, which matters because a mean of velocities
+tangent at two *different* points is not itself tangent at either, and the rotation is only a
+rotation for `V ⟂ r`."""
+@inline function rotate_along_great_circle(rx::NF, ry, rz, Vx, Vy, Vz, Δt_over_radius) where {NF}
     Vr = Vx * rx + Vy * ry + Vz * rz
     Vx -= Vr * rx
     Vy -= Vr * ry
@@ -69,6 +76,31 @@ Backward trajectories are obtained by passing a negative `Δt_over_radius`."""
     latd_new = rad2deg(asin(clamp(dz, -one(NF), one(NF))))
     lond_new = mod(rad2deg(atan(dy, dx)), 360)
     return lond_new, latd_new
+end
+
+"""$(TYPEDSIGNATURES)
+One trapezoidal backward-trajectory iterate: the departure point reached from the arrival point
+`(lond_a, latd_a)` [˚E, ˚N] by the mean of the arrival wind `u_a, v_a` [m/s], in local east/north
+components, and the departure wind `Vd` [m/s], already in the common 3D frame.
+
+Fuses [`cartesian_velocity`](@ref) and [`displace`](@ref) so that the arrival point's `sincos`
+pair is evaluated once rather than once in each — this runs per grid point per iteration and the
+transcendentals dominate it."""
+@inline function departure_point(lond_a::NF, latd_a::NF, u_a, v_a, Vdx, Vdy, Vdz, Δt_over_radius) where {NF}
+    sinλ, cosλ = sincos(deg2rad(lond_a))
+    sinφ, cosφ = sincos(deg2rad(latd_a))
+    rx, ry, rz = cosφ * cosλ, cosφ * sinλ, sinφ
+
+    # the arrival wind in the common frame, reusing the sincos above (cf. `cartesian_velocity`)
+    Vax = -u_a * sinλ - v_a * sinφ * cosλ
+    Vay = u_a * cosλ - v_a * sinφ * sinλ
+    Vaz = v_a * cosφ
+
+    return rotate_along_great_circle(
+        rx, ry, rz,
+        (Vax + Vdx) / 2, (Vay + Vdy) / 2, (Vaz + Vdz) / 2,
+        Δt_over_radius,
+    )
 end
 
 """$(TYPEDSIGNATURES)
@@ -156,24 +188,19 @@ end
     )
     ij = @index(Global, Linear)
 
-    lond_a, latd_a = arrival_lond[ij], arrival_latd[ij]
-    lond_d, latd_d = departure_lond[ij], departure_latd[ij]
-
     # trapezoidal rule: mean of the wind at the arrival and (current estimate of the) departure
     # point. The two live in different local east/north frames, so they are mapped to a common
     # 3D Cartesian frame before being averaged — adding the components directly is only valid if
     # the frames coincide, and the mismatch is the meridian convergence, O(Δλ sinφ), which is
     # small in midlatitudes but O(1) next to the poles where a trajectory spans a large Δλ.
-    Vax, Vay, Vaz = cartesian_velocity(lond_a, latd_a, u_arrival[ij], v_arrival[ij])
-    Vdx, Vdy, Vdz = cartesian_velocity(lond_d, latd_d, departure_u[ij], departure_v[ij])
-
-    Vx = (Vax + Vdx) / 2
-    Vy = (Vay + Vdy) / 2
-    Vz = (Vaz + Vdz) / 2
+    Vd = cartesian_velocity(departure_lond[ij], departure_latd[ij], departure_u[ij], departure_v[ij])
 
     # the mean wind is already the 1/2 in x_d = x_a - Δt/2 (V(x_a) + V(x_d)), so the full time
     # step is used here; backward in time, hence the minus sign
-    lond, latd = displace(lond_a, latd_a, Vx, Vy, Vz, -Δt_over_radius)
+    lond, latd = departure_point(
+        arrival_lond[ij], arrival_latd[ij], u_arrival[ij], v_arrival[ij],
+        Vd..., -Δt_over_radius
+    )
     departure_lond[ij] = lond
     departure_latd[ij] = latd
 end
