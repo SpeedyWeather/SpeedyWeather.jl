@@ -88,7 +88,7 @@ $(TYPEDFIELDS)"""
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
-    @component radiation::RA = Radiation(spectral_grid)
+    @component radiation::RA = Radiation(spectral_grid; shortwave = OneBandGreyShortwave(spectral_grid), longwave = OneBandGreyLongwave(spectral_grid))
     @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
