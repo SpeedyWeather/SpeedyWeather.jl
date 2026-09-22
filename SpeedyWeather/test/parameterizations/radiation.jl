@@ -79,7 +79,7 @@ end
         @test !haskey(vars.parameterizations, :outgoing_shortwave)
     end
 
-    @testset "Model construction and deprecations" begin
+    @testset "Model construction" begin
         spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
         # defaults
@@ -90,28 +90,12 @@ end
         @test model.radiation.shortwave isa OneBandShortwave     # the grey variant is a OneBandShortwave
         @test model.radiation.longwave isa OneBandLongwave
 
-        # deprecated keywords are wrapped into Radiation
-        shortwave = TransparentShortwave(spectral_grid)
-        longwave = UniformCooling(spectral_grid)
-        model = @test_deprecated PrimitiveWetModel(spectral_grid; shortwave_radiation = shortwave)
-        @test model.radiation.shortwave === shortwave
-        @test model.radiation.longwave isa OneBandLongwave
-        model = @test_deprecated PrimitiveDryModel(spectral_grid; longwave_radiation = longwave)
-        @test model.radiation.longwave === longwave
-        @test model.radiation.shortwave isa OneBandShortwave
-
-        # deprecated symbols in the parameterizations tuple become a single :radiation
-        model = @test_deprecated PrimitiveWetModel(
+        # :radiation can be placed anywhere in the parameterizations tuple
+        model = PrimitiveWetModel(
             spectral_grid;
-            parameterizations = (:convection, :shortwave_radiation, :longwave_radiation, :boundary_layer)
+            parameterizations = (:convection, :radiation, :boundary_layer)
         )
         @test model.parameterizations == (:convection, :radiation, :boundary_layer)
-
-        # both old and new keywords together is an error
-        @test_throws ArgumentError PrimitiveWetModel(
-            spectral_grid;
-            radiation = Radiation(spectral_grid), longwave_radiation = longwave
-        )
 
         # initialize! and a few time steps run through
         simulation = initialize!(PrimitiveWetModel(spectral_grid))

@@ -233,10 +233,3 @@ function Adapt.adapt_structure(to, model::PrimitiveWetModel)
         adapt_structure(to, getfield(model, field)) for field in adapt_fields
     )
 end
-
-# more specific than the generic (M::Type{<:AbstractModel})(SG; kwargs...) to translate
-# the deprecated shortwave_radiation/longwave_radiation keywords into radiation = Radiation(...)
-function PrimitiveWetModel(spectral_grid::SpectralGrid; kwargs...)
-    kwargs = deprecated_radiation_kwargs(Radiation(spectral_grid), kwargs)
-    return PrimitiveWetModel(; spectral_grid, kwargs...)
-end

@@ -27,6 +27,12 @@ Base revision: `1ef2a0e2` (`mg/numericalradiation`, on top of v0.22.1)
 
 ## Revision log
 
+- **2026-09-22, "remove the `deprecated_radiation_kwargs` logic, we don't need deprecation support
+  here".** Dropped `deprecated_radiation_kwargs` and the two `PrimitiveWetModel(spectral_grid;
+  kwargs...)` / `PrimitiveDryModel(spectral_grid; kwargs...)` methods that called it (the generic
+  `(M::Type{<:AbstractModel})(SG; kwargs...)` in `dynamics/spectral_grid.jl` covers them again).
+  The deprecation tests in `test/parameterizations/{radiation,longwave_radiation}.jl` were removed
+  or rewritten against `radiation = Radiation(...)`. The change is now breaking without a shim.
 - **2026-09-11, docs build.** The `docs/` environment was not instantiated (`DocumenterCitations` in
   `Project.toml` but absent from `Manifest.toml`), so `julia --project=docs docs/make.jl` aborted at
   `using DocumenterCitations` before reaching any page. Fixed with `Pkg.resolve()` + `Pkg.instantiate()`;
@@ -142,22 +148,17 @@ fields. (An earlier draft factored the two method bodies into helpers with a uni
   (dry model: `Radiation(spectral_grid; shortwave = OneBandGreyShortwave(spectral_grid), longwave = OneBandGreyLongwave(spectral_grid))`).
 - `parameterizations` tuple: `:shortwave_radiation, :longwave_radiation` → `:radiation`.
 - `initialize!`: two calls → one.
-- Backwards compatibility: the positional constructors `PrimitiveWetModel(spectral_grid; kwargs...)`
-  and `PrimitiveDryModel(spectral_grid; kwargs...)` accept `shortwave_radiation` and/or
-  `longwave_radiation`, wrap them into `Radiation` (missing stream from the default), and emit a
-  deprecation warning once. A user-supplied `parameterizations` tuple containing
-  `:shortwave_radiation` or `:longwave_radiation` has those entries replaced by a single
-  `:radiation` at the position of the first, with a deprecation warning. Reading
-  `model.longwave_radiation` is not shimmed; it errors with the usual `FieldError`, whose
-  message is enough to find `model.radiation.longwave`.
+- No backwards compatibility: this is a breaking change. The old `shortwave_radiation` /
+  `longwave_radiation` keywords, the corresponding `parameterizations` symbols, and
+  `model.shortwave_radiation` / `model.longwave_radiation` field access all error with the usual
+  `MethodError` / `FieldError`, whose message is enough to find `model.radiation.longwave`.
 
 ### Tests
 
 - `test/parameterizations/radiation.jl` (new): the bit-identity test, see below.
 - `test/parameterizations/longwave_radiation.jl`, `shortwave_radiation.jl`,
   `stochastic_physics.jl`: construct with `radiation = Radiation(spectral_grid; ...)` and read
-  `model.radiation.longwave` / `.shortwave`. One case each keeps the deprecated keyword to test
-  the shim.
+  `model.radiation.longwave` / `.shortwave`.
 
 ### Versioning and changelog
 
@@ -203,8 +204,8 @@ Breaking change of the model struct → `SpeedyWeather/Project.toml` version `0.
 
 ## Known limitations
 
-- `model.longwave_radiation` / `model.shortwave_radiation` field access is not shimmed; only the
-  constructor keywords and the `parameterizations` tuple are.
+- Breaking with no deprecation path: user code passing `shortwave_radiation` /
+  `longwave_radiation`, or reading those model fields, must be updated to `radiation`.
 - `Radiation` calls shortwave then longwave unconditionally; a scheme that needs a different
   order or interleaving should subtype `AbstractRadiation` directly.
 - Sub-stepping radiation (calling it every N steps) is out of scope here; see the companion

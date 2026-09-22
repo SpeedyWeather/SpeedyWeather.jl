@@ -18,10 +18,9 @@ end
 
     @testset for T in (FriersonLongwaveTransmissivity, TransparentLongwaveTransmissivity)
         transmissivity = T(spectral_grid)
-        longwave_radiation = OneBandLongwave(spectral_grid; transmissivity)
-        # deprecated keyword still accepted (wrapped into model.radiation.longwave)
-        model = @test_deprecated PrimitiveWetModel(spectral_grid; longwave_radiation)
-        @test model.radiation.longwave === longwave_radiation
+        longwave = OneBandLongwave(spectral_grid; transmissivity)
+        model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+        @test model.radiation.longwave === longwave
         initialize!(model.radiation, model)
 
         vars = Variables(model)
