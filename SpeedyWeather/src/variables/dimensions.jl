@@ -154,11 +154,19 @@ allocate(v::AbstractVariable{MatrixDim}, model::AbstractModel) = fill!(model.spe
 struct TransformScratchMemory <: AbstractVariableDim end
 allocate(::AbstractVariable{TransformScratchMemory}, model::AbstractModel) = model.spectral_transform.scratch_memory
 
-"""Dimension for particle locator tracking in space."""
-@kwdef struct LocatorDim <: AbstractVariableDim
-    n::Int = 1                                                  # number of locations to track, e.g. for particle advection
+"""Dimension for a locator tracking `n` points in space, e.g. the particles of particle advection
+or the departure points of semi-Lagrangian advection. The type parameter `L` is the
+`RingGrids.AbstractLocator` to allocate, so that the interpolation order is a free choice."""
+@kwdef struct LocatorDim{L} <: AbstractVariableDim
+    n::Int = 1                                                  # number of locations to track
 end
-allocate(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.AnvilLocator(model.spectral_grid.NF, model.particle_advection.nparticles; architecture = model.spectral_grid.architecture)
+
+"""$(TYPEDSIGNATURES)
+`LocatorDim` for `n` points with the default `AnvilLocator`."""
+LocatorDim(n::Integer) = LocatorDim{RingGrids.AnvilLocator}(n)
+
+allocate(v::AbstractVariable{LocatorDim{L}}, model::AbstractModel) where {L} =
+    L(model.spectral_grid.NF, v.dims.n; architecture = model.spectral_grid.architecture)
 
 # Variable fusion support
 # We may want to fuse a group of variables into a single parent variable to

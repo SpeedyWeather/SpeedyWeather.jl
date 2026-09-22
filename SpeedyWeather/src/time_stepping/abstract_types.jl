@@ -1,4 +1,8 @@
 abstract type AbstractTimeStepper <: AbstractModelComponent end
+
+# defined here (and not with the stepper itself) so that the dynamical core can dispatch
+# on it, `dynamics/semi_lagrangian.jl` is included well before `steppers/semi_lagrangian.jl`
+abstract type AbstractSemiLagrangian <: AbstractTimeStepper end
 abstract type AbstractImplicit <: AbstractModelComponent end
 abstract type AbstractDynamicalCoreComponent <: AbstractModelComponent end
 
