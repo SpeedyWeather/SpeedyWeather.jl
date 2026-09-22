@@ -141,7 +141,7 @@ function departure_points!(
     Δt_over_radius = time_stepping.Δt_trajectory[]
 
     sl = vars.dynamics.semi_lagrangian
-    (; departure_lond, departure_latd, departure_u, departure_v, u_star, v_star) = sl
+    (; departure_lond, departure_latd, departure_u, departure_v, u_trajectory, v_trajectory) = sl
     locator = sl.trajectory_locator
 
     # the (possibly time-extrapolated) wind that defines the trajectories
@@ -152,19 +152,19 @@ function departure_points!(
     arch = architecture(departure_lond)
     npoints = length(departure_lond)
 
-    # First guess for the departure point is the arrival point, where the wind is just `u_star` at
+    # First guess for the departure point is the arrival point, where the wind is just `u_trajectory` at
     # the grid point: interpolating there would be the identity. So seed the departure point and
     # the winds there directly rather than paying a locator update and two interpolations.
     copyto!(departure_lond.data, arrival_lond)
     copyto!(departure_latd.data, arrival_latd)
-    copyto!(departure_u.data, u_star.data)
-    copyto!(departure_v.data, v_star.data)
+    copyto!(departure_u.data, u_trajectory.data)
+    copyto!(departure_v.data, v_trajectory.data)
 
     for iteration in 1:n_iterations
         launch!(
             arch, LinearWorkOrder, (npoints,), _departure_point_kernel!,
             departure_lond.data, departure_latd.data, arrival_lond, arrival_latd,
-            u_star.data, v_star.data, departure_u.data, departure_v.data, Δt_over_radius
+            u_trajectory.data, v_trajectory.data, departure_u.data, departure_v.data, Δt_over_radius
         )
 
         # the winds at the *final* departure points are never read — the next thing that happens
@@ -176,8 +176,8 @@ function departure_points!(
         # short-circuits to a plain `copyto!` when the two fields share a grid — which they do,
         # the departure points just are not the grid points.
         RingGrids.update_locator!(locator, geometry, departure_lond.data, departure_latd.data)
-        RingGrids.interpolate!(departure_u.data, u_star, locator, geometry)
-        RingGrids.interpolate!(departure_v.data, v_star, locator, geometry)
+        RingGrids.interpolate!(departure_u.data, u_trajectory, locator, geometry)
+        RingGrids.interpolate!(departure_v.data, v_trajectory, locator, geometry)
     end
     return nothing
 end
@@ -206,9 +206,10 @@ end
 end
 
 """$(TYPEDSIGNATURES)
-Fill `u_star, v_star` with the wind used to define the trajectories, extrapolated to the middle of
-the time step. With `extrapolate_winds = true` this is the SETTLS-style `3/2 uⁿ - 1/2 uⁿ⁻¹`, second
-order in time for a two-time-level scheme; otherwise just `uⁿ`, which is first order.
+Fill `u_trajectory, v_trajectory` with the wind used to define the trajectories, extrapolated to
+the middle of the time step. With `extrapolate_winds = true` this is the SETTLS-style
+`3/2 uⁿ - 1/2 uⁿ⁻¹`, second order in time for a two-time-level scheme; otherwise just `uⁿ`, which
+is first order.
 
 This is not a free choice: the trajectory carries the Rossby term via `f(x_d) - f(x_a)`, so a wind
 at `tⁿ` makes that term forward Euler and hence unconditionally unstable. `extrapolate_winds =
@@ -230,11 +231,16 @@ function extrapolate_winds!(
     u_old = field_view(vars.grid.u, :, 1, 1)
     v_old = field_view(vars.grid.v, :, 1, 1)
 
-    NF = eltype(sl.u_star)
+    # Linear extrapolation in time from uⁿ⁻¹, uⁿ to the middle of the step, which is where the
+    # trapezoidal trajectory wants its wind:
+    #   u(tⁿ + Δt/2) ≈ uⁿ + (Δt/2) (uⁿ - uⁿ⁻¹)/Δt = 3/2 uⁿ - 1/2 uⁿ⁻¹
+    # hence the weights. Without it the wind stays at tⁿ, one step behind (see the docstring:
+    # that is forward Euler on the Rossby term and unstable, not merely first order).
+    NF = eltype(sl.u_trajectory)
     w, w_old = time_stepping.extrapolate_winds ? (NF(3 // 2), NF(-1 // 2)) : (one(NF), zero(NF))
 
-    @. sl.u_star = w * u_new + w_old * u_old
-    @. sl.v_star = w * v_new + w_old * v_old
+    @. sl.u_trajectory = w * u_new + w_old * u_old
+    @. sl.v_trajectory = w * v_new + w_old * v_old
     return nothing
 end
 

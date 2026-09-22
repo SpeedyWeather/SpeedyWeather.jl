@@ -345,7 +345,7 @@ end
     # and the extrapolated wind must actually extrapolate, i.e. leave the 1-step interval
     SpeedyWeather.extrapolate_winds!(simulation.variables, time_stepping, model)
     sl = simulation.variables.dynamics.semi_lagrangian
-    @test maximum(abs, sl.u_star .- u_new) > 0
+    @test maximum(abs, sl.u_trajectory .- u_new) > 0
 end
 
 @testset "SemiLagrangian: Rossby waves do not amplify" begin

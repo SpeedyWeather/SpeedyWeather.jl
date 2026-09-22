@@ -141,8 +141,8 @@ function variables(L::SemiLagrangian, model::AbstractModel)
         DynamicsVariable(:departure_latd, Grid2D(), namespace = ns, desc = "Departure point latitude", units = "˚N"),
         DynamicsVariable(:departure_u, Grid2D(), namespace = ns, desc = "Zonal wind at departure point", units = "m/s"),
         DynamicsVariable(:departure_v, Grid2D(), namespace = ns, desc = "Meridional wind at departure point", units = "m/s"),
-        DynamicsVariable(:u_star, Grid2D(), namespace = ns, desc = "Time-extrapolated zonal wind for trajectories", units = "m/s"),
-        DynamicsVariable(:v_star, Grid2D(), namespace = ns, desc = "Time-extrapolated meridional wind for trajectories", units = "m/s"),
+        DynamicsVariable(:u_trajectory, Grid2D(), namespace = ns, desc = "Wind defining the backward trajectories, zonal", units = "m/s"),
+        DynamicsVariable(:v_trajectory, Grid2D(), namespace = ns, desc = "Wind defining the backward trajectories, meridional", units = "m/s"),
         DynamicsVariable(:vorticity_departure, Grid2D(), namespace = ns, desc = "Vorticity shifted to departure points", units = "1/s"),
     )
 end

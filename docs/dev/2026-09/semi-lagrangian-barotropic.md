@@ -108,7 +108,7 @@ Base revision: 35d764b6a9029b32399bb536906ce17732de118d
      `ifelse` rather than `mod` (16 integer divisions per point removed). 6.79 → 4.08 ms.
   2. The first trajectory iteration was redundant: the first guess for the departure point *is* the
      arrival point, where the wind is already known, so the locator update and two interpolations
-     were recomputing `u_star`. Seed the departure winds directly instead. The winds at the *final*
+     were recomputing `u_trajectory` (then named `u_star`). Seed the departure winds directly instead. The winds at the *final*
      departure points are never read either, so that refresh is skipped too. `n_iterations = 2` now
      costs one locator update and two wind interpolations rather than two of each.
   3. Split the interpolators: `trajectory_interpolator` (default `AnvilInterpolator`) places the
