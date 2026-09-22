@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Bundle shortwave and longwave radiation into one model component `model.radiation = Radiation(shortwave, longwave)`, replacing the `shortwave_radiation` and `longwave_radiation` fields [#1252](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1252)
+- CI with Julia v1.13 [#1258](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1258)
+- Vertical interpolation from the model's (sigma or hybrid) levels onto pressure levels, CPU/GPU, with interpolation linear in p or log(p) and configurable extrapolation [#1256](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1256)
 - Documentation CI builds with Julia 1.12 [#1255](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1255)
 - Fix Terrarium 3D GPU Fields not being copied to host [#1250](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1250)
 - Fix the Reactant clock not advancing, adjust to recent new Reactant version [#1249](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1249)
@@ -34,6 +36,7 @@
 
 ## v0.22.1
 
+- First implementation for FFTs using Metal.jl [#1217](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1217)
 - WhichTransform for default MatrixSpectralTransform on GPU at low resolution [#1194](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1194)
 - Restructed GPU tests, and fixed an issue for which `MatrixSpectralTransform` failed on views [#1201](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1201)
 - Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions [#1147](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1147)
