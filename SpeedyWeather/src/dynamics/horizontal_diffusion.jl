@@ -4,6 +4,9 @@ abstract type AbstractHorizontalDiffusion <: AbstractModelComponent end
 horizontal_diffusion!(vars::Variables, model::AbstractModel) =
     horizontal_diffusion!(vars, model.horizontal_diffusion, model)
 
+# allow horizontal_diffusion = nothing to skip (Semi-Lagrangian advection for example may not need extra diffusion)
+horizontal_diffusion!(::Variables, ::Nothing, ::AbstractModel) = nothing
+
 # dispatch to decide between implicit or explicit diffusion
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Union{Nothing, AbstractImplicit}, ::AbstractTimeStepper) = true
 
