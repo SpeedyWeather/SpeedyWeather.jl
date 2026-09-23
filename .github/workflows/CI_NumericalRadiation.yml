@@ -1,0 +1,45 @@
+name: NumericalRadiation extension
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+jobs:
+  test:
+    name: Julia v${{ matrix.version }}, ${{ matrix.os }}, ${{ matrix.arch }}
+    # don't run if any of these labels are present
+    if: >
+      !(
+      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-numericalradiation-ci')
+      )
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    timeout-minutes: 60
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
+    strategy:
+      matrix:
+        version:
+          - '1.11'   # the test environment pulls NumericalRadiation from git through [sources], Julia >= 1.11
+        os:
+          - ubuntu-latest
+        arch:
+          - x64
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/cache@v3
+      - name: Instantiate the extension test environment
+        run: julia --color=yes --project=SpeedyWeather/test/numericalradiation -e 'using Pkg; Pkg.instantiate()'
+      - name: Run the NumericalRadiation extension tests
+        run: julia --color=yes --project=SpeedyWeather/test/numericalradiation --check-bounds=yes SpeedyWeather/test/numericalradiation/runtests.jl

@@ -36,8 +36,7 @@ $(TYPEDFIELDS)"""
         SM,     # <:AbstractSurfaceMomentumFlux,
         SH,     # <:AbstractSurfaceHeatFlux,
         CV,     # <:AbstractConvection,
-        SW,     # <:AbstractShortwave,
-        LW,     # <:AbstractLongwave,
+        RA,     # <:AbstractRadiation,
         GHG,    # NamedTuple of <:AbstractGreenhouseGas,
         SP,     # <:AbstractStochasticPhysics,
         CP,     # <:AbstractParameterization,
@@ -89,8 +88,7 @@ $(TYPEDFIELDS)"""
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
-    @component shortwave_radiation::SW = OneBandGreyShortwave(spectral_grid)
-    @component longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
+    @component radiation::RA = Radiation(spectral_grid; shortwave = OneBandGreyShortwave(spectral_grid), longwave = OneBandGreyLongwave(spectral_grid))
     @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
@@ -119,8 +117,7 @@ $(TYPEDFIELDS)"""
         :vertical_diffusion,        # mixing
         :convection,
         :albedo,                    # radiation
-        :shortwave_radiation,
-        :longwave_radiation,
+        :radiation,
         :boundary_layer,            # surface fluxes
         :surface_momentum_flux,
         :surface_heat_flux,
@@ -221,8 +218,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.boundary_layer, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.convection, model)
-    initialize!(model.shortwave_radiation, model)
-    initialize!(model.longwave_radiation, model)
+    initialize!(model.radiation, model)
     initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
