@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Output on pressure layers with the `layers = PressureLayers(spectral_grid)` keyword argument to the output writers, plus documentation for the vertical interpolation [#1257](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1257)
+- Output on pressure layers, plus documentation for the vertical interpolation [#1257](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1257)
+- Extended differentibaility tests for Barotropic model not broken anymore [#1270](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1270)
 - CI with Julia v1.13 [#1258](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1258)
 - Vertical interpolation from the model's (sigma or hybrid) layers onto pressure layers, CPU/GPU, with interpolation linear in p or log(p) and configurable extrapolation [#1256](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1256)
 - Documentation CI builds with Julia 1.12 [#1255](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1255)
@@ -36,6 +37,7 @@
 
 ## v0.22.1
 
+- First implementation for FFTs using Metal.jl [#1217](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1217)
 - WhichTransform for default MatrixSpectralTransform on GPU at low resolution [#1194](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1194)
 - Restructed GPU tests, and fixed an issue for which `MatrixSpectralTransform` failed on views [#1201](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1201)
 - Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions [#1147](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1147)
