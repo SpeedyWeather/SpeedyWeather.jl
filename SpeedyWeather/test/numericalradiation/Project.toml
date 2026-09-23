@@ -1,0 +1,32 @@
+# Environment of the NumericalRadiation extension tests, run by
+# .github/workflows/CI_NumericalRadiation.yml. Kept apart from test/Project.toml because
+# NumericalRadiation is not registered yet and comes from a git source, which needs Julia >= 1.11.
+# The revision must carry `ClearSkyEcCKDRadiation` (NumericalRadiation's own scheme type, 2026-09-22).
+# Only basic functionality is tested here; the full unit tests and the validation of the
+# coupling live in NumericalRadiation.jl (test/speedyweather/, validation/).
+#
+#   julia --project=SpeedyWeather/test/numericalradiation -e 'using Pkg; Pkg.instantiate()'
+#   julia --project=SpeedyWeather/test/numericalradiation --check-bounds=yes SpeedyWeather/test/numericalradiation/runtests.jl
+#
+# TODO: once NumericalRadiation is registered, add it to test/Project.toml, move basic.jl to
+# test/parameterizations/, and delete this environment and its workflow.
+
+[deps]
+LowerTriangularArrays = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
+NumericalRadiation = "cd8119b0-1744-44d6-9ede-6ad1ad750b26"
+RingGrids = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
+SpeedyTransforms = "6ecbb2e3-2b96-4d4f-a4d6-ffde3b6d9b5c"
+SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
+SpeedyWeatherInternals = "34489162-d270-4603-8b96-37b04f830d73"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+NumericalRadiation = "0.1"
+
+[sources]
+LowerTriangularArrays = {path = "../../../LowerTriangularArrays"}
+NumericalRadiation = {url = "https://github.com/NumericalEarth/NumericalRadiation.jl.git", rev = "mg/ecckd-speedy"}
+RingGrids = {path = "../../../RingGrids"}
+SpeedyTransforms = {path = "../../../SpeedyTransforms"}
+SpeedyWeather = {path = "../.."}
+SpeedyWeatherInternals = {path = "../../../SpeedyWeatherInternals"}

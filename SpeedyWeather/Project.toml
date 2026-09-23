@@ -35,6 +35,7 @@ StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [weakdeps]
+NumericalRadiation = "cd8119b0-1744-44d6-9ede-6ad1ad750b26"
 Browzarr = "d7a009df-479f-4526-be69-544662986fe6"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
@@ -51,6 +52,7 @@ SpeedyTransforms = {path = "../SpeedyTransforms"}
 SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 
 [extensions]
+SpeedyWeatherNumericalRadiationExt = "NumericalRadiation"
 SpeedyWeatherBrowzarrExt = "Browzarr"
 SpeedyWeatherEnzymeExt = "Enzyme"
 SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
@@ -82,6 +84,7 @@ KernelAbstractions = "0.9"
 LinearAlgebra = "1.10"
 LowerTriangularArrays = "0.1"
 NCDatasets = "0.12, 0.13, 0.14"
+NumericalRadiation = "0.1"
 Primes = "0.5"
 Printf = "1.10"
 ProgressMeter = "1.7"

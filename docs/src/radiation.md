@@ -23,6 +23,58 @@ variables via `variables(::MyRadiation)` (the standard radiation diagnostics suc
 and `surface_shortwave_down` are those of `variables(::AbstractShortwave)` and `variables(::AbstractLongwave)`),
 and is passed as `radiation = MyRadiation(spectral_grid)`.
 
+## Radiation schemes from NumericalRadiation.jl
+
+SpeedyWeather itself includes simple radiation schemes, described in the rest of this page:
+a uniform cooling, the Jeevanjee temperature-flux longwave, and one-band longwave and
+shortwave schemes with diagnostic clouds. More comprehensive schemes are provided by
+[NumericalRadiation.jl](https://github.com/NumericalEarth/NumericalRadiation.jl) through a
+package extension that is active as soon as both packages are loaded:
+
+- `ClearSkyEcCKDRadiation`: clear-sky correlated-k gas optics (ecCKD, the gas-optics models of
+  ECMWF's ecRad) with 32 or 64 longwave and 32, 64 or 96 shortwave g points, interpolated
+  from tabulated coefficients for every column. Longwave and shortwave are solved from one
+  gas-optics evaluation, with Rayleigh scattering in the shortwave. CO₂ follows the model's
+  greenhouse gases; ozone comes from an analytic default profile until SpeedyWeather has an
+  ozone field, other gases are prescribed with the scheme (`mole_fractions`).
+- `AnalyticBandLongwave`: NumericalRadiation's analytic 41-band clear-sky longwave scheme of
+  Williams (2026) for water vapour and CO₂, usable as it is as the longwave part of a
+  [`Radiation`](@ref); see its
+  [documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the
+  scheme's parameters.
+
+Both are NumericalRadiation's own scheme types, used like any other SpeedyWeather scheme; the
+extension adds constructors from a `SpectralGrid`. NumericalRadiation is not registered yet,
+add it with `Pkg.add(url = "https://github.com/NumericalEarth/NumericalRadiation.jl")`:
+
+```julia
+using SpeedyWeather, NumericalRadiation
+
+spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+
+# ecCKD for both streams: the reference 32x32 model, or e.g. ClearSkyEcCKDRadiation(spectral_grid, "64x96")
+radiation = ClearSkyEcCKDRadiation(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; radiation)
+simulation = initialize!(model)
+run!(simulation, period = Day(10))
+simulation.variables.parameterizations.outgoing_longwave
+
+# or the analytic-band longwave next to the default one-band shortwave
+longwave = AnalyticBandLongwave(spectral_grid)     # in the grid's number format, scheme parameters as keywords
+model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+```
+
+Both schemes take CO₂ from the model's [greenhouse gases](@ref) when a `co2` component is
+present and use 280 ppm otherwise.
+
+The first `ClearSkyEcCKDRadiation` downloads the ecCKD coefficient tables (a lazy artifact of
+NumericalRadiation). Its work arrays, optical depths per g point, interface fluxes and the
+surface emission, are parameterization variables in the `ecckd` namespace,
+`simulation.variables.parameterizations.ecckd`. The scheme is clear-sky, about 3x the cost
+of the one-band pair at T31 with 8 layers, and further gases of an ecCKD model are passed as
+`mole_fractions = (; ch4 = 1.8e-6)`; see NumericalRadiation's
+[documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the scheme.
+
 ## Longwave radiation implementations
 
 Currently implemented is
