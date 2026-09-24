@@ -7,8 +7,11 @@ SpeedyWeather.jl is written with differentiability in mind. This means that our 
 
 For the differentiability of our model we rely on [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl). If you've used Enzyme before, just go ahead and try to differentiate the model! It should work. We have checked the correctness of the gradients extensively against a finite differences differentiation with [FiniteDifferences.jl](https://github.com/JuliaDiff/FiniteDifferences.jl/). In the following we present a simple example how we can take the gradient of a single timestep of the [primitive equation model](@ref primitive_equation_model) with respect to one of the model parameter.
 
-!!! warning "Enzyme with Julia 1.11"
-    Currently there are still some issues with Enzyme in Julia 1.11/1.12, we recommend to use Julia 1.10 for the following
+!!! warning "Enzyme with Julia 1.12"
+    Currently there are still some issues with Enzyme in Julia 1.11/1.12, we recommend to use Julia 1.10 for the following. 
+    * Julia 1.10: All differentiation functionality tested and working
+    * Julia 1.11: Basic end-to-end differentation functionality tested and working
+    * Julia 1.12: Only individual functions and components and `BarotropicModel` differentiate correctly, no end-to-end differentiation of `PrimitiveWetModel` possible at the moment
 
 ## Differentiating through a single timestep
 
