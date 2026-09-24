@@ -107,8 +107,8 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     Tₜ = longwave.temp_tropopause
 
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, longwave)
-    lst = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, longwave) # TODO use skin temperature?
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), longwave)
+    lst = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), longwave) # TODO use skin temperature?
 
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
@@ -237,9 +237,9 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     cₚ = model.atmosphere.heat_capacity
 
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, longwave)
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), longwave)
     # TODO use skin temperature?
-    lst = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, longwave)            
+    lst = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), longwave)            
 
     U_ocean = ϵ_ocean * σ * sst[ij]^4                                   # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = U_ocean      # for ocean model forcing

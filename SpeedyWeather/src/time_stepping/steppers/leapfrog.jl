@@ -4,7 +4,7 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
+mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
@@ -22,13 +22,19 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
 
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
+
+    "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for leapfrog as the atmosphere"
+    ocean::O
+
+    "[OPTION] Time stepper for the land variables, `nothing` for leapfrog as the atmosphere"
+    land::L
 end
 
 Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt))
 
 # HOW MANY STEPS DO VARIABLES NEED?
-# leapfrogging always needs 2 steps in spectral
-prognostic_spectral_steps(::AbstractLeapfrog) = 2
+# leapfrogging always needs 2 steps (in spectral, and for ocean/land if leapfrogged)
+prognostic_steps(::AbstractLeapfrog) = 2
 # but in 2D only 1 step in grid space
 prognostic_grid_steps(::AbstractLeapfrog, ::Union{<:Barotropic, <:ShallowWater}) = 1
 # but the parameterizations are evaluated at the previous step so 2
@@ -63,15 +69,12 @@ tendency_steps(::AbstractLeapfrog) = 1
 # Parameterizations should always be evaluated on the previous time step for Euler forward
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParameterization) = 1
 
-# abstract ocean, sea ice or land components use 1 step (as not subject to time stepping, e.g. prescribed)
+# ocean, sea ice or land components read the 1st step: prescribed ones have no step dimension,
+# with the default `EulerForward` for ocean and land there is only 1 step, and with `ocean/land = nothing`
+# (leapfrogged) the 1st step is the previous one, consistent with the parameterizations
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractOcean) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSeaIce) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractLandComponent) = 1
-
-# dynamic models are then generally leapfrogged
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicOcean) = 2
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicSeaIce) = 2
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicLandComponent) = 2
 
 # particle advection using u, v at current not previous time step
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
@@ -94,6 +97,7 @@ end
 
 # copy step 1 -> step 2 for one variable; steps bound individually via get_step
 @inline function copy_step_forward!(var)
+    nsteps(var) > 1 || return nothing           # e.g. ocean/land variables with EulerForward
     var_old = get_step(var, 1)
     var_new = get_step(var, 2)
     var_new .= var_old
@@ -183,6 +187,8 @@ function Leapfrog(
         adjust_with_output = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
+        ocean = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
+        land = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
     )
     (; NF, truncation) = spectral_grid
 
@@ -192,6 +198,7 @@ function Leapfrog(
 
     return Leapfrog(
         Second(Δt_at_T32), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
+        ocean, land,
     )
 end
 
@@ -201,9 +208,18 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
-    calculate_Δt!(L, model)         # common among several time steppers
+    calculate_Δt!(L, model)         # common among several time steppers, also sets ocean/land Δt
     return nothing
 end
+
+# ocean and land use the time steppers in the respective fields, `nothing` means leapfrog like the atmosphere
+time_stepper(L::Leapfrog, ::Val{:ocean}) = something(L.ocean, L)
+time_stepper(L::Leapfrog, ::Val{:land}) = something(L.land, L)
+
+# the first Euler step and the first leapfrog step only advance the clock by Δt/2,
+# so non-leapfrog time steppers for ocean and land step Δt/2 there too
+time_step_scale(::Leapfrog, ::AbstractTimeStepper, clock::Clock) = ifelse(clock.step_counter <= 1, 2, 1)
+time_step_scale(::Leapfrog, ::AbstractLeapfrog, clock::Clock) = 1   # leapfrog does this itself
 
 """$(TYPEDSIGNATURES) Leapfrog is spun up with 1 Euler forward step that doesn't count for clock + output"""
 spin_up_steps(::AbstractLeapfrog) = 1

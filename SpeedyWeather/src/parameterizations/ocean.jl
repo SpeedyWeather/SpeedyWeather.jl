@@ -1,5 +1,5 @@
-# variable that AbstractOcean requires
-function variables(::AbstractPrescribedOcean)
+# variable that AbstractOcean requires, dynamic oceans should define it with a time dimension
+function variables(::AbstractOcean)
     return (
         PrognosticVariable(:sea_surface_temperature, GridXY(), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
     )
@@ -285,9 +285,9 @@ end
 SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 
 function variables(::SlabOcean, model::AbstractModel)
-    nsteps = get_nsteps(model.time_stepping, model)
-    pg = nsteps.prognostic_grid
-    tg = nsteps.tendency_grid
+    nsteps = get_nsteps(model.time_stepping, :ocean)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
     return (
         PrognosticVariable(:sea_surface_temperature, OceanXYT(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
         TendencyVariable(:sea_surface_temperature, OceanXYT(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),
@@ -332,7 +332,7 @@ function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEq
 end
 
 function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEquation)
-    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, model.time_stepping, ocean_model)
+    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), ocean_model)
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
     C₀⁻¹ = inv(ocean_model.heat_capacity_mixed_layer)
@@ -347,8 +347,8 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
 
-    @boundscheck size(dsst) == size(Rsd) == size(Rsu) == size(Rld) == size(Rlu) || throw(BoundsError)
-    @boundscheck size(dsst) == size(S) == size(H) || throw(BoundsError)
+    @boundscheck size(dsst) == size(Rsd) == size(Rsu) == size(Rld) == size(Rlu) || throw(BoundsError())
+    @boundscheck size(dsst) == size(S) == size(H) || throw(BoundsError())
 
     launch!(
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,

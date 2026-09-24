@@ -1,6 +1,6 @@
 abstract type AbstractLandTemperature <: AbstractLandComponent end
-abstract type AbstractDynamicLandTemperature <: AbstractDynamicLandComponent end
-abstract type AbstractPrescribedLandTemperature <: AbstractPrescribedLandComponent end
+abstract type AbstractDynamicLandTemperature <: AbstractLandTemperature end
+abstract type AbstractPrescribedLandTemperature <: AbstractLandTemperature end
 
 function variables(::AbstractPrescribedLandTemperature)
     return (
@@ -171,9 +171,9 @@ Adapt.@adapt_structure LandBucketTemperature
 LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 
 function variables(::LandBucketTemperature, model::AbstractModel)
-    nsteps = get_nsteps(model.time_stepping, model)
-    pg = nsteps.prognostic_grid
-    tg = nsteps.tendency_grid
+    nsteps = get_nsteps(model.time_stepping, :land)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
     return (
         PrognosticVariable(:soil_temperature, LandXYZT(pg), desc = "Soil temperature", units = "K", namespace = :land),
         TendencyVariable(:soil_temperature, LandXYZT(tg), desc = "Tendency of soil temperature", units = "K/s", namespace = :land),
@@ -220,13 +220,13 @@ function timestep!(
         land::LandBucketTemperature,
         model::PrimitiveEquation,
     )
-    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, land)
-    soil_temperature_tendency = get_tendency_step(vars.tendencies.land.soil_temperature, model.time_stepping, land)
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), land)
+    soil_temperature_tendency = get_tendency_step(vars.tendencies.land.soil_temperature, time_stepper(model.time_stepping, :land), land)
     soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? 
-        get_prognostic_step(vars.prognostic.land.soil_moisture, model.time_stepping, land) : nothing
+        get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), land) : nothing
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
-    Lᵢ = latent_heat_sublimation(model.atmosphere)
+    Lᵢ = latent_heat_fusion(model.atmosphere)
 
     (; land_fraction) = model.land_sea_mask
     (; thermodynamics, geometry) = model.land

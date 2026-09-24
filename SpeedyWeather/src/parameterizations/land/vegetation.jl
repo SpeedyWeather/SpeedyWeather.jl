@@ -42,11 +42,11 @@ function soil_moisture_availability!(
     haskey(vars.prognostic.land, :soil_moisture) || return nothing
 
     # view on the top layer of soil moisture
-    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, model.time_stepping, vegetation)
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), vegetation)
     soil_moisture_top = field_view(soil_moisture, :, 1)
     (; soil_moisture_availability) = vars.parameterizations.land
 
-    @boundscheck size(soil_moisture_availability) == size(soil_moisture_top) || throw(BoundsError)
+    @boundscheck size(soil_moisture_availability) == size(soil_moisture_top) || throw(BoundsError())
 
     # Fortran SPEEDY documentation eq. 51 with vegetation = 0
     W_cap = model.land.thermodynamics.field_capacity
@@ -190,7 +190,7 @@ function soil_moisture_availability!(
     haskey(vars.prognostic.land, :soil_moisture) || return nothing
 
     (; vegetation_high, vegetation_low, soil_moisture_availability) = vars.parameterizations.land
-    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, model.time_stepping, vegetation)
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), vegetation)
     (; low_veg_factor) = vegetation
 
     # copy over vegetation fields into diagnostic variables
@@ -206,9 +206,9 @@ function soil_moisture_availability!(
         throw(DimensionMismatch(vegetation_high, soil_moisture_availability))
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only = true) ||
         throw(DimensionMismatch(soil_moisture, soil_moisture_availability))
-    @boundscheck ndims(soil_moisture) == 2                  # the step is correctly chosen, yielding an IJ x K array only
-    @boundscheck size(soil_moisture, 2) >= 2                # defined for two layers
-    @boundscheck size(soil_moisture_availability, 2) == 1   # 2D only
+    @boundscheck ndims(soil_moisture) == 2 || throw(BoundsError())              # step correctly chosen, IJ x K array only
+    @boundscheck size(soil_moisture, 2) >= 2 || throw(BoundsError())            # defined for two layers
+    @boundscheck size(soil_moisture_availability, 2) == 1 || throw(BoundsError())   # 2D only
 
     # precalculate denominator
     r = 1 / (D_top * W_cap + D_root * (W_cap - W_wilt))
