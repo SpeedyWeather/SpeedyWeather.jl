@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Bundle shortwave and longwave radiation into one model component `model.radiation = Radiation(shortwave, longwave)`, replacing the `shortwave_radiation` and `longwave_radiation` fields [#1252](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1252)
+- [BREAKING] Bundle shortwave and longwave radiation into one model component `model.radiation = Radiation(shortwave, longwave)`, replacing the `shortwave_radiation` and `longwave_radiation` fields [#1252](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1252)
 - Output on pressure layers, plus documentation for the vertical interpolation [#1257](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1257)
 - Extended differentibaility tests for Barotropic model not broken anymore [#1270](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1270)
 - CI with Julia v1.13 [#1258](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1258)
