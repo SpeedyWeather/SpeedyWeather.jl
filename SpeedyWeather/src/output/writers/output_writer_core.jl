@@ -74,6 +74,10 @@ function initialize!(
     # RESET COUNTERS
     core.output_counter = 1             # start at 1 for writing the initial conditions
 
+    # VERTICAL OUTPUT LAYERS, PressureLayers allocate at construction, but take κ for
+    # any dry-adiabatic extrapolation from the model's atmosphere
+    sync_extrapolations!(output, model)
+
     # CALLBACKS
     output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
     output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
