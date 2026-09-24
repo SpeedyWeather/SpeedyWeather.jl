@@ -297,7 +297,7 @@ even though they are initialized and variables are created nevertheless
 ```@example custom-parameterization
 model = PrimitiveWetModel(spectral_grid;
     custom_parameterization = SimpleAlbedo(spectral_grid),
-    parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :shortwave_radiation,
+    parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :radiation,
         :boundary_layer, :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
 
 simulation = initialize!(model)
@@ -306,7 +306,7 @@ run!(simulation, period=Day(5)) # spin up the model a little
 heatmap(simulation.variables.parameterizations.albedo)
 ```
 
-Again, it worked! Note that it's important here to call the `:shortwave_radiation` after our
+Again, it worked! Note that it's important here to call the `:radiation` after our
 `:custom_parameterization` as the shortwave radiation will use the albedo over ocean and land
 for respective flux computations and average the albedo then according to the land-sea mask.
 
