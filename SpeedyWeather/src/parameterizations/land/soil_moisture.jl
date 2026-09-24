@@ -163,9 +163,9 @@ Adapt.@adapt_structure LandBucketMoisture
 LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 
 function variables(::LandBucketMoisture, model::AbstractModel)
-    nsteps = get_nsteps(namespace_time_stepping(model, :land), model)
-    pg = nsteps.prognostic_grid
-    tg = nsteps.tendency_grid
+    nsteps = get_namespace_nsteps(model, :land)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
     return (
         PrognosticVariable(:soil_moisture, LandXYZT(pg), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         TendencyVariable(:soil_moisture, LandXYZT(tg), desc = "Tendency of soil moisture", units = "1/s", namespace = :land),

@@ -33,8 +33,8 @@ end
 Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt))
 
 # HOW MANY STEPS DO VARIABLES NEED?
-# leapfrogging always needs 2 steps in spectral
-prognostic_spectral_steps(::AbstractLeapfrog) = 2
+# leapfrogging always needs 2 steps (in spectral, and for ocean/land if leapfrogged)
+prognostic_steps(::AbstractLeapfrog) = 2
 # but in 2D only 1 step in grid space
 prognostic_grid_steps(::AbstractLeapfrog, ::Union{<:Barotropic, <:ShallowWater}) = 1
 # but the parameterizations are evaluated at the previous step so 2
@@ -208,30 +208,8 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
-    calculate_Δt!(L, model)         # common among several time steppers
-    set_namespace_time_steps!(L, resolution_factor(model))
+    calculate_Δt!(L, model)         # common among several time steppers, also sets ocean/land Δt
     return nothing
-end
-
-# the ocean and land time steppers (if not leapfrogged) use the same Δt as the atmosphere
-function set_namespace_time_steps!(L::Leapfrog, factor::Real)
-    for child in (L.ocean, L.land)
-        if !isnothing(child)
-            set!(child, L.Δt_millisec, factor)
-            # set! disables the adjustment, restore it to calculate Δt as in the parent
-            child.adjust_with_output = L.adjust_with_output
-        end
-    end
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Change the time step of `L` (see `set!(::AbstractTimeStepper, ...)`) and also of the time steppers
-of its `ocean` and `land` fields so that they stay in sync with the atmosphere."""
-function set!(L::Leapfrog, Δt::Period, factor::Real = resolution_factor(L))
-    invoke(set!, Tuple{AbstractTimeStepper, Period, Real}, L, Δt, factor)
-    set_namespace_time_steps!(L, factor)
-    return L
 end
 
 # ocean and land use the time steppers in the respective fields, `nothing` means leapfrog like the atmosphere

@@ -285,9 +285,9 @@ end
 SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 
 function variables(::SlabOcean, model::AbstractModel)
-    nsteps = get_nsteps(namespace_time_stepping(model, :ocean), model)
-    pg = nsteps.prognostic_grid
-    tg = nsteps.tendency_grid
+    nsteps = get_namespace_nsteps(model, :ocean)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
     return (
         PrognosticVariable(:sea_surface_temperature, OceanXYT(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
         TendencyVariable(:sea_surface_temperature, OceanXYT(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),

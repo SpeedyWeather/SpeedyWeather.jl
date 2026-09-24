@@ -10,9 +10,9 @@ function variables(::AbstractSeaIce)
 end
 
 function variables(::AbstractDynamicSeaIce, model::AbstractModel)
-    nsteps = get_nsteps(namespace_time_stepping(model, :ocean), model)
-    pg = nsteps.prognostic_grid
-    tg = nsteps.tendency_grid
+    nsteps = get_namespace_nsteps(model, :ocean)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
     return (
         PrognosticVariable(:sea_ice_concentration, OceanXYT(pg), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
         TendencyVariable(:sea_ice_concentration, OceanXYT(tg), namespace = :ocean, desc = "Tendency of sea ice concentration", units = "1/s"),

@@ -24,6 +24,16 @@ const DEFAULT_NSTEPS = (
     tendency_spectral = tendency_spectral_steps(DummyTimeStepper()),
 )
 
+"""$(TYPEDSIGNATURES)
+Number of steps of the prognostic variables and tendencies in `namespace` (`:ocean` or `:land`),
+decided by the time stepper of that namespace, see `namespace_time_stepping`. These variables are
+stepped forward directly (not transformed), so the time stepper's `prognostic_steps` and
+`tendency_steps` apply without a distinction between grid and spectral space."""
+function get_namespace_nsteps(model::AbstractModel, namespace::Symbol)
+    time_stepping = namespace_time_stepping(model, namespace)
+    return (prognostic = prognostic_steps(time_stepping), tendency = tendency_steps(time_stepping))
+end
+
 function get_nsteps(time_stepping::AbstractTimeStepper, model::AbstractModel)
     return (;
         prognostic_grid = prognostic_grid_steps(time_stepping, model),

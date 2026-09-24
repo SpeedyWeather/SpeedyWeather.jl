@@ -56,9 +56,36 @@ end
     run!(simulation, steps = 4)
     @test simulation.model.feedback.nans_detected == false
 
-    # other time steppers use themselves for ocean and land
+    # NCycleLorenz uses itself for ocean and land by default
     ncycle = NCycleLorenz(spectral_grid)
     @test SpeedyWeather.namespace_time_stepping(ncycle, Val(:land)) === ncycle
+    @test SpeedyWeather.namespace_time_stepping(ncycle, Val(:ocean)) === ncycle
+end
+
+@testset "NCycleLorenz for ocean and land with leapfrog" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
+    time_stepping = Leapfrog(spectral_grid, ocean = NCycleLorenz(spectral_grid), land = NCycleLorenz(spectral_grid))
+    model = PrimitiveWetModel(spectral_grid; time_stepping)
+    simulation = initialize!(model)
+    (; variables) = simulation
+    @test time_stepping.land.Δt == time_stepping.Δt
+    # the N-cycle decides on the steps: 1 prognostic step, 2 tendency steps (F, G)
+    @test SpeedyWeather.nsteps(variables.prognostic.land.soil_temperature) == 1
+    @test SpeedyWeather.nsteps(variables.tendencies.land.soil_temperature) == 2
+    @test SpeedyWeather.nsteps(variables.tendencies.ocean.sea_surface_temperature) == 2
+    run!(simulation, steps = 4)
+    @test simulation.model.feedback.nans_detected == false
+end
+
+@testset "EulerForward for ocean and land with NCycleLorenz" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
+    time_stepping = NCycleLorenz(spectral_grid, ocean = EulerForward(spectral_grid), land = EulerForward(spectral_grid))
+    model = PrimitiveWetModel(spectral_grid; time_stepping)
+    simulation = initialize!(model)
+    @test SpeedyWeather.namespace_time_stepping(model, :land) === time_stepping.land
+    @test time_stepping.land.Δt == time_stepping.ocean.Δt == time_stepping.Δt
+    @test SpeedyWeather.nsteps(simulation.variables.tendencies.land.soil_temperature) == 1
+    # no run! as NCycleLorenz does not support primitive equation models yet
 end
 
 @testset "Leapfrogged ocean and land" begin

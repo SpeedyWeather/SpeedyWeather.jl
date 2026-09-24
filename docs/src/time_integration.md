@@ -201,8 +201,14 @@ time_stepping = Leapfrog(spectral_grid, land = nothing)             # leapfrog l
 model = PrimitiveWetModel(spectral_grid; time_stepping)
 ```
 
-The variables are allocated with the number of steps of their time stepper, so with `EulerForward`
-ocean and land variables have only one step. The time step of `ocean` and `land` is always set
+[`NCycleLorenz`](@ref) has the same `ocean` and `land` fields, defaulting to `nothing`, i.e. the
+same N-cycle as the atmosphere. Any time stepper can be used for ocean and land, e.g.
+`Leapfrog(spectral_grid, land = NCycleLorenz(spectral_grid))`.
+
+The variables are allocated with the number of steps of their time stepper
+(`prognostic_steps` and `tendency_steps`, see `SpeedyWeather.get_namespace_nsteps`), so with
+`EulerForward` ocean and land variables have only one step, with `NCycleLorenz` one prognostic
+step and two tendency steps. The time step of `ocean` and `land` is always set
 to the ``\Delta t`` of the leapfrog (also with `set!(model, Δt=...)`), and on the first two
 leapfrog steps, which each only advance the clock by ``\Delta t/2``, also Euler steps with ``\Delta t/2``.
 

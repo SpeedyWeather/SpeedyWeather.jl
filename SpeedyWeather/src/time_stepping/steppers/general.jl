@@ -112,7 +112,23 @@ function set!(
 
     # given Δt was manually set disallow adjustment to output frequency
     L.adjust_with_output = false
+    set_namespace_time_steps!(L, factor)    # and the time steppers for ocean and land
     return L
+end
+
+"""$(TYPEDSIGNATURES)
+Set the time step of the ocean and land time steppers of `time_stepping` (if not itself)
+to the time step of `time_stepping`, so that they stay in sync with the atmosphere."""
+function set_namespace_time_steps!(time_stepping::AbstractTimeStepper, factor::Real)
+    for namespace in (Val(:ocean), Val(:land))
+        child = namespace_time_stepping(time_stepping, namespace)
+        if child !== time_stepping
+            set!(child, time_stepping.Δt_millisec, factor)
+            # set! disables the adjustment, use the parent's to be consistent
+            child.adjust_with_output = time_stepping.adjust_with_output
+        end
+    end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES) Set the time step of `L` using the exact resolution factor of `model`."""
@@ -141,6 +157,7 @@ function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
                 "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but interval = $(interval.value)s"
         end
     end
+    set_namespace_time_steps!(L, resolution_factor(model))  # ocean and land time steppers
     return nothing
 end
 

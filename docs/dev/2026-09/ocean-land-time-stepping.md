@@ -29,6 +29,20 @@ Base revision: `c14d88f3` (`mc/landstepping-euler`, PR #1264, targeting #1183)
 - **Allocate variables with the namespace's time stepper.**
 - **New `EulerForward` type** rather than reusing `NCycleLorenz(steps = 1)`, which is Euler
   forward mathematically but needs 2 tendency steps and is confusing to read.
+- **`namespace_time_stepping` instead of `time_stepping`** as function name, to avoid clashes with
+  local variables of that name.
+- **Namespace allocation with the child's own step counts.** `NCycleLorenz` for land failed with
+  a `BoundsError` as land tendencies were allocated with the grid tendency steps (1, only F),
+  but NCycleLorenz needs F and G. Ocean and land variables are stepped directly, so they are
+  now allocated with `get_namespace_nsteps(model, namespace)`, i.e. `prognostic_steps` and
+  `tendency_steps` of their time stepper, without the grid/spectral distinction of the
+  atmosphere (Leapfrog: `prognostic_steps = 2`, NCycleLorenz: `tendency_steps = 2`).
+- **`NCycleLorenz` also gets `ocean` and `land` fields** (default `nothing`, i.e. itself) so that
+  the interface is not only the fallback. The Δt sync moved into the generic `calculate_Δt!`
+  and `set!` so that it works for every time stepper with these fields.
+- With Leapfrog for the atmosphere, an NCycleLorenz for ocean/land starts its first cycle at
+  step counter 0 (w = 1, Euler), the cycle phase is then shifted by leapfrog's start-up step,
+  which is fine.
 
 ## Problem description
 
@@ -85,6 +99,8 @@ choose the time stepping of ocean or land.
 
 - Ocean and sea ice share the `:ocean` namespace and cannot be stepped differently.
 - Child time steppers are not nested (a child's own `ocean`/`land` fields are ignored).
+- `Leapfrog` as ocean/land time stepper under a non-leapfrog atmosphere is not supported: its
+  steps are only initialised (copied 1 → 2) when the atmosphere uses Leapfrog.
 - No sub- or super-cycling: the children's Δt is always the Leapfrog's Δt.
 - `land = nothing` / `ocean = nothing` with Leapfrog keeps the instability #1264 fixed; it is an
   opt-in for experiments.
@@ -92,4 +108,4 @@ choose the time stepping of ocean or land.
 ## Future work
 
 - `EulerForward` as a full atmospheric time stepper (clock `time_step!`, `which_prognostic_step`).
-- `ocean`/`land` fields for `NCycleLorenz`; sub-/super-cycling of ocean and land.
+- Sub-/super-cycling of ocean and land.

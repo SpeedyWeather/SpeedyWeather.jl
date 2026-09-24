@@ -171,9 +171,9 @@ Adapt.@adapt_structure LandBucketTemperature
 LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 
 function variables(::LandBucketTemperature, model::AbstractModel)
-    nsteps = get_nsteps(namespace_time_stepping(model, :land), model)
-    pg = nsteps.prognostic_grid
-    tg = nsteps.tendency_grid
+    nsteps = get_namespace_nsteps(model, :land)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
     return (
         PrognosticVariable(:soil_temperature, LandXYZT(pg), desc = "Soil temperature", units = "K", namespace = :land),
         TendencyVariable(:soil_temperature, LandXYZT(tg), desc = "Tendency of soil temperature", units = "K/s", namespace = :land),
