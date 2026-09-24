@@ -25,7 +25,7 @@ NumericalRadiation = "0.1"
 
 [sources]
 LowerTriangularArrays = {path = "../../../LowerTriangularArrays"}
-NumericalRadiation = {url = "https://github.com/NumericalEarth/NumericalRadiation.jl.git", rev = "mg/ecckd-speedy"}
+NumericalRadiation = {url = "https://github.com/NumericalEarth/NumericalRadiation.jl.git", rev = "mg/speedy-update"}
 RingGrids = {path = "../../../RingGrids"}
 SpeedyTransforms = {path = "../../../SpeedyTransforms"}
 SpeedyWeather = {path = "../.."}

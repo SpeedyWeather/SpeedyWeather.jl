@@ -20,6 +20,10 @@ bundle of `radiation-bundle.md`). Working branch: `mg/numericalradiation-extensi
 
 ## Revision log
 
+- **2026-09-24, NumericalRadiation side collapsed.** The three-PR stack there became one PR
+  (NumericalEarth/NumericalRadiation.jl#16, branch `mg/speedy-update`, merged with its `main`);
+  `test/numericalradiation/Project.toml` pulls that branch now (`main` once the PR is merged,
+  the registered package once it exists).
 - **2026-09-22, naming.** NumericalRadiation's scheme type is `ClearSkyEcCKDRadiation`
   (the solver pair is part of its definition); SpeedyWeather-side mentions renamed.
 - **2026-09-22, third review.** Same for `EcCKDRadiation`: the configured clear-sky ecCKD scheme
