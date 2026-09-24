@@ -137,7 +137,7 @@ variables(::SurfaceLandHumidityFlux) = (
     # TODO use a skin temperature?
     soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), humidity_flux)
     T = soil_temperature[ij, 1]  # uppermost land layer with index 1
-    snow_depth = vars.prognostic.land.snow_depth[ij]
+    snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), humidity_flux)[ij]
     α = vars.parameterizations.land.soil_moisture_availability[ij]
 
     # SATURATION HUMIDITY OVER LAND

@@ -188,7 +188,7 @@ When writing a new time stepper you implement the `*_steps` methods (how many st
 ### Ocean, sea ice and land
 
 Dynamic ocean, sea ice and land components (e.g. `SlabOcean`, `ThermodynamicSeaIce`,
-`LandBucketTemperature`, `LandBucketMoisture`) write tendencies into `vars.tendencies.ocean`
+`LandBucketTemperature`, `LandBucketMoisture`, `SnowModel`) write tendencies into `vars.tendencies.ocean`
 and `vars.tendencies.land`. The variables in these namespaces are time stepped with their own
 time stepper within the time stepping setup `model.time_stepping`,
 `SpeedyWeather.time_stepper(model.time_stepping, :ocean)` and `(model.time_stepping, :land)`

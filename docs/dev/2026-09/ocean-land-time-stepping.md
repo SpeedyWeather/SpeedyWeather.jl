@@ -41,6 +41,12 @@ Base revision: `c14d88f3` (`mc/landstepping-euler`, PR #1264, targeting #1183)
 - **`NCycleLorenz` also gets `ocean` and `land` fields** (default `nothing`, i.e. itself) so that
   the interface is not only the fallback. The Δt sync moved into the generic `calculate_Δt!`
   and `set!` so that it works for every time stepper with these fields.
+- **Snow wired into the land time stepper.** `SnowModel` had Euler forward hardcoded in its
+  kernel. `snow_depth` is now a prognostic variable with a tendency (allocated with
+  `get_nsteps(model.time_stepping, :land)`), the kernel writes the tendency and the land time
+  stepper steps it. The clamp to [0, `snow_depth_cap`] moved into `filter!(vars, ::SnowModel, model)`;
+  melt is still limited to the available snow over the land time step. Readers of `snow_depth`
+  (albedo, surface heat and humidity fluxes) use `get_prognostic_step` with the land time stepper.
 - With Leapfrog for the atmosphere, an NCycleLorenz for ocean/land starts its first cycle at
   step counter 0 (w = 1, Euler), the cycle phase is then shifted by leapfrog's start-up step,
   which is fine.

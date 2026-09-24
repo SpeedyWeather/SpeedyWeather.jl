@@ -100,6 +100,33 @@ end
     @test simulation.model.feedback.nans_detected == false
 end
 
+@testset "Snow time stepped by the land time stepper" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
+    for land_time_stepper in (EulerForward(spectral_grid), nothing)    # nothing = leapfrogged
+        time_stepping = Leapfrog(spectral_grid, land = land_time_stepper)
+        model = PrimitiveWetModel(spectral_grid; time_stepping)
+        @test model.land.snow isa SnowModel
+        simulation = initialize!(model)
+        (; variables) = simulation
+        snow_depth = variables.prognostic.land.snow_depth
+        nsteps = isnothing(land_time_stepper) ? 2 : 1
+        @test SpeedyWeather.nsteps(snow_depth) == nsteps
+        @test haskey(variables.tendencies.land, :snow_depth)
+
+        # filter! keeps snow depth in [0, snow_depth_cap] for all steps
+        snow_depth .= 1000
+        snow_depth[1, :] .= -1
+        filter!(variables, model.land.snow, model)
+        @test all(snow_depth[1, :] .== 0)
+        @test all(snow_depth[2:end, :] .== model.land.snow.snow_depth_cap)
+
+        snow_depth .= 0
+        run!(simulation, steps = 4)
+        @test simulation.model.feedback.nans_detected == false
+        @test all(0 .<= snow_depth .<= model.land.snow.snow_depth_cap)
+    end
+end
+
 @testset "LandBucketMoisture excess water is conserved" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
     model = PrimitiveWetModel(spectral_grid)

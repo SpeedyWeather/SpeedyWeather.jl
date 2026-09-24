@@ -148,7 +148,8 @@ variables(::SurfaceLandHeatFlux) = (
     T_skin_land = soil_temperature[ij, 1]                       # uppermost land layer with index 1
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    snow_depth = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(T)
+    snow_depth = haskey(vars.prognostic.land, :snow_depth) ?
+        get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), heat_flux)[ij] : zero(T)
 
     # drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
