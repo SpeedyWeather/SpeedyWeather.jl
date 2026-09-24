@@ -9,14 +9,12 @@ extend for time steppers with changing time steps, e.g. `Leapfrog` on its first 
 time_step(time_stepping::AbstractTimeStepper, clock) = default_time_step(time_stepping)
 
 """$(TYPEDSIGNATURES)
-Time stepper for the variables in `namespace` (`:ocean` or `:land`). Defaults to `time_stepping`
-itself, time steppers can extend this to step ocean or land differently, e.g. `Leapfrog` uses
-its `ocean` and `land` fields (default `EulerForward`)."""
-namespace_time_stepping(time_stepping::AbstractTimeStepper, ::Val) = time_stepping
-
-"""$(TYPEDSIGNATURES) Time stepper for the variables in `namespace` (`:ocean` or `:land`) of `model`."""
-@inline namespace_time_stepping(model::AbstractModel, namespace::Symbol) =
-    namespace_time_stepping(model.time_stepping, Val(namespace))
+Time stepper for `:atmosphere`, `:ocean` (incl sea ice) or `:land` within the `time_stepping`
+setup of a model (`model.time_stepping`). Defaults to `time_stepping` itself, time steppers can
+extend this to step ocean or land differently, e.g. `Leapfrog` uses its `ocean` and `land` fields
+(default `EulerForward`)."""
+@inline time_stepper(time_stepping::AbstractTimeStepper, component::Symbol) = time_stepper(time_stepping, Val(component))
+time_stepper(time_stepping::AbstractTimeStepper, ::Val) = time_stepping
 
 """$(TYPEDSIGNATURES)
 Factor by which the time step of the `child` time stepper (for a namespace) is divided when
@@ -25,12 +23,12 @@ first two steps, so non-leapfrog children use `scale = 2` there. Defaults to 1."
 time_step_scale(parent::AbstractTimeStepper, child::AbstractTimeStepper, clock) = 1
 
 """$(TYPEDSIGNATURES)
-Time step [s] with which the variables in `namespace` (`:ocean` or `:land`) of `model` are
-stepped forward at the current `clock`."""
-function time_step(model::AbstractModel, namespace::Symbol, clock)
-    child = namespace_time_stepping(model, namespace)
-    Δt = time_step(child, clock)
-    return Δt / oftype(Δt, time_step_scale(model.time_stepping, child, clock))
+Time step [s] with which the variables of `component` (`:ocean` or `:land`) are stepped forward
+within the `time_stepping` setup at the current `clock`."""
+function time_step(time_stepping::AbstractTimeStepper, component::Symbol, clock)
+    stepper = time_stepper(time_stepping, component)
+    Δt = time_step(stepper, clock)
+    return Δt / oftype(Δt, time_step_scale(time_stepping, stepper, clock))
 end
 
 """$(TYPEDSIGNATURES)
@@ -120,8 +118,8 @@ end
 Set the time step of the ocean and land time steppers of `time_stepping` (if not itself)
 to the time step of `time_stepping`, so that they stay in sync with the atmosphere."""
 function set_namespace_time_steps!(time_stepping::AbstractTimeStepper, factor::Real)
-    for namespace in (Val(:ocean), Val(:land))
-        child = namespace_time_stepping(time_stepping, namespace)
+    for component in (:ocean, :land)
+        child = time_stepper(time_stepping, component)
         if child !== time_stepping
             set!(child, time_stepping.Δt_millisec, factor)
             # set! disables the adjustment, use the parent's to be consistent

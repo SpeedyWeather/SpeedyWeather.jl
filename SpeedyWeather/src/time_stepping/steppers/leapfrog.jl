@@ -213,8 +213,8 @@ function initialize!(L::Leapfrog, model::AbstractModel)
 end
 
 # ocean and land use the time steppers in the respective fields, `nothing` means leapfrog like the atmosphere
-namespace_time_stepping(L::Leapfrog, ::Val{:ocean}) = something(L.ocean, L)
-namespace_time_stepping(L::Leapfrog, ::Val{:land}) = something(L.land, L)
+time_stepper(L::Leapfrog, ::Val{:ocean}) = something(L.ocean, L)
+time_stepper(L::Leapfrog, ::Val{:land}) = something(L.land, L)
 
 # the first Euler step and the first leapfrog step only advance the clock by Δt/2,
 # so non-leapfrog time steppers for ocean and land step Δt/2 there too

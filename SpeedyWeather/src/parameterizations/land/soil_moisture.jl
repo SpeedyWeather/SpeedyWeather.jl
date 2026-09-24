@@ -163,7 +163,7 @@ Adapt.@adapt_structure LandBucketMoisture
 LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 
 function variables(::LandBucketMoisture, model::AbstractModel)
-    nsteps = get_namespace_nsteps(model, :land)
+    nsteps = get_nsteps(model.time_stepping, :land)
     pg = nsteps.prognostic
     tg = nsteps.tendency
     return (
@@ -228,8 +228,8 @@ function timestep!(
         soil::LandBucketMoisture,
         model::PrimitiveEquation,
     )
-    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, namespace_time_stepping(model, :land), soil)
-    soil_moisture_tendency = get_tendency_step(vars.tendencies.land.soil_moisture, namespace_time_stepping(model, :land), soil)
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), soil)
+    soil_moisture_tendency = get_tendency_step(vars.tendencies.land.soil_moisture, time_stepper(model.time_stepping, :land), soil)
 
     ρ = model.atmosphere.water_density
     (; land_fraction) = model.land_sea_mask

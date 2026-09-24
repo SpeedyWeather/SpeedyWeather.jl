@@ -66,8 +66,8 @@ tendency_grid_steps(::NCycleLorenz) = 1     # the grid tendencies are only for F
 tendency_spectral_steps(::NCycleLorenz) = 2 # to store F, G in Hotta et al. 2016, Eqs 5 & 6
 
 # ocean and land use the time steppers in the respective fields, `nothing` means the same N-cycle as the atmosphere
-namespace_time_stepping(L::NCycleLorenz, ::Val{:ocean}) = something(L.ocean, L)
-namespace_time_stepping(L::NCycleLorenz, ::Val{:land}) = something(L.land, L)
+time_stepper(L::NCycleLorenz, ::Val{:ocean}) = something(L.ocean, L)
+time_stepper(L::NCycleLorenz, ::Val{:land}) = something(L.land, L)
 
 # Most components just use the 1st tendency step and only the timestepping itself needs the 2nd so the default step 1 is used throughout
 # Exceptions here to be explicit: While two tendencies F, G are used, only G retains memory to the next time step, therefore reset F to zero for accumulation

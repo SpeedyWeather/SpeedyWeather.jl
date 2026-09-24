@@ -28,8 +28,8 @@ end
     leapfrog = model.time_stepping
 
     # default EulerForward for ocean and land, with the leapfrog's Δt
-    @test SpeedyWeather.namespace_time_stepping(model, :ocean) === leapfrog.ocean
-    @test SpeedyWeather.namespace_time_stepping(model, :land) === leapfrog.land
+    @test SpeedyWeather.time_stepper(model.time_stepping, :ocean) === leapfrog.ocean
+    @test SpeedyWeather.time_stepper(model.time_stepping, :land) === leapfrog.land
     @test leapfrog.ocean isa EulerForward
     @test leapfrog.land isa EulerForward
     @test leapfrog.land.Δt == leapfrog.ocean.Δt == leapfrog.Δt
@@ -42,8 +42,8 @@ end
     Δt = leapfrog.Δt
     for (step_counter, expected) in ((0, Δt / 2), (1, Δt / 2), (2, Δt), (100, Δt))
         clock.step_counter = step_counter
-        @test SpeedyWeather.time_step(model, :land, clock) == expected
-        @test SpeedyWeather.time_step(model, :ocean, clock) == expected
+        @test SpeedyWeather.time_step(model.time_stepping, :land, clock) == expected
+        @test SpeedyWeather.time_step(model.time_stepping, :ocean, clock) == expected
     end
 
     # only 1 step allocated for ocean and land prognostic variables and tendencies
@@ -58,8 +58,8 @@ end
 
     # NCycleLorenz uses itself for ocean and land by default
     ncycle = NCycleLorenz(spectral_grid)
-    @test SpeedyWeather.namespace_time_stepping(ncycle, Val(:land)) === ncycle
-    @test SpeedyWeather.namespace_time_stepping(ncycle, Val(:ocean)) === ncycle
+    @test SpeedyWeather.time_stepper(ncycle, :land) === ncycle
+    @test SpeedyWeather.time_stepper(ncycle, :ocean) === ncycle
 end
 
 @testset "NCycleLorenz for ocean and land with leapfrog" begin
@@ -82,7 +82,7 @@ end
     time_stepping = NCycleLorenz(spectral_grid, ocean = EulerForward(spectral_grid), land = EulerForward(spectral_grid))
     model = PrimitiveWetModel(spectral_grid; time_stepping)
     simulation = initialize!(model)
-    @test SpeedyWeather.namespace_time_stepping(model, :land) === time_stepping.land
+    @test SpeedyWeather.time_stepper(model.time_stepping, :land) === time_stepping.land
     @test time_stepping.land.Δt == time_stepping.ocean.Δt == time_stepping.Δt
     @test SpeedyWeather.nsteps(simulation.variables.tendencies.land.soil_temperature) == 1
     # no run! as NCycleLorenz does not support primitive equation models yet
@@ -93,7 +93,7 @@ end
     time_stepping = Leapfrog(spectral_grid, ocean = nothing, land = nothing)
     model = PrimitiveWetModel(spectral_grid; time_stepping)
     simulation = initialize!(model)
-    @test SpeedyWeather.namespace_time_stepping(model, :land) === time_stepping
+    @test SpeedyWeather.time_stepper(model.time_stepping, :land) === time_stepping
     @test SpeedyWeather.nsteps(simulation.variables.prognostic.land.soil_temperature) == 2
     @test SpeedyWeather.nsteps(simulation.variables.prognostic.ocean.sea_surface_temperature) == 2
     run!(simulation, steps = 4)

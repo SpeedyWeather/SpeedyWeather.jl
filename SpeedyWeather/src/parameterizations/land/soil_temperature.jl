@@ -171,7 +171,7 @@ Adapt.@adapt_structure LandBucketTemperature
 LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 
 function variables(::LandBucketTemperature, model::AbstractModel)
-    nsteps = get_namespace_nsteps(model, :land)
+    nsteps = get_nsteps(model.time_stepping, :land)
     pg = nsteps.prognostic
     tg = nsteps.tendency
     return (
@@ -220,10 +220,10 @@ function timestep!(
         land::LandBucketTemperature,
         model::PrimitiveEquation,
     )
-    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, namespace_time_stepping(model, :land), land)
-    soil_temperature_tendency = get_tendency_step(vars.tendencies.land.soil_temperature, namespace_time_stepping(model, :land), land)
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), land)
+    soil_temperature_tendency = get_tendency_step(vars.tendencies.land.soil_temperature, time_stepper(model.time_stepping, :land), land)
     soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? 
-        get_prognostic_step(vars.prognostic.land.soil_moisture, namespace_time_stepping(model, :land), land) : nothing
+        get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), land) : nothing
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
     Lᵢ = latent_heat_fusion(model.atmosphere)

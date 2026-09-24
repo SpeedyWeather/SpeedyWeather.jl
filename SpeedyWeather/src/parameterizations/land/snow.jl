@@ -45,10 +45,10 @@ function timestep!(
         model::PrimitiveEquation,
     )
 
-    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, namespace_time_stepping(model, :land), snow)
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), snow)
     (; snow_depth) = vars.prognostic.land                   # in equivalent liquid water height [m]
 
-    Δt = time_step(model, :land, vars.prognostic.clock)    # time step [s] of the land time stepper
+    Δt = time_step(model.time_stepping, :land, vars.prognostic.clock)    # time step [s] of the land time stepper
     (; land_fraction) = model.land_sea_mask
 
     # Some thermodynamics needed by snow

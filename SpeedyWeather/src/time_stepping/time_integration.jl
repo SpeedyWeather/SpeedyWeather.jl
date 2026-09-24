@@ -171,7 +171,7 @@ end
         # scale only to adjust the child's time step to the clock (not radius-scaled as the atmosphere)
         push!(
             calls, :(
-                let child = namespace_time_stepping(time_stepping, Val($(QuoteNode(namespace))))
+                let child = time_stepper(time_stepping, Val($(QuoteNode(namespace))))
                     update_prognostic!(
                         getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name))),
                         getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),

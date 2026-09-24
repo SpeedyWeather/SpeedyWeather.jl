@@ -190,7 +190,8 @@ When writing a new time stepper you implement the `*_steps` methods (how many st
 Dynamic ocean, sea ice and land components (e.g. `SlabOcean`, `ThermodynamicSeaIce`,
 `LandBucketTemperature`, `LandBucketMoisture`) write tendencies into `vars.tendencies.ocean`
 and `vars.tendencies.land`. The variables in these namespaces are time stepped with their own
-time stepper, `SpeedyWeather.namespace_time_stepping(model, :ocean)` and `(model, :land)`
+time stepper within the time stepping setup `model.time_stepping`,
+`SpeedyWeather.time_stepper(model.time_stepping, :ocean)` and `(model.time_stepping, :land)`
 (sea ice lives in the `:ocean` namespace). By default this is the time stepper of the atmosphere,
 but [`Leapfrog`](@ref) has `ocean` and `land` fields which default to
 [`EulerForward`](@ref), which steps the variables with **Euler forward over ``\Delta t``**:
@@ -206,7 +207,7 @@ same N-cycle as the atmosphere. Any time stepper can be used for ocean and land,
 `Leapfrog(spectral_grid, land = NCycleLorenz(spectral_grid))`.
 
 The variables are allocated with the number of steps of their time stepper
-(`prognostic_steps` and `tendency_steps`, see `SpeedyWeather.get_namespace_nsteps`), so with
+(`prognostic_steps` and `tendency_steps`, see `SpeedyWeather.get_nsteps(time_stepping, :land)`), so with
 `EulerForward` ocean and land variables have only one step, with `NCycleLorenz` one prognostic
 step and two tendency steps. The time step of `ocean` and `land` is always set
 to the ``\Delta t`` of the leapfrog (also with `set!(model, Δt=...)`), and on the first two
@@ -219,7 +220,7 @@ timescales of about an hour in strong winds. Leapfrogging those over ``2\Delta t
 ``t - \Delta t`` is an Euler step of ``2\Delta t``, which halves the stability limit compared to an
 Euler step of ``\Delta t`` and made long integrations unstable. Terms that are meant to act
 "within one time step" (e.g. restoring sea surface temperatures to freezing when sea ice forms)
-use `SpeedyWeather.time_step(model, :ocean, clock)` for the same reason.
+use `SpeedyWeather.time_step(model.time_stepping, :ocean, clock)` for the same reason.
 
 ````@docs; canonical=false
 EulerForward

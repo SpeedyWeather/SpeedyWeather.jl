@@ -29,12 +29,13 @@ Base revision: `c14d88f3` (`mc/landstepping-euler`, PR #1264, targeting #1183)
 - **Allocate variables with the namespace's time stepper.**
 - **New `EulerForward` type** rather than reusing `NCycleLorenz(steps = 1)`, which is Euler
   forward mathematically but needs 2 tendency steps and is confusing to read.
-- **`namespace_time_stepping` instead of `time_stepping`** as function name, to avoid clashes with
-  local variables of that name.
+- **Naming: time stepping vs time stepper.** `model.time_stepping` is the overall time stepping
+  setup, the parts within it are the time steppers for atmosphere, ocean and land:
+  `time_stepper(time_stepping, :ocean)` (first called `namespace_time_stepping`).
 - **Namespace allocation with the child's own step counts.** `NCycleLorenz` for land failed with
   a `BoundsError` as land tendencies were allocated with the grid tendency steps (1, only F),
   but NCycleLorenz needs F and G. Ocean and land variables are stepped directly, so they are
-  now allocated with `get_namespace_nsteps(model, namespace)`, i.e. `prognostic_steps` and
+  now allocated with `get_nsteps(model.time_stepping, :land)` (or `:ocean`), i.e. `prognostic_steps` and
   `tendency_steps` of their time stepper, without the grid/spectral distinction of the
   atmosphere (Leapfrog: `prognostic_steps = 2`, NCycleLorenz: `tendency_steps = 2`).
 - **`NCycleLorenz` also gets `ocean` and `land` fields** (default `nothing`, i.e. itself) so that
@@ -66,18 +67,17 @@ choose the time stepping of ocean or land.
   usual `Δt_at_T32`, `adjust_with_output`, `Δt_millisec`, `Δt` fields so that `set!` and
   `calculate_Δt!` work generically. 1 prognostic step, 1 tendency step,
   `update_prognostic!` does `var += Δt/scale * tendency`.
-- `namespace_time_stepping(time_stepping, Val(namespace))` returns the time stepper of a namespace,
-  defaulting to the time stepper itself; `namespace_time_stepping(model, namespace)` as
-  convenience. (Not called `time_stepping` to avoid clashes with local variables of that name.)
+- `time_stepper(time_stepping, :atmosphere/:ocean/:land)` returns the time stepper of that part
+  of the time stepping setup, defaulting to the time stepping itself.
 - `Leapfrog` gets `ocean` and `land` fields (default `EulerForward(spectral_grid)`, `nothing`
-  means leapfrog like the atmosphere). `initialize!(::Leapfrog, model)` and `set!(::Leapfrog, …)`
-  set the Δt of the children to the Leapfrog's Δt.
+  means leapfrog like the atmosphere). The generic `calculate_Δt!` (in `initialize!`) and `set!` set the Δt of the ocean and land
+  time steppers to the Δt of the time stepping. `NCycleLorenz` gets the same fields (default `nothing`).
 - `time_step_scale(parent, child, clock)`: Leapfrog passes `scale = 2` to non-Leapfrog children
-  on its first two steps (clock advances by Δt/2). `time_step(model, namespace, clock)` gives the
+  on its first two steps (clock advances by Δt/2). `time_step(time_stepping, :ocean/:land, clock)` gives the
   resulting time step [s], used by `ThermodynamicSeaIce`.
 - `update_prognostic_namespaces!` calls `update_prognostic!` with the namespace's time stepper;
   `update_prognostic_surface!` and `surface_time_step` from #1264 are removed.
-- Ocean, sea ice and land `variables` use `get_nsteps(namespace_time_stepping(model, namespace), model)`,
+- Ocean, sea ice and land `variables` use `get_nsteps(model.time_stepping, :ocean/:land)`,
   and every `get_prognostic_step`/`get_tendency_step` on ocean/land variables (also in surface
   fluxes and longwave radiation) passes the namespace's time stepper.
 - Leapfrog's `copy_step_forward!` is a no-op for variables with a single step.
@@ -85,7 +85,7 @@ choose the time stepping of ocean or land.
 ## Testing and verification
 
 - `test/parameterizations/surface_time_stepping.jl` rewritten: `EulerForward` step and `scale`,
-  Δt synced from Leapfrog via `initialize!` and `set!`, `time_step(model, namespace, clock)` on
+  Δt synced from Leapfrog via `initialize!` and `set!`, `time_step(time_stepping, :ocean/:land, clock)` on
   the start-up steps, 1-step allocation with the default and 2 steps with `land = nothing`, a short
   run with `land = nothing, ocean = nothing`.
 - Only small tests locally; full test suite and long integrations on CI.

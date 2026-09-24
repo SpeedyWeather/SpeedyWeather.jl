@@ -42,7 +42,7 @@ function soil_moisture_availability!(
     haskey(vars.prognostic.land, :soil_moisture) || return nothing
 
     # view on the top layer of soil moisture
-    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, namespace_time_stepping(model, :land), vegetation)
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), vegetation)
     soil_moisture_top = field_view(soil_moisture, :, 1)
     (; soil_moisture_availability) = vars.parameterizations.land
 
@@ -190,7 +190,7 @@ function soil_moisture_availability!(
     haskey(vars.prognostic.land, :soil_moisture) || return nothing
 
     (; vegetation_high, vegetation_low, soil_moisture_availability) = vars.parameterizations.land
-    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, namespace_time_stepping(model, :land), vegetation)
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), vegetation)
     (; low_veg_factor) = vegetation
 
     # copy over vegetation fields into diagnostic variables
