@@ -1,6 +1,6 @@
 # Separate time steppers for ocean and land
 
-> Status: **in progress**. `Leapfrog` gets `ocean` and `land` fields holding the time steppers
+> Status: **completed** (pending CI). `Leapfrog` gets `ocean` and `land` fields holding the time steppers
 > for these namespaces, defaulting to a new `EulerForward`. Ocean and land variables are
 > allocated with the step counts of their own time stepper.
 
