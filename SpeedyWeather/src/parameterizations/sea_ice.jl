@@ -84,19 +84,32 @@ end
     if land_fraction[ij] < 1        # at least partially ocean
         (; m, f, T_freeze, Δt) = parameters
 
-        # ice-sst flux as a relaxation term wrt to freezing, with different melt/freeze rates
-        # include 1/Δt here as SST below freezing is proportional to Δt
-        dT = sst[ij] - T_freeze                     # uncorrected difference to freezing temperature
-        dsst[ij] -= min(dT, 0) / Δt                 # increase SST to freezing temperature
-        F = -m * max(dT, 0) - f / Δt * min(dT, 0)   # melt if above freezing, freeze if below
-        dℵ[ij] = F                                  # sea ice tendency
+        # melt as a relaxation term wrt to freezing, freezing below is an adjustment in filter!
+        dT = sst[ij] - T_freeze                     # difference to freezing temperature
+        dℵ[ij] = -m * max(dT, 0)                    # sea ice tendency, melt if above freezing
     end
 end
 
 # applied after the time stepping for any kind of "hacky" correction
 function Base.filter!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation)
-    # clamp sea ice concentration in [0, 1]
     ℵ = vars.prognostic.ocean.sea_ice_concentration
+
+    # freezing is an adjustment after the time step (not a tendency) so that it is independent
+    # of the ocean time stepper: freeze sea ice below freezing and restore SST to freezing
+    if haskey(vars.prognostic.ocean, :sea_surface_temperature)
+        sst = vars.prognostic.ocean.sea_surface_temperature
+        (; freeze_rate, freezing_temperature) = sea_ice_model
+        ocean = model.land_sea_mask.land_fraction.data .< 1     # at least partially ocean
+
+        ℵ.data .+= ocean .* freeze_rate .* max.(freezing_temperature .- sst.data, 0)
+
+        # only change SST if not prescribed (i.e. the ocean has an SST tendency)
+        if haskey(vars.tendencies.ocean, :sea_surface_temperature)
+            sst.data .= ifelse.(ocean, max.(sst.data, freezing_temperature), sst.data)
+        end
+    end
+
+    # clamp sea ice concentration in [0, 1]
     ℵ .= max.(min.(ℵ, 1), 0)
     return nothing
 end

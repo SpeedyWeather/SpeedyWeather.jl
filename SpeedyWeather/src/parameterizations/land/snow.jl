@@ -123,8 +123,10 @@ end
         # limited to what's available to melt/runoff
         snow_melt_rate[ij] = (melt_rate_max + dsnow_excess) * ρ_water
 
-        # the land time stepper steps snow depth forward, non-negativity and cap in filter!
-        snow_depth_tendency[ij] = dsnow
+        # the land time stepper steps snow depth forward with the uncapped tendency (the cap to the
+        # available snow is not a tendency but an adjustment, done in filter!), with Euler forward
+        # this is identical to the capped tendency as the melt rate above is capped
+        snow_depth_tendency[ij] = dsnow_max
     end
 end
 
