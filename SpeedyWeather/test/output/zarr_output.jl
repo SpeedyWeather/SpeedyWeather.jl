@@ -409,3 +409,23 @@ end
     @test isdir(joinpath(second_path, output.filename))
     @test length(Zarr.zopen(joinpath(first_path, output.filename))["time"][:]) == n_first
 end
+
+@testset "ZarrOutput on pressure layers" begin
+    spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
+    p = [700, 300] .* 100.0
+    output = ZarrOutput(
+        spectral_grid, PrimitiveWet,
+        path = mktempdir(), write_restart = false, interval = Hour(6),
+        layers = SpeedyWeather.PressureLayers(spectral_grid, p),
+    )
+    model = PrimitiveWetModel(spectral_grid; output)
+    simulation = initialize!(model)
+    run!(simulation, period = Hour(6), output = true)
+
+    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    @test haskey(g.arrays, "pressure")
+    @test !haskey(g.arrays, "layer")
+    @test g["pressure"][:] ≈ p ./ 100
+    @test g["temp"].attrs["_ARRAY_DIMENSIONS"] == ["time", "pressure", "lat", "lon"]
+    @test size(g["temp"])[3] == length(p)
+end
