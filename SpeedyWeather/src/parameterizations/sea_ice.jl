@@ -10,7 +10,7 @@ function variables(::AbstractSeaIce)
 end
 
 function variables(::AbstractDynamicSeaIce, model::AbstractModel)
-    nsteps = get_nsteps(model.time_stepping, model)
+    nsteps = get_nsteps(namespace_time_stepping(model, :ocean), model)
     pg = nsteps.prognostic_grid
     tg = nsteps.tendency_grid
     return (
@@ -54,16 +54,16 @@ function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::P
 
     # if ocean does not have an SST tendency use scratch array to write into the void
     dsst = haskey(vars.tendencies.ocean, :sea_surface_temperature) ?
-        get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, model.time_stepping, model.ocean) :
+        get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, namespace_time_stepping(model, :ocean), model.ocean) :
         vars.scratch.grid.a_2D
 
     # sea ice concentration written as \aleph yay!
-    dℵ = get_tendency_step(vars.tendencies.ocean.sea_ice_concentration, model.time_stepping, sea_ice_model)
-    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, model.ocean)
+    dℵ = get_tendency_step(vars.tendencies.ocean.sea_ice_concentration, namespace_time_stepping(model, :ocean), sea_ice_model)
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, namespace_time_stepping(model, :ocean), model.ocean)
     
     @boundscheck size(dsst) == size(dℵ) == size(sst) || throw(BoundsError())
 
-    Δt = surface_time_step(model.time_stepping, vars.prognostic.clock)
+    Δt = time_step(model, :ocean, vars.prognostic.clock)
     (; land_fraction) = model.land_sea_mask
 
     m = sea_ice_model.melt_rate             # melt rate [m²/m²/s/K]

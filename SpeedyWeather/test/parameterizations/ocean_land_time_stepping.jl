@@ -1,34 +1,76 @@
-@testset "Surface Euler time step with leapfrog" begin
+@testset "EulerForward" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
+    euler = EulerForward(spectral_grid)
+    model = PrimitiveWetModel(spectral_grid)
+    clock = Clock()
+
+    var = zeros(spectral_grid.grid, 2)
+    var .= 280
+    tendency = zeros(spectral_grid.grid, 2)
+    tendency .= 1.0e-4
+    SpeedyWeather.update_prognostic!(var, tendency, clock, euler, nothing, model)
+    @test all(var .≈ 280 + euler.Δt * 1.0e-4)
+
+    var .= 280      # scale divides the time step
+    SpeedyWeather.update_prognostic!(var, tendency, clock, euler, nothing, model, 2)
+    @test all(var .≈ 280 + euler.Δt / 2 * 1.0e-4)
+
+    @test SpeedyWeather.prognostic_grid_steps(euler, model) == 1
+    @test SpeedyWeather.tendency_grid_steps(euler, model) == 1
+end
+
+@testset "Ocean and land time stepping with leapfrog" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
     model = PrimitiveWetModel(spectral_grid)
     simulation = initialize!(model)
     (; variables) = simulation
     (; clock) = variables.prognostic
     leapfrog = model.time_stepping
-    Δt = leapfrog.Δt
+
+    # default EulerForward for ocean and land, with the leapfrog's Δt
+    @test SpeedyWeather.namespace_time_stepping(model, :ocean) === leapfrog.ocean
+    @test SpeedyWeather.namespace_time_stepping(model, :land) === leapfrog.land
+    @test leapfrog.ocean isa EulerForward
+    @test leapfrog.land isa EulerForward
+    @test leapfrog.land.Δt == leapfrog.ocean.Δt == leapfrog.Δt
+
+    # set! also changes the time step of ocean and land
+    set!(model, Δt = Minute(10))
+    @test leapfrog.land.Δt == leapfrog.ocean.Δt == leapfrog.Δt == 600
 
     # Δt/2 on the first Euler + first leapfrog step as the clock only advances by Δt/2 each, Δt thereafter
+    Δt = leapfrog.Δt
     for (step_counter, expected) in ((0, Δt / 2), (1, Δt / 2), (2, Δt), (100, Δt))
         clock.step_counter = step_counter
-        @test SpeedyWeather.surface_time_step(leapfrog, clock) == expected
+        @test SpeedyWeather.time_step(model, :land, clock) == expected
+        @test SpeedyWeather.time_step(model, :ocean, clock) == expected
     end
 
-    # Euler forward from the 1st step, written into both steps
-    soil_temperature = variables.prognostic.land.soil_temperature
-    soil_temperature_tendency = variables.tendencies.land.soil_temperature
-    @test ArrayDimensions.hastime(soil_temperature)
+    # only 1 step allocated for ocean and land prognostic variables and tendencies
+    for var in (
+            variables.prognostic.land.soil_temperature, variables.tendencies.land.soil_temperature,
+            variables.prognostic.ocean.sea_surface_temperature, variables.tendencies.ocean.sea_surface_temperature,
+        )
+        @test SpeedyWeather.nsteps(var) == 1
+    end
+    run!(simulation, steps = 4)
+    @test simulation.model.feedback.nans_detected == false
 
-    get_step(soil_temperature, 1) .= 280
-    get_step(soil_temperature, 2) .= 300     # should be overwritten
-    soil_temperature_tendency .= 1.0e-4
+    # other time steppers use themselves for ocean and land
+    ncycle = NCycleLorenz(spectral_grid)
+    @test SpeedyWeather.namespace_time_stepping(ncycle, Val(:land)) === ncycle
+end
 
-    clock.step_counter = 2
-    SpeedyWeather.update_prognostic_surface!(soil_temperature, soil_temperature_tendency, clock, leapfrog, model.implicit, model)
-    @test all(get_step(soil_temperature, 1) .≈ 280 + Δt * 1.0e-4)
-    @test get_step(soil_temperature, 1) == get_step(soil_temperature, 2)
-
-    # other time steppers fall back to their update_prognostic!
-    @test SpeedyWeather.surface_time_step(NCycleLorenz(spectral_grid), clock) == NCycleLorenz(spectral_grid).Δt
+@testset "Leapfrogged ocean and land" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
+    time_stepping = Leapfrog(spectral_grid, ocean = nothing, land = nothing)
+    model = PrimitiveWetModel(spectral_grid; time_stepping)
+    simulation = initialize!(model)
+    @test SpeedyWeather.namespace_time_stepping(model, :land) === time_stepping
+    @test SpeedyWeather.nsteps(simulation.variables.prognostic.land.soil_temperature) == 2
+    @test SpeedyWeather.nsteps(simulation.variables.prognostic.ocean.sea_surface_temperature) == 2
+    run!(simulation, steps = 4)
+    @test simulation.model.feedback.nans_detected == false
 end
 
 @testset "LandBucketMoisture excess water is conserved" begin

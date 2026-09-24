@@ -4,7 +4,7 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
+mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
@@ -22,6 +22,12 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
 
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
+
+    "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for leapfrog as the atmosphere"
+    ocean::O
+
+    "[OPTION] Time stepper for the land variables, `nothing` for leapfrog as the atmosphere"
+    land::L
 end
 
 Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt))
@@ -63,9 +69,9 @@ tendency_steps(::AbstractLeapfrog) = 1
 # Parameterizations should always be evaluated on the previous time step for Euler forward
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParameterization) = 1
 
-# ocean, sea ice or land components use the 1st step: prescribed ones have no step dimension,
-# dynamic ones are Euler forward stepped (see `update_prognostic_surface!`) so that both steps
-# always hold the current state
+# ocean, sea ice or land components read the 1st step: prescribed ones have no step dimension,
+# with the default `EulerForward` for ocean and land there is only 1 step, and with `ocean/land = nothing`
+# (leapfrogged) the 1st step is the previous one, consistent with the parameterizations
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractOcean) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSeaIce) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractLandComponent) = 1
@@ -91,6 +97,7 @@ end
 
 # copy step 1 -> step 2 for one variable; steps bound individually via get_step
 @inline function copy_step_forward!(var)
+    nsteps(var) > 1 || return nothing           # e.g. ocean/land variables with EulerForward
     var_old = get_step(var, 1)
     var_new = get_step(var, 2)
     var_new .= var_old
@@ -180,6 +187,8 @@ function Leapfrog(
         adjust_with_output = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
+        ocean = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
+        land = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
     )
     (; NF, truncation) = spectral_grid
 
@@ -189,6 +198,7 @@ function Leapfrog(
 
     return Leapfrog(
         Second(Δt_at_T32), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
+        ocean, land,
     )
 end
 
@@ -199,8 +209,39 @@ be a divisor such that an integer number of time steps matches exactly with the 
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
     calculate_Δt!(L, model)         # common among several time steppers
+    set_namespace_time_steps!(L, resolution_factor(model))
     return nothing
 end
+
+# the ocean and land time steppers (if not leapfrogged) use the same Δt as the atmosphere
+function set_namespace_time_steps!(L::Leapfrog, factor::Real)
+    for child in (L.ocean, L.land)
+        if !isnothing(child)
+            set!(child, L.Δt_millisec, factor)
+            # set! disables the adjustment, restore it to calculate Δt as in the parent
+            child.adjust_with_output = L.adjust_with_output
+        end
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Change the time step of `L` (see `set!(::AbstractTimeStepper, ...)`) and also of the time steppers
+of its `ocean` and `land` fields so that they stay in sync with the atmosphere."""
+function set!(L::Leapfrog, Δt::Period, factor::Real = resolution_factor(L))
+    invoke(set!, Tuple{AbstractTimeStepper, Period, Real}, L, Δt, factor)
+    set_namespace_time_steps!(L, factor)
+    return L
+end
+
+# ocean and land use the time steppers in the respective fields, `nothing` means leapfrog like the atmosphere
+namespace_time_stepping(L::Leapfrog, ::Val{:ocean}) = something(L.ocean, L)
+namespace_time_stepping(L::Leapfrog, ::Val{:land}) = something(L.land, L)
+
+# the first Euler step and the first leapfrog step only advance the clock by Δt/2,
+# so non-leapfrog time steppers for ocean and land step Δt/2 there too
+time_step_scale(::Leapfrog, ::AbstractTimeStepper, clock::Clock) = ifelse(clock.step_counter <= 1, 2, 1)
+time_step_scale(::Leapfrog, ::AbstractLeapfrog, clock::Clock) = 1   # leapfrog does this itself
 
 """$(TYPEDSIGNATURES) Leapfrog is spun up with 1 Euler forward step that doesn't count for clock + output"""
 spin_up_steps(::AbstractLeapfrog) = 1
@@ -285,36 +326,4 @@ end
     update = old - 2var_lf[lmk] + new
     var_old[lmk] = var_lf[lmk] + w1 * update
     var_new[lmk] = new - w2 * update
-end
-
-"""$(TYPEDSIGNATURES)
-Time step [s] of the Euler forward step for ocean, sea ice and land with leapfrog.
-Δt/2 on the first two time steps (the first Euler step and the first leapfrog step
-each only advance the clock by Δt/2), Δt afterwards. See `update_prognostic_surface!`."""
-surface_time_step(L::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, L.Δt / 2, L.Δt)
-
-"""$(TYPEDSIGNATURES)
-With leapfrog, ocean, sea ice and land variables are stepped with Euler forward over `Δt`
-(not leapfrogged over `2Δt`) from the current state, which is written into both steps so that
-both always hold the current state. Their tendencies are computed from surface fluxes
-evaluated at the previous (=current) step and include stiff relaxation terms (e.g. the
-sensible heat flux feedback on the soil temperature) that would be unstable over `2Δt`."""
-function update_prognostic_surface!(
-        var::AbstractArray,
-        tendency::AbstractArray,
-        clock::Clock,
-        time_stepping::Leapfrog,
-        implicit,
-        model::AbstractModel,
-    )
-    Δt = surface_time_step(time_stepping, clock)
-    var_old = get_step(var, 1)
-    var_new = get_step(var, 2)
-    var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
-
-    @boundscheck size(var_old) == size(var_new) == size(var_tend) || throw(BoundsError())
-
-    var_old .+= Δt .* var_tend      # Euler forward from the current state
-    var_new .= var_old              # both steps hold the current state
-    return nothing
 end

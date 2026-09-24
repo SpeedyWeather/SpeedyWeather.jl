@@ -4,17 +4,34 @@ one more step in the main time loop."""
 spin_up_steps(::AbstractTimeStepper) = 0
 default_time_step(L::AbstractTimeStepper) = L.Δt
 
-"""$(TYPEDSIGNATURES)
-Time step the ocean, sea ice and land variables (those in the `:ocean` and `:land` namespaces).
-Defaults to the same `update_prognostic!` as the atmosphere, but time steppers can extend this
-to integrate the surface with a different scheme, e.g. `Leapfrog` uses Euler forward."""
-update_prognostic_surface!(var, tendency, clock, time_stepping::AbstractTimeStepper, implicit, model) =
-    update_prognostic!(var, tendency, clock, time_stepping, implicit, model)
+"""$(TYPEDSIGNATURES) Time step [s] of `time_stepping` at the current `clock`,
+extend for time steppers with changing time steps, e.g. `Leapfrog` on its first steps."""
+time_step(time_stepping::AbstractTimeStepper, clock) = default_time_step(time_stepping)
 
 """$(TYPEDSIGNATURES)
-Time step [s] over which ocean, sea ice and land tendencies are applied in
-`update_prognostic_surface!`. Defaults to the `default_time_step` of the time stepper."""
-surface_time_step(time_stepping::AbstractTimeStepper, clock) = default_time_step(time_stepping)
+Time stepper for the variables in `namespace` (`:ocean` or `:land`). Defaults to `time_stepping`
+itself, time steppers can extend this to step ocean or land differently, e.g. `Leapfrog` uses
+its `ocean` and `land` fields (default `EulerForward`)."""
+namespace_time_stepping(time_stepping::AbstractTimeStepper, ::Val) = time_stepping
+
+"""$(TYPEDSIGNATURES) Time stepper for the variables in `namespace` (`:ocean` or `:land`) of `model`."""
+@inline namespace_time_stepping(model::AbstractModel, namespace::Symbol) =
+    namespace_time_stepping(model.time_stepping, Val(namespace))
+
+"""$(TYPEDSIGNATURES)
+Factor by which the time step of the `child` time stepper (for a namespace) is divided when
+`parent` is the time stepper of the model, e.g. `Leapfrog` advances the clock by Δt/2 on its
+first two steps, so non-leapfrog children use `scale = 2` there. Defaults to 1."""
+time_step_scale(parent::AbstractTimeStepper, child::AbstractTimeStepper, clock) = 1
+
+"""$(TYPEDSIGNATURES)
+Time step [s] with which the variables in `namespace` (`:ocean` or `:land`) of `model` are
+stepped forward at the current `clock`."""
+function time_step(model::AbstractModel, namespace::Symbol, clock)
+    child = namespace_time_stepping(model, namespace)
+    Δt = time_step(child, clock)
+    return Δt / oftype(Δt, time_step_scale(model.time_stepping, child, clock))
+end
 
 """$(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T32` is always scaled with the resolution `truncation` 

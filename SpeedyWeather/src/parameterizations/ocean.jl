@@ -285,7 +285,7 @@ end
 SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 
 function variables(::SlabOcean, model::AbstractModel)
-    nsteps = get_nsteps(model.time_stepping, model)
+    nsteps = get_nsteps(namespace_time_stepping(model, :ocean), model)
     pg = nsteps.prognostic_grid
     tg = nsteps.tendency_grid
     return (
@@ -332,7 +332,7 @@ function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEq
 end
 
 function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEquation)
-    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, model.time_stepping, ocean_model)
+    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, namespace_time_stepping(model, :ocean), ocean_model)
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
     C₀⁻¹ = inv(ocean_model.heat_capacity_mixed_layer)

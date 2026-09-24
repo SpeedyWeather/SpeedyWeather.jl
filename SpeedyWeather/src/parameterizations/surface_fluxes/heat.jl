@@ -78,7 +78,7 @@ variables(::SurfaceOceanHeatFlux) = (
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(ρ)
 
-    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, heat_flux)
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, namespace_time_stepping(model, :ocean), heat_flux)
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
@@ -144,7 +144,7 @@ variables(::SurfaceLandHeatFlux) = (
     V₀ = vars.parameterizations.surface_wind_speed[ij]
 
     # TODO actually implement skin temperature?
-    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, model.time_stepping, heat_flux)
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, namespace_time_stepping(model, :land), heat_flux)
     T_skin_land = soil_temperature[ij, 1]                       # uppermost land layer with index 1
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]

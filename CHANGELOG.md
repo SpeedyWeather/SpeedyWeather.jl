@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `Leapfrog` has `ocean` and `land` fields for their time steppers, defaulting to the new `EulerForward`, allocating only one step [#1264](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1264)
 - Ocean, sea ice and land are Euler forward stepped with leapfrog, fixing long-integration instability [#1264](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1264)
 - Time stepping soil temperature and moisture [#1183](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1183)
 - `rand` and `randn` for fields and `LowerTriangularArray`s accept a random number generator as optional first argument [#1247](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1247)

@@ -189,28 +189,35 @@ When writing a new time stepper you implement the `*_steps` methods (how many st
 
 Dynamic ocean, sea ice and land components (e.g. `SlabOcean`, `ThermodynamicSeaIce`,
 `LandBucketTemperature`, `LandBucketMoisture`) write tendencies into `vars.tendencies.ocean`
-and `vars.tendencies.land` and are then time stepped with `update_prognostic_surface!`, which
-by default is the same `update_prognostic!` as the atmosphere. With leapfrog, however, these
-variables are stepped with **Euler forward over ``\Delta t``** from the current state and the
-result is written into both steps:
+and `vars.tendencies.land`. The variables in these namespaces are time stepped with their own
+time stepper, `SpeedyWeather.namespace_time_stepping(model, :ocean)` and `(model, :land)`
+(sea ice lives in the `:ocean` namespace). By default this is the time stepper of the atmosphere,
+but [`Leapfrog`](@ref) has `ocean` and `land` fields which default to
+[`EulerForward`](@ref), which steps the variables with **Euler forward over ``\Delta t``**:
 
 ```julia
-function update_prognostic_surface!(var, tendency, clock, time_stepping::Leapfrog, implicit, model)
-    Δt = surface_time_step(time_stepping, clock)    # Δt (Δt/2 on the first two steps)
-    var_old, var_new = get_step(var, 1), get_step(var, 2)
-    var_old .+= Δt .* get_tendency_step(tendency, time_stepping, time_stepping)
-    var_new .= var_old                              # both steps hold the current state
-end
+time_stepping = Leapfrog(spectral_grid)                             # Euler forward for ocean and land
+time_stepping = Leapfrog(spectral_grid, land = nothing)             # leapfrog land as the atmosphere
+model = PrimitiveWetModel(spectral_grid; time_stepping)
 ```
 
-The tendencies are computed from surface fluxes (sensible and latent heat, longwave radiation)
-that the parameterizations evaluate at the previous (1st) step, and they contain stiff relaxation
-terms, e.g. the sensible heat flux feedback on the thin top soil layer has timescales of about
-an hour in strong winds. Leapfrogging those over ``2\Delta t`` from ``t - \Delta t`` is an
-Euler step of ``2\Delta t``, which halves the stability limit compared to an Euler step of ``\Delta t``
-and made long integrations unstable. Terms that are meant to act "within one time step"
-(e.g. restoring sea surface temperatures to freezing when sea ice forms) use
-`surface_time_step(time_stepping, clock)` for the same reason.
+The variables are allocated with the number of steps of their time stepper, so with `EulerForward`
+ocean and land variables have only one step. The time step of `ocean` and `land` is always set
+to the ``\Delta t`` of the leapfrog (also with `set!(model, Δt=...)`), and on the first two
+leapfrog steps, which each only advance the clock by ``\Delta t/2``, also Euler steps with ``\Delta t/2``.
+
+Why not leapfrog? The tendencies are computed from surface fluxes (sensible and latent heat,
+longwave radiation) that the parameterizations evaluate at the previous (1st) step, and they
+contain stiff relaxation terms, e.g. the sensible heat flux feedback on the thin top soil layer has
+timescales of about an hour in strong winds. Leapfrogging those over ``2\Delta t`` from
+``t - \Delta t`` is an Euler step of ``2\Delta t``, which halves the stability limit compared to an
+Euler step of ``\Delta t`` and made long integrations unstable. Terms that are meant to act
+"within one time step" (e.g. restoring sea surface temperatures to freezing when sea ice forms)
+use `SpeedyWeather.time_step(model, :ocean, clock)` for the same reason.
+
+````@docs; canonical=false
+EulerForward
+````
 
 ## [Lorenz N-cycle](@id ncycle)
 
