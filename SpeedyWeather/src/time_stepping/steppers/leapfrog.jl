@@ -225,23 +225,21 @@ time_step_scale(::Leapfrog, ::AbstractLeapfrog, clock::Clock) = 1   # leapfrog d
 spin_up_steps(::AbstractLeapfrog) = 1
 
 function time_step!(clock::Clock, time_stepping::Leapfrog)
-    Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based hence ÷ not / below
+    Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based
     i = clock.step_counter          # 0-based as the clock is only stepped below
-    @trace if i == 0                # first Euler step at Δt/2
-        # i counts every time step, for the clock the first Euler step does not count
-        # hence after this the time_stepping will be 1 ahead of clock step counter
-        time_step!(clock, Δt ÷ 2, increase_counter = false)
-    elseif i == 1                   # second step: Leapfrog at Δt
-        # subtract the Δt/2 again as otherwise the time can be 1ms off due to rounding
-        # rotation and orbit time are dilated, so rewind them by their dilated Δt/2
-        half_Δt = Δt ÷ 2
-        clock.time -= half_Δt
-        clock.rotation_time -= dilate(half_Δt, clock.rotation_dilation)
-        clock.orbit_time -= dilate(half_Δt, clock.orbit_dilation)
-        time_step!(clock, Δt)
-    else                            # later steps: Leapfrog at 2Δt but increase clock by Δt
-        time_step!(clock, Δt)
-    end
+    first_step = i == 0            
+    second_step = i == 1            
+
+    step_scale = ifelse(first_step, 0.5, 1.0)       # first Euler step at Δt/2
+    rewind_scale = ifelse(second_step, 0.5, 0.0)    # second step: Leapfrog at Δt, later steps: Leapfrog at 2Δt but clock by Δt
+    increase_counter = ifelse(first_step, 0, 1)     
+
+    # rotation and orbit time are dilated, so rewind them by their dilated Δt/2
+    Δt_rewind = dilate(Δt, rewind_scale)
+    clock.time -= Δt_rewind
+    clock.rotation_time -= dilate(Δt_rewind, clock.rotation_dilation)
+    clock.orbit_time -= dilate(Δt_rewind, clock.orbit_dilation)
+    time_step!(clock, dilate(Δt, step_scale); increase_counter)
     return nothing
 end
 

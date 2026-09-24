@@ -149,7 +149,7 @@ function load_mask!(land_sea_mask::EarthLandSeaMask)
     land_sea_mask.land_fraction .= on_architecture(arch, cpu_mask)
 
     if land_sea_mask.quantization > 0
-        q = land_sea_mask.quantization
+        q = convert(eltype(land_sea_mask.land_fraction), land_sea_mask.quantization)
         land_sea_mask.land_fraction .= round.(land_sea_mask.land_fraction ./ q) .* q
     end
 

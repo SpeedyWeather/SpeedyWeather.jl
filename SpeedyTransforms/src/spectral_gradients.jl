@@ -96,7 +96,7 @@ function _divergence!(
 
     # radius scaling if not unit sphere
     if radius != 1
-        div .*= inv(radius)
+        div .*= inv(convert(real(eltype(div)), radius))
     end
 
     return div
@@ -321,6 +321,7 @@ function UV_from_vordiv!(
 
     # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
     if radius != 1
+        radius = convert(real(eltype(U)), radius)
         U .*= radius
         V .*= radius
     end
@@ -408,6 +409,7 @@ function ∇²!(
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
+        radius = convert(real(eltype(∇²alms)), radius)
         R_plusminus_squared = inverse ? radius^2 : inv(radius^2)
         ∇²alms .*= R_plusminus_squared
     end
@@ -525,7 +527,7 @@ function ∇!(
 
     # 1/radius factor if not unit sphere
     if radius != 1
-        R⁻¹ = inv(radius)
+        R⁻¹ = inv(convert(real(eltype(dpdx)), radius))
         dpdx .*= R⁻¹
         dpdy .*= R⁻¹
     end

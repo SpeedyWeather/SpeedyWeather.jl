@@ -5,7 +5,7 @@
 
 import SpeedyWeather: TerrariumOutput, AbstractOutput, AbstractSimulation,
     path, path_or_nothing, output!, write_array!, hastime, is3D,
-    vertical_dimension, get_nlayers, define_dimension!, get_dimension_length, define_coordinate!
+    vertical_dimension_name, get_nlayers, define_dimension!, get_dimension_length, define_coordinate!
 
 # name of the vertical output dimension shared by all 3D Terrarium output variables
 const SOIL_DEPTH_DIM_NAME = "soil_depth"
@@ -82,7 +82,8 @@ function terrarium_output_variable(
     field_grid = Terrarium.get_field_grid(model.grid)
     nlayers = is3d ? size(field_grid, 3) : 1
     # cell-centre depths [m], positive down; znodes is in field order (deepest layer first)
-    depths = is3d ? Float64.(-znodes(field_grid, Center(), Center(), Center())) : Float64[]
+    # ensure depths vector is copied to CPU
+    depths = is3d ? Float64.(Terrarium.on_architecture(Terrarium.CPU(), -znodes(field_grid, Center(), Center(), Center()))) : Float64[]
 
     return TerrariumOutputVariable(;
         name = String(var_name), unit, long_name,
@@ -222,7 +223,7 @@ end
 # Terrarium output variables are written on their own vertical dimension
 # (e.g. soil depth) instead of the "layer"/"soil_layer" dimensions; the generic
 # `define_variable!` of every backend picks these up via the hooks below.
-SpeedyWeather.vertical_dimension(::TerrariumOutputVariable) = SOIL_DEPTH_DIM_NAME
+SpeedyWeather.vertical_dimension_name(::TerrariumOutputVariable) = SOIL_DEPTH_DIM_NAME
 SpeedyWeather.get_nlayers(::AbstractOutput, variable::TerrariumOutputVariable) = variable.nlayers
 
 """$(TYPEDSIGNATURES)
