@@ -10,6 +10,9 @@
     simulation = initialize!(model)                             # initialize all model components
 
     step = 2
+    # ocean and land are stepped with EulerForward by default (1 step), use their last (=current) step
+    ocean_step = SpeedyWeather.nsteps(simulation.variables.prognostic.ocean.sea_surface_temperature)
+    land_step = SpeedyWeather.nsteps(simulation.variables.prognostic.land.soil_temperature)
 
     # test data
     L = rand(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
@@ -57,21 +60,21 @@
     # grids
     set!(simulation, sea_surface_temperature = A[:, 1]; namespace = :ocean)
     @test prog_new.ocean.sea_surface_temperature[:, 1] == A[:, 1]
-    set!(simulation, sea_surface_temperature = A[:, 1]; step, namespace = :ocean)
-    @test prog_new.ocean.sea_surface_temperature[:, step] == A[:, 1]
+    set!(simulation, sea_surface_temperature = A[:, 1]; step = ocean_step, namespace = :ocean)
+    @test prog_new.ocean.sea_surface_temperature[:, ocean_step] == A[:, 1]
 
-    set!(simulation, sea_ice_concentration = B[:, 1]; step, namespace = :ocean, add = true)
+    set!(simulation, sea_ice_concentration = B[:, 1]; step = ocean_step, namespace = :ocean, add = true)
     C = similar(A[:, 1])
     RingGrids.interpolate!(C, B[:, 1]; NF)
 
-    sic_new = get_step(prog_new.ocean.sea_ice_concentration, step)
-    sic_old = get_step(prog_old.ocean.sea_ice_concentration, step)
+    sic_new = get_step(prog_new.ocean.sea_ice_concentration, ocean_step)
+    sic_old = get_step(prog_old.ocean.sea_ice_concentration, ocean_step)
     @test all(isapprox(sic_new, sic_old .+ C, atol = 1.0e-6))
 
-    lst = get_step(prog_new.land.soil_temperature, step)
+    lst = get_step(prog_new.land.soil_temperature, land_step)
     Di = deepcopy(lst)
     RingGrids.interpolate!(Di, D; NF)
-    set!(simulation, soil_temperature = D, namespace = :land; step)
+    set!(simulation, soil_temperature = D, namespace = :land, step = land_step)
     @test lst == Di
 
     set!(simulation, soil_moisture = D; namespace = :land)
@@ -92,8 +95,7 @@
     set!(simulation, sea_surface_temperature = Float16(3.0), step = 1, add = true, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature[:, 1] .≈ 6.0)
 
-    set!(simulation, sea_surface_temperature = 5, step = 1, namespace = :ocean)
-    set!(simulation, sea_surface_temperature = 5, step = 2, namespace = :ocean)
+    set!(simulation, sea_surface_temperature = 5, step = ocean_step, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature .== 5)
 
     # vor_div, create u,v first in spectral space
