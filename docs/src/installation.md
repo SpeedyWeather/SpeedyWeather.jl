@@ -1,7 +1,8 @@
 # Installation
 
-SpeedyWeather.jl is registered in the Julia Registry. In most cases just open the
-[Julia REPL](https://docs.julialang.org/en/v1/stdlib/REPL/) and type
+First, [install Julia](https://julialang.org/install/) then type `julia` in your shell to open the 
+[Julia REPL](https://docs.julialang.org/en/v1/stdlib/REPL/). SpeedyWeather.jl is a registered Julia package that
+you can install with
 ```julia
 julia> using Pkg
 julia> Pkg.add("SpeedyWeather")
@@ -27,13 +28,13 @@ julia> Pkg.add(url="https://github.com/SpeedyWeather/SpeedyWeather.jl", rev="mai
 `rev` (revision) refers to the `main` branch, and `subdir` is needed as we have structured
 SpeedyWeather as a monorepo with other packages living in the same repository
 (do `subdir="RingGrids"` for example if you want to install the latest unreleased version of
-the [RingGrids](@ref) package ...). In a similar manner, you can also install other branches than `main`,
+the [RingGrids](@ref) package). In a similar manner, you can also install other branches than `main`,
 e.g. from a specific pull request.
 
 In brief you can do the same as
 
 ```julia
-(@v1.12) pkg> add SpeedyWeather:SpeedyWeather#main
+(@v1.13) pkg> add SpeedyWeather:SpeedyWeather#main
 ```
 
 following a `Repository:Subdirectory#branch` logic. Note that installing `main` gives you the
@@ -53,7 +54,7 @@ julia> Pkg.develop(url="https://github.com/SpeedyWeather/SpeedyWeather.jl", subd
 in brief you can do this in the pkg shell with
 
 ```julia
-(@v1.12) pkg> dev SpeedyWeather:SpeedyWeather
+(@v1.13) pkg> dev SpeedyWeather:SpeedyWeather
 ```
 
 The first "SpeedyWeather" refers to the repository the second to the subdirectory
@@ -64,7 +65,9 @@ section in the Pkg documentation to learn more about the differences between `ad
 ## Compatibility with Julia versions
 
 SpeedyWeather.jl requires Julia v1.10 or later.
-The package is tested on Julia 1.10, 1.11 and 1.12.
+The package is tested on Julia v1.10 and the [latest stable release](https://julialang.org/downloads/manual-downloads/).
+Some functionality (common is the [Differentiability and Adjoint Model](@ref)) may not be
+available on the latest Julia version, hence their respective tests will still use Julia v1.10, v1.11 or v1.12.
 
 ## Extensions
 
