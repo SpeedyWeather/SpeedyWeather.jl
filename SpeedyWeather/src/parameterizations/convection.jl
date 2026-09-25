@@ -138,9 +138,10 @@ and relaxes current vertical profiles to the adjusted references."""
         δq = (humid[ij, k] - q_ref) * τ⁻¹
         humid_tend[ij, k] -= δq
 
-        # convective precipitation (rain), integrate dq\dt [(kg/kg)/s] vertically
-        rain = max(δq * Δσ[k], 0)       # only integrate excess humidity for precip (no reevaporation)
-        rain_convection += rain         # integrate vertically, Formula 25, unit [m]
+        # convective precipitation (rain), integrate dq\dt [(kg/kg)/s] vertically *with sign*:
+        # moistening levels (δq < 0) are fed by the drying ones, so rain is the net column drying
+        # otherwise water would be counted twice, as vapour and as precipitation, see #1275
+        rain_convection += δq * Δσ[k]   # integrate vertically, Formula 25, unit [m]
     end
 
     # CONVECTIVE PRECIPITATION

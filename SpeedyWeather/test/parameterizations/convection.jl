@@ -211,4 +211,34 @@
         # is exactly conserved (not merely approximately) between the two configurations
         @test rain_on .+ snow_on == rain_off
     end
+
+    @testset "Column water budget" begin
+        # water removed from the column by convection must equal convective precipitation,
+        # i.e. rain + snow = -∫ dq/dt dσ ⋅ pₛΔt/(gρ), see #1275
+        spectral_grid = SpectralGrid(truncation = 15, nlayers = 8, NF = Float64)
+        model = PrimitiveWetModel(spectral_grid)
+        model.feedback.verbose = false
+        simulation = initialize!(model)
+        run!(simulation, steps = 20)   # spin up so some columns actually convect
+
+        vars = simulation.variables
+        humid_tend = SpeedyWeather.get_tendency_step(vars.tendencies.grid.humidity, model.time_stepping, model.convection)
+        humid_tend .= 0
+        vars.parameterizations.rain_convection .= 0
+        vars.parameterizations.snow_convection .= 0
+        SpeedyWeather._column_parameterizations_cpu!(vars, (convection = model.convection,), model)
+
+        Δσ = model.geometry.σ_levels_thick
+        (; Δt) = model.time_stepping
+        g = model.planet.gravity
+        ρ = model.atmosphere.water_density
+        pₛ = vars.parameterizations.surface_pressure
+        precip = vars.parameterizations.rain_convection .+ vars.parameterizations.snow_convection
+        @test any(precip .> 0)
+
+        for ij in 1:spectral_grid.npoints
+            column_drying = -sum(humid_tend[ij, k] * Δσ[k] for k in eachindex(Δσ)) * pₛ[ij] * Δt / (g * ρ)
+            @test precip[ij] ≈ column_drying atol = 1.0e-12
+        end
+    end
 end

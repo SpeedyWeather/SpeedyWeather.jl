@@ -129,6 +129,13 @@ Base revision: `557b38d5` (`mc/convection`, off `main`)
   `BettsMillerDryConvection` could not be adapted to GPU (`@adapt_structure` can't infer the
   field-less `NF` parameter; `main` had a hand-written method) — `PrimitiveDryModel` on GPU failed
   at construction on this branch; new "Adapt" test. See "GPU profiling (ncu)" below.
+- **2026-09-25, column water budget (#1275).** @ursho2552 pointed out that the per-layer
+  `max(δq·Δσ, 0)` clamp in the precipitation integral counts water moved from drying into
+  moistening layers twice (as vapour and as rain), giving a ~1.9 Sv (~11%) global P - E + dW/dt
+  residual. Added a "Column water budget" test asserting convective rain + snow equals
+  -∫ dq/dt dσ ⋅ pₛΔt/(gρ) per column; it failed on this branch (63 of ~1000 columns, rain 25-50%
+  too high). Fixed by integrating δq·Δσ with sign (the existing `max(rain, 0)` after the loop and
+  the deep-convection indicator stay); test passes. Docs updated accordingly.
 
 ## Problem description
 

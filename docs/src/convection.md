@@ -264,14 +264,14 @@ similar to [Large-scale precipitation](@ref).
 P = -\int_{p_{LZB}}^{p_0} \frac{\Delta t}{g \rho} \delta q\,dp
 ```
 
-Only layers with ``\delta q < 0`` (drying, i.e. condensation) contribute to this integral;
-layers that moisten (``\delta q > 0``) are clamped to zero rather than allowed to offset the
-total, since the scheme does not model reevaporation of falling convective rain. The result is
-additionally multiplied by a deep-convection indicator so that ``P = 0`` identically for shallow
-convection: with the ``\delta q \ge 0``-clamp in place, the qref correction's exact ``P_q = 0``
-result (derived in [Shallow convection](@ref)) is not automatically reproduced layer-by-layer, so
-the indicator is what actually enforces no precipitation in the shallow case, not merely a
-redundant restatement of it.
+The integral is taken with sign over all layers: layers that moisten are fed by the water
+removed from layers that dry, so ``P`` is the *net* column drying and the column water budget
+(precipitation equals the loss of column water vapour) is closed exactly. Clamping each layer's
+contribution to be non-negative instead would count the water that moistens a layer twice,
+once as vapour and once as precipitation (see
+[#1275](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1275)). The result is
+additionally multiplied by a deep-convection indicator so that ``P = 0`` for shallow convection,
+where the qref correction already makes the column-integrated ``\delta q`` vanish up to rounding.
 
 In the shallow convection case ``P=0`` due to the correction (and the indicator above) even though
 in the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
