@@ -2,7 +2,7 @@
 
 SpeedyWeather's two main array types, `Field` (see [RingGrids](@ref)) for gridded data
 and `LowerTriangularArray` (see [LowerTriangularArrays](@ref lowertriangularmatrices))
-for spectral coefficients, unravel the horizontal into the first array dimension.
+for spectral coefficients (see [Spectral packing](@ref)), unravel the horizontal into the first array dimension.
 Any additional array dimension can then represent whatever you like: the vertical,
 time (or time steps of the time integration), etc. To record what these additional
 dimensions actually mean, both types (optionally) carry a dimension tag from the
@@ -71,9 +71,9 @@ The tags are preserved through `similar`, `zero`, views and broadcasting; indexi
 into a tagged dimension with an integer drops it accordingly, e.g. `L[:, 1]` of an
 `LMZ`-tagged array returns an `LM`-tagged one.
 
-Within SpeedyWeather, the variables in `simulation.variables` carry these tags; in
-particular the step dimension that prognostic and tendency variables have for the time
-integration is tagged as time `T`, so their summaries show, e.g., `(LMZT)` or `(XYZT)`,
-see [Step dimension](@ref). For more details on the two array types see
+Within SpeedyWeather, the variables in `simulation.variables` (see [The `Variables` struct](@ref))
+carry these tags; in particular the step dimension that prognostic and tendency variables
+have for the [time integration](@ref time_stepping) is tagged as time `T`, so their summaries
+show, e.g., `(LMZT)` or `(XYZT)`, see [Step dimension](@ref). For more details on the two array types see
 [Array dimensions of a Field](@ref) and
 [Array dimensions for `LowerTriangularArray`](@ref).

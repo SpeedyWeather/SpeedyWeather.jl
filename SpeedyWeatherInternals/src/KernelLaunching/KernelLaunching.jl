@@ -148,7 +148,7 @@ Launches `kernel!` with arguments `kernel_args`
 over the `dims_type` with `worksize` on the architecture `arch`.
 Kernels run on the default stream.
 
-See [configure_kernel](@ref) for more information.
+See [`configure_kernel`](@ref) for more information.
 """
 @inline launch!(args...; kwargs...) = _launch!(args...; kwargs...)
 

@@ -1,4 +1,4 @@
-# SpeedyWeather.jl <img src="docs/src/public/logo.png" width="100" />
+# SpeedyWeather.jl <img src="docs/src/public/logo.gif" width="100" />
 
 [![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/)
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/)
@@ -33,8 +33,8 @@ With minimal code redundancies, it supports
 - Different resolutions (for example T16 to T1024 in spectral matched flexibly with various 800km to 10km grids)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
 - Fast on single CPUs (x86, arm) for laptop prototyping, live demos and education
-- GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs (Metal is WIP)
-- Automatic differentiation via Enzyme.jl for sensitivity analysis, parameter calibration and ML-physics hybrid modelling (limited to Julia 1.10 currently) 
+- GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs, with Metal support for Apple Silicon
+- Automatic differentiation via Enzyme.jl for sensitivity analysis, parameter calibration and ML-physics hybrid modelling (limited to Julia 1.10 and 1.11 currently) 
 - A very fast and flexible spherical harmonics transform library SpeedyTransforms.jl for CPU and GPU
 
 **User interface**
@@ -293,7 +293,7 @@ The bibtex entry for the paper is:
 
 If you are using the differentiability of our model, please cite additionally 
 
-Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615. https://doi.org/10.1029/2025MS005615
+> Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615, doi:[10.1029/2025MS005615](https://doi.org/10.1029/2025MS005615)
 
 with the bibtex entry 
 

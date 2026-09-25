@@ -6,11 +6,28 @@
     spectral_grid = SpectralGrid(truncation = 33, nlayers = 8, architecture = arch)
     spectral_transform = SpectralTransform(spectral_grid)
     particle_advection = ParticleAdvection2D(spectral_grid, nparticles = 10, layer = 1)
+    random_process = SpectralAR1Process(spectral_grid)
+    sppt = StochasticallyPerturbedParameterizationTendencies(spectral_grid)
     output = NetCDFOutput(spectral_grid, PrimitiveWet, path = tmp_output_path, id = "gpu-netcdf")
-    model = PrimitiveWetModel(spectral_grid; spectral_transform, output, particle_advection)
+    model = PrimitiveWetModel(spectral_grid; spectral_transform, output, particle_advection, random_process, stochastic_physics = sppt)
     simulation = initialize!(model)
     run!(simulation, steps = 3, output = true)
 
     @test simulation.model.feedback.nans_detected == false
     @test isfile(joinpath(output.run_path, output.filename))
+end
+
+@testset "GPU PrimitiveWetModel (default construction, WhichTransform)" begin
+    # No component overrides: at the default truncation this lets `WhichTransform`
+    # pick `MatrixSpectralTransform` (as it does for any truncation <= 64 on GPU),
+    # unlike the testset above which forces `SpectralTransform` explicitly. This is
+    # the path a plain `PrimitiveWetModel(spectral_grid)` on GPU actually takes.
+    arch = SpeedyWeather.GPU()
+    spectral_grid = SpectralGrid(architecture = arch)
+    model = PrimitiveWetModel(spectral_grid)
+    @test model.spectral_transform isa SpeedyWeather.SpeedyTransforms.MatrixSpectralTransform
+    simulation = Simulation(model)
+    run!(simulation, steps = 3)
+
+    @test simulation.model.feedback.nans_detected == false
 end

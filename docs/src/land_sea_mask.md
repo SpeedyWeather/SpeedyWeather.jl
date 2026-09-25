@@ -29,7 +29,8 @@ with `EarthLandSeaMask` being the default `LandSeaMask` using the land-sea mask 
 
 ## Manual land-sea mask
 
-You can create the default land-sea mask as follows
+You can create the default land-sea mask as follows, following the general pattern for
+[Creating model components](@ref create_model_components):
 
 ```@example landseamask
 using SpeedyWeather
@@ -99,6 +100,7 @@ the entire mask to zero afterwards `land_sea_mask.land_fraction .= 0`.
 ## Custom land-sea mask
 
 Every (custom) land-sea mask has to be a subtype of `AbstractLandSeaMask`.
+This follows a very similar pattern to [Defining a new orography type](@ref).
 A custom land-sea mask has to be defined as a new type (`struct` or `mutable struct`)
 
 ```julia

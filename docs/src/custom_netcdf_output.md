@@ -8,12 +8,12 @@ of [Extending SpeedyWeather](@ref).
 
 ## New output variable
 
-Say we want to output the [Vertical velocity](@ref). In [Sigma coordinates](@ref)
+Say we want to output the [Vertical velocity](@ref). In [Sigma coordinates](@ref sigma_coordinates_physics)
 on every time step, one has to integrate the divergence vertically to
 know where the flow is not divergence-free, meaning that the horizontally
 converging or diverging motion is balanced by a vertical velocity.
 This leads to the variable ``\partial \sigma / \partial t``, which
-is the equivalent of [Vertical velocity](@ref) in the [Sigma coordinates](@ref).
+is the equivalent of [Vertical velocity](@ref) in the [Sigma coordinates](@ref sigma_coordinates_physics).
 This variable is calculated and stored at every time step in
 
 ```julia
@@ -80,7 +80,7 @@ model = PrimitiveDryModel(spectral_grid; output)
 model.output.variables[:w]
 ```
 
-By passing on `output` to the model constructor the output variables
+By passing on `output` to the [model constructor](@ref create_model) the output variables
 now contain `w` and we see it here as we have defined it earlier.
 
 ```@example netcdf_custom

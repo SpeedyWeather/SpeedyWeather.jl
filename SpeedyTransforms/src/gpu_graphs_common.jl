@@ -1,19 +1,19 @@
 # =====================================================================================
 # BACKEND-AGNOSTIC GPU-GRAPHS MACHINERY FOR THE BATCHED FOURIER TRANSFORM
 #
-# `include()`-d by each graph-capturing backend extension (currently SpeedyTransformsCUDAExt.jl
-# and SpeedyTransformsAMDGPUExt.jl). See SpeedyTransformsCUDAExt.jl for the rationale of
-# GPU-graphs acceleration itself.
+# `include()`-d directly by SpeedyTransforms.jl, so this compiles unconditionally as part of
+# the main package — including in CPU-only sessions with no GPU backend loaded. That is
+# deliberate: nothing below references CUDA/AMDGPU/ROCArray/CuArray etc. — the kernels are
+# plain KernelAbstractions `@kernel` functions, and the only backend-specific pieces (the
+# actual capture/instantiate/launch primitives and the graph-exec type, e.g. `CuGraphExec`)
+# are supplied from outside via the `GraphBackend` struct built by each extension. So none of
+# this has a hard dependency on the "extension-triggering" package and there is no compilation
+# reason to gate it behind one (see PR #1232 review discussion).
 #
-# TODO: This code ended up in src/ by accident once and reportedly broke Enzyme's CPU-only
-# autodiff tests. Confirm and fix underlying issue.
-#
-# The only thing that differs between backends is the graph capture/instantiate/launch API
-# itself (e.g. `CUDA.capture`/`instantiate`/`launch` vs a HIP equivalent) and the graph-exec
-# type it produces (e.g. `CuGraphExec`). That's bundled into a `GraphBackend`, supplied by the
-# including extension. Everything else — kernels, the per-transform-size cache, the
-# allocation-free fused loops, and capture/replay control flow — is identical across backends
-# and lives here once.
+# What DOES still have to stay in the extensions, and can never move here: the concrete
+# `_fourier_batched!(..., ::CuArray, ...)` / `::ROCArray` methods and the `CUDA_GRAPH_BACKEND`/
+# `HIP_GRAPH_BACKEND` instances. Those genuinely cannot compile without `CuArray`/`ROCArray`
+# etc. being defined, i.e. without the GPU package loaded.
 # =====================================================================================
 
 """Maximum number of cached graphs per direction per `SpectralTransform`. Prevents
@@ -209,7 +209,7 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     # northern rings,
     launch!(arch, ArrayWorkOrder, real_size, gather_real_kernel!, packed_real, field.data, real_offset, nlons, istart_n)
     @inbounds for j in 1:nlat_half
-        mul!(complex_view[j], rfft_plans[j], real_view[j])
+        LinearAlgebra.mul!(complex_view[j], rfft_plans[j], real_view[j])
     end
     launch!(arch, ArrayWorkOrder, complex_size, scatter_complex_kernel!, f_north, packed_complex, complex_offset, nfreqs)
 
@@ -219,7 +219,7 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
         if cache.has_equator && j == j_equator
             fill!(complex_view[j], 0)
         else
-            mul!(complex_view[j], rfft_plans[j], real_view[j])
+            LinearAlgebra.mul!(complex_view[j], rfft_plans[j], real_view[j])
         end
     end
     launch!(arch, ArrayWorkOrder, complex_size, scatter_complex_kernel!, f_south, packed_complex, complex_offset, nfreqs)
@@ -245,7 +245,7 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     # northern rings
     launch!(arch, ArrayWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_north, complex_offset, nfreqs)
     @inbounds for j in 1:nlat_half
-        mul!(real_view[j], brfft_plans[j], complex_view[j])
+        LinearAlgebra.mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
     launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons, istart_n, add)
 
@@ -253,7 +253,7 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     launch!(arch, ArrayWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_south, complex_offset, nfreqs)
     @inbounds for j in 1:nlat_half
         (cache.has_equator && j == j_equator) && continue
-        mul!(real_view[j], brfft_plans[j], complex_view[j])
+        LinearAlgebra.mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
     launch!(arch, ArrayWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons_s, istart_s, add)
     return nothing

@@ -16,7 +16,7 @@ import Primes
 # GPU
 import GPUArrays: GPUArrays, AbstractGPUArray
 import Adapt: Adapt, adapt, adapt_structure
-import KernelAbstractions: @kernel, @index, synchronize
+import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures
@@ -67,6 +67,7 @@ include("array_utils.jl")
 include("spectral_transform.jl")
 include("matrix_transform.jl")
 include("fourier.jl")
+include("gpu_graphs_common.jl")
 include("legendre.jl")
 include("legendre_ka.jl")
 include("spectral_gradients.jl")

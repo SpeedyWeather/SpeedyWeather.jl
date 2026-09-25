@@ -1,4 +1,5 @@
 using JLArrays
+import Random
 
 @testset "Grid types" begin
     # TODO: These grid/field types should be pulled out into constants rather than copy-pasted
@@ -213,6 +214,35 @@ end
 
             G1 = randn(NF, G, n)
             @test eltype(G1) == NF
+        end
+    end
+end
+
+@testset "Field generators: rand, randn with rng" begin
+    for f in (rand, randn)
+        n = 4      # resolution parameter nlat_half
+        grid = OctahedralGaussianGrid(n)
+
+        # same seed = same field, reproducibility
+        @test f(Random.Xoshiro(123), grid) == f(Random.Xoshiro(123), grid)
+        @test f(Random.Xoshiro(123), grid, 2) == f(Random.Xoshiro(123), grid, 2)
+
+        # rng doesn't change type or size compared to no rng
+        for NF in (Float32, Float64)
+            F1 = f(Random.Xoshiro(123), NF, grid, 2)
+            F2 = f(NF, grid, 2)
+            @test typeof(F1) == typeof(F2)
+            @test size(F1) == size(F2)
+
+            F1 = f(Random.Xoshiro(123), NF, OctahedralGaussianGrid, n)
+            F2 = f(NF, OctahedralGaussianGrid, n)
+            @test typeof(F1) == typeof(F2)
+            @test size(F1) == size(F2)
+
+            F1 = f(Random.Xoshiro(123), OctahedralGaussianField{NF}, n)
+            F2 = f(OctahedralGaussianField{NF}, n)
+            @test typeof(F1) == typeof(F2)
+            @test size(F1) == size(F2)
         end
     end
 end
@@ -548,9 +578,16 @@ end
         field[:, 1, 2] = v
         @test field[:, 1, 2].data ≈ v.data
 
-        # fill
-        fill!(field, 2.0)
+        # fill! (returns a Field, not the bare underlying array)
+        filled = fill!(field, 2.0)
         @test all(field .== 2)
+        @test filled isa Field{NF, ndims, JLArray{NF, ndims}}
+
+        # clamp! (uses `field.data`'s clamp! to avoid scalar indexing on GPU)
+        field3 = on_architecture(jl_arch, randn(F{NF}, s...))
+        clamped = clamp!(field3, NF(-0.5), NF(0.5))
+        @test clamped isa Field{NF, ndims, JLArray{NF, ndims}}
+        @test all(-0.5 .<= clamped .<= 0.5)
     end
 end
 

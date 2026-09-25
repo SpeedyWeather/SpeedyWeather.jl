@@ -27,7 +27,7 @@ julia> Pkg.add(url="https://github.com/SpeedyWeather/SpeedyWeather.jl", rev="mai
 `rev` (revision) refers to the `main` branch, and `subdir` is needed as we have structured
 SpeedyWeather as a monorepo with other packages living in the same repository
 (do `subdir="RingGrids"` for example if you want to install the latest unreleased version of
-the RingGrids package ...). In a similar manner, you can also install other branches than `main`,
+the [RingGrids](@ref) package ...). In a similar manner, you can also install other branches than `main`,
 e.g. from a specific pull request.
 
 In brief you can do the same as
@@ -69,7 +69,8 @@ The package is tested on Julia 1.10, 1.11 and 1.12.
 ## Extensions
 
 SpeedyWeather.jl and its submodules have several weak dependencies for visualisation (Makie, GeoMakie),
-differentiability (Enzyme, FiniteDifferences) or GPU computing (CUDA, AMDGPU, Metal).
+differentiability ([Differentiability and Adjoint Model](@ref); Enzyme, FiniteDifferences) or
+GPU computing ([GPU and Architectures](@ref); CUDA, AMDGPU, Metal).
 These are all
 [extensions](https://pkgdocs.julialang.org/v1.10/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)),
 meaning that this functionality is only loaded from SpeedyWeather (or its submodules)

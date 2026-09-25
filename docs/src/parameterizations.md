@@ -66,7 +66,7 @@ front of functions and types. The flux variable is defined as a two-dimensional
 variable on our grid, and the prognostic variable is defined as a spectral variable.
 Three-dimensional variables are also possible by using `GridXYZ` and `SpectralXYZ` as `dims`
 (the 2nd argument) for a vertical dimension with the number of layers of the model, or
-`GridXYT(n)`/`SpectralXYT(n)` for a time/step dimension (of lenth `n = 1` by default).
+`GridXYT(n)`/`SpectralXYT(n)` for a [time/step dimension](@ref "Step dimension") (of lenth `n = 1` by default).
 `Grid3D(n)` and `Spectral3D(n)` exist for a
 third dimension of length `n` (default 1) of unspecified meaning.
 
@@ -208,6 +208,39 @@ model.parameterizations
 You can change the order in which the parametrizations are executed by reordering the tuple or you can add your own,
 additional parametrization to the model by adding it with `custom_parameterization` keyword argument.
 Below we will demonstrate this in an example.
+
+### Parameterizations from other packages
+
+Parameterizations can also be defined in other packages, e.g. to share a scheme between
+SpeedyWeather and other models. Such a package does not have to depend on SpeedyWeather,
+instead it can define a SpeedyWeather extension that wraps its scheme into an
+`AbstractParameterization`. However, Julia does not allow extensions to export new types or functions,
+so the wrapper type would only be accessible via `Base.get_extension`. To avoid this,
+SpeedyWeather provides the function stub `Parameterization` that extensions can add methods to
+
+```julia
+# in the main code of ExternalPackage, no SpeedyWeather dependency
+struct ExternalLongwave
+    # ...
+end
+
+# in ExternalPackageSpeedyWeatherExt
+struct SpeedyExternalLongwave{NF} <: SpeedyWeather.AbstractLongwave
+    # ...
+end
+
+SpeedyWeather.Parameterization(spectral_grid::SpectralGrid, scheme::ExternalLongwave; kwargs...) =
+    SpeedyExternalLongwave(spectral_grid, scheme; kwargs...)
+```
+
+which is then used like any other parameterization
+
+```julia
+using SpeedyWeather, ExternalPackage
+spectral_grid = SpectralGrid()
+longwave_radiation = Parameterization(spectral_grid, ExternalLongwave())
+model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+```
 
 ## Example: Albedo
 

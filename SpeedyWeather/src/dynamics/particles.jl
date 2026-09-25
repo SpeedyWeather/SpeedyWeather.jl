@@ -128,7 +128,12 @@ Modulo operator for particle locations to map them back into [0,360˚E) and [-90
 in the horizontal and to clamp vertical σ coordinates into [0,1]."""
 @inline function Base.mod(p::P) where {P <: Particle}
     (; lon, lat, σ) = p
-    pole_crossed = isodd((abs(lat) - 2eps(lat) + 90) ÷ 180)
+    # NB: avoid `isodd(x ÷ 180)` here: `÷` on floats returns a non-integer-typed value, so
+    # `isodd` falls back to a generic path with an exact Float->Int conversion (InexactError
+    # throw on failure) that triggers AMDGPU hostcalls (same failure class as the `sind`/
+    # `cosd` note in `advect_2D`). `x ÷ 180` is non-negative here (x = abs(lat) + ... >= 0),
+    # so `isodd(x ÷ 180) == (mod(x, 360) >= 180)` without ever leaving floating point.
+    pole_crossed = mod(abs(lat) - 2eps(lat) + 90, 360) >= 180
     lat = 90 - abs(mod(lat + 90, 360) - 180)   # new latitude is wrapped around poles
     lon = mod(lon + 180 * pole_crossed, 360)  # mod lon into [0,360˚E] but +180 for pole crossings
     σ = clamp(σ, 0, 1)      # particle above top (σ<0) stays at top, ground (σ>1) stays on ground
