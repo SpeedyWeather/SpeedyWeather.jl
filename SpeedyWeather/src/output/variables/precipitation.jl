@@ -143,13 +143,67 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
+# cloud top height [m] as diagnosed by the clouds, not the layer index `cloud_top`
 path(::CloudTopOutput, simulation) =
-    simulation.variables.parameterizations.cloud_top
+    simulation.variables.parameterizations.cloud_top_height
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct CloudCoverOutput <: AbstractOutputVariable
+    name::String = "cloud_cover"
+    unit::String = "1"
+    long_name::String = "cloud cover"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::CloudCoverOutput, simulation) =
+    simulation.variables.parameterizations.cloud_cover
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct ConvectiveSnowOutput{F, R} <: AbstractOutputVariable
+    name::String = "snow_conv"
+    unit::String = "mm"
+    long_name::String = "accumulated convective snow"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 20
+    transform::F = (x) -> 1000x             # [m] to [mm]
+    rate::R = ConvectiveSnowRateOutput()    # include here to be called at finalize!
+end
+
+path(::ConvectiveSnowOutput, simulation) =
+    simulation.variables.parameterizations.snow_convection
+
+# at finalize step postprocess the convective snow to get the rate
+finalize!(output::NetCDFOutput, variable::ConvectiveSnowOutput, args...) = output!(output, variable.rate, variable)
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct ConvectiveSnowRateOutput{F} <: AbstractRateOutputVariable
+    name::String = "snow_conv_rate"
+    unit::String = "mm/hr"
+    long_name::String = "convective snow rate"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+    transform::F = (x) -> 1000x     # [m] to [mm]
+end
 
 # collect all in one for convenience
 PrecipitationOutput() = (
     ConvectiveRainOutput(),
+    ConvectiveSnowOutput(),
     LargeScaleRainOutput(),
     LargeScaleSnowOutput(),
     CloudTopOutput(),
+    CloudCoverOutput(),
 )
