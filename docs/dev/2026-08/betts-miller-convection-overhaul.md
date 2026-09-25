@@ -151,6 +151,17 @@ Base revision: `557b38d5` (`mc/convection`, off `main`)
   with large-scale condensation. Tropical cloud top now mostly layer 3 (~9.2 km), zonal mean ~9.6 km
   in the tropics and 5-7 km in mid-latitudes. Radiation usage (cloud reflection at `k == cloud_top`,
   cloud absorption for `k >= cloud_top`) checked against SPEEDY, unchanged.
+- 2026-09-25, cloud top follow-up (@milankl): "Cloud top height is allocated on every output time
+  step. Is it not possible to calculate the height on the fly? [...] Also can you add cloud cover
+  as a parameterization variable and output variable too?" `DiagnosticClouds` now declares
+  `cloud_top_height` [m] and `cloud_cover` parameterization variables (collected via
+  `variables(::OneBandShortwave)`, which forwards to its clouds component) and fills them in
+  `diagnose_cloud_properties`, right after the final cloud-top index is known. The custom
+  `output!` (CPU transfer and allocation each output step) is removed: `CloudTopOutput` now points
+  at `cloud_top_height`, and a new `CloudCoverOutput` (added to `PrecipitationOutput()`) at
+  `cloud_cover`, both via the generic output path. `cloud_top` stays the layer index (not
+  overwritten in place) so it has one meaning in every model setup; with `NoClouds` the two new
+  variables don't exist and the outputs are skipped.
 
 ## Problem description
 

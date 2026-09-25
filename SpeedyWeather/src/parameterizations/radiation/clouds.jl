@@ -67,6 +67,13 @@ end
 Adapt.@adapt_structure DiagnosticClouds
 DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF}(; kwargs...)
 initialize!(clouds::DiagnosticClouds, model::AbstractModel) = nothing
+
+variables(::DiagnosticClouds) = (
+    ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
+    ParameterizationVariable(:cloud_top_height, Grid2D(), desc = "Cloud top height", units = "m"),
+    ParameterizationVariable(:cloud_cover, Grid2D(), desc = "Cloud cover", units = "1"),
+)
+
 @propagate_inbounds function clouds!(
         ij,
         vars,
@@ -143,6 +150,13 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     cloud_cover = min(1, P + humidity_term)
     cloud_top = min(cloud_top_humidity, cloud_top_precipitation)
     vars.parameterizations.cloud_top[ij] = cloud_top
+
+    # store cloud cover and cloud top height [m] (0 for no cloud) for output
+    vars.parameterizations.cloud_cover[ij] = cloud_cover
+    # cloud_top is stored as float (integer-valued) so convert to index, nlayers + 1 = no cloud
+    k_top = min(unsafe_trunc(Int, cloud_top), nlayers)
+    Φ_top = geopotential[ij, k_top]
+    vars.parameterizations.cloud_top_height[ij] = ifelse(cloud_top <= nlayers, Φ_top / model.planet.gravity, zero(NF))
 
     # Stratocumulus parameterization
     stratocumulus_cover::NF = 0         # fallback for no stratocumulus

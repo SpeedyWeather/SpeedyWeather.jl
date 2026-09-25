@@ -98,6 +98,10 @@ function OneBandGreyShortwave(
     return OneBandShortwave(clouds, transmissivity, radiative_transfer)
 end
 
+# variables of the shortwave scheme and those of its clouds component
+variables(radiation::OneBandShortwave) =
+    (invoke(variables, Tuple{AbstractShortwave}, radiation)..., variables(radiation.clouds)...)
+
 Base.show(io::IO, M::OneBandShortwave) = show(io, M, values = false)
 
 # initialize one after another

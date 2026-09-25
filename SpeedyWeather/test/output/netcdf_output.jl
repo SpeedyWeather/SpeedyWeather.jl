@@ -171,6 +171,8 @@ end
     cloud_top = ds["cloud_top"].var[:, :, end]
     @test all(0 .<= cloud_top .< 30_000)
     @test maximum(cloud_top) > 1000
+    cloud_cover = ds["cloud_cover"].var[:, :, end]
+    @test all(0 .<= cloud_cover .<= 1)
 
     ## test u10, v10 existence
     @test haskey(ds, "u")
