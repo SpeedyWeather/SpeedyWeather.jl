@@ -120,7 +120,7 @@ showing
 
 Hurray🥳 In a second we just simulated 10 days of the Earth's atmosphere at a speed of almost 1400 simulated years
 per wallclock day. Also printed is the model time, the maximum wind speed and the temperature range (on any layer).
-This simulation used a T31 spectral resolution on an
+This simulation used a T32 spectral resolution on an
 [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#OctahedralGaussianGrid)
 (~400km resolution) solving the primitive equations on 8 vertical layers,
 storing [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/output).

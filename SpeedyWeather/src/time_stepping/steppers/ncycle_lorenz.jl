@@ -99,7 +99,7 @@ function NCycleLorenz(
         variant = NCycleLorenzA(),
         Δt_at_T32 = Minute(30),
         adjust_with_output = true,
-        ocean = nothing,
+        ocean = nothing,    # default can't be NCycleLorenz, creates an infinite loop
         land = nothing,
     )
     (; NF, truncation) = spectral_grid

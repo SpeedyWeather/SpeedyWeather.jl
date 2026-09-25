@@ -32,8 +32,8 @@ using SpeedyWeather
 spectral_grid = SpectralGrid()
 ```
 You can also get the help prompt by typing `?SpectralGrid`.
-Let's explain the details: The spectral resolution is T31, so the largest
-wavenumber in spectral space is 31, and all the complex spherical harmonic
+Let's explain the details: The spectral resolution is T32 (1-based), so the largest
+wavenumber in spectral space is 31 (0-based), and all the complex spherical harmonic
 coefficients of a given 2D field (see [Spherical Harmonic Transform](@ref))
 are stored in a [`LowerTriangularMatrix`](@ref lowertriangularmatrices)
 in the number format Float32. The radius of the sphere is
