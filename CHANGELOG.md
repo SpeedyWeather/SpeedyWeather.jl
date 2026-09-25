@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Cloud top output in metres from geopotential (was layer index), diagnostic cloud top at level of maximum relative humidity as in SPEEDY, convective cloud top for deep convection only [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
 - Betts-Miller convective precipitation is now the net (signed) column drying, closing the column water budget [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
 - Betts-Miller convection: single fixed-trip pass over the column for the parcel ascent instead of an environment prefill plus a `while` loop, ~15-20% faster on GPU; fix `BettsMillerDryConvection` not adapting to GPU [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
 - Convective rain in `BettsMillerConvection` now falls as snow below a configurable freezing threshold [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)

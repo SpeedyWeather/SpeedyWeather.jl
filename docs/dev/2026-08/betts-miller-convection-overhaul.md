@@ -136,6 +136,21 @@ Base revision: `557b38d5` (`mc/convection`, off `main`)
   -∫ dq/dt dσ ⋅ pₛΔt/(gρ) per column; it failed on this branch (63 of ~1000 columns, rain 25-50%
   too high). Fixed by integrating δq·Δσ with sign (the existing `max(rain, 0)` after the loop and
   the deep-convection indicator stay); test passes. Docs updated accordingly.
+- 2026-09-25, cloud top (review by @milankl): "the cloud top height output is declared in m but
+  it's actually the layer index. Can you take the height from the grid geopotential? [...] check
+  that the cloud top height from condensation/convection is correctly computed and correctly used
+  in the radiation scheme. From the output data it seems that tropical convection always reaches
+  the top of the atmospheric column." Findings from a T31/L8 20-day run: the convective level of
+  zero buoyancy is *not* the culprit (tropical deep convection tops out mostly in layer 4, ~6.8 km).
+  The ~12.8 km (layer 2) cloud tops almost everywhere came from `DiagnosticClouds`, which took the
+  *highest* layer with RH ≥ 30% and q > 0.2 g/kg, instead of SPEEDY's level of *maximum* RH (and
+  took the RH cover term from the lowest such layer). Changes: (1) `CloudTopOutput` now writes
+  Φ/g [m] at the cloud-top layer (0 m for no cloud) via a custom `output!`; (2) `DiagnosticClouds`
+  uses the level of maximum RH excess over layers 2..nlayers-1 and the cover term from that
+  maximum; (3) convection only sets the cloud top for deep (precipitating) convection, consistent
+  with large-scale condensation. Tropical cloud top now mostly layer 3 (~9.2 km), zonal mean ~9.6 km
+  in the tropics and 5-7 km in mid-latitudes. Radiation usage (cloud reflection at `k == cloud_top`,
+  cloud absorption for `k >= cloud_top`) checked against SPEEDY, unchanged.
 
 ## Problem description
 

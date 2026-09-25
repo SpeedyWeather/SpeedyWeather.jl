@@ -174,8 +174,9 @@ and relaxes current vertical profiles to the adjusted references."""
     vars.parameterizations.rain_rate[ij] += rain_rate_convection             # instantaneous rate [m/s] for coupling
     vars.parameterizations.snow_rate[ij] += snow_rate_convection             # instantaneous rate [m/s] for coupling
 
-    # clouds reach to top of convection
-    vars.parameterizations.cloud_top[ij] = min(vars.parameterizations.cloud_top[ij], level_zero_buoyancy)
+    # clouds reach to top of (precipitating, i.e. deep) convection, as for large-scale condensation
+    cloud_top_convection = ifelse(deep_convection, level_zero_buoyancy, nlayers + 1)
+    vars.parameterizations.cloud_top[ij] = min(vars.parameterizations.cloud_top[ij], cloud_top_convection)
     return nothing
 end
 

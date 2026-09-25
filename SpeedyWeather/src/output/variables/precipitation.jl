@@ -143,8 +143,48 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
+# cloud top is stored as layer index, converted to height via geopotential in output!
 path(::CloudTopOutput, simulation) =
     simulation.variables.parameterizations.cloud_top
+
+"""$(TYPEDSIGNATURES)
+Output the cloud top height [m] (above sea level) from the cloud top layer index,
+using the geopotential on that layer, `Φ/g`. Columns without clouds (index `nlayers + 1`)
+are written as 0 m."""
+function output!(
+        output::AbstractOutput,
+        variable::CloudTopOutput,
+        simulation::AbstractSimulation,
+    )
+    # escape immediately after first call if variable doesn't have a time dimension
+    ~hastime(variable) && output.output_counter > 1 && return nothing
+
+    var = path_or_nothing(variable, simulation)
+    isnothing(var) && return nothing       # silently escape early if variable is not defined
+
+    # index-based lookup of geopotential per column, do on CPU (output is written from CPU anyway)
+    cloud_top = on_architecture(CPU(), var)
+    geopotential = on_architecture(CPU(), simulation.variables.dynamics.geopotential)
+    g = simulation.model.planet.gravity
+    nlayers = size(geopotential, 2)
+
+    cloud_top_height = similar(cloud_top)
+    for ij in eachindex(cloud_top, cloud_top_height)
+        k = round(Int, cloud_top[ij])
+        cloud_top_height[ij] = 1 <= k <= nlayers ? geopotential[ij, k] / g : 0
+    end
+
+    # interpolate 2D/3D variables
+    cloud_top_height_output = output.field2D
+    interpolate_output!(output, cloud_top_height_output, cloud_top_height)
+
+    if hasproperty(variable, :keepbits)     # round mantissabits for compression
+        round!(cloud_top_height_output, variable.keepbits)
+    end
+
+    write_array!(output, variable, cloud_top_height_output)
+    return nothing
+end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
