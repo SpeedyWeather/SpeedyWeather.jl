@@ -203,3 +203,34 @@ end
     @test SpeedyWeather.latent_heat_fusion(PrimitiveWetModel(spectral_grid).atmosphere) ≈ 3.3e5
     @test SpeedyWeather.latent_heat_fusion(PrimitiveDryModel(spectral_grid).atmosphere) == 0
 end
+
+# record after every time step whether ocean points are below freezing and the total sea ice
+mutable struct SeaIceLog <: SpeedyWeather.AbstractCallback
+    ncold::Vector{Int}
+    ice::Vector{Float64}
+end
+SpeedyWeather.initialize!(::SeaIceLog, args...) = nothing
+SpeedyWeather.finalize!(::SeaIceLog, args...) = nothing
+function SpeedyWeather.callback!(log::SeaIceLog, vars, model)
+    sst = vars.prognostic.ocean.sea_surface_temperature
+    ocean = model.land_sea_mask.land_fraction.data .< 1
+    push!(log.ncold, count(ocean .& (sst.data .< model.sea_ice.freezing_temperature - 1.0e-3)))
+    push!(log.ice, sum(vars.prognostic.ocean.sea_ice_concentration))
+    return nothing
+end
+
+@testset "Sea ice freezing and snow melt cap independent of the time stepper" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
+    for time_stepper in (EulerForward(spectral_grid), NCycleLorenz(spectral_grid))
+        time_stepping = Leapfrog(spectral_grid, ocean = time_stepper, land = time_stepper)
+        model = PrimitiveWetModel(spectral_grid; time_stepping)
+        log = SeaIceLog(Int[], Float64[])
+        add!(model, log)
+        simulation = initialize!(model)
+        run!(simulation, steps = 8)
+        @test simulation.model.feedback.nans_detected == false
+        @test all(log.ncold .== 0)          # SST restored to freezing after every step
+        @test issorted(log.ice)             # sea ice grows monotonically in the first steps (no N-cycle flip)
+        @test all(0 .<= simulation.variables.prognostic.land.snow_depth .<= model.land.snow.snow_depth_cap)
+    end
+end
