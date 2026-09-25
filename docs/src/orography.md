@@ -46,7 +46,7 @@ can be allocated in the right size and number format, following the general patt
 
 ## Earth's orography
 
-Earth's orography can be created with (here we use a resolution of T85, about 165km globally)
+Earth's orography can be created with (here we use a resolution of T86, 1-based, about 165km globally)
 
 ```@example orography
 using SpeedyWeather
@@ -63,22 +63,22 @@ model = PrimitiveDryModel(spectral_grid; orography)
 initialize!(orography, model)   # happens also in simulation = initialize!(model)
 
 using CairoMakie
-heatmap(orography.orography, title="Earth's orography at T85 resolution, no smoothing")
+heatmap(orography.orography, title="Earth's orography at T86 resolution, no smoothing")
 save("earth_orography.png", ans) # hide
 nothing # hide
 ```
 ![EarthOrography](earth_orography.png)
 
 typing `?EarthOrography` shows the various options that are provided.
-An orogaphy at T85 resolution that is as smooth as it would be at T42
+An orogaphy at T86 resolution (1-based) that is as smooth as it would be at T43
 (controlled by the `smoothing_fraction`, the fraction of highest wavenumbers
-which are the top half here, about T43 to T85) for example can be created with
+which are the top half here, about T43 to T86) for example can be created with
 
 ```@example orography
 orography = EarthOrography(spectral_grid, smoothing=true, smoothing_fraction=0.5)
 initialize!(orography, model)
 
-heatmap(orography.orography, title="Earth's orography at T85 resolution, smoothed to T42")
+heatmap(orography.orography, title="Earth's orography at T86 resolution, smoothed to T43")
 save("earth_orography_smooth.png", ans) # hide
 nothing # hide
 ```

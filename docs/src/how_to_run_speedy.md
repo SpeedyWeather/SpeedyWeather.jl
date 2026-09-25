@@ -55,7 +55,7 @@ spectral_grid = SpectralGrid(truncation=86)
 ```
 Typical values are 32, 43, 64, 86, 128, 171, ... although you can technically
 use any integer, see [Available horizontal resolutions](@ref) for details.
-Now with T85 (which is a common notation for `truncation=86`) the grid
+Now with T86 (which is our notation for `truncation=86`) the grid
 is of higher resolution too. You may play with the `dealiasing` factor,
 a larger factor increases the grid resolution that is matched with a given
 spectral resolution. You don't choose the resolution of the grid directly,
