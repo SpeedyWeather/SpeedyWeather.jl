@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `on_architecture` keeps the dimensions of a `LowerTriangularArray`, fixes for tests and docs after merging main [#NNNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNNN)
 - Sea ice freezing and the snow melt cap are adjustments in `filter!`, not tendencies, fixing sea ice with NCycleLorenz for the ocean [#1272](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1272)
 - `Leapfrog` and `NCycleLorenz` have `ocean` and `land` fields for their time steppers, Leapfrog defaulting to the new `EulerForward`; snow depth is time stepped by the land time stepper [#1264](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1264)
 - Ocean, sea ice and land are Euler forward stepped with leapfrog, fixing long-integration instability [#1264](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1264)

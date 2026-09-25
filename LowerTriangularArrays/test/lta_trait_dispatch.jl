@@ -62,3 +62,17 @@ end
     @test has_time(LowerTriangularArray(rand(ComplexF32, 55), spectrum, LM())) == false
     @test has_time(LowerTriangularArray(rand(ComplexF32, 55, 5), spectrum, LMZ())) == false
 end
+
+@testset "LowerTriangularArray: on_architecture keeps dimensions" begin
+    import SpeedyWeatherInternals.Architectures: architecture, on_architecture
+    using JLArrays
+    spectrum = Spectrum(10, 10, architecture = LowerTriangularArrays.CPU())
+    for (dims, I) in ((LM(), ()), (LMZ(), (3,)), (LMT(), (2,)), (LMZT(), (3, 2)))
+        L = rand(LowerTriangularArray{ComplexF32}, spectrum, dims, I...)
+        for arch in (LowerTriangularArrays.CPU(), architecture(JLArray))
+            L2 = on_architecture(arch, L)
+            @test L2.dims == dims
+            @test typeof(L2.dims) == typeof(L.dims)
+        end
+    end
+end
