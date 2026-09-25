@@ -78,7 +78,7 @@ variables(::SurfaceOceanHeatFlux) = (
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(ρ)
 
-    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, heat_flux)
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), heat_flux)
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
@@ -139,24 +139,25 @@ variables(::SurfaceLandHeatFlux) = (
 
     surface = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
-    pₛ = vars.parameterizations.surface_pressure[ij]                # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
 
     # TODO actually implement skin temperature?
-    T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]      # uppermost land layer with index 1
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), heat_flux)
+    T_skin_land = soil_temperature[ij, 1]                       # uppermost land layer with index 1
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    snow_depth = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(T)
+    snow_depth = haskey(vars.prognostic.land, :snow_depth) ?
+        get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), heat_flux)[ij] : zero(T)
 
     # drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
     drag_land = ifelse(heat_flux.use_boundary_layer_drag, d, heat_flux.drag)
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
-    # Only flux from land if available (not NaN) otherwise zero flux
     # leave out *cₚ here but include below to avoid division
-    flux_land = ifelse(isfinite(T_skin_land), ρ * drag_land * V₀ * (T_skin_land - T), zero(T))
+    flux_land = ρ * drag_land * V₀ * (T_skin_land - T)
 
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
     flux_land /= 1 + snow_depth / heat_flux.snow_insulation_depth

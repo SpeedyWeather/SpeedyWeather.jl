@@ -167,7 +167,7 @@ than interpolating onto a rectangular `lon`×`lat` grid the way [`NetCDFOutput`]
 using SpeedyWeather
 using Zarr     # this loads SpeedyWeatherZarrExt and enables HEALPixOutput
 
-spectral_grid = SpectralGrid(truncation=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 output = HEALPixOutput(spectral_grid, PrimitiveWet, nside=16, interval=Hour(6))
 model = PrimitiveWetModel(spectral_grid; output)
 simulation = initialize!(model)
@@ -272,7 +272,7 @@ interpolation is needed and none is set up — `output.interpolator` stays `noth
 data is copied straight out of the model state:
 
 ```@example healpix
-spectral_grid = SpectralGrid(truncation=31, nlayers=8, Grid=HEALPixGrid)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8, Grid=HEALPixGrid)
 output = HEALPixOutput(spectral_grid, PrimitiveWet)
 isnothing(output.interpolator)      # true, model and output share the grid
 ```

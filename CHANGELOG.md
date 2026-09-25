@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `on_architecture` keeps the dimensions of a `LowerTriangularArray`, fixes for tests and docs after merging main [#1274](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1274)
+- Sea ice freezing and the snow melt cap are adjustments in `filter!`, not tendencies, fixing sea ice with NCycleLorenz for the ocean [#1272](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1272)
+- `Leapfrog` and `NCycleLorenz` have `ocean` and `land` fields for their time steppers, Leapfrog defaulting to the new `EulerForward`; snow depth is time stepped by the land time stepper [#1264](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1264)
+- Ocean, sea ice and land are Euler forward stepped with leapfrog, fixing long-integration instability [#1264](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1264)
+- Time stepping soil temperature and moisture [#1183](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1183)
 - `Parameterization` function stub for packages to define SpeedyWeather parameterizations in extensions [#1261](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1261)
 - Output on pressure layers, plus documentation for the vertical interpolation [#1257](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1257)
 - Extended differentibaility tests for Barotropic model not broken anymore [#1270](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1270)
@@ -42,7 +47,7 @@
 - WhichTransform for default MatrixSpectralTransform on GPU at low resolution [#1194](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1194)
 - Restructed GPU tests, and fixed an issue for which `MatrixSpectralTransform` failed on views [#1201](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1201)
 - Extract the backend-agnostic parts of GPU-graphs acceleration (kernels, cache, capture/replay control flow) into a shared `gpu_graphs_common.jl`, `include()`-d by both the CUDA and AMDGPU extensions [#1147](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1147)
-- Restrist Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
+- Restrict Reactant compat to 0.2.279 [#1206](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1206)
 - Simulation(model) as Oceananigans-like interface [#1205](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1205)
 - Orbit and rotation time for variable length of day/year [#984](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/984)
 - Default dealiasing for non-Gaussian grids is now 3, fixing stability issues e.g. for HEALPix [#1198](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1198)
