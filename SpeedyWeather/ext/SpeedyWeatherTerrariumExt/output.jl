@@ -79,11 +79,11 @@ function terrarium_output_variable(
 
     dims = Terrarium.vardims(descriptor)
     is3d = dims isa Terrarium.XYZ
-    field_grid = Terrarium.get_field_grid(model.grid)
-    nlayers = is3d ? size(field_grid, 3) : 1
+    ground_grid = Terrarium.ground_domain(model.grid)
+    nlayers = is3d ? size(ground_grid, 3) : 1
     # cell-centre depths [m], positive down; znodes is in field order (deepest layer first)
     # ensure depths vector is copied to CPU
-    depths = is3d ? Float64.(Terrarium.on_architecture(Terrarium.CPU(), -znodes(field_grid, Center(), Center(), Center()))) : Float64[]
+    depths = is3d ? Float64.(Terrarium.on_architecture(Terrarium.CPU(), -znodes(ground_grid, Center(), Center(), Center()))) : Float64[]
 
     return TerrariumOutputVariable(;
         name = String(var_name), unit, long_name,

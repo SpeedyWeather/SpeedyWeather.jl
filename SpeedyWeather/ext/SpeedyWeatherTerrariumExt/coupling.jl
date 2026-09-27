@@ -87,11 +87,11 @@ land cutoff (default `0`, i.e. any land)."""
 Terrarium.ColumnRingGrid(
     arch::Terrarium.AbstractArchitecture,
     NF::Type{<:AbstractFloat},
-    vert::Terrarium.AbstractVerticalSpacing,
+    vertical_coordinate::Terrarium.VerticalCoordinate,
     rings::SpeedyWeather.RingGrids.AbstractGrid,
     land_sea_mask::SpeedyWeather.AbstractLandSeaMask;
     threshold = 0,
-) = Terrarium.ColumnRingGrid(arch, NF, vert, rings, land_mask(land_sea_mask; threshold))
+) = Terrarium.ColumnRingGrid(arch, NF, vertical_coordinate, rings, land_mask(land_sea_mask; threshold))
 
 """$(TYPEDSIGNATURES)
 
@@ -213,8 +213,8 @@ function TerrariumLand(
         ocean_temperature::Real = 285,
         ocean_moisture::Real = 0,
     ) where {NF}
-    field_grid = Terrarium.get_field_grid(model.grid)
-    Δz_arr = Terrarium.on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
+    ground_grid = Terrarium.ground_domain(model.grid)
+    Δz_arr = Terrarium.on_architecture(Terrarium.CPU(), ground_grid.z.Δᵃᵃᶜ)
     # The Oceananigans vertical spacing is an OffsetArray; take the last entry
     # as the layer thickness for the SpeedyWeather LandGeometry. It's not actually used, but
     # we set it here for consistency.
@@ -239,7 +239,7 @@ constructor."""
 function TerrariumLand(
         integrator::ModelIntegrator{NF, Arch, Grid};
         spectral_grid_kwargs...,
-    ) where {NF, Arch, Grid <: ColumnRingGrid}
+    ) where {NF, Arch, Grid <: Terrarium.AbstractLandGrid}
     spectral_grid = SpectralGrid(integrator.model.grid.rings; NF, spectral_grid_kwargs...)
     return TerrariumLand(
         spectral_grid, integrator.model;
