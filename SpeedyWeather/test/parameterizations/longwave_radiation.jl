@@ -16,7 +16,7 @@ end
 @testset "Longwave Transmissivity" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
-    @testset for T in (FriersonLongwaveTransmissivity, TransparentLongwaveTransmissivity)
+    @testset for T in (FriersonLongwaveTransmissivity, ByrneOGormanLongwaveTransmissivity, TransparentLongwaveTransmissivity)
         transmissivity = T(spectral_grid)
         longwave_radiation = OneBandLongwave(spectral_grid; transmissivity)
         model = PrimitiveWetModel(spectral_grid; longwave_radiation)
@@ -72,4 +72,24 @@ end
     g = model.planet.gravity
     Δp = [SpeedyWeather.pressure_thickness(k, 1.0e5, coordinates) for k in 1:spectral_grid.nlayers]
     @test sum((dTdt0 .- dTdt1) .* Δp) * cₚ / g ≈ olr1 - olr0 rtol = 1.0e-3
+end
+
+@testset "Byrne and O'Gorman humidity-dependent longwave transmissivity" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8)
+    transmissivity = ByrneOGormanLongwaveTransmissivity(spectral_grid)
+    model = PrimitiveWetModel(spectral_grid; longwave_radiation = OneBandLongwave(spectral_grid; transmissivity))
+    initialize!(model.longwave_radiation, model)
+    vars = Variables(model)
+    vars.parameterizations.surface_pressure .= 1.0e5
+
+    # dry: only the dry optical depth, summing to dry_absorption over the column
+    vars.grid.humidity .= 0
+    t_dry = copy(SpeedyWeather.transmissivity!(1, vars, transmissivity, model)[1, :])
+    @test prod(t_dry) ≈ exp(-transmissivity.dry_absorption) rtol = 1.0e-5
+
+    # moist: lower transmissivity in every layer
+    vars.grid.humidity .= 0.005
+    t_moist = SpeedyWeather.transmissivity!(1, vars, transmissivity, model)[1, :]
+    @test all(t_moist .< t_dry)
+    @test prod(t_moist) ≈ exp(-(transmissivity.dry_absorption + transmissivity.water_vapor_absorption * 0.005)) rtol = 1.0e-4
 end
