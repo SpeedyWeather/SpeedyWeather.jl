@@ -173,8 +173,10 @@ $(TYPEDFIELDS)"""
     "[OPTION] Absorptivity of water vapor, visible band (SPEEDY abswv1 = 22) [per kg/kg per 10^5 Pa]"
     @param absorptivity_water_vapor::NF = 100 (bounds = Nonnegative,)
 
-    "[OPTION] Absorptivity of water vapor, near-infrared band (SPEEDY abswv2) [per kg/kg per 10^5 Pa]"
-    @param absorptivity_water_vapor_near_infrared::NF = 15000 (bounds = Nonnegative,)
+    # TODO calibrate properly: with SPEEDY's abswv2 = 15000 the near-infrared band is absorbed in the too moist
+    # layer below the tropopause, heating it to ~247K (inversion), 500 as a provisional value that absorbs it lower
+    "[OPTION] Absorptivity of water vapor, near-infrared band (SPEEDY abswv2 = 15000) [per kg/kg per 10^5 Pa]"
+    @param absorptivity_water_vapor_near_infrared::NF = 500 (bounds = Nonnegative,)
 
     "[OPTION] Cloud absorptivity per cloud-base humidity, visible band (SPEEDY abscl1) [per kg/kg per 10^5 Pa]"
     @param absorptivity_cloud_base::NF = 15 (bounds = Nonnegative,)

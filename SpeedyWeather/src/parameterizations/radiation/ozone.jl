@@ -37,8 +37,10 @@ heating rate does not depend on surface pressure (e.g. over high orography) and 
 absorption is retained for any surface pressure > `pressure_lower`. Fields are
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SeasonalOzone{NF} <: AbstractOzone
-    "[OPTION] Reference fraction of TOA shortwave flux absorbed by ozone (SPEEDY epssw) [1]"
-    @param absorption::NF = 0.02 (bounds = 0 .. 1,)
+    # TODO calibrate properly: SPEEDY's epssw = 0.02 yields a too warm top layer (~227K at σ=0.06),
+    # 0.01 yields ~214K as a provisional value
+    "[OPTION] Reference fraction of TOA shortwave flux absorbed by ozone (SPEEDY epssw = 0.02) [1]"
+    @param absorption::NF = 0.01 (bounds = 0 .. 1,)
 
     "[OPTION] Fraction of `absorption` in the upper stratosphere [1]"
     @param upper_fraction::NF = 0.5 (bounds = Nonnegative,)
