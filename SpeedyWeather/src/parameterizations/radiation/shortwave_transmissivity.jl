@@ -167,8 +167,11 @@ $(TYPEDFIELDS)"""
     "[OPTION] Absorptivity of aerosols, visible band, scaled with σ² (SPEEDY absaer) [per 10^5 Pa]"
     @param absorptivity_aerosol::NF = 0.033 (bounds = Nonnegative,)
 
-    "[OPTION] Absorptivity of water vapor, visible band (SPEEDY abswv1) [per kg/kg per 10^5 Pa]"
-    @param absorptivity_water_vapor::NF = 22 (bounds = Nonnegative,)
+    # TODO calibrate properly: SPEEDY's abswv1 = 22 yields only ~50 W/m² atmospheric shortwave absorption
+    # (observed ~78, Trenberth et al. 2009) and a too cold atmosphere, 100 yields ~87 W/m² and 161 W/m²
+    # absorbed at the surface (observed 161) as a provisional value
+    "[OPTION] Absorptivity of water vapor, visible band (SPEEDY abswv1 = 22) [per kg/kg per 10^5 Pa]"
+    @param absorptivity_water_vapor::NF = 100 (bounds = Nonnegative,)
 
     "[OPTION] Absorptivity of water vapor, near-infrared band (SPEEDY abswv2) [per kg/kg per 10^5 Pa]"
     @param absorptivity_water_vapor_near_infrared::NF = 15000 (bounds = Nonnegative,)
