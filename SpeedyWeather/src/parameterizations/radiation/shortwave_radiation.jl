@@ -273,9 +273,9 @@ end
 
 Base.show(io::IO, M::TwoBandShortwave) = show(io, M, values = false)
 
-# shortwave variables and those of the ozone component
+# shortwave variables and those of the clouds and ozone components
 variables(radiation::TwoBandShortwave) =
-    (invoke(variables, Tuple{AbstractShortwave}, radiation)..., variables(radiation.ozone)...)
+    (invoke(variables, Tuple{AbstractShortwave}, radiation)..., variables(radiation.clouds)..., variables(radiation.ozone)...)
 
 function initialize!(radiation::TwoBandShortwave, model::PrimitiveEquation)
     initialize!(radiation.clouds, model)
