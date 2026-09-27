@@ -60,8 +60,8 @@ function test_gpu_graphs(ext, prefix)
             S = SpectralTransform(spectral_grid; gpu_graphs = true)
             nlayers = spectral_grid.nlayers
 
-            gridded = rand(Float32, spectral_grid.grid, nlayers, 2)
-            specs = rand(ComplexF32, spectral_grid.spectrum, nlayers)
+            gridded = rand(spectral_grid.GridVariableXYZT, spectral_grid.grid, nlayers, 2)
+            specs = rand(spectral_grid.SpectralVariableXYZ, spectral_grid.spectrum, nlayers)
 
             # the hazard: the per-step view wrapper identity is NOT stable across calls
             @test get_step(gridded, 2).data !== get_step(gridded, 2).data

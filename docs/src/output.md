@@ -51,7 +51,7 @@ model constructor, otherwise it will not be part of your model and the default i
 Note that the choice of `interval` can affect the actual [time step](@ref time_stepping) that is used for the model
 integration, which is explained in the following (see also
 [Adjust with output](@ref) for the equivalent option on the time stepper itself).
-Example, we run the model at a resolution of T42 and the time step is going to be
+Example, we run the model at a resolution of T43 and the time step is going to be
 ```@example netcdf
 spectral_grid = SpectralGrid(truncation=43, nlayers=1)
 time_stepping = Leapfrog(spectral_grid)

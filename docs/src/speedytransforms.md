@@ -279,7 +279,7 @@ to be used in grid-point space!
 
 How would we construct random noise in spectral space that follows a certain
 power law and transform it back into grid-point space? Define the wavenumber ``k``
-for T31, the spectral resolution we are interested in.
+for T32 (1-based), the spectral resolution we are interested in.
 (We start from 1 instead of 0 to avoid zero to the power of something negative).
 Now create some normally distributed spectral coefficients but scale them down
 for higher wavenumbers with ``k^{-2}``

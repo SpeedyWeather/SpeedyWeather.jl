@@ -133,7 +133,7 @@ around the sun. Both are controlled through the planet
 
 ```@example radiation
 using Dates
-spectral_grid = SpectralGrid(truncation=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 planet = Earth(spectral_grid, length_of_day=Hour(24), length_of_year=Day(365)+Hour(6))
 ```
 
