@@ -167,7 +167,9 @@ Adapt.@adapt_structure OneBandLongwave
 # primitive wet model version
 function OneBandLongwave(
         SG::SpectralGrid;
-        transmissivity = FriersonLongwaveTransmissivity(SG),
+        # TODO calibrate properly: Frierson's fₗ = 0.1 yields a weak greenhouse effect and a too cold troposphere
+        # (~284K near-surface air), 0.25 yields ~288K and outgoing longwave ~240 W/m² as a provisional value
+        transmissivity = FriersonLongwaveTransmissivity(SG, fₗ = 0.25),
         radiative_transfer = OneBandLongwaveRadiativeTransfer(SG, stratospheric_emissivity = 0.05),
     )
     return OneBandLongwave(transmissivity, radiative_transfer)

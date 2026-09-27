@@ -168,15 +168,14 @@ $(TYPEDFIELDS)"""
     @param absorptivity_aerosol::NF = 0.033 (bounds = Nonnegative,)
 
     # TODO calibrate properly: SPEEDY's abswv1 = 22 yields only ~50 W/m² atmospheric shortwave absorption
-    # (observed ~78, Trenberth et al. 2009) and a too cold atmosphere, 100 yields ~87 W/m² and 161 W/m²
-    # absorbed at the surface (observed 161) as a provisional value
+    # (observed ~78, Trenberth et al. 2009), 50 yields ~76-80 W/m² over a 3-year run as a provisional value
     "[OPTION] Absorptivity of water vapor, visible band (SPEEDY abswv1 = 22) [per kg/kg per 10^5 Pa]"
-    @param absorptivity_water_vapor::NF = 100 (bounds = Nonnegative,)
+    @param absorptivity_water_vapor::NF = 50 (bounds = Nonnegative,)
 
     # TODO calibrate properly: with SPEEDY's abswv2 = 15000 the near-infrared band is absorbed in the too moist
-    # layer below the tropopause, heating it to ~247K (inversion), 500 as a provisional value that absorbs it lower
+    # layer below the tropopause, heating it to ~247K (inversion), 2000 as a provisional value that absorbs it lower
     "[OPTION] Absorptivity of water vapor, near-infrared band (SPEEDY abswv2 = 15000) [per kg/kg per 10^5 Pa]"
-    @param absorptivity_water_vapor_near_infrared::NF = 500 (bounds = Nonnegative,)
+    @param absorptivity_water_vapor_near_infrared::NF = 2000 (bounds = Nonnegative,)
 
     "[OPTION] Cloud absorptivity per cloud-base humidity, visible band (SPEEDY abscl1) [per kg/kg per 10^5 Pa]"
     @param absorptivity_cloud_base::NF = 15 (bounds = Nonnegative,)
