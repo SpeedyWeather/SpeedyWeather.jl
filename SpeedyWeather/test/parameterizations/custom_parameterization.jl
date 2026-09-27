@@ -78,3 +78,32 @@
         end
     end
 end
+
+# mimic a parameterization defined in another package without SpeedyWeather dependency
+struct ExternalCooling
+    time_scale_hours::Int
+end
+
+# and its SpeedyWeather extension adding a method to the Parameterization stub
+SpeedyWeather.Parameterization(spectral_grid::SpectralGrid, scheme::ExternalCooling; kwargs...) =
+    UniformCooling(spectral_grid; time_scale = Hour(scheme.time_scale_hours), kwargs...)
+
+@testset "Parameterization from external packages" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+
+    longwave_radiation = Parameterization(spectral_grid, ExternalCooling(20), temp_min = 200)
+    @test longwave_radiation isa UniformCooling{spectral_grid.NF}
+    @test longwave_radiation.time_scale == Hour(20)
+    @test longwave_radiation.temp_min == 200
+
+    # SpeedyWeather parameterizations are passed through
+    @test Parameterization(spectral_grid, longwave_radiation) === longwave_radiation
+
+    # no method for types that aren't parameterizations
+    @test_throws MethodError Parameterization(spectral_grid, 1)
+
+    model = PrimitiveDryModel(spectral_grid; longwave_radiation)
+    simulation = initialize!(model)
+    run!(simulation, steps = 3)
+    @test simulation.model.longwave_radiation === longwave_radiation
+end
