@@ -13,6 +13,7 @@
 - Convective rain in `BettsMillerConvection` now falls as snow below a configurable freezing threshold [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
 - Add entrainment profiles (`LinearEntrainment`, `ConstantEntrainment`) to Betts-Miller convection, wet and dry; supersedes and credits [#976](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/976) by @nviebig [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
 - Restructure Betts-Miller convection to branchless, full-range vertical loops for GPU; fix docs to match the code [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- ImplicitCondensation: keep the melting cooling, fix its units and the Clausius-Clapeyron derivative in the implicit correction [#1277](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1277)
 - `Parameterization` function stub for packages to define SpeedyWeather parameterizations in extensions [#1261](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1261)
 - Output on pressure layers, plus documentation for the vertical interpolation [#1257](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1257)
 - Extended differentibaility tests for Barotropic model not broken anymore [#1270](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1270)
