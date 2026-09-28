@@ -156,8 +156,8 @@ points). Some consequences:
   advection beyond the ``\sigma`` level vector the model already needs, plus two small
   per-level pole-average buffers (see [`RingGrids.AnvilLocator`](@ref)).
 - Because the same horizontal indices and weights are reused for both bracketing ``\sigma``
-  levels, horizontal and vertical motion are effectively decoupled: a particle moving only
-  vertically never triggers a new horizontal search.
+  levels, horizontal and vertical location are decoupled: the (horizontal) locator does not
+  depend on ``\sigma`` and is reused for all levels and for fields on full and half levels alike.
 - As with the horizontal scheme, particles are pinned rather than extrapolated at the edges of
   the ``\sigma`` range, so they cannot leave the atmosphere through the model top, or fall through
   the surface; instead they continue to be advected along the topmost or bottommost level.
@@ -180,6 +180,37 @@ simulation.variables.prognostic.particles
 
 Every particle's `σ` field is now updated over time, whereas with `ParticleAdvection2D` it would
 have remained fixed at the `layer`-th value of `model.geometry.σ_levels_full`.
+
+To check that the vertical trajectories are smooth and reasonable we can track the particles
+with a [`ParticleTracker`](@ref) (see [Tracking particles](@ref) below), which also writes
+out ``\sigma``, and plot every particle's ``\sigma`` over time
+
+```@example particle3d
+particle_tracker = ParticleTracker(spectral_grid, schedule = Schedule(every = Hour(1)))
+particle_advection = ParticleAdvection3D(spectral_grid, nparticles = 20, every_n_time_steps = 1)
+model = PrimitiveWetModel(spectral_grid; particle_advection)
+add!(model.callbacks, particle_tracker)
+simulation = initialize!(model)
+run!(simulation, period = Day(10))
+
+using NCDatasets, CairoMakie
+ds = NCDataset(joinpath(model.output.run_folder, particle_tracker.filename))
+σ = ds["sigma"][:, :]
+hours = ds["time"].var[:]      # raw hours since start, not decoded into DateTime
+close(ds)
+
+fig = Figure()
+ax = Axis(fig[1, 1], xlabel = "time [hours]", ylabel = "σ", yreversed = true)
+[lines!(ax, hours, σ[i, :]) for i in axes(σ, 1)]
+save("particles_sigma.png", fig) # hide
+nothing # hide
+```
+![Particle trajectories in σ](particles_sigma.png)
+
+with `yreversed = true` so that the surface (``\sigma = 1``) is at the bottom. We use
+`every_n_time_steps = 1` here to advect the particles on every time step, with the default
+(every 6th time step) the tracker, which outputs more frequently, would record the particles
+as standing still in between advection steps and the trajectories would look like staircases.
 
 ## Create a particle
 
