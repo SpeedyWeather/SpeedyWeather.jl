@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Cloud top height [m] and cloud cover as parameterization and output variables (cloud top output was a layer index), diagnostic cloud top at level of maximum relative humidity as in SPEEDY, convective cloud top for deep convection only [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Betts-Miller convective precipitation is now the net (signed) column drying, closing the column water budget [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Betts-Miller convection: single fixed-trip pass over the column for the parcel ascent instead of an environment prefill plus a `while` loop, ~15-20% faster on GPU; fix `BettsMillerDryConvection` not adapting to GPU [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Convective rain in `BettsMillerConvection` now falls as snow below a configurable freezing threshold [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Add entrainment profiles (`LinearEntrainment`, `ConstantEntrainment`) to Betts-Miller convection, wet and dry; supersedes and credits [#976](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/976) by @nviebig [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Restructure Betts-Miller convection to branchless, full-range vertical loops for GPU; fix docs to match the code [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
 - `Parameterization` function stub for packages to define SpeedyWeather parameterizations in extensions [#1261](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1261)
 - Output on pressure layers, plus documentation for the vertical interpolation [#1257](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1257)
 - Extended differentibaility tests for Barotropic model not broken anymore [#1270](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1270)

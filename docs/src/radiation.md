@@ -245,17 +245,16 @@ transmissivity ``t=1``.
 
 **Cloud diagnosis:**
 Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column.
-The cloud base is set at the interface between the lowest two model layers, and the cloud top is the
-highest layer where both
+The cloud base is set at the interface between the lowest two model layers. The cloud top
+from relative humidity is the level ``k_{RH}`` of *maximum* relative humidity excess
+``\Delta \mathrm{RH} = \max_k (\mathrm{RH}_k - \mathrm{RH}_{cl})`` over the tropospheric layers
+``k = 2, ..., N-1`` (excluding the uppermost and the surface layer) with ``Q_k > Q_{cl}``
+(and ``\Delta \mathrm{RH} > 0``), following SPEEDY. The final cloud top is the higher (smaller ``k``) of ``k_{RH}``
+and the top of precipitation, i.e. the level of zero buoyancy of (deep) convection or the
+highest layer with large-scale condensation. The cloud cover (CLC) is then given by
 
 ```math
-\mathrm{RH}_k > \mathrm{RH}_{cl} \quad \text{and} \quad Q_k > Q_{cl}
-```
-
-are satisfied. The cloud cover (CLC) in a layer is then given by
-
-```math
-\mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \left(\frac{\mathrm{RH}_k - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right)\right]
+\mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \frac{\Delta \mathrm{RH}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right]
 ```
 
 where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are [large-scale](@ref "Large-scale precipitation")
