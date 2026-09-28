@@ -96,3 +96,43 @@ end
     # north pole value is the average of the first ring, i.e. its (constant) latitude
     @test Aout[1] ≈ geometry.latd[2]
 end
+
+@testset "3D interpolation: size checks" begin
+    NF = Float32
+    grid = FullGaussianGrid(8)
+    nlayers = 4
+    A = zeros(NF, grid, nlayers)
+    geometry = RingGrids.GridGeometry(A)
+    σ_levels_full = NF[0.1, 0.3, 0.6, 0.9]
+    positions = [TestParticle3D(NF(0.5)) for _ in 1:3]
+    Aout = zeros(NF, 3)
+
+    # default locator has pole buffers for a single layer only
+    locator_single_layer = RingGrids.AnvilLocator(NF, 3)
+    @test_throws DimensionMismatch RingGrids.interpolate_3D!(Aout, A, locator_single_layer, geometry, positions, σ_levels_full)
+
+    locator = RingGrids.AnvilLocator(NF, 3, nlayers)
+    @test_throws DimensionMismatch RingGrids.interpolate_3D!(zeros(NF, 2), A, locator, geometry, positions, σ_levels_full)
+    @test_throws DimensionMismatch RingGrids.interpolate_3D!(Aout, A, locator, geometry, positions[1:2], σ_levels_full)
+
+    # faces need nlayers + 1 σ levels, full levels aren't enough
+    @test_throws DimensionMismatch RingGrids.interpolate_3D!(
+        Aout, A, locator, geometry, positions, SigmaFaceBelow(σ_levels_full, zero(NF))
+    )
+end
+
+@testset "3D interpolation: single layer" begin
+    NF = Float32
+    grid = FullGaussianGrid(8)
+    A = zeros(NF, grid, 1)
+    A[:, 1] .= 3
+    geometry = RingGrids.GridGeometry(A)
+    locator = RingGrids.AnvilLocator(NF, 2, 1)
+    RingGrids.update_locator!(locator, geometry, NF[0, 180], NF[45, -45])
+
+    # a single level means the field is constant in the vertical, for any σ
+    positions = [TestParticle3D(NF(0.2)), TestParticle3D(NF(0.9))]
+    Aout = zeros(NF, 2)
+    RingGrids.interpolate_3D!(Aout, A, locator, geometry, positions, NF[0.5])
+    @test Aout ≈ [3, 3]
+end

@@ -52,10 +52,15 @@ Adapt.@adapt_structure SigmaFaceBelow
 @inline boundary(s::SigmaFaceAbove) = s.bottom_boundary_condition
 @inline boundary(s::SigmaFaceBelow) = s.top_boundary_condition
 
+# number of σ levels a staggering needs for a field with nlayers stored layers
+@inline nlevels(::SigmaCenter, nlayers) = nlayers
+@inline nlevels(::Union{SigmaFaceAbove, SigmaFaceBelow}, nlayers) = nlayers + 1
+
 # Zero-gradient (von Neumann) BC: σ outside [σ_levels[1], σ_levels[end]]
 # returns the boundary value unchanged (gradient assumed zero at boundary).
 @inline function find_vertical_bracket(σ, σ_levels)
     n = length(σ_levels)
+    n == 1 && return 1, 1, zero(σ)      # single level: field is constant in the vertical
     k_lo = 1
     for k in 1:(n - 1)
         σ_levels[k] <= σ && (k_lo = k)
@@ -136,10 +141,37 @@ reused across calls without CPU allocations."""
 function interpolate_3D!(Aout, A, locator, geometry, positions, staggering::AbstractVerticalStaggering)
     (; npoints_output, north_pole_average, south_pole_average) = locator
     A_data = A.data
+    nlayers = size(A_data, 2)
+
+    @boundscheck length(Aout) == npoints_output || throw(
+        DimensionMismatch(
+            "Aout has length $(length(Aout)) but the locator has $npoints_output points."
+        )
+    )
+    @boundscheck length(positions) == npoints_output || throw(
+        DimensionMismatch(
+            "positions has length $(length(positions)) but the locator has $npoints_output points."
+        )
+    )
+    @boundscheck length(north_pole_average) >= nlayers || throw(
+        DimensionMismatch(
+            "Locator has pole buffers for $(length(north_pole_average)) layers but the field has $nlayers, " *
+                "create it with AnvilLocator(NF, npoints, nlayers)."
+        )
+    )
+    @boundscheck length(staggering.sigma) == nlevels(staggering, nlayers) || throw(
+        DimensionMismatch(
+            "$(nameof(typeof(staggering))) needs $(nlevels(staggering, nlayers)) σ levels for a field " *
+                "with $nlayers layers, got $(length(staggering.sigma))."
+        )
+    )
+
     arch = architecture(Aout)
     (; ring_starts, nlons, nlat) = geometry
-    launch!(arch, LinearWorkOrder, (size(A_data, 2),), _compute_pole_averages_kernel!,
-            north_pole_average, south_pole_average, A_data, ring_starts, nlons, nlat)
+    launch!(
+        arch, LinearWorkOrder, (nlayers,), _compute_pole_averages_kernel!,
+        north_pole_average, south_pole_average, A_data, ring_starts, nlons, nlat
+    )
     launch!(
         arch, LinearWorkOrder, (npoints_output,),
         _interpolate_3D_kernel!,
