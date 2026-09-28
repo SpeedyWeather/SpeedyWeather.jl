@@ -136,3 +136,40 @@ end
     RingGrids.interpolate_3D!(Aout, A, locator, geometry, positions, NF[0.5])
     @test Aout ≈ [3, 3]
 end
+
+@testset "3D interpolation: face staggering" begin
+    NF = Float32
+    grid = FullGaussianGrid(8)
+    nlayers = 4
+    σ_half = NF[0, 0.2, 0.5, 0.7, 1]
+    f(σ) = 1 + σ * (1 - σ)                      # equal to the boundary value 1 at σ = 0 and 1
+
+    # expected: piecewise linear interpolation of f between half levels
+    function expected(σ)
+        k = findlast(≤(σ), σ_half[1:(end - 1)])
+        α = (σ - σ_half[k]) / (σ_half[k + 1] - σ_half[k])
+        return f(σ_half[k]) + (f(σ_half[k + 1]) - f(σ_half[k])) * α
+    end
+
+    geometry = RingGrids.GridGeometry(zeros(NF, grid, nlayers))
+    locator = RingGrids.AnvilLocator(NF, 6, nlayers)
+    RingGrids.update_locator!(locator, geometry, NF[0, 60, 120, 180, 240, 300], NF[80, 45, 10, -10, -45, -80])
+    σs = NF[0, 0.1, 0.2, 0.35, 0.95, 1]
+    positions = [TestParticle3D(σ) for σ in σs]
+
+    # FaceBelow: layer k stores σ_half[k+1], top (σ=0) not stored
+    A = zeros(NF, grid, nlayers)
+    for k in 1:nlayers
+        A[:, k] .= f(σ_half[k + 1])
+    end
+    Aout = zeros(NF, 6)
+    RingGrids.interpolate_3D!(Aout, A, locator, geometry, positions, SigmaFaceBelow(σ_half, one(NF)))
+    @test Aout ≈ expected.(σs)
+
+    # FaceAbove: layer k stores σ_half[k], bottom (σ=1) not stored
+    for k in 1:nlayers
+        A[:, k] .= f(σ_half[k])
+    end
+    RingGrids.interpolate_3D!(Aout, A, locator, geometry, positions, SigmaFaceAbove(σ_half, one(NF)))
+    @test Aout ≈ expected.(σs)
+end
