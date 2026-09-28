@@ -16,7 +16,7 @@ end
 @testset "Longwave Transmissivity" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
-    @testset for T in (FriersonLongwaveTransmissivity, TransparentLongwaveTransmissivity)
+    @testset for T in (FriersonLongwaveTransmissivity, ByrneOGormanLongwaveTransmissivity, TransparentLongwaveTransmissivity)
         transmissivity = T(spectral_grid)
         longwave_radiation = OneBandLongwave(spectral_grid; transmissivity)
         model = PrimitiveWetModel(spectral_grid; longwave_radiation)
@@ -33,4 +33,63 @@ end
 
         @test all(0 .< t .<= 1)
     end
+end
+
+@testset "Stratospheric longwave emission" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    initialize!(model.longwave_radiation, model)
+    @test model.longwave_radiation.radiative_transfer.stratospheric_emissivity > 0     # on for wet model
+    @test PrimitiveDryModel(spectral_grid).longwave_radiation.radiative_transfer.stratospheric_emissivity == 0
+
+    # compare with and without stratospheric emission for the same state
+    function column(ϵ)
+        radiative_transfer = OneBandLongwaveRadiativeTransfer(spectral_grid, stratospheric_emissivity = ϵ)
+        longwave_radiation = OneBandLongwave(spectral_grid; radiative_transfer)
+        model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+        simulation = initialize!(model)
+        vars = simulation.variables
+        vars.parameterizations.surface_pressure .= 1.0e5
+        vars.grid.temperature .= 250
+        vars.tendencies.grid.temperature .= 0
+        ij = 1
+        SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
+        dTdt = SpeedyWeather.get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, model.longwave_radiation)
+        return Array(dTdt[ij, :]), vars.parameterizations.outgoing_longwave[ij], model
+    end
+
+    dTdt0, olr0, model = column(0)
+    dTdt1, olr1, _ = column(0.05)
+    coordinates = model.geometry.vertical_coordinates
+    stratosphere = [SpeedyWeather.pressure_above(k, 1.0e5, coordinates) < 14000 for k in 1:spectral_grid.nlayers]
+
+    @test all(dTdt1[stratosphere] .< dTdt0[stratosphere])          # cools the stratosphere
+    @test dTdt1[.!stratosphere] ≈ dTdt0[.!stratosphere]             # troposphere unchanged
+    @test olr1 > olr0                                               # emitted to space
+
+    # energy conservation: extra OLR equals column-integrated extra cooling
+    cₚ = model.atmosphere.heat_capacity
+    g = model.planet.gravity
+    Δp = [SpeedyWeather.pressure_thickness(k, 1.0e5, coordinates) for k in 1:spectral_grid.nlayers]
+    @test sum((dTdt0 .- dTdt1) .* Δp) * cₚ / g ≈ olr1 - olr0 rtol = 1.0e-3
+end
+
+@testset "Byrne and O'Gorman humidity-dependent longwave transmissivity" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8)
+    transmissivity = ByrneOGormanLongwaveTransmissivity(spectral_grid)
+    model = PrimitiveWetModel(spectral_grid; longwave_radiation = OneBandLongwave(spectral_grid; transmissivity))
+    initialize!(model.longwave_radiation, model)
+    vars = Variables(model)
+    vars.parameterizations.surface_pressure .= 1.0e5
+
+    # dry: only the dry optical depth, summing to dry_absorption over the column
+    vars.grid.humidity .= 0
+    t_dry = copy(SpeedyWeather.transmissivity!(1, vars, transmissivity, model)[1, :])
+    @test prod(t_dry) ≈ exp(-transmissivity.dry_absorption) rtol = 1.0e-5
+
+    # moist: lower transmissivity in every layer
+    vars.grid.humidity .= 0.005
+    t_moist = SpeedyWeather.transmissivity!(1, vars, transmissivity, model)[1, :]
+    @test all(t_moist .< t_dry)
+    @test prod(t_moist) ≈ exp(-(transmissivity.dry_absorption + transmissivity.water_vapor_absorption * 0.005)) rtol = 1.0e-4
 end

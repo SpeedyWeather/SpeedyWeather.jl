@@ -107,8 +107,8 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     Tₜ = longwave.temp_tropopause
 
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, longwave)
-    lst = vars.prognostic.land.soil_temperature[ij, 1]  # TODO use skin temperature?
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), longwave)
+    lst = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), longwave) # TODO use skin temperature?
 
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
@@ -116,7 +116,7 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     Fₖ_ocean = ϵ_ocean * σ * sst[ij]^4                                  # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = Fₖ_ocean     # for ocean model forcing
 
-    Fₖ_land = ϵ_land * σ * lst^4                                        # [W/m²]
+    Fₖ_land = ϵ_land * σ * lst[ij, 1]^4                                 # [W/m²]
     vars.parameterizations.land.surface_longwave_up[ij] = Fₖ_land       # for land model forcing
 
     Fₖ_down = ϵ * σ * T[ij, nlayers]^4
@@ -167,8 +167,10 @@ Adapt.@adapt_structure OneBandLongwave
 # primitive wet model version
 function OneBandLongwave(
         SG::SpectralGrid;
-        transmissivity = FriersonLongwaveTransmissivity(SG),
-        radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
+        # TODO calibrate properly: Frierson's fₗ = 0.1 yields a weak greenhouse effect and a too cold troposphere
+        # (~284K near-surface air), 0.25 yields ~288K and outgoing longwave ~240 W/m² as a provisional value
+        transmissivity = FriersonLongwaveTransmissivity(SG, fₗ = 0.25),
+        radiative_transfer = OneBandLongwaveRadiativeTransfer(SG, stratospheric_emissivity = 0.05),
     )
     return OneBandLongwave(transmissivity, radiative_transfer)
 end
@@ -203,6 +205,11 @@ export OneBandLongwaveRadiativeTransfer
 
 """Radiative transfer solver for OneBandLongwave radiation scheme.
 Computes longwave radiative transfer with upward and downward beams including surface fluxes.
+Optionally with an additional stratospheric emission directly to space following the
+stratospheric correction in Fortran SPEEDY (`epslw`): the stratosphere [0, `stratosphere_pressure`]
+emits `stratospheric_emissivity * σT⁴`, distributed on the layers by their pressure overlap,
+representing emission in the centre of the CO₂ band that a grey scheme with a transparent
+stratosphere lacks, and needed to balance stratospheric ozone heating.
 Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct OneBandLongwaveRadiativeTransfer{NF} <: AbstractLongwaveRadiativeTransfer
     "[OPTION] Emissivity for surface flux over ocean [1]"
@@ -210,6 +217,12 @@ Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Emissivity for surface flux over land [1]"
     @param emissivity_land::NF = 0.98 (bounds = 0 .. 1,)
+
+    "[OPTION] Additional emissivity of the stratosphere, emitting directly to space (SPEEDY epslw) [1]"
+    @param stratospheric_emissivity::NF = 0 (bounds = 0 .. 1,)
+
+    "[OPTION] Lower boundary of the stratosphere for the stratospheric emission (SPEEDY σ = 0.14 at 1000 hPa) [Pa]"
+    stratosphere_pressure::NF = 14000
 end
 
 Adapt.@adapt_structure OneBandLongwaveRadiativeTransfer
@@ -237,13 +250,14 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     cₚ = model.atmosphere.heat_capacity
 
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, longwave)
-    lst = vars.prognostic.land.soil_temperature[ij, 1]                  # TODO use skin temperature?
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), longwave)
+    # TODO use skin temperature?
+    lst = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), longwave)            
 
     U_ocean = ϵ_ocean * σ * sst[ij]^4                                   # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = U_ocean      # for ocean model forcing
 
-    U_land = ϵ_land * σ * lst^4                                         # [W/m²]
+    U_land = ϵ_land * σ * lst[ij, 1]^4                                  # [W/m²], 1 for top layer
     vars.parameterizations.land.surface_longwave_up[ij] = U_land        # for land model forcing
 
     # land-sea mask weighted combined flux from land and ocean (surface boundary condition)
@@ -263,6 +277,21 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     t = transmissivity[ij, 1]
     U = U * t + (1 - t) * σ * T[ij, 1]^4
     dTdt[ij, 1] -= flux_to_tendency(U / cₚ, pₛ, 1, model)               # out of layer 1
+
+    # Additional stratospheric emission directly to space, distributed by pressure overlap
+    ϵ_strat = longwave.stratospheric_emissivity
+    p_strat = longwave.stratosphere_pressure
+    coord = model.geometry.vertical_coordinates
+    if ϵ_strat > 0
+        for k in 1:nlayers
+            p_top = pressure_above(k, pₛ, coord)
+            p_top >= p_strat && break                                   # below the stratosphere
+            overlap = (min(pressure_below(k, pₛ, coord), p_strat) - p_top) / p_strat
+            E = ϵ_strat * overlap * σ * T[ij, k]^4
+            dTdt[ij, k] -= flux_to_tendency(E / cₚ, pₛ, k, model)
+            U += E
+        end
+    end
     vars.parameterizations.outgoing_longwave[ij] = U
 
     # DOWNWARD BEAM

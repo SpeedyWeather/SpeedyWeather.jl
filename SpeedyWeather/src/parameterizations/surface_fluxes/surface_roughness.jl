@@ -9,8 +9,10 @@ over land and ocean. Fields are $(TYPEDFIELDS)"""
     "[OPTION] constant roughness length over land [m]"
     @param roughness_length_land::NF = 0.5 (bounds = Nonnegative,)
 
+    # TODO calibrate properly: the drag's log law is evaluated at the lowermost layer (~500m), which with
+    # 1e-4 yields a too small exchange coefficient (~6.7e-4) and too weak evaporation, 5e-3 as a provisional value
     "[OPTION] constant roughness length over ocean [m]"
-    @param roughness_length_ocean::NF = 1.0e-4 (bounds = Nonnegative,)
+    @param roughness_length_ocean::NF = 5.0e-3 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure ConstantSurfaceRoughness

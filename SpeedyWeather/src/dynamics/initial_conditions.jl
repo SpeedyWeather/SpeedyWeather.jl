@@ -831,8 +831,13 @@ end
 
 export ConstantRelativeHumidity
 @kwdef struct ConstantRelativeHumidity{NF} <: AbstractInitialConditions
-    """[OPTION] Relative humidity as fraction of saturation [1]"""
+    """[OPTION] Relative humidity at the surface as fraction of saturation [1]"""
     relhumid_ref::NF = 0.7
+
+    """[OPTION] σ at which relative humidity decreases linearly to zero, following
+    Manabe and Wetherald, 1967, for a dry upper troposphere and stratosphere.
+    Set to 0 for a vertically constant relative humidity [1]"""
+    σ_dry::NF = 0.02
 end
 
 ConstantRelativeHumidity(SG::SpectralGrid; kwargs...) = ConstantRelativeHumidity{SG.NF}(; kwargs...)
@@ -847,7 +852,7 @@ function initialize!(
     )
     haskey(vars.prognostic, :humidity) || warn_undefvar(vars, :humidity) && return nothing
 
-    (; relhumid_ref) = IC
+    (; relhumid_ref, σ_dry) = IC
     (; σ_levels_full) = model.geometry
     (; atmosphere) = model
 
@@ -864,7 +869,7 @@ function initialize!(
     launch!(
         architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
         constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
-        σ_levels_full, relhumid_ref, atmosphere,
+        σ_levels_full, relhumid_ref, σ_dry, atmosphere,
     )
     set!(vars, model; humidity = humid_grid)
 
@@ -877,6 +882,7 @@ end
         pres_grid,
         σ_levels_full,
         relhumid_ref,
+        σ_dry,
         atmosphere,
     )
     ij, k = @index(Global, NTuple)
@@ -885,8 +891,10 @@ end
     pₖ = σ_levels_full[k] * pres_grid[ij]
     T = temp_grid[ij, k]
 
-    # Set humidity as fraction of saturation
-    humid_grid[ij, k] = relhumid_ref * saturation_humidity(T, pₖ, atmosphere)
+    # Set humidity as fraction of saturation, relative humidity decreasing linearly with σ
+    σ = σ_levels_full[k]
+    relhumid = relhumid_ref * max(0, (σ - σ_dry) / (1 - σ_dry))
+    humid_grid[ij, k] = relhumid * saturation_humidity(T, pₖ, atmosphere)
 end
 
 export RandomWaves

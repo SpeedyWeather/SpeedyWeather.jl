@@ -76,3 +76,50 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     # return so the radiative_trasfer uses the right scratch array
     return t
 end
+
+export ByrneOGormanLongwaveTransmissivity
+"""Longwave transmissivity with an optical depth that depends on specific humidity, following
+Byrne and O'Gorman, 2013, J. Climate, https://doi.org/10.1175/JCLI-D-12-00262.1, as also used in Isca.
+The optical depth of layer k is `dτ = (a*μ + b*q) * Δp / p₀` with pressure thickness `Δp`,
+specific humidity `q` [kg/kg], reference pressure `p₀`, a dry absorption `a` (well-mixed greenhouse gases,
+scaled by `μ`) and a water vapor absorption `b`. In contrast to the `FriersonLongwaveTransmissivity`
+there is no prescribed latitude-vertical profile, the optical depth follows the model's humidity,
+introducing a water vapor feedback. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct ByrneOGormanLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
+    "[OPTION] Optical depth of the dry atmosphere (well-mixed greenhouse gases) per p₀ [1]"
+    @param dry_absorption::NF = 0.8678 (bounds = Nonnegative,)
+
+    "[OPTION] Optical depth from water vapor per p₀ and per specific humidity [1/(kg/kg)]"
+    @param water_vapor_absorption::NF = 1997.9 (bounds = Nonnegative,)
+
+    "[OPTION] Scaling of the dry optical depth, e.g. for changing CO₂ [1]"
+    @param co2_scaling::NF = 1 (bounds = Nonnegative,)
+
+    "[OPTION] Reference pressure [Pa]"
+    reference_pressure::NF = 100000
+end
+
+Adapt.@adapt_structure ByrneOGormanLongwaveTransmissivity
+ByrneOGormanLongwaveTransmissivity(SG::SpectralGrid; kwargs...) = ByrneOGormanLongwaveTransmissivity{SG.NF}(; kwargs...)
+initialize!(::ByrneOGormanLongwaveTransmissivity, ::AbstractModel) = nothing
+
+@propagate_inbounds function transmissivity!(ij, vars, transmissivity::ByrneOGormanLongwaveTransmissivity, model)
+    t = vars.scratch.grid.a                         # use scratch array to compute transmissivity t
+    nlayers = size(t, 2)
+    NF = eltype(t)
+
+    (; dry_absorption, water_vapor_absorption, co2_scaling, reference_pressure) = transmissivity
+    coord = model.geometry.vertical_coordinates
+    pₛ = vars.parameterizations.surface_pressure[ij]
+    has_humidity = haskey(vars.grid, :humidity)     # dry models: only the dry optical depth
+
+    for k in 1:nlayers
+        q = has_humidity ?
+            max(get_prognostic_step(vars.grid.humidity, model.time_stepping, transmissivity)[ij, k], zero(NF)) :
+            zero(NF)
+        Δp = pressure_thickness(k, pₛ, coord)
+        dτ = (dry_absorption * co2_scaling + water_vapor_absorption * q) * Δp / reference_pressure
+        t[ij, k] = exp(-dτ)
+    end
+    return t
+end

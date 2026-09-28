@@ -94,7 +94,7 @@ $(TYPEDFIELDS)"""
     @component surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
     @component large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     @component convection::CV = BettsMillerConvection(spectral_grid)
-    @component shortwave_radiation::SW = OneBandShortwave(spectral_grid)
+    @component shortwave_radiation::SW = TwoBandShortwave(spectral_grid)
     @component longwave_radiation::LW = OneBandLongwave(spectral_grid)
     @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
