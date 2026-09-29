@@ -133,6 +133,10 @@ export interpolate,
     update_locator,
     update_locator!
 
+export SigmaCenter,
+    SigmaFaceAbove,
+    SigmaFaceBelow
+
 # STATISTICS
 export zonal_mean
 

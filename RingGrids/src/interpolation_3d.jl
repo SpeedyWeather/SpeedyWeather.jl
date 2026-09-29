@@ -1,5 +1,3 @@
-export interpolate_3D!, SigmaCenter, SigmaFaceAbove, SigmaFaceBelow
-
 """Supertype for markers describing how a field is staggered vertically relative to the
 σ coordinates it is interpolated onto/from. Subtypes bundle the σ-vector together with
 whatever boundary condition applies at the missing end of the vertical bracket, so kernels
