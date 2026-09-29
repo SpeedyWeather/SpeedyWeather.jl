@@ -243,6 +243,156 @@ SpeedyWeather-specific:
 Its `main` gained an independent fix of the shortwave two-stream pole (`λμ₀ = 1`, 54b6a75
 there) that this coupling had also guarded; `main`'s version stands.
 
+## How the extension runs NumericalRadiation's ecCKD scheme, and why
+
+NumericalRadiation already implements clear-sky ecCKD as a staged column API:
+`optical_properties!(longwave, shortwave, gas_optics, atmosphere)` fills per-g-point optical
+properties for both streams from a `ColumnAtmosphere`, `radiative_fluxes!` with
+`CloudlessLongwave()` or `CloudlessShortwave()` turns them into interface fluxes, and the
+flux convergence gives heating rates. The extension does not touch that physics; its job is
+to build the inputs from SpeedyWeather's state for one column, without allocating, and to
+hand the results back in SpeedyWeather's conventions. Every choice in the kernel
+(`ext/SpeedyWeatherNumericalRadiationExt/ecckd_radiation.jl`, stages `ecckd_surface_state`,
+`ecckd_column_atmosphere!`, `ecckd_column_optics`, `ecckd_longwave!`, `ecckd_shortwave!`,
+`ecckd_heating!`) and its reason:
+
+### One component for both streams
+
+ecCKD evaluates the gas optics for the longwave and the shortwave g points from the same
+layer state in one pass. With SpeedyWeather's former separate `shortwave_radiation` and
+`longwave_radiation` components that work would be done twice or passed from one component
+to the other through scratch arrays and a call-order assumption. `ClearSkyEcCKDRadiation` is
+therefore one `radiation` component (the `Radiation` bundle of #1252 made that slot exist):
+one `optical_properties!` call per column, then the two solvers.
+
+### The column state
+
+- **Pressures** at layer centres and interfaces come from `pressure(k, pₛ, coordinates)`
+  and `pressure_half`, i.e. the vertical coordinate and the surface pressure of the step.
+  The radiation therefore sees the hydrostatic column the dynamics integrates; both packages
+  index top-down (`k = 1` at the top), so no reordering is needed.
+- **Layer temperature and humidity** are views into the prognostic step that SpeedyWeather's
+  time stepping selects (`get_prognostic_step`), the same step every other parameterization
+  reads. They are passed as views, not copies, which is what required NumericalRadiation's
+  `ColumnAtmosphere` to accept a different array type per field (stepped 3D arrays, 2D work
+  arrays and interface arrays give three `SubArray` types).
+- **Interface temperatures** are needed because the longwave solver is run with the
+  half-level Planck sources (`source_top`, `source_bottom`) that ecRad uses: the source varies
+  linearly across a layer, which avoids the bias of a constant layer source in the thick
+  layers of an eight-level model. They are interpolated linearly in pressure between layer
+  centres; the top interface takes the temperature of layer 1; the bottom interface takes the
+  air temperature extrapolated from the two lowest layers and *not* the skin temperature.
+  IFS uses the skin temperature there, but its lowest layer is metres thick; at L8
+  SpeedyWeather's is ~100 hPa, and letting that whole layer emit downward at skin temperature
+  fed the surface back on itself until land ran away to 400 K within a day. The skin
+  temperature enters only through the surface emission, where it belongs.
+- **Gas amounts** are what the ecCKD tables expect, moles per unit area per layer. They
+  follow from hydrostatic balance with the step's surface pressure and specific humidity:
+  moist air mass `Δp/g`, water mass `q Δp/g`, dry-air moles `(1 − q) Δp / (g M_dry)`, water
+  moles `q Δp / (g M_H₂O)`. `composite` (ecCKD's well-mixed dry air) is the dry-air moles,
+  `h2o` the water moles, `co2` a mole fraction times the dry-air moles, every other gas of
+  the model (`o3` by default) the scheme's prescribed mole fraction, a number or a function
+  of pressure evaluated per layer. The CO₂ mole fraction comes from
+  `greenhouse_gases.co2` [ppm] when the model has that component, so a CO₂ scenario forces
+  the radiation, otherwise from the scheme's prescription (280 ppm by default).
+- **Constants** (gravity, molar masses, heat capacity, Stefan–Boltzmann constant, solar
+  constant) are built from `model.planet` and `model.atmosphere` into NumericalRadiation's
+  `PhysicalConstants` and passed through `ColumnAtmosphere.constants`, so the gas amounts,
+  the Planck sources and the heating rates use the same constants as the dynamics and the
+  other parameterizations. SpeedyWeather stores molar masses in g mol⁻¹, NumericalRadiation
+  in kg mol⁻¹; the conversion is in one place (`physical_constants`).
+- **Surface state**: sea-surface and soil temperature, ocean and land albedo, land fraction
+  and the cosine of the solar zenith angle of the column. The land-fraction blend of the two
+  albedos is the surface albedo of the shortwave solver; the blended skin temperature is
+  carried only for the solvers' boundary conditions.
+
+### Work arrays and allocation
+
+All per-column memory is SpeedyWeather parameterization variables in the `:ecckd` namespace,
+declared by `variables(::ClearSkyEcCKDRadiation, model)` and sized from the model and the
+gas-optics tables: layer and interface pressures and interface temperatures, gas amounts
+(`Grid4D(n = ngas)`), optical depths and Planck sources per g point (`Grid4D(n = ng)`),
+interface fluxes, the surface emission per g point, and the seven scratch vectors of the
+shortwave adding method. The kernel takes views into them; NumericalRadiation wants a
+column's g-point arrays as `(ng, nlayers)` while `Grid4D` allocates `(npoints, nlayers, ng)`,
+so `column_gpoints` wraps the column slice in a `PermutedDimsArray`, a zero-cost view. With
+the caller-owned `ShortwaveColumnScratch` (seven views, all of interface length so that they
+share one type) the whole column update allocates nothing, which the coupling tests check;
+on a GPU, where kernels cannot allocate, the same layout is what makes the scheme possible
+at all. Declaring the arrays as variables rather than allocating them in the scheme also
+lets SpeedyWeather move them to the device with everything else.
+
+`variables` starts with the standard shortwave and longwave diagnostics
+(`variables(TransparentShortwave())...`, `variables(UniformCooling{NF}())...`), so
+`outgoing_longwave`, `surface_shortwave_down`, the ocean and land surface fluxes and the
+other fields SpeedyWeather's surface models and output read exist under their usual names.
+
+### Longwave stream
+
+The surface emission is built per g point with `TabulatedSurfaceEmission` (a lazy vector
+that evaluates the Planck table at the surface temperature with the scheme's emissivity),
+once at the sea-surface and once at the soil temperature, and blended by the land fraction
+into the `surface_emission` work vector: emitted flux is linear in fractional coverage, so
+blending fluxes is exact for a partially land-covered cell, while blending temperatures
+would not be. The broadband ocean and land emissions are accumulated with the g-point
+weights in the same loop and stored as `ocean.surface_longwave_up` and
+`land.surface_longwave_up`, which the ocean and land models need for their own energy
+budgets, exactly as SpeedyWeather's one-band longwave fills them. The solver then runs with
+`LongwaveBoundaryConditions(surface_longwave_up = emission)`: zero downward flux at the top,
+and the longwave surface albedo left at zero, so the 2 % of the downward flux that an
+`ε = 0.98` surface reflects by Kirchhoff's law (about 6 W m⁻²) is neglected; see Future work.
+Outgoing longwave is the top upward flux, the surface fluxes are the bottom entries.
+
+### Shortwave stream
+
+The solver runs only for `cos_zenith > 0`; at night both fluxes are set to zero without a
+solver call (the direct beam is undefined at `μ₀ ≤ 0`, and it halves the cost). The top
+boundary is `solar_constant × cos_zenith`, instantaneous: SpeedyWeather's zenith field
+already carries the diurnal and seasonal cycle, and since the global mean of `max(μ₀, 0)`
+is 1/4 at any instant the global-mean insolation is `S₀/4` without averaging. The surface
+albedo is the ocean/land blend. The diagnostics mirror what `OneBandShortwave` fills:
+`outgoing_shortwave`, `surface_shortwave_down` (the same value for the ocean and land
+namespaces), `surface_shortwave_up` from the blended albedo, the ocean and land upward
+fluxes from their own albedos, and the blended `albedo`.
+
+### Heating
+
+The temperature tendency of layer `k` is the net flux convergence
+(`F↓_LW − F↑_LW + F↓_SW − F↑_SW` at the two interfaces) divided by `c_p`, converted with
+SpeedyWeather's own `flux_to_tendency` (which divides by the layer mass `Δσ pₛ / g`), and
+*added* to the tendency array the other parameterizations accumulate into. Using the host's
+conversion keeps the energy accounting consistent with the dynamics: summed over the column
+the heating equals the net radiative flux into the column, TOA net minus surface net, an
+identity the coupling test checks to a relative 1e-3.
+
+### Time stepping and number format
+
+The scheme is NumericalRadiation's type, not a SpeedyWeather component; the extension
+provides the `get_prognostic_step`/`get_tendency_step` methods for it (forwarding to what
+any radiation parameterization gets), so the same steps as the other parameterizations are
+read and written whether the scheme is `model.radiation` itself or the longwave part of a
+`Radiation` bundle. The tables are converted to the spectral grid's number format at
+construction (`ClearSkyEcCKDRadiation(spectral_grid, "32x32")`), Float32 by default; the
+Float32 kernel reproduces a Float64 run of the staged API to 2e-3 in the column cross-check,
+and the one Float32 hazard found, the two-stream pole at `λμ₀ = 1`, is guarded in
+NumericalRadiation's solver.
+
+### Evidence that the coupling is right
+
+- One column through the kernel against the same inputs through NumericalRadiation's staged
+  API called directly: fluxes agree to 2e-3.
+- Column energy conservation to 1e-3; physically signed budgets (surface loses longwave,
+  outgoing shortwave below the surface downward flux); night gives zero shortwave and the
+  unchanged longwave; two doublings of CO₂ reduce the OLR by ~7 W m⁻².
+- T31 L8, 10 days after 10 days of spin-up, global means: OLR 246.8 W m⁻², planetary albedo
+  0.106 and a TOA imbalance of +58 W m⁻², which is what a cloud-free atmosphere over a mostly
+  ocean surface gives (the missing cloud albedo), not a coupling error; the prescribed ozone
+  is worth 20 K in the top layer (213 K against 193 K without it, the one-band model at
+  210 K); 64x96 is indistinguishable from 32x32 (OLR within 0.3 W m⁻²) at twice the cost.
+- Cost: ~24 μs per column and step for 32x32 against ~0.3 μs for the one-band pair, the
+  whole model 3.3× slower at T31 L8; a radiation call frequency is the future-work item
+  that would recover most of it.
+
 ## Testing and verification
 
 1. `Pkg.test("SpeedyWeather")` includes `parameterizations/numericalradiation` (21 tests,
@@ -277,6 +427,9 @@ As listed above: `docs/src/radiation.md` section, docstrings, CHANGELOG, this pl
   scheme then reads a per-column ozone profile instead of `mole_fractions.o3`.
 - A radiation call frequency: parameterizations that run every `N` steps and hold their
   tendency in between; a 32×32 g-point column per step dominates cost at climate resolution.
+- Longwave surface reflection: pass `surface_albedo = 1 − surface_emissivity` to the longwave
+  boundary conditions (one line in the kernel; the coupling cross-check test then needs the
+  same). Adds the ~6 W m⁻² of reflected downwelling to the surface upward flux.
 - Clouds for the ecCKD scheme (a cloudy counterpart of `ClearSkyEcCKDRadiation` in
   NumericalRadiation, which already has cloud-overlap solvers) once SpeedyWeather has a cloud
   state to feed them.
