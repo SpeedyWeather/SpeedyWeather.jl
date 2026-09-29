@@ -28,6 +28,17 @@ function Radiation(
     return Radiation(shortwave, longwave)
 end
 
+export DryRadiation
+
+"""$(TYPEDSIGNATURES) `Radiation` but with longwave/shortwave defaults for the PrimitiveDryModel."""
+function DryRadiation(
+        SG::SpectralGrid;
+        shortwave = OneBandGreyShortwave(SG),
+        longwave = OneBandGreyLongwave(SG),
+    )
+    return Radiation(shortwave, longwave)
+end
+
 Base.show(io::IO, radiation::Radiation) = show(io, radiation, values = false)
 
 function initialize!(radiation::Radiation, model::PrimitiveEquation)

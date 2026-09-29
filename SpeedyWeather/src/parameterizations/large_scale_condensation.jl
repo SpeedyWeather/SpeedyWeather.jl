@@ -114,7 +114,7 @@ large-scale precipitation vertically for output."""
             snow_flux_down -= melt_rate                     # move melted snow to rain
             rain_flux_down += melt_rate                     # this can evaporate now too
             δq_melt = melt_rate * Δtgρ_Δp                   # convert back to humidity increase over timestep [kg/kg]
-            δT = -Lᵢ_cₚ * δq_melt                           # just to calculate the latent heat required (explicit in time)
+            δT = -Lᵢ_cₚ * δq_melt / Δt                      # latent heat required for melting [K/s] (explicit in time)
             # don't use δq_melt as humidity tendency as it's only snow->rain
 
             # 2. Reevaporation and condensation
@@ -129,10 +129,10 @@ large-scale precipitation vertically for output."""
             # Solve for melting of snow, condensation, reevaporation (and possibly sublimation) implicitly in time
             # implicit correction, Frierson et al. 2006 eq. (21)
             # derivative of qsat wrt to temp
-            T = temp[ij, k] + Δt * δT                       # use temperature minus latent heat for melting in gradient
-            dqsat_dT = sat_humid_k * relative_humidity_threshold * Lᵥ_cₚ / (Rᵥ * T^2)
+            T = temp[ij, k] + Δt * δT                       # use temperature after melting [K] in gradient
+            dqsat_dT = sat_humid_k * relative_humidity_threshold * Lᵥ / (Rᵥ * T^2)    # Clausius-Clapeyron [1/K]
             δq /= ((1 + Lᵥ_cₚ * dqsat_dT) * time_scale * Δt)
-            δT = -Lᵥ_cₚ * δq                                # latent heat release for enthalpy conservation
+            δT -= Lᵥ_cₚ * δq                                # add latent heat release to melting for enthalpy conservation
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top

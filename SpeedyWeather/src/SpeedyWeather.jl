@@ -115,6 +115,9 @@ function animate end
 # constructors to be defined in Terrarium extension
 export TerrariumOutput
 
+# constructor to be extended by packages that define parameterizations
+export Parameterization
+
 # abstract types
 include("variables/abstract_types.jl")
 include("models/abstract_models.jl")
@@ -207,6 +210,7 @@ include("output/feedback.jl")
 include("output/vertical_interpolation.jl")
 include("output/writers/general.jl")
 include("output/writers/output_writer_core.jl")
+include("output/writers/output_layers.jl")
 include("output/writers/netcdf_output.jl")
 include("output/writers/variables_output.jl")
 include("output/writers/zarr_output.jl")
