@@ -39,23 +39,23 @@ end
 @testset "Stratospheric longwave emission" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid)
-    initialize!(model.longwave_radiation, model)
-    @test model.longwave_radiation.radiative_transfer.stratospheric_emissivity > 0     # on for wet model
-    @test PrimitiveDryModel(spectral_grid).longwave_radiation.radiative_transfer.stratospheric_emissivity == 0
+    initialize!(model.radiation.longwave, model)
+    @test model.radiation.longwave.radiative_transfer.stratospheric_emissivity > 0     # on for wet model
+    @test PrimitiveDryModel(spectral_grid).radiation.longwave.radiative_transfer.stratospheric_emissivity == 0
 
     # compare with and without stratospheric emission for the same state
     function column(ϵ)
         radiative_transfer = OneBandLongwaveRadiativeTransfer(spectral_grid, stratospheric_emissivity = ϵ)
-        longwave_radiation = OneBandLongwave(spectral_grid; radiative_transfer)
-        model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+        longwave = OneBandLongwave(spectral_grid; radiative_transfer)
+        model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
         simulation = initialize!(model)
         vars = simulation.variables
         vars.parameterizations.surface_pressure .= 1.0e5
         vars.grid.temperature .= 250
         vars.tendencies.grid.temperature .= 0
         ij = 1
-        SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
-        dTdt = SpeedyWeather.get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, model.longwave_radiation)
+        SpeedyWeather.parameterization!(ij, vars, model.radiation.longwave, model)
+        dTdt = SpeedyWeather.get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, model.radiation.longwave)
         return Array(dTdt[ij, :]), vars.parameterizations.outgoing_longwave[ij], model
     end
 

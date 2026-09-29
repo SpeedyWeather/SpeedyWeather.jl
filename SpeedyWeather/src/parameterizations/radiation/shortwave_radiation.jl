@@ -7,11 +7,12 @@ struct TransparentShortwave <: AbstractShortwave end
 Adapt.@adapt_structure TransparentShortwave
 TransparentShortwave(SG::SpectralGrid) = TransparentShortwave()
 
-function variables(::AbstractShortwave)
+variables(::AbstractShortwave) = shortwave_variables()
+
+# variables shared by all shortwave schemes
+function shortwave_variables()
     return (
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m^2"),
-        ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down over ocean", units = "W/m^2", namespace = :ocean),
-        ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down over land", units = "W/m^2", namespace = :land),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up", units = "W/m^2"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over land", units = "W/m^2", namespace = :land),
@@ -39,8 +40,6 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
     S₀ = planet.solar_constant
     D = S₀ * cos_zenith             # top of atmosphere downward radiation
     vars.parameterizations.surface_shortwave_down[ij] = D  # transparent atmosphere so same at surface (before albedo)
-    vars.parameterizations.ocean.surface_shortwave_down[ij] = D
-    vars.parameterizations.land.surface_shortwave_down[ij] = D
 
     # shortwave up is after albedo reflection, separated by ocean/land
     vars.parameterizations.ocean.surface_shortwave_up[ij] = albedo_ocean * D
@@ -208,8 +207,6 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     U_stratocumulus = D * stratocumulus_albedo * stratocumulus_cover
     D_surface = D - U_stratocumulus
     vars.parameterizations.surface_shortwave_down[ij] = D_surface
-    vars.parameterizations.ocean.surface_shortwave_down[ij] = D_surface
-    vars.parameterizations.land.surface_shortwave_down[ij] = D_surface
 
     # Surface albedo reflections
     up_ocean = albedo_ocean * D_surface
@@ -270,8 +267,7 @@ end
 Base.show(io::IO, M::TwoBandShortwave) = show(io, M, values = false)
 
 # shortwave variables and those of the ozone component
-variables(radiation::TwoBandShortwave) =
-    (invoke(variables, Tuple{AbstractShortwave}, radiation)..., variables(radiation.ozone)...)
+variables(radiation::TwoBandShortwave) = (shortwave_variables()..., variables(radiation.ozone)...)
 
 function initialize!(radiation::TwoBandShortwave, model::PrimitiveEquation)
     initialize!(radiation.clouds, model)
@@ -364,7 +360,7 @@ no reflection by clouds or the surface."""
         end
 
         # 2. ozone absorption (visible), fraction of TOA flux, corrected for slant path
-        O₃ = min(D, ozone_absorption(ij, k, vars, ozone, model) * D_toa * zenith_factor)
+        O₃ = ozone_absorption(ij, k, vars, ozone, model) * D_toa * zenith_factor
 
         # 3. absorption in both bands
         D_out = (D - O₃) * visible[ij, k]
@@ -377,8 +373,6 @@ no reflection by clouds or the surface."""
     # SURFACE, both bands reach the surface but only visible is reflected
     D_surface = D + D_nir
     vars.parameterizations.surface_shortwave_down[ij] = D_surface
-    vars.parameterizations.ocean.surface_shortwave_down[ij] = D_surface
-    vars.parameterizations.land.surface_shortwave_down[ij] = D_surface
 
     vars.parameterizations.ocean.surface_shortwave_up[ij] = albedo_ocean * D
     vars.parameterizations.land.surface_shortwave_up[ij] = albedo_land * D

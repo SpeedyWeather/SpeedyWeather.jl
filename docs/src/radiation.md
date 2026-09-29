@@ -9,7 +9,7 @@ them in that order for every grid column
 ```@example radiation
 using SpeedyWeather
 spectral_grid = SpectralGrid()
-radiation = Radiation(spectral_grid; shortwave = OneBandShortwave(spectral_grid), longwave = OneBandLongwave(spectral_grid))
+radiation = Radiation(spectral_grid; shortwave = TwoBandShortwave(spectral_grid), longwave = OneBandLongwave(spectral_grid))
 model = PrimitiveWetModel(spectral_grid; radiation)
 model.radiation
 ```
@@ -309,9 +309,9 @@ so that stratospheric heating rates don't increase over high orography where the
 
 ```@example radiation
 spectral_grid = SpectralGrid(truncation=31, nlayers=8)
-shortwave_radiation = TwoBandShortwave(spectral_grid, ozone=NoOzone(spectral_grid))
-model = PrimitiveWetModel(spectral_grid; shortwave_radiation)
-model.shortwave_radiation
+shortwave = TwoBandShortwave(spectral_grid, ozone=NoOzone(spectral_grid))
+model = PrimitiveWetModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave))
+model.radiation.shortwave
 ```
 
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds

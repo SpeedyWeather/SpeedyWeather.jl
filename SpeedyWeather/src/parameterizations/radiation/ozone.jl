@@ -53,10 +53,10 @@ $(TYPEDFIELDS)"""
     @param latitudinal_amplitude::NF = 1.8 (bounds = Nonnegative,)
 
     "[OPTION] Lower boundary of the upper stratosphere (SPEEDY σ = 0.05 at 1000 hPa) [Pa]"
-    pressure_upper::NF = 5000
+    @param pressure_upper::NF = 5000 (bounds = Nonnegative,)
 
     "[OPTION] Lower boundary of the lower stratosphere (SPEEDY σ = 0.14 at 1000 hPa) [Pa]"
-    pressure_lower::NF = 14000
+    @param pressure_lower::NF = 14000 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure SeasonalOzone

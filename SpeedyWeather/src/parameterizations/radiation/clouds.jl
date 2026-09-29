@@ -28,7 +28,7 @@ initialize!(clouds::NoClouds, ::AbstractModel) = nothing
 end
 
 export DiagnosticClouds
-@parameterized @kwdef struct DiagnosticClouds{NF} <: AbstractShortwaveClouds
+@parameterized @kwdef struct DiagnosticClouds{NF, RI} <: AbstractShortwaveClouds
     "[OPTION] Relative humidity threshold for cloud cover = 0 [1]."
     @param relative_humidity_threshold_min::NF = 0.3 (bounds = 0 .. 1,)
 
@@ -73,11 +73,23 @@ export DiagnosticClouds
 
     "[OPTION] Stratocumulus cloud factor (SPEEDY clfact) [1]"
     @param stratocumulus_cloud_factor::NF = 1.2 (bounds = Nonnegative,)
+
+    "[DERIVED] Highest layer in which clouds can form, first layer below the tropopause, set in `initialize!`"
+    layer_top::RI = Ref(0)
+
+    "[DERIVED] Cloud base, lowest layer above the boundary layer, set in `initialize!`"
+    cloud_base::RI = Ref(0)
 end
 
 Adapt.@adapt_structure DiagnosticClouds
-DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF}(; kwargs...)
-initialize!(clouds::DiagnosticClouds, model::AbstractModel) = nothing
+DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF, Base.RefValue{Int}}(; kwargs...)
+
+# the free troposphere layers only depend on the vertical coordinates, precompute them
+function initialize!(clouds::DiagnosticClouds, model::AbstractModel)
+    vertical_coordinates = on_architecture(CPU(), model.geometry.vertical_coordinates)
+    clouds.layer_top[], clouds.cloud_base[] = free_troposphere_layers(clouds, vertical_coordinates)
+    return nothing
+end
 @propagate_inbounds function clouds!(
         ij,
         vars,
@@ -126,7 +138,9 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
     cover_min_land = clouds.stratocumulus_cover_min_land
 
     # Precipitation contribution from rain and snow (both in m/s)
-    precip_rate = vars.parameterizations.rain_rate[ij] + snow_rate(ij, vars)
+    (; parameterizations) = vars
+    snow_rate = haskey(parameterizations, :snow_rate) ? parameterizations.snow_rate[ij] : zero(NF)
+    precip_rate = parameterizations.rain_rate[ij] + snow_rate
     precip_term = min(precip_max, max(0, precip_rate) * 86400 * 1000)   # convert m/s to mm/day
     P = precip_weight * sqrt(precip_term)
 
@@ -134,7 +148,7 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
     cloud_top_precipitation = vars.parameterizations.cloud_top[ij]
 
     # clouds form in the free troposphere, layers between the tropopause and the boundary layer
-    layer_top, cloud_base = free_troposphere_layers(clouds, model)
+    layer_top, cloud_base = clouds.layer_top[], clouds.cloud_base[]
 
     # Find the layer of maximum relative humidity in the free troposphere (with q > q_min,
     # except for the cloud base layer directly above the boundary layer as in SPEEDY, so that
@@ -198,22 +212,20 @@ Range of layers `layer_top:cloud_base` of the free troposphere in which clouds c
 from the first layer below the tropopause (σ ≥ `σ_tropopause`) to the cloud base, the lowest
 layer above the boundary layer (σ ≤ `σ_boundary_layer`). Clouds never include the surface layer
 (unless there is only one layer), the cloud base is at least the first layer below the tropopause
-and at most the layer above the surface layer. For 8 equally spaced layers these are layers 2 to 7."""
-@propagate_inbounds function free_troposphere_layers(clouds::DiagnosticClouds, model)
-    σ = model.geometry.σ_levels_full
-    nlayers = length(σ)
+and at most the layer above the surface layer. For 8 equally spaced layers these are layers 2 to 7.
+Uses the surface pressure-independent `sigma(k, vertical_coordinates)`, so this is computed once
+in `initialize!` for any vertical coordinates."""
+function free_troposphere_layers(clouds::DiagnosticClouds, vertical_coordinates::AbstractVerticalCoordinates)
+    nlayers = get_nlayers(vertical_coordinates)
     layer_top = 1
     cloud_base = 0
     for k in 1:(nlayers - 1)
-        layer_top = σ[k] < clouds.σ_tropopause ? k + 1 : layer_top
-        cloud_base = σ[k] <= clouds.σ_boundary_layer ? k : cloud_base
+        σ = sigma(k, vertical_coordinates)
+        layer_top = σ < clouds.σ_tropopause ? k + 1 : layer_top
+        cloud_base = σ <= clouds.σ_boundary_layer ? k : cloud_base
     end
     cloud_base = max(cloud_base, min(layer_top, nlayers - 1), 1)
     layer_top = min(layer_top, cloud_base)
     return layer_top, cloud_base
 end
 
-# snow rate [m/s] if defined (e.g. by large-scale condensation), zero otherwise
-@propagate_inbounds snow_rate(ij, vars) = _snow_rate(ij, vars.parameterizations)
-@propagate_inbounds _snow_rate(ij, parameterizations::NamedTuple) =
-    haskey(parameterizations, :snow_rate) ? parameterizations.snow_rate[ij] : zero(eltype(parameterizations.rain_rate))

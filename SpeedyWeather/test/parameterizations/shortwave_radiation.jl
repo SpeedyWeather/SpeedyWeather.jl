@@ -22,7 +22,7 @@ end
         init_shortwave_state!(vars, model)
 
         SpeedyWeather.parameterization!(vars, model.solar_zenith, model)
-        SpeedyWeather.parameterization!(vars, model.shortwave_radiation, model)
+        SpeedyWeather.parameterization!(vars, model.radiation, model)
 
         for ij in 1:model.spectral_grid.npoints
             SpeedyWeather.parameterization!(ij, vars, model.radiation.shortwave, model)
@@ -95,16 +95,16 @@ end
 
 @testset "Two-band shortwave transmissivity" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
-    model = PrimitiveWetModel(spectral_grid; shortwave_radiation = TwoBandShortwave(spectral_grid))
-    initialize!(model.shortwave_radiation, model)
+    model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; shortwave = TwoBandShortwave(spectral_grid)))
+    initialize!(model.radiation.shortwave, model)
 
     vars = Variables(model)
     init_shortwave_state!(vars, model)
     vars.parameterizations.cos_zenith .= 1
 
     for ij in 1:model.spectral_grid.npoints
-        clouds = SpeedyWeather.clouds!(ij, vars, model.shortwave_radiation.clouds, model)
-        t = SpeedyWeather.transmissivity!(ij, vars, clouds, model.shortwave_radiation.transmissivity, model)
+        clouds = SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model)
+        t = SpeedyWeather.transmissivity!(ij, vars, clouds, model.radiation.shortwave.transmissivity, model)
         @test t.zenith_factor == 1
     end
     @test all(0 .< vars.scratch.grid.a .<= 1)   # visible
@@ -117,11 +117,11 @@ end
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     @testset for ozone in (SeasonalOzone(spectral_grid), NoOzone(spectral_grid))
         sw = TwoBandShortwave(spectral_grid; ozone)
-        model = PrimitiveWetModel(spectral_grid; shortwave_radiation = sw)
+        model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; shortwave = sw))
         simulation = initialize!(model)
         vars = simulation.variables
         vars.parameterizations.surface_pressure .= 1.0e5
-        SpeedyWeather.parameterization!(vars, model.shortwave_radiation, model)
+        SpeedyWeather.parameterization!(vars, model.radiation, model)
 
         nlayers = spectral_grid.nlayers
         absorption = [SpeedyWeather.ozone_absorption(ij, k, vars, ozone, model) for ij in 1:spectral_grid.npoints, k in 1:nlayers]
@@ -150,10 +150,10 @@ end
     # ratio of lower stratospheric ozone absorption in the northernmost over southernmost ring
     function north_south_ratio(time; kwargs...)
         planet = Earth(spectral_grid; kwargs...)
-        model = PrimitiveWetModel(spectral_grid; planet, shortwave_radiation = TwoBandShortwave(spectral_grid))
+        model = PrimitiveWetModel(spectral_grid; planet, radiation = Radiation(spectral_grid; shortwave = TwoBandShortwave(spectral_grid)))
         simulation = initialize!(model; time)
         vars = simulation.variables
-        SpeedyWeather.parameterization!(vars, model.shortwave_radiation, model)
+        SpeedyWeather.parameterization!(vars, model.radiation, model)
         lower = vars.parameterizations.ozone_absorption_lower
         return lower[1] / lower[end]
     end
@@ -170,7 +170,8 @@ end
 @testset "Diagnostic clouds in cold, dry air and from snow" begin
     spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid)
-    clouds = model.shortwave_radiation.clouds
+    clouds = model.radiation.shortwave.clouds
+    initialize!(clouds, model)
     vars = Variables(model)
     init_shortwave_state!(vars, model)
     nlayers = spectral_grid.nlayers
@@ -195,9 +196,12 @@ end
     for nlayers in (1, 2, 3, 4, 8, 16, 32, 64)
         spectral_grid = SpectralGrid(truncation = 21, nlayers = nlayers)
         model = PrimitiveWetModel(spectral_grid)
-        clouds = model.shortwave_radiation.clouds
-        layer_top, cloud_base = SpeedyWeather.free_troposphere_layers(clouds, model)
-        σ = model.geometry.σ_levels_full
+        clouds = model.radiation.shortwave.clouds
+        initialize!(clouds, model)
+        layer_top, cloud_base = clouds.layer_top[], clouds.cloud_base[]
+        coordinates = model.geometry.vertical_coordinates
+        @test (layer_top, cloud_base) == SpeedyWeather.free_troposphere_layers(clouds, coordinates)
+        σ = [SpeedyWeather.sigma(k, coordinates) for k in 1:nlayers]
 
         @test 1 <= layer_top <= cloud_base <= nlayers
         nlayers > 1 && @test cloud_base < nlayers       # clouds never in the surface layer
@@ -215,10 +219,10 @@ end
 @testset "Ozone heating independent of surface pressure" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 8)
     ozone = SeasonalOzone(spectral_grid)
-    model = PrimitiveWetModel(spectral_grid; shortwave_radiation = TwoBandShortwave(spectral_grid; ozone))
+    model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; shortwave = TwoBandShortwave(spectral_grid; ozone)))
     simulation = initialize!(model)
     vars = simulation.variables
-    SpeedyWeather.parameterization!(vars, model.shortwave_radiation, model)
+    SpeedyWeather.parameterization!(vars, model.radiation, model)
     coordinates = model.geometry.vertical_coordinates
 
     # absorption per layer pressure thickness (∝ heating rate) in the top layer and column total
