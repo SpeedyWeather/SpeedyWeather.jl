@@ -9,7 +9,7 @@ export BulkRichardsonDiffusion
     @param roughness_length::NF = 3.21e-5 (bounds = Positive,)
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    @param critical_Richardson::NF = 10 (bounds = Positive,)
+    @param critical_Richardson::NF = 1 (bounds = Positive,)
 
     "[OPTION] Fraction of surface boundary layer"
     @param surface_layer_fraction::NF = 0.1 (bounds = 0 .. 1,)
@@ -42,6 +42,8 @@ end
 
 variables(::BulkRichardsonDiffusion) = (
     ParameterizationVariable(:boundary_layer_height, Grid2D(), desc = "Boundary layer height index", units = "1"),
+    ScratchVariable(:vertical_diffusion_c, GridXYZ(), desc = "Scratch array for the tridiagonal solver", units = "?", namespace = :grid),
+    ScratchVariable(:vertical_diffusion_d, GridXYZ(), desc = "Scratch array for the tridiagonal solver", units = "?", namespace = :grid),
 )
 
 function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquation)
@@ -76,7 +78,7 @@ end
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, vars, diffusion, model.time_stepping, model.atmosphere, model.planet, model.orography, model.geopotential)
+    vertical_diffusion!(ij, vars, diffusion, model.time_stepping, model.atmosphere, model.planet, model.orography, model.land_sea_mask, model.geopotential, model.geometry.σ_levels_full)
 
 @propagate_inbounds function vertical_diffusion!(
         ij,
@@ -86,7 +88,9 @@ end
         atmosphere,
         planet,
         orography,
+        land_sea_mask,
         geopot,
+        σ_levels_full,
     )
 
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
@@ -94,7 +98,7 @@ end
     # escape immediately if all diffusions disabled
     any((diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
 
-    K, kₕ = get_diffusion_coefficients!(ij, vars, diffusion, time_stepping, atmosphere, planet, orography, geopot)
+    K, kₕ = get_diffusion_coefficients!(ij, vars, diffusion, time_stepping, atmosphere, planet, orography, land_sea_mask, geopot, σ_levels_full)
 
     u_tend = get_tendency_step(vars.tendencies.grid.u, time_stepping, diffusion)
     v_tend = get_tendency_step(vars.tendencies.grid.v, time_stepping, diffusion)
@@ -103,13 +107,15 @@ end
     u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
     v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
 
-    diffuse_momentum && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
-    diffuse_momentum && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
+    # implicit (backward Euler) time step, unconditionally stable
+    Δt = implicit_vertical_diffusion_time_step(time_stepping)
+    diffuse_momentum && _vertical_diffusion!(ij, vars, u_tend, u, K, kₕ, diffusion, Δt)
+    diffuse_momentum && _vertical_diffusion!(ij, vars, v_tend, v, K, kₕ, diffusion, Δt)
 
     if atmosphere isa AbstractWetAtmosphere && diffuse_humidity
         humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, diffusion)
         humid = get_prognostic_step(vars.grid.humidity, time_stepping, diffusion)
-        _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
+        _vertical_diffusion!(ij, vars, humid_tend, humid, K, kₕ, diffusion, Δt)
     end
 
     if diffuse_static_energy
@@ -121,10 +127,10 @@ end
 
         for k in 1:size(T, 2)
             dry_static_energy[ij, k] = cₚ * T[ij, k] + Φ[ij, k]
-            K[ij, k] /= cₚ        # put temperature => dry static energy conversion into K
         end
 
-        _vertical_diffusion!(ij, temp_tend, dry_static_energy, K, kₕ, diffusion)
+        # diffuse dry static energy but convert its tendency back to temperature with 1/cₚ
+        _vertical_diffusion!(ij, vars, temp_tend, dry_static_energy, K, kₕ, diffusion, Δt, inv(cₚ))
     end
     return nothing
 end
@@ -137,7 +143,9 @@ end
         atmosphere::AbstractAtmosphere,
         planet::AbstractPlanet,
         orog,
+        land_sea_mask,
         geopot::AbstractGeopotential,
+        σ_levels_full,
     )
     nlayers = length(diffusion.∇²_above)
 
@@ -160,12 +168,13 @@ end
 
     u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
     v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
+    T = get_prognostic_step(vars.grid.temperature, time_stepping, diffusion)
     geopotential = vars.dynamics.geopotential
     (; orography) = orog
 
     # Boundary layer depth is highest layer for which Ri < Ri_c (the "critical" threshold)
     # as well as all layers below
-    Ri = bulk_richardson!(ij, vars, diffusion, time_stepping, atmosphere)
+    Ri = bulk_richardson!(ij, vars, diffusion, time_stepping, atmosphere, planet, orog, land_sea_mask)
     kₕ::Int = nlayers
     while kₕ > 0 && Ri[ij, kₕ] < Ri_c
         kₕ -= 1
@@ -203,10 +212,12 @@ end
             # multiply with z-dependent factor in eq. (18) ?
             K_k *= z < fb * h ? one(K0) : zfac(z, h, fb)
 
-            # multiply with Ri-dependent factor in eq. (20) ?
-            # TODO use Ri[kₕ] or Ri_N here?
-            K_k *= Ri[ij, kₕ] <= 0 ? one(K0) : Rifac(Ri[ij, kₕ], Ri_c, logZ_z₀)
-            K[ij, k] = K_k              # write diffusion coefficient into array
+            # multiply with Ri-dependent factor in eq. (20) for stable surface layer, using
+            # the surface bulk Richardson number Ri_N (Ri at kₕ is ≈ Ri_c by construction)
+            K_k *= Ri_N <= 0 ? one(K0) : Rifac(Ri_N, Ri_c, logZ_z₀)
+            # convert K [m²/s] from z to σ coordinates, ∂z = -gρ/pₛ ∂σ = -gσ/(RT) ∂σ, into [1/s]
+            dσdz = gravity * σ_levels_full[k] / (atmosphere.R_dry * T[ij, k])
+            K[ij, k] = K_k * dσdz^2     # write diffusion coefficient into array
         end
     end
 
@@ -230,29 +241,58 @@ end
     return inv(1 + Ri_Ri_c * logz_z₀ / (1 - Ri_Ri_c))
 end
 
+"""$(TYPEDSIGNATURES)
+Time step over which the implicit vertical diffusion is solved. Leapfrog evaluates the
+parameterizations at the previous step and applies their tendencies over 2Δt."""
+implicit_vertical_diffusion_time_step(time_stepping::AbstractLeapfrog) = 2 * time_stepping.Δt
+implicit_vertical_diffusion_time_step(time_stepping::AbstractTimeStepper) = time_stepping.Δt
+
+"""
+$(TYPEDSIGNATURES)
+Vertical diffusion of `var` within the boundary layer (layers `kₕ` to the surface) with
+diffusion coefficients `K` [1/s] in σ coordinates, no flux through the top of the boundary
+layer and the surface. Implicit (backward Euler) in time over `Δt` for unconditional stability,
+solved with the tridiagonal Thomas algorithm, the change is accumulated as
+`scale * (var_new - var) / Δt` into `tend`."""
 @propagate_inbounds function _vertical_diffusion!(
-        ij,     # horizontal grid point ij
-        tend,   # tendency to accumulate diffusion into
-        var,    # variable calculate diffusion from
-        K,      # diffusion coefficients
-        kₕ,     # uppermost layer that's still within the boundary layer
+        ij,         # horizontal grid point ij
+        vars,       # for scratch arrays
+        tend,       # tendency to accumulate diffusion into
+        var,        # variable calculate diffusion from
+        K,          # diffusion coefficients [1/s] in σ coordinates
+        kₕ,         # uppermost layer that's still within the boundary layer
         diffusion::BulkRichardsonDiffusion,
+        Δt,         # time step [s]
+        scale = 1,  # scale the tendency, e.g. 1/cₚ to convert dry static energy to temperature
     )
     (; ∇²_above, ∇²_below) = diffusion
     nlayers = size(tend, 2)
+    c′ = vars.scratch.grid.vertical_diffusion_c    # modified upper diagonal
+    d′ = vars.scratch.grid.vertical_diffusion_d    # modified right-hand side, then solution
 
-    for k in kₕ:nlayers         # diffusion only in surface boundary layer of thickness h
-
-        # sets the gradient across surface and top to 0 = no flux boundary conditions
-        k₋ = max(k, 1)          # index above (- in σ direction which is 0 at top and 1 at surface)
-        k₊ = min(k, nlayers)    # index below (+ in σ direction which is 0 at top and 1 at surface)
-
-        K_∂var_below = (var[ij, k₊] - var[ij, k]) * (K[ij, k₊] + K[ij, k])  # average diffusion coefficient K here
-        K_∂var_above = (var[ij, k] - var[ij, k₋]) * (K[ij, k] + K[ij, k₋])  # but 1/2 is already baked into the ∇² operators
-
-        tend[ij, k] += ∇²_below[k] * K_∂var_below - ∇²_above[k] * K_∂var_above
+    # tridiagonal system -a[k]*x[k-1] + (1 + a[k] + c[k])*x[k] - c[k]*x[k+1] = var[k]
+    # with a, c the diffusive exchange (×Δt) with the layer above, below
+    # 1/2 of the average diffusion coefficient K is already baked into the ∇² operators
+    # forward sweep, no flux through the top of the boundary layer (a = 0 at k = kₕ)
+    for k in kₕ:nlayers
+        a = k > kₕ ? Δt * ∇²_above[k] * (K[ij, k] + K[ij, k - 1]) : zero(Δt)
+        c = k < nlayers ? Δt * ∇²_below[k] * (K[ij, k] + K[ij, k + 1]) : zero(Δt)
+        c′ₖ₋₁ = k > kₕ ? c′[ij, k - 1] : zero(Δt)
+        d′ₖ₋₁ = k > kₕ ? d′[ij, k - 1] : zero(Δt)
+        denominator = 1 + a + c - a * c′ₖ₋₁
+        c′[ij, k] = c / denominator
+        d′[ij, k] = (var[ij, k] + a * d′ₖ₋₁) / denominator
     end
-    return
+
+    # back substitution, d′ becomes the solution var_new
+    for k in (nlayers - 1):-1:kₕ
+        d′[ij, k] += c′[ij, k] * d′[ij, k + 1]
+    end
+
+    for k in kₕ:nlayers
+        tend[ij, k] += scale * (d′[ij, k] - var[ij, k]) / Δt
+    end
+    return nothing
 end
 
 """
@@ -265,6 +305,9 @@ For vertical stability in the boundary layer."""
         diffusion::BulkRichardsonDiffusion,
         time_stepping::AbstractTimeStepper,
         atmosphere::AbstractAtmosphere,
+        planet::AbstractPlanet,
+        orog,
+        land_sea_mask,
     )
     # reuse work array
     Ri = vars.scratch.grid.a
@@ -285,11 +328,14 @@ For vertical stability in the boundary layer."""
         get_prognostic_step(vars.grid.humidity, time_stepping, diffusion) :
         vars.scratch.grid.b
 
-    # surface layer
+    # surface layer, between the surface (skin temperature, orography) and the lowermost layer
     V² = u[ij, surface]^2 + v[ij, surface]^2
-    Θ₀ = cₚ * virtual_temperature(T[ij, surface], q[ij, surface], atmosphere)
-    Θ₁ = Θ₀ + Φ[ij, surface]
-    Ri[ij, surface] = Φ[ij, surface] * (Θ₁ - Θ₀) / (Θ₀ * V²)
+    Tₛ = surface_skin_temperature(ij, vars, land_sea_mask, time_stepping, diffusion, T[ij, surface])
+    Tᵥₛ = virtual_temperature(Tₛ, q[ij, surface], atmosphere)
+    Φₛ = planet.gravity * orog.orography[ij]                                    # surface geopotential
+    Θ₀ = cₚ * Tᵥₛ + Φₛ                                                        # virtual dry static energy at surface
+    Θ₁ = cₚ * virtual_temperature(T[ij, surface], q[ij, surface], atmosphere) + Φ[ij, surface]  # and at lowermost layer
+    Ri[ij, surface] = (Φ[ij, surface] - Φₛ) * (Θ₁ - Θ₀) / (cₚ * Tᵥₛ * V²)
 
     for k in 1:(nlayers - 1)
         V² = u[ij, k]^2 + v[ij, k]^2

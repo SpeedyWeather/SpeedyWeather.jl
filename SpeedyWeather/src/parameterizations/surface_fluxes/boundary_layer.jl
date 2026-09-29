@@ -135,7 +135,7 @@ $(TYPEDFIELDS)"""
     @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    @param critical_Richardson::NF = 10 (bounds = Positive,)
+    @param critical_Richardson::NF = 1 (bounds = Positive,)
 
     "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
     @param drag_min::NF = 1.0e-5 (bounds = Nonnegative,)
@@ -146,12 +146,12 @@ variables(::BulkRichardsonDrag) = (
 )
 
 Adapt.@adapt_structure BulkRichardsonDrag
-BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
+BulkRichardsonDrag(SG::SpectralGrid; kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
 initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, vars, drag, model.atmosphere, model.planet, model.orography, model.time_stepping)
+    boundary_layer_drag!(ij, vars, drag, model.atmosphere, model.planet, model.orography, model.land_sea_mask, model.time_stepping)
 
 @propagate_inbounds function boundary_layer_drag!(
         ij,
@@ -160,6 +160,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
         atmosphere,
         planet,
         orography,
+        land_sea_mask,
         time_stepping,
     )
 
@@ -183,7 +184,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
     ΔΦ₀ = gravity * z     # geopotential height relative to surface
-    Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
+    Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, land_sea_mask, drag, time_stepping)
     Ri_c = drag.critical_Richardson
     (; drag_min) = drag
 
@@ -198,9 +199,11 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Calculate the bulk Richardson number following Frierson, 2006.
-For vertical stability in the boundary layer."""
-@propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
+Calculate the bulk Richardson number following Frierson, 2006, eq. (15)
+for the vertical stability between the surface and the lowermost layer.
+Uses the surface (skin) temperature, see `surface_skin_temperature`, so that
+a surface warmer than the air above yields Ri < 0 (unstable)."""
+@propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, land_sea_mask, drag, time_stepping)
     cₚ = atmosphere.heat_capacity
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, drag)
     NF = eltype(temp)
@@ -209,13 +212,35 @@ For vertical stability in the boundary layer."""
     Vₛ = vars.parameterizations.surface_wind_speed[ij]
     T = temp[ij, surface]
     q = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, drag)[ij, surface] : zero(NF)
-    Tᵥ = virtual_temperature(T, q, atmosphere)
+    Tₛ = surface_skin_temperature(ij, vars, land_sea_mask, time_stepping, drag, T)
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
-    Θ₀ = cₚ * Tᵥ          # virtual dry static energy at surface (z=0)
-    Θ₁ = Θ₀ + ΔΦ₀       # virtual dry static energy at first model level (z=z)
+    Θ₀ = cₚ * virtual_temperature(Tₛ, q, atmosphere)         # virtual dry static energy at surface (z=0)
+    Θ₁ = cₚ * virtual_temperature(T, q, atmosphere) + ΔΦ₀    # virtual dry static energy at first model level (z=z)
     bulk_richardson = ΔΦ₀ * (Θ₁ - Θ₀) / (Θ₀ * Vₛ^2)
     return bulk_richardson
+end
+
+"""
+$(TYPEDSIGNATURES)
+Surface (skin) temperature [K] at grid point `ij` for the bulk Richardson number:
+the sea surface temperature over ocean and the temperature of the uppermost soil layer
+over land, weighted by the land fraction. Where neither is available (not defined or NaN)
+this falls back to `T_air`, the air temperature of the lowermost layer."""
+@propagate_inbounds function surface_skin_temperature(ij, vars, land_sea_mask, time_stepping, component, T_air)
+    has_ocean = haskey(vars.prognostic, :ocean) && haskey(vars.prognostic.ocean, :sea_surface_temperature)
+    has_land = haskey(vars.prognostic, :land) && haskey(vars.prognostic.land, :soil_temperature)
+
+    SST = has_ocean ? get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepping, component)[ij] : T_air
+    T_land = has_land ? vars.prognostic.land.soil_temperature[ij, 1] : T_air    # uppermost land layer with index 1
+
+    # NaN where not defined (e.g. SST over land), use the other surface type then, or the air temperature
+    SST_valid, T_land_valid = isfinite(SST), isfinite(T_land)
+    SST = SST_valid ? SST : (T_land_valid ? T_land : T_air)
+    T_land = T_land_valid ? T_land : SST
+
+    land_fraction = land_sea_mask.land_fraction[ij]
+    return (1 - land_fraction) * SST + land_fraction * T_land
 end
 
 @propagate_inbounds function parameterization!(ij, vars, nw::NeutralWindSpeed{NF}, model) where {NF}
