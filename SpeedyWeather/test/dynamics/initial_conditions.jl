@@ -157,6 +157,46 @@ end
     @test temp_custom != temp  # Different parameters should give different results
 end
 
+@testset "BalancedZonalState" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    @test model.initial_conditions.zonal isa BalancedZonalState    # default for PrimitiveWet
+
+    ic = BalancedZonalState(spectral_grid)
+    vars = Variables(model)
+    initialize!(vars, ic, model)
+    S = model.spectral_transform
+    temp = transform(SpeedyWeather.get_step(vars.prognostic.temperature, 1), S)
+    vor = transform(SpeedyWeather.get_step(vars.prognostic.vorticity, 1), S)
+    @test !any(isnan.(temp))
+    @test !any(isnan.(vor))
+
+    (; R_dry) = model.atmosphere
+    (; gravity, radius) = model.planet
+    σ = model.geometry.σ_levels_full
+    φ = model.geometry.latds
+
+    # area-weighted global mean via zonal means and the quadrature weights of the rings
+    weights = RingGrids.get_quadrature_weights(spectral_grid.grid)
+    temp_zonal_mean = zonal_mean(temp)
+
+    for k in 1:spectral_grid.nlayers
+        # global mean temperature is the prescribed profile T̄(σ)
+        T̄ = max(ic.T₀ * σ[k]^(R_dry * ic.lapse_rate / gravity), ic.Tmin)
+        @test sum(temp_zonal_mean[:, k] .* weights) / sum(weights) ≈ T̄ rtol = 1.0e-3
+
+        # vorticity of u = U(σ)sin²(2φ) in the southern hemisphere away from the perturbation
+        U = ic.u₀ * tanh(-log(σ[k]) / ic.H)
+        ij = findfirst(φ .< -30)
+        ζ = -4U / radius * sind(φ[ij]) * cosd(φ[ij]) * (2 - 5sind(φ[ij])^2)
+        @test vor[ij, k] ≈ ζ rtol = 0.02
+    end
+
+    # warmer tropics than poles near the surface
+    tropics, poles = abs.(φ) .< 10, abs.(φ) .> 80
+    @test sum(temp[tropics, end]) / count(tropics) > sum(temp[poles, end]) / count(poles) + 30
+end
+
 @testset "PressureOnOrography" begin
     spectral_grid = SpectralGrid(nlayers = 8)
 
@@ -234,6 +274,47 @@ end
 
     @test !any(isnan.(humid_custom))
     @test humid_custom != humid  # Different relative humidity should give different results
+end
+
+@testset "ConstantRelativeHumidity vertical profile" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    humid_ic = ConstantRelativeHumidity(spectral_grid; relhumid_ref = 0.7, σ_moist = 0.3, σ_dry = 0.1)
+    ic = (; zonal = BalancedZonalState(spectral_grid), pres = ConstantPressure(spectral_grid), humid = humid_ic)
+    vars = Variables(model)
+    initialize!(vars, ic, model)
+
+    S = model.spectral_transform
+    temp = transform(SpeedyWeather.get_step(vars.prognostic.temperature, 1), S)
+    humid = transform(SpeedyWeather.get_step(vars.prognostic.humidity, 1), S)
+    pₛ = model.atmosphere.reference_pressure
+    σ = model.geometry.σ_levels_full
+
+    for k in 1:spectral_grid.nlayers
+        RH = [humid[ij, k] / SpeedyWeather.saturation_humidity(temp[ij, k], σ[k] * pₛ, model.atmosphere) for ij in eachindex(temp[:, k])]
+        RH_mean = sum(RH) / length(RH)
+        if σ[k] >= 0.3
+            @test RH_mean ≈ 0.7 rtol = 0.02
+        elseif σ[k] <= 0.1
+            @test maximum(abs, humid[:, k]) < 1.0e-6
+        else    # linearly decreasing
+            @test RH_mean ≈ 0.7 * (σ[k] - 0.1) / (0.3 - 0.1) rtol = 0.05
+        end
+    end
+end
+
+@testset "No initial precipitation burst" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    model.feedback.verbose = false
+    simulation = initialize!(model)
+    run!(simulation, period = Day(1))
+
+    P = simulation.variables.parameterizations
+    rain = P.rain_convection .+ P.rain_large_scale .+ P.snow_large_scale     # accumulated [m]
+    weights = RingGrids.get_quadrature_weights(spectral_grid.grid)
+    global_mean_rain = sum(zonal_mean(rain) .* weights) / sum(weights) * 1000  # [mm] in 1 day
+    @test global_mean_rain < 3
 end
 
 @testset "RandomWaves" begin
