@@ -81,6 +81,14 @@ Base revision: `35d764b6` (`main`)
   top-layer T mean/min/max 217/190/232 K vs 220/194/231 K on `main`.
 - **2026-09-19.** Version of `SpeedyWeather` bumped to `0.23.0-DEV` (new public types,
   changed default).
+- **2026-09-29.** Review by milankl ("I left a review for you in PR1262, can you address those
+  points and respond?"). Merged main with #1252: `TwoBandShortwave` is now the default
+  `shortwave` of `Radiation`, and `Radiation` forwards the global `parameterization!` so the
+  ozone update still runs. `DiagnosticClouds` precomputes the free troposphere layers in
+  `initialize!` (stored in `Ref`s) from the surface pressure-independent `sigma(k, coordinates)`,
+  so it works for hybrid coordinates too. The unused `ocean`/`land` copies of
+  `surface_shortwave_down` were removed, `SeasonalOzone` pressure bounds are `@param`s, and the
+  `min` safeguard on the ozone absorption was dropped (not in speedy.f90, ≤ 6% of the TOA flux).
 
 ## Problem description
 

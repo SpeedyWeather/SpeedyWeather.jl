@@ -86,7 +86,7 @@ DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF, Base.Ref
 
 # the free troposphere layers only depend on the vertical coordinates, precompute them
 function initialize!(clouds::DiagnosticClouds, model::AbstractModel)
-    vertical_coordinates = on_architecture(CPU(), model.geometry.vertical_coordinates)
+    vertical_coordinates = Adapt.adapt(Array, model.geometry.vertical_coordinates)  # on CPU
     clouds.layer_top[], clouds.cloud_base[] = free_troposphere_layers(clouds, vertical_coordinates)
     return nothing
 end
@@ -228,4 +228,3 @@ function free_troposphere_layers(clouds::DiagnosticClouds, vertical_coordinates:
     layer_top = min(layer_top, cloud_base)
     return layer_top, cloud_base
 end
-
