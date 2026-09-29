@@ -76,7 +76,7 @@ end
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, vars, diffusion, model.time_stepping, model.atmosphere, model.planet, model.orography, model.geopotential)
+    vertical_diffusion!(ij, vars, diffusion, model.time_stepping, model.atmosphere, model.planet, model.orography, model.land_sea_mask, model.geopotential)
 
 @propagate_inbounds function vertical_diffusion!(
         ij,
@@ -86,6 +86,7 @@ end
         atmosphere,
         planet,
         orography,
+        land_sea_mask,
         geopot,
     )
 
@@ -94,7 +95,7 @@ end
     # escape immediately if all diffusions disabled
     any((diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
 
-    K, kₕ = get_diffusion_coefficients!(ij, vars, diffusion, time_stepping, atmosphere, planet, orography, geopot)
+    K, kₕ = get_diffusion_coefficients!(ij, vars, diffusion, time_stepping, atmosphere, planet, orography, land_sea_mask, geopot)
 
     u_tend = get_tendency_step(vars.tendencies.grid.u, time_stepping, diffusion)
     v_tend = get_tendency_step(vars.tendencies.grid.v, time_stepping, diffusion)
@@ -137,6 +138,7 @@ end
         atmosphere::AbstractAtmosphere,
         planet::AbstractPlanet,
         orog,
+        land_sea_mask,
         geopot::AbstractGeopotential,
     )
     nlayers = length(diffusion.∇²_above)
@@ -165,7 +167,7 @@ end
 
     # Boundary layer depth is highest layer for which Ri < Ri_c (the "critical" threshold)
     # as well as all layers below
-    Ri = bulk_richardson!(ij, vars, diffusion, time_stepping, atmosphere)
+    Ri = bulk_richardson!(ij, vars, diffusion, time_stepping, atmosphere, planet, orog, land_sea_mask)
     kₕ::Int = nlayers
     while kₕ > 0 && Ri[ij, kₕ] < Ri_c
         kₕ -= 1
@@ -265,6 +267,9 @@ For vertical stability in the boundary layer."""
         diffusion::BulkRichardsonDiffusion,
         time_stepping::AbstractTimeStepper,
         atmosphere::AbstractAtmosphere,
+        planet::AbstractPlanet,
+        orog,
+        land_sea_mask,
     )
     # reuse work array
     Ri = vars.scratch.grid.a
@@ -285,11 +290,14 @@ For vertical stability in the boundary layer."""
         get_prognostic_step(vars.grid.humidity, time_stepping, diffusion) :
         vars.scratch.grid.b
 
-    # surface layer
+    # surface layer, between the surface (skin temperature, orography) and the lowermost layer
     V² = u[ij, surface]^2 + v[ij, surface]^2
-    Θ₀ = cₚ * virtual_temperature(T[ij, surface], q[ij, surface], atmosphere)
-    Θ₁ = Θ₀ + Φ[ij, surface]
-    Ri[ij, surface] = Φ[ij, surface] * (Θ₁ - Θ₀) / (Θ₀ * V²)
+    Tₛ = surface_skin_temperature(ij, vars, land_sea_mask, time_stepping, diffusion, T[ij, surface])
+    Tᵥₛ = virtual_temperature(Tₛ, q[ij, surface], atmosphere)
+    Φₛ = planet.gravity * orog.orography[ij]                                    # surface geopotential
+    Θ₀ = cₚ * Tᵥₛ + Φₛ                                                        # virtual dry static energy at surface
+    Θ₁ = cₚ * virtual_temperature(T[ij, surface], q[ij, surface], atmosphere) + Φ[ij, surface]  # and at lowermost layer
+    Ri[ij, surface] = (Φ[ij, surface] - Φₛ) * (Θ₁ - Θ₀) / (cₚ * Tᵥₛ * V²)
 
     for k in 1:(nlayers - 1)
         V² = u[ij, k]^2 + v[ij, k]^2
