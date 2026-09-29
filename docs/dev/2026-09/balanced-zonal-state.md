@@ -236,7 +236,7 @@ dry soil.
 - No initial burst: the default PrimitiveWet at T31L8 rains less than 3 mm in the first day,
   area-weighted global mean. JW gives about 10 mm.
 
-Also passing locally: `dynamics/{dispatch,time_stepping,set,simulation_constructor,copy_variables}.jl`,
+Also passing locally: `output/netcdf_output.jl`, `dynamics/{dispatch,time_stepping,set,simulation_constructor,copy_variables}.jl`,
 `output/boundary_layer_output.jl`, `parameterizations/{all_parametrizations,boundary_layer}.jl`.
 
 Initial state at T31L8, tropics 0–10°, compared with the equilibrium (days 60–120) with #1283:
