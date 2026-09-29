@@ -74,8 +74,9 @@ end
 
 # Compute north and south pole ring averages per vertical layer on device.
 @kernel inbounds = true function _compute_pole_averages_kernel!(
-        north_pole_average, south_pole_average, A_data, ring_starts, nlons, nlat
+        north_pole_average, south_pole_average, A_data, geometry
     )
+    (; ring_starts, nlons, nlat) = geometry
     k = @index(Global, Linear)
     n_north = nlons[1]
     rs_north = ring_starts[1]
@@ -93,13 +94,20 @@ end
     south_pole_average[k] = south_sum / n_south
 end
 
+# anvil interpolation of layer k of A_data onto point i, pole values from the locator
+Base.@propagate_inbounds function anvil_average(A_data, k, i, locator)
+    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, north_pole_average, south_pole_average) = locator
+    a, b = ij_as[i] == 0 ? (north_pole_average[k], north_pole_average[k]) : (A_data[ij_as[i], k], A_data[ij_bs[i], k])
+    c, d = ij_cs[i] == -1 ? (south_pole_average[k], south_pole_average[k]) : (A_data[ij_cs[i], k], A_data[ij_ds[i], k])
+    return anvil_average(a, b, c, d, Δabs[i], Δcds[i], Δys[i])
+end
+
 # Vertically-blended anvil interpolation kernel, generic over the vertical staggering
 # (full level / face above / face below): staggering determines the data-column shift
 # and the boundary value substituted when a bracket index falls outside stored data.
 @kernel inbounds = true function _interpolate_3D_kernel!(
         Aout, A_data, locator, positions, staggering,
     )
-    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, north_pole_average, south_pole_average) = locator
     i = @index(Global, Linear)
     k_lo, k_hi, α = find_vertical_bracket(positions[i].σ, staggering.sigma)
 
@@ -108,27 +116,8 @@ end
     k_data_hi = k_hi + s
     nlayers = size(A_data, 2)
 
-    val_lo = if k_data_lo < 1 || k_data_lo > nlayers
-        boundary(staggering)
-    else
-        a = ij_as[i] == 0 ? north_pole_average[k_data_lo] : A_data[ij_as[i], k_data_lo]
-        b = ij_as[i] == 0 ? north_pole_average[k_data_lo] : A_data[ij_bs[i], k_data_lo]
-        c = ij_cs[i] == -1 ? south_pole_average[k_data_lo] : A_data[ij_cs[i], k_data_lo]
-        d = ij_cs[i] == -1 ? south_pole_average[k_data_lo] : A_data[ij_ds[i], k_data_lo]
-        ab = a + (b - a) * Δabs[i]
-        ab + (c + (d - c) * Δcds[i] - ab) * Δys[i]
-    end
-
-    val_hi = if k_data_hi < 1 || k_data_hi > nlayers
-        boundary(staggering)
-    else
-        a = ij_as[i] == 0 ? north_pole_average[k_data_hi] : A_data[ij_as[i], k_data_hi]
-        b = ij_as[i] == 0 ? north_pole_average[k_data_hi] : A_data[ij_bs[i], k_data_hi]
-        c = ij_cs[i] == -1 ? south_pole_average[k_data_hi] : A_data[ij_cs[i], k_data_hi]
-        d = ij_cs[i] == -1 ? south_pole_average[k_data_hi] : A_data[ij_ds[i], k_data_hi]
-        ab = a + (b - a) * Δabs[i]
-        ab + (c + (d - c) * Δcds[i] - ab) * Δys[i]
-    end
+    val_lo = 1 <= k_data_lo <= nlayers ? anvil_average(A_data, k_data_lo, i, locator) : boundary(staggering)
+    val_hi = 1 <= k_data_hi <= nlayers ? anvil_average(A_data, k_data_hi, i, locator) : boundary(staggering)
 
     Aout[i] = val_lo + (val_hi - val_lo) * α
 end
@@ -168,10 +157,9 @@ function interpolate_3D!(Aout, A, locator, geometry, positions, staggering::Abst
     )
 
     arch = architecture(Aout)
-    (; ring_starts, nlons, nlat) = geometry
     launch!(
         arch, LinearWorkOrder, (nlayers,), _compute_pole_averages_kernel!,
-        north_pole_average, south_pole_average, A_data, ring_starts, nlons, nlat
+        north_pole_average, south_pole_average, A_data, geometry
     )
     launch!(
         arch, LinearWorkOrder, (npoints_output,),
