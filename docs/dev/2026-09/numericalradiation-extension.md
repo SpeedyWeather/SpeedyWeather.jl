@@ -1,8 +1,8 @@
 # A NumericalRadiation extension of SpeedyWeather
 
-> Status: **in progress**. Reviewed 2026-09-22 (decisions in the revision log); implemented on
-> `mg/numericalradiation-extension`, uncommitted, local tests pending. Companion plan on the
-> NumericalRadiation side: `docs/plans/extension_upstream.md` there.
+> Status: **implemented** on `mg/numericalradiation-extension` (decisions in the revision log);
+> the extension tests are part of the normal test suite. This document stands on its own: the
+> NumericalRadiation side is summarised below and linked by PR, not by its plan files.
 
 Date of initial draft: 2026-09-22
 
@@ -20,10 +20,16 @@ bundle of `radiation-bundle.md`). Working branch: `mg/numericalradiation-extensi
 
 ## Revision log
 
+- **2026-09-29, tests in the normal suite.** The extension test is
+  `test/parameterizations/numericalradiation.jl`, run by `Pkg.test` on Julia 1.10 and 1.13
+  like every other test: NumericalRadiation is a test dependency (`test/Project.toml`, git
+  source until it is registered; the 1.10 CI step adds it with `Pkg.add`). The dedicated
+  environment and workflow are gone. This plan no longer refers to NumericalRadiation's plan
+  documents.
 - **2026-09-24, NumericalRadiation side collapsed.** The three-PR stack there became one PR
   (NumericalEarth/NumericalRadiation.jl#16, branch `mg/speedy-update`, merged with its `main`);
-  `test/numericalradiation/Project.toml` pulls that branch now (`main` once the PR is merged,
-  the registered package once it exists).
+  the test environment pulls that branch (`main` once the PR is merged, the registered package
+  once it exists).
 - **2026-09-22, naming.** NumericalRadiation's scheme type is `ClearSkyEcCKDRadiation`
   (the solver pair is part of its definition); SpeedyWeather-side mentions renamed.
 - **2026-09-22, third review.** Same for `EcCKDRadiation`: the configured clear-sky ecCKD scheme
@@ -53,7 +59,7 @@ bundle of `radiation-bundle.md`). Working branch: `mg/numericalradiation-extensi
   environment and the ecCKD tables); (4) on the NumericalRadiation side the removal is squashed
   into the bottom PR of its stack (#16) and propagated upward; (5) NumericalRadiation will be
   registered within days by its maintainers, after which the dedicated test environment and
-  workflow collapse into `test/Project.toml` (TODO noted in `test/numericalradiation/Project.toml`).
+  workflow collapse into `test/Project.toml` (done 2026-09-29, see above).
 - **2026-09-22, initial draft.**
 
 ## Problem description
@@ -89,11 +95,13 @@ shortwave solver, a two-stream robustness fix), which any host benefits from.
   `GPU/`, `differentiability/` and `reactant/` prefixes, which have their own environments
   and workflows (`CI_Enzyme.yml` develops the monorepo packages into
   `test/differentiability/` and runs a script there).
-- **NumericalRadiation is not registered.** It can be a weak dependency (only a UUID is
+- **NumericalRadiation is not registered yet.** It can be a weak dependency (only a UUID is
   needed) but any environment that installs it needs a `[sources]` git entry, which requires
   Julia ≥ 1.11, or `Pkg.add(url = ...)`. `CI_SpeedyWeather.yml` runs Julia 1.10 and 1.13 and
-  already has a 1.10-only step working around missing `[sources]` support. Listing an
-  unregistered package in `test/Project.toml` would break `Pkg.test` on 1.10.
+  has a 1.10-only step that `Pkg.develop`s the monorepo packages because `[sources]` is
+  ignored there; the same step adds NumericalRadiation from git (checked: `Pkg.add` of a weak
+  dependency from a git URL works on 1.10, moves it to `[deps]` of that throwaway checkout,
+  and the extension still loads). Registration removes both workarounds.
 - **NCDatasets** is a hard dependency of SpeedyWeather, so NumericalRadiation's NetCDF reader
   extension (needed to load the ecCKD tables) is active whenever both packages are loaded;
   no extra dependency is needed for `ClearSkyEcCKDRadiation(spectral_grid, "32x32")`.
@@ -166,65 +174,79 @@ work both as `model.radiation` and inside a `Radiation` bundle. Earlier drafts h
 The code is moved, not rewritten; the diff against `mg/ecckd-speedy` should be renames,
 import lines and the split of the struct definitions into `src/`.
 
-### Tests: `test/numericalradiation/` (own environment)
+### Tests: `test/parameterizations/numericalradiation.jl`
 
-Because NumericalRadiation cannot be a plain test dependency (unregistered, see Background):
+Part of the normal suite (autodiscovered by `test/runtests.jl`, run by `Pkg.test` on Julia
+1.10 and 1.13). The file starts with `using NumericalRadiation`; NumericalRadiation is a test
+dependency in `test/Project.toml` with a `[sources]` git entry (`rev` = the NumericalRadiation
+branch of PR #16 until merged/registered), and the 1.10 step of `CI_SpeedyWeather.yml` adds
+it with `Pkg.add(url, rev)` before `Pkg.test`. The `ecrad_data` artifact (~30 MB) is fetched
+by NumericalRadiation on first use and cached by `julia-actions/cache`.
 
-- `test/numericalradiation/Project.toml`: `NumericalRadiation` (git source, URL of
-  NumericalEarth/NumericalRadiation.jl, `rev` = the branch carrying the package-side changes
-  until they are on `main`), `SpeedyWeather` and the monorepo siblings by path, `Statistics`,
-  `Test`. Needs Julia ≥ 1.11 for the git source.
-- `test/numericalradiation/runtests.jl` includes `basic.jl` (see below).
-- `test/runtests.jl`: add `numericalradiation/` to the prefix filter so `Pkg.test` does not
-  pick these files up.
-- `.github/workflows/CI_NumericalRadiation.yml`: modelled on `CI_Enzyme.yml`; Julia 1.11,
-  instantiate `test/numericalradiation`, run its `runtests.jl`; skip labels as the other
-  workflows. The `ecrad_data` artifact (~30 MB download) is fetched by NumericalRadiation
-  on first use and cached by `julia-actions/cache`.
+What it checks (basic functionality only): the extension is active; `AnalyticBandLongwave`
+constructs from a `SpectralGrid`, a longwave-only model runs one column update with finite
+tendencies and positive OLR, and without a CO₂ component gives the same OLR as with one at
+280 ppm; `ClearSkyEcCKDRadiation` constructs from the reference tables in the grid's number
+format, its `:ecckd` work arrays have the expected sizes, one column update gives finite
+tendencies, positive OLR and outgoing shortwave below the surface flux; a default wet model
+with `ClearSkyEcCKDRadiation` runs two time steps. The full tests of the coupling (budget and
+energy-conservation checks, a cross-check of one column against NumericalRadiation's staged
+API, CO₂ forcing, night, 4× CO₂) live in NumericalRadiation.
 
-Alternative (**decision for review**): register NumericalRadiation in General, after which it
-becomes an ordinary entry of `test/Project.toml` and `docs/Project.toml`, the test file moves
-to `test/parameterizations/`, and the dedicated workflow and environment go away. The
-dedicated environment is the right shape until then and is a small change to undo.
+Once NumericalRadiation is registered, the `[sources]` entry and the `Pkg.add` line go and it
+becomes an ordinary test dependency; the docs environment can then also execute the example.
 
 ### Scripts and the full tests
 
-Decided at review: the example, the three validation scripts and the full unit tests of the
-coupling stay in NumericalRadiation (`examples/`, `validation/`, `test/speedyweather/`, whose
-environment pulls this branch of SpeedyWeather). SpeedyWeather tests basic functionality only
-(`test/numericalradiation/basic.jl`: both schemes construct, models build, one column update
-and two time steps give finite output, the `:ecckd` work arrays exist) and, in the main suite,
-that the constructors throw the explanatory error without NumericalRadiation.
+Decided at review: the example, the validation scripts and the full unit tests of the
+coupling stay in NumericalRadiation (its `examples/speedyweather_ecckd.jl`, `validation/`
+and `test/speedyweather/`, whose environment pulls this branch of SpeedyWeather).
+SpeedyWeather tests basic functionality only, see above.
 
 ### Documentation
 
-- `docs/src/radiation.md`: a section "ecCKD and analytic-band radiation from
-  NumericalRadiation.jl": what the schemes are, how to construct them, the `:ecckd` work
+- `docs/src/radiation.md`: a section "Radiation schemes from NumericalRadiation.jl":
+  what the schemes are, how to construct them, the `:ecckd` work
   arrays, the clear-sky caveat and the ozone default. As a non-executed code block: the docs
   environment would otherwise need NumericalRadiation (git source; docs build on Julia 1.12,
   so possible) and the ecCKD tables, and an executed example adds minutes to the build.
   Decided: plain code block for now.
-- Docstrings of the two `src/` types are picked up by the API page through `@autodocs`.
+- No docstrings on this side: both scheme types are documented in NumericalRadiation, so the
+  section names them in code font and links NumericalRadiation's documentation instead of
+  `@ref`.
 - CHANGELOG entry under `## Unreleased`.
 
-### On the NumericalRadiation side (its own plan, `docs/plans/extension_upstream.md`)
+### The NumericalRadiation side
 
-Delete the extension, its test and environment, the example and the validation scripts;
-drop the SpeedyWeather weak dependency, extension entry, compat and CI job; rewrite the
-README section to point here. Everything in `src/` stays.
+NumericalEarth/NumericalRadiation.jl#16 (branch `mg/speedy-update`; a former stack of three
+PRs, collapsed on 2026-09-24) carries everything this extension needs and nothing
+SpeedyWeather-specific:
+
+- `ClearSkyEcCKDRadiation` and `default_ozone_profile` (new `src/ecckd_radiation.jl`): the
+  configured clear-sky scheme this extension dispatches on.
+- `AtmosphereProfile` and `ColumnAtmosphere` with one array-type parameter per array, so the
+  extension can pass views of different `SubArray` types (stepped prognostic arrays, 2D work
+  arrays, interface arrays) without copies.
+- An optional caller-owned `ShortwaveColumnScratch` argument of the clear-sky shortwave
+  solver, so the per-column call in the fused kernel does not allocate.
+- Its former extension `NumericalRadiationSpeedyWeatherExt` deleted, no `SpeedyWeather` weak
+  dependency; the full coupling tests, the example and the validation scripts kept there,
+  testing this branch of SpeedyWeather.
+
+Its `main` gained an independent fix of the shortwave two-stream pole (`λμ₀ = 1`, 54b6a75
+there) that this coupling had also guarded; `main`'s version stands.
 
 ## Testing and verification
 
-1. `test/numericalradiation/runtests.jl` locally against the NumericalRadiation branch, one
-   Julia process (the suite takes ~2 min after precompilation; 53 tests on the source
-   branch).
-2. `Pkg.test("SpeedyWeather")` unaffected: no new test dependency, the new files are filtered
-   out of autodiscovery, and the `src/` types add only two struct definitions and two error
-   methods (checked by the existing radiation tests, which construct `Radiation` and the
-   primitive models).
-3. Without NumericalRadiation loaded neither scheme type exists; SpeedyWeather's own test
-   suite is unchanged by the extension.
-4. The dedicated workflow on the PR.
+1. `Pkg.test("SpeedyWeather")` includes `parameterizations/numericalradiation` (21 tests,
+   ~1.5 min after precompilation); locally also
+   `julia --project=SpeedyWeather/test SpeedyWeather/test/runtests.jl parameterizations/numericalradiation`.
+2. The rest of the suite is unchanged by the extension: `src/` is untouched apart from
+   `Project.toml`, and without NumericalRadiation loaded neither scheme type exists.
+3. NumericalRadiation's own coupling tests (54 tests: budgets, energy conservation, a
+   column cross-checked against its staged API, CO₂ forcing, night) run there against this
+   branch, in its `test/speedyweather/` environment.
+4. CI: `CI_SpeedyWeather.yml` on Julia 1.10 (git dependency added by the 1.10 step) and 1.13.
 
 ## Documentation changes
 
@@ -233,18 +255,22 @@ As listed above: `docs/src/radiation.md` section, docstrings, CHANGELOG, this pl
 ## Known limitations
 
 - Until NumericalRadiation is registered, users install it with
-  `Pkg.add(url = "https://github.com/NumericalEarth/NumericalRadiation.jl")` and the tests run
-  only on Julia ≥ 1.11 in their own workflow.
-- The ecCKD scheme is clear-sky and takes ozone from an analytic default profile; both are
-  tracked on the NumericalRadiation side (their plan, items U2 and clouds) and unchanged by the
-  move.
+  `Pkg.add(url = "https://github.com/NumericalEarth/NumericalRadiation.jl")`, the test
+  environment pulls it from git, and the docs example is not executed.
+- The ecCKD scheme is clear-sky; ozone comes from an analytic default profile
+  (`default_ozone_profile` in NumericalRadiation, a Chapman-layer shape peaking at 8 ppmv near
+  30 hPa) because SpeedyWeather has no ozone field; CO₂ is the only gas taken from the model.
 - GPU: untested (Metal fails earlier in SpeedyWeather; needs a CUDA machine).
 
 ## Future work
 
-- Register NumericalRadiation and collapse the dedicated test environment.
-- Prescribed ozone (a SpeedyWeather component or a tracer) and a radiation call frequency;
-  both were planned as upstream items U2 and U3 in NumericalRadiation's plan and belong here
-  now.
+- Register NumericalRadiation, then drop the git source in `test/Project.toml` and the
+  `Pkg.add` line of the 1.10 CI step, and execute the docs example.
+- Prescribed ozone, as a SpeedyWeather component modelled on `greenhouse_gases` (a zonal-mean,
+  pressure-dependent climatology filled at `initialize!`) or as a prescribed tracer; the
+  scheme then reads a per-column ozone profile instead of `mole_fractions.o3`.
+- A radiation call frequency: parameterizations that run every `N` steps and hold their
+  tendency in between; a 32×32 g-point column per step dominates cost at climate resolution.
 - Clouds for the ecCKD scheme (a cloudy counterpart of `ClearSkyEcCKDRadiation` in
-  NumericalRadiation) once SpeedyWeather has a cloud state to feed them.
+  NumericalRadiation, which already has cloud-overlap solvers) once SpeedyWeather has a cloud
+  state to feed them.

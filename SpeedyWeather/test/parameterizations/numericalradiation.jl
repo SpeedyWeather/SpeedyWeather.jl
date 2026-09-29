@@ -1,5 +1,7 @@
-# Both schemes construct, models build with them, one column update and a few time steps
-# give finite, physically signed output.
+# NumericalRadiation's schemes through the extension SpeedyWeatherNumericalRadiationExt:
+# both construct, models build with them, one column update and a few time steps give
+# finite, physically signed output. The full tests of the coupling live in NumericalRadiation.
+using NumericalRadiation
 
 spectral_grid = SpectralGrid(truncation = 16, nlayers = 8)
 NF = spectral_grid.NF
