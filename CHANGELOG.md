@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `BalancedZonalState` initial conditions and height-dependent `ConstantRelativeHumidity` as new PrimitiveWet default, near equilibrium and without initial precipitation burst [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - Primitive equation models transform U, V and the surface pressure gradient ∇ln(pₛ) to grid space in one batched transform, 2 instead of 3 spectral→grid transforms per time step [#1313](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1313)
 - Update Zarr requirement from 0.9, 0.10 to 0.9, 0.10, 0.11 [#1309](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1309)
 - Update GPUArrays requirement from 11 to 11, 12.1 [#1308](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1308)
