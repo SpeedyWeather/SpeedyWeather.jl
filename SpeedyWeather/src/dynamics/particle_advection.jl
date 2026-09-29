@@ -215,8 +215,9 @@ function initialize!(
     w_3d = vars.dynamics.w                      # vertical velocity is diagnostic in hydrostatic models
 
     # interpolate initial velocity on initial locations
-    σ_levels_full = model.geometry.σ_levels_full
-    σ_levels_half = model.geometry.σ_levels_half
+    # u, v on full levels; w on half levels storing the lower face (k+½), zero at σ=0 (kinematic BC)
+    uv_levels = SigmaCenter(model.geometry.σ_levels_full)
+    w_levels = SigmaFaceBelow(model.geometry.σ_levels_half)
     (; locator) = vars.particles
     (; geometry) = particle_advection
     lons = vars.particles.u                     # reuse u,v arrays as only used for u, v
@@ -232,11 +233,9 @@ function initialize!(
     v0 = vars.particles.v
     w0 = vars.particles.w
 
-    # u, v sit on full (center) levels; w sits on half levels, storing the lower face
-    # (k+½) with an implicit zero at the top boundary (σ=0, kinematic condition)
-    interpolate_3D!(u0, u_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
-    interpolate_3D!(v0, v_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
-    interpolate_3D!(w0, w_3d, locator, geometry, particles, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
+    interpolate_3D!(u0, u_3d, locator, geometry, particles, uv_levels)
+    interpolate_3D!(v0, v_3d, locator, geometry, particles, uv_levels)
+    interpolate_3D!(w0, w_3d, locator, geometry, particles, w_levels)
     unscale_vertical_velocity!(w0, radius)
     return nothing
 end
@@ -386,17 +385,17 @@ function particle_advection!(
     u_3d = field_view(vars.grid.u, :, :, l)
     v_3d = field_view(vars.grid.v, :, :, l)
     w_3d = vars.dynamics.w
-    σ_levels_full = model.geometry.σ_levels_full
-    σ_levels_half = model.geometry.σ_levels_half
+    # u, v on full levels; w on half levels storing the lower face (k+½), zero at σ=0 (kinematic BC)
+    uv_levels = SigmaCenter(model.geometry.σ_levels_full)
+    w_levels = SigmaFaceBelow(model.geometry.σ_levels_half)
 
     RingGrids.update_locator!(locator, geometry, lons, lats)
     u_new = vars.particles.u
     v_new = vars.particles.v
     w_new = vars.particles.w
-    # u, v on full (center) levels; w on half levels (lower face, implicit zero at σ=0)
-    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, SigmaCenter(σ_levels_full))
-    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, SigmaCenter(σ_levels_full))
-    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
+    interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, uv_levels)
+    interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, uv_levels)
+    interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, w_levels)
     unscale_vertical_velocity!(w_new, radius)
 
     launch!(
@@ -406,11 +405,10 @@ function particle_advection!(
     )
 
     # store new velocities at corrected position for next advection step
-    # (u, v center levels; w half levels)
     RingGrids.update_locator!(locator, geometry, lons, lats)
-    interpolate_3D!(u_new, u_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
-    interpolate_3D!(v_new, v_3d, locator, geometry, particles, SigmaCenter(σ_levels_full))
-    interpolate_3D!(w_new, w_3d, locator, geometry, particles, SigmaFaceBelow(σ_levels_half, zero(eltype(σ_levels_half))))
+    interpolate_3D!(u_new, u_3d, locator, geometry, particles, uv_levels)
+    interpolate_3D!(v_new, v_3d, locator, geometry, particles, uv_levels)
+    interpolate_3D!(w_new, w_3d, locator, geometry, particles, w_levels)
     unscale_vertical_velocity!(w_new, radius)
     return nothing
 end

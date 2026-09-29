@@ -16,8 +16,8 @@ Adapt.@adapt_structure SigmaCenter
 
 """Fields located on half vertical levels (upper cell face, k-½). Layer `k` in the data
 stores the value at the face above full-level `k` (σ at k-½); the bottom face (σ=1,
-k=nlayers+½) is not stored and is replaced by `bottom_boundary_condition`.
-$(TYPEDFIELDS)"""
+k=nlayers+½) is not stored and is replaced by `bottom_boundary_condition`, zero by
+default as in `SigmaFaceAbove(σ)`. $(TYPEDFIELDS)"""
 struct SigmaFaceAbove{V, T} <: AbstractVerticalStaggering
     "σ_levels_half: one σ value per face, length nlayers+1"
     sigma::V
@@ -25,12 +25,14 @@ struct SigmaFaceAbove{V, T} <: AbstractVerticalStaggering
     bottom_boundary_condition::T
 end
 
+SigmaFaceAbove(σ::AbstractVector) = SigmaFaceAbove(σ, zero(eltype(σ)))
 Adapt.@adapt_structure SigmaFaceAbove
 
 """Fields located on half vertical levels (lower cell face, k+½), e.g. vertical velocity
 w. Layer `k` in the data stores the value at the face below full-level `k` (σ at k+½);
-the top face (σ=0, k=½) is not stored and is replaced by `top_boundary_condition`
-(typically zero, from the kinematic boundary condition w(σ=0) = 0). $(TYPEDFIELDS)"""
+the top face (σ=0, k=½) is not stored and is replaced by `top_boundary_condition`,
+zero by default as in `SigmaFaceBelow(σ)` (kinematic boundary condition w(σ=0) = 0).
+$(TYPEDFIELDS)"""
 struct SigmaFaceBelow{V, T} <: AbstractVerticalStaggering
     "σ_levels_half: one σ value per face, length nlayers+1"
     sigma::V
@@ -38,6 +40,7 @@ struct SigmaFaceBelow{V, T} <: AbstractVerticalStaggering
     top_boundary_condition::T
 end
 
+SigmaFaceBelow(σ::AbstractVector) = SigmaFaceBelow(σ, zero(eltype(σ)))
 Adapt.@adapt_structure SigmaFaceBelow
 
 # data column index = bracket index k + shift(staggering); out-of-[1, nlayers] means

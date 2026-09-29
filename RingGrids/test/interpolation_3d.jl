@@ -117,7 +117,7 @@ end
 
     # faces need nlayers + 1 σ levels, full levels aren't enough
     @test_throws DimensionMismatch RingGrids.interpolate_3D!(
-        Aout, A, locator, geometry, positions, SigmaFaceBelow(σ_levels_full, zero(NF))
+        Aout, A, locator, geometry, positions, SigmaFaceBelow(σ_levels_full)
     )
 end
 
@@ -172,4 +172,8 @@ end
     end
     RingGrids.interpolate_3D!(Aout, A, locator, geometry, positions, SigmaFaceAbove(σ_half, one(NF)))
     @test Aout ≈ expected.(σs)
+
+    # one-argument constructors default to a zero boundary value of the σ levels' number type
+    @test SigmaFaceBelow(σ_half).top_boundary_condition === zero(NF)
+    @test SigmaFaceAbove(σ_half).bottom_boundary_condition === zero(NF)
 end
