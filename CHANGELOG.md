@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
 - [BREAKING] Bundle shortwave and longwave radiation into one model component `model.radiation = Radiation(shortwave, longwave)`, replacing the `shortwave_radiation` and `longwave_radiation` fields [#1252](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1252)
 - ImplicitCondensation: keep the melting cooling, fix its units and the Clausius-Clapeyron derivative in the implicit correction [#1277](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1277)
 - `Parameterization` function stub for packages to define SpeedyWeather parameterizations in extensions [#1261](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1261)
