@@ -83,3 +83,41 @@ end
     @test boundary_layer_top(10) <= nlayers
     @test boundary_layer_top(-10) == nlayers + 1
 end
+
+@testset "Vertical diffusion conserves and mixes" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    model.feedback.verbose = false
+    simulation = initialize!(model)
+    run!(simulation, period = Day(1))
+
+    vars = simulation.variables
+    diffusion = model.vertical_diffusion
+    nlayers = spectral_grid.nlayers
+    Δσ = diff(Array(model.geometry.σ_levels_half))
+    u = SpeedyWeather.get_prognostic_step(vars.grid.u, model.time_stepping, diffusion)
+    u_tend = SpeedyWeather.get_tendency_step(vars.tendencies.grid.u, model.time_stepping, diffusion)
+
+    # a column with a boundary layer at least 2 layers deep and vertical wind shear in it
+    ij = findfirst(eachindex(vars.parameterizations.boundary_layer_height)) do ij
+        u_tend.data[ij, :] .= 0
+        SpeedyWeather.parameterization!(ij, vars, diffusion, model)
+        vars.parameterizations.boundary_layer_height[ij] < nlayers && any(u_tend.data[ij, :] .!= 0)
+    end
+    @test ij !== nothing
+
+    u_tend.data[ij, :] .= 0
+    SpeedyWeather.parameterization!(ij, vars, diffusion, model)
+    tend = u_tend.data[ij, :]
+
+    # conserves the mass-weighted column integral
+    @test abs(sum(tend .* Δσ)) < 1.0e-5 * sum(abs.(tend) .* Δσ)
+
+    # and reduces the vertical variance in the boundary layer (mixing)
+    kₕ = Int(vars.parameterizations.boundary_layer_height[ij])
+    u_column = u.data[ij, kₕ:nlayers]
+    Δt = SpeedyWeather.implicit_vertical_diffusion_time_step(model.time_stepping)
+    u_new = u_column .+ Δt .* tend[kₕ:nlayers]
+    variance(x) = sum((x .- sum(x .* Δσ[kₕ:nlayers]) / sum(Δσ[kₕ:nlayers])) .^ 2 .* Δσ[kₕ:nlayers])
+    @test variance(u_new) < variance(u_column)
+end

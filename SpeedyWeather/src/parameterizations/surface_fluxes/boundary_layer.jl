@@ -135,7 +135,7 @@ $(TYPEDFIELDS)"""
     @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    @param critical_Richardson::NF = 10 (bounds = Positive,)
+    @param critical_Richardson::NF = 1 (bounds = Positive,)
 
     "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
     @param drag_min::NF = 1.0e-5 (bounds = Nonnegative,)
@@ -146,7 +146,7 @@ variables(::BulkRichardsonDrag) = (
 )
 
 Adapt.@adapt_structure BulkRichardsonDrag
-BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
+BulkRichardsonDrag(SG::SpectralGrid; kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
 initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
