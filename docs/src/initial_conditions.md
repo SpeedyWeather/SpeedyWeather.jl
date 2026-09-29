@@ -235,3 +235,67 @@ nothing # hide
 As you can see the actual Rossby-Haurwitz wave is not as stable any more
 (because those initial conditions are not a stable solution of the primitive equations)
 and so the 3-day integration looks already different from the barotropic model!
+
+## Default initial conditions for the PrimitiveWetModel
+
+The [`PrimitiveWetModel`](@ref) starts by default from a state close to its own equilibrium
+climate, so that the model does not first have to adjust towards it. This matters mostly for humidity:
+a warm and moist tropical lower troposphere that is conditionally unstable would be rained out
+by the convection scheme within the first day.
+
+```@example wet_initial_conditions
+using SpeedyWeather
+spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+InitialConditions(spectral_grid, PrimitiveWet)
+```
+
+`BalancedZonalState` sets vorticity, divergence and temperature. It generalises the
+Jablonowski-Williamson initial conditions [Jablonowski2006](@citep) to a different vertical
+profile of the zonal wind ``u``. With ``x = -\ln \sigma``,
+
+```math
+u(\phi, \sigma) = U(\sigma) \sin^2(2\phi), \qquad U(\sigma) = u_0 \tanh(x/H)
+```
+
+which is zero at the surface and increases about linearly with ``x`` in the troposphere.
+Thermal wind balance then determines the temperature
+
+```math
+T(\phi, \sigma) = \bar{T}(\sigma) + \frac{1}{R_d}\frac{dU}{dx}\left(2A(\phi)U + B(\phi)a\Omega\right)
+```
+
+with ``A(\phi) = -2\sin^6\phi(\cos^2\phi + \tfrac{1}{3}) + \tfrac{10}{63}``
+and ``B(\phi) = \tfrac{8}{5}\cos^3\phi(\sin^2\phi + \tfrac{2}{3}) - \tfrac{\pi}{4}``,
+radius ``a`` and rotation ``\Omega``. Jablonowski and Williamson's temperature is the special case
+``U = u_0\cos^{3/2}\eta_v``. ``A`` and ``B`` have a zero global mean, so
+``\bar{T}(\sigma) = \max(T_0 \sigma^{R_d\Gamma/g}, T_{min})`` is the global-mean temperature
+and can be chosen freely without breaking the balance. Its parameters
+``T_0, \Gamma, T_{min}, u_0, H`` are fitted to the equilibrium climate of the `PrimitiveWetModel`.
+As in Jablonowski-Williamson a small perturbation of the zonal wind triggers baroclinic instability.
+
+`ConstantRelativeHumidity` then sets the humidity to a relative humidity of `relhumid_ref`
+below `σ_moist`, decreasing linearly to zero at `σ_dry` for a dry stratosphere.
+Use `σ_moist = σ_dry = 0` for a vertically constant relative humidity instead.
+
+To change these, pass a new NamedTuple of initial conditions, e.g. a colder surface,
+a weaker jet, or the Jablonowski-Williamson initial conditions
+
+```@example wet_initial_conditions
+initial_conditions = (;
+    zonal = BalancedZonalState(spectral_grid, T₀ = 280, u₀ = 40),
+    pres = PressureOnOrography(spectral_grid),
+    humid = ConstantRelativeHumidity(spectral_grid, relhumid_ref = 0.6),
+)
+
+# or
+initial_conditions = (;
+    vordiv = ZonalWind(spectral_grid),
+    temp = JablonowskiTemperature(spectral_grid),
+    pres = PressureOnOrography(spectral_grid),
+    humid = ConstantRelativeHumidity(spectral_grid),
+)
+model = PrimitiveWetModel(spectral_grid; initial_conditions)
+nothing # hide
+```
+
+Humidity is computed from temperature and pressure, so it has to come last in the NamedTuple.
