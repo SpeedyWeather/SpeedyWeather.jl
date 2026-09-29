@@ -16,7 +16,7 @@ SpeedyWeather.initialize!(::AnalyticBandLongwave, ::SpeedyWeather.PrimitiveEquat
 
 # Every constant comes from the SpeedyWeather model, so the radiation runs
 # with the host's values; SpeedyWeather stores molar masses in g mol⁻¹.
-@inline function speedy_physical_constants(model)
+@inline function physical_constants(model)
     NF = typeof(model.planet.gravity)
     (; planet, atmosphere) = model
     return PhysicalConstants{NF}(
@@ -31,7 +31,7 @@ SpeedyWeather.initialize!(::AnalyticBandLongwave, ::SpeedyWeather.PrimitiveEquat
     )
 end
 
-@inline function speedy_column_geometry(model)
+@inline function column_geometry(model)
     geom = model.geometry
     return ColumnGrid(geom.σ_levels_full, geom.σ_levels_half, geom.σ_levels_thick)
 end
@@ -64,13 +64,13 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(ij, variables,
                                  geopotential = Φ, surface_pressure = pˢ,
                                  CO₂ = CO₂)
 
-    geometry = speedy_column_geometry(model)
+    geometry = column_geometry(model)
     surface  = SurfaceState{NF}(
         sea_surface_temperature  = sst_all[ij],
         land_surface_temperature = variables.prognostic.land.soil_temperature[ij, 1],
         land_fraction            = model.land_sea_mask.land_fraction[ij],
     )
-    constants = speedy_physical_constants(model)
+    constants = physical_constants(model)
     diagnostics = LongwaveDiagnostics{NF}()
 
     solve_longwave!(temperature_tendency, diagnostics, scheme, profile, geometry, surface, constants)

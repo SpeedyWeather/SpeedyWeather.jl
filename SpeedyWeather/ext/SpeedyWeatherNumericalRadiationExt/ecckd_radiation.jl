@@ -215,7 +215,7 @@ Base.@propagate_inbounds function ecckd_column_atmosphere!(ij, W, rad::ClearSkyE
     end
     names = Val(NumericalRadiation.gas_names(rad.gas_optics))
     amounts = @view W.gas_amounts[ij, :, :]
-    constants = speedy_physical_constants(model)
+    constants = physical_constants(model)
     gas_amounts!(amounts, names, rad, q, p, p_half, co2, constants)
 
     return ColumnAtmosphere(
