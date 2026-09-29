@@ -38,14 +38,14 @@ package extension that is active as soon as both packages are loaded:
   greenhouse gases; ozone comes from an analytic default profile until SpeedyWeather has an
   ozone field, other gases are prescribed with the scheme (`mole_fractions`).
 - `AnalyticBandLongwave`: NumericalRadiation's analytic 41-band clear-sky longwave scheme of
-  Williams (2026) for water vapour and CO₂, usable as it is as the longwave part of a
+  [Williams2026](@citet) for water vapour and CO₂, usable as it is as the longwave part of a
   [`Radiation`](@ref); see its
   [documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the
   scheme's parameters.
 
 Both are NumericalRadiation's own scheme types, used like any other SpeedyWeather scheme; the
-extension adds constructors from a `SpectralGrid`. NumericalRadiation is not registered yet,
-add it with `Pkg.add(url = "https://github.com/NumericalEarth/NumericalRadiation.jl")`:
+extension adds constructors from a `SpectralGrid`. Add NumericalRadiation (version 0.1.1 or
+later) with `Pkg.add("NumericalRadiation")`:
 
 ```julia
 using SpeedyWeather, NumericalRadiation

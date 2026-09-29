@@ -20,6 +20,12 @@ bundle of `radiation-bundle.md`). Working branch: `mg/numericalradiation-extensi
 
 ## Revision log
 
+- **2026-09-29, NumericalRadiation registered.** Version 0.1.0 is in General, but it is
+  NumericalRadiation's `main` before its PR #16 and has neither `ClearSkyEcCKDRadiation` nor the
+  per-array types the extension needs, so with 0.1.0 the extension would fail to load. The git
+  source in `test/Project.toml` and the `Pkg.add` line of the 1.10 CI step stay until PR #16 is
+  released as 0.1.1; `[compat] NumericalRadiation = "0.1.1"` in `Project.toml` excludes 0.1.0
+  already, and the release then makes the git source unnecessary.
 - **2026-09-29, tests in the normal suite.** The extension test is
   `test/parameterizations/numericalradiation.jl`, run by `Pkg.test` on Julia 1.10 and 1.13
   like every other test: NumericalRadiation is a test dependency (`test/Project.toml`, git
@@ -128,7 +134,7 @@ NumericalRadiation = "cd8119b0-1744-44d6-9ede-6ad1ad750b26"
 SpeedyWeatherNumericalRadiationExt = "NumericalRadiation"
 
 [compat]
-NumericalRadiation = "0.1"
+NumericalRadiation = "0.1.1"
 ```
 
 Version stays `0.23.0-DEV` (already bumped on the base branch for the `Radiation` bundle;
@@ -193,8 +199,9 @@ with `ClearSkyEcCKDRadiation` runs two time steps. The full tests of the couplin
 energy-conservation checks, a cross-check of one column against NumericalRadiation's staged
 API, CO₂ forcing, night, 4× CO₂) live in NumericalRadiation.
 
-Once NumericalRadiation is registered, the `[sources]` entry and the `Pkg.add` line go and it
-becomes an ordinary test dependency; the docs environment can then also execute the example.
+Once NumericalRadiation 0.1.1 is registered, the `[sources]` entry and the `Pkg.add` line go
+and it becomes an ordinary test dependency; the docs environment can then also execute the
+example.
 
 ### Scripts and the full tests
 
@@ -254,9 +261,8 @@ As listed above: `docs/src/radiation.md` section, docstrings, CHANGELOG, this pl
 
 ## Known limitations
 
-- Until NumericalRadiation is registered, users install it with
-  `Pkg.add(url = "https://github.com/NumericalEarth/NumericalRadiation.jl")`, the test
-  environment pulls it from git, and the docs example is not executed.
+- Until NumericalRadiation 0.1.1 is released (0.1.0 predates PR #16), users install it from
+  that branch, the test environment pulls it from git, and the docs example is not executed.
 - The ecCKD scheme is clear-sky; ozone comes from an analytic default profile
   (`default_ozone_profile` in NumericalRadiation, a Chapman-layer shape peaking at 8 ppmv near
   30 hPa) because SpeedyWeather has no ozone field; CO₂ is the only gas taken from the model.
@@ -264,8 +270,8 @@ As listed above: `docs/src/radiation.md` section, docstrings, CHANGELOG, this pl
 
 ## Future work
 
-- Register NumericalRadiation, then drop the git source in `test/Project.toml` and the
-  `Pkg.add` line of the 1.10 CI step, and execute the docs example.
+- After NumericalRadiation 0.1.1 is released: drop the git source in `test/Project.toml` and
+  the `Pkg.add` line of the 1.10 CI step, and execute the docs example.
 - Prescribed ozone, as a SpeedyWeather component modelled on `greenhouse_gases` (a zonal-mean,
   pressure-dependent climatology filled at `initialize!`) or as a prescribed tracer; the
   scheme then reads a per-column ozone profile instead of `mole_fractions.o3`.
