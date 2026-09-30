@@ -286,13 +286,21 @@ function interpolate(
     ) where {NF}
     (; npoints_output) = I.locator                                      # number of points to interpolate onto
     Aout = array_type(architecture(A), NF, 1)(undef, npoints_output)    # preallocate: onto θs, λs interpolated values of A
-    return _interpolate!(Aout, A.data, I.locator, I.geometry, architecture(A)) # perform interpolation, store in Aout
+    return interpolate_2D!(Aout, A.data, I.locator, I.geometry, architecture(A)) # perform interpolation, store in Aout
 end
 
-# the actual interpolation function
-function _interpolate!(
-        Aout,                               # Out: interpolated values
-        A,                                  # gridded values to interpolate from
+"""
+$(TYPEDSIGNATURES)
+Horizontal (2D) interpolation of the gridded values `A` onto the points located in `locator`,
+writing into `Aout`. This is the actual interpolation function; the `interpolate!` methods
+forward to it. A 3D (vertically blended) interpolation is `interpolate_3D!` instead. The
+methods on plain arrays take the raw ring-ordered data, i.e. `field.data`, so that views and
+reshapes of a field's data can be passed too. This method interpolates a single layer, the
+`AbstractMatrix` method below interpolates all layers of a `(npoints, nlayers)` matrix in a
+single (batched) launch."""
+function interpolate_2D!(
+        Aout::AbstractVector,               # Out: interpolated values
+        A::AbstractVector,                  # gridded values to interpolate from
         locator::AnvilLocator,
         geometry::GridGeometry,
         architecture::AbstractArchitecture
@@ -359,7 +367,7 @@ end
 end
 
 # batched version: all layers in a single launch, sharing the locator's indices and weights
-function _interpolate!(
+function interpolate_2D!(
         Aout::AbstractMatrix,               # Out: interpolated values, (npoints_output, nlayers)
         A::AbstractMatrix,                  # gridded values to interpolate from, (npoints, nlayers)
         locator::AnvilLocator,
@@ -430,13 +438,13 @@ end
 end
 
 # version for 2D fields
-interpolate!(
+interpolate_2D!(
     Aout::Field,
     A::Field2D,
     interpolator::AbstractInterpolator,
-) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
+) = interpolate_2D!(Aout, A, interpolator.locator, interpolator.geometry)
 
-function interpolate!(
+function interpolate_2D!(
         Aout::Field,
         A::Field2D,
         locator::AbstractLocator,
@@ -444,33 +452,34 @@ function interpolate!(
     )
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
-    return _interpolate!(Aout.data, A.data, locator, geometry, architecture(A))
+    return interpolate_2D!(Aout.data, A.data, locator, geometry, architecture(A))
 end
 
 # version for 2D field and vector
-interpolate!(
+interpolate_2D!(
     Aout::AbstractVector,       # Out: points to interpolate onto
     A::Field2D,                 # In: field to interpolate from
     interpolator::AbstractInterpolator,
-) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
+) = interpolate_2D!(Aout, A, interpolator.locator, interpolator.geometry)
 
-function interpolate!(
+function interpolate_2D!(
         Aout::AbstractVector,       # Out: points to interpolate onto
         A::Field2D,                 # In: field to interpolate from
         locator::AbstractLocator,
         geometry::AbstractGridGeometry,
     )
-    return _interpolate!(Aout, A.data, locator, geometry, architecture(A))  # use .data to trigger dispatch for method above
+    return interpolate_2D!(Aout, A.data, locator, geometry, architecture(A))  # use .data to trigger dispatch for method above
 end
 
-# version for 3D+ fields
-interpolate!(
+# version for 3D+ fields: batched 2D interpolation, every layer interpolated horizontally
+# onto the same points, no interpolation in the vertical (that is interpolate_3D!)
+interpolate_2D!(
     Aout::Field,        # Out: grid to interpolate onto
     A::Field,           # In: gridded data to interpolate from
     interpolator::AbstractInterpolator,
-) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
+) = interpolate_2D!(Aout, A, interpolator.locator, interpolator.geometry)
 
-function interpolate!(
+function interpolate_2D!(
         Aout::Field,        # Out: grid to interpolate onto
         A::Field,           # In: gridded data to interpolate from
         locator::AbstractLocator,
@@ -481,10 +490,10 @@ function interpolate!(
     @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
 
     # Interpolate every layer in a single launch by collapsing the trailing dimensions into
-    # one. That reshape is O(1) for dense data only, so anything else (e.g. a field wrapping
-    # a non-contiguous view) would end up in a slower wrapper type and keeps the layer loop.
-    if Aout.data isa DenseArray && A.data isa DenseArray
-        _interpolate!(
+    # one. That reshape is O(1) for dense data and contiguous views only, so anything else
+    # (e.g. a field wrapping a strided view) keeps the per-layer loop.
+    if is_flattenable(Aout.data) && is_flattenable(A.data)
+        interpolate_2D!(
             reshape(Aout.data, size(Aout.data, 1), :),
             reshape(A.data, size(A.data, 1), :),
             locator,
@@ -493,11 +502,41 @@ function interpolate!(
         )
     else
         for k in eachlayer(Aout, A, vertical_only = true)
-            _interpolate!(view(Aout.data, :, k), view(A.data, :, k), locator, geometry, architecture(A))
+            interpolate_2D!(view(Aout.data, :, k), view(A.data, :, k), locator, geometry, architecture(A))
         end
     end
     return Aout                             # return the field wrapped around the interpolated data
 end
+
+"""
+$(TYPEDSIGNATURES)
+True if `reshape(x, size(x, 1), :)` is O(1) and yields an array that the interpolation kernels
+can index directly: dense arrays and contiguous views (e.g. `view(A, :, :, k)`). A strided view
+would reshape into a slow wrapper type, so the batched interpolation is not used in this case."""
+is_flattenable(x::DenseArray) = true
+is_flattenable(x::SubArray) = Base.iscontiguous(x)
+is_flattenable(x::AbstractArray) = false
+
+"""
+$(TYPEDSIGNATURES)
+Interpolate `A` onto `Aout`, choosing the interpolation by the way vertical locations are
+communicated: with a `locator` and `geometry` (or an `interpolator` bundling both) only,
+this is a horizontal interpolation via `interpolate_2D!`, batched over all layers of a
+3D+ field. Methods that also take vertical positions perform a 3D interpolation via
+`interpolate_3D!`."""
+interpolate!(Aout::Field, A::Field, interpolator::AbstractInterpolator) =
+    interpolate_2D!(Aout, A, interpolator)
+interpolate!(Aout::Field, A::Field, locator::AbstractLocator, geometry::AbstractGridGeometry) =
+    interpolate_2D!(Aout, A, locator, geometry)
+# Field2D is an AbstractVector too, resolve the ambiguity with the vector-output methods
+interpolate!(Aout::Field, A::Field2D, interpolator::AbstractInterpolator) =
+    interpolate_2D!(Aout, A, interpolator)
+interpolate!(Aout::Field, A::Field2D, locator::AbstractLocator, geometry::AbstractGridGeometry) =
+    interpolate_2D!(Aout, A, locator, geometry)
+interpolate!(Aout::AbstractVector, A::Field2D, interpolator::AbstractInterpolator) =
+    interpolate_2D!(Aout, A, interpolator)
+interpolate!(Aout::AbstractVector, A::Field2D, locator::AbstractLocator, geometry::AbstractGridGeometry) =
+    interpolate_2D!(Aout, A, locator, geometry)
 
 # interpolate while creating an interpolator on the fly
 function interpolate!(

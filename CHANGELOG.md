@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Batched interpolation for multi-dimensaional `Field`s [#1263](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1263)
+- Batched interpolation for multi-dimensional `Field`s, horizontal interpolation now named `interpolate_2D!` forwarded from `interpolate!` [#1263](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1263)
 - [BREAKING] Bundle shortwave and longwave radiation into one model component `model.radiation = Radiation(shortwave, longwave)`, replacing the `shortwave_radiation` and `longwave_radiation` fields [#1252](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1252)
 - ImplicitCondensation: keep the melting cooling, fix its units and the Clausius-Clapeyron derivative in the implicit correction [#1277](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1277)
 - `Parameterization` function stub for packages to define SpeedyWeather parameterizations in extensions [#1261](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1261)
