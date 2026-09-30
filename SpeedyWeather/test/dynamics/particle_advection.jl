@@ -31,28 +31,6 @@
     end
 end
 
-@testset "find_vertical_bracket" begin
-    σf = Float32[0.1, 0.3, 0.5, 0.7, 0.9]
-
-    k_lo, k_hi, α = RingGrids.find_vertical_bracket(0.0f0, σf)
-    @test k_lo == 1 && k_hi == 2 && α == 0.0f0       # below grid top → pin
-
-    k_lo, k_hi, α = RingGrids.find_vertical_bracket(σf[1], σf)
-    @test k_lo == 1 && k_hi == 2 && α == 0.0f0       # exactly at top layer
-
-    k_lo, k_hi, α = RingGrids.find_vertical_bracket(0.4f0, σf)
-    @test k_lo == 2 && k_hi == 3 && α ≈ 0.5f0        # midpoint between layers 2 and 3
-
-    k_lo, k_hi, α = RingGrids.find_vertical_bracket(σf[end], σf)
-    @test k_lo == 4 && k_hi == 5 && α == 1.0f0       # exactly at bottom layer
-
-    k_lo, k_hi, α = RingGrids.find_vertical_bracket(1.0f0, σf)
-    @test k_lo == 4 && k_hi == 5 && α == 1.0f0       # below grid bottom → pin
-
-    @test all(0 ≤ α ≤ 1 for (_, _, α) in
-        [RingGrids.find_vertical_bracket(σ, σf) for σ in range(0f0, 1f0, 50)])
-end
-
 @testset "ParticleAdvection3D" begin
     @testset for Model in (PrimitiveDryModel, PrimitiveWetModel)
         spectral_grid = SpectralGrid(truncation = 32, nlayers = 4)
@@ -64,7 +42,7 @@ end
         model.feedback.verbose = false
         simulation = initialize!(model)
 
-        σ_initial = copy([p.σ for p in simulation.variables.prognostic.particles])
+        σ_initial = [p.σ for p in simulation.variables.prognostic.particles]
 
         run!(simulation, period = Day(1), output = false)
 
@@ -76,9 +54,18 @@ end
         σ_final = [p.σ for p in simulation.variables.prognostic.particles]
         @test !all(σ_initial .≈ σ_final)   # vertical motion occurred
 
-        # particles drift inside the column, not slammed onto σ=0/1. The checks above can't catch
-        # that: `0 ≤ σ ≤ 1` holds by the clamp in mod(::Particle), and σ changing even more so.
-        @test any(0 .< σ_final .< 1)
+        # particles stay spread through the column rather than collecting on σ=0/1. The checks
+        # above can't catch that: `0 ≤ σ ≤ 1` holds by the clamp in mod(::Particle).
+        @test count(s -> 0 < s < 1, σ_final) / length(σ_final) > 0.8
+    end
+end
+
+@testset "ParticleAdvection3D requires a primitive equation model" begin
+    @testset for Model in (BarotropicModel, ShallowWaterModel)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+        particle_advection = ParticleAdvection3D(spectral_grid, nparticles = 3)
+        model = Model(spectral_grid; particle_advection)
+        @test_throws ArgumentError initialize!(model)
     end
 end
 
@@ -187,25 +174,8 @@ end
     dlon = maximum(abs(wrapped_dlon(particles_3d[i].lon, particles_2d[i].lon)) for i in eachindex(lons))
     dlat = maximum(abs(particles_3d[i].lat - particles_2d[i].lat) for i in eachindex(lons))
 
-    # tracks agree to ~0.03˚ while the 3D particles stay near layer k; they diverged by ~4˚ when
-    # the radius scaling of w flung them onto σ=0/1, into the top/bottom layer winds.
+    # over 6 hours the 3D particles stay close to layer k, so the tracks agree to ~0.03˚ in practice;
+    # much larger differences mean the 3D particles were moved vertically away from layer k.
     @test dlon < 0.5
     @test dlat < 0.2
 end
-
-@testset "ParticleAdvection3D no boundary pile-up" begin
-    # statistical counterpart to the above: particles seeded uniformly through the column stay
-    # spread through it after a day, rather than collecting on σ=0/1.
-    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
-    pa = ParticleAdvection3D(spectral_grid, nparticles = 50)
-    model = PrimitiveWetModel(spectral_grid; particle_advection = pa)
-    model.feedback.verbose = false
-    simulation = initialize!(model)
-
-    run!(simulation, period = Day(1), output = false)
-
-    σ = [p.σ for p in simulation.variables.prognostic.particles]
-    interior_fraction = count(s -> 0 < s < 1, σ) / length(σ)
-    @test interior_fraction > 0.8   # 1.0 in practice; was 0.0, all 50 pinned, before the fix
-end
-

@@ -4,6 +4,34 @@ struct TestParticle3D{NF}
     σ::NF
 end
 
+@testset "find_vertical_bracket" begin
+    σf = Float32[0.1, 0.3, 0.5, 0.7, 0.9]
+
+    k_lo, k_hi, α = RingGrids.find_vertical_bracket(0.0f0, σf)
+    @test k_lo == 1 && k_hi == 2 && α == 0.0f0       # below grid top → pin
+
+    k_lo, k_hi, α = RingGrids.find_vertical_bracket(σf[1], σf)
+    @test k_lo == 1 && k_hi == 2 && α == 0.0f0       # exactly at top layer
+
+    k_lo, k_hi, α = RingGrids.find_vertical_bracket(0.4f0, σf)
+    @test k_lo == 2 && k_hi == 3 && α ≈ 0.5f0        # midpoint between layers 2 and 3
+
+    k_lo, k_hi, α = RingGrids.find_vertical_bracket(σf[end], σf)
+    @test k_lo == 4 && k_hi == 5 && α == 1.0f0       # exactly at bottom layer
+
+    k_lo, k_hi, α = RingGrids.find_vertical_bracket(1.0f0, σf)
+    @test k_lo == 4 && k_hi == 5 && α == 1.0f0       # below grid bottom → pin
+
+    @test all(
+        0 ≤ α ≤ 1 for (_, _, α) in
+            [RingGrids.find_vertical_bracket(σ, σf) for σ in range(0.0f0, 1.0f0, 50)]
+    )
+
+    # single level: that level with zero weight, for any σ
+    @test RingGrids.find_vertical_bracket(0.2f0, Float32[0.5]) == (1, 1, 0.0f0)
+    @test RingGrids.find_vertical_bracket(0.9f0, Float32[0.5]) == (1, 1, 0.0f0)
+end
+
 @testset "3D interpolation: vertical profile" begin
     npoints = 50
     nlayers = 6

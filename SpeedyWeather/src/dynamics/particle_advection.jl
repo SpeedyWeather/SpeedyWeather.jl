@@ -115,7 +115,13 @@ function initialize!(particle_advection::ParticleAdvection2D, model::AbstractMod
     return nothing
 end
 
-initialize!(::ParticleAdvection3D, ::AbstractModel) = nothing
+initialize!(::ParticleAdvection3D, ::PrimitiveEquation) = nothing
+initialize!(::ParticleAdvection3D, model::AbstractModel) = throw(
+    ArgumentError(
+        "ParticleAdvection3D requires a PrimitiveDryModel or PrimitiveWetModel, " *
+            "use ParticleAdvection2D for $(nameof(typeof(model)))."
+    )
+)
 
 """
 $(TYPEDSIGNATURES)
