@@ -65,30 +65,30 @@ export Variables
 groups corresponding to the fields here $(TYPEDFIELDS) Each group can have
 their own namespaces to distinguish between e.g. ocean, land, or tracer variables.
 All non-prognostic groups are considered to be diagnostic with no memory between time steps."""
-@kwdef struct Variables{Po, G, T, D, Pm, Pt, S, F} <: AbstractVariables
+@kwdef mutable struct Variables{Po, G, T, D, Pm, Pt, S, F} <: AbstractVariables
     "Prognostic variables subject to time stepping."
-    prognostic::Po = NamedTuple()
+    const prognostic::Po = NamedTuple()
 
     "Variables defined on the grid, mostly copies of spectral prognostic variables."
-    grid::G = NamedTuple()
+    const grid::G = NamedTuple()
 
     "Tendencies of the prognostic variables"
-    tendencies::T = NamedTuple()
+    const tendencies::T = NamedTuple()
 
     "Variables used in the dynamical core"
-    dynamics::D = NamedTuple()
+    const dynamics::D = NamedTuple()
 
     "Variables used in the parameterizations"
-    parameterizations::Pm = NamedTuple()
+    const parameterizations::Pm = NamedTuple()
 
     "Variables used for particle advection"
-    particles::Pt = NamedTuple()
+    const particles::Pt = NamedTuple()
 
     "Scratch variables for temporary storage during calculations with undetermined state (write before read)."
-    scratch::S = NamedTuple()
+    const scratch::S = NamedTuple()
 
     "Fused variables, contiguous allocations of e.g. spectral prognostic variables for batching transforms and other optimizations."
-    fused::F = NamedTuple()
+    const fused::F = NamedTuple()
 end
 
 # defined e.g. for output filters, as fieldnames(Variables) isn't fully type stable
