@@ -105,7 +105,7 @@ end
 variables(P::ParticleAdvection2D) = particle_variables(P.nparticles)
 variables(P::ParticleAdvection3D) = (
     particle_variables(P.nparticles)...,
-    ParticleVariable(:w, VectorDim(P.nparticles), desc = "Vertical velocity dσ/dt at particle location", units = "1/s"),
+    ParticleVariable(:w, VectorDim(P.nparticles), desc = "Radius-scaled vertical velocity radius*dσ/dt at particle location", units = "m/s"),
 )
 
 function initialize!(particle_advection::ParticleAdvection2D, model::AbstractModel)
@@ -180,10 +180,6 @@ function initialize!(
     return nothing
 end
 
-# `vars.dynamics.w` is radius*σ̇ as vor, div stay radius-scaled throughout `run!`. Particles move
-# in physical coordinates, the vertical counterpart of the 180/(π*radius) factor for u, v below.
-@inline unscale_vertical_velocity!(w, radius) = (w .*= inv(radius))   # radius*σ̇ -> σ̇ [1/s]
-
 """$(TYPEDSIGNATURES)
 Initialize 3D particle advection work arrays: interpolate u, v, w at each particle's
 initial 3D position to seed the Heun predictor for the first advection step."""
@@ -198,7 +194,6 @@ function initialize!(
 
     # index step dimension according to time stepper
     (; time_stepping) = model
-    (; radius) = model.planet
     l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
     u_3d = field_view(vars.grid.u, :, :, l)     # prognostic variables have a step dimension
     v_3d = field_view(vars.grid.v, :, :, l)
@@ -226,7 +221,6 @@ function initialize!(
     interpolate_3D!(u0, u_3d, locator, geometry, particles, uv_levels)
     interpolate_3D!(v0, v_3d, locator, geometry, particles, uv_levels)
     interpolate_3D!(w0, w_3d, locator, geometry, particles, w_levels)
-    unscale_vertical_velocity!(w0, radius)
     return nothing
 end
 
@@ -345,8 +339,9 @@ function particle_advection!(
     Δt = model.time_stepping.Δt * n * convert(NF, 180 / (π * radius))
     Δt_half = Δt / 2            # /2 because Heun is average of Euler+corrected step
 
-    # vertical time step without the degree/radius conversion for dσ = w[s⁻¹]*Δt_vert[s]
-    Δt_vert = model.time_stepping.Δt * n
+    # vars.dynamics.w is radius*σ̇ [m/s] (vor, div stay radius-scaled throughout run!), so like the
+    # horizontal Δt [s*˚/m] also scale the vertical time step by 1/radius to get dσ = w*Δt_vert
+    Δt_vert = model.time_stepping.Δt * n / radius   # [s/m]
     Δt_vert_half = Δt_vert / 2
 
     # trace trajectories backwards in time: reverse both horizontal and vertical motion
@@ -386,7 +381,6 @@ function particle_advection!(
     interpolate_3D!(u_new, u_3d, locator, geometry, vars.particles.locations, uv_levels)
     interpolate_3D!(v_new, v_3d, locator, geometry, vars.particles.locations, uv_levels)
     interpolate_3D!(w_new, w_3d, locator, geometry, vars.particles.locations, w_levels)
-    unscale_vertical_velocity!(w_new, radius)
 
     launch!(
         architecture(u_new), LinearWorkOrder, (length(particles),),
@@ -399,7 +393,6 @@ function particle_advection!(
     interpolate_3D!(u_new, u_3d, locator, geometry, particles, uv_levels)
     interpolate_3D!(v_new, v_3d, locator, geometry, particles, uv_levels)
     interpolate_3D!(w_new, w_3d, locator, geometry, particles, w_levels)
-    unscale_vertical_velocity!(w_new, radius)
     return nothing
 end
 
@@ -407,9 +400,9 @@ end
         particle::Particle{NF},                 # particle to advect
         u::NF,                                  # zonal velocity [m/s]
         v::NF,                                  # meridional velocity [m/s]
-        w::NF,                                  # vertical velocity [1/s]
+        w::NF,                                  # radius-scaled vertical velocity radius*σ̇ [m/s]
         Δt::NF,                                 # horizontal: scaled time step [s*˚/m]
-        Δt_vert::NF,                            # vertical: [s]; dσ = w[s⁻¹] * Δt_vert[s]
+        Δt_vert::NF,                            # vertical: scaled time step [s/m], dσ = w * Δt_vert
     ) where {NF}
 
     dlat = v * Δt                                           # increment in latitude [˚N]

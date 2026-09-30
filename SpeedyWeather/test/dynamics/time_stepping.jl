@@ -310,7 +310,7 @@ end
 
 @testset "unscale! leaves the diagnosed vertical velocity scaled" begin
     # `unscale!` undoes the radius scaling of vor, div but not of w = radius*σ̇, which the
-    # dycore uses scaled. Consumers in physical units divide by radius, see ParticleAdvection3D.
+    # dycore uses scaled. ParticleAdvection3D accounts for it with a 1/radius in its vertical time step.
     spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
     model = PrimitiveWetModel(spectral_grid)
     vars = Variables(model)
