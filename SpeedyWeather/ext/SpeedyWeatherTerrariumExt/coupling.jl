@@ -378,7 +378,10 @@ function SpeedyWeather.timestep!(
     # Push forcings into Terrarium inputs (copy_unmasked! avoids allocations)
     inputs = state.inputs
     RingGrids.copy_unmasked!(inputs.air_temperature, Tair, indices)
-    Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
+    # K -> °C, in place on the interior array. `set!(f, f - c)` would build a lazy Oceananigans
+    # `BinaryOperation` and materialize it through the dynamic broadcasting machinery, which
+    # Enzyme can only differentiate via runtime generic rules (and gets wrong).
+    interior(inputs.air_temperature) .-= NF(273.15)
     RingGrids.copy_unmasked!(inputs.air_pressure, pres, indices)
     RingGrids.copy_unmasked!(inputs.specific_humidity, humid, indices)
     RingGrids.copy_unmasked!(inputs.rainfall, rain, indices)
@@ -464,7 +467,7 @@ function SpeedyWeather.timestep!(
     Tair = vars.grid.temperature[mask, end, l]
     inputs = state.inputs
     Terrarium.set!(inputs.air_temperature, Tair)
-    Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))
+    interior(inputs.air_temperature) .-= NF(273.15)   # K -> °C, in place (see timestep!)
 
     # Same reasoning as in TerrariumLand.timestep!: free to construct, empty
     # InputSources(NF) so SpeedyWeather owns the input-update cycle.
