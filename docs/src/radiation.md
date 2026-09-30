@@ -59,13 +59,14 @@ simulation = initialize!(model)
 run!(simulation, period = Day(10))
 simulation.variables.parameterizations.outgoing_longwave
 
-# or the analytic-band longwave next to the default one-band shortwave
-longwave = AnalyticBandLongwave(spectral_grid)     # in the grid's number format, scheme parameters as keywords
+# or the analytic-band longwave next to the default one-band shortwave; keywords are the scheme's
+# parameters, e.g. the surface emissivities (SpeedyWeather has no field for them)
+longwave = AnalyticBandLongwave(spectral_grid; ocean_emissivity = 0.98, land_emissivity = 0.97)
 model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
 ```
 
-Both schemes take CO₂ from the model's [greenhouse gases](@ref) when a `co2` component is
-present and use 280 ppm otherwise.
+Both schemes take CO₂ from the model's `co2` component when present (see
+[Greenhouse gases](@ref)) and use 280 ppm otherwise.
 
 The first `ClearSkyEcCKDRadiation` downloads the ecCKD coefficient tables (a lazy artifact of
 NumericalRadiation). Its work arrays, optical depths per g point, interface fluxes and the

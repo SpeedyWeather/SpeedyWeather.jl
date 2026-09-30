@@ -4,8 +4,9 @@
 
 """$(TYPEDSIGNATURES)
 An `AnalyticBandLongwave` in the number format of the spectral grid; `kwargs` are the scheme's
-parameters. CO₂ follows the model's `greenhouse_gases.co2` when present, else
-$(DEFAULT_CO₂) ppm."""
+parameters, including the surface emissivities `ocean_emissivity` and `land_emissivity`
+(default 1), which SpeedyWeather has no field of its own for. CO₂ follows the model's
+`greenhouse_gases.co2` when present, else $(DEFAULT_CO₂) ppm."""
 AnalyticBandLongwave(SG::SpeedyWeather.SpectralGrid; kwargs...) = AnalyticBandLongwave{SG.NF}(; kwargs...)
 
 # the standard longwave diagnostics, as declared for any SpeedyWeather.AbstractLongwave
@@ -65,10 +66,13 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(ij, variables,
                                  CO₂ = CO₂)
 
     geometry = column_geometry(model)
+    # SpeedyWeather has no surface emissivity of its own: the scheme's values are used
     surface  = SurfaceState{NF}(
         sea_surface_temperature  = sst_all[ij],
         land_surface_temperature = variables.prognostic.land.soil_temperature[ij, 1],
         land_fraction            = model.land_sea_mask.land_fraction[ij],
+        ocean_emissivity         = scheme.ocean_emissivity,
+        land_emissivity          = scheme.land_emissivity,
     )
     constants = physical_constants(model)
     diagnostics = LongwaveDiagnostics{NF}()

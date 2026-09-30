@@ -20,6 +20,14 @@ bundle of `radiation-bundle.md`). Working branch: `mg/numericalradiation-extensi
 
 ## Revision log
 
+- **2026-09-30, surface emissivity (NumericalRadiation issue #9).** The analytic-band kernel
+  built its `SurfaceState` without emissivities, so the solver's default of 1 applied and
+  nothing could be set from SpeedyWeather. SpeedyWeather has no surface emissivity of its own
+  (its one-band longwave keeps them as scheme parameters), so NumericalRadiation's
+  `AnalyticBandLongwave` gained `ocean_emissivity` and `land_emissivity` fields (default 1) and
+  the kernel passes them into the surface state: `AnalyticBandLongwave(spectral_grid;
+  ocean_emissivity = 0.98, land_emissivity = 0.97)`. Same pattern as
+  `ClearSkyEcCKDRadiation.surface_emissivity`.
 - **2026-09-29, allocation-free again.** Rerunning the validation scripts showed the ecCKD
   kernel allocating 320 bytes per column (it was allocation-free on 2026-09-11): the clear-sky
   longwave solver of NumericalRadiation's `main` allocates four small work vectors per call on

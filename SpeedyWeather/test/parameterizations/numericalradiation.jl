@@ -32,6 +32,7 @@ end
     longwave = AnalyticBandLongwave(spectral_grid)
     @test longwave isa NumericalRadiation.AnalyticBandLongwave{NF}
     @test AnalyticBandLongwave(spectral_grid; diffusivity = 1.5).diffusivity == NF(1.5)
+    @test AnalyticBandLongwave(spectral_grid; ocean_emissivity = 0.98, land_emissivity = 0.97).land_emissivity == NF(0.97)
 
     # longwave only, no other parameterizations
     radiation = Radiation(spectral_grid; shortwave = nothing, longwave)
