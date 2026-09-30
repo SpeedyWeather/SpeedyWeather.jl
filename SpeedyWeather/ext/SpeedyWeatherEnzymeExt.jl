@@ -61,7 +61,10 @@ _make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ScratchMemory) =
 _make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ColumnScratchMemory) =
     (_make_zero_view!(x.north); _make_zero_view!(x.south); nothing)
 _make_zero_view!(x::Base.RefValue) = (x[] isa Number && (x[] = zero(x[])); nothing)
-_make_zero_view!(x) = nothing
+# Anything else (e.g. a coupled component's own state, such as Terrarium's `StateVariables`) is not
+# view-backed, so let Enzyme zero it in place; silently skipping it would leave the shadow as a copy
+# of the primal.
+_make_zero_view!(x) = (Enzyme.make_zero!(x); nothing)
 
 ###
 # TODO
