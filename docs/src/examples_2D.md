@@ -24,7 +24,7 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
 We want to use the barotropic model to simulate some free-decaying 2D turbulence
 on the sphere without rotation. We start by defining the `SpectralGrid` object.
 To have a resolution of about 200km, we choose a spectral resolution of
-T63 (see [Available horizontal resolutions](@ref)) and `nlayers=1` vertical levels.
+T64 (see [Available horizontal resolutions](@ref)) and `nlayers=1` vertical levels.
 The [`SpectralGrid`](@ref) object will provide us with some more information
 ```@example barotropic_setup
 using SpeedyWeather

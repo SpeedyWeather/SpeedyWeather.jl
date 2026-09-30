@@ -205,7 +205,7 @@ end
     cpu_arch = S_cpu.architecture
 
     # lm x nsteps, like a prognostic surface pressure with a leapfrog step dimension
-    pressure_cpu = rand(LowerTriangularArray{Complex{NF}}, spectral_grid_cpu.spectrum, 2)
+    pressure_cpu = rand(LowerTriangularArray{Complex{NF}}, spectral_grid_cpu.spectrum, SpeedyWeather.ArrayDimensions.LMT(), 2)
     pressure_gpu = on_architecture(S_gpu.architecture, pressure_cpu)
 
     lnpₛ_cpu = get_step(pressure_cpu, 1)
