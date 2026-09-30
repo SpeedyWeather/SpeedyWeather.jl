@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- CPU column parameterizations loop over grid points per bundled scheme (`Radiation`: shortwave loop, then longwave loop) via `column_parameterization_cpu!`, fixing the Enzyme/LLVM segfault of the extended differentiability tests [#1290](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1290)
 - `on_architecture` keeps the dimensions of a `LowerTriangularArray`, fixes for tests and docs after merging main [#1274](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1274)
 - Sea ice freezing and the snow melt cap are adjustments in `filter!`, not tendencies, fixing sea ice with NCycleLorenz for the ocean [#1272](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1272)
 - `Leapfrog` and `NCycleLorenz` have `ocean` and `land` fields for their time steppers, Leapfrog defaulting to the new `EulerForward`; snow depth is time stepped by the land time stepper [#1264](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1264)
