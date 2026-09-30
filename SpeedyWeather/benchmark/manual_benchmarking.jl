@@ -89,23 +89,8 @@ const TIMESTEP_MULTIPLIER = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 1.0
 TIMESTEP_MULTIPLIER > 0 || error("timestep multiplier must be > 0, got $TIMESTEP_MULTIPLIER")
 @info "Timestep multiplier: $TIMESTEP_MULTIPLIER"
 
-# Free memory between benchmark runs (called outside the timed region). SpeedyTransforms
-# keeps the GPU-graph cache of every SpectralTransform (captured graphs, buffers and the
-# batched FFT plans) in a global dictionary that is never cleared, so without clearing it
-# the transforms of all previous runs stay alive until FFT plan creation fails, see
-# `GRAPH_CACHES` in SpeedyTransforms/src/gpu_graphs_common.jl. Then a full GC runs the
-# finalizers of the previous run's arrays and FFT plans, and on GPU the backend's pool is
-# trimmed so the freed device memory is returned to the driver.
-function free_memory!()
-    SpeedyWeather.SpeedyTransforms.clear_fourier_graph_cache!()
-    GC.gc(true)
-    if ARCH_LABEL == "gpu-amd"
-        AMDGPU.reclaim()
-    elseif ARCH_LABEL == "gpu-nvidia"
-        CUDA.reclaim()
-    end
-    return nothing
-end
+# Free (device) memory between benchmark runs, called outside the timed region
+free_memory!() = SpeedyWeather.SpeedyTransforms.clear_fourier_graph_cache!(ARCH)
 
 include("benchmark_suite.jl")
 include("define_benchmarks.jl")

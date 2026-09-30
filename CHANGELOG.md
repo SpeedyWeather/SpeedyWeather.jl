@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- AMDGPU benchmarks on LUMI: `amdgpu` argument for `manual_benchmarking.jl`, memory freed between benchmark runs, and `gpu-amd` results [#XXXX](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/XXXX)
+- AMDGPU benchmarks on LUMI: `amdgpu` argument for `manual_benchmarking.jl`, `clear_fourier_graph_cache!` now also runs the GC and reclaims device memory (used between benchmark runs), and `gpu-amd` results [#1288](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1288)
 - [BREAKING] Bundle shortwave and longwave radiation into one model component `model.radiation = Radiation(shortwave, longwave)`, replacing the `shortwave_radiation` and `longwave_radiation` fields [#1252](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1252)
 - ImplicitCondensation: keep the melting cooling, fix its units and the Clausius-Clapeyron derivative in the implicit correction [#1277](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1277)
 - `Parameterization` function stub for packages to define SpeedyWeather parameterizations in extensions [#1261](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1261)

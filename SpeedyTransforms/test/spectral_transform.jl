@@ -413,3 +413,12 @@ end
         @test grid_back ≈ grid_out rtol = 1.0e-13
     end
 end
+
+@testset "Clear Fourier graph cache" begin
+    # no GPU graphs on CPU: nothing to reclaim, but clearing (with/without GC) must still work
+    @test SpeedyTransforms.reclaim!(SpeedyTransforms.CPU()) === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!() === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!(SpeedyTransforms.CPU()) === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!(gc = false) === nothing
+    @test isempty(SpeedyTransforms.GRAPH_CACHES)
+end
