@@ -21,7 +21,7 @@ const DOCS_ASSETS_DIR = joinpath(@__DIR__, "src", "assets", "benchmarks")
 const DOCS_PAGE_PATH = joinpath(@__DIR__, "src", "benchmarks.md")
 
 # Stable arch ordering — matches manual_benchmarking.jl
-const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "reactant-cpu", "reactant-gpu"]
+const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "gpu-amd", "reactant-cpu", "reactant-gpu"]
 
 function sorted_arch_labels(results)
     known = filter(in(keys(results)), ARCH_ORDER)
