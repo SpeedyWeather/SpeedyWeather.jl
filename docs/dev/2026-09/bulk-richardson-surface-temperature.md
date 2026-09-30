@@ -1,6 +1,6 @@
-# Bulk Richardson number with the surface temperature
+# Bulk Richardson number with the surface temperature and a working vertical diffusion
 
-> Status: **completed**. The surface bulk Richardson number now uses the surface (skin) temperature in both `BulkRichardsonDrag` and `BulkRichardsonDiffusion`.
+> Status: **in progress**. Richardson fix, working implicit vertical diffusion and Ri_c = 1 implemented; stable up to T85L16, but T31L24 blows up over Tibet through an explicit land–atmosphere coupling instability (limiter proposed, awaiting decision).
 
 Date of initial draft: 2026-09-29
 
@@ -32,6 +32,26 @@ Base revision: c7d631c658feefc851eb7af5b93aa5754430faf5
   for a separate issue (#1282) and PR, because switching it on also needs the conversion of K from m²/s
   to σ-space.
 
+- 2026-09-30: review of the drag behaviour:
+  > Can we talk about PR1283, you replaced the temperature used in the bulk Richardson from
+  > lowermost layer to surface ocean/land temperatures but not the surface air temperatures. Now
+  > the boundary layer drag is always maxed out [...] maybe variables.parameterization.surface_temperature
+  > should be used instead because that's actually at z=0 but is still air [...]
+
+  Kept the ocean/land temperature. The surface air temperature is T_N σ^(−κ), the lowermost
+  layer's potential temperature, so Θ₁ − Θ₀ ≈ 0 and Ri ≈ 0 (always neutral) by construction.
+  The drag is near its maximum at ~90% of points because the surface is on average 3.3 K
+  (ocean) and 5.5 K (land) warmer than the lowermost layer's potential temperature.
+- 2026-09-30:
+  > Can you turn PR1283 into fixing both drag and vertical diffusion as suggested?
+
+  PR extended to fix #1282 (see Summary of changes, items 4–8). Explicit diffusion with K in
+  σ-space blew up at T85L16, so it's now implicit. Solving over Δt with Leapfrog applying the
+  tendency over 2Δt overshot and blew up at T31L16, so it's now solved over 2Δt. The stability
+  factor used Ri at the boundary-layer top (≈ Ri_c by construction), which made K ≈ 1 m²/s, so
+  it now uses the surface Ri_N (Frierson eq. 20). T31L24 still blows up; diagnosed as explicit
+  land–atmosphere coupling (see Known limitations).
+
 ## Problem description
 
 `bulk_richardson_surface` computed
@@ -55,38 +75,67 @@ surface value θ_v(0) uses the surface temperature. In dry static energy form th
 
 ## Summary of changes
 
-- New `surface_skin_temperature(ij, vars, land_sea_mask, time_stepping, component, T_air)`:
-  SST over ocean and the uppermost soil layer temperature over land, weighted by the land
-  fraction. Where a surface type is undefined (NaN) the other one is used. If neither is
-  available it falls back to the air temperature, which recovers the previous behaviour.
-- `bulk_richardson_surface` (drag): Θ₀ = cₚ T_v(Tₛ), Θ₁ = cₚ T_v(T_N) + gz. `land_sea_mask` is
-  passed through.
-- `bulk_richardson!` (diffusion), surface layer: Θ₀ = cₚ T_v(Tₛ) + Φₛ, Θ₁ = cₚ T_v(T_N) + Φ_N,
-  Ri_N = (Φ_N − Φₛ)(Θ₁ − Θ₀)/(cₚ T_v(Tₛ) V²). The height is now measured above the surface
-  rather than as absolute geopotential. The layers above are unchanged.
+Surface bulk Richardson number (#1281):
+
+1. New `surface_skin_temperature(ij, vars, land_sea_mask, time_stepping, component, T_air)`:
+   SST over ocean and the uppermost soil layer temperature over land, weighted by the land
+   fraction. Where a surface type is undefined (NaN) the other one is used. If neither is
+   available it falls back to the air temperature, which recovers the previous behaviour.
+2. `bulk_richardson_surface` (drag): Θ₀ = cₚ T_v(Tₛ), Θ₁ = cₚ T_v(T_N) + gz.
+3. `bulk_richardson!` (diffusion), surface layer: Θ₀ = cₚ T_v(Tₛ) + Φₛ, Θ₁ = cₚ T_v(T_N) + Φ_N,
+   Ri_N = (Φ_N − Φₛ)(Θ₁ − Θ₀)/(cₚ T_v(Tₛ) V²).
+
+Vertical diffusion (#1282):
+
+4. Neighbour indices in `_vertical_diffusion!`: `k₋ = max(k - 1, 1)`, `k₊ = min(k + 1, nlayers)`
+   (were both `k`, so all gradients were zero).
+5. K [m²/s] converted to σ coordinates: K̃ = K (gσ/(RT))² [1/s], from ∂z = −(gσ/(RT)) ∂σ.
+6. Implicit (backward Euler) solve per column with the Thomas algorithm, over
+   `implicit_vertical_diffusion_time_step` = 2Δt for Leapfrog (tendencies are applied over 2Δt
+   from the previous step), Δt otherwise. No flux through the boundary-layer top. Dry static
+   energy is diffused and its tendency converted with 1/cₚ, rather than dividing K by cₚ. Two
+   new scratch arrays `vertical_diffusion_c`, `vertical_diffusion_d`.
+7. Stability factor, Frierson eq. (20), uses the surface Ri_N instead of Ri at the
+   boundary-layer top.
+
+Both:
+
+8. Critical Richardson number 10 → 1 in `BulkRichardsonDrag` and `BulkRichardsonDiffusion`
+   (Frierson 2006, still to be checked against the paper). 10 was probably tuned to live with
+   the always-stable bug.
+9. `BulkRichardsonDrag(SG::SpectralGrid; kwargs...)`, previously `, kwargs...`, which rejected
+   keyword arguments.
 
 ## Testing and verification
 
-New `test/parameterizations/boundary_layer.jl`:
-- `surface_skin_temperature` returns SST on ocean points, soil temperature on land points and
-  the weighted value on coastal points.
-- For calm wind at an ocean point, a surface 10 K warmer than the air gives Ri < 0 and the
-  neutral maximum drag (κ/ln(z/z₀))². A surface 10 K colder gives Ri > 0 and `drag_min`.
-- The diffusion finds a boundary layer over the warm surface and none over the cold one.
+`test/parameterizations/boundary_layer.jl`:
+- `surface_skin_temperature` on ocean, land and coastal points.
+- Calm wind at an ocean point: a surface 10 K warmer than the air gives Ri < 0 and the neutral
+  maximum drag (κ/ln(z/z₀))². A surface 10 K colder gives `drag_min`. The diffusion finds a
+  boundary layer over the warm surface and none over the cold one.
+- The vertical diffusion changes u, conserves the column integral Σ tendency·Δσ, and reduces
+  the vertical variance within the boundary layer.
 
-Effect on the default `PrimitiveWetModel` (start 2000-01-01, zonal and time mean over days
-60–120, main → this PR):
+Diffusion before and after (T31L8, 3 days): identical results with and without
+`vertical_diffusion` on main. With this PR, K ≈ 50–100 m²/s near the surface in a typical
+column, and tendencies of a few K/day.
 
-| | global T, lowest layer [K] | T 0–10°, lowest layer [K] | T 0–10°, σ ≈ 0.45 [K] | q 0–10°, lowest layer [g/kg] | max zonal-mean u [m/s] |
-|---|---|---|---|---|---|
-| T31L8 | 277.4 → 281.0 | 287.0 → 291.3 | 250.9 → 259.0 | 7.2 → 10.0 | 50.4 → 57.0 |
-| T63L8 | 277.9 → 280.7 | 287.9 → 291.2 | 252.4 → 258.5 | 7.6 → 9.8 | 45.3 → 51.6 |
-| T31L16 | 282.2 → 283.6 | 292.1 → 294.1 | 257.1 → 261.3 | 9.9 → 11.6 | 51.5 → 52.8 |
+Drag with this PR (T31L8, day 20): ≥ 99% of the maximum at 91% of ocean and 83% of land points,
+at `drag_min` at 1% (ocean) and 8% (land). Surface minus lowermost-layer potential temperature
+is +3.5 K (ocean) and +5.1 K (land) on average; the diffusion doesn't change this.
 
-Global mean precipitation over days 10–15: T31L8 2.24 → 2.58, T63L8 1.95 → 2.49 and T31L16
-2.13 → 2.31 mm/day. The model's tropics warm, which reduces the known cold bias (#856). The
-effect is smaller at 16 layers, where the lowermost layer is closer to the surface. There z is
-smaller, so the old Ri was less often above Ri_c.
+Stability, default `PrimitiveWetModel`, 20 days:
+
+| | main | this PR |
+|---|---|---|
+| T31L4, T31L8, T63L8, T31L16, T85L16 | stable | stable |
+| T31L24 | stable | NaN after ~12 h (over Tibet) |
+| T31L24, 20-min time step | – | stable |
+| T31L24, no orography | – | stable |
+| T31L32 | NaN | – |
+
+The climate impact numbers from the first version (Richardson fix only) are outdated and will
+be redone once the stability question is settled.
 
 ## Documentation changes
 
@@ -95,13 +144,22 @@ formulation.
 
 ## Known limitations
 
+- **T31L24 blows up over Tibet.** The soil top layer swings between 218 and 342 K from hour to
+  hour and the drag flips between minimum and maximum. Momentum diffusion brings jet-level winds
+  (~40 m/s) to the 2.5 km plateau surface. The thin lowermost layer (z ≈ 190 m) raises the
+  maximum drag to ~4.7e-3. Together ρcₚC_DV ≈ 150 W/m²/K, an exchange time scale of about
+  20–25 min for both the top soil layer and the lowermost air layer. That is shorter than the
+  2 × 40 min Leapfrog step, so the explicit surface heat flux overshoots. Proposed: limit
+  ρC_DV so that the exchange time scale can't fall below the time step. Awaiting decision.
 - Tₛ is the SST or the top soil layer temperature, not a proper skin temperature. The surface
   heat fluxes make the same assumption.
-- Sea ice is not considered separately. The SST is used under sea ice, as in the heat flux.
+- Sea ice is not considered separately.
+- The critical Richardson number of 1 is from memory of Frierson (2006) and not yet checked.
 
 ## Future work
 
-- The vertical diffusion is a no-op (neighbour indices), and its K would need the conversion to
-  σ-space before it can be switched on, #1282.
+- Implicit coupling of the surface fluxes with land and the lowermost layer, as an
+  alternative to a limiter.
 - The land humidity flux ρC_DV(α·qsat(T_soil) − q_air) is negative over dry soil whenever
   q_air > α·qsat, so dry soil takes up moisture from unsaturated air.
+- Refit `BalancedZonalState` (#1284) to the new equilibrium.

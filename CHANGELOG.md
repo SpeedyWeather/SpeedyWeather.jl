@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Bulk Richardson number for the surface drag and vertical diffusion uses the surface (skin) temperature, previously always stable [#1283](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1283)
+- Bulk Richardson number uses the surface (skin) temperature (was always stable), vertical diffusion works (was a no-op): σ-space K, implicit, critical Richardson number 1 [#1283](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1283)
 - [BREAKING] Bundle shortwave and longwave radiation into one model component `model.radiation = Radiation(shortwave, longwave)`, replacing the `shortwave_radiation` and `longwave_radiation` fields [#1252](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1252)
 - ImplicitCondensation: keep the melting cooling, fix its units and the Clausius-Clapeyron derivative in the implicit correction [#1277](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1277)
 - `Parameterization` function stub for packages to define SpeedyWeather parameterizations in extensions [#1261](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1261)
