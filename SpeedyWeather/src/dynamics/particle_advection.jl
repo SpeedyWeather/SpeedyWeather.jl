@@ -403,11 +403,13 @@ function particle_advection!(
     return nothing
 end
 
-@inline function advect_2D(
+@inline function advect_3D(
         particle::Particle{NF},                 # particle to advect
         u::NF,                                  # zonal velocity [m/s]
         v::NF,                                  # meridional velocity [m/s]
-        Δt::NF,                                 # scaled time step [s*˚/m]
+        w::NF,                                  # vertical velocity [1/s]
+        Δt::NF,                                 # horizontal: scaled time step [s*˚/m]
+        Δt_vert::NF,                            # vertical: [s]; dσ = w[s⁻¹] * Δt_vert[s]
     ) where {NF}
 
     dlat = v * Δt                                           # increment in latitude [˚N]
@@ -416,24 +418,13 @@ end
     # JuliaGPU/AMDGPU.jl#1041 is merged/released and `cosd` is supported on AMD GPUs.
     coslat = max(cos(deg2rad(particle.lat)), eps(NF))       # prevents division by zero
     dlon = u * Δt / coslat                                  # increment in longitude [˚E]
-    return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
+    dσ = w * Δt_vert                                        # increment in σ
+    return mod(move(particle, dlon, dlat, dσ))  # move, mod back to [0, 360˚E], [-90, 90˚N], [0, 1]
 end
 
-@inline function advect_3D(
-        particle::Particle{NF},
-        u::NF,
-        v::NF,
-        w::NF,
-        Δt::NF,         # horizontal: [s*˚/m]
-        Δt_vert::NF,    # vertical: [s]; dσ = w[s⁻¹] * dt_vert[s]
-    ) where {NF}
-
-    dlat = v * Δt
-    coslat = max(cos(deg2rad(particle.lat)), eps(NF))
-    dlon = u * Δt / coslat
-    dσ = w * Δt_vert
-    return mod(move(particle, dlon, dlat, dσ))
-end
+# 2D: no vertical movement, σ is unchanged (and only clamped by mod)
+@inline advect_2D(particle::Particle{NF}, u::NF, v::NF, Δt::NF) where {NF} =
+    advect_3D(particle, u, v, zero(NF), Δt, zero(NF))
 
 # Kernel for predictor step in Heun's method
 @kernel inbounds = true function predictor_step_kernel!(
