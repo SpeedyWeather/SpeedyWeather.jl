@@ -20,6 +20,13 @@ bundle of `radiation-bundle.md`). Working branch: `mg/numericalradiation-extensi
 
 ## Revision log
 
+- **2026-09-29, allocation-free again.** Rerunning the validation scripts showed the ecCKD
+  kernel allocating 320 bytes per column (it was allocation-free on 2026-09-11): the clear-sky
+  longwave solver of NumericalRadiation's `main` allocates four small work vectors per call on
+  its interface-source path. The kernel now calls the exported `streaming_longwave_fluxes!`
+  (the sweeps that solver runs per g point) once for all g points with two work vectors from
+  the `:ecckd` namespace; fluxes are bit-identical, no `src` change needed. Budget and NaN
+  detector runs reproduce the September 11 results.
 - **2026-09-29, NumericalRadiation registered.** Version 0.1.0 is in General, but it is
   NumericalRadiation's `main` before its PR #16 and has neither `ClearSkyEcCKDRadiation` nor the
   per-array types the extension needs, so with 0.1.0 the extension would fail to load. The git
@@ -312,8 +319,8 @@ All per-column memory is SpeedyWeather parameterization variables in the `:ecckd
 declared by `variables(::ClearSkyEcCKDRadiation, model)` and sized from the model and the
 gas-optics tables: layer and interface pressures and interface temperatures, gas amounts
 (`Grid4D(n = ngas)`), optical depths and Planck sources per g point (`Grid4D(n = ng)`),
-interface fluxes, the surface emission per g point, and the seven scratch vectors of the
-shortwave adding method. The kernel takes views into them; NumericalRadiation wants a
+interface fluxes, the surface emission per g point, two work vectors of the streaming
+longwave solver, and the seven scratch vectors of the shortwave adding method. The kernel takes views into them; NumericalRadiation wants a
 column's g-point arrays as `(ng, nlayers)` while `Grid4D` allocates `(npoints, nlayers, ng)`,
 so `column_gpoints` wraps the column slice in a `PermutedDimsArray`, a zero-cost view. With
 the caller-owned `ShortwaveColumnScratch` (seven views, all of interface length so that they
@@ -337,11 +344,16 @@ blending fluxes is exact for a partially land-covered cell, while blending tempe
 would not be. The broadband ocean and land emissions are accumulated with the g-point
 weights in the same loop and stored as `ocean.surface_longwave_up` and
 `land.surface_longwave_up`, which the ocean and land models need for their own energy
-budgets, exactly as SpeedyWeather's one-band longwave fills them. The solver then runs with
-`LongwaveBoundaryConditions(surface_longwave_up = emission)`: zero downward flux at the top,
-and the longwave surface albedo left at zero, so the 2 % of the downward flux that an
-`ε = 0.98` surface reflects by Kirchhoff's law (about 6 W m⁻²) is neglected; see Future work.
-Outgoing longwave is the top upward flux, the surface fluxes are the bottom entries.
+budgets, exactly as SpeedyWeather's one-band longwave fills them. The transfer itself is
+NumericalRadiation's exported `streaming_longwave_fluxes!`, the downward and upward sweeps
+that `radiative_fluxes!(…, CloudlessLongwave(), …)` runs per g point, called once for all g
+points with the blended emission, zero downward flux at the top, the longwave surface albedo
+at zero (so the 2 % of the downward flux that an `ε = 0.98` surface reflects by Kirchhoff's
+law, about 6 W m⁻², is neglected; see Future work) and two work vectors from the `:ecckd`
+namespace, which is what keeps the stage allocation-free (the solver's own entry point
+allocates four vectors per call). The layer optics are handed over as a three-field callable
+over the column's g-point views. Outgoing longwave is the top upward flux, the surface fluxes
+are the bottom entries.
 
 ### Shortwave stream
 

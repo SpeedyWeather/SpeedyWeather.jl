@@ -17,7 +17,7 @@ import NumericalRadiation: ClearSkyEcCKDRadiation, EcCKDTabulatedGasOpticsModel,
     LongwaveOptics, ShortwaveOptics, CloudlessLongwave, CloudlessShortwave,
     ShortwaveColumnScratch, TabulatedSurfaceEmission, LongwaveBoundaryConditions,
     ShortwaveBoundaryConditions, optical_properties!, radiative_fluxes!,
-    read_reference_ecckd_gas_optics
+    streaming_longwave_fluxes!, read_reference_ecckd_gas_optics
 
 # CO₂ [ppm] of the analytic-band longwave when the model has no `greenhouse_gases.co2`;
 # NumericalRadiation's own default (AtmosphereProfile). ClearSkyEcCKDRadiation carries its own.

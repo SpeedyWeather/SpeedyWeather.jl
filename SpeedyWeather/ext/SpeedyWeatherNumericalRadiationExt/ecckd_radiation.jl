@@ -54,6 +54,9 @@ function SpeedyWeather.variables(rad::ClearSkyEcCKDRadiation{NF}, model::SpeedyW
         PV(:shortwave_up, interfaces, desc = "Upward shortwave flux", units = "W/m^2", namespace = ns),
         PV(:shortwave_down, interfaces, desc = "Downward shortwave flux", units = "W/m^2", namespace = ns),
         PV(:surface_emission, SpeedyWeather.Grid3D(n = ng_lw), desc = "Surface longwave emission per g point", units = "W/m^2", namespace = ns),
+        # work vectors of the streaming longwave solver (layer transmittance and upward source of the current g point)
+        PV(:longwave_transmittance, layers, desc = "Longwave layer transmittance (work)", units = "1", namespace = ns),
+        PV(:longwave_source_up, layers, desc = "Longwave upward layer source (work)", units = "W/m^2", namespace = ns),
         # shortwave adding-method work arrays, the fields of ShortwaveColumnScratch; all with the
         # interface length so that the seven column views share one type (the struct has one
         # array-type parameter), the layer ones use the first nlayers entries
@@ -70,6 +73,16 @@ end
 # column views: (npoints, n) -> vector, (npoints, nlayers, ng) -> (ng, nlayers) matrix
 @inline column(field, ij) = view(field, ij, :)
 @inline column_gpoints(field, ij) = PermutedDimsArray(view(field, ij, :, :), (2, 1))
+
+# The layer optics of one column as NumericalRadiation's streaming longwave solver reads them:
+# optical depth and the Planck sources at the layer's top and bottom, per g point and layer.
+struct ColumnLayerOptics{A, T, B}
+    optical_depth::A
+    source_top::T
+    source_bottom::B
+end
+Base.@propagate_inbounds (o::ColumnLayerOptics)(g, k) =
+    (o.optical_depth[g, k], o.source_top[g, k], o.source_bottom[g, k])
 
 """$(TYPEDSIGNATURES)
 Interface temperatures from layer temperatures `T` at pressures `p`: linear in
@@ -247,7 +260,8 @@ end
 
 """$(TYPEDSIGNATURES)
 Longwave stream: spectral surface emission over ocean and land blended by land
-fraction, clear-sky transfer, and the longwave diagnostics of column `ij`."""
+fraction, clear-sky transfer with NumericalRadiation's streaming solver, and the
+longwave diagnostics of column `ij`."""
 Base.@propagate_inbounds function ecckd_longwave!(ij, vars, fluxes, longwave, atmosphere,
                                                   rad::ClearSkyEcCKDRadiation{NF}, surface) where NF
     (; gas_optics) = rad
@@ -272,8 +286,14 @@ Base.@propagate_inbounds function ecckd_longwave!(ij, vars, fluxes, longwave, at
         emission[ig] = (1 - f) * eₒ + f * eₗ
     end
 
-    radiative_fluxes!(fluxes, CloudlessLongwave(), longwave, atmosphere,
-                      LongwaveBoundaryConditions(surface_longwave_up = emission))
+    # NumericalRadiation's streaming clear-sky solver, the same sweeps that
+    # radiative_fluxes!(…, CloudlessLongwave(), …) runs per g point, called once for all g
+    # points with two caller-owned work vectors so that nothing is allocated. No downward
+    # flux at the top, no longwave surface reflection (surface albedo zero).
+    layer_optics = ColumnLayerOptics(longwave.optical_depth, longwave.source_top, longwave.source_bottom)
+    streaming_longwave_fluxes!(fluxes.longwave_up, fluxes.longwave_down, layer_optics, emission,
+                               zero(NF), zero(NF), weights, length(weights), nlayers,
+                               column(W.longwave_transmittance, ij), column(W.longwave_source_up, ij))
 
     vars.parameterizations.outgoing_longwave[ij] = fluxes.longwave_up[1]
     vars.parameterizations.surface_longwave_down[ij] = fluxes.longwave_down[nlayers + 1]
