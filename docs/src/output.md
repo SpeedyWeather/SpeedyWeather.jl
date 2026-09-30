@@ -51,7 +51,7 @@ model constructor, otherwise it will not be part of your model and the default i
 Note that the choice of `interval` can affect the actual [time step](@ref time_stepping) that is used for the model
 integration, which is explained in the following (see also
 [Adjust with output](@ref) for the equivalent option on the time stepper itself).
-Example, we run the model at a resolution of T42 and the time step is going to be
+Example, we run the model at a resolution of T43 and the time step is going to be
 ```@example netcdf
 spectral_grid = SpectralGrid(truncation=43, nlayers=1)
 time_stepping = Leapfrog(spectral_grid)
@@ -135,6 +135,75 @@ Overview of the corresponding full grids
 The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings as their reduced grids,
 but have always as many longitude points as there are around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
+
+## [Output layers](@id output_layers)
+
+By default, 3D variables are written on the model's vertical layers, sigma or hybrid
+sigma-pressure depending on the model's
+[Vertical coordinates](@ref vertical_coordinates_page), on a dimension called `layer`.
+Pass `layers = PressureLayers(spectral_grid)` to write them on pressure layers instead
+
+```@example netcdf
+spectral_grid = SpectralGrid(nlayers = 8)
+output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = PressureLayers(spectral_grid))
+output.layers
+```
+
+or choose the layers yourself, in Pa
+
+```@example netcdf
+output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = PressureLayers(spectral_grid, [850, 500, 200] .* 100))
+nothing # hide
+```
+
+The vertical dimension in the file is then called `pressure` and holds the layers in hPa,
+and every 3D atmospheric variable (temperature, humidity, wind, vorticity, ...) is written
+on it. 2D variables and soil variables with their own `soil_layer` dimension are
+unaffected. The interpolation happens column-wise on the model's own grid — and so on the
+GPU for a GPU simulation — before the horizontal interpolation onto the output grid, see
+[Vertical interpolation onto pressure layers](@ref vertical_interpolation). The default
+`PressureLayers(spectral_grid)` writes the layers 50, 100, 200, 300, 500, 700, 850, 925 and 1000 hPa.
+
+`PressureLayers` takes the model's `SpectralGrid` because it allocates the pressure layers
+and one scratch field on the model's grid and architecture, shared by all output variables.
+It interpolates linearly in log(pressure) by default, pass
+`interpolation = SpeedyWeather.LinearInPressure()` for linear in pressure instead. The
+same interpolation is used for every variable.
+
+### Below the lowest model layer
+
+Pressure layers can lie below the lowest model layer, which sits some tens of hPa above
+the surface, and below the surface itself over orography. What happens there is a
+per-variable choice, through an optional `extrapolation` field on the output variable.
+Temperature descends dry-adiabatically, everything else is held constant, which are the
+defaults
+
+```@example netcdf
+SpeedyWeather.output_extrapolation(SpeedyWeather.TemperatureOutput())
+```
+
+```@example netcdf
+SpeedyWeather.output_extrapolation(SpeedyWeather.HumidityOutput())
+```
+
+κ = R_dry/cₚ of the dry adiabat is taken from the model's atmosphere at `initialize!`.
+To mask everything below the surface with the variable's `missing_value` (`NaN` by
+default) instead, while still extrapolating between the lowest model layer and the
+surface, use a `SubsurfaceMask`
+
+```@example netcdf
+temp = SpeedyWeather.TemperatureOutput(
+    extrapolation = SpeedyWeather.SubsurfaceMask(
+        above_surface = SpeedyWeather.DryAdiabaticExtrapolation(),
+    ),
+)
+add!(output, temp)
+nothing # hide
+```
+
+Note that masking happens *before* the horizontal interpolation onto the output grid, so
+the masked region grows by the four-point interpolation stencil. Above the model top
+every variable is currently held constant.
 
 ## Output variables
 

@@ -205,7 +205,7 @@ Fortran SPEEDY.
 
 SpeedyWeather.jl uses triangular truncation such that only spherical harmonics with ``l \leq l_{max}`` and ``|m| \leq m_{max}``
 are explicitly represented. This is usually described as ``Tm_{max}``, with ``l_{max} = m_{max}`` (although in vector quantities
-require one more degree ``l`` in the recursion relation of meridional gradients). For example, T31 is the spectral resolution
+require one more degree ``l`` in the recursion relation of meridional gradients). For example, T32 (1-based) is the spectral resolution
 with ``l_{max} = m_{max} = 31``. Note that the degree ``l`` and order ``m`` are mathematically 0-based, such that the
 corresponding coefficient matrix is of size 32x32.
 

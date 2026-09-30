@@ -9,6 +9,7 @@ $(TYPEDFIELDS)"""
         Interpolator,
         DT,
         S,
+        Layers,
     } <: AbstractOutput
 
     # FILE OPTIONS
@@ -57,6 +58,10 @@ $(TYPEDFIELDS)"""
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
 
+    "[OPTION] vertical layers to write 3D atmospheric variables on, `ModelLayers()` (default)
+    or `PressureLayers(spectral_grid)`, see [`AbstractOutputLayers`](@ref)"
+    layers::Layers = ModelLayers()
+
     # the netcdf file to be written into, will be created
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
@@ -86,6 +91,7 @@ function NetCDFOutput(
         output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),  # only needed for dispatch
+        layers::AbstractOutputLayers = ModelLayers(),        # needed to size field3D
         kwargs...
     )
 
@@ -96,15 +102,14 @@ function NetCDFOutput(
     interpolator = RingGrids.interpolator(output_grid, input_grid, NF = DEFAULT_OUTPUT_NF)
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
-    (; nlayers) = SG
-
     land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction
     field2D = Field(output_NF, output_grid)
-    field3D = Field(output_NF, output_grid, nlayers)
+    field3D = Field(output_NF, output_grid, get_nlayers(layers, SG))
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     output = NetCDFOutput(;
         interval = Second(interval),    # convert to seconds for dispatch
+        layers,
         interpolator,
         land_fraction,
         field2D,
@@ -128,9 +133,13 @@ function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
     println(io, styled"├ {info:write restart file} = $(output.write_restart) (if active)")
 
     interp_type_str = string(typeof(output.interpolator))
-    interp_type_str_short = length(interp_type_str) > 70 ? string(first(interp_type_str, 70), "...}") : interp_type_str
-
+    interp_type_str_short = length(interp_type_str) > 64 ? string(first(interp_type_str, 64), "...}") : interp_type_str
     println(io, styled"├ {info:interpolator}::$interp_type_str_short")
+
+    layers_type_str = string(typeof(output.layers))
+    layers_type_str_short = length(layers_type_str) > 70 ? string(first(layers_type_str, 70), "...}") : layers_type_str
+    println(io, styled"├ {info:layers}::$layers_type_str_short")
+    
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, styled"├ {info:interval} = $(output.interval)")
     print(io, styled"└ {info:variables}")
@@ -185,12 +194,11 @@ function initialize!(
     # explictly move to CPU and convert to common format as determined by RingGrids.get_lond (Float64 default)
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
     soil_indices = collect(1:get_soil_layers(model))
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib = Dict("units" => "degrees_north", "long_name" => "latitude"))
-    defVar(dataset, "layer", σ, ("layer",), attrib = Dict("units" => "1", "long_name" => "sigma layer"))
+    define_vertical_coordinate!(dataset, output.layers, model)      # sigma or pressure layers
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
     # VARIABLES: define every output variable in the netCDF file and write initial
@@ -201,7 +209,7 @@ function initialize!(
     warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
         exists_in_simulation(var, simulation) || continue
-        define_variable!(dataset, var, eltype(output.field2D))
+        define_variable!(dataset, var, eltype(output.field2D), vertical_dim_name = vertical_dimension_name(output, var))
         output!(output, var, simulation)
     end
 
@@ -219,7 +227,8 @@ Base.close(output::NetCDFOutput) = NCDatasets.close(output.netcdf_file)
 function define_variable!(
         dataset::NCDataset,
         var::AbstractOutputVariable,
-        output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
+        output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF;
+        vertical_dim_name::String = vertical_dimension_name(var),
     )
     # hook for custom output variables to define their own (vertical) dimension
     define_dimension!(dataset, var)
@@ -227,8 +236,9 @@ function define_variable!(
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
     attributes = Dict("long_name" => var.long_name, "units" => var.unit, "_FillValue" => output_NF(missing_value))
 
-    # the vertical dimension depends on the variable, e.g. "layer" or "soil_layer"
-    all_dims = ("lon", "lat", vertical_dimension(var), "time")
+    # the vertical dimension depends on the variable and the output's layers,
+    # e.g. "layer", "pressure" or "soil_layer"
+    all_dims = ("lon", "lat", vertical_dim_name, "time")
     dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
     # pick defaults for compression if not defined

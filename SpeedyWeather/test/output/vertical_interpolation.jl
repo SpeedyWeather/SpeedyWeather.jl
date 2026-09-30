@@ -1,7 +1,9 @@
-import SpeedyWeather: interpolate_pressure_levels!, pressure
+import SpeedyWeather: interpolate_pressure_layers!, pressure
+import SpeedyWeather: LinearInPressure, LinearInLogPressure
+import SpeedyWeather: ConstantExtrapolation, DryAdiabaticExtrapolation, SubsurfaceMask
 
 # a field that is an exact function f of pressure, so that interpolating it onto pressure
-# levels can be checked against f evaluated at those levels
+# layers can be checked against f evaluated at those layers
 function pressure_test_field(spectral_grid, coordinates, pₛ, f::Function)
     field = zeros(spectral_grid.NF, spectral_grid.grid, spectral_grid.nlayers)
     for k in 1:spectral_grid.nlayers, ij in eachgridpoint(field)
@@ -10,8 +12,8 @@ function pressure_test_field(spectral_grid, coordinates, pₛ, f::Function)
     return field
 end
 
-# maximum relative error of `out` against `f(p)`, for all grid points and pressure levels
-# that are inside the model levels (outside is extrapolation, tested separately).
+# maximum relative error of `out` against `f(p)`, for all grid points and pressure layers
+# that are inside the model layers (outside is extrapolation, tested separately).
 # Returns the error and the number of points checked.
 function max_relative_error(out, p, pₛ, coordinates, nlayers, f::Function)
     error, n = zero(eltype(out)), 0
@@ -23,7 +25,7 @@ function max_relative_error(out, p, pₛ, coordinates, nlayers, f::Function)
     return error, n
 end
 
-@testset "Vertical interpolation onto pressure levels" begin
+@testset "Vertical interpolation onto pressure layers" begin
     @testset "Interpolation with $VerticalCoordinates" for VerticalCoordinates in
         (SigmaCoordinates, SigmaPressureCoordinates)
 
@@ -48,14 +50,14 @@ end
                 (LinearInLogPressure(), p -> 2log(p) + 3),
             )
             in_field = pressure_test_field(spectral_grid, coordinates, pₛ, f)
-            interpolate_pressure_levels!(out, in_field, pₛ, p, coordinates, interpolation)
+            interpolate_pressure_layers!(out, in_field, pₛ, p, coordinates, interpolation)
             error, n = max_relative_error(out, p, pₛ, coordinates, nlayers, f)
             @test n > 0                     # don't pass vacuously
             @test error < 10eps(NF)
         end
 
-        # interpolating onto pressure levels that coincide with the model levels returns
-        # the model level values, constant pₛ so that they are the same in every column
+        # interpolating onto pressure layers that coincide with the model layers returns
+        # the model layer values, constant pₛ so that they are the same in every column
         in_field = zeros(NF, spectral_grid.grid, nlayers)
         for k in 1:nlayers, ij in eachgridpoint(in_field)
             in_field[ij, k] = k^2 + ij
@@ -66,14 +68,14 @@ end
         out_levels = zeros(NF, spectral_grid.grid, nlayers)
 
         for interpolation in (LinearInPressure(), LinearInLogPressure())
-            interpolate_pressure_levels!(
+            interpolate_pressure_layers!(
                 out_levels, in_field, pₛ_const, p_levels, coordinates, interpolation,
             )
             @test all(≈(0, atol = 10eps(NF)), (out_levels .- in_field) ./ in_field)
         end
     end
 
-    @testset "Extrapolation beyond the model levels" begin
+    @testset "Extrapolation beyond the model layers" begin
         spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
         coordinates = SigmaCoordinates(spectral_grid)
         NF = spectral_grid.NF
@@ -88,9 +90,9 @@ end
 
         p_top = pressure(1, NF(1000.0e2), coordinates)
         p_bottom = pressure(nlayers, NF(1000.0e2), coordinates)
-        @test p_bottom < 1000.0e2     # lowest full level is above the surface
+        @test p_bottom < 1000.0e2     # lowest full layer is above the surface
 
-        # 1: above the model top, 2: below the lowest level but above ground, 3: below ground
+        # 1: above the model top, 2: below the lowest layer but above ground, 3: below ground
         p = NF[p_top / 2, (p_bottom + 1000.0e2) / 2, 1010.0e2]
         out = zeros(NF, spectral_grid.grid, length(p))
 
@@ -98,17 +100,17 @@ end
         bottom = in_field[:, nlayers]
 
         @testset "constant" begin
-            interpolate_pressure_levels!(
+            interpolate_pressure_layers!(
                 out, in_field, pₛ, p, coordinates,
                 LinearInLogPressure(), ConstantExtrapolation(),
             )
-            @test out[:, 1] == top          # outer-most levels held constant
+            @test out[:, 1] == top          # outer-most layers held constant
             @test out[:, 2] == bottom
             @test out[:, 3] == bottom
         end
 
         @testset "dry adiabatic" begin
-            interpolate_pressure_levels!(
+            interpolate_pressure_layers!(
                 out, in_field, pₛ, p, coordinates,
                 LinearInLogPressure(), DryAdiabaticExtrapolation(κ),
             )
@@ -119,7 +121,7 @@ end
         end
 
         @testset "subsurface mask" begin
-            interpolate_pressure_levels!(
+            interpolate_pressure_layers!(
                 out, in_field, pₛ, p, coordinates, LinearInLogPressure(),
                 SubsurfaceMask(above_surface = DryAdiabaticExtrapolation(κ)),
             )
@@ -138,22 +140,22 @@ end
         in_field = zeros(NF, spectral_grid.grid, spectral_grid.nlayers)
         p = NF[500.0e2, 850.0e2]
 
-        # number of pressure levels doesn't match the output field
+        # number of pressure layers doesn't match the output field
         out = zeros(NF, spectral_grid.grid, 3)
-        @test_throws DimensionMismatch interpolate_pressure_levels!(
+        @test_throws DimensionMismatch interpolate_pressure_layers!(
             out, in_field, pₛ, p, coordinates,
         )
 
         # output field on a different grid
         out = zeros(NF, FullGaussianGrid(spectral_grid.grid.nlat_half), length(p))
-        @test_throws DimensionMismatch interpolate_pressure_levels!(
+        @test_throws DimensionMismatch interpolate_pressure_layers!(
             out, in_field, pₛ, p, coordinates,
         )
 
-        # more pressure levels than model layers is fine, the output field decides
+        # more pressure layers than model layers is fine, the output field decides
         p_many = NF[100.0e2 * i for i in 1:10]
         out = zeros(NF, spectral_grid.grid, length(p_many))
-        interpolate_pressure_levels!(out, in_field, pₛ, p_many, coordinates)
+        interpolate_pressure_layers!(out, in_field, pₛ, p_many, coordinates)
         @test all(isfinite, out)
     end
 end
