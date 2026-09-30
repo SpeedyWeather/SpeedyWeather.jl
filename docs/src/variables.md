@@ -110,7 +110,8 @@ As you'll notice when inspecting `simulation.variables` is that many prognostic 
 will have one more dimension than you may think they should have. This is the step dimension as
 many time stepping schemes require either several steps in the prognostic variables (think [Leapfrog](@ref leapfrog))
 or several tendency steps (think multi-step methods). In many cases this additional dimension
-will just be a trailing singleton dimension and you can drop it by selecting it, e.g. `[:, 1]`.
+will just be a trailing singleton dimension, but rather than dropping it by hand use
+[`get_step`](@ref) which knows which dimension is the step dimension (see below).
 As the step dimension essentially contains several "versions" of the same variable the error you
 will make by selecting the wrong one is generally small. In Leapfrog, you would simply select
 the previous time step for example, see [Time steppers](@ref steps).
@@ -135,11 +136,12 @@ So a conceptually 2D horizontal-only variable may use an array of
 and similar with 3D variables (but the vertical dimension isn't singleton then).
 Whether the step dimension is singleton or not depends on the time stepping scheme in use.
 
-To ease the selection of the step dimension you can use the `get_step` function without any argument
-which will automatically create a view onto the array selecting the last step as this
-in many cases represents the "current" step and not any previous ones.
-But this depends on your time stepping scheme (which the variable itself does not know about).
-For example
+To ease the selection of the step dimension use the `get_step` function. It always selects the
+dimension tagged as time `T`, so you do not have to work out yourself whether a given array's
+2nd dimension is the vertical or the step. Called without a step index it creates a view onto
+the array selecting the last step, as this in many cases represents the "current" step and not
+any previous ones. But this depends on your time stepping scheme (which the variable itself does
+not know about). For example
 
 ```julia
 size(simulation.variables.grid.u)
@@ -154,7 +156,25 @@ This is what the `get_step` function will do for you
 ```julia
 get_step(simulation.variables.grid.u)       # selects the last step index automatically
 get_step(simulation.variables.grid.u, 1)    # select first step
-get_steP(simulation.variables.grid.u, 2)    # select 2nd step
+get_step(simulation.variables.grid.u, 2)    # select 2nd step
 ```
 
-Then you can use `[ij, k]` indexing afterwards again. 
+Then you can use `[ij, k]` indexing afterwards again.
+
+Because `get_step` goes by the time tag `T` and not by the position of the last dimension, it is
+also safe to call on variables that have *no* step dimension: a variable tagged `XY`, `XYZ`, `LM`
+or `LMZ` has nothing to select from, so the full variable is returned as a view and the step index
+is ignored. This means you can write `get_step(var)` generically without checking first whether
+`var` has steps at all. Diagnostic and working variables typically fall in this category, e.g. a
+`ParameterizationVariable` tagged `XYZ` whose 2nd dimension is the vertical: `get_step` returns
+the whole thing rather than mistaking a layer for a step.
+
+The companion `get_steps` returns *all* steps as a tuple of views, one per step, which is handy
+when a scheme needs several of them at once:
+
+```julia
+u_old, u_new = get_steps(simulation.variables.grid.u)   # Leapfrog: previous and current step
+```
+
+Consistently with `get_step`, a variable without a step dimension yields a 1-tuple holding the
+full variable — the vertical layers of an `XYZ` variable are *not* steps and are never splatted. 

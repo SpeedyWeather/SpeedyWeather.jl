@@ -219,7 +219,7 @@ run!(simulation, period=Day(5))
 nothing # hide
 ```
 
-Note that we chose a lower resolution here (T42) as we are simulating
+Note that we chose a lower resolution here (T43) as we are simulating
 8 vertical layers now too. Let us visualise the surface vorticity
 (`[:, 8]` is the lowermost layer)
 
