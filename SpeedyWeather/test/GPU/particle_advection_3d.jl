@@ -32,8 +32,8 @@ end
     simulation = initialize!(model)
     vars = simulation.variables
 
-    # call particle_advection! directly, bypassing the time_step!/column_parameterizations!
-    # pipeline that currently fails to compile on GPU, see testset below and PR #1215
+    # call particle_advection! directly to test the advection on its own, without the rest of
+    # the time step; the full simulation is tested below
     for step in 1:10
         vars.prognostic.clock.time_step_counter = step
         SpeedyWeather.particle_advection!(vars, model)
@@ -43,15 +43,38 @@ end
     @test all(0 .<= σ_final .<= 1)
 end
 
+# largest horizontal displacement of any particle between two snapshots
+max_displacement(before, after) = maximum(max(abs(a.lon - b.lon), abs(a.lat - b.lat)) for (a, b) in zip(after, before))
+
+# every_n_time_steps = 1 so that particles are advected within the two time steps
 @testset "GPU 3D particle advection full simulation" begin
     arch = SpeedyWeather.GPU()
     spectral_grid = SpectralGrid(truncation = 31, nlayers = 4, architecture = arch)
-    particle_advection = ParticleAdvection3D(spectral_grid, nparticles = 20)
+    particle_advection = ParticleAdvection3D(spectral_grid, nparticles = 20, every_n_time_steps = 1)
 
     model = PrimitiveDryModel(spectral_grid; particle_advection)
     model.feedback.verbose = false
     simulation = initialize!(model)
+    particles_initial = Array(simulation.variables.prognostic.particles)
 
-    @test_nowarn run!(simulation, steps = 1, output = false)
+    @test_nowarn run!(simulation, steps = 2, output = false)
+    particles_final = Array(simulation.variables.prognostic.particles)
+    @test max_displacement(particles_initial, particles_final) > 0
+    @test all(0 <= p.σ <= 1 for p in particles_final)
 end
 
+@testset "GPU 2D particle advection full simulation" begin
+    arch = SpeedyWeather.GPU()
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 1, architecture = arch)
+    particle_advection = ParticleAdvection2D(spectral_grid, nparticles = 20, every_n_time_steps = 1)
+
+    model = BarotropicModel(spectral_grid; particle_advection)
+    model.feedback.verbose = false
+    simulation = initialize!(model)
+    particles_initial = Array(simulation.variables.prognostic.particles)
+
+    @test_nowarn run!(simulation, steps = 2, output = false)
+    particles_final = Array(simulation.variables.prognostic.particles)
+    @test max_displacement(particles_initial, particles_final) > 0
+    @test all(p -> isfinite(p.lon) && isfinite(p.lat), particles_final)
+end
