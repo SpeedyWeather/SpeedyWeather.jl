@@ -71,16 +71,20 @@ end
 
 @testset "ParticleAdvection3D vertical displacement" begin
     # Vertical drift must be gradual: σ̇ ~ O(1e-6) 1/s, so over a few advection steps particles
-    # started mid-column stay mid-column. Deterministic (fixed σ), unlike the random init above.
+    # started mid-column stay mid-column. Deterministic (fixed positions), unlike the random init above.
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     pa = ParticleAdvection3D(spectral_grid, nparticles = 10, every_n_time_steps = 2)
     model = PrimitiveWetModel(spectral_grid; particle_advection = pa)
     model.feedback.verbose = false
     simulation = initialize!(model)
 
-    # place every particle mid-column, away from the boundaries where w vanishes by construction
+    # place every particle mid-column, away from the boundaries where w vanishes by construction,
+    # at fixed horizontal positions as the drift depends on the local vertical velocity
+    lons = collect(range(0, 350, 10))
+    lats = collect(range(-60, 60, 10))
     particles = simulation.variables.prognostic.particles
-    particles .= [SpeedyWeather.set(p; σ = 0.5) for p in particles]
+    P = eltype(particles)
+    particles .= [P(true, lons[i], lats[i], 0.5) for i in eachindex(particles)]
     SpeedyWeather.initialize!(simulation.variables, particles, model.particle_advection, model)
 
     run!(simulation, period = Hour(4), output = false)
