@@ -61,7 +61,6 @@ end
 
 export ParticleAdvection3D
 
-# σ_levels_full is read from model.geometry at runtime.
 """
 $(TYPEDFIELDS)
 
@@ -93,36 +92,21 @@ function ParticleAdvection3D(SG::SpectralGrid; kwargs...)
     return ParticleAdvection3D{SG.NF, typeof(geometry), typeof(SG.truncation)}(; geometry, kwargs...)
 end
 
-variables(P::AbstractParticleAdvection) = variables(typeof(P), P.nparticles)
-
-# Common particle variables shared between 2D and 3D advection (no locator)
-function _common_particle_variables(nparticles)
+function particle_variables(nparticles)
     return (
         PrognosticVariable(:particles, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
-        ParticleVariable(:locations, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
+        ParticleVariable(:locations, ParticleVectorDim(nparticles), desc = "Predicted particle locations", units = "˚/1"),
         ParticleVariable(:u, VectorDim(nparticles), desc = "Zonal velocity at particle location", units = "m/s"),
         ParticleVariable(:v, VectorDim(nparticles), desc = "Meridional velocity at particle location", units = "m/s"),
-    )
-end
-
-function variables(::Type{<:ParticleAdvection2D}, nparticles)
-    return (
-        _common_particle_variables(nparticles)...,
         ParticleVariable(:locator, LocatorDim(), desc = "Particle locator for horizontal interpolation", units = "1"),
     )
 end
 
-# 3D advection: same common variables but LocatorDim's allocate() dispatches on
-# model.particle_advection isa ParticleAdvection3D to embed north/south_pole_average
-# arrays in the locator (type-stable, avoids per-call allocation)
-function variables(P::ParticleAdvection3D, ::AbstractModel)
-    (; nparticles) = P
-    return (
-        _common_particle_variables(nparticles)...,
-        ParticleVariable(:locator, LocatorDim(), desc = "Particle locator with embedded pole averages for 3D interpolation", units = "1"),
-        ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity dσ/dt at particle location", units = "1/s"),
-    )
-end
+variables(P::ParticleAdvection2D) = particle_variables(P.nparticles)
+variables(P::ParticleAdvection3D) = (
+    particle_variables(P.nparticles)...,
+    ParticleVariable(:w, VectorDim(P.nparticles), desc = "Vertical velocity dσ/dt at particle location", units = "1/s"),
+)
 
 function initialize!(particle_advection::ParticleAdvection2D, model::AbstractModel)
     (; nlayers) = model.spectral_grid
@@ -136,7 +120,7 @@ initialize!(::ParticleAdvection3D, ::AbstractModel) = nothing
 """
 $(TYPEDSIGNATURES)
 Initialize particle locations uniformly in latitude, longitude and in the
-vertical σ coordinates. This uses a cosin-distribution in latitude for
+vertical σ coordinates. This uses a cosine-distribution in latitude for
 an equal-area uniformity."""
 function initialize!(
         particles::AbstractVector{P},
