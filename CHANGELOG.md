@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- AMDGPU benchmarks on LUMI: `amdgpu` argument for `manual_benchmarking.jl`, `clear_fourier_graph_cache!` now also runs the GC and reclaims device memory (used between benchmark runs), and `gpu-amd` results [#1288](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1288)
 - `on_architecture` keeps the dimensions of a `LowerTriangularArray`, fixes for tests and docs after merging main [#1274](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1274)
 - Sea ice freezing and the snow melt cap are adjustments in `filter!`, not tendencies, fixing sea ice with NCycleLorenz for the ocean [#1272](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1272)
 - `Leapfrog` and `NCycleLorenz` have `ocean` and `land` fields for their time steppers, Leapfrog defaulting to the new `EulerForward`; snow depth is time stepped by the land time stepper [#1264](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1264)
