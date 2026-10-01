@@ -20,6 +20,10 @@ bundle of `radiation-bundle.md`). Working branch: `mg/numericalradiation-extensi
 
 ## Revision log
 
+- **2026-10-01, NumericalRadiation 0.1.1 registered.** NumericalRadiation is an ordinary test
+  dependency now: the `[sources]` git entry in `test/Project.toml` and the `Pkg.add` line of
+  the 1.10 CI step are gone; `[compat] NumericalRadiation = "0.1.1"` in `Project.toml` picks
+  the registered release. SpeedyWeather's own tests run on Julia 1.10 and 1.13 as before.
 - **2026-10-01, NumericalRadiation PR #16 merged.** Its `main` now carries everything the
   extension needs (version 0.1.1, unregistered yet): the test environment and the 1.10 CI step
   pull `main` instead of the PR branch. Once 0.1.1 is registered both git references go.
@@ -202,9 +206,7 @@ import lines and the split of the struct definitions into `src/`.
 
 Part of the normal suite (autodiscovered by `test/runtests.jl`, run by `Pkg.test` on Julia
 1.10 and 1.13). The file starts with `using NumericalRadiation`; NumericalRadiation is a test
-dependency in `test/Project.toml` with a `[sources]` git entry (`rev = "main"` until 0.1.1 is
-registered), and the 1.10 step of `CI_SpeedyWeather.yml` adds
-it with `Pkg.add(url, rev)` before `Pkg.test`. The `ecrad_data` artifact (~30 MB) is fetched
+dependency in `test/Project.toml` (registered, `[compat] NumericalRadiation = "0.1.1"`). The `ecrad_data` artifact (~30 MB) is fetched
 by NumericalRadiation on first use and cached by `julia-actions/cache`.
 
 What it checks (basic functionality only): the extension is active; `AnalyticBandLongwave`
@@ -217,9 +219,8 @@ with `ClearSkyEcCKDRadiation` runs two time steps. The full tests of the couplin
 energy-conservation checks, a cross-check of one column against NumericalRadiation's staged
 API, CO₂ forcing, night, 4× CO₂) live in NumericalRadiation.
 
-Once NumericalRadiation 0.1.1 is registered, the `[sources]` entry and the `Pkg.add` line go
-and it becomes an ordinary test dependency; the docs environment can then also execute the
-example.
+Since 0.1.1 is registered (2026-10-01) it is an ordinary test dependency; the docs environment
+can now also execute the example (not done yet).
 
 ### Scripts and the full tests
 
@@ -426,7 +427,7 @@ NumericalRadiation's solver.
 3. NumericalRadiation's own coupling tests (54 tests: budgets, energy conservation, a
    column cross-checked against its staged API, CO₂ forcing, night) run there against this
    branch, in its `test/speedyweather/` environment.
-4. CI: `CI_SpeedyWeather.yml` on Julia 1.10 (git dependency added by the 1.10 step) and 1.13.
+4. CI: `CI_SpeedyWeather.yml` on Julia 1.10 and 1.13, nothing extension-specific any more.
 
 ## Documentation changes
 
@@ -443,8 +444,8 @@ As listed above: `docs/src/radiation.md` section, docstrings, CHANGELOG, this pl
 
 ## Future work
 
-- After NumericalRadiation 0.1.1 is released: drop the git source in `test/Project.toml` and
-  the `Pkg.add` line of the 1.10 CI step, and execute the docs example.
+- Execute the docs example now that NumericalRadiation is registered (needs it in the docs
+  environment and the ecCKD tables at build time).
 - Prescribed ozone, as a SpeedyWeather component modelled on `greenhouse_gases` (a zonal-mean,
   pressure-dependent climatology filled at `initialize!`) or as a prescribed tracer; the
   scheme then reads a per-column ozone profile instead of `mole_fractions.o3`.
