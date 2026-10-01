@@ -45,8 +45,6 @@ jobs:
         run: |
           using Pkg
           Pkg.develop([PackageSpec(; path) for path in ("../SpeedyWeatherInternals", "../LowerTriangularArrays", "../RingGrids", "../SpeedyTransforms")])
-          # NumericalRadiation (test dependency of its extension): the registered 0.1.0 predates the schemes, same git source as test/Project.toml until 0.1.1 is released
-          Pkg.add(PackageSpec(url = "https://github.com/NumericalEarth/NumericalRadiation.jl.git", rev = "main"))
           Pkg.instantiate()
         if: ${{ matrix.version == '1.10' }}
       - uses: julia-actions/julia-runtest@v1
