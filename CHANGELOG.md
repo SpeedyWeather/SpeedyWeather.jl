@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Restrict `DocumenterCitations` compat to fix citations in docs [#1292](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1292)
 - Extension `SpeedyWeatherNumericalRadiationExt` making NumericalRadiation.jl's radiation schemes SpeedyWeather components: `ClearSkyEcCKDRadiation` (clear-sky correlated-k, both streams in one component) and `AnalyticBandLongwave` (analytic-band longwave) [#1271](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1271)
 - CPU column parameterizations loop over grid points per bundled scheme (`Radiation`: shortwave loop, then longwave loop) via `column_parameterization_cpu!`, fixing the Enzyme/LLVM segfault of the extended differentiability tests [#1290](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1290)
 - AMDGPU benchmarks on LUMI: `amdgpu` argument for `manual_benchmarking.jl`, `clear_fourier_graph_cache!` now also runs the GC and reclaims device memory (used between benchmark runs), and `gpu-amd` results [#1288](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1288)
