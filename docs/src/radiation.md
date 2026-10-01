@@ -76,6 +76,9 @@ of the one-band pair at T31 with 8 layers, and further gases of an ecCKD model a
 `mole_fractions = (; ch4 = 1.8e-6)`; see NumericalRadiation's
 [documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the scheme.
 
+!!! warning "Work in progress"
+    NumericalRadiation is still in an early stage and not yet fully validated.
+
 ## Longwave radiation implementations
 
 Currently implemented is
