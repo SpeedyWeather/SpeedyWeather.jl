@@ -31,7 +31,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [sources]
-NumericalRadiation = {url = "https://github.com/NumericalEarth/NumericalRadiation.jl.git", rev = "mg/speedy-update"}
+NumericalRadiation = {url = "https://github.com/NumericalEarth/NumericalRadiation.jl.git", rev = "main"}
 LowerTriangularArrays = {path = "../../LowerTriangularArrays"}
 RingGrids = {path = "../../RingGrids"}
 SpeedyWeather = {path = ".."}

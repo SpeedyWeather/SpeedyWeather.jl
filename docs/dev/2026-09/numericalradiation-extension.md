@@ -20,6 +20,9 @@ bundle of `radiation-bundle.md`). Working branch: `mg/numericalradiation-extensi
 
 ## Revision log
 
+- **2026-10-01, NumericalRadiation PR #16 merged.** Its `main` now carries everything the
+  extension needs (version 0.1.1, unregistered yet): the test environment and the 1.10 CI step
+  pull `main` instead of the PR branch. Once 0.1.1 is registered both git references go.
 - **2026-09-30, surface emissivity (NumericalRadiation issue #9).** The analytic-band kernel
   built its `SurfaceState` without emissivities, so the solver's default of 1 applied and
   nothing could be set from SpeedyWeather. SpeedyWeather has no surface emissivity of its own
@@ -199,8 +202,8 @@ import lines and the split of the struct definitions into `src/`.
 
 Part of the normal suite (autodiscovered by `test/runtests.jl`, run by `Pkg.test` on Julia
 1.10 and 1.13). The file starts with `using NumericalRadiation`; NumericalRadiation is a test
-dependency in `test/Project.toml` with a `[sources]` git entry (`rev` = the NumericalRadiation
-branch of PR #16 until merged/registered), and the 1.10 step of `CI_SpeedyWeather.yml` adds
+dependency in `test/Project.toml` with a `[sources]` git entry (`rev = "main"` until 0.1.1 is
+registered), and the 1.10 step of `CI_SpeedyWeather.yml` adds
 it with `Pkg.add(url, rev)` before `Pkg.test`. The `ecrad_data` artifact (~30 MB) is fetched
 by NumericalRadiation on first use and cached by `julia-actions/cache`.
 
@@ -240,8 +243,8 @@ SpeedyWeather tests basic functionality only, see above.
 
 ### The NumericalRadiation side
 
-NumericalEarth/NumericalRadiation.jl#16 (branch `mg/speedy-update`; a former stack of three
-PRs, collapsed on 2026-09-24) carries everything this extension needs and nothing
+NumericalEarth/NumericalRadiation.jl#16 (a former stack of three PRs, collapsed on 2026-09-24,
+merged into its `main` on 2026-10-01) carries everything this extension needs and nothing
 SpeedyWeather-specific:
 
 - `ClearSkyEcCKDRadiation` and `default_ozone_profile` (new `src/ecckd_radiation.jl`): the
