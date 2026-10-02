@@ -35,3 +35,25 @@
         end
     end
 end
+
+@testset "MatrixSpectralTransform transform! free of runtime dispatch (JET)" begin
+    arch = SpeedyTransforms.Architectures.CPU()
+    spectrum = Spectrum(truncation = 32, architecture = arch)
+    grid = OctahedralGaussianGrid(RingGrids.get_nlat_half(32), arch)
+    nlayers = 8
+    M = MatrixSpectralTransform(spectrum, grid; NF = Float32, nlayers)
+    scratch = M.scratch_memory
+
+    specs = rand(ComplexF32, spectrum, nlayers)
+    field = rand(Float32, grid, nlayers)
+    @test_opt target_modules = (SpeedyTransforms,) transform!(specs, field, scratch, M)  # grid → spectral
+    @test_opt target_modules = (SpeedyTransforms,) transform!(field, specs, scratch, M)  # spectral → grid
+
+    # views into a larger parent as for the model's fused variables
+    specs_parent = zeros(ComplexF32, spectrum, nlayers, 2)
+    field_parent = zeros(Float32, grid, nlayers, 2)
+    specs_view = LowerTriangularArray(view(specs_parent.data, :, :, 1), spectrum)
+    field_view = Field(view(field_parent.data, :, :, 1), grid)
+    @test_opt target_modules = (SpeedyTransforms,) transform!(specs_view, field_view, scratch, M)
+    @test_opt target_modules = (SpeedyTransforms,) transform!(field_view, specs_view, scratch, M)
+end
