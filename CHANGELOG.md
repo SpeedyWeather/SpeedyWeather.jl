@@ -3,6 +3,11 @@
 ## Unreleased
 
 - Add ParticleAdvection3D via 3D interpolation [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
+- Batched interpolation for multi-dimensional `Field`s, horizontal interpolation now named `interpolate_2D!` forwarded from `interpolate!` [#1263](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1263)
+- Restrict `DocumenterCitations` compat to fix citations in docs [#1292](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1292)
+- Extension `SpeedyWeatherNumericalRadiationExt` making NumericalRadiation.jl's radiation schemes SpeedyWeather components: `ClearSkyEcCKDRadiation` (clear-sky correlated-k, both streams in one component) and `AnalyticBandLongwave` (analytic-band longwave) [#1271](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1271) [#1293](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1293)
+- CPU column parameterizations loop over grid points per bundled scheme (`Radiation`: shortwave loop, then longwave loop) via `column_parameterization_cpu!`, fixing the Enzyme/LLVM segfault of the extended differentiability tests [#1290](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1290)
+- AMDGPU benchmarks on LUMI: `amdgpu` argument for `manual_benchmarking.jl`, `clear_fourier_graph_cache!` now also runs the GC and reclaims device memory (used between benchmark runs), and `gpu-amd` results [#1288](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1288)
 - `on_architecture` keeps the dimensions of a `LowerTriangularArray`, fixes for tests and docs after merging main [#1274](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1274)
 - Sea ice freezing and the snow melt cap are adjustments in `filter!`, not tendencies, fixing sea ice with NCycleLorenz for the ocean [#1272](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1272)
 - `Leapfrog` and `NCycleLorenz` have `ocean` and `land` fields for their time steppers, Leapfrog defaulting to the new `EulerForward`; snow depth is time stepped by the land time stepper [#1264](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1264)

@@ -55,3 +55,13 @@ variables(radiation::Radiation, model::AbstractModel) =
     parameterization!(ij, vars, radiation.longwave, model)      # then longwave, as before
     return nothing
 end
+
+# On CPU (no fused kernel) loop over all grid points for shortwave first, then again for longwave,
+# i.e. the same loop order as with shortwave and longwave being separate model components:
+# contiguous memory access per scheme and smaller loop bodies (the fused shortwave+longwave
+# loop body made Enzyme's reverse pass segfault inside LLVM on x86 in CI, see #1290)
+@propagate_inbounds function column_parameterization_cpu!(vars, radiation::Radiation, model)
+    column_parameterization_cpu!(vars, radiation.shortwave, model)
+    column_parameterization_cpu!(vars, radiation.longwave, model)
+    return nothing
+end

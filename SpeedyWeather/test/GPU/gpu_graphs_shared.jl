@@ -14,6 +14,28 @@
 # same trust decision, not a separate toggle.
 
 function test_gpu_graphs(ext, prefix)
+    @testset "$prefix Graphs: clearing the cache reclaims device memory" begin
+        if ext !== nothing
+            architecture = SpeedyWeather.GPU()
+            # the backend extension provides the method that trims the memory pool
+            @test parentmodule(which(SpeedyTransforms.reclaim!, (typeof(architecture),))) == ext
+            @test SpeedyTransforms.reclaim!(architecture) === nothing
+
+            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture)
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
+            transform(rand(Float32, spectral_grid.grid, spectral_grid.nlayers), S)
+
+            @test SpeedyTransforms.clear_fourier_graph_cache!(gc = false) === nothing
+            @test isempty(SpeedyTransforms.GRAPH_CACHES)
+
+            # with GC + reclaim (default), also with the architecture passed on explicitly
+            transform(rand(Float32, spectral_grid.grid, spectral_grid.nlayers), S)
+            @test SpeedyTransforms.clear_fourier_graph_cache!() === nothing
+            @test SpeedyTransforms.clear_fourier_graph_cache!(architecture) === nothing
+            @test isempty(SpeedyTransforms.GRAPH_CACHES)
+        end
+    end
+
     @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
         if ext !== nothing && SpeedyTransforms.default_gpu_graphs(SpeedyWeather.GPU())
             spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
