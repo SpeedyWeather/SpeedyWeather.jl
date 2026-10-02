@@ -307,3 +307,16 @@ end
         @test Array(grid_parent.data) ≈ original         # round-trips to the identity
     end
 end
+
+@testset "unscale! leaves the diagnosed vertical velocity scaled" begin
+    # `unscale!` undoes the radius scaling of vor, div but not of w = radius*σ̇, which the
+    # dycore uses scaled. ParticleAdvection3D accounts for it with a 1/radius in its vertical time step.
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
+    model = PrimitiveWetModel(spectral_grid)
+    vars = Variables(model)
+
+    fill!(vars.dynamics.w.data, 2)
+    vars.prognostic.scale[] = 3
+    SpeedyWeather.unscale!(vars)
+    @test all(Array(vars.dynamics.w.data) .== 2)
+end

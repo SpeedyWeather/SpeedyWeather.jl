@@ -44,6 +44,9 @@ include("spectral_transform.jl")
 # INTERPOLATION OF RINGGRIDS
 include("interpolate.jl")
 
+# 3D INTERPOLATION AND PARTICLE ADVECTION
+include("particle_advection_3d.jl")
+
 # SET FUNCTIONS, GPU SPECIFIC
 include("set.jl")
 

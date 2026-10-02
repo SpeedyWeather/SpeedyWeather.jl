@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add ParticleAdvection3D via 3D interpolation [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
 - Batched interpolation for multi-dimensional `Field`s, horizontal interpolation now named `interpolate_2D!` forwarded from `interpolate!` [#1263](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1263)
 - Restrict `DocumenterCitations` compat to fix citations in docs [#1292](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1292)
 - Extension `SpeedyWeatherNumericalRadiationExt` making NumericalRadiation.jl's radiation schemes SpeedyWeather components: `ClearSkyEcCKDRadiation` (clear-sky correlated-k, both streams in one component) and `AnalyticBandLongwave` (analytic-band longwave) [#1271](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1271) [#1293](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1293)
