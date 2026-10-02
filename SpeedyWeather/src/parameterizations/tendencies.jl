@@ -86,7 +86,7 @@ Parameterizations that bundle several schemes (e.g. `Radiation`) extend this met
 over the grid points for every scheme separately, keeping the memory access contiguous per
 scheme and the loop bodies small."""
 @propagate_inbounds function column_parameterization_cpu!(vars, parameterization, model)
-    for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
+    Threads.@threads for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
         parameterization!(ij, vars, parameterization, model)
     end
     return nothing
