@@ -205,3 +205,23 @@ end
     @test SigmaFaceBelow(σ_half).top_boundary_condition === zero(NF)
     @test SigmaFaceAbove(σ_half).bottom_boundary_condition === zero(NF)
 end
+
+@testset "interpolate! forwards to interpolate_3D!" begin
+    NF = Float32
+    nlayers = 4
+    npoints = 20
+    A = rand(NF, FullGaussianGrid(8), nlayers)
+    geometry = RingGrids.GridGeometry(A)
+    locator = RingGrids.AnvilLocator(NF, npoints, nlayers)
+    RingGrids.update_locator!(locator, geometry, 360 * rand(NF, npoints), 180 * rand(NF, npoints) .- 90)
+    positions = [TestParticle3D(σ) for σ in rand(NF, npoints)]
+
+    σ_full = NF[0.1, 0.3, 0.6, 0.9]
+    σ_half = NF[0, 0.2, 0.5, 0.7, 1]
+    @testset for vertical in (SigmaCenter(σ_full), σ_full, SigmaFaceBelow(σ_half))
+        out1, out2 = zeros(NF, npoints), zeros(NF, npoints)
+        interpolate!(out1, A, locator, geometry, positions, vertical)
+        interpolate_3D!(out2, A, locator, geometry, positions, vertical)
+        @test out1 == out2
+    end
+end

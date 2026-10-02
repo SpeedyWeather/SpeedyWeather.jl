@@ -174,3 +174,17 @@ Convenience method: a bare σ-levels vector is interpreted as full-level (`Sigma
 staggering, e.g. for u, v, temperature. Pass `σ_levels_full` from `model.geometry`."""
 interpolate_3D!(Aout, A, locator, geometry, positions, σ::AbstractVector) =
     interpolate_3D!(Aout, A, locator, geometry, positions, SigmaCenter(σ))
+
+"""$(TYPEDSIGNATURES)
+`interpolate!` with vertical positions: a 3D interpolation that also blends vertically at
+each point's `σ`, forwarding to [`interpolate_3D!`](@ref). `vertical` is an
+`AbstractVerticalStaggering` or a σ-levels vector (interpreted as `SigmaCenter`). Without
+`positions` and `vertical`, `interpolate!` is a horizontal interpolation via `interpolate_2D!`."""
+interpolate!(
+    Aout::AbstractVector,
+    A::AbstractField,
+    locator::AbstractLocator,
+    geometry::AbstractGridGeometry,
+    positions::AbstractVector,
+    vertical::Union{AbstractVerticalStaggering, AbstractVector},
+) = interpolate_3D!(Aout, A, locator, geometry, positions, vertical)
