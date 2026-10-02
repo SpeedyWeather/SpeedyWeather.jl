@@ -1,17 +1,17 @@
 @testset "Power spectrum" begin
     @testset for NF in (Float16, Float32, Float64)
-        @testset for trunc in (31, 42)
+        @testset for truncation in (32, 43)
 
             nlayers = 2
 
-            spectrum = Spectrum(trunc)
+            spectrum = Spectrum(truncation)
             L = randn(complex(NF), spectrum, nlayers)
 
             # one more degree that shouldbe ignored
-            spectrum2 = Spectrum(trunc, one_degree_more = true)
+            spectrum2 = Spectrum(truncation, one_degree_more = true)
             L2 = randn(complex(NF), spectrum2, nlayers)
 
-            # make trunc x trunc identical random numbers
+            # make truncation x truncation identical random numbers
             copyto!(L2, L)
 
             p = SpeedyTransforms.power_spectrum(L)

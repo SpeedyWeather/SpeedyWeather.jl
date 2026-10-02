@@ -119,7 +119,7 @@ Skipping view leaves avoids both problems."""
 function Base.copy!(dest::Variables, src::Variables)
     for group in propertynames(dest)
         # skip scratch: it is write-before-read (never needs to survive a sync) and its size
-        # is architecture-dependent 
+        # is architecture-dependent
         group === :scratch && continue
         copy_variables!(getfield(dest, group), getfield(src, group))
     end
@@ -153,7 +153,7 @@ can differentiate through this function without runtime reflection more easily."
     end
 end
 
-# Skip view-backed leaves when both dest and src are views; their data lives in a fuse parent 
+# Skip view-backed leaves when both dest and src are views; their data lives in a fuse parent
 # that is itself copied via vars.fused.<name>. See `is_view_entry` and the `copy!` docstring.
 _copy_entry!(dest::AbstractArray, src::AbstractArray) =
     is_view_entry(dest) && is_view_entry(src) ? dest : copyto!(dest, src)
@@ -304,8 +304,10 @@ Base.summary(fp::FusedParent) = Base.summary(fp.parent)
 function Base.show(io::IO, fp::FusedParent)
     nslots = length(fp.slot_map)
     fpsize = prettymemory(_pretty_size(fp))
-    print(io, styled"{warning:FusedParent}", " ", Base.summary(fp.parent),
-          styled"{note: ($nslots slots, $fpsize)}")
+    print(
+        io, styled"{warning:FusedParent}", " ", Base.summary(fp.parent),
+        styled"{note: ($nslots slots, $fpsize)}"
+    )
     names = keys(fp.slot_map)
     for (i, name) in enumerate(names)
         s = i == length(names) ? "└" : "├"                  # choose ending └ for last slot
@@ -351,14 +353,14 @@ function _assert_fuse_alignment(a::FusedParent, b::FusedParent; name_a = :a, nam
     keys_a, keys_b = keys(a.slot_map), keys(b.slot_map)
     map(_canonical_fuse_member, keys_a) == map(_canonical_fuse_member, keys_b) || error(
         "Fuse parents `$name_a` and `$name_b` have different members: " *
-        "$(keys_a) vs $(keys_b)."
+            "$(keys_a) vs $(keys_b)."
     )
     for i in eachindex(keys_a)
         ra, rb = a.slot_map[i], b.slot_map[i]
         ra == rb || error(
             "Fuse parents `$name_a` and `$name_b` disagree on slot range for `$(keys_a[i])`/`$(keys_b[i])`: " *
-            "$ra vs $rb. The two parents must declare members in matching order " *
-            "so that mega-batched transforms map slot k of one to slot k of the other."
+                "$ra vs $rb. The two parents must declare members in matching order " *
+                "so that mega-batched transforms map slot k of one to slot k of the other."
         )
     end
     return nothing
@@ -374,8 +376,8 @@ function build_fused_namespace(fuse_parents)
         if haskey(seen, fuse_sym)
             error(
                 "Fuse symbol `$fuse_sym` is used in multiple namespaces (`$(seen[fuse_sym])` and `$ns`). " *
-                "Fuse symbols must be globally unique across namespaces so they can live flat under " *
-                "`vars.fused.<fuse_symbol>`."
+                    "Fuse symbols must be globally unique across namespaces so they can live flat under " *
+                    "`vars.fused.<fuse_symbol>`."
             )
         end
         seen[fuse_sym] = ns
@@ -409,8 +411,8 @@ function build_fuse_parents(all_vars, model)
             nonparametric_type(prev) === nonparametric_type(v) && continue  # same type, same var declared twice — fine
             error(
                 "Fuse group `$(v.fuse)` (namespace `$(v.namespace)`): variable `$(v.name)` is " *
-                "declared as both $(nonparametric_type(prev)) and $(nonparametric_type(v)). " *
-                "Each (namespace, name) pair may appear at most once across all variable types in a single fuse group."
+                    "declared as both $(nonparametric_type(prev)) and $(nonparametric_type(v)). " *
+                    "Each (namespace, name) pair may appear at most once across all variable types in a single fuse group."
             )
         end
         seen[key] = v
@@ -426,15 +428,15 @@ function build_fuse_parents(all_vars, model)
         for v in vars
             fuse_family(v.dims) === family || error(
                 "Fuse group `$fuse_sym` (namespace `$ns`) mixes fuse families: " *
-                "`$(v.name)` has $(typeof(v.dims)) (family `$(fuse_family(v.dims))`) but " *
-                "the group is family `$family`. Grid and spectral variables cannot share a parent buffer."
+                    "`$(v.name)` has $(typeof(v.dims)) (family `$(fuse_family(v.dims))`) but " *
+                    "the group is family `$family`. Grid and spectral variables cannot share a parent buffer."
             )
         end
         # Validate: member names are unique within the group.
         names = Tuple(v.name for v in vars)
         length(unique(names)) == length(names) || error(
             "Fuse group `$fuse_sym` (namespace `$ns`) has duplicate member names: $names. " *
-            "Each member of a fuse group must have a unique `name`."
+                "Each member of a fuse group must have a unique `name`."
         )
         # Allocate one parent for this fuse group; views & slots aligned with `vars`.
         parent, views, slots = allocate_fused(vars, model)
@@ -469,7 +471,7 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
         if view_data isa SubArray
             Base.parent(view_data) === parent.data || error(
                 "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` is not a view " *
-                "of the fused parent buffer (got parent $(typeof(Base.parent(view_data))))."
+                    "of the fused parent buffer (got parent $(typeof(Base.parent(view_data))))."
             )
 
             # The layer axis is always parent axis 2. parentindices may be scalar (collapsed
@@ -478,7 +480,7 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
             p_index_layer_range = p_index_layer isa Integer ? (p_index_layer:p_index_layer) : p_index_layer
             p_index_layer_range == slot || error(
                 "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` has " *
-                "parentindices(axis 2) $(p_index_layer) but slot map declares $(slot)."
+                    "parentindices(axis 2) $(p_index_layer) but slot map declares $(slot)."
             )
         else # fallback for GPU array types that are not SubArrays (e.g. CuArray views)
             # On non-SubArray backends we can only check the layer-axis size is consistent.
@@ -487,25 +489,27 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
             # 2D-in-3D and 3D-in-4D collapse the layer dim (view has fewer dims), in
             # which case axis 2 of the view is the trailing parent dim, so we skip the
             # size check and rely on slot bookkeeping below.
-            ndims(view_data) == ndims(parent.data) || (view_layer_size == length(slot) ||
-                error(
-                "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` is not a " *
-                "SubArray (got $(typeof(view_data))) and its axis-2 size " *
-                "$(view_layer_size) does not match slot length $(length(slot))."
-            ))
+            ndims(view_data) == ndims(parent.data) || (
+                view_layer_size == length(slot) ||
+                    error(
+                    "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` is not a " *
+                        "SubArray (got $(typeof(view_data))) and its axis-2 size " *
+                        "$(view_layer_size) does not match slot length $(length(slot))."
+                )
+            )
         end
         for k in slot
 
             # chck the slot is within the parent
             (1 <= k <= parent_size) || error(
                 "Fuse group `$fuse_sym` (namespace `$ns`): slot $k for `$(v.name)` " *
-                "is outside the parent buffer's layer axis 1:$parent_size."
+                    "is outside the parent buffer's layer axis 1:$parent_size."
             )
 
             # check it's not already claimed
             covered[k] && error(
                 "Fuse group `$fuse_sym` (namespace `$ns`): slot $k is claimed by " *
-                "multiple members (offending member: `$(v.name)`)."
+                    "multiple members (offending member: `$(v.name)`)."
             )
             covered[k] = true
         end
@@ -513,7 +517,7 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
     # check everything is covered
     all(covered) || error(
         "Fuse group `$fuse_sym` (namespace `$ns`): slots do not tile the parent's " *
-        "layer axis 1:$parent_size (uncovered slots: $(findall(!, covered)))."
+            "layer axis 1:$parent_size (uncovered slots: $(findall(!, covered)))."
     )
     return nothing
 end

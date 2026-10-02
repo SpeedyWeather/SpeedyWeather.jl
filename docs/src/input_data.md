@@ -3,7 +3,8 @@
 Several components will allow you to specify your own input data. You
 can either do this with the [`set!`](@ref) method, passing on a
 `Field` to a variable, or many components allow for a `path` and `filename`.
-See for example [Load orography from file](@ref).
+See for example [Load orography from file](@ref) or the [Earth's land-sea mask](@ref) option
+described in [The land-sea mask](@ref).
 
 However, we also use SpeedyWeatherAssets.jl to handle different versions
 of input data with Julia's Artifacts system (`Artifacts.jl` and `Pkg.Artifacts`)

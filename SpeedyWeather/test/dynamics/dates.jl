@@ -2,36 +2,36 @@ using Dates
 
 @testset "Sec, min, hrs arguments" begin
     @testset for TS in (Leapfrog, NCycleLorenz)
-        SG = SpectralGrid(trunc = 42, nlayers = 1)
-        L1 = TS(SG, Δt_at_T31 = 30)
-        L2 = TS(SG, Δt_at_T31 = Second(30))
+        SG = SpectralGrid(truncation = 43, nlayers = 1)
+        L1 = TS(SG, Δt_at_T32 = 30)
+        L2 = TS(SG, Δt_at_T32 = Second(30))
         @test L1.Δt == L2.Δt
 
-        L3 = TS(SG, Δt_at_T31 = Second(300))
-        L4 = TS(SG, Δt_at_T31 = Minute(5))
+        L3 = TS(SG, Δt_at_T32 = Second(300))
+        L4 = TS(SG, Δt_at_T32 = Minute(5))
         @test L3.Δt == L4.Δt
 
-        L4 = TS(SG, Δt_at_T31 = Minute(60))
-        L5 = TS(SG, Δt_at_T31 = Hour(1))
+        L4 = TS(SG, Δt_at_T32 = Minute(60))
+        L5 = TS(SG, Δt_at_T32 = Hour(1))
         @test L4.Δt == L5.Δt
 
         # without adjustment
-        L1 = TS(SG, Δt_at_T31 = 30, adjust_with_output = false)
-        L2 = TS(SG, Δt_at_T31 = Second(30), adjust_with_output = false)
+        L1 = TS(SG, Δt_at_T32 = 30, adjust_with_output = false)
+        L2 = TS(SG, Δt_at_T32 = Second(30), adjust_with_output = false)
         @test L1.Δt == L2.Δt
 
-        L3 = TS(SG, Δt_at_T31 = Second(300), adjust_with_output = false)
-        L4 = TS(SG, Δt_at_T31 = Minute(5), adjust_with_output = false)
+        L3 = TS(SG, Δt_at_T32 = Second(300), adjust_with_output = false)
+        L4 = TS(SG, Δt_at_T32 = Minute(5), adjust_with_output = false)
         @test L3.Δt == L4.Δt
 
-        L4 = TS(SG, Δt_at_T31 = Minute(60), adjust_with_output = false)
-        L5 = TS(SG, Δt_at_T31 = Hour(1), adjust_with_output = false)
+        L4 = TS(SG, Δt_at_T32 = Minute(60), adjust_with_output = false)
+        L5 = TS(SG, Δt_at_T32 = Hour(1), adjust_with_output = false)
         @test L4.Δt == L5.Δt
 
         # clock tests
         c1 = SpeedyWeather.Clock()
-        SG2 = SpectralGrid(trunc = 31, nlayers = 1)
-        L = TS(SG2, Δt_at_T31 = Hour(1), adjust_with_output = false)
+        SG2 = SpectralGrid(truncation = 32, nlayers = 1)
+        L = TS(SG2, Δt_at_T32 = Hour(1), adjust_with_output = false)
 
         # set period
         SpeedyWeather.initialize!(c1, L, Hour(10))
@@ -56,7 +56,7 @@ end
 
     @testset for TS in (Leapfrog, NCycleLorenz)
         time_stepping = TS(spectral_grid)
-        Δt = time_stepping.Δt_at_T31
+        Δt = time_stepping.Δt_at_T32
 
         # set n_time_steps
         clock = Clock()

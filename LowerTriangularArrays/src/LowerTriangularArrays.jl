@@ -6,6 +6,7 @@ using StyledStrings
 
 # NUMERICS
 import LinearAlgebra: Transpose, tril!
+import Random
 
 # GPU
 import Adapt: Adapt, adapt
@@ -41,17 +42,23 @@ export OneBased, ZeroBased
 export lta_view
 export zero_last_degree!
 
+include("index_basis.jl")
 include("spectrum.jl")
 include("lower_triangular_array.jl")
 include("rotate_reverse.jl")
 include("truncation.jl")
 
 # Trait-based dispatch on dimensions
+# NOTE these aliases must repeat the parameter bounds of the `LowerTriangularArray` struct itself
+# (`ArrayType <: AbstractArray{T, N}`, `S <: AbstractSpectrum`). A `where` clause with *looser*
+# bounds than the declaration does not produce a subtype of `LowerTriangularArray`, so the alias
+# would neither be usable for dispatch (a method on it and a fallback on the plain type are then
+# unordered, and Julia picks by definition order) nor satisfy `alias <: LowerTriangularArray`.
 """Type alias for all LowerTriangularArrays with a time dimension"""
-const LowerTriangularArrayWithTime = LowerTriangularArray{T, N, ArrayType, S, Dims} where {T, N, ArrayType, S, Dims <: DimensionsWithTime}
+const LowerTriangularArrayWithTime = LowerTriangularArray{T, N, ArrayType, S, Dims} where {T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum, Dims <: DimensionsWithTime}
 """Type alias for all LowerTriangularArrays with a vertical dimension"""
-const LowerTriangularArrayWithVertical = LowerTriangularArray{T, N, ArrayType, S, Dims} where {T, N, ArrayType, S, Dims <: DimensionsWithVertical}
+const LowerTriangularArrayWithVertical = LowerTriangularArray{T, N, ArrayType, S, Dims} where {T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum, Dims <: DimensionsWithVertical}
 """Type alias for all LowerTriangularArrays with both time and vertical dimensions"""
-const LowerTriangularArrayWithTimeAndVertical = LowerTriangularArray{T, N, ArrayType, S, Dims} where {T, N, ArrayType, S, Dims <: DimensionsWithTimeAndVertical}
+const LowerTriangularArrayWithTimeAndVertical = LowerTriangularArray{T, N, ArrayType, S, Dims} where {T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum, Dims <: DimensionsWithTimeAndVertical}
 
 end

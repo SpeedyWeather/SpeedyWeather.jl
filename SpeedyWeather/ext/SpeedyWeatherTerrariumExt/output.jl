@@ -5,7 +5,7 @@
 
 import SpeedyWeather: TerrariumOutput, AbstractOutput, AbstractSimulation,
     path, path_or_nothing, output!, write_array!, hastime, is3D,
-    vertical_dimension, get_nlayers, define_dimension!, get_dimension_length, define_coordinate!
+    vertical_dimension_name, get_nlayers, define_dimension!, get_dimension_length, define_coordinate!
 
 # name of the vertical output dimension shared by all 3D Terrarium output variables
 const SOIL_DEPTH_DIM_NAME = "soil_depth"
@@ -65,8 +65,12 @@ function terrarium_output_variable(
     )
     var_name = Terrarium.varname(descriptor)
     supported_variable(descriptor) ||
-        throw(ArgumentError("Terrarium variable $var_name on $(Terrarium.vardims(descriptor)) " *
-            "is not supported for output, only 2D (XY) and cell-centre 3D (XYZ) variables are."))
+        throw(
+        ArgumentError(
+            "Terrarium variable $var_name on $(Terrarium.vardims(descriptor)) " *
+                "is not supported for output, only 2D (XY) and cell-centre 3D (XYZ) variables are."
+        )
+    )
 
     units = Terrarium.varunits(descriptor)
     unit_string = string(units)
@@ -78,7 +82,8 @@ function terrarium_output_variable(
     field_grid = Terrarium.get_field_grid(model.grid)
     nlayers = is3d ? size(field_grid, 3) : 1
     # cell-centre depths [m], positive down; znodes is in field order (deepest layer first)
-    depths = is3d ? Float64.(-znodes(field_grid, Center(), Center(), Center())) : Float64[]
+    # ensure depths vector is copied to CPU
+    depths = is3d ? Float64.(Terrarium.on_architecture(Terrarium.CPU(), -znodes(field_grid, Center(), Center(), Center()))) : Float64[]
 
     return TerrariumOutputVariable(;
         name = String(var_name), unit, long_name,
@@ -89,20 +94,22 @@ function terrarium_output_variable(
     )
 end
 
-# name-keyed NamedTuple of all top-level Terrarium variable descriptors of the
-# selected groups; prognostic variables take precedence over auxiliary and input
-# duplicates of the same name (as does `getproperty` on the Terrarium state)
+"""
+Return a name-keyed OrderedDict of all top-level Terrarium variable descriptors of the
+selected groups; prognostic variables take precedence over auxiliary and input
+duplicates of the same name (as does `getproperty` on the Terrarium state)
+"""
 function variable_descriptors(
         model::Terrarium.AbstractModel;
         prognostic::Bool = true,
         auxiliary::Bool = true,
         inputs::Bool = false,
     )
-    tvars = Terrarium.Variables(Terrarium.variables(model))
+    terrarium_vars = Terrarium.Variables(model)
     return merge(
-        inputs ? tvars.inputs : (;),
-        auxiliary ? tvars.auxiliary : (;),
-        prognostic ? tvars.prognostic : (;),
+        inputs ? terrarium_vars.inputs : empty(terrarium_vars.inputs),
+        auxiliary ? terrarium_vars.auxiliary : empty(terrarium_vars.auxiliary),
+        prognostic ? terrarium_vars.prognostic : empty(terrarium_vars.prognostic),
     )
 end
 
@@ -118,8 +125,12 @@ function SpeedyWeather.TerrariumOutput(
     )
     descriptors = variable_descriptors(model, inputs = true)
     haskey(descriptors, var_name) ||
-        throw(ArgumentError("Terrarium model has no variable $var_name, " *
-            "available are: $(join(keys(descriptors), ", "))"))
+        throw(
+        ArgumentError(
+            "Terrarium model has no variable $var_name, " *
+                "available are: $(join(keys(descriptors), ", "))"
+        )
+    )
     return terrarium_output_variable(model, descriptors[var_name]; kwargs...)
 end
 
@@ -138,8 +149,8 @@ function SpeedyWeather.TerrariumOutput(
         kwargs...
     )
     descriptors = variable_descriptors(model; prognostic, auxiliary, inputs)
-    supported = filter(supported_variable, collect(descriptors))
-    return Tuple(terrarium_output_variable(model, descriptor; kwargs...) for descriptor in supported)
+    supported = filter(supported_variable, Tuple(values(descriptors)))
+    return map(descriptor -> terrarium_output_variable(model, descriptor; kwargs...), supported)
 end
 
 # convenience: construct directly from the SpeedyWeather land component
@@ -212,7 +223,7 @@ end
 # Terrarium output variables are written on their own vertical dimension
 # (e.g. soil depth) instead of the "layer"/"soil_layer" dimensions; the generic
 # `define_variable!` of every backend picks these up via the hooks below.
-SpeedyWeather.vertical_dimension(::TerrariumOutputVariable) = SOIL_DEPTH_DIM_NAME
+SpeedyWeather.vertical_dimension_name(::TerrariumOutputVariable) = SOIL_DEPTH_DIM_NAME
 SpeedyWeather.get_nlayers(::AbstractOutput, variable::TerrariumOutputVariable) = variable.nlayers
 
 """$(TYPEDSIGNATURES)
@@ -233,8 +244,10 @@ function SpeedyWeather.define_dimension!(dest, variable::TerrariumOutputVariable
             )
         )
     elseif nlayers != variable.nlayers
-        error("Terrarium output variable $(variable.name) has $(variable.nlayers) soil layers, " *
-            "but the $SOIL_DEPTH_DIM_NAME dimension already has $nlayers.")
+        error(
+            "Terrarium output variable $(variable.name) has $(variable.nlayers) soil layers, " *
+                "but the $SOIL_DEPTH_DIM_NAME dimension already has $nlayers."
+        )
     end
     return nothing
 end

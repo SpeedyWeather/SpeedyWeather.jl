@@ -4,8 +4,8 @@ The following sections outline the implementation of the spherical harmonic tran
 between the coefficients of the spherical harmonics (the _spectral_ space) and the grid space which can be any of the
 [Implemented grids](@ref) as defined by [RingGrids](@ref). This includes the classical full
 [Gaussian grid](https://confluence.ecmwf.int/display/FCST/Gaussian+grids), a regular longitude-latitude grid called
-the full Clenshaw grid ([FullClenshawGrid](@ref FullClenshawGrid)), ECMWF's octahedral Gaussian grid[^Malardel2016],
-and HEALPix grids[^Gorski2004].
+the full Clenshaw grid ([FullClenshawGrid](@ref FullClenshawGrid)), ECMWF's octahedral Gaussian grid
+[Malardel2016](@citep), and HEALPix grids [Gorski2005](@citep).
 SpeedyWeather.jl's spectral transform module SpeedyTransforms is grid-flexible and can be used with any of these,
 see [Grids](@ref).
 
@@ -21,7 +21,10 @@ The spectral transform implemented by SpeedyWeather.jl follows largely Justin Wi
 [SphericalHarmonicTransforms.jl](https://github.com/jmert/SphericalHarmonicTransforms.jl) package and makes use of
 [AssociatedLegendrePolynomials.jl](https://github.com/jmert/AssociatedLegendrePolynomials.jl) and
 [FFTW.jl](https://github.com/JuliaMath/FFTW.jl) for the Fourier transform.
-Justin described his work in a Blog series [^Willmert2020].
+Justin described his work in a blog series [Willmert2020](@citep). However, many changes have been
+made since the first versions of SpeedyWeather, particularly around GPU support, acceleration
+and flexible grids, but Justin Willmert's writings are nevertheless a good starting point
+to understand the underlying algorithms.
 
 ## Spherical harmonics
 
@@ -40,7 +43,7 @@ For an interactive visualisation of the spherical harmonics, see
 !!! info "Latitudes versus colatitudes"
     The implementation of the spectral transforms in SpeedyWeather.jl uses colatitudes ``\theta = (0, \pi)``
     (0 at the north pole) but the dynamical core uses latitudes ``\theta = (-\pi/2, \pi/2)`` (``\pi/2`` at the north pole).
-    Note: We may also use latitudes in the spherical harmonic transform in the future for consistency. 
+    Note: We may also use latitudes in the spherical harmonic transform in the future for consistency.
 
 ## [Synthesis (spectral to grid)](@id synthesis)
 
@@ -55,9 +58,10 @@ f(\phi, \theta) = \sum_{l=0}^{\infty} \sum_{m=-l}^l a_{lm} Y_{lm}(\phi, \theta).
 We obtain an approximation with a finite set of ``a_{l, m}`` by truncating the series in both degree ``l``
 and order ``m`` somehow. Most commonly, a triangular truncation is applied, such that all degrees
 after ``l = l_{max}`` are discarded. Triangular because the retained array of the coefficients ``a_{l, m}``
-looks like a triangle. Other truncations like rhomboidal have been studied[^Daley78] but are rarely used
+looks like a triangle. Other truncations like rhomboidal have been studied [DaleyBourassa1978](@citep) but are rarely used
 since. Choosing ``l_{max}`` also constrains ``m_{max}`` and determines the (horizontal) spectral resolution.
-In SpeedyWeather.jl this resolution as chosen as `trunc` when creating the [SpectralGrid](@ref).
+In SpeedyWeather.jl this resolution as chosen as `truncation` (1-based, i.e. `truncation = l_{max} + 1`)
+when creating the [SpectralGrid](@ref).
 
 For ``f`` being a real-valued there is a symmetry
 ```math
@@ -66,9 +70,10 @@ a_{l, -m} = (-1)^m a^*_{l, +m},
 meaning that the coefficients at ``-m`` and ``m`` are the same, but the sign of the real and imaginary component
 can be flipped, as denoted with the ``(-1)^m`` and the complex conjugate ``a_{l, m}^*``. As we are only dealing with
 real-valued fields anyway, we therefore never have to store the negative orders ``-m`` and end up with a lower
-triangular matrix of size ``(l_{max}+1) \times (m_{max}+1)`` or technically ``(T+1)^2`` where ``T`` is
-the truncation `trunc`. One is added here because the degree ``l`` and order ``m`` use 0-based indexing
-but sizes (and so is Julia's indexing) are 1-based.
+triangular matrix of size ``(l_{max}+1) \times (m_{max}+1)`` or technically ``(T+1)^2`` where ``T``
+is the 0-based truncation ``l_{max}``, corresponding to `truncation - 1` (`truncation` is the
+1-based keyword argument of [SpectralGrid](@ref)). One is added here because the degree ``l``
+and order ``m`` use 0-based indexing but sizes (and so is Julia's indexing) are 1-based.
 
 For correctness we want to mention here that vector quantities require one more degree ``l`` due to the recurrence
 relation in the [Meridional derivative](@ref). Hence for practical reasons *all* spectral fields are represented
@@ -78,9 +83,9 @@ sections ignore this and only discuss it again in [Meridional derivative](@ref).
 
 Another consequence of the symmetry mentioned above is that the zonal harmonics, meaning ``a_{l, m=0}`` have
 no imaginary component. Because these harmonics are zonally constant, a non-zero imaginary component would
-rotate them around the Earth's axis, which, well, doesn't actually change a real-valued field. 
+rotate them around the Earth's axis, which, well, doesn't actually change a real-valued field.
 
-Following the notation of [^Willmert2020] we can therefore write the truncated synthesis as
+Following the notation of [Willmert2020](@citep), we can therefore write the truncated synthesis as
 ```math
 f(\phi, \theta) = \sum_{l=0}^{l_{max}} \sum_{m=0}^l (2-\delta_{m0}) a_{lm} Y_{lm}(\phi, \theta).
 ```
@@ -91,7 +96,7 @@ a pair.
 
 Another symmetry arises from the fact that the spherical harmonics are either symmetric or anti-symmetric
 around the Equator. There is an even/odd combination of degrees and orders so that the sign flips like a
-checkerboard: 
+checkerboard:
 ```math
 Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \theta).
 ```
@@ -108,7 +113,7 @@ a_{l, m} = \int_0^{2\pi} \int_{0}^\pi f(\phi, \theta) Y_{l, m}(\phi, \theta) \si
 
 Note that this notation again uses colatitudes ``\theta``, for latitudes the ``\sin\theta`` becomes a ``\cos\theta`` and the
 bounds have to be changed accordingly to ``(-\frac{\pi}{2}, \frac{\pi}{2})``. A discretization with ``N``
-grid points at location ``(\phi_i, \theta_i)``, indexed by ``i`` can be written as [^Willmert2020]
+grid points at location ``(\phi_i, \theta_i)``, indexed by ``i`` can be written as [Willmert2020](@citep)
 ```math
 \hat{a}_{l, m} = \sum_i f(\phi_i, \theta_i) Y_{l, m}(\phi_i, \theta_i) \sin \theta_i \Delta\theta \Delta\phi.
 ```
@@ -138,36 +143,41 @@ and order ``m`` as illustrated in the following image
 ```@raw html
 <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Rotating_spherical_harmonics.gif">
 ```
-Every row represents an order ``l \geq 0``, starting from ``l=0`` at the top.
-Every column represents an order ``m \geq 0``, starting from ``m=0`` on the left. The coefficients of these
-spherical harmonics are directly mapped into a matrix ``a_{lm}`` as 
+Every row represents an order ``l \geq 1``, starting from ``l=1`` at the top.
+Every column represents an order ``m \geq 1``, starting from ``m=1`` on the left.
+We use 1-based indexing, despite the mathematically typical 0-based indexing,
+see [Available horizontal resolutions](@ref).
+
+!!! info "1-based Array indices"
+    For a spectral field `a` due to Julia's 1-based indexing the coefficient ``a_{lm}`` (1-based) is obtained via `a[l, m]`.
+    This matches our definition throughout, but contrasts to the typical mathematical definition with 0-based ``l, m``,
+    which would be accessed via `a[l+1, m+1]`.
+
+The coefficients of these spherical harmonics are directly mapped into a matrix ``a_{lm}`` as
 
 |     |``m``     |          |          |          |
-| :-: | :------: | :------: | :------: | :------: | 
-|``l``|``a_{00}``|          |          |          |
-|     |``a_{10}``|``a_{11}``|          |          |
-|     |``a_{20}``|``a_{12}``|``a_{22}``|          |
-|     |``a_{30}``|``a_{13}``|``a_{23}``|``a_{33}``|
+| :-: | :------: | :------: | :------: | :------: |
+|``l``|``a_{11}``|          |          |          |
+|     |``a_{21}``|``a_{22}``|          |          |
+|     |``a_{31}``|``a_{23}``|``a_{33}``|          |
+|     |``a_{41}``|``a_{24}``|``a_{34}``|``a_{44}``|
 
 which is consistently extended for higher degrees and orders. Consequently, all spectral fields are lower-triangular matrices
 with complex entries. The upper triangle excluding the diagonal are zero. Note that internally vector fields
 include an additional degree, such that ``l_{max} = m_{max} + 1`` (see [Derivatives in spherical coordinates](@ref) for more information).
-The harmonics with ``a_{l0}`` (the first column) are also called _zonal_ harmonics as they are constant with longitude ``\phi``.
+The harmonics with ``a_{l1}`` (the first column) are also called _zonal_ harmonics as they are constant with longitude ``\phi``.
 The harmonics with ``a_{ll}`` (the main diagonal) are also called _sectoral_ harmonics as they essentially split the sphere
-into ``2l`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
+into ``2(l-1)`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
 
 For correctness it is mentioned here that SpeedyWeather.jl uses a `LowerTriangularMatrix` type to store
 the spherical harmonic coefficients. By doing so, the upper triangle is actually *not* explicitly stored
 and the data technically unravelled into a vector, but this is hidden as much as possible from the user.
 For more details see [`LowerTriangularArrays`](@ref lowertriangularmatrices).
 
-!!! info "Array indices"
-    For a spectral field `a` note that due to Julia's 1-based indexing the coefficient ``a_{lm}`` is obtained via
-    `a[l+1, m+1]`. Alternatively, we may index over 1-based `l`, `m` but a comment is usually added for clarification.
-
-[Fortran SPEEDY](https://users.ictp.it/~kucharsk/speedy-net.html) does not use the same spectral packing as
-SpeedyWeather.jl. The alternative packing ``l', m'`` therein uses ``l'=m`` and ``m'=l-m`` as summarized in the
-following table.
+[Fortran SPEEDY](@cite KucharskiMolteniBracco2006) does not use the same spectral packing as
+SpeedyWeather.jl and also does not use 1-based indices and notation consistently throughout.
+The alternative packing ``l', m'`` therein uses ``l'=m`` and ``m'=l-m`` as summarized in the following table,
+(all 0-based).
 
 | degree ``l`` | order ``m`` |  ``l'=m`` |  ``m'=l-m`` |
 | :----------: | :---------: | :-------: | :---------: |
@@ -184,7 +194,7 @@ This alternative packing uses the top-left triangle of a coefficient matrix, and
 stored at the following indices
 
 |      |``m'``    |          |          |          |
-| :--: | :-:      | :-------:| :-------:| :-------:| 
+| :--: | :-:      | :-------:| :-------:| :-------:|
 |``l'``|``a_{00}``|``a_{10}``|``a_{20}``|``a_{30}``|
 |      |``a_{11}``|``a_{21}``|``a_{31}``|          |
 |      |``a_{22}``|``a_{32}``|          |          |
@@ -195,45 +205,56 @@ Fortran SPEEDY.
 
 SpeedyWeather.jl uses triangular truncation such that only spherical harmonics with ``l \leq l_{max}`` and ``|m| \leq m_{max}``
 are explicitly represented. This is usually described as ``Tm_{max}``, with ``l_{max} = m_{max}`` (although in vector quantities
-require one more degree ``l`` in the recursion relation of meridional gradients). For example, T31 is the spectral resolution
+require one more degree ``l`` in the recursion relation of meridional gradients). For example, T32 (1-based) is the spectral resolution
 with ``l_{max} = m_{max} = 31``. Note that the degree ``l`` and order ``m`` are mathematically 0-based, such that the
 corresponding coefficient matrix is of size 32x32.
 
 ## Available horizontal resolutions
 
-Technically, SpeedyWeather.jl supports arbitrarily chosen resolution parameter `trunc` when
+Technically, SpeedyWeather.jl supports an arbitrarily chosen resolution parameter `truncation` when
 creating the [SpectralGrid](@ref) that refers to the highest non-zero degree ``l_{max}``
-that is resolved in spectral space. SpeedyWeather.jl will always try to choose an
-easily-Fourier transformable[^FFT] size of the grid, but as we use
-[FFTW.jl](https://github.com/JuliaMath/FFTW.jl) there is quite some flexibility without
-performance sacrifice. However, this has traditionally lead to typical resolutions that
+that is resolved in spectral space, 1-based, i.e. `truncation = l_{max} + 1`. SpeedyWeather.jl will
+always try to choose an easily Fourier-transformable size of the grid
+[CooleyTukey1965, Bluestein1970](@citep). [FFTW.jl](https://github.com/JuliaMath/FFTW.jl)
+[FrigoJohnson2005](@citep) also provides efficient algorithms for a broad range of sizes.
+This has traditionally led to typical resolutions that
 we also use for testing we therefore recommend to use.
+See also [Notation: Spectral resolution](@ref) for how this resolution is denoted in practice.
 They are as follows with more details below
 
-| `trunc`       | nlon | nlat | ``\Delta x`` |
+!!! warning "Why is `truncation` 1-based?"
+    Spherical harmonics are mathematically 0-based, i.e. the highest degree resolved is
+    ``l_{max}``, and most other spectral models refer to the resolution this way too
+    (e.g. "T31" for ``l_{max}=31``). SpeedyWeather.jl's `truncation` keyword is 1-based
+    instead (`truncation = l_{max} + 1`) purely for user convenience: it lets you pick
+    resolutions as powers of 2 (e.g. `truncation=32` or `truncation=64`) rather than
+    having to remember to subtract one every time. For consistency, we may refer to a
+    resolution as e.g. T32 too, though that's equivalent to T31 for everyone else.
+
+| `truncation`  | nlon | nlat | ``\Delta x`` |
 | ------------- | ---- | ---- | ------------ |
-| 31 (default)  | 96   | 48   | 400 km       |
-| 42            | 128  | 64   | 312 km       |
-| 63            | 192  | 96   | 216 km       |
-| 85            | 256  | 128  | 165 km       |
-| 127           | 384  | 192  | 112 km       |
-| 170           | 512  | 256  | 85 km        |
-| 255           | 768  | 384  | 58 km        |
-| 341           | 1024 | 512  | 43 km        |
-| 511           | 1536 | 768  | 29 km        |
-| 682           | 2048 | 1024 | 22 km        |
-| 1024          | 3072 | 1536 | 14 km        |
-| 1365          | 4096 | 2048 | 11 km        |
+| 32 (default)  | 96   | 48   | 400 km       |
+| 43            | 128  | 64   | 312 km       |
+| 64            | 192  | 96   | 216 km       |
+| 86            | 256  | 128  | 165 km       |
+| 128           | 384  | 192  | 112 km       |
+| 171           | 512  | 256  | 85 km        |
+| 256           | 768  | 384  | 58 km        |
+| 342           | 1024 | 512  | 43 km        |
+| 512           | 1536 | 768  | 29 km        |
+| 683           | 2048 | 1024 | 22 km        |
+| 1025          | 3072 | 1536 | 14 km        |
+| 1366          | 4096 | 2048 | 11 km        |
 
 Some remarks on this table
 - This assumes the default quadratic truncation, you can always adapt the grid resolution via the `dealiasing` option, see [Matching spectral and grid resolution](@ref)
 - `nlat` refers to the total number of latitude rings, see [Grids](@ref). With non-Gaussian grids, `nlat` will be one one less, e.g. 47 instead of 48 rings.
 - `nlon` is the number of longitude points on the [Full Gaussian Grid](@ref FullGaussianGrid), for other grids there will be at most these number of points around the Equator.
-- ``\Delta x`` is the horizontal resolution. For a spectral model there are many ways of estimating this[^Randall2021]. We use here the square root of the average area a grid cell covers, see [Effective grid resolution](@ref)
+- ``\Delta x`` is the horizontal resolution. For a spectral model there are many ways of estimating this [Randall2021](@citep). We use here the square root of the average area a grid cell covers, see [Effective grid resolution](@ref)
 
 ## Effective grid resolution
 
-There are many ways to estimate the effective grid resolution of spectral models[^Randall2021].
+There are many ways to estimate the effective grid resolution of spectral models [Randall2021](@citep).
 Some of them are based on the wavelength a given spectral resolution allows to
 represent, others on the total number of real variables per area.
 However, as many atmospheric models do represent a considerable amount of physics
@@ -246,8 +267,8 @@ resolution
 ```
 with ``N`` number of grid points over a sphere with radius ``R``. However, we have
 to acknowledge that this usually gives higher resolution compared to other methods
-of estimating the effective resolution, see [^Randall2021] for a discussion. You may therefore
-need to be careful to make claims that, e.g. `trunc=85` can resolve the
+of estimating the effective resolution; see [Randall2021](@citet) for a discussion. You may therefore
+need to be careful to make claims that, e.g. `truncation=86` can resolve the
 atmospheric dynamics at a scale of 165km.
 
 ## Derivatives in spherical coordinates
@@ -273,7 +294,7 @@ and similar for the curl
 \frac{1}{R\cos\theta}\frac{\partial (u \cos\theta)}{\partial \theta}.
 ```
 
-The radius of the sphere (i.e. Earth) is ``R``. The zonal gradient scales with ``1/\cos(\theta)`` as the 
+The radius of the sphere (i.e. Earth) is ``R``. The zonal gradient scales with ``1/\cos(\theta)`` as the
 longitudes converge towards the poles (note that ``\theta`` describes latitudes here, definitions using colatitudes
 replace the ``\cos`` with a ``\sin``.)
 
@@ -326,7 +347,7 @@ number ``m`` times imaginary ``i``.
 ### Meridional derivative
 
 The meridional derivative of the spherical harmonics is a derivative of the Legendre polynomials for which the following
-recursion relation applies[^Randall2021], [^Durran2010], [^GFDL], [^Orszag70]
+recursion relation applies [Randall2021, Durran2010, GFDLBarotropicVorticity, Orszag1970](@citep)
 
 ```math
 \cos\theta \frac{dP_{l, m}}{d\theta} = -l\epsilon_{l+1, m}P_{l+1, m} + (l+1)\epsilon_{l, m}P_{l-1, m}.
@@ -354,15 +375,15 @@ at which point the recursion from above can be applied. Collecting terms proport
 (\cos(\theta)u)_{l, m} = -\frac{1}{R}(-(l-1)\epsilon_{l, m}\Psi_{l-1, m} + (l+2)\epsilon_{l+1, m}\Psi_{l+1, m})
 ```
 
-To obtain the coefficient of each spherical harmonic ``l, m`` of the meridional gradient of a spectral field, two 
+To obtain the coefficient of each spherical harmonic ``l, m`` of the meridional gradient of a spectral field, two
 coefficients at ``l-1, m`` and ``l+1, m`` have to be combined. This means that the coefficient of a gradient
 ``((\cos\theta) u)_{lm}`` is a linear combination of the coefficients of one higher and one lower degree
 ``\Psi_{l+1, m}, \Psi_{l-1, m}``. As the coefficient ``\Psi_{lm}`` with ``m<l`` are zero, the sectoral harmonics
 (``l=m``) of the gradients are obtained from the first off-diagonal only. However, the ``l=l_{max}`` harmonics of
 the gradients require the ``l_{max}-1`` as well as the ``l_{max}+1`` harmonics. As a consequence
 vector quantities like velocity components ``u, v`` require one more degree ``l`` than scalar quantities like
-vorticity[^Bourke72]. However, for easier compatibility all spectral fields in SpeedyWeather.jl use one more
-degree ``l``, but scalar quantities should not make use of it. Equivalently, the last degree ``l`` is 
+vorticity [Bourke1972](@citep). However, for easier compatibility all spectral fields in SpeedyWeather.jl use one more
+degree ``l``, but scalar quantities should not make use of it. Equivalently, the last degree ``l`` is
 set to zero before the time integration, which only advances scalar quantities.
 
 
@@ -376,7 +397,7 @@ the [Zonal derivative](@ref) and in [Radius scaling](@ref scaling).
 The meridional gradient as described above can be applied to scalars, such as ``\Psi`` and ``\Phi`` in the conversion
 to velocities ``(u, v) = \nabla^\bot\Psi + \nabla\Phi``, however, the operators curl ``\nabla \times`` and divergence
 ``\nabla \cdot`` in spherical coordinates involve a ``\cos\theta`` scaling _before_ the meridional gradient is applied.
-How to translate this to spectral coefficients has to be derived separately[^Randall2021], [^Durran2010].
+How to translate this to spectral coefficients has to be derived separately [Randall2021, Durran2010](@citep).
 
 The spectral transform of vorticity ``\zeta`` is
 ```math
@@ -454,24 +475,3 @@ V_{l, m} &= -\frac{im}{l(l+1)}(R\zeta)_{l, m} - \frac{\epsilon_{l+1, m}}{l+1}(RD
 
 We have moved the scaling with the radius ``R`` directly into ``\zeta, D``
 as further described in [Radius scaling](@ref scaling).
-
-## References
-
-[^Malardel2016]: Malardel S, Wedi N, Deconinck W, Diamantakis M, Kühnlein C, Mozdzynski G, Hamrud M, Smolarkiewicz P. A new grid for the IFS. ECMWF newsletter. 2016; 146(23-28):321. doi: [10.21957/zwdu9u5i](https://doi.org/10.21957/zwdu9u5i)
-[^Gorski2004]: Górski, Hivon, Banday, Wandelt, Hansen, Reinecke, Bartelmann, 2004. _HEALPix: A FRAMEWORK FOR HIGH-RESOLUTION DISCRETIZATION AND FAST ANALYSIS OF DATA DISTRIBUTED ON THE SPHERE_, The Astrophysical Journal. doi:[10.1086/427976](https://doi.org/10.1086/427976)
-[^Willmert2020]: Justin Willmert, 2020. [justinwillmert.com](https://justinwillmert.com/)
-    - [Introduction to Associated Legendre Polynomials (Legendre.jl Series, Part I)](https://justinwillmert.com/articles/2020/introduction-to-associated-legendre-polynomials/)
-    - [Calculating Legendre Polynomials (Legendre.jl Series, Part II)](https://justinwillmert.com/articles/2020/calculating-legendre-polynomials/)
-    - [Pre-normalizing Legendre Polynomials (Legendre.jl Series, Part III)](https://justinwillmert.com/articles/2020/pre-normalizing-legendre-polynomials/)
-    - [Maintaining numerical accuracy in the Legendre recurrences (Legendre.jl Series, Part IV)](https://justinwillmert.com/articles/2020/maintaining-numerical-accuracy-in-the-legendre-recurrences/)
-    - [Introducing Legendre.jl (Legendre.jl Series, Part V)](https://justinwillmert.com/articles/2020/introducing-legendre.jl/)
-    - [Numerical Accuracy of the Spherical Harmonic Recurrence Coefficient (Legendre.jl Series Addendum)](https://justinwillmert.com/posts/2020/pre-normalizing-legendre-polynomials-addendum/)
-    - [Notes on Calculating the Spherical Harmonics](https://justinwillmert.com/articles/2020/notes-on-calculating-the-spherical-harmonics)
-    - [More Notes on Calculating the Spherical Harmonics: Analysis of maps to harmonic coefficients](https://justinwillmert.com/articles/2022/more-notes-on-calculating-the-spherical-harmonics/)
-[^Daley78]:  Roger Daley & Yvon Bourassa (1978) Rhomboidal versus triangular spherical harmonic truncation: Some verification statistics, Atmosphere-Ocean, 16:2, 187-196, DOI: [10.1080/07055900.1978.9649026](https://doi.org/10.1080/07055900.1978.9649026)
-[^Randall2021]: David Randall, 2021. [An Introduction to Numerical Modeling of the Atmosphere](http://hogback.atmos.colostate.edu/group/dave/at604pdf/An_Introduction_to_Numerical_Modeling_of_the_Atmosphere.pdf), Chapter 22.
-[^Durran2010]: Dale Durran, 2010. [Numerical Methods for Fluid Dynamics](https://link.springer.com/book/10.1007/978-1-4419-6412-0), Springer. In particular section 6.2, 6.4.
-[^GFDL]: Geophysical Fluid Dynamics Laboratory, [The barotropic vorticity equation](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/barotropic.pdf).
-[^FFT]: Depending on the implementation of the Fast Fourier Transform ([Cooley-Tukey algorithm](https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm), or or the [Bluestein algorithm](https://en.wikipedia.org/wiki/Chirp_Z-transform#Bluestein.27s_algorithm)) *easily Fourier-transformable* can mean different things: Vectors of the length ``n`` that is a power of two, i.e. ``n = 2^i`` is certainly easily Fourier-transformable, but for most FFT implementations so are ``n = 2^i3^j5^k`` with ``i, j, k`` some positive integers. In fact, [FFTW](http://fftw.org/) uses ``O(n \log n)`` algorithms even for prime sizes.
-[^Bourke72]: Bourke, W. An Efficient, One-Level, Primitive-Equation Spectral Model. Mon. Wea. Rev. 100, 683–689 (1972). doi:[10.1175/1520-0493(1972)100<0683:AEOPSM>2.3.CO;2](https://doi.org/10.1175/1520-0493(1972)100<0683:AEOPSM>2.3.CO;2)
-[^Orszag70]: Orszag, S. A., 1970: Transform Method for the Calculation of Vector-Coupled Sums: Application to the Spectral Form of the Vorticity Equation. J. Atmos. Sci., 27, 890–895, [10.1175/1520-0469(1970)027<0890:TMFTCO>2.0.CO;2](https://doi.org/10.1175/1520-0469(1970)027<0890:TMFTCO>2.0.CO;2). 

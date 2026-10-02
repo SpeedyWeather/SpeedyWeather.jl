@@ -107,7 +107,7 @@ end
         @param z::T2 = 3.0 (b = 3,)
         date::DateTime = DateTime(0)
     end
-    ps = parameters(TestType5());
+    ps = parameters(TestType5())
     @test haskey(ps, :a)
     @test haskey(ps, :b)
     @test !haskey(ps, :c)

@@ -11,6 +11,9 @@ struct Simulation{V, M <: AbstractModel} <: AbstractSimulation{M}
     model::M
 end
 
+"""($TYPEDSIGNATURES) Same as `initialize!(model)` which returns a `Simulation`."""
+Simulation(model::AbstractModel; kwargs...) = initialize!(model; kwargs...)
+
 function Base.show(io::IO, S::AbstractSimulation)
     vsize = prettymemory(_pretty_size(S.variables))
     Msize = prettymemory(Base.summarysize(S.model))
@@ -62,18 +65,19 @@ function initialize!(
     # SET THE CLOCK
     (; clock) = progn
     (; time_stepping) = model
+    (; planet) = model  # pass on planet to calculate time dilation for solar zenith calculations
     if steps != DEFAULT_TIMESTEPS
         # sets the steps, calculate period from it, store the start date, reset counter
         @assert period == DEFAULT_PERIOD "Period and steps cannot be set simultaneously"
-        initialize!(clock, time_stepping, steps)
+        initialize!(clock, time_stepping, planet, steps)
     else
         # set period = how long to integrate for, store the start date, reset counter
-        initialize!(clock, time_stepping, period)
+        initialize!(clock, time_stepping, planet, period)
     end
 
     # SCALING we use vorticity*radius, divergence*radius in the dynamical core
     scale_prognostic!(variables, model.planet.radius)
-    
+
     # TRANSFORM variables from spectral to grid (= set the diagnostic variables in the correct initial state)
     transform!(variables, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays

@@ -28,7 +28,9 @@ everywhere, even where the land-sea mask is 1 (fully land).
 
 # Custom ocean model
 
-Now the ocean model is expected to change `ocean.sea_surface_temperature`
+For an overview of SpeedyWeather's built-in ocean models, such as `SlabOcean` or
+`SeasonalOceanClimatology`, see [Ocean models](@ref). Now the ocean model is
+expected to change `ocean.sea_surface_temperature`
 and/or `ocean.sea_ice_concentration` on a given time step.
 A new ocean model has to be defined as
 

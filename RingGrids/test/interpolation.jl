@@ -252,3 +252,165 @@ end
         end
     end
 end
+
+@testset "interpolate_2D!: batched matches per-layer" begin
+    # A 3D field interpolates all its layers in one launch; the result must agree exactly
+    # with interpolating each layer separately as a 2D field.
+    @testset for Grid in (
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+        )
+        @testset for NF in (Float32, Float64)
+            grid_in = Grid(8)
+            grid_out = Grid(12)
+            nlayers = 5
+
+            field_in = randn(NF, grid_in, nlayers)
+            field_out = zeros(NF, grid_out, nlayers)
+
+            interpolator = RingGrids.interpolator(grid_out, grid_in, NF = NF)
+            RingGrids.interpolate_2D!(field_out, field_in, interpolator)
+
+            for k in 1:nlayers
+                layer_in = zeros(NF, grid_in)
+                layer_out = zeros(NF, grid_out)
+                layer_in .= RingGrids.field_view(field_in, :, k)
+                RingGrids.interpolate_2D!(layer_out, layer_in, interpolator)
+                # ≈ rather than ==: the batched path averages the pole rings with a
+                # reduction over all layers at once, which accumulates in a different
+                # order than the single-layer reduction. On some grids that differs in
+                # the last bit, and the difference reaches only those output points that
+                # take a pole value (observed: HEALPix-family grids in Float64, 1 ULP).
+                @test Array(layer_out) ≈ Array(RingGrids.field_view(field_out, :, k))
+            end
+        end
+    end
+end
+
+@testset "interpolate_2D!: batched 4D field" begin
+    # trailing dimensions are collapsed into one for the batched launch; the result must
+    # match interpolating each (layer, trailing) slice on its own
+    @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid, HEALPixGrid)
+        @testset for NF in (Float32, Float64)
+            grid_in = Grid(8)
+            grid_out = Grid(12)
+            n2, n3 = 4, 3
+
+            field_in = randn(NF, grid_in, n2, n3)
+            field_out = zeros(NF, grid_out, n2, n3)
+
+            interpolator = RingGrids.interpolator(grid_out, grid_in, NF = NF)
+            RingGrids.interpolate_2D!(field_out, field_in, interpolator)
+
+            for k in RingGrids.eachlayer(field_out, field_in)
+                layer_in = zeros(NF, grid_in)
+                layer_out = zeros(NF, grid_out)
+                layer_in .= view(field_in.data, :, k)
+                RingGrids.interpolate_2D!(layer_out, layer_in, interpolator)
+                @test Array(layer_out) ≈ Array(view(field_out.data, :, k))
+            end
+        end
+    end
+end
+
+@testset "interpolate_2D!: falls back for strided data" begin
+    # a field whose data is a non-contiguous view cannot be reshaped in O(1), so it takes
+    # the per-layer loop instead; either way the answer must be the same
+    grid_in, grid_out = OctahedralGaussianGrid(8), OctahedralGaussianGrid(12)
+    nlayers = 3
+
+    backing = randn(Float64, RingGrids.get_npoints(grid_in), 2 * nlayers)
+    strided = view(backing, :, 1:2:(2 * nlayers))        # every other column
+    @test !(strided isa DenseArray)
+
+    field_in = Field(strided, grid_in)
+    dense_in = Field(Array(strided), grid_in)
+
+    out_strided = zeros(Float64, grid_out, nlayers)
+    out_dense = zeros(Float64, grid_out, nlayers)
+    interpolator = RingGrids.interpolator(grid_out, grid_in, NF = Float64)
+    RingGrids.interpolate_2D!(out_strided, field_in, interpolator)
+    RingGrids.interpolate_2D!(out_dense, dense_in, interpolator)
+
+    @test Array(out_strided.data) ≈ Array(out_dense.data)
+end
+
+@testset "interpolate_2D!: constant field" begin
+    # constants must survive, including at the poles where the batched kernel uses
+    # per-layer pole averages rather than the single-layer kernel's scalars
+    @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid, HEALPixGrid)
+        @testset for NF in (Float32, Float64)
+            grid_in = Grid(8)
+            grid_out = Grid(16)
+            nlayers = 3
+
+            field_in = zeros(NF, grid_in, nlayers)
+            for k in 1:nlayers
+                RingGrids.field_view(field_in, :, k) .= NF(k)
+            end
+
+            field_out = zeros(NF, grid_out, nlayers)
+            RingGrids.interpolate_2D!(field_out, field_in, RingGrids.interpolator(grid_out, grid_in, NF = NF))
+
+            for k in 1:nlayers
+                @test all(Array(RingGrids.field_view(field_out, :, k)) .≈ NF(k))
+            end
+        end
+    end
+end
+
+@testset "interpolate_2D!: contiguous views take the batched path" begin
+    # a field wrapping a contiguous view (e.g. one time slice of a 4D array) is reshapeable
+    # in O(1) and so is batched, not looped; the result must still match the dense one
+    grid_in, grid_out = OctahedralGaussianGrid(8), OctahedralGaussianGrid(12)
+    nlayers, ntime = 3, 2
+
+    backing = randn(Float64, RingGrids.get_npoints(grid_in), nlayers, ntime)
+    contiguous = view(backing, :, :, 2)
+    @test RingGrids.is_flattenable(contiguous)
+    @test !RingGrids.is_flattenable(view(backing, :, 1:2:nlayers, 1))
+
+    field_in = Field(contiguous, grid_in)
+    dense_in = Field(Array(contiguous), grid_in)
+
+    out_view = zeros(Float64, grid_out, nlayers)
+    out_dense = zeros(Float64, grid_out, nlayers)
+    interpolator = RingGrids.interpolator(grid_out, grid_in, NF = Float64)
+    RingGrids.interpolate_2D!(out_view, field_in, interpolator)
+    RingGrids.interpolate_2D!(out_dense, dense_in, interpolator)
+
+    @test Array(out_view.data) == Array(out_dense.data)
+end
+
+@testset "interpolate! forwards to interpolate_2D!" begin
+    # without vertical positions interpolate! is a horizontal interpolation for every arity
+    grid_in, grid_out = HEALPixGrid(8), FullGaussianGrid(12)
+    interpolator = RingGrids.interpolator(grid_out, grid_in, NF = Float64)
+
+    @testset for nlayers in (nothing, 4)
+        field_in = isnothing(nlayers) ? randn(Float64, grid_in) : randn(Float64, grid_in, nlayers)
+        out1 = isnothing(nlayers) ? zeros(Float64, grid_out) : zeros(Float64, grid_out, nlayers)
+        out2 = deepcopy(out1)
+        interpolate!(out1, field_in, interpolator)
+        interpolate_2D!(out2, field_in, interpolator)
+        @test out1.data == out2.data
+        interpolate!(out1, field_in, interpolator.locator, interpolator.geometry)
+        @test out1.data == out2.data
+    end
+
+    # vector output from a 2D field
+    field_in = randn(Float64, grid_in)
+    londs, latds = collect(-10.0:2.0:8.0), collect(0.0:5.0:45.0)
+    I = RingGrids.interpolator(grid_in, length(londs), NF = Float64)
+    RingGrids.update_locator!(I, londs, latds)
+    v1, v2 = zeros(length(londs)), zeros(length(londs))
+    interpolate!(v1, field_in, I)
+    interpolate_2D!(v2, field_in, I)
+    @test v1 == v2
+    interpolate!(v1, field_in, I.locator, I.geometry)
+    @test v1 == v2
+end

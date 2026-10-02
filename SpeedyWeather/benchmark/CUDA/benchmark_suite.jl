@@ -5,7 +5,7 @@ include("../benchmark_suite.jl")
     nruns::Int = 1
     model::Vector = fill(:CPU, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
-    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    truncation::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNCATION, nruns)
     nlayers::Vector{Int} = fill(SpeedyWeather.DEFAULT_NLAYERS, nruns)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
@@ -31,18 +31,18 @@ function run_benchmark_suite!(suite::BenchmarkSuiteTransform)
 
     for i in 1:suite.nruns
         NF = suite.NF[i]
-        trunc = suite.trunc[i]
+        truncation = suite.truncation[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
         architecture = suite.model[i]
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
+        spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
         S = SpectralTransform(spectral_grid)
 
         specs, grids = generate_random_inputs(spectral_grid)
 
-        println("Running BenchmarkSuiteTransform for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
+        println("Running BenchmarkSuiteTransform for architecture=$architecture, truncation=$truncation, nlayers=$nlayers, NF=$NF \n")
 
         # Forward _legendre
         b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($specs, $S.scratch_memory.north, $S.scratch_memory.south, $S.scratch_memory.column, $S)
@@ -69,7 +69,7 @@ end
     nruns::Int = 1
     model::Vector = fill(SpeedyWeather.CPU, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
-    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    truncation::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNCATION, nruns)
     nlayers::Vector{Int} = fill(SpeedyWeather.DEFAULT_NLAYERS, nruns)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
@@ -84,14 +84,14 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
 
     for i in 1:suite.nruns
         NF = suite.NF[i]
-        trunc = suite.trunc[i]
+        truncation = suite.truncation[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
         architecture = suite.model[i]
         transform_type = suite.transform_type[i]
         lf = 2
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
+        spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
 
         if transform_type == :matrix
@@ -107,7 +107,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
         initialize!(simulation)
         vars, model = SpeedyWeather.unpack(simulation)
 
-        println("Running BenchmarkSuiteModel for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
+        println("Running BenchmarkSuiteModel for architecture=$architecture, truncation=$truncation, nlayers=$nlayers, NF=$NF \n")
 
         b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($vars, $model)
         add_results!(suite, b, i, 1)
@@ -127,7 +127,7 @@ end
     nruns::Int = 1
     model::Vector = fill(SpeedyWeather.CPU, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
-    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    truncation::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNCATION, nruns)
     nlayers::Vector{Int} = fill(SpeedyWeather.DEFAULT_NLAYERS, nruns)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
@@ -142,14 +142,14 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamicsGPU)
 
     for i in 1:suite.nruns
         NF = suite.NF[i]
-        trunc = suite.trunc[i]
+        truncation = suite.truncation[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
         architecture = suite.model[i]
         transform_type = suite.transform_type[i]
         lf = 2
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
+        spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
 
         if transform_type == :matrix
@@ -166,7 +166,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamicsGPU)
         vars, model = SpeedyWeather.unpack(simulation)
         (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
 
-        println("Running BenchmarkSuiteDynamics for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
+        println("Running BenchmarkSuiteDynamics for architecture=$architecture, truncation=$truncation, nlayers=$nlayers, NF=$NF \n")
 
         b = @benchmark CUDA.@sync SpeedyWeather.forcing!($vars, $lf, $model)
         add_results!(suite, b, i, 1)

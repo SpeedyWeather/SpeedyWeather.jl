@@ -2,7 +2,7 @@
 
 SpeedyWeather's two main array types, `Field` (see [RingGrids](@ref)) for gridded data
 and `LowerTriangularArray` (see [LowerTriangularArrays](@ref lowertriangularmatrices))
-for spectral coefficients, unravel the horizontal into the first array dimension.
+for spectral coefficients (see [Spectral packing](@ref)), unravel the horizontal into the first array dimension.
 Any additional array dimension can then represent whatever you like: the vertical,
 time (or time steps of the time integration), etc. To record what these additional
 dimensions actually mean, both types (optionally) carry a dimension tag from the
@@ -27,7 +27,7 @@ The array summary includes the dimension tag in parentheses
 
 ```@example dimensions
 using SpeedyWeather
-spectrum = Spectrum(trunc=5)
+spectrum = Spectrum(truncation=6)
 L = rand(ComplexF32, spectrum, ArrayDimensions.LMZ(), 3)
 ```
 
@@ -67,13 +67,23 @@ ArrayDimensions.hasvertical(L), ArrayDimensions.hastime(L)
 or through dispatch on the tag types and their unions like
 `ArrayDimensions.DimensionsWithTime` and `ArrayDimensions.DimensionsWithVertical`.
 
+!!! note "Writing your own `...WithTime`-style alias"
+    These aliases are `where` clauses over the array type, e.g.
+    `Field{T, N, A, G, Dims} where {..., Dims <: DimensionsWithTime}`. If you write one yourself,
+    repeat *all* parameter bounds of the underlying type declaration. A `where` clause with looser
+    bounds than the declaration is not a subtype of it, so the alias would silently fail to
+    dispatch: a method on the alias and a fallback on the plain type end up unordered and Julia
+    picks by definition order rather than by the tag. `LowerTriangularArray` declares
+    `ArrayType <: AbstractArray{T, N}` and `S <: AbstractSpectrum`, so its aliases must spell those
+    out; `AbstractField` declares its parameters unbounded, so its aliases need not.
+
 The tags are preserved through `similar`, `zero`, views and broadcasting; indexing
 into a tagged dimension with an integer drops it accordingly, e.g. `L[:, 1]` of an
 `LMZ`-tagged array returns an `LM`-tagged one.
 
-Within SpeedyWeather, the variables in `simulation.variables` carry these tags; in
-particular the step dimension that prognostic and tendency variables have for the time
-integration is tagged as time `T`, so their summaries show, e.g., `(LMZT)` or `(XYZT)`,
-see [Step dimension](@ref). For more details on the two array types see
+Within SpeedyWeather, the variables in `simulation.variables` (see [The `Variables` struct](@ref))
+carry these tags; in particular the step dimension that prognostic and tendency variables
+have for the [time integration](@ref time_stepping) is tagged as time `T`, so their summaries
+show, e.g., `(LMZT)` or `(XYZT)`, see [Step dimension](@ref). For more details on the two array types see
 [Array dimensions of a Field](@ref) and
 [Array dimensions for `LowerTriangularArray`](@ref).

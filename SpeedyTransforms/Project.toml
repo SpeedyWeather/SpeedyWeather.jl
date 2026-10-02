@@ -1,13 +1,12 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-version = "0.2.0-DEV"
+version = "0.2.1+DEV"
 authors = ["SpeedyTransforms contributors"]
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 AssociatedLegendrePolynomials = "2119f1ac-fb78-50f5-8cc0-dda848ebdb19"
-Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
@@ -27,6 +26,7 @@ StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 [weakdeps]
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 cuFFT = "533571aa-0936-420e-b4be-9c66f5f626ca"
 
@@ -39,13 +39,13 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 SpeedyTransformsAMDGPUExt = "AMDGPU"
 SpeedyTransformsCUDAExt = ["CUDA", "cuFFT"]
 SpeedyTransformsEnzymeExt = "Enzyme"
+SpeedyTransformsMetalExt = "Metal"
 
 [compat]
 AMDGPU = "2.1.2"
 AbstractFFTs = "1.5.0"
 Adapt = "4.3.0"
 AssociatedLegendrePolynomials = "1.0.1"
-Atomix = "1"
 CUDA = "4, 5, 6.0"
 DocStringExtensions = "0.9.5"
 Enzyme = "0.13"
@@ -56,6 +56,7 @@ GenericFFT = "0.1.6"
 KernelAbstractions = "0.9.38"
 LinearAlgebra = "1.10"
 LowerTriangularArrays = "0.1"
+Metal = "1.8"
 Primes = "0.5.7"
 Printf = "1.10"
 ProgressMeter = "1.11.0"

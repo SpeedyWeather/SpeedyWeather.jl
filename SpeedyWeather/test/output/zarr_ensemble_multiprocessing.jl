@@ -22,7 +22,7 @@ using Zarr, Dates
         ensemble_size = parse(Int, ARGS[2])
         path          = ARGS[3]
 
-        spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+        spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
         initial_conditions = ZonalJet(spectral_grid)   # deterministic, identical for all members
         output = ZarrOutput(
             spectral_grid, ShallowWater;

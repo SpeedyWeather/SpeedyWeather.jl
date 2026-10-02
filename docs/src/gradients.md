@@ -13,7 +13,7 @@ under the hood.
 !!! info "SpeedyTransforms assumes a unit sphere"
     The gradient operators in SpeedyTransforms generally assume a sphere of radius ``R=1``.
     For the transforms themselves that does not make a difference, but the gradient operators
-    `divergence`, `curl`, `∇`, `∇²`, `∇⁻²` omit the radius scaling unless you provide the optional
+    `divergence`, `curl`, `∇`, `∇²`, `∇⁻²` omit the [radius scaling](@ref scaling) unless you provide the optional
     keyword `radius` (or you can do `./= radius` manually).
     Also note that meridional derivates in spectral space expect a ``\cos^{-1}(\theta)`` scaling.
     Details are always outlined in the respective docstrings, `?∇` for example.
@@ -57,8 +57,8 @@ data `G` on the grid first
 using SpeedyWeather, CairoMakie
 
 # create some data with wave numbers 0,1,2,3,4
-trunc = 64                  # 1-based maximum degree of spherical harmonics
-L = randn(LowerTriangularMatrix{ComplexF32}, trunc, trunc)
+truncation = 64                  # 1-based maximum degree of spherical harmonics
+L = randn(LowerTriangularMatrix{ComplexF32}, truncation, truncation)
 SpeedyTransforms.spectral_truncation!(L, 5)  # remove higher wave numbers
 G = transform(L)
 heatmap(G, title="Some fake data G")        # requires `using CairoMakie`
@@ -109,7 +109,7 @@ SpeedyTransforms?
 
 Let us start by generating some data
 ```@example gradient
-spectral_grid = SpectralGrid(trunc=31, nlayers=1)
+spectral_grid = SpectralGrid(truncation=32, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = LinearVorticityDrag(spectral_grid)
 model = ShallowWaterModel(spectral_grid; forcing, drag)

@@ -9,8 +9,7 @@ struct MatrixSpectralTransform{
         VectorType,                 # <: ArrayType{NF, 1},
         MatrixType,                 # <: ArrayType{NF, 2},
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
-        GradientType,               # <: NamedTuple for gradients
-        IntType,                    # <: Integer
+        GradientType,               # <: Gradients struct (see gradient_arrays.jl)
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -19,7 +18,7 @@ struct MatrixSpectralTransform{
     # SPECTRAL AND GRID RESOLUTION
     spectrum::SpectrumType              # spectral truncation
     grid::GridType                      # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::IntType                    # number of layers in vertical
+    nlayers::Int                        # number of layers in vertical
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType                  # Cosine of latitudes, north to south
@@ -27,6 +26,11 @@ struct MatrixSpectralTransform{
 
     # NORMALIZATION
     norm_sphere::NF                 # normalization of the l=0, m=0 mode
+
+    # LAPLACE EIGENVALUES -l*(l+1) and their inverse, for ∇²/∇⁻². Stored here (with the existing
+    # VectorType parameter) rather than inside `gradients` to keep the type name short.
+    eigenvalues::VectorType
+    eigenvalues⁻¹::VectorType
 
     # THE ACTUAL TRANSFORM MATRICES for forward = LT(FFT(input)) and backward = IFFT(ILT(input))
     forward::MatrixComplexType          # forward transform matrix
@@ -95,8 +99,10 @@ function MatrixSpectralTransform(
     scratch_memory = on_architecture(architecture, zeros(NF, spectrum, nlayers).data)
     #scratch_memory = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
 
-    # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES
+    # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES + LAPLACE EIGENVALUES (stored on the transform,
+    # not inside `gradients`, so the `gradients` type stays short — see `Gradients`)
     gradients = gradient_arrays(NF, spectrum)
+    eigenvalues, eigenvalues⁻¹ = get_eigenvalues_and_inverse(NF, spectrum)
 
     return MatrixSpectralTransform{
         NF,
@@ -107,12 +113,12 @@ function MatrixSpectralTransform(
         typeof(backward_real),
         typeof(forward),
         typeof(gradients),
-        typeof(nlayers),
     }(
         architecture,
         spectrum, grid, nlayers,
         coslat, coslat⁻¹,
         S.norm_sphere,
+        eigenvalues, eigenvalues⁻¹,
         forward,
         backward,
         backward_real,
@@ -164,6 +170,23 @@ function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2
     return nothing
 end
 
+"""On the CPU a `reshape` of a view is a `Base.ReshapedArray` that LinearAlgebra still recognizes
+as a `StridedArray`, so `mul!` dispatches to BLAS without needing to materialize anything."""
+function _as_matrix(x::AbstractArray, ::AbstractArchitecture)
+    ndims(x) == 2 && return x, false
+    return reshape(x, size(x, 1), :), false
+end
+
+"""On the GPU non-contiguous views need materializing first. For the PrimitiveWetModel this should
+never be hit as all transforms actually act on fused variables and/or contiguous views (which
+aren't treated as views by CUDA.jl/AMDGPU.jl/..)."""
+function _as_matrix(x::AbstractArray, ::GPU)
+    ndims(x) == 2 && return x, false
+    n = size(x, 1)
+    parent(x) === x && return reshape(x, n, :), false
+    return reshape(copy(x), n, :), true
+end
+
 """$(TYPEDSIGNATURES)
 Spectral transform (grid to spectral space) from n-dimensional array `field` to an n-dimensional
 array `coeffs` of spherical harmonic coefficients. Uses precomputed dense transform matrices to
@@ -186,11 +209,11 @@ function transform!(                        # GRID TO SPECTRAL
     # Collapse any batch/layer dimensions into columns so the single dense matrix multiply also
     # works for n-dimensional (batched/fused) fields, not just 2D. This is not a batched matmul
     # (one matrix `M.forward` × many columns), so one big `mul!` (→ `BLAS.gemm!`) is both correct
-    # and optimal. `reshape` on a contiguous array is zero-copy and a no-op for genuinely 2D input,
-    # so the 2D path is unaffected; the result is written in place through the shared memory.
-    coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), :)
-    field_matrix = reshape(field.data, size(field.data, 1), :)
+    # and optimal. See `_as_matrix` for why GPU non-contigous views need materializing first (CPU views don't).
+    field_matrix, _ = _as_matrix(field.data, M.architecture)                # read-only source, no writeback needed
+    coeffs_matrix, coeffs_materialized = _as_matrix(coeffs.data, M.architecture)
     @maybe_jit M.architecture LinearAlgebra.mul!(coeffs_matrix, M.forward, field_matrix)
+    coeffs_materialized && copyto!(coeffs.data, coeffs_matrix)
     return coeffs
 end
 
@@ -218,7 +241,7 @@ function transform!(                        # SPECTRAL TO GRID
     # transform emits, so a column-view of the required width always fits.
     ncolumns = length(coeffs.data) ÷ size(coeffs.data, 1)
     coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), ncolumns)
-    field_matrix = reshape(field.data, size(field.data, 1), ncolumns)
+    field_matrix, field_materialized = _as_matrix(field.data, M.architecture)
     scratch = view(scratch_memory, :, 1:ncolumns)
 
     # the result is real-valued, therefore we can split the complex multiplication
@@ -228,6 +251,7 @@ function transform!(                        # SPECTRAL TO GRID
 
     scratch .= imag.(coeffs_matrix)
     @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_imag, scratch, -1, 1)
+    field_materialized && copyto!(field.data, field_matrix)
 
     if unscale_coslat
         @maybe_jit M.architecture RingGrids._scale_lat!(field, M.coslat⁻¹)

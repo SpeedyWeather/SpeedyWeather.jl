@@ -56,9 +56,11 @@ function _legendre!(
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     # scratch dim 2 is the per-call capacity (= max(planned_K) on CPU, S.nlayers elsewhere);
     # allow it to exceed length(nlayers) so chunked CPU calls pass the bound.
-    @boundscheck (size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
-                  size(g_north, 3) == nlat_half && size(g_north, 2) >= length(nlayers)) ||
-                 throw(DimensionMismatch(S, specs))
+    @boundscheck (
+        size(g_north) == size(g_south) && size(g_north, 1) == S.nfreq_max &&
+            size(g_north, 3) == nlat_half && size(g_north, 2) >= length(nlayers)
+    ) ||
+        throw(DimensionMismatch(S, specs))
 
     north = scratch_memory.north     # use scratch memory for vertically-batched dot product
     south = scratch_memory.south
@@ -146,9 +148,11 @@ function _legendre!(                        # GRID TO SPECTRAL
     mmax = mmax - 1                           # 0-based max order m of spherical harmonics
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck (size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
-                  size(f_north, 3) == nlat_half && size(f_north, 2) >= length(nlayers)) ||
-                 throw(DimensionMismatch(S, specs))
+    @boundscheck (
+        size(f_north) == size(f_south) && size(f_north, 1) == S.nfreq_max &&
+            size(f_north, 3) == nlat_half && size(f_north, 2) >= length(nlayers)
+    ) ||
+        throw(DimensionMismatch(S, specs))
 
     even = scratch_memory.north      # use scratch memory for outer product
     odd = scratch_memory.south
@@ -197,13 +201,14 @@ Unscale by cosine of latitude on the fly.
 function unscale_coslat!(
         g_north::AbstractArray{<:Complex, 3},
         g_south::AbstractArray{<:Complex, 3},
-        coslat⁻¹::AbstractArray{<:Real, 1};
+        coslat⁻¹::AbstractArray{<:Real, 1},
+        nlayers::Integer = size(g_north, 2);     # scale only the layers this transform wrote
         architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE
     )
 
     launch!(
-        architecture, ArrayWorkOrder, size(g_north), unscale_coslat_kernel!,
-        g_north, g_south, coslat⁻¹
+        architecture, ArrayWorkOrder, (size(g_north, 1), nlayers, size(g_north, 3)),
+        unscale_coslat_kernel!, g_north, g_south, coslat⁻¹
     )
     return nothing
 end

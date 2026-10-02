@@ -29,11 +29,12 @@ with `EarthLandSeaMask` being the default `LandSeaMask` using the land-sea mask 
 
 ## Manual land-sea mask
 
-You can create the default land-sea mask as follows
+You can create the default land-sea mask as follows, following the general pattern for
+[Creating model components](@ref create_model_components):
 
 ```@example landseamask
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 land_sea_mask = LandSeaMask(spectral_grid)
 ```
 
@@ -46,7 +47,7 @@ model = PrimitiveWetModel(spectral_grid; land_sea_mask)
 simulation = initialize!(model)     # triggers also initialization of model.land_sea_mask
 
 using CairoMakie
-heatmap(land_sea_mask.land_fraction, title="Land-sea mask at T31 resolution")
+heatmap(land_sea_mask.land_fraction, title="Land-sea mask at T32 resolution")
 save("land-sea_mask.png", ans) # hide
 nothing # hide
 ```
@@ -99,6 +100,7 @@ the entire mask to zero afterwards `land_sea_mask.land_fraction .= 0`.
 ## Custom land-sea mask
 
 Every (custom) land-sea mask has to be a subtype of `AbstractLandSeaMask`.
+This follows a very similar pattern to [Defining a new orography type](@ref).
 A custom land-sea mask has to be defined as a new type (`struct` or `mutable struct`)
 
 ```julia

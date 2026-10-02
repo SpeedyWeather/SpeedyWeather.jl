@@ -68,9 +68,11 @@ function dynamics_tendencies!(
     grid_tendencies!(vars, model)
 
     # batched transform of grid tendencies to spectral space
-    transform!(get_tendency_step(parent(vars.fused.spectral_tendencies), time_stepping, DynamicalCore()),
-               get_tendency_step(parent(vars.fused.grid_tendencies), time_stepping, DynamicalCore()),
-               vars.scratch.transform_memory, model.spectral_transform)
+    transform!(
+        get_tendency_step(parent(vars.fused.spectral_tendencies), time_stepping, DynamicalCore()),
+        get_tendency_step(parent(vars.fused.grid_tendencies), time_stepping, DynamicalCore()),
+        vars.scratch.transform_memory, model.spectral_transform
+    )
 
     # accumulates into final spectral tendencies: vorticity
     spectral_tendencies!(vars, model)
@@ -97,9 +99,11 @@ function dynamics_tendencies!(
     grid_tendencies!(vars, model)
 
     # batched transform of grid tendencies to spectral space
-    transform!(get_tendency_step(parent(vars.fused.spectral_tendencies), time_stepping, DynamicalCore()),
-               get_tendency_step(parent(vars.fused.grid_tendencies), time_stepping, DynamicalCore()),
-               vars.scratch.transform_memory, spectral_transform)
+    transform!(
+        get_tendency_step(parent(vars.fused.spectral_tendencies), time_stepping, DynamicalCore()),
+        get_tendency_step(parent(vars.fused.grid_tendencies), time_stepping, DynamicalCore()),
+        vars.scratch.transform_memory, spectral_transform
+    )
 
     # accumulates into final spectral tendencies: vorticity, divergence, η
     spectral_tendencies!(vars, model)
@@ -152,11 +156,13 @@ function dynamics_tendencies!(
     # compute tendencies in grid space: u, v, temperature, pressure, u·T'·coslat⁻¹, v·T'·coslat⁻¹, kinetic energy, (wet model: humidity, u·q·coslat⁻¹, v·q·coslat⁻¹)
     grid_tendencies!(vars, model)
 
-    
+
     # batched transform of grid tendencies to spectral space
-    transform!(get_tendency_step(parent(vars.fused.spectral_tendencies), time_stepping, DynamicalCore()),
-               get_tendency_step(parent(vars.fused.grid_tendencies), time_stepping, DynamicalCore()),
-               vars.scratch.transform_memory, spectral_transform)
+    transform!(
+        get_tendency_step(parent(vars.fused.spectral_tendencies), time_stepping, DynamicalCore()),
+        get_tendency_step(parent(vars.fused.grid_tendencies), time_stepping, DynamicalCore()),
+        vars.scratch.transform_memory, spectral_transform
+    )
 
     # accumulates into final spectral tendencies: vorticity, divergence, temperature, divergence, pressure (, humidity)
     spectral_tendencies!(vars, model)
@@ -189,10 +195,12 @@ function pressure_gradient_flux!(
 
     ∇!(dpres_dx_spec, dpres_dy_spec, pres, S)       # CALCULATE ∇ln(pₛ)
 
-    # One batched spectral→grid transform for both gradients 
-    transform!(parent(vars.fused.dpres_grad),
-               parent(vars.fused.dpres_grad_spec),
-               scratch_memory, S, unscale_coslat = true)
+    # One batched spectral→grid transform for both gradients
+    transform!(
+        parent(vars.fused.dpres_grad),
+        parent(vars.fused.dpres_grad_spec),
+        scratch_memory, S, unscale_coslat = true
+    )
 
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
@@ -510,7 +518,7 @@ function vordiv_tendencies!(
     return vordiv_tendencies!(vars, coriolis, atmosphere, geometry, implicit, spectral_transform, time_stepping)
 end
 
-# TODO: Might rename this just to u, v spectral tendencies? Because that's what it does, but 
+# TODO: Might rename this just to u, v spectral tendencies? Because that's what it does, but
 # then it's also nice to always have the symmetric with *_grid_tendencies! _spectral_tendencies!
 """$(TYPEDSIGNATURES)
 
@@ -579,7 +587,7 @@ curled/dived to get the tendencies for vorticity/divergence in spectral space
 `+ ...` because there's more terms added later for divergence."""
 function vordiv_spectral_tendencies!(vars::Variables, time_stepping::AbstractTimeStepper, S::AbstractSpectralTransform)
     vor_tend = get_tendency_step(vars.tendencies.vorticity, time_stepping, DynamicalCore())
-    div_tend = get_tendency_step(vars.tendencies.divergence, time_stepping, DynamicalCore()) 
+    div_tend = get_tendency_step(vars.tendencies.divergence, time_stepping, DynamicalCore())
     u_tend = get_tendency_step(vars.dynamics.u_tendency, time_stepping, DynamicalCore())
     v_tend = get_tendency_step(vars.dynamics.v_tendency, time_stepping, DynamicalCore())
     curl!(vor_tend, u_tend, v_tend, S, add = true)
@@ -649,9 +657,11 @@ function parameterization_tendencies_only!(
     # images are harmless. A per-variable transform of the individual slot views would pass
     # non-contiguous SubArrays to the GPU Legendre transform, whose `reinterpret` fails to compile
     # (InvalidIRError); the full contiguous parent transform is the GPU-safe path.
-    transform!(get_tendency_step(parent(vars.fused.spectral_tendencies), TS, DynamicalCore()),
-               get_tendency_step(parent(vars.fused.grid_tendencies), TS, DynamicalCore()),
-               scratch_memory, S)
+    transform!(
+        get_tendency_step(parent(vars.fused.spectral_tendencies), TS, DynamicalCore()),
+        get_tendency_step(parent(vars.fused.grid_tendencies), TS, DynamicalCore()),
+        scratch_memory, S
+    )
 
     # divergence and curl of the (now spectral) u, v tendencies for vor, div tendencies
     vor_tend = get_tendency_step(vars.tendencies.vorticity, TS, DynamicalCore())
@@ -769,9 +779,11 @@ function humidity_grid_tendency!(vars::Variables, model::PrimitiveWet)
     (; time_stepping) = model
     humid_tend_grid = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, DynamicalCore())
     humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore())
-    horizontal_grid_advection!(humid_tend_grid, humid_grid, vars, model; add = true,
-                               uA_grid = get_step(vars.dynamics.grid.uq),
-                               vA_grid = get_step(vars.dynamics.grid.vq))
+    horizontal_grid_advection!(
+        humid_tend_grid, humid_grid, vars, model; add = true,
+        uA_grid = get_step(vars.dynamics.grid.uq),
+        vA_grid = get_step(vars.dynamics.grid.vq)
+    )
     return nothing
 end
 humidity_grid_tendency!(::Variables, ::PrimitiveDry) = nothing
@@ -932,7 +944,7 @@ function flux_grid_divergence!(
     return nothing
 end
 
-#TODO: just call `divergence!` directly instead or keep this to have the *_spectral_ *_grid_ symmetry? 
+#TODO: just call `divergence!` directly instead or keep this to have the *_spectral_ *_grid_ symmetry?
 """$(TYPEDSIGNATURES)
 Purely spectral half of `flux_divergence!`: Just computes the actual divergence"""
 function flux_spectral_divergence!(
@@ -1188,7 +1200,7 @@ end
 
 function _bernoulli_spectral_potential!(vars::Variables, S::AbstractSpectralTransform, time_stepper::AbstractTimeStepper)
     bernoulli = get_step(vars.dynamics.kinetic_energy)
-    div_tend = get_tendency_step(vars.tendencies.divergence, time_stepper, DynamicalCore()) 
+    div_tend = get_tendency_step(vars.tendencies.divergence, time_stepper, DynamicalCore())
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)
     return nothing
 end

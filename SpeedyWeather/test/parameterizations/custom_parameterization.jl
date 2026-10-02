@@ -29,7 +29,7 @@
     end
 
     # replace the existing albedo with our custom albedo
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     albedo = SimpleAlbedo(spectral_grid)
     model = PrimitiveWetModel(spectral_grid; albedo = albedo)
     simulation = initialize!(model)
@@ -57,7 +57,7 @@
         custom_parameterization = SimpleAlbedo(spectral_grid),
         parameterizations = (
             :convection, :large_scale_condensation, :custom_parameterization,
-            :surface_condition, :surface_momentum_flux,
+            :boundary_layer, :surface_momentum_flux,
             :surface_heat_flux, :surface_humidity_flux,
             :stochastic_physics,
         )
@@ -77,4 +77,33 @@
             @test albedo.ocean_albedo <= my_albedo[ij] <= albedo.seaice_albedo
         end
     end
+end
+
+# mimic a parameterization defined in another package without SpeedyWeather dependency
+struct ExternalCooling
+    time_scale_hours::Int
+end
+
+# and its SpeedyWeather extension adding a method to the Parameterization stub
+SpeedyWeather.Parameterization(spectral_grid::SpectralGrid, scheme::ExternalCooling; kwargs...) =
+    UniformCooling(spectral_grid; time_scale = Hour(scheme.time_scale_hours), kwargs...)
+
+@testset "Parameterization from external packages" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+
+    longwave_radiation = Parameterization(spectral_grid, ExternalCooling(20), temp_min = 200)
+    @test longwave_radiation isa UniformCooling{spectral_grid.NF}
+    @test longwave_radiation.time_scale == Hour(20)
+    @test longwave_radiation.temp_min == 200
+
+    # SpeedyWeather parameterizations are passed through
+    @test Parameterization(spectral_grid, longwave_radiation) === longwave_radiation
+
+    # no method for types that aren't parameterizations
+    @test_throws MethodError Parameterization(spectral_grid, 1)
+
+    model = PrimitiveDryModel(spectral_grid; radiation = DryRadiation(spectral_grid; longwave = longwave_radiation))
+    simulation = initialize!(model)
+    run!(simulation, steps = 3)
+    @test simulation.model.radiation.longwave === longwave_radiation
 end

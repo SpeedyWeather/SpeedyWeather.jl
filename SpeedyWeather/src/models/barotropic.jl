@@ -49,7 +49,7 @@ $(TYPEDFIELDS)"""
 
     # NUMERICS
     time_stepping::TS = NCycleLorenz(spectral_grid)
-    spectral_transform::ST = SpectralTransform(spectral_grid)
+    spectral_transform::ST = WhichTransform(spectral_grid)
     implicit::IM = nothing
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 

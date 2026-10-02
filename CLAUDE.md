@@ -39,7 +39,7 @@ SpeedyWeather/src/
 
 | Type | Purpose |
 |------|---------|
-| `SpectralGrid` | Central config: resolution (`trunc`), grid type, `nlayers`, `NF`, architecture |
+| `SpectralGrid` | Central config: resolution (`truncation`), grid type, `nlayers`, `NF`, architecture |
 | `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch) |
 | `Simulation{V,M}` | Top-level container holding model + variables |
 | `Leapfrog` | Time stepper with Robert/Williams filters |
@@ -77,9 +77,9 @@ and `finalize!`.
 Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
 
 ```julia
-vars.prognostic.vorticity                             # Spectral vorticity
+vars.prognostic.vorticity                       # Spectral vorticity
 vars.prognostic.ocean.sea_surface_temperature   # Ocean namespace
-vars.tendencies.vorticity                             # Spectral vorticity tendency
+vars.tendencies.vorticity                       # Spectral vorticity tendency
 vars.tendencies.grid.u                          # Grid-space u-wind tendency
 vars.dynamics.w                                 # Vertical velocity
 ```
@@ -93,7 +93,7 @@ These are collected and allocated automatically by the `Variables(model)` constr
 
 ```julia
 arch = SpeedyWeather.CPU()
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, architecture=arch)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8, architecture=arch)
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period=Day(10), output=true)
@@ -109,7 +109,7 @@ using CUDA              # or AMDGPU, Metal
 using SpeedyWeather
 
 arch = SpeedyWeather.GPU()
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, architecture=arch)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8, architecture=arch)
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
@@ -118,11 +118,18 @@ run!(simulation, period=Day(10))
 The GPU backend must be loaded first so that SpeedyWeather's extension modules
 register the correct array types (`CuArray`, `ROCArray`, `MtlArray`).
 
-GPU tests live in `SpeedyWeather/test/GPU/` and can be run with:
+GPU tests live in `SpeedyWeather/test/GPU/` and auto-detect the backend (`runtests.jl` tries
+`AMDGPU`, then `CUDA`, then `Metal`). Each backend has its own self-contained test environment
+under `SpeedyWeather/test/GPU/<Backend>/Project.toml` (with `SpeedyWeather` resolved via a
+`[sources]` path entry, transitively pulling in its monorepo siblings), so no manual
+`Pkg.develop`/`Pkg.add` is needed — just `instantiate` and run:
 
 ```bash
-julia --project=SpeedyWeather SpeedyWeather/test/GPU/runtests.jl
+julia --project=SpeedyWeather/test/GPU/CUDA -e 'using Pkg; Pkg.instantiate()'
+julia --project=SpeedyWeather/test/GPU/CUDA SpeedyWeather/test/GPU/runtests.jl
 ```
+
+Substitute `AMDGPU` or `MetalGPU` for the backend directory as appropriate.
 
 ## Time-Step Information Flow
 
@@ -148,7 +155,7 @@ Mainly two array types are used: `LowerTriangularArray` for spectral coefficient
 
 ```julia 
 arch = SpeedyWeather.CPU()
-spectrum = Spectrum(trunc=10, architecture = arch)
+spectrum = Spectrum(truncation=10, architecture = arch)
 nlayers = 5
 coeffs_zero = zeros(ComplexF32, spectrum, nlayers)
 coeffs_rand = rand(ComplexF32, spectrum, nlayers)
@@ -162,7 +169,7 @@ In case there's already a `SpectralGrid` use it instead:
 
 ```julia
 arch = SpeedyWeather.CPU()
-spectral_grid = SpectralGrid(trunc=10, architecture=arch)
+spectral_grid = SpectralGrid(truncation=11, architecture=arch)
 coeffs = rand(ComplexF32, spectral_grid.spectrum)
 field = rand(Float32, spectral_grid.grid)
 ```
@@ -207,9 +214,24 @@ field = rand(Float32, spectral_grid.grid)
   and `using` it at the top of the test file. Do not consider a feature complete until its
   unit tests have been added and run successfully.
 
+**Which `--project` to use.** `SpeedyWeather/Project.toml` has only the package's own
+dependencies; the test-only ones (`JET`, `Enzyme`, `NCDatasets`, `CairoMakie`, `Terrarium`, …)
+live in `SpeedyWeather/test/Project.toml`. So:
+
+- `--project=SpeedyWeather` — only for a single test file that needs nothing beyond
+  `SpeedyWeather` and `Test`.
+- `--project=SpeedyWeather/test` — for anything else: files that `using` a test-only
+  dependency (e.g. `dynamics/dispatch.jl` needs `JET`), or running several test files by hand.
+  When in doubt use this one; it is a superset.
+
+`Pkg.test(...)` builds its own environment and works from either.
+
 ```bash
-# Single test file (fast — load Test manually, avoid full Pkg.test overhead)
+# Single test file with no test-only dependencies (fast — load Test manually, skip Pkg.test overhead)
 julia --project=SpeedyWeather --check-bounds=yes -e 'using Test, SpeedyWeather; include("SpeedyWeather/test/dynamics/vertical_coordinates.jl")'
+
+# Single test file that needs test-only dependencies, or several files at once
+julia --project=SpeedyWeather/test --check-bounds=yes -e 'using Test, SpeedyWeather; include("SpeedyWeather/test/dynamics/dispatch.jl")'
 
 # Main model tests
 julia --project=SpeedyWeather --check-bounds=yes -e 'using Pkg; Pkg.test("SpeedyWeather")'
@@ -221,7 +243,17 @@ julia --project=SpeedyWeather SpeedyWeather/test/runtests.jl extended_tests
 julia --project=RingGrids --check-bounds=yes -e 'using Pkg; Pkg.test("RingGrids")'
 ```
 
+Run these from the repository root — the `include` paths above are relative to it.
+
 Test subdirectories: `dynamics/`, `parameterizations/`, `output/`, `GPU/`, `differentiability/`.
+
+**Stale manifests.** `Manifest.toml` files are gitignored (except the deliberately pinned
+`SpeedyWeather/test/differentiability/sensitivity_examples/Manifest.toml`). If loading fails
+during precompilation of a *stdlib* — a symptom of a manifest resolved for an older Julia than
+the one on `PATH` — check `grep -m1 julia_version <env>/Manifest.toml` against
+`julia --version`, then regenerate: `rm <env>/Manifest.toml` and
+`julia --project=<env> -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'`. CI covers both
+Julia 1.10 and 1.12, so either is a valid target.
 
 ## Documentation
 
@@ -357,3 +389,46 @@ that submodule must be bumped according to its size:
 Bump the version of every submodule whose source you actually touched in the PR.
 A change confined to `SpeedyWeather/` does not require bumping
 `LowerTriangularArrays`, etc.
+
+## Implementation plans
+
+All major feature additions, bug fixes, or refactoring that requires substantial changes to the existing code must be prefaced with an **implementation plan** that is reviewed and signed off by a human. These plan documents should be organized by date and stored in `docs/dev/YYYY-MM`. Each document should be prefaced by the following template:
+
+```md
+# Descriptive title
+
+> Status: **planned**/**in progress**/**completed**. One sentence summary of current status.
+
+Date of initial draft: YYYY-MM-dd
+
+Base revision: <SHA1 of HEAD when plan was drafted>
+
+## Originating prompt
+
+> User prompts here
+
+## Revision log
+
+> User prompts here
+
+## Problem description
+
+## Background
+
+```
+
+The revision log should, to the greatest extent possible, briefly summarize changes to the plan that are made on-the-fly during development.
+
+The remainder of the plan document may be adapted on a case-by-case basis but should generally follow this structure:
+
+```md
+## Summary of changes
+
+## Testing and verification
+
+## Documentation changes
+
+## Known limitations
+
+## Future work
+```

@@ -1,32 +1,6 @@
-module SpeedyWeatherZarrExt
-
-using SpeedyWeather
-using Zarr
-using DocStringExtensions
-
-import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
-    AbstractSimulation, AbstractModel, Barotropic, OutputWriterCore,
-    OUTPUT_VARIABLES_DICT, OutputVariablesDict, DEFAULT_NLAYERS_SOIL,
-    DEFAULT_OUTPUT_NF, DEFAULT_OUTPUT_INTERVAL, DEFAULT_MISSING_VALUE,
-    DEFAULT_COMPRESSION_LEVEL, DEFAULT_KEEPBITS,
-    Variables, Simulation, SpectralGrid, Field,
-    initialize!, finalize!, output!, write_array!, define_variable!, set!, add!, add_default!,
-    define_dimension!, vertical_dimension, get_nlayers, get_dimension_length, define_coordinate!,
-    is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
-    get_lond, get_latd, on_architecture, CPU,
-    AbstractFullGrid, path_or_nothing, run_folder_name
-
-import SpeedyWeather.RingGrids
-import SpeedyWeather: round!
-import SpeedyWeather.Printf
-import SpeedyWeather.Dates: Dates, DateTime, Period, Second, Millisecond
-
-# default Zarr compressor: BloscCompressor with the same default level we use
-# for NetCDF output. Users can override by passing compressor=... to ZarrOutput.
-default_zarr_compressor() = Zarr.BloscCompressor(clevel = DEFAULT_COMPRESSION_LEVEL)
-
-resolve_compressor(c) = c
-resolve_compressor(::Nothing) = default_zarr_compressor()
+# `ZarrOutput`: writes interpolated output onto a *full* (rectangular lon/lat) grid, with
+# arrays shaped (lon, lat, vertical, time[, ensemble]). Everything that is not specific to
+# that layout — time-chunk buffering, the time axis, coordinate helpers — lives in shared.jl.
 
 """$(TYPEDSIGNATURES)
 Constructor for [`ZarrOutput`](@ref) (extension version, available once `Zarr.jl`
@@ -43,6 +17,7 @@ function ZarrOutput(
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
         compressor = nothing,
+        layers::SpeedyWeather.AbstractOutputLayers = SpeedyWeather.ModelLayers(),
         kwargs...
     )
 
@@ -53,10 +28,9 @@ function ZarrOutput(
     interpolator = RingGrids.interpolator(output_grid, input_grid, NF = DEFAULT_OUTPUT_NF)
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
-    (; nlayers) = SG
     land_fraction = Field(output_NF, output_grid)
     field2D = Field(output_NF, output_grid)
-    field3D = Field(output_NF, output_grid, nlayers)
+    field3D = Field(output_NF, output_grid, SpeedyWeather.get_nlayers(layers, SG))
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     # Concrete type parameters: pick the compressor's type (defaulting to
@@ -72,9 +46,11 @@ function ZarrOutput(
     F2 = typeof(field2D)
     F3 = typeof(field3D)
     Itp = typeof(interpolator)
+    L = typeof(layers)
 
-    output = ZarrOutput{F2, F3, Itp, DT, S, C, Z}(;
+    output = ZarrOutput{F2, F3, Itp, DT, S, C, Z, L}(;
         interval = interval_sec,
+        layers,
         interpolator,
         land_fraction,
         field2D,
@@ -87,6 +63,12 @@ function ZarrOutput(
     add_default!(output.variables, Model)
     return output
 end
+
+# to dispatch over the dataset type
+SpeedyWeather.dataset_type(::ZarrOutput) = Zarr.ZGroup
+
+# ZarrOutput is the only writer with ensemble support, see its `ensemble_index` option
+zarr_ensemble_index(output::ZarrOutput) = output.ensemble_index
 
 """$(TYPEDSIGNATURES)
 Initialize `ZarrOutput` by creating a Zarr group on disk and storing the initial
@@ -114,14 +96,7 @@ function initialize!(
     )
     output.active || return nothing
 
-    # only checked for models that have a land component and output variables that
-    # actually use the soil vertical dimension (and its scratch field `field3Dland`)
-    if hasfield(typeof(model), :land) && !isnothing(model.land) &&
-            any(var -> is_land(var) && is3D(var), values(output.variables))
-        @assert SpeedyWeather.get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
-            " soil layers initialized for output, but $(SpeedyWeather.get_nlayers(model.land)) soil layers initialized for model." *
-            " Please construct ZarrOutput with the same `nlayers_soil` as the model."
-    end
+    assert_soil_layers(output, model)
 
     ensemble = output.ensemble_index > 0
     if ensemble
@@ -161,17 +136,16 @@ function initialize!(
         g = Zarr.zopen(store_path, "w")
         output.zarr_group = g
 
-        # remove output variables not existent in simulation.variables (mirrors the
-        # creator, which prunes them with a warning before defining the store schema)
+        # skip output variables not existent in simulation.variables, exactly as the
+        # creator does when it defines the store schema
         simulation = Simulation(vars, model)
-        nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
-        isempty(nonexisting_vars) || delete!(output, nonexisting_vars...)
 
         # the creator's store must match this member's configuration, error early
         # (and clearly) otherwise instead of writing into wrong time/ensemble slots
-        validate_ensemble_store(g, output, n_outputs)
+        validate_ensemble_store(g, output, n_outputs, simulation)
 
         for (key, var) in output.variables
+            exists_in_simulation(var, simulation) || continue
             output!(output, var, simulation)
         end
         return nothing
@@ -198,29 +172,17 @@ function initialize!(
     end
 
     # TIME: full-length, chunked by `output.time_chunk`.
-    (; startdate) = output
-    time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
-    Zarr.zcreate(
-        Float64, g, "time", n_outputs;
-        chunks = (max(output.time_chunk, 1),),
-        attrs = Dict(
-            "units" => time_string, "long_name" => "time",
-            "standard_name" => "time", "calendar" => "proleptic_gregorian",
-            "_ARRAY_DIMENSIONS" => ["time"]
-        ),
-    )
+    create_time_axis!(g, output, n_outputs)
     output!(output, vars.prognostic.clock.time)   # write initial time
 
-    # VARIABLES, remove output variables not existent in simulation.variables
+    # VARIABLES: define every output variable in the Zarr store and write initial
+    # conditions, skipping any that don't exist in the simulation — the same check the
+    # generic `output!` makes at write time, applied here so a skipped variable doesn't
+    # leave an all-fill_value phantom array behind
     simulation = Simulation(vars, model)
-    nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
-    if !isempty(nonexisting_vars)
-        @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
-    end
-    delete!(output, nonexisting_vars...)
-
-    # then define every output variable in the Zarr store and write initial conditions
+    warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
+        exists_in_simulation(var, simulation) || continue
         define_variable!(g, output, var, n_outputs, eltype(output.field2D))
         output!(output, var, simulation)
     end
@@ -228,7 +190,7 @@ function initialize!(
     # calculate land fraction on output grid
     if hasproperty(model, :land_sea_mask)
         land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
-        RingGrids.interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
+        SpeedyWeather.interpolate_output!(output, output.land_fraction, land_fraction_cpu)
     end
 
     # consolidate the store metadata (.zmetadata) for faster opening with xarray etc.;
@@ -250,7 +212,6 @@ function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::Abst
     assert_ensemble_creator(output)
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
     soil_indices = collect(1:get_soil_layers(model))
 
     write_coordinate!(
@@ -261,10 +222,7 @@ function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::Abst
         g, "lat", collect(latd);
         attrs = Dict("units" => "degrees_north", "long_name" => "latitude", "_ARRAY_DIMENSIONS" => ["lat"])
     )
-    write_coordinate!(
-        g, "layer", collect(σ);
-        attrs = Dict("units" => "1", "long_name" => "sigma layer", "_ARRAY_DIMENSIONS" => ["layer"])
-    )
+    define_vertical_coordinate!(g, output.layers, model)     # sigma or pressure layers
     write_coordinate!(
         g, "soil_layer", collect(soil_indices);
         attrs = Dict("units" => "1", "long_name" => "soil layer index", "_ARRAY_DIMENSIONS" => ["soil_layer"])
@@ -315,7 +273,9 @@ ensemble size, and every output variable of this member defined. Errors otherwis
 a mismatch means the members were launched with inconsistent options (e.g. different
 `period` or output `interval`, different output variables) or the readiness marker
 belonged to a stale store from a previous run into the same run folder."""
-function validate_ensemble_store(g::Zarr.ZGroup, output::ZarrOutput, n_outputs::Integer)
+function validate_ensemble_store(
+        g::Zarr.ZGroup, output::ZarrOutput, n_outputs::Integer, simulation::AbstractSimulation
+    )
     member = output.ensemble_index
 
     n_time = get_dimension_length(g, "time")
@@ -331,7 +291,12 @@ function validate_ensemble_store(g::Zarr.ZGroup, output::ZarrOutput, n_outputs::
             "of $n_ensemble but this member expects ensemble_size=$(output.ensemble_size)."
     )
 
-    undefined_vars = [var.name for var in values(output.variables) if !haskey(g, var.name)]
+    # only variables this member will actually write need to exist in the shared store;
+    # ones missing from the simulation are skipped by creator and writers alike
+    undefined_vars = [
+        var.name for var in values(output.variables)
+            if exists_in_simulation(var, simulation) && !haskey(g, var.name)
+    ]
     isempty(undefined_vars) || error(
         "ZarrOutput ensemble member $member: variable(s) $(join(undefined_vars, ", ")) " *
             "not defined in the shared store by the creator (member 1). Ensure all members " *
@@ -372,38 +337,6 @@ function wait_for_ensemble_store(output::ZarrOutput, store_path::AbstractString)
 end
 
 """$(TYPEDSIGNATURES)
-Helper: write a 1D coordinate array `data` to the Zarr group `g` under `name`.
-A single chunk is used since the coordinates are small."""
-function write_coordinate!(g::Zarr.ZGroup, name::AbstractString, data::AbstractVector; attrs = Dict())
-    n = length(data)
-    if n == 0
-        # Zarr requires chunk size > 0; create a length-0 array with a
-        # nominal chunk size of 1.
-        z = Zarr.zcreate(eltype(data), g, name, 0; chunks = (1,), attrs = attrs)
-    else
-        z = Zarr.zcreate(eltype(data), g, name, n; chunks = (n,), attrs = attrs)
-        z[:] = data
-    end
-    return z
-end
-
-"""$(TYPEDSIGNATURES)
-Length of the coordinate array `name` in the Zarr group `g` or `nothing` if not
-defined. Zarr-store equivalent of `get_dimension_length(::NCDataset, name)` so that
-custom output variables can define their own dimension in `define_dimension!`
-with one method for all output backends."""
-get_dimension_length(g::Zarr.ZGroup, name::String) = haskey(g, name) ? length(g[name]) : nothing
-
-"""$(TYPEDSIGNATURES)
-Define a coordinate in the Zarr group `g`: a 1D array `name` with `values` and
-`attribs` as attributes, tagged with its own `_ARRAY_DIMENSIONS`. Zarr-store
-equivalent of `define_coordinate!(::NCDataset, ...)` so that custom output
-variables can define their own dimension in `define_dimension!` with one
-method for all output backends."""
-define_coordinate!(g::Zarr.ZGroup, name::String, values::AbstractVector; attribs = Dict{String, String}()) =
-    write_coordinate!(g, name, values; attrs = merge(Dict{String, Any}("_ARRAY_DIMENSIONS" => [name]), attribs))
-
-"""$(TYPEDSIGNATURES)
 Define a Zarr array for output `var` in the Zarr group `g`. Shape and chunk
 shape are derived from `var.dims_xyzt` and the output grid; the time axis is
 pre-allocated to its final length `n_outputs`. Unwritten chunks read back as
@@ -436,8 +369,9 @@ function define_variable!(
     cz = output.vertical_chunk > 0 ? min(output.vertical_chunk, nz) : nz
     full_chunks = (cx, cy, cz, max(output.time_chunk, 1))
 
-    # the vertical dimension depends on the variable, e.g. "layer" or "soil_layer"
-    all_dims = ("lon", "lat", vertical_dimension(var), "time")
+    # the vertical dimension depends on the variable and the output's layers,
+    # e.g. "layer", "pressure" or "soil_layer"
+    all_dims = ("lon", "lat", vertical_dimension_name(output, var), "time")
 
     # Pick out the active dims as flagged by var.dims_xyzt.
     active = var.dims_xyzt
@@ -460,64 +394,5 @@ function define_variable!(
     # `ensemble` first, matching the CF realization/ensemble convention.
     reverse!(dims)
 
-    compressor = resolve_compressor(output.compressor)
-
-    attrs = Dict{String, Any}(
-        "long_name" => var.long_name,
-        "units" => var.unit,
-        "_ARRAY_DIMENSIONS" => dims,
-    )
-
-    # Zarr stores fill_value in metadata (.zarray); only add a JSON-safe
-    # `_FillValue` attribute if the value can be serialized (NaN can't).
-    fill = output_NF(missing_value)
-    if isfinite(fill)
-        attrs["_FillValue"] = fill
-    end
-
-    return Zarr.zcreate(
-        output_NF, g, var.name, shape...;
-        chunks = chunks,
-        fill_value = fill,
-        compressor = compressor,
-        attrs = attrs,
-    )
+    return zcreate_output_variable!(g, output, var, shape, chunks, dims, output_NF, missing_value)
 end
-
-"""$(TYPEDSIGNATURES)
-Write a single output time step for `variable` to the Zarr store in `output`.
-The generic [`output!`](@ref) handles interpolation, transforms and bitrounding;
-this method just performs the Zarr-specific store-side write."""
-function write_array!(
-        output::ZarrOutput,
-        variable::AbstractOutputVariable,
-        field,
-    )
-    z = output.zarr_group[variable.name]
-    # time-varying variables index into the current time slot; static fields are written
-    # once (index 1 is ignored by get_indices). The ensemble slot, if any, is appended.
-    i = hastime(variable) ? output.output_counter : 1
-    indices = get_indices(i, variable, output.ensemble_index)
-    z[indices...] = parent_array(field)
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Write the current time `time::DateTime` to the Zarr store in `output`."""
-function output!(output::ZarrOutput, time::DateTime)
-    output.ensemble_index > 1 && return nothing
-    i = output.output_counter
-
-    (; startdate) = output
-    time_passed = Millisecond(time - startdate)
-    time_hrs = time_passed.value / 3600_000
-    output.zarr_group["time"][i] = time_hrs
-    return nothing
-end
-
-"""Pull out the parent (Array) of a Field for direct copy into a Zarr array."""
-parent_array(var) = Array(parent(var))
-
-Base.close(output::ZarrOutput) = nothing
-
-end # module

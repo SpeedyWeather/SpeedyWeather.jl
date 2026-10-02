@@ -32,17 +32,17 @@ A semi-implicit Lorenz N-cycle time integration scheme following Hotta et al. (2
 3. x = x + Δt*dx                            (state update)
 $(TYPEDFIELDS)
 """
-mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
+mutable struct NCycleLorenz{NF, V, IntType, S, MS, B, O, L} <: AbstractNCycleLorenz
     "[OPTION] Number of steps N in a cycle (3 or 4 recommended, 4 is more stable)"
     steps::IntType
 
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
     variant::V
 
-    "[OPTION] Time step for T31, scale linearly with resolution"
-    Δt_at_T31::S
+    "[OPTION] Time step for T32 resolution, scale linearly with resolution"
+    Δt_at_T32::S
 
-    "[OPTION] Adjust `Δt_at_T31` with the `interval` to reach `interval` exactly"
+    "[OPTION] Adjust `Δt_at_T32` with the `interval` to reach `interval` exactly"
     adjust_with_output::B
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
@@ -50,13 +50,24 @@ mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
 
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
+
+    "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for the same N-cycle as the atmosphere"
+    ocean::O
+
+    "[OPTION] Time stepper for the land variables, `nothing` for the same N-cycle as the atmosphere"
+    land::L
 end
 
 Adapt.adapt_structure(to, L::NCycleLorenz) = Adapt.adapt_structure(to, NCycleLorenzCore(L.Δt_millisec, L.Δt))
 
 prognostic_steps(::NCycleLorenz) = 1
+tendency_steps(::NCycleLorenz) = 2          # F and G, e.g. for ocean/land variables stepped directly on the grid
 tendency_grid_steps(::NCycleLorenz) = 1     # the grid tendencies are only for F though, the G term only needs storing in spectral space
 tendency_spectral_steps(::NCycleLorenz) = 2 # to store F, G in Hotta et al. 2016, Eqs 5 & 6
+
+# ocean and land use the time steppers in the respective fields, `nothing` means the same N-cycle as the atmosphere
+time_stepper(L::NCycleLorenz, ::Val{:ocean}) = something(L.ocean, L)
+time_stepper(L::NCycleLorenz, ::Val{:land}) = something(L.land, L)
 
 # Most components just use the 1st tendency step and only the timestepping itself needs the 2nd so the default step 1 is used throughout
 # Exceptions here to be explicit: While two tendencies F, G are used, only G retains memory to the next time step, therefore reset F to zero for accumulation
@@ -86,16 +97,18 @@ function NCycleLorenz(
         spectral_grid::SpectralGrid;
         steps = 3,
         variant = NCycleLorenzA(),
-        Δt_at_T31 = Minute(30),
+        Δt_at_T32 = Minute(30),
         adjust_with_output = true,
+        ocean = nothing,    # default can't be NCycleLorenz, creates an infinite loop
+        land = nothing,
     )
-    (; NF, trunc) = spectral_grid
+    (; NF, truncation) = spectral_grid
 
     # compute time step
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
     Δt::NF = Δt_millisec.value / 1000
 
-    return NCycleLorenz(steps, variant, Second(Δt_at_T31), adjust_with_output, Δt_millisec, Δt)
+    return NCycleLorenz(steps, variant, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt, ocean, land)
 end
 
 """$(TYPEDSIGNATURES)

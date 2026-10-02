@@ -1,13 +1,13 @@
 @testset "MatrixSpectralTransform: Initialization and roundtrip" begin
-    @testset for trunc in (31, 63)
+    @testset for truncation in (32, 64)
         @testset for NF in (Float32, Float64)
             @testset for Grid in (
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
                 )
 
-                spectrum = Spectrum(trunc)
-                grid = Grid(SpeedyTransforms.get_nlat_half(trunc))
+                spectrum = Spectrum(truncation)
+                grid = Grid(SpeedyTransforms.get_nlat_half(truncation))
                 M = MatrixSpectralTransform(spectrum, grid; NF)
 
                 # initialization checks
@@ -60,7 +60,7 @@
 end
 
 @testset "MatrixSpectralTransform: Agreement with SpectralTransform" begin
-    @testset for trunc in (31, 63)
+    @testset for truncation in (32, 64)
         @testset for NF in (Float32, Float64)
             @testset for Grid in (
                     FullGaussianGrid,
@@ -73,8 +73,8 @@ end
                 )
 
                 nlayers = 8
-                spectrum = Spectrum(trunc)
-                grid = Grid(SpeedyTransforms.get_nlat_half(trunc))
+                spectrum = Spectrum(truncation)
+                grid = Grid(SpeedyTransforms.get_nlat_half(truncation))
                 S = SpectralTransform(spectrum, grid; NF, nlayers)
                 M = MatrixSpectralTransform(spectrum, grid; NF, nlayers)
 

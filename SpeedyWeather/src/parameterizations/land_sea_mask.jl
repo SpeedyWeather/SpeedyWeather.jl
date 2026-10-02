@@ -110,8 +110,10 @@ end
 function set!(mask::AbstractLandSeaMask, args...; kwargs...)
     set!(mask.land_fraction, args...; kwargs...)
     lo, hi = extrema(mask.land_fraction)
-    (lo < 0 || hi > 1) && @warn "Land-sea mask not in [0, 1] but in [$lo, $hi]. Clamping."
-    clamp!(mask.land_fraction, 0, 1)
+    if lo < 0 || hi > 1
+        @warn "Land-sea mask not in [0, 1] but in [$lo, $hi]. Clamping."
+        clamp!(mask.land_fraction, 0, 1)
+    end
     return nothing
 end
 
@@ -147,7 +149,7 @@ function load_mask!(land_sea_mask::EarthLandSeaMask)
     land_sea_mask.land_fraction .= on_architecture(arch, cpu_mask)
 
     if land_sea_mask.quantization > 0
-        q = land_sea_mask.quantization
+        q = convert(eltype(land_sea_mask.land_fraction), land_sea_mask.quantization)
         land_sea_mask.land_fraction .= round.(land_sea_mask.land_fraction ./ q) .* q
     end
 

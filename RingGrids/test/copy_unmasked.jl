@@ -28,10 +28,10 @@
             # overwrite the unmasked positions in src, then copy back and check restoration
             field2d .= zero(NF)
             copy_unmasked!(field2d, array2d, indices)
-            
+
             # agreement in non-masked elements
             @test field2d[.~mask] == field2d_copy[.~mask]
-            
+
             # masked positions were not touched (still zero)
             @test all(field2d[mask] .== 0)
 
@@ -49,7 +49,7 @@
 
             # agreement in non-masked elements
             @test field3d[.~mask, :] == field3d_copy[.~mask, :]
-            
+
             # masked positions were not touched (still zero)
             @test all(field3d[mask, :] .== 0)
         end

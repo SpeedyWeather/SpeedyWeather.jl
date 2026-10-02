@@ -9,9 +9,11 @@ using Metal
     @test RingGrids.array_type(spectral_grid.SpectralVariable2D) <: MtlArray
 
     # allocate variables with Metal arrays
+    # `.data` may be a `SubArray` into a fused parent buffer (see Variables system), so
+    # check architecture rather than array type directly, which correctly unwraps views
     model = PrimitiveWetModel(spectral_grid)
     vars = Variables(model)
-    @test vars.prognostic.vorticity.data isa MtlArray
-    @test vars.prognostic.ocean.sea_surface_temperature.data isa MtlArray
-    @test vars.grid.vorticity.data isa MtlArray
+    @test architecture(vars.prognostic.vorticity.data) isa SpeedyWeather.GPU
+    @test architecture(vars.prognostic.ocean.sea_surface_temperature.data) isa SpeedyWeather.GPU
+    @test architecture(vars.grid.vorticity.data) isa SpeedyWeather.GPU
 end

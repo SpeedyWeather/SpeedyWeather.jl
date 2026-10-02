@@ -21,7 +21,7 @@ import ModelParameters: ModelParameters, Model, Param, params, update
     # @test all(map(p -> p.category == "planet", ps))
     @test all(map(p -> p.category == "planet", params(ps)))
     # test for nested model type
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)   # define resolution
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)   # define resolution
     model = BarotropicModel(spectral_grid)
     model_ps = parameters(model)
     new_ps = 2 * vec(model_ps)

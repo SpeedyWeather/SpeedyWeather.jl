@@ -3,7 +3,7 @@ using JET
 # Regression guard: the barotropic `time_step!` must contain NO runtime dynamic dispatch.
 
 @testset "barotropic time_step! free of runtime dispatch (JET)" begin
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     model = BarotropicModel(; spectral_grid)
     model.feedback.verbose = false
     simulation = initialize!(model)
@@ -16,7 +16,7 @@ using JET
 end
 
 @testset "PrimitiveWet time_step! free of runtime dispatch (JET)" begin
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 8)
     model = PrimitiveWetModel(; spectral_grid)
     model.feedback.verbose = false
     simulation = initialize!(model)

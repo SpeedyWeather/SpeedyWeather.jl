@@ -11,7 +11,7 @@ Here, the orography is used in meters above the surface which shortens
 
 In the [primitive equations](@ref primitive_equation_model) the orography enters
 the equations when computing the [Geopotential](@ref). So actually required here
-is the surface geopotential ``\Phi_s = gz_s`` where ``z_s``
+is the surface geopotential ``\Phi_s = gz_s``, where ``z_s``
 is the orography height in meters as used in the shallow-water equations too
 ``z_s = H_b``.
 However, the primitive equations require the orography in spectral
@@ -41,15 +41,16 @@ which are
 
 all orographies need to be created with `spectral_grid::SpectralGrid` as the first argument,
 so that the respective fields for `surface_geopotential`, i.e. ``\Phi_s`` and `orography`, i.e. ``H_b``
-can be allocated in the right size and number format.
+can be allocated in the right size and number format, following the general pattern for
+[Creating model components](@ref create_model_components).
 
 ## Earth's orography
 
-Earth's orography can be created with (here we use a resolution of T85, about 165km globally)
+Earth's orography can be created with (here we use a resolution of T86, 1-based, about 165km globally)
 
 ```@example orography
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=85)
+spectral_grid = SpectralGrid(truncation=86)
 orography = EarthOrography(spectral_grid)
 ```
 
@@ -62,22 +63,22 @@ model = PrimitiveDryModel(spectral_grid; orography)
 initialize!(orography, model)   # happens also in simulation = initialize!(model)
 
 using CairoMakie
-heatmap(orography.orography, title="Earth's orography at T85 resolution, no smoothing")
+heatmap(orography.orography, title="Earth's orography at T86 resolution, no smoothing")
 save("earth_orography.png", ans) # hide
 nothing # hide
 ```
 ![EarthOrography](earth_orography.png)
 
 typing `?EarthOrography` shows the various options that are provided.
-An orogaphy at T85 resolution that is as smooth as it would be at T42
+An orogaphy at T86 resolution (1-based) that is as smooth as it would be at T43
 (controlled by the `smoothing_fraction`, the fraction of highest wavenumbers
-which are the top half here, about T43 to T85) for example can be created with
+which are the top half here, about T43 to T86) for example can be created with
 
 ```@example orography
 orography = EarthOrography(spectral_grid, smoothing=true, smoothing_fraction=0.5)
 initialize!(orography, model)
 
-heatmap(orography.orography, title="Earth's orography at T85 resolution, smoothed to T42")
+heatmap(orography.orography, title="Earth's orography at T86 resolution, smoothed to T43")
 save("earth_orography_smooth.png", ans) # hide
 nothing # hide
 ```
@@ -223,7 +224,9 @@ then radians are returned and so we could have defined ``\sigma`` in terms of ra
 ## Defining a new orography type
 
 You can also define a new orography like we defined `ZonalRidge` or `EarthOrography`.
-The following explains what's necessary for this. The new `MyOrography` has to be defined as
+The following explains what's necessary for this, following the same modular logic
+as outlined in [Extending SpeedyWeather](@ref) (a [Custom land-sea mask](@ref) follows
+a very similar pattern). The new `MyOrography` has to be defined as
 (`mutable` or not, but always with `@kwdef`)
 
 ```@example orography
@@ -239,9 +242,9 @@ end
 
 # constructor
 function MyOrography(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
+    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, truncation) = spectral_grid
     orography   = zeros(GridVariable2D, nlat_half)
-    surface_geopotential = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    surface_geopotential = zeros(SpectralVariable2D, truncation+1, truncation)
     return MyOrography{NF, GridVariable2D, SpectralVariable2D}(;
         orography, surface_geopotential, kwargs...)
 end

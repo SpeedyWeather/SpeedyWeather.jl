@@ -158,10 +158,12 @@ function SpeedyTransforms.transform!(
     # Batched spec→grid for the velocities: the general-purpose `:spectral_scratch` fuse packs
     # `(:a, :b)` (here holding U, V) into one Spectral3D parent, and `:uv_grid` packs `(:u, :v)`
     # TODO: theoretically we could merge this with the other big transform and then unscale coslat
-    # seperately, but the dimensions don't quite align, shall we still do that in a hacky way?    
-    transform!(get_prognostic_step(parent(vars.fused.uv_grid), time_stepping, S),
-               parent(vars.fused.spectral_scratch), scratch_memory, S;
-               unscale_coslat = true)
+    # seperately, but the dimensions don't quite align, shall we still do that in a hacky way?
+    transform!(
+        get_prognostic_step(parent(vars.fused.uv_grid), time_stepping, S),
+        parent(vars.fused.spectral_scratch), scratch_memory, S;
+        unscale_coslat = true
+    )
 
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
     # only do after transforms to avoid copying uninitialized zeros
@@ -175,7 +177,7 @@ function SpeedyTransforms.transform!(
     # include humidity effect into temp for everything stability-related
     temperature_average!(vars, temp, S)
     geopotential!(vars, model)                  # calculate geopotential
-        
+
     for (name, tracer) in model.tracers
         tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
         tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)

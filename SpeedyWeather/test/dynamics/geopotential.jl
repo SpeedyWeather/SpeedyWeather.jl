@@ -61,8 +61,8 @@ end
 
         Φ = transform(vars.dynamics.spectral_geopotential, model.spectral_transform)
         # geopotential decreases from top to surface (layer 1 is highest, last is lowest)
-        for k in 1:spectral_grid.nlayers-1
-            @test all(Φ[:, k] .> Φ[:, k+1])
+        for k in 1:(spectral_grid.nlayers - 1)
+            @test all(Φ[:, k] .> Φ[:, k + 1])
         end
     end
 end
@@ -83,15 +83,16 @@ end
         )
 
         for coord in coords
-            model = PrimitiveDryModel(spectral_grid;
+            model = PrimitiveDryModel(
+                spectral_grid;
                 orography = NoOrography(spectral_grid),
-                geometry  = Geometry(spectral_grid; vertical_coordinates = coord),
+                geometry = Geometry(spectral_grid; vertical_coordinates = coord),
             )
             simulation = initialize!(model)
             vars = simulation.variables
 
             T₀ = NF(280)
-            p_surf = NF(1e5)
+            p_surf = NF(1.0e5)
             vars.grid.temperature .= T₀
             vars.parameterizations.surface_pressure .= p_surf
 
@@ -118,20 +119,20 @@ end
 @testset "Grid-space geopotential: orography raises geopotential at all levels" begin
     spectral_grid = SpectralGrid(nlayers = 4)
     model_flat = PrimitiveDryModel(spectral_grid; orography = NoOrography(spectral_grid))
-    model_oro  = PrimitiveDryModel(spectral_grid; orography = NoOrography(spectral_grid))
+    model_oro = PrimitiveDryModel(spectral_grid; orography = NoOrography(spectral_grid))
 
     sim_flat = initialize!(model_flat)
-    sim_oro  = initialize!(model_oro)
+    sim_oro = initialize!(model_oro)
 
-    T₀ = 280f0
-    p_surf = 1f5
+    T₀ = 280.0f0
+    p_surf = 1.0f5
     for (vars, model) in ((sim_flat.variables, model_flat), (sim_oro.variables, model_oro))
         vars.grid.temperature .= T₀
         vars.parameterizations.surface_pressure .= p_surf
     end
 
     # add a uniform orography of 1 km to the second model
-    z_oro = 1000f0
+    z_oro = 1000.0f0
     sim_oro.variables.dynamics.geopotential  # touch to ensure allocated
     model_oro.orography.orography .= z_oro
 
@@ -139,11 +140,11 @@ end
     SpeedyWeather.geopotential!(sim_oro.variables, model_oro)
 
     Φ_flat = Array(sim_flat.variables.dynamics.geopotential)
-    Φ_oro  = Array(sim_oro.variables.dynamics.geopotential)
+    Φ_oro = Array(sim_oro.variables.dynamics.geopotential)
     g = model_flat.planet.gravity
 
     # uniform orography shifts geopotential at every level and grid point by g * z_oro
-    @test Φ_oro ≈ Φ_flat .+ g * z_oro rtol = 1e-5
+    @test Φ_oro ≈ Φ_flat .+ g * z_oro rtol = 1.0e-5
 end
 
 @testset "Grid-space geopotential: warmer atmosphere gives higher geopotential" begin
@@ -153,13 +154,13 @@ end
     model = PrimitiveDryModel(spectral_grid; orography = NoOrography(spectral_grid))
     simulation = initialize!(model)
     vars = simulation.variables
-    vars.parameterizations.surface_pressure .= 1f5
+    vars.parameterizations.surface_pressure .= 1.0f5
 
-    vars.grid.temperature .= 250f0
+    vars.grid.temperature .= 250.0f0
     SpeedyWeather.geopotential!(vars, model)
     Φ_cold = copy(Array(vars.dynamics.geopotential))
 
-    vars.grid.temperature .= 310f0
+    vars.grid.temperature .= 310.0f0
     SpeedyWeather.geopotential!(vars, model)
     Φ_warm = Array(vars.dynamics.geopotential)
 
@@ -167,7 +168,7 @@ end
     @test all(Φ_warm .> Φ_cold)
 
     # proportionality: same log factor, so ratio equals temperature ratio
-    @test Φ_warm ≈ Φ_cold .* (310f0 / 250f0) rtol = 1e-5
+    @test Φ_warm ≈ Φ_cold .* (310.0f0 / 250.0f0) rtol = 1.0e-5
 end
 
 @testset "Grid-space geopotential: SigmaPressureCoordinates with A=0 matches SigmaCoordinates" begin
@@ -177,11 +178,13 @@ end
     σ = SigmaCoordinates(spectral_grid)
     S = SigmaPressureCoordinates(spectral_grid; transition = _ -> 1.0)
 
-    model_σ = PrimitiveDryModel(spectral_grid;
-        geometry  = Geometry(spectral_grid; vertical_coordinates = σ),
+    model_σ = PrimitiveDryModel(
+        spectral_grid;
+        geometry = Geometry(spectral_grid; vertical_coordinates = σ),
     )
-    model_S = PrimitiveDryModel(spectral_grid;
-        geometry  = Geometry(spectral_grid; vertical_coordinates = S),
+    model_S = PrimitiveDryModel(
+        spectral_grid;
+        geometry = Geometry(spectral_grid; vertical_coordinates = S),
     )
 
     sim_σ = initialize!(model_σ)
@@ -197,5 +200,5 @@ end
     Φ_σ = sim_σ.variables.dynamics.geopotential
     Φ_S = sim_S.variables.dynamics.geopotential
 
-    @test Φ_σ ≈ Φ_S rtol = 1e-4
+    @test Φ_σ ≈ Φ_S rtol = 1.0e-4
 end

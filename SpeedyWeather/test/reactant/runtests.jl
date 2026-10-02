@@ -19,7 +19,7 @@ const SpeedyWeatherReactantExt = Base.get_extension(SpeedyWeather, :SpeedyWeathe
 
 # Configuration
 
-const TRUNC = 31            # spectral truncation
+const TRUNCATION = 32       # spectral truncation
 const NSTEPS = 10           # number of time steps to compare
 const RTOL = 1.0e-3         # relative tolerance for comparison
 const ATOL = 1.0e-8         # absolute tolerance for comparison

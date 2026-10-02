@@ -6,6 +6,7 @@ function set!(
         model::AbstractModel;
         orography = nothing,
         land_sea_mask = nothing,
+        Δt = nothing,
         #TODO add vegetation?
         kwargs...
     )
@@ -16,5 +17,9 @@ function set!(
     )
 
     isnothing(land_sea_mask) || set!(model.land_sea_mask, land_sea_mask, model.geometry; kwargs...)
+
+    # time step, using the model's exact resolution factor so that a later initialize!(model)
+    # (which recalculates Δt from Δt_at_T31) reproduces the requested time step
+    isnothing(Δt) || set!(model.time_stepping, Δt, model)
     return nothing
 end

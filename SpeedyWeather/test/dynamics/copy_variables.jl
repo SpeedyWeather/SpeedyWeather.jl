@@ -1,7 +1,7 @@
 @testset "copy!(::Variables, ::Variables)" begin
 
     @testset "Barotropic" begin
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         model = BarotropicModel(spectral_grid)
         simulation = initialize!(model)
         run!(simulation, period = Day(1), output = false)
@@ -33,7 +33,7 @@
     end
 
     @testset "ShallowWater" begin
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         model = ShallowWaterModel(spectral_grid)
         simulation = initialize!(model)
         run!(simulation, period = Day(1), output = false)
@@ -54,7 +54,7 @@
     end
 
     @testset "PrimitiveDry" begin
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 5)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 5)
         model = PrimitiveDryModel(spectral_grid)
         simulation = initialize!(model)
         run!(simulation, period = Day(1), output = false)
@@ -91,7 +91,7 @@
     end
 
     @testset "copy! returns dest" begin
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         model = BarotropicModel(spectral_grid)
         model.feedback.verbose = false
         simulation = initialize!(model)

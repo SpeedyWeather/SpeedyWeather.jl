@@ -18,6 +18,7 @@ struct GridGeometry{
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
     nlons::VectorIntType        # number of longitudinal points per ring
+    ring_starts::VectorIntType  # first flat index ij of each ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 
     # rings, GPU/architecture copy (if needed) of grid.rings
@@ -58,13 +59,18 @@ function GridGeometry(
     nlons = get_nlons(grid)                                 # number of longitude per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in eachring(grid)]   # offset of the first point from 0˚E
 
+    # first flat index ij of every ring, precomputed here so that the interpolation kernels
+    # can convert an in-ring index i to a flat index ij without indexing into rings (which
+    # would be dynamic indexing on GPU)
+    ring_starts = [first(ring) for ring in eachring(grid)]
+
     # vector type
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
     device_rings = on_architecture(architecture, grid.rings)
 
     return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings), typeof(nlat_half)}(
-        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, ring_starts, lon_offsets, device_rings
     )
 end
 
@@ -280,13 +286,21 @@ function interpolate(
     ) where {NF}
     (; npoints_output) = I.locator                                      # number of points to interpolate onto
     Aout = array_type(architecture(A), NF, 1)(undef, npoints_output)    # preallocate: onto θs, λs interpolated values of A
-    return _interpolate!(Aout, A.data, I.locator, I.geometry, architecture(A)) # perform interpolation, store in Aout
+    return interpolate_2D!(Aout, A.data, I.locator, I.geometry, architecture(A)) # perform interpolation, store in Aout
 end
 
-# the actual interpolation function
-function _interpolate!(
-        Aout,                               # Out: interpolated values
-        A,                                  # gridded values to interpolate from
+"""
+$(TYPEDSIGNATURES)
+Horizontal (2D) interpolation of the gridded values `A` onto the points located in `locator`,
+writing into `Aout`. This is the actual interpolation function; the `interpolate!` methods
+forward to it. A 3D (vertically blended) interpolation is `interpolate_3D!` instead. The
+methods on plain arrays take the raw ring-ordered data, i.e. `field.data`, so that views and
+reshapes of a field's data can be passed too. This method interpolates a single layer, the
+`AbstractMatrix` method below interpolates all layers of a `(npoints, nlayers)` matrix in a
+single (batched) launch."""
+function interpolate_2D!(
+        Aout::AbstractVector,               # Out: interpolated values
+        A::AbstractVector,                  # gridded values to interpolate from
         locator::AnvilLocator,
         geometry::GridGeometry,
         architecture::AbstractArchitecture
@@ -352,14 +366,85 @@ end
     Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
 end
 
+# batched version: all layers in a single launch, sharing the locator's indices and weights
+function interpolate_2D!(
+        Aout::AbstractMatrix,               # Out: interpolated values, (npoints_output, nlayers)
+        A::AbstractMatrix,                  # gridded values to interpolate from, (npoints, nlayers)
+        locator::AnvilLocator,
+        geometry::GridGeometry,
+        architecture::AbstractArchitecture
+    )
+    (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
+    (; npoints) = geometry
+    (; rings) = geometry.grid # CPU version even on GPU
+
+    nlayers = size(A, 2)
+
+    # as in the single-layer method, but the layer dimensions must agree too
+    @boundscheck size(Aout, 1) == length(ij_as) || throw(DimensionMismatchArray(Aout, ij_as))
+    @boundscheck size(A, 1) == npoints ||
+        throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(size(A, 1)) points)."))
+    @boundscheck size(Aout, 2) == nlayers ||
+        throw(DimensionMismatch("Output has $(size(Aout, 2)) layers but input has $nlayers."))
+
+    A_northpole, A_southpole = average_on_poles(A, rings)
+
+    @boundscheck extrema_in(ij_as, 0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_bs, 0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_cs, -1, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_ds, -1, npoints) || throw(BoundsError)
+
+    launch!(
+        architecture,
+        ArrayWorkOrder,
+        (npoints_output, nlayers),
+        _interpolate_batched_kernel!,
+        Aout,
+        A,
+        ij_as,
+        ij_bs,
+        ij_cs,
+        ij_ds,
+        Δabs,
+        Δcds,
+        Δys,
+        A_northpole,
+        A_southpole,
+    )
+
+    return Aout
+end
+
+@kernel inbounds = true function _interpolate_batched_kernel!(
+        Aout,        # Out: interpolated values
+        A,           # gridded values to interpolate from
+        ij_as,       # indices of A to interpolate from
+        ij_bs,       # indices of A to interpolate from
+        ij_cs,       # indices of A to interpolate from
+        ij_ds,       # indices of A to interpolate from
+        Δabs,        # weights of A to interpolate from
+        Δcds,        # weights of A to interpolate from
+        Δys,         # weights of A to interpolate from
+        A_northpole, # per-layer, unlike the single-layer kernel's scalars
+        A_southpole,
+    )
+
+    k, l = @index(Global, NTuple)
+
+    a, b = ij_as[k] == 0 ? (A_northpole[l], A_northpole[l]) : (A[ij_as[k], l], A[ij_bs[k], l])
+    c, d = ij_cs[k] == -1 ? (A_southpole[l], A_southpole[l]) : (A[ij_cs[k], l], A[ij_ds[k], l])
+
+    Aout[k, l] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
+end
+
 # version for 2D fields
-interpolate!(
+interpolate_2D!(
     Aout::Field,
     A::Field2D,
     interpolator::AbstractInterpolator,
-) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
+) = interpolate_2D!(Aout, A, interpolator.locator, interpolator.geometry)
 
-function interpolate!(
+function interpolate_2D!(
         Aout::Field,
         A::Field2D,
         locator::AbstractLocator,
@@ -367,33 +452,34 @@ function interpolate!(
     )
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
-    return _interpolate!(Aout.data, A.data, locator, geometry, architecture(A))
+    return interpolate_2D!(Aout.data, A.data, locator, geometry, architecture(A))
 end
 
 # version for 2D field and vector
-interpolate!(
+interpolate_2D!(
     Aout::AbstractVector,       # Out: points to interpolate onto
     A::Field2D,                 # In: field to interpolate from
     interpolator::AbstractInterpolator,
-) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
+) = interpolate_2D!(Aout, A, interpolator.locator, interpolator.geometry)
 
-function interpolate!(
+function interpolate_2D!(
         Aout::AbstractVector,       # Out: points to interpolate onto
         A::Field2D,                 # In: field to interpolate from
         locator::AbstractLocator,
         geometry::AbstractGridGeometry,
     )
-    return _interpolate!(Aout, A.data, locator, geometry, architecture(A))  # use .data to trigger dispatch for method above
+    return interpolate_2D!(Aout, A.data, locator, geometry, architecture(A))  # use .data to trigger dispatch for method above
 end
 
-# version for 3D+ fields
-interpolate!(
+# version for 3D+ fields: batched 2D interpolation, every layer interpolated horizontally
+# onto the same points, no interpolation in the vertical (that is interpolate_3D!)
+interpolate_2D!(
     Aout::Field,        # Out: grid to interpolate onto
     A::Field,           # In: gridded data to interpolate from
     interpolator::AbstractInterpolator,
-) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
+) = interpolate_2D!(Aout, A, interpolator.locator, interpolator.geometry)
 
-function interpolate!(
+function interpolate_2D!(
         Aout::Field,        # Out: grid to interpolate onto
         A::Field,           # In: gridded data to interpolate from
         locator::AbstractLocator,
@@ -403,11 +489,54 @@ function interpolate!(
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
 
-    for k in eachlayer(Aout, A, vertical_only = true)
-        _interpolate!(view(Aout.data, :, k), view(A.data, :, k), locator, geometry, architecture(A))
+    # Interpolate every layer in a single launch by collapsing the trailing dimensions into
+    # one. That reshape is O(1) for dense data and contiguous views only, so anything else
+    # (e.g. a field wrapping a strided view) keeps the per-layer loop.
+    if is_flattenable(Aout.data) && is_flattenable(A.data)
+        interpolate_2D!(
+            reshape(Aout.data, size(Aout.data, 1), :),
+            reshape(A.data, size(A.data, 1), :),
+            locator,
+            geometry,
+            architecture(A),
+        )
+    else
+        for k in eachlayer(Aout, A, vertical_only = true)
+            interpolate_2D!(view(Aout.data, :, k), view(A.data, :, k), locator, geometry, architecture(A))
+        end
     end
     return Aout                             # return the field wrapped around the interpolated data
 end
+
+"""
+$(TYPEDSIGNATURES)
+True if `reshape(x, size(x, 1), :)` is O(1) and yields an array that the interpolation kernels
+can index directly: dense arrays and contiguous views (e.g. `view(A, :, :, k)`). A strided view
+would reshape into a slow wrapper type, so the batched interpolation is not used in this case."""
+is_flattenable(x::DenseArray) = true
+is_flattenable(x::SubArray) = Base.iscontiguous(x)
+is_flattenable(x::AbstractArray) = false
+
+"""
+$(TYPEDSIGNATURES)
+Interpolate `A` onto `Aout`, choosing the interpolation by the way vertical locations are
+communicated: with a `locator` and `geometry` (or an `interpolator` bundling both) only,
+this is a horizontal interpolation via `interpolate_2D!`, batched over all layers of a
+3D+ field. Methods that also take vertical positions perform a 3D interpolation via
+`interpolate_3D!`."""
+interpolate!(Aout::Field, A::Field, interpolator::AbstractInterpolator) =
+    interpolate_2D!(Aout, A, interpolator)
+interpolate!(Aout::Field, A::Field, locator::AbstractLocator, geometry::AbstractGridGeometry) =
+    interpolate_2D!(Aout, A, locator, geometry)
+# Field2D is an AbstractVector too, resolve the ambiguity with the vector-output methods
+interpolate!(Aout::Field, A::Field2D, interpolator::AbstractInterpolator) =
+    interpolate_2D!(Aout, A, interpolator)
+interpolate!(Aout::Field, A::Field2D, locator::AbstractLocator, geometry::AbstractGridGeometry) =
+    interpolate_2D!(Aout, A, locator, geometry)
+interpolate!(Aout::AbstractVector, A::Field2D, interpolator::AbstractInterpolator) =
+    interpolate_2D!(Aout, A, interpolator)
+interpolate!(Aout::AbstractVector, A::Field2D, locator::AbstractLocator, geometry::AbstractGridGeometry) =
+    interpolate_2D!(Aout, A, locator, geometry)
 
 # interpolate while creating an interpolator on the fly
 function interpolate!(
@@ -593,8 +722,8 @@ end
         λs,            # longitudes to interpolate onto
         lon_offsets,   # longitude offsets for each ring
         nlons,         # number of longitude points per ring
+        ring_starts,   # starting flat index for each ring
         nlat,          # number of latitude rings
-        rings          # ring indices
     )
     k = @index(Global, Linear)
 
@@ -610,8 +739,8 @@ end
         # and b the next grid point to the right, such that
         # λ ∈ [a, b); while in most cases i_a + 1 = i_b, across 0˚E this is not the case
         i_a, i_b, Δ = find_lon_indices(λ, lon_offsets[j], nlons[j])
-        ij_as[k] = rings[j][i_a]    # index ij for a
-        ij_bs[k] = rings[j][i_b]    # index ij for b
+        ij_as[k] = ring_starts[j] + i_a - 1    # convert to flat index
+        ij_bs[k] = ring_starts[j] + i_b - 1    # convert to flat index
         Δabs[k] = Δ                 # distance fraction of λ between a, b
     end
 
@@ -622,8 +751,8 @@ end
     else
         # as above but for one ring further down
         i_c, i_d, Δ = find_lon_indices(λ, lon_offsets[j + 1], nlons[j + 1])
-        ij_cs[k] = rings[j + 1][i_c]  # index ij for c
-        ij_ds[k] = rings[j + 1][i_d]  # index ij for d
+        ij_cs[k] = ring_starts[j + 1] + i_c - 1  # convert to flat index
+        ij_ds[k] = ring_starts[j + 1] + i_d - 1  # convert to flat index
         Δcds[k] = Δ                 # distance fraction of λ between c, d
     end
 end
@@ -643,8 +772,7 @@ function find_grid_indices!(
 
     (; js, ij_as, ij_bs, ij_cs, ij_ds) = locator
     (; Δabs, Δcds) = locator
-    (; nlons, lon_offsets, nlat) = geometry
-    (; rings) = geometry # architecture version (GPU if needed)
+    (; nlons, ring_starts, lon_offsets, nlat) = geometry
 
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
@@ -661,8 +789,8 @@ function find_grid_indices!(
         λs_converted,
         lon_offsets,
         nlons,
-        nlat,
-        rings
+        ring_starts,
+        nlat
     )
     return nothing
 end
@@ -675,7 +803,10 @@ end
 
     Δλ = convert(NF, 360) / nlon          # longitude spacing
     ix = (λ - λ₀) / Δλ                      # grid index i but with fractional part
-    i = floor(Int, ix)                  # 0-based grid index to the left
+    # unsafe_trunc(Int, floor(ix)) instead of floor(Int, ix): the latter carries an
+    # InexactError branch which boxes ix, requiring GPU-side allocation. AMDGPU rejects
+    # that at compile time. λ, λ₀ are bounded degrees so the conversion cannot overflow.
+    i = Base.unsafe_trunc(Int, floor(ix))   # 0-based grid index to the left
     Δ = ix - i                            # distance fraction from i to i+1
 
     # λ ∈ [λa, λb), i.e. a is the next grid point to the left, b to the right
@@ -705,6 +836,27 @@ to return the same number format `NF`."""
     A_northpole = mean(A[rings[1]])    # average of all grid points around the north pole
     A_southpole = mean(A[rings[end]])  # same for south pole
     return round(NF, A_northpole), round(NF, A_southpole)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Method for a layered `A`, returning a vector of pole averages, one per layer, for the batched
+interpolation kernel. Indexing rather than viewing matches the single-layer methods above: it
+allocates, but a view would trigger scalar indexing on GPU."""
+@inline function average_on_poles(A::AbstractMatrix{NF}, rings) where {NF <: AbstractFloat}
+    A_northpole = vec(mean(A[rings[1], :], dims = 1))    # per layer, around the north pole
+    A_southpole = vec(mean(A[rings[end], :], dims = 1))  # same for south pole
+    return A_northpole, A_southpole
+end
+
+"""
+$(TYPEDSIGNATURES)
+Method for a layered `A::AbstractMatrix{T<:Integer}` which rounds the averaged values
+to return the same number format `NF`."""
+@inline function average_on_poles(A::AbstractMatrix{NF}, rings) where {NF <: Integer}
+    A_northpole = vec(mean(A[rings[1], :], dims = 1))
+    A_southpole = vec(mean(A[rings[end], :], dims = 1))
+    return round.(NF, A_northpole), round.(NF, A_southpole)
 end
 
 """

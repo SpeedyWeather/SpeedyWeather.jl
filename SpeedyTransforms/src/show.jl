@@ -19,7 +19,10 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     Grid = nonparametric_type(grid)
 
     # add information about size of Legendre polynomials and scratch memory
-    polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
+    # (including the transposed copy the GPU inverse transform reads, empty on CPU)
+    polysize_str = prettymemory(
+        Base.summarysize(S.legendre_polynomials) + sizeof(S.legendre_polynomials_transposed)
+    )
     memorysize_str = prettymemory(
         sizeof(S.scratch_memory.north) +      # add all scratch_memories
             sizeof(S.scratch_memory.south) +
@@ -27,14 +30,14 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
             sizeof(S.scratch_memory.column.south)
     )
 
-    dealias = get_dealiasing(mmax - 1, nlat_half) # -1 for zero-based
+    dealias = get_dealiasing(mmax, nlat_half)
     truncations = ["<linear", "linear", "quadratic", "cubic", ">cubic"]
     truncation = truncations[clamp(floor(Int, dealias) + 1, 1, 5)]
     dealiasing = @sprintf("%.3g", dealias)
 
     param_str = "{$NF, $AT}"
     println(io, styled"{warning:SpectralTransform}{note:$param_str}")
-    println(io, styled"├ {info:Spectral}:     T$(mmax - 1), $(lmax)x$(mmax) LowerTriangularMatrix{note:\{Complex\{$NF\}\}}")
+    println(io, styled"├ {info:Spectral}:     T$mmax, $(lmax)x$(mmax) LowerTriangularMatrix{note:\{Complex\{$NF\}\}}")
     println(io, styled"├ {info:Grid}:         Field{note:\{$NF\}}, $(RingGrids.get_nlat(grid))-ring $Grid")
     println(io, styled"├ {info:Truncation}:   dealiasing = $dealiasing {note:($truncation)}")
     println(io, styled"├ {info:Legendre}:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
@@ -59,14 +62,14 @@ function Base.show(io::IO, S::MatrixSpectralTransform{NF, AR, AT}) where {NF, AR
     matrixsize_str = prettymemory(2 * Base.sizeof(S.forward))
     scratchsize_str = prettymemory(Base.sizeof(S.scratch_memory))
 
-    dealias = get_dealiasing(mmax - 1, nlat_half) # -1 for zero-based
+    dealias = get_dealiasing(mmax, nlat_half)
     truncations = ["<linear", "linear", "quadratic", "cubic", ">cubic"]
     truncation = truncations[clamp(floor(Int, dealias) + 1, 1, 5)]
     dealiasing = @sprintf("%.3g", dealias)
 
     param_str = "{$NF, $AT}"
     println(io, styled"{warning:MatrixSpectralTransform}{note:$param_str}")
-    println(io, styled"├ {info:Spectral}:     T$(mmax - 1), $(lmax)x$(mmax) LowerTriangularMatrix{note:\{Complex\{$NF\}\}}")
+    println(io, styled"├ {info:Spectral}:     T$mmax, $(lmax)x$(mmax) LowerTriangularMatrix{note:\{Complex\{$NF\}\}}")
     println(io, styled"├ {info:Grid}:         Field{note:\{$NF\}}, $(RingGrids.get_nlat(grid))-ring $Grid")
     println(io, styled"├ {info:Truncation}:   dealiasing = $dealiasing {note:($truncation)}")
     println(io, styled"├ {info:Architecture}: $architecture")

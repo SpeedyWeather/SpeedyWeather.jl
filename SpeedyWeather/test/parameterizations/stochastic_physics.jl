@@ -1,5 +1,5 @@
 @testset "SPPT" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
     @testset for S in (Nothing, StochasticallyPerturbedParameterizationTendencies)
         s = S(spectral_grid)
@@ -16,7 +16,7 @@
 
         # execute only one parameterization
         ij = rand(1:model.geometry.npoints)
-        SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
+        SpeedyWeather.parameterization!(ij, vars, model.radiation.longwave, model)
 
         dTdt = vars.tendencies.grid.temperature[ij, end]
         @test dTdt != 0

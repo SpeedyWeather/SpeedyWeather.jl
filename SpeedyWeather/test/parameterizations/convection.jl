@@ -1,6 +1,6 @@
 @testset "Convection" begin
 
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
     @testset for Convection in (
             Nothing,

@@ -9,6 +9,7 @@ import Printf
 import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
+import Random
 
 # ASSET DOWNLOADING
 import Downloads
@@ -128,6 +129,7 @@ export AbstractInterpolator,
 
 export interpolate,
     interpolate!,
+    interpolate_2D!,
     update_locator,
     update_locator!
 

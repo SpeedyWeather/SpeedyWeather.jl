@@ -2,23 +2,26 @@
 
     nlayers = 8
     nlayers_soil = 2
-    trunc = 31
+    truncation = 32
     NF = Float64
     complex_NF = Complex{NF}
-    spectral_grid = SpectralGrid(; NF, trunc, nlayers)  # define resolution
-    model = PrimitiveWetModel(spectral_grid)            # construct model
-    simulation = initialize!(model)                     # initialize all model components
+    spectral_grid = SpectralGrid(; NF, truncation, nlayers)     # define resolution
+    model = PrimitiveWetModel(spectral_grid)                    # construct model
+    simulation = initialize!(model)                             # initialize all model components
 
     step = 2
+    # ocean and land are stepped with EulerForward by default (1 step), use their last (=current) step
+    ocean_step = SpeedyWeather.nsteps(simulation.variables.prognostic.ocean.sea_surface_temperature)
+    land_step = SpeedyWeather.nsteps(simulation.variables.prognostic.land.soil_temperature)
 
     # test data
-    L = rand(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
+    L = rand(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
     L_grid = transform(L, model.spectral_transform)
 
-    L2 = rand(spectral_grid.SpectralVariable3D, trunc - 5, trunc - 6, nlayers)      # smaller
-    L2_trunc = SpeedyTransforms.spectral_truncation(L2, size(L, 1, ZeroBased, as = Matrix), size(L, 2, ZeroBased, as = Matrix))
-    L3 = rand(spectral_grid.SpectralVariable3D, trunc + 6, trunc + 5, nlayers)      # bigger
-    L3_trunc = SpeedyTransforms.spectral_truncation(L3, size(L, 1, ZeroBased, as = Matrix), size(L, 2, ZeroBased, as = Matrix))
+    L2 = rand(spectral_grid.SpectralVariable3D, truncation - 5, truncation - 6, nlayers)      # smaller
+    L2_trunc = SpeedyTransforms.spectral_truncation(L2, size(L, 1, as = Matrix), size(L, 2, as = Matrix))
+    L3 = rand(spectral_grid.SpectralVariable3D, truncation + 6, truncation + 5, nlayers)      # bigger
+    L3_trunc = SpeedyTransforms.spectral_truncation(L3, size(L, 1, as = Matrix), size(L, 2, as = Matrix))
 
     A = rand(NF, spectral_grid.grid, nlayers)                                   # same grid
     A_spec = transform(A, model.spectral_transform)
@@ -57,24 +60,25 @@
     # grids
     set!(simulation, sea_surface_temperature = A[:, 1]; namespace = :ocean)
     @test prog_new.ocean.sea_surface_temperature[:, 1] == A[:, 1]
-    set!(simulation, sea_surface_temperature = A[:, 1]; step, namespace = :ocean)
-    @test prog_new.ocean.sea_surface_temperature[:, step] == A[:, 1]
+    set!(simulation, sea_surface_temperature = A[:, 1]; step = ocean_step, namespace = :ocean)
+    @test prog_new.ocean.sea_surface_temperature[:, ocean_step] == A[:, 1]
 
-    set!(simulation, sea_ice_concentration = B[:, 1]; step, namespace = :ocean, add = true)
+    set!(simulation, sea_ice_concentration = B[:, 1]; step = ocean_step, namespace = :ocean, add = true)
     C = similar(A[:, 1])
     RingGrids.interpolate!(C, B[:, 1]; NF)
 
-    sic_new = get_step(prog_new.ocean.sea_ice_concentration, step)
-    sic_old = get_step(prog_old.ocean.sea_ice_concentration, step)
+    sic_new = get_step(prog_new.ocean.sea_ice_concentration, ocean_step)
+    sic_old = get_step(prog_old.ocean.sea_ice_concentration, ocean_step)
     @test all(isapprox(sic_new, sic_old .+ C, atol = 1.0e-6))
 
-    Di = deepcopy(prog_new.land.soil_temperature)
+    lst = get_step(prog_new.land.soil_temperature, land_step)
+    Di = deepcopy(lst)
     RingGrids.interpolate!(Di, D; NF)
-    set!(simulation, soil_temperature = D, namespace = :land)
-    @test prog_new.land.soil_temperature == Di
+    set!(simulation, soil_temperature = D, namespace = :land, step = land_step)
+    @test lst == Di
 
     set!(simulation, soil_moisture = D; namespace = :land)
-    @test prog_new.land.soil_moisture == Di
+    @test get_step(prog_new.land.soil_moisture, 1) == Di
 
     # numbers
     set!(simulation, vorticity = Float32(3.0); step)
@@ -91,13 +95,12 @@
     set!(simulation, sea_surface_temperature = Float16(3.0), step = 1, add = true, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature[:, 1] .≈ 6.0)
 
-    set!(simulation, sea_surface_temperature = 5, step = 1, namespace = :ocean)
-    set!(simulation, sea_surface_temperature = 5, step = 2, namespace = :ocean)
+    set!(simulation, sea_surface_temperature = 5, step = ocean_step, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature .== 5)
 
     # vor_div, create u,v first in spectral space
-    u = randn(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
-    v = randn(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
+    u = randn(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
+    v = randn(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
 
     # set imaginary component of m=0 to 0 as the rotation of zonal modes is arbitrary
     SpeedyTransforms.zero_imaginary_zonal_modes!(u)

@@ -18,7 +18,7 @@ function StochasticallyPerturbedParameterizationTendencies(
         SG::SpectralGrid;
         tapering = σ -> 1, # σ < 0.8 ? 1 : 1 - (σ - 0.8)/0.2
     )
-    taper = on_architecture(SG.architecture, zeros(SG.nlayers))
+    taper = on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
     return StochasticallyPerturbedParameterizationTendencies(tapering, taper)
 end
 
@@ -29,10 +29,31 @@ variables(::AbstractStochasticPhysics) = ()
 
 # precompute the taper
 function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, model::PrimitiveEquation)
+    # SPPT perturbs with vars.grid.random_pattern but doesn't define that variable itself, it has
+    # to come from another component, e.g. a random process. Check here, otherwise sppt! errors
+    # only later inside the column parameterizations (on GPU as an unsupported jl_f_getfield call)
+    has_random_pattern = any(all_variables(model)) do var
+        var isa GridVariable && var.name == :random_pattern && var.namespace == Symbol()
+    end
+    @assert has_random_pattern "StochasticallyPerturbedParameterizationTendencies requires a "*
+        "`random_pattern` grid variable, define a random process for the model, e.g. "*
+        "`random_process = SpectralAR1Process(spectral_grid)`."
+
     coord = model.geometry.vertical_coordinates
     nlayers = get_nlayers(coord)
-    sppt.taper .= [sppt.tapering(sigma(k, coord)) for k in 1:nlayers]
+    (; taper) = sppt
+    arch = architecture(taper)
+
+    launch!(
+        arch, LinearWorkOrder, (nlayers,), initialize_sppt_taper_kernel!,
+        taper, sppt.tapering, coord
+    )
     return nothing
+end
+
+@kernel inbounds = true function initialize_sppt_taper_kernel!(taper, tapering, coordinate)
+    k = @index(Global, Linear)
+    taper[k] = tapering(sigma(k, coordinate))
 end
 
 # function barrier

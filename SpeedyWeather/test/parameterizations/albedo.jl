@@ -2,7 +2,7 @@ import Statistics: mean
 
 @testset "Single Albedos" begin
     @testset for Model in (PrimitiveWetModel, PrimitiveDryModel)
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
         @testset for AlbedoType in (GlobalConstantAlbedo, ManualAlbedo, AlbedoClimatology)
 
@@ -26,7 +26,7 @@ end
 
 @testset "Albedo composites" begin
     for Model in (PrimitiveWetModel, PrimitiveDryModel)
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
         @testset for OceanAlbedo in (GlobalConstantAlbedo, ManualAlbedo, AlbedoClimatology, OceanSeaIceAlbedo)
             @testset for LandAlbedo in (GlobalConstantAlbedo, ManualAlbedo, AlbedoClimatology, LandSnowAlbedo)

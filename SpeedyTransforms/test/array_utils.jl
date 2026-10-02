@@ -1,12 +1,12 @@
 @testset "similar for LowerTriangularArray and Field" begin
     @testset for NF in (Float32, Float64)
         @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid)
-            trunc = 31
+            truncation = 32
             nlat_half = 9
             nlayers = 3
 
             # Create spectrum and grid
-            spectrum = Spectrum(trunc)
+            spectrum = Spectrum(truncation)
             grid = Grid(nlat_half)
 
             # Create test LowerTriangularArray and Field
@@ -49,12 +49,12 @@ end
 @testset "wrapped_view for LowerTriangularArray and Field" begin
     @testset for NF in (Float32, Float64)
         @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid)
-            trunc = 31
+            truncation = 32
             nlat_half = 9
             nlayers = 3
 
             # Create spectrum and grid
-            spectrum = Spectrum(trunc)
+            spectrum = Spectrum(truncation)
             grid = Grid(nlat_half)
 
             @testset "wrapped_view on Field with `:, i` indexing" begin

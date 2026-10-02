@@ -6,6 +6,7 @@ Usage:
 
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl                # CPU, auto-labelled
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl gpu            # CUDA GPU
+    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl amdgpu         # AMDGPU (HIP graphs forced on)
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-cpu   # Reactant on CPU
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU
 
@@ -16,10 +17,15 @@ An optional second argument multiplies the number of timesteps per timed run
 
 The CPU label is auto-derived from `Sys.ARCH` (`cpu-arm` for aarch64/arm64,
 `cpu-x86` otherwise). GPU runs require a CUDA-capable device — `using CUDA`
-is loaded automatically. The Reactant variants additionally `using Reactant`
-and `Reactant.set_default_backend("cpu" | "gpu")`; for those archs the suites
-fall back to `MatrixSpectralTransform` since the FFT-based default is not yet
-covered by Reactant's MLIR pipeline.
+is loaded automatically. `amdgpu` runs require a ROCm-capable device —
+`using AMDGPU` is loaded automatically — and explicitly pass
+`gpu_graphs = true` to every `SpectralTransform` built for the `BenchmarkSuite`
+resolution/model suites, since `default_gpu_graphs` for AMDGPU's
+`ROCBackend` is `false` (HIP graphs are opt-in, verified only on datacenter/CDNA
+hardware). The Reactant variants additionally `using Reactant` and 
+`Reactant.set_default_backend("cpu" | "gpu")`; for those archs the suites fall 
+back to `MatrixSpectralTransform` since the FFT-based default is not yet covered
+by Reactant's MLIR pipeline.
 
 Per-architecture results are persisted to `assets/benchmark_results.json`.
 The `README.md` (kept at the benchmark root) is then regenerated from all
@@ -42,6 +48,9 @@ const ARCH_ARG = length(ARGS) >= 1 ? lowercase(ARGS[1]) : ""
 if ARCH_ARG == "gpu" || ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu"
     using CUDA
 end
+if ARCH_ARG == "amdgpu"
+    using AMDGPU
+end
 if ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu"
     using Reactant
     Reactant.set_default_backend(ARCH_ARG == "reactant-gpu" ? "gpu" : "cpu")
@@ -53,6 +62,8 @@ import SpeedyWeather.SpeedyTransforms: prettymemory
 function pick_architecture(arg::AbstractString)
     if arg == "gpu"
         return (SpeedyWeather.GPU(), "gpu-nvidia")
+    elseif arg == "amdgpu"
+        return (SpeedyWeather.GPU(), "gpu-amd")
     elseif arg == "reactant-cpu"
         return error("Reactant benchmarks are not yet supported. Sorry")
         #return (SpeedyWeather.ReactantDevice(), "reactant-cpu")
@@ -64,7 +75,7 @@ function pick_architecture(arg::AbstractString)
         label = (startswith(arch_str, "aarch") || arch_str == "arm64") ? "cpu-arm" : "cpu-x86"
         return (SpeedyWeather.CPU(), label)
     else
-        error("Unknown architecture argument `$arg`. Use one of: cpu, gpu, reactant-cpu, reactant-gpu.")
+        error("Unknown architecture argument `$arg`. Use one of: cpu, gpu, amdgpu, reactant-cpu, reactant-gpu.")
     end
 end
 
@@ -78,6 +89,9 @@ const TIMESTEP_MULTIPLIER = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 1.0
 TIMESTEP_MULTIPLIER > 0 || error("timestep multiplier must be > 0, got $TIMESTEP_MULTIPLIER")
 @info "Timestep multiplier: $TIMESTEP_MULTIPLIER"
 
+# Free (device) memory between benchmark runs, called outside the timed region
+free_memory!() = SpeedyWeather.SpeedyTransforms.clear_fourier_graph_cache!(ARCH)
+
 include("benchmark_suite.jl")
 include("define_benchmarks.jl")
 
@@ -85,6 +99,10 @@ for suite in values(benchmarks)
     suite.architecture = ARCH
     # BenchmarkSuiteDynamics has no timed-run step count, so skip it there.
     hasproperty(suite, :timestep_multiplier) && (suite.timestep_multiplier = TIMESTEP_MULTIPLIER)
+    # AMDGPU's `default_gpu_graphs` is `false` (HIP graphs are opt-in,
+    # so force it on explicitly for this arch;
+    # leave every other arch on its own `SpectralTransform` default (`nothing`).
+    hasproperty(suite, :gpu_graphs) && (suite.gpu_graphs = ARCH_LABEL == "gpu-amd" ? true : nothing)
 end
 
 # Deterministic suite ordering (sort by key for reproducible README sections).
@@ -109,7 +127,15 @@ function machine_info()
     write(io, "```julia\njulia> versioninfo()\n")
     versioninfo(io)
     write(io, "```\n")
-    if ARCH isa SpeedyWeather.GPU || ARCH_LABEL == "reactant-gpu"
+    if ARCH_LABEL == "gpu-amd"
+        write(io, "\n```julia\njulia> AMDGPU.versioninfo()\n")
+        try
+            AMDGPU.versioninfo(io)
+        catch err
+            write(io, "(AMDGPU.versioninfo() failed: $err)\n")
+        end
+        write(io, "```\n")
+    elseif ARCH isa SpeedyWeather.GPU || ARCH_LABEL == "reactant-gpu"
         write(io, "\n```julia\njulia> CUDA.versioninfo()\n")
         try
             CUDA.versioninfo(io)
@@ -134,7 +160,7 @@ function overview_data()
     # already renders missing/non-finite entries as "—".
     json_safe(x) = (x isa Number && isfinite(x)) ? x : nothing
     return Dict(
-        "trunc" => collect(suite.trunc),
+        "truncation" => collect(suite.truncation),
         "nlayers" => collect(suite.nlayers),
         "nlat" => collect(suite.nlat),
         "sypd" => map(json_safe, suite.SYPD),
@@ -182,7 +208,7 @@ end
 # Regenerate README.md from the JSON store
 
 # Stable ordering for arch sections in the README.
-const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "reactant-cpu", "reactant-gpu"]
+const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "gpu-amd", "reactant-cpu", "reactant-gpu"]
 
 function sorted_arch_labels(results)
     known = filter(in(keys(results)), ARCH_ORDER)
@@ -207,7 +233,7 @@ function write_preamble(md)
     write(md, "### Explanation\n\n")
     write(md, "Abbreviations in the tables below are as follows; omitted columns use defaults.\n")
     write(md, "- NF: Number format, default: $(SpeedyWeather.DEFAULT_NF)\n")
-    write(md, "- T: Spectral resolution, maximum degree of spherical harmonics, default: T$(SpeedyWeather.DEFAULT_TRUNC)\n")
+    write(md, "- T: Spectral resolution, maximum degree of spherical harmonics (1-based), default: T$(SpeedyWeather.DEFAULT_TRUNCATION)\n")
     write(md, "- L: Number of vertical layers, default: $(SpeedyWeather.DEFAULT_NLAYERS) (for 3D models)\n")
     write(md, "- Grid: Horizontal grid, default: $(SpeedyWeather.DEFAULT_GRID)\n")
     write(md, "- Rings: Grid-point resolution, number of latitude rings pole to pole\n")
@@ -222,6 +248,7 @@ function write_preamble(md)
     write(md, "```\n")
     write(md, "julia --project=. manual_benchmarking.jl                # CPU (auto-labelled cpu-arm or cpu-x86)\n")
     write(md, "julia --project=. manual_benchmarking.jl gpu            # CUDA GPU\n")
+    write(md, "julia --project=. manual_benchmarking.jl amdgpu         # AMDGPU (HIP graphs forced on)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-cpu   # Reactant on CPU\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU\n")
     write(md, "```\n\n")
@@ -241,16 +268,16 @@ function write_overview(md, all_results, labels)
     write(md, "Empty cells mean the architecture has not yet been benchmarked or that suite was skipped. ")
     write(md, "Comparison figures across architectures are available on the documentation's `Benchmarks` page.\n\n")
 
-    # Pick the union of (trunc, nlayers, transform) rows from all archs.
+    # Pick the union of (truncation, nlayers, transform) rows from all archs.
     rows = Tuple{Int, Int, String}[]
     for label in labels
         ov = get(all_results[label], "overview", nothing)
         ov === nothing && continue
-        truncs = ov["trunc"]
+        truncations = ov["truncation"]
         nlayers = ov["nlayers"]
-        transforms = get(ov, "spectral_transform", fill("default", length(truncs)))
-        for i in eachindex(truncs)
-            r = (Int(truncs[i]), Int(nlayers[i]), String(transforms[i]))
+        transforms = get(ov, "spectral_transform", fill("default", length(truncations)))
+        for i in eachindex(truncations)
+            r = (Int(truncations[i]), Int(nlayers[i]), String(transforms[i]))
             r in rows || push!(rows, r)
         end
     end
@@ -268,12 +295,12 @@ function write_overview(md, all_results, labels)
             ov = get(all_results[label], "overview", nothing)
             cell = "—"
             if ov !== nothing
-                truncs = ov["trunc"]
+                truncations = ov["truncation"]
                 nlayers = ov["nlayers"]
                 sypd = ov["sypd"]
-                transforms = get(ov, "spectral_transform", fill("default", length(truncs)))
-                for i in eachindex(truncs)
-                    if Int(truncs[i]) == t && Int(nlayers[i]) == l && String(transforms[i]) == tr
+                transforms = get(ov, "spectral_transform", fill("default", length(truncations)))
+                for i in eachindex(truncations)
+                    if Int(truncations[i]) == t && Int(nlayers[i]) == l && String(transforms[i]) == tr
                         s = sypd[i]
                         cell = (s isa Number && isfinite(s)) ? format_sypd(s) : "—"
                         break

@@ -1,5 +1,5 @@
 @testset "Dry land models" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
     for Temperature in (SeasonalLandTemperature, ConstantLandTemperature, LandBucketTemperature)
         for Model in (PrimitiveDryModel, PrimitiveWetModel)
@@ -18,7 +18,7 @@
 end
 
 @testset "Wet land models" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
     for Temperature in (SeasonalLandTemperature, ConstantLandTemperature, LandBucketTemperature)
         for SoilMoisture in (Nothing, SeasonalSoilMoisture, LandBucketMoisture)
@@ -49,7 +49,7 @@ end
 end
 
 @testset "With or without snow" begin
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
     for Snow in (Nothing, SnowModel)
         for Model in (PrimitiveDryModel, PrimitiveWetModel)
@@ -75,11 +75,11 @@ end
 end
 
 @testset "LandGeometry default constructor" begin
-    SG = SpectralGrid(trunc = 21, nlayers = 2)
+    SG = SpectralGrid(truncation = 22, nlayers = 2)
     geom = LandGeometry(SG)
     @test geom.layer_thickness isa Vector{<:AbstractFloat}
 
-    SG = SpectralGrid(trunc = 21, nlayers = 5)
+    SG = SpectralGrid(truncation = 22, nlayers = 5)
     geom = LandGeometry(SG)
     @test geom.layer_thickness isa Vector{<:AbstractFloat}
 end

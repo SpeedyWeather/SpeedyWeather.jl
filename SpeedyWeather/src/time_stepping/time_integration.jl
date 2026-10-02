@@ -17,7 +17,7 @@ function time_step!(simulation::AbstractSimulation, time_stepping::AbstractTimeS
     (; clock) = variables.prognostic
 
     # re-initialize model components if needed, e.g. implicit with changing time step
-    reinitialize!(model, variables)                      
+    reinitialize!(model, variables)
 
     time_step!(variables, time_stepping, model)     # calculate tendencies and step forward
     time_step!(clock, time_stepping)                # then step the clock forward
@@ -49,7 +49,7 @@ function time_step!(
 end
 
 # dispatch over time stepper here so that other time stepper can change the order
-diffusion_and_implicit!(vars, model) = 
+diffusion_and_implicit!(vars, model) =
     diffusion_and_implicit!(vars, model.time_stepping, model.implicit, model)
 
 # implicit = nothing just call diffusion
@@ -126,7 +126,7 @@ function update_prognostic!(
         end
     end
 
-    # ocean and land variables, use unscaled time step (unrolled per name)
+    # ocean and land variables with their own time steppers (unrolled per name)
     update_prognostic_namespaces!(vars, clock, time_stepping, model.implicit, model)
 
     # evolve the random pattern in time
@@ -150,11 +150,13 @@ end
         implicit, model::AbstractModel, scale,
     ) where {Po, G, T}
     calls = [
-        :(update_prognostic!(
-            getfield(vars.prognostic, $(QuoteNode(name))),
-            getfield(vars.tendencies, $(QuoteNode(name))),
-            clock, time_stepping, implicit, model, scale,
-        )) for name in _tendency_names(T)
+        :(
+                update_prognostic!(
+                    getfield(vars.prognostic, $(QuoteNode(name))),
+                    getfield(vars.tendencies, $(QuoteNode(name))),
+                    clock, time_stepping, implicit, model, scale,
+                )
+            ) for name in _tendency_names(T)
     ]
     return Expr(:block, calls..., :(return nothing))
 end
@@ -165,11 +167,19 @@ end
     ) where {Po, G, T}
     calls = Expr[]
     for namespace in (:ocean, :land), name in _namespace_names(T, namespace)
-        push!(calls, :(update_prognostic!(
-            getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name))),
-            getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),
-            clock, time_stepping, implicit, model,   # no scale: ocean/land use the unscaled time step
-        )))
+        # each namespace has its own time stepper, e.g. EulerForward for ocean and land with Leapfrog
+        # scale only to adjust the child's time step to the clock (not radius-scaled as the atmosphere)
+        push!(
+            calls, :(
+                let child = time_stepper(time_stepping, Val($(QuoteNode(namespace))))
+                    update_prognostic!(
+                        getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name))),
+                        getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),
+                        clock, child, nothing, model, time_step_scale(time_stepping, child, clock),
+                    )
+                end
+            )
+        )
     end
     return Expr(:block, calls..., :(return nothing))
 end

@@ -3,7 +3,7 @@
         tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
         # prescribe ocean
-        spectral_grid = SpectralGrid(trunc = 31)
+        spectral_grid = SpectralGrid(truncation = 32)
         output = NetCDFOutput(spectral_grid, path = tmp_output_path)
         ocean_heat_flux = PrescribedOceanHeatFlux(spectral_grid)
         land_heat_flux = SurfaceLandHeatFlux(spectral_grid)
@@ -34,7 +34,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     # prescribe ocean
-    spectral_grid = SpectralGrid(trunc = 31)
+    spectral_grid = SpectralGrid(truncation = 32)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
     humidity_flux_ocean = PrescribedOceanHumidityFlux(spectral_grid)
     humidity_flux_land = SurfaceLandHumidityFlux(spectral_grid)

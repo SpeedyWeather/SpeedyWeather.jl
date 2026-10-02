@@ -419,7 +419,7 @@ function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
     (; θ₀, σθ) = C
 
     # Lee and Kim, 2003, eq. 2
-    return @. C.lat_mask .= cosd((θ - θ₀) / σθ)^2
+    return @. C.lat_mask .= cos(deg2rad((θ - θ₀) / σθ))^2
 end
 
 # function barrier

@@ -1,8 +1,11 @@
 using SpeedyTransforms
-using RingGrids, LowerTriangularArrays
+using RingGrids
+using LowerTriangularArrays
+using JET
 using Test
 
 include("spectral_transform.jl")
+include("type_name_length.jl")
 include("dispatch.jl")
 include("spectral_gradients.jl")
 include("power_spectrum.jl")

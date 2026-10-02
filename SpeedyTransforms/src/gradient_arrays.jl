@@ -158,10 +158,37 @@ end
 
 get_eigenvalues(spectrum::Spectrum) = get_eigenvalues(DEFAULT_NF, spectrum)
 
+"""$(TYPEDSIGNATURES)
+Return the Laplace eigenvalues `-l*(l+1)` and their inverse (with the `l=0` integration constant set
+to 0) for `spectrum` in number format `NF`. Stored directly on the `SpectralTransform` (see there and
+`Gradients`), not inside `gradients`, to keep the transform's type name short."""
+function get_eigenvalues_and_inverse(::Type{NF}, spectrum::Spectrum) where {NF}
+    eigenvalues = get_eigenvalues(NF, spectrum)     # = -l*(l+1), degree l of spherical harmonic
+    eigenvalues⁻¹ = inv.(eigenvalues)
+    GPUArrays.@allowscalar eigenvalues⁻¹[1] = 0     # set the integration constant to 0
+    return eigenvalues, eigenvalues⁻¹
+end
+
 gradient_arrays(spectrum::Spectrum) = gradient_arrays(DEFAULT_NF, spectrum)
 
 """$(TYPEDSIGNATURES)
-Precompute all gradient-related arrays for spherical harmonics defined by `spectrum` in number format `NF`."""
+Precomputed gradient and integration matrices held by a `SpectralTransform`."""
+struct Gradients{M}
+    grad_y1::M
+    grad_y2::M
+    grad_y_vordiv1::M
+    grad_y_vordiv2::M
+    grad_x_vordiv::M
+    vordiv_to_uv1::M
+    vordiv_to_uv2::M
+    vordiv_to_uv_x::M
+end
+
+Adapt.@adapt_structure Gradients
+
+"""$(TYPEDSIGNATURES)
+Precompute all gradient-related arrays for spherical harmonics defined by `spectrum` in number format `NF`.
+The Laplace eigenvalues are computed separately by `get_eigenvalues` and stored on the transform directly."""
 function gradient_arrays(::Type{NF}, spectrum::Spectrum) where {NF}
 
     grad_y1, grad_y2, grad_y_vordiv1, grad_y_vordiv2 = meridional_gradient_factors(NF, spectrum)
@@ -171,11 +198,7 @@ function gradient_arrays(::Type{NF}, spectrum::Spectrum) where {NF}
     vordiv_to_uv1, vordiv_to_uv2 = meridional_integration_factors(NF, spectrum)
     vordiv_to_uv_x = zonal_integration_factors(NF, spectrum)
 
-    eigenvalues = get_eigenvalues(NF, spectrum)     # = -l*(l+1), degree l of spherical harmonic
-    eigenvalues⁻¹ = inv.(eigenvalues)
-    GPUArrays.@allowscalar eigenvalues⁻¹[1] = 0     # set the integration constant to 0
-
-    gradients = (;
+    gradients = Gradients(
         # GRADIENTS
         grad_y1,
         grad_y2,
@@ -186,9 +209,6 @@ function gradient_arrays(::Type{NF}, spectrum::Spectrum) where {NF}
         vordiv_to_uv1,
         vordiv_to_uv2,
         vordiv_to_uv_x,
-        # EIGENVALUES
-        eigenvalues,
-        eigenvalues⁻¹,
     )
 
     return gradients

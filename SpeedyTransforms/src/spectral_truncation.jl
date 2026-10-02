@@ -28,7 +28,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
-so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c>1."""
+so that the highest degree `truncation` is dampened by multiplication with c. Anti-diffusion for c>1."""
 function spectral_smoothing!(
         L::LowerTriangularArray,
         c::Real;
@@ -38,12 +38,15 @@ function spectral_smoothing!(
     lmax, mmax = size(L; as = Matrix)
 
     # normalize by largest eigenvalue by default, or wrt to given truncation
-    eigenvalue_norm = truncation == -1 ? -mmax * (mmax + 1) : -truncation * (truncation + 1)
+    # -l*(l+1) in 0-based becomes -l*(l-1) in 1-based
+    eigenvalue_norm = truncation == -1 ? -mmax * (mmax - 1) : -truncation * (truncation - 1)
 
-    # Launch kernel
+    # Launch kernel — pass every scalar as NF so the kernel has no Int/Float64 arithmetic
+    # (a GPU without Float64, e.g. Metal, can't compile it otherwise)
+    NF = real(eltype(L))
     launch!(
         architecture(L), SpectralWorkOrder, size(L), spectral_smoothing_kernel!,
-        L, c, power, eigenvalue_norm, L.spectrum.l_indices,
+        L, NF(c), NF(power), NF(eigenvalue_norm), L.spectrum.l_indices,
     )
 
     return L
@@ -65,6 +68,7 @@ end
     eigenvalue_normalised = -l * (l - 1) / eigenvalue_norm
 
     # Apply smoothing: for eigenvalue_norm < largest eigenvalue the factor becomes negative
-    # set to zero in that case
-    L[I] *= max(1 - (1 - c) * eigenvalue_normalised^power, 0)
+    # set to zero in that case. `@fastmath` for the `^`: a real exponent otherwise routes through
+    # Base's `Float64` `pow_body`, which does not compile on GPUs without Float64 (Metal)
+    L[I] *= max(1 - (1 - c) * (@fastmath eigenvalue_normalised^power), 0)
 end
