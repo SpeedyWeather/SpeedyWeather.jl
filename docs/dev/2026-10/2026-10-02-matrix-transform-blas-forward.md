@@ -1,7 +1,10 @@
 # MatrixSpectralTransform: real stacked matrices so both multiplies hit BLAS on every backend
 
-> Status: **in progress**. Plan drafted after the regression analysis; implementation, CPU tests,
-> GPU tests and CPU/GPU benchmarks to follow on branch `mg/matrix-transform-regression`.
+> Status: **completed**. Implemented on `mg/matrix-transform-regression` (based on `origin/main`),
+> all CPU and GPU tests pass, before/after transform benchmarks on CPU (EPYC 9554, 16 cores) and GPU
+> (H100) below: the grid → spectral multiply is 84–108× faster on CPU and 2.6–13× faster on GPU,
+> the `PrimitiveWetModel` with the matrix transform runs 15× (T32) to 41× (T86) faster on CPU and
+> 2.4× (T64) to 3.5× (T86) faster on GPU, where it now beats the FFT transform up to at least T86.
 
 Date of initial draft: 2026-10-02
 
@@ -17,6 +20,14 @@ Base revision: `8e99099f` (`origin/main`, after rebase; drafted against `8a29efd
 ## Revision log
 
 - 2026-10-02: initial draft.
+- 2026-10-02 (review 2): on request the FFT transform's scratch/`nlayers` uses the same expression
+  `max(maximum(transform_batch), max_transform_batch(nlayers))` as the matrix transform (one line in
+  `spectral_grid.jl`); on CPU this only raises the `ismatching` limit (the FFT scratch is the largest
+  planned K, wider calls are chunked), on GPU it closes a corner case where a custom `transform_batch`
+  without the 9L+1 batch left the scratch too narrow for the tendency batch (the 4L+1 floor dated from
+  #1099, before the tendency batch existed).
+- 2026-10-02 (review): column blocking dropped on request, the matrix transform's scratch is sized
+  to the widest model batch instead (`SpectralGrid` constructor, `max_transform_batch`).
 - 2026-10-02: branch rebased onto `origin/main` (`8e99099f`) on request; the release-branch base only
   differed in versions/changelog/benchmark results. Implemented; SpeedyTransforms unit tests pass
   (209 tests, `--check-bounds=yes`). Validation extended to a before/after transform benchmark
@@ -75,13 +86,16 @@ All in `SpeedyTransforms/src/matrix_transform.jl` (plus `show.jl`, tests, docs, 
    `backward` and the `backward_real`/`backward_imag` copies are dropped, which reduces the matrix
    memory from three to two complex-equivalents (T128 L8: 8.2 GB → ≈5.5 GB). The
    `MatrixComplexType` type parameter goes away.
-2. **Scratch** becomes `(2 nharmonics × nlayers)` real (`nlayers` = the scratch width the
-   `SpectralGrid` passes), used by both directions.
-3. **Grid→spectral**: for each block of at most `size(scratch, 2)` columns,
-   `mul!(scratch, forward_stacked, field_block)` (one real `gemm!` / CUBLAS / rocBLAS) followed by
-   one broadcast `coeffs_block .= complex.(scratch[1:n, :], scratch[n+1:2n, :])`.
-4. **Spectral→grid**: per block, two broadcasts fill the scratch halves with `real`/`imag` of the
-   coefficients and one `mul!(field_block, backward_stacked, scratch)` replaces the two `gemm!`s
+2. **Scratch** becomes `(2 nharmonics × nlayers)` real, used by both directions. The matrix
+   multiply has no batch restriction (unlike FFT plans), so the `SpectralGrid` constructor sizes the
+   matrix transform's scratch to the widest batch any model emits (`max_transform_batch(nlayers) =
+   9 nlayers + 1`, the `PrimitiveWet` tendency batch, a few MB) instead of chunking; the FFT
+   transform keeps its 4L+1 scratch and chunking. A batch wider than the scratch throws a
+   `DimensionMismatch` saying which `nlayers` to construct the transform with.
+3. **Grid→spectral**: `mul!(scratch, forward_stacked, field_matrix)` (one real `gemm!` / CUBLAS /
+   rocBLAS) followed by one broadcast `coeffs .= complex.(scratch[1:n, :], scratch[n+1:2n, :])`.
+4. **Spectral→grid**: two broadcasts fill the scratch halves with `real`/`imag` of the
+   coefficients and one `mul!(field_matrix, backward_stacked, scratch)` replaces the two `gemm!`s
    (measured 1.03 → 0.74 ms on CPU). `unscale_coslat` unchanged.
 5. **`_as_matrix`** on CPU unchanged (BLAS and broadcasts handle strided views; no copies). On GPU
    materialize whenever `x` is not an `AbstractGPUArray` (also for 2-D nested views, which the
@@ -97,9 +111,9 @@ low-resolution GPU configurations (`truncation <= 64`) and all `matrix` rows sho
 ## Testing and verification
 
 - `SpeedyTransforms/test/matrix_transform.jl`: adapt the field/size checks; add a short test that
-  (a) a batch wider than the scratch (`nlayers = 3` transform, 8-layer data) still round-trips, i.e.
-  the column blocking works, (b) transforms into/out of views (2-D view of a 3-D parent, 1-D slot
-  view) agree with the plain-array result, on CPU.
+  (a) a 9L+1-column batch is transformed when the transform is constructed for it and a too narrow
+  scratch throws, (b) transforms into/out of views (2-D view of a 3-D parent, 1-D slot view) agree
+  with the plain-array result, on CPU. JET `@test_opt` guard for both directions in `dispatch.jl`.
 - `SpeedyWeather/test/dynamics/matrix_transform.jl` (20-day `PrimitiveWetModel` run, no NaN).
 - GPU: `SpeedyWeather/test/GPU/runtests.jl` (CUDA env) on an H100 node, in particular the existing
   "transform! on views into a larger backing array" regression test and the model tests that use
@@ -107,6 +121,76 @@ low-resolution GPU configurations (`truncation <= 64`) and all `matrix` rows sho
 - Benchmarks: the reduced benchmark from the regression analysis (`claude_bisect/bench_subset.jl`,
   T32 L8 MT) on the same node as before (baseline 107, HEAD 57 SYPD), and the GPU suite's matrix
   rows (`manual_benchmarking.jl gpu`) against the committed README.
+
+## Results
+
+Before = `origin/main` (`8e99099f`), after = this branch. `claude_bisect/bench_matrix_transform.jl`:
+`transform!` wall time (minimum of 10 calls, 3 at T128, device-synchronised) with the transform as the
+model constructs it (`MatrixSpectralTransform(spectral_grid)`, 8 layers) for the batch widths the
+`PrimitiveWetModel` uses (K = 8 layers, 33 = prognostic batch, 73 = tendency batch), plus the model's
+SYPD with the matrix transform measured like the benchmark suite. CPU: `csp14c04` (AMD EPYC 9554,
+`--cpus-per-task=16`, Julia 1.12.2); "BLAS 16" = `BLAS.set_num_threads(16)` instead of Julia's default
+of 64 threads on the 16 allocated cores. GPU: NVIDIA H100 80GB (`csl14c246`), CUDA.jl 6.2.2.
+
+### CPU, grid → spectral (ms)
+
+| T | K | before | after | after, BLAS 16 |
+| --- | --- | --- | --- | --- |
+| 32 | 8 / 33 / 73 | 9.3 / 38.6 / 84.6 | 0.44 / 0.59 / 1.00 | 0.29 / 0.40 / 0.75 |
+| 64 | 8 / 33 / 73 | 128 / 523 / 1162 | 6.6 / 7.8 / 12.5 | 3.7 / 4.2 / 7.9 |
+| 86 | 8 / 33 / 73 | 393 / 1624 / 3600 | 22.2 / 27.0 / 39.1 | 12.3 / 14.4 / 24.3 |
+| 128 | 8 / 33 / 73 | – / 7724 / 17038 | 79.9 / 94.0 / 157 | 52.1 / 57.0 / 104 |
+
+### CPU, spectral → grid (ms; before could not take K = 73, scratch too narrow)
+
+| T | K | before | after | after, BLAS 16 |
+| --- | --- | --- | --- | --- |
+| 32 | 8 / 33 / 73 | 0.42 / 0.55 / – | 0.40 / 0.54 / 0.95 | 0.25 / 0.34 / 0.67 |
+| 64 | 8 / 33 / 73 | 6.8 / 7.9 / – | 6.5 / 7.7 / 12.3 | 3.7 / 4.5 / 7.7 |
+| 86 | 8 / 33 / 73 | 17.0 / 20.3 / – | 17.1 / 20.3 / 34.0 | 10.4 / 11.9 / 21.5 |
+| 128 | 8 / 33 / 73 | – / 93.7 / – | 80.5 / 94.3 / 158 | 52.1 / 57.8 / 104 |
+
+### CPU, `PrimitiveWetModel` L8 with the matrix transform (SYPD)
+
+| T | July README | before | after | after, BLAS 16 | FFT transform (Oct README) |
+| --- | --- | --- | --- | --- | --- |
+| 32 | 107 | 56.9 | 882 | 980 | 830 |
+| 64 | 3.7 | 2.2 | 64.8 | 82.9 | 104 |
+| 86 | 0.9 | 0.5 | 20.7 | 27.2 | 39 |
+
+### GPU (H100), `transform!` (ms) and model SYPD
+
+| T | K | grid → spectral before → after | spectral → grid before → after |
+| --- | --- | --- | --- |
+| 32 | 8 / 33 / 73 | 0.189 / 0.196 / 0.200 → 0.056 / 0.055 / 0.078 | 0.062 / 0.075 / 0.084 → 0.055 / 0.062 / 0.068 |
+| 64 | 8 / 33 / 73 | 1.23 / 1.23 / 1.78 → 0.180 / 0.179 / 0.294 | 0.140 / 0.189 / 0.307 → 0.134 / 0.177 / 0.285 |
+| 86 | 8 / 33 / 73 | 2.13 / 2.14 / 6.26 → 0.301 / 0.444 / 0.782 | 0.344 / 0.522 / 0.853 → 0.321 / 0.492 / 0.782 |
+| 128 | 33 / 73 | 13.9 / 42.9 → 1.70 / 3.26 | 1.92 / 3.36 → 1.84 / 3.29 |
+
+| T | before | after | FFT transform (Oct README) |
+| --- | --- | --- | --- |
+| 32 | 5653 | 5836 | 5621 |
+| 64 | 1206 | 2836 | 1181 |
+| 86 | 310 | 1095 | 653 |
+
+The backward transform was already BLAS-bound and is unchanged (slightly faster: one `gemm!` instead of
+two); the forward transform now costs the same as the backward one, as it should. On CPU the matrix
+transform is now within 1.3× of the FFT transform up to T64 and beats it on GPU at T64 and T86, so the
+`WhichTransform` threshold (`truncation <= 64` on GPU) could be re-evaluated with the full GPU suite.
+
+### Tests
+
+- `SpeedyTransforms/test/matrix_transform.jl` (209 tests incl. the new wide-batch/view tests) and
+  `dispatch.jl` (32 incl. the new JET guard), `--check-bounds=yes`, against the local package
+  (`SpeedyTransforms/test/Project.toml` now has `[sources]` for the monorepo packages; without them
+  `--project=SpeedyTransforms/test` silently tested the registry release).
+- `SpeedyWeather/test/dynamics/matrix_transform.jl` (20-day `PrimitiveWetModel`, no NaN) and a one-day
+  run of all four models with the FFT transform after the scratch-width change.
+- `SpeedyWeather/test/GPU/runtests.jl` on an H100 (CUDA env): all 36 testsets pass, including the
+  matrix-transform round trip, the nested-view regression test from #1201, Barotropic with the matrix
+  transform and the default GPU `PrimitiveWetModel` (`WhichTransform` → matrix transform).
+- Not run: Reactant (`test/reactant` environment has no Reactant installed here) and AMDGPU/Metal;
+  the code path is backend-agnostic (`mul!` + broadcasts over views, as the previous backward path).
 
 ## Documentation changes
 
@@ -118,9 +202,10 @@ low-resolution GPU configurations (`truncation <= 64`) and all `matrix` rows sho
 
 - `M.forward`, `M.backward`, `M.backward_real`, `M.backward_imag` no longer exist (internal
   fields; only `show` and the SpeedyTransforms tests used them).
-- BLAS thread count inside a Slurm allocation is still `Sys.CPU_THREADS ÷ 2` (64 threads on 16
-  cores); now that the forward multiply is BLAS-bound this oversubscription matters more for the
-  benchmark numbers. Measured as part of verification; not changed here.
+- BLAS thread count inside a Slurm allocation is Julia's default `Sys.CPU_THREADS ÷ 2` (64 threads on
+  the 16 allocated cores). Now that both multiplies are BLAS-bound this oversubscription costs 1.3–1.5×
+  (tables above); the benchmark driver could set `BLAS.set_num_threads` from `SLURM_CPUS_PER_TASK`.
+  Not changed here.
 
 ## Future work
 
