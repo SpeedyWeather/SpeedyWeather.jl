@@ -372,7 +372,7 @@ end
     backing = randn(Float64, RingGrids.get_npoints(grid_in), nlayers, ntime)
     contiguous = view(backing, :, :, 2)
     @test RingGrids.is_flattenable(contiguous)
-    @test !RingGrids.is_reshapeable(view(backing, :, 1:2:nlayers, 1))
+    @test !RingGrids.is_flattenable(view(backing, :, 1:2:nlayers, 1))
 
     field_in = Field(contiguous, grid_in)
     dense_in = Field(Array(contiguous), grid_in)
