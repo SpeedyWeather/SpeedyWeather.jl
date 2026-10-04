@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `time_step!(vars, time_stepping, model)` reinitializes the implicit solver for the time step of this step, so that a loop of single steps from a reset clock (as for differentiation) integrates the same model as `run!`
+- `time_step!(vars, time_stepping, model)` reinitializes the implicit solver for the time step of this step, so that a loop of single steps from a reset clock (as for differentiation) integrates the same model as `run!` [#1297](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1297)
 - AMD GPU CI is only run on `main` [#1296](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1296)
 - Batched interpolation for multi-dimensional `Field`s, horizontal interpolation now named `interpolate_2D!` forwarded from `interpolate!` [#1263](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1263)
 - Restrict `DocumenterCitations` compat to fix citations in docs [#1292](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1292)
