@@ -316,7 +316,7 @@ end
     @testset for Model in (PrimitiveDryModel, PrimitiveWetModel)
         # two identical simulations, both spun up so that the implicit solver is at 2Δt
         function spun_up()
-            spectral_grid = SpectralGrid(trunc = 21, nlayers = 4, NF = Float64)
+            spectral_grid = SpectralGrid(truncation = 22, nlayers = 4, NF = Float64)
             simulation = initialize!(Model(spectral_grid))
             run!(simulation, steps = 5)
             return simulation
