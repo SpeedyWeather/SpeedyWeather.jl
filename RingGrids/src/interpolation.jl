@@ -212,14 +212,16 @@ function AnvilInterpolator(
     return AnvilInterpolator{NF, typeof(geometry), typeof(locator)}(geometry, locator)
 end
 
-# generator from grid and npoints
+# generator from grid and npoints, nlayers sizes the locator's pole-average buffers so that
+# (batched) interpolation of fields with up to nlayers layers does not allocate
 function AnvilInterpolator(
         grid::AbstractGrid,
         npoints::Integer;       # number of points to interpolate onto
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
+        nlayers::Integer = 1,
     )
     geometry = GridGeometry(grid; NF)        # general coordinates and indices for grid
-    locator = AnvilLocator(NF, npoints; architecture = grid.architecture)  # preallocate work arrays for interpolation
+    locator = AnvilLocator(NF, npoints, nlayers; architecture = grid.architecture)  # preallocate work arrays for interpolation
 
     # assemble geometry and locator to interpolator
     return AnvilInterpolator(geometry, locator; NF)
@@ -386,7 +388,6 @@ function interpolate_2D!(
     )
     (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
     (; npoints) = geometry
-    (; rings) = geometry.grid # CPU version even on GPU
 
     nlayers = size(A, 2)
 
@@ -397,7 +398,8 @@ function interpolate_2D!(
     @boundscheck size(Aout, 2) == nlayers ||
         throw(DimensionMismatch("Output has $(size(Aout, 2)) layers but input has $nlayers."))
 
-    A_northpole, A_southpole = average_on_poles(A, rings)
+    # into the locator's buffers if large enough, otherwise allocating
+    A_northpole, A_southpole = average_on_poles!(locator, A, geometry, architecture)
 
     @boundscheck extrema_in(ij_as, 0, npoints) || throw(BoundsError)
     @boundscheck extrema_in(ij_bs, 0, npoints) || throw(BoundsError)
@@ -875,6 +877,55 @@ to return the same number format `NF`."""
     A_northpole = vec(mean(A[rings[1], :], dims = 1))
     A_southpole = vec(mean(A[rings[end], :], dims = 1))
     return round.(NF, A_northpole), round.(NF, A_southpole)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Pole averages per layer of `A` written into the `north_pole_average`, `south_pole_average`
+buffers of `locator` without allocating, returning these buffers. Falls back to the
+allocating `average_on_poles` if the buffers have fewer entries than `A` has layers (e.g.
+a locator created with the default `nlayers = 1`) or for integer data, which is rounded."""
+function average_on_poles!(
+        locator::AnvilLocator,
+        A::AbstractMatrix,
+        geometry::GridGeometry,
+        architecture::AbstractArchitecture,
+    )
+    (; north_pole_average, south_pole_average) = locator
+    nlayers = size(A, 2)
+    if eltype(A) <: AbstractFloat && length(north_pole_average) >= nlayers
+        launch!(
+            architecture, LinearWorkOrder, (nlayers,), _compute_pole_averages_kernel!,
+            north_pole_average, south_pole_average, A, geometry
+        )
+        return north_pole_average, south_pole_average
+    else
+        return average_on_poles(A, geometry.grid.rings)
+    end
+end
+
+# Compute north and south pole ring averages per vertical layer on device, accumulated in the
+# number format of the averages (which can differ from the data's, e.g. Float32 output)
+@kernel inbounds = true function _compute_pole_averages_kernel!(
+        north_pole_average, south_pole_average, A_data, geometry
+    )
+    (; ring_starts, nlons, nlat) = geometry
+    k = @index(Global, Linear)
+    T = eltype(north_pole_average)
+    n_north = nlons[1]
+    rs_north = ring_starts[1]
+    north_sum = zero(T)
+    for i in 0:(n_north - 1)
+        north_sum += convert(T, A_data[rs_north + i, k])
+    end
+    north_pole_average[k] = north_sum / n_north
+    n_south = nlons[nlat]
+    rs_south = ring_starts[nlat]
+    south_sum = zero(T)
+    for i in 0:(n_south - 1)
+        south_sum += convert(T, A_data[rs_south + i, k])
+    end
+    south_pole_average[k] = south_sum / n_south
 end
 
 """

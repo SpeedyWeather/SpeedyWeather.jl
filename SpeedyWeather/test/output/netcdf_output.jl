@@ -347,3 +347,17 @@ end
     nt = size(ds["vor"])[end]
     @test nt == Int(Millisecond(period).value ÷ Millisecond(model.output.interval).value) + 1
 end
+
+@testset "Output interpolator has pole-average buffers for all output layers" begin
+    # so that the batched interpolation of every output field writes into the locator's buffers
+    pole_buffer_length(output) = length(output.interpolator.locator.north_pole_average)
+    spectral_grid = SpectralGrid(nlayers = 8)
+
+    @test pole_buffer_length(NetCDFOutput(spectral_grid, PrimitiveWet)) == 8
+    @test pole_buffer_length(NetCDFOutput(spectral_grid, PrimitiveWet, nlayers_soil = 12)) == 12
+
+    # pressure-level output interpolates fields with the number of pressure levels
+    p = [850, 500, 200] .* 100.0
+    output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = SpeedyWeather.PressureLayers(spectral_grid, p))
+    @test pole_buffer_length(output) == max(length(p), SpeedyWeather.DEFAULT_NLAYERS_SOIL)
+end

@@ -72,28 +72,6 @@ Adapt.@adapt_structure SigmaFaceBelow
     return k_lo, k_hi, α
 end
 
-# Compute north and south pole ring averages per vertical layer on device.
-@kernel inbounds = true function _compute_pole_averages_kernel!(
-        north_pole_average, south_pole_average, A_data, geometry
-    )
-    (; ring_starts, nlons, nlat) = geometry
-    k = @index(Global, Linear)
-    n_north = nlons[1]
-    rs_north = ring_starts[1]
-    north_sum = zero(eltype(north_pole_average))
-    for i in 0:(n_north - 1)
-        north_sum += A_data[rs_north + i, k]
-    end
-    north_pole_average[k] = north_sum / n_north
-    n_south = nlons[nlat]
-    rs_south = ring_starts[nlat]
-    south_sum = zero(eltype(south_pole_average))
-    for i in 0:(n_south - 1)
-        south_sum += A_data[rs_south + i, k]
-    end
-    south_pole_average[k] = south_sum / n_south
-end
-
 # anvil interpolation of layer k of A_data onto point i, pole values from the locator
 Base.@propagate_inbounds function anvil_average(A_data, k, i, locator)
     (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys, north_pole_average, south_pole_average) = locator
