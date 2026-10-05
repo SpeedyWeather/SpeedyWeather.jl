@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Improved the performance of the `MatrixSpectralTransform` by stacking real and imaginary part in a single matrix [#1295](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1295)
 - `on_architecture` of a `Tuple` (and `NamedTuple`) keeps the element types inferred, making the implicit solver setup free of runtime dispatch [#1297](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1297)
 - `time_step!(vars, time_stepping, model)` reinitializes the implicit solver for the time step of this step, so that a loop of single steps from a reset clock (as for differentiation) integrates the same model as `run!` [#1297](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1297)
 - AMD GPU CI is only run on `main` [#1296](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1296)
