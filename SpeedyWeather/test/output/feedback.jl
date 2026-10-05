@@ -47,8 +47,7 @@ end
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
         p = model.feedback.progress_meter
-        status = SpeedyWeather.ProgressMeter.ProgressStatus(time(), 1.0, false)
-        line = join(map(e -> SpeedyWeather.ProgressMeter.print_element(e, p, status), p.elements[5:end]))
+        line = join(map(e -> SpeedyWeather.ProgressMeter.Elements.print_element(e, p), p.elements[5:end]))
         @test occursin("Cᵥ = ", line)
         @test occursin("m/s", line)
         @test occursin("˚C", line)
@@ -76,7 +75,6 @@ end
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
         p = model.feedback.progress_meter
-        status = SpeedyWeather.ProgressMeter.ProgressStatus(time(), 1.0, false)
-        @test all(e -> SpeedyWeather.ProgressMeter.print_element(e, p, status) == "", p.elements)
+        @test all(e -> SpeedyWeather.ProgressMeter.Elements.print_element(e, p) == "", p.elements)
     end
 end

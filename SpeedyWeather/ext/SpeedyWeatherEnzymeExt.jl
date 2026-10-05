@@ -25,11 +25,11 @@ end
 
 # this lock is part of the ProgressMeter that's part of the Feedback of all models
 @inline function Enzyme.make_zero(
-        ::Type{ProgressMeter.ProgressCore},
+        ::Type{<:ProgressMeter.ProgressCore},
         seen::IdDict,
-        prev::ProgressMeter.ProgressCore,
+        prev::P,
         ::Val{copy_if_inactive} = Val(false),
-    )::ProgressMeter.ProgressCore where {copy_if_inactive}
+    )::P where {P <: ProgressMeter.ProgressCore, copy_if_inactive}
     return prev
 end
 

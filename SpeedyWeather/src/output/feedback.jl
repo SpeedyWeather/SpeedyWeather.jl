@@ -37,7 +37,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Interval in time steps between NaN checks, and between the progress meter diagnostics (maximum speed, temperature range)"
     interval::Int = 50
 
-    """[OPTION] Elements of the progress line (subtypes of `ProgressMeter.AbstractProgressElement`),
+    """[OPTION] Elements of the progress line (subtypes of `ProgressMeter.Elements.AbstractProgressElement`),
     `nothing` builds them from `showspeed`, `show_time`, `show_umax`, `show_temperature_range`,
     see `default_elements`. Elements specific to SpeedyWeather (`SimulationTime`, `SimulationSpeed`,
     `MaximumWindSpeed`, `TemperatureRange`, `VerticalCourantNumber`) are bound to the simulation
@@ -126,7 +126,7 @@ end
 # step, ...) in `initialize!(::Feedback, ...)`. `print_element` is only called when the progress
 # meter is redrawn, so diagnostics are only computed when they are displayed.
 
-abstract type AbstractSimulationElement <: ProgressMeter.AbstractProgressElement end
+abstract type AbstractSimulationElement <: ProgressMeter.Elements.AbstractProgressElement end
 
 # elements that do not need anything from the simulation are their own bound version
 bind_element(element, vars, model) = element
@@ -141,8 +141,8 @@ struct SimulationTime{C} <: AbstractSimulationElement
 end
 SimulationTime() = SimulationTime(nothing)
 bind_element(::SimulationTime, vars, model) = SimulationTime(vars.prognostic.clock)
-ProgressMeter.print_element(element::SimulationTime, p, status) = string(Dates.Date(element.clock.time))
-ProgressMeter.print_element(::SimulationTime{Nothing}, p, status) = ""
+ProgressMeter.Elements.print_element(element::SimulationTime, p) = string(Dates.Date(element.clock.time))
+ProgressMeter.Elements.print_element(::SimulationTime{Nothing}, p) = ""
 
 """$(TYPEDSIGNATURES)
 Progress line element that shows the simulation speed, e.g. in simulated years per day,
@@ -153,8 +153,8 @@ which needs the time step `Δt` [s]. `separator` is printed in front."""
 end
 bind_element(element::SimulationSpeed, vars, model) = SimulationSpeed(element.separator, Float64(model.time_stepping.Δt))
 
-function ProgressMeter.print_element(element::SimulationSpeed, p, status)
-    sec_per_iter = status.elapsed / max(1, p.counter - p.start)
+function ProgressMeter.Elements.print_element(element::SimulationSpeed, p)
+    sec_per_iter = (p.tcurrent - p.tinit) / max(1, p.counter - p.start)
     return element.separator * speedstring(sec_per_iter, element.Δt)
 end
 
@@ -187,9 +187,9 @@ struct MaximumWindSpeed{V} <: AbstractSimulationElement
 end
 MaximumWindSpeed() = MaximumWindSpeed(nothing)
 bind_element(::MaximumWindSpeed, vars, model) = MaximumWindSpeed(vars)
-ProgressMeter.print_element(::MaximumWindSpeed{Nothing}, p, status) = ""
+ProgressMeter.Elements.print_element(::MaximumWindSpeed{Nothing}, p) = ""
 
-function ProgressMeter.print_element(element::MaximumWindSpeed, p, status)
+function ProgressMeter.Elements.print_element(element::MaximumWindSpeed, p)
     hasproperty(element.vars.grid, :u) || return ""
     umin, umax = extrema(element.vars.grid.u)
     return @sprintf ", %3d m/s" max(abs(umin), abs(umax))
@@ -203,9 +203,9 @@ struct TemperatureRange{V} <: AbstractSimulationElement
 end
 TemperatureRange() = TemperatureRange(nothing)
 bind_element(::TemperatureRange, vars, model) = TemperatureRange(vars)
-ProgressMeter.print_element(::TemperatureRange{Nothing}, p, status) = ""
+ProgressMeter.Elements.print_element(::TemperatureRange{Nothing}, p) = ""
 
-function ProgressMeter.print_element(element::TemperatureRange, p, status)
+function ProgressMeter.Elements.print_element(element::TemperatureRange, p)
     hasproperty(element.vars.grid, :temperature) || return ""
     tmin, tmax = extrema(element.vars.grid.temperature)
     return @sprintf ", [%4d, %4d] ˚C" tmin - 273.15f0 tmax - 273.15f0
@@ -231,9 +231,9 @@ function bind_element(::VerticalCourantNumber, vars, model)
     hasproperty(model, :geometry) || return VerticalCourantNumber()
     return VerticalCourantNumber(vars, model.geometry.σ_levels_thick, Float64(model.time_stepping.Δt))
 end
-ProgressMeter.print_element(::VerticalCourantNumber{Nothing}, p, status) = ""
+ProgressMeter.Elements.print_element(::VerticalCourantNumber{Nothing}, p) = ""
 
-function ProgressMeter.print_element(element::VerticalCourantNumber, p, status)
+function ProgressMeter.Elements.print_element(element::VerticalCourantNumber, p)
     hasproperty(element.vars.dynamics, :w) || return ""
     scale = element.vars.prognostic.scale[]     # divergence, hence w, is scaled by the radius in the dynamical core
     return @sprintf ", Cᵥ = %.2f" vertical_courant_number(element.vars.dynamics.w, element.Δσ, element.Δt / scale)
@@ -260,7 +260,8 @@ Default elements of the progress line of a `Feedback`, in the order description,
 and in parenthesis (if `showspeed`) simulation date, speed, maximum wind speed and temperature range,
 each depending on the options `showspeed`, `show_time`, `show_umax`, `show_temperature_range`."""
 function default_elements(feedback::Feedback)
-    elements = Any[ProgressMeter.Description(), ProgressMeter.Percentage(), ProgressMeter.Bar(), ProgressMeter.ETA()]
+    (; Elements) = ProgressMeter
+    elements = Any[Elements.Description(), Elements.Percentage(), Elements.Bar(), Elements.ETA()]
     if feedback.showspeed
         push!(elements, " (")
         feedback.show_time && push!(elements, SimulationTime())

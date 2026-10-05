@@ -1,7 +1,7 @@
 # Progress line from ProgressMeter elements, no type piracy, optional vertical Courant number
 
 > Status: **in progress**. Implemented and tested locally, draft PR waiting on ProgressMeter.jl#369. Replace the `ProgressMeter.speedstring(::AbstractFloat)` piracy and the global
-> `FEEDBACK_*` refs by `ProgressMeter.AbstractProgressElement`s (ProgressMeter.jl PR #369) and add an
+> `FEEDBACK_*` refs by `ProgressMeter.Elements.AbstractProgressElement`s (ProgressMeter.jl PR #369) and add an
 > optional `VerticalCourantNumber` element. Draft PR, depends on the unreleased ProgressMeter branch.
 
 Date of initial draft: 2026-10-05
@@ -37,6 +37,13 @@ Base revision: e82b41763d831f2356ad4e661650f426ab9762ff
   `Base.show(::IO, ::ProgressMeter.Progress)` is removed too. `vertical_courant_number` reduces per
   layer (`maximum(abs, w; dims=1)`) instead of allocating two full-size temporaries per redraw. Docs
   section "Progress line" added to `how_to_run_speedy.md`.
+- 2026-10-05, ProgressMeter.jl#369 changed after MarcMush's review ("In SpeedyWeather, can you update
+  PR1298 to account for these changes?"): the elements now live in the exported submodule
+  `ProgressMeter.Elements`, `ProgressStatus` is gone and `print_element(element, p)` takes two
+  arguments, with the redraw time and finished state in `p.tcurrent`/`p.finished`. `SimulationSpeed`
+  uses `p.tcurrent - p.tinit` instead of `status.elapsed`. Merging ProgressMeter master (#367) made
+  `ProgressCore` parametric on the output type, so the Enzyme extension's `make_zero` now dispatches
+  on `Type{<:ProgressCore}`.
 
 ## Problem description
 
@@ -57,7 +64,7 @@ pointing at the branch (Julia ≥ 1.11 only).
 
 ## Summary of changes
 
-- New SpeedyWeather elements (subtypes of `ProgressMeter.AbstractProgressElement`) in
+- New SpeedyWeather elements (subtypes of `ProgressMeter.Elements.AbstractProgressElement`) in
   `output/feedback.jl`: `SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`,
   `VerticalCourantNumber`. Created unbound by the user, bound to `Variables` and `model` by
   `bind_element` in `initialize!(::Feedback, ...)`, so `Feedback` never holds a reference to `Variables`
