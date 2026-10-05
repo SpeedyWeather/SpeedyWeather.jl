@@ -52,12 +52,6 @@ $(TYPEDFIELDS)"""
     nans_detected::Bool = false
 end
 
-function Base.show(io::IO, P::ProgressMeter.Progress)
-    println(io, "$(typeof(P)) <: ProgressMeter.AbstractProgress")
-    keys = propertynames(P)
-    return print_fields(io, P, keys)
-end
-
 """
 $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
@@ -132,12 +126,17 @@ end
 # step, ...) in `initialize!(::Feedback, ...)`. `print_element` is only called when the progress
 # meter is redrawn, so diagnostics are only computed when they are displayed.
 
+abstract type AbstractSimulationElement <: ProgressMeter.AbstractProgressElement end
+
 # elements that do not need anything from the simulation are their own bound version
 bind_element(element, vars, model) = element
 
+# bound elements hold the `Variables`, don't print them
+Base.show(io::IO, element::AbstractSimulationElement) = print(io, nameof(typeof(element)), "()")
+
 """$(TYPEDSIGNATURES)
 Progress line element that shows the current simulation date."""
-struct SimulationTime{C} <: ProgressMeter.AbstractProgressElement
+struct SimulationTime{C} <: AbstractSimulationElement
     clock::C
 end
 SimulationTime() = SimulationTime(nothing)
@@ -148,7 +147,7 @@ ProgressMeter.print_element(::SimulationTime{Nothing}, p, status) = ""
 """$(TYPEDSIGNATURES)
 Progress line element that shows the simulation speed, e.g. in simulated years per day,
 which needs the time step `Δt` [s]. `separator` is printed in front."""
-@kwdef struct SimulationSpeed <: ProgressMeter.AbstractProgressElement
+@kwdef struct SimulationSpeed <: AbstractSimulationElement
     separator::String = ", "
     Δt::Float64 = 0.0
 end
@@ -181,9 +180,9 @@ function speedstring(sec_per_iter, dt_in_sec)
 end
 
 """$(TYPEDSIGNATURES)
-Progress line element that shows the maximum wind speed [m/s] of the current grid-space `u`, `v`.
+Progress line element that shows the maximum absolute zonal wind `|u|` [m/s] of the current grid-space `u`.
 Shows nothing if the model has no `u`."""
-struct MaximumWindSpeed{V} <: ProgressMeter.AbstractProgressElement
+struct MaximumWindSpeed{V} <: AbstractSimulationElement
     vars::V
 end
 MaximumWindSpeed() = MaximumWindSpeed(nothing)
@@ -199,7 +198,7 @@ end
 """$(TYPEDSIGNATURES)
 Progress line element that shows the range of the grid-space temperature in ˚C.
 Shows nothing if the model has no `temperature`."""
-struct TemperatureRange{V} <: ProgressMeter.AbstractProgressElement
+struct TemperatureRange{V} <: AbstractSimulationElement
     vars::V
 end
 TemperatureRange() = TemperatureRange(nothing)
@@ -221,7 +220,7 @@ without vertical velocity `vars.dynamics.w`. Not part of the default layout, add
 ```julia
 Feedback(elements = (default_elements(Feedback())..., VerticalCourantNumber()))
 ```"""
-struct VerticalCourantNumber{V, T} <: ProgressMeter.AbstractProgressElement
+struct VerticalCourantNumber{V, T} <: AbstractSimulationElement
     vars::V
     Δσ::T
     Δt::Float64
@@ -245,11 +244,15 @@ Maximum vertical Courant number of layer `k`, `max(|σ̇ₖ₊₁/₂|, |σ̇ₖ
 and grid points. `w` is the vertical velocity at the layer interfaces `k+1/2` (zero at the surface),
 `Δσ` the layer thickness. Pass `Δt / scale` if `w` is radius-scaled as in the dynamical core."""
 function vertical_courant_number(w, Δσ, Δt)
-    w_data = w.data
-    nlayers = size(w_data, 2)
-    courant_below = maximum(abs.(w_data) ./ reshape(Δσ, 1, :))
-    courant_above = nlayers > 1 ? maximum(abs.(view(w_data, :, 1:(nlayers - 1))) ./ reshape(view(Δσ, 2:nlayers), 1, :)) : zero(courant_below)
-    return Δt * max(courant_below, courant_above)
+    # maximum |σ̇| per interface k+1/2 reduced on the device, then loop over the few layers on the CPU
+    w_max = vec(Array(maximum(abs, w.data, dims = 1)))
+    Δσ_cpu = Array(Δσ)
+    courant = zero(eltype(w_max))
+    for k in eachindex(Δσ_cpu)
+        w_above = k > 1 ? w_max[k - 1] : zero(courant)     # σ̇ = 0 at the top k = 1/2
+        courant = max(courant, max(w_max[k], w_above) / Δσ_cpu[k])
+    end
+    return Δt * courant
 end
 
 """$(TYPEDSIGNATURES)

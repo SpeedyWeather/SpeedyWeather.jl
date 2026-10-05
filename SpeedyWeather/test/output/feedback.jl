@@ -61,6 +61,14 @@ end
         w = zeros(Float32, spectral_grid.grid, 4)
         w.data[:, 1:3] .= 1
         @test SpeedyWeather.vertical_courant_number(w, fill(0.25f0, 4), 10) ≈ 40
+
+        # the interface above layer 2 (σ̇ = 1/s) with the thin Δσ = 0.1 of layer 2 dominates
+        w.data .= 0
+        w.data[:, 1] .= 1
+        @test SpeedyWeather.vertical_courant_number(w, Float32[0.5, 0.1, 0.2, 0.2], 10) ≈ 100
+
+        # bound elements hold the Variables but print compactly
+        @test repr(p.elements[end]) == "VerticalCourantNumber()"
     end
 
     @testset "barotropic has no temperature/Courant" begin

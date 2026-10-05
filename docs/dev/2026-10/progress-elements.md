@@ -29,6 +29,15 @@ Base revision: e82b41763d831f2356ad4e661650f426ab9762ff
 - `w` is radius-scaled inside the dynamical core (like divergence), so the element uses
   `Δt / vars.prognostic.scale[]`; a first version without it printed Cᵥ ≈ 3.6e5.
 
+- Review (Opus, after the first push): CI failed in the Enzyme env because only the package and
+  main test env had the `[sources]` entry, so ProgressMeter is now sourced from the branch in every env
+  that resolves SpeedyWeather by path (docs, benchmark, benchmark/CUDA, test/GPU/*, test/differentiability,
+  test/reactant). Bound elements printed the whole `Variables` (1 s to show a `Feedback`, 125k
+  characters), so they now share `AbstractSimulationElement` with a compact `show`. The pirated
+  `Base.show(::IO, ::ProgressMeter.Progress)` is removed too. `vertical_courant_number` reduces per
+  layer (`maximum(abs, w; dims=1)`) instead of allocating two full-size temporaries per redraw. Docs
+  section "Progress line" added to `how_to_run_speedy.md`.
+
 ## Problem description
 
 `src/output/feedback.jl` customizes the progress line by redefining
@@ -71,7 +80,8 @@ tuple with `VerticalCourantNumber` renders a finite number for `PrimitiveDryMode
 
 ## Documentation changes
 
-Docstrings of the elements, `Feedback.elements`; CHANGELOG.
+Docstrings of the elements, `Feedback.elements`, section "Progress line" in `how_to_run_speedy.md`;
+CHANGELOG.
 
 ## Known limitations
 
