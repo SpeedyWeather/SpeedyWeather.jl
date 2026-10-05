@@ -44,6 +44,10 @@ Base revision: e82b41763d831f2356ad4e661650f426ab9762ff
   uses `p.tcurrent - p.tinit` instead of `status.elapsed`. Merging ProgressMeter master (#367) made
   `ProgressCore` parametric on the output type, so the Enzyme extension's `make_zero` now dispatches
   on `Type{<:ProgressCore}`.
+- 2026-10-05, docs: "the usage of a custom Progress line is advanced and not something a first-time
+  user should be worried about, can you move this section to Advanced -> Feedback?" The section
+  "Progress line" moved from `how_to_run_speedy.md` to a new page `feedback.md` under Advanced, with
+  a one-line pointer left in `how_to_run_speedy.md`.
 
 ## Problem description
 
@@ -87,7 +91,7 @@ tuple with `VerticalCourantNumber` renders a finite number for `PrimitiveDryMode
 
 ## Documentation changes
 
-Docstrings of the elements, `Feedback.elements`, section "Progress line" in `how_to_run_speedy.md`;
+Docstrings of the elements, `Feedback.elements`, new page "Feedback" (`feedback.md`, under Advanced) with the section "Progress line", linked from `how_to_run_speedy.md`;
 CHANGELOG.
 
 ## Known limitations
