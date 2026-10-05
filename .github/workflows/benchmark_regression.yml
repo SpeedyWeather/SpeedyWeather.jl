@@ -1,0 +1,62 @@
+name: Benchmark regression check
+
+# Every second week: the schedule fires every Monday and the gate job skips odd ISO weeks.
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.week.outputs.run }}
+    steps:
+      - id: week
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ] || [ $(( 10#$(date -u +%V) % 2 )) -eq 0 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  benchmark:
+    name: main vs latest release and latest benchmarked revision
+    needs: gate
+    if: needs.gate.outputs.run == 'true' && github.repository == 'SpeedyWeather/SpeedyWeather.jl'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0    # full history and tags to find the release and benchmarked revisions
+
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+
+      - uses: julia-actions/cache@v3
+
+      - name: Benchmark, compare and bisect a regression
+        run: |
+          julia --color=yes SpeedyWeather/benchmark/regression/regression.jl check \
+            --workdir "$RUNNER_TEMP/benchmark-regression" --output-dir benchmark-regression \
+            --bisect --fail-on-regression
+
+      - name: Report
+        if: always()
+        run: |
+          if [ -f benchmark-regression/report.md ]; then
+            cat benchmark-regression/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: benchmark-regression
+          path: benchmark-regression/
+          if-no-files-found: ignore

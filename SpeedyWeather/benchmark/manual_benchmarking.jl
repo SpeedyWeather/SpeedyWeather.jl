@@ -307,6 +307,7 @@ function write_preamble(md)
     write(md, "julia --project=. manual_benchmarking.jl reactant-cpu   # Reactant on CPU\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU\n")
     write(md, "julia --project=. manual_benchmarking.jl --debug        # quick regression check: PrimitiveWet, T ≤ $DEBUG_MAX_TRUNCATION only, not stored\n")
+    write(md, "julia regression/regression.jl check                   # debug mode on main, latest release and latest benchmarked revision\n")
     write(md, "```\n\n")
     write(md, "Each run updates only its own architecture's section in this `README.md`; results for other architectures are preserved via `benchmark_results.json`.\n\n")
     return

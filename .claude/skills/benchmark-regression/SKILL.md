@@ -5,100 +5,62 @@ description: Check whether SpeedyWeather.jl's main branch has a performance regr
 
 # Benchmark regression check
 
-Compares the speed of `origin/main` against the latest release and the latest benchmarked
-revision with `manual_benchmarking.jl --debug`, bisects a regression to its culprit commit and
-files a GitHub issue. Expect roughly 15–30 min without and 1–2 h with a bisection; most of it is
-precompiling every revision. Run long commands with `run_in_background` and wait for completion.
+The measuring, comparing and bisecting is done by
+`SpeedyWeather/benchmark/regression/regression.jl` — the same script the scheduled CI job
+(`.github/workflows/benchmark_regression.yml`) runs. This skill runs it, sanity-checks the result,
+adds a hypothesis for the culprit and files the GitHub issue. Run `regression.jl` without arguments
+for its full usage.
 
 ## Ground rules
 
-- **Never check out another revision in the user's working tree.** Every revision is benchmarked
-  in a detached worktree under `$W/trees` (bisection in `$W/bisect`); `run_debug_benchmark.sh`
-  handles this and always uses the benchmark harness of the current checkout, so all revisions are
-  measured identically.
+- `regression.jl` benchmarks every revision in a detached worktree under the work directory, with
+  the benchmark harness of the current checkout. **Never check out other revisions in the user's
+  working tree** yourself.
 - **One benchmark at a time**, and no other heavy work (tests, builds, other agents) in parallel —
-  contention makes the timings meaningless. Same machine, arch and Julia for every revision.
-- Every Bash call starts a fresh shell: repeat the variable block below at the top of each call.
-- Benchmarks are noisy. Never call a regression from a single run; confirm it (step 4).
+  contention makes the timings meaningless.
+- Expect 30–60 min without and 1–3 h with a bisection, mostly precompiling every revision. Run it
+  with `run_in_background` and wait for the completion notification; don't poll.
+- Every Bash call starts a fresh shell: repeat the variable block at the top of each call.
 
 ```bash
 REPO=$(git rev-parse --show-toplevel)
-S=$REPO/.claude/skills/benchmark-regression/scripts
-export SPEEDY_BENCH_WORKDIR=<scratchpad dir if the session has one, else ${TMPDIR:-/tmp}>/benchmark-regression
-W=$SPEEDY_BENCH_WORKDIR
+W=<scratchpad dir if the session has one, else ${TMPDIR:-/tmp}>/benchmark-regression
 ARCH=cpu        # or gpu / amdgpu from the skill arguments
-RJ="julia --startup-file=no $S/regression.jl"   # own env in scripts/, instantiated on first use
+R="julia --startup-file=no $REPO/SpeedyWeather/benchmark/regression/regression.jl"
 ```
 
-## 1. Revisions
+## 1. Check
 
 ```bash
-git -C "$REPO" fetch origin --tags --quiet
-MAIN=$(git -C "$REPO" rev-parse origin/main)
-RELEASE=$(git -C "$REPO" tag --list 'v[0-9]*' --sort=-v:refname | head -1)
-BENCHMARKED=$($RJ benchmarked-commit --arch $ARCH --repo "$REPO")
+$R check --arch $ARCH --workdir $W --output-dir $W/results --bisect
 ```
 
-`benchmarked-commit` finds the first-parent commit on main that introduced the currently stored
-results of this architecture in `SpeedyWeather/benchmark/assets/benchmark_results.json`.
-Drop a revision that resolves to the same commit as another one. If a revision fails to run with
-the current harness (e.g. it predates an API the harness uses), say so in the report and continue
-with the remaining ones.
+This benchmarks `origin/main`, the latest release tag and the latest benchmarked revision of this
+architecture (the first-parent commit that introduced its stored results in
+`SpeedyWeather/benchmark/assets/benchmark_results.json`). A **regression** is a geometric-mean
+SYPD ratio main / reference below 0.85 for all configurations or for one of the two transforms
+(LT+FFT, MT). It is confirmed by benchmarking main and that reference a second time (best of both
+runs counts) and then bisected (first parent) from the most recent regressed reference.
 
-## 2. Benchmark
+Results: `$W/results/report.md` (table, verdicts, bisection) and `summary.json`
+(`regression`, `comparisons`, `bisect.culprit`, `notes`), plus one JSON + `.log` per run.
+Revisions that cannot run with the current harness are listed under `notes`; mention them.
 
-Sequentially, in one background command (each run prints its table, logs go to `<json>.log`):
+**No regression** → tell the user in a few lines with the table from `report.md`. Done.
+
+## 2. Sanity-check the culprit
+
+In the bisection table of `report.md`, the culprit's ratio must be clearly below the cutoff and
+its parent's clearly above. If either is within ~5% of the cutoff, benchmark both again and compare:
 
 ```bash
-$S/run_debug_benchmark.sh "$BENCHMARKED" $W/results/benchmarked-1.json $ARCH
-$S/run_debug_benchmark.sh "$RELEASE"     $W/results/release-1.json     $ARCH
-$S/run_debug_benchmark.sh "$MAIN"        $W/results/main-1.json        $ARCH
+$R benchmark <sha> $W/results/recheck-<sha7>.json --arch $ARCH --workdir $W
+$R table --candidate culprit --result parent=<files,...> --result culprit=<files,...>
 ```
 
-## 3. Compare
+If the bisection ended with only skipped commits, report that list instead of a single culprit.
 
-```bash
-$RJ table --candidate main \
-    --result benchmarked=$W/results/benchmarked-1.json \
-    --result release=$W/results/release-1.json \
-    --result main=$W/results/main-1.json
-```
-
-This prints a markdown table (SYPD per configuration, change of main vs each reference, geometric
-means for all configurations, LT+FFT and MT separately) and a verdict per reference. A
-**regression** is a geometric-mean SYPD ratio below 0.85 (main ≥ 15% slower) in any group.
-
-No regression → skip to step 7.
-
-## 4. Confirm
-
-Re-run main and every reference it regressed against once more (`main-2.json`, `release-2.json`, …),
-then re-run `table` with both files per revision, e.g. `--result main=$W/results/main-1.json,$W/results/main-2.json`
-(the best SYPD per configuration is used). Only a regression that persists counts. If it
-disappears, report it as noise and stop.
-
-## 5. Bisect
-
-Good revision = the most recent reference that main regressed against (`git merge-base
---is-ancestor` tells which is newer; if it is not an ancestor of main use `git merge-base` with
-main). Take `GROUP` and `CUTOFF` from the verdict line of that reference. The cutoff is the
-geometric midpoint between the reference and main, so single-run noise rarely flips a verdict.
-
-```bash
-git -C "$REPO" worktree add --detach $W/bisect $MAIN
-git -C $W/bisect bisect start --first-parent $MAIN $GOOD
-git -C $W/bisect bisect run $S/bisect_step.sh $W/results/<ref>-1.json,$W/results/<ref>-2.json $CUTOFF $GROUP $ARCH
-git -C $W/bisect bisect log > $W/results/bisect.log
-git -C $W/bisect bisect reset
-```
-
-`bisect_step.sh` benchmarks each step into `$W/results/bisect-<sha>.json` and skips (exit 125)
-revisions that fail to run. Sanity-check the culprit: its ratio (from the bisect output) must be
-clearly below the cutoff and its parent's clearly above. If either is within ~5% of the cutoff,
-re-run both once more with `run_debug_benchmark.sh` and judge on the best of the runs.
-If bisect ends with only skipped commits, report the remaining range instead of a single culprit.
-
-## 6. Hypothesis
+## 3. Hypothesis
 
 Read what the culprit changed — `git -C "$REPO" show --stat <sha>`, the PR (`gh pr view <N>` with
 the `#N` from the commit title) and the diff of code that runs every time step: `dynamics/`,
@@ -109,14 +71,11 @@ changed loop order or memory layout. Whether only MT or only LT+FFT regressed po
 transforms; both regressed points at dynamics or physics. Write 2–3 short sentences in plain,
 simple language and phrase it as a hypothesis, not a finding.
 
-## 7. Report
+## 4. Issue
 
-**No regression:** tell the user in a few lines with the table. No issue.
-
-**Regression** (unless the user asked for a dry run): first check for an existing open issue,
+Skip this step if the user asked for a dry run. First look for an open issue:
 `gh issue list --repo SpeedyWeather/SpeedyWeather.jl --state open --search "Performance regression in:title"`.
-If one already names the same culprit, add a comment with the new numbers instead of a new issue.
-Otherwise file one with label `performance :rocket:`:
+If one already names the same culprit, comment on it with the new numbers instead. Otherwise:
 
 ```bash
 gh issue create --repo SpeedyWeather/SpeedyWeather.jl --label "performance :rocket:" \
@@ -129,7 +88,7 @@ Keep the body short — this template, nothing more:
 `main` (<sha7>) is **~X% slower** than <reference> (<sha7>) in the quick benchmark
 (`manual_benchmarking.jl --debug`: PrimitiveWet, T ≤ 128, <arch label>). Higher SYPD is better.
 
-<table from regression.jl, the main and reference columns are enough if it gets wide>
+<table from report.md; drop the columns of a reference that did not regress if it gets wide>
 
 **Culprit (git bisect):** <sha7> <commit title> (#N)
 
@@ -137,19 +96,10 @@ Keep the body short — this template, nothing more:
 
 <details><summary>How this was measured</summary>
 
-<machine, Julia version, threads>; each revision benchmarked with the same harness in its own
-worktree, best of N runs per configuration; bisect cutoff <CUTOFF> on the <GROUP> geometric mean.
+<the machine line of report.md>; `regression.jl check --bisect`, best of N runs per configuration,
+bisect cutoff <cutoff> on the <group> geometric mean.
 </details>
 ```
 
-Give the user the issue link and the one-line verdict.
-
-## 8. Clean up
-
-```bash
-git -C $W/bisect bisect reset 2>/dev/null
-for tree in $W/trees/* $W/bisect; do [ -d "$tree" ] && git -C "$REPO" worktree remove --force "$tree"; done
-git -C "$REPO" worktree prune
-```
-
-Keep `$W/results` (JSON + logs) so the numbers can be inspected later.
+Give the user the issue link and the one-line verdict. Keep `$W/results` for later inspection;
+`regression.jl` removes its worktrees itself.
