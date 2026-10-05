@@ -129,6 +129,7 @@ export AbstractInterpolator,
 
 export interpolate,
     interpolate!,
+    interpolate_2D!,
     update_locator,
     update_locator!
 

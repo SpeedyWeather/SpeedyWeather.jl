@@ -1,5 +1,84 @@
 # Radiation
 
+## Radiation as one model component
+
+Shortwave and longwave radiation are bundled into a single model component `model.radiation`.
+The default is [`Radiation`](@ref), which holds a `shortwave` and a `longwave` scheme and calls
+them in that order for every grid column
+
+```@example radiation
+using SpeedyWeather
+spectral_grid = SpectralGrid()
+radiation = Radiation(spectral_grid; shortwave = OneBandShortwave(spectral_grid), longwave = OneBandLongwave(spectral_grid))
+model = PrimitiveWetModel(spectral_grid; radiation)
+model.radiation
+```
+
+Either stream can be `nothing` to switch it off, e.g. `Radiation(spectral_grid; shortwave = nothing)`.
+The individual schemes are accessed as `model.radiation.shortwave` and `model.radiation.longwave`.
+A radiation scheme that computes both streams at once (for example a correlated-k scheme that
+shares its gas optics between shortwave and longwave) subtypes `SpeedyWeather.AbstractRadiation`
+directly, implements `parameterization!(ij, vars, scheme, model)` for both streams, declares its
+variables via `variables(::MyRadiation)` (the standard radiation diagnostics such as `outgoing_longwave`
+and `surface_shortwave_down` are those of `variables(::AbstractShortwave)` and `variables(::AbstractLongwave)`),
+and is passed as `radiation = MyRadiation(spectral_grid)`.
+
+## Radiation schemes from NumericalRadiation.jl
+
+SpeedyWeather itself includes simple radiation schemes, described in the rest of this page:
+a uniform cooling, the Jeevanjee temperature-flux longwave, and one-band longwave and
+shortwave schemes with diagnostic clouds. More comprehensive schemes are provided by
+[NumericalRadiation.jl](https://github.com/NumericalEarth/NumericalRadiation.jl) through a
+package extension that is active as soon as both packages are loaded:
+
+- `ClearSkyEcCKDRadiation`: clear-sky correlated-k gas optics (ecCKD, the gas-optics models of
+  ECMWF's ecRad) with 32 or 64 longwave and 32, 64 or 96 shortwave g points, interpolated
+  from tabulated coefficients for every column. Longwave and shortwave are solved from one
+  gas-optics evaluation, with Rayleigh scattering in the shortwave. CO₂ follows the model's
+  greenhouse gases; ozone comes from an analytic default profile until SpeedyWeather has an
+  ozone field, other gases are prescribed with the scheme (`mole_fractions`).
+- `AnalyticBandLongwave`: NumericalRadiation's analytic 41-band clear-sky longwave scheme of
+  [Williams2026](@citet) for water vapour and CO₂, usable as it is as the longwave part of a
+  [`Radiation`](@ref); see its
+  [documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the
+  scheme's parameters.
+
+Both are NumericalRadiation's own scheme types, used like any other SpeedyWeather scheme; the
+extension adds constructors from a `SpectralGrid`. Add NumericalRadiation (version 0.1.1 or
+later) with `Pkg.add("NumericalRadiation")`:
+
+```julia
+using SpeedyWeather, NumericalRadiation
+
+spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+
+# ecCKD for both streams: the reference 32x32 model, or e.g. ClearSkyEcCKDRadiation(spectral_grid, "64x96")
+radiation = ClearSkyEcCKDRadiation(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; radiation)
+simulation = initialize!(model)
+run!(simulation, period = Day(10))
+simulation.variables.parameterizations.outgoing_longwave
+
+# or the analytic-band longwave next to the default one-band shortwave; keywords are the scheme's
+# parameters, e.g. the surface emissivities (SpeedyWeather has no field for them)
+longwave = AnalyticBandLongwave(spectral_grid; ocean_emissivity = 0.98, land_emissivity = 0.97)
+model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+```
+
+Both schemes take CO₂ from the model's `co2` component when present (see
+[Greenhouse gases](@ref)) and use 280 ppm otherwise.
+
+The first `ClearSkyEcCKDRadiation` downloads the ecCKD coefficient tables (a lazy artifact of
+NumericalRadiation). Its work arrays, optical depths per g point, interface fluxes and the
+surface emission, are parameterization variables in the `ecckd` namespace,
+`simulation.variables.parameterizations.ecckd`. The scheme is clear-sky, about 3x the cost
+of the one-band pair at T31 with 8 layers, and further gases of an ecCKD model are passed as
+`mole_fractions = (; ch4 = 1.8e-6)`; see NumericalRadiation's
+[documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the scheme.
+
+!!! warning "Work in progress"
+    NumericalRadiation is still in an early stage and not yet fully validated.
+
 ## Longwave radiation implementations
 
 Currently implemented is
@@ -96,9 +175,9 @@ To be used like (currently the default anyway)
 
 ```@example radiation
 spectral_grid = SpectralGrid()
-longwave_radiation = OneBandLongwave(spectral_grid)
-model = PrimitiveWetModel(spectral_grid; longwave_radiation)
-model.longwave_radiation
+longwave = OneBandLongwave(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+model.radiation.longwave
 ```
 
 The transmissivity is defined as in [Frierson2006](@citet)
@@ -133,7 +212,7 @@ around the sun. Both are controlled through the planet
 
 ```@example radiation
 using Dates
-spectral_grid = SpectralGrid(truncation=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 planet = Earth(spectral_grid, length_of_day=Hour(24), length_of_year=Day(365)+Hour(6))
 ```
 
@@ -339,7 +418,7 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 ```@example radiation
 using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(truncation=32, nlayers=8)
-model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
+model = PrimitiveWetModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave=OneBandShortwave(spectral_grid)))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
@@ -368,7 +447,7 @@ Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `Tra
 ```@example radiation
 using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(truncation=32, nlayers=8)
-model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
+model = PrimitiveDryModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave=OneBandGreyShortwave(spectral_grid), longwave=OneBandGreyLongwave(spectral_grid)))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
@@ -433,7 +512,7 @@ using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid()
 sw_no_sc = OneBandShortwave(spectral_grid, clouds = DiagnosticClouds(spectral_grid; use_stratocumulus=false))
 
-model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
+model = PrimitiveWetModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave=sw_no_sc))
 sim = initialize!(model)
 run!(sim, period=Day(5))
 ssrd = sim.variables.parameterizations.surface_shortwave_down

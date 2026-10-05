@@ -47,8 +47,9 @@ which is then used as
 ```julia
 using SpeedyWeather, ExternalPackage
 spectral_grid = SpectralGrid()
-longwave_radiation = Parameterization(spectral_grid, ExternalLongwave())
-model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+longwave = Parameterization(spectral_grid, ExternalLongwave())
+radiation = Radiation(spectral_grid; longwave)
+model = PrimitiveWetModel(spectral_grid; radiation)
 ```
 
 Types defined in extensions cannot be exported, so this avoids having to access

@@ -19,6 +19,9 @@ import SpeedyWeatherInternals.Architectures: GPU
 # runs on) — pass `gpu_graphs = true` explicitly to opt in.
 default_gpu_graphs(::AMDGPU.ROCBackend) = false
 
+# trim AMDGPU's memory pool, see `clear_fourier_graph_cache!`
+SpeedyTransforms.reclaim!(::GPU{<:AMDGPU.ROCBackend}) = (AMDGPU.reclaim(); nothing)
+
 # =====================================================================================
 # HIP GRAPHS ACCELERATION OF THE BATCHED FOURIER TRANSFORM
 #

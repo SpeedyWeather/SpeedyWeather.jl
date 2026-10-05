@@ -418,6 +418,18 @@ interpolate(londs, latds, field_in)
 but allows for a reuse of the interpolator. Note that the two output arrays are not exactly identical because we manually
 set our interpolator `interp` to use `Float32` for the interpolation whereas the default is `Float64`.
 
+### Horizontal and vertical interpolation
+
+`interpolate!` serves as a general front end for interpolating between grids. In the absence of any additional dimensions, it performs a horizontal interpolation and forwards to `interpolate_2D!`, which can also be called directly. For a 3D or higher-dimensional field this interpolates every layer horizontally onto the target grid, batched in a single kernel launch, but does not interpolate along the auxiliary axes: the output always has the same shape as the input in the trailing dimensions.
+
+```@example ringgrids
+field_in = rand(grid_in, 3)                     # 3 layers
+field_out = zeros(grid_out, 3)
+interp_3layers = RingGrids.interpolator(grid_out, grid_in)
+interpolate_2D!(field_out, field_in, interp_3layers)  # same as interpolate!(field_out, field_in, interp_3layers)
+nothing # hide
+```
+
 ## Anvil interpolator
 
 Currently the only interpolator implemented is a 4-point bilinear interpolator, which schematically works as follows.

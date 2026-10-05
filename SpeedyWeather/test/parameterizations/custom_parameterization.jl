@@ -102,8 +102,8 @@ SpeedyWeather.Parameterization(spectral_grid::SpectralGrid, scheme::ExternalCool
     # no method for types that aren't parameterizations
     @test_throws MethodError Parameterization(spectral_grid, 1)
 
-    model = PrimitiveDryModel(spectral_grid; longwave_radiation)
+    model = PrimitiveDryModel(spectral_grid; radiation = DryRadiation(spectral_grid; longwave = longwave_radiation))
     simulation = initialize!(model)
     run!(simulation, steps = 3)
-    @test simulation.model.longwave_radiation === longwave_radiation
+    @test simulation.model.radiation.longwave === longwave_radiation
 end
