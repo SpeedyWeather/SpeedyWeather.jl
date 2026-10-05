@@ -211,17 +211,19 @@ end
     nlayers = 4
     npoints = 20
     A = rand(NF, FullGaussianGrid(8), nlayers)
-    geometry = RingGrids.GridGeometry(A)
-    locator = RingGrids.AnvilLocator(NF, npoints, nlayers)
-    RingGrids.update_locator!(locator, geometry, 360 * rand(NF, npoints), 180 * rand(NF, npoints) .- 90)
+    interpolator = RingGrids.AnvilInterpolator(A.grid, npoints; NF, nlayers)
+    RingGrids.update_locator!(interpolator, 360 * rand(NF, npoints), 180 * rand(NF, npoints) .- 90)
+    (; locator, geometry) = interpolator
     positions = [TestParticle3D(σ) for σ in rand(NF, npoints)]
 
     σ_full = NF[0.1, 0.3, 0.6, 0.9]
     σ_half = NF[0, 0.2, 0.5, 0.7, 1]
     @testset for vertical in (SigmaCenter(σ_full), σ_full, SigmaFaceBelow(σ_half))
-        out1, out2 = zeros(NF, npoints), zeros(NF, npoints)
-        interpolate!(out1, A, locator, geometry, positions, vertical)
-        interpolate_3D!(out2, A, locator, geometry, positions, vertical)
-        @test out1 == out2
+        out1, out2, out3 = zeros(NF, npoints), zeros(NF, npoints), zeros(NF, npoints)
+        interpolate_3D!(out1, A, locator, geometry, positions, vertical)
+        interpolate!(out2, A, locator, geometry, positions, vertical)
+        interpolate!(out3, A, interpolator, positions, vertical)
+        @test out2 == out1
+        @test out3 == out1
     end
 end

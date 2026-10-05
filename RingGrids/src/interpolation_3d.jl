@@ -166,3 +166,15 @@ interpolate!(
     positions::AbstractVector,
     vertical::Union{AbstractVerticalStaggering, AbstractVector},
 ) = interpolate_3D!(Aout, A, locator, geometry, positions, vertical)
+
+"""$(TYPEDSIGNATURES)
+As above with an `interpolator` bundling `locator` and `geometry`, like the horizontal
+`interpolate!(Aout, A, interpolator)`. Create it with `nlayers` to have pole-average buffers for
+every layer of `A`, e.g. `AnvilInterpolator(grid, npoints; nlayers)`."""
+interpolate!(
+    Aout::AbstractVector,
+    A::AbstractField,
+    interpolator::AbstractInterpolator,
+    positions::AbstractVector,
+    vertical::Union{AbstractVerticalStaggering, AbstractVector},
+) = interpolate_3D!(Aout, A, interpolator.locator, interpolator.geometry, positions, vertical)
