@@ -28,6 +28,7 @@ julia --project=. manual_benchmarking.jl gpu            # CUDA GPU
 julia --project=. manual_benchmarking.jl amdgpu         # AMDGPU (HIP graphs forced on)
 julia --project=. manual_benchmarking.jl reactant-cpu   # Reactant on CPU
 julia --project=. manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU
+julia --project=. manual_benchmarking.jl --debug        # quick regression check: PrimitiveWet, T ≤ 128 only, not stored
 ```
 
 Each run updates only its own architecture's section in this `README.md`; results for other architectures are preserved via `benchmark_results.json`.
