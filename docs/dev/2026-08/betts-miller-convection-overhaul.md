@@ -1,11 +1,9 @@
 # Betts-Miller convection overhaul: branchless vertical loops, entrainment, convective snow
 
-> Status: **completed, with one open item**. Opened as
-> [PR #1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221). The full `Pkg.test`
-> run surfaces 2 JET dispatch-check failures in unrelated `Barotropic`/dynamics-core code,
-> bisected to a compilation-heuristic sensitivity rather than a logic defect (see Testing and
-> verification / Known limitations) — noted in the PR description for maintainer input rather
-> than resolved unilaterally, per user decision. This PR supersedes #976 (entrainment, by
+> Status: **completed**. Opened as
+> [PR #1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221). The 2 JET dispatch-check
+> failures in unrelated `Barotropic`/dynamics-core code (see Testing and verification / Known
+> limitations) no longer occur after merging `main` (2026-10-05). This PR supersedes #976 (entrainment, by
 > @nviebig) — commented on #976 linking here, per user decision. Note: the comment's wording
 > floated closing #976 in favor of #1221 while explicitly asking @nviebig first — #976 was
 > **not** actually closed via the API, only commented on; closing it remains a human call.
@@ -162,6 +160,12 @@ Base revision: `557b38d5` (`mc/convection`, off `main`)
   `cloud_cover`, both via the generic output path. `cloud_top` stays the layer index (not
   overwritten in place) so it has one meaning in every model setup; with `NoClouds` the two new
   variables don't exist and the outputs are skipped.
+
+- 2026-10-05: merged `main` (CHANGELOG conflict; the cloud top test adapted to the bundled
+  `model.radiation = Radiation(shortwave, longwave)` component of #1252). `dynamics/dispatch.jl`
+  (JET) now passes, closing the open item. Benchmarked the new defaults against `main` at
+  T32/T64/T128 L8 on CPU and GPU (NVIDIA L4): equal within noise except GPU T32 (~3-5% slower),
+  which is not caused by `LinearEntrainment` (same speed with `NoEntrainment`).
 
 ## Problem description
 
