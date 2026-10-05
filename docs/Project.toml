@@ -8,6 +8,7 @@ GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LowerTriangularArrays = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 RingGrids = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
 SpeedyTransforms = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
 SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
@@ -18,6 +19,7 @@ Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [sources]
 LowerTriangularArrays = {path = "../LowerTriangularArrays"}
+ProgressMeter = {url = "https://github.com/milankl-claude/ProgressMeter.jl", rev = "mc/modular-progress-callbacks"}
 RingGrids = {path = "../RingGrids"}
 SpeedyTransforms = {path = "../SpeedyTransforms"}
 SpeedyWeather = {path = "../SpeedyWeather"}
