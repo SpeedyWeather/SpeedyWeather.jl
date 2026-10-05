@@ -57,6 +57,15 @@ Base revision: e82b41763d831f2356ad4e661650f426ab9762ff
   `vertical_courant_number` and `default_elements()` (no argument). `Feedback.elements` defaults to
   `ProgressElements.default_elements()`; `showspeed`, `show_time`, `show_umax`,
   `show_temperature_range` are removed.
+- 2026-10-05: "Can you rewrite the VerticalCourantNumber to avoid allocations? Can you use a vertical
+  scratch vector for the `maximum` call? And given the smoothness of sigma, I'd probably not bother
+  checking for both above and below but just estimate by using one [...] mark this points as comments".
+  `VerticalCourantNumber` declares a `Vertical1D` scratch variable (`vars.scratch.vertical_velocity_maximum`,
+  collected via `variables(::Feedback)` from its elements); `bind_element` stores a 1×nlayers reshape of
+  it, a CPU buffer and Δσ on the CPU. `vertical_courant_number!` reduces with
+  `maximum!(abs, w_max, w.data; init = false)`, copies to the CPU and uses only the interface below each
+  layer. Allocation-free on CPU (tested); on CUDA the reduction leaves a 64 B device temporary from
+  GPUArrays plus the host allocations of the kernel launch.
 
 ## Problem description
 

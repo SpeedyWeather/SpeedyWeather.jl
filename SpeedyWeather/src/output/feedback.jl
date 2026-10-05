@@ -38,6 +38,9 @@ $(TYPEDFIELDS)"""
     nans_detected::Bool = false
 end
 
+# variables needed by the elements of the progress line, e.g. the scratch vector of `VerticalCourantNumber`
+variables(feedback::Feedback) = Tuple(Iterators.flatten(map(variables, feedback.elements)))
+
 """
 $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""

@@ -53,20 +53,29 @@ end
         @test occursin("Cᵥ = ", line)
         @test occursin("m/s", line)
         @test occursin("˚C", line)
-        courant = ProgressElements.vertical_courant_number(
-            simulation.variables.dynamics.w, model.geometry.σ_levels_thick, model.time_stepping.Δt
-        )
+        # the vertical scratch vector is allocated for the element, the redraw doesn't allocate
+        element = p.elements[end]
+        @test element.w_max isa AbstractMatrix && size(element.w_max) == (1, spectral_grid.nlayers)
+        (; w) = simulation.variables.dynamics
+        Δt = Float64(model.time_stepping.Δt)
+        courant = ProgressElements.vertical_courant_number!(element.w_max, element.w_max_cpu, w, element.Δσ, Δt)
         @test courant > 0 && isfinite(courant)
+        # measure inside a function, a call from the testset scope is a dynamic dispatch that allocates
+        allocations(e, w, Δt) = @allocated ProgressElements.vertical_courant_number!(e.w_max, e.w_max_cpu, w, e.Δσ, Δt)
+        allocations(element, w, Δt)
+        @test allocations(element, w, Δt) == 0
 
         # hand-computed for a single column with σ̇ = 1/s at the interfaces, Δσ = 0.25
         w = zeros(Float32, spectral_grid.grid, 4)
+        w_max, w_max_cpu = zeros(Float32, 1, 4), zeros(Float32, 4)
         w.data[:, 1:3] .= 1
-        @test ProgressElements.vertical_courant_number(w, fill(0.25f0, 4), 10) ≈ 40
+        @test ProgressElements.vertical_courant_number!(w_max, w_max_cpu, w, fill(0.25f0, 4), 10) ≈ 40
 
-        # the interface above layer 2 (σ̇ = 1/s) with the thin Δσ = 0.1 of layer 2 dominates
+        # only the interface below each layer is used: σ̇ = -1/s between layers 1 and 2 counts for
+        # layer 1 (Δσ = 0.5) but not for the thinner layer 2 (Δσ = 0.1) below it
         w.data .= 0
-        w.data[:, 1] .= 1
-        @test ProgressElements.vertical_courant_number(w, Float32[0.5, 0.1, 0.2, 0.2], 10) ≈ 100
+        w.data[:, 1] .= -1
+        @test ProgressElements.vertical_courant_number!(w_max, w_max_cpu, w, Float32[0.5, 0.1, 0.2, 0.2], 10) ≈ 20
 
         # bound elements hold the Variables but print compactly
         @test repr(p.elements[end]) == "VerticalCourantNumber()"

@@ -17,6 +17,7 @@ using DocStringExtensions: TYPEDSIGNATURES
 import Dates
 import Printf: @sprintf
 import ProgressMeter
+import ..SpeedyWeather: variables, ScratchVariable, Vertical1D
 import ProgressMeter.Elements: AbstractProgressElement, print_element, Colored, Description,
     Percentage, Bar, ETA, Speed, ElapsedTime, Counter
 
@@ -115,45 +116,65 @@ function print_element(element::TemperatureRange, p)
 end
 
 """$(TYPEDSIGNATURES)
-Progress line element that shows the maximum vertical Courant number
+Progress line element that shows an estimate of the maximum vertical Courant number
 `max(|σ̇| Δt / Δσ)` over all grid points and layers, with σ̇ the vertical velocity in σ coordinates
-at the layer interfaces, Δσ the layer thickness and Δt the time step. Shows nothing for models
-without vertical velocity `vars.dynamics.w`. Not part of the default layout, add it with
+at the layer interfaces, Δσ the layer thickness and Δt the time step. It is meant to indicate how
+close the simulation is to the vertical stability limit, not to be exact, see
+[`vertical_courant_number!`](@ref). Shows nothing for models without vertical velocity
+`vars.dynamics.w`. Not part of the default layout, add it with
 
 ```julia
 Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))
 ```"""
-struct VerticalCourantNumber{V, T} <: AbstractSimulationElement
+struct VerticalCourantNumber{V, W, C, S} <: AbstractSimulationElement
     vars::V
-    Δσ::T
+    w_max::W            # 1×nlayers view on the vertical scratch vector, maximum |σ̇| per interface
+    w_max_cpu::C        # copy of w_max on the CPU
+    Δσ::S               # layer thickness on the CPU
     Δt::Float64
 end
-VerticalCourantNumber() = VerticalCourantNumber(nothing, nothing, 0.0)
+VerticalCourantNumber() = VerticalCourantNumber(nothing, nothing, nothing, nothing, 0.0)
+
+# vertical scratch vector the horizontal maximum of |σ̇| is reduced into, avoids allocating on redraw
+variables(::VerticalCourantNumber) = (
+    ScratchVariable(:vertical_velocity_maximum, Vertical1D(), desc = "Maximum |σ̇| per layer interface for the vertical Courant number", units = "1/s"),
+)
 
 function bind_element(::VerticalCourantNumber, vars, model)
-    hasproperty(model, :geometry) || return VerticalCourantNumber()
-    return VerticalCourantNumber(vars, model.geometry.σ_levels_thick, Float64(model.time_stepping.Δt))
+    hasproperty(vars.dynamics, :w) || return VerticalCourantNumber()
+    # reshape once here (it allocates a wrapper) to reduce over the horizontal of w (npoints × nlayers)
+    w_max = reshape(vars.scratch.vertical_velocity_maximum, 1, :)
+    w_max_cpu = zeros(eltype(w_max), length(w_max))
+    Δσ = Array(model.geometry.σ_levels_thick)
+    return VerticalCourantNumber(vars, w_max, w_max_cpu, Δσ, Float64(model.time_stepping.Δt))
 end
 print_element(::VerticalCourantNumber{Nothing}, p) = ""
 
 function print_element(element::VerticalCourantNumber, p)
-    hasproperty(element.vars.dynamics, :w) || return ""
-    scale = element.vars.prognostic.scale[]     # divergence, hence w, is scaled by the radius in the dynamical core
-    return @sprintf ", Cᵥ = %.2f" vertical_courant_number(element.vars.dynamics.w, element.Δσ, element.Δt / scale)
+    (; vars, w_max, w_max_cpu, Δσ, Δt) = element
+    scale = vars.prognostic.scale[]     # divergence, hence w, is scaled by the radius in the dynamical core
+    return @sprintf ", Cᵥ = %.2f" vertical_courant_number!(w_max, w_max_cpu, vars.dynamics.w, Δσ, Δt / scale)
 end
 
 """$(TYPEDSIGNATURES)
-Maximum vertical Courant number of layer `k`, `max(|σ̇ₖ₊₁/₂|, |σ̇ₖ₋₁/₂|) Δt / Δσₖ`, over all layers
-and grid points. `w` is the vertical velocity at the layer interfaces `k+1/2` (zero at the surface),
-`Δσ` the layer thickness. Pass `Δt / scale` if `w` is radius-scaled as in the dynamical core."""
-function vertical_courant_number(w, Δσ, Δt)
-    # maximum |σ̇| per interface k+1/2 reduced on the device, then loop over the few layers on the CPU
-    w_max = vec(Array(maximum(abs, w.data, dims = 1)))
-    Δσ_cpu = Array(Δσ)
-    courant = zero(eltype(w_max))
-    for k in eachindex(Δσ_cpu)
-        w_above = k > 1 ? w_max[k - 1] : zero(courant)     # σ̇ = 0 at the top k = 1/2
-        courant = max(courant, max(w_max[k], w_above) / Δσ_cpu[k])
+Estimate of the maximum vertical Courant number `|σ̇ₖ₊₁/₂| Δt / Δσₖ` over all layers `k` and grid
+points, without allocations. `w` is the vertical velocity σ̇ at the layer interfaces `k+1/2`, `Δσ` the
+layer thickness (on the CPU). `w_max` (1×nlayers, on the device of `w`) and `w_max_cpu` (on the CPU)
+are preallocated buffers. Pass `Δt / scale` if `w` is radius-scaled as in the dynamical core."""
+function vertical_courant_number!(w_max, w_max_cpu, w, Δσ, Δt)
+    # maximum |σ̇| per interface k+1/2 over the horizontal, reduced on the device into the scratch
+    # vector, starting from zero (init = false) as |σ̇| ≥ 0
+    fill!(w_max, 0)
+    maximum!(abs, w_max, w.data; init = false)
+    copyto!(w_max_cpu, w_max)           # only nlayers values, loop over them on the CPU
+
+    courant = zero(eltype(w_max_cpu))
+    for k in eachindex(w_max_cpu, Δσ)
+        # Only the interface below layer k (k+1/2) is used, not also the one above (k-1/2).
+        # σ levels vary smoothly so neighbouring layers have similar Δσ, and this is only meant to
+        # indicate how close the simulation is to the vertical stability limit, not to be exact.
+        # (σ̇ = 0 at the surface, so the bottom layer is only seen through the layer above it.)
+        courant = max(courant, w_max_cpu[k] / Δσ[k])
     end
     return Δt * courant
 end
