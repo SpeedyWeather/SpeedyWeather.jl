@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Progress line built from `ProgressMeter.AbstractProgressElement`s (`SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`, new optional `VerticalCourantNumber`) via `Feedback(elements = ...)`, removes the `ProgressMeter.speedstring` type piracy and `FEEDBACK_*` globals. Depends on [ProgressMeter.jl#369](https://github.com/timholy/ProgressMeter.jl/pull/369) [#1297](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1297)
 - AMD GPU CI is only run on `main` [#1296](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1296)
 - Batched interpolation for multi-dimensional `Field`s, horizontal interpolation now named `interpolate_2D!` forwarded from `interpolate!` [#1263](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1263)
 - Restrict `DocumenterCitations` compat to fix citations in docs [#1292](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1292)
