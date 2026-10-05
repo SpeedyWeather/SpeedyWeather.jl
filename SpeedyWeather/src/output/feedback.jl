@@ -30,6 +30,9 @@ $(TYPEDFIELDS)"""
     `Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))`"""
     elements::Tuple = ProgressElements.default_elements()
 
+    "[OPTION] Separator in front of the elements showing a diagnostic of the simulation"
+    separator::String = ", "
+
     "[DERIVED] struct containing everything progress related"
     progress_meter::ProgressMeter.Progress =
         ProgressMeter.Progress(1, enabled = verbose)
@@ -53,7 +56,7 @@ function initialize!(feedback::Feedback, variables::Variables, model::AbstractMo
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
     # only do now for benchmark accuracy
     (; description, verbose, feedback_dt) = feedback
-    elements = map(element -> ProgressElements.bind_element(element, variables, model), feedback.elements)
+    elements = ProgressElements.bind_elements(feedback.elements, variables, model; feedback.separator)
     desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
     feedback.progress_meter = ProgressMeter.Progress(
         clock.n_steps;          # use time stepper steps (regardless Δt) not time steps of size Δt

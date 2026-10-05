@@ -49,10 +49,10 @@ end
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
         p = model.feedback.progress_meter
-        line = join(map(e -> ProgressElements.print_element(e, p), p.elements[5:end]))
-        @test occursin("Cᵥ = ", line)
-        @test occursin("m/s", line)
-        @test occursin("˚C", line)
+        line = join(map(e -> ProgressElements.print_element(e, p), p.elements))
+        # the simulation elements are separated by ", ", also the appended one
+        @test occursin(r"ETA: .*, \d{4}-\d\d-\d\d, .*/day, +\d+ m/s, \[ *-?\d+, +-?\d+\] ˚C, Cᵥ = \d", line)
+        @test !occursin("(", line)
         # the vertical scratch vector is allocated for the element, the redraw doesn't allocate
         element = p.elements[end]
         @test element.w_max isa AbstractMatrix && size(element.w_max) == (1, spectral_grid.nlayers)
@@ -81,12 +81,20 @@ end
         @test repr(p.elements[end]) == "VerticalCourantNumber()"
     end
 
-    @testset "barotropic has no temperature/Courant" begin
-        model = BarotropicModel(SpectralGrid(truncation = 15, nlayers = 1); feedback = Feedback(verbose = false, elements = (ProgressElements.VerticalCourantNumber(), ProgressElements.TemperatureRange())))
+    @testset "barotropic leaves out temperature/Courant, separators" begin
+        (; Description, Percentage, SimulationTime, MaximumWindSpeed, TemperatureRange, VerticalCourantNumber) = ProgressElements
+        elements = (Description(), Percentage(), VerticalCourantNumber(), SimulationTime(), TemperatureRange(), MaximumWindSpeed())
+        model = BarotropicModel(SpectralGrid(truncation = 15, nlayers = 1); feedback = Feedback(; verbose = false, elements, separator = " | "))
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
-        p = model.feedback.progress_meter
-        @test all(e -> ProgressElements.print_element(e, p) == "", p.elements)
+        bound = model.feedback.progress_meter.elements
+        @test bound[1] isa Description && bound[2] isa Percentage
+        @test bound[3] == " | " && bound[4] isa SimulationTime && bound[5] == " | " && bound[6] isa MaximumWindSpeed
+        @test length(bound) == 6
+
+        # no separator after only the description or strings
+        bound = ProgressElements.bind_elements((Description(), "[", SimulationTime(), MaximumWindSpeed()), simulation.variables, model)
+        @test bound[2] == "[" && bound[3] isa SimulationTime && bound[4] == ", " && bound[5] isa MaximumWindSpeed
     end
 end
 

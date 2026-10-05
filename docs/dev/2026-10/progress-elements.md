@@ -66,6 +66,15 @@ Base revision: e82b41763d831f2356ad4e661650f426ab9762ff
   `maximum!(abs, w_max, w.data; init = false)`, copies to the CPU and uses only the interface below each
   layer. Allocation-free on CPU (tested); on CUDA the reduction leaves a 64 B device temporary from
   GPUArrays plus the host allocations of the kernel launch.
+- 2026-10-05: "The current wrapping of additional progress elements into parentheses ( ... ) was only
+  introduced because of the hacky way to overload the `speedstring` function with type piracy, can you
+  redesign the concatenation of elements into something better?" SpeedyWeather's elements print only
+  their value (no leading `", "`, `SimulationSpeed` lost its `separator` field). New
+  `ProgressElements.bind_elements` binds the elements, leaves out those that do not apply to the model
+  (`bind_element` returns `nothing`, e.g. `TemperatureRange` in `BarotropicModel`) and puts the new
+  `Feedback.separator` (default `", "`) in front of every `AbstractSimulationElement` that follows an
+  element showing something. The default layout has no parentheses, so appended elements such as
+  `VerticalCourantNumber` are separated the same way.
 
 ## Problem description
 

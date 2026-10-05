@@ -22,18 +22,41 @@ import ProgressMeter.Elements: AbstractProgressElement, print_element, Colored, 
     Percentage, Bar, ETA, Speed, ElapsedTime, Counter
 
 export AbstractProgressElement, print_element, Colored, Description, Percentage, Bar, ETA, Speed,
-    ElapsedTime, Counter, SimulationTime, SimulationSpeed, MaximumWindSpeed, TemperatureRange,
+    ElapsedTime, Counter, AbstractSimulationElement, SimulationTime, SimulationSpeed, MaximumWindSpeed, TemperatureRange,
     VerticalCourantNumber, default_elements
 
 # Elements of the progress line. They are created unbound, e.g. `VerticalCourantNumber()`, and
 # `bind_element` returns a copy that holds what it needs from the simulation (`Variables`, time
-# step, ...) in `initialize!(::Feedback, ...)`. `print_element` is only called when the progress
-# meter is redrawn, so diagnostics are only computed when they are displayed.
+# step, ...) in `initialize!(::Feedback, ...)`, or `nothing` if the element does not apply to the
+# model, it is then left out of the line. `print_element` is only called when the progress meter
+# is redrawn, so diagnostics are only computed when they are displayed. Simulation elements print
+# only their value, the separators between them are added by `bind_elements`.
 
+"""Supertype of the elements that show a diagnostic of the simulation. They are separated from
+the elements before them by the `separator` of `Feedback`, see [`bind_elements`](@ref)."""
 abstract type AbstractSimulationElement <: AbstractProgressElement end
 
 # elements that do not need anything from the simulation are their own bound version
 bind_element(element, vars, model) = element
+
+"""$(TYPEDSIGNATURES)
+Bind `elements` to the simulation (`vars`, `model`), leave out those that do not apply to the
+model (`bind_element` returns `nothing`, e.g. `TemperatureRange` without temperature) and put
+`separator` in front of every simulation element (`AbstractSimulationElement`) that follows an
+element showing something. ProgressMeter's elements and strings are kept as they are, the
+description and strings alone do not cause a separator. Returns a tuple of the bound elements."""
+function bind_elements(elements::Tuple, vars, model; separator::AbstractString = ", ")
+    line = Any[]
+    shows_value = false     # has an element other than the description or strings been added yet?
+    for element in elements
+        bound = bind_element(element, vars, model)
+        isnothing(bound) && continue
+        bound isa AbstractSimulationElement && shows_value && push!(line, separator)
+        push!(line, bound)
+        shows_value |= !(bound isa Union{AbstractString, Description})
+    end
+    return Tuple(line)
+end
 
 # bound elements hold the `Variables`, don't print them
 Base.show(io::IO, element::AbstractSimulationElement) = print(io, nameof(typeof(element)), "()")
@@ -50,16 +73,16 @@ print_element(::SimulationTime{Nothing}, p) = ""
 
 """$(TYPEDSIGNATURES)
 Progress line element that shows the simulation speed, e.g. in simulated years per day,
-which needs the time step `Δt` [s]. `separator` is printed in front."""
-@kwdef struct SimulationSpeed <: AbstractSimulationElement
-    separator::String = ", "
-    Δt::Float64 = 0.0
+which needs the time step `Δt` [s]."""
+struct SimulationSpeed <: AbstractSimulationElement
+    Δt::Float64
 end
-bind_element(element::SimulationSpeed, vars, model) = SimulationSpeed(element.separator, Float64(model.time_stepping.Δt))
+SimulationSpeed() = SimulationSpeed(0.0)
+bind_element(::SimulationSpeed, vars, model) = SimulationSpeed(Float64(model.time_stepping.Δt))
 
 function print_element(element::SimulationSpeed, p)
     sec_per_iter = (p.tcurrent - p.tinit) / max(1, p.counter - p.start)
-    return element.separator * speedstring(sec_per_iter, element.Δt)
+    return speedstring(sec_per_iter, element.Δt)
 end
 
 """$(TYPEDSIGNATURES)
@@ -85,34 +108,32 @@ end
 
 """$(TYPEDSIGNATURES)
 Progress line element that shows the maximum absolute zonal wind `|u|` [m/s] of the current grid-space `u`.
-Shows nothing if the model has no `u`."""
+Left out if the model has no `u`."""
 struct MaximumWindSpeed{V} <: AbstractSimulationElement
     vars::V
 end
 MaximumWindSpeed() = MaximumWindSpeed(nothing)
-bind_element(::MaximumWindSpeed, vars, model) = MaximumWindSpeed(vars)
+bind_element(::MaximumWindSpeed, vars, model) = hasproperty(vars.grid, :u) ? MaximumWindSpeed(vars) : nothing
 print_element(::MaximumWindSpeed{Nothing}, p) = ""
 
 function print_element(element::MaximumWindSpeed, p)
-    hasproperty(element.vars.grid, :u) || return ""
     umin, umax = extrema(element.vars.grid.u)
-    return @sprintf ", %3d m/s" max(abs(umin), abs(umax))
+    return @sprintf "%3d m/s" max(abs(umin), abs(umax))
 end
 
 """$(TYPEDSIGNATURES)
 Progress line element that shows the range of the grid-space temperature in ˚C.
-Shows nothing if the model has no `temperature`."""
+Left out if the model has no `temperature`."""
 struct TemperatureRange{V} <: AbstractSimulationElement
     vars::V
 end
 TemperatureRange() = TemperatureRange(nothing)
-bind_element(::TemperatureRange, vars, model) = TemperatureRange(vars)
+bind_element(::TemperatureRange, vars, model) = hasproperty(vars.grid, :temperature) ? TemperatureRange(vars) : nothing
 print_element(::TemperatureRange{Nothing}, p) = ""
 
 function print_element(element::TemperatureRange, p)
-    hasproperty(element.vars.grid, :temperature) || return ""
     tmin, tmax = extrema(element.vars.grid.temperature)
-    return @sprintf ", [%4d, %4d] ˚C" tmin - 273.15f0 tmax - 273.15f0
+    return @sprintf "[%4d, %4d] ˚C" tmin - 273.15f0 tmax - 273.15f0
 end
 
 """$(TYPEDSIGNATURES)
@@ -120,7 +141,7 @@ Progress line element that shows an estimate of the maximum vertical Courant num
 `max(|σ̇| Δt / Δσ)` over all grid points and layers, with σ̇ the vertical velocity in σ coordinates
 at the layer interfaces, Δσ the layer thickness and Δt the time step. It is meant to indicate how
 close the simulation is to the vertical stability limit, not to be exact, see
-[`vertical_courant_number!`](@ref). Shows nothing for models without vertical velocity
+[`vertical_courant_number!`](@ref). Left out for models without vertical velocity
 `vars.dynamics.w`. Not part of the default layout, add it with
 
 ```julia
@@ -141,7 +162,7 @@ variables(::VerticalCourantNumber) = (
 )
 
 function bind_element(::VerticalCourantNumber, vars, model)
-    hasproperty(vars.dynamics, :w) || return VerticalCourantNumber()
+    hasproperty(vars.dynamics, :w) || return nothing
     # reshape once here (it allocates a wrapper) to reduce over the horizontal of w (npoints × nlayers)
     w_max = reshape(vars.scratch.vertical_velocity_maximum, 1, :)
     w_max_cpu = zeros(eltype(w_max), length(w_max))
@@ -153,7 +174,7 @@ print_element(::VerticalCourantNumber{Nothing}, p) = ""
 function print_element(element::VerticalCourantNumber, p)
     (; vars, w_max, w_max_cpu, Δσ, Δt) = element
     scale = vars.prognostic.scale[]     # divergence, hence w, is scaled by the radius in the dynamical core
-    return @sprintf ", Cᵥ = %.2f" vertical_courant_number!(w_max, w_max_cpu, vars.dynamics.w, Δσ, Δt / scale)
+    return @sprintf "Cᵥ = %.2f" vertical_courant_number!(w_max, w_max_cpu, vars.dynamics.w, Δσ, Δt / scale)
 end
 
 """$(TYPEDSIGNATURES)
@@ -180,11 +201,11 @@ function vertical_courant_number!(w_max, w_max_cpu, w, Δσ, Δt)
 end
 
 """$(TYPEDSIGNATURES)
-Default elements of the progress line of a `Feedback`: description, percentage, bar, ETA and in
-parentheses the simulation date, simulation speed, maximum wind speed and temperature range."""
+Default elements of the progress line of a `Feedback`: description, percentage, bar, ETA,
+simulation date, simulation speed, maximum wind speed and temperature range."""
 default_elements() = (
-    Description(), Percentage(), Bar(), ETA(), " (",
-    SimulationTime(), SimulationSpeed(), MaximumWindSpeed(), TemperatureRange(), ")",
+    Description(), Percentage(), Bar(), ETA(),
+    SimulationTime(), SimulationSpeed(), MaximumWindSpeed(), TemperatureRange(),
 )
 
 end # module ProgressElements
