@@ -15,8 +15,9 @@ the vertical velocity in ``\sigma`` coordinates. Both are supported, selected vi
 [`ParticleAdvection2D`](@ref) or [`ParticleAdvection3D`](@ref) respectively, see
 [3D particle advection](@ref) below. With `ParticleAdvection2D` in the
 [Primitive equation model](@ref primitive_equation_model) the vertical layer on which the advection
-takes place has to be specified. Particles are therefore not advected with the vertical velocity
-but maintain a constant pressure ratio compared to the surface pressure (``\sigma`` is constant). 
+takes place is chosen with the `layer` keyword (default `layer = 1`, the topmost layer). Particles
+are therefore not advected with the vertical velocity but maintain a constant pressure ratio
+compared to the surface pressure (``\sigma`` is constant).
 (See also [Tracer advection](@ref) for advecting continuous fields instead of individual particles.)
 
 ## Discretization of particle advection
@@ -111,7 +112,10 @@ In addition to being advected horizontally on a fixed model layer
 ([`ParticleAdvection2D`](@ref)), particles can also be advected freely in the vertical
 ([`ParticleAdvection3D`](@ref)). Instead of keeping ``\sigma`` fixed, a particle's ``\sigma``
 coordinate now evolves in time too, driven by the model's (diagnostic) vertical velocity, in
-exactly the same way as longitude and latitude evolve with ``u`` and ``v``. This is currently
+exactly the same way as longitude and latitude evolve with ``u`` and ``v``. As in the horizontal,
+the radius scaling is moved into the time step: the model stores the vertical velocity as
+``w = R\dot{\sigma}`` (radius-scaled like vorticity and divergence, see
+[Radius scaling](@ref scaling)), so a particle moves by ``\Delta\sigma = w \Delta t / R``. This is currently
 only available for the [Primitive equation model](@ref primitive_equation_model)s
 (`PrimitiveDryModel`, `PrimitiveWetModel`) as it requires a vertically-resolved, diagnosed
 vertical velocity; `BarotropicModel` and `ShallowWaterModel` have no such concept and continue
@@ -124,9 +128,9 @@ Wind is only known on the model's discrete ``\sigma`` levels, so a particle's co
 and latitude are translated into the horizontal (4-point "anvil") interpolation described above.
 This is done in two steps:
 
-1. Find the two neighbouring model levels that bracket the particle's ``\sigma``. If a particle
-   has drifted above the topmost or below the bottommost level, it is pinned to that level
-   instead of extrapolating beyond it.
+1. Find the two neighbouring model levels that bracket the particle's ``\sigma``. If the particle
+   is above the topmost or below the bottommost level, the value on that level is used instead
+   of extrapolating beyond it.
 2. Interpolate horizontally onto each of these two levels separately, using exactly the same
    4-point anvil interpolation as for `ParticleAdvection2D`, then linearly blend the two
    resulting values by how far the particle's ``\sigma`` lies between the two levels.
@@ -141,10 +145,10 @@ every model level instead of once for a single 2D field.
 The horizontal and vertical directions are treated quite differently for performance reasons.
 Locating a particle within the horizontal grid ([`RingGrids.update_locator!`](@ref)) is relatively
 expensive, it searches through the rings of latitude and, within a ring, through its longitudes,
-so it is precomputed once per advection step and the resulting grid indices and interpolation
-weights are reused for every interpolation that follows (``u``, ``v``, ``w``, and both the
-predictor and the corrector half-step of Heun's method) until the particle's horizontal position
-is updated again. Locating a particle's vertical bracket, on the other hand, is cheap: a short
+so it is computed once for every new horizontal position of the particles, i.e. twice per
+advection step (at the predicted and at the corrected position of Heun's method), and the
+resulting grid indices and interpolation weights are reused for all fields interpolated at that
+position (``u``, ``v`` and ``w``). Locating a particle's vertical bracket, on the other hand, is cheap: a short
 scan through as few as a handful of ``\sigma`` levels, so it is simply recomputed on the fly every
 time a value is interpolated, with no separate precompute or storage step.
 
@@ -158,9 +162,12 @@ points). Some consequences:
 - Because the same horizontal indices and weights are reused for both bracketing ``\sigma``
   levels, horizontal and vertical location are decoupled: the (horizontal) locator does not
   depend on ``\sigma`` and is reused for all levels and for fields on full and half levels alike.
-- As with the horizontal scheme, particles are pinned rather than extrapolated at the edges of
-  the ``\sigma`` range, so they cannot leave the atmosphere through the model top, or fall through
-  the surface; instead they continue to be advected along the topmost or bottommost level.
+- Above the topmost and below the bottommost full level, ``u`` and ``v`` are taken from that
+  level rather than extrapolated. The particle's ``\sigma`` itself is not held there: it keeps
+  moving with ``w``, which lives on the half levels spanning the whole column
+  ``0 \leq \sigma \leq 1`` and vanishes at ``\sigma = 0`` and ``\sigma = 1``. Together with
+  ``\sigma`` being clamped to ``[0, 1]`` after every step, particles therefore cannot leave the
+  atmosphere through the model top or fall through the surface.
 
 ### Interface example
 
