@@ -94,8 +94,8 @@ end
 
 @testset "Diagnostic cloud top at level of maximum relative humidity" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
-    model = PrimitiveWetModel(spectral_grid; shortwave_radiation = OneBandShortwave(spectral_grid))
-    initialize!(model.shortwave_radiation, model)
+    model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; shortwave = OneBandShortwave(spectral_grid)))
+    initialize!(model.radiation, model)
     vars = Variables(model)
     init_shortwave_state!(vars, model)
 
@@ -112,7 +112,7 @@ end
     end
 
     # layer 1 (top) and 8 (surface) excluded, so maximum in layer 5 not the highest layer above rh_min
-    clouds_state = SpeedyWeather.clouds!(ij, vars, model.shortwave_radiation.clouds, model)
+    clouds_state = SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model)
     @test clouds_state.cloud_top == 5
     @test clouds_state.cloud_cover ≈ ((0.95 - 0.3) / (1 - 0.3))^2 rtol = 1.0e-4
 
@@ -123,12 +123,12 @@ end
 
     # precipitation cloud top higher than humidity cloud top wins
     vars.parameterizations.cloud_top[ij] = 3
-    @test SpeedyWeather.clouds!(ij, vars, model.shortwave_radiation.clouds, model).cloud_top == 3
+    @test SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model).cloud_top == 3
     @test vars.parameterizations.cloud_top_height[ij] == vars.dynamics.geopotential[ij, 3] / g
 
     # no cloud: height 0
     vars.grid.humidity[ij, :, :] .= 0
     vars.parameterizations.cloud_top[ij] = 9
-    @test SpeedyWeather.clouds!(ij, vars, model.shortwave_radiation.clouds, model).cloud_top == 9
+    @test SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model).cloud_top == 9
     @test vars.parameterizations.cloud_top_height[ij] == 0
 end
