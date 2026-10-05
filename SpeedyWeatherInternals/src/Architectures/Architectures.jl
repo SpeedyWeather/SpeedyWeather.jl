@@ -141,7 +141,7 @@ nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_
 nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not specified, return SubArray
 
 # Tupled implementation
-on_architecture(arch::AbstractArchitecture, t::Tuple) = Tuple(on_architecture(arch, elem) for elem in t)
+on_architecture(arch::AbstractArchitecture, t::Tuple) = map(elem -> on_architecture(arch, elem), t)   # map (not a generator) keeps the element types inferred
 on_architecture(arch::AbstractArchitecture, nt::NamedTuple) = NamedTuple{keys(nt)}(on_architecture(arch, Tuple(nt)))
 
 # pass-through for types that don't need architecture transfer
