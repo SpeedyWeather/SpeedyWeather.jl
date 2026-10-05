@@ -207,6 +207,7 @@ include("parameterizations/land/rivers.jl")
 # OUTPUT
 include("output/schedule.jl")
 include("output/callbacks.jl")
+include("output/progress_elements.jl")
 include("output/feedback.jl")
 include("output/vertical_interpolation.jl")
 include("output/writers/general.jl")

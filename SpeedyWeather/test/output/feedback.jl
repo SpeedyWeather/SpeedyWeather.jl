@@ -35,23 +35,25 @@ end
 
     @testset "default elements" begin
         feedback = Feedback(verbose = false)
-        elements = default_elements(feedback)
-        @test any(e -> e isa SimulationSpeed, elements)
-        @test !any(e -> e isa VerticalCourantNumber, elements)
-        @test length(default_elements(Feedback(showspeed = false))) == 4
+        @test feedback.elements == ProgressElements.default_elements()
+        @test any(e -> e isa ProgressElements.SimulationSpeed, feedback.elements)
+        @test !any(e -> e isa ProgressElements.VerticalCourantNumber, feedback.elements)
+        # ProgressMeter's generic elements are available under ProgressElements too
+        @test ProgressElements.Bar === SpeedyWeather.ProgressMeter.Elements.Bar
+        @test !hasfield(Feedback, :showspeed) && !hasfield(Feedback, :show_umax)
     end
 
     @testset "elements on redraw, VerticalCourantNumber" begin
-        feedback = Feedback(verbose = false, elements = (default_elements(Feedback())..., VerticalCourantNumber()))
+        feedback = Feedback(verbose = false, elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))
         model = PrimitiveDryModel(spectral_grid; feedback)
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
         p = model.feedback.progress_meter
-        line = join(map(e -> SpeedyWeather.ProgressMeter.Elements.print_element(e, p), p.elements[5:end]))
+        line = join(map(e -> ProgressElements.print_element(e, p), p.elements[5:end]))
         @test occursin("Cᵥ = ", line)
         @test occursin("m/s", line)
         @test occursin("˚C", line)
-        courant = SpeedyWeather.vertical_courant_number(
+        courant = ProgressElements.vertical_courant_number(
             simulation.variables.dynamics.w, model.geometry.σ_levels_thick, model.time_stepping.Δt
         )
         @test courant > 0 && isfinite(courant)
@@ -59,22 +61,33 @@ end
         # hand-computed for a single column with σ̇ = 1/s at the interfaces, Δσ = 0.25
         w = zeros(Float32, spectral_grid.grid, 4)
         w.data[:, 1:3] .= 1
-        @test SpeedyWeather.vertical_courant_number(w, fill(0.25f0, 4), 10) ≈ 40
+        @test ProgressElements.vertical_courant_number(w, fill(0.25f0, 4), 10) ≈ 40
 
         # the interface above layer 2 (σ̇ = 1/s) with the thin Δσ = 0.1 of layer 2 dominates
         w.data .= 0
         w.data[:, 1] .= 1
-        @test SpeedyWeather.vertical_courant_number(w, Float32[0.5, 0.1, 0.2, 0.2], 10) ≈ 100
+        @test ProgressElements.vertical_courant_number(w, Float32[0.5, 0.1, 0.2, 0.2], 10) ≈ 100
 
         # bound elements hold the Variables but print compactly
         @test repr(p.elements[end]) == "VerticalCourantNumber()"
     end
 
     @testset "barotropic has no temperature/Courant" begin
-        model = BarotropicModel(SpectralGrid(truncation = 15, nlayers = 1); feedback = Feedback(verbose = false, elements = (VerticalCourantNumber(), TemperatureRange())))
+        model = BarotropicModel(SpectralGrid(truncation = 15, nlayers = 1); feedback = Feedback(verbose = false, elements = (ProgressElements.VerticalCourantNumber(), ProgressElements.TemperatureRange())))
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
         p = model.feedback.progress_meter
-        @test all(e -> SpeedyWeather.ProgressMeter.Elements.print_element(e, p) == "", p.elements)
+        @test all(e -> ProgressElements.print_element(e, p) == "", p.elements)
     end
+end
+
+# a user-defined element extends `ProgressElements.print_element`
+struct CustomElement <: ProgressElements.AbstractProgressElement end
+ProgressElements.print_element(::CustomElement, p) = " custom"
+
+@testset "custom progress element" begin
+    model = BarotropicModel(SpectralGrid(truncation = 15, nlayers = 1); feedback = Feedback(verbose = false, elements = (ProgressElements.Counter(), CustomElement())))
+    simulation = initialize!(model)
+    run!(simulation, steps = 2)
+    @test ProgressElements.print_element(model.feedback.progress_meter.elements[2], model.feedback.progress_meter) == " custom"
 end

@@ -48,6 +48,15 @@ Base revision: e82b41763d831f2356ad4e661650f426ab9762ff
   user should be worried about, can you move this section to Advanced -> Feedback?" The section
   "Progress line" moved from `how_to_run_speedy.md` to a new page `feedback.md` under Advanced, with
   a one-line pointer left in `how_to_run_speedy.md`.
+- 2026-10-05: "can we group the progress elements? Could there be a local module call ProgressElements
+  that contains the one from ProgressMeter.jl plus the ones we define? I want the user interface to be
+  ProgressElements.MaximumWindSpeed() [...] Also remove the `showspeed`, `show_time`, `show_umax` kwargs
+  from Feedback (they aren't considered public API), that should be now just controlled by `elements`".
+  New submodule `ProgressElements` (`output/progress_elements.jl`, exported by SpeedyWeather, its names
+  not) re-exports ProgressMeter's elements and holds SpeedyWeather's, `bind_element`, `speedstring`,
+  `vertical_courant_number` and `default_elements()` (no argument). `Feedback.elements` defaults to
+  `ProgressElements.default_elements()`; `showspeed`, `show_time`, `show_umax`,
+  `show_temperature_range` are removed.
 
 ## Problem description
 
@@ -68,15 +77,16 @@ pointing at the branch (Julia ≥ 1.11 only).
 
 ## Summary of changes
 
-- New SpeedyWeather elements (subtypes of `ProgressMeter.Elements.AbstractProgressElement`) in
-  `output/feedback.jl`: `SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`,
-  `VerticalCourantNumber`. Created unbound by the user, bound to `Variables` and `model` by
-  `bind_element` in `initialize!(::Feedback, ...)`, so `Feedback` never holds a reference to `Variables`
-  (Enzyme `make_zero` of the model) and the diagnostics are computed on redraw only.
-- `Feedback.elements::Union{Nothing, Tuple} = nothing`: `nothing` builds the previous layout from
-  `showspeed`, `show_time`, `show_umax`, `show_temperature_range` (`default_elements(feedback)`), so
-  existing code keeps its output. A tuple replaces it, e.g.
-  `Feedback(elements = (default_elements(Feedback())..., VerticalCourantNumber()))`.
+- New submodule `ProgressElements` (`output/progress_elements.jl`, the module is exported, its names
+  are not, so the interface is `ProgressElements.MaximumWindSpeed()`). It re-exports the generic
+  elements of `ProgressMeter.Elements` and defines SpeedyWeather's: `SimulationTime`,
+  `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`, `VerticalCourantNumber`. Created unbound
+  by the user, bound to `Variables` and `model` by `bind_element` in `initialize!(::Feedback, ...)`,
+  so `Feedback` never holds a reference to `Variables` (Enzyme `make_zero` of the model) and the
+  diagnostics are computed on redraw only.
+- `Feedback.elements::Tuple = ProgressElements.default_elements()` (the previous default layout)
+  replaces the options `showspeed`, `show_time`, `show_umax`, `show_temperature_range`, e.g.
+  `Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))`.
 - Remove the `speedstring(::AbstractFloat)` method, `progress_string` and the `FEEDBACK_*` globals;
   `ProgressTxt` takes the time step from `model.time_stepping.Δt`.
 - `progress!` no longer evaluates `max_speed`/`temperature_range` every few steps.

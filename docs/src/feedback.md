@@ -11,13 +11,25 @@ While running, `Feedback` prints a progress line like
  23% ━━━━━━     ETA: 0:00:07 (2000-01-03, 153.56 years/day,  44 m/s, [ -84,   35] ˚C)
 ```
 with the simulation date, speed, maximum zonal wind and temperature range. The line is built from
-ProgressMeter.jl elements, `default_elements(feedback)` returns the default ones (controlled by the
-options `showspeed`, `show_time`, `show_umax`, `show_temperature_range`). Pass your own tuple with
-`elements` to change it, e.g. to also show the maximum vertical Courant number
+*elements*, which are collected in the module `ProgressElements`: the generic ones from ProgressMeter.jl
+(`Description`, `Percentage`, `Bar`, `ETA`, `Speed`, `ElapsedTime`, `Counter`, `Colored`) and the ones
+specific to SpeedyWeather (`SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`,
+`VerticalCourantNumber`). `ProgressElements.default_elements()` returns the default ones. Pass your own
+tuple with `elements` to change the line, e.g. to also show the maximum vertical Courant number
 ```julia
-feedback = Feedback(elements = (default_elements(Feedback())..., VerticalCourantNumber()))
+feedback = Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))
 model = PrimitiveWetModel(spectral_grid; feedback)
 ```
-SpeedyWeather's elements (`SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`,
-`VerticalCourantNumber`) are created without arguments and bound to the simulation when it starts.
-Diagnostics are only computed when the line is redrawn (every `feedback_dt` seconds).
+or to show only the percentage, the simulation date and the maximum wind speed
+```julia
+feedback = Feedback(elements = (
+    ProgressElements.Percentage(), " ", ProgressElements.SimulationTime(), ProgressElements.MaximumWindSpeed(),
+))
+```
+Strings like `" "` are printed as they are. SpeedyWeather's elements are created without arguments
+and bound to the simulation when it starts. Diagnostics are only computed when the line is redrawn
+(every `feedback_dt` seconds).
+
+A custom element is a subtype of `ProgressElements.AbstractProgressElement` that extends
+`ProgressElements.print_element(element, progress)` to return the text it shows, see the
+documentation of ProgressMeter.jl.
