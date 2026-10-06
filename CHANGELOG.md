@@ -4,6 +4,13 @@
 
 - Add ParticleAdvection3D via 3D interpolation [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
 - `AlbedoClimatology` moves its climatology onto the model's architecture before interpolating, fixing it on GPU [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
+- Cloud top height [m] and cloud cover as parameterization and output variables (cloud top output was a layer index), diagnostic cloud top at level of maximum relative humidity as in SPEEDY, convective cloud top for deep convection only [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Betts-Miller convective precipitation is now the net (signed) column drying, closing the column water budget [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Betts-Miller convection: single fixed-trip pass over the column for the parcel ascent instead of an environment prefill plus a `while` loop, ~15-20% faster on GPU; fix `BettsMillerDryConvection` not adapting to GPU [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Convective rain in `BettsMillerConvection` now falls as snow below a configurable freezing threshold [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Add entrainment profiles (`LinearEntrainment`, `ConstantEntrainment`) to Betts-Miller convection, wet and dry; supersedes and credits [#976](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/976) by @nviebig [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Restructure Betts-Miller convection to branchless, full-range vertical loops for GPU; fix docs to match the code [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Improved the performance of the `MatrixSpectralTransform` by stacking real and imaginary part in a single matrix [#1295](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1295)
 - `on_architecture` of a `Tuple` (and `NamedTuple`) keeps the element types inferred, making the implicit solver setup free of runtime dispatch [#1297](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1297)
 - `time_step!(vars, time_stepping, model)` reinitializes the implicit solver for the time step of this step, so that a loop of single steps from a reset clock (as for differentiation) integrates the same model as `run!` [#1297](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1297)
 - AMD GPU CI is only run on `main` [#1296](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1296)
