@@ -4,6 +4,17 @@
 
 ## 0.23.0
 
+- Cloud top height [m] and cloud cover as parameterization and output variables (cloud top output was a layer index), diagnostic cloud top at level of maximum relative humidity as in SPEEDY, convective cloud top for deep convection only [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Betts-Miller convective precipitation is now the net (signed) column drying, closing the column water budget [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Betts-Miller convection: single fixed-trip pass over the column for the parcel ascent instead of an environment prefill plus a `while` loop, ~15-20% faster on GPU; fix `BettsMillerDryConvection` not adapting to GPU [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Convective rain in `BettsMillerConvection` now falls as snow below a configurable freezing threshold [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Add entrainment profiles (`LinearEntrainment`, `ConstantEntrainment`) to Betts-Miller convection, wet and dry; supersedes and credits [#976](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/976) by @nviebig [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Restructure Betts-Miller convection to branchless, full-range vertical loops for GPU; fix docs to match the code [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
+- Improved the performance of the `MatrixSpectralTransform` by stacking real and imaginary part in a single matrix [#1295](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1295)
+- `on_architecture` of a `Tuple` (and `NamedTuple`) keeps the element types inferred, making the implicit solver setup free of runtime dispatch [#1297](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1297)
+- `time_step!(vars, time_stepping, model)` reinitializes the implicit solver for the time step of this step, so that a loop of single steps from a reset clock (as for differentiation) integrates the same model as `run!` [#1297](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1297)
+- AMD GPU CI is only run on `main` [#1296](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1296)
+- Batched interpolation for multi-dimensional `Field`s, horizontal interpolation now named `interpolate_2D!` forwarded from `interpolate!` [#1263](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1263)
 - Restrict `DocumenterCitations` compat to fix citations in docs [#1292](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1292)
 - Extension `SpeedyWeatherNumericalRadiationExt` making NumericalRadiation.jl's radiation schemes SpeedyWeather components: `ClearSkyEcCKDRadiation` (clear-sky correlated-k, both streams in one component) and `AnalyticBandLongwave` (analytic-band longwave) [#1271](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1271) [#1293](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1293)
 - CPU column parameterizations loop over grid points per bundled scheme (`Radiation`: shortwave loop, then longwave loop) via `column_parameterization_cpu!`, fixing the Enzyme/LLVM segfault of the extended differentiability tests [#1290](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1290)

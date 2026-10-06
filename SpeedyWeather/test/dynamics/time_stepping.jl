@@ -307,3 +307,37 @@ end
         @test Array(grid_parent.data) ≈ original         # round-trips to the identity
     end
 end
+
+@testset "Single time steps match run! from a reset clock" begin
+    # `initialize!(simulation; steps)` resets the clock, so the next steps are the leapfrog
+    # start (Δt/2, Δt, then 2Δt) while the implicit solver still has 2Δt from the spin-up.
+    # A loop over `time_step!(vars, time_stepping, model)` (as used for differentiation)
+    # has to reinitialize the solver like `run!` does, or it integrates a different model.
+    @testset for Model in (PrimitiveDryModel, PrimitiveWetModel)
+        # two identical simulations, both spun up so that the implicit solver is at 2Δt
+        function spun_up()
+            spectral_grid = SpectralGrid(truncation = 22, nlayers = 4, NF = Float64)
+            simulation = initialize!(Model(spectral_grid))
+            run!(simulation, steps = 5)
+            return simulation
+        end
+
+        steps = 4
+        sim_run = spun_up()
+        run!(sim_run; steps)
+
+        sim_step = spun_up()
+        initialize!(sim_step; steps)
+        (; variables, model) = sim_step
+        for _ in 1:steps
+            SpeedyWeather.time_step!(variables, model.time_stepping, model)
+            SpeedyWeather.time_step!(variables.prognostic.clock, model.time_stepping)
+        end
+        SpeedyWeather.unscale!(variables)
+
+        @test sim_step.variables.prognostic.clock.time == sim_run.variables.prognostic.clock.time
+        for var in (:vorticity, :divergence, :temperature, :pressure)
+            @test sim_step.variables.prognostic[var] ≈ sim_run.variables.prognostic[var]
+        end
+    end
+end
