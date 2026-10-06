@@ -98,13 +98,16 @@ function particle_variables(nparticles)
         ParticleVariable(:locations, ParticleVectorDim(nparticles), desc = "Predicted particle locations", units = "˚/1"),
         ParticleVariable(:u, VectorDim(nparticles), desc = "Zonal velocity at particle location", units = "m/s"),
         ParticleVariable(:v, VectorDim(nparticles), desc = "Meridional velocity at particle location", units = "m/s"),
-        ParticleVariable(:locator, LocatorDim(), desc = "Particle locator for horizontal interpolation", units = "1"),
     )
 end
 
-variables(P::ParticleAdvection2D) = particle_variables(P.nparticles)
+variables(P::ParticleAdvection2D) = (
+    particle_variables(P.nparticles)...,
+    ParticleVariable(:locator, Locator2DDim(P.nparticles), desc = "Particle locator for horizontal interpolation", units = "1"),
+)
 variables(P::ParticleAdvection3D) = (
     particle_variables(P.nparticles)...,
+    ParticleVariable(:locator, Locator3DDim(P.nparticles), desc = "Particle locator for horizontal and vertical interpolation", units = "1"),
     ParticleVariable(:w, VectorDim(P.nparticles), desc = "Radius-scaled vertical velocity radius*dσ/dt at particle location", units = "m/s"),
 )
 

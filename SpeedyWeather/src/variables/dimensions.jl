@@ -154,12 +154,24 @@ allocate(v::AbstractVariable{MatrixDim}, model::AbstractModel) = fill!(model.spe
 struct TransformScratchMemory <: AbstractVariableDim end
 allocate(::AbstractVariable{TransformScratchMemory}, model::AbstractModel) = model.spectral_transform.scratch_memory
 
-"""Dimension for particle locator tracking in space (2D and 3D)."""
-struct LocatorDim <: AbstractVariableDim end
+"""Dimension for 2D locator, locating `n` positions, e.g. particles."""
+@kwdef struct Locator2DDim <: AbstractVariableDim
+    n::Int = 1
+end
 
-function allocate(::AbstractVariable{LocatorDim}, model::AbstractModel)
+function allocate(v::AbstractVariable{Locator2DDim}, model::AbstractModel)
+    (; NF, architecture) = model.spectral_grid
+    return RingGrids.AnvilLocator(NF, v.n; architecture)
+end
+
+"""Dimension for 3D locator, locating `n` positions on model's `nlayers`, e.g. particles."""
+@kwdef struct Locator3DDim <: AbstractVariableDim
+    n::Int = 1
+end
+
+function allocate(v::AbstractVariable{Locator3DDim}, model::AbstractModel)
     (; NF, architecture, nlayers) = model.spectral_grid
-    return RingGrids.AnvilLocator(NF, model.particle_advection.nparticles, nlayers; architecture)
+    return RingGrids.AnvilLocator(NF, v.n, nlayers; architecture)
 end
 
 # Variable fusion support
