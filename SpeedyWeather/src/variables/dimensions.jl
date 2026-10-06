@@ -161,7 +161,7 @@ end
 
 function allocate(v::AbstractVariable{Locator2DDim}, model::AbstractModel)
     (; NF, architecture) = model.spectral_grid
-    return RingGrids.AnvilLocator(NF, v.n; architecture)
+    return RingGrids.AnvilLocator(NF, v.dims.n; architecture)
 end
 
 """Dimension for 3D locator, locating `n` positions on model's `nlayers`, e.g. particles."""
@@ -171,7 +171,7 @@ end
 
 function allocate(v::AbstractVariable{Locator3DDim}, model::AbstractModel)
     (; NF, architecture, nlayers) = model.spectral_grid
-    return RingGrids.AnvilLocator(NF, v.n, nlayers; architecture)
+    return RingGrids.AnvilLocator(NF, v.dims.n, nlayers; architecture)
 end
 
 # Variable fusion support
