@@ -123,22 +123,22 @@ to only support `ParticleAdvection2D`.
 
 ### Vertical interpolation
 
-Wind is only known on the model's discrete ``\sigma`` levels, so a particle's continuous
+Wind is only known on the model's discrete ``\sigma`` layers so a particle's continuous
 ``\sigma`` position has to be translated into a vertical interpolation, similar to how longitude
 and latitude are translated into the horizontal (4-point "anvil") interpolation described above.
 This is done in two steps:
 
-1. Find the two neighbouring model levels that bracket the particle's ``\sigma``. If the particle
-   is above the topmost or below the bottommost level, the value on that level is used instead
+1. Find the two neighbouring model layers that bracket the particle's ``\sigma``. If the particle
+   is above the topmost or below the bottommost layer, the value on that layer is used instead
    of extrapolating beyond it.
-2. Interpolate horizontally onto each of these two levels separately, using exactly the same
+2. Interpolate horizontally onto each of these two layers separately, using exactly the same
    4-point anvil interpolation as for `ParticleAdvection2D`, then linearly blend the two
-   resulting values by how far the particle's ``\sigma`` lies between the two levels.
+   resulting values by how far the particle's ``\sigma`` lies between the two layers.
 
 In short, 3D interpolation is the same horizontal interpolation done twice (once per bracketing
-level) and then blended vertically. Near the poles, where the anvil stencil has no meaningful
+layer) and then blended vertically. Near the poles, where the anvil stencil has no meaningful
 neighbours, the same ring-average substitute as for the 2D case is used, just computed once for
-every model level instead of once for a single 2D field.
+every model layer instead of once for a single 2D field.
 
 ### Flexibility and limitations: horizontal precompute versus vertical on the fly
 
@@ -149,22 +149,22 @@ so it is computed once for every new horizontal position of the particles, i.e. 
 advection step (at the predicted and at the corrected position of Heun's method), and the
 resulting grid indices and interpolation weights are reused for all fields interpolated at that
 position (``u``, ``v`` and ``w``). Locating a particle's vertical bracket, on the other hand, is cheap: a short
-scan through as few as a handful of ``\sigma`` levels, so it is simply recomputed on the fly every
+scan through as few as a handful of ``\sigma`` layers, so it is simply recomputed on the fly every
 time a value is interpolated, with no separate precompute or storage step.
 
-This is a deliberate trade-off that assumes there are many fewer vertical levels than horizontal
-grid points, typically true (e.g. 8 vertical levels against many thousands of horizontal grid
+This is a deliberate trade-off that assumes there are many fewer vertical layers than horizontal
+grid points, typically true (e.g. 8 vertical layers against many thousands of horizontal grid
 points). Some consequences:
 
 - Increasing the vertical resolution (`nlayers`) adds essentially no cost or storage to particle
-  advection beyond the ``\sigma`` level vector the model already needs, plus two small
-  per-level pole-average buffers (see [`RingGrids.AnvilLocator`](@ref)).
+  advection beyond the ``\sigma`` layer vector the model already needs, plus two small
+  per-layer pole-average buffers (see [`RingGrids.AnvilLocator`](@ref)).
 - Because the same horizontal indices and weights are reused for both bracketing ``\sigma``
-  levels, horizontal and vertical location are decoupled: the (horizontal) locator does not
-  depend on ``\sigma`` and is reused for all levels and for fields on full and half levels alike.
-- Above the topmost and below the bottommost full level, ``u`` and ``v`` are taken from that
-  level rather than extrapolated. The particle's ``\sigma`` itself is not held there: it keeps
-  moving with ``w``, which lives on the half levels spanning the whole column
+  layers, horizontal and vertical location are decoupled: the (horizontal) locator does not
+  depend on ``\sigma`` and is reused for all layers and for fields on full and half layers alike.
+- Above the topmost and below the bottommost full layer, ``u`` and ``v`` are taken from that
+  layer rather than extrapolated. The particle's ``\sigma`` itself is not held there: it keeps
+  moving with ``w``, which lives on the half layers spanning the whole column
   ``0 \leq \sigma \leq 1`` and vanishes at ``\sigma = 0`` and ``\sigma = 1``. Together with
   ``\sigma`` being clamped to ``[0, 1]`` after every step, particles therefore cannot leave the
   atmosphere through the model top or fall through the surface.
@@ -186,7 +186,7 @@ simulation.variables.prognostic.particles
 ```
 
 Every particle's `σ` field is now updated over time, whereas with `ParticleAdvection2D` it would
-have remained fixed at the `layer`-th value of `model.geometry.σ_levels_full`.
+have remained fixed at the `layer`-th value of `model.geometry.σ_layers_full`.
 
 To check that the vertical trajectories are smooth and reasonable we can track the particles
 with a [`ParticleTracker`](@ref) (see [Tracking particles](@ref) below), which also writes
