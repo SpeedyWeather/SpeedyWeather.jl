@@ -72,19 +72,24 @@ end
 
 # Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
 @generated function _column_parameterizations_cpu!(vars, parameterizations::NamedTuple{names}, model) where {names}
-    # runic: off
-    calls = [
-        quote
-            for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
-                parameterization!(ij, vars, parameterizations.$name, model)
-            end
-        end for name in names                       # parameterizations outer loop
-    ]
-    # runic: on
+    # parameterizations outer loop, grid points inner loop inside column_parameterization_cpu!
+    calls = [:(column_parameterization_cpu!(vars, parameterizations.$name, model)) for name in names]
     return quote
         Base.@_propagate_inbounds_meta
         $(Expr(:block, calls...))
     end
+end
+
+"""$(TYPEDSIGNATURES)
+Loop over all horizontal grid points `ij` for a single column `parameterization` on CPU.
+Parameterizations that bundle several schemes (e.g. `Radiation`) extend this method to loop
+over the grid points for every scheme separately, keeping the memory access contiguous per
+scheme and the loop bodies small."""
+@propagate_inbounds function column_parameterization_cpu!(vars, parameterization, model)
+    for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
+        parameterization!(ij, vars, parameterization, model)
+    end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -109,6 +114,8 @@ function reset_variables!(vars::Variables)
     reset_variable!(vars.parameterizations, :cloud_top, nlayers + 1)   # reset to below top layer
     reset_variable!(vars.parameterizations, :rain_rate, 0)
     reset_variable!(vars.parameterizations, :snow_rate, 0)
+    reset_variable!(vars.parameterizations, :rain_rate_convection, 0)
+    reset_variable!(vars.parameterizations, :snow_rate_convection, 0)
     reset_variable!(vars.parameterizations, :surface_humidity_flux, 0)
     reset_variable!(vars.parameterizations, :sensible_heat_flux, 0)
     return nothing

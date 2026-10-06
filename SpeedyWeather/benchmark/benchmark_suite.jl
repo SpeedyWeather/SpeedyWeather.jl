@@ -77,66 +77,76 @@ default_nlayers(models) = [default_nlayers(model) for model in models]
 n_timesteps(truncation, nlayers, multiplier = 1) =
     round(Int, multiplier * clamp(round(Int, 4.0e9 / truncation^3 / nlayers^2), 50, 1200))
 
-function run_benchmark_suite!(suite::BenchmarkSuite)
+# Run every configuration of a suite. Each run lives in its own `run_benchmark!`
+# call so that its model and simulation go out of scope on return; `free_memory!`
+# (defined by the driver script) then collects them and hands device memory back
+# before the next run. This happens outside the timed region, so it does not
+# affect the measured SYPD but prevents memory piling up across many runs.
+function run_benchmark_suite!(suite::AbstractBenchmarkSuite)
     for i in 1:suite.nruns
-
-        # unpack
-        Model = suite.model[i]
-        NF = suite.NF[i]
-        truncation = suite.truncation[i]
-        nlayers = suite.nlayers[i]
-        Grid = suite.Grid[i]
-        dynamics = suite.dynamics[i]
-        physics = suite.physics[i]
-        transform_kind = suite.spectral_transform[i]
-        architecture = suite.architecture
-
-        spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture)
-        suite.nlat[i] = spectral_grid.nlat
-
-        extra_components = resolve_model_kwargs(suite.model_kwargs[i], spectral_grid)
-        model = build_model(Model, spectral_grid, architecture; transform_kind, extra_components..., feedback = Feedback(verbose = true))
-        if Model <: PrimitiveEquation
-            model.dynamics = dynamics
-            model.dynamics_only = !physics
-        else
-            suite.dynamics[i] = true
-            suite.physics[i] = false
-        end
-
-        simulation = initialize!(model)
-        suite.memory[i] = Base.summarysize(simulation)
-
-        nsteps = n_timesteps(truncation, nlayers, suite.timestep_multiplier)
-        period = Second(round(Int, model.time_stepping.Δt * (nsteps + 1)))
-
-        # Warm up before timing: run a few steps so JIT compilation of the time
-        # loop happens here rather than inside the timed run below. The timed run
-        # is short (≈nsteps steps, only a few seconds), so without this its
-        # wallclock is dominated by one-off compilation, which massively
-        # understates SYPD and can even invert the ordering between models
-        # (e.g. the model compiled first appears slower than a later one that
-        # reuses the compiled code). A handful of steps covers the Euler spin-up
-        # plus regular steps. We then re-initialize so the timed run starts from
-        # the same initial state as before.
-        warmup_period = Second(round(Int, model.time_stepping.Δt * 3))
-        run!(simulation; period = warmup_period)
-        synchronize(architecture)
-
-        # Time the run with a real wallclock timer rather than the progress
-        # meter's `tlast - tinit`. The latter measures only up to the *last*
-        # progress-bar render (every `feedback_dt = 0.1 s`)
-        simulation = initialize!(model)
-        t0 = time()
-        run!(simulation; period)
-        synchronize(architecture)
-        time_elapsed = time() - t0
-
-        sypd = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
-
-        suite.Δt[i] = model.time_stepping.Δt
-        suite.SYPD[i] = sypd
+        run_benchmark!(suite, i)
+        free_memory!()
     end
+    return suite
+end
+
+function run_benchmark!(suite::BenchmarkSuite, i::Integer)
+    # unpack
+    Model = suite.model[i]
+    NF = suite.NF[i]
+    truncation = suite.truncation[i]
+    nlayers = suite.nlayers[i]
+    Grid = suite.Grid[i]
+    dynamics = suite.dynamics[i]
+    physics = suite.physics[i]
+    transform_kind = suite.spectral_transform[i]
+    architecture = suite.architecture
+
+    spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture)
+    suite.nlat[i] = spectral_grid.nlat
+
+    extra_components = resolve_model_kwargs(suite.model_kwargs[i], spectral_grid)
+    model = build_model(Model, spectral_grid, architecture; transform_kind, extra_components..., feedback = Feedback(verbose = true))
+    if Model <: PrimitiveEquation
+        model.dynamics = dynamics
+        model.dynamics_only = !physics
+    else
+        suite.dynamics[i] = true
+        suite.physics[i] = false
+    end
+
+    simulation = initialize!(model)
+    suite.memory[i] = Base.summarysize(simulation)
+
+    nsteps = n_timesteps(truncation, nlayers, suite.timestep_multiplier)
+    period = Second(round(Int, model.time_stepping.Δt * (nsteps + 1)))
+
+    # Warm up before timing: run a few steps so JIT compilation of the time
+    # loop happens here rather than inside the timed run below. The timed run
+    # is short (≈nsteps steps, only a few seconds), so without this its
+    # wallclock is dominated by one-off compilation, which massively
+    # understates SYPD and can even invert the ordering between models
+    # (e.g. the model compiled first appears slower than a later one that
+    # reuses the compiled code). A handful of steps covers the Euler spin-up
+    # plus regular steps. We then re-initialize so the timed run starts from
+    # the same initial state as before.
+    warmup_period = Second(round(Int, model.time_stepping.Δt * 3))
+    run!(simulation; period = warmup_period)
+    synchronize(architecture)
+
+    # Time the run with a real wallclock timer rather than the progress
+    # meter's `tlast - tinit`. The latter measures only up to the *last*
+    # progress-bar render (every `feedback_dt = 0.1 s`)
+    simulation = initialize!(model)
+    t0 = time()
+    run!(simulation; period)
+    synchronize(architecture)
+    time_elapsed = time() - t0
+
+    sypd = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
+
+    suite.Δt[i] = model.time_stepping.Δt
+    suite.SYPD[i] = sypd
     return
 end
 
@@ -261,64 +271,61 @@ function safe_benchmark!(f, suite::AbstractBenchmarkSuiteTimed, i_run::Integer, 
     return suite
 end
 
-function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
+function run_benchmark!(suite::BenchmarkSuiteDynamics, i::Integer)
     arch = suite.architecture
 
-    for i in 1:suite.nruns
+    Model = suite.model[i]
+    NF = suite.NF[i]
+    truncation = suite.truncation[i]
+    nlayers = suite.nlayers[i]
+    Grid = suite.Grid[i]
 
-        Model = suite.model[i]
-        NF = suite.NF[i]
-        truncation = suite.truncation[i]
-        nlayers = suite.nlayers[i]
-        Grid = suite.Grid[i]
+    spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture = arch)
+    suite.nlat[i] = spectral_grid.nlat
 
-        spectral_grid = SpectralGrid(; NF, truncation, Grid, nlayers, architecture = arch)
-        suite.nlat[i] = spectral_grid.nlat
+    model = build_model(Model, spectral_grid, arch)
 
-        model = build_model(Model, spectral_grid, arch)
+    simulation = initialize!(model)
 
-        simulation = initialize!(model)
+    vars, model = SpeedyWeather.unpack(simulation)
+    (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit, time_stepping) = model
 
-        vars, model = SpeedyWeather.unpack(simulation)
-        (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit, time_stepping) = model
-
-        # Each benchmark sample also calls `synchronize(arch)` to wait for the device.
-        safe_benchmark!(suite, i, 1) do
-            @benchmark (_jit($arch, SpeedyWeather.pressure_gradient_flux!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 2) do
-            @benchmark (_jit($arch, SpeedyWeather.linear_virtual_temperature!, $vars, $model); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 3) do
-            @benchmark (_jit($arch, SpeedyWeather.geopotential!, $vars, $geopotential, $orography); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 4) do
-            @benchmark (_jit($arch, SpeedyWeather.vertical_integration!, $vars, $geometry, $time_stepping); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 5) do
-            @benchmark (_jit($arch, SpeedyWeather.surface_pressure_tendency!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 6) do
-            @benchmark (_jit($arch, SpeedyWeather.vertical_velocity!, $vars, $geometry, $time_stepping); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 7) do
-            @benchmark (_jit($arch, SpeedyWeather.linear_pressure_gradient!, $vars, $atmosphere, $implicit, $time_stepping); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 8) do
-            @benchmark (_jit($arch, SpeedyWeather.vertical_advection!, $vars, $model); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 9) do
-            @benchmark (_jit($arch, SpeedyWeather.vordiv_tendencies!, $vars, $model); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 10) do
-            @benchmark (_jit($arch, SpeedyWeather.temperature_tendency!, $vars, $model); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 11) do
-            @benchmark (_jit($arch, SpeedyWeather.humidity_tendency!, $vars, $model); synchronize($arch))
-        end
-        safe_benchmark!(suite, i, 12) do
-            @benchmark (_jit($arch, SpeedyWeather.bernoulli_potential!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
-        end
+    # Each benchmark sample also calls `synchronize(arch)` to wait for the device.
+    safe_benchmark!(suite, i, 1) do
+        @benchmark (_jit($arch, SpeedyWeather.pressure_gradient_flux!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 2) do
+        @benchmark (_jit($arch, SpeedyWeather.linear_virtual_temperature!, $vars, $model); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 3) do
+        @benchmark (_jit($arch, SpeedyWeather.geopotential!, $vars, $geopotential, $orography); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 4) do
+        @benchmark (_jit($arch, SpeedyWeather.vertical_integration!, $vars, $geometry, $time_stepping); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 5) do
+        @benchmark (_jit($arch, SpeedyWeather.surface_pressure_tendency!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 6) do
+        @benchmark (_jit($arch, SpeedyWeather.vertical_velocity!, $vars, $geometry, $time_stepping); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 7) do
+        @benchmark (_jit($arch, SpeedyWeather.linear_pressure_gradient!, $vars, $atmosphere, $implicit, $time_stepping); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 8) do
+        @benchmark (_jit($arch, SpeedyWeather.vertical_advection!, $vars, $model); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 9) do
+        @benchmark (_jit($arch, SpeedyWeather.vordiv_tendencies!, $vars, $model); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 10) do
+        @benchmark (_jit($arch, SpeedyWeather.temperature_tendency!, $vars, $model); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 11) do
+        @benchmark (_jit($arch, SpeedyWeather.humidity_tendency!, $vars, $model); synchronize($arch))
+    end
+    safe_benchmark!(suite, i, 12) do
+        @benchmark (_jit($arch, SpeedyWeather.bernoulli_potential!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
     end
 
     return suite
