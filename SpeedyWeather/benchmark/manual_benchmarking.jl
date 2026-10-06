@@ -17,7 +17,7 @@ An optional second argument multiplies the number of timesteps per timed run
 
 Debug mode (`--debug`, anywhere in the arguments) is a quick check whether the
 performance has regressed: it only runs the PrimitiveWet resolution sweep
-(`:benchmark201`) up to truncation 128, prints the results and leaves the
+(`:benchmark201`) with 8 layers up to truncation 128, prints the results and leaves the
 `README.md` and `assets/benchmark_results.json` untouched. With `--output=FILE`
 the results are additionally written to FILE as JSON, e.g. to compare revisions
 
@@ -50,6 +50,7 @@ const FLAGS = filter(startswith("--"), ARGS)
 const POSITIONAL_ARGS = filter(!startswith("--"), ARGS)
 const DEBUG_MODE = "--debug" in FLAGS
 const DEBUG_MAX_TRUNCATION = 128
+const DEBUG_NLAYERS = 8
 
 # resolve before the `cd` below so that a relative path is relative to the caller's directory
 const OUTPUT_PATH = let i = findfirst(startswith("--output="), FLAGS)
@@ -123,9 +124,12 @@ include("define_benchmarks.jl")
 
 if DEBUG_MODE
     resolution_suite = benchmarks[:benchmark201]
-    debug_runs = findall(<=(DEBUG_MAX_TRUNCATION), resolution_suite.truncation)
+    debug_runs = findall(
+        i -> resolution_suite.truncation[i] <= DEBUG_MAX_TRUNCATION && resolution_suite.nlayers[i] == DEBUG_NLAYERS,
+        1:resolution_suite.nruns,
+    )
     benchmarks = Dict{Symbol, AbstractBenchmarkSuite}(:benchmark201 => select_runs(resolution_suite, debug_runs))
-    @info "Debug mode: running only :benchmark201 with truncation ≤ $DEBUG_MAX_TRUNCATION ($(length(debug_runs)) runs)"
+    @info "Debug mode: running only :benchmark201 with L = $DEBUG_NLAYERS, T ≤ $DEBUG_MAX_TRUNCATION ($(length(debug_runs)) runs)"
 end
 
 for suite in values(benchmarks)
@@ -222,6 +226,7 @@ if DEBUG_MODE
         meta = arch_record["meta"]
         meta["arch_label"] = ARCH_LABEL
         meta["debug_max_truncation"] = DEBUG_MAX_TRUNCATION
+        meta["debug_nlayers"] = DEBUG_NLAYERS
         meta["timestep_multiplier"] = TIMESTEP_MULTIPLIER
         # where the monorepo packages were loaded from, to verify the benchmarked revision
         meta["package_dirs"] = Dict(
@@ -306,7 +311,7 @@ function write_preamble(md)
     write(md, "julia --project=. manual_benchmarking.jl amdgpu         # AMDGPU (HIP graphs forced on)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-cpu   # Reactant on CPU\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU\n")
-    write(md, "julia --project=. manual_benchmarking.jl --debug        # quick regression check: PrimitiveWet, T ≤ $DEBUG_MAX_TRUNCATION only, not stored\n")
+    write(md, "julia --project=. manual_benchmarking.jl --debug        # quick regression check: PrimitiveWet, L$DEBUG_NLAYERS, T ≤ $DEBUG_MAX_TRUNCATION, not stored\n")
     write(md, "julia regression/regression.jl check                   # debug mode on main, latest release and latest benchmarked revision\n")
     write(md, "```\n\n")
     write(md, "Each run updates only its own architecture's section in this `README.md`; results for other architectures are preserved via `benchmark_results.json`.\n\n")

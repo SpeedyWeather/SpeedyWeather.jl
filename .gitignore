@@ -69,6 +69,9 @@ settings.json
 .claude/*
 !.claude/skills/
 
+# results of the benchmark regression check (SpeedyWeather/benchmark/regression)
+SpeedyWeather/benchmark/regression/results/
+
 # netCDF files shouldn't generally be excluded but using the particle tracker may create this
 particles.nc
 

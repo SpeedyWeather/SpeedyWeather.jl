@@ -28,7 +28,7 @@ julia --project=. manual_benchmarking.jl gpu            # CUDA GPU
 julia --project=. manual_benchmarking.jl amdgpu         # AMDGPU (HIP graphs forced on)
 julia --project=. manual_benchmarking.jl reactant-cpu   # Reactant on CPU
 julia --project=. manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU
-julia --project=. manual_benchmarking.jl --debug        # quick regression check: PrimitiveWet, T ≤ 128 only, not stored
+julia --project=. manual_benchmarking.jl --debug        # quick regression check: PrimitiveWet, L8, T ≤ 128, not stored
 julia regression/regression.jl check                   # debug mode on main, latest release and latest benchmarked revision
 ```
 

@@ -1,16 +1,17 @@
 const USAGE = """
 Check SpeedyWeather.jl for performance regressions with the debug mode of the benchmark suite
-(`manual_benchmarking.jl --debug`: PrimitiveWet resolution sweep, truncation ≤ 128).
+(`manual_benchmarking.jl --debug`: PrimitiveWet resolution sweep, 8 layers, truncation ≤ 128).
 
 Usage: julia SpeedyWeather/benchmark/regression/regression.jl <command> [options]
 
-    check [--arch cpu|gpu|amdgpu] [--ref origin/main] [--threshold 0.85] [--output-dir DIR]
-          [--bisect] [--no-confirm] [--no-fetch] [--fail-on-regression]
-        Benchmark main, the latest release and the latest benchmarked revision of this arch, and
-        write report.md and summary.json to DIR (default WORKDIR/results). A regression (geometric
-        mean of the SYPD ratios main / reference < threshold, for all configurations or one of the
-        two transforms) is confirmed by running main and that reference again, and with --bisect
-        traced to its first bad commit. Exits with 1 on a regression with --fail-on-regression.
+    check [--candidate REV] [--arch cpu|gpu|amdgpu] [--ref origin/main] [--threshold 0.85]
+          [--output-dir DIR] [--bisect] [--no-confirm] [--no-fetch] [--fail-on-regression]
+        Benchmark the candidate (default: main, e.g. HEAD for a PR branch) and as references main,
+        the latest release and the latest benchmarked revision of this arch, and write report.md
+        and summary.json to DIR (default WORKDIR/results). A regression (geometric mean of the SYPD
+        ratios candidate / reference < threshold, for all configurations or one of the two
+        transforms) is confirmed by running both again, and with --bisect traced to its first bad
+        commit. Exits with 1 on a regression with --fail-on-regression.
     benchmark REVISION|TREE OUTPUT.json [--arch cpu]
         Debug benchmark of one git revision, or of an existing checkout as is.
     bisect --good REV --bad REV --reference FILE[,FILE...] --cutoff X [--group all|default|matrix]
@@ -234,8 +235,9 @@ function comparison_table(candidate::Measurement, references, threshold)
     measurements = [references; candidate]
     configurations = collect(union((keys(m.sypd) for m in measurements)...))
     sort!(configurations, by = key -> (key[3] != "default", key[1], key[2]))
+    layers = length(unique(key[2] for key in configurations)) > 1     # column only if it varies
     io = IOBuffer()
-    header = ["T", "L", "Transform", (m.name for m in measurements)..., ("$(candidate.name) vs $(m.name)" for m in references)...]
+    header = ["T", (layers ? ["L"] : [])..., "Transform", (m.name for m in measurements)..., ("$(candidate.name) vs $(m.name)" for m in references)...]
     print(io, markdown_row(header), "|", " --- |"^length(header), "\n")
     for key in configurations
         sypds = [format_sypd(get(m.sypd, key, nothing)) for m in measurements]
@@ -243,11 +245,13 @@ function comparison_table(candidate::Measurement, references, threshold)
             both = haskey(candidate.sypd, key) && haskey(reference.sypd, key)
             format_change(both ? candidate.sypd[key] / reference.sypd[key] : nothing, threshold)
         end
-        print(io, markdown_row([key[1], key[2], key[3] == "matrix" ? "MT" : "LT+FFT", sypds..., changes...]))
+        transform = key[3] == "matrix" ? "MT" : "LT+FFT"
+        print(io, markdown_row([key[1], (layers ? [key[2]] : [])..., transform, sypds..., changes...]))
     end
     for group in GROUPS
         changes = [format_change(geomean_ratio(candidate, reference, group), threshold) for reference in references]
-        print(io, markdown_row(["**geomean $(GROUP_LABELS[group])**", "", "", fill("", length(measurements))..., changes...]))
+        empty_cells = fill("", length(measurements) + (layers ? 2 : 1))
+        print(io, markdown_row(["**geomean $(GROUP_LABELS[group])**", empty_cells..., changes...]))
     end
 
     println(io, "\nSYPD = simulated years per wallclock day, higher is better; best of N runs.")
@@ -324,7 +328,7 @@ function bisect_report(result, measurements, output_dir)
     io = IOBuffer()
     println(io, "\n### Bisection\n")
     cutoff = @sprintf("%.3f", result.cutoff)
-    println(io, "First parent of main from $(short(result.good)) (good) to $(short(result.bad)) (bad); a revision is bad if its ")
+    println(io, "First parent of $(result.candidate_name) from $(short(result.good)) (good) to $(short(result.bad)) (bad); a revision is bad if its ")
     println(io, "geomean $(GROUP_LABELS[result.group]) SYPD ratio vs $(reference.name) is below $cutoff.\n")
     print(io, markdown_row(["commit", "ratio", "verdict"]), "| --- | --- | --- |\n")
     files = Dict(revision(m) => m.files for m in measurements)
@@ -346,31 +350,34 @@ end
 
 # CHECK
 
-"""Benchmark main, the latest release and the latest benchmarked revision, compare, confirm a
-regression with a second run and optionally bisect it. Writes report.md and summary.json to
-`output_dir` and returns whether main regressed."""
+"""Benchmark `candidate` (default: main) and as references main, the latest release and the latest
+benchmarked revision, compare, confirm a regression with a second run and optionally bisect it.
+Writes report.md and summary.json to `output_dir` and returns whether the candidate regressed."""
 function check(;
-        arch = "cpu", ref = "origin/main", threshold = 0.85, workdir = default_workdir(),
+        arch = "cpu", ref = "origin/main", candidate = ref, threshold = 0.85, workdir = default_workdir(),
         output_dir = joinpath(workdir, "results"), confirm = true, bisect_regression = false, fetch = true,
     )
     fetch && git(REPO, "fetch", "origin", "--tags", "--quiet")
     label = arch_label(arch)
     main_sha = git(REPO, "rev-parse", "$ref^{commit}")
+    candidate_sha = git(REPO, "rev-parse", "$candidate^{commit}")
+    candidate_name = candidate_sha == main_sha ? "main" : "branch"
+    branch = git(REPO, "rev-parse", "--abbrev-ref", candidate)     # for the headline, e.g. the PR branch
     release = latest_release()
     notes = String[]
 
-    candidates = ["release $release" => git(REPO, "rev-parse", "$release^{commit}")]
+    named = ["release $release" => git(REPO, "rev-parse", "$release^{commit}"), "main" => main_sha]
     try
-        pushfirst!(candidates, "benchmarked" => benchmarked_commit(label; ref))
+        pushfirst!(named, "benchmarked" => benchmarked_commit(label; ref))
     catch err
         push!(notes, sprint(showerror, err))     # e.g. no stored results for this arch yet
     end
 
-    # references, merged if they are the same commit, and dropped if they are main
+    # references, merged if they are the same commit, and dropped if they are the candidate
     references = Pair{String, String}[]
-    for (name, sha) in candidates
-        if sha == main_sha
-            push!(notes, "$name is the same commit as main ($(short(sha))).")
+    for (name, sha) in named
+        if sha == candidate_sha
+            name == "main" || push!(notes, "$name is the same commit as $candidate_name ($(short(sha))).")
             continue
         end
         i = findfirst(r -> r.second == sha, references)
@@ -387,61 +394,74 @@ function check(;
                 push!(notes, "$name ($(short(sha))) could not be benchmarked with the current harness, see $(file(name, 1)).log")
             end
         end
-        benchmark(main_sha, file("main", 1); arch, workdir) || error("benchmarking main failed, see $(file("main", 1)).log")
-        main = Measurement("main", [file("main", 1)])
-        comparisons = [compare(main, reference, threshold) for reference in measured]
+        benchmark(candidate_sha, file(candidate_name, 1); arch, workdir) ||
+            error("benchmarking $candidate_name failed, see $(file(candidate_name, 1)).log")
+        tested = Measurement(candidate_name, [file(candidate_name, 1)])
+        comparisons = [compare(tested, reference, threshold) for reference in measured]
 
         if confirm && any(c -> c.regressed, comparisons)
-            @info "Possible regression, benchmarking main and the regressed references again to confirm"
-            for m in [main; [c.reference for c in comparisons if c.regressed]]
+            @info "Possible regression, benchmarking $candidate_name and the regressed references again to confirm"
+            for m in [tested; [c.reference for c in comparisons if c.regressed]]
                 benchmark(revision(m), file(m.name, 2); arch, workdir) && push!(m.files, file(m.name, 2))
             end
             measured = [Measurement(m.name, m.files) for m in measured]
-            main = Measurement(main.name, main.files)
-            comparisons = [compare(main, reference, threshold) for reference in measured]
+            tested = Measurement(tested.name, tested.files)
+            comparisons = [compare(tested, reference, threshold) for reference in measured]
         end
         regressed = filter(c -> c.regressed, comparisons)
 
         bisection = nothing
         if bisect_regression && !isempty(regressed)
-            # bisect from the most recent regressed reference
+            # bisect from the most recent regressed reference (or where the candidate branched off it)
             newest = reduce((a, b) -> is_ancestor(revision(a.reference), revision(b.reference)) ? b : a, regressed)
-            good = revision(newest.reference)
-            is_ancestor(good, main_sha) || (good = git(REPO, "merge-base", good, main_sha))
-            bisection = bisect(;
-                good, bad = main_sha, reference = newest.reference.files, newest.cutoff, newest.group,
-                arch, workdir, output_dir,
-            )
-            bisection = (; bisection..., reference = newest.reference)
+            good = git(REPO, "merge-base", revision(newest.reference), candidate_sha)
+            # where the candidate branched off the reference may already be slow, e.g. if the
+            # reference fixed a regression later; bisecting from there would blame the wrong commit
+            base_file = joinpath(output_dir, "bisect-$(short(good)).json")
+            base_is_slow = good != revision(newest.reference) && benchmark(good, base_file; arch, workdir) &&
+                geomean_ratio(Measurement("base", [base_file]), newest.reference, newest.group) < newest.cutoff
+            if good == candidate_sha
+                push!(notes, "Nothing to bisect, $candidate_name is an ancestor of $(newest.reference.name).")
+            elseif base_is_slow
+                push!(notes, "Not bisected: $(short(good)), where $candidate_name branched off $(newest.reference.name), is already slow. Merge or rebase onto $(newest.reference.name) first.")
+            else
+                bisection = bisect(;
+                    good, bad = candidate_sha, reference = newest.reference.files, newest.cutoff, newest.group,
+                    arch, workdir, output_dir,
+                )
+                bisection = (; bisection..., reference = newest.reference, candidate_name)
+            end
         end
 
         headline = if isempty(measured)
-            "nothing to compare main with"
+            "nothing to compare $candidate_name with"
         elseif isempty(regressed)
             "no significant regression"
         else
             worst = regressed[argmin([c.ratio for c in regressed])]
             slower = @sprintf("%.0f%%", (1 - worst.ratio) * 100)
-            "**regression**, main is $slower slower than $(worst.reference.name) (geomean $(GROUP_LABELS[worst.group]))"
+            "**regression**, $candidate_name is $slower slower than $(worst.reference.name) (geomean $(GROUP_LABELS[worst.group]))"
         end
+        of = candidate_name == "main" ? "" : " of `$branch`"
         report = IOBuffer()
-        println(report, "## Benchmark regression check: $headline\n")
+        println(report, "## Benchmark regression check$of: $headline\n")
         date = Libc.strftime("%Y-%m-%d", time())
-        println(report, "`manual_benchmarking.jl --debug` (PrimitiveWet, T ≤ 128) on $label, $(Sys.cpu_info()[1].model), Julia $VERSION, $date.\n")
-        print(report, comparison_table(main, measured, threshold))
-        println(report, "\nRegression = geometric-mean SYPD ratio main / reference < $threshold:")
+        println(report, "`manual_benchmarking.jl --debug` (PrimitiveWet, L8, T ≤ 128) on $label, $(Sys.cpu_info()[1].model), Julia $VERSION, $date.\n")
+        print(report, comparison_table(tested, measured, threshold))
+        println(report, "\nRegression = geometric-mean SYPD ratio $candidate_name / reference < $threshold:")
         print(report, verdict_lines(comparisons, threshold))
         foreach(note -> println(report, "\nNote: ", note), notes)
-        isnothing(bisection) || print(report, bisect_report(bisection, [measured; main], output_dir))
+        isnothing(bisection) || print(report, bisect_report(bisection, [measured; tested], output_dir))
         report = String(take!(report))
 
         mkpath(output_dir)
         write(joinpath(output_dir, "report.md"), report)
         summary = Dict(
             "regression" => !isempty(regressed),
+            "candidate" => Dict("name" => candidate_name, "ref" => branch, "revision" => candidate_sha),
             "arch_label" => label,
             "threshold" => threshold,
-            "measurements" => [Dict("name" => m.name, "revision" => revision(m), "files" => m.files) for m in [measured; main]],
+            "measurements" => [Dict("name" => m.name, "revision" => revision(m), "files" => m.files) for m in [measured; tested]],
             "comparisons" => [
                 Dict("reference" => c.reference.name, "ratios" => Dict(c.ratios), "regressed" => c.regressed, "group" => c.group, "cutoff" => c.cutoff)
                     for c in comparisons
@@ -508,6 +528,7 @@ function main(command, args)
     if command == "check"
         regressed = check(;
             arch, workdir, output_dir, threshold, ref = option(options, "ref", "origin/main"),
+            candidate = option(options, "candidate", option(options, "ref", "origin/main")),
             confirm = !haskey(options, "no-confirm"), bisect_regression = haskey(options, "bisect"),
             fetch = !haskey(options, "no-fetch"),
         )
@@ -528,7 +549,7 @@ function main(command, args)
             reference = reference.files, cutoff = parse(Float64, option(options, "cutoff")),
             group = option(options, "group", "all"), arch, workdir, output_dir,
         )
-        print(bisect_report((; result..., reference), Measurement[], output_dir))
+        print(bisect_report((; result..., reference, candidate_name = option(options, "bad")), Measurement[], output_dir))
         return 0
 
     elseif command == "bisect-step"
