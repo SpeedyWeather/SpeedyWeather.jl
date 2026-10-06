@@ -152,9 +152,14 @@ end
 # use Float32 as default for weights
 (::Type{L})(npoints::Integer; kwargs...) where {L <: AbstractLocator} = L(DEFAULT_NF, npoints; kwargs...)
 
-function Base.show(io::IO, L::AnvilLocator)
-    println(io, "$(typeof(L))")
-    return print(io, "└ npoints_output::Int = $(L.npoints_output)")
+function Base.show(io::IO, L::AbstractLocator)
+    type_str = split("$(typeof(L))", "{", limit = 2)
+    type_itself = type_str[1]
+    type_params = length(type_str) == 2 ? ("{" * type_str[2]) : ""
+    type_params_short = length(type_params) > 30 ? first(type_params, 30) * "...}" : type_params
+    println(io, styled"{warning:$type_itself}{note:$type_params_short}" * " <: $(supertype(typeof(L)))")
+    Utils.print_fields(io, L, propertynames(L))
+    return nothing
 end
 
 
