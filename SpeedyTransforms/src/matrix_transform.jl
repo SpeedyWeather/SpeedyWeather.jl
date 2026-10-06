@@ -8,7 +8,6 @@ struct MatrixSpectralTransform{
         GridType,                   # <: AbstractGrid
         VectorType,                 # <: ArrayType{NF, 1},
         MatrixType,                 # <: ArrayType{NF, 2},
-        MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
         GradientType,               # <: Gradients struct (see gradient_arrays.jl)
     } <: AbstractSpectralTransform{NF, AR}
 
@@ -32,14 +31,16 @@ struct MatrixSpectralTransform{
     eigenvalues::VectorType
     eigenvalues⁻¹::VectorType
 
-    # THE ACTUAL TRANSFORM MATRICES for forward = LT(FFT(input)) and backward = IFFT(ILT(input))
-    forward::MatrixComplexType          # forward transform matrix
-    backward::MatrixComplexType         # backward transform matrix
+    # THE ACTUAL TRANSFORM MATRICES for forward = LT(FFT(input)) and backward = IFFT(ILT(input)).
+    # The complex forward matrix F and backward matrix B are stored as real matrices with their real and
+    # imaginary parts stacked, so that both directions are a single real matrix-matrix multiply that
+    # dispatches to BLAS/CUBLAS/rocBLAS on every architecture. A complex × real `mul!` would not
+    # (equal element types are required) and falls back to a generic, 100× slower loop/kernel.
+    forward_stacked::MatrixType         # [Re(F); Im(F)], size (2nharmonics, npoints): [Re(c); Im(c)] = forward_stacked*field
+    backward_stacked::MatrixType        # [Re(B) -Im(B)], size (npoints, 2nharmonics): field = Re(B*c) = backward_stacked*[Re(c); Im(c)]
 
-    backward_real::MatrixType           # real part of backward transform matrix
-    backward_imag::MatrixType           # imag part of backward transform matrix
-
-    # SCRATCH MEMORY
+    # SCRATCH MEMORY, size (2nharmonics, nlayers), holds [Re(c); Im(c)] for up to nlayers columns, the
+    # widest batch a transform call may have (sized to the widest batch any model emits via SpectralGrid)
     scratch_memory::MatrixType
 
     gradients::GradientType             # precomputed gradient and integration matrices
@@ -89,15 +90,12 @@ function MatrixSpectralTransform(
     progress_bwd = ProgressMeter.Progress(2 * nharmonics; dt = 2, desc = "Precalculate backward matrix:")
     backward_matrix!(backward, S, field2D, coeffs2D, progress_bwd)
 
-    forward = on_architecture(architecture, forward)
-    backward = on_architecture(architecture, backward)
+    # stack real and imaginary parts into real matrices, see struct definition
+    forward_stacked = on_architecture(architecture, vcat(real(forward), imag(forward)))
+    backward_stacked = on_architecture(architecture, hcat(real(backward), -imag(backward)))
 
-    backward_real = real(backward)
-    backward_imag = imag(backward)
-
-    # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory = on_architecture(architecture, zeros(NF, spectrum, nlayers).data)
-    #scratch_memory = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
+    # SCRATCH MEMORY for the stacked real and imaginary parts of the coefficients, nlayers columns
+    scratch_memory = on_architecture(architecture, zeros(NF, 2 * nharmonics, nlayers))
 
     # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES + LAPLACE EIGENVALUES (stored on the transform,
     # not inside `gradients`, so the `gradients` type stays short — see `Gradients`)
@@ -110,8 +108,7 @@ function MatrixSpectralTransform(
         typeof(spectrum),
         typeof(grid),
         typeof(coslat),
-        typeof(backward_real),
-        typeof(forward),
+        typeof(forward_stacked),
         typeof(gradients),
     }(
         architecture,
@@ -119,10 +116,8 @@ function MatrixSpectralTransform(
         coslat, coslat⁻¹,
         S.norm_sphere,
         eigenvalues, eigenvalues⁻¹,
-        forward,
-        backward,
-        backward_real,
-        backward_imag,
+        forward_stacked,
+        backward_stacked,
         scratch_memory,
         gradients,
     )
@@ -170,21 +165,34 @@ function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2
     return nothing
 end
 
-"""On the CPU a `reshape` of a view is a `Base.ReshapedArray` that LinearAlgebra still recognizes
-as a `StridedArray`, so `mul!` dispatches to BLAS without needing to materialize anything."""
+"""On the CPU nothing needs to be copied: BLAS and broadcasting handle strided views directly,
+so a 2-D array (also a 2-D view) is used as is and n-dimensional data is collapsed into columns
+with a (zero-copy) `reshape`."""
 function _as_matrix(x::AbstractArray, ::AbstractArchitecture)
     ndims(x) == 2 && return x, false
     return reshape(x, size(x, 1), :), false
 end
 
-"""On the GPU non-contiguous views need materializing first. For the PrimitiveWetModel this should
-never be hit as all transforms actually act on fused variables and/or contiguous views (which
-aren't treated as views by CUDA.jl/AMDGPU.jl/..)."""
+"""On the GPU only arrays that are themselves GPU arrays can go into CUBLAS/rocBLAS. Contiguous
+views of GPU arrays are GPU arrays (CUDA.jl/AMDGPU.jl/... do not wrap them in a `SubArray`), so the
+fused variables of a model never copy. Everything else (nested or non-contiguous views, which are
+not `StridedCuArray`s) is materialized first; the second return value signals that the result has to
+be copied back when it is used as output."""
 function _as_matrix(x::AbstractArray, ::GPU)
-    ndims(x) == 2 && return x, false
     n = size(x, 1)
-    parent(x) === x && return reshape(x, n, :), false
-    return reshape(copy(x), n, :), true
+    x isa AbstractGPUArray || return reshape(copy(x), n, :), true
+    ndims(x) == 2 && return x, false
+    return reshape(x, n, :), false
+end
+
+# The stacked real/imaginary parts of `ncolumns` columns of coefficients have to fit into the scratch
+# memory: `scratch_memory` is (2nharmonics, nlayers) with `nlayers` the largest batch the transform
+# was constructed for (`MatrixSpectralTransform(spectral_grid)` sizes it to the widest batch a model
+# emits, see `max_transform_batch`).
+function _check_scratch(scratch_memory, nharmonics::Integer, ncolumns::Integer)
+    size(scratch_memory, 1) == 2nharmonics || throw(DimensionMismatch("scratch memory of size $(size(scratch_memory)) does not match $(2nharmonics) stacked harmonics"))
+    ncolumns <= size(scratch_memory, 2) || throw(DimensionMismatch("$ncolumns columns to transform but scratch memory has $(size(scratch_memory, 2)), construct the MatrixSpectralTransform with nlayers >= $ncolumns"))
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -196,7 +204,7 @@ as long as `field.grid` and `M.grid` match."""
 function transform!(                        # GRID TO SPECTRAL
         coeffs::LowerTriangularArray,       # output: spectral coefficients
         field::AbstractField,               # input: gridded values
-        scratch_memory,                     # explicit scratch memory (not used only in spectral to grid)
+        scratch_memory,                     # explicit scratch memory, (2nharmonics, ncolumns) real
         M::MatrixSpectralTransform,         # precomputed spectral transform
     )
 
@@ -208,11 +216,20 @@ function transform!(                        # GRID TO SPECTRAL
 
     # Collapse any batch/layer dimensions into columns so the single dense matrix multiply also
     # works for n-dimensional (batched/fused) fields, not just 2D. This is not a batched matmul
-    # (one matrix `M.forward` × many columns), so one big `mul!` (→ `BLAS.gemm!`) is both correct
-    # and optimal. See `_as_matrix` for why GPU non-contigous views need materializing first (CPU views don't).
+    # (one matrix × many columns), so one big `mul!` is both correct and optimal.
+    # See `_as_matrix` for why GPU non-contiguous views need materializing first (CPU views don't).
     field_matrix, _ = _as_matrix(field.data, M.architecture)                # read-only source, no writeback needed
     coeffs_matrix, coeffs_materialized = _as_matrix(coeffs.data, M.architecture)
-    @maybe_jit M.architecture LinearAlgebra.mul!(coeffs_matrix, M.forward, field_matrix)
+    nharmonics, ncolumns = size(coeffs_matrix)
+    @boundscheck _check_scratch(scratch_memory, nharmonics, ncolumns)
+    scratch = view(scratch_memory, :, 1:ncolumns)
+
+    # [Re(c); Im(c)] = [Re(F); Im(F)] * field, a single real matrix multiply
+    @maybe_jit M.architecture LinearAlgebra.mul!(scratch, M.forward_stacked, field_matrix)
+
+    # combine the stacked real and imaginary parts into the complex coefficients
+    coeffs_matrix .= complex.(view(scratch, 1:nharmonics, :), view(scratch, (nharmonics + 1):(2nharmonics), :))
+
     coeffs_materialized && copyto!(coeffs.data, coeffs_matrix)
     return coeffs
 end
@@ -226,7 +243,7 @@ as `field.grid` and `M.grid` match."""
 function transform!(                        # SPECTRAL TO GRID
         field::AbstractField,               # gridded output
         coeffs::LowerTriangularArray,       # spectral coefficients input
-        scratch_memory,                     # explicit scratch memory to use
+        scratch_memory,                     # explicit scratch memory, (2nharmonics, ncolumns) real
         M::MatrixSpectralTransform;         # precomputed transform
         unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
     )
@@ -237,20 +254,18 @@ function transform!(                        # SPECTRAL TO GRID
 
     # Collapse any batch/layer dimensions into columns (see the grid→spectral transform above),
     # so the dense matrix multiply also works for n-dimensional (batched/fused) coefficients.
-    # `scratch_memory` is sized (in spectral_grid.jl) to the largest batch a spectral→grid
-    # transform emits, so a column-view of the required width always fits.
-    ncolumns = length(coeffs.data) ÷ size(coeffs.data, 1)
-    coeffs_matrix = reshape(coeffs.data, size(coeffs.data, 1), ncolumns)
+    coeffs_matrix, _ = _as_matrix(coeffs.data, M.architecture)              # read-only source, no writeback needed
     field_matrix, field_materialized = _as_matrix(field.data, M.architecture)
+    nharmonics, ncolumns = size(coeffs_matrix)
+    @boundscheck _check_scratch(scratch_memory, nharmonics, ncolumns)
     scratch = view(scratch_memory, :, 1:ncolumns)
 
-    # the result is real-valued, therefore we can split the complex multiplication
-    # into two real-valued multiplications
-    scratch .= real.(coeffs_matrix)
-    @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_real, scratch)
+    # the result is real-valued: field = Re(B*c) = Re(B)*Re(c) - Im(B)*Im(c) is a single real
+    # matrix multiply [Re(B) -Im(B)] * [Re(c); Im(c)] with the stacked real/imaginary parts
+    view(scratch, 1:nharmonics, :) .= real.(coeffs_matrix)
+    view(scratch, (nharmonics + 1):(2nharmonics), :) .= imag.(coeffs_matrix)
+    @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_stacked, scratch)
 
-    scratch .= imag.(coeffs_matrix)
-    @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_imag, scratch, -1, 1)
     field_materialized && copyto!(field.data, field_matrix)
 
     if unscale_coslat

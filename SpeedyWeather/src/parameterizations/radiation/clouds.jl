@@ -67,6 +67,13 @@ end
 Adapt.@adapt_structure DiagnosticClouds
 DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF}(; kwargs...)
 initialize!(clouds::DiagnosticClouds, model::AbstractModel) = nothing
+
+variables(::DiagnosticClouds) = (
+    ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
+    ParameterizationVariable(:cloud_top_height, Grid2D(), desc = "Cloud top height", units = "m"),
+    ParameterizationVariable(:cloud_cover, Grid2D(), desc = "Cloud cover", units = "1"),
+)
+
 @propagate_inbounds function clouds!(
         ij,
         vars,
@@ -119,29 +126,37 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
 
     # from convection or large-scale condensation
     cloud_top_precipitation = vars.parameterizations.cloud_top[ij]
-    humidity_term_cloud_top::NF = 0
-    cloud_top_humidity = nlayers + 1
+    Δrh_max::NF = 0                     # maximum relative humidity excess over rh_min
+    cloud_top_humidity = nlayers + 1    # level of maximum relative humidity, nlayers + 1 = no cloud
 
-    # Find cloud top from RH threshold
-    for k in 1:(nlayers - 1)
+    # Find cloud top as the level of maximum relative humidity (SPEEDY), not the highest level
+    # exceeding rh_min, in tropospheric layers excluding the top (stratosphere) and the
+    # surface (boundary) layer, loop upwards so that ties are resolved to the lower level
+    for k in (nlayers - 1):-1:2
         humidity_k = humid[ij, k]
         pₖ = pressure(k, pₛ, vertical_coordinates)
         qsat = saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
         if humidity_k > q_min && qsat > 0
-            relative_humidity_k = humidity_k / qsat
-
-            if relative_humidity_k >= rh_min
-                rh_norm = max(0, (relative_humidity_k - rh_min) / (rh_max - rh_min))
-                humidity_term_cloud_top = min(1, rh_norm)^2
-                cloud_top_humidity = min(k, cloud_top_humidity)
+            Δrh = humidity_k / qsat - rh_min
+            if Δrh > Δrh_max
+                Δrh_max = Δrh
+                cloud_top_humidity = k
             end
         end
     end
 
-    # Combined cloud cover
-    cloud_cover = min(1, P + humidity_term_cloud_top)
+    # Combined cloud cover, quadratic in the maximum relative humidity
+    humidity_term = min(1, Δrh_max / (rh_max - rh_min))^2
+    cloud_cover = min(1, P + humidity_term)
     cloud_top = min(cloud_top_humidity, cloud_top_precipitation)
     vars.parameterizations.cloud_top[ij] = cloud_top
+
+    # store cloud cover and cloud top height [m] (0 for no cloud) for output
+    vars.parameterizations.cloud_cover[ij] = cloud_cover
+    # cloud_top is stored as float (integer-valued) so convert to index, nlayers + 1 = no cloud
+    k_top = min(unsafe_trunc(Int, cloud_top), nlayers)
+    Φ_top = geopotential[ij, k_top]
+    vars.parameterizations.cloud_top_height[ij] = ifelse(cloud_top <= nlayers, Φ_top / model.planet.gravity, zero(NF))
 
     # Stratocumulus parameterization
     stratocumulus_cover::NF = 0         # fallback for no stratocumulus
