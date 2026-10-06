@@ -168,6 +168,7 @@ end
 @kwdef struct Locator3DDim <: AbstractVariableDim
     n::Int = 1
 end
+const LocatorDim = Locator3DDim
 
 function allocate(v::AbstractVariable{Locator3DDim}, model::AbstractModel)
     (; NF, architecture, nlayers) = model.spectral_grid
