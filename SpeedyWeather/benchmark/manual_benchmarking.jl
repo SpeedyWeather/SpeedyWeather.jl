@@ -223,7 +223,7 @@ arch_record = Dict(
 if DEBUG_MODE
     print(arch_record["markdown"])
     if !isnothing(OUTPUT_PATH)
-        meta = arch_record["meta"]
+        meta = arch_record["meta"] = Dict{String, Any}(arch_record["meta"])
         meta["arch_label"] = ARCH_LABEL
         meta["debug_max_truncation"] = DEBUG_MAX_TRUNCATION
         meta["debug_nlayers"] = DEBUG_NLAYERS

@@ -20,8 +20,10 @@ user can paste into a GitHub comment. It never posts anything to GitHub itself.
   to source files, tell the user they are not included and ask whether to continue or commit first.
 - **One benchmark at a time**, and no other heavy work (tests, builds, other agents) in parallel —
   contention makes the timings meaningless.
-- Expect 20–45 min without and 1–2 h with a bisection on Apple silicon, mostly precompiling every
-  revision. Run it with `run_in_background` and wait for the completion notification; don't poll.
+- On Apple silicon (M3) each revision takes ~10 min (~7.5 min benchmark, 2–4 min precompile):
+  ~40 min for the four revisions without a regression; a confirmed regression adds ~30 min and
+  a bisection ~10 min per step (≈ log₂ of the commits in range). Run it with `run_in_background`
+  and wait for the completion notification; don't poll.
 - Every Bash call starts a fresh shell: repeat the variable block at the top of each call.
 
 ```bash
