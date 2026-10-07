@@ -314,7 +314,9 @@ forward to it. A 3D (vertically blended) interpolation is `interpolate_3D!` inst
 methods on plain arrays take the raw ring-ordered data, i.e. `field.data`, so that views and
 reshapes of a field's data can be passed too. This method interpolates a single layer, the
 `AbstractMatrix` method below interpolates all layers of a `(npoints, nlayers)` matrix in a
-single (batched) launch."""
+single (batched) launch. A single layer is passed on to that batched method as a one-column
+matrix whenever that reshape is O(1), so that the pole averages are written into the
+locator's preallocated buffers on device instead of being allocated and reduced on every call."""
 function interpolate_2D!(
         Aout::AbstractVector,               # Out: interpolated values
         A::AbstractVector,                  # gridded values to interpolate from
@@ -322,6 +324,12 @@ function interpolate_2D!(
         geometry::GridGeometry,
         architecture::AbstractArchitecture
     )
+    if is_flattenable(Aout) && is_flattenable(A)
+        interpolate_2D!(reshape(Aout, :, 1), reshape(A, :, 1), locator, geometry, architecture)
+        return Aout
+    end
+
+    # otherwise (e.g. strided views) the single-layer kernel with allocated pole averages
     (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
     (; npoints) = geometry
     (; rings) = geometry.grid # CPU version even on GPU

@@ -92,17 +92,72 @@ function add_default!(
 end
 
 """$(TYPEDSIGNATURES)
-Move `src` (a field on the model grid, on CPU) onto the output grid of `output`, writing
-into `dest`. Interpolates with `output.interpolator`, or copies straight over when
-`output.interpolator === nothing`, i.e. when the output grid already is the model grid and
-`output` was constructed without an interpolator (see [`HEALPixOutput`](@ref) for a
-simulation that already runs on the output's HEALPix grid)."""
+Allocate the scratch fields of a gridded output writer on `output_grid`, which is on the
+model's architecture so that interpolation and post-processing run where the model runs:
+`land_fraction`, `field2D`, `field3D` (`nlayers`) and `field3Dland` (`nlayers_soil`), all in
+`output_NF`. Also returns their host (CPU) copies `host2D`, `host3D`, `host3Dland` that the
+data is copied into for writing. On CPU these are the very same objects, so no copy is made.
+Returned as a NamedTuple to be splatted into the writer's keyword constructor."""
+function output_scratch_fields(
+        output_NF::Type{<:AbstractFloat},
+        output_grid::AbstractGrid,
+        nlayers::Integer,
+        nlayers_soil::Integer,
+    )
+    land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction
+    field2D = Field(output_NF, output_grid)
+    field3D = Field(output_NF, output_grid, nlayers)
+    field3Dland = Field(output_NF, output_grid, nlayers_soil)
+    host2D, host3D, host3Dland = host_field(field2D), host_field(field3D), host_field(field3Dland)
+    return (; land_fraction, field2D, field3D, field3Dland, host2D, host3D, host3Dland)
+end
+
+"""$(TYPEDSIGNATURES)
+Host (CPU) equivalent of `field` to write from: `field` itself if it already is on the CPU,
+otherwise a newly allocated copy on the CPU."""
+host_field(field::AbstractField) = ismatching(CPU(), field.data) ? field : on_architecture(CPU(), field)
+
+"""$(TYPEDSIGNATURES)
+Scratch field on the output grid (on the model's architecture) to interpolate `variable`
+into, and its host (CPU) equivalent to write from, see [`output_scratch_fields`](@ref)."""
+function scratch_fields(output::AbstractOutput, variable::AbstractOutputVariable)
+    is3D(variable) || return output.field2D, output.host2D
+    is_land(variable) && return output.field3Dland, output.host3Dland
+    return output.field3D, output.host3D
+end
+
+"""$(TYPEDSIGNATURES)
+Move `src` (a field on the model grid and the model's architecture) onto the output grid of
+`output`, writing into `dest` (on the same architecture). Interpolates with
+`output.interpolator`, or copies straight over when `output.interpolator === nothing`, i.e.
+when the output grid already is the model grid and `output` was constructed without an
+interpolator (see [`HEALPixOutput`](@ref) for a simulation that already runs on the output's
+HEALPix grid)."""
 function interpolate_output!(output::AbstractOutput, dest::AbstractField, src::AbstractField)
     isnothing(output.interpolator) || return RingGrids.interpolate!(dest, src, output.interpolator)
 
     # No interpolator: the output grid is the model grid, copy straight over
     fields_match(dest, src) || throw(DimensionMismatch(dest, src))
     return copyto!(dest.data, src.data)
+end
+
+"""$(TYPEDSIGNATURES)
+Write `field` (on the output grid and the model's architecture) of `variable` into `output`:
+copy it into its `host` equivalent (no-op on CPU where `host === field`), round its
+mantissa bits for compression if `variable` has `keepbits` (on the host, as rounding is
+cheap there) and write via the backend-specific [`write_array!`](@ref)."""
+function write_output!(
+        output::AbstractOutput,
+        variable::AbstractOutputVariable,
+        field::AbstractField,
+        host::AbstractField,
+    )
+    host === field || copyto!(host.data, field.data)     # device to host
+    if hasproperty(variable, :keepbits)                  # round mantissabits for compression
+        round!(host, variable.keepbits)
+    end
+    write_array!(output, variable, host)
+    return nothing
 end
 
 function set!(output::AbstractOutput; active, reset_path = true)
@@ -170,8 +225,8 @@ function output!(
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
-    # interpolate 2D/3D variables
-    var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
+    # scratch field to interpolate into (on the model's architecture) and its host equivalent
+    var, host = scratch_fields(output, variable)
 
     ori = path_or_nothing(variable, simulation)         # original array as in simulation
     isnothing(ori) && return nothing                    # silently escape early if variable is not defined in the simulation
@@ -186,8 +241,8 @@ function output!(
     # grid and the model's architecture, i.e. before the horizontal interpolation
     ori = interpolate_layers!(output_layers(output), ori, variable, simulation)
 
-    raw = on_architecture(CPU(), ori)
-    interpolate_output!(output, var, raw)
+    # interpolate onto the output grid, and post-process below, on the model's architecture
+    interpolate_output!(output, var, ori)
 
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)
@@ -209,11 +264,7 @@ function output!(
         end
     end
 
-    if hasproperty(variable, :keepbits)     # round mantissabits for compression
-        round!(var, variable.keepbits)
-    end
-
-    write_array!(output, variable, var)
+    write_output!(output, variable, var, host)     # to host, round and write
     return nothing
 end
 

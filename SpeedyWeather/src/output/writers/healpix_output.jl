@@ -37,7 +37,8 @@ output = HEALPixOutput(spectral_grid, PrimitiveWet, output_grid = OctaHEALPixGri
 ```
 
 Type parameters: `Field2D`, `Field3D` are the scratch field types on the output
-grid, `Interpolator` is the interpolator type (or `Nothing` when the model
+grid (on the model's architecture), `HostField2D`, `HostField3D` their host (CPU)
+equivalents to write from, `Interpolator` is the interpolator type (or `Nothing` when the model
 grid already is the output grid and interpolation is skipped), `DT` and `S` are the
 start-date and output-step types, `C` is the Zarr compressor type (or `Nothing` for
 the Zarr default), `Z` is the Zarr group type once `initialize!` has been called
@@ -46,6 +47,8 @@ Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct HEALPixOutput{
         Field2D,
         Field3D,
+        HostField2D,
+        HostField3D,
         Interpolator,
         DT,
         S,
@@ -126,10 +129,15 @@ Fields are $(TYPEDFIELDS)"""
     const interpolator::Interpolator
     const land_fraction::Field2D
 
-    # SCRATCH FIELDS ON THE OUTPUT HEALPIX GRID TO INTERPOLATE (OR COPY) ONTO
+    # SCRATCH FIELDS ON THE OUTPUT HEALPIX GRID TO INTERPOLATE (OR COPY) ONTO, on the model's architecture
     const field2D::Field2D
     const field3D::Field3D
     const field3Dland::Field3D
+
+    # HOST (CPU) COPIES OF THE SCRATCH FIELDS TO WRITE FROM, the same objects on CPU
+    const host2D::HostField2D
+    const host3D::HostField3D
+    const host3Dland::HostField3D
 end
 
 """$(TYPEDSIGNATURES)

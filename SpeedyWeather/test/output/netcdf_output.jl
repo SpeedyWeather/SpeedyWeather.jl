@@ -369,3 +369,18 @@ end
     output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = SpeedyWeather.PressureLayers(spectral_grid, p))
     @test pole_buffer_length(output) == max(length(p), SpeedyWeather.DEFAULT_NLAYERS_SOIL)
 end
+
+@testset "Output scratch fields on CPU are written from directly" begin
+    spectral_grid = SpectralGrid(truncation = 15, nlayers = 2)
+    output = NetCDFOutput(spectral_grid, PrimitiveWet)
+
+    # on CPU the host copies are the scratch fields themselves, so nothing is copied
+    @test output.host2D === output.field2D
+    @test output.host3D === output.field3D
+    @test output.host3Dland === output.field3Dland
+
+    # the interpolator is built from the model grid, on the model's architecture
+    @test SpeedyWeather.ismatching(spectral_grid.architecture, output.interpolator.locator.ij_as)
+    @test SpeedyWeather.scratch_fields(output, SpeedyWeather.TemperatureOutput()) === (output.field3D, output.host3D)
+    @test SpeedyWeather.scratch_fields(output, SpeedyWeather.SurfacePressureOutput()) === (output.field2D, output.host2D)
+end

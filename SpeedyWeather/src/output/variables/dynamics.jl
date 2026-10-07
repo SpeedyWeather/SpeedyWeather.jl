@@ -189,16 +189,9 @@ function output!(
     (; transform) = variable                            # to change units from log(Pa) to hPa
     @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)      # log Pa to hPa
 
-    # interpolate 2D/3D variables
-    mslp_output = output.field2D
-    mslp_grid = on_architecture(CPU(), mslp)
-    interpolate_output!(output, mslp_output, mslp_grid)
-
-    if hasproperty(variable, :keepbits)                 # round mantissabits for compression
-        round!(mslp_output, variable.keepbits)
-    end
-
-    write_array!(output, variable, mslp_output)
+    # interpolate onto the output grid on the model's architecture, then to host, round and write
+    interpolate_output!(output, output.field2D, mslp)
+    write_output!(output, variable, output.field2D, output.host2D)
     return nothing
 end
 
