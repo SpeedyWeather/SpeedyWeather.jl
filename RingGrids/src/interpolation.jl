@@ -897,7 +897,9 @@ $(TYPEDSIGNATURES)
 Pole averages per layer of `A` written into the `north_pole_average`, `south_pole_average`
 buffers of `locator` without allocating, returning these buffers. Falls back to the
 allocating `average_on_poles` if the buffers have fewer entries than `A` has layers (e.g.
-a locator created with the default `nlayers = 1`) or for integer data, which is rounded."""
+a locator created with the default `nlayers = 1`), for integer data, which is rounded, or if
+the buffers' number format is less precise than `A`'s (e.g. Float64 data with a Float32
+interpolator), so that the pole averages keep the precision of the data."""
 function average_on_poles!(
         locator::AnvilLocator,
         A::AbstractMatrix,
@@ -906,7 +908,8 @@ function average_on_poles!(
     )
     (; north_pole_average, south_pole_average) = locator
     nlayers = size(A, 2)
-    if eltype(A) <: AbstractFloat && length(north_pole_average) >= nlayers
+    T = eltype(north_pole_average)
+    if eltype(A) <: AbstractFloat && promote_type(eltype(A), T) == T && length(north_pole_average) >= nlayers
         launch!(
             architecture, LinearWorkOrder, (nlayers,), _compute_pole_averages_kernel!,
             north_pole_average, south_pole_average, A, geometry

@@ -161,9 +161,10 @@ function HEALPixOutput(
     interpolator = if grids_match(output_grid, SG.grid)
         nothing
     else
-        # pole-average buffers for the most layers any output field has
+        # pole-average buffers for the most layers any output field has, at least as precise
+        # as the model data so that pole averages are computed without allocating
         nlayers = max(SpeedyWeather.get_nlayers(layers, SG), nlayers_soil)
-        RingGrids.interpolator(output_grid, SG.grid; NF = DEFAULT_OUTPUT_NF, nlayers)
+        RingGrids.interpolator(output_grid, SG.grid; NF = promote_type(SG.NF, output_NF), nlayers)
     end
 
     # CREATE HEALPIX FIELDS TO WRITE OUT FROM (+ host copies)

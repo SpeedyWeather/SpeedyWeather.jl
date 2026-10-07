@@ -109,7 +109,7 @@ function NetCDFOutput(
 
     # CREATE INTERPOLATOR, with pole-average buffers for the most layers any output field has
     nlayers = max(get_nlayers(layers, SG), nlayers_soil)
-    interpolator = RingGrids.interpolator(output_grid, SG.grid; NF = DEFAULT_OUTPUT_NF, nlayers)
+    interpolator = RingGrids.interpolator(output_grid, SG.grid; NF = promote_type(SG.NF, output_NF), nlayers)
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT (+ host copies)
     scratch = output_scratch_fields(output_NF, output_grid, get_nlayers(layers, SG), nlayers_soil)
