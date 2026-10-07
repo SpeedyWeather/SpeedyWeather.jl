@@ -420,7 +420,7 @@ set our interpolator `interp` to use `Float32` for the interpolation whereas the
 
 ### Horizontal and vertical interpolation
 
-`interpolate!` serves as a general front end for interpolating between grids. In the absence of any additional dimensions, it performs a horizontal interpolation and forwards to `interpolate_2D!`, which can also be called directly. For a 3D or higher-dimensional field this interpolates every layer horizontally onto the target grid, batched in a single kernel launch, but does not interpolate along the auxiliary axes: the output always has the same shape as the input in the trailing dimensions.
+`interpolate!` serves as a general front end for interpolating between grids. Without vertical positions, it performs a horizontal interpolation and forwards to `interpolate_2D!`, which can also be called directly. For a 3D or higher-dimensional field this interpolates every layer horizontally onto the target grid, batched in a single kernel launch, but does not interpolate along the auxiliary axes: the output always has the same shape as the input in the trailing dimensions.
 
 ```@example ringgrids
 field_in = rand(grid_in, 3)                     # 3 layers
@@ -429,6 +429,51 @@ interp_3layers = RingGrids.interpolator(grid_out, grid_in)
 interpolate_2D!(field_out, field_in, interp_3layers)  # same as interpolate!(field_out, field_in, interp_3layers)
 nothing # hide
 ```
+
+To also interpolate in the vertical, pass the vertical position of every point as well.
+`interpolate!` then forwards to `interpolate_3D!`, which interpolates horizontally onto the
+two layers above and below each point's vertical coordinate ``\sigma`` and blends them linearly
+(see [3D particle advection](@ref) for how SpeedyWeather uses this). The positions can be any
+objects with a `σ` field, e.g. SpeedyWeather's `Particle`s. Where the layers of the field sit
+in the vertical is described by its staggering:
+
+- `SigmaCenter(σ)`: one ``\sigma`` per layer, at the layer centres (full levels), e.g. for
+  temperature or wind. A plain vector of ``\sigma`` levels is interpreted as `SigmaCenter`.
+- `SigmaFaceBelow(σ)` and `SigmaFaceAbove(σ)`: values at the interfaces between layers (half
+  levels), e.g. for vertical velocity. With `nlayers` layers there are `nlayers + 1` interfaces
+  but only `nlayers` values are stored: `SigmaFaceBelow` stores the interface below each layer,
+  so the top one (``\sigma = 0``) is missing, `SigmaFaceAbove` the interface above each layer,
+  missing the bottom one (``\sigma = 1``). The missing value is replaced by a boundary value,
+  zero by default (as for the vertical velocity) or given as a second argument.
+
+Points above the first or below the last level take the value of that level. The interpolator
+needs to be created with `nlayers` to have room for the per-layer averages at the poles,
+otherwise an error is thrown. Using the 10 coordinates from above
+
+```@example ringgrids
+nlayers = 4
+interp3D = AnvilInterpolator(grid, npoints; NF = Float32, nlayers)
+RingGrids.update_locator!(interp3D, londs, latds)
+
+field_in = rand(grid, nlayers)
+σ_levels = [0.125, 0.375, 0.625, 0.875]                     # layer centres (full levels)
+positions = [(σ = σ,) for σ in range(0, 1, length = npoints)] # any objects with a σ field
+
+output_vec = zeros(npoints)
+interpolate!(output_vec, field_in, interp3D, positions, SigmaCenter(σ_levels))
+```
+
+and for a field on half levels, stored at the interface below each layer like the vertical
+velocity, use `SigmaFaceBelow` with the `nlayers + 1` interface levels
+
+```@example ringgrids
+# reuse field_in, now read as values on the interface below each of its 4 layers
+σ_half = [0, 0.25, 0.5, 0.75, 1]                            # layer interfaces (half levels)
+interpolate!(output_vec, field_in, interp3D, positions, SigmaFaceBelow(σ_half))
+```
+
+Instead of an interpolator, its `locator` and `geometry` can also be passed separately, as for
+the horizontal interpolation.
 
 ## Anvil interpolator
 
