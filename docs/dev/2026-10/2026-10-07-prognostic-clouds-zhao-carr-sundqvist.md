@@ -1,8 +1,8 @@
 # Prognostic clouds for SpeedyWeather: Sundqvist, Zhao–Carr, and how ICON does it
 
-> Status: **planned**. Literature review and recommendation, no code changed yet. The recommendation
-> is a Zhao–Carr-type scheme with one prognostic condensate variable fused with the atmospheric
-> prognostics and a cloud state read by every radiation scheme, introduced in stages (section 7).
+> Status: **in progress**. Stage 1 and the Stage 0 parts it needs are implemented and tested on CPU
+> and GPU (see Summary of changes); per-layer shortwave clouds, all-sky ecCKD, the radiation call
+> frequency, Stages 2 and 3 and the tuning are open.
 
 Date of initial draft: 2026-10-07
 
@@ -19,6 +19,43 @@ Base revision: `3c033168` (`mg/clouds`). The initial draft was checked against `
 
 ## Revision log
 
+- 2026-10-07, tuning by differentiation.
+  > note in the plan that enzyme differentiabillity might be used to tune the cloud model
+
+  - Added gradient-based tuning with Enzyme to Future work, with what it needs; pointers from the
+    differentiability checklist (7.6) and the "not tuned" limitation.
+- 2026-10-07, implementation of Stage 1 and the Stage 0 parts it needs.
+  > okay start with the implementation
+
+  - Implemented 7.2.1–7.2.4, the cloud state of 7.2.5, the one-band radiation of 7.2.6 at the
+    "day one" level, 7.2.8, and Stage 1 (7.3). Not yet: per-layer shortwave reflection and
+    absorption, all-sky ecCKD (needs the upstream solver), 7.2.7, Stages 2 and 3.
+  - Hook 4 of 7.2.1 dropped: the condensate's grid copy is not clipped, the scheme fills
+    negative condensate from vapour instead (clipping the grid copy would hide the negatives
+    from the fill and add mass to the advected field). Vertical advection turned out to be a
+    fifth hook: its call site names the variables explicitly.
+  - The hooks are generated over a registry `ADVECTED_SCALARS` of `(name, u_flux, v_flux)`
+    filtered by the names present in the `Variables` type; the humidity path emits the same
+    calls as before.
+  - New, not in the plan: the fused tendency batch with the condensate is 12L+1 = 97 layers,
+    wider than the transform scratch of 9L+1. The matrix transform (the GPU default up to T64)
+    throws for that, the FFT transform on GPU falls back to the serial path. `max_transform_batch`
+    is now 12L+1; the eagerly planned GPU batches are unchanged (9L+1), wider ones are planned on
+    first use. GPU scratch memory of the FFT transform grows by a third for all models.
+  - New, not in the plan: SPPT read `vars.scratch.a_grid`, which does not exist, so SPPT failed
+    for models without humidity. Fixed together with adding the condensate.
+  - Stage 1 details decided during implementation: rain reevaporation capped at saturation;
+    an extra latent heat term keeps the condensate at its ice fraction when liquid and ice
+    autoconvert at different rates, which makes the enthalpy budget exact; effective radii as
+    GFS (10 µm ocean, 5–10 µm land, 50 µm ice); the overlap parameter `α` is not part of the cloud
+    state yet (the one-band schemes use maximum-random and random overlap).
+  - The "bitwise identical" test of the plan does not hold: the wider batched transforms change
+    rounding (Float32, relative differences of order 1e-7 after 20 steps). The test compares to
+    `rtol = 1e-5` instead.
+  - Found, not fixed: `ImplicitCondensation` does not conserve water with reevaporation on (the
+    default). The evaporated rain is removed from the flux in full but added to humidity divided
+    by the relaxation factor; in a test column only 43 % of the condensed water reached the
+    surface or returned to vapour.
 - 2026-10-07, review and revision.
   > Critically review and reaudit the plan and the respective SpeedyWeather functionality. Also be
   > aware that we could also set up a full ecCKD/ecRad model with NumericalRadiation that uses
@@ -543,6 +580,10 @@ Four hooks in the dynamical core remain, each a copy of the humidity line:
    (`dynamics/horizontal_diffusion.jl:331-355`);
 4. hole filling of the grid copy next to humidity's (`time_stepping/transform.jl:153-156`).
 
+*As implemented:* hook 4 is replaced by the fill from vapour inside the scheme (no clipping of the
+grid copy), and the vertical advection call site (`dynamics/vertical_advection.jl:31-34`) is a
+fifth hook. See the revision log.
+
 Write these over a compile-time tuple of *advected scalar names* derived from the `Variables`
 type, as `_tendency_names` is (`variables/variables.jl:641-648`), so that humidity and condensate
 share one code path and a further species later costs nothing. Inside the fused column kernel
@@ -774,6 +815,7 @@ tracer. Either SpeedyWeather option is an ad-hoc substitute, so treat it as a *d
   - clamp the Xu–Randall denominator (GFS uses `≥ 1e-4`);
   - prefer the smooth Sundqvist threshold to hard thresholds;
   - use a phase ramp instead of the `IW` branches.
+  - These choices also keep the parameters tunable by gradients, see Future work.
 - **GPU:** one fused column kernel, fixed loop lengths, no data-dependent early exits beyond what
   `ImplicitCondensation` already has. The condensate loop runs over all layers (`q_c ≥ 0`
   everywhere) rather than branching on cloud presence. Work arrays are parameterization
@@ -793,7 +835,47 @@ tracer. Either SpeedyWeather option is an ad-hoc substitute, so treat it as a *d
 | Prognostic cloud fraction (Tiedtke, PC2) | Stiff, bounded variable with many source terms. |
 | Instantaneous saturation adjustment (ICON `satad`) | Incompatible with a spectral state updated by leapfrog tendencies. The relaxation with `τ ≥ Δt` is SpeedyWeather's equivalent. |
 
-## Testing and verification (planned)
+## Summary of changes (Stage 1 and its Stage 0 parts)
+
+- `parameterizations/cloud_condensation.jl` (new): `PrognosticCloudCondensation <: AbstractCondensation`
+  with the fused condensate variables (`cloud_condensate_variables`), the cloud state
+  (`cloud_state_variables`), the mixed-phase saturation, Xu–Randall cloud fraction, Sundqvist and
+  Lin autoconversion, and the column sweep `cloud_condensation!`.
+- `variables/variables.jl`: `ADVECTED_SCALARS` and `_advected_scalars`.
+- `dynamics/tendencies.jl`, `dynamics/horizontal_diffusion.jl`, `dynamics/vertical_advection.jl`:
+  generated drivers over the advected scalars for the grid and spectral halves of the flux-form
+  advection, hyperdiffusion and vertical advection; the humidity functions are thin wrappers.
+- `time_stepping/steppers/leapfrog.jl`: `default_time_step(::LeapfrogCore) = 2Δt`.
+- `parameterizations/stochastic_physics.jl`: SPPT perturbs the condensate; scratch path fixed.
+- `parameterizations/large_scale_condensation.jl`: precipitation variables shared by both schemes.
+- `parameterizations/radiation/clouds.jl`: `PrognosticClouds` (maximum-random column cover,
+  two-stream cloud albedo from the in-cloud optical depth).
+- `parameterizations/radiation/longwave_transmissivity.jl`: `CloudyLongwaveTransmissivity`
+  wrapping a clear-sky transmissivity; `OneBandLongwave` now declares its transmissivity's variables.
+- `dynamics/spectral_grid.jl`: `max_transform_batch` 12L+1, `primitive_wet_tendency_batch` 9L+1.
+- `output/variables/clouds.jl` (new): condensate, cloud fraction, liquid and ice water path.
+
+First 10-day run at T31 L8 (CPU, from the default initial conditions): global mean cloud cover
+0.26, liquid water path 5.7 g/m², ice water path 22 g/m², large-scale rain 0.21 mm/day and snow
+0.16 mm/day, OLR 249 W/m², outgoing shortwave 40 W/m². The cloud cover and the liquid water path
+are far below observed values; tuning is open. For comparison, the default model (ImplicitCondensation,
+DiagnosticClouds) gives cloud cover 0.60 and outgoing shortwave 126 W/m² over the same 10 days.
+
+Cost on an NVIDIA A40 (8 layers, prognostic clouds including cloud radiation against the default
+model, 200 steps after spin-up):
+
+| Truncation | Transform | Default [ms/step] | Prognostic clouds [ms/step] |
+|---|---|---|---|
+| T32 | matrix | 1.42 | 1.63 (+15 %) |
+| T128 | FFT | 5.71 | 6.09 (+7 %) |
+
+At T128 the new batch sizes 41 (prognostic) and 97 (tendencies) are planned on first use and run
+batched, not serially. GPU and CPU agree in global means to about 10⁻³ after two days at T32.
+
+## Testing and verification
+
+*Status:* `test/parameterizations/cloud_condensation.jl` implements all items below except the
+long runs and the differentiability test; the GPU test is in `test/GPU/primitive_wet.jl`.
 
 - **Unit tests on prescribed columns:**
   - a supersaturated layer produces `q_c`;
@@ -807,8 +889,8 @@ tracer. Either SpeedyWeather option is an ad-hoc substitute, so treat it as a *d
   assertions; the condensate's grid copy has `nlayers` layers and the step dimension; the
   spectral and grid slots of `cloud_condensate` agree, and a grid copy without the step
   dimension is rejected (pins the behaviour observed in the stub check of 7.2.1). A run of a few
-  steps with the scheme's tendencies set to zero is bitwise identical in all other variables to
-  a run without the scheme.
+  steps with the scheme's tendencies set to zero agrees in all other variables with a run without
+  the scheme (to `rtol = 1e-5`, not bitwise: the wider batched transforms change rounding).
 - **Time step:** a sink at the maximum rate leaves `q_c ≥ 0` after a full leapfrog step (`2Δt`),
   not only after `Δt`.
 - **GPU and differentiability tests** like those of the existing parameterizations: a fused
@@ -841,7 +923,12 @@ components may declare fused members in `docs/src/variable_system.md`. Update
   `2Δt`. Section 7.2.2 adds the accessor; whether the existing schemes switch is undecided.
 - **NumericalRadiation:** the all-sky solvers allocate and are diagnostic. The streaming all-sky
   solver is upstream work and not scheduled.
-- **No experiments:** nothing has been run. The parameter values are starting points.
+- **Not tuned:** only a 10-day run exists (see Summary of changes); cloud cover and liquid water
+  path are far too low. The parameter values are starting points. Tuning could use Enzyme
+  gradients, see Future work.
+- **No convective or stratocumulus cloud** in `PrognosticClouds` until Stage 3.
+- **No differentiability test yet** for the new scheme.
+- **`ImplicitCondensation` loses water** with reevaporation on; found while porting, not fixed here.
 
 ## Future work
 
@@ -852,6 +939,31 @@ components may declare fused members in `docs/src/variable_system.md`. Update
 - Fusing tracers into their own parents so that passive tracers get batched transforms too.
 - Prognostic cloud fraction, only if Stage 2 shows systematic cover errors that RH and condensate
   cannot fix.
+- **Tuning by gradients with Enzyme.** SpeedyWeather is differentiable with Enzyme, which could
+  tune the cloud model by gradient descent instead of by hand.
+  - *What exists:* every parameter of `PrognosticCloudCondensation`, `PrognosticClouds` and
+    `CloudyLongwaveTransmissivity` is an `@param` with bounds, so `parameters` and `reconstruct`
+    expose them as one vector, and `autodiff` through the model gives the gradient of a target
+    with respect to it. `test/differentiability/parameters.jl` and the parameter-AD test in
+    `test/differentiability/primitivewet.jl` do this for other parameterizations;
+    `test/differentiability/sensitivity_examples/` has checkpointed sensitivities over longer runs.
+  - *Targets:* global and zonal-mean cloud cover, liquid and ice water path, and the shortwave and
+    longwave cloud radiative effects against CERES-EBAF and a satellite cloud climatology (MODIS
+    or ISCCP), with precipitation as a constraint.
+  - *Candidate parameters:* `relative_humidity_threshold`, `time_scale`, `evaporation_time_scale`,
+    `autoconversion_rate`, `autoconversion_water`, `ice_autoconversion_rate`,
+    `cloud_fraction_coefficient`, the effective radii, and in radiation `asymmetry_factor` and the
+    mass absorption coefficients.
+  - *Needed first:* a differentiability test of the cloud scheme in the column kernel (reverse mode
+    against finite differences), which does not exist yet.
+  - *Time windows:* gradients through long integrations of a chaotic model grow without bound.
+    Use short windows (hours to a few days) or time-mean targets with checkpointing, or start with
+    column or single-step targets (tendencies against a reference such as reanalysis or a
+    high-resolution run), which avoid the chaos problem.
+  - *Non-smooth points:* the formulations were chosen smooth (7.6), but the cloud-presence
+    thresholds (`q_c > 10⁻⁶ p/1000 hPa`, cloud fraction ≥ 0.001), the `min`/`max` limiters of the
+    sinks and the clamps give zero or one-sided gradients where they are active.
+  - *Cost:* Enzyme compile time on the full `PrimitiveWetModel` is substantial.
 
 ## References
 

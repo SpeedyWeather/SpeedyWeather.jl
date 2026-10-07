@@ -342,8 +342,16 @@ end
 
 """$(TYPEDSIGNATURES)
 Largest batch dimension `K` (number of columns) any model emits in a single transform call: the
-`PrimitiveWetModel`'s grid → spectral tendency batch of 9 layer-variables plus surface pressure."""
-max_transform_batch(nlayers::Integer) = 9 * nlayers + 1
+`PrimitiveWetModel`'s grid → spectral tendency batch (`primitive_wet_tendency_batch`) plus the
+3 layer-variables of a cloud condensate fused into it (tendency and the two flux intermediates,
+see `PrognosticCloudCondensation`). Sizes the transform's scratch memory, the matrix transform
+throws for wider batches and the FFT transform on GPU would fall back to the serial path."""
+max_transform_batch(nlayers::Integer) = primitive_wet_tendency_batch(nlayers) + 3 * nlayers
+
+"""$(TYPEDSIGNATURES)
+Batch dimension `K` of the `PrimitiveWetModel`'s grid → spectral tendency batch:
+9 layer-variables plus surface pressure."""
+primitive_wet_tendency_batch(nlayers::Integer) = 9 * nlayers + 1
 
 """$(TYPEDSIGNATURES)
 Chooses the transform based on resolution and architecture. For low-resolution
@@ -364,7 +372,8 @@ Default `transform_batch` for a `SpectralGrid`. Architecture-dependent because:
 - On GPU, batched plans are essential, the default corresponds to the transforms needed for the `PrimitiveWetModel`:
   `[1, 2, nlayers, 2*nlayers, 4*nlayers + 1]` — covers single-layer (`1`), the surface-pressure
   gradient pair (`2`), one variable (`L`), U/V together (`2L`), and the prognostic batch
-  (`4L + 1`), 6L+1 and 9L+1 (tendency batch)
+  (`4L + 1`), 6L+1 and 9L+1 (tendency batch). Wider batches, e.g. with a fused cloud condensate,
+  are planned on first use, up to `max_transform_batch`.
 
 On GPU, if a transform is hit with a K not in `transform_batch`, the transform plans are re-allocated to avoid 
 slow transform performance during model runs. 
@@ -372,7 +381,7 @@ slow transform performance during model runs.
 default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_transform_batch(typeof(arch), nlayers)
 default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]
 default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) =
-    Int[1, 2, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, max_transform_batch(nlayers)]
+    Int[1, 2, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, primitive_wet_tendency_batch(nlayers)]
 
 function variables(::SpeedyTransforms.AbstractSpectralTransform)
     return (

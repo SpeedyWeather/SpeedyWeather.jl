@@ -19,7 +19,7 @@ Calculate tendencies in grid space for the PrimitiveEquation model."""
 function grid_tendencies!(vars::Variables, model::PrimitiveEquation)
     vordiv_grid_tendencies!(vars, model)             # u_tend_grid, v_tend_grid
     temperature_grid_tendency!(vars, model)          # temp_tend_grid + uT_anomaly_grid, vT_anomaly_grid
-    humidity_grid_tendency!(vars, model)             # humid_tend_grid + uq_grid, vq_grid (no-op for dry)
+    advected_scalars_grid_tendencies!(vars, model)   # humidity, cloud condensate (if present): A_tend_grid + uA_grid, vA_grid
     bernoulli_grid_potential!(vars, model, model.time_stepping)           # kinetic_energy_grid = ½(u²+v²)
     surface_pressure_grid_tendency!(vars, model)     # pres_tend_grid += (ū,v̄)·∇lnpₛ
     return nothing
@@ -46,7 +46,7 @@ Reads transformed spectral tendencies and accumulates the final spectral tendenc
 function spectral_tendencies!(vars::Variables, model::PrimitiveEquation)
     vordiv_spectral_tendencies!(vars, model)
     temperature_spectral_tendency!(vars, model)
-    humidity_spectral_tendency!(vars, model)         # no-op for PrimitiveDry
+    advected_scalars_spectral_tendencies!(vars, model)  # humidity, cloud condensate (if present)
     bernoulli_spectral_potential!(vars, model)
     surface_pressure_spectral_tendency!(vars, model)
     return nothing
@@ -775,32 +775,72 @@ humidity_tendency!(::Variables, ::PrimitiveDry) = nothing
 Computes the gridded contributation to the humidity tendency `humid_tend_grid` via the `horizontal_grid_advection!`
 Grid half of `humidity_tendency!`. Adds the `+q·div` advection term to `humid_tend_grid` and
 writes the `(uq, vq)` flux intermediates to the grid-side named slots — no transform."""
-function humidity_grid_tendency!(vars::Variables, model::PrimitiveWet)
-    (; time_stepping) = model
-    humid_tend_grid = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, DynamicalCore())
-    humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore())
-    horizontal_grid_advection!(
-        humid_tend_grid, humid_grid, vars, model; add = true,
-        uA_grid = get_step(vars.dynamics.grid.uq),
-        vA_grid = get_step(vars.dynamics.grid.vq)
-    )
-    return nothing
-end
+humidity_grid_tendency!(vars::Variables, model::PrimitiveWet) =
+    scalar_grid_tendency!(vars, model, Val(:humidity), Val(:uq), Val(:vq))
 humidity_grid_tendency!(::Variables, ::PrimitiveDry) = nothing
 
 """$(TYPEDSIGNATURES)
 
 Computes the spectral humidity tendency via the `horizontal_spectral_advection!`
 Adds `-∇⋅(uq, vq)` to the previously computed gridded and transformed tendency."""
-function humidity_spectral_tendency!(vars::Variables, model::PrimitiveWet)
-    S = model.spectral_transform
-    humid_tend = get_tendency_step(vars.tendencies.humidity, model.time_stepping, DynamicalCore())
-    uq_spec = get_step(vars.dynamics.uq)
-    vq_spec = get_step(vars.dynamics.vq)
-    horizontal_spectral_advection!(humid_tend, uq_spec, vq_spec, S)
+humidity_spectral_tendency!(vars::Variables, model::PrimitiveWet) =
+    scalar_spectral_tendency!(vars, model, Val(:humidity), Val(:uq), Val(:vq))
+humidity_spectral_tendency!(::Variables, ::PrimitiveDry) = nothing
+
+"""$(TYPEDSIGNATURES)
+Grid half of the flux-form advection of the advected scalar `name` (humidity, cloud condensate):
+adds the `+A⋅div` term to its grid tendency and writes the flux intermediates `(u⋅A, v⋅A)` to the
+named grid slots `vars.dynamics.grid.<u_flux>`, `<v_flux>`; no transform."""
+@inline function scalar_grid_tendency!(
+        vars::Variables, model, ::Val{name}, ::Val{u_flux}, ::Val{v_flux},
+    ) where {name, u_flux, v_flux}
+    (; time_stepping) = model
+    A_tend_grid = get_tendency_step(getfield(vars.tendencies.grid, name), time_stepping, DynamicalCore())
+    A_grid = get_prognostic_step(getfield(vars.grid, name), time_stepping, DynamicalCore())
+    horizontal_grid_advection!(
+        A_tend_grid, A_grid, vars, model; add = true,
+        uA_grid = get_step(getfield(vars.dynamics.grid, u_flux)),
+        vA_grid = get_step(getfield(vars.dynamics.grid, v_flux))
+    )
     return nothing
 end
-humidity_spectral_tendency!(::Variables, ::PrimitiveDry) = nothing
+
+"""$(TYPEDSIGNATURES)
+Spectral half of the flux-form advection of the advected scalar `name`: adds `-∇⋅(u⋅A, v⋅A)`
+to its (already transformed) spectral tendency."""
+@inline function scalar_spectral_tendency!(
+        vars::Variables, model, ::Val{name}, ::Val{u_flux}, ::Val{v_flux},
+    ) where {name, u_flux, v_flux}
+    S = model.spectral_transform
+    A_tend = get_tendency_step(getfield(vars.tendencies, name), model.time_stepping, DynamicalCore())
+    uA_spec = get_step(getfield(vars.dynamics, u_flux))
+    vA_spec = get_step(getfield(vars.dynamics, v_flux))
+    horizontal_spectral_advection!(A_tend, uA_spec, vA_spec, S)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Grid half of the flux-form advection for all advected scalars of `vars` (see `ADVECTED_SCALARS`),
+unrolled over their compile-time names: humidity in PrimitiveWet, the cloud condensate when a
+scheme declares it, nothing in PrimitiveDry."""
+@generated function advected_scalars_grid_tendencies!(vars::Variables{Po, G, T}, model) where {Po, G, T}
+    calls = [
+        :(scalar_grid_tendency!(vars, model, Val($(QuoteNode(name))), Val($(QuoteNode(u))), Val($(QuoteNode(v)))))
+            for (name, u, v) in _advected_scalars(T)
+    ]
+    return Expr(:block, calls..., :(return nothing))
+end
+
+"""$(TYPEDSIGNATURES)
+Spectral half of the flux-form advection for all advected scalars of `vars`, see
+`advected_scalars_grid_tendencies!`."""
+@generated function advected_scalars_spectral_tendencies!(vars::Variables{Po, G, T}, model) where {Po, G, T}
+    calls = [
+        :(scalar_spectral_tendency!(vars, model, Val($(QuoteNode(name))), Val($(QuoteNode(u))), Val($(QuoteNode(v)))))
+            for (name, u, v) in _advected_scalars(T)
+    ]
+    return Expr(:block, calls..., :(return nothing))
+end
 
 function tracer_advection!(
         vars::Variables,

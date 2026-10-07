@@ -35,8 +35,8 @@ function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, mo
     has_random_pattern = any(all_variables(model)) do var
         var isa GridVariable && var.name == :random_pattern && var.namespace == Symbol()
     end
-    @assert has_random_pattern "StochasticallyPerturbedParameterizationTendencies requires a "*
-        "`random_pattern` grid variable, define a random process for the model, e.g. "*
+    @assert has_random_pattern "StochasticallyPerturbedParameterizationTendencies requires a " *
+        "`random_pattern` grid variable, define a random process for the model, e.g. " *
         "`random_process = SpectralAR1Process(spectral_grid)`."
 
     coord = model.geometry.vertical_coordinates
@@ -62,7 +62,9 @@ end
 
 """$(TYPEDSIGNATURES)
 Apply stochastically perturbed parameterization tendencies (SPPT) to
-u, v, temperature and humidity in column ij."""
+u, v, temperature, humidity and cloud condensate (if present) in column ij.
+All are perturbed with the same pattern so that the water and enthalpy
+budgets between them are kept."""
 @propagate_inbounds function sppt!(ij, vars, sppt, time_stepping)
 
     r = vars.grid.random_pattern[ij]
@@ -73,15 +75,19 @@ u, v, temperature and humidity in column ij."""
 
     # dry models don't have humidity just perturb a dummy array to avoid branching in the loop below
     humid_tend = haskey(vars.tendencies.grid, :humidity) ?
-        get_tendency_step(vars.tendencies.grid.humidity, time_stepping, sppt) : vars.scratch.a_grid
+        get_tendency_step(vars.tendencies.grid.humidity, time_stepping, sppt) : vars.scratch.grid.a
 
+    # same for the cloud condensate, only present with a scheme that declares it
+    condensate_tend = haskey(vars.tendencies.grid, :cloud_condensate) ?
+        get_tendency_step(vars.tendencies.grid.cloud_condensate, time_stepping, sppt) : vars.scratch.grid.b
 
-    @inbounds for k in eachlayer(u_tend, v_tend, temp_tend, humid_tend)
+    @inbounds for k in eachlayer(u_tend, v_tend, temp_tend, humid_tend, condensate_tend)
         R = 1 + r * taper[k]        # r in [-1, 1], R in [0, 2] (don't change sign of tendency)
         u_tend[ij, k] *= R          # perturb all prognostic variables in the same way
         v_tend[ij, k] *= R
         temp_tend[ij, k] *= R
         humid_tend[ij, k] *= R
+        condensate_tend[ij, k] *= R
     end
     return nothing
 end

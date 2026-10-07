@@ -209,4 +209,17 @@ Variables can be "fused" together to be allocated as one block of contiguous mem
 This is done primarly with GPU-optimiziation in mind, so that e.g. `transform!` calls can be batched together not just across levels,
 but also across different variables. All variables that are defined with the same `fuse = :fuse_name` keyword argument are allocated together.
 At the same time a `view` is defined that allows for the variable to be used as it would without the variable fusion.
-As this is primarily a performance optimization, it is not required to run basic custom parameterizations or model components. 
+As this is primarily a performance optimization, it is not required to run basic custom parameterizations or model components.
+
+Model components can also add members to the fused parents of the model itself. The parents
+`:prognostic` and `:grid` (spectral state and its grid copy) and `:spectral_tendencies` and
+`:grid_tendencies` (the grid → spectral batch of tendencies) are transformed in one batched call
+each, and the members of each pair must be declared in the same order (this is checked when the
+variables are allocated). Variables are fused in the order the model and then its components
+declare them, so a component that declares a spectral prognostic variable with `fuse = :prognostic`
+and its grid copy with `fuse = :grid` appends one block to each and is transformed with all other
+prognostic variables. [`PrognosticCloudCondensation`](@ref) declares its condensate this way, see
+`SpeedyWeather.cloud_condensate_variables`; listed in `SpeedyWeather.ADVECTED_SCALARS` it is then
+advected and diffused like humidity. Use the step dimensions of the time stepper
+(`SpeedyWeather.get_nsteps(model.time_stepping, model)`) for fused members, a member without the
+step dimension in a parent with one only gets a single layer.

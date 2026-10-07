@@ -1,6 +1,7 @@
 # define all variables for output
 include("dynamics.jl")        # collected as DynamicsOutput()
 include("precipitation.jl")   # PrecipitationOutput()
+include("clouds.jl")          # CloudOutput()
 include("boundaries.jl")      # BoundaryOutput()
 include("radiation.jl")       # RadiationOutput()
 include("stochastic.jl")      # RandomPatternOutput()
@@ -14,6 +15,7 @@ include("boundary_layer.jl")  # BoundaryLayerOutput()
 AllOutputVariables() = (
     DynamicsOutput()...,
     PrecipitationOutput()...,
+    CloudOutput()...,
     BoundaryOutput()...,
     RadiationOutput()...,
     RandomPatternOutput(),

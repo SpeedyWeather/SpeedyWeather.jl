@@ -63,7 +63,7 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 
     τ_above::NF = 0
 
-    # TODO: Replace `sin(deg2rad(θ))` with `sind(θ)` once JuliaGPU/AMDGPU.jl#1041 
+    # TODO: Replace `sin(deg2rad(θ))` with `sind(θ)` once JuliaGPU/AMDGPU.jl#1041
     # is merged/released and `sind` is supported on AMD GPUs.k
     τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sin(deg2rad(θ))^2
     for k in 1:nlayers              # loop over half levels below
@@ -74,5 +74,72 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     end
 
     # return so the radiative_trasfer uses the right scratch array
+    return t
+end
+
+export CloudyLongwaveTransmissivity
+
+"""Longwave transmissivity of a clear-sky transmissivity `clear_sky` and the clouds of a
+prognostic cloud scheme, e.g. [`PrognosticCloudCondensation`](@ref). In every layer the clear-sky
+transmissivity is multiplied by `1 - C ε` with the cloud fraction `C` and the emissivity of the
+cloudy part
+
+    ε = 1 - exp(-D (κₗ Wₗ + κᵢ Wᵢ))
+
+from the in-cloud liquid and ice water paths `W` [kg/m²], the diffusivity factor `D` and the mass
+absorption coefficients `κₗ` (constant) and `κᵢ = a + b/rᵢ` with the ice effective radius `rᵢ`
+(Kiehl et al. 1998, CCM3, after Ebert and Curry 1992). Clouds of different layers are
+independent (random overlap). Without a prognostic cloud scheme the cloud state is zero and
+this is the clear-sky transmissivity. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct CloudyLongwaveTransmissivity{NF, T} <: AbstractLongwaveTransmissivity
+    "[OPTION] Clear-sky longwave transmissivity"
+    @component clear_sky::T
+
+    "[OPTION] Diffusivity factor of the longwave emissivity [1]"
+    @param diffusivity::NF = 1.66 (bounds = Positive,)
+
+    "[OPTION] Mass absorption coefficient of cloud liquid [m²/kg]"
+    @param liquid_mass_absorption::NF = 90.361 (bounds = Nonnegative,)
+
+    "[OPTION] Mass absorption coefficient of cloud ice, constant part a [m²/kg]"
+    @param ice_mass_absorption::NF = 5 (bounds = Nonnegative,)
+
+    "[OPTION] Mass absorption coefficient of cloud ice, part b/rᵢ inverse to the effective radius [m³/kg]"
+    @param ice_mass_absorption_radius::NF = 1.0e-3 (bounds = Nonnegative,)
+end
+
+Adapt.@adapt_structure CloudyLongwaveTransmissivity
+
+function CloudyLongwaveTransmissivity(SG::SpectralGrid; clear_sky = FriersonLongwaveTransmissivity(SG), kwargs...)
+    return CloudyLongwaveTransmissivity{SG.NF, typeof(clear_sky)}(; clear_sky, kwargs...)
+end
+
+initialize!(transmissivity::CloudyLongwaveTransmissivity, model::AbstractModel) =
+    initialize!(transmissivity.clear_sky, model)
+
+variables(transmissivity::CloudyLongwaveTransmissivity) =
+    (cloud_state_variables()..., variables(transmissivity.clear_sky)...)
+
+@propagate_inbounds function transmissivity!(ij, vars, transmissivity::CloudyLongwaveTransmissivity, model)
+    # clear-sky transmissivity first, into the scratch array it returns
+    t = transmissivity!(ij, vars, transmissivity.clear_sky, model)
+
+    (; cloud_fraction, cloud_liquid_water, cloud_ice_water, cloud_ice_effective_radius) = vars.parameterizations
+    (; diffusivity, liquid_mass_absorption, ice_mass_absorption, ice_mass_absorption_radius) = transmissivity
+    NF = eltype(t)
+    nlayers = size(t, 2)
+
+    pₛ = vars.parameterizations.surface_pressure[ij]
+    coord = model.geometry.vertical_coordinates
+    g = model.planet.gravity
+
+    for k in 1:nlayers
+        C = cloud_fraction[ij, k]
+        in_cloud_mass = pressure_thickness(k, pₛ, coord) / g / max(C, eps(NF))  # [kg/m²] per kg/kg in the cloudy part
+        κᵢ = ice_mass_absorption + ice_mass_absorption_radius / max(cloud_ice_effective_radius[ij, k], NF(1.0e-6))
+        absorption = liquid_mass_absorption * cloud_liquid_water[ij, k] + κᵢ * cloud_ice_water[ij, k]
+        emissivity = 1 - exp(-diffusivity * absorption * in_cloud_mass)
+        t[ij, k] *= 1 - C * emissivity
+    end
     return t
 end

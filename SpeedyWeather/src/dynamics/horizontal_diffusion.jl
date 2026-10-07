@@ -116,7 +116,7 @@ function initialize!(
     # Launch kernel
     arch = architecture(∇²ⁿ)
     NF = eltype(∇²ⁿ)      # the kernel must run entirely in NF; `time_scale`(s) are `Float64` and
-                          # `largest_eigenvalue` an `Int` here, which a GPU (e.g. Metal) can't compile
+    # `largest_eigenvalue` an `Int` here, which a GPU (e.g. Metal) can't compile
     worksize = (truncation + 1, nlayers)
     launch!(
         arch, ArrayWorkOrder, worksize, _initialize_hyperdiffusion_kernel!,
@@ -348,11 +348,8 @@ function horizontal_diffusion!(
 
     pres_tend.data[1:1] .= 0    # mass conservation
 
-    if haskey(vars.tendencies, :humidity)
-        humid = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, diffusion)
-        humid_tend = get_tendency_step(vars.tendencies.humidity, model.time_stepping, diffusion)
-        horizontal_diffusion!(humid_tend, humid, expl, impl)
-    end
+    # humidity (PrimitiveWet), cloud condensate (if a scheme declares it)
+    advected_scalars_diffusion!(vars, expl, impl, diffusion, model.time_stepping)
 
     for (name, tracer) in model.tracers
         tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
@@ -361,6 +358,25 @@ function horizontal_diffusion!(
     end
 
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Horizontal diffusion of all advected scalars of `vars` (see `ADVECTED_SCALARS`), unrolled
+over their compile-time names: humidity in PrimitiveWet, the cloud condensate when a scheme
+declares it, nothing in PrimitiveDry."""
+@generated function advected_scalars_diffusion!(
+        vars::Variables{Po, G, T}, expl, impl, diffusion, time_stepping,
+    ) where {Po, G, T}
+    calls = [
+        :(
+            horizontal_diffusion!(
+                get_tendency_step(vars.tendencies.$name, time_stepping, diffusion),
+                get_prognostic_step(vars.prognostic.$name, time_stepping, diffusion),
+                expl, impl,
+            )
+        ) for (name, _, _) in _advected_scalars(T)
+    ]
+    return Expr(:block, calls..., :(return nothing))
 end
 
 export SpectralFilter

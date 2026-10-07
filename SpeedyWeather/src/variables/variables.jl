@@ -647,6 +647,21 @@ function _tendency_and_uv_names(T::Type{<:NamedTuple})
     return :vorticity in names ? vcat(names, [:u, :v]) : names
 end
 
+"""Advected scalars besides temperature as `(name, u_flux, v_flux)`: the prognostic variable `name`
+and the names of its flux intermediates `u⋅A`, `v⋅A`, which are `vars.dynamics.grid.<u_flux>` on the
+grid and `vars.dynamics.<u_flux>` in spectral space. A model or component declaring the variable
+(fused into the `:prognostic`/`:grid` parents) and its flux intermediates (fused into the
+`:grid_tendencies`/`:spectral_tendencies` parents) gets horizontal flux-form advection, vertical
+advection and horizontal diffusion for it; see `_advected_scalars`."""
+const ADVECTED_SCALARS = (
+    (:humidity, :uq, :vq),
+    (:cloud_condensate, :uqc, :vqc),
+)
+
+# the entries of ADVECTED_SCALARS whose variable is a (top-level) tendency of the variables, e.g.
+# humidity only for PrimitiveWet, cloud_condensate only with a scheme that declares it (compile-time)
+_advected_scalars(T::Type{<:NamedTuple}) = Tuple(s for s in ADVECTED_SCALARS if first(s) in _tendency_names(T))
+
 # field names of the namespace NamedTuple `ns` (:ocean, :land, :tracers), or empty if absent
 _namespace_names(T::Type{<:NamedTuple}, ns::Symbol) =
     ns in fieldnames(T) ? collect(fieldnames(fieldtype(T, ns))) : Symbol[]

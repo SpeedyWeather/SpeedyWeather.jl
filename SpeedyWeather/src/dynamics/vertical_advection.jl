@@ -31,7 +31,7 @@ function vertical_advection!(vars::Variables, model)
     vertical_advection!(Val(:u), vars, w, Δσ, advection_scheme, model)
     vertical_advection!(Val(:v), vars, w, Δσ, advection_scheme, model)
     vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model)
+    advected_scalars_vertical_advection!(vars, w, Δσ, advection_scheme, model)  # humidity, cloud condensate
 
     for (name, tracer) in model.tracers
         if tracer.active
@@ -43,6 +43,17 @@ function vertical_advection!(vars::Variables, model)
         end
     end
     return nothing
+end
+
+# vertical advection of all advected scalars (see ADVECTED_SCALARS) unrolled over their compile-time names
+@generated function advected_scalars_vertical_advection!(
+        vars::Variables{Po, G, T}, w, Δσ, advection_scheme, model,
+    ) where {Po, G, T}
+    calls = [
+        :(vertical_advection!(Val($(QuoteNode(name))), vars, w, Δσ, advection_scheme, model))
+            for (name, _, _) in _advected_scalars(T)
+    ]
+    return Expr(:block, calls..., :(return nothing))
 end
 
 # var is a compile-time constant so that haskey and getproperty constant-fold to

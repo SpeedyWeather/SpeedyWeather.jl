@@ -185,6 +185,10 @@ end
 
 Base.show(io::IO, M::OneBandLongwave) = Base.show(io, M, values = false)
 
+# variables of the longwave scheme and those of its transmissivity, e.g. the cloud state
+variables(radiation::OneBandLongwave) =
+    (invoke(variables, Tuple{AbstractLongwave}, radiation)..., variables(radiation.transmissivity)...)
+
 # initialize one after another
 function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)
     initialize!(radiation.transmissivity, model)
@@ -239,7 +243,7 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     land_fraction = model.land_sea_mask.land_fraction[ij]
     sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), longwave)
     # TODO use skin temperature?
-    lst = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), longwave)            
+    lst = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), longwave)
 
     U_ocean = ϵ_ocean * σ * sst[ij]^4                                   # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = U_ocean      # for ocean model forcing

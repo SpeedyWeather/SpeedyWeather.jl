@@ -31,3 +31,26 @@ end
 
     @test simulation.model.feedback.nans_detected == false
 end
+
+@testset "GPU PrimitiveWetModel with prognostic clouds" begin
+    # the fused cloud condensate widens the batched transforms (5L+1 prognostic, 12L+1 tendency
+    # batch), the default matrix transform at this resolution has to fit them; the column scheme
+    # and cloud radiation run in the fused parameterization kernel
+    arch = SpeedyWeather.GPU()
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8, architecture = arch)
+    large_scale_condensation = PrognosticCloudCondensation(spectral_grid)
+    shortwave = OneBandShortwave(spectral_grid; clouds = PrognosticClouds(spectral_grid))
+    longwave = OneBandLongwave(spectral_grid; transmissivity = CloudyLongwaveTransmissivity(spectral_grid))
+    radiation = Radiation(spectral_grid; shortwave, longwave)
+    stochastic_physics = StochasticallyPerturbedParameterizationTendencies(spectral_grid)
+    random_process = SpectralAR1Process(spectral_grid)
+    model = PrimitiveWetModel(spectral_grid; large_scale_condensation, radiation, stochastic_physics, random_process)
+    simulation = initialize!(model)
+    run!(simulation, period = Day(1))
+
+    @test simulation.model.feedback.nans_detected == false
+    condensate = Array(simulation.variables.grid.cloud_condensate.data)
+    cloud_fraction = Array(simulation.variables.parameterizations.cloud_fraction.data)
+    @test any(condensate .> 0)
+    @test all(0 .<= cloud_fraction .<= 1)
+end

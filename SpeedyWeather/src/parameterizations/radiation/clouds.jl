@@ -183,3 +183,92 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
 
     return (; cloud_cover, cloud_top, stratocumulus_cover)
 end
+
+export PrognosticClouds
+
+"""Clouds for the one-band shortwave radiation from the cloud state of a prognostic cloud scheme,
+e.g. [`PrognosticCloudCondensation`](@ref). The column cloud cover follows from the layer cloud
+fractions with maximum-random overlap, the cloud top is the highest layer with a cloud fraction
+above `cloud_fraction_min`, and the cloud albedo follows from the in-cloud optical depth of the column
+
+    τ = 3/2 (LWP/(ρ_w r_l) + IWP/(ρ_i r_i)) / cloud cover
+
+with the two-stream reflectivity of a non-absorbing layer `R = a τ/(1 + a τ)`, `a = √3/2 (1 - g)`
+and asymmetry factor `g`. There is no separate stratocumulus. Without a prognostic cloud scheme
+the cloud state is zero and there are no clouds. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct PrognosticClouds{NF} <: AbstractShortwaveClouds
+    "[OPTION] Asymmetry factor of the scattering by cloud droplets and ice [1]"
+    @param asymmetry_factor::NF = 0.85 (bounds = 0 .. 1,)
+
+    "[OPTION] Density of ice [kg/m³] for the optical depth of cloud ice"
+    @param ice_density::NF = 917 (bounds = Positive,)
+
+    "[OPTION] Cloud fraction above which a layer counts as cloudy for the cloud top [1]"
+    @param cloud_fraction_min::NF = 0.001 (bounds = 0 .. 1,)
+end
+
+Adapt.@adapt_structure PrognosticClouds
+PrognosticClouds(SG::SpectralGrid; kwargs...) = PrognosticClouds{SG.NF}(; kwargs...)
+initialize!(::PrognosticClouds, ::AbstractModel) = nothing
+
+variables(::PrognosticClouds) = (
+    cloud_state_variables()...,
+    ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
+    ParameterizationVariable(:cloud_top_height, Grid2D(), desc = "Cloud top height", units = "m"),
+    ParameterizationVariable(:cloud_cover, Grid2D(), desc = "Cloud cover", units = "1"),
+)
+
+"""$(TYPEDSIGNATURES)
+Cloud cover and cloud top of column `ij` for the one-band shortwave from the layer cloud state,
+cloud albedo from the in-cloud optical depth, see [`PrognosticClouds`](@ref)."""
+@propagate_inbounds function clouds!(ij, vars, clouds::PrognosticClouds, model)
+    (; cloud_fraction, cloud_liquid_water, cloud_ice_water) = vars.parameterizations
+    (; cloud_liquid_effective_radius, cloud_ice_effective_radius) = vars.parameterizations
+    NF = eltype(cloud_fraction)
+    nlayers = size(cloud_fraction, 2)
+
+    pₛ = vars.parameterizations.surface_pressure[ij]
+    coord = model.geometry.vertical_coordinates
+    g = model.planet.gravity
+    ρ_water = model.atmosphere.water_density
+    ρ_ice = clouds.ice_density
+    r_min = NF(1.0e-6)                  # [m], effective radius floor, also for absent cloud state
+
+    clear_sky = one(NF)                 # maximum-random overlap (Geleyn and Hollingsworth 1979)
+    cloud_fraction_above = zero(NF)
+    optical_depth = zero(NF)            # grid-mean optical depth of the column
+    cloud_top = nlayers + 1             # nlayers + 1 = no cloud
+    for k in 1:nlayers
+        C = cloud_fraction[ij, k]
+        clear_sky *= (1 - max(C, cloud_fraction_above)) / (1 - min(cloud_fraction_above, 1 - eps(NF)))
+        cloud_fraction_above = C
+
+        Δp_g = pressure_thickness(k, pₛ, coord) / g     # layer mass [kg/m²]
+        r_liquid = max(cloud_liquid_effective_radius[ij, k], r_min)
+        r_ice = max(cloud_ice_effective_radius[ij, k], r_min)
+        optical_depth += 3 * Δp_g / 2 * (cloud_liquid_water[ij, k] / (ρ_water * r_liquid) + cloud_ice_water[ij, k] / (ρ_ice * r_ice))
+
+        # highest layer with cloud, layers loop top to bottom
+        cloud_top = ifelse((C > clouds.cloud_fraction_min) & (cloud_top > nlayers), k, cloud_top)
+    end
+
+    cloud_cover = clamp(1 - clear_sky, zero(NF), one(NF))
+    in_cloud_optical_depth = optical_depth / max(cloud_cover, NF(1.0e-3))
+    a = sqrt(NF(3)) / 2 * (1 - clouds.asymmetry_factor)
+    cloud_albedo = a * in_cloud_optical_depth / (1 + a * in_cloud_optical_depth)
+
+    # store for output, cloud top height [m] (0 for no cloud) from geopotential
+    vars.parameterizations.cloud_cover[ij] = cloud_cover
+    vars.parameterizations.cloud_top[ij] = cloud_top
+    k_top = min(cloud_top, nlayers)
+    Φ_top = vars.dynamics.geopotential[ij, k_top]
+    vars.parameterizations.cloud_top_height[ij] = ifelse(cloud_top <= nlayers, Φ_top / g, zero(NF))
+
+    return (    # NamedTuple as for DiagnosticClouds
+        cloud_cover = cloud_cover,
+        cloud_albedo = cloud_albedo,
+        cloud_top = cloud_top,
+        stratocumulus_cover = zero(NF),
+        stratocumulus_albedo = zero(NF),
+    )
+end

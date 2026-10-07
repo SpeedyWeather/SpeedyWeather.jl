@@ -27,7 +27,10 @@ Adapt.@adapt_structure ImplicitCondensation
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
 initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 
-function variables(::ImplicitCondensation)
+variables(::ImplicitCondensation) = large_scale_precipitation_variables()
+
+# precipitation variables of large-scale condensation, shared by all condensation schemes
+function large_scale_precipitation_variables()
     return (
         ParameterizationVariable(:rain_large_scale, Grid2D(), desc = "Large-scale precipitation (rain, accumulated)", units = "m"),
         ParameterizationVariable(:snow_large_scale, Grid2D(), desc = "Large-scale precipitation (snow, accumulated)", units = "m"),

@@ -178,6 +178,10 @@ end
 
 Adapt.@adapt_structure LeapfrogCore
 
+# the step the state is advanced with (after the first two steps), also for the core that Leapfrog
+# adapts to in kernels, so that parameterizations can bound their sinks with it on CPU and GPU
+default_time_step(L::LeapfrogCore) = 2 * L.Δt
+
 """$(TYPEDSIGNATURES)
 Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
@@ -227,12 +231,12 @@ spin_up_steps(::AbstractLeapfrog) = 1
 function time_step!(clock::Clock, time_stepping::Leapfrog)
     Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based
     i = clock.step_counter          # 0-based as the clock is only stepped below
-    first_step = i == 0            
-    second_step = i == 1            
+    first_step = i == 0
+    second_step = i == 1
 
     step_scale = ifelse(first_step, 0.5, 1.0)       # first Euler step at Δt/2
     rewind_scale = ifelse(second_step, 0.5, 0.0)    # second step: Leapfrog at Δt, later steps: Leapfrog at 2Δt but clock by Δt
-    increase_counter = ifelse(first_step, 0, 1)     
+    increase_counter = ifelse(first_step, 0, 1)
 
     # rotation and orbit time are dilated, so rewind them by their dilated Δt/2
     Δt_rewind = dilate(Δt, rewind_scale)

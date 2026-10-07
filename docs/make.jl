@@ -62,6 +62,7 @@ makedocs(
             "Shallow water model" => "shallowwater.md",
             "Primitive equation model" => "primitiveequation.md",
             "Large-scale condensation" => "large_scale_condensation.md",
+            "Prognostic clouds" => "prognostic_clouds.md",
             "Convection" => "convection.md",
             "Radiation" => "radiation.md",
             "Vertical diffusion" => "vertical_diffusion.md",

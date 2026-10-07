@@ -114,6 +114,20 @@ vars.tendencies.grid.temperature[ij, k] += something_you_calculated
 not `vars.tendencies.grid.temperature[ij, k] = something_you_calculated` (`+=` instead of `=`)
 which would overwrite any previous tendency. See also [Order of tendencies](@ref).
 
+## Bound sinks with the prognostic time step
+
+Parameterizations read the previous time step and their tendencies act over the step the state
+is advanced with, which is ``2\Delta t`` for leapfrog after the first two steps, not
+`model.time_stepping.Δt`. A sink that must not remove more than is available, e.g. of a
+non-negative quantity ``q``, is therefore bounded by ``q/\Delta t_p`` with
+
+```julia
+Δt_prognostic = SpeedyWeather.default_time_step(model.time_stepping)    # 2Δt for leapfrog
+```
+
+which also holds inside the fused GPU kernel. [`PrognosticCloudCondensation`](@ref) does this for
+all sinks of the cloud condensate, see [Prognostic clouds](@ref).
+
 ## Define the generator function
 
 After defining a (custom) parameterization it is recommended to also define
