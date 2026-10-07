@@ -414,3 +414,58 @@ end
     interpolate!(v1, field_in, I.locator, I.geometry)
     @test v1 == v2
 end
+
+@testset "interpolate_2D!: pole averages into the locator's buffers" begin
+    # with pole-average buffers for enough layers the batched path writes into them instead of
+    # allocating, a locator with fewer buffers (default nlayers = 1) falls back to allocating
+    nlayers = 5
+    @testset for Grid in (
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+        )
+        grid_in, grid_out = Grid(8), Grid(12)
+        rings = grid_in.rings
+
+        # data in a different number format than the interpolator, as for the model output
+        @testset for (NF_data, NF_interp) in ((Float32, Float32), (Float64, Float64), (Float64, Float32))
+            field_in = randn(NF_data, grid_in, nlayers)
+            out_buffers = zeros(NF_data, grid_out, nlayers)
+            out_fallback = zeros(NF_data, grid_out, nlayers)
+
+            I_buffers = RingGrids.interpolator(grid_out, grid_in; NF = NF_interp, nlayers)
+            I_fallback = RingGrids.interpolator(grid_out, grid_in; NF = NF_interp)
+            @test length(I_buffers.locator.north_pole_average) == nlayers
+            @test length(I_fallback.locator.north_pole_average) == 1
+
+            RingGrids.interpolate_2D!(out_buffers, field_in, I_buffers)
+            RingGrids.interpolate_2D!(out_fallback, field_in, I_fallback)
+
+            # ≈ as the buffers sum the pole rings in a different order than `mean`, and in the
+            # interpolator's number format, which is the precision the comparison can expect
+            @test isapprox(out_buffers.data, out_fallback.data, rtol = sqrt(eps(NF_interp)))
+
+            # buffers hold the pole averages, so the non-allocating path was taken
+            @test I_buffers.locator.north_pole_average ≈ vec(Statistics.mean(field_in.data[rings[1], :], dims = 1))
+            @test I_buffers.locator.south_pole_average ≈ vec(Statistics.mean(field_in.data[rings[end], :], dims = 1))
+
+            # too small buffers are left untouched, the allocating fallback was taken
+            @test all(iszero, I_fallback.locator.north_pole_average)
+        end
+    end
+
+    # integer data takes the (rounding) fallback even with large enough buffers
+    grid_in, grid_out = FullGaussianGrid(8), FullGaussianGrid(12)
+    field_in = zeros(Int, grid_in, nlayers)
+    field_in.data .= rand(1:10, size(field_in.data))
+    out_buffers = zeros(Float64, grid_out, nlayers)
+    out_fallback = zeros(Float64, grid_out, nlayers)
+    I_buffers = RingGrids.interpolator(grid_out, grid_in; nlayers)
+    RingGrids.interpolate_2D!(out_buffers, field_in, I_buffers)
+    RingGrids.interpolate_2D!(out_fallback, field_in, RingGrids.interpolator(grid_out, grid_in))
+    @test out_buffers.data == out_fallback.data
+    @test all(iszero, I_buffers.locator.north_pole_average)
+end

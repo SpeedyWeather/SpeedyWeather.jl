@@ -10,11 +10,15 @@ vertical sigma coordinate ``\sigma``, see [Sigma coordinates](@ref sigma_coordin
 ```
 
 This equation applies in 2D, i.e. ``\mathbf{x} = (\lambda, \theta)`` and ``\mathbf{u} = (u, v)`` or
-in 3D, but at the moment only 2D advection is supported. In the [Primitive equation model](@ref primitive_equation_model)
-the vertical layer on which the advection takes place has to be specified. It is therefore not
-advected with the vertical velocity but maintains a constant pressure ratio compared to the
-surface pressure (``\sigma`` is constant). (See also [Tracer advection](@ref) for
-advecting continuous fields instead of individual particles.)
+in 3D, i.e. ``\mathbf{x} = (\lambda, \theta, \sigma)`` and ``\mathbf{u} = (u, v, w)`` with ``w``
+the vertical velocity in ``\sigma`` coordinates. Both are supported, selected via
+[`ParticleAdvection2D`](@ref) or [`ParticleAdvection3D`](@ref) respectively, see
+[3D particle advection](@ref) below. With `ParticleAdvection2D` in the
+[Primitive equation model](@ref primitive_equation_model) the vertical layer on which the advection
+takes place is chosen with the `layer` keyword (default `layer = 1`, the topmost layer). Particles
+are therefore not advected with the vertical velocity but maintain a constant pressure ratio
+compared to the surface pressure (``\sigma`` is constant).
+(See also [Tracer advection](@ref) for advecting continuous fields instead of individual particles.)
 
 ## Discretization of particle advection
 
@@ -215,6 +219,120 @@ Woohoo! We just advected some particles. Note that the active particles
 have their vertical coordinate set to value of the layer they are being
 advected on given that we defined `ParticleAdvection2D` with `layer = 1`
 as default (which has that coordinate value as default).
+
+## 3D particle advection
+
+In addition to being advected horizontally on a fixed model layer
+([`ParticleAdvection2D`](@ref)), particles can also be advected freely in the vertical
+([`ParticleAdvection3D`](@ref)). Instead of keeping ``\sigma`` fixed, a particle's ``\sigma``
+coordinate now evolves in time too, driven by the model's (diagnostic) vertical velocity, in
+exactly the same way as longitude and latitude evolve with ``u`` and ``v``. As in the horizontal,
+the radius scaling is moved into the time step: the model stores the vertical velocity as
+``w = R\dot{\sigma}`` (radius-scaled like vorticity and divergence, see
+[Radius scaling](@ref scaling)), so a particle moves by ``\Delta\sigma = w \Delta t / R``. This is currently
+only available for the [Primitive equation model](@ref primitive_equation_model)s
+(`PrimitiveDryModel`, `PrimitiveWetModel`) as it requires a vertically-resolved, diagnosed
+vertical velocity; `BarotropicModel` and `ShallowWaterModel` have no such concept and continue
+to only support `ParticleAdvection2D`.
+
+### Vertical interpolation
+
+Wind is only known on the model's discrete ``\sigma`` layers so a particle's continuous
+``\sigma`` position has to be translated into a vertical interpolation, similar to how longitude
+and latitude are translated into the horizontal (4-point "anvil") interpolation described above.
+This is done in two steps:
+
+1. Find the two neighbouring model layers that bracket the particle's ``\sigma``. If the particle
+   is above the topmost or below the bottommost layer, the value on that layer is used instead
+   of extrapolating beyond it.
+2. Interpolate horizontally onto each of these two layers separately, using exactly the same
+   4-point anvil interpolation as for `ParticleAdvection2D`, then linearly blend the two
+   resulting values by how far the particle's ``\sigma`` lies between the two layers.
+
+In short, 3D interpolation is the same horizontal interpolation done twice (once per bracketing
+layer) and then blended vertically. Near the poles, where the anvil stencil has no meaningful
+neighbours, the same ring-average substitute as for the 2D case is used, just computed once for
+every model layer instead of once for a single 2D field.
+
+### Flexibility and limitations: horizontal precompute versus vertical on the fly
+
+The horizontal and vertical directions are treated quite differently for performance reasons.
+Locating a particle within the horizontal grid ([`RingGrids.update_locator!`](@ref)) is relatively
+expensive, it searches through the rings of latitude and, within a ring, through its longitudes,
+so it is computed once for every new horizontal position of the particles, i.e. twice per
+advection step (at the predicted and at the corrected position of Heun's method), and the
+resulting grid indices and interpolation weights are reused for all fields interpolated at that
+position (``u``, ``v`` and ``w``). Locating a particle's vertical bracket, on the other hand, is cheap: a short
+scan through as few as a handful of ``\sigma`` layers, so it is simply recomputed on the fly every
+time a value is interpolated, with no separate precompute or storage step.
+
+This is a deliberate trade-off that assumes there are many fewer vertical layers than horizontal
+grid points, typically true (e.g. 8 vertical layers against many thousands of horizontal grid
+points). Some consequences:
+
+- Increasing the vertical resolution (`nlayers`) adds essentially no cost or storage to particle
+  advection beyond the ``\sigma`` layer vector the model already needs, plus two small
+  per-layer pole-average buffers (see [`RingGrids.AnvilLocator`](@ref)).
+- Because the same horizontal indices and weights are reused for both bracketing ``\sigma``
+  layers, horizontal and vertical location are decoupled: the (horizontal) locator does not
+  depend on ``\sigma`` and is reused for all layers and for fields on full and half layers alike.
+- Above the topmost and below the bottommost full layer, ``u`` and ``v`` are taken from that
+  layer rather than extrapolated. The particle's ``\sigma`` itself is not held there: it keeps
+  moving with ``w``, which lives on the half layers spanning the whole column
+  ``0 \leq \sigma \leq 1`` and vanishes at ``\sigma = 0`` and ``\sigma = 1``. Together with
+  ``\sigma`` being clamped to ``[0, 1]`` after every step, particles therefore cannot leave the
+  atmosphere through the model top or fall through the surface.
+
+### Interface example
+
+Using `ParticleAdvection3D` instead of `ParticleAdvection2D` is enough to switch a simulation
+from 2D to 3D particle advection; there is no `layer` keyword any more as particles are free to
+move to any layer
+
+```@example particle3d
+using SpeedyWeather
+spectral_grid = SpectralGrid(nlayers = 8)
+particle_advection = ParticleAdvection3D(spectral_grid, nparticles = 3)
+model = PrimitiveDryModel(spectral_grid; particle_advection)
+simulation = initialize!(model)
+run!(simulation, period = Day(2))
+simulation.variables.prognostic.particles
+```
+
+Every particle's `σ` field is now updated over time, whereas with `ParticleAdvection2D` it would
+have remained fixed at the `layer`-th value of `model.geometry.σ_layers_full`.
+
+To check that the vertical trajectories are smooth and reasonable we can track the particles
+with a [`ParticleTracker`](@ref) (see [Tracking particles](@ref) below), which also writes
+out ``\sigma``, and plot every particle's ``\sigma`` over time
+
+```@example particle3d
+particle_tracker = ParticleTracker(spectral_grid, schedule = Schedule(every = Hour(4)))
+particle_advection = ParticleAdvection3D(spectral_grid, nparticles = 20, every_n_time_steps = 6)
+model = PrimitiveWetModel(spectral_grid; particle_advection)
+add!(model.callbacks, particle_tracker)
+simulation = initialize!(model)
+run!(simulation, period = Day(10))
+
+using NCDatasets, CairoMakie
+ds = NCDataset(joinpath(model.output.run_folder, particle_tracker.filename))
+σ = ds["sigma"][:, :]
+hours = ds["time"].var[:]      # raw hours since start, not decoded into DateTime
+close(ds)
+
+fig = Figure()
+ax = Axis(fig[1, 1], xlabel = "time [hours]", ylabel = "σ", yreversed = true)
+[lines!(ax, hours, σ[i, :]) for i in axes(σ, 1)]
+save("particles_sigma.png", fig) # hide
+nothing # hide
+```
+![Particle trajectories in σ](particles_sigma.png)
+
+with `yreversed = true` so that the surface (``\sigma = 1``) is at the bottom.
+We use `every_n_time_steps = 6` here (default) to advect the particles less frequently than the model time step.
+If the tracker time step (here 4 hours) is not a multiple of
+the particle advection time step the output may look staircase-like,
+adjust accordingly.
 
 ## Tracking particles
 
