@@ -24,8 +24,9 @@ function ZarrOutput(
     # INPUT GRID (but on CPU)
     input_grid = on_architecture(CPU(), SG.grid)
 
-    # CREATE INTERPOLATOR
-    interpolator = RingGrids.interpolator(output_grid, input_grid, NF = DEFAULT_OUTPUT_NF)
+    # CREATE INTERPOLATOR, with pole-average buffers for the most layers any output field has
+    nlayers = max(SpeedyWeather.get_nlayers(layers, SG), nlayers_soil)
+    interpolator = RingGrids.interpolator(output_grid, input_grid; NF = DEFAULT_OUTPUT_NF, nlayers)
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     land_fraction = Field(output_NF, output_grid)

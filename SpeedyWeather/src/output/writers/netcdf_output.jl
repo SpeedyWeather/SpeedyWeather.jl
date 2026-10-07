@@ -98,8 +98,9 @@ function NetCDFOutput(
     # INPUT GRID (but on CPU)
     input_grid = on_architecture(CPU(), SG.grid)
 
-    # CREATE INTERPOLATOR
-    interpolator = RingGrids.interpolator(output_grid, input_grid, NF = DEFAULT_OUTPUT_NF)
+    # CREATE INTERPOLATOR, with pole-average buffers for the most layers any output field has
+    nlayers = max(get_nlayers(layers, SG), nlayers_soil)
+    interpolator = RingGrids.interpolator(output_grid, input_grid; NF = DEFAULT_OUTPUT_NF, nlayers)
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction
@@ -139,7 +140,7 @@ function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
     layers_type_str = string(typeof(output.layers))
     layers_type_str_short = length(layers_type_str) > 70 ? string(first(layers_type_str, 70), "...}") : layers_type_str
     println(io, styled"├ {info:layers}::$layers_type_str_short")
-    
+
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, styled"├ {info:interval} = $(output.interval)")
     print(io, styled"└ {info:variables}")

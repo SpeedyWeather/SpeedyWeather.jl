@@ -4,6 +4,8 @@
 
 ## 0.23.0
 
+- Add ParticleAdvection3D via 3D interpolation [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
+- `AlbedoClimatology` moves its climatology onto the model's architecture before interpolating, fixing it on GPU [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
 - Cloud top height [m] and cloud cover as parameterization and output variables (cloud top output was a layer index), diagnostic cloud top at level of maximum relative humidity as in SPEEDY, convective cloud top for deep convection only [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
 - Betts-Miller convective precipitation is now the net (signed) column drying, closing the column water budget [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
 - Betts-Miller convection: single fixed-trip pass over the column for the parcel ascent instead of an environment prefill plus a `while` loop, ~15-20% faster on GPU; fix `BettsMillerDryConvection` not adapting to GPU [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
