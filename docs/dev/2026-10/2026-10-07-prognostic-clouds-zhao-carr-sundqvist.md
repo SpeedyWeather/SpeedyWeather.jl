@@ -1,11 +1,13 @@
 # Prognostic clouds for SpeedyWeather: Sundqvist, Zhao–Carr, and how ICON does it
 
 > Status: **planned**. Literature review and recommendation, no code changed yet. The recommendation
-> is a Zhao–Carr-type scheme with one prognostic condensate tracer, introduced in stages (section 7).
+> is a Zhao–Carr-type scheme with one prognostic condensate variable fused with the atmospheric
+> prognostics and a cloud state read by every radiation scheme, introduced in stages (section 7).
 
 Date of initial draft: 2026-10-07
 
-Base revision: `dbd4c661` (`mg/version1-version023`)
+Base revision: `3c033168` (`mg/clouds`). The initial draft was checked against `dbd4c661`
+(`mg/version1-version023`), the 2026-10-07 re-audit against `3c033168`.
 
 ## Originating prompt
 
@@ -17,6 +19,37 @@ Base revision: `dbd4c661` (`mg/version1-version023`)
 
 ## Revision log
 
+- 2026-10-07, review and revision.
+  > Critically review and reaudit the plan and the respective SpeedyWeather functionality. Also be
+  > aware that we could also set up a full ecCKD/ecRad model with NumericalRadiation that uses
+  > prognostic clouds. The goal of every implementation should also be to have an implementation
+  > that is efficient to compute on GPU
+
+  > review how the implementation fits our fused variables approach
+
+  > okay revise the plan based on this. Then re-audit the full plan again once more.
+
+  - Base revision moved to `3c033168`; every path and line reference re-checked there (one
+    citation corrected: the tracer hyperdiffusion of the primitive-equation models).
+  - The Zhao–Carr formulas, bounds, phase rules and constants of sections 3 and 4 were checked
+    against the v6.0.0 Fortran of `gscond`, `precpd` and `radiation_clouds.f` and hold. Two
+    details added in 4.5: the `clwmin` offset inside the Xu–Randall exponent and the default
+    ice effective radius.
+  - Section 1 gained rows on variable fusion and on what column kernels can see (time step,
+    `model` fields); section 2 two needs (SPPT, local mixed-phase saturation).
+  - Stage 0 rewritten (7.2): the condensate is a dedicated prognostic variable fused with the
+    atmospheric prognostics, not a `Tracer`; the four dynamical-core hooks it needs are listed
+    (7.2.1). New: the time step physics sees versus the step the state is advanced with (7.2.2),
+    SPPT (7.2.3), mixed-phase saturation kept local (7.2.4), a cloud state as the interface to
+    radiation (7.2.5), the one-band schemes with layer clouds and an all-sky ecCKD scheme through
+    NumericalRadiation with its GPU requirements (7.2.6), a radiation call frequency (7.2.7).
+  - Stage 1 (7.3): cloud evaporation only in the clear fraction with its own time scale; sinks
+    bounded with the prognostic step. Stage 2 (7.4): the forcing bookkeeping restated for
+    tendency-based physics; the reference states are prognostic variables without tendencies.
+  - Numerics checklist, tests, documentation, known limitations and future work updated.
+  - Re-audit of the revised plan: every `file:line` citation resolved against `3c033168` by
+    script (four path shorthands corrected), tables and cross-references checked, and the fused
+    declaration of 7.2.1 verified empirically with a stub component in `Variables(model)`.
 - 2026-10-07: initial draft.
   - Based on a code survey and literature research from 2026-09-28.
   - The SpeedyWeather facts were re-checked at the base revision.
@@ -31,13 +64,16 @@ Base revision: `dbd4c661` (`mg/version1-version023`)
   - Large-scale condensation rains out in the same step and column.
   - Clouds are diagnosed SPEEDY-style: one cover and one cloud-top level per column.
   - They only affect shortwave radiation.
-- **What already exists:** the tracer framework, the column-physics interface and the precipitation
-  sweep of `ImplicitCondensation` cover most of what a one-tracer scheme needs.
+- **What already exists:** the variable system with fused parents (humidity is the template), the
+  column-physics interface and the precipitation sweep of `ImplicitCondensation` cover most of
+  what a one-condensate scheme needs.
 - **What is missing:**
-  - physics writing tracer tendencies;
+  - a condensate variable the physics writes a tendency for, fused with the other prognostics;
   - positivity of a spectrally transported condensate;
   - saturation over ice;
-  - clouds in each layer of shortwave *and* longwave radiation.
+  - a cloud state (fraction, water, ice and effective radii in each layer) and radiation that
+    uses it in shortwave *and* longwave, in the one-band schemes and in ecCKD;
+  - a time step accessor for physics that returns the step the state is advanced with.
 - **Sundqvist (1978; Sundqvist, Berge & Kristjánsson 1989)** has three ingredients:
   - one prognostic cloud condensate `m`;
   - a cloud fraction diagnosed from relative humidity, `b = 1 − √((1 − f)/(1 − u))`;
@@ -61,6 +97,8 @@ Base revision: `dbd4c661` (`mg/version1-version023`)
   - the earlier ECHAM-physics ICON-A used Sundqvist cover, so it belongs to the same family as
     Zhao–Carr.
 - **Recommendation** (section 7):
+  - Stage 0: the fused condensate variable, the physics time step, the cloud state, layer clouds
+    in the one-band radiation, and the prerequisites of an all-sky ecCKD scheme.
   - Stage 1: Zhao–Carr-type physics, keeping `ImplicitCondensation`'s relaxation for condensation.
   - Stage 2: the Sundqvist condensation closure.
   - Stage 3: convective detrainment.
@@ -90,31 +128,34 @@ Paths are relative to `SpeedyWeather/src/` at the base revision.
 | Component | State | Where |
 |---|---|---|
 | Water variables | Only specific humidity `q` is prognostic (spectral). There is no cloud water, ice, rain or snow variable. | `models/primitive_wet.jl` |
-| Tracers | `add!(model, Tracer(:name))` creates a spectral prognostic variable, a grid copy, and spectral and grid tendencies (namespaces `:tracers` and `:grid_tracers`). Tracers are advected (flux form) and hyperdiffused. No parameterization writes a tracer tendency yet. | `dynamics/tracers.jl:9-15, 57-71`, `dynamics/tendencies.jl:805-819`, `dynamics/horizontal_diffusion.jl:271-274` |
-| Positivity | `ClipNegatives` does `max(q, 0)`, but only on the **grid copy of humidity**. The spectral state is untouched and mass is not conserved. Tracers get nothing. | `dynamics/hole_filling.jl`, `time_stepping/transform.jl:153-156` |
+| Tracers | `add!(model, Tracer(:name))` creates a spectral prognostic variable, a grid copy, and spectral and grid tendencies (namespaces `:tracers` and `:grid_tracers`). Tracers are advected (flux form) and hyperdiffused. No parameterization writes a tracer tendency yet. Tracers are **not fused**: each costs one separate spectral→grid and three separate grid→spectral transforms per step through the shared `:a/:b` scratch slots, driven by a runtime `Dict` loop. There is no tracer test under `test/GPU/` or `test/reactant/`. | `dynamics/tracers.jl:9-15, 57-71`, `dynamics/tendencies.jl:805-819`, `dynamics/horizontal_diffusion.jl:357-361`, `time_stepping/transform.jl:181-185` |
+| Positivity | `ClipNegatives` does `max(q, 0)`, but only on the **grid copy of humidity**. The spectral state is untouched and mass is not conserved. Tracers get nothing. Clipping another grid variable is one more line in the same place. | `dynamics/hole_filling.jl`, `time_stepping/transform.jl:153-156` |
 | Large-scale condensation | `ImplicitCondensation` relaxes `q` to `0.95 q_s` over `3Δt`, with the implicit latent-heat factor `1 + Lᵥ/cₚ ∂q_s/∂T` (Frierson et al. 2006). The condensate rains out immediately. A top-down sweep handles melting (above 278 K), reevaporation (proportional to subsaturation) and snow (below 263 K), and sets `cloud_top`. | `parameterizations/large_scale_condensation.jl` |
 | Convection | Betts–Miller (Frierson 2007) with linear entrainment. Rain is the net column drying. All of it falls as snow if the lowest layer is below 273.15 K. No condensate is detrained. `cloud_top` is set to the level of zero buoyancy. | `parameterizations/convection.jl:8-23, 141-179` |
 | Clouds | `DiagnosticClouds` (SPEEDY): one cover per column, `min(1, 0.2√P + RH-term²)`. Cloud top is the level of maximum RH or the precipitation cloud top. Stratocumulus comes from static stability. | `parameterizations/radiation/clouds.jl:29-185` (cover at `:149-151`) |
-| Radiation | `OneBandShortwave` reflects `cloud_albedo × cover` only at `k == cloud_top` and adds cloud absorptivity below it. The Frierson longwave has **no clouds**. The NumericalRadiation (ecCKD) extension is clear-sky. | `radiation/shortwave_radiation.jl:125-127, 194`, `radiation/shortwave_transmissivity.jl:109-131`, `radiation/longwave_transmissivity.jl:29-78` |
-| Saturation | Clausius–Clapeyron over liquid with one `Lᵥ`. `TetensEquation` has a Murray (1967) branch below freezing, but `saturation_humidity` does not use it. | `dynamics/atmosphere.jl:141-160, 162-216` |
-| Physics infrastructure | Column kernels `parameterization!(ij, vars, scheme, model)` add into the grid tendencies and are fused into one GPU kernel. The call order is zenith, vertical diffusion, condensation, convection, albedo, radiation, boundary layer, surface fluxes, stochastic physics. Physics reads the *lagged* leapfrog step and runs before dynamics. | `models/primitive_wet.jl:122`, `parameterizations/tendencies.jl:32-88`, `time_stepping/steps.jl:187`, `time_stepping/time_integration.jl:83-90` |
-| Time stepping | Leapfrog with `Δt = 40 min` at T32, so physics tendencies act over `2Δt`. | `time_stepping/steppers/leapfrog.jl:186` |
-| Post-step adjustments | `filter!` exists only for the grid-point components ocean, sea ice and land; there is none for spectral atmospheric variables. | `time_stepping/time_integration.jl:140-142` |
+| Radiation | `OneBandShortwave` reflects `cloud_albedo × cover` only at `k == cloud_top` and adds cloud absorptivity below it. The Frierson longwave has **no clouds**. The NumericalRadiation (ecCKD) extension is clear-sky; it declares its per-g-point work arrays as `Grid4D` parameterization variables in the `:ecckd` namespace and runs the clear-sky solvers allocation-free with caller-owned scratch. | `parameterizations/radiation/shortwave_radiation.jl:192-196, 233`, `parameterizations/radiation/shortwave_transmissivity.jl:109-131`, `parameterizations/radiation/longwave_transmissivity.jl:29-78`, `ext/SpeedyWeatherNumericalRadiationExt/ecckd_radiation.jl` |
+| Saturation | Clausius–Clapeyron over liquid with one `Lᵥ`. `TetensEquation` has a Murray (1967) branch below freezing, but it is unused anywhere in `src/`. `saturation_humidity` is shared by convection, the diagnostic clouds, surface fluxes and condensation. `latent_heat_sublimation` is 2801 kJ/kg while `Lᵥ + L_f` is 2831 kJ/kg. | `dynamics/atmosphere.jl:46-52, 141-160, 162-216` |
+| Physics infrastructure | Column kernels `parameterization!(ij, vars, scheme, model)` add into the grid tendencies and are fused into one GPU kernel. The call order is zenith, vertical diffusion, condensation, convection, albedo, radiation, boundary layer, surface fluxes, stochastic physics. Physics reads the *lagged* leapfrog step and runs before dynamics. On the device `model` is reduced to its `core_components`, so `model.tracers` and other `Dict`s are not available in the kernel. SPPT multiplies the u, v, T and q tendencies only. | `models/primitive_wet.jl:122-134, 230-235`, `parameterizations/tendencies.jl:32-88`, `time_stepping/steps.jl:187`, `time_stepping/time_integration.jl:83-90`, `parameterizations/stochastic_physics.jl:74-84` |
+| Time stepping | Leapfrog with `Δt = 40 min` at T32; after the first two steps the state is advanced by `2Δt` (`default_time_step`), so physics tendencies act over `2Δt`. Column kernels only see `time_stepping.Δt`, and the GPU-adapted `LeapfrogCore` carries nothing else. `ImplicitCondensation` therefore removes two thirds, not one third, of the supersaturation per step. | `time_stepping/steppers/leapfrog.jl:171-179, 186, 246-256` |
+| Post-step adjustments | `filter!` exists only for the grid-point components ocean, sea ice and land; there is none for spectral atmospheric variables. The precedent for adjustments instead of tendencies is `docs/dev/2026-09/adjustments-not-tendencies.md`. | `time_stepping/time_integration.jl:140-142` |
+| Variable fusion | Variables sharing a `fuse` symbol within a namespace share one parent buffer, concatenated along the layer axis in declaration order (the model's own variables first, then the components in field order). The `:prognostic`↔`:grid` and `:spectral_tendencies`↔`:grid_tendencies` parents must declare the same members in the same order, asserted in `Variables(model)`. The batched transforms in both directions, tendency scaling, the leapfrog shift of the grid copies and the time stepping over all top-level tendency names iterate the parents or the names, so they pick up new members automatically. Hyperdiffusion, the horizontal flux-form advection and hole filling name their variables explicitly. In a parent with a step dimension a member without one collapses to a single slot. Several in-place broadcasts into views of one parent corrupt data under Reactant. | `variables/variables.jl:237-272, 398-465`, `variables/dimensions.jl:177-330`, `time_stepping/transform.jl:149-165`, `dynamics/tendencies.jl:160-175, 778-803`, `time_stepping/steppers/leapfrog.jl:125-144`, `dynamics/scaling.jl:15-60`, `time_stepping/time_integration.jl:152-165` |
 
 ### 2. What a prognostic cloud scheme needs
 
 | # | Need | Status |
 |---|---|---|
-| 1 | A condensate variable `q_c` (cloud water + ice), advected | Tracer framework exists. Physics must write `vars.tendencies.grid_tracers[:q_c]`, which is then transformed together with the advection tendency at no extra cost. |
+| 1 | A condensate variable `q_c` (cloud water + ice), advected | The variable system allocates it. Fused with humidity (7.2.1) it joins the batched transforms, tendency scaling, the leapfrog grid shift, vertical advection and the time stepping automatically; four hooks in the dynamical core remain. Physics writes `vars.tendencies.grid.cloud_condensate`, transformed together with the advection tendency. |
 | 2 | Sources and sinks: condensation, cloud evaporation, autoconversion, accretion, phase | Missing. `ImplicitCondensation`'s relaxation can be reused as the condensation source. |
 | 3 | Precipitation with evaporation and melting | The top-down sweep exists in `ImplicitCondensation`. |
 | 4 | A cloud fraction consistent with `q_c` | Missing. The current cover is RH- and precipitation-based, one per column. |
-| 5 | Radiation using cloud fraction, condensate path and effective radius in each layer, in SW **and** LW, with an overlap assumption | Missing, and the largest single work item. |
+| 5 | Radiation using cloud fraction, condensate path and effective radius in each layer, in SW **and** LW, with an overlap assumption | Missing, and the largest single work item. Needs a cloud state as the interface (7.2.5). NumericalRadiation has GPU-fit cloud optics, but its all-sky solvers allocate (7.2.6). |
 | 6 | Convective condensate (anvils) | Missing. Betts–Miller has no updraft to detrain from. |
 | 7 | Positivity and conservation of a spectrally transported, intermittent field | Missing for tracers. |
 | 8 | Ice thermodynamics: `q_s` over ice or mixed phase, `L_s`, fusion heat | Partly present (Tetens–Murray). |
-| 9 | Bounded fast sinks under leapfrog (`2Δt = 80 min` at T32) | A design rule: implicit or exponential forms. |
+| 9 | Bounded fast sinks under leapfrog (`2Δt = 80 min` at T32) | A design rule: implicit or exponential forms, bounded with the step the state is advanced with, which physics cannot see today (7.2.2). |
 | 10 | Output: liquid and ice water path, 3D cloud fraction | Missing. |
+| 11 | SPPT consistent across `q`, `T` and `q_c` | Missing: SPPT perturbs u, v, T and q only (7.2.3). |
+| 12 | Mixed-phase saturation without changing the rest of the model | Missing (7.2.4). |
 
 ### 3. The Sundqvist scheme
 
@@ -340,7 +381,8 @@ The radiation does **not** use the Sundqvist `b`. Instead:
   C = f^¼ [1 − exp(−2000 q_c / ((1 − f) q_s)^¼)]
   ```
 
-  - `((1 − f) q_s)^¼` is clamped to `[10⁻⁴, 1]` and the exponent to 50.
+  - `((1 − f) q_s)^¼` is clamped to `[10⁻⁴, 1]`, `1 − f` to at least `10⁻¹⁰`, and the exponent to 50.
+  - Inside the exponent the code uses `q_c − clwmin/(p/1000 hPa)` with `clwmin = 10⁻⁹`, negligible.
   - `C < 0.001` is set to 0.
   - Because `C → 0` as `q_c → 0`, there is no cloud without condensate.
 - **Condensate path** `q_c Δp/g`:
@@ -350,7 +392,8 @@ The radiation does **not** use the Sundqvist `b`. Instead:
     1-2-1.
 - **Effective radius:**
   - liquid: 10 µm over ocean, `5 + 5 f_ice` µm over land;
-  - ice: a temperature-dependent power law of ice water content, limited to 10–150 µm.
+  - ice: a temperature-dependent power law of ice water content (Heymsfield & McFarquhar 1996),
+    limited to 10–150 µm; 50 µm where the power law is not used.
 
 #### 4.6 Known weaknesses
 
@@ -433,9 +476,9 @@ pitfalls when saturation adjustment is combined with one-moment rain.
 
 Adopt the **Zhao–Carr structure with Sundqvist physics**:
 
-- **One tracer, `q_c`.** It costs one spectral→grid transform (`transform.jl:181-185`) and three
-  grid→spectral transforms (`tendencies_sequential.jl:151-175`) per step, the same as any tracer.
-  Physics tendencies are transformed together with the advection tendency.
+- **One condensate variable, `q_c`,** fused with the atmospheric prognostics (7.2.1). Its transforms
+  ride in the batched calls that already exist, so it adds layers but no launches. Physics
+  tendencies are transformed together with the advection tendency.
 - **Diagnostic precipitation.** It needs no sedimentation stability (CFL) treatment, which matters
   because rain falls about 12 km in one 40 min step.
 - **Column-local, smooth formulas**, which suit the fused GPU kernel and Enzyme/Reactant.
@@ -444,30 +487,190 @@ Adopt the **Zhao–Carr structure with Sundqvist physics**:
 
 ### 7.2 Stage 0: prerequisites
 
-1. **Condensate variable.** Either a `Tracer(:cloud_condensate)` that the parameterization owns, or a
-   dedicated prognostic variable like humidity, fused into the main batched transform. *Decision
-   needed.* The tracer is less work; the dedicated variable may be faster.
-2. **Positivity.**
-   - Physics reads `max(q_c, 0)`.
-   - Add GFS's **fill from vapour** as a tendency: a negative `q_c` is moved to 0 from `q` with
-     latent heating, which conserves total water and enthalpy.
-   - Optionally use the upwind or WENO vertical advection (`dynamics/vertical_advection.jl:8-11`).
-     It is a model-wide choice and reduces overshoots at cloud edges.
-3. **Ice thermodynamics.**
-   - A mixed-phase `q_s`, e.g. the existing Tetens–Murray branch, or a blend of liquid and ice over
-     0 to −20 °C.
-   - `L = Lᵥ + f_ice L_f`.
-   - Keep the column enthalpy budget closed, as `test/parameterizations/large_scale_condensation.jl`
-     tests today.
-4. **Radiation with layer clouds.** This is the largest item and can be developed against Stage 1
-   output.
-   - **Shortwave:** reflection and absorption in every layer from the optical depth, instead of only
-     at `cloud_top`. For liquid, `τ = 3 LWP/(2 ρ_w r_e)`.
-   - **Longwave:** cloud emissivity `ε = 1 − exp(−D κ LWP)`, with `D ≈ 1.66` (CCM3 style), multiplied
-     into the Frierson transmissivity.
-   - **Overlap:** random or maximum-random, weighting each layer by its cloud fraction.
-   - The NumericalRadiation extension would need an all-sky path.
-5. **Output:** liquid and ice water path, 3D cloud fraction, and the process rates for debugging.
+#### 7.2.1 The condensate variable: fused with the atmospheric prognostics
+
+*Decision:* `q_c` is a dedicated prognostic variable `vars.prognostic.cloud_condensate` next to
+humidity, declared by the cloud scheme and fused into the parents that already exist. It is not
+a `Tracer`.
+
+Why not a tracer: tracers are not fused. Each costs one separate spectral→grid and three
+separate grid→spectral transforms per step through the shared `:a/:b` scratch slots, is driven by
+a runtime `Dict` loop, and has no GPU or Reactant test. A fused variable adds layers to the
+batched calls but no launches, and runs on the code path every GPU test already exercises for
+humidity. Transform work per step at 8 layers:
+
+| Route | spectral→grid | grid→spectral |
+|---|---|---|
+| Today, fused atmosphere | 33 + 16 layers, 2 calls | 73 layers, 1 call |
+| Condensate as `Tracer` | +8 layers, +1 call | +24 layers, +3 calls |
+| Condensate fused with humidity | +8 layers, +0 calls | +24 layers, +0 calls |
+
+What the scheme declares in `variables(::CloudScheme, model)`, mirroring the humidity lines in
+`models/primitive_wet.jl:153-161`, with the step counts from `get_nsteps(model.time_stepping, model)`
+as `variables(::Tracer, model)` does:
+
+- `PrognosticVariable(:cloud_condensate, SpectralXYZT(ps), fuse = :prognostic)`;
+- `GridVariable(:cloud_condensate, GridXYZT(pg), fuse = :grid)`;
+- `TendencyVariable(:cloud_condensate, SpectralXYZT(ts), fuse = :spectral_tendencies)`;
+- `TendencyVariable(:cloud_condensate, GridXYZT(tg), namespace = :grid, fuse = :grid_tendencies)`;
+- `DynamicsVariable`s `uqc`, `vqc` on the grid (`GridXYZT(tg)`, namespace `:grid`, fuse
+  `:grid_tendencies`) and in spectral space (`SpectralXYZT(ts)`, fuse `:spectral_tendencies`).
+
+Because `all_variables` lists the model's variables first and then the components in field order,
+these append one slot block to each parent in the same relative position, and the alignment
+assertions in `Variables(model)` pass. The spectral and the grid variable must be declared in the
+same order within the scheme; a mistake fails loudly at construction, not at run time.
+
+Checked with a stub component at `3c033168` (T31, 8 layers): the `:prognostic` and `:grid`
+parents grow from 33 to 41 slots and the tendency parents from 73 to 97; `cloud_condensate`
+lands at slots 34:41 and 74:81 with `uqc`, `vqc` at 82:89 and 90:97; the grid copy has size
+`(npoints, 8, 2)`; `tendency_names` includes `cloud_condensate`, so the time stepping and the
+tendency scaling see it without any change.
+
+What then works without any change: the batched transforms in both directions, tendency scaling,
+the leapfrog shift of the grid copy, time stepping (it runs over all top-level tendency names),
+vertical advection (generic over `vars.grid[name]`), `reset_tendencies!`, `copy!`, restarts
+(`output/restart.jl:47` materializes the whole `prognostic` group), zero initial conditions, and the step selection: physics reads the lagged step through
+`get_prognostic_step(vars.grid.cloud_condensate, …)` exactly as it reads humidity.
+
+Four hooks in the dynamical core remain, each a copy of the humidity line:
+
+1. the `+q_c D` term and the products `(u q_c, v q_c)` into the named grid slots, as
+   `humidity_grid_tendency!` (`dynamics/tendencies.jl:778-789`);
+2. the spectral flux divergence `−∇·(u q_c, v q_c)` after the batched transform, as
+   `humidity_spectral_tendency!` (`dynamics/tendencies.jl:795-803`);
+3. hyperdiffusion, which names vorticity, divergence, temperature and humidity explicitly
+   (`dynamics/horizontal_diffusion.jl:331-355`);
+4. hole filling of the grid copy next to humidity's (`time_stepping/transform.jl:153-156`).
+
+Write these over a compile-time tuple of *advected scalar names* derived from the `Variables`
+type, as `_tendency_names` is (`variables/variables.jl:641-648`), so that humidity and condensate
+share one code path and a further species later costs nothing. Inside the fused column kernel
+the scheme addresses the variable by its literal name; `model.tracers` is not available there
+anyway.
+
+Two rules of the fuse machinery the implementation must respect:
+
+- **Shape.** In a parent with a step dimension, a member without one collapses to a single
+  slot, so a grid copy declared `GridXYZ()` instead of `GridXYZT(pg)` becomes a 2D field with
+  steps (`variables/dimensions.jl:252-262`). For the `:prognostic`↔`:grid` pair the alignment
+  assertion catches this at construction (checked: slot range 34:41 against 34:34 is rejected);
+  a fuse group without an aligned partner is not checked. Always use the `…XYZT` types with the
+  step counts from `get_nsteps`, and pin the shape in a test (see Testing).
+- **Reactant.** Several in-place broadcasts into different views of one fused buffer corrupt the
+  data under Reactant (`dynamics/scaling.jl:20-35`). Hole filling and resets of fused members act
+  on each member once per step, or on the parent.
+
+What does not need fusion: the 3D cloud state (7.2.5) and the radiation work arrays. Column
+kernels read them coalesced over `ij` either way, and per-g-point `Grid4D` arrays can only share
+a parent when their trailing size agrees, which fails for ecCKD models whose longwave and
+shortwave g-point counts differ.
+
+Positivity, unchanged from the first draft:
+
+- Physics reads `max(q_c, 0)`.
+- GFS's **fill from vapour** as a tendency: a negative `q_c` is moved to 0 from `q` with latent
+  heating, which conserves total water and enthalpy.
+- Optionally the upwind or WENO vertical advection (`dynamics/vertical_advection.jl:8-11`). It is
+  a model-wide choice and reduces overshoots at cloud edges.
+
+#### 7.2.2 The time step physics sees
+
+Column kernels get `time_stepping.Δt`, but leapfrog advances the state by `2Δt` after the first
+two steps (`default_time_step`, `time_stepping/steppers/leapfrog.jl:246-256`). `ImplicitCondensation`
+therefore removes two thirds of the supersaturation per step, not one third, and any condensate
+sink bounded by `q_c/Δt` makes `q_c` negative. The GPU-adapted stepper `LeapfrogCore` carries
+only `Δt` (`time_stepping/steppers/leapfrog.jl:171-179`).
+
+- Add the prognostic step to `LeapfrogCore` and an accessor, e.g. `physics_time_step(time_stepping)`,
+  returning `default_time_step` (`2Δt` for leapfrog, `Δt` for every other stepper,
+  `time_stepping/steppers/general.jl:5-9`), following `dynamics/horizontal_diffusion.jl:430-432`,
+  which already uses the prognostic step for the implicit diffusion.
+- Every bounded sink of the cloud scheme uses that step, written `Δt_p` below. The first two
+  steps advance by `Δt/2` and `Δt`, so the bound is conservative there.
+- Whether `ImplicitCondensation` and the other schemes switch too is a separate decision; it
+  changes their results.
+
+#### 7.2.3 SPPT
+
+`StochasticallyPerturbedParameterizationTendencies` multiplies the u, v, T and q tendencies
+(`parameterizations/stochastic_physics.jl:74-84`). With a condensate tendency it has to multiply
+that one with the same pattern, otherwise water and enthalpy are no longer conserved between `q`,
+`T` and `q_c`. Add the condensate, and in general every advected scalar, to the SPPT loop.
+
+#### 7.2.4 Ice thermodynamics, kept local
+
+- A mixed-phase `q_s` as a blend of liquid and ice saturation over 0 to −20 °C, with the matching
+  `∂q_s/∂T` for the implicit factor, inside the cloud scheme. `saturation_humidity` is shared by
+  convection, the diagnostic clouds, surface fluxes and condensation; changing it globally
+  changes the whole model. A global switch, if wanted later, is an `EarthAtmosphere` option with
+  the current behaviour as default.
+- `L = Lᵥ + f_ice L_f`, never `latent_heat_sublimation`: that constant (2801 kJ/kg) is not
+  `Lᵥ + L_f` (2831 kJ/kg). Fix the constant in a separate PR.
+- Keep the column enthalpy budget closed, as `test/parameterizations/large_scale_condensation.jl`
+  tests today.
+
+#### 7.2.5 The cloud state as the interface to radiation
+
+The cloud scheme writes, per layer, as 3D parameterization variables:
+
+- `cloud_fraction`;
+- in-cloud liquid and ice water (mixing ratio, or path per layer);
+- effective radii of liquid and ice (GFS rules: 10 µm over ocean, `5 + 5 f_ice` µm over land;
+  ice from temperature and ice water content, or a fixed value to start);
+- the overlap parameter `α` between adjacent layers from a decorrelation length `L`,
+  `α = exp(−Δz/L)` (ecRad's default `L` is about 2 km), and optionally the fractional standard
+  deviation of in-cloud condensate (ecRad uses 1).
+
+Every radiation scheme reads this state and nothing else from the cloud scheme. The call order
+already runs condensation before radiation (`models/primitive_wet.jl:122-134`), so radiation
+sees this step's clouds. Column cover by maximum overlap and the highest cloudy layer are
+derived from the state for the existing `cloud_cover`, `cloud_top` and `cloud_top_height`
+outputs.
+
+#### 7.2.6 Radiation with layer clouds
+
+*One-band schemes, first.* A `PrognosticClouds <: AbstractShortwaveClouds` returns the
+NamedTuple that `clouds!` returns today (cover, top, albedos), so `OneBandShortwave` works
+unchanged on day one. Then:
+
+- **Shortwave:** reflection and absorption in every layer from the optical depth. This needs an
+  adding method, since the current code reflects once at `cloud_top`
+  (`parameterizations/radiation/shortwave_radiation.jl:192-196, 233`). For liquid, `τ = 3 LWP/(2 ρ_w r_e)`.
+- **Longwave:** cloud emissivity `ε = 1 − exp(−D κ LWP)`, `D ≈ 1.66` (CCM3 style), multiplied into
+  the Frierson transmissivity.
+- **Overlap:** maximum-random with the layer cloud fractions.
+
+*All-sky ecCKD through NumericalRadiation, second.* State of NumericalRadiation 0.1.1:
+
+- Cloud optics are ready and GPU-fit: `SpectralCloudOptics` maps ecRad's Mie droplet and Baum
+  ice tables onto the ecCKD g points (`:ecrad` averaging, delta-Eddington) on effective-radius
+  nodes; at run time `effective_radius_bracket`, `cloud_layer_optics` and `add_scattering_layer`
+  are allocation-free and branchless, and the tables are `Adapt`-able.
+- The all-sky solvers are not: `CloudOverlapShortwave` and `CloudOverlapLongwave` allocate per
+  column and per g point and are documented as diagnostic solvers, not Tripleclouds or McICA.
+  The clear-sky extension only became allocation-free through `streaming_longwave_fluxes!` and
+  the caller-owned `ShortwaveColumnScratch`.
+
+An `AllSkyEcCKDRadiation` therefore needs, upstream in NumericalRadiation, a streaming two-region
+(clear and cloudy) or three-region (Tripleclouds) adding solver with caller-owned scratch for
+both streams. In SpeedyWeather it then follows the clear-sky extension exactly: per-g-point
+optical depths for the clear and the cloudy region as `Grid4D` parameterization variables (twice
+the clear-sky arrays), the cloud optics folded in per layer from the cloud state of 7.2.5 with one
+radius bracket per layer and phase, and the fluxes blended by the solver. Cost: clear-sky ecCKD
+is about 80× the one-band pair per column; all-sky adds a factor two to three.
+
+#### 7.2.7 Radiation call frequency
+
+Run radiation every `N` steps and hold its heating in a 3D parameterization variable in between.
+This was future work in `docs/dev/2026-09/numericalradiation-extension.md`; with all-sky ecCKD as
+a target it belongs here. The fused column kernel keeps a cheap "add the stored heating" branch
+on the other steps.
+
+#### 7.2.8 Output
+
+Liquid and ice water path, 3D cloud fraction, condensate, and the process rates for debugging,
+as output variable definitions like those in `output/variables/precipitation.jl`.
 
 ### 7.3 Stage 1: Zhao–Carr with relaxation condensation (recommended first implementation)
 
@@ -479,7 +682,10 @@ This is one column kernel that replaces or extends `ImplicitCondensation`, worki
 2. **Condensation and cloud evaporation.** Reuse the implicit relaxation of `ImplicitCondensation`:
    `δq = (q − RH_c q_s) / ((1 + L/cₚ RH_c ∂q_s/∂T) τ)`.
    - Supersaturated (`δq > 0`): condense into `q_c` instead of raining out.
-   - Subsaturated with `q_c > 0`: evaporate cloud, limited by `q_c`.
+   - Subsaturated with `q_c > 0`: evaporate cloud only in the clear fraction `1 − C` of the cell,
+     with its own time scale `τ_evap ≥ τ`, limited by `q_c`. Relaxing the whole cell towards
+     `RH_c q_s` would clear advected cloud within one or two steps at 70 % RH and no anvil would
+     survive; GFS keeps the cloud unless RH falls below the critical value.
    - This is a saturation adjustment towards `RH_c` with timescale `τ`. It needs no forcing `M`, is
      already energy-checked and is stable under leapfrog.
 3. **Cloud fraction:** Xu–Randall in GFS form, `C(q_c, f, q_s)` (section 4.5). Use it for both
@@ -488,12 +694,14 @@ This is one column kernel that replaces or extends `ImplicitCondensation`, worki
 4. **Conversion to precipitation:**
    - liquid: Sundqvist with `F_co` from the flux above and `F_BF` (section 3.3);
    - ice: `P_saut` from section 4.4.
-   - Apply both in **exponential form**, `Δq_c = q_c (1 − exp(−k · 2Δt))` with `k = P/q_c`, so `q_c`
-     stays non-negative at `2Δt = 80 min` even when `F` is 5 to 10.
+   - Apply both in **exponential form**, `Δq_c = q_c (1 − exp(−k Δt_p))` with `k = P/q_c` and `Δt_p`
+     the prognostic step of 7.2.2 (`2Δt`, 80 min at T32), so `q_c` stays non-negative even when
+     `F` is 5 to 10. The tendency is `Δq_c/Δt_p`.
 5. **Precipitation sweep:** keep the existing melting, reevaporation and snow code. Optionally add
    collection of cloud by falling precipitation (`P_racw`, `P_saci`).
-6. **Output tendencies** for `q`, `T` and `q_c`, plus rain and snow rates. Keep `cloud_top` until the
-   radiation no longer needs it.
+6. **Outputs:** tendencies for `q`, `T` and `q_c`, rain and snow rates, and the cloud state of 7.2.5
+   (fraction, in-cloud water and ice, effective radii). Keep `cloud_top` and the column cover,
+   derived from the cloud state, until no radiation scheme needs them.
 
 **Parameters**, starting from GFS or the current SpeedyWeather values:
 
@@ -501,6 +709,7 @@ This is one column kernel that replaces or extends `ImplicitCondensation`, worki
 |---|---|
 | `RH_c` | 0.95 |
 | `τ` | `3Δt` |
+| `τ_evap` | `2τ` |
 | `C₀` | `1e-4 s⁻¹` |
 | `m_r` | `3e-4` |
 | `c₁`, `c₂` | 300, 0.5 |
@@ -517,11 +726,16 @@ This gives partial cloudiness before saturation and condensation consistent with
 non-cloud forcing `A_T`, `A_q`, `A_p` (section 3.2). Physics runs *before* dynamics and the dynamical
 tendencies only exist in spectral space, so there are three options:
 
-1. **The GFS approach (recommended).**
-   - Store `T` and `q` (and `p_s`) as they are after each cloud-scheme call, keeping two copies for
-     leapfrog parity.
-   - Use `A_X = (X_lagged − X_ref)/(2Δt)`.
-   - Cost: about four extra 3D grid fields. This is proven under leapfrog in GFS.
+1. **The GFS approach (recommended), restated for tendency-based physics.** GFS stores the state
+   after its own update; SpeedyWeather's physics adds tendencies. The equivalent is:
+   - at each call store `X_ref = X_lagged + Δt_p F_cloud` for `T`, `q` and `pₛ`, where `F_cloud` is
+     this scheme's own tendency of that call and `Δt_p` the prognostic step of 7.2.2;
+   - at the next call use `A_X = (X_lagged − X_ref)/Δt_p`. Physics always reads the lagged step, so
+     consecutive calls are two leapfrog steps apart, the same parity as GFS's `tp ← tp1 ← t`.
+   - Cost: two 3D and one 2D field. Declare them as `PrognosticVariable`s *without* a tendency:
+     they are allocated, saved in restarts and copied, but never stepped, since stepping runs
+     only over names that have a tendency. This is the home for a state with memory; the
+     `parameterizations` group is declared memoryless.
 2. **Reuse the two grid time levels SpeedyWeather already keeps**, minus the scheme's own previous
    tendency. No new `T`/`q` state is needed, but the difference includes the leapfrog computational
    mode. Experimental.
@@ -549,7 +763,10 @@ tracer. Either SpeedyWeather option is an ad-hoc substitute, so treat it as a *d
 ### 7.6 Numerics checklist
 
 - **Bounded sinks:** every term that can remove `q_c` within a step is implicit or exponential, or is
-  capped at `q_c/(2Δt)`. There is no atmospheric `filter!` to fix overshoots afterwards.
+  capped at `q_c/Δt_p` with the prognostic step of 7.2.2, never `q_c/Δt`. There is no atmospheric
+  `filter!` to fix overshoots afterwards; `adjustments-not-tendencies.md` is the precedent if one
+  is added.
+- **SPPT:** the condensate tendency is perturbed with the same pattern as `q` and `T` (7.2.3).
 - **Conservation tests:** column total water (`q + q_c` + precipitation) and enthalpy, extending the
   existing condensation budget tests.
 - **Differentiability:**
@@ -558,7 +775,12 @@ tracer. Either SpeedyWeather option is an ad-hoc substitute, so treat it as a *d
   - prefer the smooth Sundqvist threshold to hard thresholds;
   - use a phase ramp instead of the `IW` branches.
 - **GPU:** one fused column kernel, fixed loop lengths, no data-dependent early exits beyond what
-  `ImplicitCondensation` already has.
+  `ImplicitCondensation` already has. The condensate loop runs over all layers (`q_c ≥ 0`
+  everywhere) rather than branching on cloud presence. Work arrays are parameterization
+  variables, nothing is allocated in the kernel. The effective radius is bracketed once per
+  layer and phase, not per g point. `model.tracers` and other `Dict`s are not available in the
+  kernel; variables are addressed by literal name.
+- **Reactant:** no repeated in-place broadcasts into views of one fused parent (7.2.1).
 - **Spectral ringing:** `q_c` is intermittent. Hyperdiffusion damps the smallest scales. GFS shows
   that clipping on read plus fill-from-vapour is enough for an operational spectral model.
 
@@ -579,7 +801,19 @@ tracer. Either SpeedyWeather option is an ad-hoc substitute, so treat it as a *d
   - cloud evaporates in subsaturated air;
   - the water and enthalpy budgets close;
   - `q_c ≥ 0` after one step for extreme rates.
-- **GPU and differentiability tests** like those of the existing parameterizations.
+- **Limit test:** with instantaneous autoconversion the new scheme reproduces `ImplicitCondensation`'s
+  precipitation and `q`, `T` tendencies on a prescribed column.
+- **Variable layout:** `Variables(model)` with the cloud scheme passes the fuse alignment
+  assertions; the condensate's grid copy has `nlayers` layers and the step dimension; the
+  spectral and grid slots of `cloud_condensate` agree, and a grid copy without the step
+  dimension is rejected (pins the behaviour observed in the stub check of 7.2.1). A run of a few
+  steps with the scheme's tendencies set to zero is bitwise identical in all other variables to
+  a run without the scheme.
+- **Time step:** a sink at the maximum rate leaves `q_c ≥ 0` after a full leapfrog step (`2Δt`),
+  not only after `Δt`.
+- **GPU and differentiability tests** like those of the existing parameterizations: a fused
+  column-kernel run in `test/GPU/` and a parameter-AD test as in
+  `test/differentiability/primitivewet.jl`.
 - **Long runs at T31 and T63.** Compare global means against observations: total cloud fraction of
   about 0.6–0.7, and CERES-EBAF cloud radiative effects of about −45 to −47 W m⁻² (SW),
   +26 to +28 W m⁻² (LW) and about −20 W m⁻² (net). Check that precipitation stays close to the
@@ -588,24 +822,34 @@ tracer. Either SpeedyWeather option is an ad-hoc substitute, so treat it as a *d
 
 ## Documentation changes (planned)
 
-A new docs page for the cloud scheme, following `docs/src/large_scale_condensation.md`. Update the
-radiation docs once clouds enter the longwave.
+A new docs page for the cloud scheme, following `docs/src/large_scale_condensation.md`. Document
+the physics time step accessor and the cloud state in `docs/src/parameterizations.md`, and that
+components may declare fused members in `docs/src/variable_system.md`. Update
+`docs/src/radiation.md` once clouds enter the longwave and again for the all-sky ecCKD scheme.
 
 ## Known limitations of this review
 
 - **Primary papers not read:** the Sundqvist et al. (1989) and Zhao & Carr (1997) PDFs were not
   accessible (AMS returned 403). Formulas and constants come from the GFS code and its embedded
   documentation, which follow the papers but carry GFS tuning (e.g. `c₁`, ice autoconversion).
-- **Unverified constants:** the original Xu & Randall (1996) constants were not checked; GFS's are.
-  The ICON-A default critical-RH values were not found, only the parameter names and the refits by
-  Grundner et al. (2022).
+- **Unverified constants:** the original Xu & Randall (1996) constants were not checked against the
+  paper; from memory they are `α₀ = 100`, `γ = 0.49`, `p = 0.25`, and GFS's 2000 and ¼ are a
+  retune. GFS's constants are verified. The ICON-A default critical-RH values were not found,
+  only the parameter names and the refits by Grundner et al. (2022). The GFS Exner-interpolated
+  critical RH profile was not checked in `GFS_suite_interstitial_3.F90`.
+- **Time step convention:** the existing parameterizations use `Δt` while the state advances by
+  `2Δt`. Section 7.2.2 adds the accessor; whether the existing schemes switch is undecided.
+- **NumericalRadiation:** the all-sky solvers allocate and are diagnostic. The streaming all-sky
+  solver is upstream work and not scheduled.
 - **No experiments:** nothing has been run. The parameter values are starting points.
 
 ## Future work
 
-- Two tracers (`q_l`, `q_i`) with sedimentation of cloud ice.
+- Two condensate variables (`q_l`, `q_i`) with sedimentation of cloud ice, as two more advected
+  scalars.
 - A convective cloud scheme tied to Betts–Miller.
-- An all-sky NumericalRadiation path.
+- `AllSkyEcCKDRadiation` once NumericalRadiation has a streaming all-sky solver (7.2.6).
+- Fusing tracers into their own parents so that passive tracers get batched transforms too.
 - Prognostic cloud fraction, only if Stage 2 shows systematic cover errors that RH and condensate
   cannot fix.
 
@@ -688,6 +932,28 @@ radiation docs once clouds enter the longwave.
   ([0-moment](https://clima.github.io/CloudMicrophysics.jl/dev/Microphysics0M/),
   [1-moment](https://clima.github.io/CloudMicrophysics.jl/dev/Microphysics1M/))
 - [Breeze.jl](https://github.com/NumericalEarth/Breeze.jl)
+
+**Radiation**
+
+- Heymsfield, A. J., G. M. McFarquhar (1996): High albedos of cirrus in the tropical Pacific warm
+  pool. *J. Atmos. Sci.*, 53, 2424–2451. (GFS ice effective radius.)
+- Hogan, R. J., A. J. Illingworth (2000): Deriving cloud overlap statistics from radar.
+  *Q. J. R. Meteorol. Soc.*, 126, 2903–2909. (Overlap parameter `α` and decorrelation length.)
+- Hogan, R. J., A. Bozzo (2018): A flexible and efficient radiation scheme for the ECMWF model.
+  *JAMES*, 10, 1990–2008. (ecRad.)
+- [NumericalRadiation.jl documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/):
+  cloud optics and radiative transfer pages (`SpectralCloudOptics`, `CloudOverlapShortwave`,
+  `CloudOverlapLongwave`).
+- [NWS Technical Implementation Notice 14-46](https://www.weather.gov/media/notification/tins/tin14-46gfs_cca.pdf):
+  the January 2015 GFS upgrade from Eulerian T574 to semi-Lagrangian T1534.
+
+**SpeedyWeather development plans referenced**
+
+- `docs/dev/2026-09/adjustments-not-tendencies.md` (state adjustments in `filter!`)
+- `docs/dev/2026-09/condensation-energy-budget.md` (the enthalpy budget test)
+- `docs/dev/2026-09/numericalradiation-extension.md` (the clear-sky ecCKD extension, its work
+  arrays and future work)
+- `docs/dev/2026-08/gpu-primitive-wet-model-profiling.md` (per-phase GPU cost)
 
 **SpeedyWeather's current physics**
 
