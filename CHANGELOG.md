@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.23.0
+
 - Adjust the Terrarium coupling to Terrarium 0.1.8 [#1300](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1300)
 - Add ParticleAdvection3D via 3D interpolation [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
 - `AlbedoClimatology` moves its climatology onto the model's architecture before interpolating, fixing it on GPU [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
