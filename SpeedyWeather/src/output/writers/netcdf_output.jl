@@ -97,19 +97,21 @@ function NetCDFOutput(
         SG::SpectralGrid,
         Model::Type{<:AbstractModel} = Barotropic;
         nlayers_soil = DEFAULT_NLAYERS_SOIL,
-        output_grid::AbstractFullGrid = RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half, SG.architecture),
+        output_grid::AbstractFullGrid = RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half, output_architecture(SG.architecture)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),  # only needed for dispatch
         layers::AbstractOutputLayers = ModelLayers(),        # needed to size field3D
         kwargs...
     )
 
-    # OUTPUT GRID on the model's architecture to interpolate there
-    output_grid = on_architecture(SG.architecture, output_grid)
+    # OUTPUT GRID and MODEL GRID on the architecture to interpolate on, the model's (e.g. GPU)
+    arch = output_architecture(SG.architecture)
+    output_grid = on_architecture(arch, output_grid)
+    input_grid = on_architecture(arch, SG.grid)
 
     # CREATE INTERPOLATOR, with pole-average buffers for the most layers any output field has
     nlayers = max(get_nlayers(layers, SG), nlayers_soil)
-    interpolator = RingGrids.interpolator(output_grid, SG.grid; NF = promote_type(SG.NF, output_NF), nlayers)
+    interpolator = RingGrids.interpolator(output_grid, input_grid; NF = promote_type(SG.NF, output_NF), nlayers)
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT (+ host copies)
     scratch = output_scratch_fields(output_NF, output_grid, get_nlayers(layers, SG), nlayers_soil)

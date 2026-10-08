@@ -92,6 +92,14 @@ function add_default!(
 end
 
 """$(TYPEDSIGNATURES)
+Architecture that gridded output writers interpolate and post-process on for a model that
+runs on `architecture`: the model's own, so that e.g. a GPU simulation is interpolated on the
+GPU, except for Reactant, I/O has be done outside of the compile context anyway, currently we 
+just use CPU for Reactant simulation output. That may change in the future."""
+output_architecture(architecture::AbstractArchitecture) = architecture
+output_architecture(::ReactantDevice) = CPU()
+
+"""$(TYPEDSIGNATURES)
 Allocate the scratch fields of a gridded output writer on `output_grid`, which is on the
 model's architecture so that interpolation and post-processing run where the model runs:
 `land_fraction`, `field2D`, `field3D` (`nlayers`) and `field3Dland` (`nlayers_soil`), all in
@@ -128,12 +136,17 @@ end
 
 """$(TYPEDSIGNATURES)
 Move `src` (a field on the model grid and the model's architecture) onto the output grid of
-`output`, writing into `dest` (on the same architecture). Interpolates with
+`output`, writing into `dest` (on the [`output_architecture`](@ref), `src` is moved there
+first if that differs from the model's). Interpolates with
 `output.interpolator`, or copies straight over when `output.interpolator === nothing`, i.e.
 when the output grid already is the model grid and `output` was constructed without an
 interpolator (see [`HEALPixOutput`](@ref) for a simulation that already runs on the output's
 HEALPix grid)."""
 function interpolate_output!(output::AbstractOutput, dest::AbstractField, src::AbstractField)
+    # move the model's field to the output's architecture if they differ (e.g. Reactant)
+    arch = architecture(dest)
+    src = ismatching(arch, architecture(src)) ? src : on_architecture(arch, src)
+
     isnothing(output.interpolator) || return RingGrids.interpolate!(dest, src, output.interpolator)
 
     # No interpolator: the output grid is the model grid, copy straight over

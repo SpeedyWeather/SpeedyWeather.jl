@@ -152,19 +152,22 @@ function HEALPixOutput(
     # OUTPUT GRID: from `output_grid`, from `nside`/`nlat_half`, or following the model's own
     # grid type and resolution (which is what makes the interpolation skippable by default)
     output_grid = healpix_output_grid(SG.grid; nside, nlat_half, output_grid)
-    output_grid = on_architecture(SG.architecture, output_grid)     # to interpolate where the model runs
+    # OUTPUT GRID and MODEL GRID on the architecture to interpolate on, the model's (e.g. GPU)
+    arch = SpeedyWeather.output_architecture(SG.architecture)
+    output_grid = on_architecture(arch, output_grid)
+    input_grid = on_architecture(arch, SG.grid)
 
     # SKIP INTERPOLATION if the model already runs on this very grid: `grids_match`
     # compares the (nonparametric) grid type and nlat_half, which is exactly the condition
     # under which `RingGrids.interpolate!` would degenerate to a copy anyway. Not building
     # the interpolator also saves precomputing its stencil indices and weights.
-    interpolator = if grids_match(output_grid, SG.grid)
+    interpolator = if grids_match(output_grid, input_grid)
         nothing
     else
         # pole-average buffers for the most layers any output field has, at least as precise
         # as the model data so that pole averages are computed without allocating
         nlayers = max(SpeedyWeather.get_nlayers(layers, SG), nlayers_soil)
-        RingGrids.interpolator(output_grid, SG.grid; NF = promote_type(SG.NF, output_NF), nlayers)
+        RingGrids.interpolator(output_grid, input_grid; NF = promote_type(SG.NF, output_NF), nlayers)
     end
 
     # CREATE HEALPIX FIELDS TO WRITE OUT FROM (+ host copies)
