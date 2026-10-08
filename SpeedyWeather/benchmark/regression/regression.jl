@@ -1,5 +1,5 @@
 const USAGE = """
-Check SpeedyWeather.jl for performance regressions with the debug mode of the benchmark suite
+Check SpeedyWeather.jl for performance regression with the debug mode of the benchmark suite
 (`manual_benchmarking.jl --debug`: PrimitiveWet resolution sweep, 8 layers, truncation ≤ 128).
 
 Usage: julia SpeedyWeather/benchmark/regression/regression.jl <command> [options]
