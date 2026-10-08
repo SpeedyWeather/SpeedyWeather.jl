@@ -1,7 +1,8 @@
 name: Benchmark PR
 
-# Benchmarks a pull request against main once it is labelled `benchmark-performance`, and again on
-# every push while it has the label. benchmark_pr_comment.yml posts the report as a PR comment, as
+# Benchmarks a pull request against main once it is labelled `benchmark-performance` (substring
+# match, so the label can be decorated, e.g. `benchmark-performance 🚀`), and again on every push
+# while it has the label. benchmark_pr_comment.yml posts the report as a PR comment, as
 # this workflow runs the code of the PR without write access for pull requests from forks.
 
 on:
@@ -13,8 +14,8 @@ concurrency:
   # (e.g. adding another label) get a group of their own so that they cancel nothing
   group: >-
     benchmark-pr-${{ github.event.pull_request.number }}-${{
-    contains(github.event.pull_request.labels.*.name, 'benchmark-performance') &&
-    (github.event.action != 'labeled' || github.event.label.name == 'benchmark-performance') &&
+    contains(join(github.event.pull_request.labels.*.name, '|'), 'benchmark-performance') &&
+    (github.event.action != 'labeled' || contains(github.event.label.name, 'benchmark-performance')) &&
     'benchmark' || github.run_id }}
   cancel-in-progress: true
 
@@ -22,8 +23,8 @@ jobs:
   benchmark:
     name: PR vs main
     if: >-
-      contains(github.event.pull_request.labels.*.name, 'benchmark-performance') &&
-      (github.event.action != 'labeled' || github.event.label.name == 'benchmark-performance')
+      contains(join(github.event.pull_request.labels.*.name, '|'), 'benchmark-performance') &&
+      (github.event.action != 'labeled' || contains(github.event.label.name, 'benchmark-performance'))
     runs-on: ubuntu-latest
     timeout-minutes: 240
     permissions:
