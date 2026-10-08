@@ -357,7 +357,7 @@ primitive_wet_tendency_batch(nlayers::Integer) = 9 * nlayers + 1
 Chooses the transform based on resolution and architecture. For low-resolution
 GPU a MatrixSpectralTransform is returned, otherwise the SpectralTransform."""
 function WhichTransform(spectral_grid::SpectralGrid; kwargs...)
-    if (spectral_grid.truncation <= 64 && spectral_grid.architecture isa GPU) || spectral_grid.architecture isa ReactantDevice
+    if (spectral_grid.truncation <= 100 && spectral_grid.architecture isa GPU) || spectral_grid.architecture isa ReactantDevice
         return MatrixSpectralTransform(spectral_grid; kwargs...)
     else
         return SpectralTransform(spectral_grid; kwargs...)
