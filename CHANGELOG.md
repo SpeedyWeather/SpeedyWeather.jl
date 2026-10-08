@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- RingGrids: single-layer (2D) interpolation uses the batched kernel with the locator's preallocated pole-average buffers, no allocation or device synchronization per call [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
-- Output writers interpolate and post-process on the model's architecture (e.g. GPU), copying only the interpolated output-grid fields to the CPU [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+- RingGrids: single-layer (2D) interpolation uses the batched kernel with the locator's preallocated pole-average buffers, no allocation or device synchronization per call [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
+- Output writers interpolate and post-process on the model's architecture (e.g. GPU), copying only the interpolated output-grid fields to the CPU [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
 - Add ParticleAdvection3D via 3D interpolation [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
 - `AlbedoClimatology` moves its climatology onto the model's architecture before interpolating, fixing it on GPU [#1215](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1215)
 - Cloud top height [m] and cloud cover as parameterization and output variables (cloud top output was a layer index), diagnostic cloud top at level of maximum relative humidity as in SPEEDY, convective cloud top for deep convection only [#1221](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1221)
