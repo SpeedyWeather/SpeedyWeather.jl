@@ -34,6 +34,8 @@ julia regression/regression.jl check                   # debug mode on main, lat
 
 Each run updates only its own architecture's section in this `README.md`; results for other architectures are preserved via `benchmark_results.json`.
 
+A pull request labelled `benchmark-performance` is benchmarked against main with the same debug mode on every push, and the comparison is posted as a comment.
+
 ## Overview: PrimitiveWet resolution across architectures
 
 Simulated years per wallclock day (SYPD) for the `PrimitiveWetModel` resolution sweep, one column per architecture. Each (T, L) configuration is reported for both the standard Legendre transform and fast Fourier transform (LT+FFT) and the single matrix transform (MT). Empty cells mean the architecture has not yet been benchmarked or that suite was skipped. Comparison figures across architectures are available on the documentation's `Benchmarks` page.

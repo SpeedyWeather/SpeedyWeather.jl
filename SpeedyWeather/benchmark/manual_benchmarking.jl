@@ -315,6 +315,7 @@ function write_preamble(md)
     write(md, "julia regression/regression.jl check                   # debug mode on main, latest release and latest benchmarked revision\n")
     write(md, "```\n\n")
     write(md, "Each run updates only its own architecture's section in this `README.md`; results for other architectures are preserved via `benchmark_results.json`.\n\n")
+    write(md, "A pull request labelled `benchmark-performance` is benchmarked against main with the same debug mode on every push, and the comparison is posted as a comment.\n\n")
     return
 end
 

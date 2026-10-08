@@ -5,10 +5,12 @@ Check SpeedyWeather.jl for performance regressions with the debug mode of the be
 Usage: julia SpeedyWeather/benchmark/regression/regression.jl <command> [options]
 
     check [--candidate REV] [--arch cpu|gpu|amdgpu] [--ref origin/main] [--threshold 0.85]
-          [--output-dir DIR] [--bisect] [--no-confirm] [--no-fetch] [--fail-on-regression]
+          [--references benchmarked,release,main] [--branch-name NAME] [--output-dir DIR]
+          [--bisect] [--no-confirm] [--no-fetch] [--fail-on-regression]
         Benchmark the candidate (default: main, e.g. HEAD for a PR branch) and as references main,
-        the latest release and the latest benchmarked revision of this arch, and write report.md
-        and summary.json to DIR (default WORKDIR/results). A regression (geometric mean of the SYPD
+        the latest release and the latest benchmarked revision of this arch (or only those given
+        with --references), and write report.md and summary.json to DIR (default WORKDIR/results),
+        naming the candidate in the headline by its git ref or by --branch-name. A regression (geometric mean of the SYPD
         ratios candidate / reference < threshold, for all configurations or one of the two
         transforms) is confirmed by running both again, and with --bisect traced to its first bad
         commit. Exits with 1 on a regression with --fail-on-regression.
@@ -48,6 +50,7 @@ const RESULTS_JSON = "SpeedyWeather/benchmark/assets/benchmark_results.json"
 const AMDGPU_UUID = "21141c5a-9bdb-4563-92ae-f87d6854732e"     # not a dependency of the benchmark project
 const GROUPS = ("all", "default", "matrix")
 const GROUP_LABELS = Dict("all" => "all", "default" => "LT+FFT", "matrix" => "MT")
+const REFERENCES = ("benchmarked", "release", "main")
 
 default_workdir() = get(ENV, "SPEEDY_BENCH_WORKDIR", joinpath(tempdir(), "speedyweather-benchmark-regression"))
 short(sha) = first(sha, 10)
@@ -356,22 +359,32 @@ Writes report.md and summary.json to `output_dir` and returns whether the candid
 function check(;
         arch = "cpu", ref = "origin/main", candidate = ref, threshold = 0.85, workdir = default_workdir(),
         output_dir = joinpath(workdir, "results"), confirm = true, bisect_regression = false, fetch = true,
+        reference_names = REFERENCES, branch = nothing,
     )
+    unknown = setdiff(reference_names, REFERENCES)
+    isempty(unknown) || throw(ArgumentError("unknown references $(join(unknown, ", ")), use $(join(REFERENCES, ", "))"))
     fetch && git(REPO, "fetch", "origin", "--tags", "--quiet")
     label = arch_label(arch)
     main_sha = git(REPO, "rev-parse", "$ref^{commit}")
     candidate_sha = git(REPO, "rev-parse", "$candidate^{commit}")
     candidate_name = candidate_sha == main_sha ? "main" : "branch"
-    branch = git(REPO, "rev-parse", "--abbrev-ref", candidate)     # for the headline, e.g. the PR branch
-    release = latest_release()
+    # for the headline, e.g. the PR branch
+    branch = isnothing(branch) ? git(REPO, "rev-parse", "--abbrev-ref", candidate) : branch
     notes = String[]
 
-    named = ["release $release" => git(REPO, "rev-parse", "$release^{commit}"), "main" => main_sha]
-    try
-        pushfirst!(named, "benchmarked" => benchmarked_commit(label; ref))
-    catch err
-        push!(notes, sprint(showerror, err))     # e.g. no stored results for this arch yet
+    named = Pair{String, String}[]
+    if "benchmarked" in reference_names
+        try
+            push!(named, "benchmarked" => benchmarked_commit(label; ref))
+        catch err
+            push!(notes, sprint(showerror, err))     # e.g. no stored results for this arch yet
+        end
     end
+    if "release" in reference_names
+        release = latest_release()
+        push!(named, "release $release" => git(REPO, "rev-parse", "$release^{commit}"))
+    end
+    "main" in reference_names && push!(named, "main" => main_sha)
 
     # references, merged if they are the same commit, and dropped if they are the candidate
     references = Pair{String, String}[]
@@ -530,7 +543,8 @@ function main(command, args)
             arch, workdir, output_dir, threshold, ref = option(options, "ref", "origin/main"),
             candidate = option(options, "candidate", option(options, "ref", "origin/main")),
             confirm = !haskey(options, "no-confirm"), bisect_regression = haskey(options, "bisect"),
-            fetch = !haskey(options, "no-fetch"),
+            fetch = !haskey(options, "no-fetch"), branch = option(options, "branch-name", nothing),
+            reference_names = comma_separated(option(options, "references", join(REFERENCES, ","))),
         )
         return regressed && haskey(options, "fail-on-regression") ? 1 : 0
 

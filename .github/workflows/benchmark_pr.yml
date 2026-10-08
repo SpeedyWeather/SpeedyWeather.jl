@@ -1,0 +1,81 @@
+name: Benchmark PR
+
+# Benchmarks a pull request against main once it is labelled `benchmark-performance`, and again on
+# every push while it has the label. benchmark_pr_comment.yml posts the report as a PR comment, as
+# this workflow runs the code of the PR without write access for pull requests from forks.
+
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+concurrency:
+  # one benchmark per PR, a push cancels the running one; runs that don't benchmark
+  # (e.g. adding another label) get a group of their own so that they cancel nothing
+  group: >-
+    benchmark-pr-${{ github.event.pull_request.number }}-${{
+    contains(github.event.pull_request.labels.*.name, 'benchmark-performance') &&
+    (github.event.action != 'labeled' || github.event.label.name == 'benchmark-performance') &&
+    'benchmark' || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: PR vs main
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'benchmark-performance') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'benchmark-performance')
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: read
+    steps:
+      # the default checkout is the PR merged into main, its first parent is main
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+
+      - uses: julia-actions/cache@v3
+
+      # benchmarking the merge commit rather than the PR head measures what merging the PR changes,
+      # also if the PR is behind main
+      - name: Benchmark PR and main, compare
+        env:
+          BRANCH: ${{ github.event.pull_request.head.label }}
+        run: |
+          julia --color=yes SpeedyWeather/benchmark/regression/regression.jl check \
+            --candidate HEAD --ref HEAD^1 --references main --branch-name "$BRANCH" --no-fetch \
+            --workdir "$RUNNER_TEMP/benchmark-regression" --output-dir benchmark-pr --fail-on-regression
+
+      - name: Write comment
+        if: ${{ !cancelled() }}
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          mkdir -p benchmark-pr
+          echo "$PR_NUMBER" > benchmark-pr/pr_number
+          {
+            if [ -f benchmark-pr/report.md ]; then
+              cat benchmark-pr/report.md
+            else
+              echo "## Benchmark regression check: failed, see the [workflow run]($RUN_URL)"
+            fi
+            echo
+            echo "<sub>branch = ${HEAD_SHA::10} merged into main ($(git rev-parse --short=10 HEAD^1)), results and logs in the [workflow run]($RUN_URL).</sub>"
+            if jq -e .regression benchmark-pr/summary.json > /dev/null 2>&1; then
+              echo "<sub>To find the commit that made it slower, run \`julia SpeedyWeather/benchmark/regression/regression.jl check --candidate HEAD --bisect\` on the branch.</sub>"
+            fi
+          } > benchmark-pr/comment.md
+          cat benchmark-pr/comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: benchmark-pr
+          path: benchmark-pr/
+          if-no-files-found: ignore
