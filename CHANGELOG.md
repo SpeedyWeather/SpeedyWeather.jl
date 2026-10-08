@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `MatrixSpectralTransform` works on Reactant outside of compiled code again: the stacking of real and imaginary parts is jitted together with the matrix multiply [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 ## 0.23.0
 
 - Adjust the Terrarium coupling to Terrarium 0.1.8 [#1300](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1300)
