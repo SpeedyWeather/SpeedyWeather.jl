@@ -91,6 +91,7 @@ between two latitude rings."""
     } <: AbstractLocator
 
     npoints_output::IntType            # number of points to interpolate onto (length of following vectors)
+    nlayers::IntType = 1               # number of vertical layers; 1 for 2D (default), nlayers for 3D
 
     # to the coordinates respective indices
     js::VectorIntType = zeros(Int, npoints_output)   # ring indices j such that [j, j+1) contains the point
@@ -103,6 +104,10 @@ between two latitude rings."""
     Δys::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between rings
     Δabs::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between a, b
     Δcds::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between c, d
+
+    # pole ring averages per vertical layer for 3D interpolation
+    north_pole_average::VectorType = zero(VectorType(undef, nlayers))
+    south_pole_average::VectorType = zero(VectorType(undef, nlayers))
 end
 
 Adapt.@adapt_structure AnvilLocator
@@ -110,6 +115,7 @@ Adapt.@adapt_structure AnvilLocator
 function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLocator)
     return AnvilLocator(
         npoints_output = loc.npoints_output,
+        nlayers = loc.nlayers,
         js = on_architecture(arch, loc.js),
         ij_as = on_architecture(arch, loc.ij_as),
         ij_bs = on_architecture(arch, loc.ij_bs),
@@ -118,6 +124,8 @@ function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLoc
         Δys = on_architecture(arch, loc.Δys),
         Δabs = on_architecture(arch, loc.Δabs),
         Δcds = on_architecture(arch, loc.Δcds),
+        north_pole_average = on_architecture(arch, loc.north_pole_average),
+        south_pole_average = on_architecture(arch, loc.south_pole_average),
     )
 end
 
@@ -126,25 +134,32 @@ $(TYPEDSIGNATURES)
 Zero generator function for the 4-point average AnvilLocator. Use `update_locator!` to
 update the grid indices used for interpolation and their weights. The number format
 NF is the format used for the calculations within the interpolation, the input data
-and/or output data formats may differ."""
+and/or output data formats may differ. `nlayers = 1` (default) for 2D interpolation;
+set to the number of vertical layers for 3D vertically-blended interpolation."""
 function (::Type{L})(
         NF::Type{<:AbstractFloat},                                 # number format
-        npoints::Integer;
+        npoints::Integer,
+        nlayers::Integer = 1;
         architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE(), # architecture to use
     ) where {L <: AbstractLocator}
 
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    return L{VectorType, VectorIntType, typeof(npoints)}(; npoints_output = npoints)
+    return L{VectorType, VectorIntType, typeof(npoints)}(; npoints_output = npoints, nlayers)
 end
 
 # use Float32 as default for weights
 (::Type{L})(npoints::Integer; kwargs...) where {L <: AbstractLocator} = L(DEFAULT_NF, npoints; kwargs...)
 
-function Base.show(io::IO, L::AnvilLocator)
-    println(io, "$(typeof(L))")
-    return print(io, "└ npoints_output::Int = $(L.npoints_output)")
+function Base.show(io::IO, L::AbstractLocator)
+    type_str = split("$(typeof(L))", "{", limit = 2)
+    type_itself = type_str[1]
+    type_params = length(type_str) == 2 ? ("{" * type_str[2]) : ""
+    type_params_short = length(type_params) > 30 ? first(type_params, 30) * "...}" : type_params
+    println(io, styled"{warning:$type_itself}{note:$type_params_short}" * " <: $(supertype(typeof(L)))")
+    Utils.print_fields(io, L, propertynames(L))
+    return nothing
 end
 
 
@@ -202,14 +217,16 @@ function AnvilInterpolator(
     return AnvilInterpolator{NF, typeof(geometry), typeof(locator)}(geometry, locator)
 end
 
-# generator from grid and npoints
+# generator from grid and npoints, nlayers sizes the locator's pole-average buffers so that
+# (batched) interpolation of fields with up to nlayers layers does not allocate
 function AnvilInterpolator(
         grid::AbstractGrid,
         npoints::Integer;       # number of points to interpolate onto
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
+        nlayers::Integer = 1,
     )
     geometry = GridGeometry(grid; NF)        # general coordinates and indices for grid
-    locator = AnvilLocator(NF, npoints; architecture = grid.architecture)  # preallocate work arrays for interpolation
+    locator = AnvilLocator(NF, npoints, nlayers; architecture = grid.architecture)  # preallocate work arrays for interpolation
 
     # assemble geometry and locator to interpolator
     return AnvilInterpolator(geometry, locator; NF)
@@ -376,7 +393,6 @@ function interpolate_2D!(
     )
     (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
     (; npoints) = geometry
-    (; rings) = geometry.grid # CPU version even on GPU
 
     nlayers = size(A, 2)
 
@@ -387,7 +403,8 @@ function interpolate_2D!(
     @boundscheck size(Aout, 2) == nlayers ||
         throw(DimensionMismatch("Output has $(size(Aout, 2)) layers but input has $nlayers."))
 
-    A_northpole, A_southpole = average_on_poles(A, rings)
+    # into the locator's buffers if large enough, otherwise allocating
+    A_northpole, A_southpole = average_on_poles!(locator, A, geometry, architecture)
 
     @boundscheck extrema_in(ij_as, 0, npoints) || throw(BoundsError)
     @boundscheck extrema_in(ij_bs, 0, npoints) || throw(BoundsError)
@@ -570,6 +587,14 @@ end
 # if only the grid type is provided, create a grid with nlat_half and architecture from the input field
 interpolate(Grid::Type{<:AbstractGrid}, A::Field; kwargs...) = interpolate(Grid(A.grid.nlat_half, architecture(A)), A; kwargs...)
 
+"""
+$(TYPEDSIGNATURES)
+Locate the interpolation points `(λs, θs)` on the grid described by `I.geometry`, updating
+`I.locator` in place with the ring indices and interpolation weights required by
+`interpolate!`. This is the precomputation step of the interpolation, separate from the
+per-value `interpolate!` call so that the (relatively expensive) locating can be reused
+across multiple interpolations onto the same points.
+"""
 update_locator!(
     I::AbstractInterpolator,    # GridGeometry and Locator
     λs::AbstractVector,         # longitudes to interpolate onto
@@ -857,6 +882,55 @@ to return the same number format `NF`."""
     A_northpole = vec(mean(A[rings[1], :], dims = 1))
     A_southpole = vec(mean(A[rings[end], :], dims = 1))
     return round.(NF, A_northpole), round.(NF, A_southpole)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Pole averages per layer of `A` written into the `north_pole_average`, `south_pole_average`
+buffers of `locator` without allocating, returning these buffers. Falls back to the
+allocating `average_on_poles` if the buffers have fewer entries than `A` has layers (e.g.
+a locator created with the default `nlayers = 1`) or for integer data, which is rounded."""
+function average_on_poles!(
+        locator::AnvilLocator,
+        A::AbstractMatrix,
+        geometry::GridGeometry,
+        architecture::AbstractArchitecture,
+    )
+    (; north_pole_average, south_pole_average) = locator
+    nlayers = size(A, 2)
+    if eltype(A) <: AbstractFloat && length(north_pole_average) >= nlayers
+        launch!(
+            architecture, LinearWorkOrder, (nlayers,), _compute_pole_averages_kernel!,
+            north_pole_average, south_pole_average, A, geometry
+        )
+        return north_pole_average, south_pole_average
+    else
+        return average_on_poles(A, geometry.grid.rings)
+    end
+end
+
+# Compute north and south pole ring averages per vertical layer on device, accumulated in the
+# number format of the averages (which can differ from the data's, e.g. Float32 output)
+@kernel inbounds = true function _compute_pole_averages_kernel!(
+        north_pole_average, south_pole_average, A_data, geometry
+    )
+    (; ring_starts, nlons, nlat) = geometry
+    k = @index(Global, Linear)
+    T = eltype(north_pole_average)
+    n_north = nlons[1]
+    rs_north = ring_starts[1]
+    north_sum = zero(T)
+    for i in 0:(n_north - 1)
+        north_sum += convert(T, A_data[rs_north + i, k])
+    end
+    north_pole_average[k] = north_sum / n_north
+    n_south = nlons[nlat]
+    rs_south = ring_starts[nlat]
+    south_sum = zero(T)
+    for i in 0:(n_south - 1)
+        south_sum += convert(T, A_data[rs_south + i, k])
+    end
+    south_pole_average[k] = south_sum / n_south
 end
 
 """
