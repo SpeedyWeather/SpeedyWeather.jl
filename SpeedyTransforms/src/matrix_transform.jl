@@ -196,6 +196,30 @@ function _check_scratch(scratch_memory, nharmonics::Integer, ncolumns::Integer)
 end
 
 """$(TYPEDSIGNATURES)
+Grid to spectral: multiply the stacked real/imaginary transform matrix `forward_stacked` with the
+columns of `field` into the real `scratch`, then combine its two halves into the complex `coeffs`.
+Both steps live in one function so that `@maybe_jit` compiles them together on Reactant: outside
+of compilation, broadcasting over views of Reactant arrays falls back to scalar indexing."""
+function _forward_stacked!(coeffs, scratch, forward_stacked, field)
+    LinearAlgebra.mul!(scratch, forward_stacked, field)
+    nharmonics = size(coeffs, 1)
+    coeffs .= complex.(view(scratch, 1:nharmonics, :), view(scratch, (nharmonics + 1):(2nharmonics), :))
+    return coeffs
+end
+
+"""$(TYPEDSIGNATURES)
+Spectral to grid: stack the real and imaginary parts of `coeffs` into the real `scratch`, then
+multiply with the stacked transform matrix `backward_stacked` into the columns of `field`. In one
+function for `@maybe_jit`, see [`_forward_stacked!`](@ref)."""
+function _backward_stacked!(field, scratch, backward_stacked, coeffs)
+    nharmonics = size(coeffs, 1)
+    view(scratch, 1:nharmonics, :) .= real.(coeffs)
+    view(scratch, (nharmonics + 1):(2nharmonics), :) .= imag.(coeffs)
+    LinearAlgebra.mul!(field, backward_stacked, scratch)
+    return field
+end
+
+"""$(TYPEDSIGNATURES)
 Spectral transform (grid to spectral space) from n-dimensional array `field` to an n-dimensional
 array `coeffs` of spherical harmonic coefficients. Uses precomputed dense transform matrices to
 perform the transformation. The spectral transform is number format-flexible but `field` and the
@@ -224,11 +248,9 @@ function transform!(                        # GRID TO SPECTRAL
     @boundscheck _check_scratch(scratch_memory, nharmonics, ncolumns)
     scratch = view(scratch_memory, :, 1:ncolumns)
 
-    # [Re(c); Im(c)] = [Re(F); Im(F)] * field, a single real matrix multiply
-    @maybe_jit M.architecture LinearAlgebra.mul!(scratch, M.forward_stacked, field_matrix)
-
-    # combine the stacked real and imaginary parts into the complex coefficients
-    coeffs_matrix .= complex.(view(scratch, 1:nharmonics, :), view(scratch, (nharmonics + 1):(2nharmonics), :))
+    # [Re(c); Im(c)] = [Re(F); Im(F)] * field, a single real matrix multiply, then combined into
+    # the complex coefficients, jitted together, see `_forward_stacked!`
+    @maybe_jit M.architecture _forward_stacked!(coeffs_matrix, scratch, M.forward_stacked, field_matrix)
 
     coeffs_materialized && copyto!(coeffs.data, coeffs_matrix)
     return coeffs
@@ -261,10 +283,9 @@ function transform!(                        # SPECTRAL TO GRID
     scratch = view(scratch_memory, :, 1:ncolumns)
 
     # the result is real-valued: field = Re(B*c) = Re(B)*Re(c) - Im(B)*Im(c) is a single real
-    # matrix multiply [Re(B) -Im(B)] * [Re(c); Im(c)] with the stacked real/imaginary parts
-    view(scratch, 1:nharmonics, :) .= real.(coeffs_matrix)
-    view(scratch, (nharmonics + 1):(2nharmonics), :) .= imag.(coeffs_matrix)
-    @maybe_jit M.architecture LinearAlgebra.mul!(field_matrix, M.backward_stacked, scratch)
+    # matrix multiply [Re(B) -Im(B)] * [Re(c); Im(c)] with the stacked real/imaginary parts,
+    # stacking and multiply jitted together, see `_backward_stacked!`
+    @maybe_jit M.architecture _backward_stacked!(field_matrix, scratch, M.backward_stacked, coeffs_matrix)
 
     field_materialized && copyto!(field.data, field_matrix)
 

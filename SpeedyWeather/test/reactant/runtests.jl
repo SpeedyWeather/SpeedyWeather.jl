@@ -27,6 +27,7 @@ const ATOL = 1.0e-8         # absolute tolerance for comparison
 include("test_maybe_jit.jl")
 include("utilities.jl")
 include("setup.jl")
+include("test_transform.jl")
 include("test_correctness.jl")
 
 #include("differentation.jl")
