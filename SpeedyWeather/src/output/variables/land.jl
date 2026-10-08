@@ -10,7 +10,7 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 10
-    transform::F = (x) -> x - 273.15
+    transform::F = (x) -> x - oftype(x, 273.15)
 end
 
 path(::SoilTemperatureOutput, simulation) =

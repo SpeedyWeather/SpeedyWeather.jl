@@ -92,7 +92,7 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 12
-    transform::F = (x) -> x - 273.15     # [K] to [˚C]
+    transform::F = (x) -> x - oftype(x, 273.15)     # [K] to [˚C]
 end
 
 # not the actual surface temperature but the core variable to read in

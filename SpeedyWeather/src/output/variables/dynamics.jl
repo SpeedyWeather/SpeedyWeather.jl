@@ -206,7 +206,7 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 10
-    transform::F = (x) -> x - 273.15     # K to ˚C
+    transform::F = (x) -> x - oftype(x, 273.15)     # K to ˚C
 
     "[OPTION] how to extrapolate below the lowest model layer when written on pressure
     layers, dry-adiabatic descent so that e.g. 1000 hPa below the lowest model layer is
