@@ -46,6 +46,8 @@ Fields are: $(TYPEDFIELDS)"""
     scratch_grid::Union{Nothing, RingGrids.AbstractField} = nothing
     "Scratch field on the output grid to interpolate into (3D variables only)"
     scratch_output::Union{Nothing, RingGrids.AbstractField} = nothing
+    "Host (CPU) copy of `scratch_output` to write from, the same object on CPU (3D variables only)"
+    scratch_host::Union{Nothing, RingGrids.AbstractField} = nothing
 end
 
 # supported are 2D (XY) variables and 3D (XYZ) variables at cell centres;
@@ -166,9 +168,10 @@ SpeedyWeather.path(variable::TerrariumOutputVariable, simulation) =
 """$(TYPEDSIGNATURES)
 Gather the Terrarium land columns of `variable` onto a full ring-grid scratch
 field (ocean points remain at `missing_value`), interpolate onto the output
-grid, transform and bitround. Returns `nothing` if `variable` is not part of
-`simulation`, otherwise the output-grid field ready for a backend-specific
-[`write_array!`](@ref) (shared between [`NetCDFOutput`](@ref) and `ZarrOutput`)."""
+grid and transform, all on the model's architecture. Returns `nothing` if `variable`
+is not part of `simulation`, otherwise the output-grid field and its host (CPU)
+equivalent, ready for [`SpeedyWeather.write_output!`](@ref) (shared between
+[`NetCDFOutput`](@ref) and `ZarrOutput`)."""
 function terrarium_output_field!(
         output::AbstractOutput,
         variable::TerrariumOutputVariable,
@@ -177,37 +180,37 @@ function terrarium_output_field!(
     tfield = path_or_nothing(variable, simulation)      # Oceananigans field of the land columns
     isnothing(tfield) && return nothing                 # silently escape if not in simulation
 
-    # allocate the scratch fields on the first call
+    # allocate the scratch fields on the first call, on the model's architecture
     output_NF = eltype(output.field2D)
     if isnothing(variable.scratch_grid)
-        grid = SpeedyWeather.on_architecture(SpeedyWeather.CPU(), simulation.model.spectral_grid.grid)
+        grid = simulation.model.spectral_grid.grid
         variable.scratch_grid = is3D(variable) ?
             RingGrids.Field(output_NF, grid, variable.nlayers) : RingGrids.Field(output_NF, grid)
         fill!(variable.scratch_grid, output_NF(variable.missing_value))
         if is3D(variable)
             variable.scratch_output = RingGrids.Field(output_NF, output.field2D.grid, variable.nlayers)
+            variable.scratch_host = SpeedyWeather.host_field(variable.scratch_output)
         end
     end
 
-    # gather the land columns on CPU, drop the singleton y-dimension,
-    # then scatter onto the (land points of the) full ring grid
-    data = Array(interior(tfield))
-    data = reshape(data, size(data, 1), size(data, 3))
-    indices = SpeedyWeather.on_architecture(SpeedyWeather.CPU(), simulation.model.land.mask_indices)
+    # view the land columns without the singleton y-dimension, then scatter them onto the
+    # (land points of the) full ring grid, without copying: Terrarium's data lives on the
+    # model's architecture, like the scratch field and the indices
+    data = view(interior(tfield), :, 1, :)
+    indices = simulation.model.land.mask_indices
     RingGrids.copy_unmasked!(variable.scratch_grid, data, indices)
 
-    # interpolate onto the output grid, transform and bitround
-    out = is3D(variable) ? variable.scratch_output : output.field2D
-    RingGrids.interpolate!(out, variable.scratch_grid, output.interpolator)
+    # interpolate onto the output grid and transform
+    out, host = is3D(variable) ? (variable.scratch_output, variable.scratch_host) : (output.field2D, output.host2D)
+    SpeedyWeather.interpolate_output!(output, out, variable.scratch_grid)
     @. out = variable.transform(out)
-    SpeedyWeather.round!(out, variable.keepbits)
-    return out
+    return out, host
 end
 
 """$(TYPEDSIGNATURES)
 Output `variable` into `output`: gather, interpolate, transform (via
-[`terrarium_output_field!`](@ref)) and write via the backend-specific
-[`write_array!`](@ref); works for both `NetCDFOutput` and `ZarrOutput`."""
+[`terrarium_output_field!`](@ref)), then copy to the host, bitround and write via
+[`SpeedyWeather.write_output!`](@ref); works for both `NetCDFOutput` and `ZarrOutput`."""
 function SpeedyWeather.output!(
         output::AbstractOutput,
         variable::TerrariumOutputVariable,
@@ -215,9 +218,9 @@ function SpeedyWeather.output!(
     )
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
-    out = terrarium_output_field!(output, variable, simulation)
-    isnothing(out) && return nothing
-    write_array!(output, variable, out)
+    fields = terrarium_output_field!(output, variable, simulation)
+    isnothing(fields) && return nothing
+    SpeedyWeather.write_output!(output, variable, fields...)
     return nothing
 end
 

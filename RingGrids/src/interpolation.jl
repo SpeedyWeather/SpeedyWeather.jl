@@ -314,7 +314,9 @@ forward to it. A 3D (vertically blended) interpolation is `interpolate_3D!` inst
 methods on plain arrays take the raw ring-ordered data, i.e. `field.data`, so that views and
 reshapes of a field's data can be passed too. This method interpolates a single layer, the
 `AbstractMatrix` method below interpolates all layers of a `(npoints, nlayers)` matrix in a
-single (batched) launch."""
+single (batched) launch. A single layer is passed on to that batched method as a one-column
+matrix whenever that reshape is O(1), so that the pole averages are written into the
+locator's preallocated buffers on device instead of being allocated and reduced on every call."""
 function interpolate_2D!(
         Aout::AbstractVector,               # Out: interpolated values
         A::AbstractVector,                  # gridded values to interpolate from
@@ -322,6 +324,12 @@ function interpolate_2D!(
         geometry::GridGeometry,
         architecture::AbstractArchitecture
     )
+    if is_flattenable(Aout) && is_flattenable(A)
+        interpolate_2D!(reshape(Aout, :, 1), reshape(A, :, 1), locator, geometry, architecture)
+        return Aout
+    end
+
+    # otherwise (e.g. strided views) the single-layer kernel with allocated pole averages
     (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
     (; npoints) = geometry
     (; rings) = geometry.grid # CPU version even on GPU
@@ -889,7 +897,9 @@ $(TYPEDSIGNATURES)
 Pole averages per layer of `A` written into the `north_pole_average`, `south_pole_average`
 buffers of `locator` without allocating, returning these buffers. Falls back to the
 allocating `average_on_poles` if the buffers have fewer entries than `A` has layers (e.g.
-a locator created with the default `nlayers = 1`) or for integer data, which is rounded."""
+a locator created with the default `nlayers = 1`), for integer data, which is rounded, or if
+the buffers' number format is less precise than `A`'s (e.g. Float64 data with a Float32
+interpolator), so that the pole averages keep the precision of the data."""
 function average_on_poles!(
         locator::AnvilLocator,
         A::AbstractMatrix,
@@ -898,7 +908,8 @@ function average_on_poles!(
     )
     (; north_pole_average, south_pole_average) = locator
     nlayers = size(A, 2)
-    if eltype(A) <: AbstractFloat && length(north_pole_average) >= nlayers
+    T = eltype(north_pole_average)
+    if eltype(A) <: AbstractFloat && promote_type(eltype(A), T) == T && length(north_pole_average) >= nlayers
         launch!(
             architecture, LinearWorkOrder, (nlayers,), _compute_pole_averages_kernel!,
             north_pole_average, south_pole_average, A, geometry

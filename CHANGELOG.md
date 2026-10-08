@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- RingGrids: single-layer (2D) interpolation uses the batched kernel with the locator's preallocated pole-average buffers, no allocation or device synchronization per call [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
+- Output writers interpolate and post-process on the model's architecture (e.g. GPU), copying only the interpolated output-grid fields to the CPU [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
+
 ## 0.23.0
 
 - Adjust the Terrarium coupling to Terrarium 0.1.8 [#1300](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1300)
