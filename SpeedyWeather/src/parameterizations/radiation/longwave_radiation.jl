@@ -183,6 +183,16 @@ function OneBandGreyLongwave(
     return OneBandLongwave(transmissivity, radiative_transfer)
 end
 
+export OneBandCloudyLongwave
+"""$(TYPEDSIGNATURES)
+`OneBandLongwave` with clouds from a prognostic cloud scheme: [`CloudyLongwaveTransmissivity`](@ref)
+around the clear-sky `FriersonLongwaveTransmissivity`."""
+OneBandCloudyLongwave(
+    SG::SpectralGrid;
+    transmissivity = CloudyLongwaveTransmissivity(SG),
+    radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
+) = OneBandLongwave(transmissivity, radiative_transfer)
+
 Base.show(io::IO, M::OneBandLongwave) = Base.show(io, M, values = false)
 
 # variables of the longwave scheme and those of its transmissivity, e.g. the cloud state

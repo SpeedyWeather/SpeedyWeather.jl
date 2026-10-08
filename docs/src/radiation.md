@@ -523,6 +523,14 @@ nothing # hide
 
 ![No stratocumulus clouds](oneband_no_stratocumulus.png)
 
+## Clouds from a prognostic cloud scheme
+
+With a prognostic cloud condensate ([`PrognosticCloudCondensation`](@ref)) the one-band schemes can
+take their clouds from the condensate instead of diagnosing them:
+[`OneBandCloudyShortwave`](@ref) reflects and absorbs in every layer with the adding method, and
+[`OneBandCloudyLongwave`](@ref) adds the cloud emissivity of every layer to the Frierson
+transmissivity. See [Prognostic clouds](@ref) for the formulation.
+
 ## Greenhouse gases
 
 Greenhouse gas concentrations can be prescribed as time-varying scalar quantities and are

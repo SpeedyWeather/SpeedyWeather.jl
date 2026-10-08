@@ -290,6 +290,14 @@ to fall through and potentially melt in. The phase swap conserves total precipit
 convection produces neither since ``P = 0`` there regardless of temperature. With `snow = false`
 all convective precipitation is always rain, recovering the previous behaviour.
 
+### Detrainment of cloud condensate
+
+With a prognostic cloud condensate (see [Prognostic clouds](@ref)) a fraction `detrainment` of the
+deep convective precipitation ``P`` is not precipitated but detrained as cloud condensate into the
+top layer of the convection, the level of zero buoyancy, as a source of anvil clouds. The column
+water budget is unchanged: vapour removed equals precipitation plus detrained condensate. The default
+is `detrainment = 0`; without a prognostic cloud condensate it has no effect.
+
 ## Dry convection
 
 In the [primitive equation model](@ref primitive_equation_model) with humidity the [Betts-Miller convection scheme](@ref BettsMiller)

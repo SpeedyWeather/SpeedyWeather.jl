@@ -20,6 +20,9 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
 
     "[OPTION] Temperature of the lowermost layer below which convective rain becomes snow [K]"
     @param freezing_threshold::NF = 273.15 (bounds = Positive,)
+
+    "[OPTION] Fraction of deep convective precipitation detrained as cloud condensate into the top layer of the convection (anvils), needs a prognostic cloud condensate, e.g. `PrognosticCloudCondensation` [1]"
+    @param detrainment::NF = 0 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure BettsMillerConvection
@@ -150,6 +153,15 @@ and relaxes current vertical profiles to the adjusted references."""
     rain_convection *= pₛΔt_gρ                  # convert to [m] of rain during Δt
     rain_convection = max(rain_convection, 0)   # ensure non-negative precipitation, rounding errors
 
+    # DETRAINMENT: a fraction of the precipitation stays in the atmosphere as cloud condensate in the
+    # top layer of deep convection (anvils), only with a prognostic cloud condensate. The latent heat
+    # is already released by the relaxation (vapour to condensate as to rain), no freezing heat
+    detrained = convective_detrainment(convection, vars) * rain_convection    # [m] during Δt
+    rain_convection -= detrained
+    k_top = clamp(level_zero_buoyancy, 1, nlayers)
+    Δp_top = pressure_thickness(k_top, pₛ, model.geometry.vertical_coordinates)
+    detrain_condensate!(vars, ij, k_top, detrained / Δt * g * ρ / Δp_top, time_stepping, convection)   # [kg/kg/s]
+
     # CONVECTIVE SNOW: below freezing, all convective rain falls as snow instead. Convective
     # precipitation is deposited immediately (not fluxed through layers like large-scale
     # precipitation), so a single check on the lowermost layer's temperature is sufficient,
@@ -177,6 +189,18 @@ and relaxes current vertical profiles to the adjusted references."""
     # clouds reach to top of (precipitating, i.e. deep) convection, as for large-scale condensation
     cloud_top_convection = ifelse(deep_convection, level_zero_buoyancy, nlayers + 1)
     vars.parameterizations.cloud_top[ij] = min(vars.parameterizations.cloud_top[ij], cloud_top_convection)
+    return nothing
+end
+
+# fraction of convective precipitation detrained as condensate, zero without a prognostic condensate
+@inline convective_detrainment(convection::BettsMillerConvection, vars) =
+    ifelse(haskey(vars.tendencies.grid, :cloud_condensate), convection.detrainment, zero(convection.detrainment))
+
+# add the detrained condensate [kg/kg/s] in layer k of column ij, nothing without a prognostic condensate
+@propagate_inbounds function detrain_condensate!(vars, ij, k, rate, time_stepping, convection)
+    haskey(vars.tendencies.grid, :cloud_condensate) || return nothing
+    condensate_tend = get_tendency_step(vars.tendencies.grid.cloud_condensate, time_stepping, convection)
+    condensate_tend[ij, k] += rate
     return nothing
 end
 

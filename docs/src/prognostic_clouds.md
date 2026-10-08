@@ -11,9 +11,12 @@ where they formed.
 The scheme follows the structure of the Zhao and Carr (1997) scheme that NCEP's spectral GFS
 used from 2001 to 2019: one condensate for liquid and ice with the phase decided by
 temperature, autoconversion after Sundqvist et al. (1989), precipitation diagnosed in one
-top-down sweep, and a Xu and Randall (1996) cloud fraction for radiation. Its condensation
-closure is replaced by the implicit relaxation of [`ImplicitCondensation`](@ref), so it is
-not a published scheme as such.
+top-down sweep, and a Xu and Randall (1996) cloud fraction for radiation. How much vapour
+condenses is decided by a closure: either the implicit relaxation of
+[`ImplicitCondensation`](@ref) ([`RelaxationClosure`](@ref), the default, which makes the scheme
+Zhao–Carr with a different closure rather than a published scheme), or the Sundqvist closure of
+Zhao and Carr ([`SundqvistClosure`](@ref)). Deep convection can detrain part of its
+precipitation as condensate (anvils).
 
 !!! warning "Not tuned yet"
     The parameters are GFS and SpeedyWeather starting values. Cloud cover, water paths and the
@@ -22,19 +25,21 @@ not a published scheme as such.
 ## Usage
 
 The condensation scheme replaces the default `large_scale_condensation`. To let radiation see
-the clouds, use [`PrognosticClouds`](@ref) for the one-band shortwave radiation and
-[`CloudyLongwaveTransmissivity`](@ref) for the one-band longwave radiation
+the clouds, use [`OneBandCloudyShortwave`](@ref) (clouds in every layer) and
+[`OneBandCloudyLongwave`](@ref); to let deep convection detrain condensate set its `detrainment`
 
 ```julia
 using SpeedyWeather
 spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
-large_scale_condensation = PrognosticCloudCondensation(spectral_grid)
-shortwave = OneBandShortwave(spectral_grid; clouds = PrognosticClouds(spectral_grid))
-longwave = OneBandLongwave(spectral_grid; transmissivity = CloudyLongwaveTransmissivity(spectral_grid))
+closure = SundqvistClosure(spectral_grid)       # or RelaxationClosure(spectral_grid), the default
+large_scale_condensation = PrognosticCloudCondensation(spectral_grid; closure)
+convection = BettsMillerConvection(spectral_grid; detrainment = 0.2)
+shortwave = OneBandCloudyShortwave(spectral_grid)
+longwave = OneBandCloudyLongwave(spectral_grid)
 radiation = Radiation(spectral_grid; shortwave, longwave)
 
-model = PrimitiveWetModel(spectral_grid; large_scale_condensation, radiation)
+model = PrimitiveWetModel(spectral_grid; large_scale_condensation, convection, radiation)
 add!(model, SpeedyWeather.CloudOutput()...)     # condensate, cloud fraction, water paths
 simulation = initialize!(model)
 run!(simulation, period = Day(10), output = true)
@@ -76,8 +81,9 @@ saturation over liquid and over ice (Clausius-Clapeyron with ``L_v + L_f``)
 q^\star = (1 - f_i) q^\star_l + f_i q^\star_i
 ```
 
-**Condensation and evaporation.** Humidity above the threshold ``r q^\star`` condenses into
-the condensate with the implicit relaxation of [`ImplicitCondensation`](@ref)
+**Condensation and evaporation, relaxation closure.** With [`RelaxationClosure`](@ref) humidity
+above the threshold ``r q^\star`` condenses into the condensate with the implicit relaxation of
+[`ImplicitCondensation`](@ref)
 
 ```math
 C = \frac{\max(q - r q^\star, 0)}{\tau \left[ 1 + \frac{L r}{c_p} \frac{\partial q^\star}{\partial T} \right]}
@@ -90,6 +96,31 @@ scale ``\tau_e`` = `evaporation_time_scale` ``\times \Delta t``, but not more th
 ```math
 E = \min \left( (1 - a) \frac{\max(r q^\star - q, 0)}{\tau_e \left[ 1 + \frac{L r}{c_p} \frac{\partial q^\star}{\partial T} \right]}, \frac{q_c}{\Delta t_p} \right)
 ```
+
+**Condensation and evaporation, Sundqvist closure.** With [`SundqvistClosure`](@ref) a cell is
+partly cloudy above a critical relative humidity ``u`` with the cloud fraction
+
+```math
+b = 1 - \sqrt{\frac{1 - f}{1 - u}}, \quad u = u_{top} + (u_{s} - u_{top}) \exp(1 - (p_s/p)^n)
+```
+
+of its relative humidity ``f`` (Sundqvist et al. 1989; the pressure dependence as in ECHAM, constant
+0.9 by default as in GFS). In a cloudy cell the part ``\beta`` of the moisture supply ``M`` by all
+other processes condenses
+
+```math
+C = \frac{\beta M}{1 + \frac{L f}{c_p} \frac{\partial q^\star}{\partial T}}, \quad
+M = A_q - f \frac{\partial q^\star}{\partial T} A_T - f \frac{\partial q^\star}{\partial p} A_p, \quad
+\beta = \frac{b^2 (1-b)(1-u) q^\star + q_c/2}{b (1-b)(1-u) q^\star + q_c/2}
+```
+
+so ``\beta = b`` without condensate and ``\beta \to 1`` with much condensate, bounded by
+``0 \leq C \leq (q - u q^\star)/\Delta t_p``. In a clear cell (``b < 10^{-3}``) condensate evaporates
+towards ``u q^\star``. The supply ``A_X`` of temperature, humidity and pressure is the change of
+the state the scheme reads since the state it left (after its condensation) two calls before,
+the same leapfrog parity, as NCEP's GFS did in its leapfrogged spectral model. These reference
+states are kept in `simulation.variables.prognostic.clouds`; the supply is zero before two calls
+have stored one. The cloud fraction ``b`` is used for autoconversion, radiation uses Xu–Randall.
 
 **Cloud fraction.** After condensation the cloud fraction follows Xu and Randall (1996) in the
 form and with the constants of NCEP's GFS
@@ -135,7 +166,20 @@ their effective radii (10 µm over ocean, 5 to 10 µm over land increasing with 
 50 µm for ice). Radiation schemes read this cloud state and nothing else from the cloud scheme;
 without a prognostic cloud scheme it is zero and there are no clouds.
 
-[`PrognosticClouds`](@ref) provides clouds for the one-band shortwave radiation: the column cloud
+[`CloudyShortwaveRadiativeTransfer`](@ref), used by [`OneBandCloudyShortwave`](@ref), has clouds in
+every layer. The cloudy part of a layer, cloud fraction ``a``, has the reflectance ``R_c`` and
+transmittance ``T_c`` of a homogeneous, absorbing layer of in-cloud optical depth
+``\tau = \frac{3}{2}(\mathrm{LWP}/(\rho_w r_l) + \mathrm{IWP}/(\rho_i r_i))/a`` from the two-stream
+equations for diffuse light (quadrature coefficients, asymmetry factor ``g = 0.85``,
+single-scattering albedo ``\omega = 0.999``). The layer reflects ``R = a R_c`` and transmits
+``T = t((1-a) + a T_c)`` with the clear-sky transmissivity ``t``. The fluxes follow from the
+adding method, which includes the multiple reflections between layers and with the surface;
+clouds of different layers are independent (random overlap). The heating of every layer is its
+flux convergence, so absorption in the atmosphere, at the surface and the reflection to space add
+up to the incoming sunlight exactly.
+
+[`PrognosticClouds`](@ref) also provides clouds for the one-band shortwave radiation with
+reflection at a single cloud top: the column cloud
 cover from the layer cloud fractions with maximum-random overlap, the cloud top as the highest
 cloudy layer, and the cloud albedo from the in-cloud optical depth of the column
 
@@ -152,13 +196,26 @@ the emissivity of the cloudy part ``\varepsilon = 1 - \exp(-D(\kappa_l W_l + \ka
 in-cloud liquid and ice water paths ``W``, ``D = 1.66`` and mass absorption coefficients after
 the NCAR CCM3 (Kiehl et al. 1998).
 
+## Convective condensate
+
+Betts-Miller convection relaxes towards a reference profile and has no updraft that could
+detrain condensate. With `BettsMillerConvection(spectral_grid; detrainment = d)` a fraction ``d``
+of the deep convective precipitation stays in the atmosphere as cloud condensate in the top layer
+of the convection (the level of zero buoyancy), where the cloud scheme then treats it as any
+other condensate. The latent heat is already released by the convective relaxation. Without a
+prognostic cloud condensate the detrainment has no effect. The default is 0.
+
 ## Known limitations
 
-- Not tuned: in a first 10-day run at T31 the global mean cloud cover is about 0.26 and the
-  liquid water path about 6 g/m², far below observed values.
-- No convective condensate: Betts-Miller convection detrains no cloud water, and
-  [`PrognosticClouds`](@ref) has no separate convective or stratocumulus cloud.
-- The shortwave reflects at the cloud top only; cloud absorption is that of the one-band scheme.
+- Not tuned: in 10-day runs at T31 the global mean cloud cover is 0.26 to 0.38 depending on the
+  closure and the detrainment, and the liquid water path 5 to 9 g/m², far below observed values.
+  Tuning with SpeedyCalibration.jl is planned.
+- Convective clouds only through the detrainment of Betts-Miller convection; there is no separate
+  stratocumulus cloud.
+- Random overlap in the per-layer shortwave and in the longwave; the shortwave clouds treat the
+  sunlight as diffuse.
+- The Sundqvist closure's supply includes the leapfrog time filter's correction of the state and is
+  zero for the first two calls.
 - The NumericalRadiation ecCKD scheme is clear-sky and does not use the cloud state yet.
 
 ## References

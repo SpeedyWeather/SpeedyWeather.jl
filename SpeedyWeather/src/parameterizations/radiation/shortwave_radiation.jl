@@ -99,8 +99,12 @@ function OneBandGreyShortwave(
 end
 
 # variables of the shortwave scheme and those of its clouds component
-variables(radiation::OneBandShortwave) =
-    (invoke(variables, Tuple{AbstractShortwave}, radiation)..., variables(radiation.clouds)...)
+# variables of the shortwave scheme and those of its clouds and radiative transfer components
+variables(radiation::OneBandShortwave) = (
+    invoke(variables, Tuple{AbstractShortwave}, radiation)...,
+    variables(radiation.clouds)...,
+    variables(radiation.radiative_transfer)...,
+)
 
 Base.show(io::IO, M::OneBandShortwave) = show(io, M, values = false)
 
@@ -235,5 +239,186 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     end
 
     vars.parameterizations.outgoing_shortwave[ij] = U
+    return nothing
+end
+
+export CloudyShortwaveRadiativeTransfer
+
+"""
+    CloudyShortwaveRadiativeTransfer <: AbstractShortwaveRadiativeTransfer
+
+One-band shortwave radiative transfer with clouds in every layer from the cloud state of a
+prognostic cloud scheme, e.g. [`PrognosticCloudCondensation`](@ref), solved with the adding method
+(multiple reflections between layers and the surface). In each layer the cloudy part, cloud
+fraction `C`, has the reflectance `R_c` and transmittance `T_c` of a homogeneous, absorbing,
+diffusely illuminated two-stream layer (quadrature coefficients) with the in-cloud optical depth
+
+    τ = 3/2 (LWP/(ρ_w r_l) + IWP/(ρ_i r_i)) / C
+
+and the layer's reflectance and transmittance are `R = C R_c` and `T = t ((1 - C) + C T_c)`
+with the clear-sky transmissivity `t` (gas absorption). Clouds of different layers are
+independent (random overlap). Ozone absorbs a fraction of the incoming beam above `σ = 0.2`
+as in [`OneBandShortwaveRadiativeTransfer`](@ref). Use with clouds that do not reflect at a cloud
+top themselves and a transmissivity without cloud absorption, see [`OneBandCloudyShortwave`](@ref).
+Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct CloudyShortwaveRadiativeTransfer{NF, F} <: AbstractShortwaveRadiativeTransfer
+    "[OPTION] Asymmetry factor of the scattering by cloud droplets and ice [1]"
+    @param asymmetry_factor::NF = 0.85 (bounds = 0 .. 1,)
+
+    "[OPTION] Single-scattering albedo of cloud droplets and ice, broadband [1]"
+    @param single_scattering_albedo::NF = 0.999 (bounds = 0 .. 1,)
+
+    "[OPTION] Density of ice [kg/m³] for the optical depth of cloud ice"
+    @param ice_density::NF = 917 (bounds = Positive,)
+
+    "[OPTION] Total ozone absorption as fraction of incoming solar radiation (1)"
+    @param ozone_absorption::NF = 0.01 (bounds = 0 .. 1,)
+
+    "[OPTION] Ozone distribution above σ₀, has to be explicitly normalized to ∫dσ = 1 (1)"
+    ozone_distribution::F
+end
+
+Adapt.@adapt_structure CloudyShortwaveRadiativeTransfer
+
+function CloudyShortwaveRadiativeTransfer(
+        SG::SpectralGrid;
+        ozone_distribution = (σ) -> 50 * max(0, 1 // 5 - σ),     # as OneBandShortwaveRadiativeTransfer
+        kwargs...
+    )
+    return CloudyShortwaveRadiativeTransfer{SG.NF, typeof(ozone_distribution)}(; ozone_distribution, kwargs...)
+end
+
+initialize!(::CloudyShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
+
+# the shortwave diagnostics and the cloud state it reads
+variables(radiative_transfer::CloudyShortwaveRadiativeTransfer) = (
+    invoke(variables, Tuple{AbstractShortwave}, radiative_transfer)...,
+    cloud_state_variables()...,
+)
+
+export OneBandCloudyShortwave
+
+"""$(TYPEDSIGNATURES)
+`OneBandShortwave` with clouds in every layer from a prognostic cloud scheme: [`PrognosticClouds`](@ref)
+(column cloud cover and cloud top for output only), the background transmissivity without its
+cloud absorption, and [`CloudyShortwaveRadiativeTransfer`](@ref)."""
+function OneBandCloudyShortwave(
+        SG::SpectralGrid;
+        clouds = PrognosticClouds(SG),
+        transmissivity = BackgroundShortwaveTransmissivity(SG; absorptivity_cloud_base = 0, absorptivity_cloud_limit = 0),
+        radiative_transfer = CloudyShortwaveRadiativeTransfer(SG),
+    )
+    return OneBandShortwave(clouds, transmissivity, radiative_transfer)
+end
+
+"""$(TYPEDSIGNATURES)
+Reflectance and transmittance of a homogeneous layer of optical depth `τ`, single-scattering albedo
+`ω` and asymmetry factor `g` for diffuse illumination, from the two-stream equations with
+quadrature coefficients `γ₁ = √3/2 (2 - ω(1 + g))`, `γ₂ = √3/2 ω(1 - g)` and `k = √(γ₁² - γ₂²)`
+
+    R = γ₂ (1 - e^{-2kτ}) / (k (1 + e^{-2kτ}) + γ₁ (1 - e^{-2kτ}))
+    T = 2k e^{-kτ} / (k (1 + e^{-2kτ}) + γ₁ (1 - e^{-2kτ}))
+
+written with `expm1` so that the non-absorbing limit `R = γ₁τ/(1 + γ₁τ)`, `T = 1 - R` is
+reached without cancellation."""
+@inline function two_stream_diffuse_layer(τ, ω, g)
+    NF = typeof(τ)
+    γ₁ = sqrt(NF(3)) / 2 * (2 - ω * (1 + g))
+    γ₂ = sqrt(NF(3)) / 2 * ω * (1 - g)
+    k = max(sqrt(max(γ₁^2 - γ₂^2, zero(NF))), NF(1.0e-6))    # floor for ω = 1
+    x = -expm1(-2k * τ)                                     # 1 - e^{-2kτ}
+    denominator = k * (2 - x) + γ₁ * x
+    R = γ₂ * x / denominator
+    T = 2k * exp(-k * τ) / denominator
+    return R, T
+end
+
+"""$(TYPEDSIGNATURES)
+One-band shortwave radiative transfer of column `ij` with clouds in every layer, adding method,
+see [`CloudyShortwaveRadiativeTransfer`](@ref). `t` is the clear-sky transmissivity (scratch
+array, overwritten), `vars.scratch.grid.b` is used as work array."""
+@propagate_inbounds function shortwave_radiative_transfer!(
+        ij,
+        vars,
+        t,          # transmissivity array, overwritten
+        clouds,     # NamedTuple from clouds!, not used for the transfer
+        radiation::CloudyShortwaveRadiativeTransfer,
+        model,
+    )
+    (; cloud_fraction, cloud_liquid_water, cloud_ice_water) = vars.parameterizations
+    (; cloud_liquid_effective_radius, cloud_ice_effective_radius) = vars.parameterizations
+    (; asymmetry_factor, single_scattering_albedo, ice_density, ozone_absorption) = radiation
+    albedo_stack = vars.scratch.grid.b          # reflectance of layers, then albedo of the stack below
+
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, radiation)
+    NF = eltype(dTdt)
+    pₛ = vars.parameterizations.surface_pressure[ij]
+    nlayers = size(dTdt, 2)
+    σ = model.geometry.σ_levels_full
+    Δσ = model.geometry.σ_levels_thick
+    coord = model.geometry.vertical_coordinates
+    g = model.planet.gravity
+    cₚ = model.atmosphere.heat_capacity
+    ρ_water = model.atmosphere.water_density
+    r_min = NF(1.0e-6)                          # [m], effective radius floor, also for absent cloud state
+
+    cos_zenith = vars.parameterizations.cos_zenith[ij]
+    albedo_ocean = vars.parameterizations.ocean.albedo[ij]
+    albedo_land = vars.parameterizations.land.albedo[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
+
+    # 1. OZONE absorbs from the incoming beam in the stratosphere, LAYER OPTICS of the cloudy layers
+    D_toa = model.planet.solar_constant * cos_zenith
+    D = D_toa
+    for k in 1:nlayers
+        O₃ = ozone_absorption * radiation.ozone_distribution(σ[k]) * Δσ[k] * D_toa
+        dTdt[ij, k] += flux_to_tendency(O₃ / cₚ, pₛ, k, model)
+        D -= O₃
+
+        C = cloud_fraction[ij, k]
+        Δp_g = pressure_thickness(k, pₛ, coord) / g     # layer mass [kg/m²]
+        r_liquid = max(cloud_liquid_effective_radius[ij, k], r_min)
+        r_ice = max(cloud_ice_effective_radius[ij, k], r_min)
+        τ_grid = 3 * Δp_g / 2 * (cloud_liquid_water[ij, k] / (ρ_water * r_liquid) + cloud_ice_water[ij, k] / (ice_density * r_ice))
+        τ = τ_grid / max(C, eps(NF))                    # in-cloud optical depth
+        R_cloud, T_cloud = two_stream_diffuse_layer(τ, single_scattering_albedo, asymmetry_factor)
+        albedo_stack[ij, k] = C * R_cloud               # layer reflectance
+        t[ij, k] *= (1 - C) + C * T_cloud               # layer transmittance
+    end
+
+    # 2. ADDING from the surface up: albedo of the stack below each layer top, and the transmission
+    # of a downward flux through layer k including the multiple reflections with the stack below
+    A = albedo
+    for k in nlayers:-1:1
+        R = albedo_stack[ij, k]
+        T = t[ij, k]
+        multiple_reflections = inv(1 - R * A)
+        A = R + T^2 * A * multiple_reflections
+        albedo_stack[ij, k] = A
+        t[ij, k] = T * multiple_reflections
+    end
+
+    # 3. FLUXES from the top down, absorption in each layer from the net flux convergence
+    D_top = D                                   # downward flux into the top layer after ozone
+    for k in 1:nlayers
+        U = albedo_stack[ij, k] * D             # upward at the top of layer k
+        D_below = D * t[ij, k]
+        A_below = ifelse(k < nlayers, albedo_stack[ij, min(k + 1, nlayers)], albedo)
+        U_below = A_below * D_below
+        absorbed = (D - U) - (D_below - U_below)
+        dTdt[ij, k] += flux_to_tendency(absorbed / cₚ, pₛ, k, model)
+        D = D_below
+    end
+
+    # surface fluxes, D is now the downward flux at the surface
+    vars.parameterizations.surface_shortwave_down[ij] = D
+    vars.parameterizations.ocean.surface_shortwave_down[ij] = D
+    vars.parameterizations.land.surface_shortwave_down[ij] = D
+    vars.parameterizations.ocean.surface_shortwave_up[ij] = albedo_ocean * D
+    vars.parameterizations.land.surface_shortwave_up[ij] = albedo_land * D
+    vars.parameterizations.surface_shortwave_up[ij] = albedo * D
+    vars.parameterizations.albedo[ij] = albedo
+    vars.parameterizations.outgoing_shortwave[ij] = albedo_stack[ij, 1] * D_top
     return nothing
 end

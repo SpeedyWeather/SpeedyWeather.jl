@@ -54,3 +54,21 @@ end
     @test any(condensate .> 0)
     @test all(0 .<= cloud_fraction .<= 1)
 end
+
+@testset "GPU PrimitiveWetModel with Sundqvist clouds, per-layer shortwave and detrainment" begin
+    # Sundqvist closure with its reference state, per-layer shortwave clouds (adding method)
+    # and convective detrainment in the fused parameterization kernel
+    arch = SpeedyWeather.GPU()
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8, architecture = arch)
+    large_scale_condensation = PrognosticCloudCondensation(spectral_grid; closure = SundqvistClosure(spectral_grid))
+    convection = BettsMillerConvection(spectral_grid; detrainment = 0.2)
+    radiation = Radiation(spectral_grid; shortwave = OneBandCloudyShortwave(spectral_grid), longwave = OneBandCloudyLongwave(spectral_grid))
+    model = PrimitiveWetModel(spectral_grid; large_scale_condensation, convection, radiation)
+    simulation = initialize!(model)
+    run!(simulation, period = Day(1))
+
+    @test simulation.model.feedback.nans_detected == false
+    @test all(Array(simulation.variables.prognostic.clouds.surface_pressure_reference.data) .> 0)
+    @test any(Array(simulation.variables.grid.cloud_condensate.data) .> 0)
+    @test all(isfinite, Array(simulation.variables.parameterizations.outgoing_shortwave.data))
+end

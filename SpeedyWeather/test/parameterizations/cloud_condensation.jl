@@ -8,9 +8,9 @@ SpeedyWeather.variables(::CondensateOnly, model::SpeedyWeather.AbstractModel) =
     SpeedyWeather.cloud_condensate_variables(SpeedyWeather.get_nsteps(model.time_stepping, model))
 
 # a model with the prognostic cloud condensation and its variables, Float64 for tight budgets
-function cloud_test_model(; NF = Float64, nlayers = 8, kwargs...)
+function cloud_test_model(; NF = Float64, nlayers = 8, closure = RelaxationClosure, closure_kwargs = (;), kwargs...)
     spectral_grid = SpectralGrid(; truncation = 15, nlayers, NF)
-    large_scale_condensation = PrognosticCloudCondensation(spectral_grid; kwargs...)
+    large_scale_condensation = PrognosticCloudCondensation(spectral_grid; closure = closure(spectral_grid; closure_kwargs...), kwargs...)
     model = PrimitiveWetModel(spectral_grid; large_scale_condensation)
     model.feedback.verbose = false
     simulation = initialize!(model)
@@ -153,7 +153,7 @@ end
     # layer with nothing above: the condensate decays by the Sundqvist rate, exponential in time
     set_cloud_column!(
         vars, model, ij;
-        temperature = fill(285.0, nlayers), relative_humidity = fill(scheme.relative_humidity_threshold, nlayers),
+        temperature = fill(285.0, nlayers), relative_humidity = fill(scheme.closure.relative_humidity_threshold, nlayers),
         condensate = fill(1.0e-3, nlayers)
     )
     run_cloud_column!(vars, model, ij)
@@ -180,7 +180,7 @@ end
 
 @testset "Prognostic cloud condensation: non-negative condensate at extreme rates" begin
     model, vars = cloud_test_model(
-        autoconversion_rate = 1.0e3, ice_autoconversion_rate = 1.0e3, evaporation_time_scale = 0.01
+        autoconversion_rate = 1.0e3, ice_autoconversion_rate = 1.0e3, closure_kwargs = (; evaporation_time_scale = 0.01)
     )
     nlayers = model.spectral_grid.nlayers
     Δt_prognostic = default_time_step(model.time_stepping)
@@ -195,6 +195,25 @@ end
     dT, dq, dqc = cloud_column_tendencies(vars, model, ij)
     @test all(qc .+ Δt_prognostic .* dqc .>= -1.0e-15)
     @test all(isfinite, dT)
+end
+
+# column water and enthalpy budgets of column ij: (water imbalance [kg/m²/s], heating [W/m²], latent heat [W/m²])
+function cloud_column_budgets(vars, model, ij, temperature)
+    scheme = model.large_scale_condensation
+    (; geometry, planet, atmosphere) = model
+    nlayers = model.spectral_grid.nlayers
+    g = planet.gravity
+    ρ = atmosphere.water_density
+    dT, dq, dqc = cloud_column_tendencies(vars, model, ij)
+    Δp = [pressure_thickness(k, vars.parameterizations.surface_pressure[ij], geometry.vertical_coordinates) for k in 1:nlayers]
+    f_ice = ice_fraction.(temperature, atmosphere.temperature_freezing, scheme.ice_temperature)
+    rain = ρ * vars.parameterizations.rain_rate_large_scale[ij]
+    snow = ρ * vars.parameterizations.snow_rate_large_scale[ij]
+    water = sum((dq .+ dqc) .* Δp) / g + rain + snow
+    heating = atmosphere.heat_capacity / g * sum(dT .* Δp)
+    latent = atmosphere.latent_heat_condensation * (-sum(dq .* Δp) / g) +
+        atmosphere.latent_heat_fusion * (sum(f_ice .* dqc .* Δp) / g + snow)
+    return water, heating, latent
 end
 
 @testset "Prognostic cloud condensation: water and enthalpy budgets" begin
@@ -325,6 +344,216 @@ end
     @test t[[1, 2, 4, 6, 7, 8]] == t_clear[[1, 2, 4, 6, 7, 8]]
 end
 
+@testset "Sundqvist closure" begin
+    using SpeedyWeather: critical_relative_humidity, sundqvist_cloud_fraction
+    model, vars = cloud_test_model(closure = SundqvistClosure, autoconversion_rate = 0, ice_autoconversion_rate = 0)
+    scheme = model.large_scale_condensation
+    closure = scheme.closure
+    (; atmosphere, geometry) = model
+    nlayers = model.spectral_grid.nlayers
+    Δt_prognostic = default_time_step(model.time_stepping)
+    references = vars.prognostic.clouds
+    ij = 4
+
+    # critical relative humidity and cloud fraction
+    @test critical_relative_humidity(closure, 1.0e5, 1.0e5) ≈ closure.critical_relative_humidity_surface
+    closure_profile = SundqvistClosure(model.spectral_grid; critical_relative_humidity_surface = 0.95, critical_relative_humidity_top = 0.7)
+    @test critical_relative_humidity(closure_profile, 1.0e5, 1.0e5) ≈ 0.95
+    @test critical_relative_humidity(closure_profile, 1.0e3, 1.0e5) ≈ 0.7 atol = 1.0e-6
+    @test sundqvist_cloud_fraction(0.8, 0.9) == 0
+    @test sundqvist_cloud_fraction(0.95, 0.9) ≈ 1 - sqrt(0.5)
+    @test sundqvist_cloud_fraction(1.2, 0.9) ≈ 1 atol = 1.0e-2
+
+    # no reference state yet: no supply, no condensation; condensate in a clear cell evaporates
+    @test all(iszero, references.surface_pressure_reference)
+    qc = fill(1.0e-4, nlayers)
+    set_cloud_column!(vars, model, ij; temperature = fill(285.0, nlayers), relative_humidity = fill(0.95, nlayers), condensate = zeros(nlayers))
+    run_cloud_column!(vars, model, ij)
+    dT, dq, dqc = cloud_column_tendencies(vars, model, ij)
+    @test all(dqc .== 0)
+    set_cloud_column!(vars, model, ij; temperature = fill(285.0, nlayers), relative_humidity = fill(0.5, nlayers), condensate = qc)
+    run_cloud_column!(vars, model, ij)
+    dT, dq, dqc = cloud_column_tendencies(vars, model, ij)
+    @test all(dqc .< 0)
+    @test all(qc .+ Δt_prognostic .* dqc .>= -eps())
+
+    # references: the last call's state moves to "two calls before", this call's is stored
+    @test all(references.surface_pressure_reference[ij, :] .== 1.0e5)      # two calls, both stored
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, scheme)
+    q = get_prognostic_step(vars.grid.humidity, model.time_stepping, scheme)
+    @test references.temperature_reference[ij, :, 2] ≈ T[ij, :] .+ Δt_prognostic .* atmosphere.latent_heat_condensation ./ atmosphere.heat_capacity .* (-dq)
+    @test references.humidity_reference[ij, :, 2] ≈ q[ij, :] .+ Δt_prognostic .* dq
+
+    # a moisture supply in a partly cloudy cell (RH 0.95 > u = 0.9) condenses β M / (1 + L/cₚ f ∂q*/∂T),
+    # β = b without condensate
+    set_cloud_column!(vars, model, ij; temperature = fill(285.0, nlayers), relative_humidity = fill(0.95, nlayers), condensate = zeros(nlayers))
+    supply = 1.0e-9                                             # [kg/kg/s]
+    references.temperature_reference[ij, :, 1] .= T[ij, :]
+    references.humidity_reference[ij, :, 1] .= q[ij, :] .- supply * Δt_prognostic
+    references.surface_pressure_reference[ij, 1] = 1.0e5
+    run_cloud_column!(vars, model, ij)
+    dT, dq, dqc = cloud_column_tendencies(vars, model, ij)
+    for k in 1:nlayers
+        p = pressure(k, 1.0e5, geometry.vertical_coordinates)
+        q_sat, dq_sat_dT = mixed_phase_saturation_humidity(285.0, p, 0.0, atmosphere, true)
+        f = q[ij, k] / q_sat
+        b = sundqvist_cloud_fraction(f, critical_relative_humidity(closure, p, 1.0e5))
+        expected = b * supply / (1 + atmosphere.latent_heat_condensation / atmosphere.heat_capacity * f * dq_sat_dT)
+        @test dqc[k] ≈ expected rtol = 1.0e-6
+    end
+
+    # water and enthalpy budgets close with the Sundqvist closure too
+    model, vars = cloud_test_model(closure = SundqvistClosure)
+    references = vars.prognostic.clouds
+    column = (
+        temperature = [220.0, 235.0, 250.0, 262.0, 272.0, 282.0, 290.0, 295.0],
+        relative_humidity = [0.5, 0.97, 1.05, 0.95, 0.85, 0.99, 0.6, 0.8],
+        condensate = [0.0, 2.0e-5, 3.0e-4, -1.0e-5, 5.0e-4, 2.0e-4, 1.0e-4, 0.0],
+    )
+    set_cloud_column!(vars, model, ij; column...)
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, model.large_scale_condensation)
+    q = get_prognostic_step(vars.grid.humidity, model.time_stepping, model.large_scale_condensation)
+    references.temperature_reference[ij, :, 1] .= T[ij, :] .- 1.0e-5 * Δt_prognostic     # cooling and
+    references.humidity_reference[ij, :, 1] .= q[ij, :] .- 1.0e-9 * Δt_prognostic        # moistening supply
+    references.surface_pressure_reference[ij, 1] = 1.0e5
+    run_cloud_column!(vars, model, ij)
+    water, heating, latent = cloud_column_budgets(vars, model, ij, column.temperature)
+    @test any(cloud_column_tendencies(vars, model, ij)[3] .> 0)        # something condensed
+    @test water ≈ 0 atol = 1.0e-12
+    @test heating ≈ latent rtol = 1.0e-10
+end
+
+@testset "Convective detrainment of condensate" begin
+    spectral_grid = SpectralGrid(truncation = 15, nlayers = 8, NF = Float64)
+    model = PrimitiveWetModel(spectral_grid; large_scale_condensation = PrognosticCloudCondensation(spectral_grid))
+    model.feedback.verbose = false
+    simulation = initialize!(model)
+    run!(simulation, steps = 20)    # spin up so some columns convect
+    vars = simulation.variables
+    P = vars.parameterizations
+    (; time_stepping, geometry, planet, atmosphere) = model
+    dq = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, model.convection)
+    dqc = get_tendency_step(vars.tendencies.grid.cloud_condensate, time_stepping, model.convection)
+
+    # the same state with and without detrainment
+    function convect!(detrainment)
+        dq .= 0
+        dqc .= 0
+        P.rain_convection .= 0
+        P.snow_convection .= 0
+        convection = BettsMillerConvection(spectral_grid; detrainment)
+        SpeedyWeather._column_parameterizations_cpu!(vars, (; convection), model)
+        return copy(dq), copy(dqc), P.rain_convection .+ P.snow_convection
+    end
+    dq₀, dqc₀, precip₀ = convect!(0.0)
+    dq₁, dqc₁, precip₁ = convect!(0.3)
+
+    @test any(precip₀ .> 0)
+    @test all(dqc₀ .== 0)
+    @test dq₁ == dq₀                                            # humidity tendency unchanged
+    @test precip₁ ≈ 0.7 .* precip₀                              # 30 % of the precipitation detrained
+
+    # detrained condensate equals the precipitation removed, all in one layer per column
+    nlayers = spectral_grid.nlayers
+    Δt = time_stepping.Δt
+    for ij in 1:spectral_grid.npoints
+        Δp = [pressure_thickness(k, P.surface_pressure[ij], geometry.vertical_coordinates) for k in 1:nlayers]
+        detrained = sum(dqc₁[ij, :] .* Δp) / planet.gravity     # [kg/m²/s]
+        @test detrained ≈ 0.3 * precip₀[ij] * atmosphere.water_density / Δt atol = 1.0e-12
+        @test count(!iszero, dqc₁[ij, :]) <= 1
+    end
+
+    # without a prognostic condensate detrainment does nothing
+    model_default = PrimitiveWetModel(spectral_grid; convection = BettsMillerConvection(spectral_grid; detrainment = 0.3))
+    @test SpeedyWeather.convective_detrainment(model_default.convection, Variables(model_default)) == 0
+end
+
+@testset "Two-stream cloud layer" begin
+    two_stream = SpeedyWeather.two_stream_diffuse_layer
+    for NF in (Float32, Float64)
+        g = NF(0.85)
+        γ₁ = sqrt(NF(3)) / 2 * (1 - g)
+        for τ in NF.((0, 0.01, 1, 10, 100))
+            # non-absorbing: R + T = 1 and R = γ₁τ/(1 + γ₁τ)
+            R, T = two_stream(τ, one(NF), g)
+            @test R + T ≈ 1 rtol = 1.0e-4
+            @test R ≈ γ₁ * τ / (1 + γ₁ * τ) atol = 1.0e-4
+            # absorbing: R + T < 1, both within [0, 1]
+            R, T = two_stream(τ, NF(0.999), g)
+            @test 0 <= R <= 1 && 0 <= T <= 1
+            @test R + T <= 1 + eps(NF)
+        end
+    end
+    R, T = two_stream(20.0, 0.999, 0.85)
+    @test 0.01 < 1 - R - T < 0.1                            # a few percent absorption by a thick cloud
+end
+
+@testset "Per-layer shortwave clouds" begin
+    spectral_grid = SpectralGrid(truncation = 15, nlayers = 8, NF = Float64)
+    radiation = Radiation(spectral_grid; shortwave = OneBandCloudyShortwave(spectral_grid), longwave = nothing)
+    model = PrimitiveWetModel(spectral_grid; radiation, parameterizations = (:radiation,))
+    model.feedback.verbose = false
+    simulation = initialize!(model)
+    vars = simulation.variables
+    P = vars.parameterizations
+    shortwave = model.radiation.shortwave
+    (; geometry, planet, atmosphere) = model
+    nlayers = spectral_grid.nlayers
+    ij = 1
+    P.surface_pressure .= 1.0e5
+    P.cos_zenith .= 0.7
+    P.cloud_liquid_effective_radius .= 10.0e-6
+    P.cloud_ice_effective_radius .= 50.0e-6
+    Δp = [pressure_thickness(k, 1.0e5, geometry.vertical_coordinates) for k in 1:nlayers]
+    dTdt = vars.tendencies.grid.temperature
+
+    function shortwave_column!(; cloud_fraction, liquid, ice = zeros(nlayers), albedo = 0.2, radiative_transfer = shortwave.radiative_transfer)
+        P.cloud_fraction[ij, :] .= cloud_fraction
+        P.cloud_liquid_water[ij, :] .= liquid
+        P.cloud_ice_water[ij, :] .= ice
+        P.ocean.albedo[ij] = albedo
+        P.land.albedo[ij] = albedo
+        dTdt[ij, :, 1] .= 0
+        clouds = SpeedyWeather.clouds!(ij, vars, shortwave.clouds, model)
+        t = SpeedyWeather.transmissivity!(ij, vars, clouds, shortwave.transmissivity, model)
+        SpeedyWeather.shortwave_radiative_transfer!(ij, vars, t, clouds, radiative_transfer, model)
+        absorbed = atmosphere.heat_capacity / planet.gravity * sum(dTdt[ij, :, 1] .* Δp)   # [W/m²]
+        return (; absorbed, surface_down = P.surface_shortwave_down[ij], outgoing = P.outgoing_shortwave[ij])
+    end
+    D_toa = planet.solar_constant * 0.7
+
+    # energy conservation: absorbed in the atmosphere + at the surface + reflected to space = incoming
+    cloudy = (
+        cloud_fraction = [0, 0.3, 0.6, 0, 0.5, 0.8, 0.2, 0], liquid = [0, 1.0e-5, 1.0e-4, 0, 2.0e-4, 3.0e-4, 1.0e-5, 0],
+        ice = [0, 5.0e-5, 2.0e-5, 0, 0, 0, 0, 0],
+    )
+    for albedo in (0.0, 0.2, 0.8)
+        fluxes = shortwave_column!(; cloudy..., albedo)
+        @test fluxes.absorbed + (1 - albedo) * fluxes.surface_down + fluxes.outgoing ≈ D_toa rtol = 1.0e-10
+    end
+
+    # clouds reflect: more outgoing, less at the surface than clear sky
+    clear = shortwave_column!(; cloud_fraction = zeros(nlayers), liquid = zeros(nlayers))
+    cloudy_fluxes = shortwave_column!(; cloudy...)
+    @test cloudy_fluxes.outgoing > clear.outgoing
+    @test cloudy_fluxes.surface_down < clear.surface_down
+
+    # an overcast, optically thick layer reflects most of the sunlight
+    overcast = shortwave_column!(; cloud_fraction = [0, 0, 0, 0, 1, 0, 0, 0], liquid = [0, 0, 0, 0, 2.0e-3, 0, 0, 0])
+    @test overcast.outgoing > 0.5 * D_toa
+    @test overcast.surface_down < 0.3 * D_toa
+
+    # clear sky, no ozone, black surface: the same as the one-band transfer without clouds
+    no_ozone = SpeedyWeather.CloudyShortwaveRadiativeTransfer(spectral_grid; ozone_absorption = 0)
+    one_band = OneBandShortwaveRadiativeTransfer(spectral_grid; ozone_absorption = 0)
+    a = shortwave_column!(; cloud_fraction = zeros(nlayers), liquid = zeros(nlayers), albedo = 0.0, radiative_transfer = no_ozone)
+    heating_cloudy = copy(dTdt[ij, :, 1])
+    b = shortwave_column!(; cloud_fraction = zeros(nlayers), liquid = zeros(nlayers), albedo = 0.0, radiative_transfer = one_band)
+    @test a.surface_down ≈ b.surface_down rtol = 1.0e-10
+    @test heating_cloudy ≈ dTdt[ij, :, 1] rtol = 1.0e-10
+    @test a.outgoing ≈ 0 atol = 1.0e-12
+end
+
 @testset "SPPT perturbs the cloud condensate tendency" begin
     spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
     random_process = SpectralAR1Process(spectral_grid, seed = 1)
@@ -364,6 +593,22 @@ end
     @test all(0 .<= vars.parameterizations.cloud_cover .<= 1)
     @test all(vars.parameterizations.liquid_water_path .>= 0)
     @test all(vars.parameterizations.rain_large_scale .>= 0)
+end
+
+@testset "Prognostic clouds with the Sundqvist closure in the full model" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    large_scale_condensation = PrognosticCloudCondensation(spectral_grid; closure = SundqvistClosure(spectral_grid))
+    radiation = Radiation(spectral_grid; shortwave = OneBandCloudyShortwave(spectral_grid), longwave = OneBandCloudyLongwave(spectral_grid))
+    model = PrimitiveWetModel(spectral_grid; large_scale_condensation, radiation)
+    model.feedback.verbose = false
+    simulation = initialize!(model)
+    run!(simulation, period = Day(2))
+
+    vars = simulation.variables
+    @test model.feedback.nans_detected == false
+    @test all(vars.prognostic.clouds.surface_pressure_reference .> 0)
+    @test any(vars.grid.cloud_condensate .> 0)
+    @test all(0 .<= vars.parameterizations.cloud_fraction .<= 1)
 end
 
 @testset "Fused condensate leaves the rest of the model unchanged" begin
