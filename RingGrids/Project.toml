@@ -1,6 +1,6 @@
 name = "RingGrids"
 uuid = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
-version = "0.1.9+DEV"
+version = "1.0.0"
 authors = ["RingGrids contributors"]
 
 [deps]
@@ -53,7 +53,7 @@ Pkg = "1.10"
 Printf = "1.10"
 Random = "1.10"
 Reactant = "0.2.243"
-SpeedyWeatherInternals = "0.2"
+SpeedyWeatherInternals = "1.0"
 Statistics = "1.10"
 StyledStrings = "1"
 julia = "1.10"
