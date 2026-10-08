@@ -40,6 +40,35 @@ import SpeedyWeather.NCDatasets: NCDataset
     @test SpeedyWeather.ismatching(arch, output.field2D.data)
 end
 
+@testset "GPU output: vertical interpolation onto pressure layers" begin
+    arch = SpeedyWeather.GPU()
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8, architecture = arch)
+    spectral_grid_cpu = SpectralGrid(truncation = 31, nlayers = 8)
+    coordinates = SigmaCoordinates(spectral_grid)
+    coordinates_cpu = SigmaCoordinates(spectral_grid_cpu)
+    NF = spectral_grid.NF
+
+    pₛ_cpu = fill!(zeros(NF, spectral_grid_cpu.grid), NF(1000.0e2))
+    in_field_cpu = 200 .+ rand(NF, spectral_grid_cpu.grid, spectral_grid.nlayers)
+    p_cpu = NF[10.0e2, 500.0e2, 990.0e2, 1010.0e2]  # above, inside, below the model layers, below ground
+    out_cpu = zeros(NF, spectral_grid_cpu.grid, length(p_cpu))
+
+    pₛ, in_field, p = on_architecture(arch, pₛ_cpu), on_architecture(arch, in_field_cpu), on_architecture(arch, p_cpu)
+    out = on_architecture(arch, out_cpu)
+
+    # parameters in the model's number format, as set by sync_extrapolations! at initialize!
+    adiabatic = SpeedyWeather.DryAdiabaticExtrapolation(κ = NF(2 / 7))
+    for extrapolation in (
+            SpeedyWeather.ConstantExtrapolation(),
+            adiabatic,
+            SpeedyWeather.SubsurfaceMask(above_surface = adiabatic, missing_value = NF(NaN)),
+        )
+        SpeedyWeather.interpolate_pressure_layers!(out, in_field, pₛ, p, coordinates, SpeedyWeather.LinearInLogPressure(), extrapolation)
+        SpeedyWeather.interpolate_pressure_layers!(out_cpu, in_field_cpu, pₛ_cpu, p_cpu, coordinates_cpu, SpeedyWeather.LinearInLogPressure(), extrapolation)
+        @test on_architecture(SpeedyWeather.CPU(), out.data) ≈ out_cpu.data nans = true
+    end
+end
+
 @testset "GPU output: all variables, all writers" begin
     arch = SpeedyWeather.GPU()
     path = mktempdir(pwd(), prefix = "tmp_gpu_output_")
