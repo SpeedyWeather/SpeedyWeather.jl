@@ -19,6 +19,34 @@ Base revision: `3c033168` (`mg/clouds`). The initial draft was checked against `
 
 ## Revision log
 
+- 2026-10-08 (afternoon), differentiability, clear-sky fluxes, SpeedyCalibration.jl.
+  > continue
+
+  > For the differentiation and calibration use Julia 1.11 or Julia 1.10
+
+  - `test/differentiability/clouds.jl` (included in the differentiability `runtests.jl`): reverse-mode
+    gradients against central finite differences with respect to all parameters (via `parameters`
+    and `reconstruct`) of the cloud scheme on a column (both closures), of the cloudy shortwave and
+    longwave on a column, with respect to the cloud state handed to radiation, and through all
+    parameterizations of a step with the model `Duplicated` (the gradient SpeedyCalibration.jl
+    needs). Julia 1.12 is not used for AD. Enzyme 0.13.214, the newest release (the differentiability
+    environment pins 0.13.177), fails to precompile on this machine's `julia/1.10.10` module: its
+    precompile workload stops in GPUCompiler's relocation step ("Missing Julia object for global
+    '+Core.Float64#…'"), also in an exact copy of the CI environment. With the identical manifest it
+    loads on the official Julia 1.10.12 binary, the patch release CI uses, so the AD and calibration
+    runs use 1.10.12 (and 1.11.7). The environments develop the local SpeedyWeather packages and
+    SpeedyCalibration by path (Julia 1.10's Pkg ignores `[sources]` and otherwise resolves the
+    registered SpeedyWeather 0.23).
+  - The full SpeedyWeather test suite passes with the clear-sky changes (120,623 tests).
+  - Clear-sky outgoing shortwave and longwave (`outgoing_shortwave_clear_sky`,
+    `outgoing_longwave_clear_sky`, output `osr_clear`, `olr_clear`) with `OneBandCloudyShortwave` and
+    `OneBandCloudyLongwave`, so the cloud radiative effects can be tuned and output.
+  - SpeedyCalibration.jl was not on this machine; cloned to `~/SpeedyCalibration.jl`, branch
+    `mg/clouds`, uncommitted. Ported to SpeedyWeather 0.24 (`time_step!`, `SpectralGrid(truncation)`,
+    `Radiation` bundle paths, no `first_step_euler`); added `TrainingConfig(; model_kwargs,
+    gradient_scope)`, cloud loss keys (clear-sky fluxes, cloud cover, water paths, derived
+    `:sw_cre`, `:lw_cre`), `CLOUD_LOSS`, full-state restore after the AD pass (the Sundqvist
+    reference state would otherwise be shifted twice), `examples/clouds.jl` and `test/test_clouds.jl`.
 - 2026-10-08, tuning with SpeedyCalibration.jl, then the water loss, per-layer shortwave clouds,
   Stages 2 and 3.
   > Ok, before we continue note in the plan that our aim is to tune the cloud parameterization with
@@ -57,18 +85,17 @@ Base revision: `3c033168` (`mg/clouds`). The initial draft was checked against `
     - Before the merge, all new and changed cloud testsets passed on CPU (Two-stream, per-layer
       shortwave, Sundqvist closure, refactored Stage 1, detrainment), and both GPU testsets passed
       on an A40.
-    - After the merge, the full CPU suite and the GPU testsets were started but had not finished;
-      the suite got past the Terrarium precompilation that had failed before. Rerun both.
+    - After the merge, both GPU testsets passed on the A40 (3 and 4 tests) and the full CPU suite
+      passed (120,619 tests, `Pkg.test` with `--check-bounds=yes`).
     - `SpeedyWeather/src/parameterizations/cloud_condensation.jl` was untracked when the merge was
       made, so commit `2feedc0a` does not build on its own; commit it with the remaining changes.
   - *Next steps:*
-    1. Rerun the full test suite and the GPU tests on the merged branch.
-    2. Commit the session's work (the scheme file, Stages 2 and 3, per-layer shortwave, docs).
-    3. Enzyme differentiability tests of the cloud scheme and the cloudy radiation (7.8).
-    4. Adapt SpeedyCalibration.jl (7.8) and tune: cloud cover and shortwave cloud effect are far too
+    1. Commit the session's work (the scheme file, Stages 2 and 3, per-layer shortwave, docs).
+    2. Enzyme differentiability tests of the cloud scheme and the cloudy radiation (7.8).
+    3. Adapt SpeedyCalibration.jl (7.8) and tune: cloud cover and shortwave cloud effect are far too
        small (Summary of changes).
-    5. Decide on the `ImplicitCondensation` water fix (appendix), as its own PR.
-    6. Clear-sky fluxes for cloud radiative effects; all-sky ecCKD and the radiation call frequency.
+    4. Decide on the `ImplicitCondensation` water fix (appendix), as its own PR.
+    5. Clear-sky fluxes for cloud radiative effects; all-sky ecCKD and the radiation call frequency.
 - 2026-10-07, tuning by differentiation.
   > note in the plan that enzyme differentiabillity might be used to tune the cloud model
 
@@ -939,6 +966,15 @@ fit the cloud problem yet.
    prognostic condensate, whose lifetime is hours, is missed, and the gradient is biased. A window
    of a few differentiated steps as an option of the loop may be needed. Check the single-step
    gradient against finite differences of long-run statistics first.
+
+5. *Differentiate the parameterizations only.* The loss reads fluxes that the parameterizations
+   compute before the dynamics run in the same step, so the gradient of one `timestep!` and of
+   `parameterization_tendencies!` alone agree for such losses. The latter is far cheaper to compile
+   and avoids the dynamics entirely. Offer it as an option of the gradient step; the
+   differentiability test "all parameterizations of a step" in `test/differentiability/clouds.jl`
+   is exactly this gradient, checked against finite differences.
+6. *Julia version:* run differentiation and calibration on Julia 1.10 (the Enzyme CI carrier) or
+   1.11, not 1.12, where Enzyme hits the problems recorded for the dynamics.
 
 **What SpeedyWeather needs:**
 

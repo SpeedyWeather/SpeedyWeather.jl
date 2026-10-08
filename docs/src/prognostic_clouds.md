@@ -190,6 +190,13 @@ R = \frac{\beta \tau}{1 + \beta \tau}, \quad \beta = \frac{\sqrt{3}}{2} (1 - g)
 
 the two-stream reflectivity of a non-absorbing layer with asymmetry factor ``g = 0.85``.
 
+With [`OneBandCloudyShortwave`](@ref) and [`OneBandCloudyLongwave`](@ref) the outgoing shortwave and
+longwave radiation without clouds are diagnosed as well, `outgoing_shortwave_clear_sky` and
+`outgoing_longwave_clear_sky` (output `osr_clear`, `olr_clear`, part of
+`SpeedyWeather.CloudOutput()`), so that the cloud radiative effects are the all-sky minus the
+clear-sky fluxes. The clear-sky shortwave is the surface reflection through the cloud-free column
+twice, the clear-sky longwave one more upward sweep with the clear-sky transmissivity.
+
 [`CloudyLongwaveTransmissivity`](@ref) multiplies the transmissivity of a clear-sky scheme
 (by default `FriersonLongwaveTransmissivity`) in every layer by ``1 - a \varepsilon`` with
 the emissivity of the cloudy part ``\varepsilon = 1 - \exp(-D(\kappa_l W_l + \kappa_i W_i))`` from the

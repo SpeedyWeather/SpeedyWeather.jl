@@ -297,3 +297,26 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
     return nothing
 end
+
+"""$(TYPEDSIGNATURES)
+Outgoing longwave radiation of column `ij` with the clear-sky `transmissivity`: the upward beam of
+`longwave_radiative_transfer!` only, written to `outgoing_longwave_clear_sky`, no tendencies."""
+@propagate_inbounds function clear_sky_outgoing_longwave!(
+        ij, vars, transmissivity, longwave::OneBandLongwaveRadiativeTransfer, model,
+    )
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
+    nlayers = size(T, 2)
+    σ = model.atmosphere.stefan_boltzmann
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+
+    # the same surface emission as the all-sky transfer, stored there
+    U_ocean = vars.parameterizations.ocean.surface_longwave_up[ij]
+    U_land = vars.parameterizations.land.surface_longwave_up[ij]
+    U = (1 - land_fraction) * U_ocean + land_fraction * U_land
+    for k in nlayers:-1:1
+        t = transmissivity[ij, k]
+        U = U * t + (1 - t) * σ * T[ij, k]^4
+    end
+    vars.parameterizations.outgoing_longwave_clear_sky[ij] = U
+    return nothing
+end

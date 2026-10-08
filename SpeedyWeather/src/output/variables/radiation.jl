@@ -5,6 +5,8 @@ names = (
     (:SurfaceShortwaveDownOutput, "srd", "Surface shortwave radiation down", :surface_shortwave_down),
     (:SurfaceLongwaveUpOutput, "lru", "Surface longwave radiation up", :surface_longwave_up),
     (:SurfaceLongwaveDownOutput, "lrd", "Surface longwave radiation down", :surface_longwave_down),
+    (:OutgoingShortwaveClearSkyOutput, "osr_clear", "Outgoing shortwave radiation without clouds", :outgoing_shortwave_clear_sky),
+    (:OutgoingLongwaveClearSkyOutput, "olr_clear", "Outgoing longwave radiation without clouds", :outgoing_longwave_clear_sky),
 )
 
 for name in names

@@ -290,9 +290,10 @@ end
 
 initialize!(::CloudyShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
-# the shortwave diagnostics and the cloud state it reads
+# the shortwave diagnostics, the clear-sky outgoing shortwave and the cloud state it reads
 variables(radiative_transfer::CloudyShortwaveRadiativeTransfer) = (
     invoke(variables, Tuple{AbstractShortwave}, radiative_transfer)...,
+    ParameterizationVariable(:outgoing_shortwave_clear_sky, Grid2D(), desc = "TOA shortwave radiation up without clouds", units = "W/m^2"),
     cloud_state_variables()...,
 )
 
@@ -371,10 +372,12 @@ array, overwritten), `vars.scratch.grid.b` is used as work array."""
     # 1. OZONE absorbs from the incoming beam in the stratosphere, LAYER OPTICS of the cloudy layers
     D_toa = model.planet.solar_constant * cos_zenith
     D = D_toa
+    clear_sky_transmission = one(NF)            # through the whole column without clouds
     for k in 1:nlayers
         O₃ = ozone_absorption * radiation.ozone_distribution(σ[k]) * Δσ[k] * D_toa
         dTdt[ij, k] += flux_to_tendency(O₃ / cₚ, pₛ, k, model)
         D -= O₃
+        clear_sky_transmission *= t[ij, k]
 
         C = cloud_fraction[ij, k]
         Δp_g = pressure_thickness(k, pₛ, coord) / g     # layer mass [kg/m²]
@@ -420,5 +423,8 @@ array, overwritten), `vars.scratch.grid.b` is used as work array."""
     vars.parameterizations.surface_shortwave_up[ij] = albedo * D
     vars.parameterizations.albedo[ij] = albedo
     vars.parameterizations.outgoing_shortwave[ij] = albedo_stack[ij, 1] * D_top
+
+    # without clouds the adding method reduces to the surface reflection through the column twice
+    vars.parameterizations.outgoing_shortwave_clear_sky[ij] = albedo * clear_sky_transmission^2 * D_top
     return nothing
 end

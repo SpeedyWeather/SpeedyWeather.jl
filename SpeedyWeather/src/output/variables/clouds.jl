@@ -66,4 +66,6 @@ CloudOutput() = (
     CloudFractionOutput(),
     LiquidWaterPathOutput(),
     IceWaterPathOutput(),
+    OutgoingShortwaveClearSkyOutput(),      # for cloud radiative effects, with OneBandCloudyShortwave
+    OutgoingLongwaveClearSkyOutput(),       # and OneBandCloudyLongwave
 )

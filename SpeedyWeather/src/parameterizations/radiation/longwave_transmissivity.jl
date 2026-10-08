@@ -117,12 +117,17 @@ end
 initialize!(transmissivity::CloudyLongwaveTransmissivity, model::AbstractModel) =
     initialize!(transmissivity.clear_sky, model)
 
-variables(transmissivity::CloudyLongwaveTransmissivity) =
-    (cloud_state_variables()..., variables(transmissivity.clear_sky)...)
+variables(transmissivity::CloudyLongwaveTransmissivity) = (
+    cloud_state_variables()...,
+    variables(transmissivity.clear_sky)...,
+    ParameterizationVariable(:outgoing_longwave_clear_sky, Grid2D(), desc = "TOA longwave radiation up without clouds", units = "W/m^2"),
+)
 
 @propagate_inbounds function transmissivity!(ij, vars, transmissivity::CloudyLongwaveTransmissivity, model)
-    # clear-sky transmissivity first, into the scratch array it returns
+    # clear-sky transmissivity first, into the scratch array it returns, a copy in scratch b for
+    # the clear-sky outgoing longwave (see clear_sky_outgoing_longwave!)
     t = transmissivity!(ij, vars, transmissivity.clear_sky, model)
+    t_clear = vars.scratch.grid.b
 
     (; cloud_fraction, cloud_liquid_water, cloud_ice_water, cloud_ice_effective_radius) = vars.parameterizations
     (; diffusivity, liquid_mass_absorption, ice_mass_absorption, ice_mass_absorption_radius) = transmissivity
@@ -139,7 +144,17 @@ variables(transmissivity::CloudyLongwaveTransmissivity) =
         κᵢ = ice_mass_absorption + ice_mass_absorption_radius / max(cloud_ice_effective_radius[ij, k], NF(1.0e-6))
         absorption = liquid_mass_absorption * cloud_liquid_water[ij, k] + κᵢ * cloud_ice_water[ij, k]
         emissivity = 1 - exp(-diffusivity * absorption * in_cloud_mass)
+        t_clear[ij, k] = t[ij, k]
         t[ij, k] *= 1 - C * emissivity
     end
     return t
+end
+
+# with cloudy transmissivity also the clear-sky outgoing longwave from the clear-sky transmissivity
+# that CloudyLongwaveTransmissivity keeps in scratch b
+@propagate_inbounds function parameterization!(ij, vars, radiation::OneBandLongwave{<:CloudyLongwaveTransmissivity}, model)
+    t = transmissivity!(ij, vars, radiation.transmissivity, model)
+    longwave_radiative_transfer!(ij, vars, t, radiation.radiative_transfer, model)
+    clear_sky_outgoing_longwave!(ij, vars, vars.scratch.grid.b, radiation.radiative_transfer, model)
+    return nothing
 end

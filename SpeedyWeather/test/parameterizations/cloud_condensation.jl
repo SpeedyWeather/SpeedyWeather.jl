@@ -342,6 +342,18 @@ end
     @test t[3] < t_clear[3]
     @test t[3] ≈ t_clear[3] * (1 - 0.5) rtol = 1.0e-3          # optically thick: emissivity ≈ 1
     @test t[[1, 2, 4, 6, 7, 8]] == t_clear[[1, 2, 4, 6, 7, 8]]
+
+    # clear-sky outgoing longwave: equal to the all-sky one without clouds, larger with clouds
+    for k in 1:spectral_grid.nlayers
+        vars.grid.temperature[ij, k, :] .= 220 + 10 * (k - 1)
+    end
+    vars.prognostic.ocean.sea_surface_temperature .= 295
+    vars.prognostic.land.soil_temperature .= 290
+    SpeedyWeather.parameterization!(ij, vars, model.radiation.longwave, model)
+    @test P.outgoing_longwave[ij] < P.outgoing_longwave_clear_sky[ij]
+    P.cloud_fraction[ij, :] .= 0
+    SpeedyWeather.parameterization!(ij, vars, model.radiation.longwave, model)
+    @test P.outgoing_longwave[ij] ≈ P.outgoing_longwave_clear_sky[ij] rtol = 1.0e-6
 end
 
 @testset "Sundqvist closure" begin
@@ -534,9 +546,11 @@ end
 
     # clouds reflect: more outgoing, less at the surface than clear sky
     clear = shortwave_column!(; cloud_fraction = zeros(nlayers), liquid = zeros(nlayers))
+    @test P.outgoing_shortwave_clear_sky[ij] ≈ clear.outgoing rtol = 1.0e-10     # clear-sky diagnostic
     cloudy_fluxes = shortwave_column!(; cloudy...)
     @test cloudy_fluxes.outgoing > clear.outgoing
     @test cloudy_fluxes.surface_down < clear.surface_down
+    @test P.outgoing_shortwave_clear_sky[ij] ≈ clear.outgoing rtol = 1.0e-10     # unchanged by clouds
 
     # an overcast, optically thick layer reflects most of the sunlight
     overcast = shortwave_column!(; cloud_fraction = [0, 0, 0, 0, 1, 0, 0, 0], liquid = [0, 0, 0, 0, 2.0e-3, 0, 0, 0])
