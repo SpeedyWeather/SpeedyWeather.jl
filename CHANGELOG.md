@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Benchmark regression check: debug mode of the benchmark suite, `regression.jl` comparing a revision with main, the latest release and the latest benchmarked revision (bisecting a regression), run weekly and on PRs labelled `benchmark-performance`, plus a Claude skill [#1299](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1299)
+
 ## 0.23.0
 
 - Adjust the Terrarium coupling to Terrarium 0.1.8 [#1300](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1300)
