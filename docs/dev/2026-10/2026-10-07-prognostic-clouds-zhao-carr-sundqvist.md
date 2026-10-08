@@ -1,8 +1,9 @@
 # Prognostic clouds for SpeedyWeather: Sundqvist, Zhao–Carr, and how ICON does it
 
-> Status: **in progress**. Stages 1, 2 and 3 with per-layer shortwave clouds are implemented and
-> tested on CPU and GPU (see Summary of changes); all-sky ecCKD, the radiation call frequency and
-> the tuning with SpeedyCalibration.jl are open.
+> Status: **in progress**. Stages 1, 2 and 3 with per-layer shortwave clouds and clear-sky fluxes
+> are implemented and tested on CPU, GPU and with Enzyme (Julia 1.10.12); SpeedyCalibration.jl is
+> adapted and a smoke calibration runs. Open: the loss targets of the cloud tuning, the tuning
+> itself, all-sky ecCKD and the radiation call frequency.
 
 Date of initial draft: 2026-10-07
 
@@ -18,6 +19,50 @@ Base revision: `3c033168` (`mg/clouds`). The initial draft was checked against `
 > scheme and the recommendations
 
 ## Revision log
+
+- 2026-10-08 (evening), the differentiability tests pass on Julia 1.10.12 (cloud column 8/8,
+  radiation column 6/6, all parameterizations of a step with the model `Duplicated` 10/10).
+  > what was the Enzyme 1.10 failure?
+
+  > maybe this is due to julia 1.10.10 used, and not julia 1.10.11 or 1.10.12 as in the CI
+
+  - The Enzyme precompile failure is specific to the `julia/1.10.10` module (confirmed: 1.10.12
+    loads the identical manifest).
+  - The radiation column test failed identically on 1.10.12 and 1.11.7, which pointed to the test,
+    not Enzyme: its loss was a closure inside the `@testset` that assigned `P`, a name the testset
+    also assigns, so `P` was a boxed capture of the constant closure and Enzyme read the outgoing
+    fluxes without gradient (the reverse-mode gradient was the heating term only). A diagnosis with
+    the loss at top level gave reverse = forward = finite differences for every term (outgoing
+    shortwave, outgoing longwave, heating) of both streams. The loss is now a top-level function;
+    the test also compiles in 2 instead of 32 minutes.
+  - The test's shortwave moves off the kink of `min(absorptivity_cloud_base * q,
+    absorptivity_cloud_limit)` at `0 = 0` (both zero in `OneBandCloudyShortwave`), where finite
+    differences are meaningless; the physics is unchanged (`absorptivity_cloud_limit = 1`). Those
+    two parameters are not tuned with the cloudy shortwave.
+  - The model-level test perturbs parameters for finite differences with `reconstruct` instead of
+    constructing new components (a new `CloudyShortwaveRadiativeTransfer` carries a different
+    `ozone_distribution` closure type and cannot be assigned to the model).
+  - SpeedyCalibration.jl: its tests pass on Julia 1.10.12 with `--clouds` (65/65, including the
+    Enzyme gradient of the cloud loss through all parameterizations against finite differences).
+    On Julia 1.11.7 the same gradient segfaults in LLVM (GVN pass) while Enzyme compiles the
+    Float32 model, so calibration runs on 1.10.12.
+  - Smoke calibration with `calibrate!` (Sundqvist closure, detrainment 0.2, cloudy one-band
+    radiation, T15 L8, 20 days spin-up, 10 batches of 1 day with 5 gradient samples, Adam 1e-2,
+    `gradient_scope = :parameterizations`, `CLOUD_LOSS`): runs end to end in 9 minutes. All four
+    parameters move the way that increases cloud reflection: `critical_relative_humidity_surface`
+    0.900 → 0.894, `cloud_fraction_coefficient` 2000 → 2112, `autoconversion_rate` 1.0e-4 → 9.2e-5,
+    `asymmetry_factor` 0.850 → 0.846. Global means at batch 10: cloud cover 0.41, SW CRE −23,
+    LW CRE +24, OSR 45, OLR 232 W/m².
+  - *Loss targets are inconsistent with the one-band clear sky.* The clear-sky outgoing shortwave is
+    OSR + SW CRE ≈ 23 W/m² against about 53 W/m² observed (CERES-EBAF): the one-band shortwave
+    reflects only at the surface in clear sky, without Rayleigh scattering. `CLOUD_LOSS` targets
+    both SW CRE −47 and all-sky OSR 101.9 W/m², which then cannot be met together, and the OSR
+    term dominates the loss (about 1600 of 2380), so tuning would make clouds too reflective to
+    make up for the missing clear-sky reflection. Either drop all-sky OSR from the cloud loss (tune
+    clouds against the cloud radiative effects and cloud cover only) or first add the missing
+    clear-sky reflection (a Rayleigh term) and target the clear-sky OSR separately.
+  - *Next steps:* decide the loss targets above, then a long tuning run (spin-up of months,
+    hundreds of batches) at T31; check the result in climate validation runs. Commit the work.
 
 - 2026-10-08 (afternoon), differentiability, clear-sky fluxes, SpeedyCalibration.jl.
   > continue
@@ -1061,7 +1106,12 @@ critical humidity, the reference bookkeeping, the closure formula against a pres
 budgets), the two-stream cloud layer, the per-layer shortwave (energy conservation, reduction to
 the one-band transfer in clear sky) and the convective detrainment (water budget per column). The
 GPU tests are in `test/GPU/primitive_wet.jl`, one with the relaxation closure and one with the
-Sundqvist closure, per-layer shortwave and detrainment.
+Sundqvist closure, per-layer shortwave and detrainment. The differentiability tests are in
+`test/differentiability/clouds.jl` (Enzyme reverse mode against central finite differences, see the
+revision log of 2026-10-08) and pass on Julia 1.10.12: all parameters of the cloud scheme on a
+column with both closures, all parameters of the cloudy shortwave and longwave on a column, the
+cloud state handed to radiation, and cloud and radiation parameters through all parameterizations
+of a step with the model `Duplicated`.
 
 - **Unit tests on prescribed columns:**
   - a supersaturated layer produces `q_c`;
@@ -1128,8 +1178,9 @@ components may declare fused members in `docs/src/variable_system.md`. Update
 - Prognostic cloud fraction, only if Stage 2 shows systematic cover errors that RH and condensate
   cannot fix.
 - Tuning with SpeedyCalibration.jl, see 7.8.
-- Clear-sky fluxes of the one-band schemes (a second pass without clouds) for cloud radiative
-  effects as tuning targets and output.
+- Rayleigh scattering in the one-band shortwave, so that the clear-sky outgoing shortwave (about
+  23 W/m², observed about 53 W/m²) and the cloud radiative effect can be tuned against
+  observations at the same time (revision log of 2026-10-08, evening).
 
 ## Appendix: water loss in `ImplicitCondensation`
 

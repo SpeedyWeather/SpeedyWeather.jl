@@ -77,6 +77,24 @@ function cloud_column_loss(scheme, vars, model, ij, references)
     return loss + 1.0e5 * (P.rain_rate_large_scale[ij] + P.snow_rate_large_scale[ij])
 end
 
+# Outgoing radiation and the heating profile of column `ij` after one radiation stream. Defined at
+# top level: as a closure inside the testset, assigning `P` would rebind the testset's `P` (a boxed
+# capture), and Enzyme would read the outgoing fluxes through the constant closure, without gradient
+function radiation_loss(scheme, vars, model, ij)
+    dTdt = vars.tendencies.grid.temperature
+    nlayers = size(dTdt, 2)
+    for k in 1:nlayers
+        dTdt[ij, k, 1] = 0
+    end
+    parameterization!(ij, vars, scheme, model)
+    P = vars.parameterizations
+    heating = zero(eltype(P.outgoing_shortwave))
+    for k in 1:nlayers
+        heating += k * dTdt[ij, k, 1]
+    end
+    return P.outgoing_shortwave[ij] + P.outgoing_longwave[ij] + 1.0e5 * heating
+end
+
 @testset "Differentiability: prognostic cloud column (parameter AD)" begin
     spectral_grid = SpectralGrid(truncation = 15, nlayers = 8, NF = Float64)
     @testset for closure in (RelaxationClosure(spectral_grid), SundqvistClosure(spectral_grid))
@@ -137,20 +155,6 @@ end
         vars.grid.humidity[ij, k, :] .= 1.0e-3 * k
     end
 
-    function radiation_loss(scheme, vars, model, ij)
-        nlayers = size(vars.tendencies.grid.temperature, 2)
-        for k in 1:nlayers
-            vars.tendencies.grid.temperature[ij, k, 1] = 0
-        end
-        parameterization!(ij, vars, scheme, model)
-        P = vars.parameterizations
-        heating = zero(eltype(P.outgoing_shortwave))
-        for k in 1:nlayers
-            heating += k * vars.tendencies.grid.temperature[ij, k, 1]
-        end
-        return P.outgoing_shortwave[ij] + P.outgoing_longwave[ij] + 1.0e5 * heating
-    end
-
     @testset for stream in (:shortwave, :longwave)
         scheme = getproperty(model.radiation, stream)
         p = vec(parameters(scheme))
@@ -163,19 +167,17 @@ end
     end
 
     # with respect to the cloud state, as the cloud scheme hands it to radiation
-    scheme = model.radiation.shortwave
-    p = vec(parameters(scheme))
     dvars = make_zero(vars)
     autodiff(
-        set_runtime_activity(Reverse), Const((vars) -> radiation_loss(scheme, vars, model, ij)), Active,
+        set_runtime_activity(Reverse), Const((vars) -> radiation_loss(model.radiation.shortwave, vars, model, ij)), Active,
         Duplicated(vars, dvars),
     )
     for k in (3, 6)
         h = 1.0e-9
         P.cloud_liquid_water[ij, k] += h
-        loss₊ = radiation_loss(scheme, vars, model, ij)
+        loss₊ = radiation_loss(model.radiation.shortwave, vars, model, ij)
         P.cloud_liquid_water[ij, k] -= 2h
-        loss₋ = radiation_loss(scheme, vars, model, ij)
+        loss₋ = radiation_loss(model.radiation.shortwave, vars, model, ij)
         P.cloud_liquid_water[ij, k] += h
         @test dvars.parameterizations.cloud_liquid_water[ij, k] ≈ (loss₊ - loss₋) / 2h rtol = 1.0e-4
     end
