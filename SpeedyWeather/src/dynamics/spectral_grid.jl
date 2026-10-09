@@ -330,18 +330,26 @@ function (::Type{S})(
     (; NF, spectrum, grid, nlayers) = spectral_grid
     (; lmax, mmax, architecture) = spectrum
     spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
-    # Scratch sized to the largest K the dycore can emit (PrimitiveWet's mega-batch) so any
-    # call ≤ this K works through `_fourier_serial!` even if K isn't pre-planned. `transform_batch`
-    # is independent — it just lists which Ks get a batched FFT plan.
-    scratch_nlayers = max(maximum(transform_batch), 4 * nlayers + 1)
+    # `nlayers` of the transform is the widest batch K a call may have: sized to the widest batch any
+    # model emits (`max_transform_batch`) or the largest pre-planned FFT batch, whichever is larger.
+    # For the FFT transform this is the scratch width on GPU (nothing is chunked there) and the
+    # `ismatching` limit on CPU (scratch is the largest planned K, wider calls are chunked); for the
+    # matrix transform it is the scratch width on all architectures (no chunking, one matrix multiply).
+    # `transform_batch` is independent — it just lists which Ks get a batched FFT plan.
+    scratch_nlayers = max(maximum(transform_batch), max_transform_batch(nlayers))
     return S(spectrum, grid; NF, nlayers = scratch_nlayers, transform_batch, kwargs...)
 end
+
+"""$(TYPEDSIGNATURES)
+Largest batch dimension `K` (number of columns) any model emits in a single transform call: the
+`PrimitiveWetModel`'s grid → spectral tendency batch of 9 layer-variables plus surface pressure."""
+max_transform_batch(nlayers::Integer) = 9 * nlayers + 1
 
 """$(TYPEDSIGNATURES)
 Chooses the transform based on resolution and architecture. For low-resolution
 GPU a MatrixSpectralTransform is returned, otherwise the SpectralTransform."""
 function WhichTransform(spectral_grid::SpectralGrid; kwargs...)
-    if (spectral_grid.truncation <= 64 && spectral_grid.architecture isa GPU) || spectral_grid.architecture isa ReactantDevice
+    if (spectral_grid.truncation <= 100 && spectral_grid.architecture isa GPU) || spectral_grid.architecture isa ReactantDevice
         return MatrixSpectralTransform(spectral_grid; kwargs...)
     else
         return SpectralTransform(spectral_grid; kwargs...)
@@ -364,7 +372,7 @@ slow transform performance during model runs.
 default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_transform_batch(typeof(arch), nlayers)
 default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]
 default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) =
-    Int[1, 2, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, 9 * nlayers + 1]
+    Int[1, 2, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, max_transform_batch(nlayers)]
 
 function variables(::SpeedyTransforms.AbstractSpectralTransform)
     return (

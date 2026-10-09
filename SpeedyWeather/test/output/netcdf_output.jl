@@ -166,6 +166,14 @@ end
     # should be within ~800 to ~1200hPa
     @test all(0.8 .< mslp ./ p₀ .< 1.2)
 
+    # cloud top height in [m] (not layer index), 0 for no cloud, below top-layer geopotential height
+    @test ds["cloud_top"].attrib["units"] == "m"
+    cloud_top = ds["cloud_top"].var[:, :, end]
+    @test all(0 .<= cloud_top .< 30_000)
+    @test maximum(cloud_top) > 1000
+    cloud_cover = ds["cloud_cover"].var[:, :, end]
+    @test all(0 .<= cloud_cover .<= 1)
+
     ## test u10, v10 existence
     @test haskey(ds, "u")
     @test haskey(ds, "u10")
@@ -346,4 +354,18 @@ end
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
     nt = size(ds["vor"])[end]
     @test nt == Int(Millisecond(period).value ÷ Millisecond(model.output.interval).value) + 1
+end
+
+@testset "Output interpolator has pole-average buffers for all output layers" begin
+    # so that the batched interpolation of every output field writes into the locator's buffers
+    pole_buffer_length(output) = length(output.interpolator.locator.north_pole_average)
+    spectral_grid = SpectralGrid(nlayers = 8)
+
+    @test pole_buffer_length(NetCDFOutput(spectral_grid, PrimitiveWet)) == 8
+    @test pole_buffer_length(NetCDFOutput(spectral_grid, PrimitiveWet, nlayers_soil = 12)) == 12
+
+    # pressure-level output interpolates fields with the number of pressure levels
+    p = [850, 500, 200] .* 100.0
+    output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = SpeedyWeather.PressureLayers(spectral_grid, p))
+    @test pole_buffer_length(output) == max(length(p), SpeedyWeather.DEFAULT_NLAYERS_SOIL)
 end

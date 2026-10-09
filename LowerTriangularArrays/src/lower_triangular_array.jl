@@ -914,10 +914,11 @@ Architectures.architecture(L::LowerTriangularArray) = architecture(L.spectrum)
 Architectures.on_architecture(L1::LowerTriangularArray, L2) = on_architecture(L1.spectrum, L2)
 function Architectures.on_architecture(arch::AbstractArchitecture, L::LowerTriangularArray)
     adapted_data = on_architecture(arch, L.data)
+    # keep the dimensions (e.g. LMT) of L, otherwise the default (LM) would be used
     if ismatching(L.spectrum, typeof(adapted_data)) # if matching, use the same spectrum
-        return LowerTriangularArray(adapted_data, on_architecture(arch, L.spectrum))
+        return LowerTriangularArray(adapted_data, on_architecture(arch, L.spectrum), L.dims)
     else # if not matching, create new spectrum with other architecture
         #@warn "Adapting LowerTriangularArray to new architecture with $(typeof(adapted_data))"
-        return LowerTriangularArray(adapted_data, Spectrum(L.spectrum, architecture = architecture(typeof(adapted_data))))
+        return LowerTriangularArray(adapted_data, Spectrum(L.spectrum, architecture = architecture(typeof(adapted_data))), L.dims)
     end
 end
