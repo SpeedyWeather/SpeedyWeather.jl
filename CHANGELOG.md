@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix the centered vertical advection dropping the vertical advection of the reference temperature profile, which delayed the Jablonowski-Williamson baroclinic wave by about a day [#1286](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1286)
+
 ## 0.23.0
 
 - Adjust the Terrarium coupling to Terrarium 0.1.8 [#1300](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1300)
