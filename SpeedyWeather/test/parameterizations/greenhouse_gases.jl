@@ -33,15 +33,15 @@ end
 
 @testset "Greenhouse gases: CO2 scenarios" begin
     t_before = DateTime(1999)
-    t_after  = DateTime(2001)
+    t_after = DateTime(2001)
 
     @test TwoTimesCO2()(t_before) == SpeedyWeather.DEFAULT_CO2
-    @test TwoTimesCO2()(t_after)  == 2 * SpeedyWeather.DEFAULT_CO2
+    @test TwoTimesCO2()(t_after) == 2 * SpeedyWeather.DEFAULT_CO2
 
     @test FourTimesCO2()(t_before) == SpeedyWeather.DEFAULT_CO2
-    @test FourTimesCO2()(t_after)  == 4 * SpeedyWeather.DEFAULT_CO2
+    @test FourTimesCO2()(t_after) == 4 * SpeedyWeather.DEFAULT_CO2
 
     # constant CO2
     @test CO2(420)(t_before) == 420
-    @test CO2(420)(t_after)  == 420
+    @test CO2(420)(t_after) == 420
 end

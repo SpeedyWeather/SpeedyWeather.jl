@@ -84,7 +84,8 @@ function geopotential!(
 
     arch = architecture(T)
     if typeof(arch) <: GPU
-        launch!(arch, LinearWorkOrder, (size(T, 1),), geopotential_grid_kernel!,
+        launch!(
+            arch, LinearWorkOrder, (size(T, 1),), geopotential_grid_kernel!,
             Φ, T, q, orography, pₛ, g, G, atmosphere, vertical_coordinates,
         )
     else
@@ -148,7 +149,7 @@ end
         p_full_below = pₖ
         p_half_below = pressure_below(k, pₛ, vertical_coordinates)
         geopotential_half_below = geopotential[ij, k + 1] + R * Tᵥ_below * log(p_full_below / p_half_below)
-        
+
         pₖ = pressure(k, pₛ, vertical_coordinates)
         Tᵥ = virtual_temperature(temp[ij, k], humid[ij, k], atmosphere)
         geopotential[ij, k] = geopotential_half_below + R * Tᵥ * log(p_half_below / pₖ)

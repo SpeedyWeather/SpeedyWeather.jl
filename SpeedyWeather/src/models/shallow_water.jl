@@ -49,7 +49,7 @@ Fields, representing model components, are $(TYPEDFIELDS)"""
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
-    spectral_transform::ST = SpectralTransform(spectral_grid)
+    spectral_transform::ST = WhichTransform(spectral_grid)
     implicit::IM = ImplicitShallowWater(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 

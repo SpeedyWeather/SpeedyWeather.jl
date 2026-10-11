@@ -117,8 +117,8 @@ end
 materialize_views(x) = x
 materialize_views(nt::NamedTuple) = NamedTuple{keys(nt)}(map(materialize_views, values(nt)))
 materialize_views(vars::Variables) = isempty(vars.fused) ? vars : Variables(;
-    (k => materialize_views(getfield(vars, k)) for k in fieldnames(Variables))...
-)
+        (k => materialize_views(getfield(vars, k)) for k in fieldnames(Variables))...
+    )
 materialize_views(f::Field) = f.data isa SubArray ? Field(Array(f.data), f.grid) : f
 function materialize_views(L::LowerTriangularArray)
     return L.data isa SubArray ? LowerTriangularArray(Array(L.data), L.spectrum) : L

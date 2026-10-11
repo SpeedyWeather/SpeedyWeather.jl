@@ -103,7 +103,7 @@ ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.GridVariable2D}(zeros(SG.GridVa
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
 @propagate_inbounds albedo!(ij, albedo, vars, scheme::ManualAlbedo, model) = (albedo[ij] = scheme.albedo[ij])
 
-export PrescribedAlbedo 
+export PrescribedAlbedo
 
 """Prescribed albedo field, to be used with `set!`. In contrast to `ManualAlbedo` the albedo is not 
 hold in the struct and not copied into the diagnostic variables automatically. It's expected that the
@@ -167,6 +167,7 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
         version = albedo.version
     )
 
+    a = on_architecture(model.architecture, a)
     return interpolate!(albedo.albedo, a)
 end
 
@@ -264,7 +265,7 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
 
     # 2. Add snow cover
     if haskey(vars.prognostic, :land) && haskey(vars.prognostic.land, :snow_depth)
-        (; snow_depth) = vars.prognostic.land
+        snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), DummyParameterization())
         (; albedo_snow, snow_depth_scale) = scheme
 
         # how to compute snow cover from snow depth

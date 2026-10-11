@@ -74,6 +74,10 @@ function initialize!(
     # RESET COUNTERS
     core.output_counter = 1             # start at 1 for writing the initial conditions
 
+    # VERTICAL OUTPUT LAYERS, PressureLayers allocate at construction, but take κ for
+    # any dry-adiabatic extrapolation from the model's atmosphere
+    sync_extrapolations!(output, model)
+
     # CALLBACKS
     output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
     output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
@@ -89,7 +93,7 @@ function do_output!(core::OutputWriterCore, clock::Clock, output::AbstractOutput
     do_output =                         # boolean whether to output this time step
         output.active &&                # output must be active
         clock.time_step_counter > 0 &&  # don't store initial conditions again and skip spin up steps
-                                        # by using `time_step_counter` not `step_counter` (which counts those too)
+        # by using `time_step_counter` not `step_counter` (which counts those too)
         clock.time_step_counter % core.output_every_n_steps == 0    # and multiple of output interval
     core.output_counter += do_output    # increment output counter if output is written
     return do_output

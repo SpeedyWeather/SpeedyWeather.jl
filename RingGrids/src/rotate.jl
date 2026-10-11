@@ -43,7 +43,7 @@ end
 
 # in-place reverse of field[a:b, k], used for the in-place circular shift below
 @inline function reverse_ring!(field, k, a::Integer, b::Integer)
-    @inbounds while a < b
+    return @inbounds while a < b
         field[a, k], field[b, k] = field[b, k], field[a, k]
         a += 1
         b -= 1

@@ -136,15 +136,15 @@ function initialize!(geometry::Geometry, model::AbstractModel)
         p_ref_atmos = model.atmosphere.reference_pressure
 
         p_ref_coord != p_ref_atmos &&
-            @warn "Reference pressure of vertical coordinates and atmosphere differ. "*
-                "$p_ref_coord Pa vs $p_ref_atmos Pa"
+            @warn "Reference pressure of vertical coordinates and atmosphere differ. " *
+            "$p_ref_coord Pa vs $p_ref_atmos Pa"
     end
 
     return geometry
 end
 
-@inline pressure(k::Integer, surface_pressure::Number, geometry::Geometry) = 
+@inline pressure(k::Integer, surface_pressure::Number, geometry::Geometry) =
     pressure(k, surface_pressure, geometry.vertical_coordinate)
 
-@inline pressure_thickness(k::Integer, surface_pressure::Number, geometry::Geometry) = 
+@inline pressure_thickness(k::Integer, surface_pressure::Number, geometry::Geometry) =
     pressure_thickness(k, surface_pressure, geometry.vertical_coordinate)

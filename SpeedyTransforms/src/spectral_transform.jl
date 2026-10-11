@@ -58,7 +58,8 @@ struct SpectralTransform{
     # types and cannot share one container). FFTW/cuFFT plans bake K into the plan at construction.
     # The serial plans are the per-layer fallback (used by `_fourier_serial!`), always present. Hot K
     # values (batched dycore transforms, prognostic spec→grid, U/V) are pre-planned in the batched
-    # Dicts, keyed by K; everything else falls back to the serial plans in a loop.
+    # Dicts, keyed by K; everything else falls back to the serial plans in a loop (CPU) or is planned
+    # on first use and cached in these Dicts (GPU, see `ensure_batched_plans!`).
     rfft_plan_serial::RFFTSerialType     # grid → spectral (forward), K=1 per-ring 1-D plans
     brfft_plan_serial::BRFFTSerialType   # spectral → grid (inverse), K=1 per-ring 1-D plans
     rfft_plans_batched::RFFTBatchedType  # grid → spectral (forward), K>1 per-ring 2-D plans, keyed by K
@@ -96,17 +97,32 @@ struct SpectralTransform{
 
     gradients::GradientType                     # precomputed gradient and integration matrices
 
-    # CUDA GRAPHS
-    # toggle for the CUDA-Graphs accelerated batched Fourier transform
-    # Set to `false` to fall back to the generic (allocating) per-ring GPU
-    # Meaningless for non-CUDA architectures.
-    cuda_graphs::Bool
+    # GPU GRAPHS (CUDA graphs and HIP graphs; see SpeedyTransformsCUDAExt.jl /
+    # SpeedyTransformsAMDGPUExt.jl) toggle for the GPU-graphs accelerated batched Fourier
+    # transform. Set to `false` to fall back to the generic (allocating) per-ring GPU path.
+    # Only effective when the CUDA or AMDGPU extension is loaded; ignored on CPU. On AMDGPU
+    # this falls back to the generic path, with a one-time warning, if the installed AMDGPU.jl
+    # is too old to expose the high-level HIP graph API. Defaults to `default_gpu_graphs`
+    # (backend-dependent, see below) rather than a flat `true`/`false`.
+    gpu_graphs::Bool
+
 end
 
 # eltype of a transform is the number format used within
 Base.eltype(S::AbstractSpectralTransform{NF}) where {NF} = NF
 Architectures.array_type(S::AbstractSpectralTransform{NF, AR}) where {NF, AR} = array_type(AR)
 Architectures.nonparametric_type(::Type{<:SpectralTransform}) = SpectralTransform
+
+"""$(TYPEDSIGNATURES)
+Default value for the `gpu_graphs` keyword of [`SpectralTransform`](@ref), dispatching on the
+device wrapped by `architecture`. The fallback (`true`) covers CUDA and any other backend
+without a more specific method; extensions add their own method to opt a backend out of the
+default (e.g. `SpeedyTransformsAMDGPUExt.jl` for AMDGPU, since HIP-graphs stability is only
+confirmed so far on datacenter/CDNA hardware, not the consumer RDNA cards CI currently runs on).
+Explicitly passing `gpu_graphs = true/false` to `SpectralTransform` always overrides this."""
+default_gpu_graphs(architecture::AbstractArchitecture) = default_gpu_graphs(device(architecture))
+default_gpu_graphs(::KernelAbstractions.CPU) = false   # no graphs on CPU, be explicit
+default_gpu_graphs(backend) = true                     # fallback, e.g. CUDA
 
 """
 $(TYPEDSIGNATURES)
@@ -121,7 +137,7 @@ function SpectralTransform(
         nlayers::Integer = DEFAULT_NLAYERS,                                             # scratch size — max layer count any single transform call may carry
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
-        cuda_graphs::Bool = true,                                            # use CUDA-Graphs accelerated Fourier path (CUDA only)
+        gpu_graphs::Bool = default_gpu_graphs(spectrum.architecture),               # use GPU-graphs accelerated Fourier path (CUDA, AMDGPU); backend-dependent default
     )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
     # per-layer fallback used by `_fourier_serial!`).
@@ -296,7 +312,7 @@ function SpectralTransform(
         solid_angles,
         eigenvalues, eigenvalues⁻¹,
         gradients,
-        cuda_graphs,
+        gpu_graphs,
     )
 end
 
@@ -308,7 +324,7 @@ SpectralTransform(grid::AbstractGrid, spectrum::AbstractSpectrum; kwargs...) =
 function SpectralTransform(
         grid::AbstractGrid;
         truncation::Integer = 0,                    # spectral truncation (1-based)
-        dealiasing::Real = DEFAULT_DEALIASING,      # dealiasing factor
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(grid),      # dealiasing factor
         one_more_degree::Bool = false,              # returns a square LowerTriangularMatrix by default
         kwargs...
     )
@@ -323,7 +339,7 @@ function SpectralTransform(
         spectrum::AbstractSpectrum;                     # spectral coefficients
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,      # grid type, e.g. FullGaussianGrid
         nlat_half::Integer = 0,                         # resolution parameter nlat_half
-        dealiasing::Real = DEFAULT_DEALIASING,          # dealiasing factor
+        dealiasing::Real = SpeedyTransforms.default_dealiasing(Grid),          # dealiasing factor
         kwargs...
     )
     # get nlat_half from dealiasing if not provided
@@ -423,16 +439,16 @@ end
 
 # Layer size of scratch memory (north/south columns in `ScratchMemory`).
 # On CPU we typically use `nlayers` only (largest allocated plan and physical layers of the model)
-# On GPU we batch transforms much more, and need to use a scratch memory in 
+# On GPU we batch transforms much more, and need to use a scratch memory in
 # accordance with the largest batch which is `nlayers` in this case and ISN'T equal to the physical layers of the model
 _scratch_nlayers(::AbstractCPU, ::Integer, planned_K::AbstractVector{<:Integer}) = maximum(planned_K)
 _scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:Integer}) = nlayers
 
-# Return true if a call with `K` layers should be split into chunks that are 
-# executed sequentially. 
-# Architecture-dispatched: 
+# Return true if a call with `K` layers should be split into chunks that are
+# executed sequentially.
+# Architecture-dispatched:
 # CPU chunks to avoid FFTW's alignment-mismatch on x86 (no problem on ARM)
-# GPU doesn't need any of that we have seperate plans for each K 
+# GPU doesn't need any of that we have seperate plans for each K
 @inline function _needs_chunking(K::Integer, S::SpectralTransform{NF, <:AbstractCPU}) where {NF}
     K > 1 || return false                            # K=1 always handled directly
     haskey(S.rfft_plans_batched, K) && return false  # K is directly planned, no chunking needed
@@ -445,7 +461,7 @@ end
 
 @inline _needs_chunking(::Integer, ::SpectralTransform) = false
 
-# Largest planned batch K ≤ K_total, excluding the K=1 fallback. Used to pick the chunk size. Typically this will just be the number of layers in the model. 
+# Largest planned batch K ≤ K_total, excluding the K=1 fallback. Used to pick the chunk size. Typically this will just be the number of layers in the model.
 @inline function _largest_planned_batch(K_total::Integer, S::SpectralTransform)
     best = 1
     for k in keys(S.rfft_plans_batched)
@@ -464,9 +480,9 @@ end
 # Why this matters on CPU: FFT plans bake their batch dim K into the plan, and on x86 the
 # scratch column-stride (= nfreq_max * sizeof(Complex{NF})) is generally not a multiple
 # of the SIMD width, so the K=1 plan can't be applied to columns other than column 1
-# without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
-# that path for the bulk of the layers and effectively restores the previous behavior before 
-# fusion/batching without performance penalties. 
+# without an alignment-mismatch error. Chunking with the sequential execution sidesteps
+# that path for the bulk of the layers and effectively restores the previous behavior before
+# fusion/batching without performance penalties.
 # Greedy chunk sizes: at each position take the largest planned batch that fits the remaining
 # layers (1 = the always-planned serial fallback when nothing larger fits)
 function _transform_chunked!(                       # SPECTRAL TO GRID
@@ -542,7 +558,8 @@ function _transform_grid!(
     # Checked **before** the boundscheck below so chunking can handle K > S.nlayers
     K = size(field, 2)
     if _needs_chunking(K, S)
-        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat); return field
+        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
+        return field
     end
     return _transform_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
 end
@@ -601,7 +618,8 @@ function _transform_spec!(
     # see comment there.
     K = size(field, 2)
     if _needs_chunking(K, S)
-        _transform_chunked!(coeffs, field, scratch_memory, S); return coeffs
+        _transform_chunked!(coeffs, field, scratch_memory, S)
+        return coeffs
     end
     return _transform_nonchunked!(coeffs, field, scratch_memory, S)
 end

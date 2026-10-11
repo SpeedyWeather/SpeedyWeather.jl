@@ -22,14 +22,14 @@ benchmarks[:benchmark200] = BenchmarkSuite(
 # SpectralTransform and additionally with MatrixSpectralTransform — except for
 # T255 which is too large for the dense matrix transform (memory + speed).
 let truncations = [32, 43, 64, 86, 128, 171, 256, 86, 128, 171, 256, 86, 128, 171, 256],
-    nlayers  = [ 8,  8,  8,  8,   8,   8,   8, 16, 16,  16,  16, 24, 24, 24, 24]
+        nlayers = [8, 8, 8, 8, 8, 8, 8, 16, 16, 16, 16, 24, 24, 24, 24]
 
     matrix_idx = findall(t -> t < 150, truncations) # no matrix transform for T > 150 (it's too large)
-    truncations_matrix  = truncations[matrix_idx]
+    truncations_matrix = truncations[matrix_idx]
     nlayers_matrix = nlayers[matrix_idx]
 
     n_default = length(truncations)
-    n_matrix  = length(truncations_matrix)
+    n_matrix = length(truncations_matrix)
     benchmarks[:benchmark201] = BenchmarkSuite(
         title = "Primitive wet model, resolution",
         nruns = n_default + n_matrix,

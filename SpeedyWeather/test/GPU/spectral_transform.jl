@@ -1,19 +1,68 @@
-@testset "GPU spectral transform roundtrip " begin
-    spectral_grid = SpectralGrid(truncation = 42, nlayers = 8, architecture = GPU())
-    S = SpectralTransform(spectral_grid)
+
+@testset "GPU MatrixSpectralTransform roundtrip " begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8, architecture = GPU())
+    M = MatrixSpectralTransform(spectral_grid)
 
     # first roundtrip
     L = randn(ComplexF32, spectral_grid.spectrum, 8)
     field = zeros(Float32, spectral_grid.grid, 8)
-    transform!(field, L, S)
-    transform!(L, field, S)
+    transform!(field, L, M)
+    transform!(L, field, M)
 
     # 2nd roundtrip
     L2 = deepcopy(L)
-    transform!(field, L, S)
-    transform!(L, field, S)
+    transform!(field, L, M)
+    transform!(L, field, M)
 
     @test L ≈ L2
+end
+
+@testset "GPU MatrixSpectralTransform: transform! on views into a larger backing array" begin
+    # `vars.grid.<var>`/`vars.prognostic.<var>` in a real model are commonly *views* into a larger
+    # shared/fused backing array, not top-level CuArrays. Regression test for a bug where
+    # `MatrixSpectralTransform.transform!`'s internal `reshape` wrapped such a view in a
+    # `Base.ReshapedArray` that caused an error
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8, architecture = GPU())
+    M = MatrixSpectralTransform(spectral_grid)
+    nlayers = spectral_grid.nlayers
+
+    # reference: plain top-level arrays, the path that always worked
+    coeffs_ref = randn(ComplexF32, spectral_grid.spectrum, nlayers)
+    field_ref = transform(coeffs_ref, M)
+
+    # the same coefficients, but embedded as a *view*
+    nbatch, batch_idx = 3, 2
+    layer_range = (nlayers + 1):(2nlayers)
+
+    coeffs_backing = zeros(ComplexF32, spectral_grid.spectrum, 2nlayers, nbatch)
+    coeffs_data = view(view(coeffs_backing.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(coeffs_data) !== coeffs_data      # guard: genuinely a nested view, not optimized away
+    coeffs_data .= coeffs_ref.data
+    coeffs_view = LowerTriangularArray(coeffs_data, spectral_grid.spectrum)
+
+    field_backing = zeros(Float32, spectral_grid.grid, 2nlayers, nbatch)
+    field_data = view(view(field_backing.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(field_data) !== field_data
+    field_view = Field(field_data, spectral_grid.grid)
+
+    # spectral -> grid, writing into a field view. Compare `.data` (transferred to CPU) rather
+    # than the `Field`/`LowerTriangularArray` wrappers directly: `isapprox` on those falls back to
+    # a generic, scalar-indexing `norm`, which errors on GPU regardless of correctness.
+    transform!(field_view, coeffs_view, M)
+    @test Array(field_view.data) ≈ Array(field_ref.data)
+    # the result actually landed in the shared backing buffer (a true view, not a detached copy)
+    @test Array(field_backing.data)[:, layer_range, batch_idx] ≈ Array(field_ref.data)
+
+    # grid -> spectral, writing into a coeffs view
+    coeffs_from_field_ref = transform(field_ref, M)
+    coeffs_backing2 = zeros(ComplexF32, spectral_grid.spectrum, 2nlayers, nbatch)
+    coeffs_data2 = view(view(coeffs_backing2.data, :, layer_range, :), :, :, batch_idx)
+    @test parent(coeffs_data2) !== coeffs_data2
+    coeffs_view2 = LowerTriangularArray(coeffs_data2, spectral_grid.spectrum)
+
+    transform!(coeffs_view2, field_ref, M)
+    @test Array(coeffs_view2.data) ≈ Array(coeffs_from_field_ref.data)
+    @test Array(coeffs_backing2.data)[:, layer_range, batch_idx] ≈ Array(coeffs_from_field_ref.data)
 end
 
 spectral_resolutions = (32,) #, 63, 127)
@@ -156,7 +205,7 @@ end
     cpu_arch = S_cpu.architecture
 
     # lm x nsteps, like a prognostic surface pressure with a leapfrog step dimension
-    pressure_cpu = rand(LowerTriangularArray{Complex{NF}}, spectral_grid_cpu.spectrum, 2)
+    pressure_cpu = rand(LowerTriangularArray{Complex{NF}}, spectral_grid_cpu.spectrum, SpeedyWeather.ArrayDimensions.LMT(), 2)
     pressure_gpu = on_architecture(S_gpu.architecture, pressure_cpu)
 
     lnpₛ_cpu = get_step(pressure_cpu, 1)
@@ -191,8 +240,8 @@ end
     NF = Float32
     @testset for Grid in (FullGaussianGrid, OctahedralGaussianGrid)
         @testset for nlayers in (1, 4)
-            spectral_grid_cpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid)
-            spectral_grid_gpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid, architecture = SpeedyWeather.GPU)
+            spectral_grid_cpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid)
+            spectral_grid_gpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid, architecture = SpeedyWeather.GPU)
             S_cpu = SpectralTransform(spectral_grid_cpu)
             S_gpu = SpectralTransform(spectral_grid_gpu)
             cpu_arch = S_cpu.architecture
@@ -204,8 +253,8 @@ end
             # INVERSE, spectral coefficients -> Fourier coefficients per ring
             g_north_cpu, g_south_cpu = zero(S_cpu.scratch_memory.north), zero(S_cpu.scratch_memory.south)
             g_north_gpu, g_south_gpu = S_gpu.scratch_memory.north, S_gpu.scratch_memory.south
-            fill!(g_north_gpu, NaN)
-            fill!(g_south_gpu, NaN)
+            fill!(g_north_gpu, Complex{NF}(NaN))   # NaN is Float64; Metal has no Float64 → cast to the array eltype
+            fill!(g_south_gpu, Complex{NF}(NaN))
             SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, specs_cpu, S_cpu.scratch_memory.column, S_cpu)
             SpeedyTransforms._legendre!(g_north_gpu, g_south_gpu, specs_gpu, S_gpu.scratch_memory.column, S_gpu)
             g_north_test = on_architecture(cpu_arch, g_north_gpu)
@@ -252,8 +301,8 @@ end
     # forward kernel therefore reads its rings from a table rather than assuming their extent.
     @testset "non-monotonic Legendre shortcut" begin
         NF, nlayers, LegendreShortcut = Float32, 2, SpeedyTransforms.LegendreShortcutLinCubCoslat
-        spectral_grid_cpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid = HEALPixGrid)
-        spectral_grid_gpu = SpectralGrid(; NF, trunc = 31, nlayers, Grid = HEALPixGrid, architecture = SpeedyWeather.GPU)
+        spectral_grid_cpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid = HEALPixGrid)
+        spectral_grid_gpu = SpectralGrid(; NF, truncation = 32, nlayers, Grid = HEALPixGrid, architecture = SpeedyWeather.GPU)
         S_cpu = SpectralTransform(spectral_grid_cpu; LegendreShortcut)
         S_gpu = SpectralTransform(spectral_grid_gpu; LegendreShortcut)
         cpu_arch = S_cpu.architecture
@@ -316,47 +365,60 @@ end
     end
 end
 
-@testset "fourier_batched: CUDA Graphs equivalence and replay" begin
-    # the CUDA-Graphs acceleration lives in SpeedyTransformsCUDAExt; only test it when
-    # the CUDA backend (and hence the extension) is actually loaded
-    ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
-    if ext !== nothing
-        @testset for Grid in grid_list
-            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
-            field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
-            coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
+function test_fourier_batched_gpu_graphs_equivalence(ext, prefix)
+    @testset "fourier_batched: $prefix Graphs equivalence and replay" begin
+        # the GPU-Graphs backend wiring (CuArray/ROCArray-dispatched methods) lives in the
+        # backend extension; only test it when that backend (and hence the extension) is
+        # actually loaded, and when this backend's graphs-accelerated path is trusted enough to
+        # test (`default_gpu_graphs` — the same
+        # switch that governs the runtime default). To enable on AMDGPU (e.g. once run on trusted
+        # hardware like LUMI), edit `SpeedyTransforms/ext/SpeedyTransformsAMDGPUExt.jl` and change
+        # `default_gpu_graphs(::AMDGPU.ROCBackend) = false` to `= true`.
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(GPU())
+            @testset for Grid in grid_list
+                spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
+                field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
+                coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
 
-            # reference: generic (allocating) GPU path, graphs disabled on this transform
-            ext.clear_fourier_graph_cache!()
-            S_off = SpectralTransform(spectral_grid; cuda_graphs = false)
-            spec_off = transform(field, S_off)      # grid -> spectral
-            grid_off = transform(coeffs, S_off)      # spectral -> grid
+                # reference: generic (allocating) GPU path, graphs disabled on this transform
+                SpeedyTransforms.clear_fourier_graph_cache!()
+                S_off = SpectralTransform(spectral_grid; gpu_graphs = false)
+                spec_off = transform(field, S_off)      # grid -> spectral
+                grid_off = transform(coeffs, S_off)      # spectral -> grid
 
-            # CUDA-Graphs path (default, cuda_graphs = true)
-            ext.clear_fourier_graph_cache!()
-            S_on = SpectralTransform(spectral_grid)
-            spec_on = transform(field, S_on)
-            grid_on = transform(coeffs, S_on)
+                # GPU-graphs path (explicitly enabled: default `gpu_graphs` is backend-dependent,
+                # e.g. `false` on AMDGPU — see `default_gpu_graphs` — so don't rely on it here)
+                SpeedyTransforms.clear_fourier_graph_cache!()
+                S_on = SpectralTransform(spectral_grid; gpu_graphs = true)
+                spec_on = transform(field, S_on)
+                grid_on = transform(coeffs, S_on)
 
-            # graphs path must match the generic path (forward differs only at the level
-            # of the non-deterministic atomic Legendre transform, hence the tolerance)
-            @test Array(spec_on.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
-            @test Array(grid_on.data) ≈ Array(grid_off.data) rtol = sqrt(eps(Float32))
+                # graphs path must match the generic path (forward differs only at the level
+                # of the non-deterministic atomic Legendre transform, hence the tolerance)
+                @test Array(spec_on.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
+                @test Array(grid_on.data) ≈ Array(grid_off.data) rtol = sqrt(eps(Float32))
 
-            # a graph was actually captured and cached
-            @test !isempty(ext.GRAPH_CACHES)
+                # a graph was actually captured and cached
+                @test !isempty(SpeedyTransforms.GRAPH_CACHES)
 
-            # replaying into the same buffers across repeated calls stays correct
-            spec_repeat = similar(spec_on)
-            for _ in 1:3
-                transform!(spec_repeat, field, S_on)
+                # replaying into the same buffers across repeated calls stays correct
+                spec_repeat = similar(spec_on)
+                for _ in 1:3
+                    transform!(spec_repeat, field, S_on)
+                end
+                @test Array(spec_repeat.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
+
+                SpeedyTransforms.clear_fourier_graph_cache!()
             end
-            @test Array(spec_repeat.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
-
-            ext.clear_fourier_graph_cache!()
         end
     end
+    return ext !== nothing
 end
+
+CUDA_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt), "CUDA")
+AMD_executed = test_fourier_batched_gpu_graphs_equivalence(Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsAMDGPUExt), "HIP")
+Metal_executed = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsMetalExt) !== nothing
+@test count((CUDA_executed, AMD_executed, Metal_executed)) == 1 # exactly one GPU backend extension per machine
 
 @testset "fourier_batched: compare backward pass to CPU" begin
     @testset for truncation in spectral_resolutions
@@ -574,4 +636,58 @@ end
             end
         end
     end
+end
+
+@testset "Lazy batched FFT planning on GPU" begin
+    # FFT plans bake the batch dim K into the plan, but which K a model emits follows from the
+    # model type, not from `nlayers` alone, so `transform_batch` cannot generally list them all
+    # at `SpectralGrid` construction. On GPU a missing K (K=1 included, where the serial path is
+    # neither batched nor GPU-graph captured) is therefore planned on first use. Verify that the
+    # plan appears and that the result is identical to the serial path it replaces.
+    architecture = GPU()
+    NF = Float32
+
+    @testset for K in (1, 3)
+        spectral_grid = SpectralGrid(; truncation = 21, nlayers = max(K, 2), architecture)
+        S = SpectralTransform(spectral_grid; transform_batch = Int[1, 2])
+        @test !haskey(S.rfft_plans_batched, K)          # not pre-planned
+
+        coeffs = rand(Complex{NF}, spectral_grid.spectrum, K)
+        field_serial = zeros(NF, spectral_grid.grid, K)
+        coeffs_serial = zeros(Complex{NF}, spectral_grid.spectrum, K)
+
+        # reference: the serial (per-ring, per-layer) path, called explicitly
+        SpeedyTransforms._legendre!(
+            S.scratch_memory.north, S.scratch_memory.south, coeffs, S.scratch_memory.column, S;
+            unscale_coslat = false,
+        )
+        SpeedyTransforms._fourier_serial!(field_serial, S.scratch_memory.north, S.scratch_memory.south, S)
+        SpeedyTransforms._fourier_serial!(S.scratch_memory.north, S.scratch_memory.south, field_serial, S)
+        SpeedyTransforms._legendre!(coeffs_serial, S.scratch_memory.north, S.scratch_memory.south, S.scratch_memory.column, S)
+
+        # `transform!` now plans K on the fly and takes the batched path
+        field = zeros(NF, spectral_grid.grid, K)
+        coeffs_back = zeros(Complex{NF}, spectral_grid.spectrum, K)
+        transform!(field, coeffs, S)
+        transform!(coeffs_back, field, S)
+
+        @test haskey(S.rfft_plans_batched, K)           # planned on first use
+        @test haskey(S.brfft_plans_batched, K)
+        # batched path vs the serial path it replaces. `Array(...)` moves to the host: comparing
+        # the GPU wrappers directly falls back to scalar indexing, which errors. `≈` rather than
+        # `==` as the batched and serial K=1 plans need not agree to the last bit.
+        @test Array(field.data) ≈ Array(field_serial.data)
+        @test Array(coeffs_back.data) ≈ Array(coeffs_serial.data)
+
+        # cached: a second call reuses the plan rather than planning again
+        plans = S.rfft_plans_batched[K]
+        transform!(field, coeffs, S)
+        @test S.rfft_plans_batched[K] === plans
+    end
+
+    # K beyond the scratch memory capacity cannot use the batched path and stays serial
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 2, architecture = architecture)
+    S = SpectralTransform(spectral_grid)
+    @test SpeedyTransforms.ensure_batched_plans!(S, S.nlayers + 1) == false
+    @test !haskey(S.rfft_plans_batched, S.nlayers + 1)
 end

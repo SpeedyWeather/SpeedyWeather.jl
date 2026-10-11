@@ -5,7 +5,8 @@
         # use non-default roughness lengths to make sure they are actually used
         z₀_land = 0.3
         z₀_ocean = 2.0e-4
-        surface_roughness = ConstantSurfaceRoughness(spectral_grid,
+        surface_roughness = ConstantSurfaceRoughness(
+            spectral_grid,
             roughness_length_land = z₀_land,
             roughness_length_ocean = z₀_ocean,
         )

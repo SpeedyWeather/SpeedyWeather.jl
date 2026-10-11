@@ -48,7 +48,7 @@ end
     # solution var_new = (var + Δt*tend)/(1 - Δt*expl). Any other factor over- or
     # under-damps the full tendency, not just the diffusion.
     @testset for HD in (HyperDiffusion, SpectralFilter)
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = 4)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 4)
         horizontal_diffusion = HD(spectral_grid)
         model = PrimitiveWetModel(spectral_grid; horizontal_diffusion)
         simulation = initialize!(model)

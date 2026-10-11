@@ -84,7 +84,7 @@ model.land
 
 is now the land defined above used when integrating a SpeedyWeather `model`.
 
-In case a non-default number of soil layers is used, the `LandGeometry` also needs to be passed to the `NetCDFOutput` constructor to allocate the correct dimensions of the output variables, when an output is desired:
+In case a non-default number of soil layers is used, the `LandGeometry` also needs to be passed to the [`NetCDFOutput`](@ref) constructor to allocate the correct dimensions of the output variables, when an output is desired:
 
 ```julia
 output = NetCDFOutput("output.nc", model, land_geometry)
@@ -230,7 +230,7 @@ with ``\gamma = 0.24`` the field capacity per meter soil and
 diffusion term of soil moisture between the two layers, acting on a time scale
 of ``\tau = 2~``days.
 
-At the moment (and generally if not coupled to an ocean model) the river runoff
+At the moment (and generally if not coupled to an [ocean model](@ref "Ocean models")) the river runoff
 lets water disappear. ``W_1, W_2`` are bounded by ``[0, 1]`` so that if
 more precipitation ``P`` (or in combination with negative evaporation ``E``,
 meaning condensation) occurs than the land can hold we compute the excess water
@@ -295,14 +295,14 @@ in ``kg/m²/s``, where the `excess` term (negative for melting trying to remove 
 only appears when the naive tendency would overdraw the bucket.
 `snow_melt_rate` is zero over ocean points. Negative snow depth is clamped to zero (technically redundant given the conserving excess term above) and stored 
 as equivalent liquid water height, not physical snow thickness. The accumulation is 
-capped at 10m equivalent liquid water height, following how permanent snow area is treated 
-in [IFS Cycle 49r1](https://www.ecmwf.int/en/elibrary/81626-ifs-documentation-cy49r1-part-iv-physical-processes). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
+capped at 10m equivalent liquid water height, following how permanent snow area is treated
+in [IFSCycle49r1](@citep). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
 
 The snow budget links into other surface schemes:
 
 - `snow_melt_rate` provides a latent heat sink to the land temperature budget.
 - The same flux (converted to ``m/s`` by dividing by ``ρ_w``) feeds the soil moisture tendency alongside rain.
-- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see below).
+- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see [Albedo](@ref) below).
 
 Snow cover over land is diagnosed from snow depth using either a linear ramp
 ``σₛ = \min(S / \text{snow\_depth\_scale}, 1)`` or the default saturating form
@@ -473,8 +473,8 @@ model = PrimitiveWetModel(
 simulation = initialize!(model)
 ```
 
-Then the model can be run as any other `Simulation`.
-Terarrium's state variales are owned by SpeedyWeather's `Variables` and can be accessed via 
+Then the model can be run as any other [`Simulation`](@ref).
+Terarrium's state variales are owned by SpeedyWeather's [`Variables`](@ref "Variables") and can be accessed via 
 
 ```@example terrarium
 simulation.variables.prognostic.land.terrarium
@@ -504,8 +504,8 @@ Then run the simulation with `run!(simulation, output = true)` as usual.
 additional vertical dimension `soil_depth` with the depths of the
 Terrarium soil layer centres (in meters, positive down) as coordinates.
 Ocean grid points, where Terrarium does not simulate anything, are filled
-with NaN. Terrarium output variables are supported both with `NetCDFOutput`
-and, once Zarr.jl is loaded, with `ZarrOutput`:
+with NaN. Terrarium output variables are supported both with [`NetCDFOutput`](@ref)
+and, once Zarr.jl is loaded, with [`ZarrOutput`](@ref "Zarr Output"):
 
 ```julia
 using Zarr
@@ -513,4 +513,3 @@ output = ZarrOutput(spectral_grid, PrimitiveWet)
 model = PrimitiveWetModel(spectral_grid; land, output, ...)
 add!(model, TerrariumOutput(terrarium_model)...)
 ```
-

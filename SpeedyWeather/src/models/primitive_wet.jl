@@ -38,8 +38,7 @@ $(TYPEDFIELDS)"""
         HF,     # <:AbstractSurfaceHumidityFlux,
         LSC,    # <:AbstractCondensation,
         CV,     # <:AbstractConvection,
-        SW,     # <:AbstractShortwave,
-        LW,     # <:AbstractLongwave,
+        RA,     # <:AbstractRadiation,
         GHG,    # NamedTuple of <:AbstractGreenhouseGas,
         SP,     # <:AbstractStochasticPhysics,
         CP,     # <:AbstractParameterization
@@ -94,15 +93,14 @@ $(TYPEDFIELDS)"""
     @component surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
     @component large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     @component convection::CV = BettsMillerConvection(spectral_grid)
-    @component shortwave_radiation::SW = OneBandShortwave(spectral_grid)
-    @component longwave_radiation::LW = OneBandLongwave(spectral_grid)
+    @component radiation::RA = Radiation(spectral_grid)
     @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
-    spectral_transform::ST = SpectralTransform(spectral_grid)
+    spectral_transform::ST = WhichTransform(spectral_grid)
     implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
@@ -127,8 +125,7 @@ $(TYPEDFIELDS)"""
         :large_scale_condensation,
         :convection,
         :albedo,                    # radiation
-        :shortwave_radiation,
-        :longwave_radiation,
+        :radiation,
         :boundary_layer,            # surface fluxes
         :surface_momentum_flux,
         :surface_heat_flux,
@@ -153,8 +150,8 @@ function variables(::Type{<:PrimitiveWet}, nsteps = DEFAULT_NSTEPS)
         variables(PrimitiveDry, nsteps)...,
 
         # Add humidity
-        PrognosticVariable(:humidity, SpectralXYZT(ps), desc = "Specific humidity", units = "kg/kg", fuse=:prognostic),
-        GridVariable(:humidity, GridXYZT(pg), desc = "Specific Humidity", units = "kg/kg", fuse=:grid),
+        PrognosticVariable(:humidity, SpectralXYZT(ps), desc = "Specific humidity", units = "kg/kg", fuse = :prognostic),
+        GridVariable(:humidity, GridXYZT(pg), desc = "Specific Humidity", units = "kg/kg", fuse = :grid),
         TendencyVariable(:humidity, SpectralXYZT(ts), desc = "Tendency of specific humidity", units = "kg/kg/s", fuse = :spectral_tendencies),
         TendencyVariable(:humidity, GridXYZT(tg), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s", fuse = :grid_tendencies),
 
@@ -198,8 +195,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)
-    initialize!(model.shortwave_radiation, model)
-    initialize!(model.longwave_radiation, model)
+    initialize!(model.radiation, model)
     initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)

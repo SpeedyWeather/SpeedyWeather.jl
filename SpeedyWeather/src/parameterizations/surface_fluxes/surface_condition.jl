@@ -41,18 +41,18 @@ initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
     z₀_ocean = z₀_raw_ocean > 0 ? z₀_raw_ocean : convert(typeof(z₀_raw_ocean), 0.0001)
 
     T₁ = get_prognostic_step(vars.grid.temperature, time_stepping, ws)[ij, nlayers]
-    q₁ = hasproperty(vars.grid, :humidity) ? 
-         get_prognostic_step(vars.grid.humidity, time_stepping, ws)[ij, nlayers] : zero(T₁)
-    
+    q₁ = hasproperty(vars.grid, :humidity) ?
+        get_prognostic_step(vars.grid.humidity, time_stepping, ws)[ij, nlayers] : zero(T₁)
+
     Tᵥ₁ = virtual_temperature(T₁, q₁, atmosphere)
 
     T_skin_ocean = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepping, ws)[ij]
     T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]
-    
+
     pₛ = vars.parameterizations.surface_pressure[ij]
     q_skin_land = saturation_humidity(T_skin_land, pₛ, atmosphere)
     q_skin_ocean = saturation_humidity(T_skin_ocean, pₛ, atmosphere)
-    
+
     Tᵥ_skin_land = virtual_temperature(T_skin_land, q_skin_land, atmosphere)
     Tᵥ_skin_ocean = virtual_temperature(T_skin_ocean, q_skin_ocean, atmosphere)
     Δθᵥ_land = (Tᵥ₁ + (gravity / cₚ) * z₁) - Tᵥ_skin_land
@@ -65,7 +65,7 @@ initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
     signed_sqrt(x) = x >= 0 ? sqrt(x) : -sqrt(-x)
     ocean_slowdown = ((atan((log_z₀_ocean + ((log_z₀_ocean + log_z₀_ocean) + log_z₀_ocean)) + ((z₁ - exp(T_grad_ocean)) * 0.14511)) - 1.9883) * (-10.904 - log_z₀_ocean)) - signed_sqrt(0.34863 * (log_z₀_ocean - atan((Δθᵥ_ocean + -10.904) + (T_grad_ocean + U₁))))
-    land_slowdown = 4.2599 + ((1.9678 * atan(exp(((-11.839 - signed_sqrt(U₁)) - (signed_sqrt(Δθᵥ_land + (9.6687 + log_z₀_land)) - (Δθᵥ_land * ((Δθᵥ_land + (z₁ + Δθᵥ_land)) ^ -0.29968)))) - (log_z₀_land * 2.3145)))) * (10.215 + log_z₀_land))
+    land_slowdown = 4.2599 + ((1.9678 * atan(exp(((-11.839 - signed_sqrt(U₁)) - (signed_sqrt(Δθᵥ_land + (9.6687 + log_z₀_land)) - (Δθᵥ_land * ((Δθᵥ_land + (z₁ + Δθᵥ_land))^-0.29968)))) - (log_z₀_land * 2.3145)))) * (10.215 + log_z₀_land))
 
     slowdown = ocean_slowdown * (1 - land_fraction) + land_slowdown * land_fraction
 

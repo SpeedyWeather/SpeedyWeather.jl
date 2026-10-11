@@ -38,9 +38,15 @@ function soil_moisture_availability!(
         vegetation::NoVegetation,
         model::PrimitiveWet,
     )
+    # escape immediately if no soil moisture defined, then soil_moisture_availability stays 0
+    haskey(vars.prognostic.land, :soil_moisture) || return nothing
+
     # view on the top layer of soil moisture
-    soil_moisture_top = field_view(vars.prognostic.land.soil_moisture, :, 1)
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), vegetation)
+    soil_moisture_top = field_view(soil_moisture, :, 1)
     (; soil_moisture_availability) = vars.parameterizations.land
+
+    @boundscheck size(soil_moisture_availability) == size(soil_moisture_top) || throw(BoundsError())
 
     # Fortran SPEEDY documentation eq. 51 with vegetation = 0
     W_cap = model.land.thermodynamics.field_capacity
@@ -48,15 +54,15 @@ function soil_moisture_availability!(
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    soil_moisture_availability .= D_top * soil_moisture_top * W_cap /
-        (D_top * W_cap + D_root * (W_cap - W_wilt))
+    r = D_top * W_cap / (D_top * W_cap + D_root * (W_cap - W_wilt))
+    soil_moisture_availability .= r * soil_moisture_top
+
     return nothing
 end
 
 function variables(::NoVegetation)
     return (
-        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
+        ParameterizationVariable(:soil_moisture_availability, GridXY(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end
 
@@ -118,6 +124,14 @@ function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing
     high_lai = zeros(GridVariable2D, grid)
     low_lai = zeros(GridVariable2D, grid)
     return VegetationClimatology{NF, GridVariable2D}(; high_vegetation_cover = high_cover, low_vegetation_cover = low_cover, high_vegetation_leaf_area = high_lai, low_vegetation_leaf_area = low_lai, kwargs...)
+end
+
+function variables(::VegetationClimatology)
+    return (
+        ParameterizationVariable(:vegetation_high, GridXY(), desc = "Vegetation high cover", units = "1", namespace = :land),
+        ParameterizationVariable(:vegetation_low, GridXY(), desc = "Vegetation low cover", units = "1", namespace = :land),
+        ParameterizationVariable(:soil_moisture_availability, GridXY(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
+    )
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
@@ -210,8 +224,11 @@ function soil_moisture_availability!(
         vegetation::VegetationClimatology,
         model::PrimitiveWet,
     )
+    # escape immediately if no soil moisture defined, then soil_moisture_availability stays 0
+    haskey(vars.prognostic.land, :soil_moisture) || return nothing
+
     (; high_vegetation_cover, low_vegetation_cover, high_vegetation_leaf_area, low_vegetation_leaf_area, soil_moisture_availability) = vars.parameterizations.land
-    (; soil_moisture) = vars.prognostic.land
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), vegetation)
     (; low_veg_factor) = vegetation
 
     # copy over vegetation fields into diagnostic variables
@@ -229,8 +246,9 @@ function soil_moisture_availability!(
         throw(DimensionMismatch(high_vegetation_cover, soil_moisture_availability))
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only = true) ||
         throw(DimensionMismatch(soil_moisture, soil_moisture_availability))
-    @boundscheck size(soil_moisture, 2) >= 2                # defined for two layers
-    @boundscheck size(soil_moisture_availability, 2) == 1   # 2D only
+    @boundscheck ndims(soil_moisture) == 2 || throw(BoundsError())              # step correctly chosen, IJ x K array only
+    @boundscheck size(soil_moisture, 2) >= 2 || throw(BoundsError())            # defined for two layers
+    @boundscheck size(soil_moisture_availability, 2) == 1 || throw(BoundsError())   # 2D only
 
     # precalculate denominator
     r = 1 / (D_top * W_cap + D_root * (W_cap - W_wilt))

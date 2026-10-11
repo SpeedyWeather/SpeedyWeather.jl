@@ -10,7 +10,7 @@ function linear_virtual_temperature!(
     Tᵥ = vars.dynamics.virtual_temperature
 
     # For Leapfrog this term has to be evaluted on the previous time step
-    # as the implicit corrections will move it to the current as done for 
+    # as the implicit corrections will move it to the current as done for
     # all linear gravity-wave related terms, just denote this with `LinearDynamicalCore`
     # here, the time stepper then decides which step to return
     T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, LinearDynamicalCore())
@@ -39,7 +39,7 @@ function linear_virtual_temperature!(
     Tₖ = vars.dynamics.average_temperature_profile
 
     # For Leapfrog this term has to be evaluted on the previous time step
-    # as the implicit corrections will move it to the current as done for 
+    # as the implicit corrections will move it to the current as done for
     # all linear gravity-wave related terms, just denote this with `LinearDynamicalCore`
     # here, the time stepper then decides which step to return
     T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, LinearDynamicalCore())

@@ -63,7 +63,7 @@ end
 # (91 parameters vs 15), so it is what shows the rule removes the dependence on type size rather
 # than just raising a threshold.
 @testset "Forward-mode reconstruct on $(nameof(MT))" for (MT, nlayers) in
-        ((BarotropicModel, 1), (PrimitiveWetModel, 2))
+    ((BarotropicModel, 1), (PrimitiveWetModel, 2))
 
     spectral_grid = SpectralGrid(; truncation = 9, nlayers, NF = Float64)
     model = MT(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
@@ -91,7 +91,7 @@ end
 end
 
 @testset "Reverse-mode reconstruct on $(nameof(MT))" for (MT, nlayers) in
-        ((BarotropicModel, 1), (PrimitiveWetModel, 2))
+    ((BarotropicModel, 1), (PrimitiveWetModel, 2))
 
     spectral_grid = SpectralGrid(; truncation = 9, nlayers, NF = Float64)
     model = MT(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))

@@ -348,6 +348,35 @@ end
     end
 end
 
+@testset "rand, randn constructors with rng" begin
+    for f in (rand, randn)
+        s = (5, 5)
+        spectrum = Spectrum(s...)
+
+        # same seed = same coefficients, reproducibility
+        @test f(Random.Xoshiro(123), spectrum) == f(Random.Xoshiro(123), spectrum)
+        @test f(Random.Xoshiro(123), spectrum, 2) == f(Random.Xoshiro(123), spectrum, 2)
+
+        # rng doesn't change type or size compared to no rng
+        for NF in (Float32, Float64)
+            L1 = f(Random.Xoshiro(123), NF, spectrum, 2)
+            L2 = f(NF, spectrum, 2)
+            @test typeof(L1) == typeof(L2)
+            @test size(L1) == size(L2)
+
+            L1 = f(Random.Xoshiro(123), LowerTriangularArray{NF}, s...)
+            L2 = f(LowerTriangularArray{NF}, s...)
+            @test typeof(L1) == typeof(L2)
+            @test size(L1) == size(L2)
+
+            L1 = f(Random.Xoshiro(123), LowerTriangularMatrix{NF}, s...)
+            L2 = f(LowerTriangularMatrix{NF}, s...)
+            @test typeof(L1) == typeof(L2)
+            @test size(L1) == size(L2)
+        end
+    end
+end
+
 @testset "LowerTriangularArray: fill, copy, randn, convert, repeat" begin
     @testset for NF in (Float32, Float64)
         mmax = 32

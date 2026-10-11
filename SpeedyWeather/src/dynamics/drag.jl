@@ -92,7 +92,7 @@ function drag!(
     u = get_prognostic_step(vars.grid.u, model.time_stepping, scheme)
     v = get_prognostic_step(vars.grid.v, model.time_stepping, scheme)
     k = size(u, 2)            # drag only on surface layer
-    
+
     Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
     Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 

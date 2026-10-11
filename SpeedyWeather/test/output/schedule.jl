@@ -3,7 +3,7 @@
     # not representable as seconds
     for truncation in (32, 43, 64, 86, 128, 171, 256, 342)
         spectral_grid = SpectralGrid(truncation = truncation, nlayers = 1)
-        for TS in (Leapfrog, NCycleLorenz) 
+        for TS in (Leapfrog, NCycleLorenz)
             time_stepping = TS(spectral_grid)
 
             clock = Clock()

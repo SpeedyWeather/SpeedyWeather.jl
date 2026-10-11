@@ -18,7 +18,7 @@ function __init__()
     end
     return nothing
 end
-=# 
+=#
 
 ###
 # implement make_zero where the default one fails
@@ -63,7 +63,15 @@ _make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ColumnScratchMemory) =
 _make_zero_view!(x::Base.RefValue) = (x[] isa Number && (x[] = zero(x[])); nothing)
 _make_zero_view!(x) = nothing
 
-### 
+###
+# `reinitialize!` (called by every `time_step!`) recomputes the implicit solver whenever the
+# time step changes, i.e. in the leapfrog start (Δt/2, Δt, then 2Δt). The solver's operators are
+# treated as constants of the differentiated step, as they are when the solver is initialized
+# outside of `autodiff`: the call runs on the primal only, and the shadows of the operators are
+# left untouched.
+EnzymeRules.inactive(::typeof(SpeedyWeather.reinitialize!), args...) = nothing
+
+###
 # TODO
 # Enzyme FORWARD-mode rule for iterating the tracer registry
 #

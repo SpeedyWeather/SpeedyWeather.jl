@@ -1,10 +1,10 @@
 # Nested Enzyme AD (reverse-over-forward) through the spectral transform.
 #
 # A Hutchinson trace estimate vᵀJv is a forward-mode JVP contracted to a scalar; differentiating it
-# w.r.t. a parameter is therefore a second derivative — reverse over forward. 
+# w.r.t. a parameter is therefore a second derivative — reverse over forward.
 # This test checks that nesting now COMPILES and is CORRECT.
 
-# Top-level (non-closure) function that we differentiate 
+# Top-level (non-closure) function that we differentiate
 function _nested_scalar!(out, coeffs, p, spec, grid, S)
     @inbounds for k in eachindex(parent(spec))
         parent(spec)[k] = p[1] * complex(coeffs[k], zero(eltype(coeffs)))

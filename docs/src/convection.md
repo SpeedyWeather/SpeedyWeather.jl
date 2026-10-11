@@ -2,7 +2,7 @@
 
 Convection is the atmospheric process of rising motion because of positively
 buoyant air parcels compared to its surroundings. In hydrostatic models
-like the primitive equation model in SpeedyWeather.jl convection has to
+like the [primitive equation model](@ref primitive_equation_model) in SpeedyWeather.jl convection has to
 be parameterized as the vertical velocity is not a prognostic variable
 that depends on vertical stability but rather diagnosed to satisfy
 horizontal divergence. Convection can be shallow and non-precipitating
@@ -23,12 +23,13 @@ using InteractiveUtils # hide
 using SpeedyWeather
 subtypes(SpeedyWeather.AbstractConvection)
 ```
-which are described in the following.
+which are described in the following. See [Parameterizations](@ref) for the general
+parameterization interface these implement.
 
 ## [Simplified Betts-Miller convection](@id BettsMiller)
 
 We follow the simplification of the Betts-Miller convection scheme
-[^Betts1986][^BettsMiller1986] as studied by Frierson, 2007 [^Frierson2007].
+[Betts1986, BettsMiller1986](@citep) as studied by [Frierson2007](@citet).
 The central idea of this scheme is to represent the effect of
 convection as an adjustment towards a (pseudo-) moist adiabat
 reference profile and its associated humidity profile. Meaning that
@@ -81,13 +82,59 @@ The (absolute) temperature a lifted parcel has during ascent (following its pseu
 or moist, until reaching the level of zero buoyancy) is then taken as the reference temperature
 profile ``T_{ref}`` that the Betts-Miller convective parameterization relaxes towards as a first guess
 (with a following adjustment as discussed below). The humidity profile is taken as
-``q_{ref} = RH_{SBM}T_{ref}`` with a parameter ``RH_{SBM}`` (default ``RH_{SBM} = 0.7``)
+``q_{ref} = RH_{SBM}\,q^\star(T_{ref})`` with a parameter ``RH_{SBM}`` (default ``RH_{SBM} = 0.7``)
 of the scheme (Simplified Betts-Miller, SBM) that determines a constant relative humidity of
-the reference profile.
+the reference profile, applied to the saturation humidity ``q^\star`` evaluated at the reference
+temperature ``T_{ref}`` of that layer.
 
 An illustration of adiabat reference line is below
 
 ![image](https://github.com/user-attachments/assets/ea8d8a0b-20c5-47cc-88ff-47112eeeb200)
+
+## Entrainment
+
+A real convective plume mixes with the environmental air around it as it rises, which dilutes
+the parcel's temperature and moisture excess, reducing its buoyancy and moisture content and
+generally shallowing convection compared to the undiluted ascent described above. The scheme
+optionally applies this dilution at every level ``k`` during the ascent, after the dry or moist
+adiabatic step:
+
+```math
+\begin{aligned}
+T_p &\leftarrow (1 - \varepsilon_k) T_p + \varepsilon_k T_{e,k} \\
+q_p &\leftarrow (1 - \varepsilon_k) q_p + \varepsilon_k q_{e,k}
+\end{aligned}
+```
+
+with parcel temperature/humidity ``T_p, q_p``, environmental temperature/humidity at that level
+``T_{e,k}, q_{e,k}``, and an entrainment rate ``\varepsilon_k \in [0, 1]`` that can vary by level.
+Because ``\varepsilon_k`` is a mixing fraction *per model level* rather than a rate per unit
+height, the resulting profile depends on the vertical resolution (`nlayers`): the same
+`AbstractEntrainment` profile mixes in more environmental air over a coarser column, since each
+level spans a larger part of the atmosphere. In the moist branch of the ascent, mixing happens
+after condensation at that level, so the saturation adjustment (and thus the LZB and the
+associated ``T_{ref}, q_{ref}`` at that level) already reflects the diluted parcel; the latent
+heat implied by the change in ``q_p`` from mixing itself is not separately accounted for.
+
+Available profiles, selected via the `entrainment` option of [`BettsMillerConvection`](@ref) or
+[`BettsMillerDryConvection`](@ref):
+
+```@example convection
+subtypes(SpeedyWeather.AbstractEntrainment)
+```
+
+- `NoEntrainment` (the default for [`BettsMillerDryConvection`](@ref)): ``\varepsilon_k = 0``
+  everywhere, reproducing the scheme exactly as described above with no dilution.
+- `LinearEntrainment` (the default for [`BettsMillerConvection`](@ref), with
+  `surface_entrainment = 0.5` and `σ_entrainment = 0.5`): ``\varepsilon_k`` ramps linearly from
+  `surface_entrainment` at the surface (``\sigma = 1``) to zero at `σ_entrainment`, and is zero
+  above that level.
+- `ConstantEntrainment`: a single `entrainment_rate` applied at every level.
+
+The wet scheme therefore entrains by default; pass `entrainment = NoEntrainment()` to
+[`BettsMillerConvection`](@ref) to recover the undiluted scheme. The dry scheme defaults to
+`NoEntrainment` and can opt in the same way, e.g.
+`BettsMillerDryConvection(spectral_grid; entrainment = LinearEntrainment(spectral_grid))`.
 
 ## First-guess relaxation
 
@@ -107,13 +154,13 @@ the resulting tendencies from this scheme. Those will be calculated in [Correcte
 
 Note that above the level of zero buoyancy no relaxation takes place ``\delta T = \delta q = 0``,
 or, equivalently ``T = T_{ref}``, ``q = q_{ref}`` there.
-Vertically integration from surface ``p_0`` to level of zero buoyancy in
-pressure coordinates ``p_{LZB}`` yields
+Vertically integration from the level of zero buoyancy ``p_{LZB}`` to the surface ``p_0`` (so that
+``dp > 0``, as ``p_{LZB} < p_0``) yields
 
 ```math
 \begin{aligned}
-P_q &= - \int_{p_0}^{p_{LZB}} \delta q \frac{dp}{g} \\
-P_T &= \int_{p_0}^{p_{LZB}} \frac{c_p}{L_v} \delta T \frac{dp}{g}
+P_q &= - \int_{p_{LZB}}^{p_0} \delta q \frac{dp}{g} \\
+P_T &= \int_{p_{LZB}}^{p_0} \frac{c_p}{L_v} \delta T \frac{dp}{g}
 \end{aligned}
 ```
 
@@ -144,7 +191,7 @@ This is illustrated in the following
 
 ## Deep convection
 
-Following Frierson, 2007 [^Frierson2007] in order to conserve enthalpy we correct
+Following [Frierson2007](@citet), in order to conserve enthalpy we correct
 the reference profile for temperature ``T_{ref} \to T_{ref, 2}`` so that ``P_T = P_q``.
 
 ```math
@@ -152,12 +199,12 @@ T_{ref, 2} = T_{ref} + \frac{1}{\Delta p c_p} \int_{p_0}^{p_{LZB}} \left[ c_p (T
 ```
 
 ``\Delta p`` is the pressure difference ``p_{LZB} - p_0``.
-The terms inside the integral are rearranged compared to Frierson, 2007 to show
+The terms inside the integral are rearranged compared to [Frierson2007](@citet) to show
 that the vertical integral in [First-guess relaxation](@ref) really only has to be computed once.
 
 ## Shallow convection
 
-In the following we describe the "qref" scheme from Frierson, 2007 which corrects
+In the following we describe the "qref" scheme from [Frierson2007](@citet), which corrects
 reference profiles for both temperature and humidity to guarantee that ``P_q = 0``,
 i.e. no precipitation during convection. In that sense, shallow convection is
 non-precipitating. Although shallow convection is supposed to be shallow
@@ -166,11 +213,11 @@ determined during the calculation of the [Reference profiles](@ref).
 
 ```math
 \begin{aligned}
-\Delta q &= \int_{p_0}^{p_{LZB}} (q - q_{ref}) dp \\
-Q_{ref}  &= \int_{p_0}^{p_{LZB}} -q_{ref}~dp \\
+\Delta q &= \int_{p_{LZB}}^{p_0} (q - q_{ref}) dp \\
+Q_{ref}  &= \int_{p_{LZB}}^{p_0} -q_{ref}~dp \\
 f_q      &= 1 - \frac{\Delta q}{Q_{ref}} \\
 q_{ref, 2} &= f_q q_{ref} \\
-\Delta T &= -\frac{1}{\Delta p} \int_{p_0}^{p_{LZB}} (T - T_{ref}) dp \\
+\Delta T &= -\frac{1}{\Delta p} \int_{p_{LZB}}^{p_0} (T - T_{ref}) dp \\
 T_{ref,2} &= T_{ref} - \Delta T
 \end{aligned}
 ```
@@ -178,18 +225,18 @@ T_{ref,2} &= T_{ref} - \Delta T
 This scheme is non-precipitating (``P_q = 0``) as derived below. ``P_q`` follows from the vertical integral of the moisture tendency ``\delta q``, which in this scheme is a relaxation towards ``q_{\text{ref,2}}`` (see [Corrected relaxation](@ref)).
 
 ```math
-P_q = -\int_{p_0}^{p_{LZB}} \frac{\delta q}{g} \, dp = \int_{p_0}^{p_{LZB}} \frac{q - q_{\text{ref,2}}}{g \tau_{SBM}} dp
+P_q = -\int_{p_{LZB}}^{p_0} \frac{\delta q}{g} \, dp = \int_{p_{LZB}}^{p_0} \frac{q - q_{\text{ref,2}}}{g \tau_{SBM}} dp
 ```
 
 Inserting from above yields
 
 ```math
-P_q = \int_{p_0}^{p_{LZB}} \frac{q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} }{g \tau_{SBM}} dp = \frac{1}{g \tau_{SBM}} \int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
+P_q = \int_{p_{LZB}}^{p_0} \frac{q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} }{g \tau_{SBM}} dp = \frac{1}{g \tau_{SBM}} \int_{p_{LZB}}^{p_0} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
 ```
 
 The integral becomes
 ```math
-\Delta q + \frac{\Delta q}{Q_{\text{ref}}} \int_{p_0}^{p_{LZB}}q_{\text{ref}} dp = \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
+\Delta q + \frac{\Delta q}{Q_{\text{ref}}} \int_{p_{LZB}}^{p_0}q_{\text{ref}} dp = \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
 ```
 
 So this scheme is indeed non-precipitating, i.e. $P_q = 0$.
@@ -206,7 +253,7 @@ and [Shallow convection](@ref) we actually calculate tendencies from
 \end{aligned}
 ```
 
-with ``\tau_{SBM} = 2h`` as default.
+with ``\tau_{SBM} = 4h`` as default.
 
 ## Convective precipitation
 
@@ -215,28 +262,41 @@ The convective precipitation ``P`` results then from the vertical integration of
 similar to [Large-scale precipitation](@ref).
 
 ```math
-P = -\int \frac{\Delta t}{g \rho} \delta q dp
+P = -\int_{p_{LZB}}^{p_0} \frac{\Delta t}{g \rho} \delta q\,dp
 ```
 
-In the shallow convection case ``P=0`` due to the correction even though in
-the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
+The integral is taken with sign over all layers: layers that moisten are fed by the water
+removed from layers that dry, so ``P`` is the *net* column drying and the column water budget
+(precipitation equals the loss of column water vapour) is closed exactly. Clamping each layer's
+contribution to be non-negative instead would count the water that moistens a layer twice,
+once as vapour and once as precipitation (see
+[#1275](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1275)). The result is
+additionally multiplied by a deep-convection indicator so that ``P = 0`` for shallow convection,
+where the qref correction already makes the column-integrated ``\delta q`` vanish up to rounding.
 
+In the shallow convection case ``P=0`` due to the correction (and the indicator above) even though
+in the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
+
+### Convective snow
+
+If the temperature of the lowermost model layer is below a `freezing_threshold` (default
+``273.15\,K``), all of ``P`` falls as snow instead of rain for that column and time step,
+controlled by the `snow` option (`true` by default). This is a single check on the layer the
+parcel starts its ascent from, unlike [Large-scale condensation](@ref)'s falling-flux melt
+cascade through intermediate layers: convective precipitation is generated and deposited within
+the same time step rather than fluxed layer by layer, so there is no intermediate layer for it
+to fall through and potentially melt in. The phase swap conserves total precipitation mass
+(rain + snow is unchanged, only the partitioning between the two is affected), and shallow
+convection produces neither since ``P = 0`` there regardless of temperature. With `snow = false`
+all convective precipitation is always rain, recovering the previous behaviour.
 
 ## Dry convection
 
-In the primitive equation model with humidity the [Betts-Miller convection scheme](@ref BettsMiller)
+In the [primitive equation model](@ref primitive_equation_model) with humidity the [Betts-Miller convection scheme](@ref BettsMiller)
 as described above is defined. Without humidity, a dry version reduces to the
 [Shallow convection](@ref) case. The two different shallow convection schemes in
-Frierson 2007[^Frierson2007], the "shallower" shallow convection scheme and the "qref"
+[Frierson2007](@citet), the "shallower" shallow convection scheme and the "qref"
 (as implemented here in [Shallow convection](@ref)) in that case also reduce to
 the same formulation. The dry Betts-Miller convection scheme is the default
 in the primitive equation model without humidity.
 
-
-## References
-
-[^Betts1986]: Betts, A. K., 1986: A new convective adjustment scheme. Part I: Observational and theoretical basis. Quart. J. Roy. Meteor. Soc.,112, 677-691. DOI: [10.1002/qj.49711247307](https://doi.org/10.1002/qj.49711247307)
-
-[^BettsMiller1986]: Betts, A. K. and M. J. Miller, 1986: A new convective adjustment scheme. Part II: Single column tests using GATE wave, BOMEX, ATEX and Arctic air-mass data sets. Quart. J. Roy. Meteor. Soc.,112, 693-709. DOI: [10.1002/qj.49711247308](https://doi.org/10.1002/qj.49711247308)
-
-[^Frierson2007]: Frierson, D. M. W., 2007: The Dynamics of Idealized Convection Schemes and Their Effect on the Zonally Averaged Tropical Circulation. J. Atmos. Sci., 64, 1959-1976. DOI:[10.1175/JAS3935.1](https://doi.org/10.1175/JAS3935.1)
