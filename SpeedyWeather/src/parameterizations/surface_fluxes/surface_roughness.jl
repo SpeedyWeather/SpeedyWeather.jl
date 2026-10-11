@@ -72,13 +72,13 @@ end
     (; land, ocean) = vars.parameterizations
 
     # Momentum roughness
-    land.momentum_roughness, ocean.momentum_roughness, vars.parameterizations.momentum_roughness[ij] = constant_roughness(z₀M_land, z₀M_ocean, land_fraction)
+    land.momentum_roughness[ij], ocean.momentum_roughness[ij], vars.parameterizations.momentum_roughness[ij] = constant_roughness(z₀M_land, z₀M_ocean, land_fraction)
 
     # Heat roughness
-    land.heat_roughness, ocean.heat_roughness, vars.parameterizations.heat_roughness[ij] = constant_roughness(z₀H_land, z₀H_ocean, land_fraction)
+    land.heat_roughness[ij], ocean.heat_roughness[ij], vars.parameterizations.heat_roughness[ij] = constant_roughness(z₀H_land, z₀H_ocean, land_fraction)
 
     # Humidity roughness (just heat times a constant)
-    land.humidity_roughness, ocean.humidity_roughness, vars.parameterizations.humidity_roughness[ij] = constant_roughness(z₀Q_land, z₀Q_ocean, land_fraction)
+    land.humidity_roughness[ij], ocean.humidity_roughness[ij], vars.parameterizations.humidity_roughness[ij] = constant_roughness(z₀Q_land, z₀Q_ocean, land_fraction)
 
     return nothing
 end
@@ -350,7 +350,7 @@ end
 # First land, then ocean, then combine!
 @propagate_inbounds function parameterization!(ij, vars, LSR::LearnedSurfaceRoughness, model)
     surface_roughness!(ij, vars, LSR.land_surface_roughness, model.land_sea_mask)
-    surface_roughness!(ij, vars, LSR.ocean_surface_roughness, model.land_sea_mask)
+    surface_roughness!(ij, vars, LSR.ocean_surface_roughness, model)
     surface_roughness!(ij, vars, LSR, model.land_sea_mask)
     return nothing
 end
@@ -408,9 +408,10 @@ end
 end
 
 
-@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, land_sea_mask)
-    land_fraction = land_sea_mask.land_fraction[ij]
+@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, model)
     (; ocean) = vars.parameterizations
+    (; land_sea_mask) = model
+    land_fraction = land_sea_mask.land_fraction[ij]
 
     if land_fraction >= 1
         zero_val = zero(land_fraction)
@@ -420,8 +421,20 @@ end
         return nothing
     end
 
-    siconc = vars.prognostic.ocean.sea_ice_concentration[ij]
     (; surface_wind_speed, neutral_wind_speed) = vars.parameterizations
+    u = surface_wind_speed[ij]
+    progn_ocean = vars.prognostic.ocean
+
+    siconc = if haskey(progn_ocean, :sea_ice_concentration)
+        ice = get_prognostic_step(
+            progn_ocean.sea_ice_concentration,
+            time_stepper(model.time_stepping, :ocean),
+            scheme,
+        )
+        ice[ij]
+    else
+        zero(u)
+    end
     log_αᵪ = scheme.charnock_param(neutral_wind_speed[ij])
 
     z₀M_ocean = ocean_momentum_roughness(scheme, surface_wind_speed[ij], log_αᵪ, siconc)
