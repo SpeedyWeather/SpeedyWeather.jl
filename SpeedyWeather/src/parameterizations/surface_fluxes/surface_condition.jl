@@ -15,7 +15,7 @@ end
 
 """Calculates the near-surface wind speed from the lowest model
 level wind speed using surface roughness. Fields are $(TYPEDFIELDS)"""
-@kwdef struct LearnedWindSlowdown{NF} <: AbstractParameterization
+@parameterized @kwdef struct LearnedWindSlowdown{NF} <: AbstractParameterization
     # Ocean slowdown constants
     @param c1::NF = 0.14511
     @param c2::NF = 1.9883
@@ -44,56 +44,125 @@ end
 LearnedWindSlowdown(SG::SpectralGrid; kwargs...) = LearnedWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::LearnedWindSlowdown, model, surface_condition, U₁)
+
+@inline signed_sqrt(x) = copysign(sqrt(abs(x)), x)
+
+@inline function ocean_wind_slowdown(
+        ws::LearnedWindSlowdown,
+        U₁, z₁, log_z₀, Δθᵥ, T_grad
+    )
+    (; c1, c2, c3, c4) = ws
+
+    # Bound the exponential argument
+    exp_arg = clamp(T_grad, oftype(T_grad, -20), oftype(T_grad, 20))
+
+    term1 = atan(4 * log_z₀ + c1 * (z₁ - exp(exp_arg)))
+    term2 = atan(Δθᵥ + c3 + T_grad + U₁)
+
+    return (term1 - c2) * (c3 - log_z₀) -
+        signed_sqrt(c4 * (log_z₀ - term2))
+end
+
+@inline function land_wind_slowdown(
+        ws::LearnedWindSlowdown,
+        U₁, z₁, log_z₀, Δθᵥ
+    )
+    (; c5, c6, c7, c8, c9, c10, c11) = ws
+
+    # Keep fractional power finite and real
+    base = max(z₁ + 2 * Δθᵥ, one(z₁))
+
+    power_term = Δθᵥ * base^c9
+    root_term = signed_sqrt(Δθᵥ + c8 + log_z₀)
+
+    exponent = c7 - signed_sqrt(U₁) -
+        root_term + power_term -
+        c10 * log_z₀
+
+    # Avoid overflow and large exponential arguments
+    exponent = clamp(
+        exponent,
+        oftype(exponent, -20),
+        oftype(exponent, 20)
+    )
+
+    return c5 + c6 * atan(exp(exponent)) * (c11 + log_z₀)
+end
+
+
+@propagate_inbounds function calc_wind_slowdown(
+        ij, vars, ws::LearnedWindSlowdown,
+        model, surface_condition, U₁
+    )
     (; gravity) = model.planet
     (; nlayers) = model.geometry
     (; land_sea_mask, atmosphere, time_stepping) = model
+
     cₚ = atmosphere.heat_capacity
-    Φ₁ = vars.dynamics.geopotential[ij, nlayers]
-    z_surf = model.orography.orography[ij]
     land_fraction = land_sea_mask.land_fraction[ij]
 
-    z₁ = (Φ₁ / gravity) - z_surf
-    z₀_raw_land = vars.parameterizations.land.momentum_roughness[ij]
-    z₀_raw_ocean = vars.parameterizations.ocean.momentum_roughness[ij]
-
-    # Handle initialisation independently for land and ocean masks
-    z₀_land = z₀_raw_land > 0 ? z₀_raw_land : convert(typeof(z₀_raw_land), 0.1)
-    z₀_ocean = z₀_raw_ocean > 0 ? z₀_raw_ocean : convert(typeof(z₀_raw_ocean), 0.0001)
+    Φ₁ = vars.dynamics.geopotential[ij, nlayers]
+    z_surf = model.orography.orography[ij]
+    z₁ = Φ₁ / gravity - z_surf
 
     T₁ = get_prognostic_step(vars.grid.temperature, time_stepping, ws)[ij, nlayers]
-    q₁ = hasproperty(vars.grid, :humidity) ?
-        get_prognostic_step(vars.grid.humidity, time_stepping, ws)[ij, nlayers] : zero(T₁)
+
+    q₁ = hasproperty(vars.grid, :humidity) ? get_prognostic_step(
+            vars.grid.humidity, time_stepping, ws
+        )[ij, nlayers] : zero(T₁)
 
     Tᵥ₁ = virtual_temperature(T₁, q₁, atmosphere)
-
-    T_skin_ocean = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepping, ws)[ij]
-    T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]
+    Tᵥ_potential = Tᵥ₁ + (gravity / cₚ) * z₁
 
     pₛ = vars.parameterizations.surface_pressure[ij]
-    q_skin_land = saturation_humidity(T_skin_land, pₛ, atmosphere)
-    q_skin_ocean = saturation_humidity(T_skin_ocean, pₛ, atmosphere)
 
-    Tᵥ_skin_land = virtual_temperature(T_skin_land, q_skin_land, atmosphere)
-    Tᵥ_skin_ocean = virtual_temperature(T_skin_ocean, q_skin_ocean, atmosphere)
-    Δθᵥ_land = (Tᵥ₁ + (gravity / cₚ) * z₁) - Tᵥ_skin_land
-    Δθᵥ_ocean = (Tᵥ₁ + (gravity / cₚ) * z₁) - Tᵥ_skin_ocean
+    # Ocean contribution
+    ocean_slowdown = zero(U₁)
 
-    log_z₀_ocean = log(z₀_ocean)
-    log_z₀_land = log(z₀_land)
+    if land_fraction < 1
+        z₀_raw = vars.parameterizations.ocean.momentum_roughness[ij]
+        z₀ = z₀_raw > 0 ? z₀_raw : oftype(z₀_raw, 0.0001)
 
-    T_grad_ocean = vars.parameterizations.surface_air_temperature[ij] - T_skin_ocean
+        T_skin = get_prognostic_step(
+            vars.prognostic.ocean.sea_surface_temperature,
+            time_stepping, ws
+        )[ij]
 
-    # Unpack constants for learned slowdown parameterization
-    (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11) = ws
+        q_skin = saturation_humidity(T_skin, pₛ, atmosphere)
+        Tᵥ_skin = virtual_temperature(T_skin, q_skin, atmosphere)
 
-    signed_sqrt(x) = x >= 0 ? sqrt(x) : -sqrt(-x)
-    ocean_slowdown = ((atan((log_z₀_ocean + ((log_z₀_ocean + log_z₀_ocean) + log_z₀_ocean)) + ((z₁ - exp(T_grad_ocean)) * c1)) - c2) * (c3 - log_z₀_ocean)) - signed_sqrt(c4 * (log_z₀_ocean - atan((Δθᵥ_ocean + c3) + (T_grad_ocean + U₁))))
-    land_slowdown = c5 + ((c6 * atan(exp((c7 - signed_sqrt(U₁)) - (signed_sqrt(Δθᵥ_land + (c8 + log_z₀_land)) - (Δθᵥ_land * ((Δθᵥ_land + (z₁ + Δθᵥ_land))^c9)))) - (log_z₀_land * c10)))) * (c11 + log_z₀_land)
+        Δθᵥ = Tᵥ_potential - Tᵥ_skin
+        T_grad = vars.parameterizations.surface_air_temperature[ij] - T_skin
 
-    slowdown = ocean_slowdown * (1 - land_fraction) + land_slowdown * land_fraction
+        ocean_slowdown = ocean_wind_slowdown(
+            ws, U₁, z₁, log(z₀), Δθᵥ, T_grad
+        )
+    end
 
-    return slowdown
+    # Land contribution
+    land_slowdown = zero(U₁)
+
+    if land_fraction > 0
+        z₀_raw = vars.parameterizations.land.momentum_roughness[ij]
+        z₀ = z₀_raw > 0 ? z₀_raw : oftype(z₀_raw, 0.1)
+
+        T_skin = vars.prognostic.land.soil_temperature[ij, 1]
+
+        q_skin = saturation_humidity(T_skin, pₛ, atmosphere)
+        Tᵥ_skin = virtual_temperature(T_skin, q_skin, atmosphere)
+
+        Δθᵥ = Tᵥ_potential - Tᵥ_skin
+
+        land_slowdown = land_wind_slowdown(
+            ws, U₁, z₁, log(z₀), Δθᵥ
+        )
+    end
+
+    slowdown = (1 - land_fraction) * ocean_slowdown +
+        land_fraction * land_slowdown
+
+    return clamp(slowdown, zero(slowdown), one(slowdown))
+
 end
 
 @parameterized @kwdef struct ConstantWindGust{NF} <: AbstractParameterization
@@ -117,10 +186,10 @@ end
     @param z_i::NF = 1000.0
 
     "[OPTION] Typical heat transfer coefficient for scaling [1]"
-    @param C_H::NF = 1.0e-3
+    @param C_H::NF = 1.0e-3 #TODO: use real heat transfer coefficient calculated in boundary_layer
 
     "[OPTION] Minimum background gustiness [m/s]"
-    @param min_gust::NF = 0.0
+    @param min_gust::NF = 0.1
 end
 
 Adapt.@adapt_structure BeljaarsWindGust
@@ -156,7 +225,7 @@ variables needed for surface flux calculations. Computes surface wind speed
 including sub-grid scale gusts, surface air density, and surface air temperature
 by extrapolating from the lowest model level to the surface using standard
 atmospheric relationships. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceCondition{NF, WS, WG} <: AbstractParameterization
+@kwdef struct SurfaceCondition{WS, WG} <: AbstractParameterization
     "[OPTION] Ratio of near-surface wind to lowest-level wind [1]"
     wind_slowdown::WS
 
@@ -175,7 +244,7 @@ function SurfaceCondition(
     NF = SG.NF
     WS = typeof(wind_slowdown)
     WG = typeof(wind_gust)
-    return SurfaceCondition{NF, WS, WG}(
+    return SurfaceCondition{WS, WG}(
         ;
         wind_slowdown = wind_slowdown,
         wind_gust = wind_gust,

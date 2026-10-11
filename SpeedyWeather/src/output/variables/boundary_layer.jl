@@ -69,7 +69,7 @@ function output!(
     @. z_bottom += T_bottom * (R_dry / g) * log(pₛ / pressure(nlayers, pₛ, coord))
 
     # Compute u10, TODO should this be the same z₀ as in vertical diffusion or surface fluxes?
-    z₀ = simulation.variables.parameterizations.surface_roughness
+    z₀ = simulation.variables.parameterizations.momentum_roughness
 
     # include a max here as this will throw an error if the model blows up and have negative temperatures
     # if the max case is hit we divide by zero which yields inf so clearly flagged in any case
@@ -182,7 +182,7 @@ path(::HeatBoundaryLayerDragOutput, simulation) =
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MoistureBoundaryLayerDragOutput <: AbstractOutputVariable
+@kwdef mutable struct HumidityBoundaryLayerDragOutput <: AbstractOutputVariable
     name::String = "bld_q"
     unit::String = "1"
     long_name::String = "Moisture flux related boundary layer drag coefficient"
@@ -193,15 +193,15 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::MoistureBoundaryLayerDragOutput, simulation) =
-    simulation.variables.parameterizations.boundary_layer_drag_moisture
+path(::HumidityBoundaryLayerDragOutput, simulation) =
+    simulation.variables.parameterizations.boundary_layer_drag_humidity
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct MomentumSurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "sr"
+    name::String = "sr_m"
     unit::String = "m"
-    long_name::String = "Surface roughness length"
+    long_name::String = "Momentum surface roughness length"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -215,7 +215,7 @@ path(::MomentumSurfaceRoughnessOutput, simulation) =
 @kwdef mutable struct HeatSurfaceRoughnessOutput <: AbstractOutputVariable
     name::String = "sr_h"
     unit::String = "m"
-    long_name::String = "Surface heat roughness length"
+    long_name::String = "Heat surface roughness length"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -233,7 +233,7 @@ BoundaryLayerOutput() = (
     SurfaceTemperatureOutput(),
     MomentumBoundaryLayerDragOutput(),
     HeatBoundaryLayerDragOutput(),
-    MoistureBoundaryLayerDragOutput(),
+    HumidityBoundaryLayerDragOutput(),
     MomentumSurfaceRoughnessOutput(),
     HeatSurfaceRoughnessOutput(),
 )

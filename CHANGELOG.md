@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Learned land and ocean surface roughness [1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+- Learned land and ocean surface roughness [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 
 ## 0.23.0
 

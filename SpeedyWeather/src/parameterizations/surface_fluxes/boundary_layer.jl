@@ -181,9 +181,9 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # Get surface roughness length (computed by the surface_roughness parameterization)
     z₀M = vars.parameterizations.momentum_roughness[ij]
     z₀H = vars.parameterizations.heat_roughness[ij]
-    z₀Q = vars.parameterizations.moisture_roughness[ij]
+    z₀Q = vars.parameterizations.humidity_roughness[ij]
 
-    @inline function drag_max(z, z₀M, z₀X, κ)
+    @inline function neutral_transfer_coefficient(z, z₀M, z₀X, κ)
         # flux dependent bulk drag coefficient in the neutral limit
         # should be z > z₀, z = z₀ means infinitely high drag, cap one order above the roughness length
         zM = max(z, 10z₀M)
@@ -191,9 +191,9 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
         return κ^2 / (log(zM / z₀M) * log(zX / z₀X))
     end
 
-    drag_max_momentum = calc_drag_max(z, z₀M, z₀M, κ)
-    drag_max_heat = calc_drag_max(z, z₀M, z₀H, κ)
-    drag_max_humidity = calc_drag_max(z, z₀M, z₀Q, κ)
+    C_D = neutral_transfer_coefficient(z, z₀M, z₀M, κ)
+    C_H = neutral_transfer_coefficient(z, z₀M, z₀H, κ)
+    C_Q = neutral_transfer_coefficient(z, z₀M, z₀Q, κ)
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
@@ -207,9 +207,9 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # if Ri_c > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_c)^2
     # if Ri_c < 0 then κ^2/log(z/z₀)^2
     Ri = clamp(Ri, 0, Ri_c)
-    vars.parameterizations.boundary_layer_drag_momentum[ij] = max(drag_min, drag_max_momentum * (1 - Ri / Ri_c)^2)
-    vars.parameterizations.boundary_layer_drag_heat[ij] = max(drag_min, drag_max_heat * (1 - Ri / Ri_c)^2)
-    vars.parameterizations.boundary_layer_drag_humidity[ij] = max(drag_min, drag_max_humidity * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.boundary_layer_drag_momentum[ij] = max(drag_min, C_D * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.boundary_layer_drag_heat[ij] = max(drag_min, C_H * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q * (1 - Ri / Ri_c)^2)
     return nothing
 end
 
