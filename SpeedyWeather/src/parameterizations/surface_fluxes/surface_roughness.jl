@@ -389,13 +389,13 @@ end
     # Unpack predictors, using defaults when optional fields are absent
     (; land) = vars.parameterizations
 
-    vₕ = hasproperty(land, :high_vegetation_cover) ? land.high_vegetation_cover[ij] : zero(land_fraction)
-    vₗ = hasproperty(land, :low_vegetation_cover) ? land.low_vegetation_cover[ij] : zero(land_fraction)
-    laiₕ = hasproperty(land, :high_vegetation_leaf_area) ? land.high_vegetation_leaf_area[ij] : zero(land_fraction)
-    laiₗ = hasproperty(land, :low_vegetation_leaf_area) ? land.low_vegetation_leaf_area[ij] : zero(land_fraction)
-    sd = hasproperty(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(land_fraction)
-    soil_moisture = hasproperty(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture[ij, begin] : zero(land_fraction)
-    soil_temperature = hasproperty(vars.prognostic.land, :soil_temperature) ? vars.prognostic.land.soil_temperature[ij, end] : zero(land_fraction)
+    vₕ = haskey(land, :high_vegetation_cover) ? land.high_vegetation_cover[ij] : zero(land_fraction)
+    vₗ = haskey(land, :low_vegetation_cover) ? land.low_vegetation_cover[ij] : zero(land_fraction)
+    laiₕ = haskey(land, :high_vegetation_leaf_area) ? land.high_vegetation_leaf_area[ij] : zero(land_fraction)
+    laiₗ = haskey(land, :low_vegetation_leaf_area) ? land.low_vegetation_leaf_area[ij] : zero(land_fraction)
+    sd = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(land_fraction)
+    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture[ij, begin] : zero(land_fraction)
+    soil_temperature = haskey(vars.prognostic.land, :soil_temperature) ? vars.prognostic.land.soil_temperature[ij, end] : zero(land_fraction)
 
     z₀M_land = land_momentum_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, sd, soil_temperature, soil_moisture)
     z₀H_land = land_heat_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, soil_temperature, soil_moisture)
