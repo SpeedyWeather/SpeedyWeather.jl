@@ -119,11 +119,17 @@ end
 # generator function
 function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
     (; NF, GridVariable2D, grid) = SG
-    high_cover = zeros(GridVariable2D, grid)
-    low_cover = zeros(GridVariable2D, grid)
-    high_lai = zeros(GridVariable2D, grid)
-    low_lai = zeros(GridVariable2D, grid)
-    return VegetationClimatology{NF, GridVariable2D}(; high_vegetation_cover = high_cover, low_vegetation_cover = low_cover, high_vegetation_leaf_area = high_lai, low_vegetation_leaf_area = low_lai, kwargs...)
+    high_vegetation_cover = zeros(GridVariable2D, grid)
+    low_vegetation_cover = zeros(GridVariable2D, grid)
+    high_vegetation_leaf_area = zeros(GridVariable2D, grid)
+    low_vegetation_leaf_area = zeros(GridVariable2D, grid)
+    return VegetationClimatology{NF, GridVariable2D}(;
+        high_vegetation_cover,
+        low_vegetation_cover,
+        high_vegetation_leaf_area,
+        low_vegetation_leaf_area,
+        kwargs...
+    )
 end
 
 function variables(::VegetationClimatology)
