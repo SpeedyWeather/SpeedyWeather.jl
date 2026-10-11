@@ -474,13 +474,14 @@ end
 
 @inline positive_base(x) = max(x, one(x))
 
+@inline positive_ocean_heat_base(x) = max(x, oftype(x, eps(one(x))))
+
 @inline positive_coefficient(x) = max(x, eps(typeof(x)))
 
 @inline function bounded_roughness(log_z₀, z_min, z_max)
     log_z₀ = finite_or(log_z₀, log(z_min))
     return exp(clamp(log_z₀, log(z_min), log(z_max)))
 end
-
 
 # Ocean momentum roughness
 @inline function ocean_momentum_roughness(scheme, uₙ::NF, log_αᵪ::NF, siconc::NF) where {NF <: AbstractFloat}
@@ -513,7 +514,7 @@ end
 
     u_safe = max(u, NF(0.1))
 
-    log_z₀ = scheme.h_c1 * positive_base(u + scheme.h_c2)^scheme.h_c3 -
+    log_z₀ = scheme.h_c1 * positive_ocean_heat_base(u + scheme.h_c2)^scheme.h_c3 -
         safe_exp(scheme.h_c4 / u_safe)
 
     z₀ = bounded_roughness(log_z₀, NF(1.0e-9), NF(1.0e-2))
