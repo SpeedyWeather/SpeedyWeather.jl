@@ -63,11 +63,9 @@ initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
     T_grad_ocean = vars.parameterizations.surface_air_temperature[ij] - T_skin_ocean
 
-    sqrt_abs(x) = sqrt(abs(x))
+    signed_sqrt(x) = x >= 0 ? sqrt(x) : -sqrt(-x)
     ocean_slowdown = ((atan((log_z₀_ocean + ((log_z₀_ocean + log_z₀_ocean) + log_z₀_ocean)) + ((z₁ - exp(T_grad_ocean)) * 0.14511)) - 1.9883) * (-10.904 - log_z₀_ocean)) - signed_sqrt(0.34863 * (log_z₀_ocean - atan((Δθᵥ_ocean + -10.904) + (T_grad_ocean + U₁))))
     land_slowdown = 4.2599 + ((1.9678 * atan(exp(((-11.839 - signed_sqrt(U₁)) - (signed_sqrt(Δθᵥ_land + (9.6687 + log_z₀_land)) - (Δθᵥ_land * ((Δθᵥ_land + (z₁ + Δθᵥ_land)) ^ -0.29968)))) - (log_z₀_land * 2.3145)))) * (10.215 + log_z₀_land))
-    # ocean_slowdown=0.5
-    # land_slowdown=0.5
 
     slowdown = ocean_slowdown * (1 - land_fraction) + land_slowdown * land_fraction
 
