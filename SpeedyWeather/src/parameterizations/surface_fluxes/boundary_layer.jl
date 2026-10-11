@@ -99,7 +99,7 @@ function BoundaryLayer(
         surface_roughness = LearnedSurfaceRoughness(SG),
         drag = BulkRichardsonDrag(SG),
     )
-    return BoundaryLayer(surface_condition, neutral_wind_speed, surface_roughness, drag)
+    return BoundaryLayer(; surface_condition, neutral_wind_speed, surface_roughness, drag)
 end
 
 function initialize!(BL::BoundaryLayer)
@@ -120,7 +120,7 @@ variables(BL::BoundaryLayer) = (
 
 # just call the sub-paramterizations one after another
 @propagate_inbounds function parameterization!(ij, vars, BL::BoundaryLayer, model)
-    parameterization!(ij, vars, BL.surface_condition, model)
+    parameterization!(ij, vars, BL.surface_condition, model)  # takes the surface roughness from previous time step
     parameterization!(ij, vars, BL.neutral_wind_speed, model)
     parameterization!(ij, vars, BL.surface_roughness, model)
     parameterization!(ij, vars, BL.drag, model)
