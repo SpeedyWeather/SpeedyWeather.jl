@@ -26,7 +26,9 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
     boundary_layer_drag!(ij, vars, drag)
 
 @propagate_inbounds function boundary_layer_drag!(ij, vars, scheme::ConstantDrag)
-    vars.parameterizations.boundary_layer_drag[ij] = scheme.drag
+    vars.parameterizations.boundary_layer_drag_momentum[ij] = scheme.drag
+    vars.parameterizations.boundary_layer_drag_heat[ij] = scheme.drag
+    vars.parameterizations.boundary_layer_drag_humidity[ij] = scheme.drag
     return nothing
 end
 
@@ -181,16 +183,17 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     z₀H = vars.parameterizations.heat_roughness[ij]
     z₀Q = vars.parameterizations.moisture_roughness[ij]
 
-    function calc_drag_max(z₀)
-        # should be z > z₀, z=z₀ means an infinitely high drag, choose one order higher than roughness length at least
-        # 0 < z < z₀ doesn't make sense so cap here
-        z_calc = max(z, 10z₀)
-        return (κ / log(z_calc / z₀))^2
+    @inline function drag_max(z, z₀M, z₀X, κ)
+        # flux dependent bulk drag coefficient in the neutral limit
+        # should be z > z₀, z = z₀ means infinitely high drag, cap one order above the roughness length
+        zM = max(z, 10z₀M)
+        zX = max(z, 10z₀X)
+        return κ^2 / (log(zM / z₀M) * log(zX / z₀X))
     end
 
-    drag_max_momentum = calc_drag_max(z₀M)
-    drag_max_heat = calc_drag_max(z₀H)
-    drag_max_humidity = calc_drag_max(z₀Q)
+    drag_max_momentum = calc_drag_max(z, z₀M, z₀M, κ)
+    drag_max_heat = calc_drag_max(z, z₀M, z₀H, κ)
+    drag_max_humidity = calc_drag_max(z, z₀M, z₀Q, κ)
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here

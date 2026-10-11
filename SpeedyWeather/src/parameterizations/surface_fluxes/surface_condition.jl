@@ -9,17 +9,38 @@ Adapt.@adapt_structure ConstantWindSlowdown
 ConstantWindSlowdown(SG::SpectralGrid; kwargs...) = ConstantWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::ConstantWindSlowdown, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::ConstantWindSlowdown, model, U₁)
+@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::ConstantWindSlowdown, model, surface_condition, U₁)
     return ws.wind_slowdown
 end
 
 """Calculates the near-surface wind speed from the lowest model
 level wind speed using surface roughness. Fields are $(TYPEDFIELDS)"""
 @kwdef struct LearnedWindSlowdown{NF} <: AbstractParameterization
+    # Ocean slowdown constants
+    @param c1::NF = 0.14511
+    @param c2::NF = 1.9883
+    @param c3::NF = -10.904
+    @param c4::NF = 0.34863
 
+    # Land slowdown constants
+    @param c5::NF = 4.2599
+    @param c6::NF = 1.9678
+    @param c7::NF = -11.839
+    @param c8::NF = 9.6687
+    @param c9::NF = -0.29968
+    @param c10::NF = 2.3145
+    @param c11::NF = 10.215
 end
 
-Adapt.adapt_structure(to, obj::LearnedWindSlowdown{NF}) where {NF} = LearnedWindSlowdown{NF}()
+function Adapt.adapt_structure(to, obj::LearnedWindSlowdown{NF}) where {NF}
+    return LearnedWindSlowdown{NF}(;
+        (
+            f => Adapt.adapt(to, getfield(obj, f))
+                for f in fieldnames(typeof(obj))
+        )...
+    )
+end
+
 LearnedWindSlowdown(SG::SpectralGrid; kwargs...) = LearnedWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
@@ -63,9 +84,12 @@ initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
     T_grad_ocean = vars.parameterizations.surface_air_temperature[ij] - T_skin_ocean
 
+    # Unpack constants for learned slowdown parameterization
+    (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11) = ws
+
     signed_sqrt(x) = x >= 0 ? sqrt(x) : -sqrt(-x)
-    ocean_slowdown = ((atan((log_z₀_ocean + ((log_z₀_ocean + log_z₀_ocean) + log_z₀_ocean)) + ((z₁ - exp(T_grad_ocean)) * 0.14511)) - 1.9883) * (-10.904 - log_z₀_ocean)) - signed_sqrt(0.34863 * (log_z₀_ocean - atan((Δθᵥ_ocean + -10.904) + (T_grad_ocean + U₁))))
-    land_slowdown = 4.2599 + ((1.9678 * atan(exp(((-11.839 - signed_sqrt(U₁)) - (signed_sqrt(Δθᵥ_land + (9.6687 + log_z₀_land)) - (Δθᵥ_land * ((Δθᵥ_land + (z₁ + Δθᵥ_land))^-0.29968)))) - (log_z₀_land * 2.3145)))) * (10.215 + log_z₀_land))
+    ocean_slowdown = ((atan((log_z₀_ocean + ((log_z₀_ocean + log_z₀_ocean) + log_z₀_ocean)) + ((z₁ - exp(T_grad_ocean)) * c1)) - c2) * (c3 - log_z₀_ocean)) - signed_sqrt(c4 * (log_z₀_ocean - atan((Δθᵥ_ocean + c3) + (T_grad_ocean + U₁))))
+    land_slowdown = c5 + ((c6 * atan(exp((c7 - signed_sqrt(U₁)) - (signed_sqrt(Δθᵥ_land + (c8 + log_z₀_land)) - (Δθᵥ_land * ((Δθᵥ_land + (z₁ + Δθᵥ_land))^c9)))) - (log_z₀_land * c10)))) * (c11 + log_z₀_land)
 
     slowdown = ocean_slowdown * (1 - land_fraction) + land_slowdown * land_fraction
 
