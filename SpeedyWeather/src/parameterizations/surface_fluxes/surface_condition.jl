@@ -44,31 +44,10 @@ end
 
 Adapt.@adapt_structure LearnedWindSlowdown
 
-LearnedWindSlowdown(SG::SpectralGrid; kwargs...) =
-    LearnedWindSlowdown{SG.NF}(; kwargs...)
-
-initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
-
-
-function Adapt.adapt_structure(to, obj::LearnedWindSlowdown{NF}) where {NF}
-    return LearnedWindSlowdown{NF}(;
-        (
-            f => Adapt.adapt(to, getfield(obj, f))
-                for f in fieldnames(typeof(obj))
-        )...
-    )
-end
-
 LearnedWindSlowdown(SG::SpectralGrid; kwargs...) = LearnedWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
-@inline function wind_slowdown(
-        ws::LearnedWindSlowdown,
-        U₁::Real,
-        z₁::Real,
-        log_z₀::Real,
-        Δθᵥ::Real,
-    )
+@inline function wind_slowdown(ws::LearnedWindSlowdown, U₁, z₁, log_z₀, Δθᵥ)
     (; c1, c2, c3, c4, c5, c6) = ws
 
     # Prevent division by zero and invalid logarithms
