@@ -97,15 +97,21 @@ end
 
     Tᵥ₁ = virtual_temperature(T₁, q₁, atmosphere)
 
-    # Grid-cell skin temperature
-    T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]
-
-    T_skin_ocean = get_prognostic_step(
-        vars.prognostic.ocean.sea_surface_temperature,
-        time_stepping, ws
-    )[ij]
-
-    T_skin = land_fraction * T_skin_land + (1 - land_fraction) * T_skin_ocean
+    T_skin = zero(T₁)
+    if land_fraction > 0
+        land_temp = get_prognostic_step(
+            vars.prognostic.land.soil_temperature,
+            time_stepper(time_stepping, :land), ws,
+        )
+        T_skin += land_fraction * land_temp[ij, 1]
+    end
+    if land_fraction < 1
+        ocean_temp = get_prognostic_step(
+            vars.prognostic.ocean.sea_surface_temperature,
+            time_stepper(time_stepping, :ocean), ws,
+        )
+        T_skin += (one(land_fraction) - land_fraction) * ocean_temp[ij]
+    end
 
     # Surface virtual temperature
     pₛ = vars.parameterizations.surface_pressure[ij]
