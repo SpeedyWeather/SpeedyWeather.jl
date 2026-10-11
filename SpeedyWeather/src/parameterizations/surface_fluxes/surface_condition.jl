@@ -181,10 +181,10 @@ by extrapolating from the lowest model level to the surface using standard
 atmospheric relationships. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SurfaceCondition{WS, WG} <: AbstractParameterization
     "[OPTION] Ratio of near-surface wind to lowest-level wind [1]"
-    wind_slowdown::WS
+    @component wind_slowdown::WS
 
     "[OPTION] Wind speed of sub-grid scale gusts [m/s]"
-    wind_gust::WG
+    @component wind_gust::WG
 end
 
 Adapt.@adapt_structure SurfaceCondition
