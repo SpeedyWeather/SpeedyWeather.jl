@@ -90,7 +90,7 @@ end
         vars.grid.temperature, time_stepping, ws
     )[ij, nlayers]
 
-    q₁ = hasproperty(vars.grid, :humidity) ?
+    q₁ = haskey(vars.grid, :humidity) ?
         get_prognostic_step(
             vars.grid.humidity, time_stepping, ws
         )[ij, nlayers] : zero(T₁)
