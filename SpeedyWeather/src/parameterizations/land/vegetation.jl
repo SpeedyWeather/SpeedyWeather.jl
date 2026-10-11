@@ -132,14 +132,6 @@ function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing
     )
 end
 
-function variables(::VegetationClimatology)
-    return (
-        ParameterizationVariable(:vegetation_high, GridXY(), desc = "Vegetation high cover", units = "1", namespace = :land),
-        ParameterizationVariable(:vegetation_low, GridXY(), desc = "Vegetation low cover", units = "1", namespace = :land),
-        ParameterizationVariable(:soil_moisture_availability, GridXY(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
-    )
-end
-
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
