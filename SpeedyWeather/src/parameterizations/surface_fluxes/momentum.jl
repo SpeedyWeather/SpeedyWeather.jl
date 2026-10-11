@@ -8,9 +8,6 @@ surface drag that slows down near-surface winds. Uses bulk aerodynamic formulas
 with separate drag coefficients for ocean and land surfaces to account for
 different surface roughness characteristics. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SurfaceMomentumFlux{NF} <: AbstractSurfaceMomentumFlux
-    "[OPTION] Near-surface wind slowdown"
-    @param wind_slowdown::NF = 0.95 (bounds = 0 .. 1,)
-
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
@@ -53,15 +50,12 @@ end
     # Fortran SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
     V₀ = vars.parameterizations.surface_wind_speed[ij]
     ρ = vars.parameterizations.surface_air_density[ij]
-    u = get_prognostic_step(vars.grid.u, model.time_stepping, momentum_flux)
-    v = get_prognostic_step(vars.grid.v, model.time_stepping, momentum_flux)
-
-    # fraction to slow down the lowermost layer wind u,v to surface wind
-    f = momentum_flux.wind_slowdown
+    uₛ = vars.parameterizations.surface_wind_u[ij]
+    vₛ = vars.parameterizations.surface_wind_v[ij]
 
     # flux into lowermost layer [kg/m³ * m/s * m/s = kg/(m·s²) = Pa]
-    flux_u_upward = -ρ * drag * V₀ * f * u[ij, surface]
-    flux_v_upward = -ρ * drag * V₀ * f * v[ij, surface]
+    flux_u_upward = -ρ * drag * V₀ * uₛ
+    flux_v_upward = -ρ * drag * V₀ * vₛ
 
     # convert fluxes to tendencies
     pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]

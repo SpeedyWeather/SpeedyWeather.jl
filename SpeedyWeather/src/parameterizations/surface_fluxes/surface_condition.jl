@@ -107,7 +107,7 @@ end
 
     T₁ = get_prognostic_step(vars.grid.temperature, time_stepping, ws)[ij, nlayers]
 
-    q₁ = hasproperty(vars.grid, :humidity) ? get_prognostic_step(
+    q₁ = haskey(vars.grid, :humidity) ? get_prognostic_step(
             vars.grid.humidity, time_stepping, ws
         )[ij, nlayers] : zero(T₁)
 
@@ -225,7 +225,7 @@ variables needed for surface flux calculations. Computes surface wind speed
 including sub-grid scale gusts, surface air density, and surface air temperature
 by extrapolating from the lowest model level to the surface using standard
 atmospheric relationships. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceCondition{WS, WG} <: AbstractParameterization
+@parameterized @kwdef struct SurfaceCondition{WS, WG} <: AbstractParameterization
     "[OPTION] Ratio of near-surface wind to lowest-level wind [1]"
     wind_slowdown::WS
 
@@ -258,6 +258,11 @@ initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
 @propagate_inbounds function parameterization!(ij, vars, sc::SurfaceCondition, model)
     return surface_condition!(ij, vars, sc, model)
 end
+
+variables(::SurfaceCondition) = (
+    ParameterizationVariable(:surface_wind_u, Grid2D(), desc = "Mean zonal surface wind", units = "m/s"),
+    ParameterizationVariable(:surface_wind_v, Grid2D(), desc = "Mean meridional surface wind", units = "m/s"),
+)
 
 @propagate_inbounds function surface_condition!(ij, vars, surface_condition::SurfaceCondition, model)
 
@@ -296,6 +301,8 @@ end
 
     gust = calc_wind_gust(ij, vars, wind_gust, model, surface_condition, pₛ, Tᵥ)
 
+    vars.parameterizations.surface_wind_u[ij] = uₛ
+    vars.parameterizations.surface_wind_v[ij] = vₛ
     vars.parameterizations.surface_wind_speed[ij] = sqrt(muladd(uₛ, uₛ, muladd(vₛ, vₛ, gust^2)))
 
     return nothing

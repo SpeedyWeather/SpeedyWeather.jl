@@ -191,7 +191,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
         return κ^2 / (log(zM / z₀M) * log(zX / z₀X))
     end
 
-    C_D = neutral_transfer_coefficient(z, z₀M, z₀M, κ)
+    C_M = neutral_transfer_coefficient(z, z₀M, z₀M, κ)
     C_H = neutral_transfer_coefficient(z, z₀M, z₀H, κ)
     C_Q = neutral_transfer_coefficient(z, z₀M, z₀Q, κ)
 
@@ -207,7 +207,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # if Ri_c > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_c)^2
     # if Ri_c < 0 then κ^2/log(z/z₀)^2
     Ri = clamp(Ri, 0, Ri_c)
-    vars.parameterizations.boundary_layer_drag_momentum[ij] = max(drag_min, C_D * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.boundary_layer_drag_momentum[ij] = max(drag_min, C_M * (1 - Ri / Ri_c)^2)
     vars.parameterizations.boundary_layer_drag_heat[ij] = max(drag_min, C_H * (1 - Ri / Ri_c)^2)
     vars.parameterizations.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q * (1 - Ri / Ri_c)^2)
     return nothing

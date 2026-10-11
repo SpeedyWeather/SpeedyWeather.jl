@@ -326,10 +326,10 @@ Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct LearnedSurfaceRoughness{LLR, LOR} <: AbstractSurfaceRoughness
     "[OPTION] learned land surface roughness scheme"
-    land_surface_roughness::LLR
+    @component land_surface_roughness::LLR
 
     "[OPTION] learned ocean surface roughness scheme"
-    ocean_surface_roughness::LOR
+    @component ocean_surface_roughness::LOR
 end
 
 Adapt.@adapt_structure LearnedSurfaceRoughness
