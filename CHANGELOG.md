@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Update SpeedyWeatherAssets default version to v1.1 [#1303](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1303)
+
 ## 0.23.0
 
 - Adjust the Terrarium coupling to Terrarium 0.1.8 [#1300](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1300)
