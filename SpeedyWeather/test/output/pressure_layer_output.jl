@@ -39,11 +39,14 @@ using NCDatasets, Dates
             @test SpeedyWeather.output_extrapolation(var) isa SpeedyWeather.ConstantExtrapolation
         end
 
-        # κ is taken from the model's atmosphere at initialize!
+        # κ is taken from the model's atmosphere at initialize! and the Float64 defaults
+        # are converted to the model's number format (Metal doesn't support Float64 in kernels)
         spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
+        NF = spectral_grid.NF
         output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = SpeedyWeather.PressureLayers(spectral_grid))
         model = PrimitiveWetModel(spectral_grid; output)
         SpeedyWeather.sync_extrapolations!(output, model)
+        @test output.variables[:temp].extrapolation isa SpeedyWeather.DryAdiabaticExtrapolation{NF}
         @test output.variables[:temp].extrapolation.κ == model.atmosphere.κ
 
         # a mask keeps its inner extrapolation synced too
@@ -55,7 +58,10 @@ using NCDatasets, Dates
             ),
         )
         SpeedyWeather.sync_extrapolations!(output, model)
+        @test output.variables[:temp].extrapolation isa
+            SpeedyWeather.SubsurfaceMask{SpeedyWeather.DryAdiabaticExtrapolation{NF}, NF}
         @test output.variables[:temp].extrapolation.above_surface.κ == model.atmosphere.κ
+        @test isnan(output.variables[:temp].extrapolation.missing_value)
     end
 
     @testset "NetCDFOutput on pressure layers" begin

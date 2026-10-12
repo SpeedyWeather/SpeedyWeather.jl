@@ -136,25 +136,27 @@ end
 """$(TYPEDSIGNATURES)
 Set κ of any [`DryAdiabaticExtrapolation`](@ref) in `output.variables` from the model's
 atmosphere, so that the adiabatic descent below the lowest model layer uses the same
-κ = R_dry/cₚ as the model itself. Called at initialize!, no-op for a model without an
-atmosphere (Barotropic) or an output writer that has no output variables (JLD2Output)."""
+κ = R_dry/cₚ as the model itself, and convert all extrapolation parameters to the model's
+number format `NF`. The defaults (`κ = 2/7`, `missing_value = NaN`) are Float64 which
+e.g. Metal does not support inside the interpolation kernel, not even to convert it.
+Called at initialize!, no-op for a model without an atmosphere (Barotropic) or an output
+writer that has no output variables (JLD2Output). The `extrapolation` field of an output
+variable therefore has to accept any `AbstractVerticalExtrapolation`."""
 function sync_extrapolations!(output::AbstractOutput, model::AbstractModel)
     hasproperty(model, :atmosphere) && hasproperty(output, :variables) || return nothing
+    NF = model.spectral_grid.NF
     for variable in values(output.variables)
         hasproperty(variable, :extrapolation) || continue
-        variable.extrapolation = sync_extrapolation(variable.extrapolation, model.atmosphere)
+        variable.extrapolation = sync_extrapolation(variable.extrapolation, NF, model.atmosphere)
     end
     return nothing
 end
 
-sync_extrapolation(E::AbstractVerticalExtrapolation, ::AbstractAtmosphere) = E
-
-# keep the number format of the extrapolation so that the type of `variable.extrapolation`
-# doesn't change, κ is converted to the field's number format in `extrapolate_below` anyway
-sync_extrapolation(::DryAdiabaticExtrapolation{NF}, atmosphere::AbstractAtmosphere) where {NF} =
-    DryAdiabaticExtrapolation(NF(atmosphere.κ))
-sync_extrapolation(E::SubsurfaceMask, atmosphere::AbstractAtmosphere) =
-    SubsurfaceMask(sync_extrapolation(E.above_surface, atmosphere), E.missing_value)
+sync_extrapolation(E::AbstractVerticalExtrapolation, ::Type, ::AbstractAtmosphere) = E
+sync_extrapolation(::DryAdiabaticExtrapolation, ::Type{NF}, atmosphere::AbstractAtmosphere) where {NF} =
+    DryAdiabaticExtrapolation{NF}(atmosphere.κ)
+sync_extrapolation(E::SubsurfaceMask, ::Type{NF}, atmosphere::AbstractAtmosphere) where {NF} =
+    SubsurfaceMask(sync_extrapolation(E.above_surface, NF, atmosphere), convert(NF, E.missing_value))
 
 """$(TYPEDSIGNATURES)
 Define the vertical coordinate of 3D atmospheric variables in the output file or store
