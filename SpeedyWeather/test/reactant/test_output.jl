@@ -108,5 +108,5 @@ using Zarr
         SpeedyWeather.interpolate_output!(output, output.field2D, field)
         SpeedyWeather.interpolate_output!(output_cpu, output_cpu.field2D, field_cpu)
         @test output.field2D.data == output_cpu.field2D.data
-  end
+    end
 end
