@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Update SpeedyWeatherAssets default version to v1.1 [#1303](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1303)
+- Bug fix: `MatrixSpectralTransform` works on Reactant outside of compiled code again: the stacking of real and imaginary parts is jitted together with the matrix multiply [#1302](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1302)
 
 ## 0.23.0
 
