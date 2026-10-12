@@ -62,10 +62,13 @@ RingGrids.extrema_in(v::AbstractVector{<:Reactant.TracedRNumber}, a::Real, b::Re
 RingGrids.extrema_in(v::Union{ConcretePJRTArray{T, 1}, ConcreteIFRTArray{T, 1}}, a::Real, b::Real) where {T} =
     RingGrids.extrema_in(Array(v), a, b)
 
-# Reshaped traced arrays can't be passed to kernels (`reshape(::CuTracedArray, dims)` is broken
-# in Reactant), only flatten traced arrays that don't need to be reshaped, otherwise interpolate
-# per layer via views
-RingGrids.is_flattenable(x::Reactant.TracedRArray) = ndims(x) <= 2
+# Reshaped Reactant arrays can't be passed to kernels (`reshape(::CuTracedArray, dims)` is broken
+# in Reactant, its `_derived_array` is undefined), so only "flatten" matrices which don't need a reshape.
+# Vectors and views are interpolated with the single-layer kernel, higher-dimensional arrays per layer
+# TODO: remove once reshape(::CuTracedArray, dims) works in Reactant
+const ReactantArray = Union{Reactant.TracedRArray, ConcretePJRTArray, ConcreteIFRTArray}
+RingGrids.is_flattenable(x::ReactantArray) = ndims(x) == 2
+RingGrids.is_flattenable(x::SubArray{<:Any, <:Any, <:ReactantArray}) = false
 
 # Force `unsafe=true` in `update_locator!` for Reactant: the safety checks in `find_rings!`
 # call `extrema(θs)` and assertions on `latd` that don't trace through Reactant.
