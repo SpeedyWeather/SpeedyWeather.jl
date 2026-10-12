@@ -498,6 +498,15 @@ end
     end
     R, T = two_stream(20.0, 0.999, 0.85)
     @test 0.01 < 1 - R - T < 0.1                            # a few percent absorption by a thick cloud
+
+    # Rayleigh scattering: the non-absorbing, isotropic limit of the two-stream layer
+    for NF in (Float32, Float64), τ in NF.((0, 0.01, 0.1, 1))
+        R, T = SpeedyWeather.rayleigh_layer(τ)
+        @test R + T ≈ 1
+        R₂, T₂ = two_stream(τ, one(NF), zero(NF))
+        @test R ≈ R₂ atol = 1.0e-4
+        @test T ≈ T₂ atol = 1.0e-4
+    end
 end
 
 @testset "Per-layer shortwave clouds" begin
@@ -557,8 +566,26 @@ end
     @test overcast.outgoing > 0.5 * D_toa
     @test overcast.surface_down < 0.3 * D_toa
 
-    # clear sky, no ozone, black surface: the same as the one-band transfer without clouds
-    no_ozone = SpeedyWeather.CloudyShortwaveRadiativeTransfer(spectral_grid; ozone_absorption = 0)
+    # Rayleigh scattering reflects in clear sky over a black surface, more with a larger optical depth,
+    # energy is conserved, and the clear-sky diagnostic (adding from the top) agrees with the
+    # all-sky transfer without clouds (adding from the surface up)
+    rayleigh_outgoing = map((0.05, 0.1, 0.2)) do τ_R
+        radiative_transfer = SpeedyWeather.CloudyShortwaveRadiativeTransfer(spectral_grid; rayleigh_optical_depth = τ_R)
+        fluxes = shortwave_column!(; cloud_fraction = zeros(nlayers), liquid = zeros(nlayers), albedo = 0.0, radiative_transfer)
+        @test fluxes.absorbed + fluxes.surface_down + fluxes.outgoing ≈ D_toa rtol = 1.0e-10
+        @test P.outgoing_shortwave_clear_sky[ij] ≈ fluxes.outgoing rtol = 1.0e-10
+        fluxes.outgoing
+    end
+    @test 0 < rayleigh_outgoing[1] < rayleigh_outgoing[2] < rayleigh_outgoing[3]
+    @test 0.02 * D_toa < rayleigh_outgoing[2] < 0.15 * D_toa  # a few percent reflected for τ_R = 0.1
+    for albedo in (0.2, 0.8)
+        clear_rayleigh = shortwave_column!(; cloud_fraction = zeros(nlayers), liquid = zeros(nlayers), albedo)
+        @test P.outgoing_shortwave_clear_sky[ij] ≈ clear_rayleigh.outgoing rtol = 1.0e-10
+    end
+
+    # clear sky, no ozone, no Rayleigh scattering, black surface: the same as the one-band transfer
+    # without clouds
+    no_ozone = SpeedyWeather.CloudyShortwaveRadiativeTransfer(spectral_grid; ozone_absorption = 0, rayleigh_optical_depth = 0)
     one_band = OneBandShortwaveRadiativeTransfer(spectral_grid; ozone_absorption = 0)
     a = shortwave_column!(; cloud_fraction = zeros(nlayers), liquid = zeros(nlayers), albedo = 0.0, radiative_transfer = no_ozone)
     heating_cloudy = copy(dTdt[ij, :, 1])

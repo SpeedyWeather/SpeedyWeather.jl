@@ -2,8 +2,10 @@
 
 > Status: **in progress**. Stages 1, 2 and 3 with per-layer shortwave clouds and clear-sky fluxes
 > are implemented and tested on CPU, GPU and with Enzyme (Julia 1.10.12); SpeedyCalibration.jl is
-> adapted and a smoke calibration runs. Open: the loss targets of the cloud tuning, the tuning
-> itself, all-sky ecCKD and the radiation call frequency.
+> adapted, Rayleigh scattering in the cloudy shortwave (7.9) is implemented, and two tuning passes
+> against CERES-EBAF (prescribed SSTs) give a stable climate with all top-of-atmosphere fluxes
+> within 1 W/m²; cloud cover (0.48) and the surface radiation remain off. Open: all-sky ecCKD and
+> the radiation call frequency.
 
 Date of initial draft: 2026-10-07
 
@@ -19,6 +21,221 @@ Base revision: `3c033168` (`mg/clouds`). The initial draft was checked against `
 > scheme and the recommendations
 
 ## Revision log
+
+- 2026-10-12, second tuning pass; validation fixed.
+  > Yes do 1)
+
+  > Continue
+
+  - Second pass (started from the first pass's parameters, 300 days spin-up, cloud cover weight
+    4·10³): at the end of the online tuning cloud cover 0.47 (first pass 0.35), SW CRE −43.4,
+    LW CRE +25.6, clear-sky OSR 54.3, clear-sky OLR 265.2, OSR 97.7, OLR 239.6 W/m².
+    Parameters: critical relative humidity 0.708 (surface) and 0.665 (top),
+    `cloud_fraction_coefficient` 2531, `autoconversion_rate` 1.05e-4, `autoconversion_water`
+    2.4e-4, `ice_autoconversion_rate` 6.1e-4, `asymmetry_factor` 0.866,
+    `liquid_effective_radius_ocean` 9.5 µm, `rayleigh_optical_depth` 0.110,
+    `longwave_opacity_scale` 0.459. Its climate run is stable.
+  - *The climate validation biased the shortwave.* SpeedyCalibration's `DailyMeansCallback`
+    stored one snapshot per day, always at 00 UTC, when the sun is over the Pacific. With the
+    daily cycle the global shortwave means depend on the time of day: on three days of the
+    second-pass model the 00 UTC snapshot against the mean over all time steps was OSR 112–118
+    against 101–103, clear-sky OSR 42 against 46–47, SW CRE −70 to −76 against −54 to −57 W/m²;
+    longwave and cloud cover differ by less than 1 W/m² and 0.01. This explains why the validation
+    showed a weaker clear-sky OSR (48 against 54) and a stronger SW CRE than the online tuning,
+    which samples the whole day. All shortwave numbers of the validation tables above (slab and
+    prescribed SST) are such 00 UTC snapshots. `DailyMeansCallback` now averages over all time
+    steps of each day (with a test); the three prescribed-SST validations (default, first and
+    second pass) are rerun.
+  - Corrected validation, prescribed SSTs, means over years 2–3 [W/m²]:
+
+    | | Default | First pass | Second pass | CERES-EBAF |
+    |---|---|---|---|---|
+    | OSR | 80.0 | 100.4 | 99.1 | 99.1 |
+    | Clear-sky OSR | 49.5 | 53.9 | 53.4 | 53.8 |
+    | SW CRE | −30.6 | −46.5 | −45.7 | −45.3 |
+    | OLR | 207.5 | 238.4 | 239.9 | 240.1 |
+    | Clear-sky OLR | 238.9 | 264.5 | 266.7 | 265.9 |
+    | LW CRE | +31.4 | +26.1 | +26.8 | +25.8 |
+    | Net at TOA | +52.5 | +1.2 | +1.0 | +0.7 |
+    | Cloud cover | 0.47 | 0.37 | 0.48 | 0.67 |
+    | LWP, IWP [g/m²] | 5.0, 44.3 | 30.0, 57.9 | 26.8, 24.0 | |
+    | Surface SW down, up | 226.7, 28.4 | 210.0, 27.8 | 211.5, 28.4 | 186.6, 23.2 |
+    | Surface LW down, up | 337.3, 405.7 | 294.2, 397.4 | 295.0, 396.9 | 344.8, 398.3 |
+    | Precipitation [mm/day] | 1.4 | 1.3 | 1.4 | about 2.7 |
+
+    With the second pass all top-of-atmosphere fluxes are within 1 W/m² of CERES-EBAF; the earlier
+    gap between online tuning and validation (item 3 of "What remains" on 2026-10-09) was the
+    snapshot bias, not a difference between the online and the equilibrium climate. The climate
+    is stable (top layer 233 K from month 6 on). What remains: cloud cover 0.48, and the surface
+    radiation (downward longwave 50 W/m² too low, downward shortwave 25 W/m² too high): the
+    surface receives 29 W/m² less net radiation than observed, which with the weak atmospheric
+    radiative cooling keeps the precipitation at half the observed. Both surface errors are limits
+    of the one-band schemes (a grey longwave, one broadband shortwave without spectrally
+    resolved water vapour and cloud absorption), see 7.2.6 for ecCKD.
+
+- 2026-10-09, Julia 1.11 to-do.
+  > ok we continue, note in the plan as a to-do that we need to check and find the cause of the
+  > Enzyme error with Julia 1.11 eventually. For now we continue in Julia 1.10.12 though
+
+  - To-do in Future work: find the cause of the Enzyme segfault on Julia 1.11.7. Differentiation
+    and calibration continue on Julia 1.10.12 (7.8, item 6).
+  - Decision on the inconsistent loss targets (asked, answer "Add Rayleigh first"): add Rayleigh
+    scattering to the cloudy one-band shortwave before tuning the clouds. Plan in 7.9.
+  > go for it
+
+  - Implemented 7.9 as planned: `rayleigh_optical_depth` (default 0.1) and `rayleigh_layer` in
+    `CloudyShortwaveRadiativeTransfer`, cloud and Rayleigh optics combined in the cloudy part, and
+    the clear-sky outgoing shortwave from a top-down adding pass in the layer loop. Docs
+    (`prognostic_clouds.md`) and CHANGELOG updated.
+  - The cloud tests pass on CPU (2216 tests), including the new checks: the closed form against
+    the two-stream layer, energy conservation with Rayleigh scattering, the clear-sky diagnostic
+    against the all-sky transfer without clouds, the reflection increasing with `τ_R`, and the
+    reduction to `OneBandShortwaveRadiativeTransfer` with `rayleigh_optical_depth = 0`. Both GPU
+    testsets pass on an A40 (3 and 4 tests). On Julia 1.10.12 the radiation column and model-level
+    differentiability tests pass with `rayleigh_optical_depth` among the differentiated parameters
+    (16 tests), and SpeedyCalibration's tests with `--clouds` pass (65 tests).
+  - Ten-day global means at T32 L8 (Sundqvist closure, detrainment 0.2): with `τ_R = 0` and 0.1
+    the clear-sky outgoing shortwave is 18.0 and 39.2 W/m², the all-sky 44.9 and 64.8 W/m², the
+    SW cloud radiative effect −26.9 and −25.7 W/m², and the surface shortwave down 223 and 207
+    W/m². The rise of 21 W/m² is somewhat below the estimate of 7.9; CERES-EBAF's 53.8 W/m² needs
+    `τ_R` of about 0.17, which also stands for aerosols and the missing zenith-angle dependence.
+  - SpeedyCalibration.jl: `CLOUD_LOSS` now uses the CERES-EBAF Ed4.1 global means for
+    07/2005–06/2015 (Data Quality Summary, Tables 2-1 and 4-1, clear sky for the total region):
+    outgoing shortwave 99.1, clear-sky 53.8, SW CRE −45.3, outgoing longwave 240.1, LW CRE +25.8
+    W/m² (consistent: CRE = clear-sky − all-sky), and the cloud cover 0.67; `:osr_clear` is a
+    key of its own. `examples/clouds.jl` tunes `rayleigh_optical_depth` with the clouds.
+  > I already delted it. Proceed with the next step
+
+  - Tuning runs on SLURM (account `flai`, partition `standard`, 1 CPU, Julia 1.10.12), set up in
+    `/p/tmp/maxgelbr/calibration/` (the Julia binary, the environment developing the local
+    SpeedyWeather and SpeedyCalibration checkouts, `scripts/`, `output/`, `logs/`): the
+    configuration of `examples/clouds.jl` (Sundqvist closure, detrainment 0.2, cloudy one-band
+    radiation with Rayleigh scattering, T31 L8, perpetual equinox with daily cycle), 9 parameters,
+    `CLOUD_LOSS`, 60 days spin-up, 200 batches of 3 days with 20 single-step gradients each, Adam
+    1e-2, `gradient_scope = :parameterizations`; then 3-year climate runs with default and with
+    tuned parameters (statistics over the last 2 years).
+  - On a compute node a T31 day costs about 1 s and a gradient 0.1 s (after the Enzyme compile),
+    so 200 batches take about an hour.
+  - The first tuning run stopped after 37 batches at SpeedyCalibration's default
+    `loss_threshold = 500`, which counts as converged but is far from it for `CLOUD_LOSS`: cloud
+    cover 0.41 (target 0.67), SW CRE −42.8 (−45.3), LW CRE +34.0 (+25.8), clear-sky OSR 47.4
+    (53.8), OSR 90.2 (99.1), OLR 226.1 (240.1) W/m². Parameters moved to critical relative
+    humidity 0.873 (surface) and 0.872 (top), asymmetry factor 0.835, Rayleigh optical depth 0.122.
+    Rerun with `loss_threshold = 0`.
+  - Fixed in SpeedyCalibration for the validation: `DailyMeansCallback` read the layer-average
+    temperature from a field removed in SpeedyWeather 0.24; it now also records the clear-sky
+    fluxes, cloud cover and water paths.
+  - Slab-ocean run with 200 batches (`loss_threshold = 0`, 40 minutes): the fluxes reach their
+    targets within the tuning window, except cloud cover (0.46). Main parameter changes: critical
+    relative humidity 0.854 (surface) and 0.765 (top), `cloud_fraction_coefficient` 3327,
+    `rayleigh_optical_depth` 0.169. Three-year climate runs, means over years 2–3 [W/m²]:
+
+    | | Default | Tuned | CERES-EBAF |
+    |---|---|---|---|
+    | OSR | 67.9 | 99.1 | 99.1 |
+    | Clear-sky OSR | 34.0 | 49.7 | 53.8 |
+    | SW CRE | −33.9 | −49.5 | −45.3 |
+    | OLR | 277.4 | 249.1 | 240.1 |
+    | Clear-sky OLR | 292.9 | 274.4 | 265.9 |
+    | LW CRE | +15.5 | +25.2 | +25.8 |
+    | Cloud cover | 0.30 | 0.46 | 0.67 |
+    | LWP, IWP [g/m²] | 13.8, 30.6 | 16.3, 40.9 | |
+
+  - The slab ocean (the default ocean, 50 m) drifts for years: in the default run the monthly OLR
+    goes from 219 (month 3) to 288 (month 24) and back to 270 W/m² (month 37), and the tuning
+    window (months 2–22) lies inside that drift. The default validation also started its slab
+    ocean from January SSTs, the tuned one from March (see the next item), so this comparison is
+    rough. Clear-sky OLR is about 27 W/m² above CERES-EBAF, so OLR and LW CRE targets conflict
+    in the same way as the shortwave targets did before Rayleigh scattering.
+  > (asked) Ocean: "Prescribed SST"; clear-sky longwave: "Yes, add olr_clear"
+
+  - Tuning and validation rerun with prescribed SSTs (`ConstantOceanClimatology`, the March 21
+    climatology, constant, as the insolation is perpetual equinox), 180 days spin-up, `:olr_clear`
+    (CERES-EBAF 265.9 W/m²) in `CLOUD_LOSS`, and the clear-sky longwave optical depths of
+    `FriersonLongwaveTransmissivity` (`τ₀_equator`, `τ₀_pole`, `fₗ`) as 3 more tuned parameters
+    (12 in total).
+  - Default parameters with prescribed SSTs (3 years, means over years 2–3): the atmosphere settles
+    within about 10 months (no drift afterwards), at OSR 77.2, clear-sky OSR 44.3, SW CRE −33.0,
+    OLR 207.6, clear-sky OLR 238.9, LW CRE +31.3 W/m², cloud cover 0.47, LWP 5.1 and IWP 44.6
+    g/m², precipitation 1.4 mm/day. Over realistic SSTs the clear-sky OLR is 27 W/m² *below*
+    CERES-EBAF: the Frierson clear-sky longwave (`τ₀_equator = 6`) is too opaque for Earth-like
+    temperatures. Too little atmospheric radiative cooling also explains the low precipitation.
+    The slab runs showed the opposite sign only because the slab ocean warmed until OLR matched
+    the absorbed sunlight. Tuning the clear-sky longwave against `:olr_clear` addresses this.
+  - Prescribed-SST tuning, 12 parameters, 200 batches (19 minutes): at the end all fluxes are within
+    1–4 W/m² of CERES-EBAF (OSR 98.5, clear-sky OSR 54.8, SW CRE −43.6, OLR 236.4, clear-sky OLR
+    262.3, LW CRE +25.9) but cloud cover is 0.36 (0.67); its term is 96 of the remaining loss of
+    126. Parameters: critical relative humidity 0.708 (surface) and 0.763 (top),
+    `cloud_fraction_coefficient` 735, `autoconversion_rate` 3.2e-5, `autoconversion_water` 7.1e-4,
+    `ice_autoconversion_rate` 2.4e-4, `asymmetry_factor` 0.824, `liquid_effective_radius_ocean`
+    6.1 µm, `rayleigh_optical_depth` 0.111, `τ₀_equator` 3.68, `τ₀_pole` 0.93, `fₗ` 0.043: fewer,
+    optically thicker and brighter clouds.
+  - *The tuned climate run blows up on day 318.* Its first 9 months match CERES-EBAF well (OSR
+    90–100, OLR about 240, clear-sky OLR 265–268 W/m², cloud cover 0.33), but the top layer warms
+    all the time (monthly means 207, 228, 241, 251, 256, 262 K in months 1, 3, 5, 7, 9, 10; with
+    default parameters it levels off at 226 K after 4 months) until the model fails. The tuned
+    longwave parameters cut the optical depth of the top layer about 4× (Frierson
+    `τ₀ (fₗ σ + (1 − fₗ) σ⁴)` at σ = 1/8: 0.076 → 0.021 at the equator, 0.019 → 0.005 at the
+    poles). The top layer still absorbs the same ozone heating but hardly emits, so its
+    equilibrium temperature is much higher and its radiative relaxation takes about a year.
+    Single-step gradients of the fluxes cannot see this; the climate validation caught it.
+  > (asked) How to constrain the longwave tuning: "Hold τ₀·fₗ fixed"
+
+  - The clear-sky longwave is now tuned as one scale factor `s` with `τ₀_equator = 6s`,
+    `τ₀_pole = 1.5s`, `fₗ = 0.1/s` (bounds 0.3–1.5): `τ₀ fₗ`, the opacity of the top layers, stays
+    at its default at every latitude, and only the lower-tropospheric (σ⁴, water-vapour-like)
+    opacity `τ₀ (1 − fₗ)` changes. SpeedyCalibration gained `ScaledParamSpec` for this (one
+    trainable scale factor of several model parameters, `reference · s^exponent` each, the
+    gradient by the chain rule over the Enzyme gradients of all of them), so the tuning has 10
+    parameters.
+  - Tuning with the scale factor (200 batches, 20 minutes): `longwave_opacity_scale` 0.49
+    (`τ₀_equator` 2.94, `τ₀_pole` 0.73, `fₗ` 0.204, `τ₀ fₗ` = 0.6 unchanged, σ⁴ opacity 5.4 → 2.3),
+    critical relative humidity 0.742 (surface) and 0.745 (top), `cloud_fraction_coefficient` 990,
+    `autoconversion_rate` 4.4e-5, `autoconversion_water` 5.5e-4, `ice_autoconversion_rate`
+    2.1e-4, `asymmetry_factor` 0.823, `liquid_effective_radius_ocean` 6.9 µm,
+    `rayleigh_optical_depth` 0.111.
+  - The tuned climate run is stable (top layer levels off at 233 K after 4 months, default 226 K;
+    no drift over 3 years). Means over years 2–3 with prescribed SSTs [W/m²]:
+
+    | | Default | Tuned | CERES-EBAF |
+    |---|---|---|---|
+    | OSR | 77.2 | 100.9 | 99.1 |
+    | Clear-sky OSR | 44.3 | 48.4 | 53.8 |
+    | SW CRE | −33.0 | −52.5 | −45.3 |
+    | OLR | 207.6 | 238.3 | 240.1 |
+    | Clear-sky OLR | 238.9 | 264.3 | 265.9 |
+    | LW CRE | +31.3 | +26.0 | +25.8 |
+    | Net at TOA | +55.2 | +0.8 | +0.7 |
+    | Cloud cover | 0.47 | 0.37 | 0.67 |
+    | LWP, IWP [g/m²] | 5.1, 44.6 | 29.8, 57.9 | |
+    | Surface LW down | 337.4 | 294.3 | 344.8 |
+    | Surface SW down | 223.1 | 202.4 | 186.6 |
+    | Precipitation [mm/day] | 1.4 | 1.3 | about 2.7 |
+
+  - *What remains.* (1) Cloud cover stays near 0.37: the loss is met with fewer, optically thicker
+    clouds, as the cloud cover term (weight 10³) is small against the flux terms; the model's
+    cover (maximum-random overlap of the layer fractions) is also not the same quantity as a
+    satellite's cloud detection. (2) With a single grey longwave band the top-of-atmosphere
+    clear-sky OLR and the surface longwave are not both right: lowering the lower-tropospheric
+    opacity to match the OLR cuts the downward longwave at the surface by 50 W/m² below CERES-EBAF.
+    The atmosphere then cools too little radiatively and the precipitation stays at half the
+    observed. This is a limit of the grey Frierson longwave, not of the clouds; a spectral
+    longwave (ecCKD via NumericalRadiation, 7.2.6) is the way to get both. (3) The SW CRE in the
+    climate run (−52.5) is stronger than at the end of the online tuning (−42.1), while the
+    clear-sky OSR is weaker (48.4 against 54.5): the equilibrium climate differs from the state
+    the online tuning saw, so a second tuning pass started from the tuned climate would help.
+  > Yes do 1)
+
+  - Second tuning pass: started from the tuned parameters with 300 days spin-up (the tuned
+    climate settles within 4–7 months), cloud cover weight 4·10³ instead of 10³ (a cover error
+    of 0.05 then costs as much as a flux error of 3 W/m², roughly the observational
+    uncertainties), otherwise as the first pass (200 batches, Adam 1e-2); then a 3-year climate
+    run. Scripts: `tune_clouds.jl` takes the initial `final_weights.toml`, the cloud cover weight
+    and the spin-up length as arguments; `cloud-tune-pass2.sbatch`, `cloud-validate-pass2.sbatch`.
+  - SpeedyCalibration fixes found on the way: the model is initialized at `start_date`
+    (`initialize!(model; time)`; before, prescribed SSTs came from January 1 while the clock was
+    then set to March 21), and `final_weights.toml` quotes the parameter names (unicode names
+    such as `τ₀_equator` are not valid bare TOML keys).
 
 - 2026-10-08 (evening), the differentiability tests pass on Julia 1.10.12 (cloud column 8/8,
   radiation column 6/6, all parameterizations of a step with the model `Duplicated` 10/10).
@@ -1018,8 +1235,10 @@ fit the cloud problem yet.
    and avoids the dynamics entirely. Offer it as an option of the gradient step; the
    differentiability test "all parameterizations of a step" in `test/differentiability/clouds.jl`
    is exactly this gradient, checked against finite differences.
-6. *Julia version:* run differentiation and calibration on Julia 1.10 (the Enzyme CI carrier) or
-   1.11, not 1.12, where Enzyme hits the problems recorded for the dynamics.
+6. *Julia version:* run differentiation and calibration on Julia 1.10.12 (the Enzyme CI carrier,
+   a current 1.10 patch release; the 1.10.10 module cannot precompile Enzyme 0.13.214). Not 1.12,
+   where Enzyme hits the problems recorded for the dynamics, and for now not 1.11: on 1.11.7 the
+   SpeedyCalibration cloud gradient segfaults in LLVM while Enzyme compiles (to-do below).
 
 **What SpeedyWeather needs:**
 
@@ -1035,6 +1254,74 @@ fit the cloud problem yet.
   (`q_c > 10⁻⁶ p/1000 hPa`, cloud fraction ≥ 0.001), the `min`/`max` limiters of the sinks and the
   clamps give zero or one-sided gradients where they are active.
 - *Cost:* Enzyme compile time on the full `PrimitiveWetModel` is substantial.
+
+### 7.9 Rayleigh scattering in the cloudy one-band shortwave
+
+*Status:* **implemented** (2026-10-09, signed off: "go for it"). See the revision log of 2026-10-09
+for the results; the bounds of `rayleigh_optical_depth` in SpeedyCalibration's `examples/clouds.jl`
+are 0.03–0.3.
+
+*Problem.* In clear sky `CloudyShortwaveRadiativeTransfer` reflects only at the surface. Its
+clear-sky outgoing shortwave is about 23 W/m² in the global mean, against about 53 W/m² observed
+(CERES-EBAF). The cloud loss cannot then match both the shortwave cloud radiative effect and the
+all-sky outgoing shortwave (revision log of 2026-10-08, evening). The missing clear-sky reflection is
+mostly Rayleigh scattering (and scattering by aerosols), so it is added before the clouds are tuned.
+
+*Design.* Only `CloudyShortwaveRadiativeTransfer` changes. `OneBandShortwaveRadiativeTransfer`, the
+default model with `DiagnosticClouds`, keeps its own tuned clear sky.
+
+1. **Parameter:** `@param rayleigh_optical_depth::NF = 0.1 (bounds = Nonnegative,)`, the broadband
+   scattering optical depth of the whole atmosphere at 1000 hPa. It also stands for non-absorbing
+   aerosol scattering and is tuned against the clear-sky outgoing shortwave. Layer `k` has
+   `τ_R,k = rayleigh_optical_depth · Δp_k / 10⁵ Pa`.
+2. **Clear part of a layer:** conservative, isotropic scattering (`ω = 1`, `g = 0`). The reflectance
+   and transmittance are the non-absorbing limit of `two_stream_diffuse_layer`, written in closed
+   form (smooth, no floor on `k`): `R_R = γτ_R/(1 + γτ_R)`, `T_R = 1/(1 + γτ_R)`, with `γ = √3/2`.
+3. **Cloudy part of a layer:** the cloud and Rayleigh optical properties are combined:
+   - `τ = τ_c + τ_R`;
+   - `ω = (ω_c τ_c + τ_R)/τ`;
+   - `g = g_c ω_c τ_c/(ω_c τ_c + τ_R)`.
+
+   These go into `two_stream_diffuse_layer` as before.
+4. **Layer:** `R = (1 − C) R_R + C R_c`, `T = t ((1 − C) T_R + C T_c)`, with the gas transmissivity
+   `t`. The adding method, the fluxes and the heating are otherwise unchanged. Scattering is
+   conservative, so it heats nothing itself; it changes the heating only through the redistributed
+   flux.
+5. **Clear-sky diagnostic:** `albedo · t_clear² · D_top` becomes an adding pass over the clear-sky
+   layers (`R_R`, `T_R · t`), top-down inside the existing layer loop. It carries three scalars:
+   the reflectance of the stack from above, its reflectance from below, and its transmittance. No
+   extra arrays (GPU), and smooth (Enzyme). Then
+   `outgoing_shortwave_clear_sky = (R + T² A/(1 − R* A)) D_top` with the surface albedo `A`.
+
+*Expected effect.* With `τ_R = 0.1` the clear atmosphere reflects about 8 % of the sunlight, about
++25 W/m². Less light then reaches the surface, so its reflection contributes less. The clear-sky
+outgoing shortwave should rise from about 23 to about 45 W/m², and the tuning brings it to about
+53 W/m².
+
+*Tests* (in `test/parameterizations/cloud_condensation.jl` and `test/differentiability/clouds.jl`):
+- The closed form equals `two_stream_diffuse_layer` as `ω → 1` with `g = 0`, and `R_R + T_R = 1`.
+- Per-layer shortwave:
+  - energy conservation holds with Rayleigh scattering;
+  - the clear-sky diagnostic equals the all-sky outgoing shortwave without clouds;
+  - over a black surface the clear-sky outgoing shortwave is positive and increases with `τ_R`;
+  - with `rayleigh_optical_depth = 0` the existing reduction to `OneBandShortwaveRadiativeTransfer`
+    still holds.
+- Differentiability: `rayleigh_optical_depth` enters the radiation column test automatically, since
+  that test takes all parameters via `parameters`.
+- GPU: the existing GPU testsets run the cloudy shortwave.
+
+*SpeedyCalibration.jl.*
+- Add `:osr_clear` to `CLOUD_LOSS` and keep the all-sky `:osr`.
+- Take all targets from one dataset (CERES-EBAF), so that they satisfy `osr = osr_clear − sw_cre`.
+  Verify the values against the EBAF data when setting them.
+- Add `rayleigh_optical_depth` (bounds about 0.03–0.2) to the parameters of `examples/clouds.jl`.
+
+*Documentation:* the shortwave section of `docs/src/prognostic_clouds.md` (formulas, the new
+parameter, the clear-sky diagnostic) and the docstring of `CloudyShortwaveRadiativeTransfer`.
+
+*Known limitations.* The scattering does not depend on the zenith angle: the layers are diffusely
+illuminated two-stream layers, as for the clouds, so low sun reflects too little. A direct-beam
+treatment of clouds and Rayleigh scattering together, e.g. delta-Eddington with `μ₀`, is future work.
 
 ## Summary of changes (Stage 1 and its Stage 0 parts)
 
@@ -1178,9 +1465,16 @@ components may declare fused members in `docs/src/variable_system.md`. Update
 - Prognostic cloud fraction, only if Stage 2 shows systematic cover errors that RH and condensate
   cannot fix.
 - Tuning with SpeedyCalibration.jl, see 7.8.
-- Rayleigh scattering in the one-band shortwave, so that the clear-sky outgoing shortwave (about
-  23 W/m², observed about 53 W/m²) and the cloud radiative effect can be tuned against
-  observations at the same time (revision log of 2026-10-08, evening).
+- *To-do:* find the cause of the Enzyme error on Julia 1.11.7. SpeedyCalibration's `--clouds`
+  gradient test (`compute_gradients!` with `scope = :parameterizations`, Float32
+  `PrimitiveWetModel` with `PrognosticCloudCondensation` and cloudy one-band radiation, T15 L8,
+  Enzyme 0.13.214) segfaults in LLVM's GVN pass (`simplifyMulInst`, from Enzyme's `post_optimize!`)
+  during compilation; the same test passes on 1.10.12. The Float64 model-level test of
+  `test/differentiability/clouds.jl` compiled on 1.11.7, so the precision or the size of the
+  differentiated function may matter. A full-model `time_step!` reverse pass also crashed on 1.11.7
+  in July 2026. Until resolved, AD and calibration run on Julia 1.10.12.
+- A direct-beam (zenith-angle dependent) shortwave for clouds and Rayleigh scattering together,
+  e.g. delta-Eddington with `μ₀` (7.9, known limitations).
 
 ## Appendix: water loss in `ImplicitCondensation`
 

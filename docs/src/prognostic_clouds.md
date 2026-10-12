@@ -171,8 +171,21 @@ every layer. The cloudy part of a layer, cloud fraction ``a``, has the reflectan
 transmittance ``T_c`` of a homogeneous, absorbing layer of in-cloud optical depth
 ``\tau = \frac{3}{2}(\mathrm{LWP}/(\rho_w r_l) + \mathrm{IWP}/(\rho_i r_i))/a`` from the two-stream
 equations for diffuse light (quadrature coefficients, asymmetry factor ``g = 0.85``,
-single-scattering albedo ``\omega = 0.999``). The layer reflects ``R = a R_c`` and transmits
-``T = t((1-a) + a T_c)`` with the clear-sky transmissivity ``t``. The fluxes follow from the
+single-scattering albedo ``\omega = 0.999``). Every layer also scatters conservatively and
+isotropically (Rayleigh scattering, standing in for non-absorbing aerosols too) with the optical
+depth ``\tau_R = \tau_{R,0} \Delta p / 1000~\mathrm{hPa}``, `rayleigh_optical_depth` ``\tau_{R,0} = 0.1``
+by default. The clear part of a layer reflects ``R_R = \gamma \tau_R / (1 + \gamma \tau_R)`` and
+transmits ``T_R = 1 - R_R`` with ``\gamma = \sqrt{3}/2``, the non-absorbing limit of the two-stream
+layer. In the cloudy part the optical properties of cloud and Rayleigh scattering are combined,
+
+```math
+\tau = \tau_c + \tau_R, \quad
+\omega = \frac{\omega_c \tau_c + \tau_R}{\tau}, \quad
+g = \frac{g_c \omega_c \tau_c}{\omega_c \tau_c + \tau_R}.
+```
+
+The layer reflects ``R = (1-a) R_R + a R_c`` and transmits ``T = t((1-a) T_R + a T_c)`` with the
+clear-sky transmissivity ``t`` (gas absorption). The fluxes follow from the
 adding method, which includes the multiple reflections between layers and with the surface;
 clouds of different layers are independent (random overlap). The heating of every layer is its
 flux convergence, so absorption in the atmosphere, at the surface and the reflection to space add
@@ -194,8 +207,9 @@ With [`OneBandCloudyShortwave`](@ref) and [`OneBandCloudyLongwave`](@ref) the ou
 longwave radiation without clouds are diagnosed as well, `outgoing_shortwave_clear_sky` and
 `outgoing_longwave_clear_sky` (output `osr_clear`, `olr_clear`, part of
 `SpeedyWeather.CloudOutput()`), so that the cloud radiative effects are the all-sky minus the
-clear-sky fluxes. The clear-sky shortwave is the surface reflection through the cloud-free column
-twice, the clear-sky longwave one more upward sweep with the clear-sky transmissivity.
+clear-sky fluxes. The clear-sky shortwave is the adding method over the layers without clouds
+(Rayleigh scattering, gas absorption and the surface), the clear-sky longwave one more upward
+sweep with the clear-sky transmissivity.
 
 [`CloudyLongwaveTransmissivity`](@ref) multiplies the transmissivity of a clear-sky scheme
 (by default `FriersonLongwaveTransmissivity`) in every layer by ``1 - a \varepsilon`` with
@@ -219,8 +233,9 @@ prognostic cloud condensate the detrainment has no effect. The default is 0.
   Tuning with SpeedyCalibration.jl is planned.
 - Convective clouds only through the detrainment of Betts-Miller convection; there is no separate
   stratocumulus cloud.
-- Random overlap in the per-layer shortwave and in the longwave; the shortwave clouds treat the
-  sunlight as diffuse.
+- Random overlap in the per-layer shortwave and in the longwave; the shortwave clouds and the
+  Rayleigh scattering treat the sunlight as diffuse, so their reflection does not depend on the
+  zenith angle and low sun reflects too little.
 - The Sundqvist closure's supply includes the leapfrog time filter's correction of the state and is
   zero for the first two calls.
 - The NumericalRadiation ecCKD scheme is clear-sky and does not use the cloud state yet.

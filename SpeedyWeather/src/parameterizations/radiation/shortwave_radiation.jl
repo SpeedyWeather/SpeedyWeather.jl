@@ -255,10 +255,16 @@ diffusely illuminated two-stream layer (quadrature coefficients) with the in-clo
 
     τ = 3/2 (LWP/(ρ_w r_l) + IWP/(ρ_i r_i)) / C
 
-and the layer's reflectance and transmittance are `R = C R_c` and `T = t ((1 - C) + C T_c)`
-with the clear-sky transmissivity `t` (gas absorption). Clouds of different layers are
-independent (random overlap). Ozone absorbs a fraction of the incoming beam above `σ = 0.2`
-as in [`OneBandShortwaveRadiativeTransfer`](@ref). Use with clouds that do not reflect at a cloud
+Every layer also scatters conservatively and isotropically (Rayleigh scattering, standing in for
+non-absorbing aerosols too) with the optical depth `τ_R = rayleigh_optical_depth Δp/1000 hPa`:
+the clear part has `R_R = γτ_R/(1 + γτ_R)`, `T_R = 1 - R_R` with `γ = √3/2`, see
+[`rayleigh_layer`](@ref), and in the cloudy part the optical properties of cloud and Rayleigh
+scattering are combined (`τ = τ_c + τ_R`, `ω = (ω_c τ_c + τ_R)/τ`, `g = g_c ω_c τ_c/(ω_c τ_c + τ_R)`).
+The layer's reflectance and transmittance are `R = (1 - C) R_R + C R_c` and
+`T = t ((1 - C) T_R + C T_c)` with the clear-sky transmissivity `t` (gas absorption). Clouds of
+different layers are independent (random overlap). Ozone absorbs a fraction of the incoming beam
+above `σ = 0.2` as in [`OneBandShortwaveRadiativeTransfer`](@ref). The clear-sky outgoing shortwave
+is the adding method over the layers without clouds. Use with clouds that do not reflect at a cloud
 top themselves and a transmissivity without cloud absorption, see [`OneBandCloudyShortwave`](@ref).
 Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct CloudyShortwaveRadiativeTransfer{NF, F} <: AbstractShortwaveRadiativeTransfer
@@ -270,6 +276,9 @@ Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Density of ice [kg/m³] for the optical depth of cloud ice"
     @param ice_density::NF = 917 (bounds = Positive,)
+
+    "[OPTION] Rayleigh (and non-absorbing aerosol) scattering optical depth of the atmosphere at 1000 hPa, broadband [1]"
+    @param rayleigh_optical_depth::NF = 0.1 (bounds = Nonnegative,)
 
     "[OPTION] Total ozone absorption as fraction of incoming solar radiation (1)"
     @param ozone_absorption::NF = 0.01 (bounds = 0 .. 1,)
@@ -335,6 +344,17 @@ reached without cancellation."""
 end
 
 """$(TYPEDSIGNATURES)
+Reflectance and transmittance of a layer of optical depth `τ` that scatters conservatively and
+isotropically (single-scattering albedo 1, asymmetry factor 0, Rayleigh scattering) for diffuse
+illumination, `R = γτ/(1 + γτ)`, `T = 1/(1 + γτ)` with `γ = √3/2`, the non-absorbing limit of
+[`two_stream_diffuse_layer`](@ref)."""
+@inline function rayleigh_layer(τ)
+    γτ = sqrt(typeof(τ)(3)) / 2 * τ
+    T = inv(1 + γτ)
+    return γτ * T, T
+end
+
+"""$(TYPEDSIGNATURES)
 One-band shortwave radiative transfer of column `ij` with clouds in every layer, adding method,
 see [`CloudyShortwaveRadiativeTransfer`](@ref). `t` is the clear-sky transmissivity (scratch
 array, overwritten), `vars.scratch.grid.b` is used as work array."""
@@ -348,7 +368,7 @@ array, overwritten), `vars.scratch.grid.b` is used as work array."""
     )
     (; cloud_fraction, cloud_liquid_water, cloud_ice_water) = vars.parameterizations
     (; cloud_liquid_effective_radius, cloud_ice_effective_radius) = vars.parameterizations
-    (; asymmetry_factor, single_scattering_albedo, ice_density, ozone_absorption) = radiation
+    (; asymmetry_factor, single_scattering_albedo, ice_density, rayleigh_optical_depth, ozone_absorption) = radiation
     albedo_stack = vars.scratch.grid.b          # reflectance of layers, then albedo of the stack below
 
     dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, radiation)
@@ -370,24 +390,42 @@ array, overwritten), `vars.scratch.grid.b` is used as work array."""
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
 
     # 1. OZONE absorbs from the incoming beam in the stratosphere, LAYER OPTICS of the cloudy layers
+    # with Rayleigh scattering, and the CLEAR-SKY stack added from the top down: its reflectance
+    # from above and from below, and its transmittance
     D_toa = model.planet.solar_constant * cos_zenith
     D = D_toa
-    clear_sky_transmission = one(NF)            # through the whole column without clouds
+    R_clear_above = zero(NF)
+    R_clear_below = zero(NF)
+    T_clear = one(NF)
     for k in 1:nlayers
         O₃ = ozone_absorption * radiation.ozone_distribution(σ[k]) * Δσ[k] * D_toa
         dTdt[ij, k] += flux_to_tendency(O₃ / cₚ, pₛ, k, model)
         D -= O₃
-        clear_sky_transmission *= t[ij, k]
 
+        Δp = pressure_thickness(k, pₛ, coord)
+        τ_R = rayleigh_optical_depth * Δp / 100000      # Rayleigh scattering optical depth of the layer
+        R_R, T_R = rayleigh_layer(τ_R)
+
+        # clear sky: the layer added below the stack above
+        T_layer_clear = T_R * t[ij, k]
+        multiple_reflections = inv(1 - R_clear_below * R_R)
+        R_clear_above += T_clear^2 * R_R * multiple_reflections
+        R_clear_below = R_R + T_layer_clear^2 * R_clear_below * multiple_reflections
+        T_clear *= T_layer_clear * multiple_reflections
+
+        # cloudy part: optical properties of cloud and Rayleigh scattering combined
         C = cloud_fraction[ij, k]
-        Δp_g = pressure_thickness(k, pₛ, coord) / g     # layer mass [kg/m²]
         r_liquid = max(cloud_liquid_effective_radius[ij, k], r_min)
         r_ice = max(cloud_ice_effective_radius[ij, k], r_min)
-        τ_grid = 3 * Δp_g / 2 * (cloud_liquid_water[ij, k] / (ρ_water * r_liquid) + cloud_ice_water[ij, k] / (ice_density * r_ice))
-        τ = τ_grid / max(C, eps(NF))                    # in-cloud optical depth
-        R_cloud, T_cloud = two_stream_diffuse_layer(τ, single_scattering_albedo, asymmetry_factor)
-        albedo_stack[ij, k] = C * R_cloud               # layer reflectance
-        t[ij, k] *= (1 - C) + C * T_cloud               # layer transmittance
+        τ_grid = 3 * Δp / g / 2 * (cloud_liquid_water[ij, k] / (ρ_water * r_liquid) + cloud_ice_water[ij, k] / (ice_density * r_ice))
+        τ_cloud = τ_grid / max(C, eps(NF))              # in-cloud optical depth
+        scattering_cloud = single_scattering_albedo * τ_cloud
+        τ = τ_cloud + τ_R
+        ω = (scattering_cloud + τ_R) / max(τ, floatmin(NF))
+        asymmetry = asymmetry_factor * scattering_cloud / max(scattering_cloud + τ_R, floatmin(NF))
+        R_cloud, T_cloud = two_stream_diffuse_layer(τ, ω, asymmetry)
+        albedo_stack[ij, k] = (1 - C) * R_R + C * R_cloud   # layer reflectance
+        t[ij, k] *= (1 - C) * T_R + C * T_cloud             # layer transmittance
     end
 
     # 2. ADDING from the surface up: albedo of the stack below each layer top, and the transmission
@@ -424,7 +462,8 @@ array, overwritten), `vars.scratch.grid.b` is used as work array."""
     vars.parameterizations.albedo[ij] = albedo
     vars.parameterizations.outgoing_shortwave[ij] = albedo_stack[ij, 1] * D_top
 
-    # without clouds the adding method reduces to the surface reflection through the column twice
-    vars.parameterizations.outgoing_shortwave_clear_sky[ij] = albedo * clear_sky_transmission^2 * D_top
+    # the clear-sky stack on top of the surface
+    vars.parameterizations.outgoing_shortwave_clear_sky[ij] =
+        (R_clear_above + T_clear^2 * albedo / (1 - R_clear_below * albedo)) * D_top
     return nothing
 end
