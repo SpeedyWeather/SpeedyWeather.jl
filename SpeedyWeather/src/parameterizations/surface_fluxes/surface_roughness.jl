@@ -206,13 +206,12 @@ Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
     c4 = T(charnock_param.c4)
     c5 = T(charnock_param.c5)
 
-    val = ifelse(
+    α = ifelse(
         uₙ ≤ Uₜ,
         muladd(uₙ * uₙ, muladd(c1, uₙ, c2), c3),
         muladd(c4, uₙ - Uₜ, c5) # for uₙ > Uₜ, linear increase
     )
-    log_α = log(val)
-    return log_α
+    return α
 end
 
 export LearnedOceanRoughness
@@ -435,7 +434,7 @@ end
     else
         zero(u)
     end
-    log_αᵪ = scheme.charnock_param(neutral_wind_speed[ij])
+    log_αᵪ = log(scheme.charnock_param(neutral_wind_speed[ij]))
 
     z₀M_ocean = ocean_momentum_roughness(scheme, surface_wind_speed[ij], log_αᵪ, siconc)
     z₀H_ocean = ocean_heat_roughness(scheme, surface_wind_speed[ij], siconc)
