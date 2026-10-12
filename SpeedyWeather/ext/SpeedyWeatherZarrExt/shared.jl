@@ -156,7 +156,7 @@ function write_array!(
         variable::AbstractOutputVariable,
         field,
     )
-    data = parent_array(field)
+    data = parent(field)    # the host (CPU) array of the field, written without copying
 
     # Skip buffering for static variables (written once at index 1) and when
     # time_chunk == 1 (every time slice is its own chunk): write the slice directly.
@@ -248,9 +248,6 @@ function output!(output::AbstractZarrOutput, time::DateTime)
     output.zarr_group["time"][i] = time_hrs
     return nothing
 end
-
-"""Pull out the parent (Array) of a Field for direct copy into a Zarr array."""
-parent_array(var) = Array(parent(var))
 
 function Base.close(output::AbstractZarrOutput)
     flush_partial_time_chunks!(output)

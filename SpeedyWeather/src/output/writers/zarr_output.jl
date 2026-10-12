@@ -18,7 +18,8 @@ using SpeedyWeather
 output = ZarrOutput(spectral_grid)
 ```
 
-Type parameters: `Field2D`, `Field3D` are the scratch field types, `Interpolator`
+Type parameters: `Field2D`, `Field3D` are the scratch field types (on the model's
+architecture), `HostField2D`, `HostField3D` their host (CPU) equivalents to write from, `Interpolator`
 is the interpolator type, `DT` and `S` are the start-date and output-step types,
 `C` is the Zarr compressor type (or `Nothing` for the Zarr default), `Z` is
 the Zarr group type once `initialize!` has been called (`Nothing` before) and
@@ -26,6 +27,8 @@ the Zarr group type once `initialize!` has been called (`Nothing` before) and
 @kwdef mutable struct ZarrOutput{
         Field2D,
         Field3D,
+        HostField2D,
+        HostField3D,
         Interpolator,
         DT,
         S,
@@ -118,10 +121,15 @@ the Zarr group type once `initialize!` has been called (`Nothing` before) and
     const interpolator::Interpolator
     const land_fraction::Field2D
 
-    # SCRATCH FIELDS TO INTERPOLATE ONTO
+    # SCRATCH FIELDS TO INTERPOLATE ONTO, on the model's architecture
     const field2D::Field2D
     const field3D::Field3D
     const field3Dland::Field3D
+
+    # HOST (CPU) COPIES OF THE SCRATCH FIELDS TO WRITE FROM, the same objects on CPU
+    const host2D::HostField2D
+    const host3D::HostField3D
+    const host3Dland::HostField3D
 end
 
 """$(TYPEDSIGNATURES)
