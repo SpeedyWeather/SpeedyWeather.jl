@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Benchmark regression check: debug mode of the benchmark suite, `regression.jl` comparing a revision with main, the latest release and the latest benchmarked revision (bisecting a regression), run weekly and on PRs labelled `benchmark-performance`, plus a Claude skill [#1299](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1299)
+- Bug fix: `MatrixSpectralTransform` works on Reactant outside of compiled code again: the stacking of real and imaginary parts is jitted together with the matrix multiply [#1302](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1302)
 
 ## 0.23.0
 
