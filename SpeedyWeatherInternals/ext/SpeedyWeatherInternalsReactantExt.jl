@@ -5,7 +5,7 @@ using SpeedyWeatherInternals
 using Reactant
 
 import SpeedyWeatherInternals.Architectures: Architectures, CPU, ReactantDevice, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type, device
-import SpeedyWeatherInternals.Utils: _jit
+import SpeedyWeatherInternals.Utils: _jit, _set_scalar!
 
 # grab the proper KernelAbstractions backend for Reactant
 const ReactantKernelAbstractionsExt = Base.get_extension(
@@ -20,8 +20,8 @@ Architectures.array_type(::ReactantDevice) = ConcreteRArray
 Architectures.array_type(::Type{<:ReactantDevice}) = ConcreteRArray
 Architectures.array_type(::ReactantDevice, NF::Type, N::Int) = ConcretePJRTArray{NF, N, 1}
 
-Architectures.compatible_array_types(::ReactantDevice) = (ConcreteRArray, AnyConcreteReactantArray)
-Architectures.compatible_array_types(::Type{<:ReactantDevice}) = (ConcreteRArray, AnyConcreteReactantArray)
+Architectures.compatible_array_types(::ReactantDevice) = (ConcreteRArray, AnyConcreteReactantArray, Reactant.AnyTracedRArray)
+Architectures.compatible_array_types(::Type{<:ReactantDevice}) = (ConcreteRArray, AnyConcreteReactantArray, Reactant.AnyTracedRArray)
 
 Architectures.nonparametric_type(::Type{<:ConcreteRArray}) = ConcreteRArray
 
@@ -60,6 +60,28 @@ Base.convert(::Type{ConcretePJRTArray{T, 3, 1}}, a::AbstractArray{S, 3}) where {
 
 Reactant.ConcretePJRTArray{T, N, D}(a::AbstractArray{T, N}) where {T, N, D} = Reactant.to_rarray(a)
 
+# TODO: move upstream to Reactant
+# Broadcasting into views of concrete Reactant arrays (e.g. a variable that is a view into a fused
+# parent array) has no Reactant broadcast style, falls back to Base's elementwise scalar indexing
+# loop and silently produces wrong results. Use Reactant's broadcast style and compile instead.
+_broadcast_into!(dest, f, args...) = (dest .= f.(args...); nothing)
+
+for ArrayType in (:ConcretePJRTArray, :ConcreteIFRTArray)
+    @eval begin
+        Base.Broadcast.BroadcastStyle(::Type{<:SubArray{<:Any, <:Any, <:$ArrayType}}) =
+            Base.Broadcast.ArrayStyle{$ArrayType}()
+
+        function Base.copyto!(
+                dest::SubArray{<:Any, <:Any, <:$ArrayType},
+                bc::Base.Broadcast.Broadcasted{Base.Broadcast.ArrayStyle{$ArrayType}},
+            )
+            bc = Base.Broadcast.flatten(bc)
+            Reactant.@jit _broadcast_into!(dest, bc.f, bc.args...)
+            return dest
+        end
+    end
+end
+
 # For @maybe_jit macro - extend _jit for ReactantDevice.
 # If we are already inside a Reactant compile/trace context, call f directly (no nested @jit).
 # Otherwise JIT-compile on the fly.
@@ -69,6 +91,12 @@ function _jit(::ReactantDevice, f, args...; kwargs...)
     else
         return Reactant.@jit f(args...; kwargs...)
     end
+end
+
+# In Reactant actually use @allowscalar (in contrast to regular model which needs a workaround for Enzyme)
+function _set_scalar!(::ReactantDevice, x::AbstractArray, i::Integer, v::Number)
+    Reactant.@allowscalar x[i] = v
+    return x
 end
 
 end

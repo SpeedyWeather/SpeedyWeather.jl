@@ -128,7 +128,7 @@ and relaxes current vertical profiles to the adjusted references."""
     # arrays) as temp_ref_profile/humid_ref_profile only hold the *uncorrected* adiabat; the
     # correction is masked to the in-column range so levels above LZB stay exactly at the
     # environment and contribute exact zero, full-range and branchless
-    τ⁻¹ = inv(convert(NF, Second(convection.time_scale).value))
+    τ⁻¹ = 1 / convert(NF, Second(convection.time_scale).value)    # TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
     for k in 1:nlayers
         in_column = k >= level_zero_buoyancy
         T_ref = temp_ref_profile[ij, k] - ifelse(in_column, ΔT, zero(NF))    # eq (6) / (15)
@@ -511,7 +511,7 @@ end
     latd = model.geometry.latd[j]
     σ = model.geometry.σ_levels_full
 
-    Qmax = ifelse(abs(latd) < scheme.σθ, inv(convert(NF, Second(scheme.time_scale).value)), NF(0))
+    Qmax = ifelse(abs(latd) < scheme.σθ, 1 / convert(NF, Second(scheme.time_scale).value), NF(0))    # TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
     p₀ = scheme.p₀ * 100     # hPa -> Pa
     σₚ = scheme.σₚ * 100     # hPa -> Pa
     cos²θ_term = scheme.lat_mask[j]

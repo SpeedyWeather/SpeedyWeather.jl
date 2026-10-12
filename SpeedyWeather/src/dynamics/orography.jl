@@ -229,8 +229,9 @@ function initialize!(
 
     orography_highres = on_architecture(S.architecture, field)
 
-    # Interpolate/coarsen to desired resolution
-    interpolate!(orography, orography_highres)
+    # Interpolate/coarsen to desired resolution, jitted as one compiled function on Reactant
+    interp = RingGrids.interpolator(orography, orography_highres)
+    @maybe_jit S.architecture interpolate!(orography, orography_highres, interp)
     orography .*= scale                     # scale orography (default 1)
     transform!(surface_geopotential, orography, S)   # no *gravity yet
 

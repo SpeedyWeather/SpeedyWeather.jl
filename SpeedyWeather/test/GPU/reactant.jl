@@ -7,9 +7,22 @@ Reactant.set_default_backend("gpu")
 arch = SpeedyWeather.ReactantDevice()
 spectral_grid = SpectralGrid(architecture = arch, nlayers = 1)
 spectral_transform = MatrixSpectralTransform(spectral_grid)
-model = BarotropicModel(spectral_grid = spectral_grid, spectral_transform = spectral_transform)
+model = BarotropicModel(
+    spectral_grid = spectral_grid,
+    spectral_transform = spectral_transform,
+    output = nothing,
+    feedback = nothing,
+)
 simulation = initialize!(model)
-run!(simulation, nsteps = 10)
+run!(simulation, steps = 10)
 
-# TODO: fix GPU reactant in follow up when initial conditions are easier to handle
-@test_broken !any(isnan.(simulation.prognostic_variables.vorticity))
+@test !any(isnan, on_architecture(SpeedyWeather.CPU(), simulation.variables.prognostic.vorticity))
+
+# also test the PrimitiveWetModel
+spectral_grid = SpectralGrid(architecture = arch)
+spectral_transform = MatrixSpectralTransform(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; spectral_transform, feedback = nothing, output = nothing)
+simulation = initialize!(model)
+run!(simulation, steps = 10)
+
+@test !any(isnan, on_architecture(SpeedyWeather.CPU(), simulation.variables.prognostic.vorticity))

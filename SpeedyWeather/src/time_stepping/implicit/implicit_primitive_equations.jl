@@ -11,6 +11,7 @@ $(TYPEDFIELDS)"""
         TensorType,
         IntType,
         NLAYERS,        # nlayers as a type parameter, see `nlayers_val` below
+        RefNF,          # <: Base.RefValue{NF} or Base.RefValue{<:Number} for Reactant, see `scalar_ref`
     } <: AbstractImplicit
 
     # DIMENSIONS
@@ -28,7 +29,7 @@ $(TYPEDFIELDS)"""
     centering::NF = 1.0
 
     "[DERIVED] Time step [s] used to initialize. Used to check whether time step has changed and reinitialization is needed."
-    Δt::Base.RefValue{NF} = Ref(zero(NF))
+    Δt::RefNF = Ref(zero(NF))
 
     # PRECOMPUTED ARRAYS, to be initialized with initialize!
     "[DERIVED] vertical temperature profile, obtained from diagn on first time step"
@@ -71,9 +72,10 @@ end
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, VectorType, MatrixType, TensorType, truncation, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(truncation), nlayers}(;
-        truncation, nlayers, kwargs...
+    (; NF, VectorType, MatrixType, TensorType, truncation, nlayers, architecture) = spectral_grid
+    Δt = scalar_ref(architecture, zero(NF))
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(truncation), nlayers, typeof(Δt)}(;
+        truncation, nlayers, Δt, kwargs...
     )
 end
 
@@ -103,13 +105,16 @@ end
 Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
         implicit::ImplicitPrimitiveEquation,
-        Δt::Real,                                           # the time step [s], scaled
+        Δt::Number,                                         # the time step [s], scaled
         temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
         geometry::AbstractGeometry,
         geopotential::AbstractGeopotential,
         atmosphere::AbstractAtmosphere,
         adiabatic_conversion::AbstractAdiabaticConversion,
     )
+    # Reactant traces this function inside the time step, so no transfer to the CPU is possible
+    architecture(implicit.S) isa ReactantDevice &&
+        return initialize_traceable!(implicit, Δt, temp_average, geometry, geopotential, atmosphere, adiabatic_conversion)
 
     NF = eltype(temp_average)
 
@@ -235,6 +240,131 @@ function initialize!(
     implicit.L4             .= on_architecture(arch, L4)
     # runic: on
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Initialize the implicit terms for the PrimitiveEquation models as in `initialize!` but without
+transfers to the CPU, scalar indexing, or data-dependent control flow so that it can be traced
+by Reactant inside the time step. The operators are constructed via broadcasting on the device
+and S⁻¹ is computed per degree l via Gauss-Jordan elimination in a kernel."""
+function initialize_traceable!(
+        implicit::ImplicitPrimitiveEquation,
+        Δt::Number,                                         # the time step [s], scaled
+        temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
+        geometry::AbstractGeometry,
+        geopotential::AbstractGeopotential,
+        atmosphere::AbstractAtmosphere,
+        adiabatic_conversion::AbstractAdiabaticConversion,
+    )
+    (; truncation, nlayers) = implicit
+    (; σ_levels_full, σ_levels_thick) = geometry
+    (; R_dry, κ) = atmosphere
+    (; Δp_geopot_half, Δp_geopot_full) = geopotential
+    (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
+    (; temp_profile, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
+
+    # use current vertical temperature profile, see `initialize!` for the operators
+    temp_profile .= temp_average
+
+    @assert 0.5 <= implicit.centering <= 1 "Centering coefficient must be between 0.5 (centred implicit) and 1 (backward implicit)"
+    ξ = implicit.centering * Δt                 # 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
+
+    # index vectors for broadcasting: rows = 1:nlayers (column), cols = (1:nlayers)' (row)
+    rows = (1:nlayers)
+    cols = (1:nlayers)'
+
+    # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
+    # R[row, k] = -Δp_geopot_full[k] for row <= k, additionally -Δp_geopot_half[k] for row < k
+    R .= .-Δp_geopot_full[cols] .* (rows .<= cols) .- Δp_geopot_half[cols] .* (rows .< cols)
+    U .= .-R_dry .* temp_profile                # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
+
+    # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
+    L0 .= 1 ./ (2 .* σ_levels_thick)
+    L2 .= κ .* temp_profile .* σ_lnp_A          # factor in front of the div_sum_above term
+    L4 .= κ .* temp_profile .* σ_lnp_B          # factor in front of div term in Dlnps/Dt
+
+    # L1[k, r]: vertical advection operator, layer indices above/below clamped to 1:nlayers
+    k_above = max.(1, rows .- 1)
+    k_below = min.(rows .+ 1, nlayers)
+    ΔT_below = temp_profile[k_below] .- temp_profile[rows]
+    ΔT_above = temp_profile[rows] .- temp_profile[k_above]
+    σₖ = σ_levels_full[rows]
+    σₖ_above = σ_levels_full[k_above]
+    Δσᵣ = σ_levels_thick[cols]
+
+    L1 .= ΔT_below .* Δσᵣ .* σₖ .- Δσᵣ .* (rows .>= cols) .+
+        ΔT_above .* Δσᵣ .* σₖ_above .- Δσᵣ .* ((rows .- 1) .>= cols)
+
+    # L3[r, k]: _sum_above operator itself, lower triangle with σ_levels_thick[k]
+    L3 .= σ_levels_thick[cols] .* (rows .> cols)
+
+    # combine all operators into L = Diagonal(L0)*L1 + Diagonal(L2)*L3 + Diagonal(L4)
+    L .= L0 .* L1 .+ L2 .* L3 .+ L4 .* (rows .== cols)
+
+    # PRESSURE OPERATOR (called πᵣ in Hoskins and Simmons, 1975 Appendix 1)
+    W .= .-σ_levels_thick                       # the -D̄ term in the log surface pres equation
+
+    # S = 1 - ξ²(RL + UW) inverted for every degree l, the S⁻¹[truncation + 1, :, :] remains unused as in `initialize!`
+    S_scratch = similar(S⁻¹)
+    launch!(
+        architecture(S⁻¹), LinearWorkOrder, (truncation,), implicit_invert_S_kernel!,
+        S⁻¹, S_scratch, R, L, U, W, ξ, nlayers
+    )
+    return nothing
+end
+
+# Compute S⁻¹ for each spectral degree l via Gauss-Jordan elimination, S = I - ξ²*eigenvalue*(R*L + U*Wᵀ)
+# S_scratch[l, :, :] stores S during elimination, S⁻¹[l, :, :] tracks the identity → inverse transformation
+@kernel inbounds = true function implicit_invert_S_kernel!(
+        S⁻¹,                            # Output: (truncation+1) × nlayers × nlayers tensor
+        S_scratch,                      # Scratch: same shape as S⁻¹, stores S per l
+        @Const(R),                      # Input: divergence operator matrix
+        @Const(L),                      # Input: temperature operator matrix
+        @Const(U),                      # Input: divergence vector
+        @Const(W),                      # Input: pressure vector
+        @Const(ξ),                      # Input: semi-implicit time step coefficient
+        @Const(nlayers),                # Input: number of layers
+    )
+    l = @index(Global, Linear)          # spectral degree (1-based)
+
+    NF = eltype(S⁻¹)
+    eigenvalue = -l * (l - 1)           # 1-based, -l*(l+1) → -l*(l-1)
+    ξ²λ = ξ^2 * eigenvalue
+
+    # S = I - ξ²λ*(R*L + U*Wᵀ) into S_scratch[l, :, :] and initialize S⁻¹[l, :, :] as identity
+    for k in 1:nlayers
+        for r in 1:nlayers
+            RL_kr = zero(NF)
+            for j in 1:nlayers
+                RL_kr += R[k, j] * L[j, r]
+            end
+            S_scratch[l, k, r] = (k == r ? one(NF) : zero(NF)) - ξ²λ * (RL_kr + U[k] * W[r])
+            S⁻¹[l, k, r] = k == r ? one(NF) : zero(NF)
+        end
+    end
+
+    # Gauss-Jordan elimination: reduce S_scratch[l, :, :] to I, applying the same row operations
+    # to S⁻¹[l, :, :] (I → S⁻¹)
+    for pivot in 1:nlayers
+        pivot⁻¹ = 1 / S_scratch[l, pivot, pivot]    # TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
+
+        # scale pivot row
+        for r in 1:nlayers
+            S_scratch[l, pivot, r] *= pivot⁻¹
+            S⁻¹[l, pivot, r] *= pivot⁻¹
+        end
+
+        # eliminate all other rows
+        for k in 1:nlayers
+            if k != pivot
+                factor = S_scratch[l, k, pivot]
+                for r in 1:nlayers
+                    S_scratch[l, k, r] -= factor * S_scratch[l, pivot, r]
+                    S⁻¹[l, k, r] -= factor * S⁻¹[l, pivot, r]
+                end
+            end
+        end
+    end
 end
 
 """$(TYPEDSIGNATURES)

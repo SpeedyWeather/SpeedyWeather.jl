@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reactant compatibility for all models incl. `PrimitiveDryModel` and `PrimitiveWetModel` (requires Reactant v0.2.292 for complex-valued kernels), CPU-vs-Reactant correctness tests for all models and output writers [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - Bug fix: `MatrixSpectralTransform` works on Reactant outside of compiled code again: the stacking of real and imaginary parts is jitted together with the matrix multiply [#1302](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1302)
 
 ## 0.23.0

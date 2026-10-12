@@ -107,12 +107,27 @@ SpeedyWeather will make use of all threads available.
 !!! warning "Work in progress"
     The Reactant support of SpeedyWeather.jl is still work in progress, incomplete and considered experimental.
 
-We are currently working on making SpeedyWeather.jl compatible with the MLIR/XLA optimizer Reactant.jl.
-If you want to try it out, use the `ReactantDevice` architecture and set your device within Reactant
-with `Reactant.set_default_backend`. As of now just a subset of our models and model components are
-compatible with it. If you want to use an up-to-date Reactant setup already now, it is best to inspect
-the setups we use in the CI in `SpeedyWeather/test/reactant/`. We will update this documentation once
-most models and configurations are actually working.
+SpeedyWeather.jl is compatible with the MLIR/XLA optimizer Reactant.jl (v0.2.292 or newer).
+All models (`BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel`, `PrimitiveWetModel`)
+run with Reactant, use the `ReactantDevice` architecture together with the `MatrixSpectralTransform`
+and set your device within Reactant with `Reactant.set_default_backend`
+
+```julia
+using Reactant, CUDA   # CUDA is needed for Reactant to compile KernelAbstractions kernels
+using SpeedyWeather
+
+spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice(), nlayers = 8)
+spectral_transform = MatrixSpectralTransform(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; spectral_transform)
+simulation = initialize!(model)
+run!(simulation, period = Day(10))
+```
+
+The time step `time_step!(simulation)` is compiled once with Reactant and then called for every
+time step, output is written in between. Not all model components are compatible yet
+(e.g. particle advection) and the Reactant support on GPUs is not yet tested. The setups
+we use in the CI to compare the results with Reactant to those on the CPU are in
+`SpeedyWeather/test/reactant/`.
 
 ## Benchmarks
 
