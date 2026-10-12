@@ -8,8 +8,8 @@ only add new assets. v"2" would be a breaking change.
 e.g. `version = "main"` for the latest on the main branch.
 =#
 const ASSETS_URL = "https://github.com/SpeedyWeather/SpeedyWeatherAssets/raw/refs"
-const DEFAULT_ASSETS_VERSION = v"1"
-const AVAILABLE_ASSETS_VERSIONS = (v"1",)
+const DEFAULT_ASSETS_VERSION = v"1.1"
+const AVAILABLE_ASSETS_VERSIONS = (v"1", v"1.1",)
 
 # end SpeedyWeatherAssets "Project.toml"
 
