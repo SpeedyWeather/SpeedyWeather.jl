@@ -24,7 +24,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Resolve the output grid of a [`HEALPixOutput`](@ref) from the keyword arguments and the model
-grid `model_grid`, always on CPU as we write from the host. In order of precedence:
+grid `model_grid`, on CPU (the constructor moves it onto the model's architecture). In order of precedence:
 
 1. an explicit `output_grid`, which must be a `HEALPixGrid` or an `OctaHEALPixGrid` and
    cannot be combined with `nside`/`nlat_half`;
@@ -152,9 +152,10 @@ function HEALPixOutput(
     # OUTPUT GRID: from `output_grid`, from `nside`/`nlat_half`, or following the model's own
     # grid type and resolution (which is what makes the interpolation skippable by default)
     output_grid = healpix_output_grid(SG.grid; nside, nlat_half, output_grid)
-
-    # INPUT GRID (but on CPU)
-    input_grid = on_architecture(CPU(), SG.grid)
+    # OUTPUT GRID and MODEL GRID on the architecture to interpolate on, the model's (e.g. GPU)
+    arch = SpeedyWeather.output_architecture(SG.architecture)
+    output_grid = on_architecture(arch, output_grid)
+    input_grid = on_architecture(arch, SG.grid)
 
     # SKIP INTERPOLATION if the model already runs on this very grid: `grids_match`
     # compares the (nonparametric) grid type and nlat_half, which is exactly the condition
@@ -163,16 +164,14 @@ function HEALPixOutput(
     interpolator = if grids_match(output_grid, input_grid)
         nothing
     else
-        # pole-average buffers for the most layers any output field has
+        # pole-average buffers for the most layers any output field has, at least as precise
+        # as the model data so that pole averages are computed without allocating
         nlayers = max(SpeedyWeather.get_nlayers(layers, SG), nlayers_soil)
-        RingGrids.interpolator(output_grid, input_grid; NF = DEFAULT_OUTPUT_NF, nlayers)
+        RingGrids.interpolator(output_grid, input_grid; NF = promote_type(SG.NF, output_NF), nlayers)
     end
 
-    # CREATE HEALPIX FIELDS TO WRITE OUT FROM
-    land_fraction = Field(output_NF, output_grid)
-    field2D = Field(output_NF, output_grid)
-    field3D = Field(output_NF, output_grid, SpeedyWeather.get_nlayers(layers, SG))
-    field3Dland = Field(output_NF, output_grid, nlayers_soil)
+    # CREATE HEALPIX FIELDS TO WRITE OUT FROM (+ host copies)
+    scratch = output_scratch_fields(output_NF, output_grid, SpeedyWeather.get_nlayers(layers, SG), nlayers_soil)
 
     # Concrete type parameters, see the ZarrOutput constructor for the compressor/group ones.
     # `Itp` is `Nothing` when interpolation is skipped, which makes the branch in
@@ -183,19 +182,16 @@ function HEALPixOutput(
     interval_sec = Second(interval)
     DT = DateTime
     S = typeof(interval_sec)
-    F2 = typeof(field2D)
-    F3 = typeof(field3D)
+    F2, F3 = typeof(scratch.field2D), typeof(scratch.field3D)
+    H2, H3 = typeof(scratch.host2D), typeof(scratch.host3D)
     Itp = typeof(interpolator)
     L = typeof(layers)
 
-    output = HEALPixOutput{F2, F3, Itp, DT, S, C, Z, L}(;
+    output = HEALPixOutput{F2, F3, H2, H3, Itp, DT, S, C, Z, L}(;
         interval = interval_sec,
         layers,
         interpolator,
-        land_fraction,
-        field2D,
-        field3D,
-        field3Dland,
+        scratch...,
         compressor,
         kwargs...
     )
@@ -240,7 +236,7 @@ function initialize!(
 
     # global attributes so the store is self-describing; a HEALPixGrid store additionally
     # advertises the healpix_* keys healpy/cuHPX look for, an OctaHEALPixGrid one must not
-    g = Zarr.zgroup(store_path; attrs = healpix_store_attributes(output.field2D.grid))
+    g = Zarr.zgroup(store_path; attrs = healpix_store_attributes(output.host2D.grid))
     output.zarr_group = g
 
     # COORDINATES: the flat cell index and its lat/lon/ring, plus the vertical ones
@@ -249,6 +245,12 @@ function initialize!(
     # TIME: full-length, chunked by `output.time_chunk`.
     create_time_axis!(g, output, n_outputs)
     output!(output, vars.prognostic.clock.time)   # write initial time
+
+    # LAND FRACTION on the output grid (interpolated, or copied when skipping), before the
+    # initial conditions are written, which scale some variables by it
+    if hasproperty(model, :land_sea_mask)
+        SpeedyWeather.interpolate_output!(output, output.land_fraction, model.land_sea_mask.land_fraction)
+    end
 
     # VARIABLES: define every output variable in the Zarr store and write initial
     # conditions, skipping any that don't exist in the simulation — the same check the
@@ -260,12 +262,6 @@ function initialize!(
         exists_in_simulation(var, simulation) || continue
         define_variable!(g, output, var, n_outputs, eltype(output.field2D))
         output!(output, var, simulation)
-    end
-
-    # calculate land fraction on output grid (interpolated, or copied when skipping)
-    if hasproperty(model, :land_sea_mask)
-        land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
-        SpeedyWeather.interpolate_output!(output, output.land_fraction, land_fraction_cpu)
     end
 
     # consolidate the store metadata (.zmetadata) for faster opening with xarray etc.;
@@ -292,7 +288,7 @@ coordinates in the xarray sense: a consumer indexes into `cell` and reads off wh
 sphere that cell sits, with no knowledge of SpeedyWeather's grid machinery needed. This is
 the same for both supported grids; only the tessellation behind the coordinates differs."""
 function write_healpix_coordinates!(g::Zarr.ZGroup, output::HEALPixOutput, model::AbstractModel)
-    grid = output.field2D.grid
+    grid = output.host2D.grid
     npix = get_npoints(grid)
     grid_name = string(nameof(RingGrids.nonparametric_type(grid)))   # bare name, see above
 
@@ -363,7 +359,7 @@ function define_variable!(
 
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
 
-    ncells = get_npoints(output.field2D.grid)
+    ncells = get_npoints(output.host2D.grid)
     nz = get_nlayers(output, var)
     full_shape = (ncells, nz, n_outputs)
 

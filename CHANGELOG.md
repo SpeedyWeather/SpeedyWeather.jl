@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Reactant compatibility for all models incl. `PrimitiveDryModel` and `PrimitiveWetModel` (requires Reactant v0.2.292 for complex-valued kernels), CPU-vs-Reactant correctness tests for all models and output writers [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+- Reactant compatibility for all models incl. `PrimitiveDryModel` and `PrimitiveWetModel` (requires Reactant v0.2.292 for complex-valued kernels), CPU-vs-Reactant correctness tests for all models and output writers [#1304](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1304)
+- RingGrids: single-layer (2D) interpolation uses the batched kernel with the locator's preallocated pole-average buffers, no allocation or device synchronization per call [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
+- Output writers interpolate and post-process on the model's architecture (e.g. GPU), copying only the interpolated output-grid fields to the CPU [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
 - Bug fix: `MatrixSpectralTransform` works on Reactant outside of compiled code again: the stacking of real and imaginary parts is jitted together with the matrix multiply [#1302](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1302)
 
 ## 0.23.0
