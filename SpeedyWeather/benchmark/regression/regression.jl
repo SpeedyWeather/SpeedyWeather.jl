@@ -64,6 +64,13 @@ function arch_label(arch)
     return (startswith(arch_str, "aarch") || arch_str == "arm64") ? "cpu-arm" : "cpu-x86"
 end
 
+# the CPU, or the GPU as listed by CUDA.versioninfo() in the machine info of a result
+function device_name(label, meta)
+    startswith(label, "cpu") && return Sys.cpu_info()[1].model
+    gpu = match(r"^ *0: (.+?) \("m, string(get(meta, :machine_info, "")))
+    return isnothing(gpu) ? "unknown device" : String(gpu[1])
+end
+
 # REVISIONS
 
 latest_release() = first(split(git(REPO, "tag", "--list", "v[0-9]*", "--sort=-v:refname")))
@@ -457,9 +464,9 @@ function check(;
         end
         of = candidate_name == "main" ? "" : " of `$branch`"
         report = IOBuffer()
-        println(report, "## Benchmark regression check$of: $headline\n")
+        println(report, "## Benchmark regression check$of on $label: $headline\n")
         date = Libc.strftime("%Y-%m-%d", time())
-        println(report, "`manual_benchmarking.jl --debug` (PrimitiveWet, L8, T ≤ 128) on $label, $(Sys.cpu_info()[1].model), Julia $VERSION, $date.\n")
+        println(report, "`manual_benchmarking.jl --debug` (PrimitiveWet, L8, T ≤ 128) on $label, $(device_name(label, tested.meta)), Julia $VERSION, $date.\n")
         print(report, comparison_table(tested, measured, threshold))
         println(report, "\nRegression = geometric-mean SYPD ratio $candidate_name / reference < $threshold:")
         print(report, verdict_lines(comparisons, threshold))
