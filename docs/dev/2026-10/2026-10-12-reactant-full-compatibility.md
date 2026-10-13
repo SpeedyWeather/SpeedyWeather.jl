@@ -48,6 +48,21 @@ the raised gradients agree with finite differences. The kernels themselves are 2
 1 CPU thread (5-15% on Reactant), within noise for a full time step (Barotropic, ShallowWater T63,
 PrimitiveDry T31).
 
+> Now we have to make the benchmarks runnable with Reactant. Also inspect how we do that in
+> Terrarium.jl as a reference
+
+As in Terrarium.jl's benchmarks, architecture-specific hooks (`build_runner`, device
+synchronization, memory footprint, compiled calls) with the Reactant methods in
+`benchmark/reactant_runner.jl`, included only when Reactant is loaded. Unlike Terrarium (one
+compiled loop with a fixed number of steps) the time step is compiled once per configuration,
+reused for the warm-up and the timed run, and the compile time is reported in its own column.
+Timing covers only the time loop (as the README states), synchronizing Reactant by reading the
+clock (`KernelAbstractions.synchronize` is a no-op for Reactant). Reactant runs use the
+`MatrixSpectralTransform`, configurations too large for it (T>150) and resulting duplicates are
+dropped. `Base.summarysize` misses Reactant's device buffers, they are added. A failing
+configuration is recorded as failed instead of aborting the suite. Fixed: the Reactant models were
+built with a progress meter as repeated keyword arguments silently take the last value.
+
 ## Problem description
 
 `mg/reactant-primitive` (#985) got the primitive equation models close to running with Reactant but
