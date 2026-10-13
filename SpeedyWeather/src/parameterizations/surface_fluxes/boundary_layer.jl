@@ -17,7 +17,10 @@ export ConstantDrag
 end
 
 variables(::ConstantDrag) = (
-    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer landdrag coefficient for momentum", units = "1", namespace = :land),
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer coefficient for momentum", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer drag coefficient for heat", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer drag coefficient for humidity", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer land drag coefficient for momentum", units = "1", namespace = :land),
     ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer land drag coefficient for heat", units = "1", namespace = :land),
     ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer land drag coefficient for humidity", units = "1", namespace = :land),
     ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer ocean drag coefficient for momentum", units = "1", namespace = :ocean),
@@ -38,7 +41,7 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
 
     vars.parameterizations.ocean.boundary_layer_drag_momentum[ij] = scheme.ocean_drag
     vars.parameterizations.ocean.boundary_layer_drag_heat[ij] = scheme.ocean_drag
-    vars.parameterizations.ocean.boundary_layer_drag_humidity[ij] = scheme.oceandrag
+    vars.parameterizations.ocean.boundary_layer_drag_humidity[ij] = scheme.ocean_drag
     return nothing
 end
 
@@ -156,6 +159,9 @@ $(TYPEDFIELDS)"""
 end
 
 variables(::BulkRichardsonDrag) = (
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer coefficient for momentum", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer drag coefficient for heat", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer drag coefficient for humidity", units = "1"),
     ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer landdrag coefficient for momentum", units = "1", namespace = :land),
     ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer land drag coefficient for heat", units = "1", namespace = :land),
     ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer land drag coefficient for humidity", units = "1", namespace = :land),
@@ -176,6 +182,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
         ij,
         vars,
         drag::BulkRichardsonDrag,
+        model
     )
     (; atmosphere, planet, orography, time_stepping, land_sea_mask) = model
     # Height z [m] of lowermost layer above ground
