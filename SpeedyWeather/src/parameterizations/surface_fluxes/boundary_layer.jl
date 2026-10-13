@@ -32,9 +32,15 @@ Adapt.@adapt_structure ConstantDrag
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
 @propagate_inbounds parameterization!(ij, vars, drag::ConstantDrag, model) =
-    boundary_layer_drag!(ij, vars, drag)
+    boundary_layer_drag!(ij, vars, drag, model)
 
-@propagate_inbounds function boundary_layer_drag!(ij, vars, scheme::ConstantDrag)
+@propagate_inbounds function boundary_layer_drag!(ij, vars, scheme::ConstantDrag, model)
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+
+    vars.parameterizations.boundary_layer_drag_momentum[ij] = land_fraction * scheme.land_drag + (1 - land_fraction) * scheme.ocean_drag
+    vars.parameterizations.boundary_layer_drag_heat[ij] = land_fraction * scheme.land_drag + (1 - land_fraction) * scheme.ocean_drag
+    vars.parameterizations.boundary_layer_drag_humidity[ij] = land_fraction * scheme.land_drag + (1 - land_fraction) * scheme.ocean_drag
+
     vars.parameterizations.land.boundary_layer_drag_momentum[ij] = scheme.land_drag
     vars.parameterizations.land.boundary_layer_drag_heat[ij] = scheme.land_drag
     vars.parameterizations.land.boundary_layer_drag_humidity[ij] = scheme.land_drag
@@ -242,13 +248,10 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     vars.parameterizations.ocean.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q_ocean * (1 - Ri / Ri_c)^2)
 
     # For output reading
-    C_M = land_fraction * C_M_land + (1 - land_fraction) * C_M_ocean
-    C_H = land_fraction * C_H_land + (1 - land_fraction) * C_H_ocean
-    C_Q = land_fraction * C_Q_land + (1 - land_fraction) * C_Q_ocean
+    vars.parameterizations.boundary_layer_drag_momentum[ij] = land_fraction * vars.parameterizations.land.boundary_layer_drag_momentum[ij] + (1 - land_fraction) * vars.parameterizations.ocean.boundary_layer_drag_momentum[ij]
+    vars.parameterizations.boundary_layer_drag_heat[ij] = land_fraction * vars.parameterizations.land.boundary_layer_drag_heat[ij] + (1 - land_fraction) * vars.parameterizations.ocean.boundary_layer_drag_heat[ij]
+    vars.parameterizations.boundary_layer_drag_humidity[ij] = land_fraction * vars.parameterizations.land.boundary_layer_drag_humidity[ij] + (1 - land_fraction) * vars.parameterizations.ocean.boundary_layer_drag_humidity[ij]
 
-    vars.parameterizations.boundary_layer_drag_momentum[ij] = max(drag_min, C_M * (1 - Ri / Ri_c)^2)
-    vars.parameterizations.boundary_layer_drag_heat[ij] = max(drag_min, C_H * (1 - Ri / Ri_c)^2)
-    vars.parameterizations.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q * (1 - Ri / Ri_c)^2)
     return nothing
 end
 
