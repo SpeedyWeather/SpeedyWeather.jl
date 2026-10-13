@@ -70,6 +70,12 @@ const ReactantArray = Union{Reactant.TracedRArray, ConcretePJRTArray, ConcreteIF
 RingGrids.is_flattenable(x::ReactantArray) = ndims(x) == 2
 RingGrids.is_flattenable(x::SubArray{<:Any, <:Any, <:ReactantArray}) = false
 
+# Pole averages of concrete (not traced) arrays: `mean` falls back to scalar indexing (`first`), which
+# is disallowed on GPU, so average on the host instead. Only used eagerly outside of `@compile`
+# (e.g. interpolating boundary conditions in `initialize!`), traced arrays use Reactant's `mean`
+RingGrids.average_on_poles(A::Union{ConcretePJRTArray{T, 1}, ConcreteIFRTArray{T, 1}}, rings) where {T} =
+    RingGrids.average_on_poles(Array(A), rings)
+
 # Force `unsafe=true` in `update_locator!` for Reactant: the safety checks in `find_rings!`
 # call `extrema(θs)` and assertions on `latd` that don't trace through Reactant.
 function RingGrids.update_locator!(
