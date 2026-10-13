@@ -108,20 +108,22 @@ end
     lm = I[1]
     k = ndims(div) == 1 ? CartesianIndex() : I[2]
 
-    if lm == 1
-        div[I] = kernel_func(div[I], 0, 0, grad_y_vordiv2[1] * v[2, k])
-    elseif lm == lmmax
-        div[I] = 0
-    else
-        # ∂u/∂λ = i·m·u: multiply-by-imaginary is a 90° rotate + scale (2 real muls) rather than the
-        # generic 4-mul/2-add complex product the compiler emits for `im * m * u`.
-        z = u[I]
-        m = grad_x_vordiv[lm]
-        ∂u∂λ = Complex(-m * imag(z), m * real(z))
-        ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm - 1, k]
-        ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm + 1, k]
-        div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
-    end
+    # branch-free, see the comment above `previous_lm`: no lm-1 and no zonal term (m = 0) for the
+    # first element, the last element (lm==0) is zero
+    first_element = lm == 1
+    last_element = lm == lmmax
+
+    # ∂u/∂λ = i·m·u: multiply-by-imaginary is a 90° rotate + scale (2 real muls) rather than the
+    # generic 4-mul/2-add complex product the compiler emits for `im * m * u`.
+    z = u[I]
+    m = grad_x_vordiv[lm]
+    ∂u∂λ = Complex(-m * imag(z), m * real(z))
+    ∂u∂λ = ifelse(first_element, zero(∂u∂λ), ∂u∂λ)
+    ∂v∂θ1 = grad_y_vordiv1[lm] * v[previous_lm(lm, lmmax), k]
+    ∂v∂θ1 = ifelse(first_element, zero(∂v∂θ1), ∂v∂θ1)
+    ∂v∂θ2 = grad_y_vordiv2[lm] * v[next_lm(lm, lmmax), k]
+    div_lm = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
+    div[I] = ifelse(last_element, zero(div_lm), div_lm)
 end
 
 """
