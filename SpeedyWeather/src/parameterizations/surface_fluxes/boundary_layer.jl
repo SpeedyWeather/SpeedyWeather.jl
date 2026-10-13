@@ -9,8 +9,11 @@ variables(::AbstractBoundaryLayer) = (
 export ConstantDrag
 """Constant boundary layer drag coefficient. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct ConstantDrag{NF} <: AbstractParameterization
-    "[OPTION] Constant drag coefficient [1]"
-    @param drag::NF = 1.0e-3
+    "[OPTION] Constant land drag coefficient [1]"
+    @param land_drag::NF = 1.0e-3
+
+    "[OPTION] Constant ocean drag coefficient [1]"
+    @param ocean_drag::NF = 1.0e-3
 end
 
 variables(::ConstantDrag) = (
@@ -29,9 +32,13 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
     boundary_layer_drag!(ij, vars, drag)
 
 @propagate_inbounds function boundary_layer_drag!(ij, vars, scheme::ConstantDrag)
-    vars.parameterizations.boundary_layer_drag_momentum[ij] = scheme.drag
-    vars.parameterizations.boundary_layer_drag_heat[ij] = scheme.drag
-    vars.parameterizations.boundary_layer_drag_humidity[ij] = scheme.drag
+    vars.parameterizations.land.boundary_layer_drag_momentum[ij] = scheme.land_drag
+    vars.parameterizations.land.boundary_layer_drag_heat[ij] = scheme.land_drag
+    vars.parameterizations.land.boundary_layer_drag_humidity[ij] = scheme.land_drag
+
+    vars.parameterizations.ocean.boundary_layer_drag_momentum[ij] = scheme.ocean_drag
+    vars.parameterizations.ocean.boundary_layer_drag_heat[ij] = scheme.ocean_drag
+    vars.parameterizations.ocean.boundary_layer_drag_humidity[ij] = scheme.oceandrag
     return nothing
 end
 
@@ -163,21 +170,18 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, vars, drag, model.atmosphere, model.planet, model.orography, model.time_stepping)
+    boundary_layer_drag!(ij, vars, drag, model)
 
 @propagate_inbounds function boundary_layer_drag!(
         ij,
         vars,
         drag::BulkRichardsonDrag,
-        atmosphere,
-        planet,
-        orography,
-        time_stepping,
     )
-
+    (; atmosphere, planet, orography, time_stepping, land_sea_mask) = model
     # Height z [m] of lowermost layer above ground
     surface = size(vars.dynamics.geopotential, 2)    # surface index = nlayers
     (; gravity) = planet
+    land_fraction = land_sea_mask.land_fraction[ij]
     z = vars.dynamics.geopotential[ij, surface] / gravity - orography.orography[ij]
 
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
@@ -229,6 +233,15 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     vars.parameterizations.ocean.boundary_layer_drag_momentum[ij] = max(drag_min, C_M_ocean * (1 - Ri / Ri_c)^2)
     vars.parameterizations.ocean.boundary_layer_drag_heat[ij] = max(drag_min, C_H_ocean * (1 - Ri / Ri_c)^2)
     vars.parameterizations.ocean.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q_ocean * (1 - Ri / Ri_c)^2)
+
+    # For output reading
+    C_M = land_fraction * C_M_land + (1 - land_fraction) * C_M_ocean
+    C_H = land_fraction * C_H_land + (1 - land_fraction) * C_H_ocean
+    C_Q = land_fraction * C_Q_land + (1 - land_fraction) * C_Q_ocean
+
+    vars.parameterizations.boundary_layer_drag_momentum[ij] = max(drag_min, C_M * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.boundary_layer_drag_heat[ij] = max(drag_min, C_H * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q * (1 - Ri / Ri_c)^2)
     return nothing
 end
 
