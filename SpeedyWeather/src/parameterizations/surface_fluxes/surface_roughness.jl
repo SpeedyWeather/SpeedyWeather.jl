@@ -123,22 +123,22 @@ Predictors:
 - L_H, L_L: High and low vegetation leaf area indices
 - S: Snow depth
 - T: Soil temperature at the bottom soil layer
-- W: Soil moisture at the top soil layer
+- W: Soil moisture at the bottom soil layer
 
 Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct LearnedLandRoughness{NF} <: AbstractSurfaceRoughness
     "[OPTION] maximum land surface momentum roughness length [m]"
-    momentum_roughness_max::NF = 2.0
+    momentum_roughness_max::NF = 2.0  # from IFS docs
 
     "[OPTION] maximum land surface heat roughness length [m]"
-    heat_roughness_max::NF = 2.0
+    heat_roughness_max::NF = 2.0  # from IFS docs
 
     "[OPTION] minimum land surface momentum roughness length [m]"
-    momentum_roughness_min::NF = 1.3e-3
+    momentum_roughness_min::NF = 1.3e-3  # from IFS docs
 
     "[OPTION] minimum land surface heat roughness length [m]"
-    heat_roughness_min::NF = 1.3e-4
+    heat_roughness_min::NF = 1.3e-4  # from IFS docs
 
     "[OPTION] coefficient for momentum roughness closure over land"
     m_c1::NF = -7.231684
@@ -182,8 +182,9 @@ where
 - Uₜ: Threshold wind speed [m/s]
 - c1–c5: Fitted coefficients
 
-The parameterization returns log(α), which is used as an input to
-the learned ocean momentum roughness parameterization.
+The parameterization returns α, which is used as an input to
+the learned ocean momentum roughness parameterization. Its logarithm 
+is used as a predictor in the learned ocean momentum roughness parameterization.
 
 Fields are $(TYPEDFIELDS)
 """
@@ -230,9 +231,48 @@ Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
     return max(α, c_min)  # clamp to lower bound of Charnock parameter
 end
 
+@parameterized @kwdef struct SeaIceMomentumRoughness{NF} <: AbstractParameterization
+    @param sea_ice_roughness_min::NF = 1.0e-3
+end
+
+Adapt.@adapt_structure SeaIceMomentumRoughness
+SeaIceMomentumRoughness(SG::SpectralGrid; kwargs...) = SeaIceMomentumRoughness{SG.NF}(; kwargs...)
+
+@inline function (sea_ice_momentum_roughness::SeaIceMomentumRoughness)(ℵ::NF) where {NF <: Real}
+    # Following IFS documentation
+    base = NF(0.93e-3) * (1 - ℵ) + NF(6.05e-3) * exp(NF(-17) * (ℵ - NF(0.5))^2)
+    return max(base, sea_ice_momentum_roughness.sea_ice_roughness_min)
+end
+
+@parameterized @kwdef struct MaxOceanMomentumRoughness{NF} <: AbstractParameterization
+    @param z₀_cap::NF = 6.74e-3
+    @param z₀_high::NF = 1.3e-3
+    @param uₙ_cap::NF = 33.0
+    @param uₙ_high::NF = 55.0
+end
+
+Adapt.@adapt_structure MaxOceanMomentumRoughness
+MaxOceanMomentumRoughness(SG::SpectralGrid; kwargs...) = MaxOceanMomentumRoughness{SG.NF}(; kwargs...)
+
+@inline function (max_ocean_momentum_roughness::MaxOceanMomentumRoughness)(uₙ::NF) where {NF <: Real}
+    # Momentum roughness cap following Willett et al. (2026)
+    z₀_cap = max_ocean_momentum_roughness.z₀_cap
+    z₀_high = max_ocean_momentum_roughness.z₀_high
+    uₙ_cap = max_ocean_momentum_roughness.uₙ_cap
+    uₙ_high = max_ocean_momentum_roughness.uₙ_high
+
+    m = (z₀_high - z₀_cap) / (uₙ_high - uₙ_cap)
+    z₀_linear = muladd(m, uₙ - uₙ_cap, z₀_cap)
+
+    return max(z₀_high, min(z₀_linear, z₀_cap))
+end
+
 export LearnedOceanRoughness
 
+
 """
+    LearnedOceanRoughness
+
 Learned surface roughness lengths over ocean for momentum, heat and humidity
 fluxes, using symbolic regression expressions and sea-ice corrections.
 
@@ -242,18 +282,18 @@ The open-ocean momentum roughness length is
 
 where
 
-    A = u^m_c6
-    B = (m_c1*u + α + m_c2) / (exp(m_c3*u - m_c4) + m_c5)
+    A = uₙ^m_c1
+    B = (m_c3*uₙ + α + exp(m_c2)) / (exp(m_c4*uₙ - m_c5) + m_c6)
     C = m_c7*α - m_c8
 
-Here α = log(α_charnock), obtained from the Charnock parameterization.
+Here α = log(α_charnock), obtained from the Charnock parameterization
+using neutral wind speed uₙ.
 
-The open-ocean momentum roughness is capped,
+The open-ocean momentum roughness is upper bounded,
 
     z₀M_open = min(z₀M_base, z₀M_max)
 
-where z₀M_max is determined by the wind-dependent
-maximum_momentum_roughness function.
+where z₀M_max is determined by the wind-dependent momentum roughness cap.
 
 The final momentum roughness includes sea-ice blending,
 
@@ -268,27 +308,33 @@ where
 
 The heat roughness length is
 
-    z₀H = s*1.0e-3 + (1 - s)*exp(A - B)
+    z₀H = s*z₀H_ice + (1 - s)*exp(A - B)
 
 where
 
-    A = h_c1*(u + h_c2)^h_c3
-    B = exp(h_c4/u)
+    A = h_c1*(uₙ + h_c2)^h_c3
+    B = exp(h_c4/uₙ)
+
+and z₀H_ice is the prescribed sea-ice heat roughness length,
+defaulting to 1.0e-3 m.
 
 The humidity roughness length is proportional to the heat
 roughness length,
 
     z₀Q = z₀H * (a_q / a_h)
 
-Predictors:
-- u: Surface wind speed [m/s]
+Predictors and parameters:
+- uₙ: Neutral wind speed [m/s]
 - s: Sea-ice concentration
-- α: Logarithm of the Charnock parameter, evaluated using neutral wind
+- α: Logarithm of the Charnock parameter, evaluated using neutral wind speed
 - a_h, a_q: Heat and humidity scaling coefficients
+- z₀M_min: Minimum open-ocean momentum roughness length [m]
+- z₀M_max: Wind-dependent maximum open-ocean momentum roughness length [m]
+- z₀H_ice: Sea-ice heat roughness length [m]
 
 Fields are $(TYPEDFIELDS)
 """
-@parameterized @kwdef struct LearnedOceanRoughness{NF, CH} <: AbstractSurfaceRoughness
+@parameterized @kwdef struct LearnedOceanRoughness{NF, CH, SIMR, MOMR} <: AbstractSurfaceRoughness
     # Constants from IFS documentation
     a_h::NF = 0.4 # heat related constant
     a_q::NF = 0.62 # moisture related constant
@@ -297,6 +343,15 @@ Fields are $(TYPEDFIELDS)
 
     "[OPTION] Charnock parameter estimation"
     charnock_param::CH
+
+    "[OPTION] Sea-ice momentum_roughness"
+    sea_ice_momentum_roughness::SIMR  # from IFS docs
+
+    "[OPTION] sea-ice heat roughness length"  # defined in IFS documentation
+    sea_ice_heat_roughness::NF = 1.0e-3
+
+    "[OPTION] Momentum roughness upper limit"
+    max_ocean_momentum_roughness::MOMR
 
     "[OPTION] coefficient for momentum roughness closure over ocean"
     m_c1::NF = 0.48786303
@@ -308,22 +363,21 @@ Fields are $(TYPEDFIELDS)
     m_c7::NF = 1.0346544
     m_c8::NF = 7.1816134
 
-    "[OPTION] minimum ocean momentum roughness length [m]"
-    momentum_roughness_min::NF = 1.0e-7
-
     "[OPTION] coefficient for heat roughness closure over ocean"
     h_c1::NF = -8.207549
     h_c2::NF = 0.18300448
     h_c3::NF = 0.08970642
     h_c4::NF = -1.6667988
-
-    "[OPTION] sea-ice heat roughness length"  # defined in IFS documentation
-    sea_ice_heat_roughness::NF = 1.0e-3
 end
 
 Adapt.@adapt_structure LearnedOceanRoughness
-function LearnedOceanRoughness(SG::SpectralGrid; charnock_param = Charnock(SG), kwargs...)
-    return LearnedOceanRoughness{SG.NF, typeof(charnock_param)}(; charnock_param, kwargs...)
+function LearnedOceanRoughness(
+        SG::SpectralGrid; charnock_param = Charnock(SG),
+        sea_ice_momentum_roughness = SeaIceMomentumRoughness(SG), max_ocean_momentum_roughness = MaxOceanMomentumRoughness(SG), kwargs...
+    )
+    return LearnedOceanRoughness{SG.NF, typeof(charnock_param), typeof(sea_ice_momentum_roughness), typeof(max_ocean_momentum_roughness)}(;
+        charnock_param, sea_ice_momentum_roughness, max_ocean_momentum_roughness, kwargs...
+    )
 end
 initialize!(::LearnedOceanRoughness, ::PrimitiveEquation) = nothing
 
@@ -418,7 +472,7 @@ end
     laiₕ = haskey(land, :high_vegetation_leaf_area) ? land.high_vegetation_leaf_area[ij] : zero(land_fraction)
     laiₗ = haskey(land, :low_vegetation_leaf_area) ? land.low_vegetation_leaf_area[ij] : zero(land_fraction)
     sd = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(land_fraction)
-    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture[ij, begin] : zero(land_fraction)
+    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture[ij, end] : zero(land_fraction)
     soil_temperature = haskey(vars.prognostic.land, :soil_temperature) ? vars.prognostic.land.soil_temperature[ij, end] : zero(land_fraction)
 
     z₀M_land = land_momentum_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, sd, soil_temperature, soil_moisture)
@@ -445,9 +499,10 @@ end
         return nothing
     end
 
-    (; surface_wind_speed, neutral_wind_speed) = vars.parameterizations
-    u = surface_wind_speed[ij]
+    (; neutral_wind_speed) = vars.parameterizations
     progn_ocean = vars.prognostic.ocean
+
+    uₙ = neutral_wind_speed[ij]
 
     ℵ = if haskey(progn_ocean, :sea_ice_concentration)
         ice = get_prognostic_step(
@@ -457,37 +512,18 @@ end
         )
         ice[ij]
     else
-        zero(u)
+        zero(uₙ)
     end
-    log_αᵪ = log(scheme.charnock_param(neutral_wind_speed[ij]))
+    log_αᵪ = log(scheme.charnock_param(uₙ))
 
-    z₀M_ocean = ocean_momentum_roughness(scheme, surface_wind_speed[ij], log_αᵪ, ℵ)
-    z₀H_ocean = ocean_heat_roughness(scheme, surface_wind_speed[ij], ℵ)
+    z₀M_ocean = ocean_momentum_roughness(scheme, uₙ, log_αᵪ, ℵ)
+    z₀H_ocean = ocean_heat_roughness(scheme, uₙ, ℵ)
 
     ocean.momentum_roughness[ij] = z₀M_ocean
     ocean.heat_roughness[ij] = z₀H_ocean
     ocean.humidity_roughness[ij] = z₀H_ocean * scheme.a_ratio # moisture roughness is heat times a constant
 
     return nothing
-end
-
-@inline function sea_ice_momentum_roughness(ℵ::NF) where {NF <: Real}
-    # Following IFS documentation
-    base = NF(0.93e-3) * (1 - ℵ) + NF(6.05e-3) * exp(NF(-17) * (ℵ - NF(0.5))^2)
-    return max(base, NF(1.0e-3))
-end
-
-@inline function maximum_momentum_roughness(uₙ::NF) where {NF <: Real}
-    # Momentum roughness cap following Willett et al. (2026)
-    z_cap = NF(6.74e-3)
-    z_high = NF(1.3e-3)
-    U_cap = NF(33.0)
-    U_high = NF(55.0)
-
-    m = (z_high - z_cap) / (U_high - U_cap)
-    z_linear = muladd(m, uₙ - U_cap, z_cap)
-
-    return clamp(z_linear, z_high, z_cap)
 end
 
 # Ocean momentum roughness
@@ -501,10 +537,10 @@ end
             muladd(scheme.m_c7, log_αᵪ, -scheme.m_c8)
     )
 
-    z_max = maximum_momentum_roughness(u)
-    z₀ = clamp(z₀, NF(scheme.momentum_roughness_min), z_max)
+    z_max = scheme.max_ocean_momentum_roughness(uₙ)
+    z₀ = min(z₀, z_max)
 
-    z_ice = sea_ice_momentum_roughness(ℵ)
+    z_ice = scheme.sea_ice_momentum_roughness(ℵ)
 
     return muladd(ℵ, z_ice - z₀, z₀)
 end
