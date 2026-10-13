@@ -149,6 +149,12 @@ The `transform` function is applied element-wise to the
 array and is therefore implemented as an anonymous function
 of a single argument.
 
+The `transform` is applied after the interpolation onto the output
+grid and on the model's architecture, i.e. on the GPU for a GPU
+simulation. It therefore has to be GPU-compatible there: a plain
+function of its argument like the ones above is, but a function that
+captures non-`isbits` data (e.g. a `Vector`) is not.
+
 ## Advanced: Extend the `output!` function
 
 Defining the `path` as outlined in [Define the output variable's path](@ref)
@@ -169,16 +175,15 @@ function SpeedyWeather.output!(
     variable::VerticalVelocityOutput,
     simulation::SpeedyWeather.AbstractSimulation,
 )
-    # INTERPOLATION
-    w_out = output.grid3D               # scratch grid to interpolate into
-    w_sigma = simulation.variables.dynamics.w     # point to data in variables
-    RingGrids.interpolate!(w_out, w_sigma, output.interpolator)
+    # INTERPOLATION, on the model's architecture (e.g. GPU)
+    w_out = output.field3D                          # scratch field to interpolate into
+    w_sigma = simulation.variables.dynamics.w       # point to data in variables
+    SpeedyWeather.interpolate_output!(output, w_out, w_sigma)
 
     # (do any changes to w_out here)
 
-    # WRITE TO NETCDF
-    i = output.output_counter       # output time step to write
-    output.netcdf_file[variable.name][:, :, :, i] = w_out
+    # COPY TO CPU, ROUND AND WRITE TO NETCDF
+    SpeedyWeather.write_output!(output, variable, w_out, output.host3D)
     return nothing
 end
 ```
@@ -193,29 +198,29 @@ it to write into the netCDF file.
 In most cases you will need to interpolate any gridded variables
 inside the model (which can be on a reduced grd) onto the output grid
 (which has to be a full grid, see [Output grid](@ref)). For that
-the `NetCDFOutput` has two scratch arrays `grid3D` and `grid2D`
-which are of type and size as defined by the `output_Grid` and
-`nlat_half` arguments when creating the `NetCDFOutput`.
-So the three lines for interpolation are essentially those in
+the `NetCDFOutput` has the scratch fields `field2D`, `field3D`
+(and `field3Dland` for soil variables) on the output grid.
+They live on the model's architecture so that the interpolation
+runs where the model runs, e.g. on the GPU, and each has a CPU
+equivalent `host2D`, `host3D`, `host3Dland` to write from (on CPU
+these are the same objects).
+So the interpolation lines are essentially those in
 which your definition of a new output variable is linked
 with where to find that variable in `simulation.variables`.
 You can, in principle, also do any kind of computation here,
 for example adding two variables, normalising data and so on.
-In the end it has to be on the `output_Grid` hence you
+In the end it has to be on the output grid hence you
 probably do not want to skip the interpolation step but you
 are generally allowed to do much more here before or after
 the interpolation.
 
-The last two lines are then just about actually writing to
-netcdf. For any variable that is written on every output
-time step you can use the output counter `i` to point to the
-correct index `i` in the netcdf file as shown here.
-For 2D variables (horizontal+time) the indexing would be
-`[:, :, i]`. 2D variables without time you only want to write
-once (because they do not change) the indexing would change to
-`[:, :]` and you then probably want to add a line at the top
-like `output.output_counter > 1 || return nothing` to escape
-immediately after the first output time step. But you could
+The last line copies the field onto the CPU, rounds it to `keepbits`
+if the variable defines them, and writes it into the netCDF file at
+the current output time step `output.output_counter`, choosing the
+indices from `variable.dims_xyzt`. 2D variables without time you only
+want to write once (because they do not change), so you probably want
+to add a line at the top like `output.output_counter > 1 || return nothing`
+to escape immediately after the first output time step. But you could
 also check for a specific condition (e.g. a new temperature
 record in a given location) and only then write to netcdf.
 Just some ideas how to customize this even further.

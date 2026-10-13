@@ -58,6 +58,9 @@ include("barotropic.jl")
 include("shallowwater.jl")
 include("primitive_wet.jl")
 
+# OUTPUT WRITERS, INTERPOLATION ON GPU
+include("output.jl")
+
 include("gpu_graphs_shared.jl")
 
 if gpu_backend === :CUDA

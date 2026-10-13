@@ -75,16 +75,9 @@ function output!(
     # if the max case is hit we divide by zero which yields inf so clearly flagged in any case
     @. u_or_v10 = u_or_v_bottom .* log(10 / z₀) ./ log.(max.(z_bottom, z₀) / z₀)
 
-    # interpolate 2D/3D variables
-    u_or_v10_output = output.field2D
-    u_or_v10_grid = on_architecture(CPU(), u_or_v10)
-    interpolate_output!(output, u_or_v10_output, u_or_v10_grid)
-
-    if hasproperty(variable, :keepbits)     # round mantissabits for compression
-        round!(u_or_v10_output, variable.keepbits)
-    end
-
-    write_array!(output, variable, u_or_v10_output)
+    # interpolate onto the output grid on the model's architecture, then to host, round and write
+    interpolate_output!(output, output.field2D, u_or_v10)
+    write_output!(output, variable, output.field2D, output.host2D)
     return nothing
 end
 
@@ -99,7 +92,7 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 12
-    transform::F = (x) -> x - 273.15     # [K] to [˚C]
+    transform::F = (x) -> x - oftype(x, 273.15)     # [K] to [˚C]
 end
 
 # not the actual surface temperature but the core variable to read in
@@ -134,16 +127,9 @@ function output!(
     (; transform) = variable
     @. Ts = transform(T_bottom * (pₛ / pN)^κ)   # Convert to °C
 
-    # interpolate 2D/3D variables
-    Ts_output = output.field2D
-    Ts_grid = on_architecture(CPU(), Ts)
-    interpolate_output!(output, Ts_output, Ts_grid)
-
-    if hasproperty(variable, :keepbits)     # round mantissabits for compression
-        round!(Ts_output, variable.keepbits)
-    end
-
-    write_array!(output, variable, Ts_output)
+    # interpolate onto the output grid on the model's architecture, then to host, round and write
+    interpolate_output!(output, output.field2D, Ts)
+    write_output!(output, variable, output.field2D, output.host2D)
     return nothing
 end
 
