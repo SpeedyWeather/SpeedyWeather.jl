@@ -356,12 +356,10 @@ end
 
         # eliminate all other rows
         for k in 1:nlayers
-            if k != pivot
-                factor = S_scratch[l, k, pivot]
-                for r in 1:nlayers
-                    S_scratch[l, k, r] -= factor * S_scratch[l, pivot, r]
-                    S⁻¹[l, k, r] -= factor * S⁻¹[l, pivot, r]
-                end
+            factor = ifelse(k == pivot, zero(NF), S_scratch[l, k, pivot])
+            for r in 1:nlayers
+                S_scratch[l, k, r] -= factor * S_scratch[l, pivot, r]
+                S⁻¹[l, k, r] -= factor * S⁻¹[l, pivot, r]
             end
         end
     end
@@ -447,13 +445,8 @@ end
     geopotential = ntuple(Val(nlayers)) do k
         # skip 1:k-1 as integration is surface to k
         geopotential_val = zero(eltype(temp_tend))
-        # while loop instead of `for r in k:nlayers`: the triangular range with both
-        # endpoints dynamic miscompiles on AMDGPU/CDNA (gfx90a/gfx942), see
-        # https://github.com/JuliaGPU/AMDGPU.jl/issues/1015
-        r = k
-        while r <= nlayers
-            geopotential_val += R[k, r] * temp_tend[lm, r, temp_step]
-            r += 1
+        for r in k:nlayers
+            geopotential_val += @inbounds R[k, r] * temp_tend[lm, r, temp_step]
         end
         geopotential_val
     end
@@ -461,7 +454,7 @@ end
     # Step 3: Calculate the G = G_D + ξRG_T + ξUG_lnps terms
     # ∇² not part of U so *eigenvalues here
     G = ntuple(Val(nlayers)) do k
-        div_tend[lm, k, div_step] + ξ * eigenvalue * (U[k] * pres_tend[lm, pres_step] + geopotential[k])
+        @inbounds div_tend[lm, k, div_step] + ξ * eigenvalue * (U[k] * pres_tend[lm, pres_step] + geopotential[k])
     end
 
     # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
