@@ -97,6 +97,18 @@ Implicit kernels raise with `@inbounds` in the closures and a zero-factor Gauss-
 The `while` loop is replaced by `for` again. On the GPU, the raised correction kernel runs a matvec as
 a TF32 Triton GEMM (see "GPU (Reactant + CUDA)").
 
+> Don't try to run the potential fix, we want to concentrate of getting Reactant to work with `raise = true`
+
+> no, use reactant#main which includes the constant complex fix
+
+> but still rewrite kernels to branchless form when this doesn't come with performance penalties on GPU
+
+`@compile raise = true time_step!` on CUDA next failed on a possibly undefined variable in
+`pseudo_adiabat!` (fixed) and on complex-constant stores (Reactant.jl#3450). For the latter, a
+separate environment uses Reactant `main` with `Reactant_jll` 0.0.419. `_divergence_kernel!` is
+branch-free (no GPU penalty). The branch-free `zero_last_degree_kernel!` is 3.6-4.3x slower at large
+sizes.
+
 ## Problem description
 
 `mg/reactant-primitive` (#985) got the primitive equation models close to running with Reactant but
@@ -213,6 +225,82 @@ Findings (2026-10-13)
     the macros don't take `xla_debug_options` directly) or via `XLA_FLAGS=--xla_gpu_enable_triton_gemm=false`. The raised kernel then matches the CPU (rel 1.6e-7,
     same distance to Float64 as the CPU). Upstream fix candidate: dots created by raising should carry
     Reactant's `dot_general_precision`.
+- Full PrimitiveWetModel, `@compile raise = true time_step!` (`reactant_wet_compare_raise.jl`, RAISE,
+  PRECISION=highest, NOTRITON). With the implicit kernels raisable, two more failures:
+  - `pseudo_adiabat!` (Betts-Miller convection): `temp_parcel_dry` was assigned only in `if !saturated`
+    but read in the `else` of `if saturated`. Julia can't prove it's defined there, so an
+    `UndefVarError` check (`llvm.intr.trap`) stays in the column kernel. Fixed: defined on all paths
+    (bitwise identical). The `StepRange` of `(nlayers - 1):-1:1` also leaves an overflow-check function
+    with a trap in the module, but it is never called.
+  - Complex-constant stores (`div[I] = 0` in `_divergence_kernel!`, `data[I] = 0` in
+    `zero_last_degree_kernel!`): `cannot raise op to stablehlo llvm.mlir.constant`. Reactant.jl#3450,
+    fixed in EnzymeAD/Enzyme-JAX#3488 (merged 2026-10-12 19:29), in `Reactant_jll` 0.0.419 (built
+    2026-10-13 07:02), but Reactant 0.2.292 and `main` pin `Reactant_jll` 0.0.418. Test environment:
+    `claude_reactant_gpu_2026-10-13/env_reactant_main` (Reactant `main` d2285670 developed from
+    `reactant_main/` with jll compat widened, `Reactant_jll` 0.0.419).
+- Branch-free kernels on CUDA (no Reactant, A40, `branchfree_kernels_bench.jl`, results bitwise equal):
+  - `_divergence_kernel!` (first element masked, neighbours via `previous_lm`/`next_lm`, last element
+    via `ifelse`): equal or 1-2% faster once bandwidth-bound (>= ~20 μs, e.g. T255L32 50.4 vs 49.9 μs),
+    up to ~3 μs slower in a few latency-bound cases (6-10 μs). Applied.
+  - `zero_last_degree_kernel!` with `data[I] = ifelse(l == lmax, 0, data[I])` reads and writes all
+    elements instead of writing only the last degree: equal up to ~5 μs, but 3.6-4.3x slower from
+    T170L64, T255L32, T340L16 upwards (T255L64 16 vs 63 μs, T340L64 27 vs 115 μs). The model only
+    calls it on single-layer tendencies (`η`, surface pressure in `horizontal_diffusion.jl`), where the
+    kernel is launch-bound and equally fast. A penalty-free branch-free alternative for multi-layer
+    arrays: launch over (m, k) only, with `lm = nonzeros(lmax, m)`.
+- With Reactant `main` + `Reactant_jll` 0.0.419, `@compile raise = true time_step!` failed on both
+  branch-free kernels: `ifelse` on a `Complex` compiles to a select of an LLVM aggregate
+  (`llvm.select` on `!llvm.array<2 x f32>` with an aggregate `llvm.mlir.constant dense<0.0>`), which
+  can't be raised (EJ#3488 covers scalar constants only). New `componentwise_ifelse`
+  (SpeedyWeatherInternals.Utils, exported, tested) selects real and imaginary part separately and is
+  used for the complex selects in `_divergence_kernel!` and `zero_last_degree_kernel!`.
+  Possible upstream issue: raise aggregate selects/constants (or split them into scalars).
+  Both kernels then raise (`branchfree_kernels_raise.jl`, Reactant CPU backend): `zero_last_degree!`
+  bitwise equal to the CPU, `divergence!` max abs diff 4e-6 (values O(10), Float32 rounding).
+- 2026-10-13 17:30: **`@compile raise = true time_step!` of the PrimitiveWetModel compiles on CUDA**
+  (325 s; Reactant `main`, `Reactant_jll` 0.0.419, HIGHEST precision, Triton GEMM off). After
+  `initialize!` all 112 arrays agree with the CPU (< 1%). Step 1 has NaNs in the spectral tendencies:
+  `tendencies.divergence` 256 (= 32 x 8 layers), `tendencies.temperature` 256, `tendencies.pressure`
+  29, none in `tendencies.grid.temperature`. Everything in grid space is NaN afterwards.
+  Ruled out: the partial launch of `implicit_invert_S_kernel!` over `1:truncation`, raised on the
+  GPU it keeps the untouched last row of `S⁻¹` (`invert_S_partial_raise.jl`).
+  NaN pattern after step 1: divergence/temperature at 32 lm in all layers (m = 0 for l = 1-33 except
+  l = 2 and 8, plus one at m = 32), pressure at m = 0, l = 3-32 except 8.
+- Stage bisection (`reactant_wet_bisect_stages.jl`: the stages of `time_step!` each `@jit raise = true`
+  on the GPU, compared with the CPU after each): all physics stages are NaN-free. The first NaNs
+  appear in `dynamics_tendencies!`, in `dynamics.div_mean` (15 coefficients, m = 0,
+  l = 3-5, 10-12, 17-20, 25-29), and from there in `tendencies.pressure`. `implicit_correction!`
+  spreads them to all layers and to divergence and temperature at the same lm (62 lm then).
+  `div_mean` comes from `_vertical_integration_spectral_kernel!` in `vertical_integration!`, which
+  only reads the (NaN-free) prognostic divergence. Isolated (`vertical_integration_raise.jl`): the
+  NaNs appear only when raised, with Triton on or off.
+  Also seen: shortwave and cloud diagnostics differ by 1.7% (`cloud_top` up to 71%) after
+  `parameterization_tendencies!`, to check separately.
+- **Root cause (upstream raising bug):** a kernel that accumulates a `ComplexF32` in a loop and stores
+  it gets the store packed into an i64 by LLVM (`zext` of the real-part bits, `shl` of the imaginary
+  part, `or`). Raised, the zero-extension becomes `stablehlo.convert i32 -> i64` (sign-extending)
+  followed by `add`. A negative real part decrements the bits of the imaginary part: ±0 (all m = 0
+  modes) becomes NaN, otherwise the imaginary part is off by 1 ulp. MWE
+  `mwe_complex_store_signext.jl` (Reactant CPU backend, so not GPU-specific): summing a complex
+  matrix over its second dimension into a vector or a matrix column fails. Separate real
+  accumulators (`complex(re, im)` stored) or accumulating in memory (`out[i] += ...`) work, as does a plain copy.
+  - Fixed in `_vertical_integration_spectral_kernel!` and `implicit_primitive_leapfrog_kernel!`
+    (real and imaginary part accumulated separately; all operators are real). The implicit kernel
+    with m = 0 test data had NaN at all 264 m = 0 coefficients when raised. Now NaN-free, matches the CPU
+    to 1e-7, and the new kernel is bitwise identical to the old one on the CPU (incl. signed zeros,
+    `implicit_m0_raise.jl`). `test/dynamics/implicit.jl` passes.
+  - To report upstream (Reactant.jl / Enzyme-JAX raise of `zext`). Issue draft:
+    `reactant-issue-draft-complex-store-signext.md` with `reactant-issue-complex-store-signext-mwe.jl`
+    (minimal kernel: weighted sum with a runtime loop bound, `-1 + NaN*im` instead of `-1 + 0im`).
+- 2026-10-13 18:35: **PrimitiveWetModel with `@compile raise = true` runs on CUDA, 10 steps without
+  NaNs** (`reactant_wet_compare_raise.jl`, Reactant `main` + `Reactant_jll` 0.0.419, HIGHEST precision,
+  Triton GEMM off, compile 328 s). Max relative difference to the CPU after step 1 / step 10: vorticity
+  3.4e-6 / 7.7e-5, divergence 9.3e-4 / 2.2e-4, temperature 2.4e-6 / 1.8e-6, humidity 2.6e-5 / 1.6e-5,
+  pressure 9.6e-8 / 2.7e-8. Still different: shortwave and cloud diagnostics
+  (`surface_shortwave_down` 1.7% from the first `parameterization_tendencies!`, `cloud_top` at some
+  points). Not specific to raising or the GPU: the unraised Reactant run on the CPU backend
+  (previous session, `compare_cpu.log`) shows identical numbers (1.66e-2, 0.714). To investigate
+  separately (shortwave/cloud scheme on Reactant vs CPU).
 
 ## Known limitations
 
