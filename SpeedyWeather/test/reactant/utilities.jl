@@ -34,3 +34,19 @@
     @test clock_cpu2.period == clock_cpu.period
     @test clock_cpu2.Δt == clock_cpu.Δt
 end
+
+@testset "Views into concrete Reactant arrays" begin
+    x = Reactant.to_rarray(ones(Float32, 6))
+    v = view(x, 2:4)
+
+    # broadcasting into a view writes into the parent
+    v .*= 3
+    @test Array(x) == Float32[1, 3, 3, 3, 1, 1]
+
+    # deepcopy keeps the view aliased with the copied parent, as for Array
+    copied = deepcopy((; parent = x, view = v))
+    @test parent(copied.view) === copied.parent
+    fill!(copied.parent, 0)
+    @test all(iszero, Array(copied.view))
+    @test Array(x) == Float32[1, 3, 3, 3, 1, 1]     # original untouched
+end

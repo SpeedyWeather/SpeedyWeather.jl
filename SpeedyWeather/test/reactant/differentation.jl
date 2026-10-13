@@ -2,13 +2,12 @@
 # differentiate KernelAbstractions kernels that are raised to StableHLO, hence `raise = true`.
 # The Reactant gradient is compared against Enzyme on the CPU for the same state.
 #
-# Currently broken upstream (Reactant v0.2.292, Reactant_jll v0.0.418), both minimal to reproduce:
-#   - raising fails for complex-valued kernels that store a complex constant, e.g. `V[I] = 0` in
-#     a branch (`_UV_from_vor_kernel!`, `_divergence_kernel!`): "cannot raise op to stablehlo
-#     llvm.mlir.constant"
-#   - with those kernels raised, the reverse pass fails as stores conditional on the index
-#     (e.g. `if lm == 1`) are raised to a masked stablehlo.reduce (select/or body) for which
-#     Enzyme-MLIR has no reverse rule: "Unsupported operation in reduction rev autodiff"
+# Currently broken upstream (Reactant v0.2.292, Reactant_jll v0.0.418): raising fails for kernels
+# that store a complex constant, e.g. `div[I] = 0` in `_divergence_kernel!`: "cannot raise op to
+# stablehlo llvm.mlir.constant". Fixed on Reactant's main, to be released. With that kernel storing
+# a computed zero instead the gradient agrees with the CPU to a relative error of 1e-6.
+# (The `UV_from_vor(div)!` kernels are branch-free as their branches were raised to a reduction
+# without a reverse rule in Enzyme-MLIR: "Unsupported operation in reduction rev autodiff")
 
 """Scalar loss to differentiate: squared norm of the prognostic vorticity after one time step."""
 function loss_one_step(vars, model)
@@ -39,6 +38,18 @@ function try_or_nothing(f, description)
     catch err
         @info "$description failed: $(first(split(sprint(showerror, err), '\n')))"
         return nothing
+    end
+end
+
+@testset "make_zero(::Variables) with Reactant" begin
+    # variables are views into fused parents, make_zero relies on deepcopy preserving that aliasing
+    simulation = initialize!(create_reactant_model(BarotropicModel))
+    run!(simulation, steps = 1)     # to have non-zero grid variables too
+    vars, _ = SpeedyWeather.unpack(simulation)
+    dvars = Enzyme.make_zero(vars)
+    for (primal, shadow) in ((vars.prognostic.vorticity, dvars.prognostic.vorticity), (vars.grid.u, dvars.grid.u))
+        @test any(!iszero, Array(primal.data))
+        @test all(iszero, Array(shadow.data))
     end
 end
 

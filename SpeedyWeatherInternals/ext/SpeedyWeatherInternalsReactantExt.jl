@@ -82,6 +82,20 @@ for ArrayType in (:ConcretePJRTArray, :ConcreteIFRTArray)
     end
 end
 
+# TODO: move upstream to Reactant
+# `deepcopy` of a concrete Reactant array does not register the copy in deepcopy's `IdDict`, so every
+# reference to the same array gets its own independent copy and aliasing is lost, e.g. between a
+# fused parent array and the variables that are views into it. Register the copy as `deepcopy` of an
+# `Array` (or Reactant's `TracedRArray`) does.
+for ArrayType in (:ConcretePJRTArray, :ConcreteIFRTArray)
+    @eval function Base.deepcopy_internal(x::$ArrayType, stackdict::IdDict)
+        haskey(stackdict, x) && return stackdict[x]::typeof(x)
+        y = copy(x)
+        stackdict[x] = y
+        return y
+    end
+end
+
 # For @maybe_jit macro - extend _jit for ReactantDevice.
 # If we are already inside a Reactant compile/trace context, call f directly (no nested @jit).
 # Otherwise JIT-compile on the fly.

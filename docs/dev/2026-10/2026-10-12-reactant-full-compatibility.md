@@ -28,6 +28,26 @@ Merged `main` (squash merge of #1302, identical to the already merged branch).
 
 Fixes that belong into Reactant are in our Reactant extensions, marked `# TODO: move upstream to Reactant`.
 
+> Next, we want to test if the differentiation now works. We need to revise the differentiation.jl
+> test for that.
+
+`test/reactant/differentation.jl` compares the gradient of one time step (raised, Enzyme reverse)
+against Enzyme on the CPU, currently `@test_broken` because of two upstream issues (complex constants
+can't be raised, no reverse rule for a masked reduction). Found and fixed (in the extension) that
+`deepcopy` of concrete Reactant arrays breaks the aliasing of views into fused parents, which made
+`make_zero(::Variables)` return shadows holding the primal values.
+
+> Upstream in Reactant `main` the issue with complex constant should be fixed. Apply the kernel
+> workaround for SpeedyTransforms
+
+`_UV_from_vor_kernel!` and `_UV_from_vordiv_kernel!` are branch-free: the special cases (first
+element, last two rows) zero the coefficients, the neighbours lm±1 wrap around with `rem` (the only
+index clamp Reactant can raise) and are multiplied by zero there. Raised, their branches became a
+masked reduction without a reverse rule in Enzyme-MLIR. Results are bitwise identical on the CPU,
+the raised gradients agree with finite differences. The kernels themselves are 20-30% slower on
+1 CPU thread (5-15% on Reactant), within noise for a full time step (Barotropic, ShallowWater T63,
+PrimitiveDry T31).
+
 ## Problem description
 
 `mg/reactant-primitive` (#985) got the primitive equation models close to running with Reactant but
@@ -78,7 +98,8 @@ Reactant extensions
   fields), bounds checks, branchless ring search, `update_locator!` without safety checks.
 - `LowerTriangularArraysReactantExt`: fix `BroadcastStyle` for the 5-parameter type.
 - Upstream candidates (`# TODO: move upstream to Reactant`): broadcasting into views of concrete
-  arrays (silently wrong results otherwise), `Dates.year` for traced days.
+  arrays (silently wrong results otherwise), `Dates.year` for traced days, `deepcopy` of concrete
+  arrays keeping views aliased with their (copied) parent.
 
 ## Testing and verification
 
@@ -98,6 +119,12 @@ Reactant extensions
 - Reactant on GPU (CUDA) is not tested in this PR, `SpeedyWeather/test/GPU/reactant.jl` is still
   not included in the GPU test suite.
 - Particles are not supported on Reactant.
+- Differentiation with Reactant (Enzyme reverse mode, kernels raised to StableHLO) is blocked
+  upstream until a Reactant release includes the fix for raising kernels that store complex
+  constants (`div[I] = 0` in `_divergence_kernel!`, fixed on Reactant's main). With a computed zero
+  there instead (tried outside of this PR only) the gradient of a `BarotropicModel` time step agrees
+  with Enzyme on the CPU to a relative error of 1e-6. ShallowWater and primitive equation models
+  are untested.
 - The prescribed seasonal climatologies (e.g. `SeasonalOceanClimatology`) are untested inside
   the compiled time step.
 

@@ -266,35 +266,44 @@ function UV_from_vor!(
     return U, V
 end
 
+# The gradient kernels below are branch-free: the special cases (first element, last two rows)
+# set coefficients to zero instead of branching, and the neighbours lm-1, lm+1 wrap around at the
+# first and last element (where their coefficient is zero). Results are identical to branching (for
+# finite input) but Reactant can raise these kernels to StableHLO, needed to differentiate with Enzyme.
+# The wrap-around uses `rem` as other index clamps (`max`, `min`, `mod`) can't be raised.
+# The wrap-around works because the coefficients are zero for lm-1, lm+1 in the first and last row and the 
+# kernels also set them so that it's safe. 
+@inline previous_lm(lm, lmmax) = rem(lm - 2 + lmmax, lmmax) + 1
+@inline next_lm(lm, lmmax) = rem(lm, lmmax) + 1
+
 @kernel inbounds = true function _UV_from_vor_kernel!(U, V, vor, l_indices, lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(vor, 1)
     l = l_indices[lm]
 
-    # Get the coefficients for the current lm index
-    z = im * vordiv_to_uv_x[lm]
-    vordiv_uv1 = vordiv_to_uv1[lm]
-    vordiv_uv2 = vordiv_to_uv2[lm]
-
     # Handle different cases based on position in the triangular matrix
-    if lm == 1  # First element (diagonal)
-        # U = -∂/∂lat(Ψ) - no lm-1 term for first element
-        U[I] = vordiv_uv2 * vor[lm + 1, k]
-        # V = ∂/∂λ(Ψ)
-        V[I] = z * vor[I]
-    elseif l == (lmax - 1)     # extra in case vor[lmax,:] != 0, see comment in UV_from_vordiv!
-        U[I] = -vordiv_uv1 * vor[lm - 1, k]    # meridional gradient again (but only 2nd term from above)
-        V[I] = z * vor[I]          # zonal gradient again (as above)
-    elseif l == lmax         # extra in case vor[lmax,:] != 0, see comment in UV_from_vordiv!
-        U[I] = -vordiv_uv1 * vor[lm - 1, k]
-        V[I] = 0
-    else  # General case (below diagonal)
-        # U = -∂/∂lat(Ψ) combined with Laplace inversion ∇⁻²
-        U[I] = muladd(vordiv_uv2, vor[lm + 1, k], -vordiv_uv1 * vor[lm - 1, k])
-        # V = ∂/∂λ(Ψ)
-        V[I] = z * vor[I]
-    end
+    # (no lm+1 terms in the last two rows in case vor[lmax,:] != 0, see comment in UV_from_vordiv!)
+    first_element = lm == 1                                 # no lm-1 term for the first element
+    second_last_row = (l == lmax - 1) & !first_element      # no lm+1 term
+    last_row = (l == lmax) & !first_element                 # no lm+1 term and V = 0
+
+    # Get the coefficients for the current lm index, zero for the terms that don't exist
+    vordiv_uv1 = vordiv_to_uv1[lm]
+    vordiv_uv1 = ifelse(first_element, zero(vordiv_uv1), vordiv_uv1)
+    vordiv_uv2 = vordiv_to_uv2[lm]
+    vordiv_uv2 = ifelse(second_last_row | last_row, zero(vordiv_uv2), vordiv_uv2)
+    uv_x = vordiv_to_uv_x[lm]
+    z = im * ifelse(last_row, zero(uv_x), uv_x)
+
+    lm_prev = previous_lm(lm, lmmax)
+    lm_next = next_lm(lm, lmmax)
+
+    # U = -∂/∂lat(Ψ) combined with Laplace inversion ∇⁻²
+    U[I] = muladd(vordiv_uv2, vor[lm_next, k], -vordiv_uv1 * vor[lm_prev, k])
+    # V = ∂/∂λ(Ψ)
+    V[I] = z * vor[I]
 end
 
 """
@@ -333,37 +342,32 @@ end
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(vor, 1)
     l = l_indices[lm]
 
-    # Get the coefficients for the current lm index
-    z = im * vordiv_to_uv_x[lm]
+    # Handle different cases based on position in the triangular matrix, branch-free (see above)
+    first_element = lm == 1                                 # no lm-1 terms for the first element
+    second_last_row = (l == lmax - 1) & !first_element      # no lm+1 terms in the second last row
+    last_row = (l == lmax) & !first_element                 # only the lm-1 terms in the last row
+
+    # Get the coefficients for the current lm index, zero for the terms that don't exist
     vordiv_uv1 = vordiv_to_uv1[lm]
+    vordiv_uv1 = ifelse(first_element, zero(vordiv_uv1), vordiv_uv1)
     vordiv_uv2 = vordiv_to_uv2[lm]
+    vordiv_uv2 = ifelse(second_last_row | last_row, zero(vordiv_uv2), vordiv_uv2)
+    uv_x = vordiv_to_uv_x[lm]
+    z = im * ifelse(last_row, zero(uv_x), uv_x)
 
-    # Handle different cases based on position in the triangular matrix
-    if lm == 1  # First element (diagonal)
-        # Meridional gradient contributions
-        ∂ζθ = vordiv_uv2 * vor[lm + 1, k]       # lm-1 term is zero
-        ∂Dθ = -vordiv_uv2 * div[lm + 1, k]       # lm-1 term is zero
+    lm_prev = previous_lm(lm, lmmax)
+    lm_next = next_lm(lm, lmmax)
 
-        # Zonal gradient contributions
-        U[I] = muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
-        V[I] = muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
-    elseif l == (lmax - 1)  # Second last row
-        U[I] = muladd(z, div[I], -vordiv_uv1 * vor[lm - 1, k])
-        V[I] = muladd(z, vor[I], vordiv_uv1 * div[lm - 1, k])
-    elseif l == lmax  # Last row
-        U[I] = -vordiv_uv1 * vor[lm - 1, k]      # only last term from 2nd last row
-        V[I] = vordiv_uv1 * div[lm - 1, k]      # only last term from 2nd last row
-    else  # General case (below diagonal)
-        # Meridional gradient contributions
-        ∂ζθ = muladd(vordiv_uv2, vor[lm + 1, k], -vordiv_uv1 * vor[lm - 1, k])
-        ∂Dθ = muladd(vordiv_uv1, div[lm - 1, k], -vordiv_uv2 * div[lm + 1, k])
+    # Meridional gradient contributions
+    ∂ζθ = muladd(vordiv_uv2, vor[lm_next, k], -vordiv_uv1 * vor[lm_prev, k])
+    ∂Dθ = muladd(vordiv_uv1, div[lm_prev, k], -vordiv_uv2 * div[lm_next, k])
 
-        # Zonal gradient contributions
-        U[I] = muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
-        V[I] = muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
-    end
+    # Zonal gradient contributions
+    U[I] = muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
+    V[I] = muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
 end
 
 
