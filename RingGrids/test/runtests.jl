@@ -11,6 +11,7 @@ include("reordering.jl")
 include("reverse.jl")
 include("rotate.jl")
 include("scaling.jl")
+include("asset_cache.jl")
 include("get_asset.jl")
 include("copy_unmasked.jl")
 
