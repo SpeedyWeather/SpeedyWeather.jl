@@ -128,6 +128,18 @@ Predictors:
 Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct LearnedLandRoughness{NF} <: AbstractSurfaceRoughness
+    "[OPTION] maximum land surface momentum roughness length [m]"
+    momentum_roughness_max::NF = 2.0
+
+    "[OPTION] maximum land surface heat roughness length [m]"
+    heat_roughness_max::NF = 2.0
+
+    "[OPTION] minimum land surface momentum roughness length [m]"
+    momentum_roughness_min::NF = 1.3e-3
+
+    "[OPTION] minimum land surface heat roughness length [m]"
+    heat_roughness_min::NF = 1.3e-4
+
     "[OPTION] coefficient for momentum roughness closure over land"
     m_c1::NF = -7.231684
     m_c2::NF = 11.078163
@@ -193,6 +205,9 @@ Fields are $(TYPEDFIELDS)
 
     "[OPTION] high wind constant term coefficient"
     c5::NF = 0.0129
+
+    "[OPTION] minimum Charnock parameter value"
+    charnock_min::NF = 1.0e-5
 end
 
 Adapt.@adapt_structure Charnock
@@ -205,13 +220,14 @@ Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
     c3 = T(charnock_param.c3)
     c4 = T(charnock_param.c4)
     c5 = T(charnock_param.c5)
+    c_min = T(charnock_param.charnock_min)
 
     α = ifelse(
         uₙ ≤ Uₜ,
         muladd(uₙ * uₙ, muladd(c1, uₙ, c2), c3),
         muladd(c4, uₙ - Uₜ, c5) # for uₙ > Uₜ, linear increase
     )
-    return α
+    return max(α, c_min)  # clamp to lower bound of Charnock parameter
 end
 
 export LearnedOceanRoughness
@@ -273,8 +289,11 @@ Predictors:
 Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct LearnedOceanRoughness{NF, CH} <: AbstractSurfaceRoughness
+    # Constants from IFS documentation
     a_h::NF = 0.4 # heat related constant
     a_q::NF = 0.62 # moisture related constant
+
+    a_ratio::NF = a_q / a_h # moisture to heat roughness ratio
 
     "[OPTION] Charnock parameter estimation"
     charnock_param::CH
@@ -289,11 +308,17 @@ Fields are $(TYPEDFIELDS)
     m_c7::NF = 1.0346544
     m_c8::NF = 7.1816134
 
+    "[OPTION] minimum ocean momentum roughness length [m]"
+    momentum_roughness_min::NF = 1.0e-7
+
     "[OPTION] coefficient for heat roughness closure over ocean"
     h_c1::NF = -8.207549
     h_c2::NF = 0.18300448
     h_c3::NF = 0.08970642
     h_c4::NF = -1.6667988
+
+    "[OPTION] sea-ice heat roughness length"  # defined in IFS documentation
+    sea_ice_heat_roughness::NF = 1.0e-3
 end
 
 Adapt.@adapt_structure LearnedOceanRoughness
@@ -424,7 +449,7 @@ end
     u = surface_wind_speed[ij]
     progn_ocean = vars.prognostic.ocean
 
-    siconc = if haskey(progn_ocean, :sea_ice_concentration)
+    ℵ = if haskey(progn_ocean, :sea_ice_concentration)
         ice = get_prognostic_step(
             progn_ocean.sea_ice_concentration,
             time_stepper(model.time_stepping, :ocean),
@@ -436,19 +461,19 @@ end
     end
     log_αᵪ = log(scheme.charnock_param(neutral_wind_speed[ij]))
 
-    z₀M_ocean = ocean_momentum_roughness(scheme, surface_wind_speed[ij], log_αᵪ, siconc)
-    z₀H_ocean = ocean_heat_roughness(scheme, surface_wind_speed[ij], siconc)
+    z₀M_ocean = ocean_momentum_roughness(scheme, surface_wind_speed[ij], log_αᵪ, ℵ)
+    z₀H_ocean = ocean_heat_roughness(scheme, surface_wind_speed[ij], ℵ)
 
     ocean.momentum_roughness[ij] = z₀M_ocean
     ocean.heat_roughness[ij] = z₀H_ocean
-    ocean.humidity_roughness[ij] = z₀H_ocean * (scheme.a_q / scheme.a_h) # moisture roughness is heat times a constant
+    ocean.humidity_roughness[ij] = z₀H_ocean * scheme.a_ratio # moisture roughness is heat times a constant
 
     return nothing
 end
 
-@inline function sea_ice_momentum_roughness(siconc::NF) where {NF <: Real}
+@inline function sea_ice_momentum_roughness(ℵ::NF) where {NF <: Real}
     # Following IFS documentation
-    base = NF(0.93e-3) * (1 - siconc) + NF(6.05e-3) * exp(NF(-17) * (siconc - NF(0.5))^2)
+    base = NF(0.93e-3) * (1 - ℵ) + NF(6.05e-3) * exp(NF(-17) * (ℵ - NF(0.5))^2)
     return max(base, NF(1.0e-3))
 end
 
@@ -465,122 +490,93 @@ end
     return clamp(z_linear, z_high, z_cap)
 end
 
-
-# Numerical safety helpers
-@inline finite_or(x, fallback) = ifelse(isfinite(x), x, oftype(x, fallback))
-
-@inline safe_exp(x) = exp(clamp(x, oftype(x, -30), oftype(x, 30)))
-
-@inline positive_base(x) = max(x, one(x))
-
-@inline positive_ocean_heat_base(x) = max(x, oftype(x, eps(one(x))))
-
-@inline positive_coefficient(x) = max(x, eps(typeof(x)))
-
-@inline function bounded_roughness(log_z₀, z_min, z_max)
-    log_z₀ = finite_or(log_z₀, log(z_min))
-    return exp(clamp(log_z₀, log(z_min), log(z_max)))
-end
-
 # Ocean momentum roughness
-@inline function ocean_momentum_roughness(scheme, uₙ::NF, log_αᵪ::NF, siconc::NF) where {NF <: AbstractFloat}
+@inline function ocean_momentum_roughness(scheme, uₙ::NF, log_αᵪ::NF, ℵ::NF) where {NF <: AbstractFloat}
 
-    u = max(finite_or(uₙ, 0), zero(NF))
-    α = finite_or(log_αᵪ, -5)
-    s = clamp(finite_or(siconc, 0), zero(NF), one(NF))
+    num = muladd(scheme.m_c3, uₙ, log_αᵪ + exp(scheme.m_c2))
+    den = exp(muladd(scheme.m_c4, uₙ, - scheme.m_c5)) + scheme.m_c6
 
-    num = muladd(scheme.m_c1, u, α + scheme.m_c2)
-    den = safe_exp(muladd(scheme.m_c3, u, -scheme.m_c4)) + scheme.m_c5
-    den = max(den, eps(NF))
-
-    log_z₀ = u^scheme.m_c6 - num / den +
-        muladd(scheme.m_c7, α, -scheme.m_c8)
+    z₀ = exp(
+        uₙ^scheme.m_c1 - num / den +
+            muladd(scheme.m_c7, log_αᵪ, -scheme.m_c8)
+    )
 
     z_max = maximum_momentum_roughness(u)
-    z₀ = bounded_roughness(log_z₀, NF(1.0e-7), z_max)
+    z₀ = clamp(z₀, NF(scheme.momentum_roughness_min), z_max)
 
-    z_ice = sea_ice_momentum_roughness(s)
+    z_ice = sea_ice_momentum_roughness(ℵ)
 
-    return muladd(s, z_ice - z₀, z₀)
+    return muladd(ℵ, z_ice - z₀, z₀)
 end
 
 
 # Ocean heat roughness
-@inline function ocean_heat_roughness(scheme, uₙ::NF, siconc::NF) where {NF <: AbstractFloat}
+@inline function ocean_heat_roughness(scheme, uₙ::NF, ℵ::NF) where {NF <: AbstractFloat}
+    z₀ = exp(scheme.h_c1 * (uₙ + scheme.h_c2)^scheme.h_c3 - exp(scheme.h_c4 / uₙ))
 
-    u = max(finite_or(uₙ, 0), zero(NF))
-    s = clamp(finite_or(siconc, 0), zero(NF), one(NF))
-
-    u_safe = max(u, NF(0.1))
-
-    log_z₀ = scheme.h_c1 * positive_ocean_heat_base(u + scheme.h_c2)^scheme.h_c3 -
-        safe_exp(scheme.h_c4 / u_safe)
-
-    z₀ = bounded_roughness(log_z₀, NF(1.0e-9), NF(1.0e-2))
-
-    return muladd(s, NF(1.0e-3) - z₀, z₀)
+    return muladd(ℵ, scheme.sea_ice_heat_roughness - z₀, z₀) # weight by sea-ice concentration
 end
 
 
 # Land momentum roughness
 @inline function land_momentum_roughness(
-        scheme, C_H::NF, C_L::NF, L_H::NF, L_L::NF,
-        S::NF, T::NF, W::NF
+        scheme, high_vegetation_cover::NF, low_vegetation_cover::NF,
+        high_vegetation_leaf_area::NF, low_vegetation_leaf_area::NF,
+        snow_depth::NF, soil_temperature_bottom::NF, soil_moisture_bottom::NF
     ) where {NF <: AbstractFloat}
-
-    C_H = clamp(finite_or(C_H, 0), zero(NF), one(NF))
-    C_L = clamp(finite_or(C_L, 0), zero(NF), one(NF))
-    L_H = max(finite_or(L_H, 0), zero(NF))
-    L_L = max(finite_or(L_L, 0), zero(NF))
-    S = max(finite_or(S, 0), zero(NF))
-    T = finite_or(T, 280)
-    W = max(finite_or(W, 0), zero(NF))
+    # From Munday et al. 2026, in prep.
+    C_H = high_vegetation_cover
+    C_L = low_vegetation_cover
+    L_H = high_vegetation_leaf_area
+    L_L = low_vegetation_leaf_area
+    S = snow_depth
+    T = soil_temperature_bottom
+    W = soil_moisture_bottom
 
     # Numerator
-    den1 = max(muladd(scheme.m_c2, C_H, -scheme.m_c3), eps(NF))
-    term1 = scheme.m_c4 * safe_exp(S / den1)
+    den1 = muladd(scheme.m_c2, C_H, -scheme.m_c3)
+    term1 = scheme.m_c4 * exp(S / den1)
 
     min_inner = min(
         scheme.m_c5 * L_L,
         muladd(scheme.m_c6, T, -W)
     )
 
-    term2 = safe_exp(
-        C_L * (min_inner - positive_coefficient(scheme.m_c7)^L_L)
+    term2 = exp(
+        C_L * (min_inner - scheme.m_c7^L_L)
     )
 
     numerator = max(scheme.m_c1, term1 + term2)
 
     # Denominator
-    term3 = safe_exp(C_H * max(L_H, scheme.m_c8))
+    term3 = exp(C_H * max(L_H, scheme.m_c8))
     term4 = min(L_H, W)
-    denominator = max(term3 + term4, eps(NF))
+    denominator = term3 + term4
 
-    log_z₀ = numerator / denominator + scheme.m_c9
+    z₀ = exp(numerator / denominator + scheme.m_c9)
 
-    return bounded_roughness(log_z₀, NF(1.3e-3), NF(2))  # Physical limits from IFS documentation
+    return clamp(z₀, scheme.momentum_roughness_min, scheme.momentum_roughness_max)  # Physical limits from IFS documentation
 end
 
 
 # Land heat roughness
 @inline function land_heat_roughness(
-        scheme, C_H::NF, C_L::NF, L_H::NF, L_L::NF,
-        T::NF, W::NF
+        scheme, high_vegetation_cover::NF, low_vegetation_cover::NF,
+        high_vegetation_leaf_area::NF, low_vegetation_leaf_area::NF,
+        soil_temperature_bottom::NF, soil_moisture_bottom::NF
     ) where {NF <: AbstractFloat}
-
-    C_H = clamp(finite_or(C_H, 0), zero(NF), one(NF))
-    C_L = clamp(finite_or(C_L, 0), zero(NF), one(NF))
-    L_H = max(finite_or(L_H, 0), zero(NF))
-    L_L = max(finite_or(L_L, 0), zero(NF))
-    T = finite_or(T, 280)
-    W = max(finite_or(W, 0), zero(NF))
+    # From Munday et al. 2026, in prep.
+    C_H = high_vegetation_cover
+    C_L = low_vegetation_cover
+    L_H = high_vegetation_leaf_area
+    L_L = low_vegetation_leaf_area
+    T = soil_temperature_bottom
+    W = soil_moisture_bottom
 
     # Gamma
-    base = max(L_L + T, one(NF))
-
-    gamma_term1 =
-        (positive_coefficient(scheme.h_c1) / base)^scheme.h_c2 *
-        min(C_H, L_H) + L_H
+    gamma_term1_num = (scheme.h_c1^scheme.h_c2) * min(C_H, L_H)
+    gamma_term1_den = (L_L + T)^scheme.h_c2
+    gamma_term1 = gamma_term1_num / gamma_term1_den + L_H
 
     gamma_term2 = muladd(NF(2), C_H, scheme.h_c3)
     Γ = max(gamma_term1, gamma_term2)
@@ -591,13 +587,12 @@ end
     arg1 = muladd(
         scheme.h_c5,
         Γ - scheme.h_c4 + C_L * inner_min,
-        -(scheme.h_c6 * L_H)
+        - (scheme.h_c6 * L_H)
     )
 
-    arg2 = scheme.h_c8 *
-        positive_coefficient(scheme.h_c7)^C_H
+    arg2 = scheme.h_c8 * (scheme.h_c7^C_H)
 
-    log_z₀ = min(arg1, arg2)
+    z₀ = exp(min(arg1, arg2))
 
-    return bounded_roughness(log_z₀, NF(1.3e-4), NF(2))  # Physical limits from IFS documentation
+    return clamp(z₀, scheme.heat_roughness_min, scheme.heat_roughness_max)  # Physical limits from IFS documentation
 end
