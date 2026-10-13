@@ -316,9 +316,9 @@ function initialize!(
     (; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     p₀ = model.atmosphere.reference_pressure
 
-    # slow relaxation everywhere, fast in the tropics
-    kₐ = 1 / Second(relax_time_slow).value
-    kₛ = 1 / Second(relax_time_fast).value
+    # slow relaxation everywhere, fast in the tropics, in the number format of the forcing
+    kₐ = oftype(σb, 1 / Second(relax_time_slow).value)
+    kₛ = oftype(σb, 1 / Second(relax_time_fast).value)
 
     # Precompute log(σ) for each layer
     @. log_σ = log(σ)

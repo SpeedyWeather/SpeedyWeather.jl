@@ -63,6 +63,24 @@ dropped. `Base.summarysize` misses Reactant's device buffers, they are added. A 
 configuration is recorded as failed instead of aborting the suite. Fixed: the Reactant models were
 built with a progress meter as repeated keyword arguments silently take the last value.
 
+> Can you find from where the warning about type-promotion from ifelse comes from exactly and fix it?
+
+Reactant's `ifelse` warning came from `max`/`min` with integer literals in broadcasts over traced
+arrays (sea ice `filter!`, Reactant traces the literal as an `Int64` number). Literals of the arrays'
+number format there and in the land-sea mask clamping, Held-Suarez forcing and 10m wind output.
+
+> yes look into them
+
+Two Reactant failures found on the way, not covered by tests before:
+- Held-Suarez forcing: its initialization broadcast Float64 constants into Float32 Reactant arrays.
+  Reactant then swaps in the Float64 result buffer without converting, any later compiled function
+  using the array fails (RuntimeProgramInputMismatch, a segfault in a plain Reactant MWE). The
+  constants are now in the forcing's number format (`oftype`). The Reactant bug itself (eager
+  broadcast into a concrete array with a different element type) is not worked around, to report
+  upstream.
+- 10m wind output: `pressure(nlayers, pₛ, coordinate)` in a broadcast, Reactant traces `nlayers` so
+  `pressure(k::Integer, ...)` doesn't apply. The bottom layer height is now computed in a kernel.
+
 ## Problem description
 
 `mg/reactant-primitive` (#985) got the primitive equation models close to running with Reactant but
