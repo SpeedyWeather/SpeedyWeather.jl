@@ -118,12 +118,13 @@ end
     z = u[I]
     m = grad_x_vordiv[lm]
     ∂u∂λ = Complex(-m * imag(z), m * real(z))
-    ∂u∂λ = ifelse(first_element, zero(∂u∂λ), ∂u∂λ)
+    # componentwise: Reactant can't raise `ifelse` of complex numbers (an LLVM aggregate select)
+    ∂u∂λ = componentwise_ifelse(first_element, zero(∂u∂λ), ∂u∂λ)
     ∂v∂θ1 = grad_y_vordiv1[lm] * v[previous_lm(lm, lmmax), k]
-    ∂v∂θ1 = ifelse(first_element, zero(∂v∂θ1), ∂v∂θ1)
+    ∂v∂θ1 = componentwise_ifelse(first_element, zero(∂v∂θ1), ∂v∂θ1)
     ∂v∂θ2 = grad_y_vordiv2[lm] * v[next_lm(lm, lmmax), k]
     div_lm = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
-    div[I] = ifelse(last_element, zero(div_lm), div_lm)
+    div[I] = componentwise_ifelse(last_element, zero(div_lm), div_lm)
 end
 
 """

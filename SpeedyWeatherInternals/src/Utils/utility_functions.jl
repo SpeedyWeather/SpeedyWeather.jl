@@ -81,6 +81,18 @@ function _set_scalar!(arch::AbstractArchitecture, x::AbstractArray, i::Integer, 
 end
 
 """
+    componentwise_ifelse(condition::Bool, x, y)
+
+`ifelse(condition, x, y)` that selects real and imaginary part of complex numbers separately.
+In kernels, `ifelse` on a `Complex` compiles to a select of an LLVM aggregate (`[2 x float]`)
+which Reactant can't raise (`raise = true`), two selects of the components it can.
+For other numbers the same as `ifelse`.
+"""
+@inline componentwise_ifelse(condition::Bool, x, y) = ifelse(condition, x, y)
+@inline componentwise_ifelse(condition::Bool, x::Complex, y::Complex) =
+    complex(ifelse(condition, real(x), real(y)), ifelse(condition, imag(x), imag(y)))
+
+"""
 $(TYPEDSIGNATURES)
 Fallback for `@maybe_jit` when Reactant is not available. Just calls `f(args...; kwargs...)`."""
 _jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)

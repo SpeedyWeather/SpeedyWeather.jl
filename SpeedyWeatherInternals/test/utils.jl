@@ -28,6 +28,16 @@ end
     @test y[1] == 0
 end
 
+@testset "componentwise_ifelse" begin
+    z = ComplexF32(1, -2)
+    for condition in (true, false)
+        @test componentwise_ifelse(condition, z, zero(z)) === ifelse(condition, z, zero(z))
+        @test componentwise_ifelse(condition, 1.5f0, 0.0f0) === ifelse(condition, 1.5f0, 0.0f0)
+    end
+    # NaN in the unselected argument doesn't propagate
+    @test componentwise_ifelse(true, zero(z), ComplexF32(NaN, NaN)) === zero(z)
+end
+
 @testset "@maybe_jit without Reactant" begin
     # just test that it works without error, even with kwargs
     A = rand(10, 10)

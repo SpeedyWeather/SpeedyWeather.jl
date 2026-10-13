@@ -23,6 +23,8 @@ export Architectures
 import SpeedyWeatherInternals.KernelLaunching: launch!, SpectralWorkOrder
 export KernelLaunching
 
+import SpeedyWeatherInternals.Utils: componentwise_ifelse
+
 import SpeedyWeatherInternals.ArrayDimensions: ArrayDimensions, AbstractArrayDimensions, hastime, hasvertical,
     Dimensions2D, Dimensions3D, Dimensions4D,
     DimensionsWithTime, DimensionsWithVertical, DimensionsWithTimeAndVertical

@@ -813,8 +813,9 @@ end
 @kernel inbounds = true function zero_last_degree_kernel!(data, l_indices, lmax)
     I = @index(Global, Cartesian)
     l = l_indices[I[1]]
-    
-    data[I] = ifelse(l == lmax, zero(eltype(data)), data[I])
+
+    # componentwise: Reactant can't raise `ifelse` of complex numbers (an LLVM aggregate select)
+    data[I] = componentwise_ifelse(l == lmax, zero(eltype(data)), data[I])
 end
 
 Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) =
