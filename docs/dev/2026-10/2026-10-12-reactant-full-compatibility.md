@@ -166,5 +166,10 @@ Reactant extensions
 - Move the `# TODO: move upstream to Reactant` fixes into Reactant, remove the `inv` and `extrema`
   workarounds once Reactant.jl#2560 and #2387 are fixed.
 - Re-enable `@trace` for the time loop (checkpointing) in `time_stepping!`.
+- On Reactant the implicit operators are recomputed every time step (`reinitialize!`, kept for now):
+  about 0.5 ms per step (PrimitiveDry T31L8 7.3 vs 6.7 ms, T63L16 within noise) and ~8 s compile
+  time, although the time step only changes in the first steps (Leapfrog: Δt/2, Δt, 2Δt).
+  Alternatives: a `@trace if` that only captures arrays (failed when it traced the model), or
+  reinitializing outside the compiled time step during the spin-up steps in `time_stepping!`.
 - Tighten the tolerances of the correctness tests, differences are orders of magnitude smaller
   than the current tolerances.

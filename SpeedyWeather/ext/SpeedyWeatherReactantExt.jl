@@ -78,6 +78,11 @@ const ReactantPrimitiveEquation = Union{
 # from is only updated if the time step changed, and the operators, deterministic functions of
 # that profile and the time step, are recomputed every time step. Equivalent to reinitializing
 # only when the time step changed as `reinitialize!` does for other architectures.
+# TODO: This is certainly a bit wasteful, however it matters less than one could think. It adds 
+# roughly 0.5ms/step. That makes a T32L8 run 10% slower, but already at T64L8 it's basically within 
+# measuring noise. We still might revise this in the future to either a) explicilty trace whether
+# the time step changed or b) just handle the first few steps sepereatly for Reactant (a bit similar
+# to what we used to do in general for the time stepping)
 function SpeedyWeather.reinitialize!(
         implicit::ImplicitPrimitiveEquation,
         model::ReactantPrimitiveEquation,
