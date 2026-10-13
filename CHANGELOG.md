@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Learned land and ocean surface roughness [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+- Learned surface wind slowdown from bottom model layer [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+- Split transfer coefficients by flux and surface type [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 
 ## 0.23.0
 

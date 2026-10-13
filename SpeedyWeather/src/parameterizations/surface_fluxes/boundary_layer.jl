@@ -14,9 +14,12 @@ export ConstantDrag
 end
 
 variables(::ConstantDrag) = (
-    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer drag coefficient for momentum", units = "1"),
-    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer drag coefficient for heat", units = "1"),
-    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer drag coefficient for humidity", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer landdrag coefficient for momentum", units = "1", namespace = :land),
+    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer land drag coefficient for heat", units = "1", namespace = :land),
+    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer land drag coefficient for humidity", units = "1", namespace = :land),
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer ocean drag coefficient for momentum", units = "1", namespace = :ocean),
+    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer ocean drag coefficient for heat", units = "1", namespace = :ocean),
+    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer ocean drag coefficient for humidity", units = "1", namespace = :ocean),
 )
 
 Adapt.@adapt_structure ConstantDrag
@@ -146,9 +149,12 @@ $(TYPEDFIELDS)"""
 end
 
 variables(::BulkRichardsonDrag) = (
-    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer drag coefficient for momentum", units = "1"),
-    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer drag coefficient for heat", units = "1"),
-    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer drag coefficient for humidity", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer landdrag coefficient for momentum", units = "1", namespace = :land),
+    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer land drag coefficient for heat", units = "1", namespace = :land),
+    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer land drag coefficient for humidity", units = "1", namespace = :land),
+    ParameterizationVariable(:boundary_layer_drag_momentum, Grid2D(), desc = "Boundary layer ocean drag coefficient for momentum", units = "1", namespace = :ocean),
+    ParameterizationVariable(:boundary_layer_drag_heat, Grid2D(), desc = "Boundary layer ocean drag coefficient for heat", units = "1", namespace = :ocean),
+    ParameterizationVariable(:boundary_layer_drag_humidity, Grid2D(), desc = "Boundary layer ocean drag coefficient for humidity", units = "1", namespace = :ocean),
 )
 
 Adapt.@adapt_structure BulkRichardsonDrag
@@ -179,9 +185,13 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     κ = drag.von_Karman
 
     # Get surface roughness length (computed by the surface_roughness parameterization)
-    z₀M = vars.parameterizations.momentum_roughness[ij]
-    z₀H = vars.parameterizations.heat_roughness[ij]
-    z₀Q = vars.parameterizations.humidity_roughness[ij]
+    z₀M_land = vars.parameterizations.land.momentum_roughness[ij]
+    z₀H_land = vars.parameterizations.land.heat_roughness[ij]
+    z₀Q_land = vars.parameterizations.land.humidity_roughness[ij]
+
+    z₀M_ocean = vars.parameterizations.ocean.momentum_roughness[ij]
+    z₀H_ocean = vars.parameterizations.ocean.heat_roughness[ij]
+    z₀Q_ocean = vars.parameterizations.ocean.humidity_roughness[ij]
 
     @inline function neutral_transfer_coefficient(z, z₀M, z₀X, κ)
         # flux dependent bulk drag coefficient in the neutral limit
@@ -191,9 +201,13 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
         return κ^2 / (log(zM / z₀M) * log(zX / z₀X))
     end
 
-    C_M = neutral_transfer_coefficient(z, z₀M, z₀M, κ)
-    C_H = neutral_transfer_coefficient(z, z₀M, z₀H, κ)
-    C_Q = neutral_transfer_coefficient(z, z₀M, z₀Q, κ)
+    C_M_land = neutral_transfer_coefficient(z, z₀M_land, z₀M_land, κ)
+    C_H_land = neutral_transfer_coefficient(z, z₀M_land, z₀H_land, κ)
+    C_Q_land = neutral_transfer_coefficient(z, z₀M_land, z₀Q_land, κ)
+
+    C_M_ocean = neutral_transfer_coefficient(z, z₀M_ocean, z₀M_ocean, κ)
+    C_H_ocean = neutral_transfer_coefficient(z, z₀M_ocean, z₀H_ocean, κ)
+    C_Q_ocean = neutral_transfer_coefficient(z, z₀M_ocean, z₀Q_ocean, κ)
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
@@ -207,9 +221,14 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # if Ri_c > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_c)^2
     # if Ri_c < 0 then κ^2/log(z/z₀)^2
     Ri = clamp(Ri, 0, Ri_c)
-    vars.parameterizations.boundary_layer_drag_momentum[ij] = max(drag_min, C_M * (1 - Ri / Ri_c)^2)
-    vars.parameterizations.boundary_layer_drag_heat[ij] = max(drag_min, C_H * (1 - Ri / Ri_c)^2)
-    vars.parameterizations.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q * (1 - Ri / Ri_c)^2)
+
+    vars.parameterizations.land.boundary_layer_drag_momentum[ij] = max(drag_min, C_M_land * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.land.boundary_layer_drag_heat[ij] = max(drag_min, C_H_land * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.land.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q_land * (1 - Ri / Ri_c)^2)
+
+    vars.parameterizations.ocean.boundary_layer_drag_momentum[ij] = max(drag_min, C_M_ocean * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.ocean.boundary_layer_drag_heat[ij] = max(drag_min, C_H_ocean * (1 - Ri / Ri_c)^2)
+    vars.parameterizations.ocean.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q_ocean * (1 - Ri / Ri_c)^2)
     return nothing
 end
 

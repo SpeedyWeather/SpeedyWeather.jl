@@ -84,7 +84,7 @@ variables(::SurfaceOceanHeatFlux) = (
     pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
 
     # drag coefficient
-    d = vars.parameterizations.boundary_layer_drag_heat[ij]
+    d = vars.parameterizations.ocean.boundary_layer_drag_heat[ij]
     drag_ocean = ifelse(heat_flux.use_boundary_layer_drag, d, heat_flux.drag)
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
@@ -152,7 +152,7 @@ variables(::SurfaceLandHeatFlux) = (
         get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), heat_flux)[ij] : zero(T)
 
     # drag coefficient
-    d = vars.parameterizations.boundary_layer_drag_heat[ij]
+    d = vars.parameterizations.land.boundary_layer_drag_heat[ij]
     drag_land = ifelse(heat_flux.use_boundary_layer_drag, d, heat_flux.drag)
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included

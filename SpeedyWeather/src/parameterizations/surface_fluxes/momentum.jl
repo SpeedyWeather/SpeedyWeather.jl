@@ -43,9 +43,12 @@ end
     land_fraction = model.land_sea_mask.land_fraction[ij]
     surface = model.geometry.nlayers
 
+    d_land = vars.parameterizations.land.boundary_layer_drag_momentum[ij]
+    d_ocean = vars.parameterizations.ocean.boundary_layer_drag_momentum[ij]
+    d_combined = land_fraction * d_land + (1 - land_fraction) * d_ocean
+    
     # drag coefficient either from SurfaceMomentumFlux or from a central drag coefficient
-    d = vars.parameterizations.boundary_layer_drag_momentum[ij]
-    drag = ifelse(momentum_flux.use_boundary_layer_drag, d, land_fraction * drag_land + (1 - land_fraction) * drag_ocean)
+    drag = ifelse(momentum_flux.use_boundary_layer_drag, d_combined, land_fraction * drag_land + (1 - land_fraction) * drag_ocean)
 
     # Fortran SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
     V₀ = vars.parameterizations.surface_wind_speed[ij]
