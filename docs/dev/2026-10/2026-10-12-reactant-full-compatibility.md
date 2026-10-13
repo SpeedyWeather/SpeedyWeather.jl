@@ -1,6 +1,6 @@
 # Full Reactant compatibility incl. the primitive equation models
 
-> Status: **in progress**. All models run on Reactant (CPU backend), CPU-vs-Reactant correctness tests pass; awaiting review, GPU (Reactant+CUDA) untested.
+> Status: **in progress**. All models run on Reactant (CPU backend), CPU-vs-Reactant correctness tests pass. On Reactant+CUDA the PrimitiveWetModel is wrong (upstream layout bug, see "GPU (Reactant + CUDA)"); making the implicit kernels raisable as a workaround.
 
 Date of initial draft: 2026-10-12
 
@@ -81,6 +81,22 @@ Two Reactant failures found on the way, not covered by tests before:
 - 10m wind output: `pressure(nlayers, pₛ, coordinate)` in a broadcast, Reactant traces `nlayers` so
   `pressure(k::Integer, ...)` doesn't apply. The bottom layer height is now computed in a kernel.
 
+(2026-10-13, GPU session) Ran the PrimitiveWetModel with Reactant on CUDA (A40, login02). It goes
+wrong because of an upstream bug (kernel operand layouts, EnzymeAD/Reactant.jl#3377), see
+"GPU (Reactant + CUDA)". `raise = true` avoids that bug but failed on the implicit solver kernels.
+That's why they are being rewritten.
+
+> We need to continue the Reactant investigation that got aborted. You were just in the process of
+> rewriting the implicit correction so that the kernel can be raised.
+
+> make regular updates to the progress markdown file, so we don't lose any progress
+
+> We might now replace the `while` loop again with a for loop as the AMD issue should be fixed
+
+Implicit kernels raise with `@inbounds` in the closures and a zero-factor Gauss-Jordan elimination.
+The `while` loop is replaced by `for` again. On the GPU, the raised correction kernel runs a matvec as
+a TF32 Triton GEMM (see "GPU (Reactant + CUDA)").
+
 ## Problem description
 
 `mg/reactant-primitive` (#985) got the primitive equation models close to running with Reactant but
@@ -146,6 +162,57 @@ Reactant extensions
 - CPU test suites of SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms pass.
 - New unit tests: `initialize_traceable!` vs `initialize!`, `secondofday`, `set_scalar!`,
   no-op conversions of `Field`/`LowerTriangularArray`.
+
+## GPU (Reactant + CUDA)
+
+Investigation on login02 (NVIDIA A40), Reactant 0.2.292 / Reactant_jll 0.0.418, environment
+`SpeedyWeather/test/GPU/CUDA`. Scripts and HLO dumps are in
+`/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/`.
+
+Findings (2026-10-13)
+- The PrimitiveWetModel initializes and steps on CUDA but is NaN by step 2 (land points first).
+  Root cause upstream: the `enzymexla_compile_gpu` custom call that KernelAbstractions kernels lower
+  to has no `operand_layouts`, so XLA's layout assignment can hand a kernel an operand with a
+  non-default layout (seen: `c64[2,33,560]{0,2,1} bitcast(...)` into `UV_from_vordiv!`), and the
+  kernel reads scrambled data. It shows up in `transform!(vars, model)` when the leapfrog step copy,
+  `UV_from_vordiv!` and the batched matrix transform are compiled together. Fixed by the open PR
+  EnzymeAD/Reactant.jl#3377 (verified with an MWE). Issue draft:
+  `reactant-issue-draft-kernel-operand-layout.md`, MWE `reactant-issue-kernel-operand-layout-mwe.jl`.
+- Float32 matmuls use TF32 on the A40 (~3e-4 relative transform error).
+  `Reactant.with_config(dot_general_precision = PrecisionConfig.HIGHEST)` fixes that.
+- Workaround until #3377 is released: raise the kernels (`@compile raise = true`), XLA then owns
+  the layouts. `@jit raise = true` of the transform is correct, but `@compile raise = true time_step!`
+  failed raising the implicit solver kernels:
+  - `implicit_invert_S_kernel!` raised to wrong results (the `if k != pivot` around the row
+    elimination). Now branch-free: the factor is zero for the pivot row (CPU bitwise identical).
+  - `implicit_primitive_leapfrog_kernel!` failed to raise ("'affine.load' op operand cannot be used as
+    a symbol") in the `ntuple` closure of step 2 (geopotential integration with a `while` loop).
+    `inbounds = true` of `@kernel` doesn't reach into closures, so the bounds checks (early exits)
+    remained. Fixed with `@inbounds` inside the closures. The `while` loop (#1193, workaround for
+    AMDGPU.jl#1015) is back to `for r in k:nlayers`: #1015 was fixed in LLVM (llvm-project#215829) and
+    backported to the AMDGPU LLVM backend jll (Yggdrasil#14465). Not verified on an AMD GPU here, and
+    the AMDGPU compat (`2.1.2` in SpeedyWeatherInternals) still allows versions without the fix.
+    Variants tested on the CPU backend (`leapfrog_variants.jl`): `while` without
+    `@inbounds` (HEAD) reproduces the error; `while`, `for r in k:nlayers` and a masked `for r in 1:nlayers`,
+    all with `@inbounds`, raise and agree with the CPU (rel 8e-8 to 9e-8), and are bitwise identical to the
+    source kernel on the CPU.
+  - Kernel test (`implicit_kernels_raise.jl`: model-like views into fused parents, vs the CPU).
+    Working tree: zero-factor Gauss-Jordan, `for r in k:nlayers` + `@inbounds` in the closures.
+    Both kernels raise. On the CPU backend both match the CPU (rel 1e-7). On the GPU backend
+    `implicit_invert_S_kernel!` matches (1.6e-6), but the raised `implicit_primitive_leapfrog_kernel!`
+    differs by 9.7e-5, also with `dot_general_precision = HIGHEST`.
+  - Why (`leapfrog_raise_diag.jl`): raising turns the vertical matvecs of steps 1 and 2 (L·ΔD, R·G_T)
+    into 16 `stablehlo.dot_general`s without a `precision_config`. Reactant's `dot_general_precision`
+    only applies to dots it traces itself, not to dots created by the raising/optimization passes.
+    The error (1.5e-4 vs a Float64 reference, CPU 1.7e-7, spread over most elements) is consistent
+    with TF32. `NVIDIA_TF32_OVERRIDE=0` has no effect. No Enzyme-JAX pass sets dot precision.
+    In XLA's optimized HLO the step-1 dot (real and imaginary parts merged, `f32[1120,8]`) is a
+    `__triton_nested_gemm_fusion`; the triangular vector dots became reductions.
+  - Workaround: `xla_gpu_enable_triton_gemm = false`, either as a compile option
+    (`@compile compile_options = Reactant.CompileOptions(; raise = true, xla_debug_options = (; xla_gpu_enable_triton_gemm = false)) f(...)`,
+    the macros don't take `xla_debug_options` directly) or via `XLA_FLAGS=--xla_gpu_enable_triton_gemm=false`. The raised kernel then matches the CPU (rel 1.6e-7,
+    same distance to Float64 as the CPU). Upstream fix candidate: dots created by raising should carry
+    Reactant's `dot_general_precision`.
 
 ## Known limitations
 
