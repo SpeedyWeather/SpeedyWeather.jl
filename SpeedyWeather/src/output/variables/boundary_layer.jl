@@ -56,7 +56,7 @@ function output!(
     u_or_v10 = simulation.variables.scratch.grid.b_2D
 
     # Compute z_bottom as z_surf + T_bottom * R/g * log(pₛ/p_full_bottom), start with z_surf
-    z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
+    z_bottom .= max.(simulation.model.orography.orography, zero(eltype(z_bottom)))   # [m] set negative values to zero
     T = get_prognostic_step(simulation.variables.grid.temperature, simulation.model.time_stepping, output)
     T_bottom = field_view(T, :, nlayers)
     R_dry = simulation.model.atmosphere.R_dry

@@ -160,7 +160,8 @@ function load_mask!(land_sea_mask::EarthLandSeaMask{NF}) where {NF}
     lo, hi = minimum(land_sea_mask.land_fraction), maximum(land_sea_mask.land_fraction)
     if (lo < 0 || hi > 1)
         # @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
-        land_sea_mask.land_fraction .= clamp.(land_sea_mask.land_fraction, 0, 1)
+        land_fraction = land_sea_mask.land_fraction
+        land_fraction .= clamp.(land_fraction, zero(eltype(land_fraction)), one(eltype(land_fraction)))
     end
     return nothing
 end

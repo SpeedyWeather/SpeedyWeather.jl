@@ -324,7 +324,7 @@ function initialize!(
     @. log_σ = log(σ)
 
     # Held and Suarez equation 4
-    temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(0, (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
+    temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(zero(σb), (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
 
     # Held and Suarez equation 3, split into max(Tmin, (a + b*ln(p))*(p/p₀)^κ)
     # precompute a, b to simplify online calculation
