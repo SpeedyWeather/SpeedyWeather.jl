@@ -87,6 +87,7 @@ end
 In kernels, `ifelse` on a `Complex` compiles to a select of an LLVM aggregate (`[2 x float]`)
 which Reactant can't raise (`raise = true`), two selects of the components it can.
 For other numbers the same as `ifelse`.
+TODO: Might be sovled upstream in Reactant in the future 
 """
 @inline componentwise_ifelse(condition::Bool, x, y) = ifelse(condition, x, y)
 @inline componentwise_ifelse(condition::Bool, x::Complex, y::Complex) =
