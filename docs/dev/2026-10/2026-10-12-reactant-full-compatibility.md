@@ -671,6 +671,23 @@ Continued 2026-10-13 evening:
 - Nsight: XLA runs the whole time step as one CUDA graph (one `cuGraphLaunch` per step, plus 2
   `cuMemcpyDtoDAsync` and 5 `cuLaunchHostFunc`), kernels inside graphs need `--cuda-graph-trace=node`. The
   CUDA profile failed (`@compile` parsed in the non-Reactant branch, now `@eval`). Rerun queued.
+- Correction: `physics_perf_layers.jl` L8 with the new code (A40, 50 steps): physics only 1.46 ms (before
+  the vertical diffusion rewrite 1.43), dynamics only 0.75, full 1.24 ms. So the rewrite did not make the
+  physics faster on its own. The full step's 1.76 → 1.24 ms has another cause, or the runs are noisy;
+  to be checked with the profiles.
+
+> we want to submit the benchmark jobs on the H100 next
+
+- Job 2490777 (combined CUDA then Reactant) cancelled right away.
+
+> don't do a combined job, do two separate jobs so that they'll finish more quickly
+
+- Two jobs in parallel, each in its own directory so they don't overwrite each other's
+  `benchmark_results.json`: **2490788** CUDA (`gpu`) with the user's `submit_bench.sh` in the repository's
+  `SpeedyWeather/benchmark` (log `benchmarks-2490788.log` in the repository root), **2490789** Reactant
+  (`reactant-gpu`) with `submit_bench_reactant.sh` in `benchmark_reactant/` (log there). Both use the current
+  working tree. Afterwards merge the `reactant-gpu` entry of `benchmark_reactant/assets/benchmark_results.json`
+  into the repository's and regenerate the README. Watch the 16/24-layer Reactant configurations.
 - Precision: `HIGHEST` alone (no Triton flag, no override, `wet_raise_gpu_highest_only.log`) gives the
   same agreement as HIGHEST + Triton off after 10 steps: vorticity 8.0e-5, divergence 2.6e-4, temperature
   1.8e-6, humidity 1.9e-5, surface pressure 2.7e-8. So for the model `HIGHEST` alone suffices (+10% T31,

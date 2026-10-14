@@ -15,6 +15,7 @@ Base.Broadcast.broadcastable(lta::LowerTriangularArray{T, N, ArrayType}) where {
 
 # Forward `copyto!(lta, bc)` to `copyto!(lta.data, bc)` so Reactant's broadcast copyto!
 # can write directly into the ConcretePJRTArray.
+# TODO: might move upstream, see https://github.com/EnzymeAD/Reactant.jl/pull/3447 and https://github.com/EnzymeAD/Reactant.jl/issues/3469
 for AT in (:ConcretePJRTArray, :ConcreteIFRTArray)
     @eval function Base.copyto!(
             dest::LowerTriangularArray{T, N, ArrayType},
