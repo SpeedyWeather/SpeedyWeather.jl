@@ -144,31 +144,23 @@ The model runs stably with TF32 but the results deviate considerably from those 
 on the CPU or with CUDA.jl). For a `PrimitiveWetModel` (T31, 8 layers) on an NVIDIA A40 the
 maximum relative differences to the CPU after 10 time steps are
 
-| Variable         | TF32 (default) | Float32 (see below) |
-| ---------------- | -------------- | ------------------- |
-| vorticity        | 1.4e-2         | 7.7e-5              |
-| divergence       | 3.9e-2         | 2.2e-4              |
-| temperature      | 5.0e-4         | 1.8e-6              |
-| humidity         | 8.4e-3         | 1.6e-5              |
-| surface pressure | 4.7e-6         | 2.7e-8              |
+| Variable         | TF32 (default) | `HIGHEST` (see below) |
+| ---------------- | -------------- | --------------------- |
+| vorticity        | 1.4e-2         | 8.0e-5                |
+| divergence       | 3.9e-2         | 2.6e-4                |
+| temperature      | 5.0e-4         | 1.8e-6                |
+| humidity         | 8.4e-3         | 1.9e-5                |
+| surface pressure | 4.7e-6         | 2.7e-8                |
 
 and after the first time step the divergence even differs by 48% with TF32. So use Float32
 precision whenever the results should agree with Float32 results, e.g. for comparisons, tests or
 gradients (see [Differentiating with Reactant](@ref)). Whether TF32 is acceptable for your
-application, e.g. for long climate simulations, we haven't evaluated. For Float32 precision set
+application, e.g. for long climate simulations, we haven't evaluated.
 
-1. `Reactant.with_config(dot_general_precision = Reactant.PrecisionConfig.HIGHEST)` around
-   everything that compiles, i.e. `initialize!` and `run!`, this applies to the matrix products that
-   Reactant creates itself, e.g. the spectral transform,
-2. the environment variable `XLA_FLAGS=--xla_gpu_enable_triton_gemm=false`, and
-3. the environment variable `NVIDIA_TF32_OVERRIDE=0`.
-
-2 and 3 are for the matrix products that XLA creates from kernel loops, which don't take 1 into
-account (yet): XLA's own Triton GEMMs ignore `NVIDIA_TF32_OVERRIDE`, without them XLA uses cuBLAS,
-which respects it. Set both before starting Julia:
+For Float32 precision wrap everything that compiles, i.e. `initialize!` and `run!`, in
+`Reactant.with_config(dot_general_precision = Reactant.PrecisionConfig.HIGHEST)`:
 
 ```julia
-# started with XLA_FLAGS=--xla_gpu_enable_triton_gemm=false NVIDIA_TF32_OVERRIDE=0 julia ...
 using Reactant, CUDA
 using SpeedyWeather
 
@@ -183,7 +175,13 @@ simulation = Reactant.with_config(dot_general_precision = Reactant.PrecisionConf
 end
 ```
 
-The Float32 column in the table above was obtained with 1 and 2.
+This makes the time step 10% (T31) to 23% (T63, 8 layers) slower on an A40 and yields the `HIGHEST`
+column in the table above. It applies to the matrix products that Reactant creates itself, e.g. those
+of the spectral transform, not (yet) to those that XLA creates from loops in raised kernels. To have
+those in Float32 too, also set the environment variables `XLA_FLAGS=--xla_gpu_enable_triton_gemm=false`
+(XLA's Triton GEMMs ignore the next setting) and `NVIDIA_TF32_OVERRIDE=0` (for cuBLAS) before starting
+Julia. In our tests this didn't change the results of the model noticeably, but it made the time step
+1.6x (T63) to 2.3x (T31) slower than with TF32.
 
 ## Benchmarks
 

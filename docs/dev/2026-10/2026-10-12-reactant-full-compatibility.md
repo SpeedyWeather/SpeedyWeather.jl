@@ -592,11 +592,20 @@ Continued 2026-10-13 evening:
     output off, so the host can't queue the next step while the GPU computes. Fixed: `output.active ||
     return false` first. (With output on it still syncs every step; a host-side counter would avoid that.)
   - `progress!` → `max_speed`/`temperature_range` → `extrema(::Field)` iterates elementwise over a view of
-    a concrete Reactant array: allowed (slowly) on Reactant's CPU backend, not on the GPU. Fixed in
-    RingGridsReactantExt: `extrema` of fields with concrete Reactant data reduces on the host
-    (`extrema(Array(F.data))`), as `average_on_poles` already does.
-  Rerun with both fixes in progress (`harness_perf_fixed.log`). This likely explains most of the gap
-  between Reactant and CUDA in the H100 benchmark (whose runner uses `time_stepping!`).
+    a concrete Reactant array: allowed (slowly) on Reactant's CPU backend, not on the GPU. First fix:
+    `extrema` on the host in RingGridsReactantExt, replaced as follows.
+
+> Just disable the extrema read on Reactant by default, only make it opt-in
+
+  - `Feedback`: `show_umax` and `show_temperature_range` are `Union{Bool, Nothing} = nothing`, `nothing` =
+    the architecture's default via `show_diagnostic(option, architecture)` in `feedback.jl`: shown for
+    CPU/GPU, not for `ReactantDevice`. An explicit `true` opts in (on Reactant GPU that then hits the scalar
+    indexing error, there is no host fallback). The `extrema` method in RingGridsReactantExt is removed.
+    Test in `test/output/feedback.jl` ("Feedback diagnostics opt-in for Reactant", 8/8).
+  Rerun with the `do_output!` fix (`harness_perf_fixed.log`): direct 1.90, `time_stepping!` without
+  feedback **still 8.01 ms**, with feedback 13.2 ms per step. So `do_output!` isn't the cause (or not the
+  only one). In progress: `harness_parts_perf.jl` times the parts of the loop separately (step + `output!`,
+  step + `progress!`, `output!` alone, `time_stepping!`) and prints the dispatched methods.
 
 > This note on precision of matrix products, should rather go into the general `architecture` docs.
 > But also please explain to me and in the docs the consequences of that. Does the reactant model has
@@ -617,8 +626,63 @@ Continued 2026-10-13 evening:
 - Speed cost (`precision_perf.jl`, A40, PrimitiveWet L8, direct compiled steps, ms per step): default (TF32)
   T31 1.81, T63 3.08; + HIGHEST T31 2.00 (+10%), T63 3.80 (+23%); + Triton off + `NVIDIA_TF32_OVERRIDE=0`
   T31 4.18 (+130%), T63 4.87 (+58%). The accuracy table (Float32 column) used HIGHEST + Triton off without
-  the override, so the override may not be needed for the model. In progress: speed of HIGHEST + Triton off
-  without the override, and accuracy of HIGHEST alone, to recommend the cheapest accurate combination.
+  the override, so the override may not be needed for the model. HIGHEST + Triton off without the override:
+  T31 2.35 ms (+30%), so the override is the expensive part. In progress: T63 of that, accuracy of HIGHEST
+  alone.
+- Benchmark rerun job 2485035 (H100) **cancelled after 3.6 h**: the log stopped at 13:09 after compiling
+  the first 16-layer configuration (T86L16, 174 s, ptxas: registers spilled, e.g. 27324 bytes spill stores in
+  one fusion), then 3 h at 100% GPU without finishing it. So at 16 layers the raised time step compiles
+  (with the branch-free vertical diffusion) but runs extremely slowly. The first run's L8/L12 results stand.
+  Next: Reactant at 12 vs 16 layers on the A40 (`physics_perf_layers.jl`, physics only / dynamics only /
+  full, 20 steps, raised modules in `hlo/physics_perf_L*`).
+- `harness_parts_perf.jl` (A40, T31L8; may have overlapped with another GPU run): compiled step 2.15,
+  + `output!` 1.92, + `progress!` 2.17, `output!` alone 0.001, but `time_stepping!` 7.52 ms per step. So neither
+  call is the cause, it's how `time_stepping!` runs the loop. Next: `harness_variants_perf.jl`.
+- GPU runs overlapped because the chained waits started at the first output line of the previous run.
+  Now `gpu_run.sh` (flock on `gpu.lock`) and one sequential chain.
+
+> also try to diagnose and improve the performance of the parameterizations / column physics with
+> reactant. are they still slower with Reactant?
+
+- Yes: A40 T31L8 physics only 1.43 ms (Reactant, raised) vs 0.93 ms (CUDA). The raised physics-only module
+  (`hlo/physics_perf/physics only_raise_true`) has only 5 `stablehlo.while` loops, **all from the vertical
+  diffusion**: the K loop and the four `_vertical_diffusion!` calls (u, v, humidity, temperature), all
+  `for k in kₕ:nlayers` with the column-dependent boundary layer top `kₕ`, so they can't be unrolled. Each
+  carries the whole fused tendency array (`1x73x3168`) through the iterations with gather/scatter. The
+  other physics loops have static trip counts and become parallel array operations.
+- Rewrite (bitwise identical): both loops over `1:nlayers` with the mask `k >= kₕ`, indices that need
+  `kₕ` clamped to `min(kₕ, nlayers)`, Rifac of `Ri[kₕ]` computed once before the loop, the diffusion stores the
+  unchanged tendency outside the boundary layer. CPU A/B (1 thread): bitwise identical, but the whole
+  `parameterization_tendencies!` 13-29% slower (T31L8 5.36 vs 4.61 ms, T127L32 186 vs 144 ms), as the masked
+  loops now cover all layers instead of the few boundary layers. Hence: the loop range depends on the
+  architecture, `boundary_layers(kₕ, nlayers, ::AbstractArchitecture) = kₕ:nlayers` and
+  `boundary_layers(kₕ, nlayers, ::ReactantDevice) = 1:nlayers`, the mask stays (a no-op for `kₕ:nlayers`),
+  `model.architecture` is passed through `vertical_diffusion!`, `get_diffusion_coefficients!` and
+  `_vertical_diffusion!` (only internal callers), the K reset loop over all layers is back.
+  CPU A/B of the whole call chain (`vertical_diffusion_aba.jl`, old = HEAD from `# function barrier` to the
+  end of `_vertical_diffusion!`): bitwise identical, `parameterization_tendencies!` new/old 0.99-1.00
+  (T31L8 4.67 vs 4.68 ms, T127L32 144.9 vs 146.4 ms). GPU A/B and the Reactant speed-up in progress.
+- `harness_variants_perf.jl` (A40, full PrimitiveWet T31L8, raise, **with the masked vertical diffusion**):
+  loop of compiled steps 1.08 ms (1.20 after `initialize!`), loop + `progress!` + `output!` 3.39 ms,
+  `time_stepping!` 6.92 ms the first time, **0.92 ms the second time**. So the `time_stepping!` overhead
+  was Julia compiling the host code on the first call inside the timed loop, an artifact (the benchmark
+  runner warms up first). And the full step went from 1.76 ms (before the vertical diffusion rewrite) to
+  ~1.1-1.2 ms, on par with or faster than CUDA (1.21 ms).
+- Nsight: XLA runs the whole time step as one CUDA graph (one `cuGraphLaunch` per step, plus 2
+  `cuMemcpyDtoDAsync` and 5 `cuLaunchHostFunc`), kernels inside graphs need `--cuda-graph-trace=node`. The
+  CUDA profile failed (`@compile` parsed in the non-Reactant branch, now `@eval`). Rerun queued.
+- Precision: `HIGHEST` alone (no Triton flag, no override, `wet_raise_gpu_highest_only.log`) gives the
+  same agreement as HIGHEST + Triton off after 10 steps: vorticity 8.0e-5, divergence 2.6e-4, temperature
+  1.8e-6, humidity 1.9e-5, surface pressure 2.7e-8. So for the model `HIGHEST` alone suffices (+10% T31,
+  +23% T63); the raised-kernel matrix products (implicit solver) don't matter at this level. Docs
+  updated: recommend `with_config(dot_general_precision = HIGHEST)` around `initialize!` and `run!`,
+  table column `HIGHEST`, the environment variables only as optional (1.6-2.3x slower, no noticeable
+  effect on the model).
+- Found on the way: `_vertical_diffusion!` uses `k₋ = max(k, 1)` and `k₊ = min(k, nlayers)`, i.e.
+  `k₋ = k₊ = k`, so the vertical diffusion adds exactly zero (since 80926431, 2024-03-21, "Vertical
+  diffusion operator streamlined"). **The user confirms, it's fixed independently in another PR**, so not
+  touched here. Note for that PR: with the masked loop (k >= kₕ) the flux out of the top of layer kₕ into kₕ - 1
+  is missing; a loop over all layers with K = 0 above the boundary layer would include it.
 - Future: with Reactant.jl#3466 (`disable_dot_formation_passes`) no dots from raised loops, then only
   setting 1 would be needed, and SpeedyWeather could set both in its compile calls by default.
 
