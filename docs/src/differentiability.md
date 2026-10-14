@@ -13,6 +13,8 @@ For the differentiability of our model we rely on [Enzyme.jl](https://github.com
     * Julia 1.11: Basic end-to-end differentation functionality tested and working
     * Julia 1.12: Only individual functions and components and `BarotropicModel` differentiate correctly, no end-to-end differentiation of `PrimitiveWetModel` possible at the moment
 
+    With Julia 1.12 and 1.13, use [Reactant](@ref "Differentiating with Reactant") instead.
+
 ## Differentiating through a single timestep
 
 First we initialize the model as usual (see [Time stepping](@ref time_stepping) for
@@ -59,6 +61,66 @@ dmodel.planet.gravity
 ## Differentiating longer trajectories and checkpointing 
 
 In a very similar fashion as for the [single timestep](@ref "Differentiating through a single timestep"), we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/SpeedyWeather/test/differentiability/sensitivity_examples/).
+
+## Differentiating with Reactant
+
+!!! warning "Work in progress"
+    Differentiating SpeedyWeather.jl with Reactant is still work in progress and experimental.
+
+Instead of differentiating the Julia code of the model with Enzyme directly ("vanilla Enzyme",
+as above), you can also run the model with [Reactant.jl](https://github.com/EnzymeAD/Reactant.jl)
+(see [Reactant Support](@ref "Reactant Support")) and differentiate the program that Reactant
+compiles. Enzyme then differentiates Reactant's intermediate representation (MLIR) instead of the
+Julia code. In contrast to vanilla Enzyme, this also works with Julia 1.12 and Julia 1.13.
+
+This needs a model created with the `ReactantDevice` architecture with a `MatrixSpectralTransform` currently (Reactant support for `SpectralTransform` will be added later):
+
+```julia
+using SpeedyWeather, Reactant, Enzyme
+using CUDA      # needed for Reactant to compile KernelAbstractions kernels, also on CPUs
+
+spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice(), nlayers = 8)
+spectral_transform = MatrixSpectralTransform(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; spectral_transform)
+simulation = initialize!(model)
+run!(simulation, period = Day(10))      # spin-up the model a bit
+initialize!(simulation, steps = 1)      # set the clock for one time step
+
+(; variables, model) = simulation
+```
+
+As a loss we take the squared norm of the vorticity after one time step
+
+```julia
+function loss(vars, model)
+    SpeedyWeather.time_step!(vars, model.time_stepping, model)
+    return sum(abs2, vars.prognostic.vorticity.data)
+end
+```
+
+and differentiate it with Enzyme in reverse mode, compiled with Reactant's `@jit` (or `@compile`):
+
+```julia
+dvars = make_zero(variables)
+@jit raise = true raise_first = true autodiff(Reverse, loss, Active, Duplicated(variables, dvars), Const(model))
+```
+
+`dvars.prognostic.vorticity` then holds the derivative of the loss with respect to the vorticity
+before the time step. The Reactant options `raise` and `raise_first` are required for the differentiation to work. They raise the KernelAbstractions kernels to StableHLO (as the remainder of model code):
+
+!!! note "Precision of matrix products on GPUs"
+    On GPUs that support TF32 (e.g. NVIDIA A100, H100), XLA runs Float32 matrix products in the
+    lower precision TF32 by default (relative errors of about 1e-4). With
+    `Reactant.with_config(dot_general_precision = Reactant.PrecisionConfig.HIGHEST)` Reactant's
+    own matrix products use Float32. The matrix products that raising creates from loops in kernels
+    don't take this setting into account yet. For those, disable XLA's Triton GEMMs
+    (`xla_debug_options = (; xla_gpu_enable_triton_gemm = false)` in `Reactant.CompileOptions`) and set
+    the environment variable `NVIDIA_TF32_OVERRIDE=0`.
+
+The gradients with Reactant are compared to vanilla Enzyme on the CPU for the same state:
+in our CI for the `BarotropicModel` (`SpeedyWeather/test/reactant/differentation.jl`) and,
+as this is too slow for the CI, for the `PrimitiveWetModel` with the script
+`SpeedyWeather/test/reactant/differentiation_primitive_wet.jl`. Note that this comparison needs Julia 1.10 or 1.11 because of vanilla Enzyme, the differentiation with Reactant itself doesn't.
 
 ## Correctness 
 
