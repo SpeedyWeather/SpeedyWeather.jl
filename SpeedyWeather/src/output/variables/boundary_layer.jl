@@ -212,14 +212,23 @@ end
 path(::HeatSurfaceRoughnessOutput, simulation) =
     simulation.variables.parameterizations.heat_roughness
 
+# collect in groups for convenience
+SurfaceRoughnessOutput() = (
+    MomentumSurfaceRoughnessOutput(),
+    HeatSurfaceRoughnessOutput(),
+)
+
+BoundaryLayerDragOutput() = (
+    MomentumBoundaryLayerDragOutput(),
+    HeatBoundaryLayerDragOutput(),
+    HumidityBoundaryLayerDragOutput(),
+)
+
 # collect all in one for convenience
 BoundaryLayerOutput() = (
     ZonalVelocity10mOutput(),
     MeridionalVelocity10mOutput(),
     SurfaceTemperatureOutput(),
-    MomentumBoundaryLayerDragOutput(),
-    HeatBoundaryLayerDragOutput(),
-    HumidityBoundaryLayerDragOutput(),
-    MomentumSurfaceRoughnessOutput(),
-    HeatSurfaceRoughnessOutput(),
+    BoundaryLayerDragOutput()...,
+    SurfaceRoughnessOutput()...,
 )
