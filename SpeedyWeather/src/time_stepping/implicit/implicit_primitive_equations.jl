@@ -102,7 +102,10 @@ function reinitialize!(
 end
 
 """$(TYPEDSIGNATURES)
-Initialize the implicit terms for the PrimitiveEquation models."""
+Initialize the implicit terms for the PrimitiveEquation models. The operators are constructed
+via broadcasting on the device, without transfers to the CPU, scalar indexing, or data-dependent
+control flow so that Reactant can trace this inside the time step. S⁻¹ is then computed per
+degree l with `invert_S!`."""
 function initialize!(
         implicit::ImplicitPrimitiveEquation,
         Δt::Number,                                         # the time step [s], scaled
@@ -112,46 +115,15 @@ function initialize!(
         atmosphere::AbstractAtmosphere,
         adiabatic_conversion::AbstractAdiabaticConversion,
     )
-    # Reactant traces this function inside the time step, so no transfer to the CPU is possible
-    architecture(implicit.S) isa ReactantDevice &&
-        return initialize_traceable!(implicit, Δt, temp_average, geometry, geopotential, atmosphere, adiabatic_conversion)
-
-    NF = eltype(temp_average)
-
-    (; truncation, nlayers) = implicit
+    (; nlayers) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
     (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
-
-    # Get the architecture to transfer back at the end
-    arch = architecture(implicit.S)
-
-    # Transfer all arrays that need to be computed to CPU
-    # These are small (nlayers × nlayers) matrices, so CPU computation is more efficient
-    temp_profile, S, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4 =
-        on_architecture(
-        CPU(), (
-            implicit.temp_profile, implicit.S, implicit.S⁻¹, implicit.L,
-            implicit.R, implicit.U, implicit.W, implicit.L0, implicit.L1,
-            implicit.L2, implicit.L3, implicit.L4,
-        )
-    )
-
-    # Also transfer geometry and other arrays to CPU
-    σ_levels_full, σ_levels_thick, Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B, temp_average =
-        on_architecture(
-        CPU(), (
-            σ_levels_full, σ_levels_thick, Δp_geopot_half, Δp_geopot_full,
-            σ_lnp_A, σ_lnp_B, temp_average,
-        )
-    )
+    (; temp_profile, L, R, U, W, L0, L1, L2, L3, L4) = implicit
 
     # use current vertical temperature profile
     temp_profile .= temp_average
-
-    # return immediately if temp_profile contains NaRs, model blew up in that case
-    all(isfinite.(temp_profile)) || return nothing
 
     # set up R, U, L, W operators from
     # δD = G_D + ξ(RδT + Uδlnps)        divergence D correction
@@ -169,111 +141,12 @@ function initialize!(
     @assert 0.5 <= implicit.centering <= 1 "Centering coefficient must be between 0.5 (centred implicit) and 1 (backward implicit)"
     ξ = implicit.centering * Δt                 # 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
 
-    # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
-    @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
-        R[1:k, k] .= -Δp_geopot_full[k]         # otherwise equivalent to geopotential! with zero orography
-        R[1:(k - 1), k] .+= -Δp_geopot_half[k]  # incl the minus but excluding the eigenvalues as with U
-    end
-    U .= -R_dry * temp_profile                  # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
-
-    # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
-    L0 .= 1 ./ 2σ_levels_thick
-    L2 .= κ * temp_profile .* σ_lnp_A    # factor in front of the div_sum_above term
-    L4 .= κ * temp_profile .* σ_lnp_B    # factor in front of div term in Dlnps/Dt
-
-    @inbounds for k in 1:nlayers
-        Tₖ = temp_profile[k]                    # average temperature at k
-        k_above = max(1, k - 1)                 # layer index above
-        k_below = min(k + 1, nlayers)           # layer index below
-        ΔT_above = Tₖ - temp_profile[k_above]   # temperature difference to layer above
-        ΔT_below = temp_profile[k_below] - Tₖ   # and to layer below
-        σₖ = σ_levels_full[k]                   # should be Σ_r=1^k Δσᵣ for model top at >0hPa
-        σₖ_above = σ_levels_full[k_above]
-
-        for r in 1:nlayers
-            L1[k, r] = ΔT_below * σ_levels_thick[r] * σₖ            # vert advection operator below
-            L1[k, r] -= k >= r ? σ_levels_thick[r] : zero(NF)
-
-            L1[k, r] += ΔT_above * σ_levels_thick[r] * σₖ_above     # vert advection operator above
-            L1[k, r] -= (k - 1) >= r ? σ_levels_thick[r] : zero(NF)
-        end
-
-        # _sum_above operator itself
-        L3[1:k, k] .= 0                              # fill upper triangle + diagonal with zeros
-        L3[(k + 1):end, k] .= σ_levels_thick[k]      # vert integration top to k-1
-    end
-
-    L .= Diagonal(L0) * L1 .+ Diagonal(L2) * L3 .+ Diagonal(L4)  # combine all operators into L
-
-    # PRESSURE OPERATOR (called πᵣ in Hoskins and Simmons, 1975 Appendix 1)
-    W .= -σ_levels_thick                # the -D̄ term in the log surface pres equation
-
-    # solving the equations above for δD yields
-    # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
-    # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
-    I = LinearAlgebra.I(nlayers)
-    @inbounds for l in 1:truncation     # 1-based degree
-        eigenvalue = -l * (l - 1)       # 1-based, -l*(l+1) → -l*(l-1)
-        S .= I .- ξ^2 * eigenvalue * (R * L .+ U * W')
-
-        # inv(S) but saving memory:
-        luS = LinearAlgebra.lu!(S)      # in-place LU decomposition (overwriting S)
-        Sinv = L1                       # reuse L1 matrix to store inv(S)
-        Sinv .= I                       # use ldiv! so last arg needs to be unity matrix
-        LinearAlgebra.ldiv!(luS, Sinv)  # now do S\I = S⁻¹ via LU decomposition
-        S⁻¹[l, :, :] .= Sinv            # store in array
-    end
-
-    # Transfer computed results back to the original architecture
-    # runic: off
-    implicit.temp_profile   .= on_architecture(arch, temp_profile)
-    implicit.S              .= on_architecture(arch, S)
-    implicit.S⁻¹            .= on_architecture(arch, S⁻¹)
-    implicit.L              .= on_architecture(arch, L)
-    implicit.R              .= on_architecture(arch, R)
-    implicit.U              .= on_architecture(arch, U)
-    implicit.W              .= on_architecture(arch, W)
-    implicit.L0             .= on_architecture(arch, L0)
-    implicit.L1             .= on_architecture(arch, L1)
-    implicit.L2             .= on_architecture(arch, L2)
-    implicit.L3             .= on_architecture(arch, L3)
-    implicit.L4             .= on_architecture(arch, L4)
-    # runic: on
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Initialize the implicit terms for the PrimitiveEquation models as in `initialize!` but without
-transfers to the CPU, scalar indexing, or data-dependent control flow so that it can be traced
-by Reactant inside the time step. The operators are constructed via broadcasting on the device
-and S⁻¹ is computed per degree l via Gauss-Jordan elimination in a kernel."""
-function initialize_traceable!(
-        implicit::ImplicitPrimitiveEquation,
-        Δt::Number,                                         # the time step [s], scaled
-        temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
-        geometry::AbstractGeometry,
-        geopotential::AbstractGeopotential,
-        atmosphere::AbstractAtmosphere,
-        adiabatic_conversion::AbstractAdiabaticConversion,
-    )
-    (; truncation, nlayers) = implicit
-    (; σ_levels_full, σ_levels_thick) = geometry
-    (; R_dry, κ) = atmosphere
-    (; Δp_geopot_half, Δp_geopot_full) = geopotential
-    (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
-    (; temp_profile, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
-
-    # use current vertical temperature profile, see `initialize!` for the operators
-    temp_profile .= temp_average
-
-    @assert 0.5 <= implicit.centering <= 1 "Centering coefficient must be between 0.5 (centred implicit) and 1 (backward implicit)"
-    ξ = implicit.centering * Δt                 # 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-
     # index vectors for broadcasting: rows = 1:nlayers (column), cols = (1:nlayers)' (row)
     rows = (1:nlayers)
     cols = (1:nlayers)'
 
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
+    # vertical geopotential integration as matrix operator, otherwise equivalent to geopotential! with zero orography
     # R[row, k] = -Δp_geopot_full[k] for row <= k, additionally -Δp_geopot_half[k] for row < k
     R .= .-Δp_geopot_full[cols] .* (rows .<= cols) .- Δp_geopot_half[cols] .* (rows .< cols)
     U .= .-R_dry .* temp_profile                # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
@@ -288,7 +161,7 @@ function initialize_traceable!(
     k_below = min.(rows .+ 1, nlayers)
     ΔT_below = temp_profile[k_below] .- temp_profile[rows]
     ΔT_above = temp_profile[rows] .- temp_profile[k_above]
-    σₖ = σ_levels_full[rows]
+    σₖ = σ_levels_full[rows]                    # should be Σ_r=1^k Δσᵣ for model top at >0hPa
     σₖ_above = σ_levels_full[k_above]
     Δσᵣ = σ_levels_thick[cols]
 
@@ -304,7 +177,57 @@ function initialize_traceable!(
     # PRESSURE OPERATOR (called πᵣ in Hoskins and Simmons, 1975 Appendix 1)
     W .= .-σ_levels_thick                       # the -D̄ term in the log surface pres equation
 
-    # S = 1 - ξ²(RL + UW) inverted for every degree l, the S⁻¹[truncation + 1, :, :] remains unused as in `initialize!`
+    # solving the equations above for δD yields
+    # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
+    # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
+    invert_S!(implicit, ξ, architecture(implicit.S⁻¹))
+    return nothing
+end
+
+# S⁻¹ via LU decomposition on the CPU, but Reactant traces `initialize!` inside the time step
+# so no transfer to the CPU is possible, use Gauss-Jordan elimination in a kernel instead
+invert_S!(implicit::ImplicitPrimitiveEquation, ξ, ::AbstractArchitecture) = invert_S_lu!(implicit, ξ)
+invert_S!(implicit::ImplicitPrimitiveEquation, ξ, ::ReactantDevice) = invert_S_gauss_jordan!(implicit, ξ)
+
+"""$(TYPEDSIGNATURES)
+Compute S⁻¹ = (1 - ξ²λₗ(RL + UWᵀ))⁻¹ for every degree l, with λₗ the eigenvalues of ∇², via
+LU decomposition on the CPU, then transfer S⁻¹ back to the device. These are small
+(nlayers × nlayers) matrices, so CPU computation is more efficient."""
+function invert_S_lu!(implicit::ImplicitPrimitiveEquation, ξ)
+    (; truncation, nlayers) = implicit
+    arch = architecture(implicit.S⁻¹)
+    temp_profile, S, S⁻¹, R, L, U, W = on_architecture(
+        CPU(), (implicit.temp_profile, implicit.S, implicit.S⁻¹, implicit.R, implicit.L, implicit.U, implicit.W)
+    )
+
+    # return immediately if temp_profile contains NaRs, model blew up in that case
+    all(isfinite, temp_profile) || return nothing
+
+    I = LinearAlgebra.I(nlayers)
+    RL_UW = R * L .+ U * W'             # same for every degree l
+    S⁻¹_l = similar(S)                  # inverse for one degree l
+    @inbounds for l in 1:truncation     # 1-based degree
+        eigenvalue = -l * (l - 1)       # 1-based, -l*(l+1) → -l*(l-1)
+        S .= I .- ξ^2 * eigenvalue * RL_UW
+
+        # inv(S) but saving memory:
+        luS = LinearAlgebra.lu!(S)      # in-place LU decomposition (overwriting S)
+        S⁻¹_l .= I                      # use ldiv! so last arg needs to be unity matrix
+        LinearAlgebra.ldiv!(luS, S⁻¹_l) # now do S\I = S⁻¹ via LU decomposition
+        S⁻¹[l, :, :] .= S⁻¹_l           # store in array, S⁻¹[truncation + 1, :, :] remains unused
+    end
+
+    implicit.S⁻¹ .= on_architecture(arch, S⁻¹)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Compute S⁻¹ as in `invert_S_lu!` but on the device via Gauss-Jordan elimination (without pivoting)
+in a kernel, one thread per degree l, so that Reactant can trace it."""
+function invert_S_gauss_jordan!(implicit::ImplicitPrimitiveEquation, ξ)
+    (; truncation, nlayers, S⁻¹, R, L, U, W) = implicit
+
+    # S⁻¹[truncation + 1, :, :] remains unused as in `invert_S_lu!`
     S_scratch = similar(S⁻¹)
     launch!(
         architecture(S⁻¹), LinearWorkOrder, (truncation,), implicit_invert_S_kernel!,
