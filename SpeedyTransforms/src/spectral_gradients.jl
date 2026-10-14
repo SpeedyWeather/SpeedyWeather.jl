@@ -553,13 +553,13 @@ end
 
     # compared to the old CPU only version, some of the gy1 and gy2 are zero
     # that's why we don't need to check for l==m (diagonal) or l==p.m (last row)
-    if lm == 1
-        dpdy[lm, k] = gy2 * p[lm + 1, k]
-    elseif lm == lmmax
-        dpdy[lm, k] = gy1 * p[lm - 1, k]
-    else
-        dpdy[lm, k] = gy1 * p[lm - 1, k] + gy2 * p[lm + 1, k]
-    end
+    # branch-free, see the comment above `previous_lm`: no lm-1 term for the first, no lm+1 term
+    # for the last element (raised branches become a reduction without reverse rule in Enzyme-MLIR)
+    ∂p∂θ1 = gy1 * p[previous_lm(lm, lmmax), k]
+    ∂p∂θ1 = componentwise_ifelse(lm == 1, zero(∂p∂θ1), ∂p∂θ1)
+    ∂p∂θ2 = gy2 * p[next_lm(lm, lmmax), k]
+    ∂p∂θ2 = componentwise_ifelse(lm == lmmax, zero(∂p∂θ2), ∂p∂θ2)
+    dpdy[lm, k] = ∂p∂θ1 + ∂p∂θ2
 end
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
