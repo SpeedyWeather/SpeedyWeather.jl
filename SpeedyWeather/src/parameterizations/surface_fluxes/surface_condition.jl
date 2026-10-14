@@ -198,18 +198,9 @@ Adapt.@adapt_structure SurfaceCondition
 function SurfaceCondition(
         SG::SpectralGrid;
         wind_slowdown = LearnedWindSlowdown(SG),
-        wind_gust = BeljaarsWindGust(SG),
-        kwargs...
+        wind_gust = BeljaarsWindGust(SG)
     )
-    NF = SG.NF
-    WS = typeof(wind_slowdown)
-    WG = typeof(wind_gust)
-    return SurfaceCondition{WS, WG}(
-        ;
-        wind_slowdown = wind_slowdown,
-        wind_gust = wind_gust,
-        kwargs...
-    )
+    return SurfaceCondition(wind_slowdown, wind_gust)
 end
 
 initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
@@ -220,8 +211,8 @@ initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
 end
 
 variables(::SurfaceCondition) = (
-    ParameterizationVariable(:surface_wind_u, Grid2D(), desc = "Mean zonal surface wind", units = "m/s"),
-    ParameterizationVariable(:surface_wind_v, Grid2D(), desc = "Mean meridional surface wind", units = "m/s"),
+    ParameterizationVariable(:surface_wind_u, GridXY(), desc = "Mean zonal surface wind", units = "m/s"),
+    ParameterizationVariable(:surface_wind_v, GridXY(), desc = "Mean meridional surface wind", units = "m/s"),
 )
 
 @propagate_inbounds function surface_condition!(ij, vars, surface_condition::SurfaceCondition, model)
@@ -236,33 +227,35 @@ variables(::SurfaceCondition) = (
     pₛ = vars.parameterizations.surface_pressure[ij]
     (; R_dry, κ) = atmosphere
 
-    σ = pressure(nlayers, pₛ, coord) / pₛ
-    T = temperature[ij, nlayers]
-    q = haskey(vars.grid, :humidity) ?
-        get_prognostic_step(vars.grid.humidity, time_stepping, surface_condition)[ij, nlayers] : zero(T)
+    σ = pressure(nlayers, pₛ, coord) / pₛ           # σ vertical coordinate at lowest model level
+    T = temperature[ij, nlayers]                    # virtual temperature at lowest model level [K]
+    q = haskey(vars.grid, :humidity) ?              # specific humidity at lowest model level [kg/kg]
+        get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)
 
-    Tᵥ = virtual_temperature(T, q, atmosphere)
-    σ⁻ᵏ = σ^(-κ)
-    Tᵥ *= σ⁻ᵏ
+    Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
+    σ⁻ᵏ = σ^(-κ)                                    # precalculate lapse rate factor
+    Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate
     T *= σ⁻ᵏ
+    vars.parameterizations.surface_air_temperature[ij] = T              # store for flux computation
+    vars.parameterizations.surface_air_density[ij] = pₛ / (R_dry * Tᵥ)  # surface air density [kg/m³] from ideal gas law
 
-    vars.parameterizations.surface_air_temperature[ij] = T
-    vars.parameterizations.surface_air_density[ij] = pₛ / (R_dry * Tᵥ)
-
+    # 2. Surface wind
     u_grid = get_prognostic_step(vars.grid.u, time_stepping, surface_condition)
     v_grid = get_prognostic_step(vars.grid.v, time_stepping, surface_condition)
 
-    U₁ = sqrt(muladd(u_grid[ij, nlayers], u_grid[ij, nlayers], v_grid[ij, nlayers]^2))
+    # lowermost-layer wind speed sqrt(u^2 + v^2) but written with fused muladd
+    Uₙ = sqrt(muladd(u_grid[ij, nlayers], u_grid[ij, nlayers], v_grid[ij, nlayers]^2))
 
-    wind_slowdown = calc_wind_slowdown(ij, vars, wind_slowdown, model, surface_condition, U₁)
+    wind_slowdown = calc_wind_slowdown(ij, vars, wind_slowdown, model, surface_condition, Uₙ)
 
-    uₛ = wind_slowdown * u_grid[ij, nlayers]
+    uₛ = wind_slowdown * u_grid[ij, nlayers]        # surface wind components
     vₛ = wind_slowdown * v_grid[ij, nlayers]
+    vars.parameterizations.surface_wind_u[ij] = uₛ  # store for fluxes
+    vars.parameterizations.surface_wind_v[ij] = vₛ
 
+    # gusts are added for surface wind speed but not on individual components
     gust = calc_wind_gust(ij, vars, wind_gust, model, surface_condition, pₛ, Tᵥ)
 
-    vars.parameterizations.surface_wind_u[ij] = uₛ
-    vars.parameterizations.surface_wind_v[ij] = vₛ
     vars.parameterizations.surface_wind_speed[ij] = sqrt(muladd(uₛ, uₛ, muladd(vₛ, vₛ, gust^2)))
 
     return nothing

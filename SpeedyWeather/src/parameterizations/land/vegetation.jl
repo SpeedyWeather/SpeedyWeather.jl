@@ -287,11 +287,10 @@ end
 
 function variables(::VegetationClimatology)
     return (
-        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        ParameterizationVariable(:high_vegetation_cover, Grid2D(), desc = "Vegetation high cover", units = "1", namespace = :land),
-        ParameterizationVariable(:low_vegetation_cover, Grid2D(), desc = "Vegetation low cover", units = "1", namespace = :land),
-        ParameterizationVariable(:high_vegetation_leaf_area, Grid2D(), desc = "Leaf Area Index of high vegetation", units = "1", namespace = :land),
-        ParameterizationVariable(:low_vegetation_leaf_area, Grid2D(), desc = "Leaf Area Index of low vegetation", units = "1", namespace = :land),
-        ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
+        ParameterizationVariable(:high_vegetation_cover, GridXY(), desc = "Vegetation high cover", units = "1", namespace = :land),
+        ParameterizationVariable(:low_vegetation_cover, GridXY(), desc = "Vegetation low cover", units = "1", namespace = :land),
+        ParameterizationVariable(:high_vegetation_leaf_area, GridXY(), desc = "Leaf Area Index of high vegetation", units = "1", namespace = :land),
+        ParameterizationVariable(:low_vegetation_leaf_area, GridXY(), desc = "Leaf Area Index of low vegetation", units = "1", namespace = :land),
+        ParameterizationVariable(:soil_moisture_availability, GridXY(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end
