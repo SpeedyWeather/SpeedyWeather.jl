@@ -452,8 +452,8 @@ end
     # scratch array, see the note at the launch site.
     geopotential = ntuple(Val(nlayers)) do k
         # skip 1:k-1 as integration is surface to k
-        geopotential_re = zero(NF)
-        geopotential_im = zero(NF)
+        geopotential_re = zero(real(eltype(temp_tend)))
+        geopotential_im = zero(real(eltype(temp_tend)))
         for r in k:nlayers
             temp_tend_r = @inbounds temp_tend[lm, r, temp_step]
             geopotential_re += @inbounds R[k, r] * real(temp_tend_r)
