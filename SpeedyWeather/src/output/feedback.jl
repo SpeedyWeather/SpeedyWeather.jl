@@ -28,11 +28,11 @@ $(TYPEDFIELDS)"""
     "[OPTION] Show simulation time?"
     show_time::Bool = true
 
-    "[OPTION] Show maximum speed of the simulated flow [m/s]"
-    show_umax::Bool = true
+    "[OPTION] Show maximum speed of the simulated flow [m/s], `nothing` = yes except for Reactant (opt-in there)"
+    show_umax::Union{Bool, Nothing} = nothing
 
-    "[OPTION] Show temperature range of simulation [˚C]"
-    show_temperature_range::Bool = true
+    "[OPTION] Show temperature range of simulation [˚C], `nothing` = yes except for Reactant (opt-in there)"
+    show_temperature_range::Union{Bool, Nothing} = nothing
 
     "[OPTION] Interval in time steps between NaN checks, and between the progress meter diagnostics (maximum speed, temperature range)"
     interval::Int = 50
@@ -90,6 +90,13 @@ end
 
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
+# Show a diagnostic (maximum speed, temperature range) in the progress meter? `nothing` = the
+# architecture's default: not for Reactant (opt-in), `extrema` of Reactant arrays falls back to
+# scalar indexing, which is disallowed on GPU (and slow on CPU)
+show_diagnostic(option::Bool, architecture::AbstractArchitecture) = option
+show_diagnostic(::Nothing, architecture::AbstractArchitecture) = true
+show_diagnostic(::Nothing, architecture::ReactantDevice) = false
+
 function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
     (; counter, n, check_iterations, enabled) = feedback.progress_meter
     interval = max(1, feedback.interval)
@@ -97,8 +104,8 @@ function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
 
     every_nsteps = enabled ? check_iterations : interval
     if mod(counter, every_nsteps) == 0
-        feedback.show_umax && max_speed(vars)
-        feedback.show_temperature_range && temperature_range(vars)
+        show_diagnostic(feedback.show_umax, model.architecture) && max_speed(vars)
+        show_diagnostic(feedback.show_temperature_range, model.architecture) && temperature_range(vars)
     end
 
     progress!(feedback)

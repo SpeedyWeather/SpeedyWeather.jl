@@ -76,11 +76,6 @@ RingGrids.is_flattenable(x::SubArray{<:Any, <:Any, <:ReactantArray}) = false
 RingGrids.average_on_poles(A::Union{ConcretePJRTArray{T, 1}, ConcreteIFRTArray{T, 1}}, rings) where {T} =
     RingGrids.average_on_poles(Array(A), rings)
 
-# Same for `extrema` of fields with concrete data (also views, e.g. into fused parents), used eagerly
-# by the progress feedback between compiled time steps
-Base.extrema(F::RingGrids.AbstractField{T, N, <:Union{Reactant.AnyConcretePJRTArray, Reactant.AnyConcreteIFRTArray}}) where {T, N} =
-    extrema(Array(F.data))
-
 # Force `unsafe=true` in `update_locator!` for Reactant: the safety checks in `find_rings!`
 # call `extrema(θs)` and assertions on `latd` that don't trace through Reactant.
 function RingGrids.update_locator!(
