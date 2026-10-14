@@ -164,11 +164,14 @@ end
     (; orography) = orog
 
     # Boundary layer depth is highest layer for which Ri < Ri_c (the "critical" threshold)
-    # as well as all layers below
+    # as well as all layers below. Fixed trip count instead of a `while` loop (Reactant can't
+    # raise its early exit, raise = true): kₕ is the lowest layer with Ri ≥ Ri_c, 0 if none
     Ri = bulk_richardson!(ij, vars, diffusion, time_stepping, atmosphere)
     kₕ::Int = nlayers
-    while kₕ > 0 && Ri[ij, kₕ] < Ri_c
-        kₕ -= 1
+    below_critical = true       # Ri < Ri_c from the surface up to layer k
+    for k in nlayers:-1:1
+        below_critical &= Ri[ij, k] < Ri_c
+        kₕ = ifelse(below_critical, k - 1, kₕ)
     end
     kₕ += 1  # uppermost layer where Ri < Ri_c
 

@@ -37,3 +37,15 @@ create_cpu_model(ModelType::Type; kwargs...) = create_model(ModelType, SpeedyWea
 
 """Create a Reactant model of the given type."""
 create_reactant_model(ModelType::Type; kwargs...) = create_model(ModelType, SpeedyWeather.ReactantDevice(); kwargs...)
+
+"""Synchronize prognostic variables from Reactant to CPU simulation
+using copy_variables! which handles arrays (via copyto!), Ref values,
+and mutable structs (Clock) recursively."""
+function sync_variables!(sim_cpu, sim_reactant)
+    vars_cpu, _ = SpeedyWeather.unpack(sim_cpu)
+    vars_reactant, _ = SpeedyWeather.unpack(sim_reactant)
+
+    # Copy all variables
+    SpeedyWeather.copy!(vars_cpu, vars_reactant)
+    return
+end

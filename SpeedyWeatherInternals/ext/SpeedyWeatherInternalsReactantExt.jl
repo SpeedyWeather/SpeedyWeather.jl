@@ -98,12 +98,14 @@ end
 
 # For @maybe_jit macro - extend _jit for ReactantDevice.
 # If we are already inside a Reactant compile/trace context, call f directly (no nested @jit).
-# Otherwise JIT-compile on the fly.
+# Otherwise JIT-compile on the fly, raising KernelAbstractions kernels to StableHLO as in the compiled
+# time step (see `time_stepping!` in SpeedyWeatherReactantExt): kernels that aren't raised can be handed
+# operands with a non-default layout on CUDA and read scrambled data (EnzymeAD/Reactant.jl#3377)
 function _jit(::ReactantDevice, f, args...; kwargs...)
     if Reactant.ReactantCore.within_compile()
         return f(args...; kwargs...)
     else
-        return Reactant.@jit f(args...; kwargs...)
+        return Reactant.@jit raise = true f(args...; kwargs...)
     end
 end
 

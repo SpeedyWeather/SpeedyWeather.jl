@@ -109,7 +109,7 @@ end
     k = ndims(div) == 1 ? CartesianIndex() : I[2]
 
     # branch-free, see the comment above `previous_lm`: no lm-1 and no zonal term (m = 0) for the
-    # first element, the last element (lm==0) is zero
+    # first element, the last element (lm==lmax) is zero
     first_element = lm == 1
     last_element = lm == lmmax
 

@@ -7,8 +7,9 @@
 # pass it to `time_stepping!` for both the warm-up and the timed run. The compiled time step takes
 # the simulation as argument so it is reused for a re-initialized simulation of the same model.
 # The compile time is reported separately, as for Reactant it is a headline number in itself.
+# Kernels are raised (`raise = true`) as in `time_stepping!`, see there.
 function build_runner(::ReactantDevice, simulation)
-    compile_time = @elapsed compiled_time_step! = @compile SpeedyWeather.time_step!(simulation)
+    compile_time = @elapsed compiled_time_step! = @compile raise = true SpeedyWeather.time_step!(simulation)
     @info @sprintf("     compiled the time step in %.1f s", compile_time)
     time_stepping(simulation) = SpeedyWeather.time_stepping!(simulation, compiled_time_step!)
     return (; time_stepping, compile_time)
@@ -43,6 +44,6 @@ end
 
 # Compile `f(args...)` once, `sync = true` so that every call waits for the device to finish
 function compiled_call(::ReactantDevice, f, args...)
-    compiled_f = @compile sync = true f(args...)
+    compiled_f = @compile raise = true sync = true f(args...)
     return () -> compiled_f(args...)
 end

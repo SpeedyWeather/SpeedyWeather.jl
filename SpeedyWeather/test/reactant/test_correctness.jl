@@ -1,16 +1,4 @@
-# Helper functions
-
-"""Synchronize prognostic variables from Reactant to CPU simulation
-using copy_variables! which handles arrays (via copyto!), Ref values,
-and mutable structs (Clock) recursively."""
-function sync_variables!(sim_cpu, sim_reactant)
-    vars_cpu, _ = SpeedyWeather.unpack(sim_cpu)
-    vars_reactant, _ = SpeedyWeather.unpack(sim_reactant)
-
-    # Copy all variables
-    SpeedyWeather.copy!(vars_cpu, vars_reactant)
-    return
-end
+# Helper functions (`sync_variables!` is in setup.jl)
 
 """Look up the (rtol, atol) tolerance pair for a variable from a namedtuple of
 tolerances. Variables not explicitly listed fall back to `tolerances.default`.
@@ -84,7 +72,7 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothi
     # as a side effect, so compile first, then finalize + sync to restore clean state)
     if isnothing(r_timestep!)
         initialize!(sim_reactant; steps = nsteps)
-        r_timestep! = @compile SpeedyWeather.time_step!(sim_reactant)
+        r_timestep! = @compile raise = true SpeedyWeather.time_step!(sim_reactant)
         SpeedyWeather.finalize!(sim_reactant)
     end
 
@@ -141,7 +129,7 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
     # Pre-compile Reactant functions if needed (this may mutate sim_reactant as a side effect)
     if isnothing(r_timestep!)
         initialize!(sim_reactant; steps = nsteps)
-        r_timestep! = @compile SpeedyWeather.time_step!(sim_reactant)
+        r_timestep! = @compile raise = true SpeedyWeather.time_step!(sim_reactant)
     end
 
     # Sync after @compile to undo any side effects on sim_reactant
@@ -235,7 +223,7 @@ function test_model(ModelType::Type; truncation = TRUNCATION, nsteps = NSTEPS, t
     if precompile
         println("\n[4/4] Pre-compiling Reactant functions...")
         initialize!(simulation_reactant; steps = nsteps)
-        r_timestep! = @compile SpeedyWeather.time_step!(simulation_reactant)
+        r_timestep! = @compile raise = true SpeedyWeather.time_step!(simulation_reactant)
         println("  ✓ Reactant functions compiled")
     else
         r_timestep! = nothing

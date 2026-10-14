@@ -28,17 +28,21 @@ In case they are not provided, they are compiled on the fly.
 Example usage:
 
 ```julia
-simulation = initialize!(model) 
-initialize!(simulation; steps=10) # don't forget this! 
-r_time_step! = @compile SpeedyWeather.time_step!(simulation)
+simulation = initialize!(model)
+initialize!(simulation; steps=10) # don't forget this!
+r_time_step! = @compile raise = true SpeedyWeather.time_step!(simulation)
 SpeedyWeather.time_stepping!(simulation, r_time_step!)
 SpeedyWeather.finalize!(simulation)
 ```
+
+The time step is compiled with `raise = true` by default, i.e. KernelAbstractions kernels are raised
+to StableHLO: kernels that aren't raised can be handed operands with a non-default layout on CUDA
+and read scrambled data (EnzymeAD/Reactant.jl#3377).
 """
 function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_time_step! = nothing, enable_checkpointing = true)
     if isnothing(r_time_step!)
         @info "Reactant compiling time_step!"
-        r_time_step! = @compile time_step!(simulation)
+        r_time_step! = @compile raise = true time_step!(simulation)
     end
 
     (; variables, model) = simulation

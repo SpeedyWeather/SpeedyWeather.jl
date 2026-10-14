@@ -390,8 +390,12 @@ end
 
     k = @index(Global, Linear)
 
-    a, b = ij_as[k] == 0 ? (A_northpole, A_northpole) : (A[ij_as[k]], A[ij_bs[k]])
-    c, d = ij_cs[k] == -1 ? (A_southpole, A_southpole) : (A[ij_cs[k]], A[ij_ds[k]])
+    # pole averages are numbers, or 0-dimensional arrays when traced by Reactant: [] for both,
+    # otherwise the branches below differ in type and Reactant can't raise the kernel (raise = true)
+    northpole = A_northpole[]
+    southpole = A_southpole[]
+    a, b = ij_as[k] == 0 ? (northpole, northpole) : (A[ij_as[k]], A[ij_bs[k]])
+    c, d = ij_cs[k] == -1 ? (southpole, southpole) : (A[ij_cs[k]], A[ij_ds[k]])
 
     Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
 end
