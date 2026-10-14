@@ -9,13 +9,13 @@ Base.broadcastable(VC::AbstractVerticalCoordinates) = Ref(VC)
 """$(TYPEDSIGNATURES)
 Pressure [Pa] at the lower interface of full level `k` (half level k+½), given `surface_pressure` [Pa].
 Equivalent to `pressure_half(k+1, surface_pressure, coordinate)`."""
-@inline pressure_below(k::Integer, surface_pressure::Number, coordinate::AbstractVerticalCoordinates) =
+@propagate_inbounds pressure_below(k::Integer, surface_pressure::Number, coordinate::AbstractVerticalCoordinates) =
     pressure_half(k + 1, surface_pressure, coordinate)
 
 """$(TYPEDSIGNATURES)
 Pressure [Pa] at the upper interface of full level `k` (half level k-½), given `surface_pressure` [Pa].
 Equivalent to `pressure_half(k, surface_pressure, coordinate)`."""
-@inline pressure_above(k::Integer, surface_pressure::Number, coordinate::AbstractVerticalCoordinates) =
+@propagate_inbounds pressure_above(k::Integer, surface_pressure::Number, coordinate::AbstractVerticalCoordinates) =
     pressure_half(k, surface_pressure, coordinate)
 
 export SigmaCoordinates
@@ -104,7 +104,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Pressure [Pa] at full level `k` given `surface_pressure` [Pa] and sigma `coordinate`."""
-@inline function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
+@propagate_inbounds function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
     σ = coordinate.σ_full
     return σ[k] * surface_pressure
 end
@@ -112,21 +112,21 @@ end
 """$(TYPEDSIGNATURES)
 Pressure [Pa] at half level `k` given `surface_pressure` [Pa] and sigma `coordinate`.
 Half levels are indexed 1 (top of atmosphere, σ = 0) to nlayers+1 (surface, σ = 1)."""
-@inline function pressure_half(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
+@propagate_inbounds function pressure_half(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
     σ = coordinate.σ_half
     return σ[k] * surface_pressure
 end
 
 """$(TYPEDSIGNATURES)
 Pressure thickness [Pa] of full level `k` given `surface_pressure` [Pa] and sigma `coordinate`."""
-@inline function pressure_thickness(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
+@propagate_inbounds function pressure_thickness(k::Integer, surface_pressure::Number, coordinate::SigmaCoordinates)
     Δσ = coordinate.σ_thickness
     return Δσ[k] * surface_pressure
 end
 
 """$(TYPEDSIGNATURES)
 Sigma coordinate (fraction of surface pressure) at full level `k` for sigma `coordinate`."""
-@inline sigma(k::Integer, coordinate::SigmaCoordinates) = coordinate.σ_full[k]
+@propagate_inbounds sigma(k::Integer, coordinate::SigmaCoordinates) = coordinate.σ_full[k]
 
 export FriersonSigmaCoordinates
 
@@ -255,7 +255,7 @@ get_σ_thickness(σ::SigmaPressureCoordinates) = σ.B_thickness
 Pressure [Pa] at full level `k` given `surface_pressure` [Pa] and hybrid sigma-pressure `coordinate`.
 Computed as `A[k] * p_ref + B[k] * surface_pressure`, where A and B are the pressure and sigma
 coefficients of the hybrid coordinate."""
-@inline function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
+@propagate_inbounds function pressure(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
     A = coordinate.A_full
     B = coordinate.B_full
     p_ref = coordinate.reference_pressure
@@ -266,7 +266,7 @@ end
 Pressure [Pa] at half level `k` given `surface_pressure` [Pa] and hybrid sigma-pressure `coordinate`.
 Half levels are indexed 1 (top of atmosphere) to nlayers+1 (surface).
 Computed as `A_half[k] * p_ref + B_half[k] * surface_pressure`."""
-@inline function pressure_half(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
+@propagate_inbounds function pressure_half(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
     A = coordinate.A_half
     B = coordinate.B_half
     p_ref = coordinate.reference_pressure
@@ -276,7 +276,7 @@ end
 """$(TYPEDSIGNATURES)
 Pressure thickness [Pa] of full level `k` given `surface_pressure` [Pa] and hybrid sigma-pressure
 `coordinate`. Computed as `ΔA[k] * p_ref + ΔB[k] * surface_pressure`."""
-@inline function pressure_thickness(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
+@propagate_inbounds function pressure_thickness(k::Integer, surface_pressure::Number, coordinate::SigmaPressureCoordinates)
     ΔA = coordinate.A_thickness
     ΔB = coordinate.B_thickness
     p_ref = coordinate.reference_pressure
@@ -287,7 +287,7 @@ end
 Sigma coordinate (fraction of surface pressure) at full level `k` for hybrid sigma-pressure
 `coordinate`. Returns `A[k] + B[k]`, which equals the nominal sigma level regardless of the
 pressure-sigma transition, and is independent of surface pressure."""
-@inline sigma(k::Integer, coordinate::SigmaPressureCoordinates) = coordinate.A_full[k] + coordinate.B_full[k]
+@propagate_inbounds sigma(k::Integer, coordinate::SigmaPressureCoordinates) = coordinate.A_full[k] + coordinate.B_full[k]
 
 export CubicSigmaPressureCoordinates
 
