@@ -568,8 +568,59 @@ Continued 2026-10-13 evening:
   0.71 ms (Reactant 4.6x slower). Lead: in raised modules the layer loops of the column kernel become
   `stablehlo.while` loops whose iterations gather/scatter into the whole fused tendency array; on a
   GPU, each iteration means more kernel launches and possibly a host sync for the condition.
-  Step 1-2 in progress (`physics_perf.jl`, A40, T31L8: physics-only / dynamics-only / full time step,
-  raise = true vs false, raised modules dumped to `hlo/physics_perf/`).
+  A40, T31L8, `feedback = nothing`, 200 calls of the compiled `time_step!` (`physics_perf.jl`, raised modules
+  in `hlo/physics_perf/`) and the same with CUDA.jl (`cuda_physics_perf.jl`), ms per step:
+
+  | | Reactant raise = true | Reactant raise = false | CUDA (FFT) | CUDA (matrix) |
+  |---|---|---|---|---|
+  | physics only | 1.43 | 2.07 | 0.93 | 1.02 |
+  | dynamics only | 0.64 | 1.59 | 1.09 | 1.06 |
+  | full | 1.76 | 2.08 (NaN, layout bug) | 1.21 | 1.36 |
+
+  So raising is not the cause: unraised is slower for both. On the A40 with this harness, Reactant's
+  physics is 1.5x slower than CUDA (the H100 benchmark suggested 4.6x), dynamics 1.7x faster, and the full
+  step 1.45x slower. The H100 benchmark had 3.3 ms for Reactant's physics alone, more than twice the A40
+  value here. Suspect: the benchmark harness, i.e. `time_stepping!` calls `progress!` and `output!` on the
+  host after every compiled step, possibly with a device sync (feedback). Next: Reactant with the
+  default feedback vs `feedback = nothing` through `time_stepping!` (`harness_perf.jl`).
+- `harness_perf.jl` (A40, PrimitiveWet T31L8, default precision): compiled `time_step!` called directly
+  1.90 ms per step, through `time_stepping!` (as `run!`, `feedback = nothing`) **7.58 ms per step**.
+  With the default feedback: **error "Scalar indexing is disallowed"**, so `run!` with the default
+  progress feedback fails on Reactant GPU. Causes:
+  - `do_output!` (Reactant method, SpeedyWeatherReactantExt) read `Int(clock.time_step_counter)` from the
+    device before checking `output.active`: a device-to-host sync after every compiled step, also with
+    output off, so the host can't queue the next step while the GPU computes. Fixed: `output.active ||
+    return false` first. (With output on it still syncs every step; a host-side counter would avoid that.)
+  - `progress!` → `max_speed`/`temperature_range` → `extrema(::Field)` iterates elementwise over a view of
+    a concrete Reactant array: allowed (slowly) on Reactant's CPU backend, not on the GPU. Fixed in
+    RingGridsReactantExt: `extrema` of fields with concrete Reactant data reduces on the host
+    (`extrema(Array(F.data))`), as `average_on_poles` already does.
+  Rerun with both fixes in progress (`harness_perf_fixed.log`). This likely explains most of the gap
+  between Reactant and CUDA in the H100 benchmark (whose runner uses `time_stepping!`).
+
+> This note on precision of matrix products, should rather go into the general `architecture` docs.
+> But also please explain to me and in the docs the consequences of that. Does the reactant model has
+> to be run with those settings or not?
+
+- Consequences measured (`reactant_wet_compare_raise.jl` with PRECISION=default, no Triton flag, log
+  `wet_raise_gpu_tf32.log`, A40, PrimitiveWet T31L8, max rel. difference to the CPU, step 1 → step 10;
+  in brackets HIGHEST + Triton off): vorticity 1.7e-4 → 1.4e-2 (3.4e-6 → 7.7e-5), divergence 4.8e-1 →
+  3.9e-2 (9.3e-4 → 2.2e-4), temperature 2.1e-4 → 5.0e-4 (2.4e-6 → 1.8e-6), humidity 1.3e-2 → 8.4e-3
+  (2.6e-5 → 1.6e-5), surface pressure 4.5e-6 → 4.7e-6 (9.6e-8 → 2.7e-8). Stable (no NaN), but effectively
+  a lower precision model, needed: Float32 precision for comparisons, tests, gradients.
+- Docs: the note moved from `differentiability.md` (now a short pointer) to `architectures_gpu.md`,
+  Reactant Support, new subsection "Precision of matrix products on GPUs" (what TF32 is, which matrix
+  products, the table above, when to use Float32, the three settings, example wrapping `initialize!` and
+  `run!` in `with_config`, environment variables before starting Julia). Also updated there: Reactant
+  version (newer than v0.2.292, `Reactant_jll` >= 0.0.419), `raise = true` default, GPU NaN test instead
+  of "not yet tested".
+- Speed cost (`precision_perf.jl`, A40, PrimitiveWet L8, direct compiled steps, ms per step): default (TF32)
+  T31 1.81, T63 3.08; + HIGHEST T31 2.00 (+10%), T63 3.80 (+23%); + Triton off + `NVIDIA_TF32_OVERRIDE=0`
+  T31 4.18 (+130%), T63 4.87 (+58%). The accuracy table (Float32 column) used HIGHEST + Triton off without
+  the override, so the override may not be needed for the model. In progress: speed of HIGHEST + Triton off
+  without the override, and accuracy of HIGHEST alone, to recommend the cheapest accurate combination.
+- Future: with Reactant.jl#3466 (`disable_dot_formation_passes`) no dots from raised loops, then only
+  setting 1 would be needed, and SpeedyWeather could set both in its compile calls by default.
 
 Next steps (state at 2026-10-13 23:00, last commit `e7f6942f`):
 1. Commit the working tree: `raise = true` defaults (both Reactant extensions), RingGrids

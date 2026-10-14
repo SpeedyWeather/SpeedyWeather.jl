@@ -161,8 +161,11 @@ function SpeedyWeather.do_output!(
         output::SpeedyWeather.AbstractOutput,
     )
     Reactant.ReactantCore.within_compile() && return false
+    # check on the host first: reading the clock from the device waits for the time step to finish,
+    # so the next time step can't be queued meanwhile (4x slower with a sync every time step)
+    output.active || return false
     time_step_counter = Int(clock.time_step_counter)
-    do_output = output.active && time_step_counter > 0 && time_step_counter % core.output_every_n_steps == 0
+    do_output = time_step_counter > 0 && time_step_counter % core.output_every_n_steps == 0
     core.output_counter += do_output
     return do_output
 end

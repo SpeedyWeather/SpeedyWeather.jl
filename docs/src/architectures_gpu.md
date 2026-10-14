@@ -107,7 +107,8 @@ SpeedyWeather will make use of all threads available.
 !!! warning "Work in progress"
     The Reactant support of SpeedyWeather.jl is still work in progress, incomplete and considered experimental.
 
-SpeedyWeather.jl is compatible with the MLIR/XLA optimizer Reactant.jl (v0.2.292 or newer).
+SpeedyWeather.jl is compatible with the MLIR/XLA optimizer Reactant.jl (newer than v0.2.292,
+with `Reactant_jll` v0.0.419 or newer).
 All models (`BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel`, `PrimitiveWetModel`)
 run with Reactant, use the `ReactantDevice` architecture together with the `MatrixSpectralTransform`
 and set your device within Reactant with `Reactant.set_default_backend`
@@ -124,10 +125,65 @@ run!(simulation, period = Day(10))
 ```
 
 The time step `time_step!(simulation)` is compiled once with Reactant and then called for every
-time step, output is written in between. Not all model components are compatible yet
-(e.g. particle advection) and the Reactant support on GPUs is not yet tested. The setups
-we use in the CI to compare the results with Reactant to those on the CPU are in
-`SpeedyWeather/test/reactant/`.
+time step, output is written in between. SpeedyWeather compiles with `raise = true`: Reactant
+raises the KernelAbstractions kernels to StableHLO, the operations of the XLA compiler, which on
+GPUs is needed for correct results. Not all model components are compatible yet
+(e.g. particle advection). The setups we use in the CI to compare the results with Reactant to
+those on the CPU are in `SpeedyWeather/test/reactant/`, on CUDA GPUs our GPU tests check that a
+`PrimitiveWetModel` runs without NaNs (`SpeedyWeather/test/GPU/reactant.jl`).
+
+### Precision of matrix products on GPUs
+
+On NVIDIA GPUs with TF32 support (Ampere and newer, e.g. A40, A100, H100) XLA runs Float32 matrix
+products in TF32 by default, which rounds the inputs to a 10-bit mantissa: relative errors of about
+1e-4 per product instead of about 1e-7 in Float32. This concerns the matrix products of the
+`MatrixSpectralTransform` and those that XLA creates from loops in raised kernels (e.g. the vertical
+matrix-vector products of the semi-implicit time stepping).
+
+The model runs stably with TF32 but the results deviate considerably from those in Float32 (e.g.
+on the CPU or with CUDA.jl). For a `PrimitiveWetModel` (T31, 8 layers) on an NVIDIA A40 the
+maximum relative differences to the CPU after 10 time steps are
+
+| Variable         | TF32 (default) | Float32 (see below) |
+| ---------------- | -------------- | ------------------- |
+| vorticity        | 1.4e-2         | 7.7e-5              |
+| divergence       | 3.9e-2         | 2.2e-4              |
+| temperature      | 5.0e-4         | 1.8e-6              |
+| humidity         | 8.4e-3         | 1.6e-5              |
+| surface pressure | 4.7e-6         | 2.7e-8              |
+
+and after the first time step the divergence even differs by 48% with TF32. So use Float32
+precision whenever the results should agree with Float32 results, e.g. for comparisons, tests or
+gradients (see [Differentiating with Reactant](@ref)). Whether TF32 is acceptable for your
+application, e.g. for long climate simulations, we haven't evaluated. For Float32 precision set
+
+1. `Reactant.with_config(dot_general_precision = Reactant.PrecisionConfig.HIGHEST)` around
+   everything that compiles, i.e. `initialize!` and `run!`, this applies to the matrix products that
+   Reactant creates itself, e.g. the spectral transform,
+2. the environment variable `XLA_FLAGS=--xla_gpu_enable_triton_gemm=false`, and
+3. the environment variable `NVIDIA_TF32_OVERRIDE=0`.
+
+2 and 3 are for the matrix products that XLA creates from kernel loops, which don't take 1 into
+account (yet): XLA's own Triton GEMMs ignore `NVIDIA_TF32_OVERRIDE`, without them XLA uses cuBLAS,
+which respects it. Set both before starting Julia:
+
+```julia
+# started with XLA_FLAGS=--xla_gpu_enable_triton_gemm=false NVIDIA_TF32_OVERRIDE=0 julia ...
+using Reactant, CUDA
+using SpeedyWeather
+
+spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice(), nlayers = 8)
+spectral_transform = MatrixSpectralTransform(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; spectral_transform)
+
+simulation = Reactant.with_config(dot_general_precision = Reactant.PrecisionConfig.HIGHEST) do
+    simulation = initialize!(model)
+    run!(simulation, period = Day(10))
+    simulation
+end
+```
+
+The Float32 column in the table above was obtained with 1 and 2.
 
 ## Benchmarks
 

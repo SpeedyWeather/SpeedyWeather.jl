@@ -108,14 +108,10 @@ dvars = make_zero(variables)
 `dvars.prognostic.vorticity` then holds the derivative of the loss with respect to the vorticity
 before the time step. The Reactant options `raise` and `raise_first` are required for the differentiation to work. They raise the KernelAbstractions kernels to StableHLO (as the remainder of model code):
 
-!!! note "Precision of matrix products on GPUs"
-    On GPUs that support TF32 (e.g. NVIDIA A100, H100), XLA runs Float32 matrix products in the
-    lower precision TF32 by default (relative errors of about 1e-4). With
-    `Reactant.with_config(dot_general_precision = Reactant.PrecisionConfig.HIGHEST)` Reactant's
-    own matrix products use Float32. The matrix products that raising creates from loops in kernels
-    don't take this setting into account yet. For those, disable XLA's Triton GEMMs
-    (`xla_debug_options = (; xla_gpu_enable_triton_gemm = false)` in `Reactant.CompileOptions`) and set
-    the environment variable `NVIDIA_TF32_OVERRIDE=0`.
+!!! note "Precision on GPUs"
+    On NVIDIA GPUs with TF32 support (e.g. A40, A100, H100) XLA runs Float32 matrix products in TF32
+    by default, which changes the results (and gradients) considerably. For gradients in Float32
+    precision see [Precision of matrix products on GPUs](@ref).
 
 The gradients with Reactant are compared to vanilla Enzyme on the CPU for the same state:
 in our CI for the `BarotropicModel` (`SpeedyWeather/test/reactant/differentation.jl`) and,
