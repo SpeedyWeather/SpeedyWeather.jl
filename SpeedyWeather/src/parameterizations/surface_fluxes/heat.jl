@@ -78,7 +78,8 @@ variables(::SurfaceOceanHeatFlux) = (
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(ρ)
 
-    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), heat_flux)
+    ts = time_stepper(model.time_stepping, :ocean)
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, ts, heat_flux)
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]

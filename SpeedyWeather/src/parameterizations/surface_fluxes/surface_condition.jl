@@ -142,6 +142,9 @@ end
     "[OPTION] Beljaars (1994) free convection parameter β [1]"
     @param β::NF = 1.2
 
+    "[DERIVED] Beljaars (1994) free convection parameter β, to the power of three [1]"
+    @param β³::NF = β^3
+
     "[OPTION] Boundary layer depth for free convection scaling [m]"
     @param z_i::NF = 1000.0
 
@@ -157,14 +160,16 @@ BeljaarsWindGust(SG::SpectralGrid; kwargs...) = BeljaarsWindGust{SG.NF}(; kwargs
 initialize!(::BeljaarsWindGust, ::PrimitiveEquation) = nothing
 
 @propagate_inbounds function calc_wind_gust(ij, vars, wg::BeljaarsWindGust, model, surface_condition, pₛ, Tᵥ)
-    (; β, z_i, C_H, min_gust) = wg
+    (; β³, z_i, C_H, min_gust) = wg
     (; gravity) = model.planet
-    (; land_sea_mask, time_stepping, atmosphere) = model
+    (; land_sea_mask, atmosphere) = model
 
     # Calculate skin temperature #TODO implement actual skin temperature parameterization
     land_fraction = land_sea_mask.land_fraction[ij]
-    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepping, surface_condition)[ij]
-    T_land = vars.prognostic.land.soil_temperature[ij, 1]
+    ts = time_stepper(model.time_stepping, :ocean)
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, ts, surface_condition)[ij]
+    ts = time_stepper(model.time_stepping, :land)
+    T_land = get_prognostic_step(vars.prognostic.land.soil_temperature, ts, surface_condition)[ij, 1]
     T_skin = SST * (1 - land_fraction) + T_land * land_fraction
 
     # Calculate skin virtual temperature
@@ -174,7 +179,7 @@ initialize!(::BeljaarsWindGust, ::PrimitiveEquation) = nothing
     ΔTᵥ = max(Tᵥ_skin - Tᵥ, zero(Tᵥ)) # Only unstable conditions generate convective gusts
 
     # Wind gust approximation based on Beljaars (1994) free convection scaling
-    gust = sqrt((β^3) * C_H * z_i * (gravity / max(Tᵥ, convert(typeof(Tᵥ), 200))) * ΔTᵥ)
+    gust = sqrt(β³ * C_H * z_i * (gravity / max(Tᵥ, convert(typeof(Tᵥ), 200))) * ΔTᵥ)
     gust = max(gust, min_gust) # Maintain a small background turbulence
 
     return gust

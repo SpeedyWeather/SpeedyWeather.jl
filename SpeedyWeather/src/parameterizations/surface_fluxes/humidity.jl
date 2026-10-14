@@ -74,7 +74,8 @@ variables(::SurfaceOceanHumidityFlux) = (
     )
 
     surface = model.geometry.nlayers
-    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), humidity_flux)
+    ts = time_stepper(model.time_stepping, :ocean)
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, ts, humidity_flux)
 
     # SATURATION HUMIDITY OVER OCEAN
     pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
@@ -135,9 +136,10 @@ variables(::SurfaceLandHumidityFlux) = (
 @propagate_inbounds function surface_humidity_flux!(ij, vars, humidity_flux::SurfaceLandHumidityFlux, model)
 
     # TODO use a skin temperature?
-    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), humidity_flux)
+    ts = time_stepper(model.time_stepping, :land)
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, ts, humidity_flux)
     T = soil_temperature[ij, 1]  # uppermost land layer with index 1
-    snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), humidity_flux)[ij]
+    snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, ts, humidity_flux)[ij]
     α = vars.parameterizations.land.soil_moisture_availability[ij]
 
     # SATURATION HUMIDITY OVER LAND
