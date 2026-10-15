@@ -125,9 +125,24 @@ the surface, z₀ is the momentum roughness length, and Δθᵥ is
 the virtual potential temperature difference between the lowest
 model level and the surface.
 
+The roughness length z₀ is by default a fixed land-sea mask-weighted value
+(`land_roughness`, `ocean_roughness`). With `use_computed_roughness = true` the
+roughness computed by `BoundaryLayer.surface_roughness` is used instead. As that is
+computed after the surface condition (it depends on the surface wind) it is then
+taken from the previous time step, making it a hidden state.
+
 Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct LearnedWindSlowdown{NF} <: AbstractWindSlowdown
+    "[OPTION] Use the computed roughness from the previous time step (true) or fixed roughness lengths (false)?"
+    use_computed_roughness::Bool = false
+
+    "[OPTION] Fixed momentum roughness length over land [m]"
+    @param land_roughness::NF = 0.1 (bounds = Positive,)
+
+    "[OPTION] Fixed momentum roughness length over ocean [m]"
+    @param ocean_roughness::NF = 1.0e-4 (bounds = Positive,)
+
     @param c1::NF = 0.0059787630088485833
     @param c2::NF = 0.23547083241598257
     @param c3::NF = 0.0099666424032772266
@@ -140,22 +155,6 @@ Adapt.@adapt_structure LearnedWindSlowdown
 
 LearnedWindSlowdown(SG::SpectralGrid; kwargs...) = LearnedWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
-
-@inline function wind_slowdown(ws::LearnedWindSlowdown, U, z, log_z₀, Δθᵥ)
-    (; c1, c2, c3, c4, c5, c6) = ws
-
-    # Prevent division by zero and invalid logarithms
-    z = max(z, one(z))
-
-    # Learned slowdown expression using fused multiply-add
-    s = muladd(c1, U, c6)
-    s = muladd(-c2, U / z, s)
-    s = muladd(c3, Δθᵥ, s)
-    s = muladd(c4, log_z₀, s)
-    s = muladd(c5, log(z), s)
-
-    return clamp(one(s) - s, zero(s), one(s))
-end
 
 @propagate_inbounds function calc_wind_slowdown(
         ij, vars, ws::LearnedWindSlowdown,
@@ -173,17 +172,17 @@ end
     z_surf = model.orography.orography[ij]
     z = Φ / gravity - z_surf
 
-    # Combined (land-sea mask-weighted) momentum roughness. The surface condition is computed
-    # *before* the surface roughness in BoundaryLayer (the roughness needs the surface wind via
-    # the neutral wind speed), so this is the roughness from the *previous* time step.
-    z₀_raw = vars.parameterizations.momentum_roughness[ij]
+    # Momentum roughness length, fixed (land-sea mask-weighted) by default
+    z₀ = land_fraction * ws.land_roughness + (1 - land_fraction) * ws.ocean_roughness
 
-    # FALLBACK: on the very first time step the roughness has not been computed yet and is still
-    # zero from allocation (log(0) = -Inf). Use typical roughness lengths instead, 0.1m over land
-    # and 1e-4m over ocean, weighted by the land fraction. These are independent of the chosen
-    # surface roughness scheme, so the first time step only approximates its roughness
-    z₀_default = land_fraction * oftype(z₀_raw, 0.1) + (1 - land_fraction) * oftype(z₀_raw, 0.0001)
-    z₀ = z₀_raw > 0 ? z₀_raw : z₀_default
+    # Or use the computed roughness. The surface condition is computed *before* the surface
+    # roughness in BoundaryLayer (the roughness needs the surface wind via the neutral wind speed),
+    # so this is the roughness from the *previous* time step. On the very first time step it
+    # has not been computed yet and is still zero (log(0) = -Inf), use the fixed z₀ then
+    if ws.use_computed_roughness
+        z₀_computed = vars.parameterizations.momentum_roughness[ij]
+        z₀ = z₀_computed > 0 ? z₀_computed : z₀
+    end
 
     # Lowest model-level temperature and humidity
     T = get_prognostic_step(vars.grid.temperature, time_stepping, ws)[ij, nlayers]
@@ -217,6 +216,22 @@ end
 
     return wind_slowdown(ws, U, z, log(z₀), Δθᵥ)
 
+end
+
+@inline function wind_slowdown(ws::LearnedWindSlowdown, U, z, log_z₀, Δθᵥ)
+    (; c1, c2, c3, c4, c5, c6) = ws
+
+    # Prevent division by zero and invalid logarithms
+    z = max(z, one(z))
+
+    # Learned slowdown expression using fused multiply-add
+    s = muladd(c1, U, c6)
+    s = muladd(-c2, U / z, s)
+    s = muladd(c3, Δθᵥ, s)
+    s = muladd(c4, log_z₀, s)
+    s = muladd(c5, log(z), s)
+
+    return clamp(one(s) - s, zero(s), one(s))
 end
 
 export ConstantWindGust
