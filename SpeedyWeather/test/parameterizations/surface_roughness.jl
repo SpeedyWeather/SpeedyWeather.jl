@@ -130,3 +130,17 @@ end
         @test z₀_actual <= z₀_max
     end
 end
+
+@testset "No neutral wind speed with constant roughness" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    surface_roughness = ConstantSurfaceRoughness(spectral_grid)
+    boundary_layer = BoundaryLayer(spectral_grid; surface_roughness, neutral_wind_speed = nothing)
+    model = PrimitiveWetModel(spectral_grid; boundary_layer)
+    simulation = initialize!(model)
+    run!(simulation, steps = 2)
+
+    (; parameterizations) = simulation.variables
+    @test !haskey(parameterizations, :neutral_wind_speed)
+    @test all(isfinite, parameterizations.boundary_layer_drag_momentum)
+    @test all(>(0), parameterizations.boundary_layer_drag_momentum)
+end

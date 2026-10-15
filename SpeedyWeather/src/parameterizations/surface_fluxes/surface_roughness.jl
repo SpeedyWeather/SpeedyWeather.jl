@@ -88,7 +88,7 @@ end
         vars.parameterizations.heat_roughness[ij] =
         constant_roughness(z₀H_land, z₀H_ocean, land_fraction)
 
-    # Humidity roughness (just heat times a constant)
+    # Humidity roughness
     land.humidity_roughness[ij],
         ocean.humidity_roughness[ij],
         vars.parameterizations.humidity_roughness[ij] =
@@ -217,37 +217,37 @@ Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct LearnedLandRoughness{NF} <: AbstractLandRoughness
     "[OPTION] Maximum land surface momentum roughness length [m]"
-    momentum_roughness_max::NF = 2.0  # from IFS docs
+    @param momentum_roughness_max::NF = 2.0  # from IFS docs
 
     "[OPTION] Maximum land surface heat roughness length [m]"
-    heat_roughness_max::NF = 2.0  # from IFS docs
+    @param heat_roughness_max::NF = 2.0  # from IFS docs
 
     "[OPTION] Minimum land surface momentum roughness length [m]"
-    momentum_roughness_min::NF = 1.3e-3  # from IFS docs
+    @param momentum_roughness_min::NF = 1.3e-3  # from IFS docs
 
     "[OPTION] Minimum land surface heat roughness length [m]"
-    heat_roughness_min::NF = 1.3e-4  # from IFS docs
+    @param heat_roughness_min::NF = 1.3e-4  # from IFS docs
 
     "[OPTION] Coefficients for momentum roughness closure over land"
-    m_c1::NF = -7.231684
-    m_c2::NF = 11.078163
-    m_c3::NF = -0.14265412
-    m_c4::NF = -5.916258
-    m_c5::NF = 2.2420337
-    m_c6::NF = 0.00613743
-    m_c7::NF = 0.51263654
-    m_c8::NF = 2.6413066
-    m_c9::NF = 0.60989547
+    @param m_c1::NF = -7.231684
+    @param m_c2::NF = 11.078163
+    @param m_c3::NF = -0.14265412
+    @param m_c4::NF = -5.916258
+    @param m_c5::NF = 2.2420337
+    @param m_c6::NF = 0.00613743
+    @param m_c7::NF = 0.51263654
+    @param m_c8::NF = 2.6413066
+    @param m_c9::NF = 0.60989547
 
     "[OPTION] Coefficients for heat roughness closure over land"
-    h_c1::NF = 373.86444
-    h_c2::NF = 5.981257
-    h_c3::NF = 3.5229454
-    h_c4::NF = 7.781359
-    h_c5::NF = 2.1035099
-    h_c6::NF = -0.41931123
-    h_c7::NF = 0.00037635124
-    h_c8::NF = -5.4191554
+    @param h_c1::NF = 373.86444
+    @param h_c2::NF = 5.981257
+    @param h_c3::NF = 3.5229454
+    @param h_c4::NF = 7.781359
+    @param h_c5::NF = 2.1035099
+    @param h_c6::NF = -0.41931123
+    @param h_c7::NF = 0.00037635124
+    @param h_c8::NF = -5.4191554
 end
 
 Adapt.@adapt_structure LearnedLandRoughness
@@ -441,41 +441,38 @@ Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct LearnedOceanRoughness{NF, CH, SIMR, MOMR} <: AbstractOceanRoughness
     "[OPTION] Heat-related constant (from IFS documentation)"
-    a_h::NF = 0.4 
+    @param a_h::NF = 0.4 
     
     "[OPTION] Moisture-related constant (from IFS documentation)"
-    a_q::NF = 0.62
-
-    "[DERIVED] Moisture to heat roughness ratio [1]"
-    a_ratio::NF = a_q / a_h
+    @param a_q::NF = 0.62
 
     "[OPTION] Charnock parameter estimation"
-    charnock::CH
+    @component charnock::CH
 
     "[OPTION] Sea-ice momentum_roughness"
-    sea_ice_momentum_roughness::SIMR  # from IFS docs
+    @component sea_ice_momentum_roughness::SIMR  # from IFS docs
 
     "[OPTION] sea-ice heat roughness length"  # defined in IFS documentation
-    sea_ice_heat_roughness::NF = 1.0e-3
+    @param sea_ice_heat_roughness::NF = 1.0e-3
 
     "[OPTION] Momentum roughness upper limit"
-    max_ocean_momentum_roughness::MOMR
+    @component max_ocean_momentum_roughness::MOMR
 
     "[OPTION] coefficient for momentum roughness closure over ocean"
-    m_c1::NF = 0.48786303
-    m_c2::NF = 3.374574
-    m_c3::NF = 0.5460857
-    m_c4::NF = 0.45002246
-    m_c5::NF = 0.9827853
-    m_c6::NF = 0.043734703
-    m_c7::NF = 1.0346544
-    m_c8::NF = 7.1816134
+    @param m_c1::NF = 0.48786303
+    @param m_c2::NF = 3.374574
+    @param m_c3::NF = 0.5460857
+    @param m_c4::NF = 0.45002246
+    @param m_c5::NF = 0.9827853
+    @param m_c6::NF = 0.043734703
+    @param m_c7::NF = 1.0346544
+    @param m_c8::NF = 7.1816134
 
     "[OPTION] coefficient for heat roughness closure over ocean"
-    h_c1::NF = -8.207549
-    h_c2::NF = 0.18300448
-    h_c3::NF = 0.08970642
-    h_c4::NF = -1.6667988
+    @param h_c1::NF = -8.207549
+    @param h_c2::NF = 0.18300448
+    @param h_c3::NF = 0.08970642
+    @param h_c4::NF = -1.6667988
 end
 
 Adapt.@adapt_structure LearnedOceanRoughness
@@ -491,7 +488,12 @@ function LearnedOceanRoughness(
         charnock, sea_ice_momentum_roughness, max_ocean_momentum_roughness, kwargs...
     )
 end
-initialize!(::LearnedOceanRoughness, ::PrimitiveEquation) = nothing
+function initialize!(scheme::LearnedOceanRoughness, model::PrimitiveEquation)
+    initialize!(scheme.charnock, model)
+    initialize!(scheme.sea_ice_momentum_roughness, model)
+    initialize!(scheme.max_ocean_momentum_roughness, model)
+    return nothing
+end
 
 # function barrier to unpack only what's needed from model
 @propagate_inbounds surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, model::AbstractModel) =
@@ -523,7 +525,7 @@ initialize!(::LearnedOceanRoughness, ::PrimitiveEquation) = nothing
 
     ocean.momentum_roughness[ij] = z₀M_ocean
     ocean.heat_roughness[ij] = z₀H_ocean
-    ocean.humidity_roughness[ij] = z₀H_ocean * scheme.a_ratio # moisture roughness is heat times a constant
+    ocean.humidity_roughness[ij] = z₀H_ocean * (scheme.a_q / scheme.a_h) # moisture roughness is heat times a constant
 
     return nothing
 end
@@ -573,29 +575,30 @@ Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct Charnock{NF} <: AbstractRoughnessFunctor
     "[OPTION] threshold wind speed [m/s] for Charnock parameterization"
-    Uₜ::NF = 7.0
+    @param Uₜ::NF = 7.0
 
     "[OPTION] low wind cubic term coefficient"
-    c1::NF = 1.8449e-6
+    @param c1::NF = 1.8449e-6
 
     "[OPTION] low wind quadratic term coefficient"
-    c2::NF = 9.7104e-5
+    @param c2::NF = 9.7104e-5
 
     "[OPTION] low wind constant term coefficient"
-    c3::NF = 0.0075
+    @param c3::NF = 0.0075
 
     "[OPTION] high wind linear term coefficient"
-    c4::NF = 0.0016
+    @param c4::NF = 0.0016
 
     "[OPTION] high wind constant term coefficient"
-    c5::NF = 0.0129
+    @param c5::NF = 0.0129
 
     "[OPTION] minimum Charnock parameter value"
-    charnock_min::NF = 1.0e-5
+    @param charnock_min::NF = 1.0e-5
 end
 
 Adapt.@adapt_structure Charnock
 Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
+initialize!(::Charnock, ::PrimitiveEquation) = nothing
 
 @inline function (charnock_param::Charnock{NF})(uₙ::T) where {NF, T <: Real}
     Uₜ = T(charnock_param.Uₜ)
@@ -627,6 +630,7 @@ end
 
 Adapt.@adapt_structure SeaIceMomentumRoughness
 SeaIceMomentumRoughness(SG::SpectralGrid; kwargs...) = SeaIceMomentumRoughness{SG.NF}(; kwargs...)
+initialize!(::SeaIceMomentumRoughness, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES) Functor returning surface roughness over sea ice given sea ice concentration ℵ."""
 @inline function (R::SeaIceMomentumRoughness)(ℵ)
@@ -654,6 +658,7 @@ end
 
 Adapt.@adapt_structure MaxOceanMomentumRoughness
 MaxOceanMomentumRoughness(SG::SpectralGrid; kwargs...) = MaxOceanMomentumRoughness{SG.NF}(; kwargs...)
+initialize!(::MaxOceanMomentumRoughness, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES) Momentum roughness cap following Willett et al. (2026) given surface wind speed uₙ."""
 @inline function (max_ocean_momentum_roughness::MaxOceanMomentumRoughness)(uₙ)

@@ -27,7 +27,11 @@ function SurfaceCondition(
     return SurfaceCondition(wind_slowdown, wind_gust)
 end
 
-initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
+function initialize!(surface_condition::SurfaceCondition, model::PrimitiveEquation)
+    initialize!(surface_condition.wind_slowdown, model)
+    initialize!(surface_condition.wind_gust, model)
+    return nothing
+end
 
 variables(::SurfaceCondition) = (
     ParameterizationVariable(:surface_air_temperature, GridXY(), desc = "Surface air temperature", units = "K"),
@@ -70,9 +74,9 @@ end
     v_grid = get_prognostic_step(vars.grid.v, time_stepping, surface_condition)
 
     # lowermost-layer wind speed sqrt(u^2 + v^2) but written with fused muladd
-    Uₙ = sqrt(muladd(u_grid[ij, nlayers], u_grid[ij, nlayers], v_grid[ij, nlayers]^2))
+    U = sqrt(muladd(u_grid[ij, nlayers], u_grid[ij, nlayers], v_grid[ij, nlayers]^2))
 
-    wind_slowdown = calc_wind_slowdown(ij, vars, wind_slowdown, model, surface_condition, Uₙ)
+    wind_slowdown = calc_wind_slowdown(ij, vars, wind_slowdown, model, surface_condition, U)
 
     uₛ = wind_slowdown * u_grid[ij, nlayers]        # surface wind components
     vₛ = wind_slowdown * v_grid[ij, nlayers]
@@ -98,7 +102,7 @@ Adapt.@adapt_structure ConstantWindSlowdown
 ConstantWindSlowdown(SG::SpectralGrid; kwargs...) = ConstantWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::ConstantWindSlowdown, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::ConstantWindSlowdown, model, surface_condition, Uₙ)
+@propagate_inbounds function calc_wind_slowdown(ij, vars, ws::ConstantWindSlowdown, model, surface_condition, U)
     return ws.wind_slowdown
 end
 
@@ -113,10 +117,10 @@ The slowdown factor is calculated as
 
 where
 
-    s = c1*Uₙ - c2*Uₙ/z₁ + c3*Δθᵥ +
-        c4*log(z₀) + c5*log(z₁) + c6
+    s = c1*U - c2*U/z + c3*Δθᵥ +
+        c4*log(z₀) + c5*log(z) + c6
 
-Here Uₙ is the lowest-level wind speed, z₁ is its height above
+Here U is the lowest-level wind speed, z is its height above
 the surface, z₀ is the momentum roughness length, and Δθᵥ is
 the virtual potential temperature difference between the lowest
 model level and the surface.
@@ -137,15 +141,15 @@ Adapt.@adapt_structure LearnedWindSlowdown
 LearnedWindSlowdown(SG::SpectralGrid; kwargs...) = LearnedWindSlowdown{SG.NF}(; kwargs...)
 initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
 
-@inline function wind_slowdown(ws::LearnedWindSlowdown, U₁, z₁, log_z₀, Δθᵥ)
+@inline function wind_slowdown(ws::LearnedWindSlowdown, U, z, log_z₀, Δθᵥ)
     (; c1, c2, c3, c4, c5, c6) = ws
 
     # Prevent division by zero and invalid logarithms
-    z = max(z₁, one(z₁))
+    z = max(z, one(z))
 
     # Learned slowdown expression using fused multiply-add
-    s = muladd(c1, U₁, c6)
-    s = muladd(-c2, U₁ / z, s)
+    s = muladd(c1, U, c6)
+    s = muladd(-c2, U / z, s)
     s = muladd(c3, Δθᵥ, s)
     s = muladd(c4, log_z₀, s)
     s = muladd(c5, log(z), s)
@@ -155,7 +159,7 @@ end
 
 @propagate_inbounds function calc_wind_slowdown(
         ij, vars, ws::LearnedWindSlowdown,
-        model, surface_condition, U₁
+        model, surface_condition, U
     )
     (; gravity) = model.planet
     (; nlayers) = model.geometry
@@ -165,29 +169,29 @@ end
     cₚ = atmosphere.heat_capacity
 
     # Reference height
-    Φ₁ = vars.dynamics.geopotential[ij, nlayers]
+    Φ = vars.dynamics.geopotential[ij, nlayers]
     z_surf = model.orography.orography[ij]
-    z₁ = Φ₁ / gravity - z_surf
+    z = Φ / gravity - z_surf
 
-    # Combined momentum roughness
+    # Combined (land-sea mask-weighted) momentum roughness. The surface condition is computed
+    # *before* the surface roughness in BoundaryLayer (the roughness needs the surface wind via
+    # the neutral wind speed), so this is the roughness from the *previous* time step.
     z₀_raw = vars.parameterizations.momentum_roughness[ij]
 
+    # FALLBACK: on the very first time step the roughness has not been computed yet and is still
+    # zero from allocation (log(0) = -Inf). Use typical roughness lengths instead, 0.1m over land
+    # and 1e-4m over ocean, weighted by the land fraction. These are independent of the chosen
+    # surface roughness scheme, so the first time step only approximates its roughness
     z₀_default = land_fraction * oftype(z₀_raw, 0.1) + (1 - land_fraction) * oftype(z₀_raw, 0.0001)
     z₀ = z₀_raw > 0 ? z₀_raw : z₀_default
 
     # Lowest model-level temperature and humidity
-    T₁ = get_prognostic_step(
-        vars.grid.temperature, time_stepping, ws
-    )[ij, nlayers]
+    T = get_prognostic_step(vars.grid.temperature, time_stepping, ws)[ij, nlayers]
 
-    q₁ = haskey(vars.grid, :humidity) ?
-        get_prognostic_step(
-            vars.grid.humidity, time_stepping, ws
-        )[ij, nlayers] : zero(T₁)
-
-    Tᵥ₁ = virtual_temperature(T₁, q₁, atmosphere)
-
-    T_skin = zero(T₁)
+    q = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, ws)[ij, nlayers] : zero(T)
+    Tᵥ = virtual_temperature(T, q, atmosphere)
+    T_skin = zero(T)
+    
     if land_fraction > 0
         land_temp = get_prognostic_step(
             vars.prognostic.land.soil_temperature,
@@ -209,9 +213,9 @@ end
     Tᵥ_skin = virtual_temperature(T_skin, q_skin, atmosphere)
 
     # Virtual potential temperature difference
-    Δθᵥ = Tᵥ₁ + (gravity / cₚ) * z₁ - Tᵥ_skin
+    Δθᵥ = Tᵥ + (gravity / cₚ) * z - Tᵥ_skin
 
-    return wind_slowdown(ws, U₁, z₁, log(z₀), Δθᵥ)
+    return wind_slowdown(ws, U, z, log(z₀), Δθᵥ)
 
 end
 

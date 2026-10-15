@@ -2,12 +2,21 @@ abstract type AbstractBoundaryLayer <: AbstractParameterization end
 
 export BoundaryLayer
 
-"""Composite type, containing surface roughness computation
-and drag coefficient computation. Fields are $(TYPEDFIELDS)"""
+"""Composite boundary layer parameterization computing the drag coefficients
+for surface fluxes of momentum, heat and humidity. Its subcomponents are
+executed in the following order:
+
+1. `surface_condition`: extrapolates temperature, density and wind to the surface
+2. `neutral_wind_speed`: neutral (stability-corrected) surface wind speed
+3. `surface_roughness`: roughness lengths for momentum, heat and humidity over land and ocean
+4. `drag`: drag coefficients for momentum, heat and humidity over land and ocean
+
+The surface condition uses the surface roughness from the previous time step.
+Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct BoundaryLayer{SC, NW, SR, D} <: AbstractBoundaryLayer
-    @component surface_roughness::SR
     @component surface_condition::SC
     @component neutral_wind_speed::NW
+    @component surface_roughness::SR
     @component drag::D
 end
 

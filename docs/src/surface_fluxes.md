@@ -53,6 +53,104 @@ subtypes(SpeedyWeather.AbstractBoundaryLayer)
 
 See [Parameterizations](@ref) for the general parameterization interface these implement.
 
+## Boundary layer
+
+The `model.boundary_layer` is a composite of four components that run one after another
+for every grid point, each writing variables the next one (and the surface fluxes) read
+
+```
+BoundaryLayer
+├── surface_condition    # 1. surface air temperature, density, wind speed
+│   ├── wind_slowdown    #    ratio of near-surface to lowest-layer wind
+│   └── wind_gust        #    sub-grid scale gusts added to the surface wind speed
+├── neutral_wind_speed   # 2. stability-corrected (neutral) surface wind speed
+├── surface_roughness    # 3. roughness lengths for momentum, heat, humidity over land and ocean
+│   ├── land_surface_roughness
+│   └── ocean_surface_roughness
+│       ├── charnock
+│       ├── sea_ice_momentum_roughness
+│       └── max_ocean_momentum_roughness
+└── drag                 # 4. drag coefficients for momentum, heat, humidity over land and ocean
+```
+
+The surface condition uses the surface roughness from the previous time step.
+The subcomponents of `SurfaceCondition` are
+
+```@example surface_fluxes
+subtypes(SpeedyWeather.AbstractWindSlowdown)
+```
+
+```@example surface_fluxes
+subtypes(SpeedyWeather.AbstractWindGust)
+```
+
+the neutral wind speed
+
+```@example surface_fluxes
+subtypes(SpeedyWeather.AbstractNeutralWindSpeed)
+```
+
+the surface roughness, with its land and ocean subcomponents (used by `LearnedSurfaceRoughness`)
+
+```@example surface_fluxes
+subtypes(SpeedyWeather.AbstractSurfaceRoughness)
+```
+
+```@example surface_fluxes
+subtypes(SpeedyWeather.AbstractLandRoughness)
+```
+
+```@example surface_fluxes
+subtypes(SpeedyWeather.AbstractOceanRoughness)
+```
+
+and the functors used within the learned ocean roughness
+
+```@example surface_fluxes
+subtypes(SpeedyWeather.AbstractRoughnessFunctor)
+```
+
+and finally the drag coefficients
+
+```@example surface_fluxes
+subtypes(SpeedyWeather.AbstractBoundaryLayerDrag)
+```
+
+All of these take the `spectral_grid` as first argument and their parameters (or subcomponents)
+as keyword arguments, so that they can be composed together and passed on to the model
+constructor, e.g.
+
+```@example surface_fluxes
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+
+# constant wind slowdown and gusts instead of the defaults
+surface_condition = SurfaceCondition(
+    spectral_grid,
+    wind_slowdown = ConstantWindSlowdown(spectral_grid, wind_slowdown = 0.9),
+    wind_gust = ConstantWindGust(spectral_grid, wind_gust = 1),
+)
+
+# learned roughness but with a different Charnock parameterization
+ocean_surface_roughness = LearnedOceanRoughness(
+    spectral_grid,
+    charnock = Charnock(spectral_grid, charnock_min = 1.0e-4),
+)
+surface_roughness = LearnedSurfaceRoughness(spectral_grid; ocean_surface_roughness)
+
+# or constant roughness lengths instead
+# surface_roughness = ConstantSurfaceRoughness(spectral_grid, momentum_roughness_ocean = 2e-4)
+
+boundary_layer = BoundaryLayer(
+    spectral_grid;
+    surface_condition,
+    surface_roughness,
+    drag = BulkRichardsonDrag(spectral_grid, critical_Richardson = 5),
+)
+
+model = PrimitiveWetModel(spectral_grid; boundary_layer)
+model.boundary_layer
+```
+
 ## Fluxes to tendencies
 
 In SpeedyWeather.jl, parameterizations can be defined either in terms of tendencies for a given

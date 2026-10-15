@@ -34,10 +34,10 @@ derived from ERA5 data via symbolic regression. Fields are $(TYPEDFIELDS)"""
 
     # Safety parameters
     "[OPTION] Minimum wind speed to avoid zero surface fluxes [m/s]"
-    minimum_wind::NF = 1.0e-6
+    @param minimum_wind::NF = 1.0e-6
 
     "[OPTION] Minimum argument for logarithm to avoid log(0) [1]"
-    log_safety::NF = 1.0e-8
+    @param log_safety::NF = 1.0e-8
 end
 
 variables(::NeutralWindSpeed) = (

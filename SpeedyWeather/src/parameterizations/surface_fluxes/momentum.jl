@@ -22,15 +22,6 @@ Adapt.@adapt_structure SurfaceMomentumFlux
 SurfaceMomentumFlux(SG::SpectralGrid; kwargs...) = SurfaceMomentumFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceMomentumFlux, ::PrimitiveEquation) = nothing
 
-function variables(::SurfaceMomentumFlux)
-    return (
-        ParameterizationVariable(:boundary_layer_drag_momentum, GridXY(), desc = "Boundary layer drag coefficient for momentum", units = "1"),
-        ParameterizationVariable(:surface_wind_speed, GridXY(), desc = "Surface wind speed", units = "m/s"),
-        ParameterizationVariable(:surface_air_density, GridXY(), desc = "Surface air density", units = "kg/m^2"),
-        ParameterizationVariable(:surface_air_temperature, GridXY(), desc = "Surface air temperature", units = "K"),
-    )
-end
-
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, momentum_flux::SurfaceMomentumFlux, model)
     surface_wind_stress!(ij, vars, momentum_flux, model)
