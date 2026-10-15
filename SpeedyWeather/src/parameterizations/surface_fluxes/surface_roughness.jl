@@ -1,4 +1,7 @@
 abstract type AbstractSurfaceRoughness <: AbstractParameterization end
+abstract type AbstractOceanRoughness <: AbstractSurfaceRoughness end
+abstract type AbstractLandRoughness <: AbstractSurfaceRoughness end
+abstract type AbstractRoughnessFunctor <: AbstractParameterization end
 
 variables(::AbstractSurfaceRoughness) = (
     # Momentum, heat and moisture roughness lengths
@@ -90,6 +93,76 @@ end
     return nothing
 end
 
+export LearnedSurfaceRoughness
+
+"""
+Combined learned surface roughness parameterization for momentum, heat
+and humidity fluxes over land and ocean.
+
+Land and ocean roughness lengths are calculated independently using
+LearnedLandRoughness and LearnedOceanRoughness, respectively.
+
+The grid-cell mean roughness length for each quantity X ∈ {M, H, Q}
+is obtained through area-weighted blending,
+
+    z₀X = f_land*z₀X_land + (1 - f_land)*z₀X_ocean
+
+where
+- f_land: Land fraction of the grid cell
+- z₀X_land: Learned land roughness length
+- z₀X_ocean: Learned ocean roughness length
+
+Fields are $(TYPEDFIELDS)
+"""
+@parameterized @kwdef struct LearnedSurfaceRoughness{LLR, LOR} <: AbstractSurfaceRoughness
+    "[OPTION] learned land surface roughness scheme"
+    @component land_surface_roughness::LLR
+
+    "[OPTION] learned ocean surface roughness scheme"
+    @component ocean_surface_roughness::LOR
+end
+
+Adapt.@adapt_structure LearnedSurfaceRoughness
+function LearnedSurfaceRoughness(
+        SG::SpectralGrid;
+        land_surface_roughness = LearnedLandRoughness(SG),
+        ocean_surface_roughness = LearnedOceanRoughness(SG),
+    )
+    return LearnedSurfaceRoughness(land_surface_roughness, ocean_surface_roughness)
+end
+
+function initialize!(LSR::LearnedSurfaceRoughness, model::PrimitiveEquation)
+    initialize!(LSR.land_surface_roughness, model)
+    initialize!(LSR.ocean_surface_roughness, model)
+    return nothing
+end
+
+# First land, then ocean, then combine!
+@propagate_inbounds function parameterization!(ij, vars, LSR::LearnedSurfaceRoughness, model)
+    surface_roughness!(ij, vars, LSR.land_surface_roughness, model.land_sea_mask, model.time_stepping)
+    surface_roughness!(ij, vars, LSR.ocean_surface_roughness, model)
+    surface_roughness!(ij, vars, LSR, model.land_sea_mask)
+    return nothing
+end
+
+@propagate_inbounds function surface_roughness!(ij, vars, LSR::LearnedSurfaceRoughness, land_sea_mask)
+    land_fraction = land_sea_mask.land_fraction[ij]
+    (; land, ocean) = vars.parameterizations
+
+    # Momentum roughness
+    vars.parameterizations.momentum_roughness[ij] = land_fraction * land.momentum_roughness[ij] +
+        (1 - land_fraction) * ocean.momentum_roughness[ij]
+
+    # Heat roughness
+    vars.parameterizations.heat_roughness[ij] = land_fraction * land.heat_roughness[ij] +
+        (1 - land_fraction) * ocean.heat_roughness[ij]
+
+    # Moisture roughness
+    vars.parameterizations.humidity_roughness[ij] = land_fraction * land.humidity_roughness[ij] +
+        (1 - land_fraction) * ocean.humidity_roughness[ij]
+    return nothing
+end
+
 export LearnedLandRoughness
 
 """
@@ -134,7 +207,7 @@ Predictors:
 
 Fields are $(TYPEDFIELDS)
 """
-@parameterized @kwdef struct LearnedLandRoughness{NF} <: AbstractSurfaceRoughness
+@parameterized @kwdef struct LearnedLandRoughness{NF} <: AbstractLandRoughness
     "[OPTION] Maximum land surface momentum roughness length [m]"
     momentum_roughness_max::NF = 2.0  # from IFS docs
 
@@ -173,122 +246,122 @@ Adapt.@adapt_structure LearnedLandRoughness
 LearnedLandRoughness(SG::SpectralGrid; kwargs...) = LearnedLandRoughness{SG.NF}(; kwargs...)
 initialize!(::LearnedLandRoughness, ::PrimitiveEquation) = nothing
 
-export Charnock
+@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedLandRoughness, land_sea_mask, time_stepping)
+    land_fraction = land_sea_mask.land_fraction[ij]
+    (; land) = vars.parameterizations
 
-"""Wind-dependent Charnock parameterization using a piecewise polynomial
-function of neutral wind speed.
+    if land_fraction <= 0
+        zero_val = zero(land_fraction)
+        land.momentum_roughness[ij] = zero_val
+        land.heat_roughness[ij] = zero_val
+        land.humidity_roughness[ij] = zero_val
+        return nothing
+    end
 
-The Charnock parameter α is calculated as
+    # Unpack predictors, using defaults when optional fields are absent
+    (; land) = vars.parameterizations
 
-    α = c1*uₙ^3 + c2*uₙ^2 + c3       for uₙ ≤ Uₜ
-    α = c4*(uₙ - Uₜ) + c5           for uₙ > Uₜ
+    vₕ = haskey(land, :high_vegetation_cover) ? land.high_vegetation_cover[ij] : zero(land_fraction)
+    vₗ = haskey(land, :low_vegetation_cover) ? land.low_vegetation_cover[ij] : zero(land_fraction)
+    laiₕ = haskey(land, :high_vegetation_leaf_area) ? land.high_vegetation_leaf_area[ij] : zero(land_fraction)
+    laiₗ = haskey(land, :low_vegetation_leaf_area) ? land.low_vegetation_leaf_area[ij] : zero(land_fraction)
+    sd = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(land_fraction)
 
-where
-- uₙ: Neutral wind speed [m/s]
-- Uₜ: Threshold wind speed [m/s]
-- c1 to c5: Fitted coefficients
+    ts = time_stepper(time_stepping, :land)
+    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ?
+        get_prognostic_step(vars.prognostic.land.soil_moisture, ts, scheme)[ij, end] : zero(land_fraction)
+    soil_temperature = haskey(vars.prognostic.land, :soil_temperature) ?
+        get_prognostic_step(vars.prognostic.land.soil_temperature, ts, scheme)[ij, end] : zero(land_fraction)
 
-The parameterization returns α, which is used as an input to
-the learned ocean momentum roughness parameterization. Its logarithm 
-is used as a predictor in the learned ocean momentum roughness parameterization.
+    z₀M_land = land_momentum_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, sd, soil_temperature, soil_moisture)
+    z₀H_land = land_heat_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, soil_temperature, soil_moisture)
 
-Fields are $(TYPEDFIELDS)
-"""
-@parameterized @kwdef struct Charnock{NF} <: AbstractParameterization
-    "[OPTION] threshold wind speed [m/s] for Charnock parameterization"
-    Uₜ::NF = 7.0
+    land.momentum_roughness[ij] = z₀M_land
+    land.heat_roughness[ij] = z₀H_land
+    land.humidity_roughness[ij] = z₀H_land # same as heat roughness over land
 
-    "[OPTION] low wind cubic term coefficient"
-    c1::NF = 1.8449e-6
-
-    "[OPTION] low wind quadratic term coefficient"
-    c2::NF = 9.7104e-5
-
-    "[OPTION] low wind constant term coefficient"
-    c3::NF = 0.0075
-
-    "[OPTION] high wind linear term coefficient"
-    c4::NF = 0.0016
-
-    "[OPTION] high wind constant term coefficient"
-    c5::NF = 0.0129
-
-    "[OPTION] minimum Charnock parameter value"
-    charnock_min::NF = 1.0e-5
+    return nothing
 end
 
-Adapt.@adapt_structure Charnock
-Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
+# Land momentum roughness
+@inline function land_momentum_roughness(
+        scheme::LearnedLandRoughness, 
+        high_vegetation_cover::NF,
+        low_vegetation_cover::NF,
+        high_vegetation_leaf_area::NF,
+        low_vegetation_leaf_area::NF,
+        snow_depth::NF,
+        soil_temperature_bottom::NF,
+        soil_moisture_bottom::NF
+    ) where {NF <: AbstractFloat}
+    
+    # From Munday et al. 2026, in prep.
+    C_H = high_vegetation_cover
+    C_L = low_vegetation_cover
+    L_H = high_vegetation_leaf_area
+    L_L = low_vegetation_leaf_area
+    S = snow_depth
+    T = soil_temperature_bottom
+    W = soil_moisture_bottom
 
-@inline function (charnock_param::Charnock{NF})(uₙ::T) where {NF, T <: Real}
-    Uₜ = T(charnock_param.Uₜ)
-    c1 = T(charnock_param.c1)
-    c2 = T(charnock_param.c2)
-    c3 = T(charnock_param.c3)
-    c4 = T(charnock_param.c4)
-    c5 = T(charnock_param.c5)
-    c_min = T(charnock_param.charnock_min)
+    # Numerator
+    den1 = muladd(scheme.m_c2, C_H, -scheme.m_c3)
+    term1 = scheme.m_c4 * exp(S / den1)
+    min_inner = min(scheme.m_c5 * L_L, muladd(scheme.m_c6, T, -W))
+    term2 = exp(C_L * (min_inner - scheme.m_c7^L_L))
+    numerator = max(scheme.m_c1, term1 + term2)
 
-    α = ifelse(
-        uₙ ≤ Uₜ,
-        muladd(uₙ * uₙ, muladd(c1, uₙ, c2), c3),
-        muladd(c4, uₙ - Uₜ, c5) # for uₙ > Uₜ, linear increase
-    )
-    return max(α, c_min)  # clamp to lower bound of Charnock parameter
+    # Denominator
+    term3 = exp(C_H * max(L_H, scheme.m_c8))
+    term4 = min(L_H, W)
+    denominator = term3 + term4
+
+    z₀ = exp(numerator / denominator + scheme.m_c9)
+
+    # Physical limits from IFS documentation
+    return clamp(z₀, scheme.momentum_roughness_min, scheme.momentum_roughness_max)  
 end
 
-"""Sea ice momentum roughness as defined for ECMWF's IFS model. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SeaIceMomentumRoughness{NF} <: AbstractParameterization
-    @param roughness_min::NF = 1.0e-3
-    @param c1::NF = 0.93e-3
-    @param c2::NF = 6.05e-3
-    @param c3::NF = -17
-    @param c4::NF = 0.5
-end
 
-Adapt.@adapt_structure SeaIceMomentumRoughness
-SeaIceMomentumRoughness(SG::SpectralGrid; kwargs...) = SeaIceMomentumRoughness{SG.NF}(; kwargs...)
+# Land heat roughness
+@inline function land_heat_roughness(
+        scheme::LearnedLandRoughness,
+        high_vegetation_cover::NF, 
+        low_vegetation_cover::NF,
+        high_vegetation_leaf_area::NF, 
+        low_vegetation_leaf_area::NF,
+        soil_temperature_bottom::NF, 
+        soil_moisture_bottom::NF
+    ) where {NF <: AbstractFloat}
+    
+    # From Munday et al. 2026, in prep.
+    C_H = high_vegetation_cover
+    C_L = low_vegetation_cover
+    L_H = high_vegetation_leaf_area
+    L_L = low_vegetation_leaf_area
+    T = soil_temperature_bottom
+    W = soil_moisture_bottom
 
-"""$(TYPEDSIGNATURES) Functor returning surface roughness over sea ice given sea ice concentration ℵ."""
-@inline function (R::SeaIceMomentumRoughness)(ℵ)
-    (; roughness_min, c1, c2, c3, c4) = R
-    roughness = c1 * (1 - ℵ) + c2 * exp(c3 * (ℵ - c4)^2)
-    return max(roughness, roughness_min)
-end
+    # Gamma
+    gamma_term1_num = (scheme.h_c1^scheme.h_c2) * min(C_H, L_H)
+    gamma_term1_den = (L_L + T)^scheme.h_c2
+    gamma_term1 = gamma_term1_num / gamma_term1_den + L_H
 
-"""Momentum roughness cap following Willett et al. (2026). Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct MaxOceanMomentumRoughness{NF} <: AbstractParameterization
-    "[OPTION] Roughness length cap (global maximum) [m]"
-    @param z₀_cap::NF = 6.74e-3
+    gamma_term2 = muladd(NF(2), C_H, scheme.h_c3)
+    Γ = max(gamma_term1, gamma_term2)
 
-    "[OPTION] Roughness length high (lower roughness for even higher winds) [m]"
-    @param z₀_high::NF = 1.3e-3
+    # Learned heat roughness
+    inner_min = min(C_L, L_L - W)
 
-    "[OPTION] Wind speed for maximum roughness length z₀_cap [m/s]"
-    @param uₙ_cap::NF = 33.0
+    arg1 = muladd(scheme.h_c5, Γ - scheme.h_c4 + C_L * inner_min, - (scheme.h_c6 * L_H))
+    arg2 = scheme.h_c8 * (scheme.h_c7^C_H)
+    z₀ = exp(min(arg1, arg2))
 
-    "[OPTION] Wind speed for high roughness length z₀_high [m/s]"
-    @param uₙ_high::NF = 55.0
-end
-
-Adapt.@adapt_structure MaxOceanMomentumRoughness
-MaxOceanMomentumRoughness(SG::SpectralGrid; kwargs...) = MaxOceanMomentumRoughness{SG.NF}(; kwargs...)
-
-"""$(TYPEDSIGNATURES) Momentum roughness cap following Willett et al. (2026) given surface wind speed uₙ."""
-@inline function (max_ocean_momentum_roughness::MaxOceanMomentumRoughness)(uₙ)
-    z₀_cap = max_ocean_momentum_roughness.z₀_cap
-    z₀_high = max_ocean_momentum_roughness.z₀_high
-    uₙ_cap = max_ocean_momentum_roughness.uₙ_cap
-    uₙ_high = max_ocean_momentum_roughness.uₙ_high
-
-    m = (z₀_high - z₀_cap) / (uₙ_high - uₙ_cap)
-    z₀_linear = muladd(m, uₙ - uₙ_cap, z₀_cap)
-
-    return max(z₀_high, min(z₀_linear, z₀_cap))
+    # Physical limits from IFS documentation
+    return clamp(z₀, scheme.heat_roughness_min, scheme.heat_roughness_max)  
 end
 
 export LearnedOceanRoughness
-
 
 """
     LearnedOceanRoughness
@@ -354,7 +427,7 @@ Predictors and parameters:
 
 Fields are $(TYPEDFIELDS)
 """
-@parameterized @kwdef struct LearnedOceanRoughness{NF, CH, SIMR, MOMR} <: AbstractSurfaceRoughness
+@parameterized @kwdef struct LearnedOceanRoughness{NF, CH, SIMR, MOMR} <: AbstractOceanRoughness
     "[OPTION] Heat-related constant (from IFS documentation)"
     a_h::NF = 0.4 
     
@@ -365,7 +438,7 @@ Fields are $(TYPEDFIELDS)
     a_ratio::NF = a_q / a_h
 
     "[OPTION] Charnock parameter estimation"
-    charnock_param::CH
+    charnock::CH
 
     "[OPTION] Sea-ice momentum_roughness"
     sea_ice_momentum_roughness::SIMR  # from IFS docs
@@ -396,122 +469,17 @@ end
 Adapt.@adapt_structure LearnedOceanRoughness
 function LearnedOceanRoughness(
         SG::SpectralGrid;
-        charnock_param = Charnock(SG),
+        charnock = Charnock(SG),
         sea_ice_momentum_roughness = SeaIceMomentumRoughness(SG),
         max_ocean_momentum_roughness = MaxOceanMomentumRoughness(SG),
         kwargs...
     )
-    CH, SIMR, MOMR = typeof(charnock_param), typeof(sea_ice_momentum_roughness), typeof(max_ocean_momentum_roughness)
+    CH, SIMR, MOMR = typeof(charnock), typeof(sea_ice_momentum_roughness), typeof(max_ocean_momentum_roughness)
     return LearnedOceanRoughness{SG.NF, CH, SIMR, MOMR}(;
-        charnock_param, sea_ice_momentum_roughness, max_ocean_momentum_roughness, kwargs...
+        charnock, sea_ice_momentum_roughness, max_ocean_momentum_roughness, kwargs...
     )
 end
 initialize!(::LearnedOceanRoughness, ::PrimitiveEquation) = nothing
-
-export LearnedOceanRoughness
-
-"""
-Combined learned surface roughness parameterization for momentum, heat
-and humidity fluxes over land and ocean.
-
-Land and ocean roughness lengths are calculated independently using
-LearnedLandRoughness and LearnedOceanRoughness, respectively.
-
-The grid-cell mean roughness length for each quantity X ∈ {M, H, Q}
-is obtained through area-weighted blending,
-
-    z₀X = f_land*z₀X_land + (1 - f_land)*z₀X_ocean
-
-where
-- f_land: Land fraction of the grid cell
-- z₀X_land: Learned land roughness length
-- z₀X_ocean: Learned ocean roughness length
-
-Fields are $(TYPEDFIELDS)
-"""
-@parameterized @kwdef struct LearnedSurfaceRoughness{LLR, LOR} <: AbstractSurfaceRoughness
-    "[OPTION] learned land surface roughness scheme"
-    @component land_surface_roughness::LLR
-
-    "[OPTION] learned ocean surface roughness scheme"
-    @component ocean_surface_roughness::LOR
-end
-
-Adapt.@adapt_structure LearnedSurfaceRoughness
-function LearnedSurfaceRoughness(
-        SG::SpectralGrid;
-        land_surface_roughness = LearnedLandRoughness(SG),
-        ocean_surface_roughness = LearnedOceanRoughness(SG),
-    )
-    return LearnedSurfaceRoughness(land_surface_roughness, ocean_surface_roughness)
-end
-
-function initialize!(LSR::LearnedSurfaceRoughness, model::PrimitiveEquation)
-    initialize!(LSR.land_surface_roughness, model)
-    initialize!(LSR.ocean_surface_roughness, model)
-    return nothing
-end
-
-# First land, then ocean, then combine!
-@propagate_inbounds function parameterization!(ij, vars, LSR::LearnedSurfaceRoughness, model)
-    surface_roughness!(ij, vars, LSR.land_surface_roughness, model.land_sea_mask)
-    surface_roughness!(ij, vars, LSR.ocean_surface_roughness, model)
-    surface_roughness!(ij, vars, LSR, model.land_sea_mask)
-    return nothing
-end
-
-@propagate_inbounds function surface_roughness!(ij, vars, LSR::LearnedSurfaceRoughness, land_sea_mask)
-    land_fraction = land_sea_mask.land_fraction[ij]
-    (; land, ocean) = vars.parameterizations
-
-    # Momentum roughness
-    vars.parameterizations.momentum_roughness[ij] = land_fraction * land.momentum_roughness[ij] +
-        (1 - land_fraction) * ocean.momentum_roughness[ij]
-
-    # Heat roughness
-    vars.parameterizations.heat_roughness[ij] = land_fraction * land.heat_roughness[ij] +
-        (1 - land_fraction) * ocean.heat_roughness[ij]
-
-    # Moisture roughness
-    vars.parameterizations.humidity_roughness[ij] = land_fraction * land.humidity_roughness[ij] +
-        (1 - land_fraction) * ocean.humidity_roughness[ij]
-    return nothing
-end
-
-@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedLandRoughness, land_sea_mask)
-    land_fraction = land_sea_mask.land_fraction[ij]
-    (; land) = vars.parameterizations
-
-    if land_fraction <= 0
-        zero_val = zero(land_fraction)
-        land.momentum_roughness[ij] = zero_val
-        land.heat_roughness[ij] = zero_val
-        land.humidity_roughness[ij] = zero_val
-        return nothing
-    end
-
-
-    # Unpack predictors, using defaults when optional fields are absent
-    (; land) = vars.parameterizations
-
-    vₕ = haskey(land, :high_vegetation_cover) ? land.high_vegetation_cover[ij] : zero(land_fraction)
-    vₗ = haskey(land, :low_vegetation_cover) ? land.low_vegetation_cover[ij] : zero(land_fraction)
-    laiₕ = haskey(land, :high_vegetation_leaf_area) ? land.high_vegetation_leaf_area[ij] : zero(land_fraction)
-    laiₗ = haskey(land, :low_vegetation_leaf_area) ? land.low_vegetation_leaf_area[ij] : zero(land_fraction)
-    sd = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(land_fraction)
-    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture[ij, end] : zero(land_fraction)
-    soil_temperature = haskey(vars.prognostic.land, :soil_temperature) ? vars.prognostic.land.soil_temperature[ij, end] : zero(land_fraction)
-
-    z₀M_land = land_momentum_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, sd, soil_temperature, soil_moisture)
-    z₀H_land = land_heat_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, soil_temperature, soil_moisture)
-
-    land.momentum_roughness[ij] = z₀M_land
-    land.heat_roughness[ij] = z₀H_land
-    land.humidity_roughness[ij] = z₀H_land # same as heat roughness over land
-
-    return nothing
-end
-
 
 @propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, model)
     (; ocean) = vars.parameterizations
@@ -533,7 +501,7 @@ end
 
     ts = time_stepper(model.time_stepping, :ocean)
     ℵ = haskey(progn_ocean, :sea_ice_concentration) ? get_prognostic_step(progn_ocean.sea_ice_concentration, ts, scheme)[ij] : zero(uₙ)
-    log_αᵪ = log(scheme.charnock_param(uₙ))
+    log_αᵪ = log(scheme.charnock(uₙ))
 
     z₀M_ocean = ocean_momentum_roughness(scheme, uₙ, log_αᵪ, ℵ)
     z₀H_ocean = ocean_heat_roughness(scheme, uₙ, ℵ)
@@ -561,87 +529,126 @@ end
     return muladd(ℵ, z_ice - z₀, z₀)
 end
 
-
 # Ocean heat roughness
 @inline function ocean_heat_roughness(scheme, uₙ::NF, ℵ::NF) where {NF <: AbstractFloat}
     z₀ = exp(scheme.h_c1 * (uₙ + scheme.h_c2)^scheme.h_c3 - exp(scheme.h_c4 / uₙ))
     return muladd(ℵ, scheme.sea_ice_heat_roughness - z₀, z₀)    # weight by sea-ice concentration
 end
 
+export Charnock
 
-# Land momentum roughness
-@inline function land_momentum_roughness(
-        scheme::LearnedLandRoughness, 
-        high_vegetation_cover::NF,
-        low_vegetation_cover::NF,
-        high_vegetation_leaf_area::NF,
-        low_vegetation_leaf_area::NF,
-        snow_depth::NF,
-        soil_temperature_bottom::NF,
-        soil_moisture_bottom::NF
-    ) where {NF <: AbstractFloat}
-    # From Munday et al. 2026, in prep.
-    C_H = high_vegetation_cover
-    C_L = low_vegetation_cover
-    L_H = high_vegetation_leaf_area
-    L_L = low_vegetation_leaf_area
-    S = snow_depth
-    T = soil_temperature_bottom
-    W = soil_moisture_bottom
+"""Wind-dependent Charnock parameterization using a piecewise polynomial
+function of neutral wind speed.
 
-    # Numerator
-    den1 = muladd(scheme.m_c2, C_H, -scheme.m_c3)
-    term1 = scheme.m_c4 * exp(S / den1)
-    min_inner = min(scheme.m_c5 * L_L, muladd(scheme.m_c6, T, -W))
-    term2 = exp(C_L * (min_inner - scheme.m_c7^L_L))
-    numerator = max(scheme.m_c1, term1 + term2)
+The Charnock parameter α is calculated as
 
-    # Denominator
-    term3 = exp(C_H * max(L_H, scheme.m_c8))
-    term4 = min(L_H, W)
-    denominator = term3 + term4
+    α = c1*uₙ^3 + c2*uₙ^2 + c3       for uₙ ≤ Uₜ
+    α = c4*(uₙ - Uₜ) + c5            for uₙ > Uₜ
 
-    z₀ = exp(numerator / denominator + scheme.m_c9)
+where
+- uₙ: Neutral wind speed [m/s]
+- Uₜ: Threshold wind speed [m/s]
+- c1 to c5: Fitted coefficients
 
-    # Physical limits from IFS documentation
-    return clamp(z₀, scheme.momentum_roughness_min, scheme.momentum_roughness_max)  
+The parameterization returns α, which is used as an input to
+the learned ocean momentum roughness parameterization. Its logarithm 
+is used as a predictor in the learned ocean momentum roughness parameterization.
+
+Fields are $(TYPEDFIELDS)
+"""
+@parameterized @kwdef struct Charnock{NF} <: AbstractRoughnessFunctor
+    "[OPTION] threshold wind speed [m/s] for Charnock parameterization"
+    Uₜ::NF = 7.0
+
+    "[OPTION] low wind cubic term coefficient"
+    c1::NF = 1.8449e-6
+
+    "[OPTION] low wind quadratic term coefficient"
+    c2::NF = 9.7104e-5
+
+    "[OPTION] low wind constant term coefficient"
+    c3::NF = 0.0075
+
+    "[OPTION] high wind linear term coefficient"
+    c4::NF = 0.0016
+
+    "[OPTION] high wind constant term coefficient"
+    c5::NF = 0.0129
+
+    "[OPTION] minimum Charnock parameter value"
+    charnock_min::NF = 1.0e-5
 end
 
+Adapt.@adapt_structure Charnock
+Charnock(SG::SpectralGrid; kwargs...) = Charnock{SG.NF}(; kwargs...)
 
-# Land heat roughness
-@inline function land_heat_roughness(
-        scheme::LearnedLandRoughness,
-        high_vegetation_cover::NF, 
-        low_vegetation_cover::NF,
-        high_vegetation_leaf_area::NF, 
-        low_vegetation_leaf_area::NF,
-        soil_temperature_bottom::NF, 
-        soil_moisture_bottom::NF
-    ) where {NF <: AbstractFloat}
-    
-    # From Munday et al. 2026, in prep.
-    C_H = high_vegetation_cover
-    C_L = low_vegetation_cover
-    L_H = high_vegetation_leaf_area
-    L_L = low_vegetation_leaf_area
-    T = soil_temperature_bottom
-    W = soil_moisture_bottom
+@inline function (charnock_param::Charnock{NF})(uₙ::T) where {NF, T <: Real}
+    Uₜ = T(charnock_param.Uₜ)
+    c1 = T(charnock_param.c1)
+    c2 = T(charnock_param.c2)
+    c3 = T(charnock_param.c3)
+    c4 = T(charnock_param.c4)
+    c5 = T(charnock_param.c5)
+    c_min = T(charnock_param.charnock_min)
 
-    # Gamma
-    gamma_term1_num = (scheme.h_c1^scheme.h_c2) * min(C_H, L_H)
-    gamma_term1_den = (L_L + T)^scheme.h_c2
-    gamma_term1 = gamma_term1_num / gamma_term1_den + L_H
+    α = ifelse(
+        uₙ ≤ Uₜ,
+        muladd(uₙ * uₙ, muladd(c1, uₙ, c2), c3),
+        muladd(c4, uₙ - Uₜ, c5)         # for uₙ > Uₜ, linear increase
+    )
+    return max(α, c_min)                # clamp to lower bound of Charnock parameter
+end
 
-    gamma_term2 = muladd(NF(2), C_H, scheme.h_c3)
-    Γ = max(gamma_term1, gamma_term2)
+export SeaIceMomentumRoughness
 
-    # Learned heat roughness
-    inner_min = min(C_L, L_L - W)
+"""Sea ice momentum roughness as defined for ECMWF's IFS model. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct SeaIceMomentumRoughness{NF} <: AbstractRoughnessFunctor
+    @param roughness_min::NF = 1.0e-3
+    @param c1::NF = 0.93e-3
+    @param c2::NF = 6.05e-3
+    @param c3::NF = -17
+    @param c4::NF = 0.5
+end
 
-    arg1 = muladd(scheme.h_c5, Γ - scheme.h_c4 + C_L * inner_min, - (scheme.h_c6 * L_H))
-    arg2 = scheme.h_c8 * (scheme.h_c7^C_H)
-    z₀ = exp(min(arg1, arg2))
+Adapt.@adapt_structure SeaIceMomentumRoughness
+SeaIceMomentumRoughness(SG::SpectralGrid; kwargs...) = SeaIceMomentumRoughness{SG.NF}(; kwargs...)
 
-    # Physical limits from IFS documentation
-    return clamp(z₀, scheme.heat_roughness_min, scheme.heat_roughness_max)  
+"""$(TYPEDSIGNATURES) Functor returning surface roughness over sea ice given sea ice concentration ℵ."""
+@inline function (R::SeaIceMomentumRoughness)(ℵ)
+    (; roughness_min, c1, c2, c3, c4) = R
+    roughness = c1 * (1 - ℵ) + c2 * exp(c3 * (ℵ - c4)^2)
+    return max(roughness, roughness_min)
+end
+
+export MaxOceanMomentumRoughness
+
+"""Momentum roughness cap following Willett et al. (2026). Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct MaxOceanMomentumRoughness{NF} <: AbstractRoughnessFunctor
+    "[OPTION] Roughness length cap (global maximum) [m]"
+    @param z₀_cap::NF = 6.74e-3
+
+    "[OPTION] Roughness length high (lower roughness for even higher winds) [m]"
+    @param z₀_high::NF = 1.3e-3
+
+    "[OPTION] Wind speed for maximum roughness length z₀_cap [m/s]"
+    @param uₙ_cap::NF = 33.0
+
+    "[OPTION] Wind speed for high roughness length z₀_high [m/s]"
+    @param uₙ_high::NF = 55.0
+end
+
+Adapt.@adapt_structure MaxOceanMomentumRoughness
+MaxOceanMomentumRoughness(SG::SpectralGrid; kwargs...) = MaxOceanMomentumRoughness{SG.NF}(; kwargs...)
+
+"""$(TYPEDSIGNATURES) Momentum roughness cap following Willett et al. (2026) given surface wind speed uₙ."""
+@inline function (max_ocean_momentum_roughness::MaxOceanMomentumRoughness)(uₙ)
+    z₀_cap = max_ocean_momentum_roughness.z₀_cap
+    z₀_high = max_ocean_momentum_roughness.z₀_high
+    uₙ_cap = max_ocean_momentum_roughness.uₙ_cap
+    uₙ_high = max_ocean_momentum_roughness.uₙ_high
+
+    m = (z₀_high - z₀_cap) / (uₙ_high - uₙ_cap)
+    z₀_linear = muladd(m, uₙ - uₙ_cap, z₀_cap)
+
+    return max(z₀_high, min(z₀_linear, z₀_cap))
 end

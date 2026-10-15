@@ -112,23 +112,17 @@ end
     scheme = LearnedOceanRoughness(spectral_grid)
 
     for uₙ in (1.0, 5.0, 10.0, 20.0, 40.0, 60.0)
-        α = log(scheme.charnock_param(uₙ))
+        α = log(scheme.charnock(uₙ))
 
         A = uₙ^scheme.m_c1
-        B = (
-            scheme.m_c3 * uₙ + α + exp(scheme.m_c2)
-        ) / (
-            exp(scheme.m_c4 * uₙ - scheme.m_c5) + scheme.m_c6
-        )
+        B = (scheme.m_c3 * uₙ + α + exp(scheme.m_c2)) / (exp(scheme.m_c4 * uₙ - scheme.m_c5) + scheme.m_c6)
         C = scheme.m_c7 * α - scheme.m_c8
 
         z₀_base = exp(A - B + C)
         z₀_max = scheme.max_ocean_momentum_roughness(uₙ)
         z₀_expected = min(z₀_base, z₀_max)
 
-        z₀_actual = SpeedyWeather.ocean_momentum_roughness(
-            scheme, uₙ, α, 0.0
-        )
+        z₀_actual = SpeedyWeather.ocean_momentum_roughness(scheme, uₙ, α, 0.0)
 
         @test z₀_actual ≈ z₀_expected
         @test isfinite(z₀_actual)
