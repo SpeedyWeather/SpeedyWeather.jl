@@ -39,6 +39,14 @@ end
 # also allow for tuples by splatting, similar to add!(::AbstractModel, ::Tuple)
 add!(output::AbstractOutput, tuple::Tuple) = add!(output, tuple...)
 
+# adding several tuples adds one after another
+function add!(output::AbstractOutput, tuples::Tuple...)
+    for tuple in tuples
+        add!(output, tuple)
+    end
+    return output
+end
+
 """$(TYPEDSIGNATURES)
 Delete output variables from `output` by their (short name) (Symbol or String), corresponding
 to the keys in the dictionary."""
