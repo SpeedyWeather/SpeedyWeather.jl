@@ -35,3 +35,8 @@ LowerTriangularArrays = {path = "../../LowerTriangularArrays"}
 RingGrids = {path = "../../RingGrids"}
 SpeedyWeather = {path = ".."}
 SpeedyWeatherInternals = {path = "../../SpeedyWeatherInternals"}
+
+[compat]
+# < 0.24.16: GeoMakie 0.7.17 extends Makie.timed_ticklabelspace_reset, which Makie 0.24.16 removed,
+# https://github.com/MakieOrg/GeoMakie.jl/issues/398
+Makie = "0.20 - 0.24.15"
