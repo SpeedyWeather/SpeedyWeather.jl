@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Update Zarr requirement from 0.9, 0.10 to 0.9, 0.10, 0.11 [#1309](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1309)
 - Update GPUArrays requirement from 11 to 11, 12.1 [#1308](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1308)
 - Restrict Makie compat to 0.24.15 due to bug in GeoMakie and Makie [#1311](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1311)
 - Update SpeedyWeatherAssets default version to v1.1 [#1303](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1303)
