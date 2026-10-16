@@ -3,6 +3,7 @@ module SpeedyWeatherReactantExt
 using SpeedyWeather
 using Reactant
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 using Dates
 
 using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, time_step!
@@ -20,7 +21,7 @@ const ReactantSimulation = Union{
 # in case they are not provided, they are compiled on the fly
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 
 Time-stepping function for a simulation with Reactant, take compiled functions as optional arguments.
 In case they are not provided, they are compiled on the fly.

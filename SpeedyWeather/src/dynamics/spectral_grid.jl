@@ -163,7 +163,7 @@ end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
 # and calculates all derived fields
-"""$(TYPEDSIGNATURES) 
+"""$(TypedMethodSignatures(defaults = true)) 
 Initialize a SpectralGrid from a given truncation and all [OPTION] parameters of SpectralGrid."""
 function SpectralGrid(;
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
@@ -201,7 +201,7 @@ function SpectralGrid(;
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Initialize a SpectralGrid from a given grid.
 """
 function SpectralGrid(
@@ -318,7 +318,7 @@ end
 # also allow spectral grid to be passed on as first and only positional argument to model constructors
 (M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(; spectral_grid = SG, kwargs...)
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct.
 `transform_batch` is forwarded as the list of FFT batch sizes K to pre-plan."""
 function (::Type{S})(

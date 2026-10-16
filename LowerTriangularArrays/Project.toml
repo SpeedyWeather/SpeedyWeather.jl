@@ -1,6 +1,6 @@
 name = "LowerTriangularArrays"
 uuid = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
-version = "0.1.6"
+version = "0.1.6+DEV"
 authors = ["LowerTriangularArrays contributors"]
 
 [deps]
@@ -25,7 +25,7 @@ LowerTriangularArraysReactantExt = "Reactant"
 
 [compat]
 Adapt = "4.3.0"
-DocStringExtensions = "0.9.5"
+DocStringExtensions = "0.10"
 FiniteDifferences = "0.12"
 GPUArrays = "11.2.3"
 KernelAbstractions = "0.9.38"

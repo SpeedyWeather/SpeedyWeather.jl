@@ -48,7 +48,7 @@ end
 Architectures.nonparametric_type(::Type{<:MatrixSpectralTransform}) = MatrixSpectralTransform
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Generator function for a MatrixSpectralTransform struct. With `NF` the number format,
 `Grid` the grid type `<:AbstractGrid` and spectral truncation `lmax, mmax` this function sets up
 necessary constants for the spectral transform using dense transformation matrices. Also precomputes
@@ -128,7 +128,7 @@ function MatrixSpectralTransform(
     )
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Compute the forward transform matrix `F` from grid to spectral space using the precomputed
 spectral transform `S`. The matrix is computed such that multiplying it by flattened grid
 data yields spectral coefficients. This function is not yet implemented."""
@@ -143,7 +143,7 @@ function forward_matrix!(F, S::AbstractSpectralTransform, field::AbstractField2D
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Compute the backward transform matrix `B` from spectral to grid space using the precomputed
 spectral transform `S`. The inverse transform maps complex spectral coefficients to real grid
 values via `field = Re(B * coeffs)`, so `B` is complex. Each column is determined by probing
@@ -217,7 +217,7 @@ function transform!(                        # GRID TO SPECTRAL
     return coeffs
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Spectral transform (spectral to grid space) from n-dimensional array `coeffs` of spherical harmonic
 coefficients to an n-dimensional array `field`. Uses precomputed dense transform matrices to perform
 the transformation. The spectral transform is number format-flexible but `field` and the spectral

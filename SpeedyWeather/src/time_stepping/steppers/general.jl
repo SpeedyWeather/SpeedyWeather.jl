@@ -4,7 +4,7 @@ one more step in the main time loop."""
 spin_up_steps(::AbstractTimeStepper) = 0
 default_time_step(L::AbstractTimeStepper) = L.Δt
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Computes the time step in [ms]. `Δt_at_T32` is always scaled with the resolution `truncation` 
 of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T32` is additionally 
 adjusted to the closest divisor of `interval` so that the output time axis is keeping
@@ -60,7 +60,7 @@ current `Δt` was adjusted to the output frequency (`adjust_with_output`) then t
 folded into the ratio. Pass the `model` to [`set!`](@ref) to use the exact factor instead."""
 resolution_factor(L::AbstractTimeStepper) = L.Δt / Second(L.Δt_at_T32).value
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Change the time step of timestepper `L` to `Δt` (unscaled) and disable adjustment to the output
 frequency. `set!` can be used before or after `initialize!(model)`: `Δt_at_T32` is the quantity
 `calculate_Δt!` derives the time step from, so it is back-computed here with `resolution_factor`

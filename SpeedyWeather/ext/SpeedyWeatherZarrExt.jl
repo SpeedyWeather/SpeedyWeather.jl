@@ -3,6 +3,7 @@ module SpeedyWeatherZarrExt
 using SpeedyWeather
 using Zarr
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 
 import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     AbstractSimulation, AbstractModel, Barotropic, OutputWriterCore,
@@ -28,7 +29,7 @@ default_zarr_compressor() = Zarr.BloscCompressor(clevel = DEFAULT_COMPRESSION_LE
 resolve_compressor(c) = c
 resolve_compressor(::Nothing) = default_zarr_compressor()
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Constructor for [`ZarrOutput`](@ref) (extension version, available once `Zarr.jl`
 is loaded). Behaves like the [`SpeedyWeather.NetCDFOutput`](@ref) constructor:
 builds the output grid, the interpolator, scratch fields and pre-fills the
@@ -374,7 +375,7 @@ function wait_for_ensemble_store(output::ZarrOutput, store_path::AbstractString)
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Helper: write a 1D coordinate array `data` to the Zarr group `g` under `name`.
 A single chunk is used since the coordinates are small."""
 function write_coordinate!(g::Zarr.ZGroup, name::AbstractString, data::AbstractVector; attrs = Dict())
@@ -397,7 +398,7 @@ custom output variables can define their own dimension in `define_dimension!`
 with one method for all output backends."""
 get_dimension_length(g::Zarr.ZGroup, name::String) = haskey(g, name) ? length(g[name]) : nothing
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Define a coordinate in the Zarr group `g`: a 1D array `name` with `values` and
 `attribs` as attributes, tagged with its own `_ARRAY_DIMENSIONS`. Zarr-store
 equivalent of `define_coordinate!(::NCDataset, ...)` so that custom output
@@ -406,7 +407,7 @@ method for all output backends."""
 define_coordinate!(g::Zarr.ZGroup, name::String, values::AbstractVector; attribs = Dict{String, String}()) =
     write_coordinate!(g, name, values; attrs = merge(Dict{String, Any}("_ARRAY_DIMENSIONS" => [name]), attribs))
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Define a Zarr array for output `var` in the Zarr group `g`. Shape and chunk
 shape are derived from `var.dims_xyzt` and the output grid; the time axis is
 pre-allocated to its final length `n_outputs`. Unwritten chunks read back as

@@ -20,7 +20,7 @@ function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform;
     end
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 (Forward) FFT, applied in zonal direction of `field` provided. Depending on
 the field's array type (CPU/GPU) the actual application of the FFT is slightly
 different because of strided array/view support of the GPU FFT libraries."""
@@ -50,7 +50,7 @@ end
 # GPU version without view
 @inline view_only_on_cpu(A::AbstractGPUArray, I...) = A[I...]
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 (Inverse) FFT, applied in zonal direction of `field` provided. Depending on
 the field's array type (CPU/GPU) the actual application of the FFT is slightly
 different because of strided array/view support of the GPU FFT libraries."""
@@ -209,7 +209,7 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     end
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Inverse fast Fourier transform (spectral to grid) of Legendre-transformed inputs `g_north` and `g_south`
 to be stored in `field`. Not to be called directly, use `transform!` instead."""
 function _fourier_batched!(                 # SPECTRAL TO GRID
@@ -249,7 +249,7 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     end
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 (Inverse) Fast Fourier transform (spectral to grid) of Legendre-transformed inputs `g_north` and `g_south`
 to be stored in `field`. Serial version that does not require the number of vertical layers to be the same
 as precomputed in `S`. Not to be called directly, use `transform!` instead."""

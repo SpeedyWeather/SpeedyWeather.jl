@@ -61,7 +61,7 @@ end
 
 variables(model::Barotropic) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
-"""($TYPEDSIGNATURES) All variables needed for the barotropic model itself (components excluded)."""
+"""$(TypedMethodSignatures(defaults = true)) All variables needed for the barotropic model itself (components excluded)."""
 function variables(::Type{<:Barotropic}, nsteps = DEFAULT_NSTEPS)
     pg = nsteps.prognostic_grid
     ps = nsteps.prognostic_spectral
@@ -90,7 +90,7 @@ function variables(::Type{<:Barotropic}, nsteps = DEFAULT_NSTEPS)
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Calls all `initialize!` functions for most fields, representing components, of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!`."""

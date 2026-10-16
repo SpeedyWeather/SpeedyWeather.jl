@@ -66,7 +66,7 @@ only allocates columns where this mask is `true`, so every Terrarium state field
 has length `sum(mask)` (the number of land columns)."""
 @inline land_mask(land::AbstractTerrariumLandModel) = land.model.grid.mask.data
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 
 Boolean land mask (`Field{Bool}`) derived from a SpeedyWeather [`AbstractLandSeaMask`](@ref):
 `true` wherever the fractional `land_fraction` exceeds `threshold`. Pass the result to
@@ -77,7 +77,7 @@ is required for consistent coupling (see [`check_mask_consistency`](@ref))."""
 land_mask(land_sea_mask::SpeedyWeather.AbstractLandSeaMask; threshold = 0) =
     land_sea_mask.land_fraction .> threshold
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 
 Convenience constructor building a Terrarium [`ColumnRingGrid`](@ref) directly from a
 SpeedyWeather [`AbstractLandSeaMask`](@ref), so the Terrarium land columns and the
@@ -198,7 +198,7 @@ struct TerrariumLand{
     ocean_moisture::NF
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 
 Construct a [`TerrariumLand`](@ref) from a Terrarium land model and a
 SpeedyWeather spectral grid."""

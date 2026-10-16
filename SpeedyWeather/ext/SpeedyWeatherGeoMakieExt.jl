@@ -3,6 +3,7 @@ module SpeedyWeatherGeoMakieExt
 using SpeedyWeather
 using GeoMakie
 using SpeedyWeather.DocStringExtensions
+using SpeedyWeather.DocStringExtensions: TypedMethodSignatures
 using SpeedyWeather.NCDatasets
 
 # Additional globe dispatches for Speedy types
@@ -10,7 +11,7 @@ RingGrids.globe(SG::SpectralGrid; kwargs...) = globe(SG.grid; kwargs...)
 RingGrids.globe(geometry::Geometry; kwargs...) = globe(geometry.grid; kwargs...)
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Create an animation from a SpeedyWeather simulation output file/store. Using 
 `GeoMakie.surface!` or `GeoMakie.heatmap!` or `GeoMakie.meshimage!` for plotting. Needs a backend like 
 CairoMakie or GtkMakie to be loaded at the time of calling this function.

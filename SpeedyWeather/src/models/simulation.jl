@@ -31,7 +31,7 @@ const DEFAULT_TIMESTEPS = -1    # -1 means unspecified = use the period kwarg
 
 export run!
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized."""
 function run!(
         simulation::AbstractSimulation;
@@ -48,7 +48,7 @@ end
 # fallback to be extended when UnicodePlots extension is loaded
 unicodeplot(x) = nothing
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Initializes a `simulation`. Scales the variables, initializes
 the output, stores initial conditions, initializes the progress meter feedback,
 callbacks and performs the first two initial time steps to spin up the

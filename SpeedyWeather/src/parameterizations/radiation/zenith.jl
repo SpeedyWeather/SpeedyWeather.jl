@@ -104,7 +104,7 @@ Adapt.@adapt_structure NoTimeCorrection
 NoTimeCorrection(::SpectralGrid; kwargs...) = NoTimeCorrection()
 (STC::NoTimeCorrection)(g) = zero(g)
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Chooses from SolarZenith (daily and seasonal cycle) or SolarZenithSeason
 given the parameters in model.planet. In both cases the seasonal cycle can
 be disabled, calculating the solar declination from the initial time
@@ -182,7 +182,7 @@ function year_angle(::Type{T}, time::DateTime) where {T}
     return T(2π) * T(seconds_of_year / seconds_in_year)
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Fraction of day in `time` as angle in radians [-π...π], noon to noon, at longitude `λ`.
 Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as constant.
 This is because `Dates` functions assume an Earth date. Length of the daily cycle is instead

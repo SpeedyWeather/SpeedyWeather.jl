@@ -226,7 +226,7 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Allocation-free, fused inverse (spectral → grid) batched Fourier loop: one gather kernel
 packs all rings from the scratch, per-ring in-place inverse FFTs run on reshaped views,
 one scatter kernel writes the grid field. `add` accumulates onto `field` instead of overwriting it

@@ -169,7 +169,7 @@ end
 
 Adapt.@adapt_structure LeapfrogCore
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(

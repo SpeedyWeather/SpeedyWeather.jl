@@ -138,7 +138,7 @@ end
 @inline Base.getindex(field::AbstractField, col::Colon, k...) = Field(field.data[col, k...], field.grid, field.dims[col, k...])
 
 # ITERATORS
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Return an iterator over the rings of a field. These are precomputed ranges like [1:20, 21:44, ...] stored
 in `field.grid.rings`. Every element are the unravellend indices `ij` of all 2D grid points that lie on that ring.
 Intended use is like
@@ -157,7 +157,7 @@ end
 
 eachring(field::AbstractField) = eachring(field.grid)
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 CartesianIndices for the 2nd to last dimension of a field (or fields),
 e.g. the vertical layer (and possibly a time dimension, etc). E.g. for a Nx2x3 field,
 with `N` horizontal grid points k iterates over (1, 1) to (2, 3), meaning both the 2nd 
@@ -182,7 +182,7 @@ end
 @inline eachlayer(array_field::AbstractArray{T, 2}, array_fields::AbstractArray{T, 2}...) where {T} = 1:size(array_field, 2)
 @inline eachlayer(array_field::AbstractArray{T, 3}) where {T} = CartesianIndices((size(array_field, 2), size(array_field, 3)))
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Iterator over all 2D grid points of a field (or fields), i.e. the horizontal dimension only.
 Intended use is like    
 
@@ -596,7 +596,7 @@ Base.extrema(F::AbstractField) = extrema(F.data)
 
 grids_match(A::AbstractField, Bs::AbstractField...) = grids_match(A.grid, (B.grid for B in Bs)...)
 
-"""$(TYPEDSIGNATURES) True if both `A` and `B` are of the same nonparametric grid type
+"""$(TypedMethodSignatures(defaults = true)) True if both `A` and `B` are of the same nonparametric grid type
 (e.g. OctahedralGaussianArray, regardless type parameter `T` or underyling array type `ArrayType`)
 and of same resolution (`nlat_half`) and total grid points (`length`). Sizes of `(4,)` and `(4,1)`
 would match for example, but `(8,1)` and `(4,2)` would not (`nlat_half` not identical)."""

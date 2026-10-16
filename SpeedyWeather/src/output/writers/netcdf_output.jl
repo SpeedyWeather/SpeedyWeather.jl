@@ -72,7 +72,7 @@ end
 dataset_type(::NetCDFOutput) = NCDataset
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
 the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument. In case a 
 non-default number of soil layers is used, it also needs the respective `nlayers_soil` to allocate those outputs.
@@ -247,7 +247,7 @@ Used by custom output variables to define their own dimension in
 get_dimension_length(dataset::NCDataset, name::String) =
     haskey(dataset.dim, name) ? dataset.dim[name] : nothing
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Define a coordinate in `dataset`: a dimension `name` of `length(values)` with
 `values` as its coordinate variable and `attribs` as its attributes.
 Used by custom output variables to define their own dimension in

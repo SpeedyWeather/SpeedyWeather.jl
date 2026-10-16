@@ -76,7 +76,7 @@ function Base.show(io::IO, σ::SigmaCoordinates)
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Vertical sigma coordinates defined by their half levels. Sigma coordinates are
 fraction of surface pressure (p/p0) and are sorted from top (stratosphere) to bottom (surface).
 The first half level is at 0 the last at 1. Default `profile` is equally spaced from 0 to 1 (including)."""
@@ -291,7 +291,7 @@ pressure-sigma transition, and is independent of surface pressure."""
 
 export CubicSigmaPressureCoordinates
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Transition function for `CubicSigmaPressureCoordinates`. Returns 0 (pure pressure) for
 σ ≤ `pressure_only_above`, 1 (pure sigma) for σ ≥ `σ_only_below`, and a cubic smoothstep in between, giving C¹
 continuity at both thresholds. The smoothstep coefficients 3 and 2 are fixed by the C¹
@@ -305,7 +305,7 @@ function cubic_transition(σ; pressure_only_above = 0.2, σ_only_below = 0.8)
     return t * t * (3 - 2t)
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Sigma-pressure coordinate with a cubic smoothstep transition: pure pressure levels near the
 top of the atmosphere (σ ≤ `pressure_only_above`), pure sigma levels near the surface (σ ≥ `σ_only_below`), and
 a cubic smoothstep transition in between. The thresholds and transition shape are a pragmatic
