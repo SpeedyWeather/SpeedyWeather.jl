@@ -192,9 +192,12 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
     return (progn_results, grid_results)
 end
 
-"""Run all correctness tests for a given model type."""
-function test_model(ModelType::Type; truncation = TRUNCATION, nsteps = NSTEPS, tolerances::NamedTuple = TOLERANCES, precompile = false)
-    model_name = string(ModelType)
+"""Run all correctness tests for a given model type, both models with a spectral transform of type `Transform`."""
+function test_model(
+        ModelType::Type; Transform = MatrixSpectralTransform, truncation = TRUNCATION, nsteps = NSTEPS,
+        tolerances::NamedTuple = TOLERANCES, precompile = false
+    )
+    model_name = "$ModelType with $(nameof(Transform))"
 
     println("="^60)
     println("$model_name: CPU vs Reactant Correctness Tests")
@@ -202,13 +205,13 @@ function test_model(ModelType::Type; truncation = TRUNCATION, nsteps = NSTEPS, t
 
     # Setup CPU model
     println("\n[1/3] Setting up CPU model...")
-    model_cpu = create_cpu_model(ModelType; truncation)
+    model_cpu = create_cpu_model(ModelType; truncation, Transform)
     simulation_cpu = initialize!(model_cpu)
     println("  ✓ CPU model initialized (T$(truncation - 1))")
 
     # Setup Reactant model
     println("\n[2/3] Setting up Reactant model...")
-    model_reactant = create_reactant_model(ModelType; truncation)
+    model_reactant = create_reactant_model(ModelType; truncation, Transform)
     simulation_reactant = initialize!(model_reactant)
     println("  ✓ Reactant model initialized")
 
@@ -247,3 +250,8 @@ test_model(BarotropicModel)
 test_model(ShallowWaterModel)
 test_model(PrimitiveDryModel)
 test_model(PrimitiveWetModel)
+
+# FFT-based SpectralTransform: single-layer variables (ShallowWater) and the batched multi-layer
+# transforms with all physics (PrimitiveWet); the BarotropicModel in differentation.jl
+test_model(BarotropicModel; Transform = SpectralTransform)
+test_model(PrimitiveWetModel; Transform = SpectralTransform)

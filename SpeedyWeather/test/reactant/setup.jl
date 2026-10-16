@@ -20,14 +20,14 @@ function model_kwargs(::Type{PrimitiveWetModel}, spectral_grid)
     return (; radiation, convection = nothing)
 end
 
-"""Create a model of the given type on architecture `arch`."""
-function create_model(ModelType::Type, arch; truncation = TRUNCATION, kwargs...)
+"""Create a model of the given type on architecture `arch` with a spectral transform of type `Transform`."""
+function create_model(ModelType::Type, arch; truncation = TRUNCATION, Transform = MatrixSpectralTransform, kwargs...)
     nlayers = nlayers_for_model(ModelType)
     spectral_grid = SpectralGrid(; architecture = arch, nlayers, truncation)
-    M = MatrixSpectralTransform(spectral_grid)
+    spectral_transform = Transform(spectral_grid)
     initial_conditions = InitialConditions(spectral_grid, ModelType)
     return ModelType(
-        spectral_grid; spectral_transform = M, feedback = nothing, initial_conditions,
+        spectral_grid; spectral_transform, feedback = nothing, initial_conditions,
         model_kwargs(ModelType, spectral_grid)..., kwargs...
     )
 end
