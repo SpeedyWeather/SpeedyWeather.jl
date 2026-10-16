@@ -315,6 +315,24 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
 end
 
 """$(TYPEDSIGNATURES)
+Generate the per-ring FFT plans for `architecture` from the arrays they will be applied to, see the
+method below. Architectures without plans (Reactant, XLA plans the FFTs of a compiled program
+itself) extend this."""
+function plan_FFTs(
+        architecture::AbstractArchitecture,
+        planned_K::AbstractVector{<:Integer},
+        ::Type{NF},
+        grid::AbstractGrid,
+        nlayers::Integer,
+        scratch_memory_north::AbstractArray,
+        rings,
+        nlons::Vector{<:Int},
+    ) where {NF}
+    fake_grid_data = on_architecture(architecture, zeros(NF, grid, nlayers))
+    return plan_FFTs(planned_K, fake_grid_data, scratch_memory_north, rings, nlons)
+end
+
+"""$(TYPEDSIGNATURES)
 Generate the per-ring FFT plans. FFTW/cuFFT plans bake the batch dim K into the plan at
 construction, so we build **separate, concretely-typed** plan sets (they are stored on `S` with
 concrete types so `plan * view` / `mul!` is a static call — see `SpectralTransform` fields):

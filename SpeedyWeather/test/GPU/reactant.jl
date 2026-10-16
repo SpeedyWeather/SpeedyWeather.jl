@@ -6,9 +6,10 @@ using Reactant, CUDA # we need CUDA even on other devices for the kernel raising
 
 Reactant.set_default_backend("gpu")
 
-@testset "Reactant GPU: PrimitiveWetModel steps without NaNs" begin
+# with both spectral transforms (the FFT-based one uses cuFFT through XLA on the GPU)
+@testset "Reactant GPU: PrimitiveWetModel with $Transform steps without NaNs" for Transform in (MatrixSpectralTransform, ) # SpectralTransform
     spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice())
-    spectral_transform = MatrixSpectralTransform(spectral_grid)
+    spectral_transform = Transform(spectral_grid)
     model = PrimitiveWetModel(spectral_grid; spectral_transform, feedback = nothing)
     simulation = initialize!(model)
     run!(simulation, steps = 10)

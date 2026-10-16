@@ -2,7 +2,8 @@
 # time steps in one traced loop (`time_steps!`) with its checkpointing options. Enzyme-MLIR can only differentiate KernelAbstractions kernels that are
 # raised to StableHLO, hence `raise = true`. The Reactant gradients are compared against Enzyme on
 # the CPU for the same state.
-# CI runs this for the BarotropicModel and, without the comparison against Enzyme on the CPU (too slow
+# CI runs this for the BarotropicModel (one time step with both the MatrixSpectralTransform and the
+# FFT-based SpectralTransform) and, without the comparison against Enzyme on the CPU (too slow
 # to compile), the gradient of several time steps of the PrimitiveWetModel; `differentiation_primitive_wet.jl`
 # uses the functions defined here for the full comparison of the PrimitiveWetModel.
 #
@@ -73,9 +74,9 @@ function gradient_vorticity_reactant(vars, model, n, options)
 end
 
 """CPU and Reactant simulations of `ModelType` in the same state, ready for one time step."""
-function differentiability_simulations(ModelType::Type; spinup_steps = 5)
-    simulation_cpu = initialize!(create_cpu_model(ModelType))
-    simulation_reactant = initialize!(create_reactant_model(ModelType))
+function differentiability_simulations(ModelType::Type; Transform = MatrixSpectralTransform, spinup_steps = 5)
+    simulation_cpu = initialize!(create_cpu_model(ModelType; Transform))
+    simulation_reactant = initialize!(create_reactant_model(ModelType; Transform))
 
     # spin up both (a simulation's first run differs), then the same state on both, scaled for the time step
     run!(simulation_cpu, steps = spinup_steps)
@@ -90,10 +91,13 @@ end
 """Test loss and gradient of one time step of `ModelType` with Reactant against Enzyme on the CPU.
 `compare_with_enzyme = false` skips the gradient with vanilla Enzyme on the CPU (slow to compile for the
 primitive equation models) and only checks that the Reactant gradient compiles and is finite and non-zero;
-the loss is always compared with the CPU."""
-function test_differentiability(ModelType::Type; compare_with_enzyme = true, rtol_loss = 1.0e-4, rtol_gradient = 1.0e-3)
-    return @testset "Differentiability with Reactant: $ModelType" begin
-        simulation_cpu, simulation_reactant = differentiability_simulations(ModelType)
+the loss is always compared with the CPU. Both models use a spectral transform of type `Transform`."""
+function test_differentiability(
+        ModelType::Type; Transform = MatrixSpectralTransform, compare_with_enzyme = true,
+        rtol_loss = 1.0e-4, rtol_gradient = 1.0e-3
+    )
+    return @testset "Differentiability with Reactant: $ModelType with $(nameof(Transform))" begin
+        simulation_cpu, simulation_reactant = differentiability_simulations(ModelType; Transform)
         vars_cpu, model_cpu = SpeedyWeather.unpack(simulation_cpu)
         vars_reactant, model_reactant = SpeedyWeather.unpack(simulation_reactant)
 
@@ -168,6 +172,7 @@ if !(@isdefined(DIFFERENTIATION_FUNCTIONS_ONLY) && DIFFERENTIATION_FUNCTIONS_ONL
     end
 
     test_differentiability(BarotropicModel)
+    test_differentiability(BarotropicModel; Transform = SpectralTransform)  # FFTs and batched Legendre
     test_differentiability_time_steps(BarotropicModel)
 
     # PrimitiveWetModel: only that the gradient of the traced loop compiles (and is finite), the comparison
