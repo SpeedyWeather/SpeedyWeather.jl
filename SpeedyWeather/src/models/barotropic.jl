@@ -84,8 +84,6 @@ function variables(::Type{<:Barotropic}, nsteps = DEFAULT_NSTEPS)
         GridVariable(:u, GridXYZT(pg), desc = "Zonal wind", units = "m/s", fuse = :uv_dpres_grad_grid),
         GridVariable(:v, GridXYZT(pg), desc = "Meridional wind", units = "m/s", fuse = :uv_dpres_grad_grid),
 
-        # a, b hold U, V = (u, v)*coslat in spectral space for the batched spec→grid transform to u, v,
-        # primitive equation models add ∇ln(pₛ) to both fuse groups (dpres_dx(_spec), dpres_dy(_spec))
         ScratchVariable(:a, SpectralXYZ(), desc = "Scratch array", units = "?", fuse = :uv_dpres_grad_spectral),
         ScratchVariable(:b, SpectralXYZ(), desc = "Scratch array", units = "?", fuse = :uv_dpres_grad_spectral),
     )
