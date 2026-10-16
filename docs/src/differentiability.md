@@ -73,7 +73,7 @@ as above), you can also run the model with [Reactant.jl](https://github.com/Enzy
 compiles. Enzyme then differentiates Reactant's intermediate representation (MLIR) instead of the
 Julia code. In contrast to vanilla Enzyme, this also works with Julia 1.12 and Julia 1.13.
 
-This needs a model created with the `ReactantDevice` architecture with a `MatrixSpectralTransform` currently (Reactant support for `SpectralTransform` will be added later):
+This needs a model created with the `ReactantDevice` architecture, with either the `MatrixSpectralTransform` (the default with Reactant) or the FFT-based `SpectralTransform`:
 
 ```julia
 using SpeedyWeather, Reactant, Enzyme
