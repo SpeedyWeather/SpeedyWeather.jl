@@ -978,19 +978,28 @@ The earlier drafts (call overhead, zero-size loop, complex `ifelse`, complex sto
 layout, raised dot precision) are still unposted too.
 
 The PrimitiveWet CI check passes (7/7) but takes 31 min on the loaded login node (three gradient
-compiles). Running when this was written (results are recorded in the multistep plan): the
-differentiation test file with the final API, and the `reactant-gpu` benchmarks on
-an H100 (Slurm job 2516570, suite 400 of 9 after 75 min, no errors so far; it overwrites the
-2026-10-14 `reactant-gpu` results in `SpeedyWeather/benchmark`, backups in
-`claude_reactant_gpu_2026-10-13/bench_0293/`).
+compiles); the whole `differentation.jl` in its final form passes (Barotropic 6/6 and 12/12,
+PrimitiveWet 7/7). The `reactant-gpu` benchmarks on an H100 were rerun (Slurm job 2516570, results
+in `SpeedyWeather/benchmark/README.md`, the 2026-10-14 ones backed up in
+`claude_reactant_gpu_2026-10-13/bench_0293/`): every SYPD row is faster, 1.2-4x per suite (T32L8
+16563 SYPD, 3.1x CUDA.jl on the same GPU), T86L24 now works, details in the multistep plan.
 
 Open items:
-1. Record the results of the runs above (CI cost of the PrimitiveWet check; whether T86L24 now works on
-   the H100, it failed in XLA's GPU codegen on 2026-10-14).
+1. The PrimitiveWet CI check costs ~30 min (three gradient compiles); reduce to one checkpointing
+   option if that is too much for CI.
 2. Post the upstream issues; remove the pattern exclusions once they are fixed.
 3. Commit the work (everything since `f5082066`).
 4. `disable_dot_formation_passes` (released in 0.2.293) is not used yet: evaluate it against the
    TF32 precision of raised reductions on GPUs.
+5. **GPU CI times out** (Buildkite CUDA job, `timeout_in_minutes: 40` incl. instantiate): the whole
+   GPU suite takes 39.2 min on the A40 here (`claude_reactant_gpu_2026-10-13/gpu_ci_2026-10-16/`,
+   timestamped log), of which `reactant.jl` 17.7 min (~3 min precompiling Reactant, 12.9 min testset:
+   two XLA programs, the 10-step loop program ~9 min to compile) and `output.jl` 5.3 min. The `@trace`
+   loop compiles as fast as the old single step (12.9-13.3 min before, 12.9-13.7 min now; H100
+   benchmark 192 vs 196 s); `XLA_FLAGS=--xla_gpu_autotune_level=0` doesn't help (13.8 min). Options:
+   own Buildkite step for `reactant.jl`, all output variables with one writer only in `output.jl`,
+   kernel-level checks instead of whole models in `vertical_integration.jl`, the second
+   `primitive_wet.jl` testset and the graph-cache test.
 
 Scripts and logs: `/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/` (see the multistep plan
 for which script does what; `run_reactant_tests_*.jl` run parts of `test/reactant` in
