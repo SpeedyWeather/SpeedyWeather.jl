@@ -102,21 +102,64 @@ and differentiate it with Enzyme in reverse mode, compiled with Reactant's `@jit
 
 ```julia
 dvars = make_zero(variables)
-@jit raise = true raise_first = true autodiff(Reverse, loss, Active, Duplicated(variables, dvars), Const(model))
+compile_options = SpeedyWeather.reactant_compile_options(; raise_first = true)
+@jit compile_options = compile_options autodiff(Reverse, loss, Active, Duplicated(variables, dvars), Const(model))
 ```
 
 `dvars.prognostic.vorticity` then holds the derivative of the loss with respect to the vorticity
-before the time step. The Reactant options `raise` and `raise_first` are required for the differentiation to work. They raise the KernelAbstractions kernels to StableHLO (as the remainder of model code):
+before the time step. `SpeedyWeather.reactant_compile_options()` are the options SpeedyWeather compiles
+all its programs with (`raise = true`: the KernelAbstractions kernels are raised to StableHLO as the
+remainder of the model code, and the optimization patterns in `SpeedyWeather.REACTANT_EXCLUDED_PASSES`
+excluded, see [GPU and Architectures](@ref)); the differentiation additionally needs `raise_first = true`.
+
+To differentiate through several time steps, use `SpeedyWeather.time_steps!`, which runs `n`
+time steps in one traced loop (so the compiled program contains the time step once, not `n`
+times). How the loop is differentiated is set with its keyword arguments (as Reactant's `@trace`):
+`checkpointing = false` (default) stores every time step for the reverse pass,
+`checkpointing = Reactant.Periodic(k)` stores `k` checkpoints and recomputes the time steps between
+them, and `checkpointing = Reactant.Binomial(budget)` uses binomial checkpointing with at most `budget`
+checkpoints; `mincut = true` (default) minimizes what is stored per time step
+
+```julia
+function loss(vars, model, n, checkpointing)
+    SpeedyWeather.time_steps!(Simulation(vars, model), n; checkpointing)
+    return sum(abs2, vars.prognostic.vorticity.data)
+end
+
+n = 24          # time steps
+checkpointing = Reactant.Periodic(4)
+initialize!(simulation, steps = n)
+dvars = make_zero(variables)
+compile_options = SpeedyWeather.reactant_compile_options(; raise_first = true,
+    excluded_passes = [SpeedyWeather.REACTANT_EXCLUDED_PASSES; "pad_concat_to_concat_pad"; "slice_pad"])
+@jit compile_options = compile_options autodiff(Reverse, loss, Active,
+    Duplicated(variables, dvars), Const(model), Const(n), Const(checkpointing))
+```
+
+!!! warning "Excluded optimization patterns"
+    Two bugs in Reactant's optimization and differentiation currently make the gradient of the traced
+    time loop abort Julia with `LLVM ERROR: Failed to infer result type(s)` (not a catchable error):
+    the `pad_concat_to_concat_pad` pattern hoists padding out of a concatenation incorrectly, and the
+    reverse rule of a strided `stablehlo.slice` (created by the `slice_pad` pattern) pads the adjoint one
+    element short. Until they are fixed upstream, exclude both patterns as above (`excluded_passes` is
+    only accepted through `compile_options`, not as a keyword of `@jit`); the gradient of one time step
+    (`time_step!`) works without them. Issue drafts with minimal examples are in
+    `docs/dev/2026-10/reactant-issue-draft-pad-concat.md` and
+    `reactant-issue-draft-strided-slice-adjoint.md`. Also note that Reactant unrolls traced loops of at
+    most 4 iterations, so the checkpointing options only take effect for `n > 4`, and that
+    `mincut = false` currently doesn't finish compiling the gradient of the loop (it is untested).
 
 !!! note "Precision on GPUs"
     On NVIDIA GPUs with TF32 support (e.g. A40, A100, H100) XLA runs Float32 matrix products in TF32
     by default, which changes the results (and gradients) considerably. For gradients in Float32
     precision see [Precision of matrix products on GPUs](@ref).
 
-The gradients with Reactant are compared to vanilla Enzyme on the CPU for the same state:
+The gradients with Reactant (of one time step, and of several time steps with each of the
+checkpointing options above) are compared to vanilla Enzyme on the CPU for the same state:
 in our CI for the `BarotropicModel` (`SpeedyWeather/test/reactant/differentation.jl`) and,
 as this is too slow for the CI, for the `PrimitiveWetModel` with the script
-`SpeedyWeather/test/reactant/differentiation_primitive_wet.jl`. Note that this comparison needs Julia 1.10 or 1.11 because of vanilla Enzyme, the differentiation with Reactant itself doesn't.
+`SpeedyWeather/test/reactant/differentiation_primitive_wet.jl` (the CI only checks that the gradient of
+several time steps of the `PrimitiveWetModel` compiles and is finite). Note that this comparison needs Julia 1.10 or 1.11 because of vanilla Enzyme, the differentiation with Reactant itself doesn't.
 
 ## Correctness 
 
