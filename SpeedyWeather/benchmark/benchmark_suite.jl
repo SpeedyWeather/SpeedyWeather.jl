@@ -69,6 +69,16 @@ default_nlayers(::Type{<:ShallowWater}) = 1
 default_nlayers(::Type{<:PrimitiveEquation}) = 8
 default_nlayers(models) = [default_nlayers(model) for model in models]
 
+# A copy of `suite` restricted to the runs `indices`, e.g. the subset of the debug mode
+function select_runs(suite::BenchmarkSuite, indices::AbstractVector{<:Integer})
+    names = filter(!=(:nruns), fieldnames(BenchmarkSuite))
+    values = map(names) do name
+        value = getfield(suite, name)
+        value isa AbstractVector ? value[indices] : value
+    end
+    return BenchmarkSuite(; nruns = length(indices), NamedTuple{names}(values)...)
+end
+
 # Number of timesteps for a timed run, chosen so every simulation takes a few
 # seconds. The step count is clamped between a floor and a ceiling:
 # `multiplier` scales the (clamped) result — pass e.g. `10` for longer,

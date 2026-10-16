@@ -351,6 +351,14 @@ in that file serve as the baseline. When running benchmarks, compare new results
 the existing README.md values: deviations of +/- 20% are normal and acceptable, but
 larger regressions should be reported to the user.
 
+For a quick check whether performance regressed, `manual_benchmarking.jl --debug` runs only
+the PrimitiveWet resolution sweep with 8 layers up to T128 and does not touch the stored results.
+`julia SpeedyWeather/benchmark/regression/regression.jl check` runs it on main, the latest
+release and the latest benchmarked revision and compares them (also run weekly by
+`.github/workflows/benchmark_regression.yml`; the `benchmark-regression` skill builds on it).
+Labelling a PR `benchmark-performance` runs it on the PR merged into main vs main on every push
+(`.github/workflows/benchmark_pr.yml`), and `benchmark_pr_comment.yml` posts the report on the PR.
+
 ## Code Style
 
 * The project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for formatting.

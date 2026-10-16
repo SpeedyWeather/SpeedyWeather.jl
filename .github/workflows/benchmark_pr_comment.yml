@@ -1,0 +1,60 @@
+name: Benchmark PR comment
+
+# Posts the report of benchmark_pr.yml on its pull request, updating the previous one. This runs the
+# workflow of main with write access, triggered when the benchmark finished, and never executes code
+# of the PR; the report is only read as text.
+
+on:
+  workflow_run:
+    workflows: [Benchmark PR]
+    types: [completed]
+
+jobs:
+  comment:
+    name: Comment on PR
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read         # download the report of the benchmark run
+      pull-requests: write
+    steps:
+      # no report if the benchmark was skipped (PR not labelled) or failed before writing it
+      - name: Download report
+        id: download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          if gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name benchmark-pr --dir benchmark-pr; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment report
+        if: steps.download.outputs.found == 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require("fs");
+            const pr = Number(fs.readFileSync("benchmark-pr/pr_number", "utf8").trim());
+            if (!Number.isInteger(pr) || pr <= 0) throw new Error("invalid PR number in the report");
+
+            // the report comes from a run of the PR's code: only post it on the PR that was benchmarked
+            const { data: pull } = await github.rest.pulls.get({ ...context.repo, pull_number: pr });
+            if (pull.head.sha !== context.payload.workflow_run.head_sha) {
+              core.notice(`#${pr} is not at the benchmarked commit (anymore), not commenting`);
+              return;
+            }
+
+            const marker = "<!-- benchmark-pr-comment -->";
+            const body = `${marker}\n${fs.readFileSync("benchmark-pr/comment.md", "utf8")}`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo, issue_number: pr, per_page: 100,
+            });
+            const existing = comments.find((c) => c.user?.type === "Bot" && c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: pr, body });
+            }

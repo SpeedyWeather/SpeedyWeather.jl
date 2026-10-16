@@ -28,9 +28,13 @@ julia --project=. manual_benchmarking.jl gpu            # CUDA GPU
 julia --project=. manual_benchmarking.jl amdgpu         # AMDGPU (HIP graphs forced on)
 julia --project=. manual_benchmarking.jl reactant-cpu   # Reactant on CPU
 julia --project=. manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU
+julia --project=. manual_benchmarking.jl --debug        # quick regression check: PrimitiveWet, L8, T ≤ 128, not stored
+julia regression/regression.jl check                   # debug mode on main, latest release and latest benchmarked revision
 ```
 
 Each run updates only its own architecture's section in this `README.md`; results for other architectures are preserved via `benchmark_results.json`.
+
+A pull request labelled `benchmark-performance` is benchmarked against main with the same debug mode on every push, and the comparison is posted as a comment.
 
 ## Overview: PrimitiveWet resolution across architectures
 

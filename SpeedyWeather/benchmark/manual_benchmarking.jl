@@ -15,6 +15,15 @@ An optional second argument multiplies the number of timesteps per timed run
 
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl gpu 10         # 10× longer timed runs
 
+Debug mode (`--debug`, anywhere in the arguments) is a quick check whether the
+performance has regressed: it only runs the PrimitiveWet resolution sweep
+(`:benchmark201`) with 8 layers up to truncation 128, prints the results and leaves the
+`README.md` and `assets/benchmark_results.json` untouched. With `--output=FILE`
+the results are additionally written to FILE as JSON, e.g. to compare revisions
+
+    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl --debug
+    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl gpu --debug --output=main.json
+
 The CPU label is auto-derived from `Sys.ARCH` (`cpu-arm` for aarch64/arm64,
 `cpu-x86` otherwise). GPU runs require a CUDA-capable device — `using CUDA`
 is loaded automatically. `amdgpu` runs require a ROCm-capable device —
@@ -35,11 +44,29 @@ overview table of the PrimitiveWet resolution sweep. The docs page
 and additionally renders comparison figures — see `docs/make.jl`.
 =#
 
+# Flags (`--debug`, `--output=FILE`) may appear anywhere, the remaining positional
+# arguments are the architecture and the timestep multiplier
+const FLAGS = filter(startswith("--"), ARGS)
+const POSITIONAL_ARGS = filter(!startswith("--"), ARGS)
+const DEBUG_MODE = "--debug" in FLAGS
+const DEBUG_MAX_TRUNCATION = 128
+const DEBUG_NLAYERS = 8
+
+# resolve before the `cd` below so that a relative path is relative to the caller's directory
+const OUTPUT_PATH = let i = findfirst(startswith("--output="), FLAGS)
+    isnothing(i) ? nothing : abspath(chopprefix(FLAGS[i], "--output="))
+end
+
+let unknown_flags = filter(flag -> flag != "--debug" && !startswith(flag, "--output="), FLAGS)
+    isempty(unknown_flags) || error("Unknown flag(s) $(join(unknown_flags, ", ")). Use --debug and --output=FILE.")
+end
+isnothing(OUTPUT_PATH) || DEBUG_MODE || error("--output=FILE is only supported together with --debug.")
+
 import Pkg
 cd(@__DIR__)
 Pkg.activate(".")
 
-const ARCH_ARG = length(ARGS) >= 1 ? lowercase(ARGS[1]) : ""
+const ARCH_ARG = length(POSITIONAL_ARGS) >= 1 ? lowercase(POSITIONAL_ARGS[1]) : ""
 
 # Conditionally load backend packages BEFORE `using SpeedyWeather` so that
 # SpeedyWeather's extensions register the right array types and overloads.
@@ -85,7 +112,7 @@ const ARCH, ARCH_LABEL = pick_architecture(ARCH_ARG)
 # Optional second argument: a multiplier on the number of timesteps per timed run.
 # Lengthens every run for more robust (e.g. publication-ready) timings; defaults
 # to 1. Example: `julia manual_benchmarking.jl gpu 10`.
-const TIMESTEP_MULTIPLIER = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 1.0
+const TIMESTEP_MULTIPLIER = length(POSITIONAL_ARGS) >= 2 ? parse(Float64, POSITIONAL_ARGS[2]) : 1.0
 TIMESTEP_MULTIPLIER > 0 || error("timestep multiplier must be > 0, got $TIMESTEP_MULTIPLIER")
 @info "Timestep multiplier: $TIMESTEP_MULTIPLIER"
 
@@ -94,6 +121,16 @@ free_memory!() = SpeedyWeather.SpeedyTransforms.clear_fourier_graph_cache!(ARCH)
 
 include("benchmark_suite.jl")
 include("define_benchmarks.jl")
+
+if DEBUG_MODE
+    resolution_suite = benchmarks[:benchmark201]
+    debug_runs = findall(
+        i -> resolution_suite.truncation[i] <= DEBUG_MAX_TRUNCATION && resolution_suite.nlayers[i] == DEBUG_NLAYERS,
+        1:resolution_suite.nruns,
+    )
+    benchmarks = Dict{Symbol, AbstractBenchmarkSuite}(:benchmark201 => select_runs(resolution_suite, debug_runs))
+    @info "Debug mode: running only :benchmark201 with L = $DEBUG_NLAYERS, T ≤ $DEBUG_MAX_TRUNCATION ($(length(debug_runs)) runs)"
+end
 
 for suite in values(benchmarks)
     suite.architecture = ARCH
@@ -181,6 +218,29 @@ arch_record = Dict(
     "overview" => overview_data(),
 )
 
+# Debug mode: print the results and write them to `--output` (if given) to compare
+# revisions, but leave benchmark_results.json and README.md untouched
+if DEBUG_MODE
+    print(arch_record["markdown"])
+    if !isnothing(OUTPUT_PATH)
+        meta = arch_record["meta"] = Dict{String, Any}(arch_record["meta"])
+        meta["arch_label"] = ARCH_LABEL
+        meta["debug_max_truncation"] = DEBUG_MAX_TRUNCATION
+        meta["debug_nlayers"] = DEBUG_NLAYERS
+        meta["timestep_multiplier"] = TIMESTEP_MULTIPLIER
+        # where the monorepo packages were loaded from, to verify the benchmarked revision
+        meta["package_dirs"] = Dict(
+            string(name) => pkgdir(getfield(SpeedyWeather, name))
+                for name in (:SpeedyWeather, :SpeedyWeatherInternals, :LowerTriangularArrays, :RingGrids, :SpeedyTransforms)
+                if isdefined(SpeedyWeather, name)
+        )
+        mkpath(dirname(OUTPUT_PATH))
+        open(io -> JSON3.pretty(io, arch_record), OUTPUT_PATH, "w")
+        @info "Wrote debug results → $OUTPUT_PATH"
+    end
+    exit()
+end
+
 # Merge into the JSON store
 
 const ASSETS_DIR = joinpath(@__DIR__, "assets")
@@ -251,8 +311,11 @@ function write_preamble(md)
     write(md, "julia --project=. manual_benchmarking.jl amdgpu         # AMDGPU (HIP graphs forced on)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-cpu   # Reactant on CPU\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU\n")
+    write(md, "julia --project=. manual_benchmarking.jl --debug        # quick regression check: PrimitiveWet, L$DEBUG_NLAYERS, T ≤ $DEBUG_MAX_TRUNCATION, not stored\n")
+    write(md, "julia regression/regression.jl check                   # debug mode on main, latest release and latest benchmarked revision\n")
     write(md, "```\n\n")
     write(md, "Each run updates only its own architecture's section in this `README.md`; results for other architectures are preserved via `benchmark_results.json`.\n\n")
+    write(md, "A pull request labelled `benchmark-performance` is benchmarked against main with the same debug mode on every push, and the comparison is posted as a comment.\n\n")
     return
 end
 
