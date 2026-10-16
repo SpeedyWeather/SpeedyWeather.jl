@@ -1,6 +1,6 @@
 # Full Reactant compatibility incl. the primitive equation models
 
-> Status: **in progress**. See "Handoff 2026-10-14" first. All models run on Reactant with `raise = true` (now the default): the CPU-backend test suite passes, and on CUDA the PrimitiveWetModel runs a standard script without NaNs, matching the CPU to ~1e-4 for 10 steps. Needs the upcoming Reactant release with `Reactant_jll` >= 0.0.419. See "Handoff 2026-10-13" and the evening update below it for open items.
+> Status: **in progress**. See "Handoff 2026-10-16" first. All models run on Reactant 0.2.293 (`raise = true`, central compile options), on the CPU backend and on CUDA; the time loop is one compiled program per output interval and can be differentiated through several time steps. Everything since f5082066 is uncommitted; three upstream Reactant issues are drafted, not posted.
 
 Date of initial draft: 2026-10-12
 
@@ -929,16 +929,86 @@ Scripts and logs: `/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/`
 `alias_clock_perf.jl`, `multistep_perf.jl`, `submit_*.sh`, `*-24xxxxx.log`). Clean timings need a
 compute node (login node load averages up to 65 make host-bound timings meaningless).
 
+## Handoff 2026-10-16
+
+State on 2026-10-16. Everything since the last commit (`f5082066`) is uncommitted. The details of the work
+since 2026-10-14 are in `2026-10-14-reactant-multistep-time-stepping.md` (implementation plan with the
+logs of 2026-10-15/16), read that next.
+
+Done since 2026-10-14:
+- **Reactant 0.2.293** (Reactant_jll 0.0.421): compat `Reactant = "0.2.293"` in LowerTriangularArrays,
+  RingGrids, SpeedyWeatherInternals and SpeedyWeather. The gitignored benchmark manifest was regenerated
+  (it pinned 0.2.292 / jll 0.0.418 and couldn't be updated in place).
+- **Several time steps per compiled program**: `time_steps!(simulation, n; checkpointing = false,
+  mincut = true)` runs `n` steps in one `@trace` loop; `time_stepping!` compiles one program for the
+  steps between two outputs and one program for the whole run without output; feedback (progress, NaN
+  check) per program. (An `AutomaticDifferentiation` options struct was added and removed again: the
+  keywords go straight to `@trace`.)
+- **Central compile options**: `SpeedyWeather.reactant_compile_options(; kwargs...)` (=
+  `Reactant.CompileOptions(; raise = true, excluded_passes = REACTANT_EXCLUDED_PASSES, kwargs...)`) with
+  `SpeedyWeather.REACTANT_EXCLUDED_PASSES = ["concat_view_cse"]`, used by `@maybe_jit`, `time_stepping!`,
+  the tests and the benchmark runner. `concat_view_cse` (new in 0.2.293) doesn't terminate on several of
+  our programs (`run!` of every ShallowWaterModel hung in `initialize!`).
+- **Output with Reactant**: views of concrete arrays are transferred as their parent and copied out on
+  the host, the mean sea level pressure is computed on the output's architecture
+  (`on_output_architecture`), ~0.65 s → a few ms per snapshot.
+- **Differentiation through the time loop** works with `excluded_passes = [REACTANT_EXCLUDED_PASSES;
+  "pad_concat_to_concat_pad"; "slice_pad"]` and `raise_first = true` (two Enzyme-JAX bugs, see below):
+  BarotropicModel gradients of 4 and 6 steps agree with vanilla Enzyme on the CPU to 2e-7 to 6e-7
+  without checkpointing and with `Reactant.Periodic(2)` / `Reactant.Binomial(2)`, 2e-4 on the A40 (TF32).
+  `mincut = false` doesn't finish compiling when the loop is a `stablehlo.while`; Reactant unrolls loops
+  of at most 4 iterations, so the tests use `n = 6`.
+- **Tests**: `test_time_steps.jl` (new), `differentation.jl` with the loop gradients and a
+  `compare_with_enzyme` keyword; CI additionally checks that the PrimitiveWetModel loop gradient compiles
+  (`compare_with_enzyme = false`, vanilla Enzyme of the primitive equations takes too long for CI).
+- **Verification on 0.2.293** (CPU backend, before the last API cleanups): the whole `test/reactant`
+  suite passed in two parts (109/109 and 96/96); `test/GPU/reactant.jl` (PrimitiveWet standard script,
+  A40) 5/5. After the `on_output_architecture` cleanup: `utilities.jl` + `test_output.jl` 49/49.
+
+Upstream issues, drafted in this folder, not posted:
+1. `reactant-issue-draft-pad-concat.md` (+ MWE): `pad_concat_to_concat_pad` hoists the padding out of a
+   concatenation also along the concatenation dimension and drops elements. Also in 0.2.292.
+2. `reactant-issue-draft-strided-slice-adjoint.md` (+ MWE): the reverse rule of a strided
+   `stablehlo.slice` pads the adjoint as `dim - limit`, one short when the limit isn't tight; the loose
+   limits come from `GatherOpCanon` (`limit = start + count * stride`, a one-line fix). Also in 0.2.292.
+3. `reactant-issue-draft-concat-view-cse-hang.md` (+ MWE): a 0.2.293 regression; the cycle is
+   `concat_view_cse` + `broadcast_to_reshape` + `reshape_concat` (minimized by delta debugging), a
+   7-op StableHLO module reproduces it.
+The earlier drafts (call overhead, zero-size loop, complex `ifelse`, complex store, kernel operand
+layout, raised dot precision) are still unposted too.
+
+The PrimitiveWet CI check passes (7/7) but takes 31 min on the loaded login node (three gradient
+compiles). Running when this was written (results are recorded in the multistep plan): the
+differentiation test file with the final API, and the `reactant-gpu` benchmarks on
+an H100 (Slurm job 2516570, suite 400 of 9 after 75 min, no errors so far; it overwrites the
+2026-10-14 `reactant-gpu` results in `SpeedyWeather/benchmark`, backups in
+`claude_reactant_gpu_2026-10-13/bench_0293/`).
+
+Open items:
+1. Record the results of the runs above (CI cost of the PrimitiveWet check; whether T86L24 now works on
+   the H100, it failed in XLA's GPU codegen on 2026-10-14).
+2. Post the upstream issues; remove the pattern exclusions once they are fixed.
+3. Commit the work (everything since `f5082066`).
+4. `disable_dot_formation_passes` (released in 0.2.293) is not used yet: evaluate it against the
+   TF32 precision of raised reductions on GPUs.
+
+Scripts and logs: `/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/` (see the multistep plan
+for which script does what; `run_reactant_tests_*.jl` run parts of `test/reactant` in
+`env_reactant_0293`).
+
 ## Known limitations
 
-- Reactant on GPU (CUDA) is not tested in this PR, `SpeedyWeather/test/GPU/reactant.jl` is still
-  not included in the GPU test suite.
 - Particles are not supported on Reactant.
-- Differentiation with Reactant (Enzyme reverse mode, kernels raised to StableHLO) needs
-  `Reactant_jll` >= 0.0.419 (raising kernels that store complex constants, Reactant.jl#3450). With it,
-  the loss and gradient of a `BarotropicModel` time step agree with Enzyme on the CPU
-  (`test/reactant/differentation.jl`, now `@test` instead of `@test_broken`). ShallowWater and
-  primitive equation models are untested.
+- All compilations exclude Reactant's `concat_view_cse` pattern (`REACTANT_EXCLUDED_PASSES`), a
+  0.2.293 regression that doesn't terminate on our programs.
+- Differentiation with Reactant needs `raise_first = true` and two more pattern exclusions
+  (`pad_concat_to_concat_pad`, `slice_pad`) for Enzyme-JAX bugs. It is verified against vanilla Enzyme
+  on the CPU for the BarotropicModel (one step, and several steps with each checkpointing option) and
+  for one step of the PrimitiveWetModel (`differentiation_primitive_wet.jl`, 2026-10-14); the
+  PrimitiveWet loop gradient is only checked to compile and be finite. ShallowWater and PrimitiveDry
+  are untested. `mincut = false` doesn't compile for loops of more than 4 steps.
+- On NVIDIA GPUs with TF32 the raised matrix products run in TF32 unless disabled (see the docs,
+  "Precision of matrix products on GPUs").
 - The prescribed seasonal climatologies (e.g. `SeasonalOceanClimatology`) are untested inside
   the compiled time step.
 
@@ -946,11 +1016,9 @@ compute node (login node load averages up to 65 make host-bound timings meaningl
 
 - Move the `# TODO: move upstream to Reactant` fixes into Reactant, remove the `inv` and `extrema`
   workarounds once Reactant.jl#2560 and #2387 are fixed.
-- Re-enable `@trace` for the time loop (checkpointing) in `time_stepping!`.
-- On Reactant the implicit operators are recomputed every time step (`reinitialize!`, kept for now):
-  about 0.5 ms per step (PrimitiveDry T31L8 7.3 vs 6.7 ms, T63L16 within noise) and ~8 s compile
-  time, although the time step only changes in the first steps (Leapfrog: Δt/2, Δt, 2Δt).
-  Alternatives: a `@trace if` that only captures arrays (failed when it traced the model), or
-  reinitializing outside the compiled time step during the spin-up steps in `time_stepping!`.
+- On Reactant the implicit operators are recomputed every time step (`reinitialize!`): ~0.5 ms per
+  step and ~8 s compile time, although Δt only changes in the spin-up steps. With the spin-up steps
+  already outside the compiled loop (`time_stepping!`), initializing them once for the constant Δt of
+  the loop is the next step (multistep plan, "Future work").
 - Tighten the tolerances of the correctness tests, differences are orders of magnitude smaller
   than the current tolerances.
