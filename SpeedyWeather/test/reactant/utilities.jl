@@ -49,4 +49,12 @@ end
     fill!(copied.parent, 0)
     @test all(iszero, Array(copied.view))
     @test Array(x) == Float32[1, 3, 3, 3, 1, 1]     # original untouched
+
+    # to the CPU: the parent is transferred and the view copied out on the host (instead of compiling
+    # a program that materializes the view on the device on every call)
+    y = Reactant.to_rarray(reshape(Float32.(1:24), 4, 3, 2))
+    w = view(y, :, 2:3, :)
+    w_cpu = on_architecture(SpeedyWeather.CPU(), w)
+    @test w_cpu isa Array{Float32, 3}
+    @test w_cpu == Array(w)
 end

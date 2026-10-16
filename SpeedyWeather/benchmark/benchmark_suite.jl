@@ -94,9 +94,9 @@ n_timesteps(truncation, nlayers, multiplier = 1) =
 # included by the driver once Reactant is loaded).
 
 """Return `(; time_stepping, compile_time)` where `time_stepping(simulation)` runs the main
-time loop of an initialized `simulation`. `compile_time` is the time it took to compile the
-time step (Reactant only, NaN otherwise), which is not included in the timed run."""
-build_runner(arch, simulation) = (time_stepping = SpeedyWeather.time_stepping!, compile_time = NaN)
+time loop of an initialized `simulation` for the timed `period`. `compile_time` is the time it took
+to compile the time loop (Reactant only, NaN otherwise), which is not included in the timed run."""
+build_runner(arch, simulation, period) = (time_stepping = SpeedyWeather.time_stepping!, compile_time = NaN)
 
 """Wait for the device to have finished all work on `simulation`."""
 synchronize_device(arch, simulation) = synchronize(arch)
@@ -190,12 +190,12 @@ function run_benchmark!(suite::BenchmarkSuite, i::Integer)
     # (e.g. the model compiled first appears slower than a later one that
     # reuses the compiled code). A handful of steps covers the Euler spin-up
     # plus regular steps. We then re-initialize so the timed run starts from
-    # the same initial state as before. With Reactant the time step is compiled
-    # once here (timed separately) and reused for the timed run.
+    # the same initial state as before. With Reactant the whole time loop of the
+    # timed run is compiled once here (timed separately), warmed up and reused.
     # (`initialize!`, `time_stepping!`, `finalize!` is what `run!` does)
     warmup_period = Second(round(Int, model.time_stepping.Δt * 3))
     initialize!(simulation; period = warmup_period)
-    runner = build_runner(architecture, simulation)
+    runner = build_runner(architecture, simulation, period)
     runner.time_stepping(simulation)
     finalize!(simulation)
     synchronize_device(architecture, simulation)

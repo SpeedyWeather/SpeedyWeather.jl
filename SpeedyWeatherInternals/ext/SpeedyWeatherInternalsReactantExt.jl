@@ -5,7 +5,7 @@ using SpeedyWeatherInternals
 using Reactant
 
 import SpeedyWeatherInternals.Architectures: Architectures, CPU, ReactantDevice, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type, device
-import SpeedyWeatherInternals.Utils: _jit, _set_scalar!
+import SpeedyWeatherInternals.Utils: _jit, _set_scalar!, reactant_compile_options, REACTANT_EXCLUDED_PASSES
 
 # grab the proper KernelAbstractions backend for Reactant
 const ReactantKernelAbstractionsExt = Base.get_extension(
@@ -35,6 +35,16 @@ architecture(::Type{<:Reactant.AnyTracedRArray}) = ReactantDevice()
 on_architecture(::ReactantDevice, a::Reactant.AnyTracedRArray) = a
 on_architecture(::CPU, a::AnyConcreteReactantArray) = Array(a)
 on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:AnyConcreteReactantArray}) = Array(a)
+
+# A view of a concrete array: copy the whole parent buffer to the host (a plain transfer) and copy the
+# view out of it there (an `Array` as for `Array(a)`). `Array(view)` compiles a program to materialize the
+# view on the device on every call (Reactant's `convert(Array, ::WrappedConcretePJRTArray)`), ~0.1 s per
+# call, e.g. for every output variable
+const SubArrayOfConcreteArray = Union{
+    SubArray{<:Any, <:Any, <:Reactant.ConcretePJRTArray},
+    SubArray{<:Any, <:Any, <:Reactant.ConcreteIFRTArray},
+}
+on_architecture(::CPU, a::SubArrayOfConcreteArray) = Array(view(Array(parent(a)), parentindices(a)...))
 
 # which arrays should converted?
 const ArraysToRArray = Union{
@@ -96,16 +106,18 @@ for ArrayType in (:ConcretePJRTArray, :ConcreteIFRTArray)
     end
 end
 
+# Compile options for all compilations with Reactant (`@maybe_jit` here, the compiled time loop in
+# SpeedyWeatherReactantExt)
+reactant_compile_options(; kwargs...) = Reactant.CompileOptions(; raise = true, excluded_passes = REACTANT_EXCLUDED_PASSES, kwargs...)
+
 # For @maybe_jit macro - extend _jit for ReactantDevice.
 # If we are already inside a Reactant compile/trace context, call f directly (no nested @jit).
-# Otherwise JIT-compile on the fly, raising KernelAbstractions kernels to StableHLO as in the compiled
-# time step (see `time_stepping!` in SpeedyWeatherReactantExt): kernels that aren't raised can be handed
-# operands with a non-default layout on CUDA and read scrambled data (EnzymeAD/Reactant.jl#3377)
+# Otherwise JIT-compile on the fly with `reactant_compile_options()`.
 function _jit(::ReactantDevice, f, args...; kwargs...)
     if Reactant.ReactantCore.within_compile()
         return f(args...; kwargs...)
     else
-        return Reactant.@jit raise = true f(args...; kwargs...)
+        return Reactant.@jit compile_options = reactant_compile_options() f(args...; kwargs...)
     end
 end
 

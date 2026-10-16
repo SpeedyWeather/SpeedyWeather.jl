@@ -5,7 +5,8 @@ using Reactant
 using DocStringExtensions
 using Dates
 
-using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, time_step!
+using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, time_step!, time_steps!
+using SpeedyWeather: reactant_compile_options
 
 const ReactantDatesExt = Base.get_extension(
     Reactant, :ReactantDatesExt
@@ -16,43 +17,84 @@ const ReactantSimulation = Union{
     Simulation{V, <:ShallowWaterModel{SG, <:ReactantDevice}}, Simulation{V, <:PrimitiveDryModel{SG, <:ReactantDevice}}, Simulation{V, <:PrimitiveWetModel{SG, <:ReactantDevice}},
 } where {V, SG}
 
-# time stepping functions with Reactant, take compiled functions as optional arguments
-# in case they are not provided, they are compiled on the fly
+# TIME STEPPING WITH REACTANT
+#
+# IO can't happen inside a compiled program, so the time steps between two outputs are one program
+# (a traced loop) and output and feedback happen between the programs on the host. Without output
+# the whole run is one program (as Oceananigans' compiled `run!`).
 
 """
 $(TYPEDSIGNATURES)
+Time loop of a simulation with Reactant. Without output the whole run is one compiled program
+([`time_steps!`](@ref), a traced loop). With output every `m` time steps, the `m` time steps between
+two outputs are one program, called once per output interval; the spin-up steps of the time
+stepper (which don't count for output) and a remainder of fewer than `m` steps at the end use
+the compiled single time step. Output and feedback (progress meter, NaN check) happen between the
+programs. Everything is compiled with `reactant_compile_options()` (kernels raised to StableHLO, some
+patterns excluded)."""
+function SpeedyWeather.time_stepping!(simulation::ReactantSimulation)
+    (; variables, model) = simulation
+    (; feedback, output) = model
+    (; clock) = variables.prognostic
 
-Time-stepping function for a simulation with Reactant, take compiled functions as optional arguments.
-In case they are not provided, they are compiled on the fly.
+    n_steps = Int(clock.n_steps)                        # time stepper steps incl. spin-up steps
+    m = output_every_n_steps(output)
 
-Example usage:
+    # without output: one program for the whole run
+    if m == 0
+        r_time_steps! = @compile compile_options = reactant_compile_options() time_steps!(simulation, n_steps)
+        r_time_steps!(simulation, n_steps)
+        SpeedyWeather.progress!(feedback, variables, model, n_steps)
+        return simulation
+    end
+
+    # with output every m time steps: one program for the m steps between two outputs
+    spin_up_steps = n_steps - Int(clock.n_time_steps)
+    n_outputs, remainder = divrem(n_steps - spin_up_steps, m)
+    r_time_steps! = @compile compile_options = reactant_compile_options() time_steps!(simulation, m)
+    r_time_step! = spin_up_steps + remainder > 0 ? (@compile compile_options = reactant_compile_options() time_step!(simulation)) : nothing
+
+    single_steps!(r_time_step!, simulation, spin_up_steps)
+    for _ in 1:n_outputs
+        r_time_steps!(simulation, m)
+        SpeedyWeather.progress!(feedback, variables, model, m)
+        SpeedyWeather.output!(output, simulation)
+        nans_detected(feedback) && return simulation    # don't continue with NaNs
+    end
+    single_steps!(r_time_step!, simulation, remainder)
+    return simulation
+end
+
+# n steps with the compiled single time step, each followed by feedback and output (only spin-up/remainder)
+function single_steps!(r_time_step!, simulation, n)
+    (; variables, model) = simulation
+    for _ in 1:n
+        r_time_step!(simulation)
+        SpeedyWeather.progress!(model.feedback, variables, model, 1)
+        SpeedyWeather.output!(model.output, simulation)
+    end
+    return nothing
+end
+
+SpeedyWeather.time_stepping!(simulation::ReactantSimulation, ::Nothing) = SpeedyWeather.time_stepping!(simulation)
+
+"""
+$(TYPEDSIGNATURES)
+Time loop of a simulation with Reactant that calls a compiled single time step `r_time_step!` for every
+time step, with output and feedback after every step. Example:
 
 ```julia
 simulation = initialize!(model)
 initialize!(simulation; steps=10) # don't forget this!
-r_time_step! = @compile raise = true SpeedyWeather.time_step!(simulation)
+compile_options = SpeedyWeather.reactant_compile_options()
+r_time_step! = @compile compile_options = compile_options SpeedyWeather.time_step!(simulation)
 SpeedyWeather.time_stepping!(simulation, r_time_step!)
 SpeedyWeather.finalize!(simulation)
-```
-
-The time step is compiled with `raise = true` by default, i.e. KernelAbstractions kernels are raised
-to StableHLO: kernels that aren't raised can be handed operands with a non-default layout on CUDA
-and read scrambled data (EnzymeAD/Reactant.jl#3377).
-"""
-function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_time_step! = nothing, enable_checkpointing = true)
-    if isnothing(r_time_step!)
-        @info "Reactant compiling time_step!"
-        r_time_step! = @compile raise = true time_step!(simulation)
-    end
-
+```"""
+function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_time_step!)
     (; variables, model) = simulation
     (; clock) = variables.prognostic
     (; output, feedback) = model
-
-    #TODO: reenable @trace once Reactant issues fixed
-    #@trace checkpointing = enable_checkpointing for _ in 1:clock.n_steps
-    #    r_time_step!(simulation)
-    #end
 
     # n_steps (not n_time_steps) to match time_stepping!(::AbstractSimulation),
     # it includes time stepper spin-up steps (e.g. initial Euler step for Leapfrog)
@@ -62,8 +104,28 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_time_ste
         SpeedyWeather.progress!(feedback, variables, model)
         SpeedyWeather.output!(output, simulation)
     end
-    return
+    return simulation
 end
+
+"""
+$(TYPEDSIGNATURES)
+`n` time steps of `simulation` in one traced loop, compiled with `@compile`/`@jit` one program for
+all `n` steps. Reverse-mode differentiation of the loop uses `checkpointing` (`false`,
+`Reactant.Periodic(k)` or `Reactant.Binomial(budget)`) and `mincut` as Reactant's `@trace`."""
+function SpeedyWeather.time_steps!(simulation::ReactantSimulation, n::Integer; checkpointing = false, mincut::Bool = true)
+    # track_numbers = false: only trace Reactant numbers as @compile does, tracing the integers of our views fails
+    @trace track_numbers = false mincut = mincut checkpointing = checkpointing for _ in 1:n
+        time_step!(simulation)
+    end
+    return nothing
+end
+
+# output interval in time steps, 0 without (active) output
+output_every_n_steps(::Nothing) = 0
+output_every_n_steps(output::SpeedyWeather.AbstractOutput) = output.active ? output.output_every_n_steps : 0
+
+nans_detected(::Nothing) = false
+nans_detected(feedback::SpeedyWeather.Feedback) = feedback.nans_detected
 
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 SpeedyWeather.scalar_ref(::ReactantDevice, x::Number) = Ref(Reactant.ConcreteRNumber(x))

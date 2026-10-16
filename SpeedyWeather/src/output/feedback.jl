@@ -119,6 +119,20 @@ end
 # fallback for feedback = nothing
 progress!(::Nothing, vars::Variables, model::AbstractModel) = nothing
 
+"""$(TYPEDSIGNATURES)
+Feedback after `nsteps` time steps at once, e.g. after a compiled program of several time steps
+with Reactant: advance the progress meter by `nsteps` and check for NaNs (if `feedback.debug`)."""
+function progress!(feedback::Feedback, vars::Variables, model::AbstractModel, nsteps::Integer)
+    FEEDBACK_TIME[] = vars.prognostic.clock.time
+    show_diagnostic(feedback.show_umax, model.architecture) && max_speed(vars)
+    show_diagnostic(feedback.show_temperature_range, model.architecture) && temperature_range(vars)
+    ProgressMeter.next!(feedback.progress_meter; step = nsteps)
+    feedback.debug && nan_detection!(feedback, vars, model)
+    return nothing
+end
+
+progress!(::Nothing, vars::Variables, model::AbstractModel, nsteps::Integer) = nothing
+
 """
 $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""

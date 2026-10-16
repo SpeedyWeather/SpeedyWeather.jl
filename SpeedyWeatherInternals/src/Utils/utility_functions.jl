@@ -98,6 +98,20 @@ $(TYPEDSIGNATURES)
 Fallback for `@maybe_jit` when Reactant is not available. Just calls `f(args...; kwargs...)`."""
 _jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)
 
+"""Optimization patterns of Reactant excluded from every compilation (`@maybe_jit`, the compiled time
+loop, see `reactant_compile_options`): This mainly used to work around Reactant limitions and bugs. 
+Remove once fixed upstream."""
+const REACTANT_EXCLUDED_PASSES = ["concat_view_cse"]
+
+"""
+    reactant_compile_options(; kwargs...)
+
+Compile options (a `Reactant.CompileOptions`) for all compilations with Reactant: the KernelAbstractions
+kernels are raised to StableHLO (`raise = true`) and the patterns in `REACTANT_EXCLUDED_PASSES` are
+excluded; `kwargs` are passed on to `Reactant.CompileOptions` and can override both. Defined in the
+Reactant extension."""
+function reactant_compile_options end
+
 """
     @maybe_jit arch expr
 

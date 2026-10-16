@@ -2,16 +2,21 @@
 # only for the `reactant-*` architectures, after `using Reactant`, as the `@compile` macro must be
 # resolvable when this file is parsed.
 
-# `run!` compiles the time step on every call (see `time_stepping!` in SpeedyWeatherReactantExt),
-# timing it would therefore include the compilation. Instead compile the time step once here and
-# pass it to `time_stepping!` for both the warm-up and the timed run. The compiled time step takes
-# the simulation as argument so it is reused for a re-initialized simulation of the same model.
-# The compile time is reported separately, as for Reactant it is a headline number in itself.
-# Kernels are raised (`raise = true`) as in `time_stepping!`, see there.
-function build_runner(::ReactantDevice, simulation)
-    compile_time = @elapsed compiled_time_step! = @compile raise = true SpeedyWeather.time_step!(simulation)
-    @info @sprintf("     compiled the time step in %.1f s", compile_time)
-    time_stepping(simulation) = SpeedyWeather.time_stepping!(simulation, compiled_time_step!)
+# Without output and feedback (`build_model`), `run!` runs the whole time loop as one compiled
+# program (`time_stepping!` in SpeedyWeatherReactantExt) but compiles it on every call, timing it
+# would therefore include the compilation. Instead compile the time loop of the timed `period`
+# (`time_steps!` for all its steps, one program) once here and use it for both the warm-up and the
+# timed run. The compiled program takes the simulation as argument so it is reused for a
+# re-initialized simulation of the same model. The compile time is reported separately, as for
+# Reactant it is a headline number in itself. Compiled with `SpeedyWeather.reactant_compile_options()` (kernels raised, some patterns excluded) as in `time_stepping!`.
+function build_runner(::ReactantDevice, simulation, period)
+    (; model) = simulation
+    clock = SpeedyWeather.Clock()       # number of steps of the timed run, incl. spin-up steps
+    initialize!(clock, model.time_stepping, model.planet, period)
+    n_steps = Int(clock.n_steps)
+    compile_time = @elapsed compiled_time_steps! = @compile compile_options = SpeedyWeather.reactant_compile_options() SpeedyWeather.time_steps!(simulation, n_steps)
+    @info @sprintf("     compiled the time loop (%d steps) in %.1f s", n_steps, compile_time)
+    time_stepping(simulation) = compiled_time_steps!(simulation, n_steps)
     return (; time_stepping, compile_time)
 end
 
@@ -44,6 +49,6 @@ end
 
 # Compile `f(args...)` once, `sync = true` so that every call waits for the device to finish
 function compiled_call(::ReactantDevice, f, args...)
-    compiled_f = @compile raise = true sync = true f(args...)
+    compiled_f = @compile compile_options = SpeedyWeather.reactant_compile_options(; sync = true) f(args...)
     return () -> compiled_f(args...)
 end
