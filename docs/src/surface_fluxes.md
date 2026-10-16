@@ -73,12 +73,35 @@ BoundaryLayer
 └── drag                 # 4. drag coefficients for momentum, heat, humidity over land and ocean
 ```
 
-The `LearnedWindSlowdown` (default) in the surface condition depends on the surface roughness,
-which itself depends on the surface wind (via the neutral wind speed). By default it therefore
-uses fixed roughness lengths over land and ocean (`land_roughness`, `ocean_roughness`) so that
-the surface condition only depends on the current state. With `use_computed_roughness = true`
-it uses the surface roughness computed in the previous time step instead,
-starting with the fixed roughness lengths on the first time step.
+!!! info "Circularity of wind slowdown and ocean roughness"
+The `LearnedWindSlowdown` (default) reduces the lowermost-layer wind towards the surface
+depending on the momentum roughness length ``z_0``: rougher surfaces slow the wind more.
+Over the ocean, however, the roughness is itself a function of the wind: the `LearnedOceanRoughness`
+(default) computes ``z_0`` from the neutral wind speed, which is derived from the surface wind.
+So the surface wind depends on ``z_0`` which depends on the surface wind
+(`surface_condition` → `neutral_wind_speed` → `surface_roughness` → `surface_condition`).
+Over land there is no such circularity, as the land roughness depends on vegetation, snow and soil only for now.
+
+There are several ways to resolve this circularity, each with a downside:
+
+- **Lag**: use the roughness from the previous time step. This introduces a hidden state
+    that is not part of the prognostic variables (it is not, e.g., written to restart files),
+    needs an ad-hoc roughness on the first time step, and can oscillate in time at low wind speeds,
+    where the learned ocean roughness drops by many orders of magnitude.
+- **Iterate**: repeat surface condition → neutral wind speed → surface roughness within a time step
+    until converged. Stateless and consistent, but this multiplies the cost of these
+    parameterizations and converges slowly at the same low-wind points.
+- **Decouple**: use fixed roughness lengths in the wind slowdown only. Stateless and cheap,
+    but the wind slowdown does not see the actual roughness.
+
+The default is to decouple: `LearnedWindSlowdown` uses fixed roughness lengths over land and ocean
+(`land_roughness = 0.1` m, `ocean_roughness = 1e-4` m, weighted by the land fraction) so that the
+surface condition depends only on the current state. The computed roughness is still used
+for the drag coefficients. The sensitivity of the wind slowdown to ``z_0`` is weak
+(only through a term ``\propto \log z_0``), so this is a small inconsistency. With
+`use_computed_roughness = true` the wind slowdown uses the roughness from the previous
+time step instead (falling back to the fixed roughness lengths on the first time step).
+Iterative solution is currently not implemented.
 
 The subcomponents of `SurfaceCondition` are
 
@@ -95,6 +118,10 @@ the neutral wind speed
 ```@example surface_fluxes
 subtypes(SpeedyWeather.AbstractNeutralWindSpeed)
 ```
+
+which can also be set to `nothing` (`BoundaryLayer(spectral_grid, neutral_wind_speed = nothing)`).
+Parameterizations that require a neutral wind speed (e.g. `LearnedOceanRoughness`) then use
+the (non-neutral) surface wind speed instead, i.e. without stability correction.
 
 the surface roughness, with its land and ocean subcomponents (used by `LearnedSurfaceRoughness`)
 
