@@ -497,9 +497,11 @@ end
 
 # function barrier to unpack only what's needed from model
 @propagate_inbounds surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, model::AbstractModel) =
-    surface_roughness!(ij, vars, scheme, model.land_sea_mask, model.time_stepping)
+    surface_roughness!(ij, vars, scheme, model.land_sea_mask, model.time_stepping, model.boundary_layer.neutral_wind_speed)
 
-@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, land_sea_mask, time_stepping)
+@propagate_inbounds function surface_roughness!(
+        ij, vars, scheme::LearnedOceanRoughness, land_sea_mask, time_stepping, neutral_wind_speed
+    )
     (; ocean) = vars.parameterizations
     land_fraction = land_sea_mask.land_fraction[ij]
 
@@ -511,10 +513,10 @@ end
         return nothing
     end
 
-    (; neutral_wind_speed) = vars.parameterizations
     progn_ocean = vars.prognostic.ocean
 
-    uₙ = neutral_wind_speed[ij]
+    # neutral wind speed, or an approximation thereof, depending on the neutral wind speed scheme
+    uₙ = get_neutral_wind_speed(ij, vars, neutral_wind_speed)
 
     ts = time_stepper(time_stepping, :ocean)
     ℵ = haskey(progn_ocean, :sea_ice_concentration) ? get_prognostic_step(progn_ocean.sea_ice_concentration, ts, scheme)[ij] : zero(uₙ)
