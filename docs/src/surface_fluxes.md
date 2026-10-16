@@ -73,7 +73,13 @@ BoundaryLayer
 └── drag                 # 4. drag coefficients for momentum, heat, humidity over land and ocean
 ```
 
-The surface condition uses the surface roughness from the previous time step.
+The `LearnedWindSlowdown` (default) in the surface condition depends on the surface roughness,
+which itself depends on the surface wind (via the neutral wind speed). By default it therefore
+uses fixed roughness lengths over land and ocean (`land_roughness`, `ocean_roughness`) so that
+the surface condition only depends on the current state. With `use_computed_roughness = true`
+it uses the surface roughness computed in the previous time step instead,
+starting with the fixed roughness lengths on the first time step.
+
 The subcomponents of `SurfaceCondition` are
 
 ```@example surface_fluxes
