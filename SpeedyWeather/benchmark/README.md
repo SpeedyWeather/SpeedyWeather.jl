@@ -39,32 +39,32 @@ Each run updates only its own architecture's section in this `README.md`; result
 
 Simulated years per wallclock day (SYPD) for the `PrimitiveWetModel` resolution sweep, one column per architecture. Each (T, L) configuration is reported for both the standard Legendre transform and fast Fourier transform (LT+FFT) and the single matrix transform (MT). Empty cells mean the architecture has not yet been benchmarked or that suite was skipped. Comparison figures across architectures are available on the documentation's `Benchmarks` page.
 
-| T | L | Transform | cpu-arm | cpu-x86 | gpu-nvidia | gpu-amd |
-| --- | --- | --- | --- | --- | --- | --- |
-| 32 | 8 | LT+FFT | 1308 | 862 | 5439 | 3763 |
-| 32 | 8 | MT | 772 | 887 | 5343 | 3696 |
-| 43 | 8 | LT+FFT | 559 | 368 | 4199 | 2149 |
-| 43 | 8 | MT | 253 | 308 | 3986 | 2830 |
-| 64 | 8 | LT+FFT | 152 | 107 | 2822 | 828 |
-| 64 | 8 | MT | 52 | 63 | 2804 | 826 |
-| 86 | 8 | LT+FFT | 58 | 41 | 1087 | 246 |
-| 86 | 8 | MT | 14 | 19 | 1085 | 245 |
-| 86 | 16 | LT+FFT | 29 | 21 | 749 | 202 |
-| 86 | 16 | MT | 8.8 | 11 | 746 | 150 |
-| 86 | 24 | LT+FFT | 20 | 14 | 639 | 196 |
-| 86 | 24 | MT | 6.1 | 8.6 | 640 | 108 |
-| 128 | 8 | LT+FFT | 14 | 11 | 271 | 86 |
-| 128 | 8 | MT | 1.2 | 3.3 | 199 | 39 |
-| 128 | 16 | LT+FFT | 7.6 | 5.7 | 243 | 80 |
-| 128 | 16 | MT | 1.2 | 2.1 | 138 | 23 |
-| 128 | 24 | LT+FFT | 5.5 | 3.6 | 227 | 76 |
-| 128 | 24 | MT | 1.0 | 1.6 | 118 | 17 |
-| 171 | 8 | LT+FFT | 5.7 | 3.9 | 141 | 44 |
-| 171 | 16 | LT+FFT | 3.1 | 2.1 | 126 | 41 |
-| 171 | 24 | LT+FFT | 1.9 | 1.4 | 113 | 38 |
-| 256 | 8 | LT+FFT | 1.4 | 1.0 | 54 | 16 |
-| 256 | 16 | LT+FFT | 0.8 | 0.5 | 45 | 13 |
-| 256 | 24 | LT+FFT | 0.5 | 0.3 | 39 | 11 |
+| T | L | Transform | cpu-arm | cpu-x86 | gpu-nvidia | gpu-amd | reactant-gpu |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 32 | 8 | LT+FFT | 1308 | 862 | 5439 | 3763 | — |
+| 32 | 8 | MT | 772 | 887 | 5343 | 3696 | 16563 |
+| 43 | 8 | LT+FFT | 559 | 368 | 4199 | 2149 | — |
+| 43 | 8 | MT | 253 | 308 | 3986 | 2830 | 11888 |
+| 64 | 8 | LT+FFT | 152 | 107 | 2822 | 828 | — |
+| 64 | 8 | MT | 52 | 63 | 2804 | 826 | 5718 |
+| 86 | 8 | LT+FFT | 58 | 41 | 1087 | 246 | — |
+| 86 | 8 | MT | 14 | 19 | 1085 | 245 | 1324 |
+| 86 | 16 | LT+FFT | 29 | 21 | 749 | 202 | — |
+| 86 | 16 | MT | 8.8 | 11 | 746 | 150 | 1105 |
+| 86 | 24 | LT+FFT | 20 | 14 | 639 | 196 | — |
+| 86 | 24 | MT | 6.1 | 8.6 | 640 | 108 | 955 |
+| 128 | 8 | LT+FFT | 14 | 11 | 271 | 86 | — |
+| 128 | 8 | MT | 1.2 | 3.3 | 199 | 39 | 466 |
+| 128 | 16 | LT+FFT | 7.6 | 5.7 | 243 | 80 | — |
+| 128 | 16 | MT | 1.2 | 2.1 | 138 | 23 | 410 |
+| 128 | 24 | LT+FFT | 5.5 | 3.6 | 227 | 76 | — |
+| 128 | 24 | MT | 1.0 | 1.6 | 118 | 17 | 372 |
+| 171 | 8 | LT+FFT | 5.7 | 3.9 | 141 | 44 | — |
+| 171 | 16 | LT+FFT | 3.1 | 2.1 | 126 | 41 | — |
+| 171 | 24 | LT+FFT | 1.9 | 1.4 | 113 | 38 | — |
+| 256 | 8 | LT+FFT | 1.4 | 1.0 | 54 | 16 | — |
+| 256 | 16 | LT+FFT | 0.8 | 0.5 | 45 | 13 | — |
+| 256 | 24 | LT+FFT | 0.5 | 0.3 | 39 | 11 | — |
 
 ## Architecture: `cpu-arm`
 
@@ -653,4 +653,161 @@ AMDGPU versioninfo
 | temperature_tendency! | N/A| N/A| N/A |
 | humidity_tendency! | N/A| N/A| N/A |
 | bernoulli_potential! | N/A| N/A| N/A |
+
+## Architecture: `reactant-gpu`
+
+Created for SpeedyWeather.jl v0.24.0-DEV on Fri, 16 Oct 2026 10:49:04.
+
+### Machine details
+
+```julia
+julia> versioninfo()
+Julia Version 1.12.2
+Commit ca9b6662be4 (2025-11-20 16:25 UTC)
+Build Info:
+  Official https://julialang.org release
+Platform Info:
+  OS: Linux (x86_64-linux-gnu)
+  CPU: 128 × AMD EPYC 9554 64-Core Processor
+  WORD_SIZE: 64
+  LLVM: libLLVM-18.1.7 (ORCJIT, znver4)
+  GC: Built with stock GC
+Threads: 1 default, 1 interactive, 1 GC (on 128 virtual cores)
+Environment:
+  LD_LIBRARY_PATH = /usr/local/lib:/usr/local/lib:
+```
+
+```julia
+julia> CUDA.versioninfo()
+CUDA toolchain: 
+- runtime 13.3.0, artifact installation
+- driver 580.126.9 for 13.3
+- compiler 13.3.33, artifact installation
+
+CUDA libraries: 
+- cuBLAS: 13.6.0
+- cuSPARSE: 12.8.2
+- cuSOLVER: 12.2.6
+- cuFFT: 12.3.0
+- cuRAND: 10.4.3
+- CUPTI: 2026.2.1 (API 13.3.1)
+- NVML: 13.0.0+580.126.9
+
+Julia packages: 
+- CUDACore: 6.2.2
+- GPUArrays: 11.5.16
+- GPUCompiler: 1.23.0
+- KernelAbstractions: 0.9.45
+- CUDA_Driver_jll: 13.3.1+0
+- CUDA_Compiler_jll: 0.4.4+1
+- CUDA_Runtime_jll: 0.23.0+1
+- NVPTX_LLVM_Backend_jll: 22.1.7+1
+
+Toolchain:
+- Julia: 1.12.2
+- LLVM: 18.1.7
+
+1 device:
+  0: NVIDIA H100 80GB HBM3 (sm_90, 19.151 GiB / 79.647 GiB available)
+     compiles to sm_90a / PTX 9.3 (LLVM: sm_90a / PTX 9.0)
+```
+
+Reactant backend: `gpu` (via `Reactant.set_default_backend("gpu")`), Reactant v0.2.293, Reactant_jll v0.0.421+0.
+
+
+### Models, default setups
+
+| Model | truncation | L | Physics | Δt | SYPD | Memory| Compile |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| BarotropicModel | 32 | 1 | false | 1800 | 119071 | 28.73 MB | 29.6 s |
+| ShallowWaterModel | 32 | 1 | false | 2400 | 99985 | 28.92 MB | 37.7 s |
+| PrimitiveDryModel | 32 | 8 | true | 2400 | 28865 | 32.78 MB | 179.2 s |
+| PrimitiveWetModel | 32 | 8 | true | 2400 | 18000 | 33.82 MB | 196.4 s |
+
+### Shallow water model, resolution
+
+| Model | truncation | L | Rings | Δt | SYPD | Memory| Compile |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ShallowWaterModel | 32 | 1 | 48 | 2400 | 89477 | 28.92 MB | 1.9 s |
+| ShallowWaterModel | 43 | 1 | 64 | 1786 | 40055 | 83.94 MB | 9.8 s |
+| ShallowWaterModel | 64 | 1 | 96 | 1200 | 16759 | 377.31 MB | 13.8 s |
+| ShallowWaterModel | 86 | 1 | 128 | 893 | 2804 | 1.15 GB | 17.1 s |
+| ShallowWaterModel | 128 | 1 | 192 | 600 | 893 | 5.42 GB | 10.5 s |
+
+### Primitive wet model, resolution
+
+| Model | truncation | L | Rings | Δt | SYPD | Memory| Compile |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| PrimitiveWetModel | 32 | 8 | 48 | 2400 | 16563 | 33.82 MB | 14.5 s |
+| PrimitiveWetModel | 43 | 8 | 64 | 1786 | 11888 | 92.17 MB | 43.8 s |
+| PrimitiveWetModel | 64 | 8 | 96 | 1200 | 5718 | 394.60 MB | 44.2 s |
+| PrimitiveWetModel | 86 | 8 | 128 | 893 | 1324 | 1.18 GB | 48.6 s |
+| PrimitiveWetModel | 128 | 8 | 192 | 600 | 466 | 5.48 GB | 40.7 s |
+| PrimitiveWetModel | 86 | 16 | 128 | 893 | 1105 | 1.20 GB | 183.5 s |
+| PrimitiveWetModel | 128 | 16 | 192 | 600 | 410 | 5.54 GB | 48.9 s |
+| PrimitiveWetModel | 86 | 24 | 128 | 893 | 955 | 1.23 GB | 222.5 s |
+| PrimitiveWetModel | 128 | 24 | 192 | 600 | 372 | 5.59 GB | 86.5 s |
+
+### Primitive Equation, Float32 vs Float64
+
+| Model | NF | truncation | L | Δt | SYPD | Memory| Compile |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| PrimitiveWetModel | Float32 | 32 | 8 | 2400 | 16477 | 33.82 MB | 15.0 s |
+| PrimitiveWetModel | Float64 | 32 | 8 | 2400 | 7988 | 67.52 MB | 242.0 s |
+
+### Grids
+
+| Model | truncation | L | Grid | Rings | Δt | SYPD | Memory| Compile |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PrimitiveWetModel | 64 | 8 | FullGaussianGrid | 96 | 1200 | 4514 | 661.18 MB | 198.1 s |
+| PrimitiveWetModel | 64 | 8 | FullClenshawGrid | 127 | 1200 | 3205 | 1.16 GB | 198.8 s |
+| PrimitiveWetModel | 64 | 8 | OctahedralGaussianGrid | 96 | 1200 | 5702 | 394.60 MB | 19.1 s |
+| PrimitiveWetModel | 64 | 8 | OctahedralClenshawGrid | 127 | 1200 | 3597 | 660.61 MB | 197.1 s |
+| PrimitiveWetModel | 64 | 8 | HEALPixGrid | 127 | 1200 | 5701 | 442.45 MB | 197.2 s |
+| PrimitiveWetModel | 64 | 8 | OctaHEALPixGrid | 127 | 1200 | 4878 | 588.27 MB | 201.1 s |
+
+### Number of vertical layers
+
+| Model | truncation | L | Δt | SYPD | Memory| Compile |
+| --- | --- | --- | --- | --- | --- | --- |
+| PrimitiveWetModel | 32 | 4 | 2400 | 30540 | 31.72 MB | 156.1 s |
+| PrimitiveWetModel | 32 | 8 | 2400 | 16444 | 33.82 MB | 14.7 s |
+| PrimitiveWetModel | 32 | 12 | 2400 | 17013 | 35.93 MB | 166.3 s |
+| PrimitiveWetModel | 32 | 16 | 2400 | 13105 | 38.05 MB | 53.5 s |
+
+### PrimitiveDryModel: Physics or dynamics only
+
+| Model | truncation | L | Dynamics | Physics | Δt | SYPD | Memory| Compile |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PrimitiveDryModel | 32 | 8 | true | true | 2400 | 24610 | 32.78 MB | 10.0 s |
+| PrimitiveDryModel | 32 | 8 | true | false | 2400 | 28786 | 32.78 MB | 7.5 s |
+| PrimitiveDryModel | 32 | 8 | false | true | 2400 | 47684 | 32.78 MB | 10.4 s |
+
+### PrimitiveWetModel: Physics or dynamics only
+
+| Model | truncation | L | Dynamics | Physics | Δt | SYPD | Memory| Compile |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PrimitiveWetModel | 32 | 8 | true | true | 2400 | 16482 | 33.82 MB | 14.3 s |
+| PrimitiveWetModel | 32 | 8 | true | false | 2400 | 24543 | 33.82 MB | 8.0 s |
+| PrimitiveWetModel | 32 | 8 | false | true | 2400 | 32011 | 33.82 MB | 13.9 s |
+
+### Individual dynamics functions
+
+
+#### PrimitiveWetModel | Float32 | T31 L8 | OctahedralGaussianGrid | 48 Rings
+
+| Function | Time | Memory | Allocations |
+| --- | --- | --- | --- |
+| pressure_gradient_flux! | 105.590 μs| 15.19 KiB| 80 |
+| linear_virtual_temperature! | 96.940 μs| 4.55 KiB| 38 |
+| geopotential! | 99.170 μs| 6.09 KiB| 38 |
+| vertical_integration! | 99.380 μs| 16.47 KiB| 104 |
+| surface_pressure_tendency! | 129.700 μs| 14.56 KiB| 83 |
+| vertical_velocity! | 99.660 μs| 4.19 KiB| 34 |
+| linear_pressure_gradient! | 86.250 μs| 3.81 KiB| 26 |
+| vertical_advection! | 99.410 μs| 3.92 KiB| 52 |
+| vordiv_tendencies! | 136.050 μs| 18.69 KiB| 122 |
+| temperature_tendency! | 129.820 μs| 15.83 KiB| 97 |
+| humidity_tendency! | 123.390 μs| 15.83 KiB| 97 |
+| bernoulli_potential! | 107.970 μs| 15.95 KiB| 95 |
 
