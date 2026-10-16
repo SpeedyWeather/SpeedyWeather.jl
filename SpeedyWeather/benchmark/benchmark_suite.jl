@@ -1,18 +1,20 @@
 using BenchmarkTools
-using SpeedyWeather: synchronize, ReactantDevice, MatrixSpectralTransform
+using SpeedyWeather: synchronize, ReactantDevice, MatrixSpectralTransform, SpectralTransform
 
 # The dense MatrixSpectralTransform is too large (memory and speed) above this truncation
 const MAX_MATRIX_TRUNCATION = 150
 
-# Build the model with the right spectral transform for `arch`.
-# Reactant requires MatrixSpectralTransform; otherwise honour `transform_kind`
+# Build the model with the spectral transform of `transform_kind` for `arch`
 # (`:default` for FFT+Legendre, `:matrix` for MatrixSpectralTransform).
 function build_model(Model, spectral_grid, arch; transform_kind::Symbol = :default, kwargs...)
     if arch isa ReactantDevice
-        M = MatrixSpectralTransform(spectral_grid)
+        transform_kind in (:default, :matrix) || error("Unknown transform_kind = $transform_kind. Use :default or :matrix.")
+        # `:default` explicitly the FFT-based SpectralTransform: the models' default on Reactant
+        # (`WhichTransform`) is the MatrixSpectralTransform at every resolution
+        S = transform_kind == :matrix ? MatrixSpectralTransform(spectral_grid) : SpectralTransform(spectral_grid)
         # no progress meter or output: they would read the clock from the device every time step,
         # synchronizing it. Passed last as repeated keyword arguments silently take the last value
-        return Model(spectral_grid; kwargs..., spectral_transform = M, feedback = nothing, output = nothing)
+        return Model(spectral_grid; kwargs..., spectral_transform = S, feedback = nothing, output = nothing)
     elseif transform_kind == :matrix
         M = MatrixSpectralTransform(spectral_grid)
         return Model(spectral_grid; spectral_transform = M, kwargs...)
@@ -109,28 +111,6 @@ compiled_call(arch, f, args...) = () -> (f(args...); synchronize(arch))
 
 """Adapt `suite` to what `arch` supports, by default unchanged."""
 adapt_to_architecture!(suite, arch) = suite
-
-# Reactant requires the MatrixSpectralTransform: run every configuration with it, drop those
-# with a truncation that's too large for it and those that are then duplicates (e.g. the
-# default transform rows of a suite that also has matrix transform rows)
-function adapt_to_architecture!(suite::BenchmarkSuite, ::ReactantDevice)
-    suite.spectral_transform .= :matrix
-    configuration(i) = (suite.model[i], suite.NF[i], suite.truncation[i], suite.nlayers[i], suite.Grid[i], suite.dynamics[i], suite.physics[i], suite.model_kwargs[i])
-    keep = Int[]
-    for i in 1:suite.nruns
-        if suite.truncation[i] > MAX_MATRIX_TRUNCATION
-            @info "Skipping $(suite.model[i]) T$(suite.truncation[i]) on Reactant: too large for the MatrixSpectralTransform"
-        elseif all(configuration(i) != configuration(j) for j in keep)
-            push!(keep, i)
-        end
-    end
-    for name in fieldnames(BenchmarkSuite)
-        value = getfield(suite, name)
-        value isa Vector && length(value) == suite.nruns && setfield!(suite, name, value[keep])
-    end
-    suite.nruns = length(keep)
-    return suite
-end
 
 # Run every configuration of a suite. Each run lives in its own `run_benchmark!`
 # call so that its model and simulation go out of scope on return; `free_memory!`

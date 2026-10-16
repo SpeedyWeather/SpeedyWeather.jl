@@ -192,7 +192,10 @@ function SpectralTransform(
     lon_offsets = [cispi(m * lon1 / π) for m in 0:(mmax - 1), lon1 in lon1s]
 
     # PRECOMPUTE LEGENDRE POLYNOMIALS
-    legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum, nlat_half)
+    # On Reactant on the CPU: there they are only used to build the dense copy (below), and filling a
+    # Reactant array latitude by latitude is scalar indexing, an error on Reactant's GPU backend
+    spectrum_polynomials = architecture isa ReactantDevice ? on_architecture(CPU(), spectrum) : spectrum
+    legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum_polynomials, nlat_half)
     legendre_polynomials_j = zeros(NF, lmax, mmax)          # temporary for one latitude
     for j in 1:nlat_half                                    # only one hemisphere due to symmetry
         Legendre.λlm!(legendre_polynomials_j, lmax - 1, mmax - 1, cos_colat[j])     # precompute l, m 0-based
