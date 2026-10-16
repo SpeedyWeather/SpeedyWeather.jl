@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Primitive equation models transform U, V and the surface pressure gradient ∇ln(pₛ) to grid space in one batched transform, 2 instead of 3 spectral→grid transforms per time step [#1313](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1313)
 - Update GPUArrays requirement from 11 to 11, 12.1 [#1308](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1308)
 - Restrict Makie compat to 0.24.15 due to bug in GeoMakie and Makie [#1311](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1311)
 - Update SpeedyWeatherAssets default version to v1.1 [#1303](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1303)
