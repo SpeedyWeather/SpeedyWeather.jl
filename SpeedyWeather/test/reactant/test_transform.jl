@@ -38,10 +38,10 @@ end
         S_cpu = SpectralTransform(spectral_grid_cpu)
         @test S.gpu_graphs == false             # XLA runs a compiled program as one graph itself
         @test isnothing(S.rfft_plans_batched)   # no FFT plans, XLA plans the FFTs
-        # only the dense copy of the polynomials is used, the others are minimal (not zero-length, which a
-        # traced loop can't carry, see `SpeedyTransforms.unused_length`)
-        @test size(S.legendre_polynomials.data, 2) == 1
-        @test length(S.legendre_polynomials_transposed) == 1
+        # only the dense copy of the polynomials is used, the others are empty (`length`, not `isempty`: on a
+        # concrete Reactant array `isempty` checks whether its buffer was deleted, not its length)
+        @test size(S.legendre_polynomials.data, 2) == 0
+        @test length(S.legendre_polynomials_transposed) == 0
 
         # no layer dimension (vectors, as single-layer variables in the model), one layer, several layers
         for layers in ((), (1,), (nlayers,))

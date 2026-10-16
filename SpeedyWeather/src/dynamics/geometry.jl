@@ -46,8 +46,8 @@ $(TYPEDFIELDS)
     whichring::VectorIntType = RingGrids.whichring(spectral_grid.grid)
 
     # ARRAYS OF LANGITUDES/LONGITUDES
-    "Array of longitudes in degrees (0...360˚), `nothing` for non-full grids"
-    lond::VT1 = full_grid_lond(spectral_grid.Grid, nlat_half)
+    "Array of longitudes in degrees (0...360˚), empty for non-full grids"
+    lond::VT1 = get_lond(spectral_grid.Grid, nlat_half)
 
     "Array of latitudes in degrees (90˚...-90˚)"
     latd::VTLat = get_latd(spectral_grid.Grid, nlat_half)
@@ -101,11 +101,6 @@ end
 
 Adapt.@adapt_structure Geometry
 
-# longitudes of full grids, `nothing` (not an empty vector) for reduced grids: Reactant can't carry a zero-length
-# array through a traced loop (`tensor.empty` can't be exported to XLA), used for several time steps per program
-full_grid_lond(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer) = get_lond(Grid, nlat_half)
-full_grid_lond(::Type{<:AbstractReducedGrid}, nlat_half::Integer) = nothing
-
 """
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
@@ -118,8 +113,7 @@ function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG))
 
     (; NF, VectorIntType, VectorType) = SG
     σ_half = get_σ_half(vertical_coordinates)
-    VT1 = SG.Grid <: AbstractFullGrid ? VectorType : Nothing      # for lond
-    return Geometry{typeof(SG), typeof(nlayers), Base.RefValue{NF}, VectorIntType, typeof(vertical_coordinates), VT1, VectorType, VectorType, VectorType, VectorType}(;
+    return Geometry{typeof(SG), typeof(nlayers), Base.RefValue{NF}, VectorIntType, typeof(vertical_coordinates), VectorType, VectorType, VectorType, VectorType, VectorType}(;
         spectral_grid = SG,
         vertical_coordinates,
         σ_levels_half = σ_half,

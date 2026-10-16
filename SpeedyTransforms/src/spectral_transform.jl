@@ -66,14 +66,14 @@ struct SpectralTransform{
     brfft_plans_batched::BRFFTBatchedType # spectral → grid (inverse), K>1 per-ring 2-D plans, keyed by K
 
     # LEGENDRE POLYNOMIALS, for all latitudes, precomputed (unused on Reactant, which only uses the
-    # dense copy below, one latitude there, see `unused_length`)
+    # dense copy below, zero latitudes there)
     legendre_polynomials::LowerTriangularArrayType
     # ... and transposed to (latitude ring, harmonic), flattened so that it needs no type
     # parameter of its own; index it as [(lm - 1) * nlat_half + j].
     # The GPU transforms read the polynomials along opposite axes -- the inverse has
     # neighbouring threads on neighbouring rings, the forward on neighbouring harmonics -- and no
     # single layout is coalesced for both, so the GPU keeps this second copy.
-    # Empty on CPU, which only uses the layout above, unused on Reactant (`unused_length`).
+    # Empty on CPU, which only uses the layout above, and on Reactant (unused).
     legendre_polynomials_transposed::VectorType
     # ... and dense, (parity, degree, order, latitude ring) flattened, for the Legendre transform as
     # one batched matrix multiply on Reactant, see `dense_legendre_polynomials`. Empty elsewhere.
@@ -111,14 +111,6 @@ struct SpectralTransform{
     gpu_graphs::Bool
 
 end
-
-"""$(TYPEDSIGNATURES)
-Length of an array of the `SpectralTransform` that is not used on `architecture`: zero, but one on
-Reactant, which can't carry a zero-length array through a traced loop (`tensor.empty` can't be
-exported to XLA), e.g. several time steps in one compiled program.
-TODO: zero on Reactant too once that is fixed upstream."""
-unused_length(::AbstractArchitecture) = 0
-unused_length(::ReactantDevice) = 1
 
 # eltype of a transform is the number format used within
 Base.eltype(S::AbstractSpectralTransform{NF}) where {NF} = NF
@@ -206,14 +198,14 @@ function SpectralTransform(
     # field. Costs as much memory again as the polynomials themselves, so only built on GPU.
     legendre_polynomials_transposed = architecture isa Architectures.GPU ?
         vec(permutedims(legendre_polynomials.data)) :
-        on_architecture(architecture, zeros(NF, unused_length(architecture)))
+        on_architecture(architecture, zeros(NF, 0))
 
     # DENSE COPY OF THE LEGENDRE POLYNOMIALS FOR REACTANT, see the struct field, empty elsewhere
     legendre_polynomials_dense = dense_legendre_polynomials(architecture, legendre_polynomials, mmax_truncation)
 
-    # Reactant only uses the dense copy, so the polynomials are unused there (see `unused_length`)
+    # Reactant only uses the dense copy, so the polynomials are unused there (zero latitudes)
     if architecture isa ReactantDevice
-        legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum, unused_length(architecture))
+        legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum, 0)
     end
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA

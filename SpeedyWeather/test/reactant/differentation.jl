@@ -7,21 +7,16 @@
 # to compile), the gradient of several time steps of the PrimitiveWetModel; `differentiation_primitive_wet.jl`
 # uses the functions defined here for the full comparison of the PrimitiveWetModel.
 #
-# Needs Reactant >= v0.2.293 (Reactant_jll >= v0.0.419): raising kernels that store a complex constant (e.g. `div[I] = 0`)
-# fails before ("cannot raise op to stablehlo llvm.mlir.constant", Reactant.jl#3450).
+# Needs Reactant >= v0.2.294: raising kernels that store a complex constant (e.g. `div[I] = 0`) fails before
+# 0.2.293 ("cannot raise op to stablehlo llvm.mlir.constant", Reactant.jl#3450), the gradient of the traced time
+# loop aborts Julia ("LLVM ERROR: Failed to infer result type(s)") before 0.2.294 (Reactant.jl#3478, #3479).
 # (The `UV_from_vor(div)!` kernels are branch-free as their branches were raised to a reduction
 # without a reverse rule in Enzyme-MLIR: "Unsupported operation in reduction rev autodiff")
 
-# Two Reactant bugs make the gradient of the traced time loop abort Julia with "LLVM ERROR: Failed to
-# infer result type(s)" (not catchable, so no `@test_broken`): the `pad_concat_to_concat_pad` pattern hoists
-# padding out of a concatenation incorrectly, and the reverse rule of a strided `stablehlo.slice` (created
-# by the `slice_pad` pattern) pads the adjoint one element short. Exclude both patterns until they're fixed
-# upstream (`docs/dev/2026-10/reactant-issue-draft-{pad-concat,strided-slice-adjoint}.md`); excluding only
-# the first breaks the one-step gradient too. `excluded_passes` isn't a keyword of `@jit`, hence `compile_options`.
-const REACTANT_AD_COMPILE_OPTIONS = SpeedyWeather.reactant_compile_options(;
-    raise_first = true,
-    excluded_passes = [SpeedyWeather.REACTANT_EXCLUDED_PASSES; "pad_concat_to_concat_pad"; "slice_pad"],
-)
+# The compile options of every compilation in SpeedyWeather plus `raise_first = true` for the differentiation.
+# Further options (e.g. `excluded_passes` to work around a Reactant bug) can be added here, they are only
+# accepted through `compile_options`, not as keywords of `@jit`.
+const REACTANT_AD_COMPILE_OPTIONS = SpeedyWeather.reactant_compile_options(; raise_first = true)
 
 """Scalar loss to differentiate: squared norm of the prognostic vorticity after one time step."""
 function loss_one_step(vars, model)

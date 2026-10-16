@@ -99,9 +99,10 @@ Fallback for `@maybe_jit` when Reactant is not available. Just calls `f(args...;
 _jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)
 
 """Optimization patterns of Reactant excluded from every compilation (`@maybe_jit`, the compiled time
-loop, see `reactant_compile_options`): This mainly used to work around Reactant limitions and bugs. 
-Remove once fixed upstream."""
-const REACTANT_EXCLUDED_PASSES = ["concat_view_cse"]
+loop, see `reactant_compile_options`), to work around Reactant limitations and bugs: add a pattern's
+name here, remove it once fixed upstream. None needed with Reactant v0.2.294 (it fixed the
+`concat_view_cse` loop of v0.2.293)."""
+const REACTANT_EXCLUDED_PASSES = String[]
 
 """
     reactant_compile_options(; kwargs...)
