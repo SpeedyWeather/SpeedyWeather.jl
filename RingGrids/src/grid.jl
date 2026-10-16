@@ -51,7 +51,7 @@ get_quadrature_weights(grid::AbstractGrid) = get_quadrature_weights(typeof(grid)
 matrix_size(grid::Grid) where {Grid <: AbstractGrid} = matrix_size(Grid, get_nlat_half(grid))
 
 # CONSTRUCTORS
-"""$(TYPEDSIGNATURES) Create a new `grid` of type `Grid` with resolution parameter `nlat_half`.
+"""$(TypedMethodSignatures(defaults = true)) Create a new `grid` of type `Grid` with resolution parameter `nlat_half`.
 `architecture` is the device type (CPU/GPU). Precomputes the ring indices `rings`."""
 function (::Type{Grid})(nlat_half::Integer, architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE()) where {Grid <: AbstractGrid}
     Grid_ = nonparametric_type(Grid)                # strip away parameters of type, obtain from arguments
@@ -142,7 +142,7 @@ get_nlons(grid::AbstractGrid) = get_nlons(typeof(grid), grid.nlat_half)
 get_lat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = get_latd(Grid, nlat_half) * (π / 180)
 get_colat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = π / 2 .- get_lat(Grid, nlat_half)
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
 Provide grid `Grid` and its resolution parameter `nlat_half`. For keyword argument
 `both_hemispheres=false` only the northern hemisphere (incl Equator) is returned."""

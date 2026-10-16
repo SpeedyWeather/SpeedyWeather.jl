@@ -16,7 +16,7 @@ end
 
 Adapt.@adapt_structure Radiation
 
-"""$(TYPEDSIGNATURES) Bundle `shortwave` and `longwave` into one `Radiation` component,
+"""$(TypedMethodSignatures(defaults = true)) Bundle `shortwave` and `longwave` into one `Radiation` component,
 defaulting to `OneBandShortwave` and `OneBandLongwave` (the `PrimitiveWetModel` defaults).
 For a dry model use `shortwave = OneBandGreyShortwave(spectral_grid)` and
 `longwave = OneBandGreyLongwave(spectral_grid)`."""
@@ -30,7 +30,7 @@ end
 
 export DryRadiation
 
-"""$(TYPEDSIGNATURES) `Radiation` but with longwave/shortwave defaults for the PrimitiveDryModel."""
+"""$(TypedMethodSignatures(defaults = true)) `Radiation` but with longwave/shortwave defaults for the PrimitiveDryModel."""
 function DryRadiation(
         SG::SpectralGrid;
         shortwave = OneBandGreyShortwave(SG),

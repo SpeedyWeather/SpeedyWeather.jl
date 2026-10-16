@@ -72,7 +72,7 @@ be above ground; `pₛ` is passed on to distinguish the two."""
 
 # INTERPOLATION FROM MODEL LAYERS ONTO PRESSURE LAYERS
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Interpolate `in_field` on the model's vertical layers onto the pressure layers `p` [Pa],
 writing into the externally allocated `out_field`. Both are fields on the same horizontal
 grid, `in_field` has `nlayers` vertical layers, `out_field` has `length(p)` of them.

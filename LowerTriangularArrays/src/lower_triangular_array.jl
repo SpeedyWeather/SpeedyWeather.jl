@@ -63,7 +63,7 @@ function matrix_size(data::AbstractArray, lmax::Integer, mmax::Integer, i::Integ
     return size(data, i - 1)  # -1 as lmax, mmax are collapsed into a vector in the data array
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
 and as if it were a full matrix when `as <: AbstractMatrix`."""
 Base.size(L::LowerTriangularArray, base::Type{<:IndexBasis} = OneBased; as = Vector) = size(L, base, as)
@@ -529,7 +529,7 @@ function eachorder(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     return eachorder(L1)
 end
 
-"""$(TYPEDSIGNATURES) True if both `L1` and `L2` are of the same size (as matrix),
+"""$(TypedMethodSignatures(defaults = true)) True if both `L1` and `L2` are of the same size (as matrix),
 but ignores singleton dimensions, e.g. 5x5 and 5x5x1 would match.
 With `horizontal_only=true` (default `false`) ignore the non-horizontal dimensions,
 e.g. 5x5, 5x5x1, 5x5x2 would all match."""

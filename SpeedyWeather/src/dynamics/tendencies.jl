@@ -819,7 +819,7 @@ function tracer_advection!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 
 Compute the gridded contribution to the horizontal advection. 
 
@@ -885,7 +885,7 @@ end
     A_tend_grid[ij, k] = kernel_func(A_grid[ij, k], div_grid[ij, k], A_tend_grid[ij, k])
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Computes `∇⋅((u, v)*A)` with the option to add/overwrite `A_tend` and to
 `flip_sign` of the flux divergence by doing so.
 
@@ -945,7 +945,7 @@ function flux_grid_divergence!(
 end
 
 #TODO: just call `divergence!` directly instead or keep this to have the *_spectral_ *_grid_ symmetry?
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Purely spectral half of `flux_divergence!`: Just computes the actual divergence"""
 function flux_spectral_divergence!(
         A_tend::LowerTriangularArray,
@@ -1020,7 +1020,7 @@ function vorticity_flux_grid_tendencies!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 
 Compute the vorticity advection as the curl/div of the vorticity fluxes
 

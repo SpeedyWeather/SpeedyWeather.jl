@@ -11,7 +11,7 @@ CO₂ follows the model's `greenhouse_gases.co2` when present, else the scheme's
 ClearSkyEcCKDRadiation(SG::SpeedyWeather.SpectralGrid, gas_optics::EcCKDTabulatedGasOpticsModel; kwargs...) =
     ClearSkyEcCKDRadiation{SG.NF}(gas_optics; kwargs...)
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Load the reference ecCKD `model_pair` (`"32x32"` by default, or e.g. `"64x96"`) with the gases
 `names`; the tables are read with NCDatasets, a dependency of SpeedyWeather."""
 ClearSkyEcCKDRadiation(SG::SpeedyWeather.SpectralGrid, model_pair::Union{AbstractString, Symbol} = "32x32";

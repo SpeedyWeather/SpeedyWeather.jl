@@ -125,7 +125,7 @@ default_gpu_graphs(::KernelAbstractions.CPU) = false   # no graphs on CPU, be ex
 default_gpu_graphs(backend) = true                     # fallback, e.g. CUDA
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Generator function for a SpectralTransform struct. With `NF` the number format,
 `Grid` the grid type `<:AbstractGrid` and spectral truncation `lmax, mmax` this function sets up
 necessary constants for the spetral transform. Also plans the Fourier transforms, retrieves the colatitudes,
@@ -395,7 +395,7 @@ SpectralTransform(coeffs::LowerTriangularArray, field::AbstractField; kwargs...)
     SpectralTransform(field, coeffs; kwargs...)
 
 # CHECK MATCHING SIZES
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Spectral transform `S` and lower triangular matrix `L` match if the
 spectral dimensions `(lmax, mmax)` match and the number of vertical layers is
 equal or larger in the transform (constraints due to allocated scratch memory size)."""
@@ -405,7 +405,7 @@ function Architectures.ismatching(S::AbstractSpectralTransform, L::LowerTriangul
     return resolution_match && vertical_match
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Spectral transform `S` and `grid` match if the resolution `nlat_half` and the
 type of the grid match and the number of vertical layers is equal or larger in
 the transform (constraints due to allocated scratch memory size)."""
@@ -520,7 +520,7 @@ function _transform_chunked!(                       # GRID TO SPECTRAL
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Spectral transform (spectral to grid space) from n-dimensional array `coeffs` of spherical harmonic
 coefficients to an n-dimensional array `field`. Uses FFT in the zonal direction,
 and a Legendre Transform in the meridional direction exploiting symmetries. The spectral transform is
@@ -675,7 +675,7 @@ function transform(                     # SPECTRAL TO GRID
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `transform(alms, S)`."""

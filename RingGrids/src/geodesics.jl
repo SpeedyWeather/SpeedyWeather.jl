@@ -14,7 +14,7 @@ Then use the general interface `spherical_distance(NewFormula, args...; kwargs..
 abstract type AbstractSphericalDistance end
 struct Haversine <: AbstractSphericalDistance end
 
-"""$(TYPEDSIGNATURES) 
+"""$(TypedMethodSignatures(defaults = true)) 
 Haversine formula calculating the great-circle or spherical distance (in meters) on the sphere
 between two tuples of  longitude-latitude points in degrees ˚E, ˚N. Use keyword argument `radius`
 to change the radius of the sphere (default 6371e3 meters, Earth's radius), use `radius=1`
