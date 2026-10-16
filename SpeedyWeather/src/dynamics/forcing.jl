@@ -380,6 +380,8 @@ end
     p = exp(log_p)                      # pressure [Pa]
 
     # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
-    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p) * (p / p₀)^κ)
+    # `@fastmath` for the `^`: `(p / p₀)^κ` with a real exponent otherwise routes through
+    # Float64 pow_body even when p, p₀, κ are all NF, which Metal's GPU compiler rejects
+    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p) * @fastmath((p / p₀)^κ))
     temp_tend[ij, k] -= kₜ * (temp[ij, k] - Teq)  # Held and Suarez 1996, equation 2
 end

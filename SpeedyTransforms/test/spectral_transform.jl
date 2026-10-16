@@ -19,7 +19,7 @@
     # for these resolutions just test idempotence as the roundup_fft may
     # give various other options than just the 3*2^n-matching
     @testset for dealiasing in [2, 3]
-        # T42, T85, T170, T341, T682, T1365 etc (1-based truncation = T + 1)
+        # T43, T86, T171, T342, T683, T1366 etc (1-based truncation = T + 1)
         truncations = [floor(Int, 2^(i + 2) / 3) + 1 for i in p]
         for truncation in truncations
             nlat_half = SpeedyTransforms.get_nlat_half(truncation, dealiasing)
@@ -395,6 +395,14 @@ end
     @test sort!(collect(keys(S.brfft_plans_batched))) == [2, 4]
     @test S.nlayers == 4
 
+    # (c) on CPU `ensure_batched_plans!` is a pure lookup — K=1 and unplanned K stay on the
+    # serial/chunked path and no plans are created on the fly (that is GPU-only, where the serial
+    # path is neither batched nor GPU-graph captured).
+    @test SpeedyTransforms.ensure_batched_plans!(S, 1) == false
+    @test SpeedyTransforms.ensure_batched_plans!(S, 3) == false
+    @test SpeedyTransforms.ensure_batched_plans!(S, 2) == true
+    @test sort!(collect(keys(S.rfft_plans_batched))) == [2, 4]
+
     # (b)+(c) roundtrip at each K — including K=3 which is NOT in the planned set
     # and must therefore go through the K=1 serial fallback via `_fourier!` dispatch.
     for K in (1, 2, 3, 4)
@@ -404,4 +412,13 @@ end
         grid_back = transform(spec_back, S)
         @test grid_back ≈ grid_out rtol = 1.0e-13
     end
+end
+
+@testset "Clear Fourier graph cache" begin
+    # no GPU graphs on CPU: nothing to reclaim, but clearing (with/without GC) must still work
+    @test SpeedyTransforms.reclaim!(SpeedyTransforms.CPU()) === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!() === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!(SpeedyTransforms.CPU()) === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!(gc = false) === nothing
+    @test isempty(SpeedyTransforms.GRAPH_CACHES)
 end

@@ -21,7 +21,7 @@ const DOCS_ASSETS_DIR = joinpath(@__DIR__, "src", "assets", "benchmarks")
 const DOCS_PAGE_PATH = joinpath(@__DIR__, "src", "benchmarks.md")
 
 # Stable arch ordering — matches manual_benchmarking.jl
-const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "reactant-cpu", "reactant-gpu"]
+const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "gpu-amd", "reactant-cpu", "reactant-gpu"]
 
 function sorted_arch_labels(results)
     known = filter(in(keys(results)), ARCH_ORDER)
@@ -190,7 +190,7 @@ end
 
 function write_empty_page(path)
     open(path, "w") do io
-        write(io, "# Benchmarks\n\n")
+        write(io, "# [Benchmarks](@id benchmarks_page)\n\n")
         write(io, "No benchmark results have been collected yet. To populate this page, run from `SpeedyWeather/benchmark`:\n\n")
         write(io, "```\n")
         write(io, "julia --project=. manual_benchmarking.jl                # CPU\n")
@@ -222,7 +222,7 @@ function generate_benchmarks_page()
     end
 
     open(DOCS_PAGE_PATH, "w") do io
-        write(io, "# Benchmarks\n\n")
+        write(io, "# [Benchmarks](@id benchmarks_page)\n\n")
         write(io, "Performance benchmarks for SpeedyWeather.jl across architectures. ")
         write(io, "This page is auto-generated at doc-build time from `SpeedyWeather/benchmark/assets/benchmark_results.json`, ")
         write(io, "which itself is updated by `SpeedyWeather/benchmark/manual_benchmarking.jl`. ")

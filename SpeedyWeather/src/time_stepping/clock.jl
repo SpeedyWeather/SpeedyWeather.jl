@@ -64,7 +64,7 @@ Time step `Δt` dilated by `dilation`, rounded to whole milliseconds. Used to ad
 dilate(Δt::Millisecond, dilation) = Millisecond(round(Int, Δt.value * dilation))
 @inline dilate(Δt, dilation) = dilate(convert(Millisecond, Δt), dilation)
 
-function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
+function time_step!(clock::Clock, Δt; increase_counter = true)
     clock.time += Δt
     clock.step_counter += 1                     # always increased, counts time stepper steps
     clock.time_step_counter += increase_counter # spin up steps may not count for clock
@@ -144,7 +144,10 @@ end
 """$(TYPEDSIGNATURES)
 Initialize the clock with setting the start time and resetting the (time) step counters."""
 function initialize!(clock::Clock)
-    clock.start = clock.time        # store the start time
+    # store the start time as a copy of the value, never as the same object: with Reactant's tracked
+    # numbers `clock.start = clock.time` would make both fields share one buffer, and a compiled
+    # `time_step!` then writes the unchanged `start` back over the advanced `time`
+    clock.start = convert(typeof(clock.start), DateTime(clock.time))
     clock.step_counter = 0          # reset counter for time stepper steps, regardless step size
     clock.time_step_counter = 0     # reset counter for steps of size Δt
     return clock

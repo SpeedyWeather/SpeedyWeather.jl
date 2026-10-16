@@ -11,7 +11,7 @@ struct Simulation{V, M <: AbstractModel} <: AbstractSimulation{M}
     model::M
 end
 
-"""($TYPEDSIGNATURES) Same as `initialize!(model)` which returns a `Simulation`."""
+"""$(TYPEDSIGNATURES) Same as `initialize!(model)` which returns a `Simulation`."""
 Simulation(model::AbstractModel; kwargs...) = initialize!(model; kwargs...)
 
 function Base.show(io::IO, S::AbstractSimulation)

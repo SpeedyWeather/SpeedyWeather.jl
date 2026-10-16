@@ -58,7 +58,8 @@ struct SpectralTransform{
     # types and cannot share one container). FFTW/cuFFT plans bake K into the plan at construction.
     # The serial plans are the per-layer fallback (used by `_fourier_serial!`), always present. Hot K
     # values (batched dycore transforms, prognostic spec→grid, U/V) are pre-planned in the batched
-    # Dicts, keyed by K; everything else falls back to the serial plans in a loop.
+    # Dicts, keyed by K; everything else falls back to the serial plans in a loop (CPU) or is planned
+    # on first use and cached in these Dicts (GPU, see `ensure_batched_plans!`).
     rfft_plan_serial::RFFTSerialType     # grid → spectral (forward), K=1 per-ring 1-D plans
     brfft_plan_serial::BRFFTSerialType   # spectral → grid (inverse), K=1 per-ring 1-D plans
     rfft_plans_batched::RFFTBatchedType  # grid → spectral (forward), K>1 per-ring 2-D plans, keyed by K
@@ -104,6 +105,7 @@ struct SpectralTransform{
     # is too old to expose the high-level HIP graph API. Defaults to `default_gpu_graphs`
     # (backend-dependent, see below) rather than a flat `true`/`false`.
     gpu_graphs::Bool
+
 end
 
 # eltype of a transform is the number format used within
@@ -556,7 +558,8 @@ function _transform_grid!(
     # Checked **before** the boundscheck below so chunking can handle K > S.nlayers
     K = size(field, 2)
     if _needs_chunking(K, S)
-        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat); return field
+        _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
+        return field
     end
     return _transform_nonchunked!(field, coeffs, scratch_memory, S, unscale_coslat)
 end
@@ -615,7 +618,8 @@ function _transform_spec!(
     # see comment there.
     K = size(field, 2)
     if _needs_chunking(K, S)
-        _transform_chunked!(coeffs, field, scratch_memory, S); return coeffs
+        _transform_chunked!(coeffs, field, scratch_memory, S)
+        return coeffs
     end
     return _transform_nonchunked!(coeffs, field, scratch_memory, S)
 end

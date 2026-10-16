@@ -115,12 +115,14 @@ function initialize!(
 
     # Launch kernel
     arch = architecture(∇²ⁿ)
+    NF = eltype(∇²ⁿ)      # the kernel must run entirely in NF; `time_scale`(s) are `Float64` and
+                          # `largest_eigenvalue` an `Int` here, which a GPU (e.g. Metal) can't compile
     worksize = (truncation + 1, nlayers)
     launch!(
         arch, ArrayWorkOrder, worksize, _initialize_hyperdiffusion_kernel!,
         ∇²ⁿ, ∇²ⁿ_implicit, ∇²ⁿ_div, ∇²ⁿ_div_implicit, σ_levels_full,
-        truncation, power, power_stratosphere, tapering_σ,
-        time_scale, time_scale_div, Δt, largest_eigenvalue
+        truncation, NF(power), NF(power_stratosphere), NF(tapering_σ),
+        NF(time_scale), NF(time_scale_div), NF(Δt), NF(largest_eigenvalue)
     )
 
     return nothing
@@ -162,9 +164,11 @@ end
         # Normalized eigenvalue
         eigenvalue_norm = -l * (l + 1) / largest_eigenvalue
 
-        # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
-        ∇²ⁿ[l_plus_1, k] = -eigenvalue_norm^power / time_scale
-        ∇²ⁿ_div[l_plus_1, k] = -eigenvalue_norm^p / time_scale_div
+        # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue.
+        # `@fastmath` for the `^`: `eigenvalue_norm^power` with a real exponent otherwise routes
+        # through Base's `Float64` `pow_body`, which does not compile on GPUs without Float64 (Metal)
+        ∇²ⁿ[l_plus_1, k] = @fastmath -eigenvalue_norm^power / time_scale
+        ∇²ⁿ_div[l_plus_1, k] = @fastmath -eigenvalue_norm^p / time_scale_div
 
         # and implicit part of the diffusion (= 1/(1-Δtν∇²ⁿ))
         ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - Δt * ∇²ⁿ[l_plus_1, k])

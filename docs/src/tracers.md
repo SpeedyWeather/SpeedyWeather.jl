@@ -19,11 +19,12 @@ in rainfall, or deposited on the ground. However, aerosols should be considered
 _active_ and not _passive_ if they influence the radiation and hence the temperature
 which couples the tracer equation above two-way with the other equations.
 Active or passive tracers are treated equally in SpeedyWeather. By default a
-tracer is passive, but if a forcing or parameterization is defined that depends
+tracer is passive, but if a [forcing](@ref "Custom forcing and drag") or [parameterization](@ref "Parameterizations") is defined that depends
 on the tracer it becomes active, affecting the flow. A tracer definition
 in itself therefore does not make distinction between active or passive
 tracers but a forcing/parameterization definition can make existing tracers
-active.
+active. (See also [Particle advection](@ref) for advecting individual
+particles instead of continuous tracer fields.)
 
 # Eulerian advection
 
@@ -37,7 +38,7 @@ with ``\mathcal{D}`` being the horizontal divergence (see [Primitive equations](
 ``\mathbf{u} = (u, v)`` is here the horizontal wind only because ``W(q)`` is the [Vertical advection](@ref)
 operator (zero for 2D models). The products ``\mathbf{u}q, q\mathcal{D}`` are computed in grid space,
 transformed to spectral space, where the divergence is taken for the former and added to the latter.
-The time stepping is then performed in spectral space.
+The [time stepping](@ref time_stepping) is then performed in spectral space.
 
 ## Add/delete tracers
 
@@ -90,7 +91,7 @@ a tendency and so on.
 All tracers have to be added to the `model` before it is initialized to
 return the `simulation`. This is because that initialization determines
 all required variables and allocates them, after that `simulation.variables`
-is an immutable collection of (mutable) arrays. If you do want to start or
+is an immutable collection of (mutable) arrays (see [Variables](@ref)). If you do want to start or
 pause a tracer advection at any time you have to activate or deactivate them,
 see below.
 
@@ -146,7 +147,7 @@ For more examples how to use `set!` see [Changing orography manually](@ref),
 But note that because we are setting a (in general) 3D variable here
 the vertical dimension must align: Hence `nlayers` for the grid,
 and the anonymous function must take three arguments, including
-the vertical coordinate `σ` even if it's independent of it.
+the [vertical coordinate](@ref vertical_coordinates_page) `σ` even if it's independent of it.
 
 ## Tracer visualisation
 
@@ -176,7 +177,7 @@ nothing # hide
 So we started with a north-south stripe of some tracer.
 `[:, 1]` is used to pull out all values `:` on the one and only
 layer `1`, see [Step dimension](@ref)
-The `ShallowWaterModel` has by default a jet in the northern
+The [`ShallowWaterModel`](@ref) has by default a jet in the northern
 hemisphere which will advect that tracer, after some days:
 
 ```@example tracers

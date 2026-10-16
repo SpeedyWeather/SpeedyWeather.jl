@@ -126,6 +126,9 @@ latent_heat_condensation(A::AbstractDryAtmosphere) = zero(eltype(A))
 latent_heat_sublimation(A::AbstractWetAtmosphere) = A.latent_heat_sublimation
 latent_heat_sublimation(A::AbstractDryAtmosphere) = zero(eltype(A))
 
+latent_heat_fusion(A::AbstractWetAtmosphere) = A.latent_heat_fusion
+latent_heat_fusion(A::AbstractDryAtmosphere) = zero(eltype(A))
+
 saturation_vapor_pressure(T, A::AbstractDryAtmosphere) = zero(T)
 
 """$(TYPEDSIGNATURES)

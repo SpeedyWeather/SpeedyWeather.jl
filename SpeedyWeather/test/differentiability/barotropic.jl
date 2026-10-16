@@ -42,8 +42,7 @@ Random.seed!(123)
     @info "Running finite differences"
     fd_vjp = @time FiniteDifferences.j′vp(central_fdm(15, 1), x -> dynamics_tendencies(x, model), dvars2, vars2)
 
-    # this is currently failing, possibly due to problems with finite diff?
-    @test_broken all(isapprox.(to_vec(fd_vjp[1].grid)[1], to_vec(dvars.grid)[1], rtol = 1.0e-1, atol = 1.0e-1))
+    @test all(isapprox.(to_vec(fd_vjp[1].grid)[1], to_vec(dvars.grid)[1], rtol = 1.0e-1, atol = 1.0e-1))
 end
 
 #

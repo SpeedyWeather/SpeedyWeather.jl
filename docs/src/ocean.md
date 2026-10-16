@@ -1,12 +1,15 @@
 # Ocean models
 
-The following describes the currently implemented ocean models,
+The following describes the currently implemented ocean models (for defining
+your own see [Custom ocean model](@ref)),
 some prescribed sea surface temperature (not dependent on the state
 of other variables) others are active (dependent on the atmospheric
 state). All but SlabOcean force the atmosphere, as the sea surface temperatures are
-used to calculate surface heat fluxes. SlabOcean interacts with both Atmosphere and SeaIce. All models can be used
-with PrimitiveDry and PrimitiveWet models; for the former, only
-surface heat fluxes are applied, albeit not the humidity fluxes.
+used to calculate surface heat fluxes. SlabOcean interacts with both Atmosphere and
+[SeaIce](@ref "Sea ice models"). All models can be used
+with PrimitiveDry and PrimitiveWet models (see [Models](@ref) for details); for the former, only
+[surface heat fluxes](@ref "Surface heat fluxes") are applied, albeit not the
+[humidity fluxes](@ref "Surface humidity fluxes").
 
 ```@example ocean
 using InteractiveUtils # hide
@@ -27,7 +30,8 @@ ocean = AquaPlanet(spectral_grid)
 
 pole and equator temperatures can be modified and `mask` can mask the
 sea surface temperatures according to `model.land_sea_mask`. Otherwise
-sea surface temperatures are defined everywhere but the land-sea mask
+sea surface temperatures are defined everywhere but the
+[land-sea mask](@ref "The land-sea mask")
 will determine their proportional contribution to surface fluxes.
 
 ## Constant ocean climatology
