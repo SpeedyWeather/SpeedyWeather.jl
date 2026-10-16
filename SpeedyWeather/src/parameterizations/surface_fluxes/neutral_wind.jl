@@ -72,23 +72,11 @@ end
     return nothing
 end
 
-export NonNeutralSurfaceWindSpeed
-
-"""Approximates the neutral wind speed by the (non-neutral) surface wind speed,
-i.e. no stability correction. Fallback for parameterizations that require
-a neutral wind speed, e.g. `LearnedOceanRoughness`. Does not compute or store anything,
-`get_neutral_wind_speed` returns the surface wind speed instead. Fields are $(TYPEDFIELDS)"""
-struct NonNeutralSurfaceWindSpeed <: AbstractNeutralWindSpeed end
-
-NonNeutralSurfaceWindSpeed(::SpectralGrid) = NonNeutralSurfaceWindSpeed()
-initialize!(::NonNeutralSurfaceWindSpeed, ::PrimitiveEquation) = nothing
-variables(::NonNeutralSurfaceWindSpeed) = ()        # no neutral wind speed array needed
-parameterization!(ij, vars, ::NonNeutralSurfaceWindSpeed, model) = nothing
-
 """$(TYPEDSIGNATURES)
-Neutral wind speed at grid point `ij` as computed by the neutral wind speed scheme,
-or approximated by the surface wind speed for `NonNeutralSurfaceWindSpeed`."""
+Neutral wind speed at grid point `ij` as computed by the neutral wind speed scheme.
+With `neutral_wind_speed = nothing` the neutral wind speed is approximated by the
+(non-neutral) surface wind speed, i.e. without stability correction."""
 @propagate_inbounds get_neutral_wind_speed(ij, vars, ::AbstractNeutralWindSpeed) =
     vars.parameterizations.neutral_wind_speed[ij]
-@propagate_inbounds get_neutral_wind_speed(ij, vars, ::NonNeutralSurfaceWindSpeed) =
+@propagate_inbounds get_neutral_wind_speed(ij, vars, ::Nothing) =
     vars.parameterizations.surface_wind_speed[ij]

@@ -131,23 +131,20 @@ end
     end
 end
 
-@testset "Neutral wind speed alternatives" begin
+@testset "No neutral wind speed" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
-    # no neutral wind speed requires a roughness that does not depend on it
-    # NonNeutralSurfaceWindSpeed also works with the learned roughness
-    @testset for (neutral_wind_speed, surface_roughness) in (
-            (nothing, ConstantSurfaceRoughness(spectral_grid)),
-            (NonNeutralSurfaceWindSpeed(spectral_grid), ConstantSurfaceRoughness(spectral_grid)),
-            (NonNeutralSurfaceWindSpeed(spectral_grid), LearnedSurfaceRoughness(spectral_grid)),
+    # without neutral wind speed the learned roughness uses the surface wind speed instead
+    @testset for surface_roughness in (
+            ConstantSurfaceRoughness(spectral_grid),
+            LearnedSurfaceRoughness(spectral_grid),
         )
-        boundary_layer = BoundaryLayer(spectral_grid; surface_roughness, neutral_wind_speed)
+        boundary_layer = BoundaryLayer(spectral_grid; surface_roughness, neutral_wind_speed = nothing)
         model = PrimitiveWetModel(spectral_grid; boundary_layer)
         simulation = initialize!(model)
         run!(simulation, steps = 2)
 
         (; parameterizations) = simulation.variables
-        # neither allocates a neutral wind speed array
         @test !haskey(parameterizations, :neutral_wind_speed)
         @test all(isfinite, parameterizations.boundary_layer_drag_momentum)
         @test all(>(0), parameterizations.boundary_layer_drag_momentum)
