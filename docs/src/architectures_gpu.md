@@ -130,7 +130,8 @@ the `MatrixSpectralTransform`, which also need too much memory above about T150.
 `SpectralTransform` doesn't use FFT plans: the Fourier transform is one FFT per group of latitude rings
 of equal length (XLA plans them when compiling) and the Legendre transform one batched matrix
 multiply over the spherical harmonic order per direction. On Reactant's CPU backend it is faster than
-the `MatrixSpectralTransform` at all resolutions we tested (4-5x at T31, 60-100x at T127, 8 layers);
+the `MatrixSpectralTransform` at all resolutions we tested (the transforms alone 4-5x at T31 and 60-100x
+at T127, a `PrimitiveWetModel` time step 2x at T31 and 5x at T63, 8 layers);
 on GPUs we haven't compared them yet. The CUDA graphs that the `SpectralTransform` uses with CUDA.jl
 (`gpu_graphs`) are off with Reactant, XLA runs a compiled program as one CUDA graph itself.
 
