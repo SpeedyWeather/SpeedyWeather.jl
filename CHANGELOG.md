@@ -4,7 +4,8 @@
 
 - Learned land and ocean surface roughness [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 - Learned surface wind slowdown from bottom model layer [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
-- Split transfer coefficients by flux and surface type [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+- Split boundary layer drag by momentum/heat/humidity and land/ocean [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+- Restrict Makie compat to 0.24.15 due to bug in GeoMakie and Makie [#1311](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1311)
 - Update SpeedyWeatherAssets default version to v1.1 [#1303](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1303)
 - RingGrids: single-layer (2D) interpolation uses the batched kernel with the locator's preallocated pole-average buffers, no allocation or device synchronization per call [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
 - Output writers interpolate and post-process on the model's architecture (e.g. GPU), copying only the interpolated output-grid fields to the CPU [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
