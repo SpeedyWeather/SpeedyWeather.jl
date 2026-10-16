@@ -1005,13 +1005,38 @@ Scripts and logs: `/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/`
 for which script does what; `run_reactant_tests_*.jl` run parts of `test/reactant` in
 `env_reactant_0293`).
 
+## Reactant 0.2.294 (2026-10-16 evening)
+
+> A new Reactant version 0.2.294 was just released that should include fixes for several of the upstream
+> problems we had. Please check and remove the workarounds. We want to keep the option to add
+> compiler_options easily later though, so don't completely remove the option for that
+
+Reactant 0.2.294 / Reactant_jll 0.0.423 closes #3476 (zero-length array in a traced loop), #3478
+(strided-slice adjoint) and #3479 (`pad_concat_to_concat_pad`). Every MWE of our issue drafts rerun on it
+(CPU backend, `claude_reactant_gpu_2026-10-13/reactant_0294/mwe/`):
+
+| Draft / workaround | 0.2.294 | Action |
+| --- | --- | --- |
+| pad-concat (AD exclusion `pad_concat_to_concat_pad`) | fixed (1e-7 vs host) | exclusion removed |
+| strided-slice adjoint (AD exclusion `slice_pad`) | fixed (gradient error 0) | exclusion removed |
+| zero-size loop (`geometry.lond = nothing`, `unused_length` = 1) | fixed | zero-length arrays again |
+| `concat_view_cse` loop (`REACTANT_EXCLUDED_PASSES`) | MWE terminates (0.11 s); ShallowWater `initialize!` 32 s and `time_steps!` compile 68 s without exclusions | list emptied, mechanism kept |
+| complex `ifelse` in kernels (`componentwise_ifelse`) | not fixed (fails to raise) | kept |
+| `ComplexF32` accumulator store (separate real/imag accumulators) | not fixed (NaN imaginary part) | kept |
+| `donate_argument!` type stability (#3477/#3484) | fixed | nothing to remove |
+
+The while-loop unroll threshold on the Julia side is still 4 (`Reactant.Compiler.WHILE_UNROLL_THRESHOLD`).
+`reactant_compile_options(; kwargs...)` and `REACTANT_EXCLUDED_PASSES` (now `String[]`) stay, so options or
+pattern exclusions can be added in one place again; the AD tests' `REACTANT_AD_COMPILE_OPTIONS` is
+`reactant_compile_options(; raise_first = true)`. Compat `Reactant = "0.2.294"` in all five packages,
+CHANGELOG updated. The CUDA test and benchmark manifests were re-resolved from scratch (old ones in
+`reactant_0294/`). Verification: `test/reactant` on the CPU backend in three parts and the A40 GPU checks
+(`reactant_0294/test_*.log`, `gpu_checks.log`).
+
 ## Known limitations
 
 - Particles are not supported on Reactant.
-- All compilations exclude Reactant's `concat_view_cse` pattern (`REACTANT_EXCLUDED_PASSES`), a
-  0.2.293 regression that doesn't terminate on our programs.
-- Differentiation with Reactant needs `raise_first = true` and two more pattern exclusions
-  (`pad_concat_to_concat_pad`, `slice_pad`) for Enzyme-JAX bugs. It is verified against vanilla Enzyme
+- Differentiation with Reactant needs `raise_first = true` (and Reactant ≥ 0.2.294 for the time loop). It is verified against vanilla Enzyme
   on the CPU for the BarotropicModel (one step, and several steps with each checkpointing option) and
   for one step of the PrimitiveWetModel (`differentiation_primitive_wet.jl`, 2026-10-14); the
   PrimitiveWet loop gradient is only checked to compile and be finite. ShallowWater and PrimitiveDry

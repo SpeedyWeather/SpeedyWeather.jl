@@ -40,6 +40,16 @@ zero-length on CPU/GPU as before.
 
 Benchmark stopped after T31 and T63 (results in the protocol), "Handoff 2026-10-16 (to the HPC node with GPU)".
 
+> Okay, we now also have the FFTs ready for Reactant. Inspect the plan, we also need to run the tests on GPU
+> first, and then if everything passes we want to rerun the main benchmarks
+
+On the HPC node (merged into `mg/new-reactant` as #1312): GPU checks in "Protocol on the GPU node" below.
+
+> oh, then we have adjust the benchmark suite to also run FFTs with Reactant
+
+Open decision 2 resolved: the benchmark suite's default rows run with the `SpectralTransform` on Reactant,
+the matrix rows with the `MatrixSpectralTransform` (see the protocol).
+
 ## Problem description
 
 On `ReactantDevice` all models use the `MatrixSpectralTransform` (`WhichTransform` in
@@ -224,6 +234,99 @@ gitignored `test/reactant` manifest pinned Reactant 0.2.264). Scripts are in the
   So for the whole model on Reactant's CPU backend the `SpectralTransform` is 2.1x (T31) and 5.3x (T63) faster
   than the `MatrixSpectralTransform`, at similar compile times.
 
+## Protocol on the GPU node (2026-10-16, login02 A40 and Slurm H100)
+
+Branch `mg/new-reactant` at `296bb05d` (#1312 merged). Environments `SpeedyWeather/test/GPU/CUDA` and
+`SpeedyWeather/benchmark` re-resolved (both record `SpeedyTransformsReactantExt`; Reactant 0.2.293, jll
+0.0.421), backups of the old manifests and all scripts/logs in
+`/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/gpu_fft_2026-10-16/`.
+
+- The committed `test/GPU/reactant.jl` runs only the `MatrixSpectralTransform`
+  (`for Transform in (MatrixSpectralTransform, ) # SpectralTransform`), so the NaN check with the
+  `SpectralTransform` runs from a scratch copy (`nan_check_spectral.jl`).
+- **First H100 run (job 2526764): the `SpectralTransform` constructor fails on Reactant's GPU backend**,
+  "Scalar indexing is disallowed", `setindex!(::ConcretePJRTArray, ...)` from
+  `legendre_polynomials[:, j] = LowerTriangularArray(...)` (`spectral_transform.jl`, filling the
+  polynomials latitude by latitude). On Reactant's CPU backend a scalar `setindex!` writes straight into
+  the host buffer (no `assertscalar`), which is why the M3 runs never saw it; on the GPU backend it is an
+  error (with `allowscalar` it would compile a program per element). Fix: on Reactant the packed
+  polynomials are computed on a CPU spectrum (they are only used there to build the dense copy, which
+  transferred them to the host anyway, and are then replaced by the minimal array); CPU/GPU unchanged.
+- **With the fix (H100, job 2526880): the GPU checks pass.**
+  - PrimitiveWet NaN check with the `SpectralTransform` (default resolution, 10 steps, `run!`): 5/5, 10.9 min
+    (as long as with the matrix transform).
+  - `test/reactant/test_transform.jl` on the GPU backend with `dot_general_precision = HIGHEST`: all pass
+    (matrix testset 2/2, `SpectralTransform` 48/48). With the default precision (TF32) the matrix testset
+    fails 1 of 2 (`≈`), which aborts the file before the `SpectralTransform` testset, as expected.
+  - Relative errors vs the CPU `SpectralTransform` (T32, 8 layers), grid→spectral / spectral→grid:
+
+    | Grid | precision | `MatrixSpectralTransform` | `SpectralTransform` |
+    | --- | --- | --- | --- |
+    | OctahedralGaussian | TF32 | 1.5e-4 / 9.6e-4 | 4.2e-4 / 6.3e-4 |
+    | FullGaussian | TF32 | 7.8e-5 / 6.2e-4 | 4.4e-4 / 9.0e-4 |
+    | HEALPix | TF32 | 7.3e-5 / 5.6e-4 | 4.5e-4 / 1.1e-3 |
+    | OctahedralGaussian | HIGHEST | 2.7e-7 / 1.7e-6 | 6.6e-8 / 4.1e-7 |
+    | FullGaussian | HIGHEST | 2.0e-7 / 2.3e-6 | 5.1e-9 / 2.3e-7 |
+    | HEALPix | HIGHEST | 2.7e-7 / 1.5e-6 | 3.3e-8 / 2.2e-7 |
+
+    So with `HIGHEST` the `SpectralTransform` on the GPU is 4-40x more accurate than the matrix transform;
+    with TF32 both are at the TF32 level (1e-4 to 1e-3).
+- CUDA.jl GPU suite on the A40 with the merged code (committed `test/GPU/reactant.jl`, matrix transform):
+  **44/44 testsets pass, 34.1 min** (spectral transforms, CUDA graphs, models, output, Reactant NaN check
+  with the matrix transform 12.8 min).
+- Benchmarks (code `4c0257ff`, H100, submitted after all GPU checks passed): the main suite
+  `manual_benchmarking.jl reactant-gpu` (Slurm 2527277, `benchmarks-reactant-fft-2527277.log` in the claude
+  dir, writes `SpeedyWeather/benchmark/README.md` and `assets/benchmark_results.json`, previous versions in
+  `gpu_fft_2026-10-16/*_before_fft.*`) and the two-transform comparison of the handoff below, T31-T255,
+  TF32 and HIGHEST (Slurm 2527278, `bench_transforms.jl`, `gpu_fft_2026-10-16/bench-transforms-2527278.log`).
+- **Benchmark suite** (`SpeedyWeather/benchmark`, open decision 2): on Reactant `build_model` now honours
+  the row's transform, `:default` builds the FFT-based `SpectralTransform` explicitly (the models' default on
+  Reactant, `WhichTransform`, is the matrix transform at every resolution), `:matrix` the
+  `MatrixSpectralTransform`. The Reactant method of `adapt_to_architecture!` (forced every row to the matrix
+  transform and dropped T > 150) is removed: `define_benchmarks.jl` creates matrix rows only up to
+  `MAX_MATRIX_TRUNCATION` anyway, so nothing is left to adapt (the generic no-op hook stays). So the Reactant
+  resolution suite has both transforms up to T128 and the `SpectralTransform` up to T255, and every other
+  suite (default rows) runs with the `SpectralTransform` on Reactant. Driver docs and README text adjusted.
+- Finding, not changed: on CUDA.jl the resolution suite's "default" rows at T ≤ 100 are the
+  `MatrixSpectralTransform` too (the model default on GPUs below T100), their SYPD equals the matrix rows
+  (T32L8 5439 vs 5343), while the overview labels them "LT+FFT".
+
+### GPU performance analysis (2026-10-16 evening)
+
+> I am surprised the FFT based transform is faster than matrix transform even for small problems with
+> Reactant. Can you try to analyse and profile if there's anything we can still optimize?
+
+On the GPU it isn't: the matrix transform is faster wherever both run. PrimitiveWet, 8 layers, H100, TF32,
+ms per step (`bench_transforms.jl`, job 2527486; the "FFT faster" numbers above are Reactant's CPU backend):
+
+| T | Matrix, 10 steps per call | FFT, 10 steps per call | matrix / FFT |
+| --- | --- | --- | --- |
+| T31 | 0.451 | 1.12 | 2.5x faster |
+| T63 | 0.687 | 2.25 | 3.3x faster |
+| T127 | 5.27 | 5.67 | 1.08x faster |
+| T255 | (too large) | 13.0 | |
+
+Profiles (A40, Nsight with `--cuda-graph-trace=node`, scripts and reports in
+`claude_reactant_gpu_2026-10-13/profile_fft_2026-10-16/`):
+- **Per time step both transforms make the same four calls**: one grid→spectral (73 columns, all tendencies
+  batched) and three spectral→grid (2, 16 and 33 columns). Matrix: four matrix products reading 53 MB (T31) /
+  729 MB (T63) of dense matrices per step, memory-bound. FFT: 3-4 batched Legendre `dot_general`s (1 MB / 8 MB)
+  and **96 (T31) / 192 (T63) FFT ops per step**, one per run of equal-length rings and call (octahedral grid:
+  one per latitude).
+- **XLA can't capture FFTs in its CUDA graphs** (command buffer command types in this build: FUSION, CUBLAS,
+  CUBLASLT, CUDNN, CUSTOM_CALL, COLLECTIVES, CONDITIONAL, WHILE, DYNAMIC_SLICE_FUSION, no FFT). With the matrix
+  transform the whole step is one graph launch; with FFTs the program is split and most kernels are launched
+  one by one from the host.
+- Full step, A40, T31: matrix 0.418 ms per step (350 µs GPU time, 106 kernels, 1.2 graph launches per step);
+  FFT 1.466 ms (835 µs GPU time, 385 kernels, 4.2 graph launches + 269 separate kernel launches per step).
+  FFT step GPU time: FFT kernels 302 µs (103 kernels), concatenate/slice/pad 172 µs (88), transposes 119 µs
+  (64), **cuBLAS `scal` 91 µs (72 kernels: XLA normalizes every inverse FFT, `brfft` then multiplies back)**,
+  matrix products 10 µs, other fusions 141 µs. Matrix at T63: 1.48 ms per step, its matrix products 983 µs of
+  1386 µs GPU time (bandwidth bound).
+- Transform alone (forward + inverse, 73 columns, traced loop of 20, A40): T31 matrix 0.084 ms vs FFT 0.534 ms
+  (6 vs 135 kernels per roundtrip, FFT GPU time 282 µs: FFTs 145, concat/slice/pad 92); T63 matrix 0.81 ms vs
+  FFT 1.32 ms.
+
 ## Handoff 2026-10-16 (to the HPC node with GPU)
 
 State: branch `mg/reactant-fft`, code committed by the user as `14a458a1` ("FFTs working with Reactant"),
@@ -385,9 +488,9 @@ CHANGELOG.
 - The Legendre transform does about twice the floating point operations of the CPU loops (the dense
   layout's zero padding of the triangle) and the dense polynomials take about twice the memory of the packed
   ones (400 MB at T511).
-- Workarounds for Reactant/Enzyme-JAX bugs: minimal instead of zero-length unused arrays (`unused_length`,
-  zero-size loop-carried arrays); no gathers in the Fourier transform (strided slice adjoint); no 4-d
-  arrays around the FFTs (an optimization pass fails, not minimized).
+- Workarounds for Reactant/Enzyme-JAX bugs: no gathers in the Fourier transform (strided slice adjoint, fixed
+  in 0.2.294, but the gather-free version is kept); no 4-d arrays around the FFTs (an optimization pass fails,
+  not minimized). The minimal unused arrays (`unused_length`) are gone with Reactant 0.2.294: zero-length again.
 
 ## Open decisions
 

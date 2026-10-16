@@ -130,24 +130,15 @@ n = 24          # time steps
 checkpointing = Reactant.Periodic(4)
 initialize!(simulation, steps = n)
 dvars = make_zero(variables)
-compile_options = SpeedyWeather.reactant_compile_options(; raise_first = true,
-    excluded_passes = [SpeedyWeather.REACTANT_EXCLUDED_PASSES; "pad_concat_to_concat_pad"; "slice_pad"])
+compile_options = SpeedyWeather.reactant_compile_options(; raise_first = true)
 @jit compile_options = compile_options autodiff(Reverse, loss, Active,
     Duplicated(variables, dvars), Const(model), Const(n), Const(checkpointing))
 ```
 
-!!! warning "Excluded optimization patterns"
-    Two bugs in Reactant's optimization and differentiation currently make the gradient of the traced
-    time loop abort Julia with `LLVM ERROR: Failed to infer result type(s)` (not a catchable error):
-    the `pad_concat_to_concat_pad` pattern hoists padding out of a concatenation incorrectly, and the
-    reverse rule of a strided `stablehlo.slice` (created by the `slice_pad` pattern) pads the adjoint one
-    element short. Until they are fixed upstream, exclude both patterns as above (`excluded_passes` is
-    only accepted through `compile_options`, not as a keyword of `@jit`); the gradient of one time step
-    (`time_step!`) works without them. Issue drafts with minimal examples are in
-    `docs/dev/2026-10/reactant-issue-draft-pad-concat.md` and
-    `reactant-issue-draft-strided-slice-adjoint.md`. Also note that Reactant unrolls traced loops of at
-    most 4 iterations, so the checkpointing options only take effect for `n > 4`, and that
-    `mincut = false` currently doesn't finish compiling the gradient of the loop (it is untested).
+!!! note "Loops of few time steps"
+    Reactant unrolls traced loops of at most 4 iterations, so the checkpointing options only take
+    effect for `n > 4`. `mincut = false` currently doesn't finish compiling the gradient of the loop
+    (it is untested). Differentiating the loop needs Reactant v0.2.294 or newer.
 
 !!! note "Precision on GPUs"
     On NVIDIA GPUs with TF32 support (e.g. A40, A100, H100) XLA runs Float32 matrix products in TF32

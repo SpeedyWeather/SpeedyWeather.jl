@@ -144,7 +144,7 @@ the whole run is one program. With output, the spin-up steps of the time stepper
 and a remainder (if the run isn't a whole number of output intervals) use a compiled single time
 step, so at most two programs are compiled per `run!`. A program of several time steps takes about
 twice as long to compile as a single time step. The progress meter and the check for NaNs (with
-`Feedback(debug = true)`, the default) are updated after every program, not every time step. SpeedyWeather compiles with `raise = true` (and with Reactant's `concat_view_cse` optimization pattern excluded, which doesn't terminate on the `ShallowWaterModel` in Reactant 0.2.293, see `SpeedyWeather.REACTANT_EXCLUDED_PASSES`; compile your own programs with `SpeedyWeather.reactant_compile_options()` to get the same options): Reactant
+`Feedback(debug = true)`, the default) are updated after every program, not every time step. SpeedyWeather compiles with `raise = true` (and without the optimization patterns listed in `SpeedyWeather.REACTANT_EXCLUDED_PASSES`, currently none; compile your own programs with `SpeedyWeather.reactant_compile_options()` to get the same options): Reactant
 raises the KernelAbstractions kernels to StableHLO, the operations of the XLA compiler, which on
 GPUs is needed for correct results. Not all model components are compatible yet
 (e.g. particle advection). The setups we use in the CI to compare the results with Reactant to
