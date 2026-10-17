@@ -23,10 +23,7 @@ is loaded automatically. `amdgpu` runs require a ROCm-capable device —
 resolution/model suites, since `default_gpu_graphs` for AMDGPU's
 `ROCBackend` is `false` (HIP graphs are opt-in, verified only on datacenter/CDNA
 hardware). The Reactant variants additionally `using Reactant` and
-`Reactant.set_default_backend("cpu" | "gpu")`; for those archs the default rows
-run with the FFT-based `SpectralTransform` (built explicitly, the models' default
-on Reactant is the `MatrixSpectralTransform`) and the matrix rows with the
-`MatrixSpectralTransform` (only defined up to T150, above it is too large). The time loop is
+`Reactant.set_default_backend("cpu" | "gpu")`. The time loop is
 compiled once per configuration (`reactant_runner.jl`),
 the compile time is reported separately and not included in the SYPD.
 
@@ -250,9 +247,6 @@ function write_preamble(md)
     write(md, "- Memory: Memory footprint of simulation, variables and constants.\n")
     write(md, "- Compile: One-off compilation of the time step (Reactant only), not included in the SYPD. ")
     write(md, "Compiled code is cached within a session, so configurations compiled before (e.g. in an earlier suite) compile much faster.\n\n")
-
-    write(md, "Reactant runs use the FFT-based `SpectralTransform` for the default rows and the `MatrixSpectralTransform` for the matrix rows ")
-    write(md, "(defined only up to T$MAX_MATRIX_TRUNCATION, above it is too large), no progress meter and no output.\n\n")
 
     write(md, "### Running the benchmarks\n\n")
     write(md, "Reproduce the benchmark suite by running, from `SpeedyWeather/benchmark`:\n\n")
