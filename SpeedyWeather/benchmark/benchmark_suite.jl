@@ -348,6 +348,7 @@ function run_benchmark!(suite::BenchmarkSuiteDynamics, i::Integer)
     # benchmark sample also waits for the device. Building the call inside `safe_benchmark!`
     # records a function that fails to compile as N/A too.
     functions_and_arguments = (
+        (SpeedyWeather.pressure_gradient_flux!, (vars, time_stepping)),
         (SpeedyWeather.linear_virtual_temperature!, (vars, model)),
         (SpeedyWeather.geopotential!, (vars, geopotential, orography)),
         (SpeedyWeather.vertical_integration!, (vars, geometry, time_stepping)),
