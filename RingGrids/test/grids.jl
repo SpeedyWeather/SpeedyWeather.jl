@@ -10,7 +10,9 @@ import Random
             OctahedralClenshawGrid,
             OctaminimalGaussianGrid,
             HEALPixGrid,
+            HEALPixPaddedGrid,
             OctaHEALPixGrid,
+            OctaHEALPixPaddedGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
         )
@@ -47,7 +49,9 @@ end
             OctahedralClenshawField,
             OctaminimalGaussianField,
             HEALPixField,
+            HEALPixPaddedField,
             OctaHEALPixField,
+            OctaHEALPixPaddedField,
         )
 
         @test RingGrids.isreduced(F)
@@ -69,7 +73,9 @@ end
                 OctahedralClenshawGrid,
                 OctaminimalGaussianGrid,
                 HEALPixGrid,
+                HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
@@ -111,7 +117,9 @@ end
                 OctahedralClenshawGrid,
                 OctaminimalGaussianGrid,
                 HEALPixGrid,
+                HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
@@ -171,7 +179,9 @@ end
                 OctahedralClenshawField,
                 OctaminimalGaussianField,
                 HEALPixField,
+                HEALPixPaddedField,
                 OctaHEALPixField,
+                OctaHEALPixPaddedField,
                 FullHEALPixField,
                 FullOctaHEALPixField,
             )
@@ -197,7 +207,9 @@ end
                 OctahedralClenshawGrid,
                 OctaminimalGaussianGrid,
                 HEALPixGrid,
+                HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
@@ -256,7 +268,9 @@ end
                 OctahedralClenshawField,
                 OctaminimalGaussianField,
                 HEALPixField,
+                HEALPixPaddedField,
                 OctaHEALPixField,
+                OctaHEALPixPaddedField,
                 FullHEALPixField,
                 FullOctaHEALPixField,
             )
@@ -301,7 +315,9 @@ end
             OctahedralClenshawGrid,
             OctaminimalGaussianGrid,
             HEALPixGrid,
+            HEALPixPaddedGrid,
             OctaHEALPixGrid,
+            OctaHEALPixPaddedGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
         )
@@ -334,7 +350,9 @@ end
             OctahedralClenshawGrid,
             OctaminimalGaussianGrid,
             HEALPixGrid,
+            HEALPixPaddedGrid,
             OctaHEALPixGrid,
+            OctaHEALPixPaddedGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
         )
@@ -392,6 +410,7 @@ end
             # OctahedralClenshawGrid,
             # OctaminimalGaussianGrid,
             HEALPixField,
+            HEALPixPaddedField,
             # OctaHEALPixGrid,
             # FullHEALPixGrid,
             # FullOctaHEALPixGrid,
@@ -470,7 +489,9 @@ end
             OctahedralClenshawField,
             OctaminimalGaussianField,
             HEALPixField,
+            HEALPixPaddedField,
             OctaHEALPixField,
+            OctaHEALPixPaddedField,
             FullHEALPixField,
             FullOctaHEALPixField,
         )
@@ -502,7 +523,9 @@ end
             OctahedralClenshawField,
             OctaminimalGaussianField,
             HEALPixField,
+            HEALPixPaddedField,
             OctaHEALPixField,
+            OctaHEALPixPaddedField,
             FullHEALPixField,
             FullOctaHEALPixField,
         )
@@ -531,6 +554,7 @@ end
             # OctahedralClenshawField,
             # OctaminimalGaussianField,
             HEALPixField,
+            HEALPixPaddedField,
             # OctaHEALPixField,
             # FullHEALPixField,
             # FullOctaHEALPixField,
@@ -600,7 +624,9 @@ end
                 OctahedralClenshawGrid,
                 OctaminimalGaussianGrid,
                 HEALPixGrid,
+                HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
