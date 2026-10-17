@@ -27,4 +27,4 @@ const DIFFERENTIATION_FUNCTIONS_ONLY = true     # skip the CI tests in different
 include("differentation.jl")
 
 test_differentiability(PrimitiveWetModel)
-test_differentiability_time_steps(PrimitiveWetModel)
+test_differentiability_time_steps(PrimitiveWetModel; options = ((;), (; checkpointing = Reactant.Binomial(2))))
