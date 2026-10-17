@@ -24,7 +24,7 @@ using SpeedyWeatherInternals.KernelLaunching
 import SpeedyWeatherInternals.Utils: reactant_compile_options, REACTANT_EXCLUDED_PASSES
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, AbstractCPU, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
-export CPU, GPU, on_architecture, architecture                # export device functions
+export CPU, GPU, ReactantDevice, on_architecture, architecture        # export device functions
 export SpeedyWeatherInternals, Architectures, KernelLaunching, ArrayDimensions
 
 # INPUT OUTPUT
