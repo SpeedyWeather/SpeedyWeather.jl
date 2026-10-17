@@ -267,17 +267,17 @@ function update_prognostic!(
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
-        scale::Real = 1,
+        scale::Number = 1,
     )
     Δt = time_step(time_stepping, clock)
-    Δt /= oftype(Δt, scale)                         # scale time step on the fly *1/radius for atmospheric variables
-    lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index
+    Δt /= scale                                     # scale time step on the fly *1/radius for atmospheric variables
+    lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index, 1 or 2
     var_old = get_step(var, 1)                      # no tuple (get_steps) here: a tuple of step views
     var_new = get_step(var, 2)                      # breaks Enzyme's type analysis on Julia >= 1.11
-    var_lf = get_step(var, lf)                      # view on either t or t+dt to dis/enable Williams filter
     var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
 
-    @boundscheck lf == 1 || lf == 2 || throw(BoundsError())
+    # lf selects var_old (t) or var_new (t+dt) inside the kernel to dis/enable the Williams filter
+    # (not as a view here as lf depends on the clock, which is traced with Reactant)
     @boundscheck size(var_old) == size(var_new) == size(var_tend) || throw(BoundsError())
 
     (; robert_filter, williams_filter) = time_stepping          # coefficients for filters
@@ -292,16 +292,17 @@ function update_prognostic!(
 
     launch!(
         architecture(var_tend), SpectralWorkOrder, size(var_tend), leapfrog_kernel!,
-        var_old, var_new, var_lf, var_tend, Δt, w1, w2
+        var_old, var_new, lf, var_tend, Δt, w1, w2
     )
     return nothing
 end
 
-@kernel inbounds = true function leapfrog_kernel!(var_old, var_new, var_lf, tendency, Δt, w1, w2)
+@kernel inbounds = true function leapfrog_kernel!(var_old, var_new, lf, tendency, Δt, w1, w2)
     lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
     old = var_old[lmk]
+    var_lf = ifelse(lf == 1, old, var_new[lmk])     # on either t or t+dt, read before writing
     new = old + Δt * tendency[lmk]
-    update = old - 2var_lf[lmk] + new
-    var_old[lmk] = var_lf[lmk] + w1 * update
+    update = old - 2var_lf + new
+    var_old[lmk] = var_lf + w1 * update
     var_new[lmk] = new - w2 * update
 end

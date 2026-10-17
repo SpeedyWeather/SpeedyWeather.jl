@@ -91,7 +91,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF = Float32)
-    interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
+    @maybe_jit model.architecture interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
     return nothing
 end
 
@@ -208,8 +208,9 @@ function initialize!(
     masked_value = soil.ocean_moisture
     if soil.mask
         # TODO: broadcasting over views of Fields of GPUArrays doesn't work
+        # broadcast instead of logical indexing, which falls back to scalar indexing on Reactant
         sm = vars.prognostic.land.soil_moisture.data
-        sm[isnan.(sm)] .= masked_value
+        sm .= ifelse.(isnan.(sm), masked_value, sm)
         mask!(vars.prognostic.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
     return nothing

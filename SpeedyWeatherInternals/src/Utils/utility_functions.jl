@@ -68,9 +68,50 @@ function readable_secs(secs::Real)
 end
 
 """
+    set_scalar!(x::AbstractArray, i, v)
+
+Sets the value of `x[i]` to `v` in a GPU compatible way. This uses `@allowscalar` with
+Reactant and `x[i:i] .= v` as a workaround for Enzyme compatibility otherwise.
+"""
+set_scalar!(x::AbstractArray, i, v) = _set_scalar!(architecture(x), x, i, v)
+
+function _set_scalar!(arch::AbstractArchitecture, x::AbstractArray, i::Integer, v::Number)
+    x[i:i] .= v
+    return x
+end
+
+"""
+    componentwise_ifelse(condition::Bool, x, y)
+
+`ifelse(condition, x, y)` that selects real and imaginary part of complex numbers separately.
+In kernels, `ifelse` on a `Complex` compiles to a select of an LLVM aggregate (`[2 x float]`)
+which Reactant can't raise (`raise = true`), two selects of the components it can.
+For other numbers the same as `ifelse`.
+TODO: Might be sovled upstream in Reactant in the future 
+"""
+@inline componentwise_ifelse(condition::Bool, x, y) = ifelse(condition, x, y)
+@inline componentwise_ifelse(condition::Bool, x::Complex, y::Complex) =
+    complex(ifelse(condition, real(x), real(y)), ifelse(condition, imag(x), imag(y)))
+
+"""
 $(TYPEDSIGNATURES)
 Fallback for `@maybe_jit` when Reactant is not available. Just calls `f(args...; kwargs...)`."""
 _jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)
+
+"""Optimization patterns of Reactant excluded from every compilation (`@maybe_jit`, the compiled time
+loop, see `reactant_compile_options`), to work around Reactant limitations and bugs: add a pattern's
+name here, remove it once fixed upstream. None needed with Reactant v0.2.294 (it fixed the
+`concat_view_cse` loop of v0.2.293)."""
+const REACTANT_EXCLUDED_PASSES = String[]
+
+"""
+    reactant_compile_options(; kwargs...)
+
+Compile options (a `Reactant.CompileOptions`) for all compilations with Reactant: the KernelAbstractions
+kernels are raised to StableHLO (`raise = true`) and the patterns in `REACTANT_EXCLUDED_PASSES` are
+excluded; `kwargs` are passed on to `Reactant.CompileOptions` and can override both. Defined in the
+Reactant extension."""
+function reactant_compile_options end
 
 """
     @maybe_jit arch expr

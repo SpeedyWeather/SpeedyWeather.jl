@@ -21,7 +21,7 @@ import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.KernelLaunching
-import SpeedyWeatherInternals.Utils: Utils, @maybe_jit
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, componentwise_ifelse
 using RingGrids
 using LowerTriangularArrays
 

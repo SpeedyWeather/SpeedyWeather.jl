@@ -213,7 +213,7 @@ u, v are averaged in grid-point space, divergence in spectral space.
 # For the vertical integration and vertical average, the kernel version is unreasonably slow
 # on CPU, that's why we have two seperate versions for this function
 function vertical_integration!(
-        ::CPU,
+        ::AbstractCPU,
         vars::Variables,
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
@@ -267,7 +267,7 @@ function vertical_integration!(
 end
 
 function vertical_integration!(
-        ::GPU,
+        ::AbstractArchitecture,
         vars::Variables,
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
@@ -358,17 +358,23 @@ end
     )
     lm = @index(Global, Linear)  # global index: harmonic lm
 
-    # Initialize accumulator for this harmonic
-    div_sum = zero(eltype(div_mean))
+    # Initialize accumulators for this harmonic, real and imaginary part separately: Reactant
+    # (raise = true) miscompiles the store of a complex accumulator, a negative real part turns
+    # an imaginary part of ±0 into NaN (sign- instead of zero-extension when packing into an i64)
+    # TODO: revert once upstream Reactant issue is fixed
+    # https://github.com/EnzymeAD/Reactant.jl/issues/3465
+    div_sum_re = zero(real(eltype(div_mean)))
+    div_sum_im = zero(real(eltype(div_mean)))
 
     # Loop over layers, accumulating weighted divergence
     for k in 1:nlayers
         Δσₖ = σ_levels_thick[k]
-        div_sum += div[lm, k] * Δσₖ
+        div_sum_re += real(div[lm, k]) * Δσₖ
+        div_sum_im += imag(div[lm, k]) * Δσₖ
     end
 
     # Store final accumulated value
-    div_mean[lm] = div_sum
+    div_mean[lm] = complex(div_sum_re, div_sum_im)
 end
 
 """$(TYPEDSIGNATURES)
@@ -411,7 +417,7 @@ function surface_pressure_spectral_tendency!(vars::Variables)
     pres_tend = vars.tendencies.pressure
     div_mean = vars.dynamics.div_mean
     @. pres_tend = -pres_tend - div_mean
-    pres_tend.data[1:1] .= 0
+    set_scalar!(pres_tend.data, 1, zero(eltype(pres_tend.data)))  # for mass conservation
     return nothing
 end
 

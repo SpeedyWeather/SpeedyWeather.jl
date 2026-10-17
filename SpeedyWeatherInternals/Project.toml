@@ -1,6 +1,6 @@
 name = "SpeedyWeatherInternals"
 uuid = "34489162-d270-4603-8b96-37b04f830d73"
-version = "1.0.0"
+version = "1.0.0+DEV"
 authors = ["SpeedyWeatherInternals contributors"]
 
 [deps]
@@ -45,5 +45,5 @@ MacroTools = "0.5"
 Metal = "1.8.0"
 ModelParameters = "0.4"
 StyledStrings = "1"
-Reactant = "0.2.209"
+Reactant = "0.2.294"
 julia = "1.10"

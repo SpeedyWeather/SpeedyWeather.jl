@@ -65,15 +65,19 @@ struct SpectralTransform{
     rfft_plans_batched::RFFTBatchedType  # grid → spectral (forward), K>1 per-ring 2-D plans, keyed by K
     brfft_plans_batched::BRFFTBatchedType # spectral → grid (inverse), K>1 per-ring 2-D plans, keyed by K
 
-    # LEGENDRE POLYNOMIALS, for all latitudes, precomputed
+    # LEGENDRE POLYNOMIALS, for all latitudes, precomputed (unused on Reactant, which only uses the
+    # dense copy below, zero latitudes there)
     legendre_polynomials::LowerTriangularArrayType
     # ... and transposed to (latitude ring, harmonic), flattened so that it needs no type
     # parameter of its own; index it as [(lm - 1) * nlat_half + j].
     # The GPU transforms read the polynomials along opposite axes -- the inverse has
     # neighbouring threads on neighbouring rings, the forward on neighbouring harmonics -- and no
     # single layout is coalesced for both, so the GPU keeps this second copy.
-    # Empty on CPU, which only uses the layout above.
+    # Empty on CPU, which only uses the layout above, and on Reactant (unused).
     legendre_polynomials_transposed::VectorType
+    # ... and dense, (parity, degree, order, latitude ring) flattened, for the Legendre transform as
+    # one batched matrix multiply on Reactant, see `dense_legendre_polynomials`. Empty elsewhere.
+    legendre_polynomials_dense::VectorType
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
@@ -123,6 +127,7 @@ Explicitly passing `gpu_graphs = true/false` to `SpectralTransform` always overr
 default_gpu_graphs(architecture::AbstractArchitecture) = default_gpu_graphs(device(architecture))
 default_gpu_graphs(::KernelAbstractions.CPU) = false   # no graphs on CPU, be explicit
 default_gpu_graphs(backend) = true                     # fallback, e.g. CUDA
+default_gpu_graphs(::ReactantDevice) = false           # Reactant already does a sort of graph optimisation
 
 """
 $(TYPEDSIGNATURES)
@@ -179,7 +184,10 @@ function SpectralTransform(
     lon_offsets = [cispi(m * lon1 / π) for m in 0:(mmax - 1), lon1 in lon1s]
 
     # PRECOMPUTE LEGENDRE POLYNOMIALS
-    legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum, nlat_half)
+    # On Reactant on the CPU: there they are only used to build the dense copy (below), and filling a
+    # Reactant array latitude by latitude is scalar indexing, an error on Reactant's GPU backend
+    spectrum_polynomials = architecture isa ReactantDevice ? on_architecture(CPU(), spectrum) : spectrum
+    legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum_polynomials, nlat_half)
     legendre_polynomials_j = zeros(NF, lmax, mmax)          # temporary for one latitude
     for j in 1:nlat_half                                    # only one hemisphere due to symmetry
         Legendre.λlm!(legendre_polynomials_j, lmax - 1, mmax - 1, cos_colat[j])     # precompute l, m 0-based
@@ -192,16 +200,22 @@ function SpectralTransform(
         vec(permutedims(legendre_polynomials.data)) :
         on_architecture(architecture, zeros(NF, 0))
 
+    # DENSE COPY OF THE LEGENDRE POLYNOMIALS FOR REACTANT, see the struct field, empty elsewhere
+    legendre_polynomials_dense = dense_legendre_polynomials(architecture, legendre_polynomials, mmax_truncation)
+
+    # Reactant only uses the dense copy, so the polynomials are unused there (zero latitudes)
+    if architecture isa ReactantDevice
+        legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum, 0)
+    end
+
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # CPU always chunks unplanned K down to the largest planned batch, so scratch only needs
     # to hold one such chunk. GPU shouldn't chunk and must fit the full input K.
     scratch_memory = ScratchMemory(NF, architecture, grid, _scratch_nlayers(architecture, nlayers, planned_K))
 
-    fake_grid_data = on_architecture(architecture, zeros(NF, grid, nlayers))
-
     # PLAN THE FFTs: concretely-typed serial (K=1) plan vectors + batched (K>1) plan Dicts
     rfft_plan_serial, brfft_plan_serial, rfft_plans_batched, brfft_plans_batched = plan_FFTs(
-        planned_K, fake_grid_data, scratch_memory.north, rings, nlons
+        architecture, planned_K, NF, grid, nlayers, scratch_memory.north, rings, nlons
     )
 
     # PRECOMPUTE (j, m) INDICES FOR THE GPU LEGENDRE TRANSFORM
@@ -307,6 +321,7 @@ function SpectralTransform(
         rfft_plans_batched, brfft_plans_batched,
         legendre_polynomials,
         legendre_polynomials_transposed,
+        legendre_polynomials_dense,
         scratch_memory,
         jm_index_size, jm_indices, lm_indices,
         solid_angles,

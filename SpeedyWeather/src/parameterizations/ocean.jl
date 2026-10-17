@@ -89,11 +89,12 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, sst, NF = Float32)
-    interpolate!(monthly_temperature, sst, interp)
+    @maybe_jit model.architecture interpolate!(monthly_temperature, sst, interp)
 
     if ocean.mask
+        # broadcast instead of logical indexing, which falls back to scalar indexing on Reactant
         mt = monthly_temperature.data
-        mt[isnan.(mt)] .= ocean.land_temperature
+        mt .= ifelse.(isnan.(mt), ocean.land_temperature, mt)
         mask!(monthly_temperature, model.land_sea_mask, :land; masked_value = ocean.land_temperature)
     end
 
@@ -316,13 +317,14 @@ function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEq
     # set land "sst" points (100% land only)
     if ocean_model.mask
         masked_value = ocean_model.land_temperature
+        # broadcast instead of logical indexing, which falls back to scalar indexing on Reactant
         sst = vars.prognostic.ocean.sea_surface_temperature.data
-        sst[isnan.(sst)] .= masked_value
+        sst .= ifelse.(isnan.(sst), masked_value, sst)
 
         # cap initial conditions at sea ice freezing temperature
         if hasproperty(model, :sea_ice) && hasproperty(model.sea_ice, :freezing_temperature)
             Tf = model.sea_ice.freezing_temperature
-            sst[sst .< Tf] .= Tf
+            sst .= max.(sst, Tf)
         end
 
         mask!(vars.prognostic.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
