@@ -41,62 +41,99 @@ function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {
     return toplevel && print(io, " on ", F.grid.architecture)
 end
 
+
+"""An `OctaHEALPixPaddedGrid` is to the `OctaHEALPixGrid` what the `HEALPixPaddedGrid` is to
+the `HEALPixGrid`: same latitudes but rings with fewer than 20 longitudes are refined by the
+smallest integer factor `k = cld(20, n)` so that the `OctaHEALPixGrid` points nest, i.e. rings
+have 20, 24, 24, 32, 20, 24, 28, ... points from the pole. `copyto!` between both grids
+subsamples or linearly interpolates in longitude. Fields are
+$(TYPEDFIELDS)"""
+struct OctaHEALPixPaddedGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
+    nlat_half::IntType              # number of latitudes on one hemisphere
+    architecture::A                 # information about device, CPU/GPU
+    rings::V                        # precomputed ring indices
+    whichring::W                    # precomputed ring index for each grid point ij
+end
+
+Architectures.nonparametric_type(::Type{<:OctaHEALPixPaddedGrid}) = OctaHEALPixPaddedGrid
+full_grid_type(::Type{<:OctaHEALPixPaddedGrid}) = FullOctaHEALPixGrid
+
+# FIELD
+const OctaHEALPixPaddedField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid <: OctaHEALPixPaddedGrid}
+
+grid_type(::Type{OctaHEALPixPaddedField}) = OctaHEALPixPaddedGrid
+grid_type(::Type{OctaHEALPixPaddedField{T}}) where {T} = OctaHEALPixPaddedGrid
+grid_type(::Type{OctaHEALPixPaddedField{T, N}}) where {T, N} = OctaHEALPixPaddedGrid
+
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid <: OctaHEALPixPaddedGrid{A}} where {A <: AbstractArchitecture}
+    print(io, "OctaHEALPixPaddedField{$T, $N}")
+    toplevel && print(io, " as ", nonparametric_type(ArrayType))
+    return toplevel && print(io, " on ", F.grid.architecture)
+end
+
+# shared implementation for both padded grids, relative to their unpadded grid
+const PaddedHEALPixGrids = Union{HEALPixPaddedGrid, OctaHEALPixPaddedGrid}
+
+"""$(TYPEDSIGNATURES) The grid whose points nest in the padded grid `Grid`."""
+unpadded_grid_type(::Type{<:HEALPixPaddedGrid}) = HEALPixGrid
+unpadded_grid_type(::Type{<:OctaHEALPixPaddedGrid}) = OctaHEALPixGrid
+
 ## SIZE
-nlat_odd(::Type{<:HEALPixPaddedGrid}) = true
+nlat_odd(::Type{<:PaddedHEALPixGrids}) = true
 
 """$(TYPEDSIGNATURES) Minimum number of longitude points per ring of a `HEALPixPaddedGrid`."""
-npoints_min(::Type{<:HEALPixPaddedGrid}) = 20
+npoints_min(::Type{<:PaddedHEALPixGrids}) = 20
 
 """$(TYPEDSIGNATURES) Refinement factor `k` of ring `j` relative to the `HEALPixGrid`, i.e.
 the padded ring has `k` times the HEALPix longitudes."""
-function refinement_factor(Grid::Type{<:HEALPixPaddedGrid}, nlat_half::Integer, j::Integer)
-    nlon_healpix = get_nlon_per_ring(HEALPixGrid, nlat_half, j)
+function refinement_factor(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
+    nlon_healpix = get_nlon_per_ring(unpadded_grid_type(Grid), nlat_half, j)
     return cld(npoints_min(Grid), nlon_healpix)
 end
 
-function get_nlon_per_ring(Grid::Type{<:HEALPixPaddedGrid}, nlat_half::Integer, j::Integer)
-    return refinement_factor(Grid, nlat_half, j) * get_nlon_per_ring(HEALPixGrid, nlat_half, j)
+function get_nlon_per_ring(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
+    return refinement_factor(Grid, nlat_half, j) * get_nlon_per_ring(unpadded_grid_type(Grid), nlat_half, j)
 end
 
-get_npoints(Grid::Type{<:HEALPixPaddedGrid}, nlat_half::Integer) =
+get_npoints(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer) =
     nlat_half == 0 ? 0 : sum(get_nlon_per_ring(Grid, nlat_half, j) for j in 1:get_nlat(Grid, nlat_half))
 
-function get_nlat_half(Grid::Type{<:HEALPixPaddedGrid}, npoints::Integer)
-    # no closed form, but the padding only adds a constant number of points beyond nside >= 5
-    nlat_half = 2
+function get_nlat_half(Grid::Type{<:PaddedHEALPixGrids}, npoints::Integer)
+    # no closed form, so search, npoints grows monotonically with nlat_half
+    step = Grid <: HEALPixPaddedGrid ? 2 : 1          # HEALPix requires even nlat_half
+    nlat_half = step
     while get_npoints(Grid, nlat_half) < npoints
-        nlat_half += 2
+        nlat_half += step
     end
     return nlat_half
 end
 
-# with nlat_half < 10 the belt has fewer than 20 points and is refined too, so use the
-# HEALPix belt only for larger grids, otherwise the maximum over all rings
-get_nlon_max(Grid::Type{<:HEALPixPaddedGrid}, nlat_half::Integer) =
+# for small grids the refined polar rings can have more points than the Equator
+get_nlon_max(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer) =
     maximum(get_nlon_per_ring(Grid, nlat_half, j) for j in 1:nlat_half)
 
 ## COORDINATES
-get_latd(::Type{<:HEALPixPaddedGrid}, nlat_half::Integer) = get_latd(HEALPixGrid, nlat_half)
+get_latd(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer) = get_latd(unpadded_grid_type(Grid), nlat_half)
 
 # offset of dlon/2 east of 0˚ if HEALPix has one on that ring and the refinement factor is odd
-function hasoffset(Grid::Type{<:HEALPixPaddedGrid}, nlat_half::Integer, j::Integer)
-    return hasoffset(HEALPixGrid, nlat_half, j) && isodd(refinement_factor(Grid, nlat_half, j))
+function hasoffset(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
+    return hasoffset(unpadded_grid_type(Grid), nlat_half, j) && isodd(refinement_factor(Grid, nlat_half, j))
 end
 
-hasoffset(::Type{<:HEALPixPaddedGrid}) = throw(
+hasoffset(Grid::Type{<:PaddedHEALPixGrids}) = throw(
     ArgumentError(
-        "HEALPixPaddedGrid has rings with and without longitudinal offset, " *
+        "$(nonparametric_type(Grid)) has rings with and without longitudinal offset, " *
             "use hasoffset(Grid, nlat_half, j) per ring instead."
     )
 )
 
 # ring-dependent offset, so kernels need it as a vector with one Bool per ring
-function offset_maybe_vector(arch, grid::HEALPixPaddedGrid)
+function offset_maybe_vector(arch, grid::PaddedHEALPixGrids)
     (; nlat_half) = grid
-    return on_architecture(arch, [hasoffset(HEALPixPaddedGrid, nlat_half, j) for j in 1:get_nlat(grid)])
+    return on_architecture(arch, [hasoffset(nonparametric_type(grid), nlat_half, j) for j in 1:get_nlat(grid)])
 end
 
-function get_lond_per_ring(Grid::Type{<:HEALPixPaddedGrid}, nlat_half::Integer, j::Integer)
+function get_lond_per_ring(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
     s = hasoffset(Grid, nlat_half, j) ? 1 : 2       # same convention as HEALPixGrid
     return [180 / (nlon ÷ 2) * (i - s / 2) for i in 1:nlon]
@@ -105,28 +142,27 @@ end
 """$(TYPEDSIGNATURES) Refinement factor `k` and in-ring index `first` of the first HEALPix
 point on ring `j` of the `HEALPixPaddedGrid`, such that HEALPix point `i` (in-ring index)
 is padded point `k(i-1) + first`."""
-function healpix_nesting(Grid::Type{<:HEALPixPaddedGrid}, nlat_half::Integer, j::Integer)
+function healpix_nesting(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
     k = refinement_factor(Grid, nlat_half, j)
     # HEALPix point 1 is at dlon_healpix/2 = k*dlon/2 (offset) or 0˚ (no offset)
-    first = hasoffset(HEALPixGrid, nlat_half, j) ? (isodd(k) ? (k + 1) ÷ 2 : k ÷ 2 + 1) : 1
+    first = hasoffset(unpadded_grid_type(Grid), nlat_half, j) ? (isodd(k) ? (k + 1) ÷ 2 : k ÷ 2 + 1) : 1
     return k, first
 end
 
 ## QUADRATURE, same ring areas as HEALPix, the solid angle per point (generic
 # get_solid_angles) then divides by the padded nlon
-get_quadrature_weights(::Type{<:HEALPixPaddedGrid}, nlat_half::Integer) =
-    equal_area_weights(HEALPixGrid, nlat_half)
+get_quadrature_weights(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer) =
+    equal_area_weights(unpadded_grid_type(Grid), nlat_half)
 
 ## INDEXING
 function each_index_in_ring!(
         rings::AbstractVector,
-        Grid::Type{<:HEALPixPaddedGrid},
+        Grid::Type{<:PaddedHEALPixGrids},
         nlat_half::Integer
     )
     nlat = length(rings)
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
-    @boundscheck iseven(nlat_half) ||
-        throw(AssertionError("HEALPixPaddedGrid only defined for even nlat_half, nlat_half=$nlat_half provided."))
+    Grid <: HEALPixPaddedGrid && nside_healpix(nlat_half)     # throws for odd nlat_half
 
     index_end = 0
     @inbounds for j in 1:nlat
@@ -137,25 +173,28 @@ function each_index_in_ring!(
     return rings
 end
 
-## CONVERSION BETWEEN HEALPixGrid AND HEALPixPaddedGrid
+## CONVERSION BETWEEN (Octa)HEALPixGrid AND (Octa)HEALPixPaddedGrid
 
 # refinement factor k and first nested index per ring on architecture arch, for kernels
-function healpix_nesting_on_architecture(arch, grid::HEALPixPaddedGrid)
-    nesting = [healpix_nesting(HEALPixPaddedGrid, grid.nlat_half, j) for j in 1:get_nlat(grid)]
+function healpix_nesting_on_architecture(arch, grid::PaddedHEALPixGrids)
+    nesting = [healpix_nesting(nonparametric_type(grid), grid.nlat_half, j) for j in 1:get_nlat(grid)]
     return on_architecture(arch, first.(nesting)), on_architecture(arch, last.(nesting))
 end
 
 function check_nesting(healpix::AbstractField, padded::AbstractField)
-    @assert healpix.grid.nlat_half == padded.grid.nlat_half "HEALPix and HEALPixPadded grids differ in nlat_half: " *
+    @assert healpix.grid.nlat_half == padded.grid.nlat_half "Unpadded and padded grids differ in nlat_half: " *
         "$(healpix.grid.nlat_half) vs $(padded.grid.nlat_half)"
     @assert size(healpix)[2:end] == size(padded)[2:end] "Non-horizontal dimensions differ: " *
         "$(size(healpix)[2:end]) vs $(size(padded)[2:end])"
     return nothing
 end
 
-"""$(TYPEDSIGNATURES) Copy `padded` onto `healpix` by subsampling: every `HEALPixGrid` point
-is also a `HEALPixPaddedGrid` point, so this is exact."""
-function Base.copyto!(healpix::HEALPixField, padded::HEALPixPaddedField)
+"""$(TYPEDSIGNATURES) Copy `padded` onto `healpix` by subsampling: every `(Octa)HEALPixGrid`
+point is also a `(Octa)HEALPixPaddedGrid` point, so this is exact."""
+Base.copyto!(healpix::HEALPixField, padded::HEALPixPaddedField) = subsample_padded!(healpix, padded)
+Base.copyto!(healpix::OctaHEALPixField, padded::OctaHEALPixPaddedField) = subsample_padded!(healpix, padded)
+
+function subsample_padded!(healpix::AbstractField, padded::AbstractField)
     check_nesting(healpix, padded)
     arch = architecture(healpix)
     ring_first_healpix, _ = eachring_on_architecture(arch, healpix.grid)
@@ -181,7 +220,10 @@ end
 
 """$(TYPEDSIGNATURES) Copy `healpix` onto `padded`, nested points are copied, the points in
 between are linearly interpolated in longitude along each ring (the latitudes are identical)."""
-function Base.copyto!(padded::HEALPixPaddedField, healpix::HEALPixField)
+Base.copyto!(padded::HEALPixPaddedField, healpix::HEALPixField) = interpolate_padded!(padded, healpix)
+Base.copyto!(padded::OctaHEALPixPaddedField, healpix::OctaHEALPixField) = interpolate_padded!(padded, healpix)
+
+function interpolate_padded!(padded::AbstractField, healpix::AbstractField)
     check_nesting(healpix, padded)
     arch = architecture(padded)
     ring_first_healpix, ring_length_healpix = eachring_on_architecture(arch, healpix.grid)

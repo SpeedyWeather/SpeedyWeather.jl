@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- New `HEALPixPaddedGrid`: HEALPix with ≥20 longitudes per ring that nest with HEALPix, `copyto!` between both by subsampling or linear interpolation [#1315](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1315)
+- New `HEALPixPaddedGrid` and `OctaHEALPixPaddedGrid`: (Octa)HEALPix with ≥20 longitudes per ring that nest with (Octa)HEALPix, `copyto!` between both by subsampling or linear interpolation [#1315](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1315)
 - Primitive equation models transform U, V and the surface pressure gradient ∇ln(pₛ) to grid space in one batched transform, 2 instead of 3 spectral→grid transforms per time step [#1313](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1313)
 - Update Zarr requirement from 0.9, 0.10 to 0.9, 0.10, 0.11 [#1309](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1309)
 - Update GPUArrays requirement from 11 to 11, 12.1 [#1308](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1308)

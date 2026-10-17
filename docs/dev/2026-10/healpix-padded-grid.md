@@ -1,4 +1,4 @@
-# HEALPixPaddedGrid: HEALPix with at least 20 longitudes per ring, nested with HEALPix
+# HEALPixPaddedGrid and OctaHEALPixPaddedGrid: (Octa)HEALPix with at least 20 longitudes per ring, nested with HEALPix
 
 > Status: **completed**. Grid, nested `copyto!` both directions and tests implemented in RingGrids.
 
@@ -19,6 +19,10 @@ Base revision: e410eed05c967a4e117b91c91591d17da155a774
 
 - 2026-10-17: Initial draft. The requested 20 points on rings 2–4 cannot nest (see below);
   implemented the closest nesting alternative, the smallest *multiple* of HEALPix's `nlon` ≥ 20.
+- 2026-10-17: "Can you also implement the equivalent OctHEALPixPaddedGrid?" Added
+  `OctaHEALPixPaddedGrid` with the same rule relative to `OctaHEALPixGrid` (rings 20, 24, 24,
+  32, 20, 24, 28, ..., all with offset unless `k` is even). Both padded grids share one
+  implementation through `unpadded_grid_type`.
 
 ## Problem description
 
@@ -57,12 +61,17 @@ New reduced grid `HEALPixPaddedGrid` in `RingGrids/src/grids/healpix_padded.jl`:
   thread per grid point and layer, for CPU and GPU, with matching `nlat_half` asserted.
 - Export from RingGrids and SpeedyWeather; default dealiasing as for HEALPix (3).
 
+`OctaHEALPixPaddedGrid` is the same construction relative to `OctaHEALPixGrid` (4j points
+north of and on the Equator, all rings offset), sharing all methods via
+`const PaddedHEALPixGrids = Union{HEALPixPaddedGrid, OctaHEALPixPaddedGrid}` and
+`unpadded_grid_type`, with `copyto!` between `OctaHEALPixField` and `OctaHEALPixPaddedField`.
+
 ## Testing and verification
 
 `RingGrids/test/healpix_padded.jl`: nlons per ring, nesting of coordinates, total npoints,
 sum of solid angles = 4π, subsample∘interpolate = identity, interpolation exact for zonally
 constant fields and for wavenumber-1 linear profiles on nested points, multi-layer fields.
-Added to the generic grid tests list.
+Run for both padded grids, both added to the generic grid tests list.
 
 ## Documentation changes
 

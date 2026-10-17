@@ -12,6 +12,7 @@ import Random
             HEALPixGrid,
             HEALPixPaddedGrid,
             OctaHEALPixGrid,
+            OctaHEALPixPaddedGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
         )
@@ -50,6 +51,7 @@ end
             HEALPixField,
             HEALPixPaddedField,
             OctaHEALPixField,
+            OctaHEALPixPaddedField,
         )
 
         @test RingGrids.isreduced(F)
@@ -73,6 +75,7 @@ end
                 HEALPixGrid,
                 HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
@@ -116,6 +119,7 @@ end
                 HEALPixGrid,
                 HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
@@ -177,6 +181,7 @@ end
                 HEALPixField,
                 HEALPixPaddedField,
                 OctaHEALPixField,
+                OctaHEALPixPaddedField,
                 FullHEALPixField,
                 FullOctaHEALPixField,
             )
@@ -204,6 +209,7 @@ end
                 HEALPixGrid,
                 HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
@@ -264,6 +270,7 @@ end
                 HEALPixField,
                 HEALPixPaddedField,
                 OctaHEALPixField,
+                OctaHEALPixPaddedField,
                 FullHEALPixField,
                 FullOctaHEALPixField,
             )
@@ -310,6 +317,7 @@ end
             HEALPixGrid,
             HEALPixPaddedGrid,
             OctaHEALPixGrid,
+            OctaHEALPixPaddedGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
         )
@@ -344,6 +352,7 @@ end
             HEALPixGrid,
             HEALPixPaddedGrid,
             OctaHEALPixGrid,
+            OctaHEALPixPaddedGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
         )
@@ -482,6 +491,7 @@ end
             HEALPixField,
             HEALPixPaddedField,
             OctaHEALPixField,
+            OctaHEALPixPaddedField,
             FullHEALPixField,
             FullOctaHEALPixField,
         )
@@ -515,6 +525,7 @@ end
             HEALPixField,
             HEALPixPaddedField,
             OctaHEALPixField,
+            OctaHEALPixPaddedField,
             FullHEALPixField,
             FullOctaHEALPixField,
         )
@@ -615,6 +626,7 @@ end
                 HEALPixGrid,
                 HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
