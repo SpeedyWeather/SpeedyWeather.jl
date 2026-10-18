@@ -327,6 +327,56 @@ Profiles (A40, Nsight with `--cuda-graph-trace=node`, scripts and reports in
   (6 vs 135 kernels per roundtrip, FFT GPU time 282 µs: FFTs 145, concat/slice/pad 92); T63 matrix 0.81 ms vs
   FFT 1.32 ms.
 
+### Re-audit of the Reactant `SpectralTransform` (2026-10-16 night)
+
+> We don't see much speed ups with Reactant LT+FFT versus CUDA.jl. Is this expected because we already use
+> CUDA Graphs, or is there still something we can do? Re-audit the SpectralTransform for Reactant
+
+Main benchmark suite on the H100 (`reactant-gpu` 2026-10-16 vs `gpu-nvidia` 2026-10-14, PrimitiveWet, SYPD):
+Reactant LT+FFT vs CUDA.jl LT+FFT at T128-T171 0.93-0.98x, T256 1.09-1.21x; at T ≤ 86 CUDA.jl's "default"
+rows are its matrix transform (`WhichTransform`), there Reactant LT+FFT is 0.51-1.09x; Reactant's matrix
+transform is 1.2-3.1x CUDA.jl. Reactant only pulls ahead where the whole step runs as one CUDA graph, which
+the FFT path never does (XLA can't capture FFTs). At high resolution both spend most of the transform time in
+the same cuFFT kernels.
+
+Inefficiencies of `SpeedyTransformsReactantExt.jl`:
+1. One FFT op per latitude run and transform call (octahedral grids: per latitude, 96-384 per step); each
+   breaks XLA's CUDA graph, adds a cuBLAS `scal` (XLA normalizes `IRFFT`, `brfft` multiplies back) and pre/post
+   kernels.
+2. All `nfreq_max` frequencies computed and zero-padded, only `mmax` used (e.g. 32 of 57 at T31).
+3. Fourier and Legendre communicate through the scratch arrays `f_north`/`f_south`/`g_north`/`g_south` with a
+   `permutedims` on each side, real device writes/reads of loop-carried buffers inside the traced loop.
+4. Per run slices, `cat`, zero padding and `reverse`, then concatenation over runs (T31 step: 172 µs
+   concatenate/slice/pad + 119 µs transposes of 835 µs GPU time; T63 transform alone: 354 µs of 834 µs).
+5. `dot_general_complex` stacks and unstacks real/imaginary parts per product.
+
+**Prototype: Fourier as one batched matrix product** (`claude_reactant_gpu_2026-10-13/dft_proto_2026-10-16/
+dft_transform_proto.jl`): since only `mmax` frequencies are needed, the Fourier transform of every ring is a
+truncated DFT, precomputed per latitude: forward `W[2mmax, nlon_max, nlat_half]` (real/imaginary rows, quadrature
+weights and longitude offsets folded in), inverse `B[nlon_max, 2mmax, nlat_half]` (brfft of the first `mmax`
+frequencies, factor 2 and Nyquist handling); one constant-index gather of the grid into padded rings
+`(nlon_max, nlat_half, north/south, K)` and one back; Legendre unchanged. Two gathers and four `dot_general`s
+per roundtrip, no FFT ops, so XLA keeps the program in one CUDA graph. Memory O(N³): 2 × 0.7 / 5 / 39 MB at
+T31 / T63 / T127 (≈ 2 × 300 MB at T255).
+
+Forward + inverse, 73 columns, traced loop of 20, A40, TF32 (relative error vs the CPU transform 4-7e-4 for the
+prototype, the TF32 level of the other two):
+
+| T | DFT prototype | current LT+FFT | MatrixSpectralTransform |
+| --- | --- | --- | --- |
+| T31 | 0.045 ms | 0.452 ms | 0.083 ms |
+| T63 | 0.149 ms | 1.250 ms | 0.797 ms |
+| T127 | 0.851 ms | (lost in the log) | 10.24 ms |
+| T255 | 5.42 ms | 9.76 ms | (too large) |
+
+With `dot_general_precision = HIGHEST`: errors vs the CPU transform 1.3e-7 / 5.1e-7 (T31) and 2.0e-7 / 1.1e-6
+(T127) forward / inverse; times T31 0.051 (DFT) / 0.449 (FFT) / 0.111 ms (matrix), T127 0.957 / 3.231 /
+17.67 ms. So the prototype is 1.8x (T255) to 10x (T31) faster than the current FFT path and 2-18x faster than
+the matrix transform in the transform alone, at the same accuracy. Open: the full time step, odd `nlat` (equator ring: its southern slot →
+the zero row), gradients (constant-index gathers, scatter-add adjoint). Implementing it needs an
+implementation plan (it replaces `_fourier!`/the scratch round trip on Reactant), independent of it: merging
+the three spectral→grid calls per step (see above).
+
 ## Handoff 2026-10-16 (to the HPC node with GPU)
 
 State: branch `mg/reactant-fft`, code committed by the user as `14a458a1` ("FFTs working with Reactant"),

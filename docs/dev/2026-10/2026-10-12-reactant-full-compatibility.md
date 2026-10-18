@@ -1030,8 +1030,36 @@ The while-loop unroll threshold on the Julia side is still 4 (`Reactant.Compiler
 pattern exclusions can be added in one place again; the AD tests' `REACTANT_AD_COMPILE_OPTIONS` is
 `reactant_compile_options(; raise_first = true)`. Compat `Reactant = "0.2.294"` in all five packages,
 CHANGELOG updated. The CUDA test and benchmark manifests were re-resolved from scratch (old ones in
-`reactant_0294/`). Verification: `test/reactant` on the CPU backend in three parts and the A40 GPU checks
-(`reactant_0294/test_*.log`, `gpu_checks.log`).
+`reactant_0294/`).
+
+Verification on 0.2.294 (CPU backend unless noted, `reactant_0294/test_*.log`):
+- `test_maybe_jit`, `utilities`, `test_transform`, `test_correctness`: 165/165; `test_output`,
+  `test_time_steps`: 76/76; differentiation without the PrimitiveWet loop check (make_zero, one step with
+  both transforms, Barotropic 6-step loop with `(;)`, `Periodic(2)`, `Binomial(2)`): 48/48, no exclusions.
+- A40: `test/GPU/reactant.jl` 5/5, PrimitiveWet NaN check with the `SpectralTransform` 5/5, transform test
+  with `HIGHEST` 2/2 + 48/48.
+- **New with 0.2.294: the PrimitiveWet loop gradient with `checkpointing = Reactant.Periodic(2)` doesn't
+  finish compiling** (killed after 60 min, with and without the old exclusions; the CI runner sat in it for
+  2.5 h in the greedy pattern rewriter, e.g. `AddTermsToReduce`). Without checkpointing and with
+  `Binomial(2)` it compiles in 3.5 / 3.6 min, the BarotropicModel with `Periodic(2)` is fine. On 0.2.293 the
+  whole CI check (three options) took ~30 min. `test_differentiability_time_steps` got an `options` keyword,
+  the PrimitiveWet CI check and `differentiation_primitive_wet.jl` run without `Periodic(2)` (comment in the
+  test); the PrimitiveWet CI check then passes (`test_C3.log`, 21 min incl. setup). Not minimized or reported
+  upstream yet.
+
+> the concat_view_cse should fixed in Reactant 0.2.295. test that.
+
+Reactant 0.2.295 (2026-10-17, `Reactant_jll` 0.0.424; release notes: only a macOS symbol fix, #3487), no
+exclusions (`claude_reactant_gpu_2026-10-13/reactant_0295/`): the `concat_view_cse` MWE terminates in 0.1 s
+(530 patterns), the ShallowWater `initialize!` takes 31.8 s and the compile of `time_steps!(simulation, 5)`
+67.5 s, as with 0.2.294. So `concat_view_cse` works with both; `REACTANT_EXCLUDED_PASSES` stays empty, the
+compat (`0.2.294`) allows 0.2.295. The PrimitiveWet loop gradient with `Periodic(2)` is being rechecked on
+0.2.295.
+
+Benchmark fix (2026-10-17): the merge of main with #1313 (`68e4088f`) dropped `pressure_gradient_flux!` from
+the `functions_and_arguments` of the "Individual dynamics functions" suite (its signature became
+`(vars, time_stepping)`), so the name assertion failed; entry restored, the suite runs again on the CPU
+(12/12 functions).
 
 ## Known limitations
 
