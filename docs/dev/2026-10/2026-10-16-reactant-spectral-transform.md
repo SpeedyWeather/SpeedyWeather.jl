@@ -987,3 +987,17 @@ Branch `mg/reactant-dft` (base `c32de0ee`), login02 (A40) and Slurm (H100). Scri
   of `HIGHEST` for the default transform; the GPU NaN test is the BarotropicModel with both transforms);
   `differentiability.md` (default transform in the example). The PrimitiveWet gradient in CI uses the matrix
   transform; a one-off check of the one-step PrimitiveWet gradient with the DFT is running.
+- **10-year T256L8 TF32 run** (Slurm 2568499, H100, DFT, `long_run_stability.jl`): **unstable**, non-finite values in
+  all variables after the program ending at day 360. Global means steady until then (surface temperature 276-279 K,
+  surface pressure 972.5 ± 0.4 hPa, surface humidity ~4.8 g/kg); local extremes grew: minimum temperature 190 → 151 K
+  (days 90 to 330), max |v| 44 → 75 m/s. 311 SYPD on the H100. Controls requested by the user (T256L8, 2 years each):
+  Reactant DFT with `HIGHEST`, Reactant FFT path with TF32, CUDA.jl in Float32 (`long_run_stability_cuda.jl`; loop and
+  diagnostics shared in `long_run_loop.jl`).
+- **PrimitiveWet gradient with the DFT fails to compile** (one-off check, `run_ad_primitive_wet_dft.jl`, Reactant CPU
+  backend, `test_differentiability(PrimitiveWetModel; Transform = SpectralTransform, compare_with_enzyme = false)`):
+  the loss passes, the gradient fails in the MLIR pass pipeline, `'stablehlo.scatter' op inferred type(s)
+  'tensor<1x65x3168xf32>' are incompatible with return type(s) 'tensor<1x73x3168xf32>'` (from the `fill!` in
+  `reset_tendencies!` on the 73-column tendency parent, i.e. a pass narrowed the operand of a scatter). CI only
+  differentiates the PrimitiveWetModel with the matrix transform (6 steps); controls of this one-step check with the
+  matrix transform and the FFT path running. Relevant for the new default (`WhichTransform`) and the
+  `differentiability.md` example (default transform).
