@@ -3,7 +3,7 @@
 # raised to StableHLO, hence `raise = true`. The Reactant gradients are compared against Enzyme on
 # the CPU for the same state.
 # CI runs this for the BarotropicModel (one time step with both the MatrixSpectralTransform and the
-# FFT-based SpectralTransform) and, without the comparison against Enzyme on the CPU (too slow
+# SpectralTransform, Fourier transform as truncated DFT) and, without the comparison against Enzyme on the CPU (too slow
 # to compile), the gradient of several time steps of the PrimitiveWetModel; `differentiation_primitive_wet.jl`
 # uses the functions defined here for the full comparison of the PrimitiveWetModel.
 #
@@ -171,7 +171,7 @@ if !(@isdefined(DIFFERENTIATION_FUNCTIONS_ONLY) && DIFFERENTIATION_FUNCTIONS_ONL
     end
 
     test_differentiability(BarotropicModel)
-    test_differentiability(BarotropicModel; Transform = SpectralTransform)  # FFTs and batched Legendre
+    test_differentiability(BarotropicModel; Transform = SpectralTransform)  # truncated DFT and batched Legendre
     test_differentiability_time_steps(BarotropicModel)
 
     # PrimitiveWetModel: only that the gradient of the traced loop compiles (and is finite), the comparison
