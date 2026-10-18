@@ -100,9 +100,14 @@ _jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)
 
 """Optimization patterns of Reactant excluded from every compilation (`@maybe_jit`, the compiled time
 loop, see `reactant_compile_options`), to work around Reactant limitations and bugs: add a pattern's
-name here, remove it once fixed upstream. None needed with Reactant v0.2.294 (it fixed the
-`concat_view_cse` loop of v0.2.293)."""
-const REACTANT_EXCLUDED_PASSES = String[]
+name here, remove it once fixed upstream.
+- `cse_slice`: since Reactant v0.2.293 (still in v0.2.295) the optimization patterns rewrite the
+  index computation of the gradient kernel (`∇!` of the surface pressure, gathers with index
+  `(lm - 1) mod n`) in a cycle that never terminates, so the time step of the primitive equation
+  models never compiles. Excluding `cse_slice` breaks the cycle (the alternative,
+  `max_reused_const_prop_size = 0`, compiles as fast but the model runs up to 5% slower on CPU),
+  see docs/dev/2026-10/reactant-issue-draft-gather-index-cycle.md."""
+const REACTANT_EXCLUDED_PASSES = ["cse_slice"]
 
 """
     reactant_compile_options(; kwargs...)
