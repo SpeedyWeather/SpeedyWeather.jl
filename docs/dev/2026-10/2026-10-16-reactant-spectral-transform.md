@@ -1,6 +1,6 @@
 # FFT-based `SpectralTransform` with Reactant
 
-> Status: **in progress**. See "Handoff 2026-10-16 (to the HPC node with GPU)" first. The FFT-based `SpectralTransform` runs, differentiates and passes the CPU-vs-Reactant correctness tests for all models on Reactant's CPU backend; GPU tests/benchmarks and the default transform on Reactant are open.
+> Status: **in progress**. See "Handoff 2026-10-16 (to the HPC node with GPU)" first. The FFT-based `SpectralTransform` runs, differentiates and passes the CPU-vs-Reactant correctness tests for all models on Reactant's CPU backend; GPU tests/benchmarks and the default transform on Reactant are open. A Fourier stage as truncated DFT (no FFTs) is planned for a follow-up PR, see the last section.
 
 Date of initial draft: 2026-10-16
 
@@ -49,6 +49,27 @@ On the HPC node (merged into `mg/new-reactant` as #1312): GPU checks in "Protoco
 
 Open decision 2 resolved: the benchmark suite's default rows run with the `SpectralTransform` on Reactant,
 the matrix rows with the `MatrixSpectralTransform` (see the protocol).
+
+> For the SpectralTransform, why do you estimate a DFT approach to be faster than the pure MatrixSpectralTransform
+> approach? MatrixSpectralTransform just does a single transform
+
+Measured (transform alone), not estimated. One product, but O(N⁴) work and memory, bandwidth bound; the DFT +
+Legendre factorisation is O(N³). Numbers in "Follow-up plan: Fourier transform as a truncated DFT on Reactant".
+
+> Would you also estimate the DFT to be faster without Reactant? With regular CUDA.jl
+
+Estimate only: no gain at T ≤ 64 (CUDA.jl is host-bound there), ~1.5x at T86 against the matrix transform, ~1.1x
+above T100 against LT+FFT. Out of scope of the follow-up plan, see there.
+
+> Would it be possible to somehow run Reactant FFTs with CUDA Graphs though?
+
+Not without changing XLA or Reactant: `FftThunk` can't be recorded into XLA's command buffers, neither in the
+Reactant_jll build nor upstream. Capturing them would remove only the launch overhead. See the follow-up plan.
+
+> okay make a more detailed plan of the DFT approach to implmeent later in the already existing markdown document.
+> We defer this to a follow up PR
+
+Added "Follow-up plan: Fourier transform as a truncated DFT on Reactant" (deferred, not part of this PR).
 
 ## Problem description
 
@@ -373,8 +394,8 @@ With `dot_general_precision = HIGHEST`: errors vs the CPU transform 1.3e-7 / 5.1
 (T127) forward / inverse; times T31 0.051 (DFT) / 0.449 (FFT) / 0.111 ms (matrix), T127 0.957 / 3.231 /
 17.67 ms. So the prototype is 1.8x (T255) to 10x (T31) faster than the current FFT path and 2-18x faster than
 the matrix transform in the transform alone, at the same accuracy. Open: the full time step, odd `nlat` (equator ring: its southern slot →
-the zero row), gradients (constant-index gathers, scatter-add adjoint). Implementing it needs an
-implementation plan (it replaces `_fourier!`/the scratch round trip on Reactant), independent of it: merging
+the zero row), gradients (constant-index gathers, scatter-add adjoint). Implementation plan: "Follow-up
+plan: Fourier transform as a truncated DFT on Reactant" at the end (deferred to a follow-up PR); independent of it: merging
 the three spectral→grid calls per step (see above).
 
 ## Handoff 2026-10-16 (to the HPC node with GPU)
@@ -558,3 +579,205 @@ CHANGELOG.
   exists); minimize the 4-d FFT pass failure; Reactant's `isempty` meaning "buffer deleted" for concrete
   arrays is surprising (maybe by design).
 - Pack the dense Legendre layout tighter (e.g. pair column m with column mmax - m + 1 to fill the triangle).
+- Fourier stage as a truncated DFT on Reactant (follow-up PR): see the next section.
+
+## Follow-up plan: Fourier transform as a truncated DFT on Reactant
+
+> Status: **planned**, deferred to a follow-up PR. Prototype measured (transform alone, see "Re-audit" above),
+> nothing in the package yet.
+
+Date: 2026-10-18. Base revision: `e22793e3` (branch `mg/new-reactant`). Prototype:
+`/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/dft_proto_2026-10-16/dft_transform_proto.jl`.
+
+### Problem
+
+On Reactant's GPU backend the FFT-based Fourier stage is why the `SpectralTransform` loses to the matrix transform
+at T ≤ 127 (H100, PrimitiveWet L8, 10 steps per call: T31 1.12 vs 0.451 ms, T63 2.25 vs 0.687 ms per step):
+- every `stablehlo.fft` becomes an XLA `FftThunk`, which can't be recorded into a CUDA graph (below), so the step
+  splits into several graphs plus ~270 separately launched kernels per step (T31, A40);
+- XLA normalizes every inverse FFT with a cuBLAS `scal` that `brfft` multiplies back. The per-run slices, zero
+  padding, concatenations and the scratch round trip with `permutedims` add ~380 µs. Of the 835 µs GPU time per
+  step at T31 (A40), 91 µs are `scal` and 291 µs concatenate/slice/pad and transposes.
+
+Only the first `mmax` of a ring's `nlon/2 + 1` frequencies are used. So the Fourier transform of a ring is a
+truncated DFT, a small dense matrix. All rings together are one batched `dot_general`, which XLA records into its
+CUDA graph like any matrix product.
+
+**Why not FFTs inside CUDA graphs** (checked 2026-10-18). In the depot's `libReactantExtra.so` (Reactant_jll
+build of 2026-10-17), the thunks that XLA can record into a command buffer (CUDA graph) have a `Record` method:
+kernel, custom kernel, custom call, cuDNN, while, conditional, memzero, device-to-device copy, collectives.
+`FftThunk` has none. Upstream XLA `main` is the same: `FftThunk` derives only from `Thunk`, and
+`GetCommandBufferCmdType` (`command_buffer_conversion_pass.cc`) has no case for `kFft`. So there is no `FFT`
+command type to enable with `XLA_FLAGS`. Two ways would be possible, both out of scope:
+- an XLA patch making `FftThunk` a `TracedCommand` with stream-captured cuFFT calls (plans created before capture);
+- a command-buffer-compatible cuFFT FFI custom call in Reactant.
+
+Either removes only the launch overhead. The FFT path's GPU time would stay: 835 µs per step at T31, about twice
+the matrix transform's whole step (418 µs, A40).
+
+**Why the DFT is cheaper than the matrix transform, although that is a single product.** A spherical harmonic is
+separable, Y_lm(λ, φ) = P_lm(sin φ) e^{imλ}. The `MatrixSpectralTransform` stores the product for every harmonic
+and every grid point, `(2nharmonics, npoints)`, O(N⁴) in work and memory. Applied in two stages (a DFT per ring,
+then a Legendre transform per order) the factors are O(N³). The matrix transform is memory-bandwidth bound: it
+reads the whole matrix on every call, whatever K. The DFT matrices fit, or nearly fit, into L2.
+
+| T | matrix, per direction | DFT matrix `W`, per direction | FLOPs per column: matrix / DFT + Legendre |
+| --- | --- | --- | --- |
+| T31 | 14 MB | 0.7 MB | 7.1 M / ≈ 0.8 M |
+| T63 | 188 MB | 5 MB | 94 M / ≈ 6 M |
+| T127 | 2.7 GB | 39 MB | 1.4 G / ≈ 45 M |
+| T255 | ≈ 41 GB | 307 MB | 20 G / ≈ 0.36 G |
+
+### Design
+
+**Selection.** A new `Bool` field `fourier_dft`, a keyword of the `SpectralTransform` constructor like `gpu_graphs`.
+It adds no type parameter (the type name is at 1008-1014 of 1024 characters, `test/type_name_length.jl`). Defaults
+from `default_fourier_dft(architecture, truncation)`:
+- `false` on CPU/GPU: the CUDA.jl path is unchanged.
+- on `ReactantDevice`, `true` up to `dft_max_truncation` (proposal T255, decided by the benchmark).
+
+The FFT path stays for larger truncations, memory-limited runs and possibly Reactant's CPU backend. `if
+S.fourier_dft` is resolved while tracing.
+
+**Precomputed matrices.** `dense_fourier_matrices(architecture, ...)` has an empty fallback in `src/` and its
+method in `SpeedyTransformsReactantExt`. The matrices are computed on the host in Float64, converted to `NF` and
+stored flattened as `VectorType` like `legendre_polynomials_dense`. They are empty on CPU/GPU and with
+`fourier_dft = false`.
+- Forward `W[2mmax, nlon_max, nlat_half]`: row m + 1 holds the real part and row mmax + m + 1 the imaginary part
+  of `solid_angles[j] * conj(lon_offsets[m + 1, j]) * cis(-2π m (i - 1) / nlon_j)`. It is zero for longitudes
+  i > nlon_j (padding) and for orders beyond the ring's Nyquist frequency (2m > nlon_j, as the zero-padded `rfft`
+  is now). This folds in the quadrature weights and longitude offsets that the forward `_legendre!` applies today.
+- Inverse `B[nlon_max, 2mmax, nlat_half]`: `brfft` of the first mmax frequencies with the longitude offset folded
+  in. Columns are `c_m cos(θ + m λ_j)` (real part) and `-c_m sin(θ + m λ_j)` (imaginary part), where:
+  - θ = 2π m (i - 1) / nlon_j;
+  - λ_j is the first longitude of ring j;
+  - c_m = 1 for m = 0 and the Nyquist frequency, 2 otherwise;
+  - entries beyond the ring are zero.
+
+  The prototype multiplied `lon_offsets` separately as complex numbers. Folding them in makes the whole traced
+  transform real.
+- Memory 2 × 0.7 / 5 / 39 / 307 MB at T31 / T63 / T127 / T255, ≈ 2 × 2.4 GB at T511. Reported by `show`.
+
+**Index tables.** Built on the host while tracing (like `dense_indices`), constants in the program:
+- `ring_gather_indices(S)`, `(nlon_max, nlat_half, 2)`: the grid point at longitude i of northern/southern ring j.
+  Padding points to npoints + 1, an appended zero row. For odd nlat the southern copy of the equator ring does too
+  (it is transformed once, as now).
+- `ring_positions(S)`, `(npoints,)`: the position of every grid point in the inverse product's output
+  `(nlat_half, nlon_max, 2)`; `dot_general` puts the batch dimension first. Equator points come from the northern
+  slot only.
+
+**Traced transform.** New methods of `_transform_nonchunked!` for `ReactantSpectralTransform`, both directions
+(`_transform_grid!`/`_transform_spec!` already wrap them in `@maybe_jit`). They branch on `S.fourier_dft`. The FFT
+branch calls `_fourier!`/`_legendre!` as now. The DFT branch fuses the Fourier and Legendre transforms and skips
+the scratch memory.
+
+Grid → spectral:
+1. Read the field as an (npoints, K) matrix and append a zero row.
+2. Gather into padded rings `(nlon_max, nlat_half, 2, K)`.
+3. `dot_general` with `W`, batched over j, contracting the longitude: `(nlat_half, 2mmax, 2, K)`.
+4. Even/odd = north ± south.
+5. Legendre `dot_general` with the dense polynomials, batched over parity and order, contracting j. The real and
+   imaginary parts are a free dimension of the right-hand side, so neither `dot_general_complex` nor complex arrays
+   are needed.
+6. `complex(re, im)`, pack with `dense_of_lm`, `write_matrix!`.
+
+Spectral → grid:
+1. Unpack to the dense layout with `lm_of_dense`, real and imaginary parts as a free dimension.
+2. Legendre `dot_general`, contracting the degree.
+3. North/south = even ± odd, times `coslat⁻¹[j]` with `unscale_coslat`.
+4. `dot_general` with `B`, batched over j, contracting the order and the real/imaginary part.
+5. Gather with `ring_positions`, `write_matrix!`.
+
+Per direction that is one gather, two `dot_general`s and a few fused elementwise operations. There are no FFTs, no
+`scal`, no slices or concatenations per latitude run and no loop-carried scratch arrays. Layouts are chosen so one
+product's output feeds the next without transposes; check the optimized HLO for leftover `transpose`s. Arrays are
+real throughout, except the packed coefficients at the boundary. That also avoids the complex-number Reactant
+issues (`reactant-issue-draft-complex-*.md`).
+
+**Scratch memory.** Unused with `fourier_dft = true`. Allocate it with zero layers in that case (zero-length arrays
+are fine in traced loops since Reactant 0.2.294). Do the same for SpeedyWeather's `vars.scratch.transform_memory`
+if it is sized from the transform (check).
+
+**Default transform on Reactant.** If the full time step with the DFT path beats the matrix transform at all
+resolutions (prototype, transform alone: 1.8x at T31), `WhichTransform` returns the `SpectralTransform` for every
+`ReactantDevice` model. That closes open decision 1.
+
+### Implementation steps
+
+0. **Go/no-go: AD through the gathers.** Differentiate the prototype's `dft_forward`/`dft_inverse` on Reactant's
+   CPU backend and compare with central finite differences in Float64. These are constant-index gathers with
+   scatter-add adjoints. The strided-slice adjoint bug that forced the gather-free FFT path is fixed in 0.2.294,
+   the current compat. If AD fails, minimize and report it, then fall back to padded rings from contiguous slices
+   per ring (slower, as in the FFT path).
+1. `dense_fourier_matrices` and the index tables, with host-only unit tests:
+   - `W` times a ring equals the weighted, rotated `rfft` (FFTW) of that ring for its first mmax frequencies;
+   - `B` matches `brfft` in the same way.
+2. The `fourier_dft` field and keyword, `default_fourier_dft`, `show`.
+3. The DFT branch of `_transform_nonchunked!`, both directions, all real.
+4. Odd nlat (Clenshaw grids) and the HEALPix/OctaHEALPix ring offsets. These live only in the tables and matrices
+   and are covered by the tests of step 5.
+5. Tests (below) on Reactant's CPU backend.
+6. On the GPU node: GPU checks, Nsight, benchmarks (below).
+7. Defaults from the benchmarks: `dft_max_truncation`, the CPU-backend rule, `WhichTransform`.
+8. Docs: the Reactant section of `architectures_gpu.md`, i.e. how the Fourier transform is computed and when.
+   CHANGELOG line. The SpeedyTransforms version stays `1.0.0+DEV` (additive change).
+
+### Testing and verification
+
+- `test/reactant/test_transform.jl`: the DFT path vs the CPU `SpectralTransform`.
+  - Grids: OctahedralGaussian, FullGaussian, HEALPix, OctaHEALPix, FullClenshaw and OctahedralClenshaw (the last
+    two with odd nlat).
+  - No layer dimension, one and three layers; eager and compiled; with and without `unscale_coslat`.
+  - Also the DFT vs the FFT path on Reactant in Float64 (≤ 1e-12).
+- `test/reactant/test_correctness.jl`: ShallowWater and PrimitiveWet with the DFT path in CI; Barotropic and
+  PrimitiveDry once by hand.
+- `test/reactant/differentation.jl`: `test_differentiability(BarotropicModel; Transform = SpectralTransform)` with
+  the DFT path. Also finite-difference checks of both directions in Float64, by hand as for the FFT path.
+- SpeedyTransforms CPU suite (type name length, JET, AD rules): CPU must be unaffected.
+- GPU (H100/A40):
+  - `test/GPU/reactant.jl` NaN check.
+  - Errors vs the CPU transform with TF32 and `HIGHEST`; expected as in the prototype, 4-7e-4 and ~1e-7.
+  - Nsight with `--cuda-graph-trace=node`: one graph launch per compiled call, no cuFFT kernels, no `scal`.
+  - `bench_transforms.jl`: matrix vs FFT path vs DFT path, T31-T255, TF32 and `HIGHEST`, single steps and
+    `time_steps!(simulation, 10)`. Then the main suite, `manual_benchmarking.jl reactant-gpu`.
+- Reactant CPU backend: the same benchmark, to decide the default there.
+
+### Expected results (estimates, to be measured)
+
+- Transform alone: as in the prototype. 10x (T31) to 1.8x (T255) faster than the FFT path, 2-18x faster than the
+  matrix transform.
+- Full step (H100, 10 steps per call):
+  - T31: about the matrix transform's 0.45 ms/step (both run as one CUDA graph, and the transform is a small part).
+  - From T63: faster than the matrix transform, whose products take 983 of 1386 µs GPU time per step at T63 (A40).
+  - T127/T255: faster than the FFT path's 5.67 / 13.0 ms, by less than the transform-alone ratio, because the
+    Legendre products and the rest of the step are unchanged.
+
+### Risks and open questions
+
+- AD of the gathers (step 0).
+- TF32: the DFT adds one TF32 product per direction. The prototype's errors (4-7e-4) are at the level of the
+  current path with TF32. `HIGHEST` cost 10-15% in the prototype.
+- Memory is O(N³), and every call reads all of `W`/`B` whatever K. A K = 2 call at T255 reads 307 MB (~0.1 ms on
+  an H100). See `2026-10-16-fuse-inverse-transforms.md` for merging small calls.
+- Padding: on octahedral grids rings average about half of `nlon_max`, so about half of `W`/`B` is zeros. Optional:
+  split the latitudes into 2-4 bands, each with its own `nlon_max`. That means less memory and work for a few more
+  operations.
+- Full grids (all rings the same length) could share one `W`/`B` across latitudes (O(N²) memory) if the weights and
+  offsets are applied separately. Optional.
+- Reactant's CPU backend has no tensor cores, so the O(N³) DFT may be slower than XLA's FFTs (DUCC) from about
+  T127. The default there may differ; check how to query the backend when the transform is constructed.
+- Compile time: fewer operations than the FFT path (which has one per latitude run), but constant index arrays of
+  npoints entries (1.2 MB at T255). Measure.
+
+### Out of scope
+
+- The DFT Fourier stage for CUDA.jl. Rough estimate (H100, from the benchmark README and
+  `docs/dev/2026-08/gpu-idle-time-reduction.md`):
+  - T ≤ 64: no gain. A CUDA.jl step is bound by host dispatch at ~1.1 ms whatever the transform.
+  - T86: ~1.5x against the bandwidth-bound matrix transform (585 MB per direction).
+  - Above T100: ~1.1x against LT+FFT. Its FFTs already run in CUDA graphs: cuFFT and Legendre are ~2 ms each of
+    10.5 ms GPU time per step at T255, and Legendre would be unchanged.
+
+  CUDA.jl's default math mode probably runs Float32 gemms without TF32 (to check). This needs a separate analysis
+  and benchmark.
+- FFT command-buffer support in XLA or Reactant (see above). An upstream issue could be drafted.
