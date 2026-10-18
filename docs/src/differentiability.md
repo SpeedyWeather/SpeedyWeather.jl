@@ -73,15 +73,14 @@ as above), you can also run the model with [Reactant.jl](https://github.com/Enzy
 compiles. Enzyme then differentiates Reactant's intermediate representation (MLIR) instead of the
 Julia code. In contrast to vanilla Enzyme, this also works with Julia 1.12 and Julia 1.13.
 
-This needs a model created with the `ReactantDevice` architecture, with either the `MatrixSpectralTransform` (the default with Reactant) or the FFT-based `SpectralTransform`:
+This needs a model created with the `ReactantDevice` architecture:
 
 ```julia
 using SpeedyWeather, Reactant, Enzyme
 using CUDA      # needed for Reactant to compile KernelAbstractions kernels, also on CPUs
 
 spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice(), nlayers = 8)
-spectral_transform = MatrixSpectralTransform(spectral_grid)
-model = PrimitiveWetModel(spectral_grid; spectral_transform)
+model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period = Day(10))      # spin-up the model a bit
 initialize!(simulation, steps = 1)      # set the clock for one time step
