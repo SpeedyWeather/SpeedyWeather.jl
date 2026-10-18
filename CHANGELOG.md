@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reactant: the `SpectralTransform` computes the Fourier transform as a truncated DFT: one batched matrix multiply per direction [#1317](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1317)
 - Reactant compatibility for all models incl. `PrimitiveDryModel` and `PrimitiveWetModel` (requires Reactant v0.2.292 for complex-valued kernels), CPU-vs-Reactant correctness tests for all models and output writers [#1304](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1304)
 - Primitive equation models transform U, V and the surface pressure gradient ∇ln(pₛ) to grid space in one batched transform, 2 instead of 3 spectral→grid transforms per time step [#1313](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1313)
 - Update Zarr requirement from 0.9, 0.10 to 0.9, 0.10, 0.11 [#1309](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1309)
