@@ -954,3 +954,36 @@ Branch `mg/reactant-dft` (base `c32de0ee`), login02 (A40) and Slurm (H100). Scri
   (matrix 1386, FFT 1833); wall time 0.367 / 0.585 ms per step at T31 / T63 (matrix 0.418 / 1.482, FFT 1.466 /
   3.139). Transform alone (73 columns, traced loop): GPU time 38 / 134 µs (matrix 78 / 791, FFT 282 / 834), 11
   kernels per forward + inverse, one graph launch.
+- **Precision** (`precision_table.jl`, Slurm 2567378, H100, OctahedralGaussian, 8 columns of random coefficients and
+  the band-limited fields from them, relative max error vs a Float64 CPU reference): CPU Float32 baseline 1.4 to
+  5.8e-7; DFT with Float32 (`HIGHEST`) 1.8 to 6.7e-7 grid → spectral (0.8 to 1.3× the baseline) and 2.9 to 8.7e-7
+  spectral → grid (1.7 to 3.3×), the FFT path 0.7 to 1.6× the baseline, the matrix transform 4.3e-7 to 2.2e-6 (up to
+  9×, growing with resolution); with TF32 all at 2 to 4.4e-4, the DFT 1.0 to 1.5× the FFT path. The T128 matrix TF32
+  line was lost in the job's filtered log (a ptxas warning printed onto it, deterministic: also lost in a filtered
+  rerun); unfiltered rerun on the A40: 2.0e-4 grid → spectral, but 1.6e-6 spectral → grid (XLA apparently chose a
+  GEMM without TF32 for that shape on the A40).
+- **`HIGHEST` time step** (Slurm 2566174, H100, ms per step, 10 per call; matrix / FFT path / DFT): T32 0.415 /
+  0.823 / 0.280, T64 0.763 / 1.76 / 0.424, T128 5.67 / 4.07 / 0.862. Float32 instead of TF32: DFT +0 to 16%, matrix
+  +6% / +45% / 2.3×, FFT path unchanged.
+- **GPU NaN check** `test/GPU/reactant.jl`, BarotropicModel now with both transforms: 1/1 and 1/1 (A40).
+- **Long-run script** (`long_run_stability.jl`), smoke test T31L8 for 1 year on the A40: stable, 2975 SYPD, global
+  mean surface temperature 285 → 275 K in the spin-up, then 274-278 K, surface pressure 962.6 to 963.6 hPa, humidity
+  ≥ 0, |u| ≤ 87 m/s. The 10-year T256L8 TF32 run is Slurm 2568499 (queued).
+- Pitfall: waiting with `while pgrep -f "julia.*precision_table.jl"` matches the waiting shell's own command line and
+  never ends (two A40 runs didn't start for ~40 min).
+- **`HIGHEST` T256** (Slurm 2566174): FFT path 9.8, DFT 3.1 ms per step (TF32: 9.68 / 2.29), i.e. Float32 costs the
+  DFT path 35% at T256 (0 to 16% up to T128).
+- **Reactant CPU backend** (16 cores of the H100 node, same job), FFT path / DFT, ms per step with 10 per call
+  (transform alone): T32 4.14 / 4.82 (1.84 / 1.58), T64 12.7 / 12.7 (5.84 / 5.06), T128 44.9 / 43.8 (21.1 / 20.7).
+  Within 15%, no backend-specific rule: `default_fourier_dft` stays `true` on every Reactant backend (querying the
+  backend at construction isn't worth ±15%).
+- **Step 7, defaults**: `WhichTransform` returns the `SpectralTransform` for `ReactantDevice` (faster than the matrix
+  transform at every resolution: H100 TF32 1.3 to 3.3×, `HIGHEST` 1.5 to 6.6×, Reactant CPU backend 2.1 / 5.3× at
+  T31 / T63 for the FFT path, M3); `DFT_MAX_TRUNCATION = 256` kept (617 MB of DFT matrices there, the H100 runs
+  it 4.2× faster than the FFT path). New testset "Default transform on Reactant" in `test_transform.jl`: 4/4 (CPU
+  backend). Open decision 1 closed.
+- **Step 8, docs**: `architectures_gpu.md` Reactant section rewritten (default transform, truncated DFT and FFT path,
+  memory, H100 performance, CPU backend; the TF32 model table marked as measured with the matrix transform, the cost
+  of `HIGHEST` for the default transform; the GPU NaN test is the BarotropicModel with both transforms);
+  `differentiability.md` (default transform in the example). The PrimitiveWet gradient in CI uses the matrix
+  transform; a one-off check of the one-step PrimitiveWet gradient with the DFT is running.
