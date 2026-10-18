@@ -141,7 +141,7 @@ default_gpu_graphs(::ReactantDevice) = false           # Reactant already does a
 """Largest spectral truncation (1-based `mmax`) for which [`default_fourier_dft`](@ref) chooses the
 Fourier transform as a truncated DFT on Reactant. Its matrices take 2 × 307 MB in Float32 at 256, and
 grow with the cube of the truncation."""
-const DFT_MAX_TRUNCATION = 256
+const DFT_MAX_TRUNCATION = 512
 
 """$(TYPEDSIGNATURES)
 Default value for the `fourier_dft` keyword of [`SpectralTransform`](@ref): the Fourier transform as a
