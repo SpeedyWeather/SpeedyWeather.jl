@@ -1,6 +1,8 @@
+using JLArrays
+
 @testset "$Padded" for (Padded, Unpadded, nlat_halfs) in (
-        (HEALPixPaddedGrid, HEALPixGrid, (4, 8, 16, 24)),
-        (OctaHEALPixPaddedGrid, OctaHEALPixGrid, (3, 4, 7, 16)),
+        (HEALPixPaddedGrid, HEALPixGrid, (16, 18, 24, 32)),
+        (OctaHEALPixPaddedGrid, OctaHEALPixGrid, (8, 9, 16, 17)),
     )
     for nlat_half in nlat_halfs
         grid = Padded(nlat_half)
@@ -10,7 +12,8 @@
         nlons_healpix = RingGrids.get_nlons(healpix)
 
         @test all(nlons .>= 20)
-        @test all(nlons .% nlons_healpix .== 0)     # nesting requires integer refinement
+        @test all(nlons .% nlons_healpix .== 0)
+        @test [RingGrids.each_index_in_ring(Padded, j, nlat_half) for j in 1:nlat] == eachring(grid)     # nesting requires integer refinement
         @test all(iseven, nlons)
         @test nlons == reverse(nlons)                # north-south symmetric
         @test sum(nlons) == RingGrids.get_npoints(grid)
@@ -54,7 +57,7 @@
         end
 
         # linear in longitude (away from the 0˚ wrap) is interpolated exactly
-        nlat_half = 8
+        nlat_half = nlat_halfs[1]
         healpix = Field(Float64, Unpadded(nlat_half))
         padded = Field(Float64, Padded(nlat_half))
         londs, _ = RingGrids.get_londlatds(healpix.grid)
@@ -68,5 +71,23 @@
         end
 
         @test_throws AssertionError copyto!(padded, zeros(Unpadded(nlat_halfs[end])))
+        @test_throws DomainError Padded(nlat_halfs[1] - 2)
+
+        # no allocations beyond the kernel launch
+        healpix = rand(Unpadded(nlat_halfs[1]))
+        padded = zeros(Padded(nlat_halfs[1]))
+        copyto!(padded, healpix); copyto!(healpix, padded)
+        @test @allocated(copyto!(padded, healpix)) < 2000
+        @test @allocated(copyto!(healpix, padded)) < 2000
+
+        # on a GPU-like architecture
+        arch = architecture(JLArray)
+        healpix_jl = on_architecture(arch, healpix)
+        padded_jl = on_architecture(arch, zero(padded))
+        copyto!(padded_jl, healpix_jl)
+        @test Array(padded_jl.data) == padded.data
+        healpix_jl .= 0
+        copyto!(healpix_jl, padded_jl)
+        @test Array(healpix_jl.data) == healpix.data
     end
 end

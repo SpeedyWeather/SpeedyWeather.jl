@@ -13,7 +13,8 @@ from 0˚E. A refined ring has an offset if the HEALPix ring has one and `k` is o
 HEALPix point `i` on ring `j` is padded point `k(i-1) + first` with `first` from
 `healpix_nesting(Grid, nlat_half, j)`. Use `copyto!(::HEALPixField, ::HEALPixPaddedField)`
 to subsample and `copyto!(::HEALPixPaddedField, ::HEALPixField)` to linearly interpolate
-in longitude. The grid uses the equal-area ring weights of HEALPix, but is not equal-area
+in longitude. Requires `nlat_half >= 16` so that only the 4 rings around each pole are
+padded. The grid uses the equal-area ring weights of HEALPix, but is not equal-area
 as the refined pixels are smaller. Fields are
 $(TYPEDFIELDS)"""
 struct HEALPixPaddedGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
@@ -46,7 +47,7 @@ end
 the `HEALPixGrid`: same latitudes but rings with fewer than 20 longitudes are refined by the
 smallest integer factor `k = cld(20, n)` so that the `OctaHEALPixGrid` points nest, i.e. rings
 have 20, 24, 24, 32, 20, 24, 28, ... points from the pole. `copyto!` between both grids
-subsamples or linearly interpolates in longitude. Fields are
+subsamples or linearly interpolates in longitude. Requires `nlat_half >= 8`. Fields are
 $(TYPEDFIELDS)"""
 struct OctaHEALPixPaddedGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
     nlat_half::IntType              # number of latitudes on one hemisphere
@@ -81,43 +82,65 @@ unpadded_grid_type(::Type{<:OctaHEALPixPaddedGrid}) = OctaHEALPixGrid
 ## SIZE
 nlat_odd(::Type{<:PaddedHEALPixGrids}) = true
 
-"""$(TYPEDSIGNATURES) Minimum number of longitude points per ring of a `HEALPixPaddedGrid`."""
-npoints_min(::Type{<:PaddedHEALPixGrids}) = 20
+# Rings with fewer than 20 longitudes are refined by the smallest integer factor k giving at least
+# 20 points (k = cld(20, 4j)), these are always the 4 rings around each pole with 4, 8, 12, 16
+# points, given nlat_half >= nlat_half_min, with HEALPix point i on padded point k(i-1) + first
+const PADDED_NLONS = (20, 24, 24, 32)               # longitudes on rings 1-4 (and mirrored)
+const PADDED_REFINEMENT = (5, 3, 2, 2)              # refinement factor k on rings 1-4
+const PADDED_FIRST = (3, 2, 2, 2)                   # in-ring index of the first HEALPix point
+const PADDED_EXTRA_BEFORE = (0, 16, 32, 44)         # extra points north of rings 1-4
+const PADDED_EXTRA_RING = (16, 16, 12, 16)          # extra points on rings 1-4
+const PADDED_EXTRA_HEMISPHERE = 60                  # extra points per hemisphere
 
-"""$(TYPEDSIGNATURES) Refinement factor `k` of ring `j` relative to the `HEALPixGrid`, i.e.
-the padded ring has `k` times the HEALPix longitudes."""
-function refinement_factor(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
-    nlon_healpix = get_nlon_per_ring(unpadded_grid_type(Grid), nlat_half, j)
-    return cld(npoints_min(Grid), nlon_healpix)
+"""$(TYPEDSIGNATURES) Minimum `nlat_half` of the padded grids such that only the 4 rings around
+each pole are padded and the Equator has the most longitudes (at least 32)."""
+nlat_half_min(::Type{<:HEALPixPaddedGrid}) = 16
+nlat_half_min(::Type{<:OctaHEALPixPaddedGrid}) = 8
+
+# number of longitudes on the unpadded grid, without the @assert of get_nlon_per_ring for kernels
+@inline nlon_unpadded(::Type{<:HEALPixPaddedGrid}, nlat_half, j) = min(4j, 2nlat_half, 8nlat_half - 4j)
+@inline nlon_unpadded(::Type{<:OctaHEALPixPaddedGrid}, nlat_half, j) = min(4j, 8nlat_half - 4j)
+
+# ring index counted from the nearest pole, 1, 2, 3, 4 for the padded rings
+@inline polar_ring(nlat_half, j) = min(j, 2nlat_half - j)
+
+"""$(TYPEDSIGNATURES) Refinement factor `k` and in-ring index `first` of the first unpadded
+point on ring `j` of the padded `Grid`, such that unpadded point `i` (in-ring index) is padded
+point `k(i-1) + first`."""
+@inline function healpix_nesting(::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
+    m = polar_ring(nlat_half, j)
+    return m <= 4 ? (PADDED_REFINEMENT[m], PADDED_FIRST[m]) : (1, 1)
+end
+
+"""$(TYPEDSIGNATURES) Number of points the padded `Grid` has in addition to its unpadded
+grid north of ring `j`."""
+@inline function extra_points_before(::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
+    m = polar_ring(nlat_half, j)
+    m > 4 && return PADDED_EXTRA_HEMISPHERE
+    # northern polar rings, or southern ones counting backwards from the total extra points
+    return j == m ? PADDED_EXTRA_BEFORE[m] : 2PADDED_EXTRA_HEMISPHERE - PADDED_EXTRA_BEFORE[m] - PADDED_EXTRA_RING[m]
 end
 
 function get_nlon_per_ring(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
-    return refinement_factor(Grid, nlat_half, j) * get_nlon_per_ring(unpadded_grid_type(Grid), nlat_half, j)
+    nlat = get_nlat(Grid, nlat_half)
+    @assert 0 < j <= nlat "Ring $j is outside $(nonparametric_type(Grid)) with nlat_half=$nlat_half."
+    m = polar_ring(nlat_half, j)
+    return m <= 4 ? PADDED_NLONS[m] : nlon_unpadded(Grid, nlat_half, j)
 end
 
 get_npoints(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer) =
-    nlat_half == 0 ? 0 : sum(get_nlon_per_ring(Grid, nlat_half, j) for j in 1:get_nlat(Grid, nlat_half))
+    get_npoints(unpadded_grid_type(Grid), nlat_half) + 2PADDED_EXTRA_HEMISPHERE
 
-function get_nlat_half(Grid::Type{<:PaddedHEALPixGrids}, npoints::Integer)
-    # no closed form, so search, npoints grows monotonically with nlat_half
-    step = Grid <: HEALPixPaddedGrid ? 2 : 1          # HEALPix requires even nlat_half
-    nlat_half = step
-    while get_npoints(Grid, nlat_half) < npoints
-        nlat_half += step
-    end
-    return nlat_half
-end
-
-# for small grids the refined polar rings can have more points than the Equator
-get_nlon_max(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer) =
-    maximum(get_nlon_per_ring(Grid, nlat_half, j) for j in 1:nlat_half)
+get_nlat_half(Grid::Type{<:PaddedHEALPixGrids}, npoints::Integer) =
+    get_nlat_half(unpadded_grid_type(Grid), npoints - 2PADDED_EXTRA_HEMISPHERE)
 
 ## COORDINATES
 get_latd(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer) = get_latd(unpadded_grid_type(Grid), nlat_half)
 
-# offset of dlon/2 east of 0˚ if HEALPix has one on that ring and the refinement factor is odd
+# offset of dlon/2 east of 0˚ if the unpadded ring has one and the refinement factor is odd
 function hasoffset(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
-    return hasoffset(unpadded_grid_type(Grid), nlat_half, j) && isodd(refinement_factor(Grid, nlat_half, j))
+    k, _ = healpix_nesting(Grid, nlat_half, j)
+    return hasoffset(unpadded_grid_type(Grid), nlat_half, j) && isodd(k)
 end
 
 hasoffset(Grid::Type{<:PaddedHEALPixGrids}) = throw(
@@ -139,22 +162,21 @@ function get_lond_per_ring(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer,
     return [180 / (nlon ÷ 2) * (i - s / 2) for i in 1:nlon]
 end
 
-"""$(TYPEDSIGNATURES) Refinement factor `k` and in-ring index `first` of the first HEALPix
-point on ring `j` of the `HEALPixPaddedGrid`, such that HEALPix point `i` (in-ring index)
-is padded point `k(i-1) + first`."""
-function healpix_nesting(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer, j::Integer)
-    k = refinement_factor(Grid, nlat_half, j)
-    # HEALPix point 1 is at dlon_healpix/2 = k*dlon/2 (offset) or 0˚ (no offset)
-    first = hasoffset(unpadded_grid_type(Grid), nlat_half, j) ? (isodd(k) ? (k + 1) ÷ 2 : k ÷ 2 + 1) : 1
-    return k, first
-end
-
 ## QUADRATURE, same ring areas as HEALPix, the solid angle per point (generic
 # get_solid_angles) then divides by the padded nlon
 get_quadrature_weights(Grid::Type{<:PaddedHEALPixGrids}, nlat_half::Integer) =
     equal_area_weights(unpadded_grid_type(Grid), nlat_half)
 
 ## INDEXING
+# closed form from the unpadded grid's ring indices shifted by the extra points north of ring j
+@inline function each_index_in_ring(Grid::Type{<:PaddedHEALPixGrids}, j::Integer, nlat_half::Integer)
+    index_1st = first(each_index_in_ring(unpadded_grid_type(Grid), j, nlat_half)) +
+        extra_points_before(Grid, nlat_half, j)
+    m = polar_ring(nlat_half, j)
+    nlon = m <= 4 ? PADDED_NLONS[m] : nlon_unpadded(Grid, nlat_half, j)
+    return index_1st:(index_1st + nlon - 1)
+end
+
 function each_index_in_ring!(
         rings::AbstractVector,
         Grid::Type{<:PaddedHEALPixGrids},
@@ -162,6 +184,9 @@ function each_index_in_ring!(
     )
     nlat = length(rings)
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
+    nlat_half >= nlat_half_min(Grid) || throw(
+        DomainError(nlat_half, "$(nonparametric_type(Grid)) requires nlat_half >= $(nlat_half_min(Grid)).")
+    )
     Grid <: HEALPixPaddedGrid && nside_healpix(nlat_half)     # throws for odd nlat_half
 
     index_end = 0
@@ -174,12 +199,6 @@ function each_index_in_ring!(
 end
 
 ## CONVERSION BETWEEN (Octa)HEALPixGrid AND (Octa)HEALPixPaddedGrid
-
-# refinement factor k and first nested index per ring on architecture arch, for kernels
-function healpix_nesting_on_architecture(arch, grid::PaddedHEALPixGrids)
-    nesting = [healpix_nesting(nonparametric_type(grid), grid.nlat_half, j) for j in 1:get_nlat(grid)]
-    return on_architecture(arch, first.(nesting)), on_architecture(arch, last.(nesting))
-end
 
 function check_nesting(healpix::AbstractField, padded::AbstractField)
     @assert healpix.grid.nlat_half == padded.grid.nlat_half "Unpadded and padded grids differ in nlat_half: " *
@@ -196,26 +215,25 @@ Base.copyto!(healpix::OctaHEALPixField, padded::OctaHEALPixPaddedField) = subsam
 
 function subsample_padded!(healpix::AbstractField, padded::AbstractField)
     check_nesting(healpix, padded)
-    arch = architecture(healpix)
-    ring_first_healpix, _ = eachring_on_architecture(arch, healpix.grid)
-    ring_first_padded, _ = eachring_on_architecture(arch, padded.grid)
-    ks, firsts = healpix_nesting_on_architecture(arch, padded.grid)
+    Grid = nonparametric_type(padded.grid)        # as Val for the kernel to specialize on it
     launch!(
-        arch, RingGridWorkOrder, size(healpix), subsample_healpix_kernel!, healpix, padded,
-        healpix.grid.whichring, ring_first_healpix, ring_first_padded, ks, firsts
+        architecture(healpix), RingGridWorkOrder, size(healpix), subsample_padded_kernel!,
+        healpix, padded, healpix.grid.whichring, Val(Grid), healpix.grid.nlat_half
     )
     return healpix
 end
 
-@kernel inbounds = true function subsample_healpix_kernel!(
-        healpix, padded, whichring, ring_first_healpix, ring_first_padded, ks, firsts
-    )
+@kernel inbounds = true function subsample_padded_kernel!(healpix, padded, whichring, ::Val{Grid}, nlat_half) where {Grid}
     I = @index(Global, Cartesian)
-    ij = I[1]                                   # grid point index on HEALPix
+    ij = I[1]                                   # grid point index on the unpadded grid
     k = CartesianIndex(Base.tail(Tuple(I)))     # all non-horizontal dimensions
     j = whichring[ij]
-    i = ij - ring_first_healpix[j]              # 0-based in-ring index on HEALPix
-    healpix[ij, k] = padded[ring_first_padded[j] + ks[j] * i + firsts[j] - 1, k]
+    ring_first = first(each_index_in_ring(unpadded_grid_type(Grid), j, nlat_half))
+    refinement, first_nested = healpix_nesting(Grid, nlat_half, j)
+
+    # same ring on the padded grid starts later by the extra points north of it
+    ij_padded = ring_first + extra_points_before(Grid, nlat_half, j) + refinement * (ij - ring_first) + first_nested - 1
+    healpix[ij, k] = padded[ij_padded, k]
 end
 
 """$(TYPEDSIGNATURES) Copy `healpix` onto `padded`, nested points are copied, the points in
@@ -225,32 +243,29 @@ Base.copyto!(padded::OctaHEALPixPaddedField, healpix::OctaHEALPixField) = interp
 
 function interpolate_padded!(padded::AbstractField, healpix::AbstractField)
     check_nesting(healpix, padded)
-    arch = architecture(padded)
-    ring_first_healpix, ring_length_healpix = eachring_on_architecture(arch, healpix.grid)
-    ring_first_padded, _ = eachring_on_architecture(arch, padded.grid)
-    ks, firsts = healpix_nesting_on_architecture(arch, padded.grid)
+    Grid = nonparametric_type(padded.grid)        # as Val for the kernel to specialize on it
     launch!(
-        arch, RingGridWorkOrder, size(padded), interpolate_healpix_padded_kernel!, padded, healpix,
-        padded.grid.whichring, ring_first_healpix, ring_length_healpix, ring_first_padded, ks, firsts
+        architecture(padded), RingGridWorkOrder, size(padded), interpolate_padded_kernel!,
+        padded, healpix, padded.grid.whichring, Val(Grid), padded.grid.nlat_half
     )
     return padded
 end
 
-@kernel inbounds = true function interpolate_healpix_padded_kernel!(
-        padded, healpix, whichring, ring_first_healpix, ring_length_healpix, ring_first_padded, ks, firsts
-    )
+@kernel inbounds = true function interpolate_padded_kernel!(padded, healpix, whichring, ::Val{Grid}, nlat_half) where {Grid}
     I = @index(Global, Cartesian)
-    ij = I[1]                                   # grid point index on HEALPixPadded
+    ij = I[1]                                   # grid point index on the padded grid
     k = CartesianIndex(Base.tail(Tuple(I)))     # all non-horizontal dimensions
     j = whichring[ij]
-    nlon = ring_length_healpix[j]
+    ring_first = first(each_index_in_ring(unpadded_grid_type(Grid), j, nlat_half))
+    nlon = nlon_unpadded(Grid, nlat_half, j)
+    refinement, first_nested = healpix_nesting(Grid, nlat_half, j)
 
     # padded in-ring index relative to the first nested point, in units of padded points
-    d = ij - ring_first_padded[j] + 1 - firsts[j]
-    q = fld(d, ks[j])                           # 0-based HEALPix point west of (or on) ij
-    r = d - q * ks[j]                           # padded points east of that HEALPix point
-    i_west = ring_first_healpix[j] + mod(q, nlon)
-    i_east = ring_first_healpix[j] + mod(q + 1, nlon)
-    w = convert(eltype(padded), r) / ks[j]      # linear interpolation weight
+    d = ij - (ring_first + extra_points_before(Grid, nlat_half, j)) + 1 - first_nested
+    q = fld(d, refinement)                      # 0-based unpadded point west of (or on) ij
+    r = d - q * refinement                      # padded points east of that unpadded point
+    i_west = ring_first + mod(q, nlon)
+    i_east = ring_first + mod(q + 1, nlon)
+    w = convert(eltype(padded), r) / refinement # linear interpolation weight
     padded[ij, k] = (1 - w) * healpix[i_west, k] + w * healpix[i_east, k]
 end

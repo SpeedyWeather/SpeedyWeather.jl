@@ -23,6 +23,14 @@ Base revision: e410eed05c967a4e117b91c91591d17da155a774
   `OctaHEALPixPaddedGrid` with the same rule relative to `OctaHEALPixGrid` (rings 20, 24, 24,
   32, 20, 24, 28, ..., all with offset unless `k` is even). Both padded grids share one
   implementation through `unpadded_grid_type`.
+- 2026-10-18: "I like how general you kept the functions but you now have some allocations. Is it
+  possible to remove them and to hardcode the 20, 24, 24, 32, 20 into a constant [...] it would be
+  okay to restrict the padded grids to have a minimum nlat_half". Hardcoded ring lengths,
+  refinement factors, first nested index and extra points per ring as tuple constants; restricted
+  to `nlat_half >= 16` (HEALPix) / `>= 8` (OctaHEALPix) so that exactly the 4 polar rings are
+  padded and the Equator stays the longest ring. Ring starts and nesting are now computed in
+  closed form inside the `copyto!` kernels, no per-call arrays; the grid type is passed as `Val`
+  so the kernels specialise on it.
 
 ## Problem description
 
@@ -45,6 +53,8 @@ An equispaced ring with `n'` points contains them only if its spacing divides `3
 New reduced grid `HEALPixPaddedGrid` in `RingGrids/src/grids/healpix_padded.jl`:
 
 - Same latitudes as `HEALPixGrid`.
+- Restricted to `nlat_half >= 16` (HEALPix) or `>= 8` (OctaHEALPix), so only the 4 rings
+  around each pole are padded; these are hardcoded as constants.
 - Ring `j` has `k_j · n_j` longitudes, where `n_j` is HEALPix's and `k_j = cld(20, n_j)` the
   smallest integer refinement with at least `npoints_min = 20` points. Polar rings are therefore
   20, 24, 24, 32, 20, 24, 28, … — beyond ring 5 identical to HEALPix.
