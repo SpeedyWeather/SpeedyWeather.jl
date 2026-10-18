@@ -251,7 +251,7 @@ test_model(ShallowWaterModel)
 test_model(PrimitiveDryModel)
 test_model(PrimitiveWetModel)
 
-# FFT-based SpectralTransform: single-layer variables (ShallowWater) and the batched multi-layer
-# transforms with all physics (PrimitiveWet); the BarotropicModel in differentation.jl
+# SpectralTransform (on Reactant with the Fourier transform as truncated DFT by default, vs FFTW on the CPU):
+# single-layer variables (Barotropic) and the batched multi-layer transforms with all physics (PrimitiveWet)
 test_model(BarotropicModel; Transform = SpectralTransform)
 test_model(PrimitiveWetModel; Transform = SpectralTransform)

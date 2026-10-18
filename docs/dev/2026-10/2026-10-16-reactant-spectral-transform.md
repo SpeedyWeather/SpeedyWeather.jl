@@ -71,6 +71,61 @@ Reactant_jll build nor upstream. Capturing them would remove only the launch ove
 
 Added "Follow-up plan: Fourier transform as a truncated DFT on Reactant" (deferred, not part of this PR).
 
+> okay we swtichted to a new branch. In this branch, to implement the new transform for Reactant. Thsis should be
+> implemented for reactant only. If you implement a new FFT logic, it should be tested against standard ffts in
+> correctness and precision. Both while implmenting but also in the unit tests. this is very important.
+
+Implementation started on branch `mg/reactant-dft`, see "Protocol (implementation)" in the follow-up plan.
+
+> Why do we now have two versions of legendre and fourier in the extension?
+
+Two Fourier transforms by design (the FFTs stay for `fourier_dft = false`, above `DFT_MAX_TRUNCATION`), but the
+Legendre transform only needed one: the first implementation kept the FFT path's `_fourier!`/`_legendre!` (complex
+scratch arrays, `dot_general_complex`) next to the new all-real DFT functions. Proposed to share the all-real
+Legendre transform.
+
+> yes
+
+Refactored: one Legendre transform (`legendre_forward`/`legendre_inverse`) for both Fourier transforms
+(`dft_fourier_*`, `fft_fourier_*`, same interface), no scratch memory on Reactant at all, see the protocol.
+
+> do the tests really need to implement yet another fft variant? Can't we just reuse the regular CPU spectraltransform
+> of the model?
+
+No: the ring-by-ring references of `test_transform.jl` now call the CPU `SpectralTransform`'s `_fourier!` (FFTW) and
+only apply the solid angles and longitude offsets as its Legendre transform does. Same values as the earlier
+FFTW-per-ring helpers (forward ≤ 2.8e-16, inverse identical, six grids).
+
+> continue with the spectral transform work
+
+Steps 6-8 of the follow-up plan (GPU benchmarks, profiles, defaults, docs), see the protocol (2026-10-18 evening).
+
+> re-audit the code of the extension. We don't to keep code duplication at a minimum but also not change much in the
+> main non-extension code.
+
+Audit of `SpeedyTransformsReactantExt` (protocol): one dense (parity, order, degree) layout and index function for
+coefficients and polynomials (three copies of the same loop before), `stack_pair` for five `cat`/`reshape` pairs,
+`S.nlon_max`/`S.nfreq_max` instead of recomputing them; main code: one comment.
+
+> I also want you to prepare a markdown for a github PR with an overview of both the performacne across T32, T64,
+> T128, T256 but also the memory usage. Also write down the basic math of the DFT you solve
+
+`2026-10-18-reactant-dft-pr-description.md` (next to this plan): math, H100 performance, memory of the precomputed
+arrays and of the model run, accuracy, changes.
+
+> add to that the precision of the transform, how accurate it is compared to a F32 baseline. Also include numbers
+> for doing the transform both in TF32 and F32
+
+`precision_table.jl` (H100): matrix, FFT path and DFT on Reactant with TF32 and with Float32 (`HIGHEST`) vs the
+Float32 CPU `SpectralTransform` (FFTW) baseline, all against a Float64 reference, T32 to T256, both directions; a
+"Precision" section in the PR description.
+
+> we also need to test if the model is table for long roll outs with TF32. Test if T256L8 is stable for 10 years
+> with a job
+
+`long_run_stability.jl` (Slurm): PrimitiveWetModel T256L8, DFT, TF32, 10 years of 365 days, a compiled program per
+30 days with a NaN/Inf check and global diagnostics after each (CSV), see the protocol.
+
 ## Problem description
 
 On `ReactantDevice` all models use the `MatrixSpectralTransform` (`WhichTransform` in
@@ -583,8 +638,8 @@ CHANGELOG.
 
 ## Follow-up plan: Fourier transform as a truncated DFT on Reactant
 
-> Status: **planned**, deferred to a follow-up PR. Prototype measured (transform alone, see "Re-audit" above),
-> nothing in the package yet.
+> Status: **in progress** on branch `mg/reactant-dft` (2026-10-18). Implemented for Reactant only and verified
+> against FFTW on Reactant's CPU backend, see "Protocol (implementation)" at the end; GPU checks and benchmarks open.
 
 Date: 2026-10-18. Base revision: `e22793e3` (branch `mg/new-reactant`). Prototype:
 `/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/dft_proto_2026-10-16/dft_transform_proto.jl`.
@@ -781,3 +836,121 @@ resolutions (prototype, transform alone: 1.8x at T31), `WhichTransform` returns 
   CUDA.jl's default math mode probably runs Float32 gemms without TF32 (to check). This needs a separate analysis
   and benchmark.
 - FFT command-buffer support in XLA or Reactant (see above). An upstream issue could be drafted.
+
+### Protocol (implementation)
+
+Branch `mg/reactant-dft` (base `c32de0ee`), login02 (A40) and Slurm (H100). Scripts and logs in
+`/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/dft_impl_2026-10-18/`. Environments: `env_reactant_0295`
+(Reactant 0.2.295, Julia 1.12.2, Reactant's CPU backend) and `env_dft_gpu` (the same, GPU, see below).
+
+2026-10-18
+- **Step 0, go: AD through the gathers** (`ad_gather_check.jl`, Reactant CPU backend, Float64, quadratic losses):
+  forward gather into padded rings + batched `dot_general`, and inverse `dot_general` + gather of the grid points, on
+  OctahedralGaussian, HEALPix and FullClenshaw (odd nlat) grids at T15. Values vs host loops ≤ 1.4e-14, Reactant
+  gradients vs central finite differences ≤ 4e-11 relative, the forward gradient vs the analytic one 3e-16.
+- **Implementation** (Reactant only):
+  - `src/` (SpeedyTransforms): fields `fourier_matrix_forward`, `fourier_matrix_inverse` (flattened `VectorType`,
+    empty elsewhere) and `fourier_dft::Bool` (no new type parameter), keyword `fourier_dft` with
+    `default_fourier_dft(architecture, spectrum)`: `false` on CPU/GPU, on `ReactantDevice` `true` up to
+    `DFT_MAX_TRUNCATION = 256` (1-based `mmax`, 2 × 308 MB in Float32 at 256), `ArgumentError` for `true` elsewhere;
+    the hook `dense_fourier_matrices` (empty fallback in `fourier.jl`); `solid_angles` computed before it;
+    `_scratch_nlayers(::ReactantDevice, ...) = 0` (no scratch memory on Reactant, see the refactor); `show` adds a
+    "Fourier: truncated DFT, matrices ..." line only for `fourier_dft = true` (CPU/GPU output unchanged).
+  - `SpeedyTransformsReactantExt`: `fourier_matrices` (host, Float64: phases `cispi(2 mod(m(i-1), nlon)/nlon)`
+    with the argument reduced exactly, solid angle and conjugate longitude offset folded into the forward, the
+    longitude offset and the `brfft` factors 1/2/1 into the inverse, zero beyond a ring's Nyquist frequency and
+    beyond the ring), `ring_indices` (gather into padded rings with a zero row for the padding and the southern
+    copy of the equator ring; positions of the grid points in the inverse result), `dft_fourier_forward`,
+    `dft_fourier_inverse`, the all-real Legendre transform (`dense_of_lm_order_first` maps the forward result
+    without a transpose).
+- **Found and fixed in the FFT path** (pre-existing): the inverse `_fourier!` failed on grids whose equator ring is
+  a run on its own (OctaHEALPix, OctahedralClenshaw: dropping its southern copy left an empty slice, which
+  Reactant's indexing rejects, "BoundsError: attempt to access 0-element Vector{Union{}}"). The tests only covered
+  OctahedralGaussian, FullGaussian and HEALPix. Fixed (the run is dropped), both grids are tested now.
+- **Verification against FFTW** (`dft_verify.jl`, all six grids), relative max errors:
+  - A, host matrices vs FFTW `rfft`/`brfft` ring by ring (with the weights/rotations of the FFT path), Float64:
+    ≤ 1.0e-15 (T32), ≤ 1.5e-15 (T64).
+  - B, traced Fourier stages vs FFTW ring by ring: Float64 ≤ 1e-15, Float32 ≤ 4.8e-7 (T32), ≤ 6.3e-7 (T64).
+  - C, whole transform, DFT vs CPU FFTW and vs the Reactant FFT path: Float64 ≤ 1.0e-15 both directions; Float32
+    error vs the Float64 FFTW transform for DFT / Reactant FFT / FFTW: grid→spectral 0.6-1.6e-7 / 0.6-1.3e-7 /
+    0.5-2.2e-7, spectral→grid 1.3-3.7e-7 / 1.3-4.2e-7 / 1.2-5.3e-7 (T32, T64): the same order, the DFT's error at
+    most 1.9x the smaller of the two FFT errors.
+  - The same on the A40 with `dot_general_precision = HIGHEST`: Float64 ≤ 1e-15, Float32 stages ≤ 6.3e-7, Float32
+    transform errors ≤ 6.6e-7, at most 2.4x the smaller of the two FFT errors.
+- **Tests**: `test/reactant/test_transform.jl`: the existing testset for both Fourier transforms and five grids
+  (OctaHEALPix and OctahedralClenshaw new), new testset "Truncated DFT against FFTW" (defaults; the matrices vs
+  the CPU SpectralTransform's Fourier transform (FFTW) ring by ring on six grids, Float64 rtol 1e-13; the traced
+  Fourier stages (DFT and FFTs) vs the same, Float64 1e-13, Float32 2e-6; the whole transform, Float64 DFT vs the
+  CPU SpectralTransform and vs the FFT path 1e-13, Float32 error vs the Float64 CPU SpectralTransform
+  transform < 1e-6 and < 4x that of FFTW or the FFT path). Reactant CPU backend: 2 + 79 + 79 + 1461 pass (8.6 min,
+  of which the new testset 3.1 min). SpeedyTransforms CPU suite with the new testset "Fourier transform as truncated
+  DFT only on Reactant": all pass (type name length, JET, AD rules 8175/8175).
+- **GPU environment**: the shared depot's precompiled `Reactant_jll` (and `CUDA_Runtime_jll`) caches had been built
+  where no GPU driver was found (`gpu = "none"`, "No functional client was found" on the GPU backend, CUDA.jl "could
+  not find an appropriate CUDA runtime"). Not rebuilt (shared with other jobs); instead `env_dft_gpu`, a copy of
+  `env_reactant_0295` with `LocalPreferences.toml`: `Reactant_jll` `gpu = "cuda"`, `gpu_version = "13.1"`,
+  `mode = "opt"` (`gpu_version` isn't a recorded compile-time preference, `mode` forces the separate cache;
+  `Reactant_jll` under `[extras]` so that its preferences are found), `CUDA_Runtime_jll` `version = "13.0"`
+  (`CUDA.set_runtime_version!`).
+- **Refactor** (user: one Legendre transform): `legendre_forward`/`legendre_inverse` (all real) for both Fourier
+  transforms; `fft_fourier_forward`/`fft_fourier_inverse` with the interface of the DFT (weights and rotations in
+  the Fourier stage); `_transform_reactant!` for both directions; `_fourier!`, `_legendre!` and
+  `dot_general_complex` of the extension removed; no scratch memory on Reactant at all. The traced-stage testset
+  covers both Fourier transforms.
+- **After the refactor**, Reactant CPU backend: `test_transform.jl` 2 + 79 + 79 + 1479 pass (7.4 min); `dft_verify.jl`
+  T32/T64, six grids: Float64 DFT vs FFTW and vs the FFT path ≤ 1.0e-15, Float32 errors ≤ 3.7e-7 (DFT), ≤ 4.2e-7
+  (FFT path).
+- **Model tests**, Reactant CPU backend, CPU-vs-Reactant correctness (`test_correctness.jl`'s `test_model`, the CPU
+  model with FFTW) and differentiability (`test_differentiability`, gradients vs Enzyme on the CPU):
+  - before the refactor, DFT: Barotropic 8/8, ShallowWater 14/14, PrimitiveDry 17/17, PrimitiveWet 20/20, AD
+    Barotropic 6/6;
+  - after the refactor: PrimitiveWet 20/20 with the DFT and 20/20 with the FFTs (`fourier_dft = false`), AD
+    Barotropic 6/6 with the DFT and 6/6 with the FFTs.
+- **A40** (`env_dft_gpu`): `test_transform.jl` with `HIGHEST` (refactored code) 2 + 79 + 79 + 1479 pass (8.3 min).
+  With the default TF32: Float64 unaffected (≤ 1e-15), the Float32 Fourier stages 2-4.4e-4 (the TF32 level), the whole
+  transform 4.1-7.8e-4 (DFT) vs 2.6-6.9e-4 (FFT path, its TF32 product is only the Legendre transform), i.e. up to
+  ~1.8x with one more TF32 product per direction. PrimitiveWet NaN check with the DFT (default resolution, 10 steps,
+  `run!`): 6/6, 12.7 min (incl. compilation).
+- **`show`** of the transform reported the size of the Reactant array wrappers (`sizeof` of a `ConcretePJRTArray`),
+  e.g. "matrices 64 bytes", also for the dense Legendre polynomials before: now `nbytes` = length × size of the element
+  type (unchanged for CPU/GPU arrays). T32 on Reactant: DFT matrices 1.38 MB, polynomials 105.78 KB, scratch 0 bytes.
+
+2026-10-18 evening
+- **H100 benchmark** (Slurm 2566174, `bench_dft.jl`, PrimitiveWet L8, OctahedralGaussian, TF32, ms per step with 10
+  steps per call; matrix / FFT path / DFT): T32 0.391 / 0.852 / 0.284, T64 0.527 / 1.76 / 0.401, T128 2.45 / 4.07 /
+  0.745. Transform alone (forward + inverse, 73 columns): T32 0.0406 / 0.359 / 0.0312, T64 0.218 / 0.809 / 0.066,
+  T128 1.84 / 2.10 / 0.233 ms. So the DFT path is the fastest at every resolution so far (T256, `HIGHEST` and the CPU
+  backend still running).
+- **Audit of `SpeedyTransformsReactantExt`** (user: minimal duplication, little change in the main code), 519 → 499
+  lines:
+  - one dense layout (parity, order, degree) for the coefficients and the polynomials, so one `dense_indices` for
+    both maps; it builds the dense polynomials too. Before: three copies of the same (l, m) loop and two layouts, the
+    forward result was (parity, order, degree) by `dot_general`'s batch-first output, the inverse and the
+    polynomials (parity, degree, order), hence the extra `dense_of_lm_order_first`;
+  - `stack_pair(a, b, dims)` for the five `cat(reshape(a, ..., 1, ...), reshape(b, ..., 1, ...); dims)` (real and
+    imaginary parts, north and south, even and odd);
+  - `S.nlon_max` and `S.nfreq_max` instead of recomputing them from `nlons` (`fourier_matrices` keeps
+    `maximum(nlons)`, a host function of `nlons` that the tests call);
+  - the unused `_jit` import removed (`@maybe_jit` resolves it in its own module);
+  - kept: the duplicated boundschecks of the two `_transform_reactant!` methods (as in the main
+    `_transform_nonchunked!`), the empty-vector branch of `dense_fourier_matrices` (one line);
+  - main code: only the layout in the comment of `legendre_polynomials_dense`.
+  
+  Transform alone before / after the audit (A40, TF32, `bench_transform_alone.jl`, DFT and FFT path, ms): T31 0.0416
+  / 0.0416 and 0.495 / 0.491, T63 0.137 / 0.136 and 1.24 / 1.24, T127 0.766 / 0.766 and 2.95 / 2.95: unchanged.
+- **Memory and FLOPs** of the precomputed arrays (`memory_flops_table.jl`, formulas from the array sizes, Float32,
+  OctahedralGaussian; T32 checked against `show`): matrix transform 28 MB / 375 MB / 5.4 GB / 82 GB at T32 / T64 /
+  T128 / T256; DFT matrices 1.4 / 10 / 79 / 617 MB (54 to 44% nonzero, the rest padding), dense Legendre 0.10 / 0.81
+  / 6.4 / 51 MB. FLOPs per column and direction, matrix vs DFT + Legendre: 7.1 vs 0.79, 94 vs 5.9, 1352 vs 46,
+  20470 vs 359 MFLOP (9 to 57× fewer).
+- **Tests after the audit**, Reactant CPU backend (`env_reactant_0295`): `test_transform.jl` 2 + 89 + 89 + 1479 pass
+  (7.6 min; 89 instead of 79 since the `show` tests); PrimitiveWet CPU vs Reactant 20/20 with the DFT and 20/20 with
+  the FFT path; Barotropic gradients vs Enzyme on the CPU 6/6 and 6/6.
+- **Nsight, DFT path** (A40, `dft_impl_2026-10-18/profile/`, `run_nsys.sh`; matrix and FFT references from
+  `profile_fft_2026-10-16/`): the optimized StableHLO of the 10-step loop has no `fft` (FFT path: 96), 29
+  `dot_general` (matrix 27), 33 transposes (matrix 13, FFT path 123), 6380 lines (matrix 6171, FFT 7686). Per time
+  step (20 calls of 10 steps): 1.2 graph launches and 0.5 kernel launches outside graphs (matrix 1.2 / 0.5, FFT path
+  4.2 / 270), 107.5 kernels, no cuFFT, no `scal`; GPU time 304 µs at T31 (matrix 350, FFT 835) and 513 µs at T63
+  (matrix 1386, FFT 1833); wall time 0.367 / 0.585 ms per step at T31 / T63 (matrix 0.418 / 1.482, FFT 1.466 /
+  3.139). Transform alone (73 columns, traced loop): GPU time 38 / 134 µs (matrix 78 / 791, FFT 282 / 834), 11
+  kernels per forward + inverse, one graph launch.

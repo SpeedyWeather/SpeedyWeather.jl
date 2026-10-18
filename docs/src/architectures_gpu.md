@@ -156,7 +156,8 @@ those on the CPU are in `SpeedyWeather/test/reactant/`, on CUDA GPUs our GPU tes
 On NVIDIA GPUs with TF32 support (Ampere and newer, e.g. A40, A100, H100) XLA runs Float32 matrix
 products in TF32 by default, which rounds the inputs to a 10-bit mantissa: relative errors of about
 1e-4 per product instead of about 1e-7 in Float32. This concerns the matrix products of the
-`MatrixSpectralTransform`, the Legendre transform of the `SpectralTransform` and those that XLA
+`MatrixSpectralTransform`, the Legendre transform of the `SpectralTransform` (and its Fourier
+transform as truncated DFT, see above) and those that XLA
 creates from loops in raised kernels (e.g. the vertical
 matrix-vector products of the semi-implicit time stepping).
 
