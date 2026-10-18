@@ -1,6 +1,6 @@
 # FFT-based `SpectralTransform` with Reactant
 
-> Status: **in progress**. See "Handoff 2026-10-16 (to the HPC node with GPU)" first. The FFT-based `SpectralTransform` runs, differentiates and passes the CPU-vs-Reactant correctness tests for all models on Reactant's CPU backend; GPU tests/benchmarks and the default transform on Reactant are open. A Fourier stage as truncated DFT (no FFTs) is planned for a follow-up PR, see the last section.
+> Status: **in progress**. See "Handoff 2026-10-18 (work for 2026-10-19)" at the end first. The FFT-based `SpectralTransform` runs, differentiates and passes the CPU-vs-Reactant correctness tests for all models; its Fourier stage as truncated DFT (follow-up plan, last section) is implemented and the default on Reactant. Open: the PrimitiveWet gradient with the DFT, TF32 long-run stability.
 
 Date of initial draft: 2026-10-16
 
@@ -125,6 +125,12 @@ Float32 CPU `SpectralTransform` (FFTW) baseline, all against a Float64 reference
 
 `long_run_stability.jl` (Slurm): PrimitiveWetModel T256L8, DFT, TF32, 10 years of 365 days, a compiled program per
 30 days with a NaN/Inf check and global diagnostics after each (CSV), see the protocol.
+
+> why have find why it breaks with the DFT but not before with FFT or MT. This seems very counterintuitive. Note
+> this down as work for tomorrow. We'll close the session for today
+
+"Handoff 2026-10-18 (work for 2026-10-19)" at the end: why only the DFT triggers the scatter rewrite, what is known,
+how to find out, and the state of the running jobs.
 
 ## Problem description
 
@@ -638,8 +644,9 @@ CHANGELOG.
 
 ## Follow-up plan: Fourier transform as a truncated DFT on Reactant
 
-> Status: **in progress** on branch `mg/reactant-dft` (2026-10-18). Implemented for Reactant only and verified
-> against FFTW on Reactant's CPU backend, see "Protocol (implementation)" at the end; GPU checks and benchmarks open.
+> Status: **in progress** on branch `mg/reactant-dft` (2026-10-18). Implemented, verified against FFTW, benchmarked
+> on the H100, default on Reactant, docs done. Open: the PrimitiveWet gradient with the DFT doesn't compile, and the
+> TF32 long-run stability at T128L8; see "Handoff 2026-10-18 (work for 2026-10-19)" at the end first.
 
 Date: 2026-10-18. Base revision: `e22793e3` (branch `mg/new-reactant`). Prototype:
 `/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/dft_proto_2026-10-16/dft_transform_proto.jl`.
@@ -1001,3 +1008,34 @@ Branch `mg/reactant-dft` (base `c32de0ee`), login02 (A40) and Slurm (H100). Scri
   differentiates the PrimitiveWetModel with the matrix transform (6 steps); controls of this one-step check with the
   matrix transform and the FFT path running. Relevant for the new default (`WhichTransform`) and the
   `differentiability.md` example (default transform).
+- **PrimitiveWet gradient controls** (same one-step check, Reactant CPU backend): matrix transform 3/3, FFT path 3/3,
+  DFT 1 pass + 1 error (above). So the DFT path triggers the scatter type error in the MLIR passes; the BarotropicModel
+  gradient with the DFT works (6/6 vs Enzyme).
+- **Initial conditions with TF32** (smoke tests: CUDA.jl 974.2 hPa vs Reactant 963.5 hPa mean surface pressure at T31):
+  CPU vs Reactant CPU backend agree to 1e-7 (`compare_initial_conditions.jl`). On the GPU (`initial_pressure_tf32.jl`,
+  A40, T31L8, mean surface pressure / top-layer temperature / ln(ps) l=0 coefficient): CPU and CUDA.jl 974.19 hPa /
+  200.00 K; Reactant with `HIGHEST` both transforms 974.19 hPa / 200.00 K / 40.713173; TF32 matrix transform 971.21 hPa
+  / 199.93 K / 40.713173 (coefficient exact, its spectral → grid product biased −0.3%); TF32 DFT 963.49 hPa / 199.79 K /
+  40.699783 (coefficient −3.3e-4, grid −1.1%). TF32 errors are a systematic bias towards zero (consistent with inputs
+  truncated rather than rounded to TF32), which on fields with a large mean (ln ps ≈ 11.5) becomes a ~1% mass error.
+- **Stability controls** (T256L8, 2 years each, H100): CUDA.jl Float32 (Slurm 2568562) **unstable** after day 210
+  (61 SYPD), Reactant DFT `HIGHEST` (2568563) **unstable** after day 330 (246 SYPD), Reactant DFT TF32 (2568499, above)
+  after day 360; same signature (minimum temperature → ~150 K, growing winds). **The T256L8 default configuration of
+  the PrimitiveWetModel is unstable in long runs independent of Reactant, TF32 and the DFT**; the stability test of TF32
+  needs a configuration that is stable in Float32. Reactant FFT path TF32 (2568564) still running, not needed for the
+  attribution.
+- **Device memory** (Slurm 2567378, `memory_peak.jl`, H100, PrimitiveWet L8, XLA allocator, in use after `initialize!`
+  / peak after a compiled `run!` of 20 steps, GB; matrix / FFT path / DFT): T32 0.034 / 0.005 / 0.007 and 0.098 / 0.101 /
+  0.036, T64 0.396 / 0.019 / 0.029 and 0.461 / 0.104 / 0.077, T128 5.48 / 0.083 / 0.153 and 5.66 / 0.273 / 0.339, T256
+  – / 0.312 / 0.927 and – / 1.064 / 1.675.
+- **User decisions** (2026-10-18 evening): investigate a workaround for the PrimitiveWet gradient with the DFT; test TF32
+  stability at T128L8 for 10 years (Slurm 2569913 CUDA.jl Float32, 2569914 Reactant DFT TF32, 2569915 Reactant DFT
+  `HIGHEST`).
+- **The bad rewrite** (module dumped by Reactant on failure, `/tmp/reactant_g8LEgB/module_000_nxc9_post_all_pm.mlir` on
+  login02): the scatter of the `fill!` in `reset_tendencies!` has the operand `pad(slice(%8523)[0:49], high = 16)`, i.e.
+  1x65x3168, for a 1x73x3168 result (`high = 24` would be consistent), and its result is sliced to columns 24:73 and
+  padded back. So a pattern combining slice/pad and scatter shrank the operand by 8 columns without updating the type.
+  Candidate groups (`Reactant.Compiler.optimization_passes`): 45 patterns behind `disable_pad_optimization_passes`, 31
+  behind `disable_scatter_gather_optimization_passes` (among them `scatter_masked_index_slice`). Runs of the one-step
+  gradient check with each group disabled and with `scatter_masked_index_slice` or `slice_pad` excluded
+  (`run_ad_primitive_wet_options.jl`, `AD_OPTIONS`) running.
