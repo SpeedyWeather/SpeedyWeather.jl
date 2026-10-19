@@ -2,18 +2,18 @@
 in the Legendre transform. For reduced grids with as few as 4 longitudes around the poles
 (HEALPix grids) or 20 (octahedral grids) the higher wavenumbers in large orders m do not
 project (significantly) onto such few longitudes. For performance reasons the loop over m can
-therefore but truncated early. A Legendre shortcut `<: AbstractLegendreShortcut`
+therefore be truncated early. A Legendre shortcut `<: AbstractLegendreShortcut`
 is implemented as a functor that returns the 0-based maximum order m to retain per latitude ring,
 i.e. to be used for m in 0:mmax_truncation.
 
 New shortcuts can be added by defining `struct LegendreShortcutNew <: AbstractLegendreShortcut end`
-and the functor method `LegendreShortcutNew(nlon::Integer, lat::Real) = ...`, with `nlon` the
+and the functor method `LegendreShortcutNew(nlon::Integer, latd::Real) = ...`, with `nlon` the
 number of longitude points on that ring, and `latd` its latitude in degrees (-90˚ to 90˚N).
 Many implementations may not use the latitude `latd` but it is included for compatibility.
-If unused set to default value to 0. Also define `short_name(::Type{<:LegendreShortcutNew}) = "new"`.
+If unused, give it a default value, e.g. `latd::Real = 0`. Also define `short_name(::Type{<:LegendreShortcutNew}) = "new"`.
 
-Implementions are `LegendreShortcutLinear`, `LegendreShortcutQuadratic`, `LegendreShortcutCubic`,
-`LegendreShortcutLinQuadCosLat²` and `LegendreShortcutLinCubCoslat`."""
+Implementations are `LegendreShortcutLinear`, `LegendreShortcutQuadratic`, `LegendreShortcutCubic`,
+`LegendreShortcutLinQuadCoslat²` and `LegendreShortcutLinCubCoslat`."""
 abstract type AbstractLegendreShortcut end
 short_name(s::Type{<:AbstractLegendreShortcut}) = string(s)
 short_name(s::AbstractLegendreShortcut) = short_name(typeof(s))
