@@ -22,10 +22,9 @@ end
 
 """$(TYPEDSIGNATURES) Default initial conditions for the PrimitiveWetModel."""
 function InitialConditions(spectral_grid, ::Type{<:PrimitiveWet})
-    zonal = BalancedZonalState(spectral_grid)
-    pres = PressureOnOrography(spectral_grid)
+    zonal = BalancedZonalState(spectral_grid)   # includes surface pressure
     humid = ConstantRelativeHumidity(spectral_grid)
-    return (; zonal, pres, humid)
+    return (; zonal, humid)
 end
 
 """$(TYPEDSIGNATURES)
@@ -733,8 +732,11 @@ Balance then gives the temperature (JW eq. 6 is the special case U = u₀cos^(3/
 
 A and B have zero global mean, so T̄(σ) = max(T₀ σ^(RΓ/g), Tmin) is the global-mean
 temperature profile. Sets vorticity (including the JW perturbation to trigger baroclinic
-instability), divergence (JW perturbation) and temperature. Combine with
-`PressureOnOrography` and `ConstantRelativeHumidity` for humidity.
+instability), divergence (JW perturbation), surface pressure and temperature. The surface
+pressure is hydrostatic with T₀ - Γz on orography and temperature is evaluated with
+p/p₀ = σpₛ/p₀ instead of σ, so that both are consistent over orography. Do not combine
+with `PressureOnOrography`, which would overwrite the surface pressure. Combine with
+`ConstantRelativeHumidity` for humidity.
 $(TYPEDFIELDS)"""
 @kwdef struct BalancedZonalState{NF} <: AbstractInitialConditions
     "[OPTION] Zonal wind speed for σ → 0, U = u₀ tanh(-ln(σ) / H) [m/s]"
@@ -795,32 +797,33 @@ function initialize!(
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, zero(NF), perturb_uₚ, R)
     set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true)
 
-    # TEMPERATURE, vertical profiles on the CPU first
-    σ_levels_full = on_architecture(CPU(), model.geometry.σ_levels_full)
-    T̄ = similar(σ_levels_full)          # global-mean temperature [K]
-    U = similar(σ_levels_full)          # zonal wind amplitude U(σ) [m/s]
-    dUdx_R = similar(σ_levels_full)     # dU/dx / R_dry with x = -ln(σ) [K s/m]
-    for k in 1:nlayers
-        σ = σ_levels_full[k]
-        x = -log(σ)
-        T̄[k] = max(T₀ * σ^(R_dry * lapse_rate / gravity), Tmin)
-        U[k] = u₀ * tanh(x / H)
-        dUdx_R[k] = u₀ / H * (1 - tanh(x / H)^2) / R_dry
-    end
-    T̄, U, dUdx_R = on_architecture.(Ref(model.architecture), (T̄, U, dUdx_R))
+    # SURFACE PRESSURE, hydrostatic with the global-mean temperature T₀ - Γz on orography
+    # so that the temperature below is consistent with it (otherwise gravity waves)
+    (; orography) = model.orography
+    p₀ = model.atmosphere.reference_pressure
+    RΓg⁻¹ = R_dry * lapse_rate / gravity
+    lnp_grid = similar(orography)
+    @. lnp_grid = log(p₀) + log(1 - lapse_rate / T₀ * orography) / RΓg⁻¹
+    set!(vars, model; pressure = lnp_grid)
 
+    # TEMPERATURE, evaluated at p/p₀ = σpₛ/p₀ (not σ) so that it is hydrostatically
+    # consistent with the surface pressure on orography
     temp_grid = zeros(NF, grid, nlayers)
     aΩ = radius * rotation
     launch!(
         architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
-        balanced_zonal_temperature_kernel!, temp_grid, T̄, U, dUdx_R, model.geometry.latds, aΩ
+        balanced_zonal_temperature_kernel!, temp_grid, lnp_grid, model.geometry.σ_levels_full,
+        model.geometry.latds, initial_conditions, log(p₀), RΓg⁻¹, R_dry, aΩ,
     )
     set!(vars, model; temperature = temp_grid)
     return nothing
 end
 
-@kernel inbounds = true function balanced_zonal_temperature_kernel!(temp_grid, T̄, U, dUdx_R, φ, aΩ)
+@kernel inbounds = true function balanced_zonal_temperature_kernel!(
+        temp_grid, lnp_grid, σ_levels_full, φ, initial_conditions, lnp₀, RΓg⁻¹, R_dry, aΩ,
+    )
     ij, k = @index(Global, NTuple)
+    (; u₀, H, T₀, Tmin) = initial_conditions
 
     # plain sin/cos avoid AMDGPU hostcalls (see JablonowskiVorticity)
     φij = deg2rad(φ[ij])
@@ -828,9 +831,15 @@ end
     cosφ = cos(φij)
     NF = eltype(temp_grid)
 
+    # vertical coordinate x = -ln(p/p₀) with p = σpₛ
+    x = -(log(σ_levels_full[k]) + lnp_grid[ij] - lnp₀)
+    T̄ = max(T₀ * exp(-RΓg⁻¹ * x), Tmin)    # global-mean temperature [K]
+    U = u₀ * tanh(x / H)                    # zonal wind amplitude [m/s]
+    dUdx_R = u₀ / H * (1 - tanh(x / H)^2) / R_dry
+
     A = -2sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63
     B = 8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - convert(NF, π) * 1 // 4
-    temp_grid[ij, k] = T̄[k] + dUdx_R[k] * (2A * U[k] + B * aΩ)
+    temp_grid[ij, k] = T̄ + dUdx_R * (2A * U + B * aΩ)
 end
 
 # <: Function so that it works with our `set!`

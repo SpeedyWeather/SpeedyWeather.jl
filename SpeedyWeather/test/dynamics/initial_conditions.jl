@@ -159,8 +159,10 @@ end
 
 @testset "BalancedZonalState" begin
     spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
-    model = PrimitiveWetModel(spectral_grid)
-    @test model.initial_conditions.zonal isa BalancedZonalState    # default for PrimitiveWet
+    @test PrimitiveWetModel(spectral_grid).initial_conditions.zonal isa BalancedZonalState    # default
+
+    # without orography σ = p/p₀ so the profiles can be tested in σ
+    model = PrimitiveWetModel(spectral_grid; orography = NoOrography(spectral_grid))
 
     ic = BalancedZonalState(spectral_grid)
     vars = Variables(model)
@@ -195,6 +197,39 @@ end
     # warmer tropics than poles near the surface
     tropics, poles = abs.(φ) .< 10, abs.(φ) .> 80
     @test sum(temp[tropics, end]) / count(tropics) > sum(temp[poles, end]) / count(poles) + 30
+end
+
+@testset "BalancedZonalState on orography" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    ic = BalancedZonalState(spectral_grid)
+    vars = Variables(model)
+    initialize!(model.orography, model)
+    initialize!(vars, ic, model)
+    S = model.spectral_transform
+    temp = transform(SpeedyWeather.get_step(vars.prognostic.temperature, 1), S)
+    lnpₛ = transform(SpeedyWeather.get_step(vars.prognostic.pressure, 1), S)
+
+    (; R_dry) = model.atmosphere
+    (; gravity) = model.planet
+    p₀ = model.atmosphere.reference_pressure
+    σ = model.geometry.σ_levels_full
+    z = model.orography.orography
+
+    # surface pressure hydrostatic with T₀ - Γz, lower where the orography is high
+    ij = argmax(z)
+    @test z[ij] > 3000
+    @test exp(lnpₛ[ij]) ≈ p₀ * (1 - ic.lapse_rate * z[ij] / ic.T₀)^(gravity / (R_dry * ic.lapse_rate)) rtol = 0.01
+
+    # temperature is the same function of p = σpₛ everywhere: compare the lowest layer on the
+    # highest orography with the layer of about the same pressure on the ocean
+    ij_ocean = findfirst(abs.(z .- 0) .< 1 .&& abs.(model.geometry.latds .- model.geometry.latds[ij]) .< 3)
+    p_mountain = σ[end] * exp(lnpₛ[ij])
+    k = argmin(abs.(σ .* exp(lnpₛ[ij_ocean]) .- p_mountain))
+    @test abs(temp[ij, end] - temp[ij_ocean, k]) < 5
+
+    # not the σ-level temperature of the ocean, which would be ≈ T₀Γz/T₀ warmer
+    @test temp[ij_ocean, end] - temp[ij, end] > 10
 end
 
 @testset "PressureOnOrography" begin

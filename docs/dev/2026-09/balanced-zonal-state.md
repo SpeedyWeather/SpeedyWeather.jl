@@ -44,6 +44,15 @@ Base revision: c7d631c658feefc851eb7af5b93aa5754430faf5
   Rebased onto main without the #1283 commits. The parameters stay fitted to the equilibrium
   with #1283, so without it the initial state is slightly off the model's equilibrium until
   #1283 is merged.
+- 2026-10-19: follow-up prompt:
+  > Can you investigate the initial conditions of pressure too? JW starts with p=p_ref
+  > everywhere but they also have no orography, so we currently just correct surface pressure
+  > to be reduced to orographic height but there's still a wave bouncing around in the first
+  > days, any suggestions?
+
+  Diagnosed (see "Surface pressure on orography" below) and, signed off with "Just do 1 here
+  please!", `BalancedZonalState` now sets the surface pressure itself and evaluates the
+  temperature at p/p₀ = σpₛ/p₀. Digital filter initialization for the remaining wave is future work.
 
 ## Problem description
 
@@ -211,6 +220,30 @@ moisture out of unsaturated air (−1.8 mm/day over land in the first day, −3.
 SPEEDY had max(…, 0) there. It was removed to allow dew, but that also allows deposition onto
 dry soil.
 
+### Surface pressure on orography
+
+The default initial state launches a gravity wave over orography: the RMS of the hourly
+surface pressure change is 3 hPa/h in the first hours vs about 0.1 hPa/h in equilibrium.
+Two inconsistencies cause it. `PressureOnOrography` uses the atmosphere's reference
+temperature and lapse rate (288 K, 5 K/km), not T₀ and Γ of `BalancedZonalState`. And the
+temperature is a function of σ, so air on a 3 km mountain starts at the sea-level 283 K
+instead of about 266 K, out of hydrostatic balance with the reduced surface pressure.
+
+RMS of the hourly surface pressure change [hPa/h], T31L8 `PrimitiveWetModel`:
+
+| Variant | hours 1–6 | day 2 | day 5 |
+|---|---|---|---|
+| A: before | 3.0 2.9 2.0 1.2 0.9 0.9 | 0.16 | 0.12 |
+| B: pₛ with T₀, Γ of `BalancedZonalState` | 2.7 2.6 1.8 1.1 0.8 0.9 | 0.16 | 0.12 |
+| C: B and temperature at p = σpₛ (**implemented**) | 1.9 1.8 1.2 0.7 0.5 0.5 | 0.13 | 0.10 |
+| G: C and the wind at p = σpₛ too | 1.9 1.8 1.3 0.7 0.4 0.4 | 0.11 | 0.09 |
+| D: at rest, T̄(p) only | 0.07 0.06 … | 0.08 | 0.06 |
+| F: at rest, T̄(σ) only | 1.5 1.3 1.0 0.8 0.7 0.7 | 0.14 | 0.09 |
+| E: no orography | 0.07 0.09 … | 0.10 | 0.09 |
+
+At rest the consistent state (D) has no wave at all. The remainder in C and G is the wind
+blowing into orography with zero initial divergence, which no analytic profile removes.
+
 ## Summary of changes
 
 1. New `BalancedZonalState` initial condition (`dynamics/initial_conditions.jl`). It sets
@@ -229,8 +262,11 @@ dry soil.
    below σ_moist and decreases linearly to 0 at σ_dry. `σ_moist = σ_dry = 0` gives vertically
    constant RH, and `σ_moist = 1, σ_dry = 0.02` gives Manabe–Wetherald (#1279).
 3. `InitialConditions(spectral_grid, PrimitiveWet)` becomes
-   `(; zonal = BalancedZonalState, pres = PressureOnOrography, humid = ConstantRelativeHumidity)`.
+   `(; zonal = BalancedZonalState, humid = ConstantRelativeHumidity)`.
    PrimitiveDry keeps JW.
+4. `BalancedZonalState` also sets the surface pressure, hydrostatic with T₀ - Γz on orography,
+   and evaluates T̄, U and dU/dx in its temperature at x = -ln(σpₛ/p₀) instead of -ln(σ).
+   The wind stays a function of σ (zero at the surface), as G gave no improvement.
 
 ## Testing and verification
 
@@ -287,13 +323,16 @@ parameters and how to go back to JW.
 - The jet sits at 45° and the zonal wind is westerly everywhere. There are no trades or surface
   easterlies. At the surface U = 0, which keeps the constant surface pressure balanced.
 - The polar stratosphere is colder than in equilibrium, about 205 K vs 218 K at σ ≈ 0.2–0.3.
-- `PressureOnOrography` still uses the atmosphere's reference temperature (288 K) and moist
-  lapse rate (5 K/km) rather than T₀ and Γ. The difference in surface pressure over orography is
-  small.
+- Combining `BalancedZonalState` with `PressureOnOrography` overwrites the consistent surface
+  pressure. `PressureOnOrography` itself still uses the atmosphere's reference values.
+- The wind over orography still launches a gravity wave, about 60% of the original amplitude,
+  mostly decayed after a day.
 - `StartFromRest` still uses JW temperature, with the new humidity profile.
 
 ## Future work
 
 - #1282: vertical diffusion, then refit.
+- Digital filter initialization (Lynch and Huang, 1992) to remove the remaining gravity wave,
+  for any initial condition.
 - Surface winds with trades and midlatitude westerlies, balanced by a surface pressure pattern.
 - Land humidity flux into dry soil (see the #1283 plan).

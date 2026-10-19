@@ -249,7 +249,7 @@ spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
 InitialConditions(spectral_grid, PrimitiveWet)
 ```
 
-`BalancedZonalState` sets vorticity, divergence and temperature. It generalises the
+`BalancedZonalState` sets vorticity, divergence, surface pressure and temperature. It generalises the
 Jablonowski-Williamson initial conditions [Jablonowski2006](@citep) to a different vertical
 profile of the zonal wind ``u``. With ``x = -\ln \sigma``,
 
@@ -273,6 +273,13 @@ and can be chosen freely without breaking the balance. Its parameters
 ``T_0, \Gamma, T_{min}, u_0, H`` are fitted to the equilibrium climate of the `PrimitiveWetModel`.
 As in Jablonowski-Williamson a small perturbation of the zonal wind triggers baroclinic instability.
 
+Over orography the surface pressure is set hydrostatically with the temperature ``T_0 - \Gamma z``
+and the temperature above is evaluated with ``p/p_0 = \sigma p_s/p_0`` in place of ``\sigma``.
+Air over a mountain is then as cold as the free atmosphere at the same pressure, otherwise the
+initial imbalance between surface pressure and temperature radiates gravity waves.
+`BalancedZonalState` therefore should not be combined with `PressureOnOrography`, which would
+overwrite its surface pressure.
+
 `ConstantRelativeHumidity` then sets the humidity to a relative humidity of `relhumid_ref`
 below `σ_moist`, decreasing linearly to zero at `σ_dry` for a dry stratosphere.
 Use `σ_moist = σ_dry = 0` for a vertically constant relative humidity instead.
@@ -283,7 +290,6 @@ a weaker jet, or the Jablonowski-Williamson initial conditions
 ```@example wet_initial_conditions
 initial_conditions = (;
     zonal = BalancedZonalState(spectral_grid, T₀ = 280, u₀ = 40),
-    pres = PressureOnOrography(spectral_grid),
     humid = ConstantRelativeHumidity(spectral_grid, relhumid_ref = 0.6),
 )
 
