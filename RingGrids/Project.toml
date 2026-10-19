@@ -1,6 +1,6 @@
 name = "RingGrids"
 uuid = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
-version = "1.0.0"
+version = "1.0.0+DEV"
 authors = ["RingGrids contributors"]
 
 [deps]
@@ -43,7 +43,7 @@ DocStringExtensions = "0.9.5"
 Downloads = "1.6.0"
 FastGaussQuadrature = "1.0.2"
 FiniteDifferences = "0.12"
-GPUArrays = "11.2.3"
+GPUArrays = "11.2.3, 12.1"
 GeoMakie = "0.7.6"
 KernelAbstractions = "0.9.38"
 LinearAlgebra = "1.10"

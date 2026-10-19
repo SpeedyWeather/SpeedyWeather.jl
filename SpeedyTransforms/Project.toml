@@ -1,6 +1,6 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-version = "1.0.0"
+version = "1.0.0+DEV"
 authors = ["SpeedyTransforms contributors"]
 
 [deps]
@@ -51,7 +51,7 @@ DocStringExtensions = "0.9.5"
 Enzyme = "0.13"
 FFTW = "1.9.0"
 FastGaussQuadrature = "1.0.2"
-GPUArrays = "11.2.3"
+GPUArrays = "11.2.3, 12.1"
 GenericFFT = "0.1.6"
 KernelAbstractions = "0.9.38"
 LinearAlgebra = "1.10"

@@ -31,6 +31,21 @@ import Statistics
     end
 end
 
+@testset "Interpolate constant field, mixed precision and layers" begin
+    # Float64 data with a (default) Float32 interpolator whose pole-average buffers fit all
+    # layers: the pole averages must not be rounded to Float32, or constants are lost
+    grid_in, grid_out = OctahedralGaussianGrid(8), FullGaussianGrid(12)
+    nlayers = 3
+    c = randn(Float64)
+    A = fill!(Field(Float64, grid_in, nlayers), c)
+    Aout = zeros(Float64, grid_out, nlayers)
+
+    interpolator = RingGrids.interpolator(grid_out, grid_in; nlayers)
+    @test eltype(interpolator.locator.north_pole_average) == Float32
+    RingGrids.interpolate!(Aout, A, interpolator)
+    @test all(a -> a ≈ c, Aout)
+end
+
 @testset "Interpolate zonally-constant field" begin
     npoints = 1000
 
@@ -430,8 +445,9 @@ end
         grid_in, grid_out = Grid(8), Grid(12)
         rings = grid_in.rings
 
-        # data in a different number format than the interpolator, as for the model output
-        @testset for (NF_data, NF_interp) in ((Float32, Float32), (Float64, Float64), (Float64, Float32))
+        # data in a different number format than the interpolator, (Float32, Float64) uses the
+        # buffers, (Float64, Float32) doesn't to keep the precision of the data
+        @testset for (NF_data, NF_interp) in ((Float32, Float32), (Float64, Float64), (Float32, Float64), (Float64, Float32))
             field_in = randn(NF_data, grid_in, nlayers)
             out_buffers = zeros(NF_data, grid_out, nlayers)
             out_fallback = zeros(NF_data, grid_out, nlayers)
@@ -448,9 +464,15 @@ end
             # interpolator's number format, which is the precision the comparison can expect
             @test isapprox(out_buffers.data, out_fallback.data, rtol = sqrt(eps(NF_interp)))
 
-            # buffers hold the pole averages, so the non-allocating path was taken
-            @test I_buffers.locator.north_pole_average ≈ vec(Statistics.mean(field_in.data[rings[1], :], dims = 1))
-            @test I_buffers.locator.south_pole_average ≈ vec(Statistics.mean(field_in.data[rings[end], :], dims = 1))
+            if promote_type(NF_data, NF_interp) == NF_interp
+                # buffers hold the pole averages, so the non-allocating path was taken
+                @test I_buffers.locator.north_pole_average ≈ vec(Statistics.mean(field_in.data[rings[1], :], dims = 1))
+                @test I_buffers.locator.south_pole_average ≈ vec(Statistics.mean(field_in.data[rings[end], :], dims = 1))
+            else
+                # buffers less precise than the data are left untouched, the allocating
+                # fallback averages in the data's number format instead
+                @test all(iszero, I_buffers.locator.north_pole_average)
+            end
 
             # too small buffers are left untouched, the allocating fallback was taken
             @test all(iszero, I_fallback.locator.north_pole_average)

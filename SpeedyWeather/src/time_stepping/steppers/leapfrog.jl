@@ -128,10 +128,12 @@ function move_prognostic_grid_variables_back!(
         model::AbstractModel,
     )
     # The atmospheric grid prognostics (vorticity, divergence, temperature, [humidity], pressure/η)
-    # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_grid` fuse parent.
-    # Together these cover exactly `tendency_and_uv_names`, so a single contiguous copy from the
-    # current step (2nd) to the previous step (1st) per fuse parent replaces the per-variable loop.
-    for fused in (vars.fused.grid, vars.fused.uv_grid)
+    # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_dpres_grad_grid` fuse
+    # parent. Together these cover exactly `tendency_and_uv_names`, so a single contiguous copy from
+    # the current step (2nd) to the previous step (1st) per fuse parent replaces the per-variable loop.
+    # For primitive equation models `:uv_dpres_grad_grid` also holds ∇ln(pₛ) (`dpres_dx`, `dpres_dy`),
+    # which is copied along but not used from the previous step.
+    for fused in (vars.fused.grid, vars.fused.uv_dpres_grad_grid)
         copy_step_back!(parent(fused))
     end
     # tracers, ocean and land grid variables are not part of the atmospheric fuse — copy

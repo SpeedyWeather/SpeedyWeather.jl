@@ -8,10 +8,23 @@ only add new assets. v"2" would be a breaking change.
 e.g. `version = "main"` for the latest on the main branch.
 =#
 const ASSETS_URL = "https://github.com/SpeedyWeather/SpeedyWeatherAssets/raw/refs"
-const DEFAULT_ASSETS_VERSION = v"1"
-const AVAILABLE_ASSETS_VERSIONS = (v"1",)
+const DEFAULT_ASSETS_VERSION = v"1.1"
+const AVAILABLE_ASSETS_VERSIONS = (v"1", v"1.1",)
 
 # end SpeedyWeatherAssets "Project.toml"
+
+const ASSET_CACHE_LOCK = ReentrantLock()
+
+# Use the full source URL as the binding name so repositories, tags, branches,
+# and files with the same basename in different directories cannot collide.
+function asset_binding_name(
+        path::String;
+        assets_url::String = ASSETS_URL,
+        version = DEFAULT_ASSETS_VERSION,
+    )
+    ref = version isa String ? "heads/$version" : "tags/v$version"
+    return joinpath(assets_url, ref, path)
+end
 
 """$(TYPEDSIGNATURES)
 Downloads a file under `path` from an assets repository (if `from_assets=true`,
@@ -23,6 +36,10 @@ the loaded data (in most cases into a `Field` subtype, determining the grid).
 `FileFormat` determines how to read the file; load NCDatasets.jl to enable reading NetCDF files.
 `assets_url` can be set to a custom URL for alternative asset repositories (e.g. for Terrarium).
 `version` is the version tag (a `VersionNumber`) or branch name (a `String`) to download from.
+Assets are bound in Artifacts.toml by their full source URL, including the repository,
+version or branch, and file path. Switching versions preserves earlier bindings so
+previously downloaded assets can be reused. A branch remains cached until its binding
+is removed; upstream changes to the same branch are not detected automatically.
 `fill_value` is the value used to replace missing data (identified by the file's `_FillValue`
 attribute) in the loaded array; defaults to `NaN`.
 `output_grid` is the grid to interpolate the loaded data to; defaults to `nothing` (no interpolation). `ArrayType` must be a `AbstractFullField` type for interpolation to work.
@@ -51,36 +68,32 @@ function get_asset(
         end
     end
 
-    if version isa String
-        # interpret as branch name
-        target_url = joinpath(assets_url, "heads/$version")
-    else
-        # assume VersionNumber: construct tag URL and try to download
-        target_url = joinpath(assets_url, "tags/v$version")
-    end
-
     filename = basename(path)
-    url = joinpath(target_url, path)
+    binding_name = asset_binding_name(path; assets_url, version)
+    url = binding_name
     project_root = pkgdir(RingGrids)
     # fallback to @__DIR__ if pkgdir fails
     project_root = isnothing(project_root) ? (@__DIR__) : project_root
     artifact_toml = joinpath(project_root, "Artifacts.toml")
 
-    # Check if the artifact already exists in the TOML
-    hash = Artifacts.artifact_hash(filename, artifact_toml)
+    hash = lock(ASSET_CACHE_LOCK) do
+        # Check if the artifact already exists in the TOML
+        cached_hash = Artifacts.artifact_hash(binding_name, artifact_toml)
 
-    # If not found or file not installed create and bind it
-    if hash === nothing || !Artifacts.artifact_exists(hash)
-        hash = Pkg.Artifacts.create_artifact() do artifact_dir
-            dest_path = joinpath(artifact_dir, filename)
-            try
-                Downloads.download(url, dest_path)
-            catch e
-                @error "Download failed for URL: $url" exception = (e)
-                throw("Could not download asset '$filename'. Check your internet connection or if the URL asset path exists.")
+        # If not found or file not installed create and bind it
+        if cached_hash === nothing || !Artifacts.artifact_exists(cached_hash)
+            cached_hash = Pkg.Artifacts.create_artifact() do artifact_dir
+                dest_path = joinpath(artifact_dir, filename)
+                try
+                    Downloads.download(url, dest_path)
+                catch e
+                    @error "Download failed for URL: $url" exception = (e)
+                    throw("Could not download asset '$filename'. Check your internet connection or if the URL asset path exists.")
+                end
             end
+            Pkg.Artifacts.bind_artifact!(artifact_toml, binding_name, cached_hash, force = true)
         end
-        Pkg.Artifacts.bind_artifact!(artifact_toml, filename, hash, force = true)
+        return cached_hash
     end
 
     asset_path = joinpath(Artifacts.artifact_path(hash), filename)
