@@ -53,6 +53,17 @@ Base revision: c7d631c658feefc851eb7af5b93aa5754430faf5
   Diagnosed (see "Surface pressure on orography" below) and, signed off with "Just do 1 here
   please!", `BalancedZonalState` now sets the surface pressure itself and evaluates the
   temperature at p/p₀ = σpₛ/p₀. Digital filter initialization for the remaining wave is future work.
+- 2026-10-19: follow-up prompt:
+  > When outputting MeanSeaLevelPressureOutput() the initial conditions are always Inf,
+  > presumably because the surface_temperature is still 0, wondering whether we could either fix
+  > this in the output variable itself or whether it's actually a good idea to run the
+  > parameterizations also at initialize! simulation but setting the tendencies back to 0
+
+  > Can you just fix it in this PR please given it's also directly related to initial conditions?
+
+  Fixed in the output variable (see Summary of changes, 5) rather than running the
+  parameterizations at initialization, which also update accumulators, ocean/land fluxes and
+  diagnostics that resetting the tendencies would not undo.
 
 ## Problem description
 
@@ -267,6 +278,11 @@ blowing into orography with zero initial divergence, which no analytic profile r
 4. `BalancedZonalState` also sets the surface pressure, hydrostatic with T₀ - Γz on orography,
    and evaluates T̄, U and dU/dx in its temperature at x = -ln(σpₛ/p₀) instead of -ln(σ).
    The wind stays a function of σ (zero at the surface), as G gave no improvement.
+5. `MeanSeaLevelPressureOutput` computes the surface air temperature on the fly from the lowest
+   layer (dry adiabatic, as `SurfaceCondition`) instead of reading
+   `vars.parameterizations.surface_air_temperature`, which is 0 for the initial conditions
+   and gave Inf. It also no longer overwrites that variable when `dynamics_only`. Tested in
+   `test/output/netcdf_output.jl` on the first output time step.
 
 ## Testing and verification
 
