@@ -98,7 +98,7 @@ Adapt.@adapt_structure Geometry
 
 """$(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
-function Geometry(SG::SpectralGrid; vertical_coordinates = FriersonSigmaCoordinates(SG))
+function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG))
 
     (; nlayers) = SG
     error_message = "nlayers=$(SG.nlayers) does not match length nlayers=" *
