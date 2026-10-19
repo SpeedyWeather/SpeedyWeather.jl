@@ -2,10 +2,11 @@
 # time steps in one traced loop (`time_steps!`) with its checkpointing options. Enzyme-MLIR can only differentiate KernelAbstractions kernels that are
 # raised to StableHLO, hence `raise = true`. The Reactant gradients are compared against Enzyme on
 # the CPU for the same state.
-# CI runs this for the BarotropicModel (one time step with both the MatrixSpectralTransform and the
-# SpectralTransform, Fourier transform as truncated DFT) and, without the comparison against Enzyme on the CPU (too slow
-# to compile), the gradient of several time steps of the PrimitiveWetModel; `differentiation_primitive_wet.jl`
-# uses the functions defined here for the full comparison of the PrimitiveWetModel.
+# The models use the SpectralTransform (on Reactant the default, Fourier transform as truncated DFT) unless a
+# `Transform` is given. CI runs this for the BarotropicModel (one time step with the SpectralTransform and with the
+# MatrixSpectralTransform, several time steps) and, without the comparison against Enzyme on the CPU (too slow to
+# compile), the gradient of several time steps of the PrimitiveWetModel; `differentiation_primitive_wet.jl` uses the
+# functions defined here for the full comparison of the PrimitiveWetModel.
 #
 # Needs Reactant >= v0.2.294: raising kernels that store a complex constant (e.g. `div[I] = 0`) fails before
 # 0.2.293 ("cannot raise op to stablehlo llvm.mlir.constant", Reactant.jl#3450), the gradient of the traced time
@@ -69,7 +70,7 @@ function gradient_vorticity_reactant(vars, model, n, options)
 end
 
 """CPU and Reactant simulations of `ModelType` in the same state, ready for one time step."""
-function differentiability_simulations(ModelType::Type; Transform = MatrixSpectralTransform, spinup_steps = 5)
+function differentiability_simulations(ModelType::Type; Transform = SpectralTransform, spinup_steps = 5)
     simulation_cpu = initialize!(create_cpu_model(ModelType; Transform))
     simulation_reactant = initialize!(create_reactant_model(ModelType; Transform))
 
@@ -88,7 +89,7 @@ end
 primitive equation models) and only checks that the Reactant gradient compiles and is finite and non-zero;
 the loss is always compared with the CPU. Both models use a spectral transform of type `Transform`."""
 function test_differentiability(
-        ModelType::Type; Transform = MatrixSpectralTransform, compare_with_enzyme = true,
+        ModelType::Type; Transform = SpectralTransform, compare_with_enzyme = true,
         rtol_loss = 1.0e-4, rtol_gradient = 1.0e-3
     )
     return @testset "Differentiability with Reactant: $ModelType with $(nameof(Transform))" begin
@@ -119,17 +120,19 @@ end
 several checkpointing options, against Enzyme on the CPU (`compare_with_enzyme = false`: only
 that the gradients compile and are finite and non-zero, see `test_differentiability`). Reactant unrolls
 traced loops of at most 4 iterations, `n > 4` keeps the `stablehlo.while` that the checkpointing options
-act on. `options` are the keyword arguments of `time_steps!` to test (as `NamedTuple`s)."""
+act on. `options` are the keyword arguments of `time_steps!` to test (as `NamedTuple`s). Both models use a spectral
+transform of type `Transform`."""
 function test_differentiability_time_steps(
         ModelType::Type;
+        Transform = SpectralTransform,
         n = 6,
         compare_with_enzyme = true,
         options = ((;), (; checkpointing = Reactant.Periodic(2)), (; checkpointing = Reactant.Binomial(2))),
         rtol_loss = 1.0e-4,
         rtol_gradient = 1.0e-3,
     )
-    return @testset "Differentiability of $n time steps with Reactant: $ModelType" begin
-        simulation_cpu, simulation_reactant = differentiability_simulations(ModelType)
+    return @testset "Differentiability of $n time steps with Reactant: $ModelType with $(nameof(Transform))" begin
+        simulation_cpu, simulation_reactant = differentiability_simulations(ModelType; Transform)
         vars_cpu, model_cpu = SpeedyWeather.unpack(simulation_cpu)
         vars_reactant, model_reactant = SpeedyWeather.unpack(simulation_reactant)
 
@@ -170,8 +173,8 @@ if !(@isdefined(DIFFERENTIATION_FUNCTIONS_ONLY) && DIFFERENTIATION_FUNCTIONS_ONL
         end
     end
 
-    test_differentiability(BarotropicModel)
-    test_differentiability(BarotropicModel; Transform = SpectralTransform)  # truncated DFT and batched Legendre
+    test_differentiability(BarotropicModel)                                       # SpectralTransform (truncated DFT)
+    test_differentiability(BarotropicModel; Transform = MatrixSpectralTransform)
     test_differentiability_time_steps(BarotropicModel)
 
     # PrimitiveWetModel: only that the gradient of the traced loop compiles (and is finite), the comparison
