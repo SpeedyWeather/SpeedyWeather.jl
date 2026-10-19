@@ -106,8 +106,14 @@ name here, remove it once fixed upstream.
   `(lm - 1) mod n`) in a cycle that never terminates, so the time step of the primitive equation
   models never compiles. Excluding `cse_slice` breaks the cycle (the alternative,
   `max_reused_const_prop_size = 0`, compiles as fast but the model runs up to 5% slower on CPU),
-  see docs/dev/2026-10/reactant-issue-draft-gather-index-cycle.md."""
-const REACTANT_EXCLUDED_PASSES = ["cse_slice"]
+  see docs/dev/2026-10/reactant-issue-draft-gather-index-cycle.md.
+- `concat_multipad`: in Reactant v0.2.295 the pattern merges `concatenate(pad(a, high = 0),
+  pad(b, high = h))` into a pad that keeps the first pad's high padding, `h` elements short
+  (EnzymeAD/Reactant.jl#3503). The gradient of the primitive equation models with the
+  `SpectralTransform` (Fourier transform as truncated DFT) reaches this and fails to compile
+  ("'stablehlo.scatter' op inferred type(s) ... incompatible with return type(s)"). Excluding it
+  costs nothing (H100 benchmarks), see docs/dev/2026-10/reactant-issue-draft-concat-multipad.md."""
+const REACTANT_EXCLUDED_PASSES = ["cse_slice", "concat_multipad"]
 
 """
     reactant_compile_options(; kwargs...)
