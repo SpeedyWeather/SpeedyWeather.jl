@@ -1,6 +1,12 @@
 using JLArrays
 import Random
 
+# padded grids require a minimum nlat_half, otherwise use n
+function test_nlat_half(T, n)
+    G = T <: RingGrids.AbstractField ? RingGrids.grid_type(T) : T
+    return G <: RingGrids.PaddedHEALPixGrids ? max(n, RingGrids.nlat_half_min(G)) : n
+end
+
 @testset "Grid types" begin
     # TODO: These grid/field types should be pulled out into constants rather than copy-pasted
     for G in (
@@ -10,7 +16,9 @@ import Random
             OctahedralClenshawGrid,
             OctaminimalGaussianGrid,
             HEALPixGrid,
+            HEALPixPaddedGrid,
             OctaHEALPixGrid,
+            OctaHEALPixPaddedGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
         )
@@ -47,7 +55,9 @@ end
             OctahedralClenshawField,
             OctaminimalGaussianField,
             HEALPixField,
+            HEALPixPaddedField,
             OctaHEALPixField,
+            OctaHEALPixPaddedField,
         )
 
         @test RingGrids.isreduced(F)
@@ -69,11 +79,14 @@ end
                 OctahedralClenshawGrid,
                 OctaminimalGaussianGrid,
                 HEALPixGrid,
+                HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
             for nlat_half in (4, 8, 16, 24, 32)
+                Grid <: RingGrids.PaddedHEALPixGrids && nlat_half < RingGrids.nlat_half_min(Grid) && continue
 
                 npoints = RingGrids.get_npoints(Grid, nlat_half)
                 grid = Grid(nlat_half)
@@ -111,12 +124,14 @@ end
                 OctahedralClenshawGrid,
                 OctaminimalGaussianGrid,
                 HEALPixGrid,
+                HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
 
-            n = 4      # resolution parameter nlat_half
+            n = test_nlat_half(G, 4)      # resolution parameter nlat_half
             grid = G(n)
 
             F1 = zeros(grid)
@@ -171,12 +186,14 @@ end
                 OctahedralClenshawField,
                 OctaminimalGaussianField,
                 HEALPixField,
+                HEALPixPaddedField,
                 OctaHEALPixField,
+                OctaHEALPixPaddedField,
                 FullHEALPixField,
                 FullOctaHEALPixField,
             )
 
-            n = 4      # resolution parameter nlat_half
+            n = test_nlat_half(F, 4)      # resolution parameter nlat_half
             f1 = ones(F, n)
             @test all(f1 .== 1)
             @test eltype(f1) == Float64
@@ -197,12 +214,14 @@ end
                 OctahedralClenshawGrid,
                 OctaminimalGaussianGrid,
                 HEALPixGrid,
+                HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
 
-            n = 4      # resolution parameter nlat_half
+            n = test_nlat_half(G, 4)      # resolution parameter nlat_half
             G1 = rand(G, n)
             @test eltype(G1) == RingGrids.DEFAULT_NF # that's the default
 
@@ -256,12 +275,14 @@ end
                 OctahedralClenshawField,
                 OctaminimalGaussianField,
                 HEALPixField,
+                HEALPixPaddedField,
                 OctaHEALPixField,
+                OctaHEALPixPaddedField,
                 FullHEALPixField,
                 FullOctaHEALPixField,
             )
 
-            n = 4      # resolution parameter nlat_half
+            n = test_nlat_half(F, 4)      # resolution parameter nlat_half
             field1 = F(undef, n)
             @test eltype(field1) == RingGrids.DEFAULT_NF     # that's the default NF
 
@@ -301,12 +322,14 @@ end
             OctahedralClenshawGrid,
             OctaminimalGaussianGrid,
             HEALPixGrid,
+            HEALPixPaddedGrid,
             OctaHEALPixGrid,
+            OctaHEALPixPaddedGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
         )
 
-        n = 4      # resolution parameter nlat_half
+        n = test_nlat_half(G, 4)      # resolution parameter nlat_half
         field = zeros(G, n)
 
         # precompute indices and boundscheck
@@ -334,12 +357,15 @@ end
             OctahedralClenshawGrid,
             OctaminimalGaussianGrid,
             HEALPixGrid,
+            HEALPixPaddedGrid,
             OctaHEALPixGrid,
+            OctaHEALPixPaddedGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
         )
 
         for n in [8, 16, 24, 32]      # resolution parameter nlat_half
+            G <: RingGrids.PaddedHEALPixGrids && n < RingGrids.nlat_half_min(G) && continue
             grid = G(n)
 
             # precompute indices and boundscheck
@@ -470,12 +496,14 @@ end
             OctahedralClenshawField,
             OctaminimalGaussianField,
             HEALPixField,
+            HEALPixPaddedField,
             OctaHEALPixField,
+            OctaHEALPixPaddedField,
             FullHEALPixField,
             FullOctaHEALPixField,
         )
 
-        field = rand(F, m, n, p)
+        field = rand(F, test_nlat_half(F, m), n, p)
         @test field[:, 1, 1] isa F
         @test field[1] == field.data[1]
         @test field[1, 1, 1] == field.data[1, 1, 1]
@@ -502,13 +530,15 @@ end
             OctahedralClenshawField,
             OctaminimalGaussianField,
             HEALPixField,
+            HEALPixPaddedField,
             OctaHEALPixField,
+            OctaHEALPixPaddedField,
             FullHEALPixField,
             FullOctaHEALPixField,
         )
 
         for s in ((n,), (n, n), (n, n, n), (n, n, n, n))
-            field = zeros(F, s...)
+            field = zeros(F, test_nlat_half(F, s[1]), Base.tail(s)...)
 
             for k in eachlayer(field)
                 for (j, ring) in enumerate(eachring(field))
@@ -531,11 +561,12 @@ end
             # OctahedralClenshawField,
             # OctaminimalGaussianField,
             HEALPixField,
+            HEALPixPaddedField,
             # OctaHEALPixField,
             # FullHEALPixField,
             # FullOctaHEALPixField,
         )
-        s = (2, 3, 4)
+        s = (test_nlat_half(F, 2), 3, 4)
         ndims = length(s)
 
         field_cpu = randn(F{NF}, s...)
@@ -600,11 +631,13 @@ end
                 OctahedralClenshawGrid,
                 OctaminimalGaussianGrid,
                 HEALPixGrid,
+                HEALPixPaddedGrid,
                 OctaHEALPixGrid,
+                OctaHEALPixPaddedGrid,
                 FullHEALPixGrid,
                 FullOctaHEALPixGrid,
             )
-            nlat_half = 4
+            nlat_half = test_nlat_half(Grid, 4)
             grid = Grid(nlat_half)
             npoints = RingGrids.get_npoints(grid)
             field = Field(1:npoints, grid)

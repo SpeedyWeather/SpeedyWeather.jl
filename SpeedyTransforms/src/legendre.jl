@@ -15,17 +15,17 @@
 
     @inbounds for k in nlayers
         # "even" and "odd" coined with 0-based indexing, i.e. the even l=0 mode is 1st element
-        even_k = zero(eltype(south))    # dot product with elements 1, 3, 5, ...
-        odd_k = zero(eltype(north))    # dot prodcut with elements 2, 4, 6, ...
+        even_k = zero(eltype(south))        # dot product with elements 1, 3, 5, ...
+        odd_k = zero(eltype(north))         # dot prodcut with elements 2, 4, 6, ...
 
-        for l in 1:2:lmax_even          # dot product in pairs for contiguous memory access
+        for l in 1:2:lmax_even              # dot product in pairs for contiguous memory access
             even_k = muladd(specs[l, k], legendre[l], even_k)
             odd_k = muladd(specs[l + 1, k], legendre[l + 1], odd_k)
         end
 
         # now do the last row if lmax is odd, all written as muladds
         even_k = muladd(specs[end, k], isoddlmax * legendre[end], even_k)
-        north[k] = muladd(1, odd_k, even_k)    # north = even + odd
+        north[k] = muladd(1, odd_k, even_k)     # north = even + odd
         south[k] = muladd(-1, odd_k, even_k)    # south = even - odd
     end
 
@@ -43,15 +43,15 @@ function _legendre!(
         S::SpectralTransform;                   # precomputed transform
         unscale_coslat::Bool = false,           # unscale by cosine of latitude on the fly?
     )
-    (; nlat_half) = S.grid                  # dimensions
-    (; lmax, mmax) = S.spectrum            # 1-based max degree l, order m of spherical harmonics
-    (; legendre_polynomials) = S            # precomputed Legendre polynomials
-    (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 1-based
+    (; nlat_half) = S.grid                      # dimensions
+    (; lmax, mmax) = S.spectrum                 # 1-based max degree l, order m of spherical harmonics
+    (; legendre_polynomials) = S                # precomputed Legendre polynomials
+    (; mmax_truncation) = S                     # Legendre shortcut, shortens loop over m, 0-based
     (; coslat⁻¹, lon_offsets) = S
-    nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+    nlayers = axes(specs, 2)                    # get number of layers of specs for fewer layers than precomputed in S
 
-    lmax = lmax - 1                           # 0-based max degree l of spherical harmonics
-    mmax = mmax - 1                           # 0-based max order m of spherical harmonics
+    lmax = lmax - 1                             # 0-based max degree l of spherical harmonics
+    mmax = mmax - 1                             # 0-based max order m of spherical harmonics
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     # scratch dim 2 is the per-call capacity (= max(planned_K) on CPU, S.nlayers elsewhere);
@@ -62,17 +62,17 @@ function _legendre!(
     ) ||
         throw(DimensionMismatch(S, specs))
 
-    north = scratch_memory.north     # use scratch memory for vertically-batched dot product
+    north = scratch_memory.north            # use scratch memory for vertically-batched dot product
     south = scratch_memory.south
 
-    return @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
-        g_north[:, nlayers, j] .= 0       # reset scratch memory
-        g_south[:, nlayers, j] .= 0       # reset scratch memory
+    @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
+        g_north[:, nlayers, j] .= 0         # reset scratch memory
+        g_south[:, nlayers, j] .= 0         # reset scratch memory
 
         # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
         lm = 1                              # single running index for non-zero l, m indices
-        for m in 1:(mmax_truncation[j] + 1)   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
-            lm_end = lm + lmax - m + 1          # last index in column
+        for m in 1:(mmax_truncation[j] + 1) # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
+            lm_end = lm + lmax - m + 1      # last index in column
 
             # view on lower triangular column, but batched in vertical
             spec_view = view(specs.data, lm:lm_end, :)
@@ -90,11 +90,11 @@ function _legendre!(
                 g_south[m, k, j] = muladd(o, south[k], g_south[m, k, j])
             end
 
-            lm = lm_end + 1                         # first index of next m column
+            lm = lm_end + 1                 # first index of next m column
         end
 
-        if unscale_coslat
-            @views g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
+        if unscale_coslat                   # scale in place
+            @views g_north[:, nlayers, j] .*= coslat⁻¹[j]        
             @views g_south[:, nlayers, j] .*= coslat⁻¹[j]
         end
     end
@@ -128,7 +128,7 @@ end
 """$(TYPEDSIGNATURES)
 (Forward) Legendre transform, batched in the vertical. Not to be used
 directly, but called from transform!."""
-function _legendre!(                        # GRID TO SPECTRAL
+function _legendre!(                            # GRID TO SPECTRAL
         specs::LowerTriangularArray,            # Fourier and Legendre-transformed output
         f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed input, northern latitudes
         f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
@@ -136,16 +136,16 @@ function _legendre!(                        # GRID TO SPECTRAL
         S::SpectralTransform;                   # precomputed transform
         add::Bool = false,                      # accumulate onto `specs` instead of overwriting it?
     )
-    (; nlat) = S                            # dimensions
+    (; nlat) = S                                # dimensions
     (; nlat_half) = S.grid
-    (; lmax, mmax) = S.spectrum             # 1-based max degree l, order m of spherical harmonics
-    (; legendre_polynomials) = S            # precomputed Legendre polynomials
-    (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 1-based
+    (; lmax, mmax) = S.spectrum                 # 1-based max degree l, order m of spherical harmonics
+    (; legendre_polynomials) = S                # precomputed Legendre polynomials
+    (; mmax_truncation) = S                     # Legendre shortcut, shortens loop over m, 0-based
     (; solid_angles, lon_offsets) = S
-    nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+    nlayers = axes(specs, 2)                    # get number of layers of specs for fewer layers than precomputed in S
 
-    lmax = lmax - 1                           # 0-based max degree l of spherical harmonics
-    mmax = mmax - 1                           # 0-based max order m of spherical harmonics
+    lmax = lmax - 1                             # 0-based max degree l of spherical harmonics
+    mmax = mmax - 1                             # 0-based max order m of spherical harmonics
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck (
@@ -154,7 +154,7 @@ function _legendre!(                        # GRID TO SPECTRAL
     ) ||
         throw(DimensionMismatch(S, specs))
 
-    even = scratch_memory.north      # use scratch memory for outer product
+    even = scratch_memory.north                 # use scratch memory for outer product
     odd = scratch_memory.south
 
     # by default reset specs to 0 (this transform accumulates into it internally); `add=true`
@@ -162,18 +162,18 @@ function _legendre!(                        # GRID TO SPECTRAL
     # accumulates onto the existing contents instead, so no scratch spectral array is needed
     add || fill!(specs, 0)
 
-    return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
-        j = j_north                         # symmetric index / ring-away from pole index
+    return @inbounds for j_north in 1:nlat_half # symmetry: loop over northern latitudes only
+        j = j_north                             # symmetric index / ring-away from pole index
 
         # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
-        ΔΩ = solid_angles[j]                # = sinθ Δθ Δϕ, solid angle for a grid point
+        ΔΩ = solid_angles[j]                    # = sinθ Δθ Δϕ, solid angle for a grid point
 
-        lm = 1                              # single running index for spherical harmonics
-        for m in 1:(mmax_truncation[j] + 1)   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
+        lm = 1                                  # single running index for spherical harmonics
+        for m in 1:(mmax_truncation[j] + 1)     # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
 
             # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
-            o = lon_offsets[m, j]           # longitude offset rotation by multiplication with complex unit vector
-            ΔΩ_rotated = ΔΩ * conj(o)         # complex conjugate for rotation back to prime meridian
+            o = lon_offsets[m, j]               # longitude offset rotation by multiplication with complex unit vector
+            ΔΩ_rotated = ΔΩ * conj(o)           # complex conjugate for rotation back to prime meridian
 
             # LEGENDRE TRANSFORM
             for k in nlayers
@@ -183,13 +183,13 @@ function _legendre!(                        # GRID TO SPECTRAL
             end
 
             # integration over l = m:lmax+1
-            lm_end = lm + lmax - m + 1                      # last index in column m
+            lm_end = lm + lmax - m + 1          # last index in column m
             spec_view = view(specs.data, lm:lm_end, :)
             legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
 
             _fused_oddeven_outer_product_accumulate!(spec_view, legendre_view, even, odd)
 
-            lm = lm_end + 1                             # first index of next column m+1
+            lm = lm_end + 1                     # first index of next column m+1
         end
     end
 end
