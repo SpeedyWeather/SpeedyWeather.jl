@@ -1,6 +1,6 @@
 # BalancedZonalState: moist initial conditions without an initial precipitation burst
 
-> Status: **completed**. `BalancedZonalState` and a height-dependent `ConstantRelativeHumidity` are the new default initial conditions of the `PrimitiveWetModel`. This PR is stacked on the bulk Richardson fix (#1283).
+> Status: **completed**. `BalancedZonalState` and a height-dependent `ConstantRelativeHumidity` are the new default initial conditions of the `PrimitiveWetModel`. Destacked from the bulk Richardson fix (#1283), this PR contains only the initial conditions.
 
 Date of initial draft: 2026-09-29
 
@@ -37,6 +37,13 @@ Base revision: c7d631c658feefc851eb7af5b93aa5754430faf5
   with the Richardson fix: T₀ 281 → 283 K, Γ 6 → 5.7 K/km, T_min 222 → 226 K, u₀ 52 → 56 m/s,
   H = 2 unchanged. `PressureOnOrography` and `StartFromRest` stay unchanged (see Known
   limitations).
+- 2026-10-19: follow-up prompt:
+  > Look at PR1284, can you destack this from PR1283? In that PR I just want the
+  > BalancedZonalState and the new relative humidity initial conditions
+
+  Rebased onto main without the #1283 commits. The parameters stay fitted to the equilibrium
+  with #1283, so without it the initial state is slightly off the model's equilibrium until
+  #1283 is merged.
 
 ## Problem description
 
