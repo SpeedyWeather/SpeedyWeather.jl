@@ -239,7 +239,7 @@ function define_variable!(
     # hook for custom output variables to define their own (vertical) dimension
     define_dimension!(dataset, var)
 
-    missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
+    missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : OutputVariables.DEFAULT_MISSING_VALUE
     attributes = Dict("long_name" => var.long_name, "units" => var.unit, "_FillValue" => output_NF(missing_value))
 
     # the vertical dimension depends on the variable and the output's layers,
@@ -248,8 +248,8 @@ function define_variable!(
     dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
     # pick defaults for compression if not defined
-    deflatelevel = hasproperty(var, :compression_level) ? var.compression_level : DEFAULT_COMPRESSION_LEVEL
-    shuffle = hasproperty(var, :shuffle) ? var.shuffle : DEFAULT_SHUFFLE
+    deflatelevel = hasproperty(var, :compression_level) ? var.compression_level : OutputVariables.DEFAULT_COMPRESSION_LEVEL
+    shuffle = hasproperty(var, :shuffle) ? var.shuffle : OutputVariables.DEFAULT_SHUFFLE
 
     return defVar(dataset, var.name, output_NF, dims, attrib = attributes; deflatelevel, shuffle)
 end

@@ -23,8 +23,10 @@ Base revision: e410eed05c967a4e117b91c91591d17da155a774
   without `--depwarn=yes`. They are generated from `DEPRECATED_OUTPUT_VARIABLES` in
   `output/variables/deprecated.jl`. Limitation: they are functions, not types, so dispatching on
   e.g. `::SpeedyWeather.TemperatureOutput` breaks immediately.
-- `path` got a `function path end` stub in the parent module because it was previously first
-  defined by the vorticity output variable.
+- PR review (milankl): `path` and the output variable defaults (`DEFAULT_KEEPBITS`,
+  `DEFAULT_COMPRESSION_LEVEL`, `DEFAULT_SHUFFLE`, `DEFAULT_MISSING_VALUE`) move into
+  `OutputVariables`, so custom variables extend `OutputVariables.path(::MyVar, simulation)` and
+  writers read e.g. `OutputVariables.DEFAULT_KEEPBITS`. `SpeedyWeather.path` no longer exists.
 
 ## Problem description
 
@@ -53,7 +55,7 @@ and output *variables* look the same as output *writers* (`NetCDFOutput`, `ZarrO
    `src/output/variables/OutputVariables.jl`. It wraps the existing variable files and
    imports the parent's abstract types and generic functions to extend
    (`AbstractOutputVariable`, `path`, `output!`, `DocStringExtensions`, …).
-   The helpers (`get_indices`, `is2D`, `path_or_nothing`, …) stay in `SpeedyWeather`,
+   `path` and the `DEFAULT_*` constants also live in the module. The helpers (`get_indices`, `is2D`, `path_or_nothing`, …) stay in `SpeedyWeather`,
    because the writers use them.
 2. Drop the `Output` suffix inside the module:
 
@@ -91,7 +93,7 @@ and output *variables* look the same as output *writers* (`NetCDFOutput`, `ZarrO
 `docs/src/output.md`, `custom_netcdf_output.md`, `land.md`, `ocean.md` and `sea_ice.md` are
 updated to the new names, plus a short paragraph on the `OutputVariables` namespace and on
 how to define a custom variable: `struct MyVar <: SpeedyWeather.AbstractOutputVariable`
-with `SpeedyWeather.path(::MyVar, simulation) = …`.
+with `OutputVariables.path(::MyVar, simulation) = …`.
 
 ## Known limitations
 

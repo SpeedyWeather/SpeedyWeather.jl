@@ -15,10 +15,20 @@ import Dates: Hour
 # abstract types and generic functions from SpeedyWeather extended or used here
 import ..SpeedyWeather: AbstractOutput, AbstractOutputVariable, AbstractSimulation,
     AbstractVerticalExtrapolation, DryAdiabaticExtrapolation, NetCDFOutput,
-    DEFAULT_COMPRESSION_LEVEL, DEFAULT_KEEPBITS, DEFAULT_SHUFFLE,
     define_variable!, field_view, finalize!, get_prognostic_step, hastime,
-    interpolate_output!, is_land, output!, path, path_or_nothing, pressure,
+    interpolate_output!, is_land, output!, path_or_nothing, pressure,
     virtual_temperature, write_output!
+
+# defaults for output variables that don't define these fields themselves
+const DEFAULT_MISSING_VALUE = NaN
+const DEFAULT_COMPRESSION_LEVEL = 1
+const DEFAULT_SHUFFLE = false
+const DEFAULT_KEEPBITS = 15
+
+"""$(TYPEDSIGNATURES) To be extended for every output variable to define
+the path where in `simulation` to find that output variable `::AbstractField`,
+e.g. `OutputVariables.path(::MyOutputVariable, simulation) = simulation.variables.grid.vorticity`."""
+function path end
 
 include("dynamics.jl")        # collected as Dynamics()
 include("precipitation.jl")   # Precipitation()

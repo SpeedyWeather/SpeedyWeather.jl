@@ -4,7 +4,7 @@
 # and dimensionality derived from Terrarium's variable descriptors.
 
 import SpeedyWeather: AbstractOutput, AbstractSimulation,
-    path, path_or_nothing, output!, write_array!, hastime, is3D,
+    path_or_nothing, output!, write_array!, hastime, is3D,
     vertical_dimension_name, get_nlayers, define_dimension!, get_dimension_length, define_coordinate!
 
 # name of the vertical output dimension shared by all 3D Terrarium output variables
@@ -162,7 +162,7 @@ SpeedyWeather.OutputVariables.Terrarium(land::AbstractTerrariumLandModel, args..
 
 # follow the property path into the Terrarium state (prognostic, auxiliary and
 # input variables are all reachable via getproperty on StateVariables)
-SpeedyWeather.path(variable::TerrariumOutputVariable, simulation) =
+SpeedyWeather.OutputVariables.path(variable::TerrariumOutputVariable, simulation) =
     foldl(getproperty, variable.path; init = simulation.variables.prognostic.land.terrarium)
 
 """$(TYPEDSIGNATURES)

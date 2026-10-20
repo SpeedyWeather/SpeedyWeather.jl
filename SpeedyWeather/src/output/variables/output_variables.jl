@@ -1,8 +1,3 @@
-"""$(TYPEDSIGNATURES) To be extended for every output variable to define
-the path where in `simulation` to find that output variable `::AbstractField`,
-e.g. `path(::OutputVariables.Vorticity, simulation) = simulation.variables.grid.vorticity`."""
-function path end
-
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
 
 """$(TYPEDSIGNATURES)
@@ -85,7 +80,7 @@ end
 
 """$(TYPEDSIGNATURES) Like `path` but returns `nothing` instead of throwing an error if the variable is not defined in the simulation."""
 path_or_nothing(variable::AbstractOutputVariable, simulation) = try
-    path(variable, simulation)
+    OutputVariables.path(variable, simulation)
 catch FieldError
     nothing
 end

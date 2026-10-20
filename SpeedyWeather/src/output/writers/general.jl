@@ -7,10 +7,8 @@ const DEFAULT_OUTPUT_INTERVAL = Hour(6)
 const OUTPUT_VARIABLES_DICT = Dict{Symbol, AbstractOutputVariable}
 OutputVariablesDict() = OUTPUT_VARIABLES_DICT()
 
-const DEFAULT_MISSING_VALUE = NaN
-const DEFAULT_COMPRESSION_LEVEL = 1
-const DEFAULT_SHUFFLE = false
-const DEFAULT_KEEPBITS = 15
+# defaults for missing value, compression and keepbits of output variables
+# are defined in the OutputVariables module, e.g. `OutputVariables.DEFAULT_KEEPBITS`
 
 """$(TYPEDSIGNATURES)
 Add `outputvariables` to a dictionary defining the variables subject to NetCDF output."""
