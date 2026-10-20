@@ -805,6 +805,8 @@ Then for every time step
 6. Apply [Horizontal diffusion](@ref horizontal_diffusion_primitive) (which is only mentioned here as it further updates the tendencies).
 7. Use ``\delta \mathcal{D}``, ``\delta T`` and ``\delta \ln p_s`` in the [Leapfrog time integration](@ref leapfrog).
 
+The reference temperature profile ``T_k`` and operators ``\mathbf{R, U, L, W}`` are updated and recomputed in regular intervals during the integration by default once every simulated day. 
+
 ## [Horizontal diffusion](@id horizontal_diffusion_primitive)
 
 Horizontal diffusion in the primitive equations is applied to vorticity ``\zeta``, divergence ``\mathcal{D}``,
