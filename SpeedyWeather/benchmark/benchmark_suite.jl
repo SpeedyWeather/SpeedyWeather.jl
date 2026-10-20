@@ -292,7 +292,7 @@ function run_benchmark!(suite::BenchmarkSuiteDynamics, i::Integer)
 
     # Each benchmark sample also calls `synchronize(arch)` to wait for the device.
     safe_benchmark!(suite, i, 1) do
-        @benchmark (_jit($arch, SpeedyWeather.pressure_gradient_flux!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
+        @benchmark (_jit($arch, SpeedyWeather.pressure_gradient_flux!, $vars, $time_stepping); synchronize($arch))
     end
     safe_benchmark!(suite, i, 2) do
         @benchmark (_jit($arch, SpeedyWeather.linear_virtual_temperature!, $vars, $model); synchronize($arch))
