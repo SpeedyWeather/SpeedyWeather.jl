@@ -169,10 +169,10 @@ except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`
 (except for its schedule)."""
 function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
-    # NUMERICS (the implicit operators are built in the first time steps)
+    # NUMERICS
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
-    initialize!(model.implicit, model)          # needs the time step
+    initialize!(model.implicit, model)
     initialize!(model.horizontal_diffusion, model)
 
     # DYNAMICS
