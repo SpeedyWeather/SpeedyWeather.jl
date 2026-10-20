@@ -115,9 +115,6 @@ Base.filter!(vars::Variables, land_model::AbstractLand, model::PrimitiveEquation
 
 # LandModel passes on filter! to its components
 function Base.filter!(vars::Variables, land_model::LandModel, model::PrimitiveEquation)
-    # soil temperature first, snow uses it for its initial conditions
-    initialize!(vars, land_model.temperature, model)
-
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
     if model isa PrimitiveWet && land_model isa AbstractWetLand
         filter!(vars, land_model.snow, model)
