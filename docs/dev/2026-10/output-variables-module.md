@@ -27,6 +27,12 @@ Base revision: e410eed05c967a4e117b91c91591d17da155a774
   `DEFAULT_COMPRESSION_LEVEL`, `DEFAULT_SHUFFLE`, `DEFAULT_MISSING_VALUE`) move into
   `OutputVariables`, so custom variables extend `OutputVariables.path(::MyVar, simulation)` and
   writers read e.g. `OutputVariables.DEFAULT_KEEPBITS`. `SpeedyWeather.path` no longer exists.
+- Variable-only properties also move into `OutputVariables`: `path_or_nothing`,
+  `exists_in_simulation`, `is2D`, `is3D`, `is_land`, `hastime` and `output_extrapolation`. This also
+  removes the `SpeedyWeather.hastime` that shadowed `ArrayDimensions.hastime`. Kept in
+  `SpeedyWeather` after asking: `get_indices`/`get_flat_indices` (file/store layout, writer side), the
+  vertical dimension hooks `vertical_dimension_name`, `define_dimension!`, `get_nlayers` (shared with
+  output layers and vertical coordinates), and `warn_nonexisting_variables` (takes the writer).
 
 ## Problem description
 

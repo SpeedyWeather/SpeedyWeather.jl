@@ -15,8 +15,8 @@ import Dates: Hour
 # abstract types and generic functions from SpeedyWeather extended or used here
 import ..SpeedyWeather: AbstractOutput, AbstractOutputVariable, AbstractSimulation,
     AbstractVerticalExtrapolation, DryAdiabaticExtrapolation, NetCDFOutput,
-    define_variable!, field_view, finalize!, get_prognostic_step, hastime,
-    interpolate_output!, is_land, output!, path_or_nothing, pressure,
+    define_variable!, field_view, finalize!, get_prognostic_step,
+    interpolate_output!, output!, pressure, ConstantExtrapolation,
     virtual_temperature, write_output!
 
 # defaults for output variables that don't define these fields themselves
@@ -29,6 +29,38 @@ const DEFAULT_KEEPBITS = 15
 the path where in `simulation` to find that output variable `::AbstractField`,
 e.g. `OutputVariables.path(::MyOutputVariable, simulation) = simulation.variables.grid.vorticity`."""
 function path end
+
+# properties of output variables, used by the output writers
+is2D(variable::AbstractOutputVariable) = ~variable.dims_xyzt[3]
+is3D(variable::AbstractOutputVariable) = variable.dims_xyzt[3]
+is_land(variable::AbstractOutputVariable) = hasproperty(variable, :is_land) ? variable.is_land : false
+hastime(variable::AbstractOutputVariable) = variable.dims_xyzt[4]
+
+"""$(TYPEDSIGNATURES)
+`true` if `variable` exists in `simulation` and can therefore be written out. This is the
+same `path_or_nothing` check the generic [`output!`](@ref) applies at write time, exposed so
+that output writers can apply it at *schema-definition* time too: a variable that is skipped
+by `output!` but still defined in the file/store would otherwise be left behind as an
+all-`missing_value` phantom array. Variables can be absent when the `Model` type an output
+writer was constructed with declares defaults the actual model doesn't have, e.g. a
+`PrimitiveWet` output attached to a `BarotropicModel` has no temp/humid/mslp."""
+exists_in_simulation(variable::AbstractOutputVariable, simulation) =
+    !isnothing(path_or_nothing(variable, simulation))
+
+"""$(TYPEDSIGNATURES) Like `path` but returns `nothing` instead of throwing an error if the variable is not defined in the simulation."""
+path_or_nothing(variable::AbstractOutputVariable, simulation) = try
+    path(variable, simulation)
+catch FieldError
+    nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Extrapolation of `variable` beyond the model's vertical layers: its `extrapolation` field
+if it has one (e.g. [`OutputVariables.Temperature`](@ref) descends dry-adiabatically below the
+lowest model layer), otherwise constant. Same `hasproperty` pattern as `transform` and
+`unscale` in the generic [`output!`](@ref)."""
+output_extrapolation(variable::AbstractOutputVariable) =
+    hasproperty(variable, :extrapolation) ? variable.extrapolation : ConstantExtrapolation()
 
 include("dynamics.jl")        # collected as Dynamics()
 include("precipitation.jl")   # Precipitation()

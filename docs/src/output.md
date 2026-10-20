@@ -179,11 +179,11 @@ Temperature descends dry-adiabatically, everything else is held constant, which 
 defaults
 
 ```@example netcdf
-SpeedyWeather.output_extrapolation(OutputVariables.Temperature())
+OutputVariables.output_extrapolation(OutputVariables.Temperature())
 ```
 
 ```@example netcdf
-SpeedyWeather.output_extrapolation(OutputVariables.Humidity())
+OutputVariables.output_extrapolation(OutputVariables.Humidity())
 ```
 
 κ = R_dry/cₚ of the dry adiabat is taken from the model's atmosphere at `initialize!`.

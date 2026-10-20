@@ -33,10 +33,10 @@ using NCDatasets, Dates
     @testset "Extrapolation defaults" begin
         # temperature descends dry-adiabatically below the lowest model layer,
         # everything else is constant
-        @test SpeedyWeather.output_extrapolation(OutputVariables.Temperature()) isa
+        @test OutputVariables.output_extrapolation(OutputVariables.Temperature()) isa
             SpeedyWeather.DryAdiabaticExtrapolation
         for var in (OutputVariables.Vorticity(), OutputVariables.ZonalVelocity(), OutputVariables.Humidity())
-            @test SpeedyWeather.output_extrapolation(var) isa SpeedyWeather.ConstantExtrapolation
+            @test OutputVariables.output_extrapolation(var) isa SpeedyWeather.ConstantExtrapolation
         end
 
         # κ is taken from the model's atmosphere at initialize! and the Float64 defaults

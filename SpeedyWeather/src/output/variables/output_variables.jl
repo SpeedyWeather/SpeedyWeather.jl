@@ -21,31 +21,26 @@ dimension, so a 3D+time variable is written as `(:, :, i)` where the equivalent
 [`get_indices`](@ref) for a rectangular `lon`/`lat` store gives `(:, :, :, i)`.
 Used by the flat [`HEALPixOutput`](@ref) backend."""
 get_flat_indices(i, variable::AbstractOutputVariable) =
-    get_flat_indices(i, Val(is3D(variable)), Val(hastime(variable)))
+    get_flat_indices(i, Val(OutputVariables.is3D(variable)), Val(OutputVariables.hastime(variable)))
 
 get_flat_indices(i, z::Val{true}, t::Val{true}) = (:, :, i)     # 3D + time
 get_flat_indices(i, z::Val{true}, t::Val{false}) = (:, :)       # 3D
 get_flat_indices(i, z::Val{false}, t::Val{true}) = (:, i)       # 2D + time
 get_flat_indices(i, z::Val{false}, t::Val{false}) = (:,)        # 2D
 
-is2D(variable::AbstractOutputVariable) = ~variable.dims_xyzt[3]
-is3D(variable::AbstractOutputVariable) = variable.dims_xyzt[3]
-is_land(variable::AbstractOutputVariable) = hasproperty(variable, :is_land) ? variable.is_land : false
-hastime(variable::AbstractOutputVariable) = variable.dims_xyzt[4]
-
 """$(TYPEDSIGNATURES)
 Name of the vertical dimension of `variable` in the output file or store:
 the atmospheric "layer" dimension, or "soil_layer" for land variables.
 Extend for custom output variables written on their own vertical dimension,
 together with [`get_nlayers`](@ref) and [`define_dimension!`](@ref)."""
-vertical_dimension_name(variable::AbstractOutputVariable) = is_land(variable) ? "soil_layer" : "layer"
+vertical_dimension_name(variable::AbstractOutputVariable) = OutputVariables.is_land(variable) ? "soil_layer" : "layer"
 
 """$(TYPEDSIGNATURES)
 Number of vertical layers `variable` is written on, as allocated in the scratch
 fields of `output`. Extend for custom output variables written on their own
 vertical dimension, see [`vertical_dimension_name`](@ref)."""
 get_nlayers(output::AbstractOutput, variable::AbstractOutputVariable) =
-    is_land(variable) ? size(output.field3Dland, 2) : size(output.field3D, 2)
+    OutputVariables.is_land(variable) ? size(output.field3Dland, 2) : size(output.field3D, 2)
 
 """$(TYPEDSIGNATURES)
 Function called by `define_variable!` before `variable` is defined in the output
@@ -57,33 +52,16 @@ define that dimension, typically via [`get_dimension_length`](@ref) and
 define_dimension!(dest, variable::AbstractOutputVariable) = nothing
 
 """$(TYPEDSIGNATURES)
-`true` if `variable` exists in `simulation` and can therefore be written out. This is the
-same `path_or_nothing` check the generic [`output!`](@ref) applies at write time, exposed so
-that output writers can apply it at *schema-definition* time too: a variable that is skipped
-by `output!` but still defined in the file/store would otherwise be left behind as an
-all-`missing_value` phantom array. Variables can be absent when the `Model` type an output
-writer was constructed with declares defaults the actual model doesn't have, e.g. a
-`PrimitiveWet` output attached to a `BarotropicModel` has no temp/humid/mslp."""
-exists_in_simulation(variable::AbstractOutputVariable, simulation) =
-    !isnothing(path_or_nothing(variable, simulation))
-
-"""$(TYPEDSIGNATURES)
 Warn once about the output variables of `output` that don't exist in `simulation` and will
 therefore be skipped, both in the file/store schema and on every output step."""
 function warn_nonexisting_variables(output::AbstractOutput, simulation)
-    skipped = [key for (key, var) in output.variables if !exists_in_simulation(var, simulation)]
+    skipped = [key for (key, var) in output.variables if !OutputVariables.exists_in_simulation(var, simulation)]
     isempty(skipped) || @warn "Some output.variables do not exist in simulation, skipping: " *
         "$(join(skipped, ", ")). This usually means the output writer was constructed with a " *
         "different Model type than the model it is attached to."
     return nothing
 end
 
-"""$(TYPEDSIGNATURES) Like `path` but returns `nothing` instead of throwing an error if the variable is not defined in the simulation."""
-path_or_nothing(variable::AbstractOutputVariable, simulation) = try
-    OutputVariables.path(variable, simulation)
-catch FieldError
-    nothing
-end
 
 # the output variables themselves live in the `OutputVariables` submodule, which
 # imports the helpers above, so it is included after them

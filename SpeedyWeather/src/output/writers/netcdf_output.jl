@@ -169,7 +169,7 @@ function initialize!(
     # only checked for models that have a land component and output variables that
     # actually use the soil vertical dimension (and its scratch field `field3Dland`)
     if hasfield(typeof(model), :land) && !isnothing(model.land) &&
-            any(var -> is_land(var) && is3D(var), values(output.variables))
+            any(var -> OutputVariables.is_land(var) && OutputVariables.is3D(var), values(output.variables))
         @assert get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
             " soil layers initialized for output, but $(get_nlayers(model.land)) soil layers initialized for model." *
             " Please construct NetCDFOutput with the same `nlayers_soil` as the model."
@@ -220,7 +220,7 @@ function initialize!(
     simulation = Simulation(vars, model)
     warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
-        exists_in_simulation(var, simulation) || continue
+        OutputVariables.exists_in_simulation(var, simulation) || continue
         define_variable!(dataset, var, eltype(output.field2D), vertical_dim_name = vertical_dimension_name(output, var))
         output!(output, var, simulation)
     end

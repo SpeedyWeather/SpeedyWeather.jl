@@ -4,8 +4,9 @@
 # and dimensionality derived from Terrarium's variable descriptors.
 
 import SpeedyWeather: AbstractOutput, AbstractSimulation,
-    path_or_nothing, output!, write_array!, hastime, is3D,
+    output!, write_array!,
     vertical_dimension_name, get_nlayers, define_dimension!, get_dimension_length, define_coordinate!
+import SpeedyWeather.OutputVariables: path_or_nothing, hastime, is3D
 
 # name of the vertical output dimension shared by all 3D Terrarium output variables
 const SOIL_DEPTH_DIM_NAME = "soil_depth"
