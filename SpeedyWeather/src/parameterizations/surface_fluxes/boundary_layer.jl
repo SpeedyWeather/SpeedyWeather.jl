@@ -55,7 +55,7 @@ variables(BL::BoundaryLayer, model::AbstractModel) = (
 @propagate_inbounds function parameterization!(ij, vars, BL::BoundaryLayer, model)
     parameterization!(ij, vars, BL.surface_condition, model)  # optionally uses surface roughness from previous time step
     parameterization!(ij, vars, BL.neutral_wind_speed, model)
-    parameterization!(ij, vars, BL.surface_roughness, model)
+    parameterization!(ij, vars, BL.surface_roughness, model, BL.neutral_wind_speed)
     parameterization!(ij, vars, BL.drag, model)
     return nothing
 end

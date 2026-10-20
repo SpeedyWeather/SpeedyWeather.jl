@@ -49,14 +49,10 @@ Adapt.@adapt_structure ConstantSurfaceRoughness
 ConstantSurfaceRoughness(SG::SpectralGrid; kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
 initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function parameterization!(ij, vars, scheme::ConstantSurfaceRoughness, model)
-    surface_roughness!(ij, vars, scheme, model)
+@propagate_inbounds function parameterization!(ij, vars, scheme::ConstantSurfaceRoughness, model, neutral_wind_speed)
+    surface_roughness!(ij, vars, scheme, model.land_sea_mask)
     return nothing
 end
-
-# function barrier to unpack only what's needed from model
-@propagate_inbounds surface_roughness!(ij, vars, scheme::ConstantSurfaceRoughness, model::AbstractModel) =
-    surface_roughness!(ij, vars, scheme, model.land_sea_mask)
 
 @inline function constant_roughness(z₀_land, z₀_ocean, land_fraction)
     land = ifelse(land_fraction > 0, z₀_land, zero(z₀_land))
@@ -142,16 +138,12 @@ function initialize!(LSR::LearnedSurfaceRoughness, model::PrimitiveEquation)
 end
 
 # First land, then ocean, then combine!
-@propagate_inbounds function parameterization!(ij, vars, LSR::LearnedSurfaceRoughness, model)
-    surface_roughness!(ij, vars, LSR.land_surface_roughness, model)
-    surface_roughness!(ij, vars, LSR.ocean_surface_roughness, model)
-    surface_roughness!(ij, vars, LSR, model)
+@propagate_inbounds function parameterization!(ij, vars, LSR::LearnedSurfaceRoughness, model, neutral_wind_speed)
+    surface_roughness!(ij, vars, LSR.land_surface_roughness, model.land_sea_mask, model.time_stepping)
+    surface_roughness!(ij, vars, LSR.ocean_surface_roughness, model.land_sea_mask, model.time_stepping, neutral_wind_speed)
+    surface_roughness!(ij, vars, LSR, model.land_sea_mask)
     return nothing
 end
-
-# function barrier to unpack only what's needed from model
-@propagate_inbounds surface_roughness!(ij, vars, LSR::LearnedSurfaceRoughness, model::AbstractModel) =
-    surface_roughness!(ij, vars, LSR, model.land_sea_mask)
 
 @propagate_inbounds function surface_roughness!(ij, vars, LSR::LearnedSurfaceRoughness, land_sea_mask)
     land_fraction = land_sea_mask.land_fraction[ij]
@@ -254,10 +246,6 @@ Adapt.@adapt_structure LearnedLandRoughness
 LearnedLandRoughness(SG::SpectralGrid; kwargs...) = LearnedLandRoughness{SG.NF}(; kwargs...)
 initialize!(::LearnedLandRoughness, ::PrimitiveEquation) = nothing
 
-# function barrier to unpack only what's needed from model
-@propagate_inbounds surface_roughness!(ij, vars, scheme::LearnedLandRoughness, model::AbstractModel) =
-    surface_roughness!(ij, vars, scheme, model.land_sea_mask, model.time_stepping)
-
 @propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedLandRoughness, land_sea_mask, time_stepping)
     land_fraction = land_sea_mask.land_fraction[ij]
     (; land) = vars.parameterizations
@@ -297,7 +285,7 @@ end
 
 # Land momentum roughness
 @inline function land_momentum_roughness(
-        scheme::LearnedLandRoughness, 
+        scheme::LearnedLandRoughness,
         high_vegetation_cover::NF,
         low_vegetation_cover::NF,
         high_vegetation_leaf_area::NF,
@@ -306,7 +294,7 @@ end
         soil_temperature_bottom::NF,
         soil_moisture_bottom::NF
     ) where {NF <: AbstractFloat}
-    
+
     # From Munday et al. 2026, in prep.
     C_H = high_vegetation_cover
     C_L = low_vegetation_cover
@@ -331,21 +319,21 @@ end
     z₀ = exp(numerator / denominator + scheme.m_c9)
 
     # Physical limits from IFS documentation
-    return clamp(z₀, scheme.momentum_roughness_min, scheme.momentum_roughness_max)  
+    return clamp(z₀, scheme.momentum_roughness_min, scheme.momentum_roughness_max)
 end
 
 
 # Land heat roughness
 @inline function land_heat_roughness(
         scheme::LearnedLandRoughness,
-        high_vegetation_cover::NF, 
+        high_vegetation_cover::NF,
         low_vegetation_cover::NF,
-        high_vegetation_leaf_area::NF, 
+        high_vegetation_leaf_area::NF,
         low_vegetation_leaf_area::NF,
-        soil_temperature_bottom::NF, 
+        soil_temperature_bottom::NF,
         soil_moisture_bottom::NF
     ) where {NF <: AbstractFloat}
-    
+
     # From Munday et al. 2026, in prep.
     C_H = high_vegetation_cover
     C_L = low_vegetation_cover
@@ -370,7 +358,7 @@ end
     z₀ = exp(min(arg1, arg2))
 
     # Physical limits from IFS documentation
-    return clamp(z₀, scheme.heat_roughness_min, scheme.heat_roughness_max)  
+    return clamp(z₀, scheme.heat_roughness_min, scheme.heat_roughness_max)
 end
 
 export LearnedOceanRoughness
@@ -441,8 +429,8 @@ Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct LearnedOceanRoughness{NF, CH, SIMR, MOMR} <: AbstractOceanRoughness
     "[OPTION] Heat-related constant (from IFS documentation)"
-    @param a_h::NF = 0.4 
-    
+    @param a_h::NF = 0.4
+
     "[OPTION] Moisture-related constant (from IFS documentation)"
     @param a_q::NF = 0.62
 
@@ -494,10 +482,6 @@ function initialize!(scheme::LearnedOceanRoughness, model::PrimitiveEquation)
     initialize!(scheme.max_ocean_momentum_roughness, model)
     return nothing
 end
-
-# function barrier to unpack only what's needed from model
-@propagate_inbounds surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, model::AbstractModel) =
-    surface_roughness!(ij, vars, scheme, model.land_sea_mask, model.time_stepping, model.boundary_layer.neutral_wind_speed)
 
 @propagate_inbounds function surface_roughness!(
         ij, vars, scheme::LearnedOceanRoughness, land_sea_mask, time_stepping, neutral_wind_speed
