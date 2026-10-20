@@ -62,7 +62,7 @@ const DEPRECATED_OUTPUT_VARIABLES = (
 )
 
 for (old, new) in DEPRECATED_OUTPUT_VARIABLES
-    docstring = "Deprecated, use [`OutputVariables.$new`](@ref) instead."
+    docstring = "Deprecated, use `OutputVariables.$new` instead."
     message = "`SpeedyWeather.$old` is deprecated, use `OutputVariables.$new` instead."
     @eval begin
         @doc $docstring
