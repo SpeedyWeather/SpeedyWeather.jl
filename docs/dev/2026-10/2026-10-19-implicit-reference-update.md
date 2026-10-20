@@ -51,6 +51,11 @@ Base revision: `e410eed0` (branch `mg/instability`, identical to `main`)
 - 2026-10-20: the unit test now calls `reinitialize!` directly with set step counters and profiles, without
   time stepping (~1 min instead of ~3 min).
 
+> I don't understand the test, just do a test where you manaually set a new temperature, then reinitialize the
+> implicit and check whethers it's really the averege and then do that twice
+
+- 2026-10-20: simplified to that single scenario (see item 6 of *Summary of changes*).
+
 ## Problem description
 
 The default `PrimitiveWetModel` at T256L8 blows up after 6 to 12 months. The investigation is in
@@ -117,14 +122,14 @@ across realizations, and it is also what the model does at every new `run!`.
    before) **or** when the schedule says so, from the current `average_temperature_profile`.
 5. `AbstractSchedule` moved from `output/schedule.jl` to `time_stepping/abstract_types.jl`, as the implicit
    solver is included before the output.
-6. Unit test `"Reference temperature schedule of the implicit solver"` in
-   `SpeedyWeather/test/dynamics/time_stepping.jl` (T22L4, dry and wet, no time stepping, ~1 min mostly
-   model construction). It sets the global-mean profile and the clock's step counter directly, calls
-   `reinitialize!`, and checks whether the operators were rebuilt from that profile:
-   - `Hour(6)`: `every_n_steps` = round(6 h / Δt) = n; rebuild on the leapfrog start (Δt change), not on
-     step n − 1 or n + 1, on steps n and 2n (counter 2);
-   - `Second(0)`: `every_n_steps` = 0, no scheduled rebuild, but still one when the time step changes;
-   - `Minute(1)` (shorter than Δt): `every_n_steps` = 1, a rebuild on every step.
+6. Unit test `"Implicit reference temperature profile is the global-mean temperature"` in
+   `SpeedyWeather/test/dynamics/time_stepping.jl` (T22L4 PrimitiveWetModel, no time stepping, < 1 min).
+   It does the following twice, with ΔT = 0 and ΔT = 20 K:
+   - set the temperature with `set!` to 200 + 100σ + ΔT plus a wave 10 cos λ cos φ, which has zero global
+     mean;
+   - update the global mean with `transform!`;
+   - call `reinitialize!` on a step where the schedule recomputes (n, then 2n);
+   - check that the reference profile is 200 + 100σ + ΔT, the global mean of the temperature, to 0.01 K.
 7. Docs: `docs/src/primitiveequation.md` (semi-implicit pressure gradient) states how Tₖ is chosen and updated.
 8. `CHANGELOG.md` entry under Unreleased (PR number to be filled in). No version bump: `SpeedyWeather` is
    already at `0.23.0+DEV`, and no other package is touched.
@@ -150,7 +155,7 @@ Alternatives considered:
 `ReferenceTemperatureSchedule` implementation (2026-10-20):
 
 - [x] `test/dynamics/time_stepping.jl` (`--check-bounds=yes`): all pass, the new test
-  "Reference temperature schedule of the implicit solver" 30/30 in ~1 min. Runic: clean. `test/dynamics/dispatch.jl`
+  "Implicit reference temperature profile is the global-mean temperature" 2/2 in 53 s. Runic: clean. `test/dynamics/dispatch.jl`
   (JET): `PrimitiveWet time_step! free of runtime dispatch` passes, so the per-step check adds no dynamic
   dispatch.
 - [x] T256L8 default model on the GPU (H100), 730 days, unperturbed and 2 seeds (`PERTURB_SEED` 1, 2), with
