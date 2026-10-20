@@ -132,11 +132,6 @@ function dynamics_tendencies!(
     # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
     linear_virtual_temperature!(vars, model)
 
-    # temperature relative to profile
-    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (temp profile and temp_grid are different dimensions and array types)
-    T = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
-    T.data .-= implicit.temp_profile'
-
     # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
     geopotential!(vars, geopotential, orography)
 
@@ -150,7 +145,14 @@ function dynamics_tendencies!(
     linear_pressure_gradient!(vars, atmosphere, implicit, time_stepping)
 
     # use σ̇ for the vertical advection of u, v, T, q
+    # this advects the full temperature T = T' + Tₖ, i.e. it includes the vertical advection
+    # of the reference profile Tₖ, which implicit_correction! expects in the explicit tendency
     vertical_advection!(vars, model)
+
+    # temperature relative to profile
+    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (temp profile and temp_grid are different dimensions and array types)
+    T = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
+    T.data .-= implicit.temp_profile'
 
 
     # compute tendencies in grid space: u, v, temperature, pressure, u·T'·coslat⁻¹, v·T'·coslat⁻¹, kinetic energy, (wet model: humidity, u·q·coslat⁻¹, v·q·coslat⁻¹)
