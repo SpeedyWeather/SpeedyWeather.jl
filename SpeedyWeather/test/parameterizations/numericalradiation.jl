@@ -63,7 +63,8 @@ end
     @test radiation isa NumericalRadiation.ClearSkyEcCKDRadiation{NF}
     @test eltype(radiation.gas_optics) === NF
     @test radiation.surface_emissivity == NF(0.98)
-    @test ClearSkyEcCKDRadiation(spectral_grid; mole_fractions = (; co2 = 400e-6)).mole_fractions.co2 == NF(400e-6)
+    @test NumericalRadiation.gas_names(radiation.gas_optics) == (:dry_air, :H₂O, :O₃, :CO₂)
+    @test ClearSkyEcCKDRadiation(spectral_grid; mole_fractions = (; CO₂ = 400e-6)).mole_fractions.CO₂ == NF(400e-6)
 
     model = PrimitiveWetModel(spectral_grid; radiation, parameterizations = (:radiation,))
     initialize!(model.radiation, model)
@@ -77,6 +78,10 @@ end
     SpeedyWeather.column_parameterizations!(variables, model)
 
     P = variables.parameterizations
+    layer_pressures, interface_pressures = Array(W.layer_pressures), Array(W.interface_pressures)
+    @test all(interface_pressures[:, nlayers + 1] .≈ 100000)                # surface pressure [Pa]
+    @test all(interface_pressures[:, 1:nlayers] .< layer_pressures .< interface_pressures[:, 2:end])
+    @test all(isfinite, W.interface_temperatures)
     @test all(isfinite, variables.tendencies.grid.temperature)
     @test all(>(zero(NF)), P.outgoing_longwave)
     @test all(>(zero(NF)), P.outgoing_shortwave)                         # Rayleigh + surface reflection
