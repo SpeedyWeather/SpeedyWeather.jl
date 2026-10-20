@@ -26,7 +26,7 @@ LowerTriangularArraysReactantExt = "Reactant"
 
 [compat]
 Adapt = "4.3.0"
-DocStringExtensions = "0.9.5"
+DocStringExtensions = "0.9.5, 0.10"
 FiniteDifferences = "0.12"
 GPUArrays = "11.2.3, 12.1"
 KernelAbstractions = "0.9.38"
