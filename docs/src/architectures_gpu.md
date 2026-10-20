@@ -107,7 +107,9 @@ SpeedyWeather will make use of all threads available.
 !!! warning "Work in progress"
     The Reactant support of SpeedyWeather.jl is still work in progress, incomplete and considered experimental.
 
-SpeedyWeather.jl is compatible with the MLIR/XLA optimizer Reactant.jl that enables to run an optimized OpenXLA accelearted version of our model (this is the same library that powers e.g. JAX numerics). It also enables to run the model on CPU, different GPUs and even TPU architectures. 
+SpeedyWeather.jl is compatible with the MLIR/XLA optimizer Reactant.jl that enables to run an optimized OpenXLA
+accelearted version of our model (this is the same library that powers e.g. JAX numerics).
+It also enables to run the model on CPU, different GPUs and even TPU architectures. 
 All models (`BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel`, `PrimitiveWetModel`)
 run with Reactant, use the `ReactantDevice` architecture and set your device within Reactant with
 `Reactant.set_default_backend`. With `ReactantDevice` the models use the `MatrixSpectralTransform`
