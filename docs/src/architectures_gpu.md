@@ -107,7 +107,9 @@ SpeedyWeather will make use of all threads available.
 !!! warning "Work in progress"
     The Reactant support of SpeedyWeather.jl is still work in progress, incomplete and considered experimental.
 
-SpeedyWeather.jl is compatible with the MLIR/XLA optimizer Reactant.jl that enables to run an optimized OpenXLA accelearted version of our model (this is the same library that powers e.g. JAX numerics). It also enables to run the model on CPU, different GPUs and even TPU architectures. 
+SpeedyWeather.jl is compatible with the MLIR/XLA optimizer Reactant.jl that enables to run an optimized OpenXLA
+accelearted version of our model (this is the same library that powers e.g. JAX numerics).
+It also enables to run the model on CPU, different GPUs and even TPU architectures. 
 All models (`BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel`, `PrimitiveWetModel`)
 run with Reactant, use the `ReactantDevice` architecture and set your device within Reactant with
 `Reactant.set_default_backend`:
@@ -127,7 +129,7 @@ FFT plans or scratch memory; both of its stages are matrix multiplies that XLA c
 the rest of the time step:
 
 - The Fourier transform is a truncated discrete Fourier transform (`fourier_dft = true`, the default up
-  to truncation 256, `SpeedyTransforms.DFT_MAX_TRUNCATION`). It computes only the orders that the
+  to truncation 512, `SpeedyTransforms.DFT_MAX_TRUNCATION`). It computes only the orders that the
   Legendre transform uses, as one matrix multiply per direction batched over all latitude rings. Its
   matrices need memory that grows with the cube of the truncation: 1.4 MB at T32, 617 MB at T256 in
   Float32. With `fourier_dft = false` (the default above truncation 256) it uses one FFT per group of

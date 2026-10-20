@@ -351,7 +351,7 @@ GPU a MatrixSpectralTransform is returned, otherwise the SpectralTransform. On R
 always the SpectralTransform: it computes the Fourier transform as a truncated DFT up to
 `DFT_MAX_TRUNCATION` (matrix multiplies that XLA can accelerate more efficently)."""
 function WhichTransform(spectral_grid::SpectralGrid; kwargs...)
-    if spectral_grid.truncation <= 100 && spectral_grid.architecture isa GPU
+    if (spectral_grid.truncation <= 100 && spectral_grid.architecture isa GPU)
         return MatrixSpectralTransform(spectral_grid; kwargs...)
     else
         return SpectralTransform(spectral_grid; kwargs...)
