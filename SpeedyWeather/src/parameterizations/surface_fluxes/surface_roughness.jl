@@ -49,16 +49,10 @@ Adapt.@adapt_structure ConstantSurfaceRoughness
 ConstantSurfaceRoughness(SG::SpectralGrid; kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
 initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function parameterization!(ij, vars, scheme::ConstantSurfaceRoughness, model, neutral_wind_speed)
+# function barrier
+@propagate_inbounds function parameterization!(ij, vars, scheme::ConstantSurfaceRoughness, boundary_layer, model)
     surface_roughness!(ij, vars, scheme, model.land_sea_mask)
     return nothing
-end
-
-@inline function constant_roughness(z₀_land, z₀_ocean, land_fraction)
-    land = ifelse(land_fraction > 0, z₀_land, zero(z₀_land))
-    ocean = ifelse(land_fraction < 1, z₀_ocean, zero(z₀_ocean))
-    combined = land_fraction * land + (1 - land_fraction) * ocean
-    return land, ocean, combined
 end
 
 @propagate_inbounds function surface_roughness!(ij, vars, scheme::ConstantSurfaceRoughness, land_sea_mask)
@@ -91,6 +85,13 @@ end
         constant_roughness(z₀Q_land, z₀Q_ocean, land_fraction)
 
     return nothing
+end
+
+@inline function constant_roughness(z₀_land, z₀_ocean, land_fraction)
+    land = ifelse(land_fraction > 0, z₀_land, zero(z₀_land))
+    ocean = ifelse(land_fraction < 1, z₀_ocean, zero(z₀_ocean))
+    combined = land_fraction * land + (1 - land_fraction) * ocean
+    return land, ocean, combined
 end
 
 export LearnedSurfaceRoughness
@@ -138,15 +139,15 @@ function initialize!(LSR::LearnedSurfaceRoughness, model::PrimitiveEquation)
 end
 
 # First land, then ocean, then combine!
-@propagate_inbounds function parameterization!(ij, vars, LSR::LearnedSurfaceRoughness, model, neutral_wind_speed)
-    surface_roughness!(ij, vars, LSR.land_surface_roughness, model.land_sea_mask, model.time_stepping)
-    surface_roughness!(ij, vars, LSR.ocean_surface_roughness, model.land_sea_mask, model.time_stepping, neutral_wind_speed)
-    surface_roughness!(ij, vars, LSR, model.land_sea_mask)
+@propagate_inbounds function parameterization!(ij, vars, LSR::LearnedSurfaceRoughness, boundary_layer, model)
+    surface_roughness!(ij, vars, LSR.land_surface_roughness, boundary_layer, model)
+    surface_roughness!(ij, vars, LSR.ocean_surface_roughness, boundary_layer, model)
+    surface_roughness!(ij, vars, LSR, boundary_layer, model)
     return nothing
 end
 
-@propagate_inbounds function surface_roughness!(ij, vars, LSR::LearnedSurfaceRoughness, land_sea_mask)
-    land_fraction = land_sea_mask.land_fraction[ij]
+@propagate_inbounds function surface_roughness!(ij, vars, LSR::LearnedSurfaceRoughness, boundary_layer, model)
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     (; land, ocean) = vars.parameterizations
 
     # Momentum roughness
@@ -246,8 +247,8 @@ Adapt.@adapt_structure LearnedLandRoughness
 LearnedLandRoughness(SG::SpectralGrid; kwargs...) = LearnedLandRoughness{SG.NF}(; kwargs...)
 initialize!(::LearnedLandRoughness, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedLandRoughness, land_sea_mask, time_stepping)
-    land_fraction = land_sea_mask.land_fraction[ij]
+@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedLandRoughness, boundary_layer, model)
+    land_fraction = model.land_sea_mask.land_fraction[ij]
     (; land) = vars.parameterizations
 
     if land_fraction <= 0
@@ -267,7 +268,7 @@ initialize!(::LearnedLandRoughness, ::PrimitiveEquation) = nothing
     laiₗ = haskey(land, :low_vegetation_leaf_area) ? land.low_vegetation_leaf_area[ij] : zero(land_fraction)
     sd = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(land_fraction)
 
-    ts = time_stepper(time_stepping, :land)
+    ts = time_stepper(model.time_stepping, :land)
     soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ?
         get_prognostic_step(vars.prognostic.land.soil_moisture, ts, scheme)[ij, end] : zero(land_fraction)
     soil_temperature = haskey(vars.prognostic.land, :soil_temperature) ?
@@ -483,11 +484,9 @@ function initialize!(scheme::LearnedOceanRoughness, model::PrimitiveEquation)
     return nothing
 end
 
-@propagate_inbounds function surface_roughness!(
-        ij, vars, scheme::LearnedOceanRoughness, land_sea_mask, time_stepping, neutral_wind_speed
-    )
+@propagate_inbounds function surface_roughness!(ij, vars, scheme::LearnedOceanRoughness, boundary_layer, model)
     (; ocean) = vars.parameterizations
-    land_fraction = land_sea_mask.land_fraction[ij]
+    land_fraction = model.land_sea_mask.land_fraction[ij]
 
     if land_fraction >= 1
         zero_val = zero(land_fraction)
@@ -500,9 +499,9 @@ end
     progn_ocean = vars.prognostic.ocean
 
     # neutral wind speed, or an approximation thereof, depending on the neutral wind speed scheme
-    uₙ = get_neutral_wind_speed(ij, vars, neutral_wind_speed)
+    uₙ = get_neutral_wind_speed(ij, vars, boundary_layer.neutral_wind_speed)
 
-    ts = time_stepper(time_stepping, :ocean)
+    ts = time_stepper(model.time_stepping, :ocean)
     ℵ = haskey(progn_ocean, :sea_ice_concentration) ? get_prognostic_step(progn_ocean.sea_ice_concentration, ts, scheme)[ij] : zero(uₙ)
     log_αᵪ = log(scheme.charnock(uₙ))
 

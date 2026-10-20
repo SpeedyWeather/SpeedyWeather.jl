@@ -41,7 +41,7 @@ variables(::SurfaceCondition) = (
     ParameterizationVariable(:surface_wind_speed, GridXY(), desc = "Surface wind speed", units = "m/s"),
 )
 # function barrier
-@propagate_inbounds function parameterization!(ij, vars, sc::SurfaceCondition, model)
+@propagate_inbounds function parameterization!(ij, vars, sc::SurfaceCondition, boundary_layer, model)
     return surface_condition!(ij, vars, sc, model)
 end
 

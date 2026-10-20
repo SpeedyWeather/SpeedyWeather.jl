@@ -106,7 +106,6 @@
     end
 end
 
-
 @testset "Learned ocean momentum roughness" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     scheme = LearnedOceanRoughness(spectral_grid)

@@ -53,9 +53,14 @@ variables(BL::BoundaryLayer, model::AbstractModel) = (
 
 # just call the sub-paramterizations one after another
 @propagate_inbounds function parameterization!(ij, vars, BL::BoundaryLayer, model)
-    parameterization!(ij, vars, BL.surface_condition, model)  # optionally uses surface roughness from previous time step
-    parameterization!(ij, vars, BL.neutral_wind_speed, model)
-    parameterization!(ij, vars, BL.surface_roughness, model, BL.neutral_wind_speed)
-    parameterization!(ij, vars, BL.drag, model)
+    parameterization!(ij, vars, BL.surface_condition, BL, model)
+    parameterization!(ij, vars, BL.neutral_wind_speed, BL, model)
+    parameterization!(ij, vars, BL.surface_roughness, BL, model)
+    parameterization!(ij, vars, BL.drag, BL, model)
     return nothing
 end
+
+# fallback to nothing if boundary layer has nothing components
+# because generally only defined without the ::AbstractBoundaryLayer for nothing parameterizations
+# but all boundary layer components get the boundary layer itself also passed on
+parameterization!(ij, vars::AbstractVariables, parameterization::Nothing, ::AbstractBoundaryLayer, model) = nothing

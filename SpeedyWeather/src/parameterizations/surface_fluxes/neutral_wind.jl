@@ -49,13 +49,13 @@ Adapt.@adapt_structure NeutralWindSpeed
 NeutralWindSpeed(SG::SpectralGrid; kwargs...) = NeutralWindSpeed{SG.NF}(; kwargs...)
 initialize!(::NeutralWindSpeed, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function parameterization!(ij, vars, nw::NeutralWindSpeed{NF}, model) where {NF}
+@propagate_inbounds function parameterization!(ij, vars, nw::NeutralWindSpeed{NF}, boundary_layer, model) where {NF}
     (; land_fraction) = model.land_sea_mask
     (land_fraction[ij] < 1) || return nothing # TODO train a land-based neutral wind speed parameterization
-    return neutral_wind_speed(ij, vars, nw, model)
+    return neutral_wind_speed(ij, vars, nw)
 end
 
-@propagate_inbounds function neutral_wind_speed(ij, vars, nw::NeutralWindSpeed{NF}, model) where {NF}
+@propagate_inbounds function neutral_wind_speed(ij, vars, nw::NeutralWindSpeed{NF}) where {NF}
     (; surface_wind_speed) = vars.parameterizations
     (; surface_air_temperature) = vars.parameterizations
 

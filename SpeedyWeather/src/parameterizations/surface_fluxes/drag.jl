@@ -26,7 +26,7 @@ end
 Adapt.@adapt_structure ConstantDrag
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
-@propagate_inbounds parameterization!(ij, vars, drag::ConstantDrag, model) =
+@propagate_inbounds parameterization!(ij, vars, drag::ConstantDrag, boundary_layer, model) =
     boundary_layer_drag!(ij, vars, drag, model)
 
 @propagate_inbounds function boundary_layer_drag!(ij, vars, scheme::ConstantDrag, model)
@@ -67,7 +67,7 @@ BulkRichardsonDrag(SG::SpectralGrid; kwargs...) = BulkRichardsonDrag{SG.NF}(; kw
 initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, model) =
+@propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, boundary_layer, model) =
     boundary_layer_drag!(ij, vars, drag, model)
 
 @propagate_inbounds function boundary_layer_drag!(
