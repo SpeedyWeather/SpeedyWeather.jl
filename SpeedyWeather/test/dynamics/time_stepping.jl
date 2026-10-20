@@ -354,3 +354,23 @@ end
         end
     end
 end
+
+@testset "Implicit reference temperature profile is the global-mean temperature" begin
+    spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    (; implicit) = model
+    (; clock) = simulation.variables.prognostic
+    σ_levels = Array(model.geometry.σ_levels_full)
+    n = implicit.reference_temperature_schedule.every_n_steps
+
+    for (i, ΔT) in enumerate((0, 5))
+        # new temperature: global mean 200 + 100σ + ΔT per layer, plus a wave with zero global mean
+        set!(simulation, temperature = (λ, φ, σ) -> 200 + 100σ + ΔT + 10 * cosd(λ) * cosd(φ))
+        SpeedyWeather.transform!(simulation.variables, model, initialize = true)   # computes the global mean
+
+        clock.step_counter = i * n          # a time step on which the reference profile is recomputed
+        SpeedyWeather.reinitialize!(implicit, model, simulation.variables)
+        @test Array(implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT atol = 0.01
+    end
+end

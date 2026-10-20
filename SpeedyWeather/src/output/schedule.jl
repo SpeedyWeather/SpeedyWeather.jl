@@ -1,5 +1,3 @@
-abstract type AbstractSchedule <: AbstractModelComponent end
-
 export Schedule
 
 """

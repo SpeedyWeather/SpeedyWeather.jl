@@ -501,6 +501,10 @@ scheme such that we can avoid instabilities from gravity waves.
 We split the (virtual) temperature into a reference vertical profile ``T_k`` and its anomaly,
 ``T_v = T_k + T_v'``. The reference profile ``T_k`` has to be a global
 constant for the spectral transform but can depend on the vertical.
+We use the global-mean temperature of every layer, taken when the implicit solver is
+initialized at the start of a simulation and then recomputed periodically following its
+[`ReferenceTemperatureSchedule`](@ref) (default every day), so that the reference profile
+follows the model climate as it drifts away from the initial conditions.
 With this, the previous equation becomes
 ```math
 \begin{aligned}

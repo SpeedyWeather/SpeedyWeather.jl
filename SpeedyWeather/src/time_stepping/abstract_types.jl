@@ -1,6 +1,7 @@
 abstract type AbstractTimeStepper <: AbstractModelComponent end
 abstract type AbstractImplicit <: AbstractModelComponent end
 abstract type AbstractDynamicalCoreComponent <: AbstractModelComponent end
+abstract type AbstractSchedule <: AbstractModelComponent end    # defined here as also used by implicit solvers
 
 # DUMMY TYPES
 # these are used for dispatching when get_..._step but the place
