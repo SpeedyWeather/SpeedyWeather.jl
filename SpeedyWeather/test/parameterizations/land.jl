@@ -74,6 +74,21 @@ end
     end
 end
 
+@testset "Initial snow depth from soil temperature" begin
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    snow_depth = simulation.variables.prognostic.land.snow_depth[:, 1].data          # first step
+    soil_temperature = simulation.variables.prognostic.land.soil_temperature[:, 1, 1].data
+    (; melting_threshold, initial_snow_depth_max) = model.land.snow
+    land = model.land_sea_mask.land_fraction.data .> 0
+
+    @test all(0 .<= snow_depth .<= initial_snow_depth_max)
+    @test all(snow_depth[.!land] .== 0)                                     # no snow over ocean
+    @test all(snow_depth[land .& (soil_temperature .>= melting_threshold)] .== 0)
+    @test any(snow_depth[land] .> 0)                                        # some snow over cold land
+end
+
 @testset "LandGeometry default constructor" begin
     SG = SpectralGrid(truncation = 22, nlayers = 2)
     geom = LandGeometry(SG)

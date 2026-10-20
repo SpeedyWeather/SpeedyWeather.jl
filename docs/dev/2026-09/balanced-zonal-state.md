@@ -64,6 +64,13 @@ Base revision: c7d631c658feefc851eb7af5b93aa5754430faf5
   Fixed in the output variable (see Summary of changes, 5) rather than running the
   parameterizations at initialization, which also update accumulators, ocean/land fluxes and
   diagnostics that resetting the tendencies would not undo.
+- 2026-10-20: follow-up prompt:
+  > Can you look at PR1284 and add some better initial conditions for snow depth? Starting with 0
+  > everywhere just doesn't cut it because you're on the wrong side of the snow-albedo feedback
+  > [...] So could you have a good estimated guess at how much snow depth there should be with
+  > upper-layer soil temperature as predictor and then use that as initial condition?
+
+  Added as Summary of changes, 6. Soil temperature is now initialized before snow.
 
 ## Problem description
 
@@ -283,6 +290,13 @@ blowing into orography with zero initial divergence, which no analytic profile r
    `vars.parameterizations.surface_air_temperature`, which is 0 for the initial conditions
    and gave Inf. It also no longer overwrites that variable when `dynamics_only`. Tested in
    `test/output/netcdf_output.jl` on the first output time step.
+6. `SnowModel` initial snow depth (`parameterizations/land/snow.jl`) estimated from the top-layer
+   soil temperature T₁ instead of 0: `clamp(initial_snow_depth_rate * (melting_threshold - T₁), 0,
+   initial_snow_depth_max)`, zero over ocean, with 5 mm/K and a 0.2 m cap (water equivalent).
+   With the 0.05 m albedo `snow_depth_scale`, land 10 K below the 275 K melting threshold starts
+   fully snow covered, and ~250 K land (Siberia, Canada, Greenland in winter) starts with ~0.12 m,
+   close to observed winter maxima of 0.1–0.2 m. The land model now initializes soil temperature
+   before snow.
 
 ## Testing and verification
 
