@@ -131,7 +131,7 @@ the `MatrixSpectralTransform`, which also need too much memory above about T150.
 of equal length (XLA plans them when compiling) and the Legendre transform one batched matrix
 multiply over the spherical harmonic order per direction. On Reactant's CPU backend it is faster than
 the `MatrixSpectralTransform` at all resolutions we tested (the transforms alone 4-5x at T31 and 60-100x
-at T127, a `PrimitiveWetModel` time step 2x at T31 and 5x at T63, 8 layers);
+at T128, a `PrimitiveWetModel` time step 2x at T32 and 5x at T64, 8 layers);
 on GPUs we haven't compared them yet. The CUDA graphs that the `SpectralTransform` uses with CUDA.jl
 (`gpu_graphs`) are off with Reactant, XLA runs a compiled program as one CUDA graph itself.
 
