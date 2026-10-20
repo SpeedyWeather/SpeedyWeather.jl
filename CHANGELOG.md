@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Breaking: output variables moved into the exported module `OutputVariables` and lost their `Output` suffix, e.g. `SpeedyWeather.TemperatureOutput()` is now `OutputVariables.Temperature()`, `DynamicsOutput()` is `OutputVariables.Dynamics()`, `AllOutputVariables()` is `OutputVariables.All()` and `TerrariumOutput` is `OutputVariables.Terrarium`; the old names are deprecated and forward with a warning [#NNNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNNN)
 - Primitive equation models transform U, V and the surface pressure gradient ∇ln(pₛ) to grid space in one batched transform, 2 instead of 3 spectral→grid transforms per time step [#1313](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1313)
 - Update Zarr requirement from 0.9, 0.10 to 0.9, 0.10, 0.11 [#1309](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1309)
 - Update GPUArrays requirement from 11 to 11, 12.1 [#1308](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1308)

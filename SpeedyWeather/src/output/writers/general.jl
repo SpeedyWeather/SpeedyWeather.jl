@@ -55,7 +55,7 @@ function add_default!(
         output_variables::OUTPUT_VARIABLES_DICT,
         Model::Type{<:Barotropic},
     )
-    return add!(output_variables, VorticityOutput(), ZonalVelocityOutput(), MeridionalVelocityOutput())
+    return add!(output_variables, OutputVariables.Vorticity(), OutputVariables.ZonalVelocity(), OutputVariables.MeridionalVelocity())
 end
 
 """$(TYPEDSIGNATURES)
@@ -66,7 +66,7 @@ function add_default!(
         Model::Type{<:ShallowWater},
     )
     add_default!(variables, Barotropic)
-    return add!(variables, InterfaceDisplacementOutput())
+    return add!(variables, OutputVariables.InterfaceDisplacement())
 end
 
 """$(TYPEDSIGNATURES)
@@ -77,7 +77,7 @@ function add_default!(
         Model::Type{<:PrimitiveDry},
     )
     add_default!(variables, Barotropic)
-    return add!(variables, MeanSeaLevelPressureOutput(), TemperatureOutput())
+    return add!(variables, OutputVariables.MeanSeaLevelPressure(), OutputVariables.Temperature())
 end
 
 """$(TYPEDSIGNATURES)
@@ -88,7 +88,7 @@ function add_default!(
         Model::Type{<:PrimitiveWet},
     )
     add_default!(variables, PrimitiveDry)
-    return add!(variables, HumidityOutput())
+    return add!(variables, OutputVariables.Humidity())
 end
 
 """$(TYPEDSIGNATURES)

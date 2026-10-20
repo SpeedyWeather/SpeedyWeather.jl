@@ -1,9 +1,9 @@
 # Flexible output of Terrarium state variables in coupled Terrarium-SpeedyWeather
-# simulations. Constructor methods are added to the `SpeedyWeather.TerrariumOutput`
+# simulations. Constructor methods are added to the `SpeedyWeather.OutputVariables.Terrarium`
 # function stub; they build `TerrariumOutputVariable`s with name, units, long name
 # and dimensionality derived from Terrarium's variable descriptors.
 
-import SpeedyWeather: TerrariumOutput, AbstractOutput, AbstractSimulation,
+import SpeedyWeather: AbstractOutput, AbstractSimulation,
     path, path_or_nothing, output!, write_array!, hastime, is3D,
     vertical_dimension_name, get_nlayers, define_dimension!, get_dimension_length, define_coordinate!
 
@@ -12,7 +12,7 @@ const SOIL_DEPTH_DIM_NAME = "soil_depth"
 
 """Output variable for a variable of the Terrarium land state in
 `simulation.variables.prognostic.land.terrarium`, used with the constructors
-[`TerrariumOutput`](@ref). 3D (subsurface) variables are written on their own
+[`SpeedyWeather.OutputVariables.Terrarium`](@ref). 3D (subsurface) variables are written on their own
 vertical dimension `soil_depth` with the depths of the Terrarium soil layer
 centres as coordinates; ocean points are filled with `missing_value`. Supported
 by [`NetCDFOutput`](@ref), and by `ZarrOutput` once Zarr.jl is loaded.
@@ -121,7 +121,7 @@ Create a [`TerrariumOutputVariable`](@ref) for the Terrarium variable `var_name`
 of `model`, with units, long name and dimensionality derived from the variable's
 metadata. Keyword arguments like `name` (netCDF name), `unit`, `keepbits` or
 `transform` override the derived values."""
-function SpeedyWeather.TerrariumOutput(
+function SpeedyWeather.OutputVariables.Terrarium(
         model::Terrarium.AbstractModel,
         var_name::Symbol;
         kwargs...
@@ -140,11 +140,11 @@ end
 """$(TYPEDSIGNATURES)
 Create a tuple of [`TerrariumOutputVariable`](@ref)s for all (supported) variables
 of the Terrarium `model`, to be added to a SpeedyWeather model's output via
-`add!(model, TerrariumOutput(terrarium_model)...)`. The groups of Terrarium
+`add!(model, SpeedyWeather.OutputVariables.Terrarium(terrarium_model)...)`. The groups of Terrarium
 variables to include are selected with `prognostic`, `auxiliary` and `inputs`
 (inputs are excluded by default as they mirror the atmospheric forcing);
 further keyword arguments are passed on to every single output variable."""
-function SpeedyWeather.TerrariumOutput(
+function SpeedyWeather.OutputVariables.Terrarium(
         model::Terrarium.AbstractModel;
         prognostic::Bool = true,
         auxiliary::Bool = true,
@@ -157,8 +157,8 @@ function SpeedyWeather.TerrariumOutput(
 end
 
 # convenience: construct directly from the SpeedyWeather land component
-SpeedyWeather.TerrariumOutput(land::AbstractTerrariumLandModel, args...; kwargs...) =
-    TerrariumOutput(land.model, args...; kwargs...)
+SpeedyWeather.OutputVariables.Terrarium(land::AbstractTerrariumLandModel, args...; kwargs...) =
+    SpeedyWeather.OutputVariables.Terrarium(land.model, args...; kwargs...)
 
 # follow the property path into the Terrarium state (prognostic, auxiliary and
 # input variables are all reachable via getproperty on StateVariables)

@@ -64,7 +64,7 @@ PressureLayers(SG::SpectralGrid, pressure::AbstractVector; kwargs...) =
     PressureLayers(SG; pressure, kwargs...)
 
 # custom show function to have the unit printing with hPa
-function Base.show(io::IO, layers::PressureLayers{V}) where V
+function Base.show(io::IO, layers::PressureLayers{V}) where {V}
     pressure = on_architecture(CPU(), layers.pressure) ./ 100
     println(io, styled"{warning:PressureLayers}", "{$V, ...}")
     println(io, styled"├ {info:pressure} = $pressure hPa")
@@ -99,7 +99,7 @@ output_layers(output::AbstractOutput) = hasproperty(output, :layers) ? output.la
 
 """$(TYPEDSIGNATURES)
 Extrapolation of `variable` beyond the model's vertical layers: its `extrapolation` field
-if it has one (e.g. [`TemperatureOutput`](@ref) descends dry-adiabatically below the
+if it has one (e.g. [`OutputVariables.Temperature`](@ref) descends dry-adiabatically below the
 lowest model layer), otherwise constant. Same `hasproperty` pattern as `transform` and
 `unscale` in the generic [`output!`](@ref)."""
 output_extrapolation(variable::AbstractOutputVariable) =

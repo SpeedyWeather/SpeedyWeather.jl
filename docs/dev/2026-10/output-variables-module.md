@@ -1,6 +1,6 @@
 # Move output variables into an exported `OutputVariables` module
 
-> Status: **planned**. Plan drafted, awaiting sign-off before implementation.
+> Status: **completed**. `OutputVariables` module implemented, old names forward with a deprecation warning.
 
 Date of initial draft: 2026-10-19
 
@@ -14,6 +14,17 @@ Base revision: e410eed05c967a4e117b91c91591d17da155a774
 > This would be breaking!
 
 ## Revision log
+
+> Yes to 1 and 2, can you forward SpeedyWeather.TemperatureOutput() to OutputVariables.Temperature() with a deprecation warning?
+
+- Instead of being removed, the old names (`SpeedyWeather.TemperatureOutput`, `DynamicsOutput`,
+  `AllOutputVariables`, `TerrariumOutput`, …) are now functions that forward all arguments to the
+  new constructors and warn via `Base.depwarn(...; force = true)`, so the warning shows even
+  without `--depwarn=yes`. They are generated from `DEPRECATED_OUTPUT_VARIABLES` in
+  `output/variables/deprecated.jl`. Limitation: they are functions, not types, so dispatching on
+  e.g. `::SpeedyWeather.TemperatureOutput` breaks immediately.
+- `path` got a `function path end` stub in the parent module because it was previously first
+  defined by the vorticity output variable.
 
 ## Problem description
 
@@ -61,7 +72,7 @@ and output *variables* look the same as output *writers* (`NetCDFOutput`, `ZarrO
    are not exported, so they cannot clash with `Temperature`-like names elsewhere.
 4. Terrarium: `TerrariumOutput(...)` becomes `OutputVariables.Terrarium(...)`. The stub
    moves into the module and the extension adds methods to it.
-5. Breaking: the old names are removed, with no deprecation aliases (per the prompt).
+5. Breaking: the old names forward to the new ones with a deprecation warning (see revision log).
    Version bump: `SpeedyWeather` minor, e.g. `0.x.y` → `0.(x+1).0-DEV`.
 6. Every use in `src/`, `ext/`, `test/`, `docs/src/` and the benchmarks is updated.
    The CHANGELOG entry gets a migration note.

@@ -1,27 +1,7 @@
-# define all variables for output
-include("dynamics.jl")        # collected as DynamicsOutput()
-include("precipitation.jl")   # PrecipitationOutput()
-include("boundaries.jl")      # BoundaryOutput()
-include("radiation.jl")       # RadiationOutput()
-include("stochastic.jl")      # RandomPatternOutput()
-include("surface_fluxes.jl")  # SurfaceFluxesOutput()
-include("land.jl")            # LandOutput()
-include("ocean.jl")           # SeaSurfaceTemperatureOutput()
-include("tracers.jl")         # TracerOutput()
-include("boundary_layer.jl")  # BoundaryLayerOutput()
-
-# collect all together for conveneince
-AllOutputVariables() = (
-    DynamicsOutput()...,
-    PrecipitationOutput()...,
-    BoundaryOutput()...,
-    RadiationOutput()...,
-    RandomPatternOutput(),
-    SurfaceFluxesOutput()...,
-    LandOutput()...,
-    OceanOutput()...,
-    BoundaryLayerOutput()...,
-)
+"""$(TYPEDSIGNATURES) To be extended for every output variable to define
+the path where in `simulation` to find that output variable `::AbstractField`,
+e.g. `path(::OutputVariables.Vorticity, simulation) = simulation.variables.grid.vorticity`."""
+function path end
 
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
 
@@ -109,3 +89,8 @@ path_or_nothing(variable::AbstractOutputVariable, simulation) = try
 catch FieldError
     nothing
 end
+
+# the output variables themselves live in the `OutputVariables` submodule, which
+# imports the helpers above, so it is included after them
+include("OutputVariables.jl")
+include("deprecated.jl")
