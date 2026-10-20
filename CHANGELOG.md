@@ -5,6 +5,8 @@
 - Initial snow depth estimated from the top-layer soil temperature instead of 0, to start on the right side of the snow-albedo feedback [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - Mean sea-level pressure output computes the surface air temperature on the fly, finite for the initial conditions (previously Inf) [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - `BalancedZonalState` initial conditions and height-dependent `ConstantRelativeHumidity` as new PrimitiveWet default, near equilibrium, without initial precipitation burst and with surface pressure and temperature hydrostatically consistent over orography [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
+- Bug fix: Enzyme's `make_zero` of a model works again with ProgressMeter v1.12 (parametric `ProgressCore`) [#1330](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1330)
+- Fix the centered vertical advection dropping the vertical advection of the reference temperature profile, which delayed the Jablonowski-Williamson baroclinic wave by about a day [#1286](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1286)
 - Primitive equation models transform U, V and the surface pressure gradient ∇ln(pₛ) to grid space in one batched transform, 2 instead of 3 spectral→grid transforms per time step [#1313](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1313)
 - Update Zarr requirement from 0.9, 0.10 to 0.9, 0.10, 0.11 [#1309](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1309)
 - Update GPUArrays requirement from 11 to 11, 12.1 [#1308](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1308)
