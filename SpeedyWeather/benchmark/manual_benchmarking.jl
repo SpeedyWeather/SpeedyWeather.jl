@@ -19,17 +19,26 @@ not affected), e.g.
 
 The flag `--reverse` (Reactant only, anywhere among the arguments) additionally
 runs the reverse-mode (AD) benchmarks of `reverse_benchmark_suite.jl`, which
-take hours. Without the flag the reverse-mode results stored from an earlier
-run are kept, e.g.
+take hours, e.g.
 
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-gpu --reverse
 
 The flag `--hi-res` adds T342 and T512 at 8, 16 and 24 layers to the main
 benchmark (`:benchmark201`), on GPU architectures only (ignored with a warning on
-CPU, too slow). Unlike the reverse-mode results, these rows are not kept by a
-later run without the flag. Truncations are 1-based throughout (T32, …, T256) as
-in the model code.
-Flags can be combined, e.g. `reactant-gpu 10 --reverse --hi-res`.
+CPU, too slow).
+
+The flag `--SPEEDY` runs all primitive equation models in a configuration closer
+to the original SPEEDY.f90: seasonal prescribed climatologies of sea surface
+temperature, land surface temperature and soil moisture instead of the slab ocean
+and the land bucket model (`speedy_components` in `benchmark_suite.jl`). Its
+results are stored separately, as the architecture label with a `-speedy` suffix
+(e.g. `gpu-nvidia-speedy`). Not with Reactant yet: the seasonal climatologies
+don't trace.
+
+A run replaces all results stored for its label, including those of suites that a
+flag added in an earlier run. Flags can be combined and are case-insensitive, e.g.
+`reactant-gpu 10 --reverse --hi-res`. Truncations are 1-based throughout
+(T32, …, T256) as in the model code.
 
 The CPU label is auto-derived from `Sys.ARCH` (`cpu-arm` for aarch64/arm64,
 `cpu-x86` otherwise). GPU runs require a CUDA-capable device — `using CUDA`
@@ -55,19 +64,23 @@ import Pkg
 cd(@__DIR__)
 Pkg.activate(".")
 
-# Arguments starting with `--` are flags, the others are positional: architecture, then multiplier
-const FLAGS = filter(startswith("--"), ARGS)
+# Arguments starting with `--` are flags (case-insensitive), the others are positional: architecture, then multiplier
+const FLAGS = lowercase.(filter(startswith("--"), ARGS))
 const POSITIONAL_ARGS = filter(!startswith("--"), ARGS)
-const KNOWN_FLAGS = ("--reverse", "--hi-res")
 for flag in FLAGS
-    flag in KNOWN_FLAGS || error("Unknown flag `$flag`. Known flags: $(join(KNOWN_FLAGS, ", ")).")
+    flag in ("--reverse", "--hi-res", "--speedy") || error("Unknown flag `$flag`. Known flags: --reverse, --hi-res, --SPEEDY.")
 end
 const RUN_REVERSE = "--reverse" in FLAGS
 const RUN_HI_RES = "--hi-res" in FLAGS
+const RUN_SPEEDY = "--speedy" in FLAGS
 
 const ARCH_ARG = length(POSITIONAL_ARGS) >= 1 ? lowercase(POSITIONAL_ARGS[1]) : ""
 RUN_REVERSE && !(ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu") &&
     error("The reverse-mode benchmarks (--reverse) need Reactant, use reactant-cpu or reactant-gpu.")
+# The seasonal climatologies don't trace yet: Dates.month branches on the traced clock, and the
+# interpolation kernel indexes the months with a traced number
+RUN_SPEEDY && (ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu") &&
+    error("The SPEEDY configuration (--SPEEDY) doesn't run with Reactant yet, use cpu, gpu or amdgpu.")
 
 # Conditionally load backend packages BEFORE `using SpeedyWeather` so that
 # SpeedyWeather's extensions register the right array types and overloads.
@@ -110,6 +123,8 @@ end
 
 const ARCH, ARCH_LABEL = pick_architecture(ARCH_ARG)
 const ON_GPU = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-gpu")
+# the results of the SPEEDY.f90-like configuration (`--SPEEDY`) are stored separately from the default configuration
+const RESULTS_LABEL = RUN_SPEEDY ? "$ARCH_LABEL-speedy" : ARCH_LABEL
 @info "Running benchmarks for architecture: $ARCH_LABEL ($(typeof(ARCH)))"
 RUN_HI_RES && !ON_GPU && @warn "--hi-res only adds GPU configurations (T342, T512 are too slow on CPU), ignored on $ARCH_LABEL."
 
@@ -119,8 +134,9 @@ RUN_HI_RES && !ON_GPU && @warn "--hi-res only adds GPU configurations (T342, T51
 const TIMESTEP_MULTIPLIER = length(POSITIONAL_ARGS) >= 2 ? parse(Float64, POSITIONAL_ARGS[2]) : 1.0
 TIMESTEP_MULTIPLIER > 0 || error("timestep multiplier must be > 0, got $TIMESTEP_MULTIPLIER")
 @info "Timestep multiplier (benchmark201 only): $TIMESTEP_MULTIPLIER"
-@info "Reverse-mode benchmarks: $(RUN_REVERSE ? "on" : "off (stored results are kept), enable with --reverse")"
+@info "Reverse-mode benchmarks: $(RUN_REVERSE ? "on" : "off, enable with --reverse")"
 @info "High resolutions T342, T512 in benchmark201 (GPU only): $(RUN_HI_RES && ON_GPU ? "on" : "off")"
+@info "SPEEDY.f90-like configuration: $(RUN_SPEEDY ? "on, results stored as $RESULTS_LABEL" : "off, enable with --SPEEDY")"
 
 # Free (device) memory between benchmark runs, called outside the timed region
 free_memory!() = SpeedyWeather.SpeedyTransforms.clear_fourier_graph_cache!(ARCH)
@@ -142,7 +158,7 @@ function load_results()
 end
 load_results()
 
-# The reverse-mode suite, stored in its own field of the arch record (see `reverse_record`)
+# The reverse-mode suite (`--reverse`), its numbers are also stored in the `reverse` field of the arch record
 const REVERSE_SUITE_KEY = :benchmark800
 
 include("benchmark_suite.jl")
@@ -173,8 +189,8 @@ end
 
 function arch_markdown()
     io = IOBuffer()
+    RUN_SPEEDY && write(io, "\n$SPEEDY_CONFIGURATION\n")
     for key in SUITE_KEYS
-        key == REVERSE_SUITE_KEY && continue    # stored separately, see `reverse_record`
         write_results(io, benchmarks[key])
     end
     return String(take!(io))
@@ -231,35 +247,28 @@ function overview_data()
     )
 end
 
-const TIMESTAMP = Dates.format(Dates.now(), Dates.RFC1123Format)
-all_results = load_results()
-
-# The reverse-mode suite has its own field in the arch record: a run with `--reverse` replaces it,
-# a run without copies it over from the stored record, so its results are never lost
-const REVERSE_RECORD = RUN_REVERSE ? reverse_record(benchmarks[REVERSE_SUITE_KEY], TIMESTAMP) :
-    get(get(all_results, ARCH_LABEL, Dict()), "reverse", nothing)
-
 arch_record = Dict(
     "meta" => Dict(
         "speedyweather_version" => string(SpeedyWeather.pkgversion(SpeedyWeather)),
-        "timestamp" => TIMESTAMP,
+        "timestamp" => Dates.format(Dates.now(), Dates.RFC1123Format),
         "arch_type" => string(typeof(ARCH)),
+        "configuration" => RUN_SPEEDY ? "SPEEDY" : "default",
         "machine_info" => machine_info(),
     ),
-    # the reverse-mode section last, so that README.md and the docs page show it too
-    "markdown" => arch_markdown() * (isnothing(REVERSE_RECORD) ? "" : REVERSE_RECORD["markdown"]),
+    "markdown" => arch_markdown(),
     "overview" => overview_data(),
 )
-isnothing(REVERSE_RECORD) || (arch_record["reverse"] = REVERSE_RECORD)
+RUN_REVERSE && (arch_record["reverse"] = reverse_data(benchmarks[REVERSE_SUITE_KEY]))
 
-# Merge into the JSON store
+# Merge into the JSON store, replacing everything stored for this label before
 mkpath(ASSETS_DIR)
-all_results[ARCH_LABEL] = arch_record
+all_results = load_results()
+all_results[RESULTS_LABEL] = arch_record
 
 open(RESULTS_JSON, "w") do io
     JSON3.pretty(io, all_results)
 end
-@info "Wrote results for $ARCH_LABEL → $RESULTS_JSON"
+@info "Wrote results for $RESULTS_LABEL → $RESULTS_JSON"
 
 # Regenerate README.md from the JSON store
 
@@ -315,10 +324,12 @@ function write_preamble(md)
     write(md, "```\n\n")
     write(md, "An optional second argument, e.g. `manual_benchmarking.jl gpu 10`, multiplies the number of time steps of the ")
     write(md, "timed runs of the PrimitiveWet resolution sweep (the overview below) for more robust timings; the other suites are not affected. ")
-    write(md, "The flag `--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-gpu --reverse`) additionally runs the ")
-    write(md, "reverse-mode benchmarks, which take hours; without it the reverse-mode results of an earlier run are kept. ")
-    write(md, "The flag `--hi-res` (GPU only) adds T342 and T512 to the PrimitiveWet resolution sweep.\n\n")
-    write(md, "Each run updates only its own architecture's section in this `README.md`; results for other architectures are preserved via `benchmark_results.json`.\n\n")
+    write(md, "Flags, in any order: `--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-gpu --reverse`) additionally runs the ")
+    write(md, "reverse-mode benchmarks, which take hours. `--hi-res` (GPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. ")
+    write(md, "`--SPEEDY` (not with Reactant yet) runs the primitive equation models in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of ")
+    write(md, "sea surface temperature, land surface temperature and soil moisture), stored as a separate architecture with a `-speedy` suffix.\n\n")
+    write(md, "Each run replaces its own architecture's section in this `README.md` (including suites added by flags in an earlier run); ")
+    write(md, "results for other architectures are preserved via `benchmark_results.json`.\n\n")
     return
 end
 

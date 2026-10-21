@@ -1,8 +1,8 @@
 # Reactant reverse-mode (AD) benchmarks, and a timestep multiplier for benchmark201 only
 
-> Status: **in progress**. Implemented and verified locally on Reactant CPU (Phase 0 confirmed budget
-> 32 and the default physics). Outstanding: the full run on the H100 (`reactant-gpu --reverse`) and the
-> PR number in the CHANGELOG line.
+> Status: **in progress**. Implemented and verified locally (Phase 0 confirmed budget 32 and the
+> default physics); `--hi-res` and `--SPEEDY` added on request, `--SPEEDY` not with Reactant yet.
+> Outstanding: the full runs on the H100 and the PR number in the CHANGELOG line.
 
 Date of initial draft: 2026-10-21
 
@@ -53,6 +53,19 @@ the earlier T31, T63, T127 and T255 are now T32, T64, T128 and T256. The only co
 changed is the heading of the individual-dynamics-functions tables, which subtracted 1 from the
 truncation. Results already stored in `benchmark_results.json` and README.md keep the old heading
 until each architecture is rerun.
+
+> okay I reconsidered, the reverse mode results should not be kept when the next benchmark is
+> launched without --reverse
+>
+> add another flag --SPEEDY that signals a configuraiton that is more similar to original SPEEDY.f90.
+> So a configuration with seasonal prescribed climatoglies in ocean and land, also quickly review if
+> what other options might be best for that
+
+The carry-over of section 4 was removed: every run now replaces everything stored for its label, as
+before this PR, and the reverse suite is a section like any other. The check at startup that the
+results store is readable stays. Added the `--SPEEDY` flag (section 6) with prescribed seasonal
+climatologies of sea surface temperature, land surface temperature and soil moisture; section 6 also
+reviews the other options.
 
 ## Problem description
 
@@ -252,33 +265,24 @@ calls `free_memory!` between configurations. `define_benchmarks.jl` adds the sui
 - The section heading includes the measurement date, because this section can be older than the rest
   of the architecture's section (see 4).
 
-### 4. A run without `--reverse` never overwrites the reverse results
+### 4. Storing the results (revised: no carry-over)
 
-A run replaces its architecture's whole record. Without special handling, a run without `--reverse`
-would therefore delete earlier reverse results. To prevent that, the reverse suite gets its own field
-in the record:
+A run replaces its architecture's whole record, as before this PR. A run without `--reverse`
+therefore drops earlier reverse results. The first implementation copied them over; that carry-over
+was removed on request (see the revision log).
+- **The reverse suite is a section like any other.** Its table is part of the record's `markdown`,
+  after the other suites, so README.md and the docs page show it without any change to
+  `docs/generate_benchmarks_page.jl`.
+- **Structured numbers.** With `--reverse`, the record also gets a `reverse` field with the suite's
+  numbers (`reverse_data`), for later figures:
 
-```json
-"reactant-gpu": {
-    "meta": {...}, "markdown": "...", "overview": {...},
-    "reverse": {"timestamp": "...", "markdown": "...", "data": {"truncation": [...], "nsteps": [...], "forward_time": [...], ...}}
-}
-```
-
-The rules:
-- **With `--reverse`**, the driver builds a new `reverse` field from this run, which replaces the old
-  one.
-- **Without `--reverse`**, the driver copies the `reverse` field unchanged from the stored record of
-  the same architecture, if there is one. For this, `load_results()` moves before the point where the
-  record is built.
-- **Other architectures' records** are never touched, as today.
-- **README.md and the docs page keep the section.**
-  - `arch_markdown()` skips `:benchmark800`.
-  - `markdown` is the regular suites followed by `reverse.markdown`, whether that is new or copied.
-  - README.md and the docs page therefore keep showing the reverse section, without any change to
-    `docs/generate_benchmarks_page.jl`.
-- **A copied section shows its age.** Its heading carries its own measurement date
-  (`reverse.timestamp`), so it is recognisably older than the rest of the architecture's section.
+  ```json
+  "reactant-gpu": {
+      "meta": {...}, "markdown": "...", "overview": {...},
+      "reverse": {"truncation": [...], "nsteps": [...], "forward_time": [...], "gradient_time": [...], ...}
+  }
+  ```
+- **Other architectures' records** are never touched, as before.
 - **Unreadable store.**
   - Today, if `benchmark_results.json` exists but can't be parsed, `load_results()` warns and starts
     from an empty store. The run then overwrites the file, which loses every architecture's results,
@@ -286,9 +290,8 @@ The rules:
   - Instead, the driver checks at startup, before any suite runs, that the store is readable, and
     errors if it is not. This fails within seconds, not after hours of benchmarking.
   - A missing file still starts a fresh store.
-  - The merge at the end of the run re-reads the file as today.
-- **Structured data.** `data` holds the numbers in structured form for later figures. Non-finite
-  values are written as `null`, as in `overview`.
+  - The merge at the end of the run re-reads the file as before.
+- Non-finite values are written as `null`, as in `overview`.
 
 ### 5. The `--hi-res` flag (added on request, see the revision log)
 
@@ -299,16 +302,75 @@ The rules:
   with a warning, since these resolutions are too slow there.
 - The matrix transform rows are unchanged, as their cap is below these truncations.
 - The new rows get 50 time steps (the floor of `n_timesteps`); the multiplier applies to them too.
-- **Not kept.** Unlike the reverse-mode results, these rows are part of benchmark201's table and
-  overview. A later run without `--hi-res` therefore drops them for that architecture.
+- A later run without `--hi-res` drops them for that architecture (section 4).
+
+### 6. The `--SPEEDY` flag (added on request, see the revision log)
+
+- **What changes.** `build_model` gives every primitive equation model of every suite (including the
+  dynamics-functions and reverse suites) SPEEDY.f90-like components, `speedy_components` in
+  `benchmark_suite.jl`. Components given per run (`model_kwargs`) take precedence. Barotropic and
+  ShallowWater models are unchanged.
+  - Ocean: `SeasonalOceanClimatology` (monthly SST climatology, linear in time) instead of `SlabOcean`.
+  - Land surface temperature: `SeasonalLandTemperature` instead of `LandBucketTemperature`.
+  - Soil moisture: `SeasonalSoilMoisture` instead of `LandBucketMoisture` (PrimitiveWet only).
+- **Stored separately.** The results go under the label `<arch>-speedy`, with
+  `meta.configuration = "SPEEDY"` and a note at the top of the section. Default and SPEEDY results
+  therefore coexist; the overview table gets its own column and the docs page its own line. Flags are
+  case-insensitive.
+- **Not with Reactant yet.** `--SPEEDY` with `reactant-*` errors at startup, see "SPEEDY configuration
+  with Reactant" below.
+
+**Review: SPEEDY.f90 against SpeedyWeather's options.**
+
+| Aspect | SPEEDY.f90 | SpeedyWeather | In `--SPEEDY` |
+| --- | --- | --- | --- |
+| Ocean | Monthly SST climatology (optional slab anomaly model) | `SlabOcean` (default), `SeasonalOceanClimatology` | Yes |
+| Land surface temperature | Climatology | `LandBucketTemperature` (default), `SeasonalLandTemperature` | Yes |
+| Soil moisture | Monthly climatology | `LandBucketMoisture` (default), `SeasonalSoilMoisture` | Yes |
+| Sea ice | Concentration climatology | `ThermodynamicSeaIce` (default), driven here by the prescribed SST; no sea-ice climatology (`PrescribedSeaIce` is a placeholder for coupling) | Default kept |
+| Snow | Depth climatology | `SnowModel` only | Default kept |
+| Vegetation, albedo | Climatologies, snow and sea-ice albedo | `VegetationClimatology`, `OceanLandAlbedo` | Already the default |
+| Surface fluxes | Bulk formulae | Implemented after the SPEEDY documentation | Already the default |
+| Shortwave | Two bands, diagnostic clouds | `OneBandShortwave` with SPEEDY's `DiagnosticClouds` | Already the default |
+| Longwave | Four bands | One band, Frierson or constant transmissivity | No equivalent |
+| Convection | Simplified mass flux | `BettsMillerConvection` only | No equivalent |
+| Condensation | Relaxation above a humidity threshold | `ImplicitCondensation`, similar | Already the default |
+| Vertical diffusion | SPEEDY's diffusion and shallow convection | `BulkRichardsonDiffusion` | No equivalent |
+| Grid | Full Gaussian, 96×48 at T31 (SPEEDY's T30) | `OctahedralGaussianGrid` (default), `FullGaussianGrid` | Not included, option |
+| Vertical levels | 8 σ levels, half levels 0, 0.05, 0.14, 0.26, 0.42, 0.6, 0.77, 0.9, 1 | `SigmaCoordinates(spectral_grid, σ_half)` | Not included, option |
+| Time step | 40 min at T31 | 40 min at T32 (default) | Already the default |
+
+The two options left are numerics rather than physics. Both are cheap to add but change the cost:
+the full Gaussian grid has about 45 % more grid points than the octahedral one at the same number of
+rings. SPEEDY's σ levels only apply to the L8 configurations, and a grid setting must not override the
+Grids suite (`:benchmark400`).
+
+**SPEEDY configuration with Reactant.** Two blockers in the package source, found with
+`spike/speedy_config.jl` and `spike/speedy_fix_prototype.jl` (scratchpad):
+1. **`Dates.month` of the traced clock branches** on traced values ("non-boolean
+   `TracedRNumber{Bool}` used in boolean context"), and so do `firstdayofmonth` and `daysinmonth`. All
+   three seasonal components compute month and weight that way. A shared branch-free helper fixes it:
+   - `Dates.yearmonthday`, which Reactant provides branch-free, gives year, month and day;
+   - days-in-month comes from an arithmetic formula, the leap year from `&`/`|`.
+
+   Prototyped, it gives the same month, next month and weight as the current code for 2507 times
+   covering 2000 (leap year) and 2001.
+2. **The interpolation kernel indexes the monthly array with a traced month.**
+   `interpolate_monthly_climatology_kernel!` takes `this_month` as a kernel argument, which Reactant
+   passes as a `CuTracedRNumber`. It has no `to_index` inside the kernel ("invalid LLVM IR"). A fix would
+   select the two months outside the kernel (a dynamic slice with Reactant, a view elsewhere) and pass
+   only the slices and the weight. Not prototyped yet.
+
+Both are changes to `SpeedyWeather/src/parameterizations` and need tests in `test/reactant`. They are
+left for a decision.
 
 ### Files
 
 | File | Change |
 | --- | --- |
-| `benchmark/manual_benchmarking.jl` | Flag parsing (`--reverse`, `--hi-res`); `ON_GPU`; conditional `using Enzyme` and include; multiplier for benchmark201 only; carrying the reverse record over; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists the flags and the multiplier |
+| `benchmark/manual_benchmarking.jl` | Flag parsing (`--reverse`, `--hi-res`, `--SPEEDY`, case-insensitive); `ON_GPU`; `RESULTS_LABEL` and `meta.configuration` for `--SPEEDY`; conditional `using Enzyme` and include; multiplier for benchmark201 only; the `reverse` numbers in the record; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists the flags and the multiplier |
 | `benchmark/define_benchmarks.jl` | `:benchmark800`, behind `RUN_REVERSE`; T342 and T512 in `:benchmark201`, behind `RUN_HI_RES` on GPU; 1-based truncations in comments |
-| `benchmark/benchmark_suite.jl` | The comment on `timestep_multiplier`; 1-based truncation in the heading of the individual-dynamics-functions tables |
+| `benchmark/benchmark_suite.jl` | `speedy_components`, `SPEEDY_CONFIGURATION` and their use in `build_model`; the comment on `timestep_multiplier`; 1-based truncation in the heading of the individual-dynamics-functions tables |
 | `benchmark/reverse_benchmark_suite.jl` | New file |
 | `benchmark/Project.toml` | Adds `Enzyme` |
 | `CHANGELOG.md` | One line under `## Unreleased` |
@@ -344,12 +406,10 @@ The benchmark scripts have no unit tests, like the existing suites. To verify:
 1. **Local run.** Run `manual_benchmarking.jl reactant-cpu --reverse` locally.
    - Temporarily restrict it to the reverse suite at T32 with n = 50 and 100.
    - Check that the table renders, the JSON has a `reverse` field and README.md has the section.
-2. **Carry-over.** After step 1, run again without `--reverse`, restricted to one quick suite.
-   - The `reverse` field in the JSON is identical to before.
-   - README.md and `docs/generate_benchmarks_page.jl` still show the reverse section, with its original
-     date.
-   - Then make the JSON unreadable (e.g. truncate a copy and point the driver at it). The driver errors
-     at startup and leaves the file unchanged.
+2. **Replacing.** After step 1, run again without `--reverse`, restricted to one quick suite. The
+   reverse section and the `reverse` field are gone for that architecture; other architectures are
+   unchanged. Then make the JSON unreadable (e.g. truncate a copy and point the driver at it). The
+   driver errors at startup and leaves the file unchanged.
 3. **Multiplier.**
    - `manual_benchmarking.jl cpu 2` makes the timed runs of benchmark201 twice as long. Check the
      logged step counts; the other suites are unchanged.
@@ -398,8 +458,8 @@ The benchmark scripts have no unit tests, like the existing suites. To verify:
   that it does.
 - Gradients with respect to parameters (`Duplicated(model)`).
 - A docs figure from `reverse.data`.
-- `--reverse-only`, to rerun only this suite. With the carry-over from section 4 in place it is about 15
-  lines.
+- `--reverse-only`, to rerun only this suite. It would need to carry the other suites' stored results
+  over.
 - Record the multiplier in benchmark201's README section.
 
 ## Decisions
@@ -408,8 +468,8 @@ Settled on 2026-10-21:
 
 1. **Resolutions:** T32, T64, T128 and T256 at L8, for now.
 2. **Checkpointing:** one `Binomial(budget)` for every configuration. Phase 0 sets the budget.
-3. **Opt-in mechanism:** the `--reverse` flag. A run without it never overwrites the reverse results
-   (section 4).
+3. **Opt-in mechanism:** the `--reverse` flag. Originally a run without it kept the stored reverse
+   results; reconsidered later the same day: a run replaces everything stored for its label (section 4).
 4. **Physics:** the default PrimitiveWet model, the same as benchmark201. If Phase 0 shows that its
    gradient doesn't compile, ask the user before switching to the CI configuration without convection.
 
@@ -479,8 +539,9 @@ repository's suite definitions and results were not touched.
    - The JSON record of `reactant-cpu` has a `reverse` field (`timestamp`, `markdown`, `data`).
    - The record's `markdown` contains the section.
    - Both gradients are `ok`.
-3. **Carry-over.** `reactant-cpu` without `--reverse` updates the record's timestamp, while the
-   `reverse` field is byte-identical to before. README.md still shows the section with its original date.
+3. **Carry-over** (removed later on request, see the revision log). `reactant-cpu` without `--reverse`
+   updated the record's timestamp, while the `reverse` field stayed byte-identical. README.md still
+   showed the section with its original date.
 4. **Multiplier.** `cpu 2` with a second `BenchmarkSuite` present: benchmark201 gets multiplier 2
    (2400 instead of 1200 steps at T32L8), the other suite keeps 1.
 5. **Docs page.** A copy of `docs/generate_benchmarks_page.jl`, pointed at the test JSON, renders the
@@ -499,3 +560,27 @@ repository's suite definitions and results were not touched.
 
 Not done locally: the full suite. A run on reactant-cpu would take about 1.5 h on this laptop and is
 less informative than the H100 run, which is the next step.
+
+### Verification of `--hi-res`, `--SPEEDY` and the removed carry-over (2026-10-21, same machine)
+
+1. **`--hi-res`.** The suite definition, evaluated for `reactant-gpu`, `gpu-nvidia`, `reactant-cpu` and
+   `cpu-arm`, gets the six rows T342/T512 × L8/16/24 on the GPU labels only; without the flag it is
+   unchanged (27 configurations on GPU, 21 on CPU). One-off check that the model runs at these sizes
+   (plain CPU, 3 steps each, before the GPU-only request): T342 1.3 s/step, T512 3.8 s/step, finite.
+2. **`--SPEEDY` components.** PrimitiveDry and PrimitiveWet run 5 days on the plain CPU with all three
+   climatologies: SST 240–303 K, soil temperature 228–310 K, soil moisture 0–0.47, finite.
+3. **`--SPEEDY` in the driver** (scratchpad copy, reduced suites).
+   - `cpu --SPEEDY` stores `cpu-arm-speedy` with `meta.configuration = "SPEEDY"` and the configuration
+     note, and leaves `cpu-arm` byte-identical.
+   - The overview table gets a `cpu-arm-speedy` column.
+   - PrimitiveWet T32L8 needs 6.4 MB instead of 5.9 MB (the monthly fields), at a speed within this
+     laptop's noise. ShallowWater rows are unchanged.
+4. **Flags.** `reactant-cpu --speedy` and `reactant-gpu --SPEEDY --reverse` error at startup;
+   `cpu --Speedy --foo` errors with "Unknown flag `--foo`" (so `--Speedy` was recognised).
+5. **No carry-over.** `reactant-cpu --reverse` writes the `reverse` numbers and the section; the next
+   `reactant-cpu` run without the flag drops both.
+6. **Formatting.** `runic --check` is clean.
+
+Not tested: `--SPEEDY` and `--hi-res` on a GPU (none here). The seasonal components use
+KernelAbstractions kernels with plain integer months there, so they are expected to work, but nothing
+tests them on GPU yet.
