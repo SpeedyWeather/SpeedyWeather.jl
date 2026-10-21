@@ -105,7 +105,7 @@ relaxation time scale, a factor that multiplies the explicit flux."""
 abstract type AbstractFluxIntegration end
 Base.broadcastable(scheme::AbstractFluxIntegration) = Ref(scheme)
 
-export ExplicitFluxes, ImplicitFluxes, ExponentialFluxes
+export ExplicitFluxes, ImplicitFluxes, ExponentialFluxes, RationalFluxes
 
 """Explicit (forward) time integration of surface fluxes, unstable for `Δt/τ > 2`."""
 struct ExplicitFluxes <: AbstractFluxIntegration end
@@ -118,11 +118,18 @@ struct ImplicitFluxes <: AbstractFluxIntegration end
 `(1 - exp(-Δt/τ))/(Δt/τ)`. Exact for a fixed surface value, unconditionally stable."""
 struct ExponentialFluxes <: AbstractFluxIntegration end
 
+"""Rational approximation of `ExponentialFluxes`, damping the explicit flux by
+`(6 + z)/(6 + 4z + z²)` with `z = Δt/τ`. Matches `(1 - exp(-z))/z` to second order
+in `z` and as `1/z` for large `z`, at the cost of `ImplicitFluxes`. Unconditionally
+stable but overshoots the surface value slightly (≤ 10%) for `z > 3`."""
+struct RationalFluxes <: AbstractFluxIntegration end
+
 """$(TYPEDSIGNATURES)
 Factor φ(z) multiplying an explicit relaxation flux for `z = Δt/τ` given time integration `scheme`."""
 @inline flux_damping(::ExplicitFluxes, z) = one(z)
 @inline flux_damping(::ImplicitFluxes, z) = inv(1 + z)
 @inline flux_damping(::ExponentialFluxes, z) = z < sqrt(eps(z)) ? one(z) : -expm1(-z) / z
+@inline flux_damping(::RationalFluxes, z) = (6 + z) / (6 + 4z + z^2)
 
 """$(TYPEDSIGNATURES)
 Damping factor for a surface flux into the lowermost layer with `conductance = -∂flux/∂x`

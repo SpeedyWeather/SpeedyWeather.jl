@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Surface momentum, heat and humidity fluxes are integrated implicitly by default (`ImplicitFluxes`, also `ExplicitFluxes`, `ExponentialFluxes`), stabilising thin lowermost layers [#1336](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1336)
+- Surface momentum, heat and humidity fluxes are integrated implicitly by default (`ImplicitFluxes`, also `ExplicitFluxes`, `ExponentialFluxes`, `RationalFluxes`), stabilising thin lowermost layers [#1336](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1336)
 - Bug fix: Enzyme's `make_zero` of a model works again with ProgressMeter v1.12 (parametric `ProgressCore`) [#1330](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1330)
 - Fix the centered vertical advection dropping the vertical advection of the reference temperature profile, which delayed the Jablonowski-Williamson baroclinic wave by about a day [#1286](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1286)
 - Primitive equation models transform U, V and the surface pressure gradient ∇ln(pₛ) to grid space in one batched transform, 2 instead of 3 spectral→grid transforms per time step [#1313](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1313)

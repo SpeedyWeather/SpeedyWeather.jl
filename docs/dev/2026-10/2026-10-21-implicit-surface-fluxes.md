@@ -1,6 +1,6 @@
 # Implicit time integration of surface fluxes
 
-> Status: **in progress**. Draft PR implements `ExplicitFluxes`, `ImplicitFluxes`, `ExponentialFluxes`, with `ImplicitFluxes` the default for surface momentum, heat and humidity fluxes.
+> Status: **in progress**. Draft PR implements `ExplicitFluxes`, `ImplicitFluxes`, `ExponentialFluxes`, `RationalFluxes`, with `ImplicitFluxes` the default for surface momentum, heat and humidity fluxes.
 
 Date of initial draft: 2026-10-21
 
@@ -17,6 +17,10 @@ Base revision: d6e3286d
 ## Revision log
 
 - 2026-10-21: initial draft, following the analysis in #1335.
+- 2026-10-21: CI run with `ExponentialFluxes` as default (reverted). Benchmark at T32L8: implicit +1%,
+  exponential +5% time per step vs explicit. Added `RationalFluxes`, φ(z) = (6 + z)/(6 + 4z + z²),
+  a rational approximation of the exponential with the same 1/z large-z limit at the cost of implicit.
+  `ImplicitFluxes` stays the default. Documented in `docs/src/surface_fluxes.md`.
 
 ## Problem description
 
@@ -38,6 +42,7 @@ all of the following only differ by a factor φ(z), z = λ h, applied to the exp
 | `ExplicitFluxes` | 1 |
 | `ImplicitFluxes` (backward Euler) | 1/(1 + z) |
 | `ExponentialFluxes` (exponential time differencing) | (1 - e^(-z))/z |
+| `RationalFluxes` (rational approximation of exponential) | (6 + z)/(6 + 4z + z²) |
 
 ## Summary of changes
 

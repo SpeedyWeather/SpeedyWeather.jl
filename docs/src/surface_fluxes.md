@@ -96,6 +96,51 @@ with heat capacity of air at constant pressure ``c_p`` with a typical value of `
 Because we define the heat flux as having units of ``W/m^2`` the conversion includes
 the division by the heat capacity to convert to a rate of temperature change.
 
+## [Time integration of surface fluxes](@id surface_flux_time_integration)
+
+The bulk surface fluxes of momentum, heat and humidity below all relax the lowermost layer
+variable ``x`` (``u, v, T`` or ``q``) towards a surface value ``x_s``, i.e. they are of the form
+
+```math
+F^\uparrow = -a (x - x_s), \qquad \frac{\partial x}{\partial t} = \frac{g F^\uparrow}{\Delta p_N} = -\frac{x - x_s}{\tau}, \qquad \tau = \frac{\Delta p_N}{g a}
+```
+
+with conductance ``a = -\partial F^\uparrow / \partial x`` in ``kg/m^2/s``, e.g. ``a = \rho_s C V_0 f_w``
+for momentum and ``a = \rho_s C V_0`` for heat and humidity (reduced by sea-ice or snow insulation
+and weighted by the ocean or land fraction). ``\tau`` is the time scale on which the surface
+relaxes the lowermost layer, which is short for a thin lowermost layer (small ``\Delta p_N``),
+strong winds or high drag. With an explicit time step ``\Delta t`` (``2\Delta t`` for leapfrog)
+the flux is unstable for ``z = \Delta t/\tau > 2``, which happens, e.g., with
+`FriersonSigmaCoordinates` at default resolution. All schemes therefore multiply the explicit
+flux by a damping factor ``\varphi(z)`` that is applied before the flux is stored, so that
+fluxes passed to ocean, land and output are the ones the atmosphere receives:
+
+| Scheme | ``\varphi(z)`` | Single step ``x \to x_s`` | Cost |
+| ------ | -------------- | ------------------------- | ---- |
+| `ExplicitFluxes()` | ``1`` | overshoots for ``z > 1``, unstable for ``z > 2`` | none |
+| `ImplicitFluxes()` (default) | ``\frac{1}{1 + z}`` | monotone, stable, first order | 1 division |
+| `ExponentialFluxes()` | ``\frac{1 - e^{-z}}{z}`` | monotone, stable, exact for fixed ``x_s`` | `exp`, ~5% of a time step at T32L8 |
+| `RationalFluxes()` | ``\frac{6 + z}{6 + 4z + z^2}`` | stable, ≤10% overshoot for ``z > 3`` | 1 division |
+
+`RationalFluxes` approximates `ExponentialFluxes` to second order in ``z`` and has the same
+``1/z`` behaviour for large ``z``, at the cost of `ImplicitFluxes`. The scheme is chosen per flux,
+for example
+
+```julia
+spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+surface_momentum_flux = SurfaceMomentumFlux(spectral_grid, time_integration = ExponentialFluxes())
+surface_heat_flux = SurfaceHeatFlux(
+    spectral_grid,
+    ocean = SurfaceOceanHeatFlux(spectral_grid, time_integration = RationalFluxes()),
+    land = SurfaceLandHeatFlux(spectral_grid, time_integration = ExplicitFluxes()),
+)
+model = PrimitiveWetModel(spectral_grid; surface_momentum_flux, surface_heat_flux)
+```
+
+and similarly for `SurfaceOceanHumidityFlux` and `SurfaceLandHumidityFlux`.
+Prescribed fluxes (e.g. `PrescribedOceanHeatFlux`) are applied as given.
+C, ``V_0`` and ``x_s`` are held fixed over the time step (linearisation).
+
 ## Bulk Richardson-based drag coefficient
 
 All surface fluxes depend on a dimensionless drag coefficient ``C`` which
@@ -178,7 +223,7 @@ F_v^\uparrow &= - \rho_s C V_0 v_s
 with ``\rho_s = \frac{p_s}{R_d T_N}`` the surface air density calculated from
 surface pressure ``p_s`` and lowermost layer temperature ``T_N``.
 Better would be to extrapolate ``T_N`` to ``T_s`` a surface air temperature
-assuming adiabatic descent but that is currently not implemented.
+assuming adiabatic descent but that is currently not implemented. How this flux is integrated in time is described in [Time integration of surface fluxes](@ref surface_flux_time_integration).
 
 ## Surface heat fluxes
 
@@ -195,7 +240,7 @@ land surface layer or the mixed layer in the ocean. We then compute
 F_T^\uparrow = \rho_s C V_0 c_p (T_{skin} - T_s)
 ```
 
-in ``W/m^2``, positive up.
+in ``W/m^2``, positive up. How this flux is integrated in time is described in [Time integration of surface fluxes](@ref surface_flux_time_integration).
 
 ## Surface humidity fluxes
 
@@ -233,7 +278,7 @@ high and low vegetation cover per grid cell ``veg_{high}, veg_{low}``.
 The constants are depth of top soil layer ``D_{top} = 20~cm``, depth of root layer
 ``D_{root} = 2~m`` (defaults subject to change, check `model.land.geometry`),
 soil wetness at field capacity (volume fraction)
-``W_{cap} = 0.3``, and soil wetness at wilting point (volume fraction) ``W_{wil} = 0.17``.
+``W_{cap} = 0.3``, and soil wetness at wilting point (volume fraction) ``W_{wil} = 0.17``. How this flux is integrated in time is described in [Time integration of surface fluxes](@ref surface_flux_time_integration).
 
 ## Land-sea mask
 
