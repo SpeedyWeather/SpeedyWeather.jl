@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Benchmarks: opt-in reverse-mode (AD) benchmarks with Reactant (`--reverse`), the timestep multiplier only lengthens the PrimitiveWet resolution sweep [#XXXX](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/XXXX)
 - Reactant: the `SpectralTransform` computes the Fourier transform as a truncated DFT: one batched matrix multiply per direction [#1317](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1317)
 - Reactant compatibility for all models incl. `PrimitiveDryModel` and `PrimitiveWetModel` (requires Reactant v0.2.292 for complex-valued kernels), CPU-vs-Reactant correctness tests for all models and output writers [#1304](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1304)
 - Bug fix: Enzyme's `make_zero` of a model works again with ProgressMeter v1.12 (parametric `ProgressCore`) [#1330](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1330)
