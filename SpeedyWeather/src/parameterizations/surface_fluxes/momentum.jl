@@ -21,11 +21,11 @@ different surface roughness characteristics. Fields are $(TYPEDFIELDS)"""
     @param drag_land::NF = 2.4e-3 (bounds = 0 .. 1,)
 
     "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ImplicitFluxes()
+    time_integration::FI = ExponentialFluxes()
 end
 
 Adapt.@adapt_structure SurfaceMomentumFlux
-SurfaceMomentumFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
+SurfaceMomentumFlux(SG::SpectralGrid; time_integration = ExponentialFluxes(), kwargs...) =
     SurfaceMomentumFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceMomentumFlux, ::PrimitiveEquation) = nothing
 
