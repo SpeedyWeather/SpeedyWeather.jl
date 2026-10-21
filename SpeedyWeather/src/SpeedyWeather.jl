@@ -112,7 +112,10 @@ import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 export animate, globe
 function animate end
 
-# constructors to be defined in Terrarium extension
+# output variables, e.g. OutputVariables.Temperature()
+export OutputVariables
+
+# deprecated, use OutputVariables.Terrarium, to be defined in Terrarium extension
 export TerrariumOutput
 
 # constructor to be extended by packages that define parameterizations
