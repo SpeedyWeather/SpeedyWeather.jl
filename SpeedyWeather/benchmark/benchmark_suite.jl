@@ -74,7 +74,7 @@ abstract type AbstractBenchmarkSuite end
     status::Vector{String} = fill("", nruns)
     architecture::Any = SpeedyWeather.CPU()
     # Scale factor on `n_timesteps` for the timed run; >1 lengthens every run for
-    # more robust (e.g. publication-ready) timings. Set globally by the driver.
+    # more robust (e.g. publication-ready) timings. Set by the driver for :benchmark201 only.
     timestep_multiplier::Real = 1
 end
 

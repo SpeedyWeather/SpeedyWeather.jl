@@ -91,3 +91,19 @@ benchmarks[:benchmark700] = BenchmarkSuiteDynamics(
     title = "Individual dynamics functions",
     nruns = 1,
 )
+
+## REVERSE MODE (AD) WITH REACTANT, opt-in with `--reverse` (reverse_benchmark_suite.jl)
+# Forward and reverse-mode gradient over 50, 100, 200, 2000 time steps of the PrimitiveWet model, L8,
+# SpectralTransform. On Reactant CPU only up to T127, above the 2000-step gradient takes too long.
+if RUN_REVERSE
+    let truncations = ARCH_LABEL == "reactant-gpu" ? [32, 64, 128, 256] : [32, 64, 128],
+            nsteps = [50, 100, 200, 2000]
+
+        benchmarks[REVERSE_SUITE_KEY] = BenchmarkSuiteReverse(
+            title = "Primitive wet model, reverse mode (AD) with Reactant",
+            nruns = length(truncations) * length(nsteps),
+            truncation = repeat(truncations, inner = length(nsteps)),
+            nsteps = repeat(nsteps, outer = length(truncations)),
+        )
+    end
+end
