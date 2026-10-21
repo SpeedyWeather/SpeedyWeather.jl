@@ -61,11 +61,11 @@ with drag coefficients. Fields are $(TYPEDFIELDS)"""
     @param sea_ice_insulation::NF = 0.01 (bounds = Positive,)
 
     "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ExponentialFluxes()
+    time_integration::FI = ImplicitFluxes()
 end
 
 Adapt.@adapt_structure SurfaceOceanHeatFlux
-SurfaceOceanHeatFlux(SG::SpectralGrid; time_integration = ExponentialFluxes(), kwargs...) =
+SurfaceOceanHeatFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
     SurfaceOceanHeatFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
@@ -137,11 +137,11 @@ Fields are $(TYPEDFIELDS)"""
     @param snow_insulation_depth::NF = 0.05 (bounds = Positive,)
 
     "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ExponentialFluxes()
+    time_integration::FI = ImplicitFluxes()
 end
 
 Adapt.@adapt_structure SurfaceLandHeatFlux
-SurfaceLandHeatFlux(SG::SpectralGrid; time_integration = ExponentialFluxes(), kwargs...) =
+SurfaceLandHeatFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
     SurfaceLandHeatFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 

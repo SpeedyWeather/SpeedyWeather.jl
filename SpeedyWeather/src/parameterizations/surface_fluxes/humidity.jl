@@ -61,11 +61,11 @@ export SurfaceOceanHumidityFlux
     @param sea_ice_insulation::NF = 0.01 (bounds = 0 .. 1,)
 
     "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ExponentialFluxes()
+    time_integration::FI = ImplicitFluxes()
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
-SurfaceOceanHumidityFlux(SG::SpectralGrid; time_integration = ExponentialFluxes(), kwargs...) =
+SurfaceOceanHumidityFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
     SurfaceOceanHumidityFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
@@ -134,11 +134,11 @@ export SurfaceLandHumidityFlux
     @param snow_insulation_depth::NF = 0.05 (bounds = 0 .. 1,)
 
     "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ExponentialFluxes()
+    time_integration::FI = ImplicitFluxes()
 end
 
 Adapt.@adapt_structure SurfaceLandHumidityFlux
-SurfaceLandHumidityFlux(SG::SpectralGrid; time_integration = ExponentialFluxes(), kwargs...) =
+SurfaceLandHumidityFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
     SurfaceLandHumidityFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 

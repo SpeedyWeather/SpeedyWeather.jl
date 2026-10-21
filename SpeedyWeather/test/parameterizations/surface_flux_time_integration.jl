@@ -41,15 +41,15 @@ end
     spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid)
 
-    # ExponentialFluxes default for all relaxation surface fluxes
-    @test model.surface_momentum_flux.time_integration isa ExponentialFluxes
-    @test model.surface_heat_flux.ocean.time_integration isa ExponentialFluxes
-    @test model.surface_heat_flux.land.time_integration isa ExponentialFluxes
-    @test model.surface_humidity_flux.ocean.time_integration isa ExponentialFluxes
-    @test model.surface_humidity_flux.land.time_integration isa ExponentialFluxes
+    # ImplicitFluxes default for all relaxation surface fluxes
+    @test model.surface_momentum_flux.time_integration isa ImplicitFluxes
+    @test model.surface_heat_flux.ocean.time_integration isa ImplicitFluxes
+    @test model.surface_heat_flux.land.time_integration isa ImplicitFluxes
+    @test model.surface_humidity_flux.ocean.time_integration isa ImplicitFluxes
+    @test model.surface_humidity_flux.land.time_integration isa ImplicitFluxes
 
     # option chosen per flux
-    for scheme in (ExplicitFluxes(), ImplicitFluxes())
+    for scheme in (ExplicitFluxes(), ExponentialFluxes())
         @test SurfaceMomentumFlux(spectral_grid; time_integration = scheme).time_integration === scheme
         @test SurfaceOceanHeatFlux(spectral_grid; time_integration = scheme).time_integration === scheme
         @test SurfaceLandHeatFlux(spectral_grid; time_integration = scheme).time_integration === scheme
