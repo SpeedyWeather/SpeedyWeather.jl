@@ -1,10 +1,10 @@
-export ModelLayers, PressureLayers
+export ModelLayers, PressureLayers, IsentropicLayers
 
 """Supertype of the vertical layers that an output writer writes its 3D variables on.
 A property of the writer (like its output grid), not of the individual output variables,
 set with the `layers` keyword argument, e.g. `NetCDFOutput(spectral_grid, layers =
-PressureLayers(spectral_grid))`. Subtypes are [`ModelLayers`](@ref) and
-[`PressureLayers`](@ref)."""
+PressureLayers(spectral_grid))`. Subtypes are [`ModelLayers`](@ref),
+[`PressureLayers`](@ref) and [`IsentropicLayers`](@ref)."""
 abstract type AbstractOutputLayers <: AbstractModelComponent end
 
 """Write 3D variables on the model's vertical layers, sigma or hybrid sigma-pressure
@@ -71,16 +71,73 @@ function Base.show(io::IO, layers::PressureLayers{V}) where V
     return print(io, styled"└ {info:interpolation}::$(typeof(layers.interpolation))")
 end
 
+"""Dry potential temperature [K] of the layers that `IsentropicLayers` interpolates onto by default."""
+const DEFAULT_ISENTROPIC_LAYERS = Float32[285, 300, 315, 330, 350]
+
+"""Write 3D atmospheric variables interpolated onto isentropic layers, surfaces of constant
+dry potential temperature θ = T (p₀/p)^κ [K], instead of the model's vertical layers, see
+[Vertical interpolation onto isentropic layers](@ref isentropic_interpolation). Construct
+with a `SpectralGrid` and pass to an output writer as
+`NetCDFOutput(spectral_grid, PrimitiveDry, layers = IsentropicLayers(spectral_grid))`.
+Only for models with temperature (`PrimitiveDry`, `PrimitiveWet`). θ is linear in ln(p)
+between two model layers and variables are interpolated linearly in ln(p) at the
+isentrope's pressure. Outside the model's θ range the variables' own extrapolation applies
+as for [`PressureLayers`](@ref). Land (soil) variables and 2D variables are unaffected.
+Fields are $(TYPEDFIELDS)"""
+struct IsentropicLayers{V, F} <: AbstractOutputLayers
+    "[OPTION] dry potential temperature [K] of the layers to interpolate onto, monotonic.
+    In the model's number format and on its architecture so that the interpolation kernel
+    can run on the GPU"
+    potential_temperature::V
+
+    "[DERIVED] scratch field (npoints, nθ) on the model grid to interpolate into
+    before the horizontal interpolation onto the output grid"
+    scratch::F
+end
+
+"""$(TYPEDSIGNATURES)
+Vertical output layers at the given dry `potential_temperature` [K],
+$(DEFAULT_ISENTROPIC_LAYERS) K by default. Allocates the potential temperature vector and
+one scratch field (shared by all output variables) on `SG`'s architecture and in its number
+format, so that the vertical interpolation runs where the model runs."""
+function IsentropicLayers(
+        SG::SpectralGrid;
+        potential_temperature::AbstractVector = DEFAULT_ISENTROPIC_LAYERS,
+    )
+    monotonic = issorted(potential_temperature) || issorted(potential_temperature, rev = true)
+    @assert monotonic "Output isentropic layers have to be monotonic, got $potential_temperature"
+    @assert all(>(0), potential_temperature) "Output isentropic layers have to be positive, got $potential_temperature"
+
+    (; NF, grid) = SG
+    return IsentropicLayers(
+        on_architecture(SG.architecture, NF.(potential_temperature)),
+        Field(NF, grid, ArrayDimensions.XYZ(), length(potential_temperature)),     # on the model grid, not the output grid
+    )
+end
+
+# convenience: IsentropicLayers(spectral_grid, [300, 315, 330])
+IsentropicLayers(SG::SpectralGrid, potential_temperature::AbstractVector) =
+    IsentropicLayers(SG; potential_temperature)
+
+# custom show function to have the unit printing with K
+function Base.show(io::IO, layers::IsentropicLayers{V}) where V
+    θ = on_architecture(CPU(), layers.potential_temperature)
+    println(io, styled"{warning:IsentropicLayers}", "{$V, ...}")
+    return print(io, styled"└ {info:potential_temperature} = $θ K")
+end
+
 """$(TYPEDSIGNATURES)
 Number of vertical layers that 3D atmospheric variables are written on, used by the output
 writers to allocate their 3D scratch field on the output grid."""
 get_nlayers(::ModelLayers, SG::SpectralGrid) = SG.nlayers
 get_nlayers(layers::PressureLayers, ::SpectralGrid) = length(layers.pressure)
+get_nlayers(layers::IsentropicLayers, ::SpectralGrid) = length(layers.potential_temperature)
 
 """$(TYPEDSIGNATURES)
 Name of the vertical dimension in the output file or store for 3D atmospheric variables."""
 vertical_dimension_name(::ModelLayers) = "layer"
 vertical_dimension_name(::PressureLayers) = "pressure"
+vertical_dimension_name(::IsentropicLayers) = "potential_temperature"
 
 """$(TYPEDSIGNATURES)
 Vertical dimension of `variable` in `output`. Variables on the model's atmospheric layers
@@ -110,7 +167,8 @@ Interpolate `field` onto the output writer's vertical `layers`, returning the fi
 write out. No-op on [`ModelLayers`](@ref) and for variables that are not 3D atmospheric
 variables (2D variables, soil variables). For [`PressureLayers`](@ref) this interpolates
 into the layers' scratch field, on the model grid and the model's architecture, i.e.
-before the horizontal interpolation onto the output grid."""
+before the horizontal interpolation onto the output grid. For [`IsentropicLayers`](@ref)
+likewise, with the dry potential temperature from the model's temperature."""
 interpolate_layers!(::ModelLayers, field, ::AbstractOutputVariable, ::AbstractSimulation) = field
 
 function interpolate_layers!(
@@ -129,6 +187,30 @@ function interpolate_layers!(
         layers.scratch, field, surface_pressure, layers.pressure,
         model.geometry.vertical_coordinates, layers.interpolation,
         output_extrapolation(variable),
+    )
+    return layers.scratch
+end
+
+function interpolate_layers!(
+        layers::IsentropicLayers,
+        field::AbstractField,
+        variable::AbstractOutputVariable,
+        simulation::AbstractSimulation,
+    )
+    # only 3D atmospheric variables, soil variables keep their own vertical dimension
+    (is3D(variable) && !is_land(variable)) || return field
+
+    (; model, variables) = simulation
+    surface_pressure = variables.parameterizations.surface_pressure
+
+    # temperature at the step that the output writer writes (the hook has no `output`, so
+    # the layers select the step, both fall back to step 1)
+    temperature = get_prognostic_step(variables.grid.temperature, model.time_stepping, layers)
+
+    interpolate_isentropic_layers!(
+        layers.scratch, field, temperature, surface_pressure, layers.potential_temperature,
+        model.geometry.vertical_coordinates, model.atmosphere.κ,
+        model.atmosphere.reference_pressure, output_extrapolation(variable),
     )
     return layers.scratch
 end
@@ -159,8 +241,21 @@ sync_extrapolation(E::SubsurfaceMask, ::Type{NF}, atmosphere::AbstractAtmosphere
     SubsurfaceMask(sync_extrapolation(E.above_surface, NF, atmosphere), convert(NF, E.missing_value))
 
 """$(TYPEDSIGNATURES)
+Check at initialize! that the output writer's vertical `layers` can be used with `model`.
+[`IsentropicLayers`](@ref) need the temperature, i.e. a `PrimitiveEquation` model."""
+check_output_layers(::AbstractOutputLayers, ::AbstractModel) = nothing
+check_output_layers(::IsentropicLayers, ::PrimitiveEquation) = nothing
+check_output_layers(::IsentropicLayers, model::AbstractModel) = throw(
+    ArgumentError(
+        "IsentropicLayers need the temperature to compute the potential temperature, " *
+            "which $(nameof(typeof(model))) does not have. Use ModelLayers() instead."
+    )
+)
+
+"""$(TYPEDSIGNATURES)
 Define the vertical coordinate of 3D atmospheric variables in the output file or store
-`dest`: sigma for [`ModelLayers`](@ref), pressure in hPa for [`PressureLayers`](@ref).
+`dest`: sigma for [`ModelLayers`](@ref), pressure in hPa for [`PressureLayers`](@ref),
+potential temperature in K for [`IsentropicLayers`](@ref).
 Backend-agnostic via [`define_coordinate!`](@ref)."""
 function define_vertical_coordinate!(dest, layers::ModelLayers, model::AbstractModel)
     σ = on_architecture(CPU(), model.geometry.σ_levels_full)
@@ -177,6 +272,17 @@ function define_vertical_coordinate!(dest, layers::PressureLayers, ::AbstractMod
         attribs = Dict(
             "units" => "hPa", "long_name" => "pressure", "positive" => "down",
             "standard_name" => "air_pressure",
+        ),
+    )
+end
+
+function define_vertical_coordinate!(dest, layers::IsentropicLayers, ::AbstractModel)
+    θ = on_architecture(CPU(), layers.potential_temperature)    # coordinates are written from CPU
+    return define_coordinate!(
+        dest, vertical_dimension_name(layers), collect(Float64.(θ)),
+        attribs = Dict(
+            "units" => "K", "long_name" => "potential temperature", "positive" => "up",
+            "standard_name" => "air_potential_temperature",
         ),
     )
 end

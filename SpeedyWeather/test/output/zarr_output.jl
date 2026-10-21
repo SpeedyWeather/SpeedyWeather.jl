@@ -429,3 +429,23 @@ end
     @test g["temp"].attrs["_ARRAY_DIMENSIONS"] == ["time", "pressure", "lat", "lon"]
     @test size(g["temp"])[3] == length(p)
 end
+
+@testset "ZarrOutput on isentropic layers" begin
+    spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
+    θ = [300, 330]
+    output = ZarrOutput(
+        spectral_grid, PrimitiveDry,
+        path = mktempdir(), write_restart = false, interval = Hour(6),
+        layers = IsentropicLayers(spectral_grid, θ),
+    )
+    model = PrimitiveDryModel(spectral_grid; output)
+    simulation = initialize!(model)
+    run!(simulation, period = Hour(6), output = true)
+
+    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    @test haskey(g.arrays, "potential_temperature")
+    @test !haskey(g.arrays, "layer")
+    @test g["potential_temperature"][:] ≈ θ
+    @test g["temp"].attrs["_ARRAY_DIMENSIONS"] == ["time", "potential_temperature", "lat", "lon"]
+    @test size(g["temp"])[3] == length(θ)
+end

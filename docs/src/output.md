@@ -170,6 +170,22 @@ It interpolates linearly in log(pressure) by default, pass
 `interpolation = SpeedyWeather.LinearInPressure()` for linear in pressure instead. The
 same interpolation is used for every variable.
 
+To write 3D variables on isentropic layers, surfaces of constant dry potential temperature,
+pass `layers = IsentropicLayers(spectral_grid)` (285, 300, 315, 330 and 350 K by default) or
+choose the layers yourself, in K
+
+```@example netcdf
+output = NetCDFOutput(spectral_grid, PrimitiveDry, layers = IsentropicLayers(spectral_grid, [300, 315, 330, 350]))
+output.layers
+```
+
+The vertical dimension is then called `potential_temperature`, in K. Between two model
+layers the potential temperature is linear in log(pressure), and every variable is
+interpolated linearly in log(pressure) at the isentrope's pressure. Below the lowest model
+layer the same per-variable extrapolation as for pressure layers applies, see below and
+[Vertical interpolation onto isentropic layers](@ref isentropic_interpolation). This needs
+the temperature, so only `PrimitiveDry` and `PrimitiveWet` models support it.
+
 ### Below the lowest model layer
 
 Pressure layers can lie below the lowest model layer, which sits some tens of hPa above

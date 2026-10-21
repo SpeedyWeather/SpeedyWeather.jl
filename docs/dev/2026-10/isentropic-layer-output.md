@@ -1,7 +1,7 @@
 # Output on isentropic layers
 
-> Status: **planned**. All decisions are settled (revisions 1 and 2); awaiting sign-off to
-> implement.
+> Status: **completed**. Implemented on `isentropic_layers`; all tests run locally pass
+> and the PV check passes 8/8. The GPU test and the docs build were not run locally.
 
 Date of initial draft: 2026-10-21
 
@@ -48,6 +48,21 @@ Base revision: `adf0d61d` (fork `main`, branch `isentropic_layers`)
   - Decision 3: the first crossing from the top.
   - Conventions for underground isentropes, from a web search, are listed under 1a.
   - Decision 1a: the Lorenz condition for an unstable outermost layer pair.
+- **2026-10-21, implementation and revision 3 (decision 1b).** In the NetCDF round-trip
+  test, temperature on 290 K had `Inf`. The lowest layer pair is only weakly stable
+  (median θ_{n−1} − θ_n = 0.45 K, T15 L8 PrimitiveDry after 6 h), so the extrapolated p* is
+  absurd: at 290 K, p*/pₛ has a median of 17, a 90th percentile of 3e12, and overflows
+  Float32 in 11 of 206 columns. `DryAdiabaticExtrapolation` then gives huge or infinite
+  temperatures.
+
+  > yes do that
+
+  (answering whether to apply the Lorenz condition to every underground isentrope.)
+
+  - Decision 1b: an isentrope with extrapolated p* > pₛ follows the Lorenz condition,
+    p* = pₛ, for every extrapolation method; `SubsurfaceMask` still masks it.
+  - New function `extrapolate_isentrope_below`, used by the kernel instead of
+    `extrapolate_below` directly.
 
 ## Problem description
 
@@ -178,10 +193,12 @@ the outermost layer pair:
 
 - **Below the lowest layer** (θ < θ(nlayers), no crossing):
   `ln p* = ln p_bottom + (θ − θ_bottom)·(ln p_bottom − ln p_{nlayers−1})/(θ_bottom − θ_{nlayers−1})`,
-  so p* > p_bottom in a stably stratified bottom pair. Then
-  `extrapolate_below(ξ_bottom, p*, p_bottom, pₛ, E)`, which behaves as follows:
+  so p* > p_bottom in a stably stratified bottom pair. Underground, p* > pₛ, the Lorenz
+  condition p* = pₛ applies (decision 1b). Then
+  `extrapolate_below(ξ_bottom, min(p*, pₛ), p_bottom, pₛ, E)`, via
+  `extrapolate_isentrope_below`, which behaves as follows:
   - `ConstantExtrapolation` (default) → the lowest layer's value;
-  - `DryAdiabaticExtrapolation` (temperature) → T_bottom·(p*/p_bottom)^κ;
+  - `DryAdiabaticExtrapolation` (temperature) → T_bottom·(min(p*, pₛ)/p_bottom)^κ;
   - `SubsurfaceMask` → `missing_value` where p* > pₛ (an isentrope underground), and its
     `above_surface` method between the lowest layer and the surface.
 - **Above the top layer** (θ > θ(1), no crossing): p* from the top pair in the same way,
@@ -317,6 +334,38 @@ SpeedyWeather from this clone via `[sources]`, NCDatasets and CairoMakie, and le
 
 About 5 min. A figure is out of scope unless requested.
 
+### Results (2026-10-21)
+
+Run with `--check-bounds=yes`, Julia 1.12.7, in a scratch environment (SpeedyWeather from
+this clone, Test, Dates, NCDatasets, Zarr). The full `SpeedyWeather/test` environment also
+pulls in CUDA, Enzyme and Terrarium.
+
+| test file | result |
+|---|---|
+| `isentropic_layer_output.jl` | 12121/12121 (kernel) + 25/25 (writers), 2 min 22 s |
+| `vertical_interpolation.jl` (regression) | 26/26 |
+| `pressure_layer_output.jl` (regression) | 42/42 |
+| `zarr_output.jl`, including the new isentropic test | 98/98, 5 min 53 s |
+| `healpix_output.jl`, including the new isentropic test | 137/137, 2 min 57 s |
+| `test/GPU/output.jl` | **not run** (no GPU test environment set up locally) |
+
+PV check, `isentropic/check_isentropic_potential_vorticity.jl` (log
+`isentropic/check_isentropic_potential_vorticity.log`), 4 min 08 s, 8/8 passed:
+
+- PV > 0 in all 470 400 above-ground points poleward of 20°N, and PV < 0 in all of them
+  poleward of 20°S. No point poleward of ±20° was masked on 315–350 K, as JW has no
+  orography.
+- The zonal-mean 2-PVU contour on 330 K is at 48.8°N on day 0 and on day 12.
+- Hand interpolation of model-layer PV in 24 column/isentrope pairs: max relative
+  error 8.9e-7.
+- Zonal-mean PV [PVU], day 0 / day 12:
+
+  | | 30°N | 45°N | 60°N | 75°N |
+  |---|---|---|---|---|
+  | 315 K | 0.23 / 0.30 | 1.25 / 1.14 | 2.52 / 2.43 | 3.31 / 2.97 |
+  | 330 K | 0.55 / 0.57 | 1.61 / 1.59 | 2.79 / 2.76 | 3.50 / 3.32 |
+  | 350 K | 1.16 / 1.17 | 2.31 / 2.32 | 3.37 / 3.35 | 3.96 / 3.88 |
+
 ## Documentation changes
 
 - `docs/src/vertical_interpolation.md`: a section "Isentropic layers". It covers:
@@ -334,6 +383,7 @@ About 5 min. A figure is out of scope unless requested.
 |---|---|---|
 | 1 | Extrapolation | As for pressure layers: the variable's own extrapolation, at p* extrapolated with θ linear in ln p |
 | 1a | Unstable outermost pair: no p* beyond the layer | Lorenz condition: p* = pₛ below, p* = p_top above |
+| 1b | Underground isentrope, extrapolated p* > pₛ | Lorenz condition p* = pₛ; masked by `SubsurfaceMask` |
 | 2 | Interpolation | θ linear in ln p; variables linear in ln p at p* |
 | 3 | Several crossings in a column | first crossing from the top |
 | 4 | Default layers | 285, 300, 315, 330, 350 K |
