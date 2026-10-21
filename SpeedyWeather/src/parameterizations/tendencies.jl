@@ -98,6 +98,49 @@ converted to tendency [?/s]."""
 @propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
     flux_to_tendency(flux, pₛ, model.geometry.nlayers, model)
 
+"""Abstract supertype for the time integration of surface fluxes that relax the
+lowermost layer towards a surface value, `flux = -conductance * (x - x_surface)`.
+Subtypes define `flux_damping(scheme, z)` with `z = Δt/τ` the ratio of time step to
+relaxation time scale, a factor that multiplies the explicit flux."""
+abstract type AbstractFluxIntegration end
+Base.broadcastable(scheme::AbstractFluxIntegration) = Ref(scheme)
+
+export ExplicitFluxes, ImplicitFluxes, ExponentialFluxes
+
+"""Explicit (forward) time integration of surface fluxes, unstable for `Δt/τ > 2`."""
+struct ExplicitFluxes <: AbstractFluxIntegration end
+
+"""Implicit (backward Euler) time integration of surface fluxes, damping the explicit
+flux by `1/(1 + Δt/τ)`. Unconditionally stable."""
+struct ImplicitFluxes <: AbstractFluxIntegration end
+
+"""Exponential time differencing of surface fluxes, damping the explicit flux by
+`(1 - exp(-Δt/τ))/(Δt/τ)`. Exact for a fixed surface value, unconditionally stable."""
+struct ExponentialFluxes <: AbstractFluxIntegration end
+
+"""$(TYPEDSIGNATURES)
+Factor φ(z) multiplying an explicit relaxation flux for `z = Δt/τ` given time integration `scheme`."""
+@inline flux_damping(::ExplicitFluxes, z) = one(z)
+@inline flux_damping(::ImplicitFluxes, z) = inv(1 + z)
+@inline flux_damping(::ExponentialFluxes, z) = z < sqrt(eps(z)) ? one(z) : -expm1(-z) / z
+
+"""$(TYPEDSIGNATURES)
+Damping factor for a surface flux into the lowermost layer with `conductance = -∂flux/∂x`
+[kg/m²/s] with respect to the lowermost-layer variable x, surface pressure `pₛ` [Pa] and
+time integration `scheme`. Uses the time step of the time stepper, e.g. 2Δt for Leapfrog."""
+@propagate_inbounds function surface_flux_damping(scheme::AbstractFluxIntegration, conductance::Real, pₛ::Real, model)
+    Δp = pressure_thickness(model.geometry.nlayers, pₛ, model.geometry.vertical_coordinates)
+    Δt = default_time_step(model.time_stepping)
+    z = Δt * model.planet.gravity * conductance / Δp        # = Δt/τ, relaxation time scale τ
+    return flux_damping(scheme, z)
+end
+
+"""$(TYPEDSIGNATURES)
+Flux `flux` (upward positive) into the lowermost layer with `conductance = -∂flux/∂x`
+converted to tendency [?/s], time-integrated following `scheme`, see `surface_flux_damping`."""
+@propagate_inbounds surface_flux_to_tendency(scheme::AbstractFluxIntegration, flux::Real, conductance::Real, pₛ::Real, model) =
+    surface_flux_damping(scheme, conductance, pₛ, model) * surface_flux_to_tendency(flux, pₛ, model)
+
 """$(TYPEDSIGNATURES)
 Flux `flux` into layer `k` of thickness `Δσ`  converted to tendency [?/s].
 Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
