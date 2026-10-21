@@ -351,6 +351,12 @@ in that file serve as the baseline. When running benchmarks, compare new results
 the existing README.md values: deviations of +/- 20% are normal and acceptable, but
 larger regressions should be reported to the user.
 
+The reverse-mode (AD) benchmarks with Reactant are opt-in, as they take hours: add the flag
+`--reverse` (e.g. `manual_benchmarking.jl reactant-gpu --reverse`). Runs without it keep the
+stored reverse-mode results. The flag `--hi-res` adds T342 and T512 to the PrimitiveWet
+resolution sweep, on GPU only. Truncations in the benchmarks are 1-based (T32, …, T256), as in
+the model code.
+
 ## Code Style
 
 * The project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for formatting.
