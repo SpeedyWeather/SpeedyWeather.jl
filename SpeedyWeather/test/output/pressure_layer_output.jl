@@ -33,10 +33,10 @@ using NCDatasets, Dates
     @testset "Extrapolation defaults" begin
         # temperature descends dry-adiabatically below the lowest model layer,
         # everything else is constant
-        @test SpeedyWeather.output_extrapolation(SpeedyWeather.TemperatureOutput()) isa
+        @test OutputVariables.output_extrapolation(OutputVariables.Temperature()) isa
             SpeedyWeather.DryAdiabaticExtrapolation
-        for var in (SpeedyWeather.VorticityOutput(), SpeedyWeather.ZonalVelocityOutput(), SpeedyWeather.HumidityOutput())
-            @test SpeedyWeather.output_extrapolation(var) isa SpeedyWeather.ConstantExtrapolation
+        for var in (OutputVariables.Vorticity(), OutputVariables.ZonalVelocity(), OutputVariables.Humidity())
+            @test OutputVariables.output_extrapolation(var) isa SpeedyWeather.ConstantExtrapolation
         end
 
         # κ is taken from the model's atmosphere at initialize! and the Float64 defaults
@@ -51,7 +51,7 @@ using NCDatasets, Dates
 
         # a mask keeps its inner extrapolation synced too
         add!(
-            output, SpeedyWeather.TemperatureOutput(
+            output, OutputVariables.Temperature(
                 extrapolation = SpeedyWeather.SubsurfaceMask(
                     above_surface = SpeedyWeather.DryAdiabaticExtrapolation(),
                 ),
@@ -77,7 +77,7 @@ using NCDatasets, Dates
             layers = SpeedyWeather.PressureLayers(spectral_grid, p),
         )
         # no bitrounding and soil output so that the comparison below is exact
-        add!(output, SpeedyWeather.TemperatureOutput(keepbits = 23), SpeedyWeather.SoilTemperatureOutput())
+        add!(output, OutputVariables.Temperature(keepbits = 23), OutputVariables.SoilTemperature())
 
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)

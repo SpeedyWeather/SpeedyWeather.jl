@@ -413,7 +413,7 @@ using a globally constant albedo of 0.1 for the ocean but a higher albedo
 over land which also increases to 0.5 towards the poles.
 
 You can always output the land-sea mask weighted albedo with
-`add!(model, SpeedyWeather.AlbedoOutput())` or inspect it as follows
+`add!(model, OutputVariables.Albedo())` or inspect it as follows
 
 ```@example land
 simulation = initialize!(model)
@@ -497,19 +497,19 @@ simulation.variables.prognostic.land.terrarium
 ### Output of Terrarium variables
 
 Any variable of the Terrarium state (prognostic, auxiliary/diagnostic, or input)
-can be written to SpeedyWeather's output with `TerrariumOutput`. Its name,
+can be written to SpeedyWeather's output with `OutputVariables.Terrarium`. Its name,
 units, long name and dimensionality are derived automatically from Terrarium's
 variable metadata. Add all prognostic and auxiliary Terrarium variables with
 
 ```@example terrarium
-add!(model, TerrariumOutput(terrarium_model)...)
+add!(model, OutputVariables.Terrarium(terrarium_model)...)
 ```
 
 or add a single variable (here renamed in the output file via `name`, any Terrarium
 variable name works, e.g. also `:saturation_water_ice` or `:sensible_heat_flux`) with
 
 ```@example terrarium
-add!(model, TerrariumOutput(terrarium_model, :temperature, name = "soil_temperature"))
+add!(model, OutputVariables.Terrarium(terrarium_model, :temperature, name = "soil_temperature"))
 nothing # hide
 ```
 
@@ -525,5 +525,5 @@ and, once Zarr.jl is loaded, with [`ZarrOutput`](@ref "Zarr Output"):
 using Zarr
 output = ZarrOutput(spectral_grid, PrimitiveWet)
 model = PrimitiveWetModel(spectral_grid; land, output, ...)
-add!(model, TerrariumOutput(terrarium_model)...)
+add!(model, OutputVariables.Terrarium(terrarium_model)...)
 ```
