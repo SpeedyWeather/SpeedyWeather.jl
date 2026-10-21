@@ -24,6 +24,13 @@ run are kept, e.g.
 
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-gpu --reverse
 
+The flag `--hi-res` adds T342 and T512 at 8, 16 and 24 layers to the main
+benchmark (`:benchmark201`), on GPU architectures only (ignored with a warning on
+CPU, too slow). Unlike the reverse-mode results, these rows are not kept by a
+later run without the flag. Truncations are 1-based throughout (T32, …, T256) as
+in the model code.
+Flags can be combined, e.g. `reactant-gpu 10 --reverse --hi-res`.
+
 The CPU label is auto-derived from `Sys.ARCH` (`cpu-arm` for aarch64/arm64,
 `cpu-x86` otherwise). GPU runs require a CUDA-capable device — `using CUDA`
 is loaded automatically. `amdgpu` runs require a ROCm-capable device —
@@ -51,10 +58,12 @@ Pkg.activate(".")
 # Arguments starting with `--` are flags, the others are positional: architecture, then multiplier
 const FLAGS = filter(startswith("--"), ARGS)
 const POSITIONAL_ARGS = filter(!startswith("--"), ARGS)
+const KNOWN_FLAGS = ("--reverse", "--hi-res")
 for flag in FLAGS
-    flag == "--reverse" || error("Unknown flag `$flag`. The only flag is --reverse.")
+    flag in KNOWN_FLAGS || error("Unknown flag `$flag`. Known flags: $(join(KNOWN_FLAGS, ", ")).")
 end
 const RUN_REVERSE = "--reverse" in FLAGS
+const RUN_HI_RES = "--hi-res" in FLAGS
 
 const ARCH_ARG = length(POSITIONAL_ARGS) >= 1 ? lowercase(POSITIONAL_ARGS[1]) : ""
 RUN_REVERSE && !(ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu") &&
@@ -100,7 +109,9 @@ function pick_architecture(arg::AbstractString)
 end
 
 const ARCH, ARCH_LABEL = pick_architecture(ARCH_ARG)
+const ON_GPU = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-gpu")
 @info "Running benchmarks for architecture: $ARCH_LABEL ($(typeof(ARCH)))"
+RUN_HI_RES && !ON_GPU && @warn "--hi-res only adds GPU configurations (T342, T512 are too slow on CPU), ignored on $ARCH_LABEL."
 
 # Optional second argument: a multiplier on the number of timesteps per timed run
 # of the main benchmark (:benchmark201) only. Lengthens its runs for more robust
@@ -109,6 +120,7 @@ const TIMESTEP_MULTIPLIER = length(POSITIONAL_ARGS) >= 2 ? parse(Float64, POSITI
 TIMESTEP_MULTIPLIER > 0 || error("timestep multiplier must be > 0, got $TIMESTEP_MULTIPLIER")
 @info "Timestep multiplier (benchmark201 only): $TIMESTEP_MULTIPLIER"
 @info "Reverse-mode benchmarks: $(RUN_REVERSE ? "on" : "off (stored results are kept), enable with --reverse")"
+@info "High resolutions T342, T512 in benchmark201 (GPU only): $(RUN_HI_RES && ON_GPU ? "on" : "off")"
 
 # Free (device) memory between benchmark runs, called outside the timed region
 free_memory!() = SpeedyWeather.SpeedyTransforms.clear_fourier_graph_cache!(ARCH)
@@ -304,7 +316,8 @@ function write_preamble(md)
     write(md, "An optional second argument, e.g. `manual_benchmarking.jl gpu 10`, multiplies the number of time steps of the ")
     write(md, "timed runs of the PrimitiveWet resolution sweep (the overview below) for more robust timings; the other suites are not affected. ")
     write(md, "The flag `--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-gpu --reverse`) additionally runs the ")
-    write(md, "reverse-mode benchmarks, which take hours; without it the reverse-mode results of an earlier run are kept.\n\n")
+    write(md, "reverse-mode benchmarks, which take hours; without it the reverse-mode results of an earlier run are kept. ")
+    write(md, "The flag `--hi-res` (GPU only) adds T342 and T512 to the PrimitiveWet resolution sweep.\n\n")
     write(md, "Each run updates only its own architecture's section in this `README.md`; results for other architectures are preserved via `benchmark_results.json`.\n\n")
     return
 end

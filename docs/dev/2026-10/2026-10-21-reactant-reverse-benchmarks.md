@@ -40,6 +40,20 @@ ahead as planned with budget 32. The benchmark environment's manifest was stale 
 ProgressMeter 1.11, below the compat bounds), so it was regenerated with Julia 1.12.7, giving
 Reactant 0.2.296. Enzyme was added to `benchmark/Project.toml`.
 
+> add a further --hi-res flag that adds T342 and T512 to the :benchmark201
+>
+> edit benchmark scripts to use a 1-based notation throughout so T256 instead of T255 as we do in the
+> model code
+>
+> Don't run CPU setups in the hi-res configurations
+
+Added the `--hi-res` flag (section 5). It applies on GPU architectures only and adds T342 and T512 at
+8, 16 and 24 layers. The benchmark scripts and this document now use 1-based truncations throughout:
+the earlier T31, T63, T127 and T255 are now T32, T64, T128 and T256. The only computed label that
+changed is the heading of the individual-dynamics-functions tables, which subtracted 1 from the
+truncation. Results already stored in `benchmark_results.json` and README.md keep the old heading
+until each architecture is rerun.
+
 ## Problem description
 
 This plan makes two changes to `SpeedyWeather/benchmark/manual_benchmarking.jl`:
@@ -112,10 +126,10 @@ model at L8 with the `SpectralTransform`.
 
 | Truncation | Forward time per step | 2000 steps forward |
 | --- | --- | --- |
-| T31 | 0.23 ms | 0.5 s |
-| T63 | 0.36 ms | 0.7 s |
-| T127 | 0.73 ms | 1.5 s |
-| T255 | 2.3 ms | 4.5 s |
+| T32 | 0.23 ms | 0.5 s |
+| T64 | 0.36 ms | 0.7 s |
+| T128 | 0.73 ms | 1.5 s |
+| T256 | 2.3 ms | 4.5 s |
 
 Compilation dominates the cost:
 - Each forward program takes 16–45 s to compile (README).
@@ -174,7 +188,7 @@ calls `free_memory!` between configurations. `define_benchmarks.jl` adds the sui
   `build_model(...; transform_kind = :default)`.
   - On Reactant, `build_model` passes the `SpectralTransform` explicitly.
   - Its Fourier stage is a truncated DFT.
-- Truncations: 32, 64, 128 and 256 (T31, T63, T127, T255).
+- Truncations: T32, T64, T128 and T256 (1-based, as in the model code).
 - Steps: 50, 100, 200 and 2000.
 - That gives 16 configurations.
 - On `reactant-cpu`, only truncations ≤ 128 run. This mirrors how benchmark201 caps the matrix
@@ -217,7 +231,7 @@ calls `free_memory!` between configurations. `define_benchmarks.jl` adds the sui
 - The scheme is stored per configuration, so it appears in the table and can later be varied per
   configuration.
 - Why not the alternatives:
-  - Storing every step (`false`) needs memory proportional to n. 2000 copies of the state at T255 do
+  - Storing every step (`false`) needs memory proportional to n. 2000 copies of the state at T256 do
     not fit.
   - `Periodic` does not compile (see Background).
 
@@ -276,13 +290,25 @@ The rules:
 - **Structured data.** `data` holds the numbers in structured form for later figures. Non-finite
   values are written as `null`, as in `overview`.
 
+### 5. The `--hi-res` flag (added on request, see the revision log)
+
+- `--hi-res` adds T342 and T512 at 8, 16 and 24 layers to `:benchmark201`, inserted into each layer
+  block of the sweep.
+- **GPU only.** On `gpu-nvidia`, `gpu-amd` and `reactant-gpu` (the new driver constant `ON_GPU`, which
+  also sets the matrix transform's cap) the six rows are added. On CPU architectures the flag is ignored
+  with a warning, since these resolutions are too slow there.
+- The matrix transform rows are unchanged, as their cap is below these truncations.
+- The new rows get 50 time steps (the floor of `n_timesteps`); the multiplier applies to them too.
+- **Not kept.** Unlike the reverse-mode results, these rows are part of benchmark201's table and
+  overview. A later run without `--hi-res` therefore drops them for that architecture.
+
 ### Files
 
 | File | Change |
 | --- | --- |
-| `benchmark/manual_benchmarking.jl` | Flag parsing; conditional `using Enzyme` and include; multiplier for benchmark201 only; carrying the reverse record over; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists `--reverse` and the multiplier |
-| `benchmark/define_benchmarks.jl` | `:benchmark800`, behind `RUN_REVERSE` |
-| `benchmark/benchmark_suite.jl` | The comment on `timestep_multiplier` only |
+| `benchmark/manual_benchmarking.jl` | Flag parsing (`--reverse`, `--hi-res`); `ON_GPU`; conditional `using Enzyme` and include; multiplier for benchmark201 only; carrying the reverse record over; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists the flags and the multiplier |
+| `benchmark/define_benchmarks.jl` | `:benchmark800`, behind `RUN_REVERSE`; T342 and T512 in `:benchmark201`, behind `RUN_HI_RES` on GPU; 1-based truncations in comments |
+| `benchmark/benchmark_suite.jl` | The comment on `timestep_multiplier`; 1-based truncation in the heading of the individual-dynamics-functions tables |
 | `benchmark/reverse_benchmark_suite.jl` | New file |
 | `benchmark/Project.toml` | Adds `Enzyme` |
 | `CHANGELOG.md` | One line under `## Unreleased` |
@@ -292,7 +318,7 @@ No package source changes, so no version bumps.
 ### Phase 0: spike before implementing
 
 A throwaway script in the session scratchpad runs on reactant-cpu locally, and on the H100 if it is
-available. It uses the PrimitiveWet model at T31L8 with the `SpectralTransform` and default physics. It
+available. It uses the PrimitiveWet model at T32L8 with the `SpectralTransform` and default physics. It
 answers three questions:
 
 1. **Does the gradient compile with default physics?**
@@ -305,8 +331,8 @@ answers three questions:
      b ∈ {8, 32}.
    - If the revolve schedule is unrolled, compile time would grow with n, and n = 2000 would be
      infeasible.
-3. **Does the budget fit in memory?** Check that `Binomial(32)` at 2000 steps fits: T127 on the CPU,
-   T255 on the H100.
+3. **Does the budget fit in memory?** Check that `Binomial(32)` at 2000 steps fits: T128 on the CPU,
+   T256 on the H100.
 
 The spike's outcome is the budget, recorded in the revision log. If compile time grows strongly with n,
 come back to the user before implementing.
@@ -316,7 +342,7 @@ come back to the user before implementing.
 The benchmark scripts have no unit tests, like the existing suites. To verify:
 
 1. **Local run.** Run `manual_benchmarking.jl reactant-cpu --reverse` locally.
-   - Temporarily restrict it to the reverse suite at T31 with n = 50 and 100.
+   - Temporarily restrict it to the reverse suite at T32 with n = 50 and 100.
    - Check that the table renders, the JSON has a `reverse` field and README.md has the section.
 2. **Carry-over.** After step 1, run again without `--reverse`, restricted to one quick suite.
    - The `reverse` field in the JSON is identical to before.
@@ -349,10 +375,10 @@ The benchmark scripts have no unit tests, like the existing suites. To verify:
 - **Many compilations.** n is baked into each compiled program, so the suite needs 16 forward and 16
   gradient compilations. Phase 0 measured about 35–40 s per gradient compilation once Julia is warm,
   independent of n, the budget and the resolution. Including the runs, the estimate is 1–1.5 h on the
-  H100 and about 1.5 h on reactant-cpu (12 configurations); on the CPU, T127 with 2000 steps alone takes
+  H100 and about 1.5 h on reactant-cpu (12 configurations); on the CPU, T128 with 2000 steps alone takes
   about 40 minutes.
 - **Different simulated periods.** The same step count covers different periods: 2000 steps are 55 days
-  at T31 (Δt = 2400 s) but 7 days at T255 (Δt = 300 s).
+  at T32 (Δt = 2400 s) but 7 days at T256 (Δt = 300 s).
 - **Gradient/Forward includes recomputation.** The ratio includes revolve's recomputation, so with
   budget 32 it jumps at n = 2000 (r = 3 instead of 2). It reports the cost of this checkpointing scheme,
   not of the adjoint alone.
@@ -380,7 +406,7 @@ The benchmark scripts have no unit tests, like the existing suites. To verify:
 
 Settled on 2026-10-21:
 
-1. **Resolutions:** T31, T63, T127 and T255 at L8, for now.
+1. **Resolutions:** T32, T64, T128 and T256 at L8, for now.
 2. **Checkpointing:** one `Binomial(budget)` for every configuration. Phase 0 sets the budget.
 3. **Opt-in mechanism:** the `--reverse` flag. A run without it never overwrites the reverse results
    (section 4).
@@ -398,14 +424,14 @@ first call excluded.
 
 | T | Run | Compile | Time | per step |
 | --- | --- | --- | --- | --- |
-| T31 | forward, n = 50 | 161 s (cold) | 0.18 s | 3.6 ms |
-| T31 | gradient, n = 50, Binomial(32) | 112 s (cold) | 1.39 s | 28 ms |
-| T31 | gradient, n = 2000, Binomial(32) | 38 s | 65 s | 33 ms |
-| T31 | gradient, n = 50, Binomial(8) | 35 s | 1.46 s | 29 ms |
-| T31 | gradient, n = 2000, Binomial(8) | 38 s | 80 s | 40 ms |
-| T31 | forward, n = 2000 | 7 s | 7.3 s | 3.6 ms |
-| T127 | forward, n = 50 | 157 s (cold) | 4.1 s | 83 ms |
-| T127 | gradient, n = 50, Binomial(32) | 106 s | 21 s | 420 ms |
+| T32 | forward, n = 50 | 161 s (cold) | 0.18 s | 3.6 ms |
+| T32 | gradient, n = 50, Binomial(32) | 112 s (cold) | 1.39 s | 28 ms |
+| T32 | gradient, n = 2000, Binomial(32) | 38 s | 65 s | 33 ms |
+| T32 | gradient, n = 50, Binomial(8) | 35 s | 1.46 s | 29 ms |
+| T32 | gradient, n = 2000, Binomial(8) | 38 s | 80 s | 40 ms |
+| T32 | forward, n = 2000 | 7 s | 7.3 s | 3.6 ms |
+| T128 | forward, n = 50 | 157 s (cold) | 4.1 s | 83 ms |
+| T128 | gradient, n = 50, Binomial(32) | 106 s | 21 s | 420 ms |
 
 The answers to the three questions:
 
@@ -416,14 +442,14 @@ The answers to the three questions:
    budget (8 or 32) and of the resolution: about 35–40 s once Julia is warm. "Cold" (the first program
    of its kind in a process) adds about 2 minutes of Julia compilation. The revolve schedule is not
    unrolled.
-3. **Memory fits.** With 32 checkpoints the process peak was 2.6 GiB at T31 and 3.1 GiB at T127,
-   against about 2 GiB without them. T255 on the H100 should need a few GiB for the checkpoints.
+3. **Memory fits.** With 32 checkpoints the process peak was 2.6 GiB at T32 and 3.1 GiB at T128,
+   against about 2 GiB without them. T256 on the H100 should need a few GiB for the checkpoints.
 
 Further findings:
 - **Budget 32 beats 8.** At 2000 steps the gradient takes 65 s with budget 32 against 80 s with
   budget 8 (19 % faster), as revolve predicts: 3 recomputation sweeps against 6. At 50 steps both take
   the same time. Budget 32 stays.
-- **Gradient/Forward.** At T31 the ratio is 7.6 for 50 steps and 9.0 for 2000; at T127 it is 5.1 for
+- **Gradient/Forward.** At T32 the ratio is 7.6 for 50 steps and 9.0 for 2000; at T128 it is 5.1 for
   50 steps.
 - **The first call of a compiled program is slow.** In the first program of its kind per process it
   took 14–25 s longer than later calls. Later programs had less of this extra cost or none (up to
@@ -432,7 +458,7 @@ Further findings:
   85 s. After `Reactant.synchronize` on the fused parent of the vorticity shadow, copying the gradient
   to the host takes under 1 ms. So the timed region covers the whole computation.
 - **Chaotic growth of the adjoint.** The maximum of the vorticity gradient grows from about 5e2 at
-  50 steps to about 8e7 at 2000 steps (55 days at T31), still finite in Float32. The two budgets give
+  50 steps to about 8e7 at 2000 steps (55 days at T32), still finite in Float32. The two budgets give
   the same gradient at 50 steps (to 4 digits) but differ by 9 % at 2000 steps. That fits rounding
   differences between the two programs' recomputations being amplified, the same chaotic amplification
   found before for the forward model. It doesn't affect the timings.
@@ -440,7 +466,7 @@ Further findings:
 ### Local verification of the implementation (2026-10-21, same machine)
 
 The checks ran against a scratchpad copy of `SpeedyWeather/benchmark` with a reduced
-`define_benchmarks.jl`: benchmark201 at T31L8 only, the reverse suite at T31 with n = 50 and 100. The
+`define_benchmarks.jl`: benchmark201 at T32L8 only, the reverse suite at T32 with n = 50 and 100. The
 repository's suite definitions and results were not touched.
 
 1. **Failure paths.** Each fails before any suite runs:
@@ -456,7 +482,7 @@ repository's suite definitions and results were not touched.
 3. **Carry-over.** `reactant-cpu` without `--reverse` updates the record's timestamp, while the
    `reverse` field is byte-identical to before. README.md still shows the section with its original date.
 4. **Multiplier.** `cpu 2` with a second `BenchmarkSuite` present: benchmark201 gets multiplier 2
-   (2400 instead of 1200 steps at T31L8), the other suite keeps 1.
+   (2400 instead of 1200 steps at T32L8), the other suite keeps 1.
 5. **Docs page.** A copy of `docs/generate_benchmarks_page.jl`, pointed at the test JSON, renders the
    reverse section; its heading carries the generator's ` — reactant-cpu` suffix.
 6. **Formatting.** `runic --check` is clean for all four benchmark files.
