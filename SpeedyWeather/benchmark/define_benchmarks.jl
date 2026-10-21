@@ -17,17 +17,20 @@ benchmarks[:benchmark200] = BenchmarkSuite(
 )
 
 ## Primitive WET MODELS RESOLUTION
-# Resolution sweep: L=8 from T31 → T255, plus L=16 and L=24 at the four highest
-# truncations. Each configuration is run with the default (FFT + Legendre)
+# Resolution sweep: L=8 from T32 → T256, plus L=16 and L=24 at the four highest
+# truncations. With `--hi-res` on GPU additionally T342 and T512 for all three layer
+# counts (not on CPU, too slow). Each configuration is run with the default (FFT + Legendre)
 # SpectralTransform and additionally with MatrixSpectralTransform up to an
 # architecture-dependent maximum truncation, as the dense matrix transform gets
 # too large (memory + speed) at high resolution: up to T171 on GPU (incl. Reactant GPU),
-# up to T86 on CPU (incl. Reactant CPU). `ARCH_LABEL` is set in manual_benchmarking.jl.
-let truncations = [32, 43, 64, 86, 128, 171, 256, 86, 128, 171, 256, 86, 128, 171, 256],
-        nlayers = [8, 8, 8, 8, 8, 8, 8, 16, 16, 16, 16, 24, 24, 24, 24]
+# up to T86 on CPU (incl. Reactant CPU). `ARCH_LABEL`, `ON_GPU` and `RUN_HI_RES` are set in manual_benchmarking.jl.
+let hi_res = RUN_HI_RES && ON_GPU ? [342, 512] : Int[],
+        truncations_L8 = vcat([32, 43, 64, 86, 128, 171, 256], hi_res),
+        truncations_L16_L24 = vcat([86, 128, 171, 256], hi_res),
+        truncations = vcat(truncations_L8, truncations_L16_L24, truncations_L16_L24),
+        nlayers = vcat(fill(8, length(truncations_L8)), fill(16, length(truncations_L16_L24)), fill(24, length(truncations_L16_L24)))
 
-    on_gpu = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-gpu")
-    max_truncation_matrix = on_gpu ? 180 : 86
+    max_truncation_matrix = ON_GPU ? 180 : 86
     matrix_idx = findall(t -> t <= max_truncation_matrix, truncations)
     truncations_matrix = truncations[matrix_idx]
     nlayers_matrix = nlayers[matrix_idx]
@@ -94,7 +97,7 @@ benchmarks[:benchmark700] = BenchmarkSuiteDynamics(
 
 ## REVERSE MODE (AD) WITH REACTANT, opt-in with `--reverse` (reverse_benchmark_suite.jl)
 # Forward and reverse-mode gradient over 50, 100, 200, 2000 time steps of the PrimitiveWet model, L8,
-# SpectralTransform. On Reactant CPU only up to T127, above the 2000-step gradient takes too long.
+# SpectralTransform. On Reactant CPU only up to T128, above the 2000-step gradient takes too long.
 if RUN_REVERSE
     let truncations = ARCH_LABEL == "reactant-gpu" ? [32, 64, 128, 256] : [32, 64, 128],
             nsteps = [50, 100, 200, 2000]

@@ -381,7 +381,7 @@ function write_results(md, suite::AbstractBenchmarkSuiteTimed)
 
         title_row = "$(suite.model[i_run]) "
         title_row *= "| $(suite.NF[i_run]) "
-        title_row *= "| T$(suite.truncation[i_run] - 1) "
+        title_row *= "| T$(suite.truncation[i_run]) "
         title_row *= "L$(suite.nlayers[i_run]) "
         title_row *= "| $(suite.Grid[i_run]) "
         title_row *= "| $(suite.nlat[i_run]) Rings"
