@@ -116,9 +116,8 @@ checkpointing_label(checkpointing) = string(checkpointing)
 # seconds with 3 significant digits, "—" if not available (e.g. a failed run)
 format_time(t) = isfinite(t) ? @sprintf("%.3g s", t) : "—"
 
-function write_results(md, suite::BenchmarkSuiteReverse; timestamp = "")
+function write_results(md, suite::BenchmarkSuiteReverse)
     write(md, "\n### $(suite.title)\n\n")
-    isempty(timestamp) || write(md, "Measured on $timestamp, possibly earlier than the other suites (run only with `--reverse`). ")
     write(md, "Wallclock time of the time steps forward and of the reverse-mode gradient with respect to the ")
     write(md, "initial state over the same time steps, minimum over up to $(suite.nsamples) runs, ")
     write(md, "compilation excluded. The loss is the squared norm of the vorticity after the time steps.\n\n")
@@ -143,11 +142,9 @@ function write_results(md, suite::BenchmarkSuiteReverse; timestamp = "")
     return
 end
 
-"""The `reverse` field of the arch record in the results store: the markdown section and the numbers."""
-function reverse_record(suite::BenchmarkSuiteReverse, timestamp)
-    io = IOBuffer()
-    write_results(io, suite; timestamp)
-    data = Dict(
+"""The numbers of the reverse-mode suite, the `reverse` field of the arch record in the results store."""
+function reverse_data(suite::BenchmarkSuiteReverse)
+    return Dict(
         "truncation" => collect(suite.truncation),
         "nlayers" => collect(suite.nlayers),
         "nlat" => collect(suite.nlat),
@@ -160,5 +157,4 @@ function reverse_record(suite::BenchmarkSuiteReverse, timestamp)
         "gradient_compile_time" => map(json_safe, suite.gradient_compile_time),
         "status" => collect(suite.status),
     )
-    return Dict("timestamp" => timestamp, "markdown" => String(take!(io)), "data" => data)
 end

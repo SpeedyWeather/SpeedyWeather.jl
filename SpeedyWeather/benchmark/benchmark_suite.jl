@@ -4,9 +4,29 @@ using SpeedyWeather: synchronize, ReactantDevice, MatrixSpectralTransform, Spect
 # The dense MatrixSpectralTransform is too large (memory and speed) above this truncation
 const MAX_MATRIX_TRUNCATION = 150
 
+const SPEEDY_CONFIGURATION = "Configuration `--SPEEDY`, closer to SPEEDY.f90: the primitive equation models use seasonal " *
+    "prescribed climatologies of sea surface temperature (`SeasonalOceanClimatology`), land surface temperature " *
+    "(`SeasonalLandTemperature`) and soil moisture (`SeasonalSoilMoisture`, wet model only) instead of the slab ocean " *
+    "and the land bucket model; sea ice stays thermodynamic, driven by the prescribed sea surface temperature."
+
+# Model components of the SPEEDY.f90-like configuration (`--SPEEDY`) by model type, see `SPEEDY_CONFIGURATION`
+speedy_components(_, _) = (;)      # Barotropic, ShallowWater unchanged
+speedy_components(::Type{<:PrimitiveDry}, spectral_grid) = (;
+    ocean = SeasonalOceanClimatology(spectral_grid),
+    land = DryLandModel(spectral_grid; temperature = SeasonalLandTemperature(spectral_grid)),
+)
+speedy_components(::Type{<:PrimitiveWet}, spectral_grid) = (;
+    ocean = SeasonalOceanClimatology(spectral_grid),
+    land = LandModel(
+        spectral_grid; temperature = SeasonalLandTemperature(spectral_grid), soil_moisture = SeasonalSoilMoisture(spectral_grid)
+    ),
+)
+
 # Build the model with the spectral transform of `transform_kind` for `arch`
 # (`:default` for FFT+Legendre, `:matrix` for MatrixSpectralTransform).
+# With `--SPEEDY` (`RUN_SPEEDY`, set by the driver) the SPEEDY.f90-like components, components in `kwargs` take precedence.
 function build_model(Model, spectral_grid, arch; transform_kind::Symbol = :default, kwargs...)
+    kwargs = RUN_SPEEDY ? merge(speedy_components(Model, spectral_grid), kwargs) : kwargs
     if arch isa ReactantDevice
         transform_kind in (:default, :matrix) || error("Unknown transform_kind = $transform_kind. Use :default or :matrix.")
         # `:default` explicitly the FFT-based SpectralTransform: the models' default on Reactant
