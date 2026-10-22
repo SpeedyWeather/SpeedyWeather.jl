@@ -9,11 +9,11 @@ using NCDatasets
     model = PrimitiveWetModel(spectral_grid; output)
     model.feedback.verbose = false
 
-    # the three surface roughness output writers under test
+    # the surface roughness and boundary layer drag output groups under test
     add!(
         model,
-        SpeedyWeather.SurfaceRoughnessOutput(),
-        SpeedyWeather.BoundaryLayerDragOutput(),
+        OutputVariables.SurfaceRoughness(),
+        OutputVariables.BoundaryLayerDrag(),
     )
 
     simulation = initialize!(model)

@@ -50,14 +50,14 @@ end
         end
 
         # add divergence output
-        div_output = SpeedyWeather.DivergenceOutput()
+        div_output = OutputVariables.Divergence()
         add!(output.variables, div_output)
         run!(simulation, output = true; period)
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
         @test haskey(ds, div_output.name)
 
         # add orography output
-        orog_output = SpeedyWeather.OrographyOutput()
+        orog_output = OutputVariables.Orography()
         add!(output.variables, orog_output)
         run!(simulation, output = true; period)
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -134,18 +134,18 @@ end
     # Add surface variables output for testing them
     add!(
         model,
-        SpeedyWeather.ZonalVelocity10mOutput(),
-        SpeedyWeather.MeridionalVelocity10mOutput(),
-        SpeedyWeather.SurfaceTemperatureOutput(),
-        #         SpeedyWeather.MeanSeaLevelPressureOutput(),   # this should be default now
-        #         SpeedyWeather.SurfacePressureOutput(),        # don't output surface pressure too
+        OutputVariables.ZonalVelocity10m(),
+        OutputVariables.MeridionalVelocity10m(),
+        OutputVariables.SurfaceTemperature(),
+        #         OutputVariables.MeanSeaLevelPressure(),   # this should be default now
+        #         OutputVariables.SurfacePressure(),        # don't output surface pressure too
     )
 
     # add tuples of output variables through various interfaces to model/output w/out splatting ...
-    add!(model, SpeedyWeather.PrecipitationOutput())
-    add!(model, SpeedyWeather.PrecipitationOutput()...)
-    add!(model.output, SpeedyWeather.PrecipitationOutput())
-    add!(model.output, SpeedyWeather.PrecipitationOutput()...)
+    add!(model, OutputVariables.Precipitation())
+    add!(model, OutputVariables.Precipitation()...)
+    add!(model.output, OutputVariables.Precipitation())
+    add!(model.output, OutputVariables.Precipitation()...)
 
     simulation = initialize!(model)
     run!(simulation, output = true; period)
@@ -380,6 +380,6 @@ end
 
     # the interpolator is built from the model grid, on the model's architecture
     @test SpeedyWeather.ismatching(spectral_grid.architecture, output.interpolator.locator.ij_as)
-    @test SpeedyWeather.scratch_fields(output, SpeedyWeather.TemperatureOutput()) === (output.field3D, output.host3D)
-    @test SpeedyWeather.scratch_fields(output, SpeedyWeather.SurfacePressureOutput()) === (output.field2D, output.host2D)
+    @test SpeedyWeather.scratch_fields(output, OutputVariables.Temperature()) === (output.field3D, output.host3D)
+    @test SpeedyWeather.scratch_fields(output, OutputVariables.SurfacePressure()) === (output.field2D, output.host2D)
 end

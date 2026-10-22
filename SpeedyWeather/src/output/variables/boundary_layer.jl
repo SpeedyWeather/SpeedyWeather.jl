@@ -1,6 +1,6 @@
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ZonalVelocity10mOutput <: AbstractOutputVariable
+@kwdef mutable struct ZonalVelocity10m <: AbstractOutputVariable
     name::String = "u10"
     unit::String = "m/s"
     long_name::String = "10m zonal wind speed"
@@ -11,11 +11,11 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 12
 end
 
-path(::ZonalVelocity10mOutput, simulation) = simulation.variables.grid.u
+path(::ZonalVelocity10m, simulation) = simulation.variables.grid.u
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MeridionalVelocity10mOutput <: AbstractOutputVariable
+@kwdef mutable struct MeridionalVelocity10m <: AbstractOutputVariable
     name::String = "v10"
     unit::String = "m/s"
     long_name::String = "10m meridional wind speed"
@@ -26,7 +26,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 12
 end
 
-path(::MeridionalVelocity10mOutput, simulation) = simulation.variables.grid.v
+path(::MeridionalVelocity10m, simulation) = simulation.variables.grid.v
 
 """$(TYPEDSIGNATURES)
 10m wind is defined using a logarithmic profile from the lowermost model layer.
@@ -39,7 +39,7 @@ path(::MeridionalVelocity10mOutput, simulation) = simulation.variables.grid.v
 """
 function output!(
         output::AbstractOutput,
-        variable::Union{ZonalVelocity10mOutput, MeridionalVelocity10mOutput},
+        variable::Union{ZonalVelocity10m, MeridionalVelocity10m},
         simulation::AbstractSimulation,
     )
     # escape immediately after first call if variable doesn't have a time dimension
@@ -81,9 +81,9 @@ function output!(
     return nothing
 end
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct SurfaceTemperatureOutput{F} <: AbstractOutputVariable
+@kwdef mutable struct SurfaceTemperature{F} <: AbstractOutputVariable
     name::String = "tsurf"
     unit::String = "degC"
     long_name::String = "Surface air temperature"
@@ -96,11 +96,11 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # not the actual surface temperature but the core variable to read in
-path(::SurfaceTemperatureOutput, simulation) = simulation.variables.grid.temperature
+path(::SurfaceTemperature, simulation) = simulation.variables.grid.temperature
 
 function output!(
         output::AbstractOutput,
-        variable::SurfaceTemperatureOutput,
+        variable::SurfaceTemperature,
         simulation::AbstractSimulation,
     )
     # escape immediately after first call if variable doesn't have a time dimension
@@ -134,9 +134,9 @@ function output!(
 end
 
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MomentumBoundaryLayerDragOutput <: AbstractOutputVariable
+@kwdef mutable struct MomentumBoundaryLayerDrag <: AbstractOutputVariable
     name::String = "bld_m"
     unit::String = "1"
     long_name::String = "Momentum flux related boundary layer drag coefficient"
@@ -147,12 +147,12 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::MomentumBoundaryLayerDragOutput, simulation) =
+path(::MomentumBoundaryLayerDrag, simulation) =
     simulation.variables.parameterizations.boundary_layer_drag_momentum
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct HeatBoundaryLayerDragOutput <: AbstractOutputVariable
+@kwdef mutable struct HeatBoundaryLayerDrag <: AbstractOutputVariable
     name::String = "bld_h"
     unit::String = "1"
     long_name::String = "Heat flux related boundary layer drag coefficient"
@@ -163,12 +163,12 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::HeatBoundaryLayerDragOutput, simulation) =
+path(::HeatBoundaryLayerDrag, simulation) =
     simulation.variables.parameterizations.boundary_layer_drag_heat
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct HumidityBoundaryLayerDragOutput <: AbstractOutputVariable
+@kwdef mutable struct HumidityBoundaryLayerDrag <: AbstractOutputVariable
     name::String = "bld_q"
     unit::String = "1"
     long_name::String = "Moisture flux related boundary layer drag coefficient"
@@ -179,12 +179,12 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::HumidityBoundaryLayerDragOutput, simulation) =
+path(::HumidityBoundaryLayerDrag, simulation) =
     simulation.variables.parameterizations.boundary_layer_drag_humidity
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MomentumSurfaceRoughnessOutput <: AbstractOutputVariable
+@kwdef mutable struct MomentumSurfaceRoughness <: AbstractOutputVariable
     name::String = "sr_m"
     unit::String = "m"
     long_name::String = "Momentum surface roughness length"
@@ -195,10 +195,10 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::MomentumSurfaceRoughnessOutput, simulation) =
+path(::MomentumSurfaceRoughness, simulation) =
     simulation.variables.parameterizations.momentum_roughness
 
-@kwdef mutable struct HeatSurfaceRoughnessOutput <: AbstractOutputVariable
+@kwdef mutable struct HeatSurfaceRoughness <: AbstractOutputVariable
     name::String = "sr_h"
     unit::String = "m"
     long_name::String = "Heat surface roughness length"
@@ -209,26 +209,26 @@ path(::MomentumSurfaceRoughnessOutput, simulation) =
     keepbits::Int = 7
 end
 
-path(::HeatSurfaceRoughnessOutput, simulation) =
+path(::HeatSurfaceRoughness, simulation) =
     simulation.variables.parameterizations.heat_roughness
 
 # collect in groups for convenience
-SurfaceRoughnessOutput() = (
-    MomentumSurfaceRoughnessOutput(),
-    HeatSurfaceRoughnessOutput(),
+SurfaceRoughness() = (
+    MomentumSurfaceRoughness(),
+    HeatSurfaceRoughness(),
 )
 
-BoundaryLayerDragOutput() = (
-    MomentumBoundaryLayerDragOutput(),
-    HeatBoundaryLayerDragOutput(),
-    HumidityBoundaryLayerDragOutput(),
+BoundaryLayerDrag() = (
+    MomentumBoundaryLayerDrag(),
+    HeatBoundaryLayerDrag(),
+    HumidityBoundaryLayerDrag(),
 )
 
 # collect all in one for convenience
-BoundaryLayerOutput() = (
-    ZonalVelocity10mOutput(),
-    MeridionalVelocity10mOutput(),
-    SurfaceTemperatureOutput(),
-    BoundaryLayerDragOutput()...,
-    SurfaceRoughnessOutput()...,
+BoundaryLayer() = (
+    ZonalVelocity10m(),
+    MeridionalVelocity10m(),
+    SurfaceTemperature(),
+    BoundaryLayerDrag()...,
+    SurfaceRoughness()...,
 )
