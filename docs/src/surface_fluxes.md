@@ -174,18 +174,19 @@ state at the beginning of the time step and then used to step forward. For the s
 alone this is a forward Euler step
 
 ```math
-x^{new} = x + \Delta t \frac{\partial x}{\partial t} = x + \Delta t \frac{g F^\uparrow}{\Delta p_N},
-\qquad F^\uparrow = -a (x - x_s)
+x^{n+1} = x^n + \Delta t \frac{\partial x}{\partial t} = x^n + \Delta t \frac{g F^\uparrow}{\Delta p_N},
+\qquad F^\uparrow = -a (x^n - x_s)
 ```
 
-with ``x = x(t)``. Using ``\Delta t\, g a / \Delta p_N = \Delta t / \tau = z`` this can be written as a
+with ``x^n = x(t)`` the value at the beginning of the time step and ``x^{n+1}`` the numerical
+approximation of the exact ``x(t + \Delta t)``. Using ``\Delta t\, g a / \Delta p_N = \Delta t / \tau = z`` this can be written as a
 change in the deviation from the surface value
 
 ```math
-x^{new} - x_s = (x - x_s) - z (x - x_s) = (1 - z)(x - x_s)
+x^{n+1} - x_s = (x^n - x_s) - z (x^n - x_s) = (1 - z)(x^n - x_s)
 ```
 
-So within one time step the explicit step multiplies the deviation ``x - x_s`` by ``1 - z``,
+So within one time step the explicit step multiplies the deviation ``x^n - x_s`` by ``1 - z``,
 whereas the exact solution multiplies it by ``e^{-z}``. The two agree for small ``z``,
 as ``e^{-z} = 1 - z + z^2/2 - \dots``, but they differ more and more for larger ``z``:
 for ``z > 1`` the factor ``1 - z`` is negative, so ``x`` overshoots past ``x_s``
@@ -198,23 +199,23 @@ over one time step from both
 
 ```math
 \begin{aligned}
-\text{explicit:} \quad x^{new} - x &= -z\, (x - x_s) \\
-\text{exact:} \quad x(t + \Delta t) - x &= -(1 - e^{-z})(x - x_s)
+\text{explicit:} \quad x^{n+1} - x^n &= -z\, (x^n - x_s) \\
+\text{exact:} \quad x(t + \Delta t) - x(t) &= -(1 - e^{-z})(x(t) - x_s)
 \end{aligned}
 ```
 
-Both changes are proportional to the same deviation ``x - x_s``, they only differ by the factor
+With ``x^n = x(t)`` both changes are proportional to the same deviation ``x^n - x_s``, they only differ by the factor
 
 ```math
 \varphi(z) = \frac{1 - e^{-z}}{z}
 ```
 
 which only depends on ``z``. So if we replace the flux ``F^\uparrow`` by ``\varphi(z) F^\uparrow``
-the explicit step yields the exact solution, without changing the time stepping itself:
+the explicit step yields the exact solution, ``x^{n+1} = x(t + \Delta t)``, without changing the time stepping itself:
 
 ```math
-x^{new} = x + \Delta t \frac{g\, \varphi(z) F^\uparrow}{\Delta p_N}
-\quad \Rightarrow \quad x^{new} - x_s = (1 - z \varphi(z))(x - x_s) = e^{-z}(x - x_s)
+x^{n+1} = x^n + \Delta t \frac{g\, \varphi(z) F^\uparrow}{\Delta p_N}
+\quad \Rightarrow \quad x^{n+1} - x_s = (1 - z \varphi(z))(x^n - x_s) = e^{-z}(x^n - x_s)
 ```
 
 There is also a physical interpretation of ``\varphi(z) F^\uparrow``: as ``x`` relaxes towards ``x_s``
@@ -250,7 +251,7 @@ correspond to such approximations of the exact ``\varphi``:
   ``1 - z`` replaces ``e^{-z}``, which overshoots the surface value for ``z > 1``
   and is unstable (``|1 - z| > 1``) for ``z > 2``.
 - **Implicit** (backward Euler) evaluates the flux with ``x`` at the end of the time step,
-  ``x^{new} - x_s = (x - x_s) - z (x^{new} - x_s)``, so that ``\varphi = 1/(1 + z)``.
+  ``x^{n+1} - x_s = (x^n - x_s) - z (x^{n+1} - x_s)``, so that ``\varphi = 1/(1 + z)``.
   This is unconditionally stable and monotone, and has the correct ``1/z`` behaviour for large ``z``,
   but is only first-order accurate, ``\varphi \approx 1 - z``, so it overdamps for small ``z``.
 - **Rational**, ``\varphi = (6 + z)/(6 + 4z + z^2)``, matches the expansion of the exact
