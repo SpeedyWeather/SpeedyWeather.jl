@@ -57,7 +57,8 @@ itself); CUDA.jl is loaded there too, without a GPU, as Reactant's kernel raisin
 needs it. On TPU, XLA's default precision for Float32 matrix multiplies (the
 Fourier and Legendre transforms on Reactant) is a single bfloat16 pass, and TPUs
 have no native Float64, so expect the Float64 configuration to fail there
-(recorded as failed, the other configurations continue).
+(recorded as failed, the other configurations continue). The matrix transform
+only goes up to T128 on TPU, as T171 needs more memory than some TPU chips have.
 
 Per-architecture results are persisted to `assets/benchmark_results.json`.
 The `README.md` (kept at the benchmark root) is then regenerated from all
@@ -132,7 +133,7 @@ function pick_architecture(arg::AbstractString)
 end
 
 const ARCH, ARCH_LABEL = pick_architecture(ARCH_ARG)
-# GPU or TPU: higher resolutions (`--hi-res`, reverse mode), larger matrix transforms than on CPU
+# GPU or TPU: higher resolutions (`--hi-res`, reverse mode), larger matrix transforms than on CPU (T128 on TPU)
 const ON_ACCELERATOR = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-gpu", "reactant-tpu")
 # the results of the SPEEDY.f90-like configuration (`--SPEEDY`) are stored separately from the default configuration
 const RESULTS_LABEL = RUN_SPEEDY ? "$ARCH_LABEL-speedy" : ARCH_LABEL
