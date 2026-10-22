@@ -1,8 +1,9 @@
 # Reactant reverse-mode (AD) benchmarks, and a timestep multiplier for benchmark201 only
 
 > Status: **in progress**. Implemented and verified locally (Phase 0 confirmed budget 32 and the
-> default physics); `--hi-res` and `--SPEEDY` added on request, `--SPEEDY` not with Reactant yet.
-> Outstanding: the full runs on the H100 and the PR number in the CHANGELOG line.
+> default physics); `--hi-res`, `--SPEEDY` and `reactant-tpu` added on request, `--SPEEDY` not with
+> Reactant yet, `reactant-tpu` untested. Outstanding: the full runs on the H100 and a TPU, and the PR
+> number in the CHANGELOG line.
 
 Date of initial draft: 2026-10-21
 
@@ -66,6 +67,12 @@ before this PR, and the reverse suite is a section like any other. The check at 
 results store is readable stays. Added the `--SPEEDY` flag (section 6) with prescribed seasonal
 climatologies of sea surface temperature, land surface temperature and soil moisture; section 6 also
 reviews the other options.
+
+> add a reactant-tpu option to run the benchmark on a tpu with reactant
+
+Added the architecture `reactant-tpu` (section 7, 2026-10-22). It is treated like a GPU for the
+resolution choices, and its machine info lists the TPU devices. It is untested on a TPU: none is
+available here.
 
 ## Problem description
 
@@ -364,12 +371,46 @@ Grids suite (`:benchmark400`).
 Both are changes to `SpeedyWeather/src/parameterizations` and need tests in `test/reactant`. They are
 left for a decision.
 
+### 7. The `reactant-tpu` architecture (added on request, see the revision log)
+
+- **Usage.** `manual_benchmarking.jl reactant-tpu` runs on a TPU host, e.g. a Cloud TPU VM; Reactant
+  downloads libtpu itself. It loads CUDA.jl and Reactant and calls
+  `Reactant.set_default_backend("tpu")`. CUDA.jl loads without a GPU; Reactant's kernel raising needs
+  it, and on TPU Reactant raises every kernel, as SpeedyWeather's compile options already do
+  everywhere.
+- **Like a GPU.** The new driver constant `ON_ACCELERATOR` replaces `ON_GPU` and covers
+  `gpu-nvidia`, `gpu-amd`, `reactant-gpu` and `reactant-tpu`. On a TPU:
+  - `--hi-res` adds T342 and T512;
+  - the matrix transform goes up to T171;
+  - the reverse suite goes up to T256.
+- **Like the other Reactant architectures.** `--reverse` works; `--SPEEDY` is refused at startup.
+- **Driver cleanup.** A single `ON_REACTANT` constant now replaces the repeated
+  `reactant-cpu || reactant-gpu` checks.
+- **Machine info.** The README section lists the number and kind of Reactant devices
+  (`Reactant.devices()`, `Reactant.XLA.device_kind`), for every Reactant architecture. The benchmarks
+  use one device.
+- **Ordering.** `reactant-tpu` comes after `reactant-gpu` in README.md and on the docs page
+  (`ARCH_ORDER` in both scripts).
+
+What to expect on a TPU (not testable here):
+- **Matrix multiply precision.** XLA's default precision for Float32 matrix multiplies on TPU is a
+  single bfloat16 pass. On Reactant the Fourier transform (truncated DFT) and the Legendre transform
+  are matrix multiplies, so the transforms run at reduced precision unless set otherwise. The
+  benchmark uses the backend's default, as on the GPUs (TF32 on the H100), and doesn't set a precision.
+  Reactant can raise it per compilation with `Reactant.with_config(; dot_general_precision =
+  PrecisionConfig.HIGHEST)`.
+- **Float64.** TPUs have no native Float64, so the Float64 configuration of `:benchmark300` will
+  probably fail. Failures are recorded per configuration and the other configurations continue.
+- **Memory.** The matrix transform at T171 needs about 17 GB (H100 numbers), more than the HBM of
+  some TPU chips (e.g. 16 GB on v5e). It would then fail and be recorded the same way.
+
 ### Files
 
 | File | Change |
 | --- | --- |
-| `benchmark/manual_benchmarking.jl` | Flag parsing (`--reverse`, `--hi-res`, `--SPEEDY`, case-insensitive); `ON_GPU`; `RESULTS_LABEL` and `meta.configuration` for `--SPEEDY`; conditional `using Enzyme` and include; multiplier for benchmark201 only; the `reverse` numbers in the record; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists the flags and the multiplier |
-| `benchmark/define_benchmarks.jl` | `:benchmark800`, behind `RUN_REVERSE`; T342 and T512 in `:benchmark201`, behind `RUN_HI_RES` on GPU; 1-based truncations in comments |
+| `benchmark/manual_benchmarking.jl` | Architecture `reactant-tpu`, `ON_REACTANT`, `ON_ACCELERATOR`, Reactant devices in the machine info; flag parsing (`--reverse`, `--hi-res`, `--SPEEDY`, case-insensitive); `RESULTS_LABEL` and `meta.configuration` for `--SPEEDY`; conditional `using Enzyme` and include; multiplier for benchmark201 only; the `reverse` numbers in the record; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists the flags and the multiplier |
+| `benchmark/define_benchmarks.jl` | `:benchmark800`, behind `RUN_REVERSE`; T342 and T512 in `:benchmark201`, behind `RUN_HI_RES` on GPU and TPU (`ON_ACCELERATOR`); 1-based truncations in comments |
+| `docs/generate_benchmarks_page.jl` | `reactant-tpu` in `ARCH_ORDER` |
 | `benchmark/benchmark_suite.jl` | `speedy_components`, `SPEEDY_CONFIGURATION` and their use in `build_model`; the comment on `timestep_multiplier`; 1-based truncation in the heading of the individual-dynamics-functions tables |
 | `benchmark/reverse_benchmark_suite.jl` | New file |
 | `benchmark/Project.toml` | Adds `Enzyme` |
