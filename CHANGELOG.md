@@ -9,7 +9,6 @@
 - Primitive equation models transform U, V and the surface pressure gradient ∇ln(pₛ) to grid space in one batched transform, 2 instead of 3 spectral→grid transforms per time step [#1313](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1313)
 - Update Zarr requirement from 0.9, 0.10 to 0.9, 0.10, 0.11 [#1309](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1309)
 - Update GPUArrays requirement from 11 to 11, 12.1 [#1308](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1308)
-- Restrict Makie compat to 0.24.15 due to bug in GeoMakie and Makie [#1311](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1311)
 - Update SpeedyWeatherAssets default version to v1.1 [#1303](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1303)
 - RingGrids: single-layer (2D) interpolation uses the batched kernel with the locator's preallocated pole-average buffers, no allocation or device synchronization per call [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
 - Output writers interpolate and post-process on the model's architecture (e.g. GPU), copying only the interpolated output-grid fields to the CPU [#1301](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1301)
