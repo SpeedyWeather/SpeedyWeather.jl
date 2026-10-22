@@ -118,16 +118,7 @@ function timestep!(
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
-    (; time) = vars.prognostic.clock
-
-    this_month = Dates.month(time)
-    next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
-
-    # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
-    NF = eltype(vars.prognostic.land.soil_moisture)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
-
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time)
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = vars.prognostic.land
 
