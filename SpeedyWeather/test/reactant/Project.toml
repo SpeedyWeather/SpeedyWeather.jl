@@ -10,3 +10,7 @@ Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [sources]
 SpeedyWeather = {path = "../.."}
+
+[compat]
+# 0.2.298 segfaults compiling a broadcast into a view (Enzyme-JAX ScatterOpCanon), 0.2.296 works
+Reactant = "0.2.294 - 0.2.296"
