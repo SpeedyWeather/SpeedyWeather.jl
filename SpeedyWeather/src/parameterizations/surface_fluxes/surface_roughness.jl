@@ -233,13 +233,13 @@ Fields are $(TYPEDFIELDS)
     @param m_c9::NF = 0.60989547
 
     "[OPTION] Coefficients for heat roughness closure over land"
-    @param h_c1::NF = 373.86444
+    @param h_c1::NF = 373.86444 (bounds = Nonnegative,)
     @param h_c2::NF = 5.981257
     @param h_c3::NF = 3.5229454
     @param h_c4::NF = 7.781359
     @param h_c5::NF = 2.1035099
     @param h_c6::NF = -0.41931123
-    @param h_c7::NF = 0.00037635124
+    @param h_c7::NF = 0.00037635124 (bounds = Nonnegative,)
     @param h_c8::NF = -5.4191554
 end
 
@@ -343,13 +343,10 @@ end
     T = soil_temperature_bottom
     W = soil_moisture_bottom
 
-    # Ensure positive bases for fractional powers
-    ε = eps(NF)
-
     # Gamma
-    base1 = max(scheme.h_c1, ε)
-    base2 = max(L_L + T, ε)
-    base3 = max(scheme.h_c7, ε)
+    base1 = scheme.h_c1                 # should always be >=0, restricted by @param bounds
+    base2 = max(L_L + T, zero(NF))      # ensure positive base for fractional powers
+    base3 = scheme.h_c7                 # should always be >=0, restricted by @param bounds
 
     gamma_term1_num = base1^scheme.h_c2 * min(C_H, L_H)
     # The power can underflow even when its base is positive.
