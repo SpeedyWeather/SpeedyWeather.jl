@@ -251,9 +251,9 @@ end
 
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
-    spectral_grid = SpectralGrid()
-    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "dense-output-test", interval = Hour(0))
-    model = PrimitiveDryModel(spectral_grid; output)
+    spectral_grid = SpectralGrid(nlayers=1)
+    output = NetCDFOutput(spectral_grid, path = tmp_output_path, id = "dense-output-test", interval = Hour(0))
+    model = BarotropicModel(spectral_grid; output)
     model.feedback.verbose = false
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
@@ -264,9 +264,9 @@ end
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_time_steps)
 
     # do a simulation with the adjust_Δt_with_output turned on
-    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "adjust_dt_with_output-test", interval = Minute(70))
+    output = NetCDFOutput(spectral_grid, path = tmp_output_path, id = "adjust_dt_with_output-test", interval = Minute(70))
     time_stepping = Leapfrog(spectral_grid, adjust_with_output = true)
-    model = PrimitiveDryModel(spectral_grid; output, time_stepping)
+    model = BarotropicModel(spectral_grid; output, time_stepping)
     model.feedback.verbose = false
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
@@ -278,10 +278,9 @@ end
     # for future tests: This simulation blows up because of too large time steps but only a warning is thrown
     # at the moment, no error
     # 1kyrs simulation
-    spectral_grid = SpectralGrid()
     time_stepping = Leapfrog(spectral_grid, Δt_at_T32 = Day(3650))
-    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "long-output-test", interval = Day(3650))
-    model = PrimitiveDryModel(spectral_grid; output, time_stepping)
+    output = NetCDFOutput(spectral_grid, path = tmp_output_path, id = "long-output-test", interval = Day(3650))
+    model = BarotropicModel(spectral_grid; output, time_stepping)
     model.feedback.verbose = false
     simulation = initialize!(model)
     run!(simulation, output = true, period = Day(365000))

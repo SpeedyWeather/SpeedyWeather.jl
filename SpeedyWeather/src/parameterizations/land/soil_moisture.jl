@@ -228,8 +228,9 @@ function timestep!(
         soil::LandBucketMoisture,
         model::PrimitiveEquation,
     )
-    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), soil)
-    soil_moisture_tendency = get_tendency_step(vars.tendencies.land.soil_moisture, time_stepper(model.time_stepping, :land), soil)
+    ts = time_stepper(model.time_stepping, :land)
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, ts, soil)
+    soil_moisture_tendency = get_tendency_step(vars.tendencies.land.soil_moisture, ts, soil)
 
     ρ = model.atmosphere.water_density
     (; land_fraction) = model.land_sea_mask
