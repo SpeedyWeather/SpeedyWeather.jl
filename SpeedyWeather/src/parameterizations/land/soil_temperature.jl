@@ -106,9 +106,9 @@ function timestep!(
         land::SeasonalLandTemperature,
         model,
     )
-    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time)
     (; monthly_temperature) = land
     (; soil_temperature) = vars.prognostic.land
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time, eltype(soil_temperature))
 
     launch!(
         architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
