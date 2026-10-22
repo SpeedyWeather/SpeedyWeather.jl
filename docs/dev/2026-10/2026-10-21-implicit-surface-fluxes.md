@@ -25,6 +25,9 @@ Base revision: d6e3286d
   expanded: conductance `a = ρCV₀` is a mass exchange rate [kg/m²/s] for all fluxes; written as
   `F = -c a (x - xₛ)` with `c = cₚ` for heat, so `a = -∂F/∂x` only for momentum and humidity, and `c`
   cancels in the relaxation time scale `τ = Δp/(g a)`. Added derivations and `1 - zφ(z)` for each scheme.
+- 2026-10-22: docs restructured following review: fluxes written as `F = -a (x - xₛ)` with a separate
+  subsection on why cₚ cancels for heat; flux damping motivated from the exact exponential solution
+  (exponential time differencing) with explicit, implicit and rational schemes as approximations of φ.
 
 ## Problem description
 
