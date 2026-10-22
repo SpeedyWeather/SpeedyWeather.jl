@@ -1,8 +1,7 @@
 abstract type AbstractGeometry <: AbstractModelComponent end
 export Geometry
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Construct Geometry struct containing parameters and arrays describing an iso-latitude grid `<:AbstractGrid`
 and the vertical levels. Pass on `SpectralGrid` to calculate the following fields
 $(TYPEDFIELDS)
@@ -97,8 +96,7 @@ end
 
 Adapt.@adapt_structure Geometry
 
-"""
-$(TypedMethodSignatures(defaults = true))
+"""$(TypedMethodSignatures(defaults = true))
 Generator function for `Geometry` struct based on `spectral_grid`."""
 function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG))
 

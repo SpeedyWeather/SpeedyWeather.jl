@@ -27,10 +27,11 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 # < 0.15.16 (pins Makie 0.24.16): GeoMakie 0.7.17 extends Makie.timed_ticklabelspace_reset,
 # which Makie 0.24.16 removed, https://github.com/MakieOrg/GeoMakie.jl/issues/398
 CairoMakie = "0.12 - 0.15.15"
+Documenter = "1.11"
 # < 1.5: DocumenterVitepress can't render the CitationSiteNode introduced in 1.5,
 # https://github.com/LuxDL/DocumenterVitepress.jl/issues/391
 DocumenterCitations = "1 - 1.4"
 DocumenterVitepress = "0.3"
-GeoMakie = "0.7.6"
+GeoMakie = "0.7.18"
 NCDatasets = "0.12, 0.13, 0.14"
 UnicodePlots = "3"

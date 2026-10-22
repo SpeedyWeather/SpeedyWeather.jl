@@ -59,7 +59,7 @@ nothing #hide
 
 Custom output variables work exactly as with `NetCDFOutput`
 (see [Output variables](@ref) and [Customizing netCDF output](@ref)): subtype
-`AbstractOutputVariable`, implement `path(::MyOutputVariable, simulation)` to
+`AbstractOutputVariable`, implement `OutputVariables.path(::MyOutputVariable, simulation)` to
 return the `AbstractField` to write, and `add!(output, MyOutputVariable())` it to the
 `ZarrOutput`. 
 
