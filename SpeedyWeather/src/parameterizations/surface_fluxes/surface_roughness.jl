@@ -228,7 +228,7 @@ Fields are $(TYPEDFIELDS)
     @param m_c4::NF = -5.916258
     @param m_c5::NF = 2.2420337
     @param m_c6::NF = 0.00613743
-    @param m_c7::NF = 0.51263654
+    @param m_c7::NF = 0.51263654 (bounds = Nonnegative,)
     @param m_c8::NF = 2.6413066
     @param m_c9::NF = 0.60989547
 
@@ -464,7 +464,7 @@ Fields are $(TYPEDFIELDS)
 
     "[OPTION] coefficient for heat roughness closure over ocean"
     @param h_c1::NF = -8.207549
-    @param h_c2::NF = 0.18300448
+    @param h_c2::NF = 0.18300448 (bounds = Nonnegative,)
     @param h_c3::NF = 0.08970642
     @param h_c4::NF = -1.6667988
 end
@@ -583,7 +583,7 @@ Fields are $(TYPEDFIELDS)
     @param c5::NF = 0.0129
 
     "[OPTION] minimum Charnock parameter value"
-    @param charnock_min::NF = 1.0e-5
+    @param charnock_min::NF = 1.0e-5 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure Charnock
