@@ -168,20 +168,73 @@ has the exact solution of an exponential decay towards the surface value
 x(t + \Delta t) - x_s = e^{-z} (x(t) - x_s), \qquad z = \frac{\Delta t}{\tau}
 ```
 
-We can write this exact change as an explicit step with a modified flux. With
-``F^\uparrow`` the flux evaluated with ``x(t)`` at the beginning of the time step, the
-explicit step changes ``x`` by ``-z (x - x_s)``, while the exact solution changes it by
-``-(1 - e^{-z}) (x - x_s)``. Hence the exact solution is obtained by multiplying the
-explicit flux with a damping factor ``\varphi(z)``
+How does this compare to what the model actually does? The time stepping in SpeedyWeather
+is explicit: all tendencies, including those from the surface fluxes, are calculated from the
+state at the beginning of the time step and then used to step forward. For the surface flux
+alone this is a forward Euler step
 
 ```math
-F^\uparrow \to \varphi(z) F^\uparrow, \qquad x^{new} - x_s = (1 - z \varphi(z))(x - x_s), \qquad
+x^{new} = x + \Delta t \frac{\partial x}{\partial t} = x + \Delta t \frac{g F^\uparrow}{\Delta p_N},
+\qquad F^\uparrow = -a (x - x_s)
+```
+
+with ``x = x(t)``. Using ``\Delta t\, g a / \Delta p_N = \Delta t / \tau = z`` this can be written as a
+change in the deviation from the surface value
+
+```math
+x^{new} - x_s = (x - x_s) - z (x - x_s) = (1 - z)(x - x_s)
+```
+
+So within one time step the explicit step multiplies the deviation ``x - x_s`` by ``1 - z``,
+whereas the exact solution multiplies it by ``e^{-z}``. The two agree for small ``z``,
+as ``e^{-z} = 1 - z + z^2/2 - \dots``, but they differ more and more for larger ``z``:
+for ``z > 1`` the factor ``1 - z`` is negative, so ``x`` overshoots past ``x_s``
+(e.g. the wind reverses direction or the air becomes colder than the surface below it),
+and for ``z > 2`` we have ``|1 - z| > 1``, so the deviation grows with every time step:
+the explicit step is unstable even though the true solution simply decays.
+
+Can we get the exact solution but keep the explicit time stepping? Compare the change in ``x``
+over one time step from both
+
+```math
+\begin{aligned}
+\text{explicit:} \quad x^{new} - x &= -z\, (x - x_s) \\
+\text{exact:} \quad x(t + \Delta t) - x &= -(1 - e^{-z})(x - x_s)
+\end{aligned}
+```
+
+Both changes are proportional to the same deviation ``x - x_s``, they only differ by the factor
+
+```math
 \varphi(z) = \frac{1 - e^{-z}}{z}
 ```
 
-This is exponential time differencing. ``\varphi`` only depends on ``z``, so the damped flux is
-calculated directly from the explicit one without iterating or solving a system.
-``\varphi = 1 - z/2 + z^2/6 - \dots`` for small ``z``, and ``\varphi \approx 1/z`` for large ``z``,
+which only depends on ``z``. So if we replace the flux ``F^\uparrow`` by ``\varphi(z) F^\uparrow``
+the explicit step yields the exact solution, without changing the time stepping itself:
+
+```math
+x^{new} = x + \Delta t \frac{g\, \varphi(z) F^\uparrow}{\Delta p_N}
+\quad \Rightarrow \quad x^{new} - x_s = (1 - z \varphi(z))(x - x_s) = e^{-z}(x - x_s)
+```
+
+There is also a physical interpretation of ``\varphi(z) F^\uparrow``: as ``x`` relaxes towards ``x_s``
+during the time step, the flux decays exponentially too, ``F^\uparrow(t') = F^\uparrow e^{-t'/\tau}``.
+Its average over the time step is
+
+```math
+\frac{1}{\Delta t} \int_0^{\Delta t} F^\uparrow e^{-t'/\tau} \, dt' = \frac{\tau}{\Delta t}(1 - e^{-\Delta t/\tau}) F^\uparrow = \varphi(z) F^\uparrow
+```
+
+So ``\varphi(z) F^\uparrow`` is the time-mean flux over the time step, whereas the explicit step
+uses the flux at the beginning of the time step, which is too large when the flux decays
+quickly. ``\varphi`` is therefore a damping factor ``0 < \varphi \leq 1``, close to ``1`` when the time
+step resolves the relaxation (``z \ll 1``) and small when it does not (``z \gg 1``). This approach
+of integrating the linear part of an equation exactly is known as exponential time differencing.
+It has two practical advantages here: ``\varphi`` is calculated pointwise from ``z``, so no iteration
+or system of equations has to be solved, and the damped flux ``\varphi F^\uparrow`` is a flux
+itself, which can be passed on to the ocean and land models (see below).
+
+For small ``z`` we have ``\varphi = 1 - z/2 + z^2/6 - \dots``, and ``\varphi \approx 1/z`` for large ``z``,
 meaning ``x`` is relaxed fully to ``x_s`` within one time step.
 
 However, evaluating ``\varphi`` requires an exponential for every grid point, every surface flux
