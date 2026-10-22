@@ -89,7 +89,7 @@ _jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)
 loop, see `reactant_compile_options`), to work around Reactant limitations and bugs: add a pattern's
 name here, remove it once fixed upstream. None currently (`cse_slice` was excluded for Reactant
 v0.2.293 to v0.2.296, see docs/dev/2026-10/reactant-issue-draft-gather-index-cycle.md)."""
-const REACTANT_EXCLUDED_PASSES = String[] # TODO: currenlty untested if concat_multipad is needed
+const REACTANT_EXCLUDED_PASSES = String["concat_multipad"] # TODO: currenlty untested if concat_multipad is needed
 
 """
     reactant_compile_options(; kwargs...)
