@@ -125,17 +125,17 @@ the surface, z₀ is the momentum roughness length, and Δθᵥ is
 the virtual potential temperature difference between the lowest
 model level and the surface.
 
-The roughness length z₀ is by default a fixed land-sea mask-weighted value
-(`land_roughness`, `ocean_roughness`). With `use_computed_roughness = true` the
-roughness computed by `BoundaryLayer.surface_roughness` is used instead. As that is
-computed after the surface condition (it depends on the surface wind) it is then
-taken from the previous time step, making it a hidden state.
+By default we set `use_computed_roughness = true` which uses the 
+roughness from the previous timestep, and we fall back to the fixed 
+roughness length on the first time step. With `use_computed_roughness = false`
+the roughness length z₀ is a fixed land-sea mask-weighted value
+(`land_roughness`, `ocean_roughness`).
 
 Fields are $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct LearnedWindSlowdown{NF} <: AbstractWindSlowdown
     "[OPTION] Use the computed roughness from the previous time step (true) or fixed roughness lengths (false)?"
-    use_computed_roughness::Bool = false
+    use_computed_roughness::Bool = true
 
     "[OPTION] Fixed momentum roughness length over land [m]"
     @param land_roughness::NF = 0.1 (bounds = Positive,)
@@ -190,7 +190,7 @@ initialize!(::LearnedWindSlowdown, ::PrimitiveEquation) = nothing
     q = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, ws)[ij, nlayers] : zero(T)
     Tᵥ = virtual_temperature(T, q, atmosphere)
     T_skin = zero(T)
-    
+
     if land_fraction > 0
         land_temp = get_prognostic_step(
             vars.prognostic.land.soil_temperature,

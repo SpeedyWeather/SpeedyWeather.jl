@@ -94,14 +94,15 @@ There are several ways to resolve this circularity, each with a downside:
 - **Decouple**: use fixed roughness lengths in the wind slowdown only. Stateless and cheap,
     but the wind slowdown does not see the actual roughness.
 
-The default is to decouple: `LearnedWindSlowdown` uses fixed roughness lengths over land and ocean
-(`land_roughness = 0.1` m, `ocean_roughness = 1e-4` m, weighted by the land fraction) so that the
+The default is to lag. We set `LearnedWindSlowdown` with `use_computed_roughness = true` which uses
+the roughness from the previous timestep, and we fall back to the fixed roughness length on the 
+first time step.
+
+To decouple, one sets `use_computed_roughness = false`, and the `LearnedWindSlowdown` uses fixed roughness lengths over land and ocean (`land_roughness = 0.1` m, `ocean_roughness = 1e-4` m, weighted by the land fraction) so that the
 surface condition depends only on the current state. The computed roughness is still used
-for the drag coefficients. The sensitivity of the wind slowdown to ``z_0`` is weak
-(only through a term ``\propto \log z_0``), so this is a small inconsistency. With
-`use_computed_roughness = true` the wind slowdown uses the roughness from the previous
-time step instead (falling back to the fixed roughness lengths on the first time step).
-Iterative solution is currently not implemented.
+for the drag coefficients.
+
+The iterative solution is currently not implemented.
 
 The subcomponents of `SurfaceCondition` are
 
