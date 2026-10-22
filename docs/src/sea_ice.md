@@ -128,13 +128,13 @@ no insulation (i.e. no impact) in the case of no ice.
 And output is added like
 
 ```@example sea_ice
-add!(model, SpeedyWeather.SeaIceConcentrationOutput())
+add!(model, OutputVariables.SeaIceConcentration())
 ```
 
-or as part of `SpeedyWeather.OceanOutput()`
+or as part of `OutputVariables.Ocean()`
 
 ```@example sea_ice
-add!(model, SpeedyWeather.OceanOutput())
+add!(model, OutputVariables.Ocean())
 ```
 
 For more information see [Output variables](@ref).

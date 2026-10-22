@@ -106,17 +106,9 @@ function timestep!(
         land::SeasonalLandTemperature,
         model,
     )
-    (; time) = vars.prognostic.clock
-
-    this_month = Dates.month(time)
-    next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
-
-    # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time)
     (; monthly_temperature) = land
     (; soil_temperature) = vars.prognostic.land
-    NF = eltype(soil_temperature)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
 
     launch!(
         architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),

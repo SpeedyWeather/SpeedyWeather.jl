@@ -12,9 +12,9 @@ using NCDatasets
     # the three surface roughness output writers under test
     add!(
         model,
-        SpeedyWeather.SurfaceRoughnessOutput(),
-        SpeedyWeather.LandSurfaceRoughnessOutput(),
-        SpeedyWeather.OceanSurfaceRoughnessOutput(),
+        OutputVariables.SurfaceRoughness(),
+        OutputVariables.LandSurfaceRoughness(),
+        OutputVariables.OceanSurfaceRoughness(),
     )
 
     simulation = initialize!(model)

@@ -10,7 +10,7 @@
         surface_heat_flux = SurfaceHeatFlux(ocean = ocean_heat_flux, land = land_heat_flux)
         model = Model(spectral_grid; surface_heat_flux, output)
         model.feedback.verbose = false
-        add!(model, SpeedyWeather.SurfaceFluxesOutput())
+        add!(model, OutputVariables.SurfaceFluxes())
 
         simulation = initialize!(model)
         set!(simulation.variables.prognostic.ocean.sensible_heat_flux, (λ, ϕ) -> ϕ > 0 ? 10 : 0, model.geometry)
@@ -22,7 +22,7 @@
         surface_heat_flux = SurfaceHeatFlux(ocean = ocean_heat_flux, land = land_heat_flux)
         model = Model(spectral_grid; surface_heat_flux, output)
         model.feedback.verbose = false
-        add!(model, SpeedyWeather.SurfaceFluxesOutput())
+        add!(model, OutputVariables.SurfaceFluxes())
 
         simulation = initialize!(model)
         set!(simulation.variables.prognostic.land.sensible_heat_flux, (λ, ϕ) -> ϕ > 0 ? 100 : 0, model.geometry)

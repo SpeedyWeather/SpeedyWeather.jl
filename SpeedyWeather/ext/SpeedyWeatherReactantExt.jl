@@ -134,6 +134,13 @@ SpeedyWeather.scalar_ref(::ReactantDevice, x::Number) = Ref(Reactant.ConcreteRNu
 # Dates.year(days) for which Dates' method branches on the traced month, use yearmonthday instead
 Dates.year(days::Reactant.TracedRNumber) = first(Dates.yearmonthday(days))
 
+# TODO: move upstream to Reactant, Dates' method indexes a table with the (traced) month and branches
+# with `&&`, used by the seasonal climatologies (`monthly_interpolation`)
+function Dates.daysinmonth(year::Reactant.TracedRNumber, month::Reactant.TracedRNumber)
+    thirty_days = (month == 4) | (month == 6) | (month == 9) | (month == 11)
+    return ifelse(month == 2, 28 + Dates.isleapyear(year), ifelse(thirty_days, 30, 31))
+end
+
 const ReactantPrimitiveEquation = Union{
     PrimitiveDryModel{SG, <:ReactantDevice}, PrimitiveWetModel{SG, <:ReactantDevice},
 } where {SG}
