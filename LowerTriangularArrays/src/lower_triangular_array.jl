@@ -814,8 +814,7 @@ end
     I = @index(Global, Cartesian)
     l = l_indices[I[1]]
 
-    # componentwise: Reactant can't raise `ifelse` of complex numbers (an LLVM aggregate select)
-    data[I] = componentwise_ifelse(l == lmax, zero(eltype(data)), data[I])
+    data[I] = ifelse(l == lmax, zero(eltype(data)), data[I])
 end
 
 Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) =

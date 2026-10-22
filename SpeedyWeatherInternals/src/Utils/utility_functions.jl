@@ -81,33 +81,15 @@ function _set_scalar!(arch::AbstractArchitecture, x::AbstractArray, i::Integer, 
 end
 
 """
-    componentwise_ifelse(condition::Bool, x, y)
-
-`ifelse(condition, x, y)` that selects real and imaginary part of complex numbers separately.
-In kernels, `ifelse` on a `Complex` compiles to a select of an LLVM aggregate (`[2 x float]`)
-which Reactant can't raise (`raise = true`), two selects of the components it can.
-For other numbers the same as `ifelse`.
-TODO: Might be sovled upstream in Reactant in the future 
-"""
-@inline componentwise_ifelse(condition::Bool, x, y) = ifelse(condition, x, y)
-@inline componentwise_ifelse(condition::Bool, x::Complex, y::Complex) =
-    complex(ifelse(condition, real(x), real(y)), ifelse(condition, imag(x), imag(y)))
-
-"""
 $(TYPEDSIGNATURES)
 Fallback for `@maybe_jit` when Reactant is not available. Just calls `f(args...; kwargs...)`."""
 _jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)
 
 """Optimization patterns of Reactant excluded from every compilation (`@maybe_jit`, the compiled time
 loop, see `reactant_compile_options`), to work around Reactant limitations and bugs: add a pattern's
-name here, remove it once fixed upstream.
-- `cse_slice`: since Reactant v0.2.293 (still in v0.2.295) the optimization patterns rewrite the
-  index computation of the gradient kernel (`∇!` of the surface pressure, gathers with index
-  `(lm - 1) mod n`) in a cycle that never terminates, so the time step of the primitive equation
-  models never compiles. Excluding `cse_slice` breaks the cycle (the alternative,
-  `max_reused_const_prop_size = 0`, compiles as fast but the model runs up to 5% slower on CPU),
-  see docs/dev/2026-10/reactant-issue-draft-gather-index-cycle.md."""
-const REACTANT_EXCLUDED_PASSES = ["cse_slice"]
+name here, remove it once fixed upstream. None currently (`cse_slice` was excluded for Reactant
+v0.2.293 to v0.2.296, see docs/dev/2026-10/reactant-issue-draft-gather-index-cycle.md)."""
+const REACTANT_EXCLUDED_PASSES = String[]
 
 """
     reactant_compile_options(; kwargs...)
