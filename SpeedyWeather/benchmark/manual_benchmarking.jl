@@ -9,6 +9,7 @@ Usage:
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl amdgpu         # AMDGPU (HIP graphs forced on)
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-cpu   # Reactant on CPU
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU
+    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-tpu   # Reactant on TPU
 
 An optional second argument multiplies the number of timesteps per timed run of
 the main benchmark, the PrimitiveWet resolution sweep (`:benchmark201`), for
@@ -24,8 +25,8 @@ take hours, e.g.
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-gpu --reverse
 
 The flag `--hi-res` adds T342 and T512 at 8, 16 and 24 layers to the main
-benchmark (`:benchmark201`), on GPU architectures only (ignored with a warning on
-CPU, too slow).
+benchmark (`:benchmark201`), on GPU and TPU architectures only (ignored with a
+warning on CPU, too slow).
 
 The flag `--SPEEDY` runs all primitive equation models in a configuration closer
 to the original SPEEDY.f90: seasonal prescribed climatologies of sea surface
@@ -48,9 +49,15 @@ is loaded automatically. `amdgpu` runs require a ROCm-capable device —
 resolution/model suites, since `default_gpu_graphs` for AMDGPU's
 `ROCBackend` is `false` (HIP graphs are opt-in, verified only on datacenter/CDNA
 hardware). The Reactant variants additionally `using Reactant` and
-`Reactant.set_default_backend("cpu" | "gpu")`. The time loop is
+`Reactant.set_default_backend("cpu" | "gpu" | "tpu")`. The time loop is
 compiled once per configuration (`reactant_runner.jl`),
 the compile time is reported separately and not included in the SYPD.
+`reactant-tpu` runs on a TPU host (e.g. a Cloud TPU VM, Reactant downloads libtpu
+itself); CUDA.jl is loaded there too, without a GPU, as Reactant's kernel raising
+needs it. On TPU, XLA's default precision for Float32 matrix multiplies (the
+Fourier and Legendre transforms on Reactant) is a single bfloat16 pass, and TPUs
+have no native Float64, so expect the Float64 configuration to fail there
+(recorded as failed, the other configurations continue).
 
 Per-architecture results are persisted to `assets/benchmark_results.json`.
 The `README.md` (kept at the benchmark root) is then regenerated from all
@@ -75,26 +82,27 @@ const RUN_HI_RES = "--hi-res" in FLAGS
 const RUN_SPEEDY = "--speedy" in FLAGS
 
 const ARCH_ARG = length(POSITIONAL_ARGS) >= 1 ? lowercase(POSITIONAL_ARGS[1]) : ""
-RUN_REVERSE && !(ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu") &&
-    error("The reverse-mode benchmarks (--reverse) need Reactant, use reactant-cpu or reactant-gpu.")
+const ON_REACTANT = ARCH_ARG in ("reactant-cpu", "reactant-gpu", "reactant-tpu")
+RUN_REVERSE && !ON_REACTANT &&
+    error("The reverse-mode benchmarks (--reverse) need Reactant, use reactant-cpu, reactant-gpu or reactant-tpu.")
 # The seasonal climatologies don't trace yet: Dates.month branches on the traced clock, and the
 # interpolation kernel indexes the months with a traced number
-RUN_SPEEDY && (ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu") &&
+RUN_SPEEDY && ON_REACTANT &&
     error("The SPEEDY configuration (--SPEEDY) doesn't run with Reactant yet, use cpu, gpu or amdgpu.")
 
 # Conditionally load backend packages BEFORE `using SpeedyWeather` so that
 # SpeedyWeather's extensions register the right array types and overloads.
-# CUDA must be loaded for any Reactant run (even the CPU backend) — Reactant's
-# KernelAbstractions kernel-raising path always needs it.
-if ARCH_ARG == "gpu" || ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu"
+# CUDA must be loaded for any Reactant run (even the CPU and TPU backends, where it
+# loads without a GPU) — Reactant's KernelAbstractions kernel-raising path always needs it.
+if ARCH_ARG == "gpu" || ON_REACTANT
     using CUDA
 end
 if ARCH_ARG == "amdgpu"
     using AMDGPU
 end
-if ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu"
+if ON_REACTANT
     using Reactant
-    Reactant.set_default_backend(ARCH_ARG == "reactant-gpu" ? "gpu" : "cpu")
+    Reactant.set_default_backend(replace(ARCH_ARG, "reactant-" => ""))     # "cpu", "gpu" or "tpu"
 end
 if RUN_REVERSE
     using Enzyme   # Enzyme.autodiff and make_zero(::Variables) of SpeedyWeatherEnzymeExt
@@ -112,21 +120,24 @@ function pick_architecture(arg::AbstractString)
         return (SpeedyWeather.ReactantDevice(), "reactant-cpu")
     elseif arg == "reactant-gpu"
         return (SpeedyWeather.ReactantDevice(), "reactant-gpu")
+    elseif arg == "reactant-tpu"
+        return (SpeedyWeather.ReactantDevice(), "reactant-tpu")
     elseif arg == "cpu" || isempty(arg)
         arch_str = String(Sys.ARCH)
         label = (startswith(arch_str, "aarch") || arch_str == "arm64") ? "cpu-arm" : "cpu-x86"
         return (SpeedyWeather.CPU(), label)
     else
-        error("Unknown architecture argument `$arg`. Use one of: cpu, gpu, amdgpu, reactant-cpu, reactant-gpu.")
+        error("Unknown architecture argument `$arg`. Use one of: cpu, gpu, amdgpu, reactant-cpu, reactant-gpu, reactant-tpu.")
     end
 end
 
 const ARCH, ARCH_LABEL = pick_architecture(ARCH_ARG)
-const ON_GPU = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-gpu")
+# GPU or TPU: higher resolutions (`--hi-res`, reverse mode), larger matrix transforms than on CPU
+const ON_ACCELERATOR = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-gpu", "reactant-tpu")
 # the results of the SPEEDY.f90-like configuration (`--SPEEDY`) are stored separately from the default configuration
 const RESULTS_LABEL = RUN_SPEEDY ? "$ARCH_LABEL-speedy" : ARCH_LABEL
 @info "Running benchmarks for architecture: $ARCH_LABEL ($(typeof(ARCH)))"
-RUN_HI_RES && !ON_GPU && @warn "--hi-res only adds GPU configurations (T342, T512 are too slow on CPU), ignored on $ARCH_LABEL."
+RUN_HI_RES && !ON_ACCELERATOR && @warn "--hi-res only adds GPU and TPU configurations (T342, T512 are too slow on CPU), ignored on $ARCH_LABEL."
 
 # Optional second argument: a multiplier on the number of timesteps per timed run
 # of the main benchmark (:benchmark201) only. Lengthens its runs for more robust
@@ -135,7 +146,7 @@ const TIMESTEP_MULTIPLIER = length(POSITIONAL_ARGS) >= 2 ? parse(Float64, POSITI
 TIMESTEP_MULTIPLIER > 0 || error("timestep multiplier must be > 0, got $TIMESTEP_MULTIPLIER")
 @info "Timestep multiplier (benchmark201 only): $TIMESTEP_MULTIPLIER"
 @info "Reverse-mode benchmarks: $(RUN_REVERSE ? "on" : "off, enable with --reverse")"
-@info "High resolutions T342, T512 in benchmark201 (GPU only): $(RUN_HI_RES && ON_GPU ? "on" : "off")"
+@info "High resolutions T342, T512 in benchmark201 (GPU, TPU only): $(RUN_HI_RES && ON_ACCELERATOR ? "on" : "off")"
 @info "SPEEDY.f90-like configuration: $(RUN_SPEEDY ? "on, results stored as $RESULTS_LABEL" : "off, enable with --SPEEDY")"
 
 # Free (device) memory between benchmark runs, called outside the timed region
@@ -219,8 +230,10 @@ function machine_info()
         write(io, "```\n")
     end
     if ARCH isa SpeedyWeather.ReactantDevice
-        backend = ARCH_LABEL == "reactant-gpu" ? "gpu" : "cpu"
+        backend = replace(ARCH_LABEL, "reactant-" => "")
+        devices = Reactant.devices()
         write(io, "\nReactant backend: `$backend` (via `Reactant.set_default_backend(\"$backend\")`), ")
+        write(io, "$(length(devices)) device(s): $(join(unique(Reactant.XLA.device_kind.(devices)), ", ")) (one used), ")
         write(io, "Reactant v$(pkgversion(Reactant)), Reactant_jll v$(pkgversion(Reactant.Reactant_jll)).\n")
     end
     return String(take!(io))
@@ -273,7 +286,7 @@ end
 # Regenerate README.md from the JSON store
 
 # Stable ordering for arch sections in the README.
-const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "gpu-amd", "reactant-cpu", "reactant-gpu"]
+const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "gpu-amd", "reactant-cpu", "reactant-gpu", "reactant-tpu"]
 
 function sorted_arch_labels(results)
     known = filter(in(keys(results)), ARCH_ORDER)
@@ -321,11 +334,12 @@ function write_preamble(md)
     write(md, "julia --project=. manual_benchmarking.jl amdgpu         # AMDGPU (HIP graphs forced on)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-cpu   # Reactant on CPU\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU\n")
+    write(md, "julia --project=. manual_benchmarking.jl reactant-tpu   # Reactant on TPU\n")
     write(md, "```\n\n")
     write(md, "An optional second argument, e.g. `manual_benchmarking.jl gpu 10`, multiplies the number of time steps of the ")
     write(md, "timed runs of the PrimitiveWet resolution sweep (the overview below) for more robust timings; the other suites are not affected. ")
     write(md, "Flags, in any order: `--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-gpu --reverse`) additionally runs the ")
-    write(md, "reverse-mode benchmarks, which take hours. `--hi-res` (GPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. ")
+    write(md, "reverse-mode benchmarks, which take hours. `--hi-res` (GPU and TPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. ")
     write(md, "`--SPEEDY` (not with Reactant yet) runs the primitive equation models in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of ")
     write(md, "sea surface temperature, land surface temperature and soil moisture), stored as a separate architecture with a `-speedy` suffix.\n\n")
     write(md, "Each run replaces its own architecture's section in this `README.md` (including suites added by flags in an earlier run); ")
