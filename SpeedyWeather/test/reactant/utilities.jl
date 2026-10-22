@@ -48,6 +48,11 @@ end
         this_month, next_month, weight = interpolation(traced_time(time))
         @test (Int(this_month), Int(next_month), Float64(weight)) == SpeedyWeather.monthly_interpolation(time)
     end
+
+    # weight in the precision of the interpolated variable (promoted, `convert` doesn't apply to traced numbers)
+    interpolation = @compile SpeedyWeather.monthly_interpolation(traced_time(DateTime(2000, 1, 1)), Float32)
+    weight = interpolation(traced_time(DateTime(2000, 2, 29, 12)), Float32)[3]
+    @test Float32(weight) === SpeedyWeather.monthly_interpolation(DateTime(2000, 2, 29, 12), Float32)[3]
 end
 
 @testset "Views into concrete Reactant arrays" begin

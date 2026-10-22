@@ -1,6 +1,6 @@
 # Full Reactant compatibility incl. the primitive equation models
 
-> Status: **in progress**. See "Handoff 2026-10-16" first. All models run on Reactant 0.2.293 (`raise = true`, central compile options), on the CPU backend and on CUDA; the time loop is one compiled program per output interval and can be differentiated through several time steps. Everything since f5082066 is uncommitted; three upstream Reactant issues are drafted, not posted.
+> Status: **in progress**. See "Reactant 0.2.296 to 0.2.298 and the remaining workarounds (2026-10-22)" first: CI's Reactant tests are capped at Reactant 0.2.296 until Enzyme-JAX#3683 is released, and three workarounds can go with 0.2.297. All models run on Reactant (`raise = true`, central compile options), on the CPU backend and on CUDA; the time loop is one compiled program per output interval and can be differentiated through several time steps.
 
 Date of initial draft: 2026-10-12
 
@@ -1061,6 +1061,72 @@ the `functions_and_arguments` of the "Individual dynamics functions" suite (its 
 `(vars, time_stepping)`), so the name assertion failed; entry restored, the suite runs again on the CPU
 (12/12 functions).
 
+## Reactant 0.2.296 to 0.2.298 and the remaining workarounds (2026-10-22)
+
+> i think we made mistake merging main in, I get [`UndefVarError: @kernel not defined in SpeedyWeather.OutputVariables`]
+
+> Metal and Reactant tests are still failing https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1304
+
+> update the plan with notes on which workarounds we still have and which we might remove quickly again.
+> A fix for the problem we just found is already proposed upstream
+
+CI failures after merging `main` (#1331, `OutputVariables` module) into this branch:
+- Precompilation: the branch's 10m wind kernel and `on_output_architecture` (MSLP) moved with the output
+  variables into the `OutputVariables` submodule without their imports (`e06cb369`).
+- Metal: `monthly_interpolation` (from `695efd17`) returned the weight as `Float64`, a kernel argument of
+  `interpolate_monthly_climatology_kernel!`, and Metal has no `Float64`. The weight is now in the variable's
+  number format by promotion, `(day - 1) * one(NF) / (daysinmonth * one(NF))`, as `convert` doesn't apply to
+  traced numbers (`353697b4`, `8a036781`). Not run on Metal here.
+- Reactant Correctness: segfault (exit 139) once CI resolved Reactant 0.2.298 (released 2026-10-22), not
+  caused by our code. The only two Enzyme-JAX commits between 0.2.297 and 0.2.298, #3674/#3676 (native
+  integer constant evaluator), keep pointers into a `SmallVector` that reallocates. `scatter_op_canon` hits
+  that on the scatter `split_complex_scatter` makes from `A[:, 1] .= b` with a complex `A`: the shallow water
+  initial conditions, `η .+= η_perturb` into a leapfrog step. MWE (12-line StableHLO, `Float32`, only
+  `scatter_op_canon`) and issue draft: `reactant-issue-scatter-index-eval-segfault-mwe.jl`,
+  `reactant-issue-draft-scatter-index-eval-segfault.md`. Fix proposed upstream: Enzyme-JAX#3683 (open).
+  Meanwhile `SpeedyWeather/test/reactant/Project.toml` caps Reactant at 0.2.296 (`d0c66f25`). The packages'
+  compat (`Reactant = "0.2.294"` in all five) still allows 0.2.298 for users.
+
+### Workarounds that can go with Reactant 0.2.297
+
+0.2.296 contains none of the fixes its release notes list (its Enzyme-JAX is still `964d3ed1`, as in
+0.2.294/0.2.295). 0.2.297 (`Reactant_jll` 0.0.426, Enzyme-JAX `85832ba7`) contains Enzyme-JAX #3636, #3642,
+#3643, #3648 and #3672 (GitHub compare API against each merge commit), and doesn't have the 0.2.298 segfault.
+The MWEs of our issue drafts on the CPU backend (fresh environments with only Reactant, `CUDA` and
+`KernelAbstractions`):
+
+| Workaround (where) | Upstream | 0.2.296 | 0.2.297 | 0.2.298 |
+| --- | --- | --- | --- | --- |
+| `componentwise_ifelse` for complex `ifelse` in kernels (SpeedyWeatherInternals `Utils`, `lower_triangular_array.jl:818`, `spectral_gradients.jl:122-127, 559-561`) | Reactant.jl#3475, fixed by Enzyme-JAX#3643 | fails to raise | MWE fixed | MWE fixed |
+| real and imaginary accumulators kept separately (`tendencies.jl:363`, vertical integration; `implicit_primitive_equations.jl:353-431`) | Reactant.jl#3465, fixed by Enzyme-JAX#3636 | NaN | MWE fixed | MWE fixed |
+| `REACTANT_EXCLUDED_PASSES = ["cse_slice"]` (`utility_functions.jl:110`) | Reactant.jl#3501 (open), presumably fixed by Enzyme-JAX#3672 | never returns (killed after 300 s) | MWE terminates (0.01 s) | MWE terminates |
+| Reactant ≤ 0.2.296 in `test/reactant/Project.toml` | Enzyme-JAX#3683 (open) | fine | MWE fine | segfault |
+
+Fixed means the MWE only, the model tests haven't run with 0.2.297. Quick path:
+1. Allow 0.2.297 in `test/reactant/Project.toml` (`"0.2.294 - 0.2.297"`) and run `test/reactant` and the
+   GPU standard script with it.
+2. If those pass, remove the first three workarounds (keep `REACTANT_EXCLUDED_PASSES` and
+   `reactant_compile_options` as the mechanism, empty list) and raise the lower compat bound to 0.2.297 in
+   the five packages, as on 0.2.294 to 0.2.296 the model would silently produce NaNs without them.
+3. Drop the cap once a release contains Enzyme-JAX#3683 (jll README `revision:` → that commit's
+   `deps/ReactantExtra/WORKSPACE` `ENZYMEXLA_COMMIT` → compare against the fix's merge commit).
+
+On `mg/reactant-dft` the `concat_multipad`/`slice_pad` exclusion (Reactant.jl#3503) can presumably go as
+well: Enzyme-JAX#3648 is in 0.2.297 (commit check only, MWE not rerun).
+
+### Workarounds that stay
+
+| Workaround (where) | Upstream | Note |
+| --- | --- | --- |
+| `raise = true` in `reactant_compile_options` | Reactant.jl#3377 (kernel operand layouts on CUDA), merged 2026-10-22 after 0.2.298, unreleased | stays the default (everything is tested raised); non-raised kernels on CUDA become an option to evaluate once released |
+| TF32 in raised matrix products on NVIDIA GPUs (Triton GEMM off / `dot_general_precision`, see the docs) | `reactant-issue-draft-raised-dot-precision.md`, not posted | documented, not worked around in code |
+| `inv(x)` → `1 / x` in kernels (12 places, `# TODO` comments) | Reactant.jl#2560 (open) | |
+| `minimum`/`maximum` instead of `extrema` (`land_sea_mask.jl:159`, `RingGridsReactantExt`) | Reactant.jl#2387 (open) | |
+| broadcasting into views of concrete arrays (`SpeedyWeatherInternalsReactantExt.jl:73-93`), `copyto!` forwarding for `LowerTriangularArray`s (`LowerTriangularArraysReactantExt.jl:18`) | Reactant.jl#3447 (open PR), #3469 (closed) | |
+| `deepcopy` of concrete arrays keeping views aliased (`SpeedyWeatherInternalsReactantExt.jl:95`), `Dates.year` and `Dates.daysinmonth` for traced numbers (`SpeedyWeatherReactantExt.jl:133-143`) | none yet, `# TODO: move upstream to Reactant` | |
+| PrimitiveWet loop gradient in CI without `Reactant.Periodic(2)` (`differentation.jl:179`) | not reported (0.2.294 regression, compile doesn't finish) | recheck with ≥ 0.2.297, over an hour if still broken |
+| traced numbers can't be `convert`ed (`Float32(::TracedRNumber{Float64})` is a `MethodError`): weight by promotion in `monthly_interpolation`, scalar arguments converted inside the climatology kernel | not reported | small, can stay |
+
 ## Known limitations
 
 - Particles are not supported on Reactant.
@@ -1076,8 +1142,9 @@ the `functions_and_arguments` of the "Individual dynamics functions" suite (its 
 
 ## Future work
 
-- Move the `# TODO: move upstream to Reactant` fixes into Reactant, remove the `inv` and `extrema`
-  workarounds once Reactant.jl#2560 and #2387 are fixed.
+- Move the `# TODO: move upstream to Reactant` fixes into Reactant, remove the workarounds as their
+  upstream fixes are released, see "Workarounds that can go with Reactant 0.2.297" and "Workarounds that
+  stay" (2026-10-22).
 - On Reactant the implicit operators are recomputed every time step (`reinitialize!`): ~0.5 ms per
   step and ~8 s compile time, although Δt only changes in the spin-up steps. With the spin-up steps
   already outside the compiled loop (`time_stepping!`), initializing them once for the constant Δt of

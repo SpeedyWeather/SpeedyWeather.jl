@@ -118,9 +118,9 @@ function timestep!(
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
-    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time)
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = vars.prognostic.land
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time, eltype(soil_moisture))
 
     launch!(
         architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),

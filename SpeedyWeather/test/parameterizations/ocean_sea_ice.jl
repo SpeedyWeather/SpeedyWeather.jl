@@ -68,4 +68,7 @@ end
     @test SpeedyWeather.monthly_interpolation(DateTime(2000, 2, 29, 12)) == (2, 3, 28 / 29)
     @test SpeedyWeather.monthly_interpolation(DateTime(2001, 12, 31, 23)) == (12, 1, 30 / 31)
     @test SpeedyWeather.monthly_interpolation(DateTime(2100, 2, 15)) == (2, 3, 14 / 28)  # not a leap year
+
+    # weight in the precision of the interpolated variable, as it's a kernel argument (no Float64 on Metal)
+    @test SpeedyWeather.monthly_interpolation(DateTime(2000, 2, 29, 12), Float32) === (2, 3, 28.0f0 / 29.0f0)
 end

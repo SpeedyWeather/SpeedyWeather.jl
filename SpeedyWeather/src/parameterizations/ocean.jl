@@ -109,9 +109,9 @@ function timestep!(
         ocean::SeasonalOceanClimatology,
         model::PrimitiveEquation,
     )
-    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time)
     (; monthly_temperature) = ocean
     (; sea_surface_temperature) = vars.prognostic.ocean
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time, eltype(sea_surface_temperature))
 
     launch!(
         architecture(sea_surface_temperature), ArrayWorkOrder, size(sea_surface_temperature),
@@ -126,15 +126,17 @@ end
 Months and weight to interpolate a monthly climatology linearly in time at `time`,
 `(1 - weight) * monthly[this_month] + weight * monthly[next_month]` with the weight the
 fraction of the month's days passed (full days only). Returns `(this_month, next_month, weight)`,
-the weight as `Float64`. Branch-free, so that it also works for the traced clock on Reactant
+the weight of type `NF`, pass the variable's eltype as it's a kernel argument (Metal doesn't support
+`Float64`). Branch-free, so that it also works for the traced clock on Reactant
 (`Dates.daysinmonth` is overloaded for traced numbers in the Reactant extension)."""
-function monthly_interpolation(time)
+function monthly_interpolation(time, ::Type{NF} = Float64) where {NF}
     year, this_month, day = Dates.yearmonthday(time)
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
-    # linear interpolation weight between the two months
+    # linear interpolation weight between the two months, in NF via promotion as Reactant's traced
+    # numbers can't be `convert`ed
     # TODO check whether this shifts the climatology by 1/2 a month
-    weight = (day - 1) / Dates.daysinmonth(year, this_month)
+    weight = (day - 1) * one(NF) / (Dates.daysinmonth(year, this_month) * one(NF))
     return this_month, next_month, weight
 end
 
