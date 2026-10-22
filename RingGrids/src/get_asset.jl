@@ -26,7 +26,7 @@ function asset_binding_name(
     return joinpath(assets_url, ref, path)
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Downloads a file under `path` from an assets repository (if `from_assets=true`,
 otherwise loads locally), adds it to Artifacts.toml in the package directory, and returns
 the loaded data. Use `version = "branch"` (a String) to retrieve data from a branch,

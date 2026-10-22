@@ -19,7 +19,7 @@ end
 
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Curl of a vector `u, v` written into `curl`, `curl = ∇×(u, v)`.
 `u, v` are expected to have a 1/coslat-scaling included, otherwise `curl` is scaled.
 Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators
@@ -41,7 +41,7 @@ function curl!(
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
 `u, v` are expected to have a 1/coslat-scaling included, otherwise `div` is scaled.
 Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators,
@@ -238,7 +238,7 @@ function curl(
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Get U, V (=(u, v)*coslat) from vorticity ζ spectral space (divergence D=0)
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity. Then
@@ -298,7 +298,7 @@ end
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity and
@@ -368,7 +368,7 @@ end
 
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Laplace operator ∇² applied to the spectral coefficients `alms` in spherical
 coordinates. The eigenvalues which are precomputed in `S`.
 ∇²! is the in-place version which directly stores the output in the first argument `∇²alms`.
@@ -493,7 +493,7 @@ Acts on the unit sphere, i.e. it omits radius^2 scaling unless
 `radius` keyword argument is provided."""
 ∇⁻²(∇²alms::LowerTriangularArray; kwargs...) = ∇⁻²(∇²alms, SpectralTransform(∇²alms); kwargs...)
 
-"""$(TYPEDSIGNATURES) Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
+"""$(TypedMethodSignatures(defaults = true)) Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
 function ∇⁻²!(
         ∇⁻²alms::LowerTriangularArray,          # Output: inverse Laplacian of alms
         alms::LowerTriangularArray,             # Input: spectral coefficients
@@ -506,7 +506,7 @@ function ∇⁻²!(
     return ∇²!(∇⁻²alms, alms, S; add, flipsign, inverse, kwargs...)
 end
 
-"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
+"""$(TypedMethodSignatures(defaults = true)) Applies the gradient operator ∇ applied to input `p` and stores the result
 in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
 on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
 function ∇!(

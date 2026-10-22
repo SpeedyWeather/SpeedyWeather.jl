@@ -337,7 +337,7 @@ function create_run_folder!(output::AbstractOutput)
     return output.run_path = run_path
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Concatenate the run folder name from `prefix`, `id` and `number` to
 e.g. "run_0001" or "run_shallow_convection_0001"."""
 function run_folder_name(prefix::String, id::String, number::Int; fmt = Printf.Format("%04d"))

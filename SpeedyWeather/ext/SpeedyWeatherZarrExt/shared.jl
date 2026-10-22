@@ -26,7 +26,7 @@ flat-cell equivalent."""
 zarr_write_indices(output::AbstractZarrOutput, i, variable::AbstractOutputVariable) =
     get_indices(i, variable, zarr_ensemble_index(output))
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Helper: write a 1D coordinate array `data` to the Zarr group `g` under `name`.
 A single chunk is used since the coordinates are small."""
 function write_coordinate!(g::Zarr.ZGroup, name::AbstractString, data::AbstractVector; attrs = Dict())
@@ -49,7 +49,7 @@ custom output variables can define their own dimension in `define_dimension!`
 with one method for all output backends."""
 get_dimension_length(g::Zarr.ZGroup, name::String) = haskey(g, name) ? length(g[name]) : nothing
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Define a coordinate in the Zarr group `g`: a 1D array `name` with `values` and
 `attribs` as attributes, tagged with its own `_ARRAY_DIMENSIONS`. Zarr-store
 equivalent of `define_coordinate!(::NCDataset, ...)` so that custom output

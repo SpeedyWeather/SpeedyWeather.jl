@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Require DocStringExtensions v0.10 and show default argument values in docstrings of methods with default (keyword) arguments via `$(TypedMethodSignatures(defaults = true))` [#1310](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1310)
 - [BREAKING] Output variables moved into the exported module `OutputVariables` and lost their `Output` suffix, e.g. `SpeedyWeather.TemperatureOutput()` is now `OutputVariables.Temperature()`, the old names are deprecated and forward with a warning [#1331](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1331)
 - Bug fix: Enzyme's `make_zero` of a model works again with ProgressMeter v1.12 (parametric `ProgressCore`) [#1330](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1330)
 - Fix the centered vertical advection dropping the vertical advection of the reference temperature profile, which delayed the Jablonowski-Williamson baroclinic wave by about a day [#1286](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1286)

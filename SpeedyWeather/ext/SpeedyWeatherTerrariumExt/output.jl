@@ -138,7 +138,7 @@ function SpeedyWeather.OutputVariables.Terrarium(
     return terrarium_output_variable(model, descriptors[var_name]; kwargs...)
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Create a tuple of [`TerrariumOutputVariable`](@ref)s for all (supported) variables
 of the Terrarium `model`, to be added to a SpeedyWeather model's output via
 `add!(model, SpeedyWeather.OutputVariables.Terrarium(terrarium_model)...)`. The groups of Terrarium

@@ -185,7 +185,7 @@ get_cache(::Type{E}, S::SpectralTransform, nlayers::Integer) where {E} =
 Trim the memory pool of the backend. EXTENSION POINT, does nothing by default."""
 reclaim!(::AbstractArchitecture) = nothing
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Clear all cached GPU-graphs Fourier buffers and graphs. With `gc = true` (default) also
 run a full GC and [`reclaim!`](@ref) the device memory of the cleared caches' architectures
 and of any `architectures` passed on. Mainly useful for tests/benchmarks."""
@@ -239,7 +239,7 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Allocation-free, fused inverse (spectral → grid) batched Fourier loop: one gather kernel
 packs all rings from the scratch, per-ring in-place inverse FFTs run on reshaped views,
 one scatter kernel writes the grid field. `add` accumulates onto `field` instead of overwriting it

@@ -2,7 +2,7 @@
 # arrays shaped (lon, lat, vertical, time[, ensemble]). Everything that is not specific to
 # that layout — time-chunk buffering, the time axis, coordinate helpers — lives in shared.jl.
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Constructor for [`ZarrOutput`](@ref) (extension version, available once `Zarr.jl`
 is loaded). Behaves like the [`SpeedyWeather.NetCDFOutput`](@ref) constructor:
 builds the output grid, the interpolator, scratch fields and pre-fills the
@@ -331,7 +331,7 @@ function wait_for_ensemble_store(output::ZarrOutput, store_path::AbstractString)
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Define a Zarr array for output `var` in the Zarr group `g`. Shape and chunk
 shape are derived from `var.dims_xyzt` and the output grid; the time axis is
 pre-allocated to its final length `n_outputs`. Unwritten chunks read back as

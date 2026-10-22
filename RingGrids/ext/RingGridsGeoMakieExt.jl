@@ -3,6 +3,7 @@ module RingGridsGeoMakieExt
 using RingGrids
 using GeoMakie
 using RingGrids.DocStringExtensions
+using RingGrids.DocStringExtensions: TypedMethodSignatures
 
 RingGrids.globe(grid::AbstractGrid; kwargs...) = globe(typeof(grid), grid.nlat_half; kwargs...)
 
@@ -17,7 +18,7 @@ function default_title(field::RingGrids.AbstractField)
     return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
 end
 
-"""($TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Create a 3D interactive globe plot of the grid `Grid` at resolution `nlat_half` displaying
 cell centers and faces. Optionally, add coastlines and a background image of the Earth."""
 function RingGrids.globe(
@@ -87,7 +88,7 @@ end
 
 import GeoMakie.Makie.GeometryBasics: Polygon, Point
 
-"""($TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Create a 3D interactive globe plot of the data in `grid` displayed as polygons bounded by
 the cell faces. Optionally, add coastlines (default true)."""
 function RingGrids.globe(

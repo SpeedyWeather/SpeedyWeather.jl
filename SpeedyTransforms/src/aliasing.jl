@@ -1,7 +1,7 @@
 const DEFAULT_DEALIASING = 2.0
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 For the spectral `truncation` (1-based, e.g. 32 for T32) return the
 grid resolution parameter `nlat_half` (number of latitude rings on one hemisphere
 including the Equator) following a dealiasing parameter (default 2)
@@ -17,7 +17,7 @@ end
 # inverse of get_nlat_half to reobtain dealiasing
 get_dealiasing(truncation, nlat_half) = (4nlat_half) / truncation - 1
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 For the grid resolution parameter `nlat_half` (e.g. 24 for a 48-ring FullGaussianGrid)
 return the spectral `truncation` (1-based, max degree of spherical harmonics)
 following a dealiasing parameter (default 2) to match spectral and grid resolution."""
@@ -33,7 +33,7 @@ end
 get_truncation(grid::AbstractGrid, args...) = get_truncation(grid.nlat_half, args...)
 get_truncation(field::AbstractField, args...) = get_truncation(field.grid, args...)
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Returns an integer `m >= n` with only small prime factors 2, 3 (default, others can be specified
 with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of
 longitudes, m = 2^i * 3^j * 5^k >= n, with i, j, k >=0.
