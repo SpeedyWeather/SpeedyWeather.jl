@@ -20,12 +20,12 @@ different surface roughness characteristics. Fields are $(TYPEDFIELDS)"""
     "[OPTION] Or fixed drag coefficient for momentum fluxes over land"
     @param drag_land::NF = 2.4e-3 (bounds = 0 .. 1,)
 
-    "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ImplicitFluxes()
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceMomentumFlux
-SurfaceMomentumFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
+SurfaceMomentumFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
     SurfaceMomentumFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceMomentumFlux, ::PrimitiveEquation) = nothing
 
@@ -72,7 +72,8 @@ end
     pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]
     u_tend = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, momentum_flux)
     v_tend = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, momentum_flux)
-    scheme = momentum_flux.time_integration     # explicit, implicit or exponential integration
+
+    scheme = momentum_flux.time_integration
     u_tend[ij, surface] += surface_flux_to_tendency(scheme, flux_u_upward, conductance, pₛ, model)
     v_tend[ij, surface] += surface_flux_to_tendency(scheme, flux_v_upward, conductance, pₛ, model)
     return nothing

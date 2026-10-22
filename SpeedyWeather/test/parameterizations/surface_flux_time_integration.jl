@@ -51,15 +51,15 @@
 end
 
 @testset "Surface flux time integration: model" begin
-    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid)
 
-    # ImplicitFluxes default for all relaxation surface fluxes
-    @test model.surface_momentum_flux.time_integration isa ImplicitFluxes
-    @test model.surface_heat_flux.ocean.time_integration isa ImplicitFluxes
-    @test model.surface_heat_flux.land.time_integration isa ImplicitFluxes
-    @test model.surface_humidity_flux.ocean.time_integration isa ImplicitFluxes
-    @test model.surface_humidity_flux.land.time_integration isa ImplicitFluxes
+    # Defaults for all relaxation surface fluxes
+    @test model.surface_momentum_flux.time_integration isa SpeedyWeather.DEFAULT_FLUX_INTEGRATION
+    @test model.surface_heat_flux.ocean.time_integration isa SpeedyWeather.DEFAULT_FLUX_INTEGRATION
+    @test model.surface_heat_flux.land.time_integration isa SpeedyWeather.DEFAULT_FLUX_INTEGRATION
+    @test model.surface_humidity_flux.ocean.time_integration isa SpeedyWeather.DEFAULT_FLUX_INTEGRATION
+    @test model.surface_humidity_flux.land.time_integration isa SpeedyWeather.DEFAULT_FLUX_INTEGRATION
 
     # option chosen per flux
     for scheme in (ExplicitFluxes(), ExponentialFluxes(), RationalFluxes())
@@ -84,7 +84,7 @@ end
 
 @testset "Surface flux time integration: Frierson sigma coordinates" begin
     # thin lowermost layer made explicit surface fluxes unstable at default Δt (#1335)
-    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     geometry = Geometry(spectral_grid; vertical_coordinates = FriersonSigmaCoordinates(spectral_grid))
     for Model in (PrimitiveDryModel, PrimitiveWetModel)
         model = Model(spectral_grid; geometry)

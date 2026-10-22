@@ -60,12 +60,12 @@ export SurfaceOceanHumidityFlux
     "[OPTION] Sea ice insulating surface humidity fluxes [1]"
     @param sea_ice_insulation::NF = 0.01 (bounds = 0 .. 1,)
 
-    "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ImplicitFluxes()
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
-SurfaceOceanHumidityFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
+SurfaceOceanHumidityFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
     SurfaceOceanHumidityFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
@@ -95,9 +95,9 @@ variables(::SurfaceOceanHumidityFlux) = (
     d = vars.parameterizations.boundary_layer_drag[ij]
     drag_ocean = ifelse(humidity_flux.use_boundary_layer_drag, d, humidity_flux.drag)
 
-    # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
-    # but remove the max( ,0) to allow for surface condensation
-    flux_ocean = ρ * drag_ocean * V₀ * (sat_humid_ocean - surface_humid)
+    # SPEEDY documentation eq. 55/57, but remove the max( ,0) to allow for surface condensation
+    conductance = ρ * drag_ocean * V₀   # = -∂flux/∂q [kg/m²/s]
+    flux_ocean = conductance * (sat_humid_ocean - surface_humid)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     insulation = 1 + sea_ice_concentration / humidity_flux.sea_ice_insulation
@@ -105,7 +105,7 @@ variables(::SurfaceOceanHumidityFlux) = (
 
     # damp explicit flux for stable time integration with thin lowermost layers, applied
     # before storing so that coupled ocean/land receive the flux the atmosphere receives
-    conductance = ρ * drag_ocean * V₀ / insulation  # = -∂flux/∂x [kg/m²/s]
+    conductance /= insulation  
     flux_ocean *= surface_flux_damping(humidity_flux.time_integration, (1 - land_fraction) * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling
@@ -133,12 +133,12 @@ export SurfaceLandHumidityFlux
     "[OPTION] Snow insulation depth [m], e-folding depth controlling how snow insulates surface humidity fluxes"
     @param snow_insulation_depth::NF = 0.05 (bounds = 0 .. 1,)
 
-    "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ImplicitFluxes()
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceLandHumidityFlux
-SurfaceLandHumidityFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
+SurfaceLandHumidityFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
     SurfaceLandHumidityFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
@@ -168,9 +168,9 @@ variables(::SurfaceLandHumidityFlux) = (
     d = vars.parameterizations.boundary_layer_drag[ij]
     drag_land = humidity_flux.use_boundary_layer_drag ? d : humidity_flux.drag
 
-    # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
-    # but remove the max( ,0) to allow for surface condensation
-    flux_land = ifelse(isfinite(T) && isfinite(α), ρ * drag_land * V₀ * (α * sat_humid_land - surface_humid), zero(T))
+    # SPEEDY documentation eq. 55/57 but remove the max( ,0) to allow for surface condensation
+    conductance = ρ * drag_land * V₀ # [kg/m²/s]
+    flux_land = conductance * (α * sat_humid_land - surface_humid)
 
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
     insulation = 1 + snow_depth / humidity_flux.snow_insulation_depth
@@ -178,7 +178,7 @@ variables(::SurfaceLandHumidityFlux) = (
 
     # damp explicit flux for stable time integration with thin lowermost layers, applied
     # before storing so that coupled ocean/land receive the flux the atmosphere receives
-    conductance = ρ * drag_land * V₀ / insulation  # = -∂flux/∂x [kg/m²/s]
+    conductance /= insulation  # = -∂flux/∂x [kg/m²/s]
     flux_land *= surface_flux_damping(humidity_flux.time_integration, land_fraction * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling

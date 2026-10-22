@@ -60,12 +60,12 @@ with drag coefficients. Fields are $(TYPEDFIELDS)"""
     "[OPTION] Sea ice insulating surface heat fluxes [1]"
     @param sea_ice_insulation::NF = 0.01 (bounds = Positive,)
 
-    "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ImplicitFluxes()
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceOceanHeatFlux
-SurfaceOceanHeatFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
+SurfaceOceanHeatFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
     SurfaceOceanHeatFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
@@ -92,9 +92,9 @@ variables(::SurfaceOceanHeatFlux) = (
     drag_ocean = ifelse(heat_flux.use_boundary_layer_drag, d, heat_flux.drag)
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
-    # Only flux from ocean if available (not NaN) otherwise zero flux
     # leave out *cₚ here but include below to avoid division
-    flux_ocean = ρ * drag_ocean * V₀ * (SST[ij] - T)
+    conductance = ρ * drag_ocean * V₀                           # = -∂flux/∂T [kg/m²/s]
+    flux_ocean = conductance * (SST[ij] - T)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     insulation = 1 + sea_ice_concentration / heat_flux.sea_ice_insulation
@@ -102,13 +102,12 @@ variables(::SurfaceOceanHeatFlux) = (
 
     # damp explicit flux for stable time integration with thin lowermost layers, applied
     # before storing so that coupled ocean/land receive the flux the atmosphere receives
-    conductance = ρ * drag_ocean * V₀ / insulation  # = -∂flux/∂x [kg/m²/s]
+    conductance /= insulation  
     flux_ocean *= surface_flux_damping(heat_flux.time_integration, (1 - land_fraction) * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling [W/m²]
-    vars.parameterizations.ocean.sensible_heat_flux[ij] = flux_ocean * cₚ  # to store ocean flux separately too
-
-    flux_ocean *= (1 - land_fraction)                             # weight by ocean fraction of land-sea mask
+    vars.parameterizations.ocean.sensible_heat_flux[ij] = flux_ocean * cₚ   # to store ocean flux separately too
+    flux_ocean *= (1 - land_fraction)                                       # weight by ocean fraction of land-sea mask
 
     # output/diagnostics: ocean sets the flux (=), land accumulates (+=)
     vars.parameterizations.sensible_heat_flux[ij] = flux_ocean * cₚ        # [W/m²]
@@ -136,12 +135,12 @@ Fields are $(TYPEDFIELDS)"""
     "[OPTION] Snow insulation depth [m], e-folding depth reducing surface heat fluxes"
     @param snow_insulation_depth::NF = 0.05 (bounds = Positive,)
 
-    "[OPTION] Time integration of the flux into the lowermost layer: ExplicitFluxes, ImplicitFluxes or ExponentialFluxes"
-    time_integration::FI = ImplicitFluxes()
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceLandHeatFlux
-SurfaceLandHeatFlux(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
+SurfaceLandHeatFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
     SurfaceLandHeatFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
@@ -171,7 +170,8 @@ variables(::SurfaceLandHeatFlux) = (
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # leave out *cₚ here but include below to avoid division
-    flux_land = ρ * drag_land * V₀ * (T_skin_land - T)
+    conductance = ρ * drag_land * V₀
+    flux_land = conductance * (T_skin_land - T)
 
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
     insulation = 1 + snow_depth / heat_flux.snow_insulation_depth
@@ -179,7 +179,7 @@ variables(::SurfaceLandHeatFlux) = (
 
     # damp explicit flux for stable time integration with thin lowermost layers, applied
     # before storing so that coupled ocean/land receive the flux the atmosphere receives
-    conductance = ρ * drag_land * V₀ / insulation  # = -∂flux/∂x [kg/m²/s]
+    conductance /= insulation  # = -∂flux/∂x [kg/m²/s]
     flux_land *= surface_flux_damping(heat_flux.time_integration, land_fraction * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling [W/m²]

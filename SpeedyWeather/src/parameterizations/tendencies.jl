@@ -124,11 +124,13 @@ in `z` and as `1/z` for large `z`, at the cost of `ImplicitFluxes`. Unconditiona
 stable but overshoots the surface value slightly (≤ 10%) for `z > 3`."""
 struct RationalFluxes <: AbstractFluxIntegration end
 
+const DEFAULT_FLUX_INTEGRATION = RationalFluxes
+
 """$(TYPEDSIGNATURES)
 Factor φ(z) multiplying an explicit relaxation flux for `z = Δt/τ` given time integration `scheme`."""
 @inline flux_damping(::ExplicitFluxes, z) = one(z)
-@inline flux_damping(::ImplicitFluxes, z) = inv(1 + z)
-@inline flux_damping(::ExponentialFluxes, z) = z < sqrt(eps(z)) ? one(z) : -expm1(-z) / z
+@inline flux_damping(::ImplicitFluxes, z) = 1 / (1 + z)
+@inline flux_damping(::ExponentialFluxes, z) = ifelse(z < sqrt(eps(z)), one(z), -expm1(-z) / z)
 @inline flux_damping(::RationalFluxes, z) = (6 + z) / (6 + 4z + z^2)
 
 """$(TYPEDSIGNATURES)
