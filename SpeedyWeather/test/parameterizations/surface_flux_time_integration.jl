@@ -62,7 +62,7 @@ end
     @test model.surface_humidity_flux.land.time_integration isa SpeedyWeather.DEFAULT_FLUX_INTEGRATION
 
     # option chosen per flux
-    for scheme in (ExplicitFluxes(), ExponentialFluxes(), RationalFluxes())
+    for scheme in (ExplicitFluxes(), ImplicitFluxes(), ExponentialFluxes())
         @test SurfaceMomentumFlux(spectral_grid; time_integration = scheme).time_integration === scheme
         @test SurfaceOceanHeatFlux(spectral_grid; time_integration = scheme).time_integration === scheme
         @test SurfaceLandHeatFlux(spectral_grid; time_integration = scheme).time_integration === scheme

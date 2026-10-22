@@ -1,6 +1,6 @@
 # Implicit time integration of surface fluxes
 
-> Status: **in progress**. Draft PR implements `ExplicitFluxes`, `ImplicitFluxes`, `ExponentialFluxes`, `RationalFluxes`, with `ImplicitFluxes` the default for surface momentum, heat and humidity fluxes.
+> Status: **in progress**. Draft PR implements `ExplicitFluxes`, `ImplicitFluxes`, `ExponentialFluxes`, `RationalFluxes`, with `RationalFluxes` the default for surface momentum, heat and humidity fluxes.
 
 Date of initial draft: 2026-10-21
 
@@ -21,6 +21,10 @@ Base revision: d6e3286d
   exponential +5% time per step vs explicit. Added `RationalFluxes`, φ(z) = (6 + z)/(6 + 4z + z²),
   a rational approximation of the exponential with the same 1/z large-z limit at the cost of implicit.
   `ImplicitFluxes` stays the default. Documented in `docs/src/surface_fluxes.md`.
+- 2026-10-22: `RationalFluxes` made the default (`DEFAULT_FLUX_INTEGRATION`) by @milankl. Documentation
+  expanded: conductance `a = ρCV₀` is a mass exchange rate [kg/m²/s] for all fluxes; written as
+  `F = -c a (x - xₛ)` with `c = cₚ` for heat, so `a = -∂F/∂x` only for momentum and humidity, and `c`
+  cancels in the relaxation time scale `τ = Δp/(g a)`. Added derivations and `1 - zφ(z)` for each scheme.
 
 ## Problem description
 

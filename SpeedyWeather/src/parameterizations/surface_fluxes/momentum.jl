@@ -33,7 +33,7 @@ function variables(::SurfaceMomentumFlux)
     return (
         ParameterizationVariable(:boundary_layer_drag, Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
         ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
-        ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m^2"),
+        ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m^3"),
         ParameterizationVariable(:surface_air_temperature, Grid2D(), desc = "Surface air temperature", units = "K"),
     )
 end

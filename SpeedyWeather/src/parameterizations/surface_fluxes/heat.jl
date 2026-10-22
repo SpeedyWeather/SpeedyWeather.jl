@@ -93,7 +93,7 @@ variables(::SurfaceOceanHeatFlux) = (
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # leave out *cₚ here but include below to avoid division
-    conductance = ρ * drag_ocean * V₀                           # = -∂flux/∂T [kg/m²/s]
+    conductance = ρ * drag_ocean * V₀    # mass conductance [kg/m²/s], = -∂flux/∂T without cₚ
     flux_ocean = conductance * (SST[ij] - T)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
@@ -102,7 +102,7 @@ variables(::SurfaceOceanHeatFlux) = (
 
     # damp explicit flux for stable time integration with thin lowermost layers, applied
     # before storing so that coupled ocean/land receive the flux the atmosphere receives
-    conductance /= insulation  
+    conductance /= insulation
     flux_ocean *= surface_flux_damping(heat_flux.time_integration, (1 - land_fraction) * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling [W/m²]
@@ -170,7 +170,7 @@ variables(::SurfaceLandHeatFlux) = (
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # leave out *cₚ here but include below to avoid division
-    conductance = ρ * drag_land * V₀
+    conductance = ρ * drag_land * V₀     # mass conductance [kg/m²/s], = -∂flux/∂T without cₚ
     flux_land = conductance * (T_skin_land - T)
 
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
@@ -179,7 +179,7 @@ variables(::SurfaceLandHeatFlux) = (
 
     # damp explicit flux for stable time integration with thin lowermost layers, applied
     # before storing so that coupled ocean/land receive the flux the atmosphere receives
-    conductance /= insulation  # = -∂flux/∂x [kg/m²/s]
+    conductance /= insulation
     flux_land *= surface_flux_damping(heat_flux.time_integration, land_fraction * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling [W/m²]

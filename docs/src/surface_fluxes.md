@@ -98,48 +98,128 @@ the division by the heat capacity to convert to a rate of temperature change.
 
 ## [Time integration of surface fluxes](@id surface_flux_time_integration)
 
-The bulk surface fluxes of momentum, heat and humidity below all relax the lowermost layer
-variable ``x`` (``u, v, T`` or ``q``) towards a surface value ``x_s``, i.e. they are of the form
+### Surface fluxes as a relaxation
+
+The bulk surface fluxes of momentum, heat and humidity below all relax a variable ``x``
+of the lowermost layer ``N`` (``u, v, T`` or ``q``) towards a surface value ``x_s``
+(``0`` for momentum, the skin or sea surface temperature for heat, the saturation
+humidity at the surface for humidity). Each of them can be written as
 
 ```math
-F^\uparrow = -a (x - x_s), \qquad \frac{\partial x}{\partial t} = \frac{g F^\uparrow}{\Delta p_N} = -\frac{x - x_s}{\tau}, \qquad \tau = \frac{\Delta p_N}{g a}
+F^\uparrow = -c\, a\, (x - x_s), \qquad a = \rho_s C V_0
 ```
 
-with conductance ``a = -\partial F^\uparrow / \partial x`` in ``kg/m^2/s``, e.g. ``a = \rho_s C V_0 f_w``
-for momentum and ``a = \rho_s C V_0`` for heat and humidity (reduced by sea-ice or snow insulation
-and weighted by the ocean or land fraction). ``\tau`` is the time scale on which the surface
-relaxes the lowermost layer, which is short for a thin lowermost layer (small ``\Delta p_N``),
-strong winds or high drag. With an explicit time step ``\Delta t`` (``2\Delta t`` for leapfrog)
-the flux is unstable for ``z = \Delta t/\tau > 2``, which happens, e.g., with
-`FriersonSigmaCoordinates` at default resolution. All schemes therefore multiply the explicit
-flux by a damping factor ``\varphi(z)`` that is applied before the flux is stored, so that
-fluxes passed to ocean, land and output are the ones the atmosphere receives:
+with the conductance ``a`` in ``kg/m^2/s`` and a factor ``c`` that converts ``x`` into the
+quantity that is actually transported, see the table below. ``a`` is a mass exchange rate:
+the mass of air per square metre and second that effectively exchanges its momentum,
+heat or moisture with the surface. ``a`` contains the surface air density ``\rho_s``,
+the (dimensionless) drag coefficient ``C`` and the surface wind speed ``V_0``, it is
+additionally scaled by ``f_w`` for momentum, and divided by the sea-ice or snow insulation
+factors for heat and humidity. All fluxes are positive upward.
 
-| Scheme | ``\varphi(z)`` | Single step ``x \to x_s`` | Cost |
-| ------ | -------------- | ------------------------- | ---- |
-| `ExplicitFluxes()` | ``1`` | overshoots for ``z > 1``, unstable for ``z > 2`` | none |
-| `ImplicitFluxes()` (default) | ``\frac{1}{1 + z}`` | monotone, stable, first order | 1 division |
-| `ExponentialFluxes()` | ``\frac{1 - e^{-z}}{z}`` | monotone, stable, exact for fixed ``x_s`` | `exp`, ~5% of a time step at T32L8 |
-| `RationalFluxes()` | ``\frac{6 + z}{6 + 4z + z^2}`` | stable, ≤10% overshoot for ``z > 3`` | 1 division |
+| Flux | ``x`` | ``x_s`` | ``c`` | ``F^\uparrow`` units | ``a`` |
+| ---- | ----- | ------- | ----- | -------------------- | ----- |
+| Momentum | ``u, v`` [``m/s``] | ``0`` | ``1`` | ``kg/m/s^2 = Pa`` | ``\rho_s C V_0 f_w`` |
+| Heat | ``T`` [``K``] | ``T_{skin}`` or SST | ``c_p`` | ``W/m^2`` | ``\rho_s C V_0`` / insulation |
+| Humidity | ``q`` [``kg/kg``] | ``\alpha q^*(T_{skin})`` or ``q^*(SST)`` | ``1`` | ``kg/m^2/s`` | ``\rho_s C V_0`` / insulation |
 
-`RationalFluxes` approximates `ExponentialFluxes` to second order in ``z`` and has the same
-``1/z`` behaviour for large ``z``, at the cost of `ImplicitFluxes`. The scheme is chosen per flux,
-for example
+with ``q^*`` the saturation humidity and ``\alpha`` the soil moisture availability over land.
+Because of the factor ``c``, ``a = -\partial F^\uparrow / \partial x`` only holds for momentum and
+humidity, for heat it is ``-\partial F^\uparrow / \partial T = c_p a`` in ``W/m^2/K``.
+Note that ``\alpha`` only scales the surface value ``x_s``, not ``x``, so it does not enter ``a``.
+
+### Relaxation time scale
+
+A flux ``F^\uparrow`` through the bottom of layer ``N`` with pressure thickness ``\Delta p_N``
+changes the content of that layer. The layer has a mass of ``\Delta p_N / g`` per square metre,
+so its momentum, heat or moisture content is ``c (\Delta p_N / g) x`` per square metre
+and therefore
+
+```math
+\frac{\partial x}{\partial t} = \frac{g F^\uparrow}{c\, \Delta p_N} = -\frac{g a}{\Delta p_N}(x - x_s) = -\frac{x - x_s}{\tau},
+\qquad \tau = \frac{\Delta p_N}{g a}
+```
+
+The factor ``c`` appears both in the flux and in the content of the layer and cancels.
+That is why the heat capacity ``c_p`` does not appear in the conductance: the relaxation
+time scale ``\tau`` is the time it takes to exchange the mass of the lowermost layer
+``\Delta p_N/g`` with the surface at a rate ``a``, which is the same for momentum, heat
+and humidity if they use the same drag coefficient. In the code the heat flux is accordingly
+calculated without ``c_p`` (in ``K\,kg/m^2/s``) for the time integration, and only multiplied
+by ``c_p`` when stored in ``W/m^2``.
+
+``\tau`` is short for a thin lowermost layer (small ``\Delta p_N``), strong winds or high drag.
+With `FriersonSigmaCoordinates` for example, the lowermost layer is about 3 times thinner than
+with equi-distant ``\sigma`` levels, which can reduce ``\tau`` below the time step.
+
+### Damping the explicit flux
+
+Over one time step ``\Delta t`` (``2\Delta t`` for leapfrog, as the tendency is applied from
+``t - \Delta t`` to ``t + \Delta t``) define ``z = \Delta t / \tau``. Evaluating the flux
+explicitly (with ``x`` at the beginning of the time step) changes the deviation from the
+surface value as
+
+```math
+x^{new} - x_s = (1 - z)(x - x_s)
+```
+
+which overshoots the surface value for ``z > 1`` and is unstable (``|1 - z| > 1``) for ``z > 2``.
+To avoid this, the explicit flux is multiplied by a damping factor ``\varphi(z)``, so that
+
+```math
+F^\uparrow \to \varphi(z) F^\uparrow, \qquad x^{new} - x_s = (1 - z \varphi(z))(x - x_s)
+```
+
+``\varphi`` only depends on ``z``, so the damped flux can be calculated directly from the explicit
+one without any iteration or solving a system. Because ``\varphi`` is applied to the flux
+(not only to the tendency) before it is stored, the fluxes passed on to the ocean and land
+models and to the output are consistent with those the atmosphere receives, conserving
+momentum, energy and water between the components. For the land and ocean fluxes, ``a``
+is weighted by the land or ocean fraction respectively, as only that fraction of the flux
+enters the lowermost layer of the atmosphere. The following schemes are implemented
+
+| Scheme | ``\varphi(z)`` | ``1 - z\varphi(z)`` | Single step ``x \to x_s`` | Cost |
+| ------ | -------------- | ------------------- | ------------------------- | ---- |
+| `ExplicitFluxes()` | ``1`` | ``1 - z`` | overshoots for ``z > 1``, unstable for ``z > 2`` | none |
+| `ImplicitFluxes()` | ``\frac{1}{1 + z}`` | ``\frac{1}{1 + z}`` | monotone, stable, first order | 1 division |
+| `ExponentialFluxes()` | ``\frac{1 - e^{-z}}{z}`` | ``e^{-z}`` | monotone, stable, exact for fixed ``x_s`` | `exp`, ~5% of a time step at T32L8 |
+| `RationalFluxes()` (default) | ``\frac{6 + z}{6 + 4z + z^2}`` | ``\frac{6 - 2z}{6 + 4z + z^2}`` | stable, ≤10% overshoot for ``z > 3`` | 1 division |
+
+- `ImplicitFluxes` evaluates the flux with ``x`` at the end of the time step (backward Euler),
+  ``x^{new} - x_s = (x - x_s) - z (x^{new} - x_s)``, which is unconditionally stable and monotone
+  but overdamps: for ``z \to 0`` it is only first-order accurate, ``\varphi \approx 1 - z``.
+- `ExponentialFluxes` uses the exact solution ``x(t) - x_s = (x - x_s) e^{-t/\tau}`` of the
+  relaxation equation for fixed ``a`` and ``x_s`` (exponential time differencing).
+  ``\varphi = 1 - z/2 + z^2/6 - \dots`` for small ``z`` and ``\varphi \approx 1/z`` for large ``z``,
+  meaning ``x`` is relaxed fully to ``x_s`` within one time step. This requires an `exp`
+  for every grid point and flux.
+- `RationalFluxes` approximates ``\varphi`` of `ExponentialFluxes` by a rational function that
+  matches its expansion to second order, ``1 - z/2 + z^2/6``, and has the same ``1/z``
+  behaviour for large ``z``, at the cost of `ImplicitFluxes`. ``1 - z\varphi(z)`` becomes
+  negative for ``z > 3`` with a minimum of about ``-0.1`` near ``z \approx 8``,
+  meaning that ``x`` overshoots the surface value by at most 10% of the initial deviation,
+  then tends to zero for large ``z``.
+
+The drag coefficient ``C``, the wind speed ``V_0`` and the surface value ``x_s`` are held
+fixed over the time step (linearisation), which makes ``a`` and ``\tau`` constant
+within a time step. Prescribed fluxes (e.g. `PrescribedOceanHeatFlux`) are applied as given.
+
+### Choosing the time integration
+
+The scheme is chosen per flux, for example
 
 ```julia
 spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
 surface_momentum_flux = SurfaceMomentumFlux(spectral_grid, time_integration = ExponentialFluxes())
 surface_heat_flux = SurfaceHeatFlux(
     spectral_grid,
-    ocean = SurfaceOceanHeatFlux(spectral_grid, time_integration = RationalFluxes()),
+    ocean = SurfaceOceanHeatFlux(spectral_grid, time_integration = ImplicitFluxes()),
     land = SurfaceLandHeatFlux(spectral_grid, time_integration = ExplicitFluxes()),
 )
 model = PrimitiveWetModel(spectral_grid; surface_momentum_flux, surface_heat_flux)
 ```
 
 and similarly for `SurfaceOceanHumidityFlux` and `SurfaceLandHumidityFlux`.
-Prescribed fluxes (e.g. `PrescribedOceanHeatFlux`) are applied as given.
-C, ``V_0`` and ``x_s`` are held fixed over the time step (linearisation).
 
 ## Bulk Richardson-based drag coefficient
 
