@@ -182,8 +182,16 @@ F^\uparrow \to \varphi(z) F^\uparrow, \qquad x^{new} - x_s = (1 - z \varphi(z))(
 This is exponential time differencing. ``\varphi`` only depends on ``z``, so the damped flux is
 calculated directly from the explicit one without iterating or solving a system.
 ``\varphi = 1 - z/2 + z^2/6 - \dots`` for small ``z``, and ``\varphi \approx 1/z`` for large ``z``,
-meaning ``x`` is relaxed fully to ``x_s`` within one time step. Other time integration schemes
-correspond to other approximations of this ``\varphi``:
+meaning ``x`` is relaxed fully to ``x_s`` within one time step.
+
+However, evaluating ``\varphi`` requires an exponential for every grid point, every surface flux
+and every time step. This is relatively expensive: at T32L8 using `ExponentialFluxes` for all
+surface fluxes increases the time per time step by about 5%, compared to about 1% for
+`ImplicitFluxes`. We therefore look for cheaper approximations of ``\varphi`` that keep its
+essential properties: ``\varphi \approx 1`` for small ``z`` (the flux is unchanged if
+the time step resolves the relaxation) and ``\varphi \approx 1/z`` for large ``z``
+(``x`` relaxes to ``x_s`` but does not overshoot it). The other time integration schemes
+correspond to such approximations of the exact ``\varphi``:
 
 - **Explicit**, ``\varphi = 1``, only approximates the exact solution to first order in ``z``.
   ``1 - z`` replaces ``e^{-z}``, which overshoots the surface value for ``z > 1``
