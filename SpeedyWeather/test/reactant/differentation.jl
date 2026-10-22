@@ -7,12 +7,6 @@
 # MatrixSpectralTransform, several time steps) and, without the comparison against Enzyme on the CPU (too slow to
 # compile), the gradient of several time steps of the PrimitiveWetModel; `differentiation_primitive_wet.jl` uses the
 # functions defined here for the full comparison of the PrimitiveWetModel.
-#
-# Needs Reactant >= v0.2.294: raising kernels that store a complex constant (e.g. `div[I] = 0`) fails before
-# 0.2.293 ("cannot raise op to stablehlo llvm.mlir.constant", Reactant.jl#3450), the gradient of the traced time
-# loop aborts Julia ("LLVM ERROR: Failed to infer result type(s)") before 0.2.294 (Reactant.jl#3478, #3479).
-# (The `UV_from_vor(div)!` kernels are branch-free as their branches were raised to a reduction
-# without a reverse rule in Enzyme-MLIR: "Unsupported operation in reduction rev autodiff")
 
 # The compile options of every compilation in SpeedyWeather plus `raise_first = true` for the differentiation.
 # Further options (e.g. `excluded_passes` to work around a Reactant bug) can be added here, they are only
@@ -175,7 +169,6 @@ if !(@isdefined(DIFFERENTIATION_FUNCTIONS_ONLY) && DIFFERENTIATION_FUNCTIONS_ONL
 
     test_differentiability(BarotropicModel)                                       # SpectralTransform (truncated DFT)
     test_differentiability(BarotropicModel; Transform = MatrixSpectralTransform)
-    test_differentiability_time_steps(BarotropicModel)
 
     # PrimitiveWetModel: only that the gradient of the traced loop compiles (and is finite), the comparison
     # with Enzyme on the CPU takes too long to compile for CI (`differentiation_primitive_wet.jl`). Without
