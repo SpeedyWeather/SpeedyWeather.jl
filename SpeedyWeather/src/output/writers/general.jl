@@ -7,10 +7,8 @@ const DEFAULT_OUTPUT_INTERVAL = Hour(6)
 const OUTPUT_VARIABLES_DICT = Dict{Symbol, AbstractOutputVariable}
 OutputVariablesDict() = OUTPUT_VARIABLES_DICT()
 
-const DEFAULT_MISSING_VALUE = NaN
-const DEFAULT_COMPRESSION_LEVEL = 1
-const DEFAULT_SHUFFLE = false
-const DEFAULT_KEEPBITS = 15
+# defaults for missing value, compression and keepbits of output variables
+# are defined in the OutputVariables module, e.g. `OutputVariables.DEFAULT_KEEPBITS`
 
 """$(TYPEDSIGNATURES)
 Add `outputvariables` to a dictionary defining the variables subject to NetCDF output."""
@@ -55,7 +53,7 @@ function add_default!(
         output_variables::OUTPUT_VARIABLES_DICT,
         Model::Type{<:Barotropic},
     )
-    return add!(output_variables, VorticityOutput(), ZonalVelocityOutput(), MeridionalVelocityOutput())
+    return add!(output_variables, OutputVariables.Vorticity(), OutputVariables.ZonalVelocity(), OutputVariables.MeridionalVelocity())
 end
 
 """$(TYPEDSIGNATURES)
@@ -66,7 +64,7 @@ function add_default!(
         Model::Type{<:ShallowWater},
     )
     add_default!(variables, Barotropic)
-    return add!(variables, InterfaceDisplacementOutput())
+    return add!(variables, OutputVariables.InterfaceDisplacement())
 end
 
 """$(TYPEDSIGNATURES)
@@ -77,7 +75,7 @@ function add_default!(
         Model::Type{<:PrimitiveDry},
     )
     add_default!(variables, Barotropic)
-    return add!(variables, MeanSeaLevelPressureOutput(), TemperatureOutput())
+    return add!(variables, OutputVariables.MeanSeaLevelPressure(), OutputVariables.Temperature())
 end
 
 """$(TYPEDSIGNATURES)
@@ -88,7 +86,7 @@ function add_default!(
         Model::Type{<:PrimitiveWet},
     )
     add_default!(variables, PrimitiveDry)
-    return add!(variables, HumidityOutput())
+    return add!(variables, OutputVariables.Humidity())
 end
 
 """$(TYPEDSIGNATURES)
@@ -129,8 +127,8 @@ host_field(field::AbstractField) = ismatching(CPU(), field.data) ? field : on_ar
 Scratch field on the output grid (on the model's architecture) to interpolate `variable`
 into, and its host (CPU) equivalent to write from, see [`output_scratch_fields`](@ref)."""
 function scratch_fields(output::AbstractOutput, variable::AbstractOutputVariable)
-    is3D(variable) || return output.field2D, output.host2D
-    is_land(variable) && return output.field3Dland, output.host3Dland
+    OutputVariables.is3D(variable) || return output.field2D, output.host2D
+    OutputVariables.is_land(variable) && return output.field3Dland, output.host3Dland
     return output.field3D, output.host3D
 end
 
@@ -244,18 +242,18 @@ function output!(
         simulation::AbstractSimulation,
     )
     # escape immediately after first call if variable doesn't have a time dimension
-    ~hastime(variable) && output.output_counter > 1 && return nothing
+    ~OutputVariables.hastime(variable) && output.output_counter > 1 && return nothing
 
     # scratch field to interpolate into (on the model's architecture) and its host equivalent
     var, host = scratch_fields(output, variable)
 
-    ori = path_or_nothing(variable, simulation)         # original array as in simulation
+    ori = OutputVariables.path_or_nothing(variable, simulation)         # original array as in simulation
     isnothing(ori) && return nothing                    # silently escape early if variable is not defined in the simulation
     ts = simulation.model.time_stepping
 
     # decide on existence of step dimension by comparing dimensionality
-    has_step = (is3D(variable) && ndims(ori) == 3) ||   # 2D/3D variables have 1/2 array dimensions respectively
-        (is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
+    has_step = (OutputVariables.is3D(variable) && ndims(ori) == 3) ||   # 2D/3D variables have 1/2 array dimensions respectively
+        (OutputVariables.is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
     ori = has_step ? get_prognostic_step(ori, ts, output) : ori
 
     # interpolate onto the output's vertical layers (no-op on ModelLayers), on the model
