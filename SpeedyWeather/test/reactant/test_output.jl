@@ -113,7 +113,7 @@ using Zarr
     # the height of the bottom layer is computed in a kernel, in a broadcast Reactant traces the
     # layer index for which `pressure(k::Integer, ...)` doesn't apply
     @testset "10m wind output on Reactant" begin
-        variable = SpeedyWeather.ZonalVelocity10mOutput()
+        variable = OutputVariables.ZonalVelocity10m()
         simulations = map((SpeedyWeather.CPU(), ReactantDevice())) do architecture
             spectral_grid = SpectralGrid(; architecture, nlayers = 8, truncation = TRUNCATION)
             spectral_transform = MatrixSpectralTransform(spectral_grid)
