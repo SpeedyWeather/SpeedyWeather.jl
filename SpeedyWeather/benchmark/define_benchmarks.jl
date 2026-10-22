@@ -22,15 +22,16 @@ benchmarks[:benchmark200] = BenchmarkSuite(
 # counts (not on CPU, too slow). Each configuration is run with the default (FFT + Legendre)
 # SpectralTransform and additionally with MatrixSpectralTransform up to an
 # architecture-dependent maximum truncation, as the dense matrix transform gets
-# too large (memory + speed) at high resolution: up to T171 on GPU and TPU (incl. Reactant GPU),
-# up to T86 on CPU (incl. Reactant CPU). `ARCH_LABEL`, `ON_ACCELERATOR` and `RUN_HI_RES` are set in manual_benchmarking.jl.
+# too large (memory + speed) at high resolution: up to T171 on GPU (incl. Reactant GPU), up to T128
+# on TPU (T171 needs ~17 GB, more than some TPU chips have), up to T86 on CPU (incl. Reactant CPU).
+# `ARCH_LABEL`, `ON_ACCELERATOR` and `RUN_HI_RES` are set in manual_benchmarking.jl.
 let hi_res = RUN_HI_RES && ON_ACCELERATOR ? [342, 512] : Int[],
         truncations_L8 = vcat([32, 43, 64, 86, 128, 171, 256], hi_res),
         truncations_L16_L24 = vcat([86, 128, 171, 256], hi_res),
         truncations = vcat(truncations_L8, truncations_L16_L24, truncations_L16_L24),
         nlayers = vcat(fill(8, length(truncations_L8)), fill(16, length(truncations_L16_L24)), fill(24, length(truncations_L16_L24)))
 
-    max_truncation_matrix = ON_ACCELERATOR ? 180 : 86
+    max_truncation_matrix = ARCH_LABEL == "reactant-tpu" ? 128 : ON_ACCELERATOR ? 180 : 86
     matrix_idx = findall(t -> t <= max_truncation_matrix, truncations)
     truncations_matrix = truncations[matrix_idx]
     nlayers_matrix = nlayers[matrix_idx]

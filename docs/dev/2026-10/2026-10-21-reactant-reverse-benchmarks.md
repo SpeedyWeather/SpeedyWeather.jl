@@ -74,6 +74,10 @@ Added the architecture `reactant-tpu` (section 7, 2026-10-22). It is treated lik
 resolution choices, and its machine info lists the TPU devices. It is untested on a TPU: none is
 available here.
 
+> then don't do T171 matrix transform on TPUs
+
+The matrix transform goes up to T128 on TPU (section 7).
+
 ## Problem description
 
 This plan makes two changes to `SpeedyWeather/benchmark/manual_benchmarking.jl`:
@@ -381,8 +385,10 @@ left for a decision.
 - **Like a GPU.** The new driver constant `ON_ACCELERATOR` replaces `ON_GPU` and covers
   `gpu-nvidia`, `gpu-amd`, `reactant-gpu` and `reactant-tpu`. On a TPU:
   - `--hi-res` adds T342 and T512;
-  - the matrix transform goes up to T171;
   - the reverse suite goes up to T256.
+- **Except the matrix transform**, which goes up to T128 on TPU instead of T171 (on request, see the
+  revision log). T171 needs about 17 GB (H100 numbers), more than the HBM of some TPU chips (e.g.
+  16 GB on v5e).
 - **Like the other Reactant architectures.** `--reverse` works; `--SPEEDY` is refused at startup.
 - **Driver cleanup.** A single `ON_REACTANT` constant now replaces the repeated
   `reactant-cpu || reactant-gpu` checks.
@@ -401,8 +407,9 @@ What to expect on a TPU (not testable here):
   PrecisionConfig.HIGHEST)`.
 - **Float64.** TPUs have no native Float64, so the Float64 configuration of `:benchmark300` will
   probably fail. Failures are recorded per configuration and the other configurations continue.
-- **Memory.** The matrix transform at T171 needs about 17 GB (H100 numbers), more than the HBM of
-  some TPU chips (e.g. 16 GB on v5e). It would then fail and be recorded the same way.
+- **Memory.** With the matrix transform capped at T128 (about 5.5 GB), the largest configurations
+  are T512 at 24 layers with `--hi-res`, and the reverse suite at T256. Neither is measured on a TPU
+  yet.
 
 ### Files
 
