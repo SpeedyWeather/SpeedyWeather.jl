@@ -1,6 +1,6 @@
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ConvectiveRainOutput{F, R} <: AbstractOutputVariable
+@kwdef mutable struct ConvectiveRain{F, R} <: AbstractOutputVariable
     name::String = "rain_conv"
     unit::String = "mm"
     long_name::String = "accumulated convective rain"
@@ -10,20 +10,20 @@ Fields are: $(TYPEDFIELDS)"""
     shuffle::Bool = true
     keepbits::Int = 20
     transform::F = (x) -> 1000x             # [m] to [mm]
-    rate::R = ConvectiveRainRateOutput()    # include here to be called at finalize!
+    rate::R = ConvectiveRainRate()    # include here to be called at finalize!
 end
 
-path(::ConvectiveRainOutput, simulation) =
+path(::ConvectiveRain, simulation) =
     simulation.variables.parameterizations.rain_convection
 
 # at finalize step postprocess the convective rain to get the rate
-finalize!(output::NetCDFOutput, variable::ConvectiveRainOutput, args...) = output!(output, variable.rate, variable)
+finalize!(output::NetCDFOutput, variable::ConvectiveRain, args...) = output!(output, variable.rate, variable)
 
 abstract type AbstractRateOutputVariable <: AbstractOutputVariable end
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ConvectiveRainRateOutput{F} <: AbstractRateOutputVariable
+@kwdef mutable struct ConvectiveRainRate{F} <: AbstractRateOutputVariable
     name::String = "rain_conv_rate"
     unit::String = "mm/hr"
     long_name::String = "convective rain rate"
@@ -60,9 +60,9 @@ function output!(
     return nothing
 end
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LargeScaleRainOutput{F, R} <: AbstractOutputVariable
+@kwdef mutable struct LargeScaleRain{F, R} <: AbstractOutputVariable
     name::String = "rain_cond"
     unit::String = "mm"
     long_name::String = "accumulated large-scale rain"
@@ -72,18 +72,18 @@ Fields are: $(TYPEDFIELDS)"""
     shuffle::Bool = true
     keepbits::Int = 20
     transform::F = (x) -> 1000x             # [m] to [mm]
-    rate::R = LargeScaleRainRateOutput()    # include here to be called at finalize!
+    rate::R = LargeScaleRainRate()    # include here to be called at finalize!
 end
 
-path(::LargeScaleRainOutput, simulation) =
+path(::LargeScaleRain, simulation) =
     simulation.variables.parameterizations.rain_large_scale
 
 # at finalize step postprocess the accumulated rain to get the rate
-finalize!(output::NetCDFOutput, variable::LargeScaleRainOutput, args...) = output!(output, variable.rate, variable)
+finalize!(output::NetCDFOutput, variable::LargeScaleRain, args...) = output!(output, variable.rate, variable)
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LargeScaleRainRateOutput{F} <: AbstractRateOutputVariable
+@kwdef mutable struct LargeScaleRainRate{F} <: AbstractRateOutputVariable
     name::String = "rain_cond_rate"
     unit::String = "mm/hr"
     long_name::String = "large-scale rain rate"
@@ -95,9 +95,9 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> 1000x     # [m] to [mm]
 end
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LargeScaleSnowOutput{F, R} <: AbstractOutputVariable
+@kwdef mutable struct LargeScaleSnow{F, R} <: AbstractOutputVariable
     name::String = "snow_cond"
     unit::String = "mm"
     long_name::String = "accumulated large-scale snow"
@@ -107,18 +107,18 @@ Fields are: $(TYPEDFIELDS)"""
     shuffle::Bool = true
     keepbits::Int = 20
     transform::F = (x) -> 1000x             # [m] to [mm]
-    rate::R = LargeScaleSnowRateOutput()    # include here to be called at finalize!
+    rate::R = LargeScaleSnowRate()    # include here to be called at finalize!
 end
 
-path(::LargeScaleSnowOutput, simulation) =
+path(::LargeScaleSnow, simulation) =
     simulation.variables.parameterizations.snow_large_scale
 
 # at finalize step postprocess the convective snow to get the rate
-finalize!(output::NetCDFOutput, variable::LargeScaleSnowOutput, args...) = output!(output, variable.rate, variable)
+finalize!(output::NetCDFOutput, variable::LargeScaleSnow, args...) = output!(output, variable.rate, variable)
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LargeScaleSnowRateOutput{F} <: AbstractRateOutputVariable
+@kwdef mutable struct LargeScaleSnowRate{F} <: AbstractRateOutputVariable
     name::String = "snow_cond_rate"
     unit::String = "mm/hr"
     long_name::String = "large-scale snow rate"
@@ -130,9 +130,9 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> 1000x     # [m] to [mm]
 end
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct CloudTopOutput <: AbstractOutputVariable
+@kwdef mutable struct CloudTop <: AbstractOutputVariable
     name::String = "cloud_top"
     unit::String = "m"
     long_name::String = "cloud top height"
@@ -144,12 +144,12 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # cloud top height [m] as diagnosed by the clouds, not the layer index `cloud_top`
-path(::CloudTopOutput, simulation) =
+path(::CloudTop, simulation) =
     simulation.variables.parameterizations.cloud_top_height
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct CloudCoverOutput <: AbstractOutputVariable
+@kwdef mutable struct CloudCover <: AbstractOutputVariable
     name::String = "cloud_cover"
     unit::String = "1"
     long_name::String = "cloud cover"
@@ -160,12 +160,12 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::CloudCoverOutput, simulation) =
+path(::CloudCover, simulation) =
     simulation.variables.parameterizations.cloud_cover
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ConvectiveSnowOutput{F, R} <: AbstractOutputVariable
+@kwdef mutable struct ConvectiveSnow{F, R} <: AbstractOutputVariable
     name::String = "snow_conv"
     unit::String = "mm"
     long_name::String = "accumulated convective snow"
@@ -175,18 +175,18 @@ Fields are: $(TYPEDFIELDS)"""
     shuffle::Bool = true
     keepbits::Int = 20
     transform::F = (x) -> 1000x             # [m] to [mm]
-    rate::R = ConvectiveSnowRateOutput()    # include here to be called at finalize!
+    rate::R = ConvectiveSnowRate()    # include here to be called at finalize!
 end
 
-path(::ConvectiveSnowOutput, simulation) =
+path(::ConvectiveSnow, simulation) =
     simulation.variables.parameterizations.snow_convection
 
 # at finalize step postprocess the convective snow to get the rate
-finalize!(output::NetCDFOutput, variable::ConvectiveSnowOutput, args...) = output!(output, variable.rate, variable)
+finalize!(output::NetCDFOutput, variable::ConvectiveSnow, args...) = output!(output, variable.rate, variable)
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ConvectiveSnowRateOutput{F} <: AbstractRateOutputVariable
+@kwdef mutable struct ConvectiveSnowRate{F} <: AbstractRateOutputVariable
     name::String = "snow_conv_rate"
     unit::String = "mm/hr"
     long_name::String = "convective snow rate"
@@ -199,11 +199,11 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # collect all in one for convenience
-PrecipitationOutput() = (
-    ConvectiveRainOutput(),
-    ConvectiveSnowOutput(),
-    LargeScaleRainOutput(),
-    LargeScaleSnowOutput(),
-    CloudTopOutput(),
-    CloudCoverOutput(),
+Precipitation() = (
+    ConvectiveRain(),
+    ConvectiveSnow(),
+    LargeScaleRain(),
+    LargeScaleSnow(),
+    CloudTop(),
+    CloudCover(),
 )

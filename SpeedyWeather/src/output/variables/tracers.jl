@@ -1,4 +1,4 @@
-@kwdef mutable struct TracerOutput{F} <: AbstractOutputVariable
+@kwdef mutable struct Tracer{F} <: AbstractOutputVariable
     name::String = "tracer1"
     unit::String = "?"
     long_name::String = "tracer1"
@@ -11,8 +11,8 @@
 end
 
 # as tracers are identified by their name::Symbol, allow this too
-TracerOutput(name::Symbol; kwargs...) =
-    TracerOutput(; name = string(name), long_name = string(name), kwargs...)
+Tracer(name::Symbol; kwargs...) =
+    Tracer(; name = string(name), long_name = string(name), kwargs...)
 
-path(tracer::TracerOutput, simulation) =
+path(tracer::Tracer, simulation) =
     simulation.variables.grid.tracers[Symbol(tracer.name)]
