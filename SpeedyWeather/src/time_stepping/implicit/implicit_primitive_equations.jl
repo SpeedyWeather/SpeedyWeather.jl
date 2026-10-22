@@ -350,22 +350,14 @@ end
     # Get degree l for this spectral mode
     l = l_indices[lm]
 
-    # All operators are real, so real and imaginary part are corrected independently. They are
-    # accumulated separately (identical results): Reactant (raise = true) miscompiles the store of a
-    # complex accumulator, a negative real part turns an imaginary part of ±0 (all m = 0 modes) into NaN
-    NF = real(eltype(temp_tend))
-
     # Step 1: Move implicit terms of temperature equation from time step i to i-1
     # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
     for k in 1:nlayers
-        temp_tend_re = zero(NF)
-        temp_tend_im = zero(NF)
+        temp_tend_val = zero(eltype(temp_tend))
         for r in 1:nlayers
-            Δdiv = divergence[lm, r, 1] - divergence[lm, r, 2]
-            temp_tend_re += L[k, r] * real(Δdiv)
-            temp_tend_im += L[k, r] * imag(Δdiv)
+            temp_tend_val += L[k, r] * (divergence[lm, r, 1] - divergence[lm, r, 2])
         end
-        temp_tend[lm, k, temp_step] += complex(temp_tend_re, temp_tend_im)
+        temp_tend[lm, k, temp_step] += temp_tend_val
     end
 
     eigenvalue = -l * (l - 1)  # 1-based, -l*(l+1) → -l*(l-1)
@@ -375,58 +367,43 @@ end
     # scratch array, see the note at the launch site.
     geopotential = ntuple(Val(nlayers)) do k
         # skip 1:k-1 as integration is surface to k
-        geopotential_re = zero(real(eltype(temp_tend)))
-        geopotential_im = zero(real(eltype(temp_tend)))
+        geopotential_val = zero(eltype(temp_tend))
         for r in k:nlayers
-            temp_tend_r = @inbounds temp_tend[lm, r, temp_step]
-            geopotential_re += @inbounds R[k, r] * real(temp_tend_r)
-            geopotential_im += @inbounds R[k, r] * imag(temp_tend_r)
+            geopotential_val += @inbounds R[k, r] * temp_tend[lm, r, temp_step]
         end
-        (geopotential_re, geopotential_im)
+        geopotential_val
     end
 
     # Step 3: Calculate the G = G_D + ξRG_T + ξUG_lnps terms
     # ∇² not part of U so *eigenvalues here
-    pres_tend_lm = pres_tend[lm, pres_step]
     G = ntuple(Val(nlayers)) do k
-        div_tend_k = @inbounds div_tend[lm, k, div_step]
-        G_re = real(div_tend_k) + ξ * eigenvalue * (@inbounds U[k] * real(pres_tend_lm) + geopotential[k][1])
-        G_im = imag(div_tend_k) + ξ * eigenvalue * (@inbounds U[k] * imag(pres_tend_lm) + geopotential[k][2])
-        (G_re, G_im)
+        @inbounds div_tend[lm, k, div_step] + ξ * eigenvalue * (U[k] * pres_tend[lm, pres_step] + geopotential[k])
     end
 
     # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
     for k in 1:nlayers
-        div_re = zero(NF)
-        div_im = zero(NF)
+        div_val = zero(eltype(div_tend))
         for r in 1:nlayers
-            div_re += S⁻¹[l, k, r] * G[r][1]
-            div_im += S⁻¹[l, k, r] * G[r][2]
+            div_val += S⁻¹[l, k, r] * G[r]
         end
-        div_tend[lm, k, div_step] = complex(div_re, div_im)
+        div_tend[lm, k, div_step] = div_val
     end
 
     # Step 5: Semi implicit corrections for temperature and pressure
 
     # Step 5a: Temperature correction δT = G_T + ξLδD
     for k in 1:nlayers
-        temp_correction_re = zero(NF)
-        temp_correction_im = zero(NF)
+        temp_correction = zero(eltype(temp_tend))
         for r in 1:nlayers
-            div_tend_r = div_tend[lm, r, div_step]
-            temp_correction_re += ξ * L[k, r] * real(div_tend_r)
-            temp_correction_im += ξ * L[k, r] * imag(div_tend_r)
+            temp_correction += ξ * L[k, r] * div_tend[lm, r, div_step]
         end
-        temp_tend[lm, k, temp_step] += complex(temp_correction_re, temp_correction_im)
+        temp_tend[lm, k, temp_step] += temp_correction
     end
 
     # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
-    pres_correction_re = zero(NF)
-    pres_correction_im = zero(NF)
+    pres_correction = zero(eltype(pres_tend))
     for k in 1:nlayers
-        div_tend_k = div_tend[lm, k, div_step]
-        pres_correction_re += ξ * W[k] * real(div_tend_k)
-        pres_correction_im += ξ * W[k] * imag(div_tend_k)
+        pres_correction += ξ * W[k] * div_tend[lm, k, div_step]
     end
-    pres_tend[lm, pres_step] += complex(pres_correction_re, pres_correction_im)
+    pres_tend[lm, pres_step] += pres_correction
 end
