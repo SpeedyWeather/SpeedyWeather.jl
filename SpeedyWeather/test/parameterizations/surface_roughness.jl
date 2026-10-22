@@ -94,10 +94,10 @@
 
         # all roughness lengths are finite and the blend stays strictly positive
         for (sr, lsr, osr) in (
-            (srM, lsrM, osrM),
-            (srH, lsrH, osrH),
-            (srQ, lsrQ, osrQ),
-        )
+                (srM, lsrM, osrM),
+                (srH, lsrH, osrH),
+                (srQ, lsrQ, osrQ),
+            )
             @test all(isfinite, sr)
             @test all(>(0), sr)
             @test all(>=(0), lsr)

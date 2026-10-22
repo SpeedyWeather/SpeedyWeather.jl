@@ -343,9 +343,17 @@ end
     T = soil_temperature_bottom
     W = soil_moisture_bottom
 
+    # Ensure positive bases for fractional powers
+    ε = eps(NF)
+
     # Gamma
-    gamma_term1_num = (scheme.h_c1^scheme.h_c2) * min(C_H, L_H)
-    gamma_term1_den = (L_L + T)^scheme.h_c2
+    base1 = max(scheme.h_c1, ε)
+    base2 = max(L_L + T, ε)
+    base3 = max(scheme.h_c7, ε)
+
+    gamma_term1_num = base1^scheme.h_c2 * min(C_H, L_H)
+    # The power can underflow even when its base is positive.
+    gamma_term1_den = max(base2^scheme.h_c2, floatmin(NF))
     gamma_term1 = gamma_term1_num / gamma_term1_den + L_H
 
     gamma_term2 = muladd(NF(2), C_H, scheme.h_c3)
@@ -355,7 +363,7 @@ end
     inner_min = min(C_L, L_L - W)
 
     arg1 = muladd(scheme.h_c5, Γ - scheme.h_c4 + C_L * inner_min, - (scheme.h_c6 * L_H))
-    arg2 = scheme.h_c8 * (scheme.h_c7^C_H)
+    arg2 = scheme.h_c8 * base3^C_H
     z₀ = exp(min(arg1, arg2))
 
     # Physical limits from IFS documentation
