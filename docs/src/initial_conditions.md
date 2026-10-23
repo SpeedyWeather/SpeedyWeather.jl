@@ -333,7 +333,7 @@ at mid-latitudes, then check that the resulting meridional temperature contrast 
 The initial conditions remain balanced for any choice of parameters, only how close they
 are to the equilibrium climate depends on them.
 
-Over orography the surface pressure is set hydrostatically with the temperature ``T_0 - \Gamma z``
+Over orography the surface pressure is set hydrostatically with the temperature ``T_0 - \Gamma h`` at orographic height ``h`` (in meters)
 and the temperature above is evaluated with ``p/p_0 = \sigma p_s/p_0`` in place of ``\sigma``.
 Air over a mountain is then as cold as the free atmosphere at the same pressure, otherwise the
 initial imbalance between surface pressure and temperature radiates gravity waves.

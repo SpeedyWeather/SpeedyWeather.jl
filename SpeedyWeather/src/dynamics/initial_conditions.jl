@@ -734,7 +734,7 @@ Balance then gives the temperature (JW eq. 6 is the special case U = u₀cos^(3/
 A and B have zero global mean, so T̄(σ) = max(T₀ σ^(R_dΓ/g), Tmin) is the global-mean
 temperature profile. Sets vorticity (including the JW perturbation to trigger baroclinic
 instability), divergence (JW perturbation), surface pressure and temperature. The surface
-pressure is hydrostatic with T₀ - Γz on orography and temperature is evaluated with
+pressure is hydrostatic with T₀ - Γh on orography of height h and temperature is evaluated with
 p/p₀ = σpₛ/p₀ instead of σ, so that both are consistent over orography. Do not combine
 with `PressureOnOrography`, which would overwrite the surface pressure. Combine with
 `ConstantRelativeHumidity` for humidity.
