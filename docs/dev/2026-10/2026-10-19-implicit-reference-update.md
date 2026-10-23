@@ -1,6 +1,6 @@
 # Recompute the semi-implicit reference temperature profile periodically
 
-> Status: **in progress**. Implemented with a `ReferenceTemperatureSchedule`, uncommitted on `mg/instability`.
+> Status: **in progress**. Implemented with a general `PeriodicSchedule` on `mg/instability` (PR #1332), after review.
 > T256L8 on the GPU is stable in all 10 runs with it: 3 × 2 years each with `Day(1)`, `Day(7)` and `Day(14)`,
 > and 10 years with `Day(1)`. The default blew up in 8 of 8. GPU and differentiability tests are still to run.
 
@@ -56,6 +56,17 @@ Base revision: `e410eed0` (branch `mg/instability`, identical to `main`)
 
 - 2026-10-20: simplified to that single scenario (see item 6 of *Summary of changes*).
 
+> PR review: this is very similar to the `Schedule` we already have [...] we have at least 3 schedules we could all
+> move into `src/time_stepping`: `Schedule` (periodic or aperiodic via bitvector), `PeriodicSchedule` (`every::Second`
+> converted to `every_n_steps` at `initialize!`, mutable), `StepSchedule` (immutable, just `every_n_steps`). Each
+> initialized with `model.time_stepping` and with an `isscheduled(::MySchedule, ::Clock)` method.
+
+- 2026-10-23: `ReferenceTemperatureSchedule` and `recompute_reference_temperature` replaced by a general
+  `PeriodicSchedule`; new immutable `StepSchedule`; `Schedule` moved to `time_stepping/schedules.jl`. The
+  implicit option is now `schedule`, the recomputation counts `time_step_counter` (spin-up excluded) like all
+  other schedules, and the architecture hook for Reactant is dropped in favour of `StepSchedule(1)`.
+  `Schedule` keeps being initialized with the clock, as its bitvector needs start and length of the run.
+
 ## Problem description
 
 The default `PrimitiveWetModel` at T256L8 blows up after 6 to 12 months. The investigation is in
@@ -101,27 +112,26 @@ across realizations, and it is also what the model does at every new `run!`.
 
 ## Summary of changes
 
-1. New `ReferenceTemperatureSchedule <: AbstractSchedule` (exported, mutable, in
-   `SpeedyWeather/src/time_stepping/implicit/implicit_primitive_equations.jl`):
-   - `every::Second = Day(1)`, the period set when the model is constructed (`Second(0)` = never, the old
-     behaviour), also as `ReferenceTemperatureSchedule(Day(1))`;
-   - `every_n_steps::Int`, precomputed from `every` and the time step by
-     `initialize!(schedule, time_stepping)` (rounded, at least 1, 0 = never);
-   - `counter::Int`, the number of recomputations, for diagnostics and tests.
-2. `recompute_reference_temperature(schedule, clock, architecture)` decides whether to recompute on this time
-   step: `step_counter > 0 && step_counter % n == 0`. It dispatches on the architecture, so that an
-   architecture which compiles the time step (Reactant) can add a method that recomputes on every time step
-   instead of tracing the condition. No such method is added yet.
-3. `ImplicitPrimitiveEquation` gets the option
-   `reference_temperature_schedule::ReferenceTemperatureSchedule = ReferenceTemperatureSchedule()` and a new
+1. New `SpeedyWeather/src/time_stepping/schedules.jl` with `AbstractSchedule` and three exported schedules,
+   all used with `isscheduled(schedule, clock)`, counting `clock.time_step_counter` (initial and spin-up steps
+   excluded):
+   - `Schedule` (moved from `output/schedule.jl`, unchanged): periodic and/or event times via a `BitVector`,
+     initialized with the clock at `run!` as it needs the start and length of the simulation;
+   - `PeriodicSchedule` (mutable): `every::Second = Day(1)` (`Second(0)` = never), converted by
+     `initialize!(schedule, time_stepping)` into `every_n_steps` (rounded, at least 1), plus a `counter`;
+   - `StepSchedule` (immutable): just `every_n_steps` (default 1, 0 = never), no initialization needed.
+2. The decision whether to recompute is `isscheduled(implicit.schedule, clock)`. For Reactant, which
+   would rather recompute every step than trace a condition, a `StepSchedule(1)` can be passed. Not tested here.
+3. `ImplicitPrimitiveEquation` gets the option `schedule::ScheduleType = PeriodicSchedule(every = Day(1))`
+   (a new type parameter, so the field is concrete) and a new
    `initialize!(implicit, model)`, which initializes the schedule once with the model's time step. It is called
    in `initialize!(model)` of `PrimitiveWet` and `PrimitiveDry` right after the time stepper; like horizontal
    diffusion, a time step changed with `set!` needs a new `initialize!(model)`. The operators are still built
-   in the first time steps by `reinitialize!`.
+   in the first time steps by `reinitialize!`. A `Schedule` cannot be used here, it has no
+   `initialize!(schedule, time_stepping)`.
 4. `reinitialize!(implicit, model, vars)` rebuilds the operators when Δt has changed (leapfrog start, as
    before) **or** when the schedule says so, from the current `average_temperature_profile`.
-5. `AbstractSchedule` moved from `output/schedule.jl` to `time_stepping/abstract_types.jl`, as the implicit
-   solver is included before the output.
+5. Unit tests for `PeriodicSchedule` and `StepSchedule` in `SpeedyWeather/test/output/schedule.jl`.
 6. Unit test `"Implicit reference temperature profile is the global-mean temperature"` in
    `SpeedyWeather/test/dynamics/time_stepping.jl` (T22L4 PrimitiveWetModel, no time stepping, < 1 min).
    It does the following twice, with ΔT = 0 and ΔT = 20 K:
@@ -219,24 +229,26 @@ First draft (`reference_update_period`, 2026-10-19):
 
 - `ImplicitPrimitiveEquation` docstring (new option, via `TYPEDFIELDS`).
 - `docs/src/primitiveequation.md`: one paragraph on how the reference profile Tₖ is chosen and updated.
+- `docs/src/callbacks.md`: one paragraph on `PeriodicSchedule` and `StepSchedule` next to `Schedule`.
 
 ## Known limitations
 
 - **Reactant**: `time_stepping!` for a `ReactantSimulation` compiles `time_step!` once and calls it in a loop.
   The host-side decision in `reinitialize!` is evaluated at trace time only, so compiled Reactant runs keep
-  the reference from tracing, exactly like the Δt-based rebuild today. The hook for Reactant is a method of
-  `recompute_reference_temperature(schedule, clock, ::ReactantDevice)` that returns `true` (recompute on every
-  time step, no traced condition). The recomputation itself (`initialize!(implicit, Δt, Tₖ, …)`, an LU per
+  the reference from tracing, exactly like the Δt-based rebuild today. The hook for Reactant is to pass `schedule = StepSchedule(1)`
+  (recompute on every time step, no traced condition). The recomputation itself (`initialize!(implicit, Δt, Tₖ, …)`, an LU per
   degree on the CPU) would then also need a traceable implementation. Neither is done or tested here.
 - **Restarts**: a restart rebuilds the reference from the restart state (as before) and then updates it
   periodically. Bit-identical restarts were not possible before either.
 - **Reproducibility**: results of primitive equation runs longer than the schedule's period change
-  compared with v0.23.0. `ReferenceTemperatureSchedule(Second(0))` restores the old behaviour.
+  compared with v0.23.0. `PeriodicSchedule(every = Second(0))` restores the old behaviour.
 - **Mechanism**: why the stale reference produces the Antarctic cold spots is still open (see the
   investigation). The fix removes the trigger without a full explanation.
 
 ## Future work
 
+- Use `PeriodicSchedule`/`StepSchedule` for the hand-rolled `time_step_counter % n` checks in particle
+  advection and the output writer.
 - Reactant support for the periodic rebuild (rebuild between compiled steps).
 - A temperature tendency budget at the cold spots with the stale vs the refreshed reference, to explain the
   mechanism.

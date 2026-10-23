@@ -144,6 +144,7 @@ include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("time_stepping/clock.jl")
+include("time_stepping/schedules.jl")
 include("variables/set.jl")
 
 # MODEL COMPONENTS
@@ -209,7 +210,6 @@ include("parameterizations/land/vegetation.jl")
 include("parameterizations/land/rivers.jl")
 
 # OUTPUT
-include("output/schedule.jl")
 include("output/callbacks.jl")
 include("output/feedback.jl")
 include("output/vertical_interpolation.jl")

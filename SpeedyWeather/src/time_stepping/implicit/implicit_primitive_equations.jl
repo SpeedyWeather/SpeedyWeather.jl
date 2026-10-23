@@ -1,60 +1,3 @@
-export ReferenceTemperatureSchedule
-
-"""
-Schedule for the semi-implicit solver of the primitive equations to recompute its reference
-temperature profile from the current global-mean temperature, and with it all implicit operators.
-Otherwise the reference stays the profile of the initial conditions for the whole simulation,
-and the model climate can drift far enough away from it to destabilise long simulations at
-high resolution. The period `every` is set when the model is constructed, e.g.
-
-    implicit = ImplicitPrimitiveEquation(spectral_grid, reference_temperature_schedule = ReferenceTemperatureSchedule(Day(1)))
-
-and converted to `every_n_steps` once with the time step of the model in `initialize!(model)`.
-Whether to recompute on a given time step is decided by `recompute_reference_temperature(schedule,
-clock, architecture)`, so that architectures that compile the time step (e.g. Reactant) can
-recompute on every time step instead of tracing that condition. Fields are
-$(TYPEDFIELDS)"""
-@kwdef mutable struct ReferenceTemperatureSchedule <: AbstractSchedule
-    "[OPTION] Recompute the reference temperature profile every this period, rounded to a multiple of the time step, `Second(0)` = never"
-    every::Second = Day(1)
-
-    "[DERIVED] `every` in time steps (at least 1), 0 = never"
-    every_n_steps::Int = 0
-
-    "[DERIVED] Number of recomputations since initialization"
-    counter::Int = 0
-end
-
-"""$(TYPEDSIGNATURES)
-A `ReferenceTemperatureSchedule` to recompute the reference temperature profile `every` period."""
-ReferenceTemperatureSchedule(every::Period) = ReferenceTemperatureSchedule(; every)
-
-"""$(TYPEDSIGNATURES)
-Precompute `every_n_steps` from `schedule.every` and the time step `Δt` of `time_stepping`,
-at least 1, and 0 (never) for `every = Second(0)`. Resets the counter."""
-function initialize!(schedule::ReferenceTemperatureSchedule, time_stepping::AbstractTimeStepper)
-    (; every) = schedule
-    Δt = time_stepping.Δt_millisec
-    every_n_steps = every > Second(0) ? max(1, round(Int, Millisecond(every) / Δt)) : 0
-    schedule.every_n_steps = every_n_steps
-    schedule.counter = 0
-    return schedule
-end
-
-"""$(TYPEDSIGNATURES)
-Whether to recompute the reference temperature profile on the time step of `clock`, every
-`every_n_steps` steps of the time stepper since the start of the simulation. Dispatches over
-the architecture so that architectures which compile the timAe step (e.g. Reactant) can
-recompute on every time step instead of tracing this condition."""
-function recompute_reference_temperature(
-        schedule::ReferenceTemperatureSchedule,
-        clock::AbstractClock,
-        architecture::AbstractArchitecture,
-    )
-    n = schedule.every_n_steps
-    return n > 0 && clock.step_counter > 0 && clock.step_counter % n == 0
-end
-
 export ImplicitPrimitiveEquation
 
 """
@@ -68,6 +11,7 @@ $(TYPEDFIELDS)"""
         TensorType,
         IntType,
         NLAYERS,        # nlayers as a type parameter, see `nlayers_val` below
+        ScheduleType,
     } <: AbstractImplicit
 
     # DIMENSIONS
@@ -85,7 +29,7 @@ $(TYPEDFIELDS)"""
     centering::NF = 1.0
 
     "[OPTION] Schedule to recompute the reference temperature profile (and the implicit operators) from the current global-mean temperature"
-    reference_temperature_schedule::ReferenceTemperatureSchedule = ReferenceTemperatureSchedule()
+    schedule::ScheduleType = PeriodicSchedule(every = Day(1))
 
     "[DERIVED] Time step [s] used to initialize. Used to check whether time step has changed and reinitialization is needed."
     Δt::Base.RefValue{NF} = Ref(zero(NF))
@@ -130,10 +74,15 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
-function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
+function ImplicitPrimitiveEquation(
+        spectral_grid::SpectralGrid;
+        schedule::AbstractSchedule = PeriodicSchedule(every = Day(1)),
+        kwargs...
+    )
     (; NF, VectorType, MatrixType, TensorType, truncation, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(truncation), nlayers}(;
-        truncation, nlayers, kwargs...
+    IntType = typeof(truncation)
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, IntType, nlayers, typeof(schedule)}(;
+        truncation, nlayers, schedule, kwargs...
     )
 end
 
@@ -144,12 +93,12 @@ function variables(implicit::ImplicitPrimitiveEquation)
 end
 
 """$(TYPEDSIGNATURES)
-Initialize the `reference_temperature_schedule` of `implicit` with the time step of `model`.
+Initialize the `schedule` of `implicit` with the time step of `model`.
 The implicit operators themselves are only built in the first time steps by `reinitialize!`,
 as they need the temperature profile of the initial conditions and the time step of the
 leapfrog start."""
 function initialize!(implicit::ImplicitPrimitiveEquation, model::PrimitiveEquation)
-    initialize!(implicit.reference_temperature_schedule, model.time_stepping)
+    initialize!(implicit.schedule, model.time_stepping)
     return nothing
 end
 
@@ -161,15 +110,11 @@ function reinitialize!(
         model::PrimitiveEquation,
         vars::Variables,
     )
-    (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion, architecture) = model
+    (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
     (; clock) = vars.prognostic
-    schedule = implicit.reference_temperature_schedule
     Δt = time_step(time_stepping, clock)
     Δt_changed = implicit.Δt[] != Δt
-
-    recompute = recompute_reference_temperature(schedule, clock, architecture)
-    schedule.counter += recompute
-    Δt_changed || recompute || return nothing
+    Δt_changed || isscheduled(implicit.schedule, clock) || return nothing
 
     scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
     Tₖ = vars.dynamics.average_temperature_profile          # current global-mean temperature profile

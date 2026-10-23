@@ -503,7 +503,7 @@ We split the (virtual) temperature into a reference vertical profile ``T_k`` and
 constant for the spectral transform but can depend on the vertical.
 We use the global-mean temperature of every layer, taken when the implicit solver is
 initialized at the start of a simulation and then recomputed periodically following its
-[`ReferenceTemperatureSchedule`](@ref) (default every day), so that the reference profile
+`schedule` (a [`PeriodicSchedule`](@ref), default every day), so that the reference profile
 follows the model climate as it drifts away from the initial conditions.
 With this, the previous equation becomes
 ```math
