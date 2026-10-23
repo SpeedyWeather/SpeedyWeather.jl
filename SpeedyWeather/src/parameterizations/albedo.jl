@@ -252,20 +252,21 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
     # 1. Albedo of vegetation + bare soil (no snow)
     (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = scheme
 
-    if haskey(vars.parameterizations.land, :vegetation_high) && haskey(vars.parameterizations.land, :vegetation_low)
-        (; vegetation_high, vegetation_low) = vars.parameterizations.land
+    if haskey(vars.parameterizations.land, :high_vegetation_cover) && haskey(vars.parameterizations.land, :low_vegetation_cover)
+        (; high_vegetation_cover, low_vegetation_cover) = vars.parameterizations.land
 
         # linear combination of high and low vegetation and bare soil
-        albedo[ij] = vegetation_high[ij] * albedo_high_vegetation +
-            vegetation_low[ij] * albedo_low_vegetation +
-            albedo_land * (1 - vegetation_high[ij] - vegetation_low[ij])
+        albedo[ij] = high_vegetation_cover[ij] * albedo_high_vegetation +
+            low_vegetation_cover[ij] * albedo_low_vegetation +
+            albedo_land * (1 - high_vegetation_cover[ij] - low_vegetation_cover[ij])
     else
         albedo[ij] = albedo_land
     end
 
     # 2. Add snow cover
     if haskey(vars.prognostic, :land) && haskey(vars.prognostic.land, :snow_depth)
-        snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), DummyParameterization())
+        ts = time_stepper(model.time_stepping, :land)
+        snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, ts, DummyParameterization())
         (; albedo_snow, snow_depth_scale) = scheme
 
         # how to compute snow cover from snow depth
