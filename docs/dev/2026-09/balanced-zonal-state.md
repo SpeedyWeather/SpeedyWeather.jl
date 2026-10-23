@@ -71,6 +71,14 @@ Base revision: c7d631c658feefc851eb7af5b93aa5754430faf5
   > upper-layer soil temperature as predictor and then use that as initial condition?
 
   Added as Summary of changes, 6. Soil temperature is now initialized before snow.
+- 2026-10-23: follow-up prompt:
+  > Can you expand the documentation on how they have been derived? [...] as long as it's just
+  > about a few parameters that's fine, let's just state them and highlight that in order to
+  > start with a balanced state for a climatology they would need to be adapted.
+
+  Docs now derive the temperature from gradient-wind balance, state that the parameters were
+  read off the zonal/time-mean equilibrium (no formal optimisation) with a table of how each
+  was chosen, explain how to refit them, and contrast with DCMIP-2016 (Ullrich et al. 2016).
 
 ## Problem description
 

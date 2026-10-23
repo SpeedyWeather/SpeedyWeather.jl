@@ -269,9 +269,69 @@ and ``B(\phi) = \tfrac{8}{5}\cos^3\phi(\sin^2\phi + \tfrac{2}{3}) - \tfrac{\pi}{
 radius ``a`` and rotation ``\Omega``. Jablonowski and Williamson's temperature is the special case
 ``U = u_0\cos^{3/2}\eta_v``. ``A`` and ``B`` have a zero global mean, so
 ``\bar{T}(\sigma) = \max(T_0 \sigma^{R_d\Gamma/g}, T_{min})`` is the global-mean temperature
-and can be chosen freely without breaking the balance. Its parameters
-``T_0, \Gamma, T_{min}, u_0, H`` are fitted to the equilibrium climate of the `PrimitiveWetModel`.
+and can be chosen freely without breaking the balance.
 As in Jablonowski-Williamson a small perturbation of the zonal wind triggers baroclinic instability.
+
+### Derivation
+
+The temperature follows from the same balance that Jablonowski and Williamson use, only
+without fixing the vertical profile of the wind. With a uniform surface pressure the
+gradient-wind balance on the sphere is
+
+```math
+\left(f + \frac{2u\tan\phi}{a}\right) u = -\frac{1}{a}\frac{\partial \Phi}{\partial \phi}
+```
+
+with ``f = 2\Omega\sin\phi`` and geopotential ``\Phi``. Differentiating with respect to
+``x = -\ln\sigma`` and using hydrostatic balance ``\partial\Phi/\partial x = R_d T`` gives the
+thermal wind equation in its gradient-wind form
+
+```math
+\frac{\partial T}{\partial \phi} = -\frac{1}{R_d}\left(2a\Omega\sin\phi + 2u\tan\phi\right)\frac{\partial u}{\partial x}.
+```
+
+Inserting ``u = U(\sigma)\sin^2(2\phi)`` the right-hand side separates into ``dU/dx`` times
+two functions of latitude, ``8\sin^3\phi\cos^2\phi`` (Coriolis term) and
+``16 U \sin^5\phi\cos^3\phi`` (curvature term). These are exactly ``-dB/d\phi``
+and ``-2U\,dA/d\phi``, so integrating in latitude yields the temperature above. The integration
+constants in ``A`` and ``B`` (``10/63`` and ``-\pi/4``) are chosen such that both have zero global
+mean, which leaves the global-mean temperature ``\bar{T}(\sigma)`` as a free function of height
+that does not affect the balance. The vorticity is the curl of ``u``, i.e. Jablonowski and
+Williamson's eq. (3) with ``U(\sigma)`` in place of ``u_0\cos^{3/2}\eta_v``, and the divergence is zero
+apart from the perturbation.
+
+This is not the moist baroclinic wave of the DCMIP-2016 intercomparison [Ullrich2016](@citep),
+which prescribes a different analytic temperature (and a specific humidity profile) chosen for a
+reproducible test case, not to be close to a given model's climate. The point here is that only
+``U(\sigma)`` and ``\bar{T}(\sigma)`` are free, and they can be shaped like the model's climate
+while the balance is guaranteed analytically.
+
+### Parameters
+
+The default parameters were chosen to be close to the equilibrium climate of the default
+`PrimitiveWetModel`, by comparing against zonal and time means over days 60-120 of a long
+run at T31L8, T63L8 and T31L16 (which agree within about 2K). No formal optimisation was done;
+the parameters were read off these means:
+
+| Parameter | Default | How it was chosen |
+| --------- | ------- | ----------------- |
+| ``T_0`` | 283 K | Global-mean temperature extrapolated to ``\sigma = 1`` |
+| ``\Gamma`` | 5.7 K/km | Slope of the global-mean ``\ln T`` against ``\ln\sigma`` in the troposphere, which is ``R_d\Gamma/g`` |
+| ``T_{min}`` | 226 K | Roughly isothermal global-mean stratosphere |
+| ``u_0`` | 56 m/s | Zonal-mean wind at 45°, about 40 m/s at ``\sigma = 0.2`` |
+| ``H`` | 2 | Wind growing about linearly in ``-\ln\sigma`` through the troposphere |
+
+With ``u_0`` and ``H`` fixed by the wind, the meridional temperature contrast (about 45K equator to
+pole near the surface) is no longer free but follows from the balance, and it agrees with the
+equilibrium to a few Kelvin. These parameters therefore describe the climate of a specific
+version of SpeedyWeather with its default parameterizations. If you change the physics, resolution
+or the planet substantially, the model's climate will change and to start close to the new
+equilibrium the parameters need to be adapted the same way: run the model into equilibrium
+(a few months), compute the zonal and time-mean temperature and zonal wind, fit ``T_0, \Gamma`` to
+the global-mean temperature profile, ``T_{min}`` to the stratosphere and ``u_0, H`` to the wind
+at mid-latitudes, then check that the resulting meridional temperature contrast is reasonable.
+The initial conditions remain balanced for any choice of parameters, only how close they
+are to the equilibrium climate depends on them.
 
 Over orography the surface pressure is set hydrostatically with the temperature ``T_0 - \Gamma z``
 and the temperature above is evaluated with ``p/p_0 = \sigma p_s/p_0`` in place of ``\sigma``.
