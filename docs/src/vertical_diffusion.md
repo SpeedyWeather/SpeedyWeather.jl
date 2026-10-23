@@ -19,7 +19,9 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractVerticalDiffusion)
 ```
 
-You can always set `vertical_diffusion=nothing` which will disable all vertical diffusion.
+Vertical diffusion is currently disabled by default (`vertical_diffusion=nothing`) in both
+`PrimitiveDryModel` and `PrimitiveWetModel` until the scheme is overhauled. Pass
+`vertical_diffusion = BulkRichardsonDiffusion(spectral_grid)` to the model constructor to enable it.
 `BulkRichardsonDiffusion` is explained in the following. See [Parameterizations](@ref) for the
 general parameterization interface these implement.
 

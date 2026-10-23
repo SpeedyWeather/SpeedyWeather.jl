@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `FriersonSigmaCoordinates` are the default vertical coordinates, vertical diffusion is off by default (`vertical_diffusion = nothing`) in primitive equation models [#PRNUM](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/PRNUM)
 - Surface momentum, heat and humidity fluxes are time integrated with a damped flux, `RationalFluxes` by default (also `ExplicitFluxes`, `ImplicitFluxes`, `ExponentialFluxes`), stabilising thin lowermost layers [#1336](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1336)
 - Learned land and ocean surface roughness [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 - Learned surface wind slowdown from bottom model layer [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
