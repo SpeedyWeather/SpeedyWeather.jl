@@ -7,7 +7,7 @@ turbulent exchange of momentum between the surface and atmosphere, representing
 surface drag that slows down near-surface winds. Uses bulk aerodynamic formulas
 with separate drag coefficients for ocean and land surfaces to account for
 different surface roughness characteristics. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceMomentumFlux{NF} <: AbstractSurfaceMomentumFlux
+@parameterized @kwdef struct SurfaceMomentumFlux{NF, FI <: AbstractFluxIntegration} <: AbstractSurfaceMomentumFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
@@ -16,10 +16,14 @@ different surface roughness characteristics. Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Or fixed drag coefficient for momentum fluxes over land"
     @param drag_land::NF = 2.4e-3 (bounds = 0 .. 1,)
+
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceMomentumFlux
-SurfaceMomentumFlux(SG::SpectralGrid; kwargs...) = SurfaceMomentumFlux{SG.NF}(; kwargs...)
+SurfaceMomentumFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
+    SurfaceMomentumFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceMomentumFlux, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -47,15 +51,21 @@ end
     uₛ = vars.parameterizations.surface_wind_u[ij]
     vₛ = vars.parameterizations.surface_wind_v[ij]
 
+    # surface wind uₛ = f * u with slowdown factor f relative to the lowermost layer wind u
+    f = vars.parameterizations.surface_wind_slowdown[ij]
+
     # flux into lowermost layer [kg/m³ * m/s * m/s = kg/(m·s²) = Pa]
-    flux_u_upward = -ρ * drag * V₀ * uₛ
-    flux_v_upward = -ρ * drag * V₀ * vₛ
+    conductance = ρ * drag * V₀ * f             # = -∂flux/∂u [kg/m²/s] w.r.t. lowermost layer u
+    flux_u_upward = -conductance * uₛ
+    flux_v_upward = -conductance * vₛ
 
     # convert fluxes to tendencies
     pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]
     u_tend = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, momentum_flux)
     v_tend = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, momentum_flux)
-    u_tend[ij, surface] += surface_flux_to_tendency(flux_u_upward, pₛ, model)
-    v_tend[ij, surface] += surface_flux_to_tendency(flux_v_upward, pₛ, model)
+
+    scheme = momentum_flux.time_integration
+    u_tend[ij, surface] += surface_flux_to_tendency(scheme, flux_u_upward, conductance, pₛ, model)
+    v_tend[ij, surface] += surface_flux_to_tendency(scheme, flux_v_upward, conductance, pₛ, model)
     return nothing
 end

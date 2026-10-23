@@ -38,6 +38,7 @@ variables(::SurfaceCondition) = (
     ParameterizationVariable(:surface_air_density, GridXY(), desc = "Surface air density", units = "kg/m³"),
     ParameterizationVariable(:surface_wind_u, GridXY(), desc = "Mean zonal surface wind", units = "m/s"),
     ParameterizationVariable(:surface_wind_v, GridXY(), desc = "Mean meridional surface wind", units = "m/s"),
+    ParameterizationVariable(:surface_wind_slowdown, GridXY(), desc = "Surface wind slowdown factor relative to lowermost layer", units = "1"),
     ParameterizationVariable(:surface_wind_speed, GridXY(), desc = "Surface wind speed", units = "m/s"),
 )
 # function barrier
@@ -82,6 +83,7 @@ end
     vₛ = wind_slowdown * v_grid[ij, nlayers]
     vars.parameterizations.surface_wind_u[ij] = uₛ  # store for fluxes
     vars.parameterizations.surface_wind_v[ij] = vₛ
+    vars.parameterizations.surface_wind_slowdown[ij] = wind_slowdown    # = ∂uₛ/∂u for implicit fluxes
 
     # gusts are added for surface wind speed but not on individual components
     gust = calc_wind_gust(ij, vars, wind_gust, model, surface_condition, pₛ, Tᵥ)
