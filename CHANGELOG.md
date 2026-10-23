@@ -4,6 +4,10 @@
 
 - Primitive equation models recompute the reference temperature profile of the semi-implicit solver from the current global-mean temperature, fixes the instability of long T256L8 runs [#1332](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1332)
 - New `PeriodicSchedule` and `StepSchedule`, both in `time_stepping/schedules.jl` with old `Schedule` [#1332](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1332)
+- Surface momentum, heat and humidity fluxes are time integrated with a damped flux, `RationalFluxes` by default (also `ExplicitFluxes`, `ImplicitFluxes`, `ExponentialFluxes`), stabilising thin lowermost layers [#1336](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1336)
+- Learned land and ocean surface roughness [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+- Learned surface wind slowdown from bottom model layer [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+- Split boundary layer drag by momentum/heat/humidity and land/ocean [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 - [BREAKING] Output variables moved into the exported module `OutputVariables` and lost their `Output` suffix, e.g. `SpeedyWeather.TemperatureOutput()` is now `OutputVariables.Temperature()`, the old names are deprecated and forward with a warning [#1331](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1331)
 - Bug fix: Enzyme's `make_zero` of a model works again with ProgressMeter v1.12 (parametric `ProgressCore`) [#1330](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1330)
 - Fix the centered vertical advection dropping the vertical advection of the reference temperature profile, which delayed the Jablonowski-Williamson baroclinic wave by about a day [#1286](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1286)

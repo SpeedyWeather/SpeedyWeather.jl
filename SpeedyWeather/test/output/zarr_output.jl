@@ -222,7 +222,7 @@ end
             path = tmp_output_path, write_restart = false,
             interval, time_chunk = tc,
         )
-        model = PrimitiveDryModel(spectral_grid; output)
+        model = PrimitiveDryModel(spectral_grid; output, dynamics_only=true)
         simulation = initialize!(model)
         run!(simulation, output = true; period)
         return Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
