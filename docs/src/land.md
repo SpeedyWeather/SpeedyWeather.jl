@@ -298,6 +298,20 @@ as equivalent liquid water height, not physical snow thickness. The accumulation
 capped at 10m equivalent liquid water height, following how permanent snow area is treated
 in [IFSCycle49r1](@citep). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
 
+Snow needs time to accumulate from precipitation, so starting from snow-free land would put
+the model on the wrong side of the snow-albedo feedback: dark, cold land warms and melts what
+little snow falls. The initial snow depth is therefore estimated from the initial top-layer soil
+temperature ``T_1``
+
+```math
+S_0 = \min\left(r \max(T_{melt} - T_1, 0), S_{max}\right)
+```
+
+with `initial_snow_depth_rate` ``r = 5~mm/K`` and `initial_snow_depth_max` ``S_{max} = 0.2~m``,
+and zero over ocean. So land 10 K below ``T_{melt}`` starts fully snow covered and ``250~K`` land
+with about ``0.12~m``, comparable to observed winter maxima at high latitudes.
+Use `SnowModel(spectral_grid, initial_snow_depth_rate = 0)` to start without snow.
+
 The snow budget links into other surface schemes:
 
 - `snow_melt_rate` provides a latent heat sink to the land temperature budget.

@@ -18,6 +18,12 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Permanent snow/ice depth cap in equivalent liquid water depth [m]"
     snow_depth_cap::NF = 10
+
+    "[OPTION] Initial snow depth per Kelvin the top soil layer is below `melting_threshold` [m/K]"
+    @param initial_snow_depth_rate::NF = 0.005 (bounds = Nonnegative,)
+
+    "[OPTION] Maximum initial snow depth [m]"
+    @param initial_snow_depth_max::NF = 0.2 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure SnowModel
@@ -40,9 +46,25 @@ end
 # initialize component
 initialize!(snow::SnowModel, model::PrimitiveEquation) = nothing
 
-# set initial conditions for snow depth in initial conditions
-initialize!(vars::Variables, snow::SnowModel, model::PrimitiveEquation) =
-    set!(vars.prognostic.land, model.geometry, snow_depth = 0)
+"""$(TYPEDSIGNATURES)
+Initial snow depth estimated from the top-layer soil temperature (which therefore has to be
+initialized first), growing linearly by `initial_snow_depth_rate` per Kelvin below
+`melting_threshold` up to `initial_snow_depth_max`, zero over ocean. Starting from cold but snow-free
+land puts the model on the wrong side of the snow-albedo feedback as snow accumulates only slowly."""
+function initialize!(vars::Variables, snow::SnowModel, model::PrimitiveEquation)
+    (; melting_threshold, initial_snow_depth_rate, initial_snow_depth_max) = snow
+    soil_temperature = view(vars.prognostic.land.soil_temperature.data, :, 1, :)  # top layer, all steps
+    snow_depth = vars.prognostic.land.snow_depth
+    snow_depth.data .= initial_snow_depth.(soil_temperature, melting_threshold, initial_snow_depth_rate, initial_snow_depth_max)
+    mask!(snow_depth, model.land_sea_mask, :ocean, masked_value = 0)
+    return nothing
+end
+
+# finite soil temperature only, NaN (e.g. unmasked ocean) → no snow
+@inline function initial_snow_depth(soil_temperature, melting_threshold, rate, max_depth)
+    isfinite(soil_temperature) || return zero(soil_temperature)
+    return clamp(rate * (melting_threshold - soil_temperature), 0, max_depth)
+end
 
 function timestep!(
         vars::Variables,
