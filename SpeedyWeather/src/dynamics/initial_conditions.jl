@@ -719,18 +719,19 @@ export BalancedZonalState
 Zonal wind and temperature in thermal wind balance, generalising the Jablonowski and
 Williamson, 2006 (JW) initial conditions to a vertical wind profile and a global-mean
 temperature profile close to the equilibrium climate of the `PrimitiveWetModel`.
-With x = -ln(σ) the zonal wind is
+With the dimensionless log-pressure coordinate z = -ln(σ) (not a height in meters)
+the zonal wind is
 
-    u(φ, σ) = U(σ) sin²(2φ),    U(σ) = u₀ tanh(x / H)
+    u(φ, σ) = U(σ) sin²(2φ),    U(σ) = u₀ tanh(z / H)
 
-which is zero at the surface and increases about linearly with x in the troposphere.
+which is zero at the surface and increases about linearly with z in the troposphere.
 Balance then gives the temperature (JW eq. 6 is the special case U = u₀cos^(3/2)(ηᵥ))
 
-    T(φ, σ) = T̄(σ) + (1/R) dU/dx (2A(φ)U + B(φ)aΩ)
+    T(φ, σ) = T̄(σ) + (1/R_d) dU/dz (2A(φ)U + B(φ)RΩ)
     A(φ) = -2sin⁶(φ)(cos²(φ) + 1/3) + 10/63
     B(φ) = 8/5 cos³(φ)(sin²(φ) + 2/3) - π/4
 
-A and B have zero global mean, so T̄(σ) = max(T₀ σ^(RΓ/g), Tmin) is the global-mean
+A and B have zero global mean, so T̄(σ) = max(T₀ σ^(R_dΓ/g), Tmin) is the global-mean
 temperature profile. Sets vorticity (including the JW perturbation to trigger baroclinic
 instability), divergence (JW perturbation), surface pressure and temperature. The surface
 pressure is hydrostatic with T₀ - Γz on orography and temperature is evaluated with
@@ -742,7 +743,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Zonal wind speed for σ → 0, U = u₀ tanh(-ln(σ) / H) [m/s]"
     u₀::NF = 56
 
-    "[OPTION] Vertical scale of the zonal wind in -ln(σ), U = u₀ tanh(-ln(σ) / H) [1]"
+    "[OPTION] Vertical scale of the zonal wind in z = -ln(σ), U = u₀ tanh(z / H) [1]"
     H::NF = 2
 
     "[OPTION] Global-mean temperature at the surface σ = 1 [K]"

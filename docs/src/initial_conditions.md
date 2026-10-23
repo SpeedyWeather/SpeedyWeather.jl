@@ -251,22 +251,22 @@ InitialConditions(spectral_grid, PrimitiveWet)
 
 `BalancedZonalState` sets vorticity, divergence, surface pressure and temperature. It generalises the
 Jablonowski-Williamson initial conditions [Jablonowski2006](@citep) to a different vertical
-profile of the zonal wind ``u``. With ``x = -\ln \sigma``,
+profile of the zonal wind ``u``. With the dimensionless log-pressure coordinate ``z = -\ln \sigma`` (zero at the surface, increasing upwards, but not a height in meters),
 
 ```math
-u(\phi, \sigma) = U(\sigma) \sin^2(2\phi), \qquad U(\sigma) = u_0 \tanh(x/H)
+u(\phi, \sigma) = U(\sigma) \sin^2(2\phi), \qquad U(\sigma) = u_0 \tanh(z/H)
 ```
 
-which is zero at the surface and increases about linearly with ``x`` in the troposphere.
+which is zero at the surface and increases about linearly with ``z`` in the troposphere.
 Thermal wind balance then determines the temperature
 
 ```math
-T(\phi, \sigma) = \bar{T}(\sigma) + \frac{1}{R_d}\frac{dU}{dx}\left(2A(\phi)U + B(\phi)a\Omega\right)
+T(\phi, \sigma) = \bar{T}(\sigma) + \frac{1}{R_d}\frac{dU}{dz}\left(2A(\phi)U + B(\phi)R\Omega\right)
 ```
 
 with ``A(\phi) = -2\sin^6\phi(\cos^2\phi + \tfrac{1}{3}) + \tfrac{10}{63}``
 and ``B(\phi) = \tfrac{8}{5}\cos^3\phi(\sin^2\phi + \tfrac{2}{3}) - \tfrac{\pi}{4}``,
-radius ``a`` and rotation ``\Omega``. Jablonowski and Williamson's temperature is the special case
+radius ``R`` and rotation ``\Omega``. Jablonowski and Williamson's temperature is the special case
 ``U = u_0\cos^{3/2}\eta_v``. ``A`` and ``B`` have a zero global mean, so
 ``\bar{T}(\sigma) = \max(T_0 \sigma^{R_d\Gamma/g}, T_{min})`` is the global-mean temperature
 and can be chosen freely without breaking the balance.
@@ -279,18 +279,18 @@ without fixing the vertical profile of the wind. With a uniform surface pressure
 gradient-wind balance on the sphere is
 
 ```math
-\left(f + \frac{2u\tan\phi}{a}\right) u = -\frac{1}{a}\frac{\partial \Phi}{\partial \phi}
+\left(f + \frac{2u\tan\phi}{R}\right) u = -\frac{1}{R}\frac{\partial \Phi}{\partial \phi}
 ```
 
 with ``f = 2\Omega\sin\phi`` and geopotential ``\Phi``. Differentiating with respect to
-``x = -\ln\sigma`` and using hydrostatic balance ``\partial\Phi/\partial x = R_d T`` gives the
+``z`` and using hydrostatic balance ``\partial\Phi/\partial z = R_d T`` gives the
 thermal wind equation in its gradient-wind form
 
 ```math
-\frac{\partial T}{\partial \phi} = -\frac{1}{R_d}\left(2a\Omega\sin\phi + 2u\tan\phi\right)\frac{\partial u}{\partial x}.
+\frac{\partial T}{\partial \phi} = -\frac{1}{R_d}\left(2R\Omega\sin\phi + 2u\tan\phi\right)\frac{\partial u}{\partial z}.
 ```
 
-Inserting ``u = U(\sigma)\sin^2(2\phi)`` the right-hand side separates into ``dU/dx`` times
+Inserting ``u = U(\sigma)\sin^2(2\phi)`` the right-hand side separates into ``dU/dz`` times
 two functions of latitude, ``8\sin^3\phi\cos^2\phi`` (Coriolis term) and
 ``16 U \sin^5\phi\cos^3\phi`` (curvature term). These are exactly ``-dB/d\phi``
 and ``-2U\,dA/d\phi``, so integrating in latitude yields the temperature above. The integration
