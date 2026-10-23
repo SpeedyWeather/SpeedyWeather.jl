@@ -84,10 +84,11 @@ end
 
 @testset "Surface flux time integration: Frierson sigma coordinates" begin
     # thin lowermost layer made explicit surface fluxes unstable at default Δt (#1335)
+    # FriersonSigmaCoordinates are the default vertical coordinates
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
-    geometry = Geometry(spectral_grid; vertical_coordinates = FriersonSigmaCoordinates(spectral_grid))
+    @test Geometry(spectral_grid).vertical_coordinates.σ_half ≈ FriersonSigmaCoordinates(spectral_grid).σ_half
     for Model in (PrimitiveDryModel, PrimitiveWetModel)
-        model = Model(spectral_grid; geometry)
+        model = Model(spectral_grid)
         simulation = initialize!(model)
         run!(simulation, period = Day(5))
         @test model.feedback.nans_detected == false
