@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `BalancedZonalState` uses the atmosphere's `reference_temperature` and lapse rate, default `moist_lapse_rate` of `EarthAtmosphere` 5 → 5.7 K/km [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - Initial snow depth estimated from the top-layer soil temperature instead of 0, to start on the right side of the snow-albedo feedback [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - Mean sea-level pressure output computes the surface air temperature on the fly, finite for the initial conditions (previously Inf) [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - `BalancedZonalState` initial conditions and height-dependent `ConstantRelativeHumidity` as new PrimitiveWet default, near equilibrium, without initial precipitation burst and with surface pressure and temperature hydrostatically consistent over orography [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)

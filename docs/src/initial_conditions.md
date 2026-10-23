@@ -308,15 +308,20 @@ while the balance is guaranteed analytically.
 
 ### Parameters
 
-The default parameters were chosen to be close to the equilibrium climate of the default
-`PrimitiveWetModel`, by comparing against zonal and time means over days 60-120 of a long
-run at T31L8, T63L8 and T31L16 (which agree within about 2K). No formal optimisation was done;
-the parameters were read off these means:
+The surface temperature ``T_0`` and the lapse rate ``\Gamma`` are taken from the atmosphere,
+`model.atmosphere.reference_temperature` and `SpeedyWeather.lapse_rate(model.atmosphere)`
+(the `moist_lapse_rate` for wet atmospheres, the `dry_lapse_rate` for dry ones), so that the
+initial conditions start from the climate the atmosphere is meant to have. Change them there,
+e.g. `EarthAtmosphere(spectral_grid, reference_temperature = 283)`, which also changes
+other components that use these reference values. The remaining parameters were chosen to be
+close to the equilibrium climate of the default `PrimitiveWetModel`, by comparing against zonal
+and time means over days 60-120 of a long run at T31L8, T63L8 and T31L16 (which agree within
+about 2K). No formal optimisation was done; the parameters were read off these means:
 
 | Parameter | Default | How it was chosen |
 | --------- | ------- | ----------------- |
-| ``T_0`` | 283 K | Global-mean temperature extrapolated to ``\sigma = 1`` |
-| ``\Gamma`` | 5.7 K/km | Slope of the global-mean ``\ln T`` against ``\ln\sigma`` in the troposphere, which is ``R_d\Gamma/g`` |
+| ``T_0`` | 288 K | `atmosphere.reference_temperature` |
+| ``\Gamma`` | 5.7 K/km | `atmosphere.moist_lapse_rate`, slope of the global-mean ``\ln T`` against ``\ln\sigma`` in the troposphere, which is ``R_d\Gamma/g`` |
 | ``T_{min}`` | 226 K | Roughly isothermal global-mean stratosphere |
 | ``u_0`` | 56 m/s | Zonal-mean wind at 45°, about 40 m/s at ``\sigma = 0.2`` |
 | ``H`` | 2 | Wind growing about linearly in ``-\ln\sigma`` through the troposphere |
@@ -327,7 +332,7 @@ equilibrium to a few Kelvin. These parameters therefore describe the climate of 
 version of SpeedyWeather with its default parameterizations. If you change the physics, resolution
 or the planet substantially, the model's climate will change and to start close to the new
 equilibrium the parameters need to be adapted the same way: run the model into equilibrium
-(a few months), compute the zonal and time-mean temperature and zonal wind, fit ``T_0, \Gamma`` to
+(a few months), compute the zonal and time-mean temperature and zonal wind, fit ``T_0, \Gamma`` (of the atmosphere) to
 the global-mean temperature profile, ``T_{min}`` to the stratosphere and ``u_0, H`` to the wind
 at mid-latitudes, then check that the resulting meridional temperature contrast is reasonable.
 The initial conditions remain balanced for any choice of parameters, only how close they
@@ -344,12 +349,11 @@ overwrite its surface pressure.
 below `σ_moist`, decreasing linearly to zero at `σ_dry` for a dry stratosphere.
 Use `σ_moist = σ_dry = 0` for a vertically constant relative humidity instead.
 
-To change these, pass a new NamedTuple of initial conditions, e.g. a colder surface,
-a weaker jet, or the Jablonowski-Williamson initial conditions
+To change these, pass a new NamedTuple of initial conditions, e.g. a weaker jet, or the Jablonowski-Williamson initial conditions
 
 ```@example wet_initial_conditions
 initial_conditions = (;
-    zonal = BalancedZonalState(spectral_grid, T₀ = 280, u₀ = 40),
+    zonal = BalancedZonalState(spectral_grid, u₀ = 40),
     humid = ConstantRelativeHumidity(spectral_grid, relhumid_ref = 0.6),
 )
 

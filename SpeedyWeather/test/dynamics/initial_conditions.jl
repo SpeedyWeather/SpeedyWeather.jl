@@ -164,7 +164,8 @@ end
     # without orography σ = p/p₀ so the profiles can be tested in σ
     model = PrimitiveWetModel(spectral_grid; orography = NoOrography(spectral_grid))
 
-    ic = BalancedZonalState(spectral_grid)
+    # no perturbation, its spectral ringing would spoil the comparison with the analytic vorticity
+    ic = BalancedZonalState(spectral_grid, perturb_uₚ = 0)
     vars = Variables(model)
     initialize!(vars, ic, model)
     S = model.spectral_transform
@@ -174,6 +175,7 @@ end
     @test !any(isnan.(vor))
 
     (; R_dry) = model.atmosphere
+    T₀, Γ = model.atmosphere.reference_temperature, SpeedyWeather.lapse_rate(model.atmosphere)
     (; gravity, radius) = model.planet
     σ = model.geometry.σ_levels_full
     φ = model.geometry.latds
@@ -184,7 +186,7 @@ end
 
     for k in 1:spectral_grid.nlayers
         # global mean temperature is the prescribed profile T̄(σ)
-        T̄ = max(ic.T₀ * σ[k]^(R_dry * ic.lapse_rate / gravity), ic.Tmin)
+        T̄ = max(T₀ * σ[k]^(R_dry * Γ / gravity), ic.Tmin)
         @test sum(temp_zonal_mean[:, k] .* weights) / sum(weights) ≈ T̄ rtol = 1.0e-3
 
         # vorticity of u = U(σ)sin²(2φ) in the southern hemisphere away from the perturbation
@@ -211,6 +213,7 @@ end
     lnpₛ = transform(SpeedyWeather.get_step(vars.prognostic.pressure, 1), S)
 
     (; R_dry) = model.atmosphere
+    T₀, Γ = model.atmosphere.reference_temperature, SpeedyWeather.lapse_rate(model.atmosphere)
     (; gravity) = model.planet
     p₀ = model.atmosphere.reference_pressure
     σ = model.geometry.σ_levels_full
@@ -219,7 +222,7 @@ end
     # surface pressure hydrostatic with T₀ - Γz, lower where the orography is high
     ij = argmax(z)
     @test z[ij] > 3000
-    @test exp(lnpₛ[ij]) ≈ p₀ * (1 - ic.lapse_rate * z[ij] / ic.T₀)^(gravity / (R_dry * ic.lapse_rate)) rtol = 0.01
+    @test exp(lnpₛ[ij]) ≈ p₀ * (1 - Γ * z[ij] / T₀)^(gravity / (R_dry * Γ)) rtol = 0.01
 
     # temperature is the same function of p = σpₛ everywhere: compare the lowest layer on the
     # highest orography with the layer of about the same pressure on the ocean

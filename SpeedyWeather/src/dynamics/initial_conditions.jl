@@ -732,7 +732,8 @@ Balance then gives the temperature (JW eq. 6 is the special case U = u₀cos^(3/
     B(φ) = 8/5 cos³(φ)(sin²(φ) + 2/3) - π/4
 
 A and B have zero global mean, so T̄(σ) = max(T₀ σ^(R_dΓ/g), Tmin) is the global-mean
-temperature profile. Sets vorticity (including the JW perturbation to trigger baroclinic
+temperature profile, with T₀ = `atmosphere.reference_temperature` and Γ = `lapse_rate(atmosphere)`
+(the moist lapse rate for wet atmospheres). Sets vorticity (including the JW perturbation to trigger baroclinic
 instability), divergence (JW perturbation), surface pressure and temperature. The surface
 pressure is hydrostatic with T₀ - Γh on orography of height h and temperature is evaluated with
 p/p₀ = σpₛ/p₀ instead of σ, so that both are consistent over orography. Do not combine
@@ -745,12 +746,6 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Vertical scale of the zonal wind in z = -ln(σ), U = u₀ tanh(z / H) [1]"
     H::NF = 2
-
-    "[OPTION] Global-mean temperature at the surface σ = 1 [K]"
-    T₀::NF = 283
-
-    "[OPTION] Global-mean temperature lapse rate [K/m]"
-    lapse_rate::NF = 5.7e-3
 
     "[OPTION] Minimum global-mean temperature, isothermal stratosphere above [K]"
     Tmin::NF = 226
@@ -784,7 +779,9 @@ function initialize!(
     haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
     haskey(vars.prognostic, :temperature) || warn_undefvar(vars, :temperature) && return nothing
 
-    (; u₀, H, T₀, lapse_rate, Tmin) = initial_conditions
+    (; u₀, H, Tmin) = initial_conditions
+    T₀ = model.atmosphere.reference_temperature
+    Γ = lapse_rate(model.atmosphere)
     (; perturb_uₚ, perturb_radius) = initial_conditions
     (; radius, rotation, gravity) = model.planet
     (; R_dry) = model.atmosphere
@@ -798,13 +795,13 @@ function initialize!(
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, zero(NF), perturb_uₚ, R)
     set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true)
 
-    # SURFACE PRESSURE, hydrostatic with the global-mean temperature T₀ - Γz on orography
+    # SURFACE PRESSURE, hydrostatic with the global-mean temperature T₀ - Γh on orography
     # so that the temperature below is consistent with it (otherwise gravity waves)
     (; orography) = model.orography
     p₀ = model.atmosphere.reference_pressure
-    RΓg⁻¹ = R_dry * lapse_rate / gravity
+    RΓg⁻¹ = R_dry * Γ / gravity
     lnp_grid = similar(orography)
-    @. lnp_grid = log(p₀) + log(1 - lapse_rate / T₀ * orography) / RΓg⁻¹
+    @. lnp_grid = log(p₀) + log(1 - Γ / T₀ * orography) / RΓg⁻¹
     set!(vars, model; pressure = lnp_grid)
 
     # TEMPERATURE, evaluated at p/p₀ = σpₛ/p₀ (not σ) so that it is hydrostatically
@@ -814,17 +811,17 @@ function initialize!(
     launch!(
         architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
         balanced_zonal_temperature_kernel!, temp_grid, lnp_grid, model.geometry.σ_levels_full,
-        model.geometry.latds, initial_conditions, log(p₀), RΓg⁻¹, R_dry, aΩ,
+        model.geometry.latds, initial_conditions, T₀, log(p₀), RΓg⁻¹, R_dry, aΩ,
     )
     set!(vars, model; temperature = temp_grid)
     return nothing
 end
 
 @kernel inbounds = true function balanced_zonal_temperature_kernel!(
-        temp_grid, lnp_grid, σ_levels_full, φ, initial_conditions, lnp₀, RΓg⁻¹, R_dry, aΩ,
+        temp_grid, lnp_grid, σ_levels_full, φ, initial_conditions, T₀, lnp₀, RΓg⁻¹, R_dry, aΩ,
     )
     ij, k = @index(Global, NTuple)
-    (; u₀, H, T₀, Tmin) = initial_conditions
+    (; u₀, H, Tmin) = initial_conditions
 
     # plain sin/cos avoid AMDGPU hostcalls (see JablonowskiVorticity)
     φij = deg2rad(φ[ij])

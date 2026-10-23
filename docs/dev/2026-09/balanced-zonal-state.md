@@ -79,6 +79,15 @@ Base revision: c7d631c658feefc851eb7af5b93aa5754430faf5
   Docs now derive the temperature from gradient-wind balance, state that the parameters were
   read off the zonal/time-mean equilibrium (no formal optimisation) with a table of how each
   was chosen, explain how to refit them, and contrast with DCMIP-2016 (Ullrich et al. 2016).
+- 2026-10-23: follow-up prompt:
+  > can you use the reference temperature please as this is the climate we ultimately would
+  > like to have (roughly) but do feel free to use your lapse rate and write this into
+  > EarthAtmosphere as the new default
+
+  Removed the `T₀` and `lapse_rate` fields of `BalancedZonalState`, which now uses
+  `atmosphere.reference_temperature` (288 K) and `lapse_rate(atmosphere)`. Default
+  `moist_lapse_rate` of `EarthAtmosphere` 5 → 5.7 K/km (also affects JW and `PressureOnOrography`
+  in wet models). Notation: z = -ln σ, radius R.
 
 ## Problem description
 
