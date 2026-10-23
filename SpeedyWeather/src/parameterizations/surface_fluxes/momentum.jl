@@ -51,8 +51,11 @@ end
     uₛ = vars.parameterizations.surface_wind_u[ij]
     vₛ = vars.parameterizations.surface_wind_v[ij]
 
+    # surface wind uₛ = f * u with slowdown factor f relative to the lowermost layer wind u
+    f = vars.parameterizations.surface_wind_slowdown[ij]
+
     # flux into lowermost layer [kg/m³ * m/s * m/s = kg/(m·s²) = Pa]
-    conductance = ρ * drag * V₀ * f             # = -∂flux/∂u [kg/m²/s]
+    conductance = ρ * drag * V₀ * f             # = -∂flux/∂u [kg/m²/s] w.r.t. lowermost layer u
     flux_u_upward = -conductance * uₛ
     flux_v_upward = -conductance * vₛ
 
