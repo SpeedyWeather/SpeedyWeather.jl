@@ -35,7 +35,7 @@ Adapt.@adapt_structure OceanLandAlbedo
 function OceanLandAlbedo(
         SG::SpectralGrid;
         ocean = OceanSeaIceAlbedo(SG),      # default ocean albedo
-        land = LandSnowAlbedo(SG),          # default land albedo
+        land = LearnedLandAlbedo(SG),       # default land albedo
     )
     return OceanLandAlbedo(ocean, land)
 end
@@ -280,3 +280,201 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
     end
     return nothing
 end
+
+export LearnedLandAlbedo
+
+@parameterized @kwdef struct LearnedLandAlbedo{NF, Scheme <: AbstractSnowCover} <: AbstractAlbedo
+    # Put symbolic regression coefficients in here
+    "Visible wavelength weight to the broadband shortwave albedo"
+    @param vis_weight::NF = 0.5143 (bounds = 0 .. 1,)
+
+    "Snow depth scaling for calculation snow cover fraction from snow depth"
+    @param snow_depth_scale::NF = 0.05 (bounds = Positive,)
+
+    "Snow cover-albedo scheme"
+    @param snow_cover::Scheme = SaturatingSnowCover() (group = :snow_cover,)
+
+    "[OPTION] Switch on stochastic output for the learned albedo"
+    noise::Bool = false
+end
+
+Adapt.@adapt_structure LearnedLandAlbedo
+function LearnedLandAlbedo(
+        SG::SpectralGrid;
+        snow_cover = SaturatingSnowCover(),
+        kwargs...,
+    )
+    return LearnedLandAlbedo{SG.NF, typeof(snow_cover)}(; snow_cover, kwargs...)
+end
+
+function variables(::LearnedLandAlbedo)
+    return (
+        ParameterizationVariable(:black_sky_albedo, GridXY(), desc = "Black-sky land albedo", units = "1", namespace = :land),
+        ParameterizationVariable(:white_sky_albedo, GridXY(), desc = "White-sky land albedo", units = "1", namespace = :land),
+    )
+end
+
+initialize!(albedo::LearnedLandAlbedo, model::PrimitiveEquation) = nothing
+
+@propagate_inbounds function white_sky_albedo(f_iso, f_vol, f_geo)
+    # Calculates the SZA-independent White-Sky Albedo (WSA).
+    # Based on the Lucht et al. (2000) BRDF model approximation.
+    NF = typeof(f_iso)
+
+    # Coefficients taken from Lucht et al. (2000)
+    wsa_vol_const = NF(0.189184)
+    wsa_geo_const = NF(-1.377622)
+    return f_iso + (wsa_vol_const * f_vol) + (wsa_geo_const * f_geo)
+end
+
+@propagate_inbounds function black_sky_albedo(f_iso, f_vol, f_geo, θ)
+    # Calculate black sky albedo using the Lucht et al. (2000) polynomial
+    NF = typeof(f_iso)
+
+    # Coefficients taken from Lucht et al. (2000)
+    c_iso = NF(1.0)
+    c_vol = evalpoly(θ, (NF(-0.007574), NF(0.0), NF(-0.070987), NF(0.307588)))
+    c_geo = evalpoly(θ, (NF(-1.284909), NF(0.0), NF(-0.166314), NF(0.04184)))
+
+    return (c_iso * f_iso) + (c_vol * f_vol) + (c_geo * f_geo)
+end
+
+@inline _safe_sqrt(x) = x >= zero(x) ? sqrt(x) : oftype(x, NaN)
+
+@inline function visible_isotropic_scattering(vₕ, vₗ, laiₗ, sm2, st2, snow_cover, noise)
+    T = promote_type(Float32, typeof(vₕ), typeof(vₗ), typeof(laiₗ), typeof(sm2), typeof(st2), typeof(snow_cover), typeof(noise))
+    return (((noise * T(0.03896045440440107) + T(-0.1218158966586572)) * T(0.025728017593462257)) * snow_cover + T(-0.1346102784222333)) * vₕ + (((T(0.006908593126432138) * snow_cover + T(-0.13673067396327065)) + (T(0.683619830705067) + ((T(-0.0009017510759633551) * st2 + noise * T(0.0285256619975839)) + T(-0.1346102784222333) * sm2))) + T(-0.052392875442762124) * (vₗ * ((T(0.683619830705067) + laiₗ) + (T(-0.14487101003784875) + T(0.11589160767036352) * noise) * (T(-0.13673067396327065) * snow_cover)) + T(0.7161992148232291)))
+end
+
+@inline function visible_volumetric_scattering(vₕ, vₗ, laiₗ, sm1, st1, st2, geopotential, snow_cover, t2m, noise)
+    T = promote_type(Float32, typeof(vₕ), typeof(vₗ), typeof(laiₗ), typeof(sm1), typeof(st1), typeof(st2), typeof(geopotential), typeof(snow_cover), typeof(t2m), typeof(noise))
+    return (T(0.016140250524517893) * noise + T(-0.04410325379601232) * sm1) + ((((vₕ + vₗ) * (T(-0.01470440805972792) + (T(9.122606489165302e-5) * (t2m * T(0.008546824863390104) + noise)) * ((((T(0.0025200785769508103) * geopotential) * (geopotential * T(0.0025200785769508103))) * T(0.016140250524517893) + (T(0.005668214606309846) * snow_cover) * (((t2m - snow_cover) - snow_cover) * (st2 * ((t2m * T(0.008546824863390104)) * T(0.005668214606309846))) + T(0.016140250524517893) * geopotential)) / ((vₕ + T(0.0025200785769508103)) + vₗ))) + laiₗ * T(-0.005123590195731909)) + st1 * T(0.0014159332530380526)) + t2m * T(-0.0011845617711790535))
+end
+
+@inline function visible_geometric_scattering(vₕ, laiₗ, sm1, geopotential, snow_cover, noise)
+    T = promote_type(Float32, typeof(vₕ), typeof(laiₗ), typeof(sm1), typeof(geopotential), typeof(snow_cover), typeof(noise))
+    return T(0.013754593690262884) + (_safe_sqrt(_safe_sqrt(laiₗ)) * (T(9.906885493797509e-7) * geopotential + (T(0.006595930444019463) + (sm1 + (geopotential * laiₗ) * T(2.1805730417085534e-5)) * T(-0.018464047185435716))) + (((geopotential * T(4.3663667100446695e-7)) * snow_cover - T(0.04395703327526142)) * ((((laiₗ - vₕ * geopotential) * T(2.1805730417085534e-5) + (laiₗ - (vₕ - T(0.03334265669607637)) * (T(-2.161750513690768) + laiₗ))) - T(0.04395703327526142)) * (T(0.03334265669607637) + noise * T(0.019535615884723058))) + (noise + sm1) * T(0.008867523895391013)))
+end
+
+@inline function near_infrared_isotropic_scattering(vₕ, vₗ, laiₕ, sm2, snow_cover, t2m, noise)
+    T = promote_type(Float32, typeof(vₕ), typeof(vₗ), typeof(laiₕ), typeof(sm2), typeof(snow_cover), typeof(t2m), typeof(noise))
+    return T(-0.08235648263453457) * (_safe_sqrt(vₗ) + (snow_cover / t2m + T(-0.1892657831005156) * vₕ) * (T(-0.07359907041268714) * (noise * laiₕ + snow_cover))) + (((T(-0.09496896272780166) * vₕ + sm2 * (T(-0.741150547535996) + sm2)) + T(0.4934449209685155)) + noise * T(0.045780621419124166))
+end
+
+@inline function near_infrared_volumetric_scattering(vₗ, sm1, sm2, st1, st2, geopotential, snow_cover, t2m, noise)
+    T = promote_type(Float32, typeof(vₗ), typeof(sm1), typeof(sm2), typeof(st1), typeof(st2), typeof(geopotential), typeof(snow_cover), typeof(t2m), typeof(noise))
+    return (((((T(-0.0003633530764346828) * geopotential) * vₗ + t2m) * ((t2m * t2m) * (st1 * T(-1.5726052867019688e-11) + (snow_cover + sm1) * T(6.961606055872098e-10)) + snow_cover * T(-0.00014194486565677876)) + sm2 * ((T(-0.021328337298982213) * st2 + (st1 * T(7.673078268962595e-5)) * st1) * T(0.3118690306291605))) + T(0.02426093826350491) * snow_cover) + T(0.21359294919077146)) + T(0.03500057089164972) * noise
+end
+
+@inline function near_infrared_geometric_scattering(vₕ, vₗ, laiₕ, sm2, st1, st2, geopotential, snow_cover, noise)
+    T = promote_type(Float32, typeof(vₕ), typeof(vₗ), typeof(laiₕ), typeof(sm2), typeof(st1), typeof(st2), typeof(geopotential), typeof(snow_cover), typeof(noise))
+    return (st2 * ((geopotential * T(3.818568357356443e-10)) * st2 + (T(-0.008433043494284033) + T(0.008482159093250554)) * noise) + ((snow_cover * T(-0.0005895508304773011) + T(0.02588756791821848)) * ((((T(-0.0005895508304773011) * (st2 + st2)) * ((sm2 + (st2 + st2) * T(-0.0005895508304773011)) + (snow_cover * (T(-3.7415065307307705e-5) * geopotential) + snow_cover) * T(-0.008433043494284033))) * (((geopotential * T(7.820596733390864e-5) + snow_cover * T(-0.008433043494284033)) + vₗ) + (sm2 + vₗ)) + geopotential * (T(-3.7415065307307705e-5) * vₕ)) + (((T(0.02588756791821848) * laiₕ) * laiₕ) * vₕ + sm2)) + ((T(0.08179264552082091) + (st2 * (geopotential * T(-1.7057584346842938e-7)) + T(0.008482159093250554) * vₗ)) + st1 * T(-0.00020412859377729543)))) + (vₕ * T(0.009331484441448655) + geopotential * T(1.853145610962989e-5))
+end
+
+@propagate_inbounds function albedo!(ij, albedo, vars, scheme::LearnedLandAlbedo, model)
+    # Unpack predictors for albedo parameter prediction
+    (; land) = vars.parameterizations
+    field_capacity = model.land.thermodynamics.field_capacity
+
+    NF = eltype(albedo)
+    zero_value = zero(NF)
+
+    noise = zero_value
+    t2m = surface_air_temperature(ij, vars, scheme, model)
+    vₕ = haskey(land, :high_vegetation_cover) ? land.high_vegetation_cover[ij] : zero_value
+    vₗ = haskey(land, :low_vegetation_cover) ? land.low_vegetation_cover[ij] : zero_value
+    laiₕ = haskey(land, :high_vegetation_leaf_area) ? land.high_vegetation_leaf_area[ij] : zero_value
+    laiₗ = haskey(land, :low_vegetation_leaf_area) ? land.low_vegetation_leaf_area[ij] : zero_value
+    geopotential = model.planet.gravity * model.orography.orography[ij]
+
+    # Get snow depth and calculate snow cover
+    ts = time_stepper(model.time_stepping, :land)
+    if haskey(vars.prognostic, :land) && haskey(vars.prognostic.land, :snow_depth)
+        ts = time_stepper(model.time_stepping, :land)
+        snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, ts, DummyParameterization())
+
+        # how to compute snow cover from snow depth
+        snow_cover_scheme = scheme.snow_cover
+
+        # compute snow-cover fraction using the chosen scheme and convert to percentage
+        # as the learned albedos use snow-cover in percentage
+        snow_cover = NF(100) * snow_cover_scheme(snow_depth[ij], scheme.snow_depth_scale)
+    else
+        snow_cover = zero_value
+    end
+
+    # Get soil moisture at upper and lower layers
+    if haskey(vars.prognostic.land, :soil_moisture)
+        soil_moisture = get_prognostic_step(
+            vars.prognostic.land.soil_moisture, ts, scheme,
+        )
+        # Multiply by field capacity to get back volume of water in the layer
+        sm1 = soil_moisture[ij, begin] * field_capacity
+        sm2 = soil_moisture[ij, end] * field_capacity
+    else
+        sm1 = sm2 = zero_value
+    end
+
+    # Get soil temperature at upper and lower layers
+    if haskey(vars.prognostic.land, :soil_temperature)
+        soil_temperature = get_prognostic_step(
+            vars.prognostic.land.soil_temperature, ts, scheme,
+        )
+        st1 = soil_temperature[ij, begin]
+        st2 = soil_temperature[ij, end]
+    else
+        st1 = st2 = zero_value
+    end
+
+    # Calculate parameters!
+    vis_iso = visible_isotropic_scattering(vₕ, vₗ, laiₗ, sm2, st2, snow_cover, noise)
+    nir_iso = near_infrared_isotropic_scattering(vₕ, vₗ, laiₕ, sm2, snow_cover, t2m, noise)
+
+    vis_vol = visible_volumetric_scattering(vₕ, vₗ, laiₗ, sm1, st1, st2, geopotential, snow_cover, t2m, noise)
+    nir_vol = near_infrared_volumetric_scattering(vₗ, sm1, sm2, st1, st2, geopotential, snow_cover, t2m, noise)
+
+    vis_geo = visible_geometric_scattering(vₕ, laiₗ, sm1, geopotential, snow_cover, noise)
+    nir_geo = near_infrared_geometric_scattering(vₕ, vₗ, laiₕ, sm2, st1, st2, geopotential, snow_cover, noise)
+
+    # Near infrared parameter weight
+    nir_weight = 1 - scheme.vis_weight
+
+    # Weight vis/nir parameters to get the shortwave broadband albedo
+    sw_iso = (vis_iso * scheme.vis_weight) + (nir_iso * nir_weight)
+    sw_vol = (vis_vol * scheme.vis_weight) + (nir_vol * nir_weight)
+    sw_geo = (vis_geo * scheme.vis_weight) + (nir_geo * nir_weight)
+
+    # Get zenith angle in radians
+    μ = vars.parameterizations.cos_zenith[ij]
+    θ = acos(clamp(μ, zero(μ), one(μ))) # only need when the sun is up
+
+    # Then from those we'll calculate the black and white sky albedos
+    vars.parameterizations.land.black_sky_albedo[ij] = black_sky_albedo(sw_iso, sw_vol, sw_geo, θ)
+    vars.parameterizations.land.white_sky_albedo[ij] = white_sky_albedo(sw_iso, sw_vol, sw_geo)
+
+    return nothing
+end
+
+combine_albedos!(ij, vars, ::AbstractAlbedo, fraction_direct) = nothing
+
+# function barrier
+@propagate_inbounds function combine_albedos!(ij, vars, scheme::OceanLandAlbedo, fraction_direct)
+    combine_albedos!(ij, vars, scheme.ocean, fraction_direct)
+    combine_albedos!(ij, vars, scheme.land, fraction_direct)
+    return nothing
+end
+
+@propagate_inbounds function combine_albedos!(ij, vars, ::LearnedLandAlbedo, fraction_direct)
+    land = vars.parameterizations.land
+    bsa = land.black_sky_albedo[ij]
+    wsa = land.white_sky_albedo[ij]
+
+    land.albedo[ij] = fraction_direct * bsa + (1 - fraction_direct) * wsa
+    return nothing
+end
+
+# @propagate_inbounds function combine_albedos!(ij, vars, scheme::JinOceanAlbedo, direct_radiation_fraction)
+#     bsa = vars.parameterizations.land.black_sky_albedo[ij]
+#     wsa = vars.parameterizations.land.white_sky_albedo[ij]
+#     vars.parameterizations.land.albedo[ij] = bsa * direct_radiation_fraction + wsa * (1 - direct_radiation_fraction)
+# end

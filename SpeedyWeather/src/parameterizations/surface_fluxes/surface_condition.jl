@@ -46,27 +46,31 @@ variables(::SurfaceCondition) = (
     return surface_condition!(ij, vars, sc, model)
 end
 
+"""Extrapolate the selected lowest-level air temperature to the surface with a dry
+adiabatic lapse rate, without depending on stored boundary-layer diagnostics."""
+@propagate_inbounds function surface_air_temperature(ij, vars, component, model)
+    temperature = get_prognostic_step(vars.grid.temperature, model.time_stepping, component)
+    nlayers = model.geometry.nlayers
+    pₛ = vars.parameterizations.surface_pressure[ij]
+    σ = pressure(nlayers, pₛ, model.geometry.vertical_coordinates) / pₛ
+    return temperature[ij, nlayers] * σ^(-model.atmosphere.κ)
+end
+
 @propagate_inbounds function surface_condition!(ij, vars, surface_condition::SurfaceCondition, model)
 
     (; wind_slowdown, wind_gust) = surface_condition
     (; nlayers) = model.geometry
-    coord = model.geometry.vertical_coordinates
     (; atmosphere, time_stepping) = model
 
     # 1. Lower air temperature to surface assuming dry adiabatic lapse rate
-    temperature = get_prognostic_step(vars.grid.temperature, time_stepping, surface_condition)
     pₛ = vars.parameterizations.surface_pressure[ij]
-    (; R_dry, κ) = atmosphere
+    (; R_dry) = atmosphere
 
-    σ = pressure(nlayers, pₛ, coord) / pₛ           # σ vertical coordinate at lowest model level
-    T = temperature[ij, nlayers]                    # virtual temperature at lowest model level [K]
+    T = surface_air_temperature(ij, vars, surface_condition, model)
     q = haskey(vars.grid, :humidity) ?              # specific humidity at lowest model level [kg/kg]
         get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)
 
-    Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
-    σ⁻ᵏ = σ^(-κ)                                    # precalculate lapse rate factor
-    Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate
-    T *= σ⁻ᵏ
+    Tᵥ = virtual_temperature(T, q, atmosphere)
     vars.parameterizations.surface_air_temperature[ij] = T              # store for flux computation
     vars.parameterizations.surface_air_density[ij] = pₛ / (R_dry * Tᵥ)  # surface air density [kg/m³] from ideal gas law
 
