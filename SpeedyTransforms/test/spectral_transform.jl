@@ -429,6 +429,17 @@ end
     end
 end
 
+@testset "Fourier transform as truncated DFT only on Reactant" begin
+    # the DFT (`fourier_dft = true`) is only implemented in SpeedyTransformsReactantExt (tested there,
+    # against FFTW): FFTs on the CPU by default, no DFT matrices, an error if requested
+    spectrum = Spectrum(truncation = 32)
+    @test SpeedyTransforms.default_fourier_dft(SpeedyTransforms.CPU(), spectrum) == false
+    S = SpectralTransform(spectrum)
+    @test S.fourier_dft == false
+    @test length(S.fourier_matrix_forward) == length(S.fourier_matrix_inverse) == 0
+    @test_throws ArgumentError SpectralTransform(spectrum; fourier_dft = true)
+end
+
 @testset "Clear Fourier graph cache" begin
     # no GPU graphs on CPU: nothing to reclaim, but clearing (with/without GC) must still work
     @test SpeedyTransforms.reclaim!(SpeedyTransforms.CPU()) === nothing

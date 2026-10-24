@@ -12,6 +12,9 @@ function prettymemory(b)
     return string(@sprintf("%.2f", value), " ", units)
 end
 
+# memory of the data of an array: `sizeof` of a Reactant array is the size of its wrapper, not of its data
+nbytes(A::AbstractArray) = length(A) * sizeof(eltype(A))
+
 function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     (; spectrum, grid, nlayers, architecture) = S
     (; lmax, mmax) = spectrum   # 1-based max degree/order of harmonics
@@ -22,14 +25,14 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     # (including the transposed copy the GPU inverse transform reads and the dense copy on Reactant,
     # empty on CPU)
     polysize_str = prettymemory(
-        Base.summarysize(S.legendre_polynomials) + sizeof(S.legendre_polynomials_transposed) +
-            sizeof(S.legendre_polynomials_dense)
+        Base.summarysize(S.legendre_polynomials) + nbytes(S.legendre_polynomials_transposed) +
+            nbytes(S.legendre_polynomials_dense)
     )
     memorysize_str = prettymemory(
-        sizeof(S.scratch_memory.north) +      # add all scratch_memories
-            sizeof(S.scratch_memory.south) +
-            sizeof(S.scratch_memory.column.north) +
-            sizeof(S.scratch_memory.column.south)
+        nbytes(S.scratch_memory.north) +      # add all scratch_memories
+            nbytes(S.scratch_memory.south) +
+            nbytes(S.scratch_memory.column.north) +
+            nbytes(S.scratch_memory.column.south)
     )
 
     dealias = get_dealiasing(mmax, nlat_half)
@@ -42,6 +45,10 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     println(io, styled"├ {info:Spectral}:     T$mmax, $(lmax)x$(mmax) LowerTriangularMatrix{note:\{Complex\{$NF\}\}}")
     println(io, styled"├ {info:Grid}:         Field{note:\{$NF\}}, $(RingGrids.get_nlat(grid))-ring $Grid")
     println(io, styled"├ {info:Truncation}:   dealiasing = $dealiasing {note:($truncation)}")
+    if S.fourier_dft    # Fourier transform as truncated DFT, only on Reactant
+        dft_size_str = prettymemory(nbytes(S.fourier_matrix_forward) + nbytes(S.fourier_matrix_inverse))
+        println(io, styled"├ {info:Fourier}:      truncated DFT, matrices $dft_size_str")
+    end
     println(io, styled"├ {info:Legendre}:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
     println(io, styled"├ {info:Architecture}: $architecture")
     print(io, styled"└ {info:Memory}:       for $nlayers layers {note:($memorysize_str)}")

@@ -75,9 +75,15 @@ struct SpectralTransform{
     # single layout is coalesced for both, so the GPU keeps this second copy.
     # Empty on CPU, which only uses the layout above, and on Reactant (unused).
     legendre_polynomials_transposed::VectorType
-    # ... and dense, (parity, degree, order, latitude ring) flattened, for the Legendre transform as
+    # ... and dense, (parity, order, degree, latitude ring) flattened, for the Legendre transform as
     # one batched matrix multiply on Reactant, see `dense_legendre_polynomials`. Empty elsewhere.
     legendre_polynomials_dense::VectorType
+
+    # FOURIER TRANSFORM AS TRUNCATED DFT on Reactant (`fourier_dft = true`), see `dense_fourier_matrices`:
+    # forward (2mmax, nlon_max, nlat_half) and inverse (nlon_max, 2mmax, nlat_half) real matrices, flattened.
+    # Empty elsewhere and with `fourier_dft = false`.
+    fourier_matrix_forward::VectorType
+    fourier_matrix_inverse::VectorType
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
@@ -110,6 +116,9 @@ struct SpectralTransform{
     # (backend-dependent, see below) rather than a flat `true`/`false`.
     gpu_graphs::Bool
 
+    # Fourier transform as a truncated DFT (batched matrix multiplies) instead of FFTs, only on
+    # Reactant, see `default_fourier_dft` and SpeedyTransformsReactantExt.
+    fourier_dft::Bool
 end
 
 # eltype of a transform is the number format used within
@@ -129,6 +138,19 @@ default_gpu_graphs(::KernelAbstractions.CPU) = false   # no graphs on CPU, be ex
 default_gpu_graphs(backend) = true                     # fallback, e.g. CUDA
 default_gpu_graphs(::ReactantDevice) = false           # Reactant already does a sort of graph optimisation
 
+"""Largest spectral truncation (1-based `mmax`) for which [`default_fourier_dft`](@ref) chooses the
+Fourier transform as a truncated DFT on Reactant. Its matrices take 2 × 307 MB in Float32 at 256, and
+grow with the cube of the truncation."""
+const DFT_MAX_TRUNCATION = 512
+
+"""$(TYPEDSIGNATURES)
+Default value for the `fourier_dft` keyword of [`SpectralTransform`](@ref): the Fourier transform as a
+truncated discrete Fourier transform, one batched matrix multiply per direction instead of one FFT per
+latitude ring, which XLA keeps in its CUDA graph (it can't capture FFTs). Only on Reactant up to
+`DFT_MAX_TRUNCATION`, never on other architectures (not implemented there)."""
+default_fourier_dft(architecture::AbstractArchitecture, spectrum::AbstractSpectrum) = false
+default_fourier_dft(::ReactantDevice, spectrum::AbstractSpectrum) = spectrum.mmax <= DFT_MAX_TRUNCATION
+
 """
 $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct. With `NF` the number format,
@@ -143,7 +165,10 @@ function SpectralTransform(
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
         gpu_graphs::Bool = default_gpu_graphs(spectrum.architecture),               # use GPU-graphs accelerated Fourier path (CUDA, AMDGPU); backend-dependent default
+        fourier_dft::Bool = default_fourier_dft(spectrum.architecture, spectrum),   # Fourier transform as truncated DFT (Reactant only)
     )
+    fourier_dft && !(spectrum.architecture isa ReactantDevice) &&
+        throw(ArgumentError("fourier_dft = true is only implemented for ReactantDevice, not $(spectrum.architecture)."))
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
     # per-layer fallback used by `_fourier_serial!`).
     planned_K = sort!(unique!(Int[1; transform_batch]))
@@ -208,9 +233,21 @@ function SpectralTransform(
         legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum, 0)
     end
 
+    # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
+    # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
+    # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
+    # and sum up to 2 over all latitudes as ∫sin(θ)dθ = 2 over 0...π.
+    # Δϕ = 2π/nlon is the azimuth every grid point covers
+    solid_angles = get_solid_angles(grid)
+
+    # FOURIER TRANSFORM AS TRUNCATED DFT ON REACTANT, see the struct fields, empty elsewhere
+    fourier_matrix_forward, fourier_matrix_inverse =
+        dense_fourier_matrices(architecture, NF, fourier_dft, nlons, lon_offsets, solid_angles, mmax)
+
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # CPU always chunks unplanned K down to the largest planned batch, so scratch only needs
     # to hold one such chunk. GPU shouldn't chunk and must fit the full input K.
+    # Reactant transforms without scratch memory (zero layers).
     scratch_memory = ScratchMemory(NF, architecture, grid, _scratch_nlayers(architecture, nlayers, planned_K))
 
     # PLAN THE FFTs: concretely-typed serial (K=1) plan vectors + batched (K>1) plan Dicts
@@ -283,13 +320,6 @@ function SpectralTransform(
         end
     end
 
-    # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
-    # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
-    # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
-    # and sum up to 2 over all latitudes as ∫sin(θ)dθ = 2 over 0...π.
-    # Δϕ = 2π/nlon is the azimuth every grid point covers
-    solid_angles = get_solid_angles(grid)
-
     # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES + LAPLACE EIGENVALUES
     gradients = gradient_arrays(NF, spectrum)
     eigenvalues, eigenvalues⁻¹ = get_eigenvalues_and_inverse(NF, spectrum)
@@ -322,12 +352,14 @@ function SpectralTransform(
         legendre_polynomials,
         legendre_polynomials_transposed,
         legendre_polynomials_dense,
+        fourier_matrix_forward, fourier_matrix_inverse,
         scratch_memory,
         jm_index_size, jm_indices, lm_indices,
         solid_angles,
         eigenvalues, eigenvalues⁻¹,
         gradients,
         gpu_graphs,
+        fourier_dft,
     )
 end
 
@@ -458,6 +490,8 @@ end
 # accordance with the largest batch which is `nlayers` in this case and ISN'T equal to the physical layers of the model
 _scratch_nlayers(::AbstractCPU, ::Integer, planned_K::AbstractVector{<:Integer}) = maximum(planned_K)
 _scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:Integer}) = nlayers
+# Reactant fuses the Fourier and Legendre transform without scratch memory (SpeedyTransformsReactantExt)
+_scratch_nlayers(::ReactantDevice, ::Integer, ::AbstractVector{<:Integer}) = 0
 
 # Return true if a call with `K` layers should be split into chunks that are
 # executed sequentially.
