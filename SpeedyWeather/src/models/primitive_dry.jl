@@ -84,7 +84,7 @@ $(TYPEDFIELDS)"""
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer::BL = BoundaryLayer(spectral_grid)
-    @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
+    @component vertical_diffusion::VD = nothing    # TODO overhaul BulkRichardsonDiffusion
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
@@ -190,11 +190,13 @@ end
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
-at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
+at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!` 
+(except for its schedule)."""
 function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
-    # NUMERICS (implicit is initialized later)
+    # NUMERICS
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
+    initialize!(model.implicit, model)
     initialize!(model.horizontal_diffusion, model)
 
     # DYNAMICS
