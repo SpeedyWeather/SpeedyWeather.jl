@@ -218,6 +218,21 @@ end
     # transform!(L2, field3_f64, S)    # throws an error
 end
 
+@testset "Transform: allocating transform returns number format of S" begin
+    # the Fourier transform is pre-planned for the number format of S, so the allocating
+    # transform converts to it, that way a roundtrip also works with other input number formats
+    spectrum = Spectrum(31)
+    grid = OctahedralGaussianGrid(24)
+    S = SpectralTransform(spectrum, grid, NF = Float32)
+
+    L_f64 = randn(ComplexF64, spectrum)
+    field = transform(L_f64, S)     # Float64 -> Float32
+    @test eltype(field) == Float32
+
+    L = transform(field, S)         # Float32 -> Float32
+    @test eltype(L) == ComplexF32
+end
+
 @testset "Transform: NF flexibility for spectral outputs" begin
 
     # test Float32 -> Float64

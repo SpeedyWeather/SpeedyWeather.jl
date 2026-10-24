@@ -24,3 +24,18 @@
     @test isfile(joinpath(tmp_output_path, "parameters.txt"))
     @test isfile(joinpath(tmp_output_path, "progress.txt"))
 end
+
+@testset "Feedback diagnostics opt-in for Reactant" begin
+    show_diagnostic = SpeedyWeather.show_diagnostic
+    reactant = SpeedyWeather.ReactantDevice(nothing)   # for dispatch only, no Reactant needed
+    for arch in (SpeedyWeather.CPU(), reactant), option in (true, false)
+        @test show_diagnostic(option, arch) == option   # explicit options apply everywhere
+    end
+    @test show_diagnostic(nothing, SpeedyWeather.CPU())   # default: shown
+    @test !show_diagnostic(nothing, reactant)              # default for Reactant: not shown, opt-in
+
+    # the default feedback leaves it to the architecture
+    feedback = Feedback()
+    @test isnothing(feedback.show_umax)
+    @test isnothing(feedback.show_temperature_range)
+end

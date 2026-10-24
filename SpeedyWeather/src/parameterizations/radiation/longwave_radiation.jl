@@ -39,8 +39,8 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
     nlayers = size(T, 2)
 
     NF = eltype(T)
-    cooling = -inv(convert(NF, Second(longwave.time_scale).value))
-    τ⁻¹ = inv(convert(NF, Second(longwave.time_scale_stratosphere).value))
+    cooling = -1 / convert(NF, Second(longwave.time_scale).value)       # TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
+    τ⁻¹ = 1 / convert(NF, Second(longwave.time_scale_stratosphere).value)    # TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
 
     for k in 1:nlayers
         # Paulius and Garner, 2006, eq (1) and (2)
@@ -98,7 +98,7 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     nlayers = size(T, 2)
 
     (; α) = longwave
-    τ⁻¹ = inv(convert(eltype(T), Second(longwave.time_scale).value))
+    τ⁻¹ = 1 / convert(eltype(T), Second(longwave.time_scale).value)    # TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
     ϵ_ocean = longwave.emissivity_ocean
     ϵ_land = longwave.emissivity_land
     ϵ = longwave.emissivity_atmosphere
