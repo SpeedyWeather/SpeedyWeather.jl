@@ -19,6 +19,7 @@ Base revision: e83b6e1f
 ## Revision log
 
 - Scope limited to a workaround in RingGrids (no upstream Julia issue yet), see #1347.
+- Root cause identified (via @vchuravy): JuliaLang/julia#60924, GC-pointer null stores sunk past a safepoint, fixed on master but not yet backported to 1.13 (JuliaLang/julia#63831). Stress-tested other candidates with `--heap-size-hint=64M`; no further crashes, so no further workarounds.
 
 ## Problem description
 
@@ -48,6 +49,16 @@ miscompile in Julia rather than a bug in RingGrids.
 ## Documentation changes
 
 None.
+
+- Stress tests on Julia v1.13.2 with `--heap-size-hint=64M` (makes the original MWE crash in 3 of 3
+  runs), 2 runs each, all clean: RingGrids coordinates (`get_londlatds`, `get_lonlats`, `get_latd`,
+  `get_lond`), grid construction, `GridGeometry`, `interpolator`, `interpolate`, `average_on_poles`,
+  `grid_cell_average!` over all grid types and `nlat_half` 1:32; `SpectralTransform`,
+  `initialize!(BarotropicModel)` and `initialize!(PrimitiveWetModel)` over 7 grid types,
+  T5/8/16/31, 1/2/4 layers; and 3-day `PrimitiveWetModel` runs at small resolutions.
+- Static search for the known triggers (Union-typed ternaries over tuples with GC pointers,
+  reshaped broadcasts): the only ternary-tuple hits are bits-only (scalars, indices, ranges),
+  which this bug cannot affect.
 
 ## Known limitations
 
