@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Primitive equation models recompute the reference temperature profile of the semi-implicit solver from the current global-mean temperature, fixes the instability of long T256L8 runs [#1332](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1332)
+- New `PeriodicSchedule` and `StepSchedule`, both in `time_stepping/schedules.jl` with old `Schedule` [#1332](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1332)
+- `FriersonSigmaCoordinates` are the default vertical coordinates, vertical diffusion is off by default (`vertical_diffusion = nothing`) in primitive equation models [#1346](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1346)
+- Surface momentum, heat and humidity fluxes are time integrated with a damped flux, `RationalFluxes` by default (also `ExplicitFluxes`, `ImplicitFluxes`, `ExponentialFluxes`), stabilising thin lowermost layers [#1336](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1336)
+- Learned land and ocean surface roughness [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+- Learned surface wind slowdown from bottom model layer [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
+- Split boundary layer drag by momentum/heat/humidity and land/ocean [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 - [BREAKING] Output variables moved into the exported module `OutputVariables` and lost their `Output` suffix, e.g. `SpeedyWeather.TemperatureOutput()` is now `OutputVariables.Temperature()`, the old names are deprecated and forward with a warning [#1331](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1331)
 - Reactant: the `SpectralTransform` computes the Fourier transform as a truncated DFT: one batched matrix multiply per direction [#1317](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1317)
 - Reactant compatibility for all models incl. `PrimitiveDryModel` and `PrimitiveWetModel` (requires Reactant v0.2.292 for complex-valued kernels), CPU-vs-Reactant correctness tests for all models and output writers [#1304](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1304)

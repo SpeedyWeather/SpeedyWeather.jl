@@ -333,3 +333,110 @@ NCycleLorenzB
 NCycleLorenzAB
 NCycleLorenzABBA
 ````
+## [Periodic schedules](@id periodic_schedules)
+
+Many components don't need to do something on every time step but only periodically,
+e.g. the semi-implicit solver of the primitive equations, which recomputes its reference
+temperature profile (and with it the implicit operators) once a day by default.
+SpeedyWeather.jl has three schedules for this, all subtypes of `AbstractSchedule`
+and all used with `isscheduled(schedule, clock)`, which returns `true` on the time
+steps on which to execute
+
+| Schedule | Mutable | Periodic | Events | Initialized with | Primarily used for |
+| -------- | ------- | -------- | ------ | ---------------- | ------------------ |
+| [`Schedule`](@ref) | yes | `every::Second` | `times::Vector{DateTime}` | `initialize!(schedule, clock)` at every `run!` | callbacks, see [Schedules](@ref) |
+| [`PeriodicSchedule`](@ref) | yes | `every::Second` | – | `initialize!(schedule, time_stepping)` in `initialize!(model)` | model components |
+| [`StepSchedule`](@ref) | no | `every_n_steps::Int` | – | nothing to initialize | model components |
+
+The `Schedule` precomputes a `BitVector` of all time steps of a simulation, so that it can
+combine periodic execution with events at given times. But for that it needs the start
+time and the length of the simulation, which are only known in `run!`.
+`PeriodicSchedule` and `StepSchedule` are purely periodic and only need the time step, so
+they can be part of model components that are initialized with `initialize!(model)`
+before `run!` is called. A model component would typically use them as
+
+```julia
+@kwdef struct MyComponent <: SpeedyWeather.AbstractModelComponent
+    schedule::PeriodicSchedule = PeriodicSchedule(every = Day(1))
+    # other fields
+end
+
+function SpeedyWeather.initialize!(component::MyComponent, model::AbstractModel)
+    initialize!(component.schedule, model.time_stepping)    # converts every to every_n_steps
+    # initialize other things here
+end
+
+function SpeedyWeather.timestep!(vars::Variables, component::MyComponent, model::AbstractModel)
+    isscheduled(component.schedule, vars.prognostic.clock) || return nothing
+    # do something every day only
+end
+```
+
+### PeriodicSchedule vs StepSchedule
+
+A `PeriodicSchedule` is defined by a period of time, `every`, which is converted into a
+number of time steps `every_n_steps` with the model's time step on `initialize!`.
+`every` is rounded to a multiple of the time step, and is at least one time step;
+`every = Second(0)` means never. It also counts its executions in `counter`.
+
+```@example periodic_schedules
+using SpeedyWeather
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+time_stepping = Leapfrog(spectral_grid)
+periodic_schedule = PeriodicSchedule(every = Hour(6))
+initialize!(periodic_schedule, time_stepping)
+```
+
+so with a time step of `time_stepping.Δt_millisec` at T32 executing every 6 hours means every
+`periodic_schedule.every_n_steps` time steps. Changing the resolution therefore changes
+`every_n_steps` but not (up to rounding) `every`. A `StepSchedule` on the other hand is
+immutable and directly defined by the number of time steps `every_n_steps`, independent of the
+time step; `every_n_steps = 0` means never
+
+```@example periodic_schedules
+step_schedule = StepSchedule(every_n_steps = 4)
+```
+
+which is useful if something should execute every n-th time step regardless of resolution.
+`StepSchedule(1)` executes on every time step (but the first), e.g. for the semi-implicit solver
+to always recompute its reference temperature profile
+
+```julia
+implicit = ImplicitPrimitiveEquation(spectral_grid, schedule = StepSchedule(1))
+model = PrimitiveWetModel(spectral_grid; implicit)
+```
+
+### Scheduling and the leapfrog spin-up
+
+All schedules count the time steps with `clock.time_step_counter` which excludes the
+initial conditions and the spin-up of the [Leapfrog initialisation](@ref): the first
+Euler forward step with ``\Delta t/2`` does not count. With every 4th time step, i.e.
+`Schedule(every = 4Δt)`, `PeriodicSchedule(every = 4Δt)` or `StepSchedule(4)`, all three
+schedules execute on the same steps, after 4``\Delta t``, 8``\Delta t``, ... of simulated time.
+For the first 10 leapfrog time steps (clock shown after each step)
+
+| Time stepper step | Leapfrog step | `clock.step_counter` | `clock.time_step_counter` | Clock time | `isscheduled` |
+|---|---|---|---|---|---|
+| (initial) | - | 0 | 0 | 0 | |
+| 1 | Euler, ``\Delta t/2`` (spin-up) | 1 | 0 | ``\tfrac{1}{2}\Delta t`` | |
+| 2 | Leapfrog, ``\Delta t`` (spin-up end) | 2 | 1 | ``\Delta t`` | |
+| 3 | Leapfrog, ``2\Delta t`` | 3 | 2 | ``2\Delta t`` | |
+| 4 | Leapfrog, ``2\Delta t`` | 4 | 3 | ``3\Delta t`` | |
+| 5 | Leapfrog, ``2\Delta t`` | 5 | 4 | ``4\Delta t`` | ✅ |
+| 6 | Leapfrog, ``2\Delta t`` | 6 | 5 | ``5\Delta t`` | |
+| 7 | Leapfrog, ``2\Delta t`` | 7 | 6 | ``6\Delta t`` | |
+| 8 | Leapfrog, ``2\Delta t`` | 8 | 7 | ``7\Delta t`` | |
+| 9 | Leapfrog, ``2\Delta t`` | 9 | 8 | ``8\Delta t`` | ✅ |
+| 10 | Leapfrog, ``2\Delta t`` | 10 | 9 | ``9\Delta t`` | |
+
+Callbacks are evaluated after the clock is stepped forward, so they see the clock as in the table.
+Model components inside the time step, like the semi-implicit solver, are evaluated before the
+clock is stepped forward. They see the same clock one time stepper step later, e.g. the semi-implicit
+solver recomputes its reference temperature profile at the beginning of time stepper step 6,
+computing the tendencies at time ``4\Delta t``. With events, `Schedule(times = ...)`, a `Schedule`
+executes on the first time step on or after the given time, see [Scheduling logic](@ref).
+
+````@docs; canonical=false
+PeriodicSchedule
+StepSchedule
+````
