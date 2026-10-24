@@ -46,10 +46,6 @@ miscompile in Julia rather than a bug in RingGrids.
 - Reproducer (looping `get_londlatds` over all grid types, `nlat_half` 1:48, 20 times, then
   `GC.gc(true)`) passes on Julia v1.13.2 without bounds checks.
 
-## Documentation changes
-
-None.
-
 - Stress tests on Julia v1.13.2 with `--heap-size-hint=64M` (makes the original MWE crash in 3 of 3
   runs), 2 runs each, all clean: RingGrids coordinates (`get_londlatds`, `get_lonlats`, `get_latd`,
   `get_lond`), grid construction, `GridGeometry`, `interpolator`, `interpolate`, `average_on_poles`,
@@ -60,10 +56,14 @@ None.
   reshaped broadcasts): the only ternary-tuple hits are bits-only (scalars, indices, ranges),
   which this bug cannot affect.
 
+## Documentation changes
+
+None.
+
 ## Known limitations
 
 Other code paths may hit the same miscompile, so this may not remove every crash on Julia v1.13.2.
 
 ## Future work
 
-Report the MWE to JuliaLang/julia if it persists in later 1.13 patch releases.
+Revert to the vectorised form once the backport of JuliaLang/julia#60924 (JuliaLang/julia#63831) is in a 1.13 release.
