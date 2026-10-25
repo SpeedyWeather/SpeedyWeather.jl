@@ -245,7 +245,8 @@ function time_step!(clock::Clock, time_stepping::Leapfrog)
     return nothing
 end
 
-default_time_step(L::Leapfrog) = 2 * L.Δt
+# for any AbstractLeapfrog: inside kernels the Leapfrog is adapted to a LeapfrogCore
+default_time_step(L::AbstractLeapfrog) = 2 * L.Δt
 function time_step(L::Leapfrog, clock::Clock)
     (; Δt) = L
     return ifelse(
