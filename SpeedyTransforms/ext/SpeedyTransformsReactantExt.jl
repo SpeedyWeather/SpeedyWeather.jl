@@ -14,6 +14,10 @@ import SpeedyWeatherInternals.Utils: @maybe_jit
 import SpeedyTransforms: SpectralTransform, ScratchMemory, plan_FFTs, dense_legendre_polynomials,
     dense_fourier_matrices, _transform_grid!, _transform_spec!
 
+# Note this code is only used for Reactant. Reactant XLA compiliation includes a lot of optimisations 
+# that e.g. eliminate allocations (and in this case here for example the need for explicit scratch 
+# memory). 
+
 # =====================================================================================
 # SPECTRAL TRANSFORM WITH REACTANT
 #
@@ -118,7 +122,8 @@ insert_dimension(a, dims::Integer) = reshape(a, size(a)[1:(dims - 1)]..., 1, siz
 # (indexing them as matrices falls back to scalar indexing), views are materialized
 as_matrix(data) = reshape(materialize(data), size(data, 1), :)
 
-# write the (n, columns) matrix `result` into `data` of any shape
+# write the (n, columns) matrix `result` into `data` of any shape (done so we cover 2d, 3d and 4d 
+# arrays together)
 write_matrix!(data, result) = (data .= reshape(result, size(data)); nothing)
 
 # =====================================================================================
