@@ -117,8 +117,24 @@ parameterizations) after one step from the synced state. Largest differences, as
 
 All values are finite. The **land** surface fluxes differ by 37 % after a single step, and the ocean
 fluxes by 3 %. That is not a rounding difference: the Reactant path computes the (damped) land surface
-fluxes differently. Next: compare the inputs of `SurfaceLandHeatFlux` (conductance, drag, soil and air
-temperature, surface pressure) and the damping factor point by point.
+fluxes differently.
+
+### 3. Land sensible heat flux: inputs or kernel?
+
+`land_flux.jl` saves the synced start state (soil temperature, snow depth), takes one step on both
+architectures, and recomputes the flux of `SurfaceLandHeatFlux` on the host from each architecture's
+own inputs. The inputs are surface pressure, air density, wind speed, air temperature and drag.
+
+| | max\|Δ\| / max\|x\| (land points) |
+| --- | --- |
+| Inputs, CPU vs Reactant | ≤ 4.2e-6 (drag), the others ≤ 6.5e-7 |
+| CPU: stored flux vs flux recomputed from its own inputs | 5.0e-8 |
+| Reactant: stored flux vs flux recomputed from its own inputs | **3.7e-1** |
+
+The inputs are the same, but **Reactant's kernel computes a different flux from them**. The damping
+factor is the prime suspect: z = Δt/τ reaches 1.66 at land points (Δσ of the lowermost Frierson layer
+0.040, Δt = 2Δt = 4800 s), where the rational factor is about 0.5. Next: the damping factor each
+architecture actually applied (stored / undamped flux) against z.
 
 ## Open questions and next steps
 
