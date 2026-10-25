@@ -1,9 +1,10 @@
 # Reactant differentiation test fails after merging main into `mg/new-reactant`
 
-> Status: **fix implemented, final verification running**. Forward difference: `default_time_step`
+> Status: **fixed and verified locally**, CI run outstanding. Forward difference: `default_time_step`
 > inside kernels (section 4, committed). Non-finite gradient: the drag's `log(z/0)` for the absent surface
-> type, fixed in `drag.jl` with an unchanged forward result (section 6). The rain rate is not a NaN source
-> (section 7).
+> type, fixed in `drag.jl`; the forward result is bit-identical and the 6-step Reactant gradient is finite
+> (section 6). The rain rate is not a NaN source, but its conversion to mm/day in the clouds is 1e6
+> too small (section 7, not fixed).
 
 Date of initial draft: 2026-10-25
 
@@ -376,6 +377,14 @@ type absent at a point.
 - `test/reactant/test_drag.jl`: Reactant derivative w.r.t. z and z₀ for a present and an absent surface
   is finite. This fails with the old code, while CPU Enzyme gives 0 there and can't catch a regression.
 
+**Verified locally (2026-10-25):**
+- CPU: `test/parameterizations/drag.jl` passes (4 + 12), and so does `surface_roughness.jl`.
+- Reactant: `test/reactant/test_drag.jl` passes 2/2 with the fix. It fails 2/2 with the old coefficient
+  restored, so it catches the regression.
+- **The CI case without any patches** (`repro.jl default gradient`, the source fix only): loss CPU
+  4.445139e5 vs Reactant 4.445144e5 (1.2e-6, unchanged from before the fix). **Gradient finite: 0 of
+  8960 non-finite.**
+
 ### 7. Rain rate in the diagnostic clouds: no NaN, but a singular derivative
 
 - `clouds.jl:123-125,150`: `P = precip_weight * sqrt(min(precip_max, 86.4 · rain_rate))`, then
@@ -392,6 +401,39 @@ type absent at a point.
   of rain. A smooth alternative would be e.g. `sqrt(x + ε) - sqrt(ε)` with a small ε, which changes the
   forward result slightly. That is a choice for the cloud scheme (SPEEDY's formulation uses the plain
   `sqrt`), not needed for the CI test.
+
+#### Unit error: the precipitation term is 1e6 too small (not fixed, independent of the CI failure)
+
+> no keep it, but continue to investigate the rain_rate problem
+
+- `clouds.jl:124` converts with `(86400 * rain_rate) / 1000`, i.e. 86.4 · rain_rate. That is SPEEDY's
+  conversion from g/(m² s) to mm/day (1 g/(m² s) = 86.4 mm/day).
+- SpeedyWeather's `rain_rate` is in **m/s**: the variable declarations in `convection.jl` and
+  `large_scale_condensation.jl` say so, and `soil_moisture.jl:230` uses it as m/s. It was already m/s
+  when the conversion came in with #888 (`47a6ce87`, 2025-11-19, `rain_rate_large_scale::NF = 0 # … [m/s]`).
+- m/s → mm/day is `86400 * 1000 * rain_rate`, a factor of **1e6** more than the code uses.
+  `precipitation_max = 10` is documented as mm/day, and so is the formula in `docs/src/radiation.md`.
+- Measured in a CPU T32 `PrimitiveWetModel` (default, with convection) after 2 days, 3168 points:
+
+  | Quantity (points with rain, 28%) | Median | Max |
+  | --- | --- | --- |
+  | Rain rate [mm/day] | 1.1 | 45 (10% quantile 1.2e-2, 90% quantile 18) |
+  | P = 0.2 √min(10, ·), current conversion | 2.1e-4 | 1.3e-3 |
+  | P with the m/s → mm/day conversion | 0.21 | 0.63 (the 10 mm/day cap) |
+  | dP/d(rain) [1/(mm/day)], current | 9.4e-5 | 1.9e-2 |
+  | dP/d(rain) [1/(mm/day)], m/s → mm/day | 9.4e-2 | 19 |
+
+  Cloud cover for comparison: mean 0.62, 6% of points at 1.
+- **Consequence:** the precipitation contribution to the cloud cover is effectively off (at most 0.001
+  instead of up to 0.63). The diagnostic clouds are humidity-only, and the 10 mm/day cap is never reached.
+  The rain rates themselves are plausible as m/s (median 1 mm/day), which rules out the alternative that
+  the variable is in the wrong unit instead.
+- With the correct conversion the derivative w.r.t. the rain rate is 1000× larger (√1e6), and the 1/√
+  singularity at the onset of rain stays. Light rain (1e-2 mm/day, the 10% quantile) then gives
+  dP/d(rain) ≈ 1 per mm/day.
+- **Fixing it changes the forward physics:** more cloud cover where it rains, so less shortwave at the
+  surface. Anything tuned against the current behaviour (default parameters, stored reference values in
+  tests) may shift. So it's a decision for the cloud scheme, separate from this CI failure.
 
 ## Handoff (2026-10-25, session closed): where we are and how to restart
 
