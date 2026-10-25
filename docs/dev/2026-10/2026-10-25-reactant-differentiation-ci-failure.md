@@ -141,4 +141,10 @@ temperature, surface pressure) and the damping factor point by point.
    - `isscheduled(every_n_steps, clock)` uses `&` on the step counter.
    - `PeriodicSchedule` counts executions through `count_execution!`, a no-op for a traced decision.
    - Tested in `test/reactant/test_implicit.jl` against the CPU: `StepSchedule`, `PeriodicSchedule`,
-     and a schedule that never executes.
+     and a schedule that never executes. All 12 checks pass locally (committed as `e6044288`).
+   - CPU: the schedule and implicit-solver tests pass, and a 40-step run stays finite with one
+     scheduled reinitialization (step 36).
+   - **Pitfall:** run with `--check-bounds=yes`, the Reactant test fails with "MLIR pass pipeline all
+     failed". Forced bounds checks keep the throwing branches in the KernelAbstractions kernels (here
+     the Gauss-Jordan inversion), and those can't be raised. CI runs the Reactant tests without the
+     flag, and so must local runs.
