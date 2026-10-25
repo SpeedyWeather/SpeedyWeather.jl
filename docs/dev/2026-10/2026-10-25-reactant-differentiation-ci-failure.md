@@ -1,8 +1,9 @@
 # Reactant differentiation test fails after merging main into `mg/new-reactant`
 
-> Status: **in progress, paused 2026-10-25**. The forward difference is found and fixed (section 4).
-> The non-finite gradient comes from the physics (`dynamics_only` makes it finite), but the
-> parameterization isn't identified yet. See "Handoff" for where to restart.
+> Status: **fix implemented, final verification running**. Forward difference: `default_time_step`
+> inside kernels (section 4, committed). Non-finite gradient: the drag's `log(z/0)` for the absent surface
+> type, fixed in `drag.jl` with an unchanged forward result (section 6). The rain rate is not a NaN source
+> (section 7).
 
 Date of initial draft: 2026-10-25
 
@@ -255,6 +256,143 @@ ruled out on their own. Next round, splitting the physics: `constsc` (surface co
 constant slowdown and gust), `nosurface` (boundary layer and surface fluxes off), `noveg` (no
 vegetation), `nolsc` (no large-scale condensation).
 
+### 6. Where the NaN enters: gradient of one time step (2026-10-25, later)
+
+`nan_locate.jl`: Reactant gradient of `loss_one_step` from the synced state, then the non-finite
+entries of every shadow variable. The adjoints of grid-space inputs aren't spread by the spectral
+transform yet. Non-finite:
+
+| Shadow variable | Non-finite |
+| --- | --- |
+| `dynamics.geopotential` | 2281 of 25344: **layer 8 (lowermost) only**, at **all ocean-only (1805) and all land-only (476) points**, **none of the 887 coastal points** |
+| `parameterizations.neutral_wind_speed` | 476: all land-only points |
+
+**Reading.**
+- "Pure points, never coastal" is the pattern of the drag's `log(z/z₀)` with z₀ = 0 for the absent
+  surface type (`drag.jl:104`). At coastal points both roughness lengths are positive.
+  - Forward: `log(z/0) = Inf`.
+  - Derivative w.r.t. z: `(1/Inf) · (1/0) = 0 · ∞ = NaN`.
+- The NaN enters the lowermost-layer geopotential through `z = Φ/g - orography` (`drag.jl:84`). The
+  parameterizations run before the dynamics, so they read the previous step's geopotential, which comes
+  from the temperature. That's how the NaN reaches the state, and the transform then spreads it over
+  every coefficient.
+- `neutral_wind_speed` at land points: never written there (`neutral_wind.jl:54`). That adjoint has
+  nowhere further to go; it comes from the ocean roughness formulas evaluated at uₙ = 0 on the side of
+  the land/ocean select that isn't taken.
+
+**With the patches** (`nan_locate.jl default drag,roughness,gust`, overrides in `patches.jl`):
+- The `neutral_wind_speed` adjoint is clean now; the roughness patch takes effect.
+- The lowermost-layer geopotential is **still non-finite at exactly the same 2281 pure points**.
+- The drag override is in effect: `methods(boundary_layer_drag!)` lists the `BulkRichardsonDrag` method
+  from the patch file.
+
+So the drag's `log(z/0)` isn't the (only) source. Readers of the lowermost geopotential in this test
+configuration: the drag (`z`) and `LearnedWindSlowdown` (`surface_condition.jl:173`). Convection and
+vertical diffusion are off. The diagnostic clouds read layers 7 and 8 symmetrically, but the NaN is in
+layer 8 only.
+- In both readers z enters only finite local derivatives once patched.
+- The likely explanation: a NaN adjoint arrives from **downstream**, e.g. from a surface flux of the
+  surface type that is present, and reaches z through the drag or the wind slowdown.
+
+Being checked: `physics_locate.jl drag,roughness,gust`. It differentiates `parameterization_tendencies!`
+alone, with a loss on one output at a time (land drag, ocean drag, surface wind speed, wind slowdown,
+lowermost-layer temperature tendency).
+
+**Scalar derivatives, CPU Enzyme vs Reactant** (one-element arrays, `Duplicated`):
+
+| Term | CPU Enzyme | Reactant |
+| --- | --- | --- |
+| Drag `max(drag_min, κ²/log(max(z,10z₀)/z₀)²)`, d/dz at z₀ = 0 (`drag.jl:102-104,131`) | 0 | **NaN** |
+| Cloud cover `min(1, w·sqrt(min(P_max, 86.4·rain)) + h)`, d/d(rain) at rain = 0 (`clouds.jl:124-125,150`) | 0 | 0 |
+| Same, at rain = 1e-8 m/s | 9.3e3 | 9.3e3 |
+
+- The drag's `log(z/0)` is a NaN source **under Reactant only**. W.r.t. z, CPU Enzyme gives 0; w.r.t.
+  z₀ it gave NaN on the CPU too (section 5).
+- The rain-rate `sqrt(0)` in the clouds is **not** a NaN source: both give 0. Near 0 the derivative is
+  huge but finite.
+
+**Physics only** (`physics_locate.jl drag,roughness,gust`): the Reactant gradient of
+`parameterization_tendencies!` alone, with a loss on one output at a time. **Every** output (land drag,
+ocean drag, surface wind speed, wind slowdown, lowermost-layer temperature tendency) gives d/dΦ non-finite
+at the **same 2281 pure points**, other layers finite.
+- The surface wind speed doesn't depend on the drag. So the NaN doesn't depend on what's differentiated:
+  it's created as 0 · ∞ in the reverse pass of the fused column-parameterization kernel, even with a
+  zero incoming adjoint.
+- With the drag patched, something in that kernel still has an infinite local derivative w.r.t. the
+  lowermost geopotential at pure points. Candidates: the remaining z-reader `LearnedWindSlowdown`, or
+  the patched drag after all.
+**Drag vs wind slowdown** (`physics_locate.jl drag,roughness,gust constdrag,constsc wind_speed`):
+
+| Variant (patches applied) | d/dΦ non-finite |
+| --- | --- |
+| `constdrag`: `ConstantDrag`, doesn't read z | **0 points** |
+| `constsc`: constant wind slowdown and gust, `BulkRichardsonDrag` (patched) | 2281 pure points |
+
+**The source is `BulkRichardsonDrag`'s `log(z/z₀)` with z₀ = 0, even with the `ifelse` patch.**
+- The likely reason: Reactant's optimizer folds the double select away. On the side where the surface
+  exists, `select(exists, z₀, 1)` is `z₀`. So `select(exists, f(select(exists, z₀, 1)), 0)` becomes
+  `select(exists, f(z₀), 0)`, which restores `log(z/0)` and its 0 · ∞ in the reverse pass.
+- A fix the optimizer can't undo: clamp the roughness itself, `z₀ = max(z₀, 1e-10)`, before the `log`.
+  - No intermediate is ever infinite.
+  - Real roughness lengths are untouched, and `z/z₀` stays far from Float32 overflow.
+  - The coefficient of the absent surface becomes finite instead of 0, but it's weighted by a surface
+    fraction of 0, so fluxes and outputs stay the same.
+- **Tested, patch `dragclamp`** (with the roughness and gust patches):
+  - Physics only: d/dΦ non-finite at **0 points**.
+  - **Full 6-step gradient (the CI test case): finite, 0 of 8960.** Loss CPU 4.443358e5 vs Reactant
+    4.443371e5, 2.9e-6 relative.
+  - The clamp changes the forward loss by 4e-4 compared with the unpatched model (4.445139e5). The
+    absent surface's coefficient, now finite instead of 0, is evidently used somewhere without the zero
+    weighting.
+
+**Cause of the non-finite gradient: found.** It is the drag's `log(z/z₀)` with z₀ = 0 for the surface
+type absent at a point.
+
+**Variants of the fix, each alone** (6-step gradient; the unpatched forward loss is 4.445139e5):
+
+| Patch | Loss CPU | Gradient |
+| --- | --- | --- |
+| `dragexact`: `max(z₀, 1e-10)` in the `log`, then `ifelse(exists, C, 0)` | 4.443358e5 | finite |
+| `dragsafe`: `ifelse(z₀ > 0, z₀, 1)`, no select on the result | **4.445139e5** (unchanged) | **finite** |
+
+- So the drag alone is the cause under Reactant; the roughness and gust patches are not needed.
+- The clamp at 1e-10 changes the forward result because real roughness lengths do fall below 1e-10. The
+  learned ocean momentum roughness is an exponential without a lower bound and gets that small in calm
+  conditions. For z₀ = 1e-15 the clamp roughly doubles the transfer coefficient.
+- The absent surface's coefficient (0 or a finite stand-in) makes no difference to the loss, because it
+  is weighted by a zero fraction.
+
+**Fix, implemented in `drag.jl`:**
+- The coefficient is lifted from a closure in `boundary_layer_drag!` to a top-level
+  `neutral_transfer_coefficient(z, z₀M, z₀X, κ)`.
+- It replaces only an exactly-zero roughness by 1 m: real roughness lengths are untouched, and the forward
+  result is bit-identical.
+- The absent surface's stored drag is now `max(drag_min, finite stand-in)` instead of `drag_min`. Only
+  that field changes; it is weighted by a zero fraction everywhere.
+
+**Tests:**
+- `test/parameterizations/drag.jl` (CPU): the coefficient is unchanged for real roughness and finite for
+  zero roughness; the drag in a T32 model with land-only and ocean-only points is finite and ≥ `drag_min`.
+- `test/reactant/test_drag.jl`: Reactant derivative w.r.t. z and z₀ for a present and an absent surface
+  is finite. This fails with the old code, while CPU Enzyme gives 0 there and can't catch a regression.
+
+### 7. Rain rate in the diagnostic clouds: no NaN, but a singular derivative
+
+- `clouds.jl:123-125,150`: `P = precip_weight * sqrt(min(precip_max, 86.4 · rain_rate))`, then
+  `cloud_cover = min(1, P + humidity_term)`.
+- The rain rate comes from the large-scale condensation (and convection, off in this test). Besides the
+  clouds it is used linearly in the land soil moisture. Neither the condensation nor the soil moisture has
+  a singular derivative.
+- **Not a NaN source:** at rain = 0 both CPU Enzyme and Reactant give d(cloud cover)/d(rain) = **0**.
+  Both define the derivative of `sqrt` at exactly 0 as 0, although the one-sided derivative is +∞. The
+  full 6-step gradient is finite once the drag is fixed, so this test has no other NaN source.
+- **But the derivative is singular as the rain rate → 0⁺**, like `1/sqrt(rain)`: 9.3e3 at 1e-8 m/s
+  (about 0.9 mm/day), and growing without bound for smaller rates. With exactly 0 rain it jumps to 0.
+- So for gradient *quality* the clouds' sensitivity to light rain is huge and discontinuous at the onset
+  of rain. A smooth alternative would be e.g. `sqrt(x + ε) - sqrt(ε)` with a small ε, which changes the
+  forward result slightly. That is a choice for the cloud scheme (SPEEDY's formulation uses the plain
+  `sqrt`), not needed for the CI test.
+
 ## Handoff (2026-10-25, session closed): where we are and how to restart
 
 ### State
@@ -272,6 +410,9 @@ vegetation), `nolsc` (no large-scale condensation).
   - **Hint:** the gradient w.r.t. one leapfrog time level is non-finite in every coefficient, the other
     is all zero. So the NaN reaches the state and the transform spreads it everywhere.
 - **Interrupted at closing** (results lost, rerun): the physics round `constsc`, `noveg`, `nolsc`.
+  A later rerun of it, together with `noradiation` (`radiation = nothing`), ran as 4 parallel processes.
+  That **froze the local machine** (16 GB) and produced no results. **Run one heavy Julia job at a time
+  locally**, and use the HPC node for sweeps.
   `nosurface` failed by construction: other components need the surface-flux variables (`FieldError:
   … no field sensible_heat_flux`). Turning the surface fluxes off needs a different variant, e.g. zero
   drag or prescribed fluxes.
