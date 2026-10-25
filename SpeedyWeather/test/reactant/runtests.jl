@@ -45,5 +45,7 @@ include("test_interpolation.jl")
 include("test_correctness.jl")
 include("test_output.jl")
 include("test_time_steps.jl")
+include("test_implicit.jl")
+include("test_drag.jl")
 
 include("differentation.jl")

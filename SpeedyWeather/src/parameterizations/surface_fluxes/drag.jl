@@ -96,14 +96,6 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     z₀H_ocean = vars.parameterizations.ocean.heat_roughness[ij]
     z₀Q_ocean = vars.parameterizations.ocean.humidity_roughness[ij]
 
-    @inline function neutral_transfer_coefficient(z, z₀M, z₀X, κ)
-        # flux dependent bulk drag coefficient in the neutral limit
-        # should be z > z₀, z = z₀ means infinitely high drag, cap one order above the roughness length
-        zM = max(z, 10z₀M)
-        zX = max(z, 10z₀X)
-        return κ^2 / (log(zM / z₀M) * log(zX / z₀X))
-    end
-
     C_M_land = neutral_transfer_coefficient(z, z₀M_land, z₀M_land, κ)
     C_H_land = neutral_transfer_coefficient(z, z₀M_land, z₀H_land, κ)
     C_Q_land = neutral_transfer_coefficient(z, z₀M_land, z₀Q_land, κ)
@@ -145,6 +137,23 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
         land_fraction * land.boundary_layer_drag_humidity[ij] + (1 - land_fraction) * ocean.boundary_layer_drag_humidity[ij]
 
     return nothing
+end
+
+"""
+$(TYPEDSIGNATURES)
+Bulk transfer coefficient in the neutral limit, κ²/(log(z/z₀M) log(z/z₀X)), for the height `z` [m] of
+the lowermost layer, the momentum roughness length `z₀M` [m] and the roughness length `z₀X` [m] of
+momentum, heat or humidity. Should be z > z₀ (z = z₀ means infinitely high drag), so capped one order
+of magnitude above the roughness length. A roughness length of exactly zero marks a surface type that
+is absent at a grid point (the coefficient is then weighted by a zero land or ocean fraction). 1 m is
+used instead, as `log(z/0) = Inf` gives a zero coefficient but a NaN derivative (0 · ∞) in reverse
+mode, e.g. with Reactant."""
+@inline function neutral_transfer_coefficient(z, z₀M, z₀X, κ)
+    z₀M = ifelse(z₀M > 0, z₀M, one(z₀M))
+    z₀X = ifelse(z₀X > 0, z₀X, one(z₀X))
+    zM = max(z, 10z₀M)
+    zX = max(z, 10z₀X)
+    return κ^2 / (log(zM / z₀M) * log(zX / z₀X))
 end
 
 """

@@ -112,16 +112,27 @@ function reinitialize!(
         model::PrimitiveEquation,
         vars::Variables,
     )
-    (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
     (; clock) = vars.prognostic
-    Δt = time_step(time_stepping, clock)
-    Δt_changed = implicit.Δt[] != Δt
-    Δt_changed || isscheduled(implicit.schedule, clock) || return nothing
+    Δt = time_step(model.time_stepping, clock)
+    update = (implicit.Δt[] != Δt) | isscheduled(implicit.schedule, clock)
+    implicit.Δt[] = Δt
+    return reinitialize!(implicit, update, Δt, model, vars)
+end
 
+# (re)initialize the implicit operators with time step Δt and the current global-mean temperature
+# as reference profile only if `update`, see SpeedyWeatherReactantExt for a traced `update`
+function reinitialize!(
+        implicit::ImplicitPrimitiveEquation,
+        update::Bool,
+        Δt,
+        model::PrimitiveEquation,
+        vars::Variables,
+    )
+    update || return nothing
+    (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
     scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
     Tₖ = vars.dynamics.average_temperature_profile          # current global-mean temperature profile
     initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
-    implicit.Δt[] = Δt
     return nothing
 end
 

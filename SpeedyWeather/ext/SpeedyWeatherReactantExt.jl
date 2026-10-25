@@ -141,39 +141,37 @@ function Dates.daysinmonth(year::Reactant.TracedRNumber, month::Reactant.TracedR
     return ifelse(month == 2, 28 + Dates.isleapyear(year), ifelse(thirty_days, 30, 31))
 end
 
-const ReactantPrimitiveEquation = Union{
-    PrimitiveDryModel{SG, <:ReactantDevice}, PrimitiveWetModel{SG, <:ReactantDevice},
-} where {SG}
-
-# The time step depends on the (traced) clock, so whether the implicit solver has to be
-# reinitialized (time step changed) is only known at run time. Instead of branching (`@trace if`
-# would trace all captured model components) the temperature profile the operators are built
-# from is only updated if the time step changed, and the operators, deterministic functions of
-# that profile and the time step, are recomputed every time step. Equivalent to reinitializing
-# only when the time step changed as `reinitialize!` does for other architectures.
-# TODO: This is certainly a bit wasteful, however it matters less than one could think. It adds 
-# roughly 0.5ms/step. That makes a T32L8 run 10% slower, but already at T64L8 it's basically within 
+# Whether the implicit solver has to be reinitialized (time step changed, or the reference temperature
+# profile is scheduled to be recomputed) depends on the traced clock, so `update` is only known at run
+# time. Instead of branching (`@trace if` would trace all captured model components) the reference
+# temperature profile is only updated if `update`, and the operators, deterministic functions of that
+# profile and the time step, are recomputed every time step. Equivalent to `reinitialize!` with a
+# `update::Bool` for other architectures.
+# TODO: This is certainly a bit wasteful, however it matters less than one could think. It adds
+# roughly 0.5ms/step. That makes a T32L8 run 10% slower, but already at T64L8 it's basically within
 # measuring noise. We still might revise this in the future to either a) explicilty trace whether
 # the time step changed or b) just handle the first few steps sepereatly for Reactant (a bit similar
 # to what we used to do in general for the time stepping)
 function SpeedyWeather.reinitialize!(
         implicit::ImplicitPrimitiveEquation,
-        model::ReactantPrimitiveEquation,
+        update::Reactant.TracedRNumber{Bool},
+        Δt,
+        model::SpeedyWeather.PrimitiveEquation,
         vars::SpeedyWeather.Variables,
     )
-    (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    Δt = SpeedyWeather.time_step(time_stepping, vars.prognostic.clock)
-    Δt_changed = implicit.Δt[] != Δt
-    implicit.Δt[] = Δt
-
+    (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
     (; temp_profile) = implicit
-    Tₖ = vars.dynamics.average_temperature_profile
-    temp_profile .= ifelse.(Δt_changed, Tₖ, temp_profile)
+    Tₖ = vars.dynamics.average_temperature_profile          # current global-mean temperature profile
+    temp_profile .= ifelse.(update, Tₖ, temp_profile)
 
     scale = vars.prognostic.scale[]         # implicit solver needs to be initialized with scaled time step
     initialize!(implicit, Δt / scale, temp_profile, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end
+
+# The executions of a schedule are counted in a plain integer of the model, a traced decision can't
+# be added to it, so executions aren't counted with Reactant
+SpeedyWeather.count_execution!(::SpeedyWeather.AbstractSchedule, ::Reactant.TracedRNumber{Bool}) = nothing
 
 SpeedyWeather.dilate(Δt::Millisecond, dilation::Reactant.TracedRNumber) =
     ReactantDatesExt.ReactantMillisecond(round(Int, Δt.value * dilation))

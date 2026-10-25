@@ -212,6 +212,17 @@ end
     end
 end
 
+@testset "Default time step inside kernels" begin
+    # time steppers are adapted to a core struct inside kernels (GPU, Reactant), which has to
+    # return the same default time step, e.g. 2Δt for leapfrog used by the surface flux damping
+    @testset for TS in (Leapfrog, NCycleLorenz)
+        time_stepping = TS(SpectralGrid())
+        adapted = SpeedyWeather.Adapt.adapt(Array, time_stepping)
+        @test typeof(adapted) != typeof(time_stepping)
+        @test SpeedyWeather.default_time_step(adapted) == SpeedyWeather.default_time_step(time_stepping)
+    end
+end
+
 @testset "Set timestep manually" begin
     @testset for TS in (Leapfrog, NCycleLorenz)
         @testset for truncation in (32, 64, 128)
