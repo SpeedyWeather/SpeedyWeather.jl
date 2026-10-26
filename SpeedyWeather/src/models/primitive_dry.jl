@@ -116,9 +116,9 @@ $(TYPEDFIELDS)"""
         :solar_zenith,              # orbit or external forcing
         :vertical_diffusion,        # mixing
         :convection,
+        :boundary_layer,            # surface fluxes
         :albedo,                    # radiation
         :radiation,
-        :boundary_layer,            # surface fluxes
         :surface_momentum_flux,
         :surface_heat_flux,
         :stochastic_physics,        # perturbations
