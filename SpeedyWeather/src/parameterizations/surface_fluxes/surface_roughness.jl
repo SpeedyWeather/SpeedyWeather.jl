@@ -269,12 +269,11 @@ initialize!(::LearnedLandRoughness, ::PrimitiveEquation) = nothing
     sd = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(land_fraction)
 
     ts = time_stepper(model.time_stepping, :land)
-    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ?
-        get_prognostic_step(vars.prognostic.land.soil_moisture, ts, scheme)[ij, end] : zero(land_fraction)
+    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) && haskey(land, :soil_moisture_capacity) ?
+        get_prognostic_step(vars.prognostic.land.soil_moisture, ts, scheme)[ij, end] * land.soil_moisture_capacity[ij] :
+        zero(land_fraction)
     soil_temperature = haskey(vars.prognostic.land, :soil_temperature) ?
         get_prognostic_step(vars.prognostic.land.soil_temperature, ts, scheme)[ij, end] : zero(land_fraction)
-
-    soil_moisture *= land.soil_moisture_capacity # recover volume of water in the layer
 
     z₀M_land = land_momentum_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, sd, soil_temperature, soil_moisture)
     z₀H_land = land_heat_roughness(scheme, vₕ, vₗ, laiₕ, laiₗ, soil_temperature, soil_moisture)

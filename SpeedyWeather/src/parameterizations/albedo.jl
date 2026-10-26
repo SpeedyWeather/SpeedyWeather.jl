@@ -7,8 +7,8 @@ Albedo structs should be defined as MyAlbedo <: AbstractAlbedo and implement the
 `initialize!` is as for every model component but in contrast to other parameterizations albedos
 should not implement `parameterization!` but rather `albedo!`, which is called from within `parameterization!`.
 This is because every albedo needs to be used either as part of OceanLandAlbedo or the same albedo
-is called over both land and ocean surfaces. If a surface namespace (vars.parameterizations.land or .ocean) 
-contains both black_sky_albedo and white_sky_albedo, a shortwave scheme that knows the direct-beam fraction 
+is called over both land and ocean surfaces. If a surface namespace (`vars.parameterizations.land` or `.ocean``) 
+contains both `black_sky_albedo` and `white_sky_albedo`, a shortwave scheme that knows the direct-beam fraction 
 blends them into that namespace's albedo. Otherwise it leaves albedo alone."""
 abstract type AbstractAlbedo <: AbstractModelComponent end
 
@@ -376,7 +376,6 @@ end
 @propagate_inbounds function albedo!(ij, albedo, vars, scheme::LearnedLandAlbedo, model)
     # Unpack predictors for albedo parameter prediction
     (; land) = vars.parameterizations
-    field_capacity = model.land.thermodynamics.field_capacity
 
     NF = eltype(albedo)
     zero_value = zero(NF)
@@ -406,13 +405,13 @@ end
     end
 
     # Get soil moisture at upper and lower layers
-    if haskey(vars.prognostic.land, :soil_moisture)
+    if haskey(vars.prognostic.land, :soil_moisture) && haskey(land, :soil_moisture_capacity)
         soil_moisture = get_prognostic_step(
             vars.prognostic.land.soil_moisture, ts, scheme,
         )
         capacity = land.soil_moisture_capacity[ij]
 
-        # Multiply by field capacity to get back volume of water in the layer
+        # Multiply by soil moisture capacity to get back volume of water in the layer
         sm1 = soil_moisture[ij, begin] * capacity
         sm2 = soil_moisture[ij, end] * capacity
     else
