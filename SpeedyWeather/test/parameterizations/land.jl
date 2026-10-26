@@ -108,4 +108,5 @@ end
     W = simulation.variables.prognostic.land.soil_moisture.data[land_points, :, :]
     @test all(0 .<= W .<= 1)
     @test any(W .== 1)
+    @test all(isfinite, soil_moisture)
 end

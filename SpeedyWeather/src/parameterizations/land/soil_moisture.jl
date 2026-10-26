@@ -7,7 +7,7 @@ export SeasonalSoilMoisture
 """SeasonalSoilMoisture model that prescribes soil moisture from a monthly climatology file.
 The soil moisture is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractPrescribedSoilMoisture
+@parameterized @kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractPrescribedSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
@@ -32,6 +32,12 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
+
+    "[OPTION] Apply land-sea mask to set ocean-only points and missing values?"
+    mask::Bool = true
+
+    "[OPTION] Soil moisture for ocean points/missing values, fraction of field capacity [1]"
+    @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
 
     # to be filled from file
     "Monthly soil moisture fraction of field capacity [1], interpolated onto Grid"
@@ -98,6 +104,14 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     # capacity used by all land models, capped at 1 as wetter soil drains (see LandBucketMoisture)
     γ = model.land.thermodynamics.field_capacity
     monthly_soil_moisture.data .= min.(monthly_soil_moisture.data ./ γ, 1)
+
+    # replace missing values with the fallback and set 100% ocean points to it, as for land temperature
+    masked_value = soil.ocean_moisture
+    if soil.mask
+        msm = monthly_soil_moisture.data    # unpack via .data due to broadcasting issues
+        msm[isnan.(msm)] .= masked_value
+        mask!(monthly_soil_moisture, model.land_sea_mask, :ocean; masked_value)
+    end
 
     return nothing
 end
@@ -210,7 +224,7 @@ function initialize!(
         model::PrimitiveEquation,
     )
     # create a seasonal model, initialize it and the variables
-    seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry)
+    seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry; soil.mask, soil.ocean_moisture)
     initialize!(seasonal_model, model)
     initialize!(vars, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
