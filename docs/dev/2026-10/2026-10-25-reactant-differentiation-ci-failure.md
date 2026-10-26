@@ -1,10 +1,11 @@
 # Reactant differentiation test fails after merging main into `mg/new-reactant`
 
-> Status: **fixed and verified locally**, CI run outstanding. Forward difference: `default_time_step`
-> inside kernels (section 4, committed). Non-finite gradient: the drag's `log(z/0)` for the absent surface
-> type, fixed in `drag.jl`; the forward result is bit-identical and the 6-step Reactant gradient is finite
-> (section 6). The rain rate is not a NaN source, but its conversion to mm/day in the clouds is 1e6
-> too small (section 7, not fixed).
+> Status: **fixed**; the differentiation test passes in CI (run 40320298827). Forward difference:
+> `default_time_step` inside kernels (section 4). Non-finite gradient: the drag's `log(z/0)` for the absent
+> surface type, fixed in `drag.jl`; the forward result is bit-identical and the 6-step Reactant gradient
+> is finite (section 6). The rain rate is not a NaN source, but its conversion to mm/day in the clouds
+> was 1e6 too small (section 7, fixed in #1351). In the same CI run, "time_steps! vs single compiled
+> time steps" failed on rounding noise at its `rtol = 1e-5`; the tolerance is now 1e-4 (section 8).
 
 Date of initial draft: 2026-10-25
 
@@ -407,7 +408,7 @@ type absent at a point.
   forward result slightly. That is a choice for the cloud scheme (SPEEDY's formulation uses the plain
   `sqrt`), not needed for the CI test.
 
-#### Unit error: the precipitation term is 1e6 too small (not fixed, independent of the CI failure)
+#### Unit error: the precipitation term is 1e6 too small (fixed in #1351, independent of the CI failure)
 
 > no keep it, but continue to investigate the rain_rate problem
 
@@ -439,6 +440,36 @@ type absent at a point.
 - **Fixing it changes the forward physics:** more cloud cover where it rains, so less shortwave at the
   surface. Anything tuned against the current behaviour (default parameters, stored reference values in
   tests) may shift. So it's a decision for the cloud scheme, separate from this CI failure.
+
+### 8. "time_steps! vs single compiled time steps: PrimitiveWetModel" (2026-10-26)
+
+> Can you look into this failure I'm getting now in the CI
+> https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/runs/40320298827/job/121563228276?pr=1304
+
+- **Test** (`test/reactant/test_time_steps.jl:37`): 4 time steps as 4 calls of a compiled `time_step!`
+  against one compiled `time_steps!` loop, `loop ≈ single` with `rtol = 1e-5` for vorticity, divergence and
+  temperature. The differentiation test passes in this run; this is the only failure.
+- **CI history:** it passed at `19247bfc` and `e6044288`, and has failed since `4090860d` (also at
+  `abdfae18` and `738f848e`). The only source change in between is `0e9e523d`,
+  `default_time_step(::AbstractLeapfrog) = 2Δt`, so the surface-flux damping in kernels uses 2Δt instead
+  of Δt (section 4). The rain-rate fix (#1351) came in later and isn't the cause.
+- **Not a bug of `time_steps!`:** `default_time_step` doesn't depend on the clock. Both programs use the
+  same constant, so it changes the trajectory but can't make them diverge systematically.
+- **Local reproduction** (macOS ARM, worktree at `738f848e`, `time_steps_repro.jl`), norm-relative
+  difference loop vs single after 4 steps:
+
+  | Variant | Vorticity | Divergence | Temperature |
+  | --- | --- | --- | --- |
+  | as in CI (2Δt in kernels) | 3.9e-7 | 1.1e-6 | 2.1e-9 |
+  | Δt in kernels (before `0e9e523d`) | 1.1e-6 | **1.3e-5** (one time level 1.9e-5) | 4.8e-8 |
+
+- So locally it's the old Δt that fails and the fix that passes, the reverse of CI on x86. The mismatch is
+  rounding noise from the differently fused programs, grown over 4 steps of the wet physics. Its size
+  depends on the trajectory and the platform, and for the divergence it is ~1e-6 to 2e-5, right at the
+  tolerance.
+- **Fix:** `rtol = 1e-4`, 5× above the largest noise seen. A real error in `time_steps!` (wrong time
+  step, clock, leapfrog levels) changes the tendencies' contribution itself, not only its rounding, and
+  is expected to be far above that (not tested).
 
 ## Handoff (2026-10-25, session closed): where we are and how to restart
 
