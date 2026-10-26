@@ -124,9 +124,9 @@ $(TYPEDFIELDS)"""
         :vertical_diffusion,        # mixing and precipitation
         :large_scale_condensation,
         :convection,
+        :boundary_layer,            # surface fluxes
         :albedo,                    # radiation
         :radiation,
-        :boundary_layer,            # surface fluxes
         :surface_momentum_flux,
         :surface_heat_flux,
         :surface_humidity_flux,
