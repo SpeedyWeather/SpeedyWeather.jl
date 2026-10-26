@@ -411,7 +411,7 @@ end
             vars.prognostic.land.soil_moisture, ts, scheme,
         )
         capacity = land.soil_moisture_capacity[ij]
-        
+
         # Multiply by field capacity to get back volume of water in the layer
         sm1 = soil_moisture[ij, begin] * capacity
         sm2 = soil_moisture[ij, end] * capacity
