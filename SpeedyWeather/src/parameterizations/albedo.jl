@@ -449,32 +449,34 @@ end
     θ = acos(clamp(μ, zero(μ), one(μ))) # only need when the sun is up
 
     # Then from those we'll calculate the black and white sky albedos
-    vars.parameterizations.land.black_sky_albedo[ij] = black_sky_albedo(sw_iso, sw_vol, sw_geo, θ)
-    vars.parameterizations.land.white_sky_albedo[ij] = white_sky_albedo(sw_iso, sw_vol, sw_geo)
+    black_sky = black_sky_albedo(sw_iso, sw_vol, sw_geo, θ)
+    white_sky = white_sky_albedo(sw_iso, sw_vol, sw_geo)
+    land.black_sky_albedo[ij] = black_sky
+    land.white_sky_albedo[ij] = white_sky
+
+    # Fallbback for radiation schemes with no direct/diffuse radiation fraction
+    albedo[ij] = white_sky
 
     return nothing
 end
 
-combine_albedos!(ij, vars, ::AbstractAlbedo, fraction_direct) = nothing
-
-# function barrier
-@propagate_inbounds function combine_albedos!(ij, vars, scheme::OceanLandAlbedo, fraction_direct)
-    combine_albedos!(ij, vars, scheme.ocean, fraction_direct)
-    combine_albedos!(ij, vars, scheme.land, fraction_direct)
+"""$(TYPEDSIGNATURES)
+Blend direct (black-sky) and diffuse (white-sky) albedo into the broadband `albedo` of
+`surface` (a namespace of `vars.parameterizations`, e.g. `.land`) given the fraction of
+direct shortwave radiation `fraction_direct`. Does nothing if `surface` does not define
+both, decided at compile time."""
+@propagate_inbounds function combine_surface_albedo!(ij, surface::NamedTuple, fraction_direct)
+    if haskey(surface, :black_sky_albedo) && haskey(surface, :white_sky_albedo)
+        black_sky = surface.black_sky_albedo[ij]
+        white_sky = surface.white_sky_albedo[ij]
+        surface.albedo[ij] = fraction_direct * black_sky + (1 - fraction_direct) * white_sky
+    end
     return nothing
 end
 
-@propagate_inbounds function combine_albedos!(ij, vars, ::LearnedLandAlbedo, fraction_direct)
-    land = vars.parameterizations.land
-    bsa = land.black_sky_albedo[ij]
-    wsa = land.white_sky_albedo[ij]
-
-    land.albedo[ij] = fraction_direct * bsa + (1 - fraction_direct) * wsa
+"""$(TYPEDSIGNATURES) Blend black/white-sky albedos over ocean and land wherever defined."""
+@propagate_inbounds function combine_albedos!(ij, vars, fraction_direct)
+    combine_surface_albedo!(ij, vars.parameterizations.ocean, fraction_direct)
+    combine_surface_albedo!(ij, vars.parameterizations.land, fraction_direct)
     return nothing
 end
-
-# @propagate_inbounds function combine_albedos!(ij, vars, scheme::JinOceanAlbedo, direct_radiation_fraction)
-#     bsa = vars.parameterizations.land.black_sky_albedo[ij]
-#     wsa = vars.parameterizations.land.white_sky_albedo[ij]
-#     vars.parameterizations.land.albedo[ij] = bsa * direct_radiation_fraction + wsa * (1 - direct_radiation_fraction)
-# end

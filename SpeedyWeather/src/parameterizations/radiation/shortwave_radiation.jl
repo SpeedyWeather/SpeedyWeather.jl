@@ -33,10 +33,10 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
     # Combine black/white sky albedos, though in the case of transparent atmosphere
     # only black sky will be active
-    fraction_direct = 1 
-    combine_albedos!(ij, vars, model.albedo, fraction_direct)
-
     cos_zenith = vars.parameterizations.cos_zenith[ij]
+    fraction_direct = one(cos_zenith)
+    combine_albedos!(ij, vars, fraction_direct)
+
     land_fraction = land_sea_mask[ij]
     albedo_ocean = vars.parameterizations.ocean.albedo[ij]
     albedo_land = vars.parameterizations.land.albedo[ij]
@@ -183,7 +183,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     # Here we take fractional cloud cover as a proxy for direct/diffuse
     # radiation fraction, and use it to combine black/white sky surface albedos
     fraction_direct = 1 - cloud_cover
-    combine_albedos!(ij, vars, model.albedo, fraction_direct)
+    combine_albedos!(ij, vars, fraction_direct)
 
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     albedo_ocean = vars.parameterizations.ocean.albedo[ij]
