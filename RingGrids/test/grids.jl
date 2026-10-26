@@ -749,3 +749,21 @@ end
     # Check that concatenation along dimension 1 fails
     @test_throws AssertionError cat(F1, F2, dims = 1)
 end
+
+@testset "get_londlatds for full grids" begin
+    for G in (FullClenshawGrid, FullGaussianGrid, FullHEALPixGrid, FullOctaHEALPixGrid)
+        for nlat_half in (1, 2, 3, 8)
+            (G <: FullHEALPixGrid && isodd(nlat_half)) && continue
+            grid = G(nlat_half)
+            londs, latds = RingGrids.get_londlatds(grid)
+            lond = RingGrids.get_lond(grid)
+            latd = RingGrids.get_latd(grid)
+
+            @test length(londs) == length(latds) == RingGrids.get_npoints(grid)
+            for (j, ring) in enumerate(eachring(grid))
+                @test londs[ring] == lond
+                @test all(latds[ring] .== latd[j])
+            end
+        end
+    end
+end
