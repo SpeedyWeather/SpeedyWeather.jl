@@ -112,7 +112,10 @@ import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 export animate, globe
 function animate end
 
-# constructors to be defined in Terrarium extension
+# output variables, e.g. OutputVariables.Temperature()
+export OutputVariables
+
+# deprecated, use OutputVariables.Terrarium, to be defined in Terrarium extension
 export TerrariumOutput
 
 # constructor to be extended by packages that define parameterizations
@@ -141,6 +144,7 @@ include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("time_stepping/clock.jl")
+include("time_stepping/schedules.jl")
 include("variables/set.jl")
 
 # MODEL COMPONENTS
@@ -162,6 +166,7 @@ include("dynamics/random_process.jl")
 include("time_stepping/time_integration.jl")
 include("time_stepping/steps.jl")
 include("time_stepping/steppers/general.jl")
+include("time_stepping/steppers/euler_forward.jl")
 include("time_stepping/steppers/leapfrog.jl")
 include("time_stepping/steppers/ncycle_lorenz.jl")
 include("time_stepping/transform.jl")
@@ -177,9 +182,12 @@ include("parameterizations/large_scale_condensation.jl")
 include("parameterizations/surface_fluxes/boundary_layer.jl")
 include("parameterizations/surface_fluxes/surface_roughness.jl")
 include("parameterizations/surface_fluxes/surface_condition.jl")
+include("parameterizations/surface_fluxes/neutral_wind.jl")
+include("parameterizations/surface_fluxes/drag.jl")
 include("parameterizations/surface_fluxes/momentum.jl")
 include("parameterizations/surface_fluxes/heat.jl")
 include("parameterizations/surface_fluxes/humidity.jl")
+include("parameterizations/entrainment.jl")
 include("parameterizations/convection.jl")
 include("parameterizations/radiation/zenith.jl")
 include("parameterizations/radiation/shortwave_radiation.jl")
@@ -187,6 +195,7 @@ include("parameterizations/radiation/shortwave_transmissivity.jl")
 include("parameterizations/radiation/clouds.jl")
 include("parameterizations/radiation/longwave_radiation.jl")
 include("parameterizations/radiation/longwave_transmissivity.jl")
+include("parameterizations/radiation/radiation.jl")
 include("parameterizations/radiation/greenhouse_gases.jl")
 include("parameterizations/stochastic_physics.jl")
 
@@ -203,7 +212,6 @@ include("parameterizations/land/vegetation.jl")
 include("parameterizations/land/rivers.jl")
 
 # OUTPUT
-include("output/schedule.jl")
 include("output/callbacks.jl")
 include("output/feedback.jl")
 include("output/vertical_interpolation.jl")

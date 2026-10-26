@@ -19,7 +19,7 @@
     # for these resolutions just test idempotence as the roundup_fft may
     # give various other options than just the 3*2^n-matching
     @testset for dealiasing in [2, 3]
-        # T42, T85, T170, T341, T682, T1365 etc (1-based truncation = T + 1)
+        # T43, T86, T171, T342, T683, T1366 etc (1-based truncation = T + 1)
         truncations = [floor(Int, 2^(i + 2) / 3) + 1 for i in p]
         for truncation in truncations
             nlat_half = SpeedyTransforms.get_nlat_half(truncation, dealiasing)
@@ -412,4 +412,13 @@ end
         grid_back = transform(spec_back, S)
         @test grid_back ≈ grid_out rtol = 1.0e-13
     end
+end
+
+@testset "Clear Fourier graph cache" begin
+    # no GPU graphs on CPU: nothing to reclaim, but clearing (with/without GC) must still work
+    @test SpeedyTransforms.reclaim!(SpeedyTransforms.CPU()) === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!() === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!(SpeedyTransforms.CPU()) === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!(gc = false) === nothing
+    @test isempty(SpeedyTransforms.GRAPH_CACHES)
 end

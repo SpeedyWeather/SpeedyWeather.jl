@@ -47,7 +47,7 @@ model = PrimitiveWetModel(spectral_grid; land_sea_mask)
 simulation = initialize!(model)     # triggers also initialization of model.land_sea_mask
 
 using CairoMakie
-heatmap(land_sea_mask.land_fraction, title="Land-sea mask at T31 resolution")
+heatmap(land_sea_mask.land_fraction, title="Land-sea mask at T32 resolution")
 save("land-sea_mask.png", ans) # hide
 nothing # hide
 ```

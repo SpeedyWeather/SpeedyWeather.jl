@@ -59,7 +59,7 @@ function Base.show(io::IO, S::MatrixSpectralTransform{NF, AR, AT}) where {NF, AR
     Grid = nonparametric_type(grid)
 
     # add information about size of Legendre polynomials and scratch memory
-    matrixsize_str = prettymemory(2 * Base.sizeof(S.forward))
+    matrixsize_str = prettymemory(Base.sizeof(S.forward_stacked) + Base.sizeof(S.backward_stacked))
     scratchsize_str = prettymemory(Base.sizeof(S.scratch_memory))
 
     dealias = get_dealiasing(mmax, nlat_half)

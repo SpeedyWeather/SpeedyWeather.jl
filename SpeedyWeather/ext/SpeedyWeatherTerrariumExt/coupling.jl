@@ -10,6 +10,14 @@ SpeedyWeather.LandModel(
 ) where {NF} =
     TerrariumLand(spectral_grid, model; kwargs...)
 
+"""Terrarium grids discretizing the horizontal with a SpeedyWeather ring grid: a bare
+`ColumnRingGrid` (as stored by e.g. a `SoilModel`) or a `LandGrid` whose ground domain is a
+`ColumnRingGrid` (as stored by e.g. a `LandModel`). Both forward `rings` and `mask`."""
+const RingLandGrid = Union{
+    ColumnRingGrid,
+    Terrarium.LandGrid{<:Any, <:Any, <:Any, <:Any, <:Any, <:ColumnRingGrid},
+}
+
 """$(TYPEDEF)
 
 Variable dimension for the full Terrarium land state. `allocate` for an
@@ -239,7 +247,7 @@ constructor."""
 function TerrariumLand(
         integrator::ModelIntegrator{NF, Arch, Grid};
         spectral_grid_kwargs...,
-    ) where {NF, Arch, Grid <: Terrarium.AbstractLandGrid}
+    ) where {NF, Arch, Grid <: RingLandGrid}
     spectral_grid = SpectralGrid(integrator.model.grid.rings; NF, spectral_grid_kwargs...)
     return TerrariumLand(
         spectral_grid, integrator.model;

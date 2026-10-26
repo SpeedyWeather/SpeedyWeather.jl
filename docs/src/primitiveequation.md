@@ -501,6 +501,10 @@ scheme such that we can avoid instabilities from gravity waves.
 We split the (virtual) temperature into a reference vertical profile ``T_k`` and its anomaly,
 ``T_v = T_k + T_v'``. The reference profile ``T_k`` has to be a global
 constant for the spectral transform but can depend on the vertical.
+We use the global-mean temperature of every layer, taken when the implicit solver is
+initialized at the start of a simulation and then recomputed periodically following its
+`schedule` (a [`PeriodicSchedule`](@ref), default every day), so that the reference profile
+follows the model climate as it drifts away from the initial conditions.
 With this, the previous equation becomes
 ```math
 \begin{aligned}
@@ -800,6 +804,8 @@ Then for every time step
 5. Obtain the corrected tendencies for temperature ``\delta T`` and surface pressure ``\delta \ln p_s`` from ``\delta \mathcal{D}``.
 6. Apply [Horizontal diffusion](@ref horizontal_diffusion_primitive) (which is only mentioned here as it further updates the tendencies).
 7. Use ``\delta \mathcal{D}``, ``\delta T`` and ``\delta \ln p_s`` in the [Leapfrog time integration](@ref leapfrog).
+
+The reference temperature profile ``T_k`` and operators ``\mathbf{R, U, L, W}`` are updated and recomputed in regular intervals during the integration by default once every simulated day. 
 
 ## [Horizontal diffusion](@id horizontal_diffusion_primitive)
 

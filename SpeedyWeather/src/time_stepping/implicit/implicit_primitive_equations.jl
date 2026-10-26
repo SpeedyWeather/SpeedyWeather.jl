@@ -11,6 +11,7 @@ $(TYPEDFIELDS)"""
         TensorType,
         IntType,
         NLAYERS,        # nlayers as a type parameter, see `nlayers_val` below
+        ScheduleType,
     } <: AbstractImplicit
 
     # DIMENSIONS
@@ -27,11 +28,14 @@ $(TYPEDFIELDS)"""
     "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
     centering::NF = 1.0
 
+    "[OPTION] Schedule to recompute the reference temperature profile (and the implicit operators) from the current global-mean temperature"
+    schedule::ScheduleType = PeriodicSchedule(every = Day(1))
+
     "[DERIVED] Time step [s] used to initialize. Used to check whether time step has changed and reinitialization is needed."
     Δt::Base.RefValue{NF} = Ref(zero(NF))
 
     # PRECOMPUTED ARRAYS, to be initialized with initialize!
-    "[DERIVED] vertical temperature profile, obtained from diagn on first time step"
+    "[DERIVED] Reference temperature profile, the global-mean temperature when last (re)initialized"
     temp_profile::VectorType = zeros(NF, nlayers)
 
     "[DERIVED] divergence: operator for the geopotential calculation"
@@ -70,10 +74,15 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
-function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
+function ImplicitPrimitiveEquation(
+        spectral_grid::SpectralGrid;
+        schedule::AbstractSchedule = PeriodicSchedule(every = Day(1)),
+        kwargs...
+    )
     (; NF, VectorType, MatrixType, TensorType, truncation, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(truncation), nlayers}(;
-        truncation, nlayers, kwargs...
+    IntType = typeof(truncation)
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, IntType, nlayers, typeof(schedule)}(;
+        truncation, nlayers, schedule, kwargs...
     )
 end
 
@@ -83,17 +92,32 @@ function variables(implicit::ImplicitPrimitiveEquation)
     )
 end
 
-# function barrier to decide whether to initialize or not based on time step
+"""$(TYPEDSIGNATURES)
+Initialize the `schedule` of `implicit` with the time step of `model`.
+The implicit operators themselves are only built in the first time steps by `reinitialize!`,
+as they need the temperature profile of the initial conditions and the time step of the
+leapfrog start."""
+function initialize!(implicit::ImplicitPrimitiveEquation, model::PrimitiveEquation)
+    initialize!(implicit.schedule, model.time_stepping)
+    return nothing
+end
+
+# function barrier to decide whether to (re)initialize: when the time step changes (the leapfrog
+# start with Δt/2, Δt, then 2Δt, or a new time step) or when the reference temperature profile
+# is scheduled to be recomputed from the current global-mean temperature
 function reinitialize!(
         implicit::ImplicitPrimitiveEquation,
         model::PrimitiveEquation,
         vars::Variables,
     )
     (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    Δt = time_step(time_stepping, vars.prognostic.clock)
-    implicit.Δt[] == Δt && return nothing                   # if time step has not changed no need to reinitialize
+    (; clock) = vars.prognostic
+    Δt = time_step(time_stepping, clock)
+    Δt_changed = implicit.Δt[] != Δt
+    Δt_changed || isscheduled(implicit.schedule, clock) || return nothing
+
     scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
-    Tₖ = vars.dynamics.average_temperature_profile
+    Tₖ = vars.dynamics.average_temperature_profile          # current global-mean temperature profile
     initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
     implicit.Δt[] = Δt
     return nothing

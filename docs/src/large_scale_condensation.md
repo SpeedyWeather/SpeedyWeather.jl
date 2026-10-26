@@ -228,7 +228,10 @@ The according latent heat required for melting is
 But note that we do not add ``\delta q_m`` to the humidity tendency as this is a
 phase transition from snow to rain water and so does not increase water vapor ``q``.
 We solely use this to calculate the rain water concentration in ``[kg/kg]`` from melting,
-and translate it to latent heat.
+and translate it to latent heat. The melting cooling ``\delta T_m / \Delta t`` is added
+to the temperature tendency together with the latent heat release from condensation below,
+so that snow which melts on its way down takes up again the latent heat of fusion released
+when it froze.
 
 We calculate the melting of a downward snow flux before [Re-evaporation](@ref).
 This is such that melting snow becomes rain water and is subject to reevaporation

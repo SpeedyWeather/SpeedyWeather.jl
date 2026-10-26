@@ -2,15 +2,15 @@
 $(TYPEDFIELDS)
 
 Custom variable output defined similarly with required fields marked,
-optional fields otherwise use variable-independent defaults. Initialize with `VorticityOutput()`
+optional fields otherwise use variable-independent defaults. Initialize with `Vorticity()`
 and non-default fields can always be passed on as keyword arguments,
-e.g. `VorticityOutput(long_name="relative vorticity", compression_level=0)`.
+e.g. `Vorticity(long_name="relative vorticity", compression_level=0)`.
 Custom variable output also requires the `path(::MyOutputVariable, simulation)`
 to be extended to return the AbstractField subject to output.
 Custom element-wise variable transforms, e.g. scale and/or offset to change
 units, or even exp(x)/100 to change from log surface pressure to hPa
 are passed on as `transform::Function = x -> exp(x)/100`."""
-@kwdef mutable struct VorticityOutput <: AbstractOutputVariable
+@kwdef mutable struct Vorticity <: AbstractOutputVariable
 
     "[Required] short name of variable (unique) used in netCDF file and key for dictionary"
     name::String = "vor"
@@ -40,13 +40,11 @@ are passed on as `transform::Function = x -> exp(x)/100`."""
     unscale::Bool = true
 end
 
-"""$TYPEDSIGNATURES To be extended for every output variable to define
-the path where in `simulation` to find that output variable `::AbstractField`."""
-path(::VorticityOutput, simulation) = simulation.variables.grid.vorticity
+path(::Vorticity, simulation) = simulation.variables.grid.vorticity
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ZonalVelocityOutput <: AbstractOutputVariable
+@kwdef mutable struct ZonalVelocity <: AbstractOutputVariable
     name::String = "u"
     unit::String = "m/s"
     long_name::String = "zonal wind"
@@ -57,11 +55,11 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::ZonalVelocityOutput, simulation) = simulation.variables.grid.u
+path(::ZonalVelocity, simulation) = simulation.variables.grid.u
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MeridionalVelocityOutput <: AbstractOutputVariable
+@kwdef mutable struct MeridionalVelocity <: AbstractOutputVariable
     name::String = "v"
     unit::String = "m/s"
     long_name::String = "meridional wind"
@@ -72,11 +70,11 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::MeridionalVelocityOutput, simulation) = simulation.variables.grid.v
+path(::MeridionalVelocity, simulation) = simulation.variables.grid.v
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct DivergenceOutput <: AbstractOutputVariable
+@kwdef mutable struct Divergence <: AbstractOutputVariable
     name::String = "div"
     unit::String = "s^-1"
     long_name::String = "divergence"
@@ -88,11 +86,11 @@ Fields are: $(TYPEDFIELDS)"""
     unscale::Bool = true
 end
 
-path(::DivergenceOutput, simulation) = simulation.variables.grid.divergence
+path(::Divergence, simulation) = simulation.variables.grid.divergence
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct InterfaceDisplacementOutput <: AbstractOutputVariable
+@kwdef mutable struct InterfaceDisplacement <: AbstractOutputVariable
     name::String = "eta"
     unit::String = "m"
     long_name::String = "interface displacement"
@@ -103,11 +101,11 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::InterfaceDisplacementOutput, simulation) = simulation.variables.grid.η
+path(::InterfaceDisplacement, simulation) = simulation.variables.grid.η
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct SurfacePressureOutput{F} <: AbstractOutputVariable
+@kwdef mutable struct SurfacePressure{F} <: AbstractOutputVariable
     name::String = "pres"
     unit::String = "hPa"
     long_name::String = "surface pressure"
@@ -120,11 +118,11 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # use from parameterizations as already converted to Pa there to avoid exp in multiple places
-path(::SurfacePressureOutput, simulation) = simulation.variables.parameterizations.surface_pressure
+path(::SurfacePressure, simulation) = simulation.variables.parameterizations.surface_pressure
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MeanSeaLevelPressureOutput{F} <: AbstractOutputVariable
+@kwdef mutable struct MeanSeaLevelPressure{F} <: AbstractOutputVariable
     name::String = "mslp"
     unit::String = "hPa"
     long_name::String = "mean sea-level pressure"
@@ -137,11 +135,11 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # points to surface not mean sea level pressure but core variable to read in
-path(::MeanSeaLevelPressureOutput, simulation) = simulation.variables.grid.pressure
+path(::MeanSeaLevelPressure, simulation) = simulation.variables.grid.pressure
 
 function output!(
         output::AbstractOutput,
-        variable::MeanSeaLevelPressureOutput,
+        variable::MeanSeaLevelPressure,
         simulation::AbstractSimulation,
     )
     # escape immediately after first call if variable doesn't have a time dimension
@@ -189,22 +187,15 @@ function output!(
     (; transform) = variable                            # to change units from log(Pa) to hPa
     @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)      # log Pa to hPa
 
-    # interpolate 2D/3D variables
-    mslp_output = output.field2D
-    mslp_grid = on_architecture(CPU(), mslp)
-    interpolate_output!(output, mslp_output, mslp_grid)
-
-    if hasproperty(variable, :keepbits)                 # round mantissabits for compression
-        round!(mslp_output, variable.keepbits)
-    end
-
-    write_array!(output, variable, mslp_output)
+    # interpolate onto the output grid on the model's architecture, then to host, round and write
+    interpolate_output!(output, output.field2D, mslp)
+    write_output!(output, variable, output.field2D, output.host2D)
     return nothing
 end
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct TemperatureOutput{F, E} <: AbstractOutputVariable
+@kwdef mutable struct Temperature{F} <: AbstractOutputVariable
     name::String = "temp"
     unit::String = "degC"
     long_name::String = "temperature"
@@ -213,19 +204,20 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 10
-    transform::F = (x) -> x - 273.15     # K to ˚C
+    transform::F = (x) -> x - oftype(x, 273.15)     # K to ˚C
 
     "[OPTION] how to extrapolate below the lowest model layer when written on pressure
     layers, dry-adiabatic descent so that e.g. 1000 hPa below the lowest model layer is
-    sensible. Only used with `PressureLayers`, see [`AbstractVerticalExtrapolation`](@ref)"
-    extrapolation::E = DryAdiabaticExtrapolation()
+    sensible. Only used with `PressureLayers`, see [`AbstractVerticalExtrapolation`](@ref).
+    Not a type parameter so that it can be converted to the model's number format at initialize!"
+    extrapolation::AbstractVerticalExtrapolation = DryAdiabaticExtrapolation()
 end
 
-path(::TemperatureOutput, simulation) = simulation.variables.grid.temperature
+path(::Temperature, simulation) = simulation.variables.grid.temperature
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct HumidityOutput <: AbstractOutputVariable
+@kwdef mutable struct Humidity <: AbstractOutputVariable
     name::String = "humid"
     unit::String = "kg/kg"
     long_name::String = "specific humidity"
@@ -236,17 +228,17 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::HumidityOutput, simulation) = simulation.variables.grid.humidity
+path(::Humidity, simulation) = simulation.variables.grid.humidity
 
 # collect all in one for convenience
-DynamicsOutput() = (
-    VorticityOutput(),
-    ZonalVelocityOutput(),
-    MeridionalVelocityOutput(),
-    DivergenceOutput(),
-    InterfaceDisplacementOutput(),
-    SurfacePressureOutput(),
-    MeanSeaLevelPressureOutput(),
-    TemperatureOutput(),
-    HumidityOutput(),
+Dynamics() = (
+    Vorticity(),
+    ZonalVelocity(),
+    MeridionalVelocity(),
+    Divergence(),
+    InterfaceDisplacement(),
+    SurfacePressure(),
+    MeanSeaLevelPressure(),
+    Temperature(),
+    Humidity(),
 )
