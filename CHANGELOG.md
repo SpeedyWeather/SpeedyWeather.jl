@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `DiagnosticClouds` convert the rain rate from m/s to mm/day correctly, the precipitation contribution to the cloud cover was 1e6 too small [#1351](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1351)
 - Full-grid `get_londlatds` built with loops to work around a Julia v1.13.2 miscompile causing segfaults [#1348](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1348)
 - Primitive equation models recompute the reference temperature profile of the semi-implicit solver from the current global-mean temperature, fixes the instability of long T256L8 runs [#1332](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1332)
 - New `PeriodicSchedule` and `StepSchedule`, both in `time_stepping/schedules.jl` with old `Schedule` [#1332](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1332)
