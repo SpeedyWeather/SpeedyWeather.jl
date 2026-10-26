@@ -83,3 +83,29 @@ end
     geom = LandGeometry(SG)
     @test geom.layer_thickness isa Vector{<:AbstractFloat}
 end
+
+@testset "Seasonal soil moisture as fraction of field capacity" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+
+    # prescribed: converted and capped (volumetric file values never reach 1, so a 1 proves the conversion)
+    land = LandModel(spectral_grid; soil_moisture = SeasonalSoilMoisture(spectral_grid))
+    model = PrimitiveWetModel(spectral_grid; land)
+    simulation = initialize!(model)
+    (; soil_moisture) = simulation.variables.prognostic.land
+    (; soil_moisture_capacity, soil_moisture_availability) = simulation.variables.parameterizations.land
+    land_points = model.land_sea_mask.land_fraction.data .== 1
+    W = soil_moisture.data[land_points, :]
+    @test all(0 .<= W .<= 1)
+    @test any(W .== 1)
+    @test all(soil_moisture_capacity.data .== model.land.thermodynamics.field_capacity)
+
+    run!(simulation, steps = 2)
+    @test all(soil_moisture_availability.data .<= 1)     # guards against #771
+
+    # bucket: initialized from the converted climatology
+    model = PrimitiveWetModel(spectral_grid)              # LandBucketMoisture by default
+    simulation = initialize!(model)
+    W = simulation.variables.prognostic.land.soil_moisture.data[land_points, :, :]
+    @test all(0 .<= W .<= 1)
+    @test any(W .== 1)
+end

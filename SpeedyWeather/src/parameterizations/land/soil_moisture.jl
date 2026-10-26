@@ -34,7 +34,7 @@ $(TYPEDFIELDS)"""
     missing_value::NF = NF(NaN)
 
     # to be filled from file
-    "Monthly soil moisture volume fraction [1], interpolated onto Grid"
+    "Monthly soil moisture fraction of field capacity [1], interpolated onto Grid"
     monthly_soil_moisture::GridVariable4D
 end
 
@@ -93,6 +93,11 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF = Float32)
     interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
+
+    # the file contains volumetric soil moisture [m³/m³], convert to the fraction of field
+    # capacity used by all land models, capped at 1 as wetter soil drains (see LandBucketMoisture)
+    γ = model.land.thermodynamics.field_capacity
+    monthly_soil_moisture.data .= min.(monthly_soil_moisture.data ./ γ, 1)
 
     return nothing
 end
@@ -160,7 +165,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
 
-    "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
+    "[OPTION] Initial soil moisture over ocean, fraction of field capacity [1]"
     @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
 end
 
@@ -209,6 +214,8 @@ function initialize!(
     initialize!(seasonal_model, model)
     initialize!(vars, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
+    # seasonal model has already converted the climatology from volumetric soil moisture
+    # to fraction of field capacity!
 
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture

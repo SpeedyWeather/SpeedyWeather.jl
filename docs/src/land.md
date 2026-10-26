@@ -181,7 +181,7 @@ C_2 &= C_w W_2 \gamma + C_s
 \end{aligned}
 ```
 
-with ``\gamma = 0.24`` being the field capacity per meter soil.
+with ``\gamma = 0.3`` being the field capacity per meter soil.
 
 ## Land soil moisture
 
@@ -199,6 +199,9 @@ model constructor
 soil_moisture = LandBucketMoisture(spectral_grid)
 land = LandModel(spectral_grid; soil_moisture)
 ```
+
+`SeasonalSoilMoisture` reads volumetric soil moisture from the climatology
+and converts it to a fraction of the field capacity, capped at 1.
 
 ### LandBucketMoisture
 
@@ -223,7 +226,7 @@ The equations are
 
 for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
 defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
-with ``\gamma = 0.24`` the field capacity per meter soil and
+with ``\gamma = 0.3`` the field capacity per meter soil and
 ``\Delta z_1 = 0.1~m`` the top layer thickness by default, and
 ``\Delta z_2 = 4.0~m`` the layer below. The top layer is forced by precipitation
 ``P`` minus evaporation ``E`` minus river runoff ``R``. The second term is a
