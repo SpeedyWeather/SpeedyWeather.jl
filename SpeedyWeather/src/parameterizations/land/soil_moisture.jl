@@ -52,6 +52,7 @@ SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = Seas
 function variables(::SeasonalSoilMoisture)
     return (
         PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water at soil_moisture = 1", units = "m³/m³", namespace = :land),
     )
 end
 
@@ -92,6 +93,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF = Float32)
     interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
+
     return nothing
 end
 
@@ -100,6 +102,9 @@ function initialize!(
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
+    # Make the field capacity a parameterization variable for easy access later
+    vars.parameterizations.land.soil_moisture_capacity .= model.land.thermodynamics.field_capacity
+
     # initialize soil_moisture by "running" the step at the current time
     timestep!(vars, soil, model)
     return nothing
@@ -169,7 +174,8 @@ function variables(::LandBucketMoisture, model::AbstractModel)
     return (
         PrognosticVariable(:soil_moisture, LandXYZT(pg), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         TendencyVariable(:soil_moisture, LandXYZT(tg), desc = "Tendency of soil moisture", units = "1/s", namespace = :land),
-        
+
+        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water at soil_moisture = 1", units = "m³/m³", namespace = :land),
         ParameterizationVariable(:river_runoff, Grid2D(), desc = "Accumulated river runoff from soil moisture", units = "m", namespace = :land),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
         ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
@@ -212,6 +218,9 @@ function initialize!(
         sm[isnan.(sm)] .= masked_value
         mask!(vars.prognostic.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
+
+    # Make the field capacity a parameterization variable for easy access later
+    vars.parameterizations.land.soil_moisture_capacity .= model.land.thermodynamics.field_capacity
     return nothing
 end
 

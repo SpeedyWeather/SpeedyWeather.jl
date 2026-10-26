@@ -7,7 +7,9 @@ Albedo structs should be defined as MyAlbedo <: AbstractAlbedo and implement the
 `initialize!` is as for every model component but in contrast to other parameterizations albedos
 should not implement `parameterization!` but rather `albedo!`, which is called from within `parameterization!`.
 This is because every albedo needs to be used either as part of OceanLandAlbedo or the same albedo
-is called over both land and ocean surfaces."""
+is called over both land and ocean surfaces. If a surface namespace (vars.parameterizations.land or .ocean) 
+contains both black_sky_albedo and white_sky_albedo, a shortwave scheme that knows the direct-beam fraction 
+blends them into that namespace's albedo. Otherwise it leaves albedo alone."""
 abstract type AbstractAlbedo <: AbstractModelComponent end
 
 # all albedos need to define albedo fields for ocean and land separately and total
@@ -408,9 +410,11 @@ end
         soil_moisture = get_prognostic_step(
             vars.prognostic.land.soil_moisture, ts, scheme,
         )
+        capacity = land.soil_moisture_capacity[ij]
+        
         # Multiply by field capacity to get back volume of water in the layer
-        sm1 = soil_moisture[ij, begin] * field_capacity
-        sm2 = soil_moisture[ij, end] * field_capacity
+        sm1 = soil_moisture[ij, begin] * capacity
+        sm2 = soil_moisture[ij, end] * capacity
     else
         sm1 = sm2 = zero_value
     end
@@ -454,7 +458,7 @@ end
     land.black_sky_albedo[ij] = black_sky
     land.white_sky_albedo[ij] = white_sky
 
-    # Fallbback for radiation schemes with no direct/diffuse radiation fraction
+    # Fallback for radiation schemes with no direct/diffuse radiation fraction
     albedo[ij] = white_sky
 
     return nothing
