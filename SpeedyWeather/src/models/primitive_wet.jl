@@ -166,11 +166,13 @@ end
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
-at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
+at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`
+(except for its schedule)."""
 function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
-    # NUMERICS (implicit is initialized later)
+    # NUMERICS
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
+    initialize!(model.implicit, model)
     initialize!(model.horizontal_diffusion, model)
 
     # DYNAMICS

@@ -358,6 +358,9 @@ larger regressions should be reported to the user.
   them, e.g. `temperature` not `temp`, `surface_pressure` not `surf_pres`,
   `layer_thickness` not `lyr_thk`, `spectral_grid` not `sg`. Established physics/maths
   shorthand that is itself the conventional name (e.g. `coslat`, `vor`, `div`) is fine.
+* Spectral truncations are 1-based: always use the new 1-based truncations `T32`, `T64`, `T128`, …
+  (e.g. `SpectralGrid(truncation = 32)`) in code, tests and docs, never the old 0-based
+  `T31`, `T63`, `T127`, ….
 
 
 ## Pull Request Convention
