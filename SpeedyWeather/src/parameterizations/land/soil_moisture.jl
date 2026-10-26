@@ -7,7 +7,7 @@ export SeasonalSoilMoisture
 """SeasonalSoilMoisture model that prescribes soil moisture from a monthly climatology file.
 The soil moisture is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractPrescribedSoilMoisture
+@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractPrescribedSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
@@ -37,7 +37,7 @@ $(TYPEDFIELDS)"""
     mask::Bool = true
 
     "[OPTION] Soil moisture for ocean points/missing values, fraction of field capacity [1]"
-    @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
+    ocean_moisture::NF = 0
 
     # to be filled from file
     "Monthly soil moisture fraction of field capacity [1], interpolated onto Grid"
