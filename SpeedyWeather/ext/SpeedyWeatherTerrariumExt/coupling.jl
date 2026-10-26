@@ -121,6 +121,27 @@ function fill_fallback!(vars::Variables, land::AbstractTerrariumLandModel)
 end
 
 """$(TYPEDSIGNATURES)
+Copy the porosity of the topmost Terrarium soil layer into `soil_moisture_capacity`.
+Terrarium's soil moisture is a saturation (volumetric water content / porosity), so
+`soil_moisture * soil_moisture_capacity` is the volumetric soil water [m³/m³]."""
+function soil_moisture_capacity!(vars::Variables, land::AbstractTerrariumLandModel)
+    haskey(vars.parameterizations.land, :soil_moisture_capacity) || return nothing
+    state = vars.prognostic.land.terrarium
+    soil = land.model.soil
+    porosity = Terrarium.kernel_operation2D(
+        Terrarium.porosity_top, state, land.model.grid,
+        Terrarium.get_stratigraphy(soil), Terrarium.get_biogeochemistry(soil),
+    )
+    porosity_field = Terrarium.Field(porosity)
+    Terrarium.compute!(porosity_field)
+    RingGrids.copy_unmasked!(
+        vars.parameterizations.land.soil_moisture_capacity,
+        @view(interior(porosity_field)[:, 1, 1]), land.mask_indices,
+    )
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
 
 Warn if the SpeedyWeather land-sea mask and the Terrarium land mask disagree. Terrarium
 allocates a soil column only where its Boolean mask is `true`, whereas SpeedyWeather weights
@@ -293,6 +314,11 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.Abstr
             units = "1", desc = "Soil moisture (saturation fraction) mirrored from Terrarium",
             namespace = :land,
         ),
+        SpeedyWeather.ParameterizationVariable(
+            name = :soil_moisture_capacity, dims = SpeedyWeather.Grid2D(),
+            units = "m³/m³", desc = "Volumetric soil water content at soil_moisture = 1",
+            namespace = :land,
+        ),
     )
 end
 
@@ -346,6 +372,7 @@ function SpeedyWeather.initialize!(
     end
     if haskey(vars.prognostic.land, :soil_moisture)
         RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, sat, indices)
+        soil_moisture_capacity!(vars, land)
     end
     if haskey(vars.prognostic.land, :snow_depth)
         RingGrids.copy_unmasked!(vars.prognostic.land.snow_depth, state.snow_water_equivalent, indices)
@@ -414,6 +441,7 @@ function SpeedyWeather.timestep!(
     end
     if haskey(vars.prognostic.land, :soil_moisture)
         RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, @view(interior(state.saturation_water_ice)[:, 1, end]), indices)
+        soil_moisture_capacity!(vars, land)
     end
     if haskey(vars.prognostic.land, :sensible_heat_flux)
         RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, @view(interior(state.sensible_heat_flux)[:, 1, 1]), indices)
