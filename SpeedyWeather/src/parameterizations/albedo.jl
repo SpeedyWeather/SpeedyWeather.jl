@@ -380,7 +380,7 @@ end
     zero_value = zero(NF)
 
     noise = zero_value
-    t2m = surface_air_temperature(ij, vars, scheme, model)
+    t2m = vars.parameterizations.surface_air_temperature[ij]
     vₕ = haskey(land, :high_vegetation_cover) ? land.high_vegetation_cover[ij] : zero_value
     vₗ = haskey(land, :low_vegetation_cover) ? land.low_vegetation_cover[ij] : zero_value
     laiₕ = haskey(land, :high_vegetation_leaf_area) ? land.high_vegetation_leaf_area[ij] : zero_value
