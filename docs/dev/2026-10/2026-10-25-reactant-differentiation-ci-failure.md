@@ -366,8 +366,13 @@ type absent at a point.
 **Fix, implemented in `drag.jl`:**
 - The coefficient is lifted from a closure in `boundary_layer_drag!` to a top-level
   `neutral_transfer_coefficient(z, z₀M, z₀X, κ)`.
-- It replaces only an exactly-zero roughness by 1 m: real roughness lengths are untouched, and the forward
-  result is bit-identical.
+- It replaces only an exactly-zero roughness by 1e-5 m (first 1 m, changed on 2026-10-26: the value is
+  irrelevant as long as it's positive): real roughness lengths are untouched, and the forward result is
+  bit-identical.
+- **A replacement, not a lower bound.** In a 5-day CPU T32 run of the default wet model, the replacement
+  by 1 m and by 1e-5 m give bit-identical temperatures. A lower bound `max(z₀, 1e-5)` changes them by up
+  to 7.2 K: the learned ocean momentum roughness is below 1e-5 at 63% of ocean points (median 8e-7), and
+  the ocean heat roughness at 2% (minimum 6.6e-6).
 - The absent surface's stored drag is now `max(drag_min, finite stand-in)` instead of `drag_min`. Only
   that field changes; it is weighted by a zero fraction everywhere.
 
