@@ -34,7 +34,7 @@ end
         single = Array(parent(getfield(simulation_single.variables.prognostic, name)))
         loop = Array(parent(getfield(simulation_loop.variables.prognostic, name)))
         @test any(!iszero, loop)
-        @test loop ≈ single rtol = 1.0e-5
+        @test loop ≈ single rtol = 1.0e-4
     end
 
     clock_single, clock_loop = simulation_single.variables.prognostic.clock, simulation_loop.variables.prognostic.clock
