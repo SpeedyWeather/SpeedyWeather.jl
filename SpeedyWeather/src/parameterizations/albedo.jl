@@ -7,7 +7,7 @@ Albedo structs should be defined as MyAlbedo <: AbstractAlbedo and implement the
 `initialize!` is as for every model component but in contrast to other parameterizations albedos
 should not implement `parameterization!` but rather `albedo!`, which is called from within `parameterization!`.
 This is because every albedo needs to be used either as part of OceanLandAlbedo or the same albedo
-is called over both land and ocean surfaces. If a surface namespace (`vars.parameterizations.land` or `.ocean``) 
+is called over both land and ocean surfaces. If a surface namespace (`vars.parameterizations.land` or `.ocean`) 
 contains both `black_sky_albedo` and `white_sky_albedo`, a shortwave scheme that knows the direct-beam fraction 
 blends them into that namespace's albedo. Otherwise it leaves albedo alone."""
 abstract type AbstractAlbedo <: AbstractModelComponent end
