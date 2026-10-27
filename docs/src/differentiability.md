@@ -80,8 +80,7 @@ using SpeedyWeather, Reactant, Enzyme
 using CUDA      # needed for Reactant to compile KernelAbstractions kernels, also on CPUs
 
 spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice(), nlayers = 8)
-spectral_transform = MatrixSpectralTransform(spectral_grid)
-model = PrimitiveWetModel(spectral_grid; spectral_transform)
+model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period = Day(10))      # spin-up the model a bit
 initialize!(simulation, steps = 1)      # set the clock for one time step

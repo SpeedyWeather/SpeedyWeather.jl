@@ -315,6 +315,16 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
 end
 
 """$(TYPEDSIGNATURES)
+Forward and inverse matrices of the Fourier transform as a truncated DFT (`fourier_dft = true`), only
+implemented on Reactant, see SpeedyTransformsReactantExt. Empty vectors on other architectures."""
+function dense_fourier_matrices(
+        architecture::AbstractArchitecture, ::Type{NF}, fourier_dft::Bool, nlons, lon_offsets, solid_angles, mmax,
+    ) where {NF}
+    empty_vector() = on_architecture(architecture, zeros(NF, 0))
+    return empty_vector(), empty_vector()
+end
+
+"""$(TYPEDSIGNATURES)
 Generate the per-ring FFT plans for `architecture` from the arrays they will be applied to, see the
 method below. Architectures without plans (Reactant, XLA plans the FFTs of a compiled program
 itself) extend this."""

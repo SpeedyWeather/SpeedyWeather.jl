@@ -112,30 +112,31 @@ accelearted version of our model (this is the same library that powers e.g. JAX 
 It also enables to run the model on CPU, different GPUs and even TPU architectures. 
 All models (`BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel`, `PrimitiveWetModel`)
 run with Reactant, use the `ReactantDevice` architecture and set your device within Reactant with
-`Reactant.set_default_backend`. With `ReactantDevice` the models use the `MatrixSpectralTransform`
-by default
+`Reactant.set_default_backend`:
 
 ```julia
 using Reactant, CUDA   # CUDA is needed for Reactant to compile KernelAbstractions kernels
 using SpeedyWeather
 
 spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice(), nlayers = 8)
-spectral_transform = MatrixSpectralTransform(spectral_grid)
-model = PrimitiveWetModel(spectral_grid; spectral_transform)
+model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period = Day(10))
 ```
 
-The FFT-based `SpectralTransform` runs with Reactant, too (`spectral_transform = SpectralTransform(spectral_grid)`).
-Its cost grows with the cube of the truncation instead of the fourth power for the dense matrices of
-the `MatrixSpectralTransform`, which also need too much memory above about T150. On Reactant the
-`SpectralTransform` doesn't use FFT plans: the Fourier transform is one FFT per group of latitude rings
-of equal length (XLA plans them when compiling) and the Legendre transform one batched matrix
-multiply over the spherical harmonic order per direction. On Reactant's CPU backend it is faster than
-the `MatrixSpectralTransform` at all resolutions we tested (the transforms alone 4-5x at T31 and 60-100x
-at T128, a `PrimitiveWetModel` time step 2x at T32 and 5x at T64, 8 layers);
-on GPUs we haven't compared them yet. The CUDA graphs that the `SpectralTransform` uses with CUDA.jl
-(`gpu_graphs`) are off with Reactant, XLA runs a compiled program as one CUDA graph itself.
+With `ReactantDevice` the models use the `SpectralTransform` by default. On Reactant it doesn't use
+FFT plans or scratch memory; both of its stages are matrix multiplies that XLA compiles together with
+the rest of the time step:
+
+- The Fourier transform is a truncated discrete Fourier transform (`fourier_dft = true`, the default up
+  to truncation 512, `SpeedyTransforms.DFT_MAX_TRUNCATION`). It computes only the orders that the
+  Legendre transform uses, as one matrix multiply per direction batched over all latitude rings. Its
+  matrices need memory that grows with the cube of the truncation: 1.4 MB at T32, 617 MB at T256 in
+  Float32. With `fourier_dft = false` (the default above truncation 256) it uses one FFT per group of
+  latitude rings of equal length instead. XLA can't put FFTs into its CUDA graphs, though, which splits
+  a compiled time step on GPUs into many separately launched kernels.
+- The Legendre transform is one matrix multiply per direction, batched over the spherical harmonic
+  order.
 
 `run!` compiles the time loop with Reactant into programs that run many time steps at once
 (a traced loop, see `SpeedyWeather.time_steps!`), as calling a compiled function from Julia costs
@@ -146,25 +147,26 @@ the whole run is one program. With output, the spin-up steps of the time stepper
 and a remainder (if the run isn't a whole number of output intervals) use a compiled single time
 step, so at most two programs are compiled per `run!`. A program of several time steps takes about
 twice as long to compile as a single time step. The progress meter and the check for NaNs (with
-`Feedback(debug = true)`, the default) are updated after every program, not every time step. SpeedyWeather compiles with `raise = true` (and without the optimization patterns listed in `SpeedyWeather.REACTANT_EXCLUDED_PASSES`, currently none; compile your own programs with `SpeedyWeather.reactant_compile_options()` to get the same options): Reactant
+`Feedback(debug = true)`, the default) are updated after every program, not every time step. SpeedyWeather compiles with `raise = true` (and without the optimization patterns listed in `SpeedyWeather.REACTANT_EXCLUDED_PASSES`, workarounds for bugs in Reactant; compile your own programs with `SpeedyWeather.reactant_compile_options()` to get the same options): Reactant
 raises the KernelAbstractions kernels to StableHLO, the operations of the XLA compiler, which on
 GPUs is needed for correct results. Not all model components are compatible yet
 (e.g. particle advection). The setups we use in the CI to compare the results with Reactant to
 those on the CPU are in `SpeedyWeather/test/reactant/`, on CUDA GPUs our GPU tests check that a
-`PrimitiveWetModel` runs without NaNs (`SpeedyWeather/test/GPU/reactant.jl`).
+`BarotropicModel` runs without NaNs with both transforms (`SpeedyWeather/test/GPU/reactant.jl`).
 
 ### Precision of matrix products on GPUs
 
 On NVIDIA GPUs with TF32 support (Ampere and newer, e.g. A40, A100, H100) XLA runs Float32 matrix
 products in TF32 by default, which rounds the inputs to a 10-bit mantissa: relative errors of about
 1e-4 per product instead of about 1e-7 in Float32. This concerns the matrix products of the
-`MatrixSpectralTransform`, the Legendre transform of the `SpectralTransform` and those that XLA
+`MatrixSpectralTransform`, the Legendre transform of the `SpectralTransform` (and its Fourier
+transform as truncated DFT, see above) and those that XLA
 creates from loops in raised kernels (e.g. the vertical
 matrix-vector products of the semi-implicit time stepping).
 
 The model runs stably with TF32 but the results deviate considerably from those in Float32 (e.g.
-on the CPU or with CUDA.jl). For a `PrimitiveWetModel` (T31, 8 layers) on an NVIDIA A40 the
-maximum relative differences to the CPU after 10 time steps are
+on the CPU or with CUDA.jl). For a `PrimitiveWetModel` (T31, 8 layers, `MatrixSpectralTransform`) on
+an NVIDIA A40 the maximum relative differences to the CPU after 10 time steps are
 
 | Variable         | TF32 (default) | `HIGHEST` (see below) |
 | ---------------- | -------------- | --------------------- |
@@ -187,8 +189,7 @@ using Reactant, CUDA
 using SpeedyWeather
 
 spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice(), nlayers = 8)
-spectral_transform = MatrixSpectralTransform(spectral_grid)
-model = PrimitiveWetModel(spectral_grid; spectral_transform)
+model = PrimitiveWetModel(spectral_grid)
 
 simulation = Reactant.with_config(dot_general_precision = Reactant.PrecisionConfig.HIGHEST) do
     simulation = initialize!(model)
@@ -197,8 +198,11 @@ simulation = Reactant.with_config(dot_general_precision = Reactant.PrecisionConf
 end
 ```
 
-This makes the time step 10% (T31) to 23% (T63, 8 layers) slower on an A40 and yields the `HIGHEST`
-column in the table above. It applies to the matrix products that Reactant creates itself, e.g. those
+With the default `SpectralTransform` this makes a `PrimitiveWetModel` time step (8 layers) on an H100
+up to 16% slower up to T128 and 35% slower at T256 (with the `MatrixSpectralTransform` 6% at T32 to
+2.3x at T128, which gave the `HIGHEST` column in the table above). In the transform alone, Float32 instead
+of TF32 reduces the error from 2e-4 to 4e-4 to about 1e-7 to 9e-7, the level of the Float32 transform on
+the CPU. It applies to the matrix products that Reactant creates itself, e.g. those
 of the spectral transform, not (yet) to those that XLA creates from loops in raised kernels. To have
 those in Float32 too, also set the environment variables `XLA_FLAGS=--xla_gpu_enable_triton_gemm=false`
 (XLA's Triton GEMMs ignore the next setting) and `NVIDIA_TF32_OVERRIDE=0` (for cuBLAS) before starting

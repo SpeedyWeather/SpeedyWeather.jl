@@ -1,6 +1,6 @@
 # FFT-based `SpectralTransform` with Reactant
 
-> Status: **in progress**. See "Handoff 2026-10-16 (to the HPC node with GPU)" first. The FFT-based `SpectralTransform` runs, differentiates and passes the CPU-vs-Reactant correctness tests for all models on Reactant's CPU backend; GPU tests/benchmarks and the default transform on Reactant are open. A Fourier stage as truncated DFT (no FFTs) is planned for a follow-up PR, see the last section.
+> Status: **in progress**. See "Handoff 2026-10-18 (work for 2026-10-19)" at the end first. The FFT-based `SpectralTransform` runs, differentiates and passes the CPU-vs-Reactant correctness tests for all models; its Fourier stage as truncated DFT (follow-up plan, last section) is implemented and the default on Reactant (PR #1317). The PrimitiveWet gradient with the DFT works with `concat_multipad` excluded (Enzyme-JAX bug, EnzymeAD/Reactant.jl#3503); TF32 is stable for 10 years at T128L8 (T256L8 is unstable on `main` too, a separate model issue).
 
 Date of initial draft: 2026-10-16
 
@@ -70,6 +70,67 @@ Reactant_jll build nor upstream. Capturing them would remove only the launch ove
 > We defer this to a follow up PR
 
 Added "Follow-up plan: Fourier transform as a truncated DFT on Reactant" (deferred, not part of this PR).
+
+> okay we swtichted to a new branch. In this branch, to implement the new transform for Reactant. Thsis should be
+> implemented for reactant only. If you implement a new FFT logic, it should be tested against standard ffts in
+> correctness and precision. Both while implmenting but also in the unit tests. this is very important.
+
+Implementation started on branch `mg/reactant-dft`, see "Protocol (implementation)" in the follow-up plan.
+
+> Why do we now have two versions of legendre and fourier in the extension?
+
+Two Fourier transforms by design (the FFTs stay for `fourier_dft = false`, above `DFT_MAX_TRUNCATION`), but the
+Legendre transform only needed one: the first implementation kept the FFT path's `_fourier!`/`_legendre!` (complex
+scratch arrays, `dot_general_complex`) next to the new all-real DFT functions. Proposed to share the all-real
+Legendre transform.
+
+> yes
+
+Refactored: one Legendre transform (`legendre_forward`/`legendre_inverse`) for both Fourier transforms
+(`dft_fourier_*`, `fft_fourier_*`, same interface), no scratch memory on Reactant at all, see the protocol.
+
+> do the tests really need to implement yet another fft variant? Can't we just reuse the regular CPU spectraltransform
+> of the model?
+
+No: the ring-by-ring references of `test_transform.jl` now call the CPU `SpectralTransform`'s `_fourier!` (FFTW) and
+only apply the solid angles and longitude offsets as its Legendre transform does. Same values as the earlier
+FFTW-per-ring helpers (forward ≤ 2.8e-16, inverse identical, six grids).
+
+> continue with the spectral transform work
+
+Steps 6-8 of the follow-up plan (GPU benchmarks, profiles, defaults, docs), see the protocol (2026-10-18 evening).
+
+> re-audit the code of the extension. We don't to keep code duplication at a minimum but also not change much in the
+> main non-extension code.
+
+Audit of `SpeedyTransformsReactantExt` (protocol): one dense (parity, order, degree) layout and index function for
+coefficients and polynomials (three copies of the same loop before), `stack_pair` for five `cat`/`reshape` pairs,
+`S.nlon_max`/`S.nfreq_max` instead of recomputing them; main code: one comment.
+
+> I also want you to prepare a markdown for a github PR with an overview of both the performacne across T32, T64,
+> T128, T256 but also the memory usage. Also write down the basic math of the DFT you solve
+
+`2026-10-18-reactant-dft-pr-description.md` (next to this plan): math, H100 performance, memory of the precomputed
+arrays and of the model run, accuracy, changes.
+
+> add to that the precision of the transform, how accurate it is compared to a F32 baseline. Also include numbers
+> for doing the transform both in TF32 and F32
+
+`precision_table.jl` (H100): matrix, FFT path and DFT on Reactant with TF32 and with Float32 (`HIGHEST`) vs the
+Float32 CPU `SpectralTransform` (FFTW) baseline, all against a Float64 reference, T32 to T256, both directions; a
+"Precision" section in the PR description.
+
+> we also need to test if the model is table for long roll outs with TF32. Test if T256L8 is stable for 10 years
+> with a job
+
+`long_run_stability.jl` (Slurm): PrimitiveWetModel T256L8, DFT, TF32, 10 years of 365 days, a compiled program per
+30 days with a NaN/Inf check and global diagnostics after each (CSV), see the protocol.
+
+> why have find why it breaks with the DFT but not before with FFT or MT. This seems very counterintuitive. Note
+> this down as work for tomorrow. We'll close the session for today
+
+"Handoff 2026-10-18 (work for 2026-10-19)" at the end: why only the DFT triggers the scatter rewrite, what is known,
+how to find out, and the state of the running jobs.
 
 ## Problem description
 
@@ -583,8 +644,10 @@ CHANGELOG.
 
 ## Follow-up plan: Fourier transform as a truncated DFT on Reactant
 
-> Status: **planned**, deferred to a follow-up PR. Prototype measured (transform alone, see "Re-audit" above),
-> nothing in the package yet.
+> Status: **in progress** on branch `mg/reactant-dft` (2026-10-18). Implemented, verified against FFTW, benchmarked
+> on the H100, default on Reactant, docs done, PR #1317. The PrimitiveWet gradient with the DFT needs `concat_multipad`
+> excluded (EnzymeAD/Reactant.jl#3503, until fixed upstream); TF32 is stable for 10 years at T128L8. See the protocol
+> of 2026-10-19 at the end.
 
 Date: 2026-10-18. Base revision: `e22793e3` (branch `mg/new-reactant`). Prototype:
 `/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/dft_proto_2026-10-16/dft_transform_proto.jl`.
@@ -781,3 +844,399 @@ resolutions (prototype, transform alone: 1.8x at T31), `WhichTransform` returns 
   CUDA.jl's default math mode probably runs Float32 gemms without TF32 (to check). This needs a separate analysis
   and benchmark.
 - FFT command-buffer support in XLA or Reactant (see above). An upstream issue could be drafted.
+
+### Protocol (implementation)
+
+Branch `mg/reactant-dft` (base `c32de0ee`), login02 (A40) and Slurm (H100). Scripts and logs in
+`/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/dft_impl_2026-10-18/`. Environments: `env_reactant_0295`
+(Reactant 0.2.295, Julia 1.12.2, Reactant's CPU backend) and `env_dft_gpu` (the same, GPU, see below).
+
+2026-10-18
+- **Step 0, go: AD through the gathers** (`ad_gather_check.jl`, Reactant CPU backend, Float64, quadratic losses):
+  forward gather into padded rings + batched `dot_general`, and inverse `dot_general` + gather of the grid points, on
+  OctahedralGaussian, HEALPix and FullClenshaw (odd nlat) grids at T15. Values vs host loops ≤ 1.4e-14, Reactant
+  gradients vs central finite differences ≤ 4e-11 relative, the forward gradient vs the analytic one 3e-16.
+- **Implementation** (Reactant only):
+  - `src/` (SpeedyTransforms): fields `fourier_matrix_forward`, `fourier_matrix_inverse` (flattened `VectorType`,
+    empty elsewhere) and `fourier_dft::Bool` (no new type parameter), keyword `fourier_dft` with
+    `default_fourier_dft(architecture, spectrum)`: `false` on CPU/GPU, on `ReactantDevice` `true` up to
+    `DFT_MAX_TRUNCATION = 256` (1-based `mmax`, 2 × 308 MB in Float32 at 256), `ArgumentError` for `true` elsewhere;
+    the hook `dense_fourier_matrices` (empty fallback in `fourier.jl`); `solid_angles` computed before it;
+    `_scratch_nlayers(::ReactantDevice, ...) = 0` (no scratch memory on Reactant, see the refactor); `show` adds a
+    "Fourier: truncated DFT, matrices ..." line only for `fourier_dft = true` (CPU/GPU output unchanged).
+  - `SpeedyTransformsReactantExt`: `fourier_matrices` (host, Float64: phases `cispi(2 mod(m(i-1), nlon)/nlon)`
+    with the argument reduced exactly, solid angle and conjugate longitude offset folded into the forward, the
+    longitude offset and the `brfft` factors 1/2/1 into the inverse, zero beyond a ring's Nyquist frequency and
+    beyond the ring), `ring_indices` (gather into padded rings with a zero row for the padding and the southern
+    copy of the equator ring; positions of the grid points in the inverse result), `dft_fourier_forward`,
+    `dft_fourier_inverse`, the all-real Legendre transform (`dense_of_lm_order_first` maps the forward result
+    without a transpose).
+- **Found and fixed in the FFT path** (pre-existing): the inverse `_fourier!` failed on grids whose equator ring is
+  a run on its own (OctaHEALPix, OctahedralClenshaw: dropping its southern copy left an empty slice, which
+  Reactant's indexing rejects, "BoundsError: attempt to access 0-element Vector{Union{}}"). The tests only covered
+  OctahedralGaussian, FullGaussian and HEALPix. Fixed (the run is dropped), both grids are tested now.
+- **Verification against FFTW** (`dft_verify.jl`, all six grids), relative max errors:
+  - A, host matrices vs FFTW `rfft`/`brfft` ring by ring (with the weights/rotations of the FFT path), Float64:
+    ≤ 1.0e-15 (T32), ≤ 1.5e-15 (T64).
+  - B, traced Fourier stages vs FFTW ring by ring: Float64 ≤ 1e-15, Float32 ≤ 4.8e-7 (T32), ≤ 6.3e-7 (T64).
+  - C, whole transform, DFT vs CPU FFTW and vs the Reactant FFT path: Float64 ≤ 1.0e-15 both directions; Float32
+    error vs the Float64 FFTW transform for DFT / Reactant FFT / FFTW: grid→spectral 0.6-1.6e-7 / 0.6-1.3e-7 /
+    0.5-2.2e-7, spectral→grid 1.3-3.7e-7 / 1.3-4.2e-7 / 1.2-5.3e-7 (T32, T64): the same order, the DFT's error at
+    most 1.9x the smaller of the two FFT errors.
+  - The same on the A40 with `dot_general_precision = HIGHEST`: Float64 ≤ 1e-15, Float32 stages ≤ 6.3e-7, Float32
+    transform errors ≤ 6.6e-7, at most 2.4x the smaller of the two FFT errors.
+- **Tests**: `test/reactant/test_transform.jl`: the existing testset for both Fourier transforms and five grids
+  (OctaHEALPix and OctahedralClenshaw new), new testset "Truncated DFT against FFTW" (defaults; the matrices vs
+  the CPU SpectralTransform's Fourier transform (FFTW) ring by ring on six grids, Float64 rtol 1e-13; the traced
+  Fourier stages (DFT and FFTs) vs the same, Float64 1e-13, Float32 2e-6; the whole transform, Float64 DFT vs the
+  CPU SpectralTransform and vs the FFT path 1e-13, Float32 error vs the Float64 CPU SpectralTransform
+  transform < 1e-6 and < 4x that of FFTW or the FFT path). Reactant CPU backend: 2 + 79 + 79 + 1461 pass (8.6 min,
+  of which the new testset 3.1 min). SpeedyTransforms CPU suite with the new testset "Fourier transform as truncated
+  DFT only on Reactant": all pass (type name length, JET, AD rules 8175/8175).
+- **GPU environment**: the shared depot's precompiled `Reactant_jll` (and `CUDA_Runtime_jll`) caches had been built
+  where no GPU driver was found (`gpu = "none"`, "No functional client was found" on the GPU backend, CUDA.jl "could
+  not find an appropriate CUDA runtime"). Not rebuilt (shared with other jobs); instead `env_dft_gpu`, a copy of
+  `env_reactant_0295` with `LocalPreferences.toml`: `Reactant_jll` `gpu = "cuda"`, `gpu_version = "13.1"`,
+  `mode = "opt"` (`gpu_version` isn't a recorded compile-time preference, `mode` forces the separate cache;
+  `Reactant_jll` under `[extras]` so that its preferences are found), `CUDA_Runtime_jll` `version = "13.0"`
+  (`CUDA.set_runtime_version!`).
+- **Refactor** (user: one Legendre transform): `legendre_forward`/`legendre_inverse` (all real) for both Fourier
+  transforms; `fft_fourier_forward`/`fft_fourier_inverse` with the interface of the DFT (weights and rotations in
+  the Fourier stage); `_transform_reactant!` for both directions; `_fourier!`, `_legendre!` and
+  `dot_general_complex` of the extension removed; no scratch memory on Reactant at all. The traced-stage testset
+  covers both Fourier transforms.
+- **After the refactor**, Reactant CPU backend: `test_transform.jl` 2 + 79 + 79 + 1479 pass (7.4 min); `dft_verify.jl`
+  T32/T64, six grids: Float64 DFT vs FFTW and vs the FFT path ≤ 1.0e-15, Float32 errors ≤ 3.7e-7 (DFT), ≤ 4.2e-7
+  (FFT path).
+- **Model tests**, Reactant CPU backend, CPU-vs-Reactant correctness (`test_correctness.jl`'s `test_model`, the CPU
+  model with FFTW) and differentiability (`test_differentiability`, gradients vs Enzyme on the CPU):
+  - before the refactor, DFT: Barotropic 8/8, ShallowWater 14/14, PrimitiveDry 17/17, PrimitiveWet 20/20, AD
+    Barotropic 6/6;
+  - after the refactor: PrimitiveWet 20/20 with the DFT and 20/20 with the FFTs (`fourier_dft = false`), AD
+    Barotropic 6/6 with the DFT and 6/6 with the FFTs.
+- **A40** (`env_dft_gpu`): `test_transform.jl` with `HIGHEST` (refactored code) 2 + 79 + 79 + 1479 pass (8.3 min).
+  With the default TF32: Float64 unaffected (≤ 1e-15), the Float32 Fourier stages 2-4.4e-4 (the TF32 level), the whole
+  transform 4.1-7.8e-4 (DFT) vs 2.6-6.9e-4 (FFT path, its TF32 product is only the Legendre transform), i.e. up to
+  ~1.8x with one more TF32 product per direction. PrimitiveWet NaN check with the DFT (default resolution, 10 steps,
+  `run!`): 6/6, 12.7 min (incl. compilation).
+- **`show`** of the transform reported the size of the Reactant array wrappers (`sizeof` of a `ConcretePJRTArray`),
+  e.g. "matrices 64 bytes", also for the dense Legendre polynomials before: now `nbytes` = length × size of the element
+  type (unchanged for CPU/GPU arrays). T32 on Reactant: DFT matrices 1.38 MB, polynomials 105.78 KB, scratch 0 bytes.
+
+2026-10-18 evening
+- **H100 benchmark** (Slurm 2566174, `bench_dft.jl`, PrimitiveWet L8, OctahedralGaussian, TF32, ms per step with 10
+  steps per call; matrix / FFT path / DFT): T32 0.391 / 0.852 / 0.284, T64 0.527 / 1.76 / 0.401, T128 2.45 / 4.07 /
+  0.745. Transform alone (forward + inverse, 73 columns): T32 0.0406 / 0.359 / 0.0312, T64 0.218 / 0.809 / 0.066,
+  T128 1.84 / 2.10 / 0.233 ms. So the DFT path is the fastest at every resolution so far (T256, `HIGHEST` and the CPU
+  backend still running).
+- **Audit of `SpeedyTransformsReactantExt`** (user: minimal duplication, little change in the main code), 519 → 499
+  lines:
+  - one dense layout (parity, order, degree) for the coefficients and the polynomials, so one `dense_indices` for
+    both maps; it builds the dense polynomials too. Before: three copies of the same (l, m) loop and two layouts, the
+    forward result was (parity, order, degree) by `dot_general`'s batch-first output, the inverse and the
+    polynomials (parity, degree, order), hence the extra `dense_of_lm_order_first`;
+  - `stack_pair(a, b, dims)` for the five `cat(reshape(a, ..., 1, ...), reshape(b, ..., 1, ...); dims)` (real and
+    imaginary parts, north and south, even and odd);
+  - `S.nlon_max` and `S.nfreq_max` instead of recomputing them from `nlons` (`fourier_matrices` keeps
+    `maximum(nlons)`, a host function of `nlons` that the tests call);
+  - the unused `_jit` import removed (`@maybe_jit` resolves it in its own module);
+  - kept: the duplicated boundschecks of the two `_transform_reactant!` methods (as in the main
+    `_transform_nonchunked!`), the empty-vector branch of `dense_fourier_matrices` (one line);
+  - main code: only the layout in the comment of `legendre_polynomials_dense`.
+  
+  Transform alone before / after the audit (A40, TF32, `bench_transform_alone.jl`, DFT and FFT path, ms): T31 0.0416
+  / 0.0416 and 0.495 / 0.491, T63 0.137 / 0.136 and 1.24 / 1.24, T127 0.766 / 0.766 and 2.95 / 2.95: unchanged.
+- **Memory and FLOPs** of the precomputed arrays (`memory_flops_table.jl`, formulas from the array sizes, Float32,
+  OctahedralGaussian; T32 checked against `show`): matrix transform 28 MB / 375 MB / 5.4 GB / 82 GB at T32 / T64 /
+  T128 / T256; DFT matrices 1.4 / 10 / 79 / 617 MB (54 to 44% nonzero, the rest padding), dense Legendre 0.10 / 0.81
+  / 6.4 / 51 MB. FLOPs per column and direction, matrix vs DFT + Legendre: 7.1 vs 0.79, 94 vs 5.9, 1352 vs 46,
+  20470 vs 359 MFLOP (9 to 57× fewer).
+- **Tests after the audit**, Reactant CPU backend (`env_reactant_0295`): `test_transform.jl` 2 + 89 + 89 + 1479 pass
+  (7.6 min; 89 instead of 79 since the `show` tests); PrimitiveWet CPU vs Reactant 20/20 with the DFT and 20/20 with
+  the FFT path; Barotropic gradients vs Enzyme on the CPU 6/6 and 6/6.
+- **Nsight, DFT path** (A40, `dft_impl_2026-10-18/profile/`, `run_nsys.sh`; matrix and FFT references from
+  `profile_fft_2026-10-16/`): the optimized StableHLO of the 10-step loop has no `fft` (FFT path: 96), 29
+  `dot_general` (matrix 27), 33 transposes (matrix 13, FFT path 123), 6380 lines (matrix 6171, FFT 7686). Per time
+  step (20 calls of 10 steps): 1.2 graph launches and 0.5 kernel launches outside graphs (matrix 1.2 / 0.5, FFT path
+  4.2 / 270), 107.5 kernels, no cuFFT, no `scal`; GPU time 304 µs at T31 (matrix 350, FFT 835) and 513 µs at T63
+  (matrix 1386, FFT 1833); wall time 0.367 / 0.585 ms per step at T31 / T63 (matrix 0.418 / 1.482, FFT 1.466 /
+  3.139). Transform alone (73 columns, traced loop): GPU time 38 / 134 µs (matrix 78 / 791, FFT 282 / 834), 11
+  kernels per forward + inverse, one graph launch.
+- **Precision** (`precision_table.jl`, Slurm 2567378, H100, OctahedralGaussian, 8 columns of random coefficients and
+  the band-limited fields from them, relative max error vs a Float64 CPU reference): CPU Float32 baseline 1.4 to
+  5.8e-7; DFT with Float32 (`HIGHEST`) 1.8 to 6.7e-7 grid → spectral (0.8 to 1.3× the baseline) and 2.9 to 8.7e-7
+  spectral → grid (1.7 to 3.3×), the FFT path 0.7 to 1.6× the baseline, the matrix transform 4.3e-7 to 2.2e-6 (up to
+  9×, growing with resolution); with TF32 all at 2 to 4.4e-4, the DFT 1.0 to 1.5× the FFT path. The T128 matrix TF32
+  line was lost in the job's filtered log (a ptxas warning printed onto it, deterministic: also lost in a filtered
+  rerun); unfiltered rerun on the A40: 2.0e-4 grid → spectral, but 1.6e-6 spectral → grid (XLA apparently chose a
+  GEMM without TF32 for that shape on the A40).
+- **`HIGHEST` time step** (Slurm 2566174, H100, ms per step, 10 per call; matrix / FFT path / DFT): T32 0.415 /
+  0.823 / 0.280, T64 0.763 / 1.76 / 0.424, T128 5.67 / 4.07 / 0.862. Float32 instead of TF32: DFT +0 to 16%, matrix
+  +6% / +45% / 2.3×, FFT path unchanged.
+- **GPU NaN check** `test/GPU/reactant.jl`, BarotropicModel now with both transforms: 1/1 and 1/1 (A40).
+- **Long-run script** (`long_run_stability.jl`), smoke test T31L8 for 1 year on the A40: stable, 2975 SYPD, global
+  mean surface temperature 285 → 275 K in the spin-up, then 274-278 K, surface pressure 962.6 to 963.6 hPa, humidity
+  ≥ 0, |u| ≤ 87 m/s. The 10-year T256L8 TF32 run is Slurm 2568499 (queued).
+- Pitfall: waiting with `while pgrep -f "julia.*precision_table.jl"` matches the waiting shell's own command line and
+  never ends (two A40 runs didn't start for ~40 min).
+- **`HIGHEST` T256** (Slurm 2566174): FFT path 9.8, DFT 3.1 ms per step (TF32: 9.68 / 2.29), i.e. Float32 costs the
+  DFT path 35% at T256 (0 to 16% up to T128).
+- **Reactant CPU backend** (16 cores of the H100 node, same job), FFT path / DFT, ms per step with 10 per call
+  (transform alone): T32 4.14 / 4.82 (1.84 / 1.58), T64 12.7 / 12.7 (5.84 / 5.06), T128 44.9 / 43.8 (21.1 / 20.7).
+  Within 15%, no backend-specific rule: `default_fourier_dft` stays `true` on every Reactant backend (querying the
+  backend at construction isn't worth ±15%).
+- **Step 7, defaults**: `WhichTransform` returns the `SpectralTransform` for `ReactantDevice` (faster than the matrix
+  transform at every resolution: H100 TF32 1.3 to 3.3×, `HIGHEST` 1.5 to 6.6×, Reactant CPU backend 2.1 / 5.3× at
+  T31 / T63 for the FFT path, M3); `DFT_MAX_TRUNCATION = 256` kept (617 MB of DFT matrices there, the H100 runs
+  it 4.2× faster than the FFT path). New testset "Default transform on Reactant" in `test_transform.jl`: 4/4 (CPU
+  backend). Open decision 1 closed.
+- **Step 8, docs**: `architectures_gpu.md` Reactant section rewritten (default transform, truncated DFT and FFT path,
+  memory, H100 performance, CPU backend; the TF32 model table marked as measured with the matrix transform, the cost
+  of `HIGHEST` for the default transform; the GPU NaN test is the BarotropicModel with both transforms);
+  `differentiability.md` (default transform in the example). The PrimitiveWet gradient in CI uses the matrix
+  transform; a one-off check of the one-step PrimitiveWet gradient with the DFT is running.
+- **10-year T256L8 TF32 run** (Slurm 2568499, H100, DFT, `long_run_stability.jl`): **unstable**, non-finite values in
+  all variables after the program ending at day 360. Global means steady until then (surface temperature 276-279 K,
+  surface pressure 972.5 ± 0.4 hPa, surface humidity ~4.8 g/kg); local extremes grew: minimum temperature 190 → 151 K
+  (days 90 to 330), max |v| 44 → 75 m/s. 311 SYPD on the H100. Controls requested by the user (T256L8, 2 years each):
+  Reactant DFT with `HIGHEST`, Reactant FFT path with TF32, CUDA.jl in Float32 (`long_run_stability_cuda.jl`; loop and
+  diagnostics shared in `long_run_loop.jl`).
+- **PrimitiveWet gradient with the DFT fails to compile** (one-off check, `run_ad_primitive_wet_dft.jl`, Reactant CPU
+  backend, `test_differentiability(PrimitiveWetModel; Transform = SpectralTransform, compare_with_enzyme = false)`):
+  the loss passes, the gradient fails in the MLIR pass pipeline, `'stablehlo.scatter' op inferred type(s)
+  'tensor<1x65x3168xf32>' are incompatible with return type(s) 'tensor<1x73x3168xf32>'` (from the `fill!` in
+  `reset_tendencies!` on the 73-column tendency parent, i.e. a pass narrowed the operand of a scatter). CI only
+  differentiates the PrimitiveWetModel with the matrix transform (6 steps); controls of this one-step check with the
+  matrix transform and the FFT path running. Relevant for the new default (`WhichTransform`) and the
+  `differentiability.md` example (default transform).
+- **PrimitiveWet gradient controls** (same one-step check, Reactant CPU backend): matrix transform 3/3, FFT path 3/3,
+  DFT 1 pass + 1 error (above). So the DFT path triggers the scatter type error in the MLIR passes; the BarotropicModel
+  gradient with the DFT works (6/6 vs Enzyme).
+- **Initial conditions with TF32** (smoke tests: CUDA.jl 974.2 hPa vs Reactant 963.5 hPa mean surface pressure at T31):
+  CPU vs Reactant CPU backend agree to 1e-7 (`compare_initial_conditions.jl`). On the GPU (`initial_pressure_tf32.jl`,
+  A40, T31L8, mean surface pressure / top-layer temperature / ln(ps) l=0 coefficient): CPU and CUDA.jl 974.19 hPa /
+  200.00 K; Reactant with `HIGHEST` both transforms 974.19 hPa / 200.00 K / 40.713173; TF32 matrix transform 971.21 hPa
+  / 199.93 K / 40.713173 (coefficient exact, its spectral → grid product biased −0.3%); TF32 DFT 963.49 hPa / 199.79 K /
+  40.699783 (coefficient −3.3e-4, grid −1.1%). TF32 errors are a systematic bias towards zero (consistent with inputs
+  truncated rather than rounded to TF32), which on fields with a large mean (ln ps ≈ 11.5) becomes a ~1% mass error.
+- **Stability controls** (T256L8, 2 years each, H100): CUDA.jl Float32 (Slurm 2568562) **unstable** after day 210
+  (61 SYPD), Reactant DFT `HIGHEST` (2568563) **unstable** after day 330 (246 SYPD), Reactant DFT TF32 (2568499, above)
+  after day 360; same signature (minimum temperature → ~150 K, growing winds). **The T256L8 default configuration of
+  the PrimitiveWetModel is unstable in long runs independent of Reactant, TF32 and the DFT**; the stability test of TF32
+  needs a configuration that is stable in Float32. Reactant FFT path TF32 (2568564) still running, not needed for the
+  attribution.
+- **Device memory** (Slurm 2567378, `memory_peak.jl`, H100, PrimitiveWet L8, XLA allocator, in use after `initialize!`
+  / peak after a compiled `run!` of 20 steps, GB; matrix / FFT path / DFT): T32 0.034 / 0.005 / 0.007 and 0.098 / 0.101 /
+  0.036, T64 0.396 / 0.019 / 0.029 and 0.461 / 0.104 / 0.077, T128 5.48 / 0.083 / 0.153 and 5.66 / 0.273 / 0.339, T256
+  – / 0.312 / 0.927 and – / 1.064 / 1.675.
+- **User decisions** (2026-10-18 evening): investigate a workaround for the PrimitiveWet gradient with the DFT; test TF32
+  stability at T128L8 for 10 years (Slurm 2569913 CUDA.jl Float32, 2569914 Reactant DFT TF32, 2569915 Reactant DFT
+  `HIGHEST`).
+- **The bad rewrite** (module dumped by Reactant on failure, `/tmp/reactant_g8LEgB/module_000_nxc9_post_all_pm.mlir` on
+  login02): the scatter of the `fill!` in `reset_tendencies!` has the operand `pad(slice(%8523)[0:49], high = 16)`, i.e.
+  1x65x3168, for a 1x73x3168 result (`high = 24` would be consistent), and its result is sliced to columns 24:73 and
+  padded back. So a pattern combining slice/pad and scatter shrank the operand by 8 columns without updating the type.
+  Candidate groups (`Reactant.Compiler.optimization_passes`): 45 patterns behind `disable_pad_optimization_passes`, 31
+  behind `disable_scatter_gather_optimization_passes` (among them `scatter_masked_index_slice`). Runs of the one-step
+  gradient check with each group disabled and with `scatter_masked_index_slice` or `slice_pad` excluded
+  (`run_ad_primitive_wet_options.jl`, `AD_OPTIONS`) running.
+
+### Handoff 2026-10-18 (work for 2026-10-19)
+
+State: branch `mg/reactant-dft` with the user's commits `872c8f9c`, `946d9869`, `d41938f2` (code, tests, docs, `WhichTransform`,
+CHANGELOG). Uncommitted: the protocol additions of this plan since then. Untracked: the PR description draft
+`2026-10-18-reactant-dft-pr-description.md`. `SpeedyWeather/benchmark/README.md` and `assets/benchmark_results.json`
+are modified outside this session. Scripts and logs: `/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/dft_impl_2026-10-18/`.
+
+**1. Why does only the DFT break the PrimitiveWet gradient?** (User: counterintuitive, as the failing op is the
+`fill!` in `reset_tendencies!`, not the transform.)
+
+Known:
+- One-step gradient, Reactant CPU backend (`test_differentiability(PrimitiveWetModel; compare_with_enzyme = false)`):
+  matrix transform 3/3, FFT path 3/3, DFT fails to compile (the forward loss passes). The BarotropicModel gradient
+  with the DFT works (6/6, matches Enzyme on the CPU). CI's PrimitiveWet gradient (6 steps) uses the matrix transform.
+- The bad op in the dumped module (`/tmp/reactant_g8LEgB/module_000_nxc9_post_all_pm.mlir` on login02, line ~13153):
+  `scatter(pad(slice(%8523 : 1x57x3168)[0:49], high = 16) : 1x65x3168) -> 1x73x3168`; the scatter result is sliced to
+  columns 24:73 and padded back with `low = 24`. A consistent operand would have `high = 24`. 73 = 9L + 1 tendency
+  columns (L = 8).
+- The optimization patterns rewrite the whole program, so the transform can change what a pattern does to a
+  neighbouring op. **Hypothesis, unverified:** the DFT reads the 73-column tendency parent differently from the
+  other two transforms. It does one gather over all grid points (`padded[gather, :]` of `cat(data, zero row)`),
+  whose adjoint in the reverse pass is a scatter-add followed by a slice of the first npoints rows. The FFT path
+  slices contiguous rows per latitude run, the matrix transform does one `dot_general` on the whole (npoints, K)
+  matrix; neither has gathers or scatters on these arrays. So only with the DFT would the slice/pad/scatter patterns
+  find gathers, scatters and slices on the tendency parent to combine. Not yet explained: where the 57- and 49-column
+  tensors come from.
+
+- **Lead** (from the 2026-10-15 notes on Reactant 0.2.293, `2026-10-14-reactant-multistep-time-stepping.md`): the
+  pattern `pad_concat_to_concat_pad` rewrote `concat(pad(x,1,1), pad(y,1,1))` to `pad(concat(x,y),1,1)`, two elements
+  short. `slice_pad` was excluded for gradients together with it until 0.2.294 counted as fixed (`REACTANT_EXCLUDED_PASSES`
+  emptied then). The broken op here is the same class, a pad 8 columns short. The DFT path is full of `cat`s (the
+  zero row before the gather, `stack_pair` for real/imaginary and north/south), which would give this pattern the
+  concat(pad, pad) structures to rewrite. That would explain why only the DFT triggers it.
+
+To do:
+1. Results of the five pattern variants. They are running on login02 as orphaned processes and finish around
+   23:20-23:30. Logs are `ad_primitive_wet_dft_{no_pad,no_scatter}.log` and
+   `ad_primitive_wet_dft_exclude_{scatter_masked_index_slice,slice_pad,pad_concat_to_concat_pad}.log`
+   (`run_ad_primitive_wet_options.jl`, `AD_OPTIONS`). They show which pattern group or single pattern avoids the error.
+   The group lists are in the protocol above.
+   Faster than 17-minute recompiles (the technique of 2026-10-15): run the pattern list of
+   `Reactant.Compiler.optimization_passes` on the module dumped before the passes with
+   `Reactant.Compiler.run_pass_pipeline_on_source`, one excluded pattern per process (`pad_concat_mwe_one.jl` in the
+   claude dir).
+2. Dump the modules before the passes (`Reactant.MLIR.IR.DUMP_MLIR_ALWAYS[] = true`, directory
+   `Reactant.MLIR.IR.DUMP_MLIR_DIR[]`) for the DFT and the FFT gradient. In the DFT module, follow the def-use chain
+   of `%8523` and of the tendency parent: which ops make the 57- and 49-column tensors, and do they come from the DFT's
+   gather or its adjoint? Compare with the FFT module.
+3. Once the pattern is known, run it alone on the pre-pass module to get a minimal before/after. Then write a small
+   Julia reproducer: `fill!` of a column of a fused parent, a gather over another view of it, and the gradient; it
+   should compile in seconds. Report it to Enzyme-JAX, as for `cse_slice`.
+4. Workaround, one of:
+   - exclude the pattern via `REACTANT_EXCLUDED_PASSES`. It applies to every compilation, so check the forward
+     performance (`bench_transform_alone.jl`, `bench_dft.jl` at T32/T128) and the `test/reactant` suite;
+   - change the DFT's gather so that the pattern no longer applies, e.g. gather from `data` with clamped indices and a
+     mask instead of the appended zero row, or materialize the view first. Re-run `test_transform.jl` and the
+     gradient check.
+5. Until resolved: `differentiability.md`'s example (default transform, PrimitiveWetModel) fails with the DFT. The PR
+   draft lists this under limitations (TBD there).
+
+**2. TF32 stability at T128L8, 10 years.**
+- Running: Slurm 2569913 (CUDA.jl Float32). At 23:01 it was at day 630, with the minimum temperature already at
+  158 K, the signature of the T256 blow-ups.
+- Queued behind 2568564: 2569914 (Reactant DFT TF32) and 2569915 (Reactant DFT `HIGHEST`).
+- 2568564 is the T256 FFT-path TF32 control, no longer needed for the attribution.
+- Logs and CSVs: `long_run/lr128-*`.
+- If CUDA.jl Float32 is unstable at T128 too, the default configuration of the PrimitiveWetModel is unstable over long
+  runs at T128 and T256. The TF32 test then needs a configuration that is stable in Float32: a smaller time step
+  (`Δt_at_T32`), more diffusion, or T63. Check the dev notes on blow-ups first
+  (`docs/dev/2026-08/2026-08-31-healpix-superrotation-blowup.md`, `2026-08-17-healpix-instability-analysis.md`).
+
+**3. PR description.** Fill in the T128 result, the gradient outcome and its workaround (the TBD), and update the
+default and the docs if the workaround changes them.
+
+**Disk quota.** A write to the home directory failed once at ~23:10 with "Disk quota exceeded"; small writes worked
+again right after. The shared Julia depot is in home (`~/.julia` 30 GB, of which `artifacts` 26 GB, probably several
+Reactant_jll/CUDA versions). If precompilation or package loads fail tomorrow, check the quota first;
+`Pkg.gc()` would free unused artifacts (the user's decision). The job logs are on `/p/tmp`, not affected.
+
+**4. Questions for the user.**
+- The testset "Default transform on Reactant" (`WhichTransform` returns the DFT `SpectralTransform` on
+  `ReactantDevice`) was not in the commit. Was that intended? Without it the new default is untested.
+- Should 2568564 be cancelled?
+
+2026-10-19
+- **The pattern is `slice_pad`** (one-step PrimitiveWet gradient with the DFT, Reactant CPU backend,
+  `run_ad_primitive_wet_options.jl`): all pad patterns disabled 3/3, `slice_pad` alone excluded 3/3; failing with
+  the scatter/gather patterns disabled, with `scatter_masked_index_slice` excluded and with
+  `pad_concat_to_concat_pad` excluded (yesterday's lead was wrong). Source locations of the bad ops (failing module,
+  `resolve_loc.py` in the session scratchpad): the 57-column operand is the `multiply` of `scale_tendencies!`
+  (`scaling.jl:15`, scaling a fused tendency parent by the radius), the scatter is the `fill!` of `reset_tendencies!`
+  (`tendencies.jl:1262`). Neither is in the transform; why only the DFT's program gives `slice_pad` the structure
+  it mis-rewrites is being traced with the modules dumped before the passes (`dump_ad_primitive_wet_dft.jl`,
+  `DUMP_MLIR_ALWAYS`, into `slice_pad_dump/`).
+- **T128L8, 10 years, all stable** (H100): CUDA.jl Float32 (Slurm 2569913) 443 SYPD, mean surface pressure 975.3-975.4
+  hPa; Reactant DFT `HIGHEST` (2569915) 2036 SYPD, 975.4 hPa; Reactant DFT TF32 (2569914) 2394 SYPD, 963.7-964.1 hPa
+  (the ~1.2% mass deficit of the TF32 initial state persists, mass is conserved during the run). Minimum temperatures
+  160-185 K, max |u| 87-99 m/s in all three. So TF32 does not destabilize a configuration that is stable in Float32
+  (10 years at T128L8); Reactant with the DFT is 5.4× (TF32) / 4.6× (Float32) faster than CUDA.jl there.
+  The T256 FFT-path TF32 control (2568564): unstable after day 330, like all T256L8 runs.
+- **Workaround check**: `slice_pad` excluded in all compilations at runtime (`with_excluded.jl`, `EXTRA_EXCLUDED`,
+  pushes onto `REACTANT_EXCLUDED_PASSES`): the whole `test/reactant` suite in five processes
+  (`run_reactant_suite_part.jl`, logs `suite_no_slice_pad_*.log`) and the one-step PrimitiveWet DFT gradient on the CPU
+  backend; the time step with and without the exclusion on the H100 (Slurm 2577884, `bench_dft.jl` with
+  `EXTRA_EXCLUDED`). Running.
+- **Is the T256L8 instability already on `main`?** (user: agreed it is independent of this PR; the branch sits on
+  `mg/new-reactant`, so whether `main` has it is open.) Worktree `claude_reactant_gpu_2026-10-13/wt_main_e410eed0` at
+  `origin/main` (`e410eed0`, #1313; the local `main` branch is stale), environment `env_main_cuda` (CUDA.jl 6.4.2 vs 6.2.2
+  in `env_dft_gpu`). `long_run_stability_cuda.jl` now does the chunks with a local loop over `time_step!`, as `main`
+  has no `time_steps!` (identical to the branch's generic `time_steps!`). Smoke test on `main` T31L8 1 year: stable,
+  same initial state as the branch (974.19 hPa, 200.00 K). T256L8 2 years on `main`: Slurm 2582219.
+- **`test/reactant` suite with `slice_pad` excluded in all compilations** (Reactant CPU backend, `with_excluded.jl`):
+  `test_maybe_jit.jl` 8 + 14 + 6; `test_transform.jl` 2 + 89 + 89 + 1479; `test_correctness.jl` all models with the
+  matrix transform 8 / 14 / 17 / 20 and with the `SpectralTransform` (DFT) Barotropic 8, PrimitiveWet 20;
+  `differentation.jl` (CI part) `make_zero` 4, Barotropic matrix 6 and DFT 6, Barotropic 6-step loop 12, PrimitiveWet
+  6-step loop (matrix) 5 (17 min, as before); the one-step PrimitiveWet DFT gradient 3/3 (fails without the exclusion).
+  `test_output.jl`/`test_time_steps.jl` didn't load in `env_reactant_0295` (Zarr listed but not installed; unrelated),
+  rerun in `env_dft_gpu`.
+- Why the user asked: the custom chunk loop of the long runs is the model's own `time_stepping!` (`for _ in 1:n_steps;
+  time_step!; end`) cut into 30-day pieces for diagnostics, numerically identical to `run!`; the local `steps!` of
+  `long_run_stability_cuda.jl` only because `main` has no `time_steps!`. `env_main_cuda` resolves CUDA.jl 6.4.2,
+  `env_dft_gpu` 6.2.2 because Reactant 0.2.295's compat caps CUDA.jl at 6.2.
+- **T256L8 on `main` is unstable too** (Slurm 2582219, `e410eed0`, CUDA.jl 6.4.2 Float32, `env_main_cuda`): non-finite
+  after day 300 (minimum temperature 136 K, |u| 105 m/s at day 270), 65 SYPD. **The T256L8 instability is pre-existing
+  on `main`**, independent of this PR and of `mg/new-reactant`; worth its own issue.
+- **Isolating `slice_pad`** on the dumped modules (`slice_pad_dump/`; `rerun_all_pipeline.jl`, `bisect_slice_pad.jl`):
+  Reactant's "all" pipeline on the gradient module before it (`module_1330_btrJ_pre_all_pm.mlir`) reproduces the error
+  in 10 s (17 min via Julia), without `slice_pad` it succeeds in 9 s; `slice_pad` alone on the optimized result changes
+  nothing harmful. The pipeline has 10 pattern rounds: the failure needs `slice_pad` in round 1 *and* round 7 (rounds
+  1..6 or 2..10 alone are fine; rounds {1, 7} fail). Round 7 alone on the module before it (`before_round_7.mlir`, with
+  `slice_pad` only in round 1 before) fails; minimizing its 529 patterns hit an LLVM abort ("Element is not a complex
+  value") for some removals, so the minimization restarts after aborts.
+- **Whole `test/reactant` suite passes with `slice_pad` excluded** (also `test_output.jl` 29/29 and `test_time_steps.jl`
+  6 + 10 + 4 + 7, rerun in `env_dft_gpu` after installing its missing Zarr).
+- **What goes wrong** (round 7 with the 11 patterns on `before_round_7.mlir`; `apply_round_minimal.jl`): the failing
+  scatter is `%11324` in the *reverse* pass, the adjoint of the single-column write of the tendency array
+  (`stablehlo.return %cst_411`: zero cotangent at the overwritten positions). Its operand is the accumulated cotangent
+  of the 73-column fused tendency array, a sum of padded pieces covering columns 0:8, 8:16, 16:24, 24:49 and 57:73
+  (`((pad(24:49) + pad(16:24)) + pad(8:16)) + pad(0:8)) + pad(57:73)`); columns 49:57 (one 8-layer variable) get no
+  cotangent at this point. The pad/concat patterns (`add_pad_pad_to_concat`, `binop_pad_to_concat_add`,
+  `concat_multipad`, `slice_concat`, `pad_simplify`, with `slice_pad`) turn the sum into a concatenation of 14 pieces
+  (7+1, 7+1, 8×1, 25, 16 columns) that **drops the zero block of columns 49:57**: 65 instead of 73 columns. The forward
+  side shows the DFT's part: the tendency array `%3011 = concatenate(10 blocks)` → single-column `scatter` →
+  `reshape` → `pad(high = [1, 0])` (the DFT's appended zero row, `cat(data, zeros(1, K))`) → `gather` (the DFT's ring
+  gather, 5376 = 112 × 24 × 2 rows) → transpose → `dot_general`. A hand-written MWE (five padded pieces with the gap,
+  scatter, slice/pad) does *not* fail: the patterns keep the gap there (`pad(concat(c, d), high = 8)`), so the real
+  pieces (sums of further pieces, the 7+1 splits) matter. Automatic reduction of the module (`reduce_module.jl`/`.sh`:
+  ops deleted in halving chunks, used results replaced by opaque `stablehlo.custom_call @mwe_input` placeholders,
+  one pattern round per trial, restarts after LLVM aborts) running, `slice_pad_mwe/reduce/`.
+- **Root cause found: Enzyme-JAX's `concat_multipad`.** Automatic reduction of the module before round 7
+  (`reduce_module.jl`/`.sh`, 13,063 → 151 ops, no aborts) and hand clean-up gave StableHLO MWEs
+  (`slice_pad_mwe/mwe.mlir`, 73 columns, and `mwe_small.mlir`, 13 columns): a sum of padded column blocks with a gap,
+  one block itself a sum of two pads, then the adjoint scatter. They fail with Reactant's default 530 patterns and with
+  7 (`slice_pad`, `slice_concat`, `add_pad_pad_to_concat`, `binop_pad_to_concat_add`, `concat_multipad`, `add_simplify`,
+  `broadcast_in_dim_simplify`), pass without `slice_pad` or without `concat_multipad`. Testing single patterns on micro
+  modules: `concat_multipad` alone fails on `concatenate(pad(a, high = 0), pad(b, high = 2))`, the result is
+  `pad(concatenate(a, b), high = 0)`, 2 short. In the source (`ConcatMultiPad`, `canMergePadsAlongAxis`, Enzyme-JAX
+  `main`): pads are merged along the axis when the first has `high = 0` and the second `low = 0` there, and the merged
+  pad is created with the *first* pad's high padding; the fix is `high[dim] = otherPad.high[dim]`. `slice_pad` only
+  produces the `high = 0` pad (its new `slicePadHelper` from Enzyme-JAX #3524 is correct for these cases). Why only the
+  DFT: its gradient program reaches a state where such a pad stands next to a pad holding the gap (an 8-layer variable
+  without cotangent there); the FFT and matrix programs don't, so the same buggy pattern stays harmless for them. On the
+  dumped gradient module the full pipeline passes without `concat_multipad` (and without `slice_pad`). Through `@jit`
+  with default options a Julia-level `cat(pad(a), pad(b))` doesn't trigger it (other patterns rewrite the pads first),
+  so the MWE is StableHLO. Issue draft: `reactant-issue-draft-concat-multipad.md`, MWE script
+  `reactant-issue-concat-multipad-mwe.jl` (both in `docs/dev/2026-10/`). No existing Enzyme-JAX issue found. The old
+  Reactant environments (0.2.292-0.2.294) no longer load (packages missing in the depot), so whether the bug is older
+  than 0.2.295 wasn't tested.
+- **`slice_pad` exclusion, performance** (Slurm 2577884, H100, DFT, ms per step with 10 per call, default / excluded):
+  T32 0.284 / 0.273, T64 0.396 / 0.381, T128 0.740 / 0.761, T256 2.27 / 2.28: no cost (the T32 single-step 7.54 ms is
+  host-bound noise). Matrix and FFT path at T64 still running.
+- `slice_pad` exclusion, matrix transform and FFT path at T64 (Slurm 2577884, ms per step with 10 per call, default /
+  excluded): matrix 0.546 / 0.532, FFT path 1.70 / 1.74. So no cost for any of the three transforms. Verification of the
+  `concat_multipad` exclusion (user: test it) running: `test/reactant` suite and the one-step PrimitiveWet DFT gradient
+  (`suite_no_concat_multipad_*.log`), H100 benchmark Slurm 2582902 (`submit_bench_excluded.sh`).
+- **`test/reactant` suite with `concat_multipad` excluded in all compilations**: all pass, the same counts as with
+  `slice_pad` excluded (`test_maybe_jit.jl` 8 + 14 + 6, `test_transform.jl` 2 + 89 + 89 + 1479, `test_correctness.jl`
+  all models, `differentation.jl` incl. the PrimitiveWet 6-step loop gradient 5/5 in 17 min, `test_output.jl` 29,
+  `test_time_steps.jl` 6 + 10 + 4 + 7) and the one-step PrimitiveWet DFT gradient 3/3.
+- **`concat_multipad` excluded** (user: #3503 will be fixed upstream soon, exclude it until then; the user had posted
+  the issue draft as EnzymeAD/Reactant.jl#3503; their #3501 is the different `cse_slice` non-termination):
+  `REACTANT_EXCLUDED_PASSES = ["cse_slice", "concat_multipad"]` in SpeedyWeatherInternals (version already
+  `1.0.0+DEV`) with an explanation; `architectures_gpu.md` no longer says "currently none" about the list. H100 benchmark
+  (Slurm 2582902, DFT, ms per step with 10 per call, default / excluded): T32 0.290 / 0.296, T64 0.398 / 0.396, T128
+  0.745 / 0.738, T256 2.27 / 2.29; transform alone unchanged. Remove the entry once a Reactant release has the fix
+  (`reactant-issue-concat-multipad-mwe.jl` example 1 then passes).
+- **Differentiability tests default to the `SpectralTransform`** (user: the default for testing differentiability, the
+  `MatrixSpectralTransform` on one model as well): `differentiability_simulations`, `test_differentiability` and
+  `test_differentiability_time_steps` (new `Transform` keyword, in the testset name) default to `SpectralTransform`;
+  CI: Barotropic one step with both transforms, Barotropic 6-step loop and PrimitiveWet 6-step loop with the
+  `SpectralTransform` (the latter was the matrix transform, so CI missed #3503). `differentiation_primitive_wet.jl`
+  follows the default. Run on the CPU backend with `concat_multipad` in `REACTANT_EXCLUDED_PASSES` (source): running.
+- `concat_multipad` exclusion, matrix transform and FFT path at T64 (Slurm 2582902, ms per step with 10 per call,
+  default / excluded): matrix 0.546 / 0.528, FFT path 1.71 / 1.70. No cost for any of the three transforms.
+- **`concat_multipad` exclusion, performance** (Slurm 2582902, H100, same node, ms per step with 10 per call, default /
+  excluded): DFT T32 0.290 / 0.296, T64 0.398 / 0.396, T128 0.745 / 0.738, T256 2.27 / 2.29; matrix T64 0.546 / 0.528,
+  FFT path T64 1.71 / 1.70; transform alone and compile times unchanged. So excluding `concat_multipad` (the faulty
+  pattern) is verified like `slice_pad`: all tests pass, no cost. Proposal: add `concat_multipad` to
+  `REACTANT_EXCLUDED_PASSES` (SpeedyWeatherInternals) until Enzyme-JAX fixes it.
