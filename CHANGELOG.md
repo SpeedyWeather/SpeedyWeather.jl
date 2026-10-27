@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Bump SpeedyWeatherInternals to v1.0.1 [#1361](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1361)
 - `ParameterEditing.parameters` and `reconstruct` support `Tuple`s, keying elements by their 1-based index; parameters nested in a tuple were previously dropped silently [#1352](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1352)
 - `DiagnosticClouds` convert the rain rate from m/s to mm/day correctly, the precipitation contribution to the cloud cover was 1e6 too small [#1351](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1351)
 - Full-grid `get_londlatds` built with loops to work around a Julia v1.13.2 miscompile causing segfaults [#1348](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1348)
