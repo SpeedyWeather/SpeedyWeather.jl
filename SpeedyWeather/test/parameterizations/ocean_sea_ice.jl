@@ -1,3 +1,5 @@
+using Dates
+
 @testset "Ocean and sea ice models" begin
 
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 5)
@@ -53,4 +55,20 @@
             end
         end
     end
+end
+
+@testset "Monthly interpolation of climatologies" begin
+    # months and weight as computed with Dates' month arithmetic, 2000 is a leap year
+    times = DateTime(2000, 1, 1):Hour(13):DateTime(2002, 1, 1)
+    @test all(times) do time
+        this_month, next_month, weight = SpeedyWeather.monthly_interpolation(time)
+        this_month == Dates.month(time) && next_month == mod1(this_month + 1, 12) &&
+            weight == Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time)
+    end
+    @test SpeedyWeather.monthly_interpolation(DateTime(2000, 2, 29, 12)) == (2, 3, 28 / 29)
+    @test SpeedyWeather.monthly_interpolation(DateTime(2001, 12, 31, 23)) == (12, 1, 30 / 31)
+    @test SpeedyWeather.monthly_interpolation(DateTime(2100, 2, 15)) == (2, 3, 14 / 28)  # not a leap year
+
+    # weight in the precision of the interpolated variable, as it's a kernel argument (no Float64 on Metal)
+    @test SpeedyWeather.monthly_interpolation(DateTime(2000, 2, 29, 12), Float32) === (2, 3, 28.0f0 / 29.0f0)
 end
