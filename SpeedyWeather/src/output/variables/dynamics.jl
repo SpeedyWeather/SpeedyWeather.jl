@@ -148,42 +148,45 @@ function output!(
     # get log(surface pressure) field
     var = path_or_nothing(variable, simulation)
     isnothing(var) && return nothing       # silently escape early if variable is not defined
-    lnpₛ = get_prognostic_step(var, simulation.model.time_stepping, output)
-    h = simulation.model.orography.orography
+
+    # compute on the output's architecture, the model's except for Reactant (the CPU, see on_output_architecture)
+    lnpₛ = on_output_architecture(output, get_prognostic_step(var, simulation.model.time_stepping, output))
+    h = on_output_architecture(output, simulation.model.orography.orography)
     (; R_dry, κ) = simulation.model.atmosphere
     g = simulation.model.planet.gravity
     TS = simulation.model.time_stepping     # used to determine step of variables to write to file
 
     # compute virtual temperature on the fly
     nlayers = size(simulation.variables.grid.temperature, 2)
-    T = simulation.variables.parameterizations.surface_air_temperature
+    T = on_output_architecture(output, simulation.variables.parameterizations.surface_air_temperature)
 
     if simulation.model.dynamics_only    # otherwise this has been computed already
         # calculate the surface air temperature from lowest model level temperature
         # via dry adiabatic lapse rate
-        temp = get_prognostic_step(simulation.variables.grid.temperature, TS, output)
+        temp = on_output_architecture(output, get_prognostic_step(simulation.variables.grid.temperature, TS, output))
         T .= field_view(temp, :, nlayers)
         # σ vertical coordinate at lowest model level
-        GPUArrays.@allowscalar σ = simulation.model.geometry.σ_levels_full[nlayers]
+        σ_levels_full = on_output_architecture(output, simulation.model.geometry.σ_levels_full)
+        GPUArrays.@allowscalar σ = σ_levels_full[nlayers]
         σ⁻ᵏ = σ^(-κ)    # precalculate adiabatic descent factor
         T .*= σ⁻ᵏ       # lower to surface assuming dry adiabatic lapse rate
     end
 
     q = if haskey(simulation.variables.grid, :humidity)
-        humid = get_prognostic_step(simulation.variables.grid.humidity, TS, output)
+        humid = on_output_architecture(output, get_prognostic_step(simulation.variables.grid.humidity, TS, output))
         field_view(humid, :, nlayers)
     else
         # reuse scratch array b which is free to be used for mslp after the virtual temperature calculation
         # set to zero as q=0 in dry atmosphere
-        simulation.variables.scratch.grid.b_2D .= 0
+        on_output_architecture(output, simulation.variables.scratch.grid.b_2D) .= 0
     end
-    Tᵥ = simulation.variables.scratch.grid.a_2D
+    Tᵥ = on_output_architecture(output, simulation.variables.scratch.grid.a_2D)
 
     (; atmosphere) = simulation.model
     Tᵥ .= virtual_temperature.(T, q, atmosphere)
 
     # calculate mean sea-level pressure on model grid
-    mslp = simulation.variables.scratch.grid.b_2D
+    mslp = on_output_architecture(output, simulation.variables.scratch.grid.b_2D)
     (; transform) = variable                            # to change units from log(Pa) to hPa
     @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)      # log Pa to hPa
 

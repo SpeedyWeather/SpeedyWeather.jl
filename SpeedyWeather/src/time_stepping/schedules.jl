@@ -141,9 +141,12 @@ Whether `schedule` executes on the time step of `clock`, i.e. every `every_n_ste
 (spin-up steps excluded). Counts the executions."""
 function isscheduled(schedule::PeriodicSchedule, clock::Clock)
     is_scheduled = isscheduled(schedule.every_n_steps, clock)
-    schedule.counter += is_scheduled
+    count_execution!(schedule, is_scheduled)
     return is_scheduled
 end
+
+# count the executions of a schedule, see SpeedyWeatherReactantExt for a traced `is_scheduled`
+count_execution!(schedule::AbstractSchedule, is_scheduled::Bool) = (schedule.counter += is_scheduled; nothing)
 
 export StepSchedule
 
@@ -173,6 +176,7 @@ isscheduled(schedule::StepSchedule, clock::Clock) = isscheduled(schedule.every_n
 
 # every n time steps of size Δt (spin-up steps excluded), 0 = never
 function isscheduled(every_n_steps::Integer, clock::Clock)
+    every_n_steps > 0 || return false
     n = clock.time_step_counter
-    return every_n_steps > 0 && n > 0 && n % every_n_steps == 0
+    return (n > 0) & (n % every_n_steps == 0)
 end
