@@ -13,6 +13,8 @@ For the differentiability of our model we rely on [Enzyme.jl](https://github.com
     * Julia 1.11: Basic end-to-end differentation functionality tested and working
     * Julia 1.12: Only individual functions and components and `BarotropicModel` differentiate correctly, no end-to-end differentiation of `PrimitiveWetModel` possible at the moment
 
+    With Julia 1.12 and 1.13, use [Reactant](@ref "Differentiating with Reactant") instead.
+
 ## Differentiating through a single timestep
 
 First we initialize the model as usual (see [Time stepping](@ref time_stepping) for
@@ -59,6 +61,96 @@ dmodel.planet.gravity
 ## Differentiating longer trajectories and checkpointing 
 
 In a very similar fashion as for the [single timestep](@ref "Differentiating through a single timestep"), we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/SpeedyWeather/test/differentiability/sensitivity_examples/).
+
+## Differentiating with Reactant
+
+!!! warning "Work in progress"
+    Differentiating SpeedyWeather.jl with Reactant is still work in progress and experimental.
+
+Instead of differentiating the Julia code of the model with Enzyme directly ("vanilla Enzyme",
+as above), you can also run the model with [Reactant.jl](https://github.com/EnzymeAD/Reactant.jl)
+(see [Reactant Support](@ref "Reactant Support")) and differentiate the program that Reactant
+compiles. Enzyme then differentiates Reactant's intermediate representation (MLIR) instead of the
+Julia code. In contrast to vanilla Enzyme, this also works with Julia 1.12 and Julia 1.13.
+
+This needs a model created with the `ReactantDevice`:
+
+```julia
+using SpeedyWeather, Reactant, Enzyme
+using CUDA      # needed for Reactant to compile KernelAbstractions kernels, also on CPUs
+
+spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice(), nlayers = 8)
+spectral_transform = MatrixSpectralTransform(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; spectral_transform)
+simulation = initialize!(model)
+run!(simulation, period = Day(10))      # spin-up the model a bit
+initialize!(simulation, steps = 1)      # set the clock for one time step
+
+(; variables, model) = simulation
+```
+
+As a loss we take the squared norm of the vorticity after one time step
+
+```julia
+function loss(vars, model)
+    SpeedyWeather.time_step!(vars, model.time_stepping, model)
+    return sum(abs2, vars.prognostic.vorticity.data)
+end
+```
+
+and differentiate it with Enzyme in reverse mode, compiled with Reactant's `@jit` (or `@compile`):
+
+```julia
+dvars = make_zero(variables)
+compile_options = SpeedyWeather.reactant_compile_options(; raise_first = true)
+@jit compile_options = compile_options autodiff(Reverse, loss, Active, Duplicated(variables, dvars), Const(model))
+```
+
+`dvars.prognostic.vorticity` then holds the derivative of the loss with respect to the vorticity
+before the time step. `SpeedyWeather.reactant_compile_options()` are the options SpeedyWeather compiles
+all its programs with (`raise = true`: the KernelAbstractions kernels are raised to StableHLO as the
+remainder of the model code, and the optimization patterns in `SpeedyWeather.REACTANT_EXCLUDED_PASSES`
+excluded, see [GPU and Architectures](@ref)); the differentiation additionally needs `raise_first = true`.
+
+To differentiate through several time steps, use `SpeedyWeather.time_steps!`, which runs `n`
+time steps in one traced loop (so the compiled program contains the time step once, not `n`
+times). How the loop is differentiated is set with its keyword arguments (as Reactant's `@trace`):
+`checkpointing = false` (default) stores every time step for the reverse pass,
+`checkpointing = Reactant.Periodic(k)` stores `k` checkpoints and recomputes the time steps between
+them, and `checkpointing = Reactant.Binomial(budget)` uses binomial checkpointing with at most `budget`
+checkpoints; `mincut = true` (default) minimizes what is stored per time step
+
+```julia
+function loss(vars, model, n, checkpointing)
+    SpeedyWeather.time_steps!(Simulation(vars, model), n; checkpointing)
+    return sum(abs2, vars.prognostic.vorticity.data)
+end
+
+n = 24          # time steps
+checkpointing = Reactant.Periodic(4)
+initialize!(simulation, steps = n)
+dvars = make_zero(variables)
+compile_options = SpeedyWeather.reactant_compile_options(; raise_first = true)
+@jit compile_options = compile_options autodiff(Reverse, loss, Active,
+    Duplicated(variables, dvars), Const(model), Const(n), Const(checkpointing))
+```
+
+!!! note "Loops of few time steps"
+    Reactant unrolls traced loops of at most 4 iterations, so the checkpointing options only take
+    effect for `n > 4`. `mincut = false` currently doesn't finish compiling the gradient of the loop
+    (it is untested). Differentiating the loop needs Reactant v0.2.294 or newer.
+
+!!! note "Precision on GPUs"
+    On NVIDIA GPUs with TF32 support (e.g. A40, A100, H100) XLA runs Float32 matrix products in TF32
+    by default, which changes the results (and gradients) considerably. For gradients in Float32
+    precision see [Precision of matrix products on GPUs](@ref).
+
+The gradients with Reactant (of one time step, and of several time steps with each of the
+checkpointing options above) are compared to vanilla Enzyme on the CPU for the same state:
+in our CI for the `BarotropicModel` (`SpeedyWeather/test/reactant/differentation.jl`) and,
+as this is too slow for the CI, for the `PrimitiveWetModel` with the script
+`SpeedyWeather/test/reactant/differentiation_primitive_wet.jl` (the CI only checks that the gradient of
+several time steps of the `PrimitiveWetModel` compiles and is finite). Note that this comparison needs Julia 1.10 or 1.11 because of vanilla Enzyme, the differentiation with Reactant itself doesn't.
 
 ## Correctness 
 

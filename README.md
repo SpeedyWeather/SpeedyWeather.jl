@@ -35,6 +35,7 @@ With minimal code redundancies, it supports
 - Fast on single CPUs (x86, arm) for laptop prototyping, live demos and education
 - GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs, with Metal support for Apple Silicon
 - Automatic differentiation via Enzyme.jl for sensitivity analysis, parameter calibration and ML-physics hybrid modelling (limited to Julia 1.10 and 1.11 currently) 
+- MLIR/OpenXLA compilation with Reactant for GPU and TPU support and more efficient AD
 - A very fast and flexible spherical harmonics transform library SpeedyTransforms.jl for CPU and GPU
 
 **User interface**
@@ -90,7 +91,6 @@ On our TODO list are
 Currently in development, but already (partially) available are
 
 - Better CPU multi-threading support
-- MLIR/OpenXLA compilation with Reactant
 
 ## Contributing
 

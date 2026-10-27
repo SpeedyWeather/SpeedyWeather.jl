@@ -56,9 +56,8 @@ function output!(
     u_or_v10 = simulation.variables.scratch.grid.b_2D
 
     # Compute z_bottom as z_surf + T_bottom * R/g * log(pₛ/p_full_bottom), start with z_surf
-    z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
+    z_bottom .= max.(simulation.model.orography.orography, zero(eltype(z_bottom)))   # [m] set negative values to zero
     T = get_prognostic_step(simulation.variables.grid.temperature, simulation.model.time_stepping, output)
-    T_bottom = field_view(T, :, nlayers)
     R_dry = simulation.model.atmosphere.R_dry
     g = simulation.model.planet.gravity
     coord = simulation.model.geometry.vertical_coordinates
@@ -66,7 +65,11 @@ function output!(
 
     # R/g * log(pₛ/p_full_bottom): for sigma coords this is constant (= Δp_geopot_full[end]/g);
     # for hybrid it varies per grid point since p_full_bottom = A*p_ref + B*pₛ.
-    @. z_bottom += T_bottom * (R_dry / g) * log(pₛ / pressure(nlayers, pₛ, coord))
+    # In a kernel so that the layer index stays an integer (Reactant traces numbers in broadcasts)
+    launch!(
+        architecture(z_bottom), LinearWorkOrder, size(z_bottom), bottom_layer_height_kernel!,
+        z_bottom, T, pₛ, coord, nlayers, R_dry / g
+    )
 
     # Compute u10, TODO should this be the same z₀ as in vertical diffusion or surface fluxes?
     z₀ = simulation.variables.parameterizations.momentum_roughness
@@ -79,6 +82,13 @@ function output!(
     interpolate_output!(output, output.field2D, u_or_v10)
     write_output!(output, variable, output.field2D, output.host2D)
     return nothing
+end
+
+# add the height of the bottom layer k above the surface, T_k * R/g * log(pₛ/p_k), to z_bottom
+@kernel inbounds = true function bottom_layer_height_kernel!(z_bottom, temperature, surface_pressure, coordinate, k, R_dry_over_g)
+    ij = @index(Global, Linear)
+    pₛ = surface_pressure[ij]
+    z_bottom[ij] += temperature[ij, k] * R_dry_over_g * log(pₛ / pressure(k, pₛ, coordinate))
 end
 
 """Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.

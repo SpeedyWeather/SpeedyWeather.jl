@@ -186,6 +186,70 @@ end
     end
 end
 
+# `unsafe = true` only skips the checks on the input latitudes (e.g. for Reactant, which can't
+# trace them, or for coordinates that are in range by construction), it never indexes out of bounds
+@testset "update_locator! with and without safety checks (unsafe)" begin
+    locator_arrays(L) = (L.js, L.ij_as, L.ij_bs, L.ij_cs, L.ij_ds, L.Δys, L.Δabs, L.Δcds)
+
+    @testset for NF in (Float32, Float64)
+        @testset for Grid in (
+                FullGaussianGrid,
+                FullClenshawGrid,
+                OctahedralGaussianGrid,
+                OctahedralClenshawGrid,
+                OctaminimalGaussianGrid,
+                HEALPixGrid,
+                OctaHEALPixGrid,
+            )
+            grid = Grid(4)
+            (; nlat, npoints) = RingGrids.GridGeometry(grid; NF)
+
+            # valid latitudes incl the poles, just inside the poles, on and between rings
+            latd = NF.(RingGrids.get_latd(grid))
+            θs = vcat(
+                NF[90, prevfloat(NF(90)), 0, nextfloat(NF(-90)), -90],
+                latd, (latd[1:(end - 1)] .+ latd[2:end]) / 2, 180 * rand(NF, 50) .- 90,
+            )
+            # any longitude is valid as it's periodic, incl. negative and ≥ 360˚
+            λs = vcat(NF[0, 360, prevfloat(NF(360)), -eps(NF), 720], 720 * rand(NF, length(θs) - 5) .- 360)
+
+            I_safe = RingGrids.interpolator(grid, length(θs); NF)
+            I_unsafe = RingGrids.interpolator(grid, length(θs); NF)
+            RingGrids.update_locator!(I_safe, λs, θs, unsafe = false)
+            RingGrids.update_locator!(I_unsafe, λs, θs, unsafe = true)
+
+            # identical for valid latitudes, i.e. the checks don't change the result
+            @test all(map(==, locator_arrays(I_safe.locator), locator_arrays(I_unsafe.locator)))
+            @test all(0 .<= I_safe.locator.js .<= nlat)
+            @test all(0 .<= I_safe.locator.Δys .<= 1)
+
+            # invalid latitudes: thrown with the safety checks
+            θs_invalid = NF[90.5, -90.5, 1000, -Inf, NaN]
+            λs_invalid = NF[10, 20, 30, 40, NaN]
+            I = RingGrids.interpolator(grid, 1; NF)
+            for (λ, θ) in zip(λs_invalid, θs_invalid)
+                @test_throws ArgumentError RingGrids.update_locator!(I, [λ], [θ], unsafe = false)
+            end
+
+            # without the checks: north of 90˚N clamped to the north pole, south of -90˚N to
+            # the south pole (extrapolated with Δy outside of [0, 1]), NaN to the north pole
+            I = RingGrids.interpolator(grid, length(θs_invalid); NF)
+            RingGrids.update_locator!(I, λs_invalid, θs_invalid, unsafe = true)
+            (; js, ij_as, ij_bs, ij_cs, ij_ds, Δys) = I.locator
+            @test js == [0, nlat, 0, nlat, 0]
+            @test Δys[1] < 0 && Δys[2] > 1 && isnan(Δys[5])
+
+            # but all indices stay in bounds (0 flags the north pole, -1 the south pole)
+            @test all(ij -> ij == 0 || 1 <= ij <= npoints, vcat(ij_as, ij_bs))
+            @test all(ij -> ij == -1 || 1 <= ij <= npoints, vcat(ij_cs, ij_ds))
+            Aout = zeros(NF, length(θs_invalid))
+            interpolate!(Aout, rand(NF, grid), I)       # no BoundsError (tests run with --check-bounds=yes)
+            @test all(isfinite, Aout[1:3])
+            @test isnan(Aout[5])
+        end
+    end
+end
+
 @testset "Interpolate between grids" begin
     @testset for NF in (Float32, Float64)
         @testset for Grid in (

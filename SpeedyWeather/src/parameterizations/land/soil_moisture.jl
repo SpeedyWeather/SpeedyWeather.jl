@@ -91,7 +91,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF = Float32)
-    interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
+    @maybe_jit model.architecture interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
     return nothing
 end
 
@@ -118,18 +118,9 @@ function timestep!(
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
-    (; time) = vars.prognostic.clock
-
-    this_month = Dates.month(time)
-    next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
-
-    # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
-    NF = eltype(vars.prognostic.land.soil_moisture)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
-
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = vars.prognostic.land
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time, eltype(soil_moisture))
 
     launch!(
         architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
@@ -208,8 +199,9 @@ function initialize!(
     masked_value = soil.ocean_moisture
     if soil.mask
         # TODO: broadcasting over views of Fields of GPUArrays doesn't work
+        # broadcast instead of logical indexing, which falls back to scalar indexing on Reactant
         sm = vars.prognostic.land.soil_moisture.data
-        sm[isnan.(sm)] .= masked_value
+        sm .= ifelse.(isnan.(sm), masked_value, sm)
         mask!(vars.prognostic.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
     return nothing
