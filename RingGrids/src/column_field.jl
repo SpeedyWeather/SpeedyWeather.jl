@@ -35,7 +35,8 @@ const ReducedColumnField = ColumnField{T, N, ArrayType, Grid} where {T, N, Array
 # default constructors
 ColumnField(grid::AbstractGrid, k...) = transpose(zeros(grid, k...))
 ColumnField(::Type{T}, grid::AbstractGrid, k...) where {T} = transpose(zeros(T, grid, k...))
-(::Type{<:ColumnField{T}})(data::AbstractArray, grid::AbstractGrid) where {T} = ColumnField(T.(data), grid)
+(::Type{<:ColumnField{T}})(data::AbstractArray, grid::AbstractGrid) where {T} =
+    ColumnField(eltype(data) === T ? data : T.(data), grid)
 
 default_column_field_dimensions(::AbstractVector) = ArrayDimensions.XY()
 default_column_field_dimensions(::AbstractArray) = ArrayDimensions.ZXY()

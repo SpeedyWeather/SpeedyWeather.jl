@@ -347,9 +347,11 @@ max_transform_batch(nlayers::Integer) = 9 * nlayers + 1
 
 """$(TYPEDSIGNATURES)
 Chooses the transform based on resolution and architecture. For low-resolution
-GPU a MatrixSpectralTransform is returned, otherwise the SpectralTransform."""
+GPU a MatrixSpectralTransform is returned, otherwise the SpectralTransform. On Reactant
+always the SpectralTransform: it computes the Fourier transform as a truncated DFT up to
+`DFT_MAX_TRUNCATION` (matrix multiplies that XLA can accelerate more efficently)."""
 function WhichTransform(spectral_grid::SpectralGrid; kwargs...)
-    if (spectral_grid.truncation <= 64 && spectral_grid.architecture isa GPU) || spectral_grid.architecture isa ReactantDevice
+    if (spectral_grid.truncation <= 100 && spectral_grid.architecture isa GPU)
         return MatrixSpectralTransform(spectral_grid; kwargs...)
     else
         return SpectralTransform(spectral_grid; kwargs...)
@@ -361,10 +363,12 @@ Default `transform_batch` for a `SpectralGrid`. Architecture-dependent because:
 
 - On CPU, batched FFT plans give negligible speedup, default: `[1, nlayers]` — matches the pre-multiplexing system.
 
-- On GPU, batched plans are essential, the default corresponds to the transforms needed for the `PrimitiveWetModel`:
-  `[1, 2, nlayers, 2*nlayers, 4*nlayers + 1]` — covers single-layer (`1`), the surface-pressure
-  gradient pair (`2`), one variable (`L`), U/V together (`2L`), and the prognostic batch
-  (`4L + 1`), 6L+1 and 9L+1 (tendency batch)
+- On GPU, batched plans are essential, the default corresponds to the transforms needed for the models:
+  `[1, nlayers, 2*nlayers, 2*nlayers + 2, 4*nlayers + 1, 6*nlayers + 1, 9*nlayers + 1]` — covers
+  single-layer (`1`), one variable (`L`), the u, v tendencies of the barotropic model (`2L`), U/V
+  together with the surface-pressure gradient pair in primitive equation models (`2L + 2`), the
+  prognostic batch (`4L + 1`) and the tendency batches of the dry and wet primitive equation models
+  (`6L + 1`, `9L + 1`)
 
 On GPU, if a transform is hit with a K not in `transform_batch`, the transform plans are re-allocated to avoid 
 slow transform performance during model runs. 
@@ -372,7 +376,7 @@ slow transform performance during model runs.
 default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_transform_batch(typeof(arch), nlayers)
 default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]
 default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) =
-    Int[1, 2, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, max_transform_batch(nlayers)]
+    Int[1, nlayers, 2 * nlayers, 2 * nlayers + 2, 4 * nlayers + 1, 6 * nlayers + 1, max_transform_batch(nlayers)]
 
 function variables(::SpeedyTransforms.AbstractSpectralTransform)
     return (

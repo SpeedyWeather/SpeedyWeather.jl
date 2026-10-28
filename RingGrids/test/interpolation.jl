@@ -31,6 +31,21 @@ import Statistics
     end
 end
 
+@testset "Interpolate constant field, mixed precision and layers" begin
+    # Float64 data with a (default) Float32 interpolator whose pole-average buffers fit all
+    # layers: the pole averages must not be rounded to Float32, or constants are lost
+    grid_in, grid_out = OctahedralGaussianGrid(8), FullGaussianGrid(12)
+    nlayers = 3
+    c = randn(Float64)
+    A = fill!(Field(Float64, grid_in, nlayers), c)
+    Aout = zeros(Float64, grid_out, nlayers)
+
+    interpolator = RingGrids.interpolator(grid_out, grid_in; nlayers)
+    @test eltype(interpolator.locator.north_pole_average) == Float32
+    RingGrids.interpolate!(Aout, A, interpolator)
+    @test all(a -> a ≈ c, Aout)
+end
+
 @testset "Interpolate zonally-constant field" begin
     npoints = 1000
 
@@ -167,6 +182,70 @@ end
                 @test j == r[i] - 1
                 @test Δref ≈ Δ
             end
+        end
+    end
+end
+
+# `unsafe = true` only skips the checks on the input latitudes (e.g. for Reactant, which can't
+# trace them, or for coordinates that are in range by construction), it never indexes out of bounds
+@testset "update_locator! with and without safety checks (unsafe)" begin
+    locator_arrays(L) = (L.js, L.ij_as, L.ij_bs, L.ij_cs, L.ij_ds, L.Δys, L.Δabs, L.Δcds)
+
+    @testset for NF in (Float32, Float64)
+        @testset for Grid in (
+                FullGaussianGrid,
+                FullClenshawGrid,
+                OctahedralGaussianGrid,
+                OctahedralClenshawGrid,
+                OctaminimalGaussianGrid,
+                HEALPixGrid,
+                OctaHEALPixGrid,
+            )
+            grid = Grid(4)
+            (; nlat, npoints) = RingGrids.GridGeometry(grid; NF)
+
+            # valid latitudes incl the poles, just inside the poles, on and between rings
+            latd = NF.(RingGrids.get_latd(grid))
+            θs = vcat(
+                NF[90, prevfloat(NF(90)), 0, nextfloat(NF(-90)), -90],
+                latd, (latd[1:(end - 1)] .+ latd[2:end]) / 2, 180 * rand(NF, 50) .- 90,
+            )
+            # any longitude is valid as it's periodic, incl. negative and ≥ 360˚
+            λs = vcat(NF[0, 360, prevfloat(NF(360)), -eps(NF), 720], 720 * rand(NF, length(θs) - 5) .- 360)
+
+            I_safe = RingGrids.interpolator(grid, length(θs); NF)
+            I_unsafe = RingGrids.interpolator(grid, length(θs); NF)
+            RingGrids.update_locator!(I_safe, λs, θs, unsafe = false)
+            RingGrids.update_locator!(I_unsafe, λs, θs, unsafe = true)
+
+            # identical for valid latitudes, i.e. the checks don't change the result
+            @test all(map(==, locator_arrays(I_safe.locator), locator_arrays(I_unsafe.locator)))
+            @test all(0 .<= I_safe.locator.js .<= nlat)
+            @test all(0 .<= I_safe.locator.Δys .<= 1)
+
+            # invalid latitudes: thrown with the safety checks
+            θs_invalid = NF[90.5, -90.5, 1000, -Inf, NaN]
+            λs_invalid = NF[10, 20, 30, 40, NaN]
+            I = RingGrids.interpolator(grid, 1; NF)
+            for (λ, θ) in zip(λs_invalid, θs_invalid)
+                @test_throws ArgumentError RingGrids.update_locator!(I, [λ], [θ], unsafe = false)
+            end
+
+            # without the checks: north of 90˚N clamped to the north pole, south of -90˚N to
+            # the south pole (extrapolated with Δy outside of [0, 1]), NaN to the north pole
+            I = RingGrids.interpolator(grid, length(θs_invalid); NF)
+            RingGrids.update_locator!(I, λs_invalid, θs_invalid, unsafe = true)
+            (; js, ij_as, ij_bs, ij_cs, ij_ds, Δys) = I.locator
+            @test js == [0, nlat, 0, nlat, 0]
+            @test Δys[1] < 0 && Δys[2] > 1 && isnan(Δys[5])
+
+            # but all indices stay in bounds (0 flags the north pole, -1 the south pole)
+            @test all(ij -> ij == 0 || 1 <= ij <= npoints, vcat(ij_as, ij_bs))
+            @test all(ij -> ij == -1 || 1 <= ij <= npoints, vcat(ij_cs, ij_ds))
+            Aout = zeros(NF, length(θs_invalid))
+            interpolate!(Aout, rand(NF, grid), I)       # no BoundsError (tests run with --check-bounds=yes)
+            @test all(isfinite, Aout[1:3])
+            @test isnan(Aout[5])
         end
     end
 end
@@ -430,8 +509,9 @@ end
         grid_in, grid_out = Grid(8), Grid(12)
         rings = grid_in.rings
 
-        # data in a different number format than the interpolator, as for the model output
-        @testset for (NF_data, NF_interp) in ((Float32, Float32), (Float64, Float64), (Float64, Float32))
+        # data in a different number format than the interpolator, (Float32, Float64) uses the
+        # buffers, (Float64, Float32) doesn't to keep the precision of the data
+        @testset for (NF_data, NF_interp) in ((Float32, Float32), (Float64, Float64), (Float32, Float64), (Float64, Float32))
             field_in = randn(NF_data, grid_in, nlayers)
             out_buffers = zeros(NF_data, grid_out, nlayers)
             out_fallback = zeros(NF_data, grid_out, nlayers)
@@ -448,9 +528,15 @@ end
             # interpolator's number format, which is the precision the comparison can expect
             @test isapprox(out_buffers.data, out_fallback.data, rtol = sqrt(eps(NF_interp)))
 
-            # buffers hold the pole averages, so the non-allocating path was taken
-            @test I_buffers.locator.north_pole_average ≈ vec(Statistics.mean(field_in.data[rings[1], :], dims = 1))
-            @test I_buffers.locator.south_pole_average ≈ vec(Statistics.mean(field_in.data[rings[end], :], dims = 1))
+            if promote_type(NF_data, NF_interp) == NF_interp
+                # buffers hold the pole averages, so the non-allocating path was taken
+                @test I_buffers.locator.north_pole_average ≈ vec(Statistics.mean(field_in.data[rings[1], :], dims = 1))
+                @test I_buffers.locator.south_pole_average ≈ vec(Statistics.mean(field_in.data[rings[end], :], dims = 1))
+            else
+                # buffers less precise than the data are left untouched, the allocating
+                # fallback averages in the data's number format instead
+                @test all(iszero, I_buffers.locator.north_pole_average)
+            end
 
             # too small buffers are left untouched, the allocating fallback was taken
             @test all(iszero, I_fallback.locator.north_pole_average)

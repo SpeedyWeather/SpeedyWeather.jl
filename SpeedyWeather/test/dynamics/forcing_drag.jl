@@ -4,7 +4,7 @@
     # 2D models
     spectral_grid = SpectralGrid(truncation = 43, nlayers = 1)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
-    add!(output, SpeedyWeather.RandomPatternOutput())
+    add!(output, OutputVariables.RandomPattern())
     drag = LinearVorticityDrag(spectral_grid)
     forcing = StochasticStirring(spectral_grid)
     random_process = SpectralAR1Process(spectral_grid, time_scale = Day(2))
@@ -26,7 +26,7 @@ end
     # 3D models
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
-    add!(output, SpeedyWeather.RandomPatternOutput())
+    add!(output, OutputVariables.RandomPattern())
     drag = LinearVorticityDrag(spectral_grid)
     forcing = StochasticStirring(spectral_grid)
     random_process = SpectralAR1Process(spectral_grid, time_scale = Day(2))

@@ -21,9 +21,10 @@ import Base: @propagate_inbounds
 using SpeedyWeatherInternals
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.KernelLaunching
-import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU,
+import SpeedyWeatherInternals.Utils: reactant_compile_options, REACTANT_EXCLUDED_PASSES
+import SpeedyWeatherInternals.Architectures: AbstractArchitecture, AbstractCPU, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
-export CPU, GPU, on_architecture, architecture                # export device functions
+export CPU, GPU, ReactantDevice, on_architecture, architecture        # export device functions
 export SpeedyWeatherInternals, Architectures, KernelLaunching, ArrayDimensions
 
 # INPUT OUTPUT
@@ -43,7 +44,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 
 # UTILITIES
 export Utils
-import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs, set_scalar!
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets
@@ -112,7 +113,10 @@ import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 export animate, globe
 function animate end
 
-# constructors to be defined in Terrarium extension
+# output variables, e.g. OutputVariables.Temperature()
+export OutputVariables
+
+# deprecated, use OutputVariables.Terrarium, to be defined in Terrarium extension
 export TerrariumOutput
 
 # constructor to be extended by packages that define parameterizations
@@ -141,6 +145,7 @@ include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("time_stepping/clock.jl")
+include("time_stepping/schedules.jl")
 include("variables/set.jl")
 
 # MODEL COMPONENTS
@@ -178,6 +183,8 @@ include("parameterizations/large_scale_condensation.jl")
 include("parameterizations/surface_fluxes/boundary_layer.jl")
 include("parameterizations/surface_fluxes/surface_roughness.jl")
 include("parameterizations/surface_fluxes/surface_condition.jl")
+include("parameterizations/surface_fluxes/neutral_wind.jl")
+include("parameterizations/surface_fluxes/drag.jl")
 include("parameterizations/surface_fluxes/momentum.jl")
 include("parameterizations/surface_fluxes/heat.jl")
 include("parameterizations/surface_fluxes/humidity.jl")
@@ -206,7 +213,6 @@ include("parameterizations/land/vegetation.jl")
 include("parameterizations/land/rivers.jl")
 
 # OUTPUT
-include("output/schedule.jl")
 include("output/callbacks.jl")
 include("output/feedback.jl")
 include("output/vertical_interpolation.jl")

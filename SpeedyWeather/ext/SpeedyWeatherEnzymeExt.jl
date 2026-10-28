@@ -24,12 +24,14 @@ end
 # implement make_zero where the default one fails
 
 # this lock is part of the ProgressMeter that's part of the Feedback of all models
+# dispatch on T <: ProgressCore as ProgressMeter v1.12 made it parametric (ProgressCore{O<:IO})
+# and Type{} is invariant, so Type{ProgressCore} would not match Type{ProgressCore{IO}}
 @inline function Enzyme.make_zero(
-        ::Type{ProgressMeter.ProgressCore},
+        ::Type{T},
         seen::IdDict,
-        prev::ProgressMeter.ProgressCore,
+        prev::T,
         ::Val{copy_if_inactive} = Val(false),
-    )::ProgressMeter.ProgressCore where {copy_if_inactive}
+    )::T where {T <: ProgressMeter.ProgressCore, copy_if_inactive}
     return prev
 end
 
