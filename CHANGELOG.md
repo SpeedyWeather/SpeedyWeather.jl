@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recompute the Legendre polynomials on the fly instead of precomputing them, via a new `recompute_legendre` keyword of `SpectralTransform` and a new `SpeedyTransforms.ScaledLegendre` module, turning their `O(T³)` memory into `O(T²)` [#1244](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1244)
 - Bump SpeedyWeatherInternals to v1.0.1 [#1361](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1361)
 - `ParameterEditing.parameters` and `reconstruct` support `Tuple`s, keying elements by their 1-based index; parameters nested in a tuple were previously dropped silently [#1352](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1352)
 - `DiagnosticClouds` convert the rain rate from m/s to mm/day correctly, the precipitation contribution to the cloud cover was 1e6 too small [#1351](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1351)

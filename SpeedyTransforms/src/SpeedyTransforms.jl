@@ -59,6 +59,11 @@ export power_spectrum
 # UTILS
 export wrapped_view
 
+include("scaled_legendre.jl")
+using .ScaledLegendre
+
+include("legendre_polynomials.jl")
+
 include("aliasing.jl")
 include("legendre_shortcuts.jl")
 include("scratch_memory.jl")

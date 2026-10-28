@@ -4,7 +4,9 @@ using LowerTriangularArrays
 using JET
 using Test
 
+include("scaled_legendre.jl")
 include("spectral_transform.jl")
+include("recompute_legendre.jl")
 include("type_name_length.jl")
 include("dispatch.jl")
 include("spectral_gradients.jl")
