@@ -47,6 +47,9 @@ function initialize!(vars::Variables, model::AbstractModel)
     # green house gases are function of time only, just do one "timestep"
     greenhouse_gases_time_step!(vars, model)
 
+    # initialize diagnostics in variables.output before StartFromFile may restore them from a restart file
+    hasproperty(model, :diagnostics) && initialize!(vars, model.diagnostics, model)
+
     # then atmosphere as this may include initial conditions like StartFromFile
     # which would contain ocean/land initial conditions that should overwrite the above if they are included
     initialize!(vars, model.initial_conditions, model)
@@ -746,7 +749,8 @@ StartFromFile(SG::SpectralGrid; kwargs...) = StartFromFile(; kwargs...)
 """
 $(TYPEDSIGNATURES)
 Restart from a previous SpeedyWeather.jl simulation via the restart file `restart.jld2`.
-Applies interpolation in the horizontal but not in the vertical."""
+Applies interpolation in the horizontal but not in the vertical. Restores the prognostic
+variables and, if present, the output variables, e.g. to continue accumulated precipitation."""
 function initialize!(
         vars::Variables,
         initial_conditions::StartFromFile,
@@ -770,6 +774,10 @@ function initialize!(
             "but currently used is $(pkgversion(SpeedyWeather))"
     end
     copy_variables!(vars.prognostic, progn_old)
+
+    # continue accumulations and other diagnostics in variables.output if present (only the ones in both)
+    haskey(restart_file, "variables.output") && copy_variables!(vars.output, restart_file["variables.output"])
+    close(restart_file)
     return nothing
 end
 

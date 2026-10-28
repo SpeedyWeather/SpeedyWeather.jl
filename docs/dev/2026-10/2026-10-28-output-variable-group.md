@@ -1,6 +1,6 @@
 # Output variable group and model diagnostics
 
-> Status: **in progress**. Part 1 (`OutputVariable` and `variables.output`) is implemented; part 2 (`model.diagnostics`) is a proposal awaiting sign-off.
+> Status: **in progress**. `OutputVariable`, `variables.output` and `model.diagnostics` with `Accumulate` and `DailyMaximum` are implemented; "rate since last output" and monthly means are future work.
 
 Date of initial draft: 2026-10-28
 
@@ -22,6 +22,13 @@ Base revision: e292baf012d70813f9eab23081661bf1e168c3fb
 
 - 2026-10-28: Split into part 1 (implemented in this PR) and part 2 (design only, needs sign-off).
 - 2026-10-28: Option A chosen (the diagnostic owns its reset schedule). Option B dropped: a model has only one output writer.
+- 2026-10-28: Signed off: (1) `variables.output` is written to and restored from restart files,
+  (2) parameterizations only write rates, accumulation moves into `Accumulate` diagnostics.
+  Requested in addition: a `DailyMaximum` diagnostic to illustrate a non-accumulating diagnostic.
+  Part 2 implemented in the same PR.
+
+> Yes to 1 and 2. Can you also implement something like a DailyMaximum diagnostic just to
+> illustrate how a non-accumulating diagnostic would be set up?
 
 ## Problem description
 
@@ -64,7 +71,7 @@ filters all declared variables by that type and allocates them into the group.
 The instantaneous rates (`rain_rate`, `snow_rate`, `*_rate_convection`, …) stay in
 `parameterizations` because the land/snow/cloud schemes read them.
 
-### Part 2 (proposal, not implemented)
+### Part 2 (implemented, as proposed below)
 
 A `diagnostics` field in the primitive equation models (and later all models), a `NamedTuple` of
 `AbstractDiagnostic <: AbstractModelComponent`s, e.g.
@@ -95,27 +102,54 @@ read `variables.output`, but they only read and never reset.
 With this, the post-hoc `AbstractRateOutputVariable` diff in NetCDF `finalize!` can be replaced by
 an on-the-fly "accumulated since last output / elapsed time" diagnostic that works for every writer.
 
-Open questions for sign-off: whether `output` should be written to restart files
-(for continuous accumulations across restarts); whether existing parameterization accumulations
-(`rain_convection += …`) should move into a diagnostic that accumulates the instantaneous rate
-instead, so the parameterizations only write rates.
+Implemented (`output/diagnostics.jl`):
+
+- `AbstractDiagnostic`, `diagnostic!(vars, diagnostic, model)` and `initialize!(vars, diagnostic, model)`
+  fallbacks; `diagnostics!(vars, model)` called in `time_step!(simulation)` after the clock is
+  stepped (so spin-up steps are included, as before) and before `output!`.
+- `diagnostics::DG` field in `PrimitiveWetModel` (default `PrecipitationDiagnostics()`) and
+  `PrimitiveDryModel` (default `(;)`). `initialize!(model.diagnostics, model)` in the model's
+  `initialize!`, `initialize!(vars, model.diagnostics, model)` before the initial conditions so
+  `StartFromFile` can overwrite them.
+- `Accumulate(rate, name; namespace, units, desc)`: adds `Δt * rate` every time step, `Δt` being
+  `model.time_stepping.Δt` that the parameterizations used to compute their rates, so results are
+  unchanged. Also declares the rate so that it works (as zero) when the component is `nothing`.
+- `PrecipitationDiagnostics()`: `Accumulate`s for large-scale and convective rain and snow and
+  `land.river_runoff`. Convection and large-scale condensation no longer accumulate; the soil
+  moisture filter writes a new `land.river_runoff_rate` [m/s] instead of accumulating.
+- `DailyMaximum(; variable, group, namespace, name, units, schedule)`: running maximum
+  `<name>_running` (initialized to -Inf), copied to `<name>` (initialized to NaN) and reset when
+  `schedule` (`PeriodicSchedule(every = Day(1))`) is scheduled, branchless for Reactant.
+- Restart files store `variables.output`, `StartFromFile` restores the entries present in both.
+
+Not yet: "rate since last output" (a diagnostic resetting on the output schedule) and monthly means.
 
 ## Testing and verification
 
 - `test/variables/variables.jl`: new testset checking the moved variables live in `vars.output`
   and not in `vars.parameterizations`, `OutputVariable` type.
 - Existing convection, large-scale condensation, land time stepping and output tests updated to
-  the new paths and run.
+  the new paths and run; convection and soil moisture tests now check rates × Δt.
+- `test/output/diagnostics.jl`: `Accumulate` adds `Δt * rate` and works without convection,
+  `DailyMaximum` running maximum and end-of-day reset (unit and in a 30h run), restart round trip
+  of `variables.output`.
 
 ## Documentation changes
 
 `docs/src/variables.md` and `docs/src/variable_system.md` list the new `output` group and
-`OutputVariable`; `docs/src/examples_3D.md` uses `simulation.variables.output`.
+`OutputVariable`; `docs/src/examples_3D.md` uses `simulation.variables.output`. New page
+`docs/src/diagnostics.md` on default, added and custom diagnostics.
 
 ## Known limitations
 
 Breaking for user code accessing `simulation.variables.parameterizations.rain_convection` etc.
+Passing `diagnostics` replaces the defaults, so precipitation needs `PrecipitationDiagnostics()...`
+merged in, otherwise e.g. `ConvectiveRain` output fails. `DailyMaximum` is 2D only.
+Barotropic and shallow water models have no `diagnostics` yet.
 
 ## Future work
 
-Part 2 above after sign-off.
+- "Rate since last output" diagnostic bound to `model.output.interval`, replacing the post-hoc
+  `AbstractRateOutputVariable` diff in the NetCDF `finalize!`.
+- Time means over calendar periods (monthly mean temperature), needs a calendar-aware schedule.
+- `diagnostics` for barotropic and shallow water models.

@@ -163,8 +163,6 @@ and relaxes current vertical profiles to the adjusted references."""
     )
 
     # Store precipitation in diagnostic arrays
-    vars.output.rain_convection[ij] += rain_convection            # accumulated rain [m] for output
-    vars.output.snow_convection[ij] += snow_convection            # accumulated snow [m] for output
     rain_rate_convection = rain_convection / Δt                     # instantaneous rate [m/s] for coupling
     snow_rate_convection = snow_convection / Δt                     # instantaneous rate [m/s] for coupling
     vars.parameterizations.rain_rate_convection[ij] = rain_rate_convection   # instantaneous rate [m/s] for coupling
@@ -182,9 +180,7 @@ end
 
 function variables(::BettsMillerConvection)
     return (
-        OutputVariable(:rain_convection, Grid2D(), desc = "Convective precipitation (accumulated)", units = "m"),
         ParameterizationVariable(:rain_rate_convection, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
-        OutputVariable(:snow_convection, Grid2D(), desc = "Convective precipitation (snow, accumulated)", units = "m"),
         ParameterizationVariable(:snow_rate_convection, Grid2D(), desc = "Convective snow rate", units = "m/s"),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
         ParameterizationVariable(:snow_rate, Grid2D(), desc = "Snow rate (large-scale + convection)", units = "m/s"),

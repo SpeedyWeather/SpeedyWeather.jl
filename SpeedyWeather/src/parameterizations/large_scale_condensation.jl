@@ -29,8 +29,6 @@ initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 
 function variables(::ImplicitCondensation)
     return (
-        OutputVariable(:rain_large_scale, Grid2D(), desc = "Large-scale precipitation (rain, accumulated)", units = "m"),
-        OutputVariable(:snow_large_scale, Grid2D(), desc = "Large-scale precipitation (snow, accumulated)", units = "m"),
         ParameterizationVariable(:rain_rate_large_scale, Grid2D(), desc = "Large-scale precipitation (rain)", units = "m/s"),
         ParameterizationVariable(:snow_rate_large_scale, Grid2D(), desc = "Large-scale precipitation (snow)", units = "m/s"),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
@@ -162,10 +160,6 @@ large-scale precipitation vertically for output."""
     # avoid negative precipitation from rounding errors
     rain_flux_down = max(rain_flux_down, 0)
     snow_flux_down = max(snow_flux_down, 0)
-
-    # precipitation from rain/snow [m] during time step whatever is fluxed out
-    vars.output.rain_large_scale[ij] += Δt * rain_flux_down
-    vars.output.snow_large_scale[ij] += Δt * snow_flux_down
 
     # and the rain/snow fall rate [m/s]
     vars.parameterizations.rain_rate_large_scale[ij] = rain_flux_down

@@ -31,6 +31,7 @@ function time_step!(simulation::AbstractSimulation, time_stepping::AbstractTimeS
     time_step!(clock, time_stepping)                # then step the clock forward
 
     progress!(feedback, variables, model)           # updates the progress meter bar
+    diagnostics!(variables, model)                  # accumulate or update diagnostics for output
     output!(output, simulation)                     # do output?
     callback!(model.callbacks, variables, model)    # any callbacks?
     return nothing
