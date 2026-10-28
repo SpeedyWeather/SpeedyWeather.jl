@@ -145,7 +145,7 @@ end
 
     soil_moisture = variables.prognostic.land.soil_moisture
     R = variables.parameterizations.land.river_runoff_rate
-    (; Δt) = model.time_stepping
+    Δt = SpeedyWeather.elapsed_time(model.time_stepping, variables.prognostic.clock)   # model time of this step as in filter!
     soil_moisture[ij, 1, :] .= 1.2     # 0.2 excess in top layer
     soil_moisture[ij, 2, :] .= 0.5
     R[ij] = 0
