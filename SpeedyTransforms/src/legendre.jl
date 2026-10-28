@@ -227,6 +227,13 @@ function _legendre!(                        # GRID TO SPECTRAL
     end
 end
 
+"""$(TYPEDSIGNATURES)
+Legendre polynomials in the dense layout of the Legendre transform on Reactant (one batched matrix
+multiply per direction, see SpeedyTransformsReactantExt). Not used on other architectures, an empty
+vector there."""
+dense_legendre_polynomials(architecture::AbstractArchitecture, legendre_polynomials::LowerTriangularArray, mmax_truncation) =
+    on_architecture(architecture, zeros(eltype(legendre_polynomials), 0))
+
 """
 $(TYPEDSIGNATURES)
 Unscale by cosine of latitude on the fly.

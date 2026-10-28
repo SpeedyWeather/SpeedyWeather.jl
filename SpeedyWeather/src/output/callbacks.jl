@@ -107,6 +107,14 @@ add!(model::AbstractModel, callbacks::AbstractCallback...) =
 # adding via tuple splats the tuple
 add!(model::AbstractModel, tuple::Tuple) = add!(model, tuple...)
 
+# adding several tuples adds one after another
+function add!(output::AbstractModel, tuples::Tuple...)
+    for tuple in tuples
+        add!(output, tuple)
+    end
+    return output
+end
+
 # delete!(dict, key) already defined in Base
 
 export GlobalSurfaceTemperatureCallback

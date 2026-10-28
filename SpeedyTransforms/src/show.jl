@@ -12,6 +12,9 @@ function prettymemory(b)
     return string(@sprintf("%.2f", value), " ", units)
 end
 
+# memory of the data of an array: `sizeof` of a Reactant array is the size of its wrapper, not of its data
+nbytes(A::AbstractArray) = length(A) * sizeof(eltype(A))
+
 function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     (; spectrum, grid, nlayers, architecture) = S
     (; lmax, mmax) = spectrum   # 1-based max degree/order of harmonics
@@ -20,13 +23,15 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
 
     # add information about size of Legendre polynomials and scratch memory
     # (precomputed: includes the transposed copy the GPU inverse transform reads, empty on CPU;
-    # recomputed: the much smaller recursion coefficients/sectoral starting values, see legendre_polynomials.jl)
-    polysize_str = prettymemory(legendre_memory_size(S.legendre)) * " ($(legendre_mode(S.legendre)))"
+    # recomputed: the much smaller recursion coefficients/sectoral starting values, see legendre_polynomials.jl;
+    # plus the dense copy on Reactant, empty elsewhere)
+    polysize_str = prettymemory(legendre_memory_size(S.legendre) + nbytes(S.legendre_polynomials_dense)) *
+        " ($(legendre_mode(S.legendre)))"
     memorysize_str = prettymemory(
-        sizeof(S.scratch_memory.north) +      # add all scratch_memories
-            sizeof(S.scratch_memory.south) +
-            sizeof(S.scratch_memory.column.north) +
-            sizeof(S.scratch_memory.column.south)
+        nbytes(S.scratch_memory.north) +      # add all scratch_memories
+            nbytes(S.scratch_memory.south) +
+            nbytes(S.scratch_memory.column.north) +
+            nbytes(S.scratch_memory.column.south)
     )
 
     dealias = get_dealiasing(mmax, nlat_half)
@@ -39,6 +44,10 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     println(io, styled"├ {info:Spectral}:     T$mmax, $(lmax)x$(mmax) LowerTriangularMatrix{note:\{Complex\{$NF\}\}}")
     println(io, styled"├ {info:Grid}:         Field{note:\{$NF\}}, $(RingGrids.get_nlat(grid))-ring $Grid")
     println(io, styled"├ {info:Truncation}:   dealiasing = $dealiasing {note:($truncation)}")
+    if S.fourier_dft    # Fourier transform as truncated DFT, only on Reactant
+        dft_size_str = prettymemory(nbytes(S.fourier_matrix_forward) + nbytes(S.fourier_matrix_inverse))
+        println(io, styled"├ {info:Fourier}:      truncated DFT, matrices $dft_size_str")
+    end
     println(io, styled"├ {info:Legendre}:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
     println(io, styled"├ {info:Architecture}: $architecture")
     print(io, styled"└ {info:Memory}:       for $nlayers layers {note:($memorysize_str)}")
@@ -58,7 +67,7 @@ function Base.show(io::IO, S::MatrixSpectralTransform{NF, AR, AT}) where {NF, AR
     Grid = nonparametric_type(grid)
 
     # add information about size of Legendre polynomials and scratch memory
-    matrixsize_str = prettymemory(2 * Base.sizeof(S.forward))
+    matrixsize_str = prettymemory(Base.sizeof(S.forward_stacked) + Base.sizeof(S.backward_stacked))
     scratchsize_str = prettymemory(Base.sizeof(S.scratch_memory))
 
     dealias = get_dealiasing(mmax, nlat_half)

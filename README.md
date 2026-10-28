@@ -33,8 +33,9 @@ With minimal code redundancies, it supports
 - Different resolutions (for example T16 to T1024 in spectral matched flexibly with various 800km to 10km grids)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
 - Fast on single CPUs (x86, arm) for laptop prototyping, live demos and education
-- GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs (Metal is WIP)
-- Automatic differentiation via Enzyme.jl for sensitivity analysis, parameter calibration and ML-physics hybrid modelling (limited to Julia 1.10 currently) 
+- GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs, with Metal support for Apple Silicon
+- Automatic differentiation via Enzyme.jl for sensitivity analysis, parameter calibration and ML-physics hybrid modelling (limited to Julia 1.10 and 1.11 currently) 
+- MLIR/OpenXLA compilation with Reactant for GPU and TPU support and more efficient AD
 - A very fast and flexible spherical harmonics transform library SpeedyTransforms.jl for CPU and GPU
 
 **User interface**
@@ -90,7 +91,6 @@ On our TODO list are
 Currently in development, but already (partially) available are
 
 - Better CPU multi-threading support
-- MLIR/OpenXLA compilation with Reactant
 
 ## Contributing
 
@@ -120,7 +120,7 @@ showing
 
 Hurray🥳 In a second we just simulated 10 days of the Earth's atmosphere at a speed of almost 1400 simulated years
 per wallclock day. Also printed is the model time, the maximum wind speed and the temperature range (on any layer).
-This simulation used a T31 spectral resolution on an
+This simulation used a T32 spectral resolution on an
 [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#OctahedralGaussianGrid)
 (~400km resolution) solving the primitive equations on 8 vertical layers,
 storing [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/output).
@@ -144,21 +144,21 @@ now needs to be written as `q = get_step(simulation.variables.grid.humidity)[:, 
 
 ## Gallery
 
-Specific humidity in the primitive equation model simulated at T340 spectral resolution (about 40km)
+Specific humidity in the primitive equation model simulated at T342 spectral resolution (about 40km)
 with 16 vertical levels (shown here is level 15, just above the surface) on the octahedral Gaussian grid
 computed in single precision multi-threaded on 16 CPUs. With convection, large-scale condensation, surface fluxes
 and some simplified radiation (the daily cycle is visible)
 
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/614f04cf-5080-4c89-9fd6-35efd54103a7
 
-Relative vorticity in the shallow water model, simulated at T1023 spectral resolution (about 10km) on an
+Relative vorticity in the shallow water model, simulated at T1024 spectral resolution (about 10km) on an
 [octahedral Clenshaw-Curtis grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#OctahedralClenshawGrid)
 with more than 4 million grid points
 
 https://user-images.githubusercontent.com/25530332/190443050-d5b8d093-86c0-46c9-b515-8420059ac8dc.mp4
 
 Surface temperature in the primitive equation model without surface fluxes or radiation
-at T511 (~20km resolution) and 31 vertical levels. The simulation was multi-threaded in Float32 (single precision).
+at T512 (~20km resolution) and 31 vertical levels. The simulation was multi-threaded in Float32 (single precision).
 
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/95897b82-9b81-4980-934b-cfdcf4d5a4b0
 
@@ -177,7 +177,7 @@ resolves gravity waves with a timestep of CFL=1.2-1.4 despite a single-stage RAW
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/510c38c7-12cb-42d5-b905-c66b4eaa514d
 
 Advection of 5000 particles with wind in the lower-most layer of the primitive equation model at
-T85 (150km) resolution and 8 vertical layers.
+T86 (150km) resolution and 8 vertical layers.
 
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a6192374-24d9-4065-9fcc-8b719190472f
 
@@ -293,7 +293,7 @@ The bibtex entry for the paper is:
 
 If you are using the differentiability of our model, please cite additionally 
 
-Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615. https://doi.org/10.1029/2025MS005615
+> Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615, doi:[10.1029/2025MS005615](https://doi.org/10.1029/2025MS005615)
 
 with the bibtex entry 
 

@@ -37,5 +37,7 @@ steps:
     agents:
       queue: "rocm"
       rocmgpu: "*"
-    if: "!(build.pull_request.labels includes 'skip-ci' || build.pull_request.labels includes 'skip-gpu-ci')"
+    # if: "!(build.pull_request.labels includes 'skip-ci' || build.pull_request.labels includes 'skip-gpu-ci')"
+    # only run on pushes to main, not on pull requests
+    if: "build.branch == 'main' && build.pull_request.id == null"
     timeout_in_minutes: 40

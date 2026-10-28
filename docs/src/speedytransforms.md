@@ -279,7 +279,7 @@ to be used in grid-point space!
 
 How would we construct random noise in spectral space that follows a certain
 power law and transform it back into grid-point space? Define the wavenumber ``k``
-for T31, the spectral resolution we are interested in.
+for T32 (1-based), the spectral resolution we are interested in.
 (We start from 1 instead of 0 to avoid zero to the power of something negative).
 Now create some normally distributed spectral coefficients but scale them down
 for higher wavenumbers with ``k^{-2}``
@@ -382,19 +382,21 @@ power_spectrum(alms[:, 1])
 
 SpeedyTransforms also provides a `MatrixSpectralTransform`, an alternative spectral transform
 that replaces the ring-by-ring FFT + Legendre recursion of `SpectralTransform` with a single
-dense matrix-matrix multiply. Concretely, the forward (grid → spectral) transform becomes
+dense matrix-matrix multiply. Mathematically the forward (grid → spectral) transform is
+``\text{coeffs} = F \cdot \text{field}`` with a complex matrix ``F`` and the backward (spectral →
+grid) transform ``\text{field} = \Re(B \cdot \text{coeffs})`` with a complex matrix ``B``. Both are
+evaluated as a single real-valued matrix multiply with the real and imaginary parts stacked,
 
 ```math
-\text{coeffs} = F \cdot \text{field}
+\begin{pmatrix} \Re(\text{coeffs}) \\ \Im(\text{coeffs}) \end{pmatrix}
+= \begin{pmatrix} \Re(F) \\ \Im(F) \end{pmatrix} \cdot \text{field},
+\qquad
+\text{field} = \begin{pmatrix} \Re(B) & -\Im(B) \end{pmatrix} \cdot
+\begin{pmatrix} \Re(\text{coeffs}) \\ \Im(\text{coeffs}) \end{pmatrix}
 ```
 
-and the backward (spectral → grid) transform is split into two real-valued multiplications
-
-```math
-\text{field} = B_{\Re} \cdot \Re(\text{coeffs}) - B_{\Im} \cdot \Im(\text{coeffs})
-```
-
-where ``F``, ``B_{\Re}``, ``B_{\Im}`` are dense real/complex matrices precomputed at construction
+so that `mul!` dispatches to BLAS (or cuBLAS/rocBLAS on GPU), which a complex × real product
+would not. The stacked matrices are dense real matrices precomputed at construction
 time by probing the existing `SpectralTransform` with unit vectors.
 
 ### When to use it

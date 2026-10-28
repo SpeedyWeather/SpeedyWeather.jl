@@ -50,7 +50,7 @@ export SurfaceOceanHeatFlux
 turbulent exchange of sensible heat between the ocean surface and the atmosphere
 based on temperature differences and wind speed. Uses bulk aerodynamic formulas
 with drag coefficients. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceOceanHeatFlux{NF, FI <: AbstractFluxIntegration} <: AbstractSurfaceHeatFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
@@ -59,10 +59,14 @@ with drag coefficients. Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Sea ice insulating surface heat fluxes [1]"
     @param sea_ice_insulation::NF = 0.01 (bounds = Positive,)
+
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceOceanHeatFlux
-SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(; kwargs...)
+SurfaceOceanHeatFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
+    SurfaceOceanHeatFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
 variables(::SurfaceOceanHeatFlux) = (
@@ -78,27 +82,33 @@ variables(::SurfaceOceanHeatFlux) = (
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(ρ)
 
-    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, heat_flux)
+    ts = time_stepper(model.time_stepping, :ocean)
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, ts, heat_flux)
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]
     pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
 
     # drag coefficient
-    d = vars.parameterizations.boundary_layer_drag[ij]
+    d = vars.parameterizations.ocean.boundary_layer_drag_heat[ij]
     drag_ocean = ifelse(heat_flux.use_boundary_layer_drag, d, heat_flux.drag)
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
-    # Only flux from ocean if available (not NaN) otherwise zero flux
     # leave out *cₚ here but include below to avoid division
-    flux_ocean = ρ * drag_ocean * V₀ * (SST[ij] - T)
+    conductance = ρ * drag_ocean * V₀    # mass conductance [kg/m²/s], = -∂flux/∂T without cₚ
+    flux_ocean = conductance * (SST[ij] - T)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
-    flux_ocean /= 1 + sea_ice_concentration / heat_flux.sea_ice_insulation
+    insulation = 1 + sea_ice_concentration / heat_flux.sea_ice_insulation
+    flux_ocean /= insulation
+
+    # damp explicit flux for stable time integration with thin lowermost layers, applied
+    # before storing so that coupled ocean/land receive the flux the atmosphere receives
+    conductance /= insulation
+    flux_ocean *= surface_flux_damping(heat_flux.time_integration, (1 - land_fraction) * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling [W/m²]
-    vars.parameterizations.ocean.sensible_heat_flux[ij] = flux_ocean * cₚ  # to store ocean flux separately too
-
-    flux_ocean *= (1 - land_fraction)                             # weight by ocean fraction of land-sea mask
+    vars.parameterizations.ocean.sensible_heat_flux[ij] = flux_ocean * cₚ   # to store ocean flux separately too
+    flux_ocean *= (1 - land_fraction)                                       # weight by ocean fraction of land-sea mask
 
     # output/diagnostics: ocean sets the flux (=), land accumulates (+=)
     vars.parameterizations.sensible_heat_flux[ij] = flux_ocean * cₚ        # [W/m²]
@@ -116,7 +126,7 @@ turbulent exchange of sensible heat between the land surface and the atmosphere
 based on soil temperature differences and wind speed. Uses bulk aerodynamic 
 formulas with drag coefficients that can account for surface roughness. 
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceLandHeatFlux{NF, FI <: AbstractFluxIntegration} <: AbstractSurfaceHeatFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
@@ -125,10 +135,14 @@ Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Snow insulation depth [m], e-folding depth reducing surface heat fluxes"
     @param snow_insulation_depth::NF = 0.05 (bounds = Positive,)
+
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceLandHeatFlux
-SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)
+SurfaceLandHeatFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
+    SurfaceLandHeatFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
 variables(::SurfaceLandHeatFlux) = (
@@ -139,27 +153,35 @@ variables(::SurfaceLandHeatFlux) = (
 
     surface = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
-    pₛ = vars.parameterizations.surface_pressure[ij]                # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
 
     # TODO actually implement skin temperature?
-    T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]      # uppermost land layer with index 1
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), heat_flux)
+    T_skin_land = soil_temperature[ij, 1]                       # uppermost land layer with index 1
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    snow_depth = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(T)
+    snow_depth = haskey(vars.prognostic.land, :snow_depth) ?
+        get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), heat_flux)[ij] : zero(T)
 
     # drag coefficient
-    d = vars.parameterizations.boundary_layer_drag[ij]
+    d = vars.parameterizations.land.boundary_layer_drag_heat[ij]
     drag_land = ifelse(heat_flux.use_boundary_layer_drag, d, heat_flux.drag)
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
-    # Only flux from land if available (not NaN) otherwise zero flux
     # leave out *cₚ here but include below to avoid division
-    flux_land = ifelse(isfinite(T_skin_land), ρ * drag_land * V₀ * (T_skin_land - T), zero(T))
+    conductance = ρ * drag_land * V₀     # mass conductance [kg/m²/s], = -∂flux/∂T without cₚ
+    flux_land = conductance * (T_skin_land - T)
 
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
-    flux_land /= 1 + snow_depth / heat_flux.snow_insulation_depth
+    insulation = 1 + snow_depth / heat_flux.snow_insulation_depth
+    flux_land /= insulation
+
+    # damp explicit flux for stable time integration with thin lowermost layers, applied
+    # before storing so that coupled ocean/land receive the flux the atmosphere receives
+    conductance /= insulation
+    flux_land *= surface_flux_damping(heat_flux.time_integration, land_fraction * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling [W/m²]
     vars.parameterizations.land.sensible_heat_flux[ij] = flux_land * cₚ  # store land flux separately too

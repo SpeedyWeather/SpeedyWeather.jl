@@ -209,6 +209,39 @@ You can change the order in which the parametrizations are executed by reorderin
 additional parametrization to the model by adding it with `custom_parameterization` keyword argument.
 Below we will demonstrate this in an example.
 
+### Parameterizations from other packages
+
+Parameterizations can also be defined in other packages, e.g. to share a scheme between
+SpeedyWeather and other models. Such a package does not have to depend on SpeedyWeather,
+instead it can define a SpeedyWeather extension that wraps its scheme into an
+`AbstractParameterization`. However, Julia does not allow extensions to export new types or functions,
+so the wrapper type would only be accessible via `Base.get_extension`. To avoid this,
+SpeedyWeather provides the function stub `Parameterization` that extensions can add methods to
+
+```julia
+# in the main code of ExternalPackage, no SpeedyWeather dependency
+struct ExternalLongwave
+    # ...
+end
+
+# in ExternalPackageSpeedyWeatherExt
+struct SpeedyExternalLongwave{NF} <: SpeedyWeather.AbstractLongwave
+    # ...
+end
+
+SpeedyWeather.Parameterization(spectral_grid::SpectralGrid, scheme::ExternalLongwave; kwargs...) =
+    SpeedyExternalLongwave(spectral_grid, scheme; kwargs...)
+```
+
+which is then used like any other parameterization
+
+```julia
+using SpeedyWeather, ExternalPackage
+spectral_grid = SpectralGrid()
+longwave_radiation = Parameterization(spectral_grid, ExternalLongwave())
+model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+```
+
 ## Example: Albedo
 
 Let's implement a very simple albedo parameterization as an example how to define a new parameterization.
@@ -297,7 +330,7 @@ even though they are initialized and variables are created nevertheless
 ```@example custom-parameterization
 model = PrimitiveWetModel(spectral_grid;
     custom_parameterization = SimpleAlbedo(spectral_grid),
-    parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :shortwave_radiation,
+    parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :radiation,
         :boundary_layer, :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
 
 simulation = initialize!(model)
@@ -306,7 +339,7 @@ run!(simulation, period=Day(5)) # spin up the model a little
 heatmap(simulation.variables.parameterizations.albedo)
 ```
 
-Again, it worked! Note that it's important here to call the `:shortwave_radiation` after our
+Again, it worked! Note that it's important here to call the `:radiation` after our
 `:custom_parameterization` as the shortwave radiation will use the albedo over ocean and land
 for respective flux computations and average the albedo then according to the land-sea mask.
 

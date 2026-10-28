@@ -10,6 +10,9 @@
     simulation = initialize!(model)                             # initialize all model components
 
     step = 2
+    # ocean and land are stepped with EulerForward by default (1 step), use their last (=current) step
+    ocean_step = SpeedyWeather.nsteps(simulation.variables.prognostic.ocean.sea_surface_temperature)
+    land_step = SpeedyWeather.nsteps(simulation.variables.prognostic.land.soil_temperature)
 
     # test data
     L = rand(spectral_grid.SpectralVariable3D, truncation + 1, truncation, nlayers)
@@ -48,33 +51,36 @@
     set!(simulation, pressure = L[:, 1]; step)
     @test get_step(prog_new.pressure, step) == L[:, 1]
 
+    # set! transforms in-place into the variable (a view), A_spec into a new array: the `muladd`s in
+    # the Legendre transform may be fused differently for these, ≈ instead of == (differs on x86)
     set!(simulation, vorticity = A; step)
-    @test get_step(prog_new.vorticity, step) == A_spec
+    @test get_step(prog_new.vorticity, step) ≈ A_spec
 
     set!(simulation, vorticity = A; step, add = true)
-    @test get_step(prog_new.vorticity, step) == (2 .* A_spec)
+    @test get_step(prog_new.vorticity, step) ≈ (2 .* A_spec)
 
     # grids
     set!(simulation, sea_surface_temperature = A[:, 1]; namespace = :ocean)
     @test prog_new.ocean.sea_surface_temperature[:, 1] == A[:, 1]
-    set!(simulation, sea_surface_temperature = A[:, 1]; step, namespace = :ocean)
-    @test prog_new.ocean.sea_surface_temperature[:, step] == A[:, 1]
+    set!(simulation, sea_surface_temperature = A[:, 1]; step = ocean_step, namespace = :ocean)
+    @test prog_new.ocean.sea_surface_temperature[:, ocean_step] == A[:, 1]
 
-    set!(simulation, sea_ice_concentration = B[:, 1]; step, namespace = :ocean, add = true)
+    set!(simulation, sea_ice_concentration = B[:, 1]; step = ocean_step, namespace = :ocean, add = true)
     C = similar(A[:, 1])
     RingGrids.interpolate!(C, B[:, 1]; NF)
 
-    sic_new = get_step(prog_new.ocean.sea_ice_concentration, step)
-    sic_old = get_step(prog_old.ocean.sea_ice_concentration, step)
+    sic_new = get_step(prog_new.ocean.sea_ice_concentration, ocean_step)
+    sic_old = get_step(prog_old.ocean.sea_ice_concentration, ocean_step)
     @test all(isapprox(sic_new, sic_old .+ C, atol = 1.0e-6))
 
-    Di = deepcopy(prog_new.land.soil_temperature)
+    lst = get_step(prog_new.land.soil_temperature, land_step)
+    Di = deepcopy(lst)
     RingGrids.interpolate!(Di, D; NF)
-    set!(simulation, soil_temperature = D, namespace = :land)
-    @test prog_new.land.soil_temperature == Di
+    set!(simulation, soil_temperature = D, namespace = :land, step = land_step)
+    @test lst == Di
 
     set!(simulation, soil_moisture = D; namespace = :land)
-    @test prog_new.land.soil_moisture == Di
+    @test get_step(prog_new.land.soil_moisture, 1) == Di
 
     # numbers
     set!(simulation, vorticity = Float32(3.0); step)
@@ -91,8 +97,7 @@
     set!(simulation, sea_surface_temperature = Float16(3.0), step = 1, add = true, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature[:, 1] .≈ 6.0)
 
-    set!(simulation, sea_surface_temperature = 5, step = 1, namespace = :ocean)
-    set!(simulation, sea_surface_temperature = 5, step = 2, namespace = :ocean)
+    set!(simulation, sea_surface_temperature = 5, step = ocean_step, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature .== 5)
 
     # vor_div, create u,v first in spectral space

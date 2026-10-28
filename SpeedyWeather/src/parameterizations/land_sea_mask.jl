@@ -28,7 +28,7 @@ abstract type AbstractLandSeaMask <: AbstractModelComponent end
 
 function mask!(
         field::AbstractField,
-        mask::AbstractField,
+        mask::AbstractArray,
         land_or_sea::Symbol;
         masked_value = NaN,
     )
@@ -36,18 +36,19 @@ function mask!(
     val = land_or_sea == :land ? 1 : 0
     masked_val = convert(eltype(field), masked_value)
 
-    @boundscheck fields_match(field, mask, horizontal_only = true) || throw(DimensionMismatch(field, mask))
-    @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
+    @boundscheck size(field, 1) == size(mask, 1) || throw(DimensionMismatch(field, mask))
 
     arch = architecture(field)
     launch!(arch, RingGridWorkOrder, size(field), mask_kernel!, field, mask, val, masked_val)
     return field
 end
 
-# 2D, 3D or ND variant via Cartesian indexing
+# 2D, 3D or ND variant via Cartesian indexing, a horizontal-only mask (vector) is applied to all
+# layers, otherwise mask has the same size as field (e.g. a mask from `isnan.(field)`)
 @kernel inbounds = true function mask_kernel!(field, mask, val, masked_val)
     ijk = @index(Global, Cartesian)
-    if mask[ijk[1]] == val
+    mask_ijk = ndims(mask) == 1 ? mask[ijk[1]] : mask[ijk]
+    if mask_ijk == val
         field[ijk] = masked_val
     end
 end
@@ -87,7 +88,7 @@ $(TYPEDFIELDS)"""
     FieldType::Type{<:AbstractField} = FullClenshawField
 
     "[OPTION] Quantization to fraction?"
-    quantization::Float64 = 0.01
+    quantization::NF = 0.01
 
     # FIELDS (to be initialized in initialize!)
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
@@ -129,18 +130,20 @@ $(TYPEDSIGNATURES)
 Loads the land-sea mask from the path set in `land_sea_mask`, interpolates (grid-cell average) 
 onto the model grid for a fractional sea mask and saves it to the field `land_sea_mask.land_fraction`.
 """
-function load_mask!(land_sea_mask::EarthLandSeaMask)
+function load_mask!(land_sea_mask::EarthLandSeaMask{NF}) where {NF}
 
     arch = architecture(land_sea_mask.land_fraction)
 
     # LOAD NETCDF FILE
-    lsm_highres = get_asset(
-        land_sea_mask.path;
-        from_assets = land_sea_mask.from_assets,
-        name = land_sea_mask.varname,
-        ArrayType = land_sea_mask.FieldType,
-        FileFormat = NCDataset,
-        version = land_sea_mask.version
+    lsm_highres = NF.(
+        get_asset(
+            land_sea_mask.path;
+            from_assets = land_sea_mask.from_assets,
+            name = land_sea_mask.varname,
+            ArrayType = land_sea_mask.FieldType,
+            FileFormat = NCDataset,
+            version = land_sea_mask.version
+        )
     )
 
     # average onto grid cells of the model
@@ -149,14 +152,16 @@ function load_mask!(land_sea_mask::EarthLandSeaMask)
     land_sea_mask.land_fraction .= on_architecture(arch, cpu_mask)
 
     if land_sea_mask.quantization > 0
-        q = land_sea_mask.quantization
+        q = convert(eltype(land_sea_mask.land_fraction), land_sea_mask.quantization)
         land_sea_mask.land_fraction .= round.(land_sea_mask.land_fraction ./ q) .* q
     end
 
-    lo, hi = extrema(land_sea_mask.land_fraction)
+    # TODO: return to `extrema` when Reactant fixed https://github.com/EnzymeAD/Reactant.jl/issues/2387
+    lo, hi = minimum(land_sea_mask.land_fraction), maximum(land_sea_mask.land_fraction)
     if (lo < 0 || hi > 1)
         # @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
-        land_sea_mask.land_fraction .= clamp.(land_sea_mask.land_fraction, 0, 1)
+        land_fraction = land_sea_mask.land_fraction
+        land_fraction .= clamp.(land_fraction, zero(eltype(land_fraction)), one(eltype(land_fraction)))
     end
     return nothing
 end

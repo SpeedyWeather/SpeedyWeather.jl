@@ -9,7 +9,7 @@
     "docs:preview": "vitepress preview build/.documenter"
   },
   "dependencies": {
-    "@nolebase/vitepress-plugin-enhanced-readabilities": "^2.18.2",
+    "@nolebase/vitepress-plugin-enhanced-readabilities": "~2.18.2",
     "@mdit/plugin-mathjax": "^0.26.1",
     "@mdit/plugin-tex": "^0.24.1",
     "markdown-it": "^14.1.0",
@@ -17,5 +17,8 @@
     "markdown-it-mathjax3": "^4.3.2",
     "vitepress": "^1.6.4",
     "vitepress-plugin-tabs": "^0.8.0"
+  },
+  "overrides": {
+    "@nolebase/ui": "~2.18.2"
   }
 }
