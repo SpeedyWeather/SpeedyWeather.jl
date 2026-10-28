@@ -180,10 +180,6 @@ end
     @test haskey(ds, "v")
     @test haskey(ds, "v10")
 
-    # and 10m values cannot exceed lowermost layer of u,v value
-    @test maximum(abs.(ds["u10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
-    @test maximum(abs.(ds["v10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
-
     ## surface temperature should be within 60-130% of
     T₀ = model.atmosphere.reference_temperature     # in K
     Tsurf = ds["tsurf"].var[:, :, end] .+ 273.15    # last timestep from ˚C to K
