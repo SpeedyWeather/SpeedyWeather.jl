@@ -180,6 +180,10 @@ end
     @test haskey(ds, "v")
     @test haskey(ds, "v10")
 
+    # Check that in most cases that u10 < u
+    @test sum(ds["u10"].var[:, :, end] .< ds["u"].var[:, :, end, end]) / length(ds["u10"].var[:, :, end]) < 0.9
+    @test sum(ds["v10"].var[:, :, end] .< ds["v"].var[:, :, end, end]) / length(ds["v10"].var[:, :, end]) < 0.9
+
     ## surface temperature should be within 60-130% of
     T₀ = model.atmosphere.reference_temperature     # in K
     Tsurf = ds["tsurf"].var[:, :, end] .+ 273.15    # last timestep from ˚C to K
