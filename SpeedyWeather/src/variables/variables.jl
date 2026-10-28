@@ -4,6 +4,7 @@ export PrognosticVariable,
     DynamicsVariable,
     ParameterizationVariable,
     ParticleVariable,
+    OutputVariable,
     ScratchVariable
 
 for Var in (
@@ -13,6 +14,7 @@ for Var in (
         :DynamicsVariable,
         :ParameterizationVariable,
         :ParticleVariable,
+        :OutputVariable,
         :ScratchVariable,
     )
 
@@ -65,7 +67,7 @@ export Variables
 groups corresponding to the fields here $(TYPEDFIELDS) Each group can have
 their own namespaces to distinguish between e.g. ocean, land, or tracer variables.
 All non-prognostic groups are considered to be diagnostic with no memory between time steps."""
-@kwdef struct Variables{Po, G, T, D, Pm, Pt, S, F} <: AbstractVariables
+@kwdef struct Variables{Po, G, T, D, Pm, Pt, O, S, F} <: AbstractVariables
     "Prognostic variables subject to time stepping."
     prognostic::Po = NamedTuple()
 
@@ -84,6 +86,9 @@ All non-prognostic groups are considered to be diagnostic with no memory between
     "Variables used for particle advection"
     particles::Pt = NamedTuple()
 
+    "Variables for output only, e.g. accumulated precipitation. Write-only for dynamics and parameterizations."
+    output::O = NamedTuple()
+
     "Scratch variables for temporary storage during calculations with undetermined state (write before read)."
     scratch::S = NamedTuple()
 
@@ -92,7 +97,7 @@ All non-prognostic groups are considered to be diagnostic with no memory between
 end
 
 # defined e.g. for output filters, as fieldnames(Variables) isn't fully type stable
-const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles, :scratch, :fused)
+const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles, :output, :scratch, :fused)
 
 Adapt.@adapt_structure Variables
 
@@ -250,6 +255,7 @@ function Variables(model::AbstractModel)
     dynamics          = allocate(filter_variables(all_vars,         DynamicsVariable), model, fuse_parents)
     parameterizations = allocate(filter_variables(all_vars, ParameterizationVariable), model, fuse_parents)
     particles         = allocate(filter_variables(all_vars,         ParticleVariable), model, fuse_parents)
+    output            = allocate(filter_variables(all_vars,           OutputVariable), model, fuse_parents)
     scratch           = allocate(filter_variables(all_vars,          ScratchVariable), model, fuse_parents)
 
     # Install fused parents at their canonical home: vars.fused.<fuse_symbol>.
@@ -272,7 +278,7 @@ function Variables(model::AbstractModel)
                                name_a = :spectral_tendencies, name_b = :grid_tendencies)
     end
 
-    return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch, fused)
+    return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, output, scratch, fused)
 end
 # runic: on
 

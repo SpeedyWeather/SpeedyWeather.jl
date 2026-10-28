@@ -258,6 +258,10 @@ function time_step(L::Leapfrog, clock::Clock)
     )
 end
 
+# the clock passes Δt/2 on the 1st Euler step and on the 2nd leapfrog step (Δt but rewinds Δt/2),
+# then Δt on every later step, see `time_step!(::Clock, ::Leapfrog)`
+elapsed_time(L::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, L.Δt / 2, L.Δt)
+
 # on 1st Euler step + 2nd Leapfrog step disable filters; with RAW filters afterwards
 prognostic_step(::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, 1, 2)
 

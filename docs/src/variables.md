@@ -6,7 +6,7 @@ model components with their own fields and so on, see [Models](@ref).
 
 The variables are split into
 
-- groups: prognostic, grid, tendencies, dynamics, parameterizations, particles and scratch
+- groups: prognostic, grid, tendencies, dynamics, parameterizations, particles, output and scratch
 - namespace, these are optional sub-categories, e.g. `prognostic.land` and `prognostic.ocean`
 
 Such that their paths are fully defined by
@@ -46,14 +46,18 @@ the model during integration.
 ## The `Variables` struct
 
 All simulation variables (prognostic and diagnostic) are stored in `simulation.variables`,
-which is a `Variables` struct with 7 (hardcoded) groups `prognostic`, `grid`, `tendencies`,
-`dynamics`, `parameterizations`, `particles` and `scratch`.
+which is a `Variables` struct with 8 (hardcoded) groups `prognostic`, `grid`, `tendencies`,
+`dynamics`, `parameterizations`, `particles`, `output` and `scratch`.
 The variables are model-specific, each model only allocates the variables it needs.
 The prognostic variables in `variables.prognostic` are generally in spectral coefficients,
 `variables.grid` hold gridded variables, `variables.tendencies` the tendencies,
 `variables.dynamics` work arrays that are computed by the dynamical core. `variables.parameterizations`
 are those required by the [parameterizations](@ref "Parameterizations") and `variables.particles` by
 [particle advection](@ref "Particle advection").
+`variables.output` holds variables that only exist for output, e.g. accumulated precipitation
+`variables.output.rain_convection`. They are write-only for the dynamics and parameterizations,
+nothing in the model reads them back, so the output can process or reset them without changing
+the simulation.
 `variables.scratch` are scratch arrays: These can be used in any computation by should be considered
 in an undefined state, so write to it before you read from it. Any other component can leave this
 in any state. But you can use them to avoid allocations and hold intermediate results.

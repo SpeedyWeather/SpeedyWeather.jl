@@ -8,6 +8,13 @@ default_time_step(L::AbstractTimeStepper) = L.Δt
 extend for time steppers with changing time steps, e.g. `Leapfrog` on its first steps."""
 time_step(time_stepping::AbstractTimeStepper, clock) = default_time_step(time_stepping)
 
+"""$(TYPEDSIGNATURES) Model time [s] that passes in the current time step of `time_stepping`
+(evaluated before the clock is stepped forward). Unlike `time_step`, which is the step the
+tendencies are integrated over (e.g. 2Δt for leapfrog), this sums to the simulated period
+and is used to integrate rates over time, e.g. precipitation. Extend for time steppers with
+changing time steps, e.g. `Leapfrog` on its spin-up steps."""
+elapsed_time(time_stepping::AbstractTimeStepper, clock) = time_stepping.Δt
+
 """$(TYPEDSIGNATURES)
 Time stepper for `:atmosphere`, `:ocean` (incl sea ice) or `:land` within the `time_stepping`
 setup of a model (`model.time_stepping`). Defaults to `time_stepping` itself, time steppers can

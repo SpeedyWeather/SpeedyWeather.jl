@@ -144,7 +144,8 @@ end
     p = soil.infiltration_fraction
 
     soil_moisture = variables.prognostic.land.soil_moisture
-    R = variables.parameterizations.land.river_runoff
+    R = variables.parameterizations.land.river_runoff_rate
+    Δt = SpeedyWeather.elapsed_time(model.time_stepping, variables.prognostic.clock)   # model time of this step as in filter!
     soil_moisture[ij, 1, :] .= 1.2     # 0.2 excess in top layer
     soil_moisture[ij, 2, :] .= 0.5
     R[ij] = 0
@@ -156,8 +157,8 @@ end
         @test soil_moisture[ij, 1, step] ≈ 1
         @test soil_moisture[ij, 2, step] ≈ 0.5 + p * 0.2 * f₁ / f₂
     end
-    @test R[ij] ≈ (1 - p) * 0.2 * f₁                   # runoff only accumulated once
-    @test f₁ * soil_moisture[ij, 1, 1] + f₂ * soil_moisture[ij, 2, 1] + R[ij] ≈ water_before
+    @test R[ij] * Δt ≈ (1 - p) * 0.2 * f₁              # runoff only diagnosed once
+    @test f₁ * soil_moisture[ij, 1, 1] + f₂ * soil_moisture[ij, 2, 1] + R[ij] * Δt ≈ water_before
 
     # everything in [0, 1]
     @test all(0 .<= soil_moisture .<= 1)

@@ -228,7 +228,7 @@ We set `snow = false` in `ImplicitCondensation` and therefore deal with rain onl
 ```@example precipitation
 using CairoMakie
 
-(; rain_large_scale, rain_convection) = simulation.variables.parameterizations
+(; rain_large_scale, rain_convection) = simulation.variables.output
 m2mm = 1000     # convert from [m] to [mm]
 heatmap(m2mm*rain_large_scale, title="Large-scale precipiation (rain) [mm]: Accumulated over 10 days", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
@@ -236,17 +236,17 @@ nothing # hide
 ```
 ![Large-scale precipitation](large-scale_precipitation_acc.png)
 
-Precipitation (rain, both large-scale and convective) are written into the
-`simulation.variables.parameterizations` which, however, accumulate all precipitation
-during simulation. In the NetCDF output, precipitation rate (in mm/hr) is calculated
-from accumulated precipitation as a post-processing step.
+Precipitation (rain, both large-scale and convective) is accumulated by [Diagnostics](@ref)
+in `simulation.variables.output`. With output these are reset after every output so that the
+NetCDF output contains the precipitation since the last output, but without output they
+accumulate all precipitation during the simulation.
 More interactively, you can also reset these accumulators and integrate for another 6 hours
 to get the precipitation only in that period.
 
 ```@example precipitation
 # reset accumulators and simulate 6 hours
-simulation.variables.parameterizations.rain_large_scale .= 0
-simulation.variables.parameterizations.rain_convection .= 0
+simulation.variables.output.rain_large_scale .= 0
+simulation.variables.output.rain_convection .= 0
 run!(simulation, period=Hour(6))
 
 # visualise, rain_* arrays are flat copies, no need to read them out again!

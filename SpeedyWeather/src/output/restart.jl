@@ -1,7 +1,7 @@
 export WriteVariablesRestartFile
 
-"""WriteVariablesRestartFile callback. Writes a restart file for the prognostic variables
-on the last time step as jld2 file. Options are $(TYPEDFIELDS)"""
+"""WriteVariablesRestartFile callback. Writes a restart file for the prognostic and output
+variables (e.g. accumulated precipitation) on the last time step as jld2 file. Options are $(TYPEDFIELDS)"""
 @kwdef mutable struct WriteVariablesRestartFile <: AbstractCallback
     "[OPTION] File name for restart file, should end with .jld2"
     filename::String = "restart.jld2"
@@ -45,6 +45,7 @@ function finalize!(
 
     jldopen(joinpath(path, filename), "w"; compress) do f
         f["variables.prognostic"] = materialize_views(vars.prognostic)
+        f["variables.output"] = materialize_views(vars.output)
         f["version"] = restart.pkg_version
         f["description"] = "Restart file created by SpeedyWeather.jl"
     end
