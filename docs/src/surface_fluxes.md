@@ -431,13 +431,16 @@ All surface fluxes depend on a dimensionless drag coefficient ``C`` which
 we calculate as a function of the bulk Richardson number ``Ri``
 (see also [Vertical diffusion](@ref) for a similar Richardson-number-based diffusion coefficient)
 following [Frierson2006](@citet) with some simplification as outlined below.
-We use different drag coefficients for momentum, heat and moisture fluxes. The bulk Richardson number at the lowermost model layer ``k = N`` of height ``z_N`` is
+We use different drag coefficients for momentum, heat and moisture fluxes. The bulk Richardson number 
+at the lowermost model layer ``k = N`` of height ``z_N`` is
 
 ```math
 Ri_N = \frac{gz_N \left[ \Theta_v(z_N) - \Theta_v(0) \right]}{V_0^2 \Theta_v(0)}
 ```
 
-with ``gz_N = \Phi_N`` the [Geopotential](@ref) at ``z = z_N``, ``\Theta_v = c_pT_v + gz`` the virtual dry static energy, ``T_v`` the [Virtual temperature](@ref) and ``V_0`` the surface wind speed including gusts (see [Surface momentum fluxes](@ref)).
+with ``gz_N = \Phi_N`` the [Geopotential](@ref) at ``z = z_N``, ``\Theta_v = c_pT_v + gz`` the virtual 
+dry static energy, ``T_v`` the [Virtual temperature](@ref) and ``V_0`` the surface wind speed 
+including gusts (see [Surface momentum fluxes](@ref)).
 
 The virtual dry static energy at the surface ``z=0`` is
 
@@ -445,7 +448,10 @@ The virtual dry static energy at the surface ``z=0`` is
 \Theta_v(0) = c_p T_v(T_{skin}, q_{skin})
 ```
 
-computed separately over land and ocean. Over ocean, ``T_{skin}`` is the sea surface temperature and ``q_{skin} = q^*(T_{skin}, p_s)``. Over land, ``T_{skin}`` is the top soil layer temperature and ``q_{skin} = \alpha q^*(T_{skin}, p_s)``, with ``\alpha`` the soil moisture availability as in the land humidity flux. In the dry model ``q = 0``.
+computed separately over land and ocean. Over ocean, ``T_{skin}`` is the sea surface temperature and 
+``q_{skin} = q^*(T_{skin}, p_s)``. Over land, ``T_{skin}`` is the top soil layer temperature and 
+``q_{skin} = \alpha q^*(T_{skin}, p_s)``, with ``\alpha`` the soil moisture availability as in the 
+land humidity flux. In the dry model ``q = 0``.
 
 Then the drag coefficient ``C`` follows as
 
@@ -457,7 +463,10 @@ C = \begin{cases}
     \end{cases}
 ```
 
-with the neutral drag coefficient ``C_{max}`` and the minimum drag ``C_{min}`` defined below, and roughness lengths computed in the surface roughness scheme `boundary_layer.surface_roughness`, per surface and per flux type. There is a maximum drag ``C`` for negative bulk Richardson numbers ``Ri_N`` but the drag drops to ``C_{min}`` for bulk Richardson numbers being larger than a critical
+with the neutral drag coefficient ``C_{max}`` and the minimum drag ``C_{min}`` defined below, and 
+roughness lengths computed in the surface roughness scheme `boundary_layer.surface_roughness`, per 
+surface and per flux type. There is a maximum drag ``C`` for negative bulk Richardson numbers 
+``Ri_N`` but the drag drops to ``C_{min}`` for bulk Richardson numbers being larger than a critical
 ``Ri_c = 10`` with a smooth transition in between. The height of the ``N``-th
 model layer is ``z_N = \tfrac{\Phi_N - \Phi_0}{g}`` with the geopotential
 ```math
@@ -472,13 +481,16 @@ then follows as
 C_{max} = \frac{\kappa^2}{\log(\frac{z_N}{z_{0M}}) \log(\frac{z_N}{z_{0X}})}
 ```
 
-with ``\kappa = 0.4`` the von Kármán constant, ``z_{0M}`` the momentum roughness length and ``z_{0X}`` the roughness length of momentum, heat or humidity, so the three coefficients share the stability dependence but differ in their roughness lengths. This simplifies the drag coefficient calculation to
+with ``\kappa = 0.4`` the von Kármán constant, ``z_{0M}`` the momentum roughness length and ``z_{0X}`` 
+the roughness length of momentum, heat or humidity, so the three coefficients share the stability dependence 
+but differ in their roughness lengths. This simplifies the drag coefficient calculation to
 
 ```math
 C = \max\left(C_{min}, C_{max} \left[1 - \frac{Ri_N^*}{Ri_c}\right]^2\right)
 ```
 with ``Ri_N^* = \max(0, \min(Ri_N, Ri_c))`` the clamped ``Ri_N`` which
-is at least ``0`` and at most ``Ri_c``, and ``C_{min} = 10^{-5}`` (`drag_min`) a minimum drag that avoids vanishing surface fluxes in strongly stable conditions.
+is at least ``0`` and at most ``Ri_c``, and ``C_{min} = 10^{-5}`` (`drag_min`) a minimum drag that avoids 
+vanishing surface fluxes in strongly stable conditions.
 
 ## Surface momentum fluxes
 
