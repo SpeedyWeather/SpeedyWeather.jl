@@ -431,21 +431,23 @@ All surface fluxes depend on a dimensionless drag coefficient ``C`` which
 we calculate as a function of the bulk Richardson number ``Ri``
 (see also [Vertical diffusion](@ref) for a similar Richardson-number-based diffusion coefficient)
 following [Frierson2006](@citet) with some simplification as outlined below.
-We use different drag coefficients for momentum, heat and moisture fluxes. The dry static energy at the surface (z=0) is
+We use different drag coefficients for momentum, heat and moisture fluxes. The bulk Richardson number at the lowermost model layer ``k = N`` of height ``z_N`` is
 
 ```math
-Θ_s = c_p T_v(T_s, q_s) 
-```
-
-computed separately over land and ocean. Over ocean, ``T_s`` is the sea surface temperature and ``q_s = q⋆(T_s, p_s)``. Over land, ``T_s`` is the top soil layer temperature and ``q_s = α q⋆(T_s, p_s)``, with ``α`` the soil moisture availability as in the land humidity flux. In the dry model ``q = 0``.
-The bulk Richardson number at the lowermost model layer ``k = N`` of height ``z_N`` is
-
-```math
-Ri_N = \frac{gz_N \left[ \Theta_v(z_N) - \Theta_v(0) \right]}{|V_0|^2 \Theta_v(0)}
+Ri_N = \frac{gz_N \left[ \Theta_v(z_N) - \Theta_v(0) \right]}{V_0^2 \Theta_v(0)}
 ```
 
 with ``gz_N = \Phi_N`` the [Geopotential](@ref) at ``z = z_N``, ``\Theta =  c_pT_v + gz``
 the virtual dry static energy and ``T_v`` the [Virtual temperature](@ref).
+
+The virtual dry static energy at the surface (z=0) is
+
+```math
+\Theta_v(0) = c_p T_v(T_{skin}, q_{skin}) 
+```
+
+computed separately over land and ocean. Over ocean, ``T_{skin}`` is the sea surface temperature and ``q_{skin} = q^*(T_{skin}, p_s)``. Over land, ``T_{skin}`` is the top soil layer temperature and ``q_{skin} = \alpha q^*(T_{skin}, p_s)``, with ``\alpha`` the soil moisture availability as in the land humidity flux. In the dry model ``q = 0``.
+
 Then the drag coefficient ``C`` follows as
 
 ```math
