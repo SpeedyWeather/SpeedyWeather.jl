@@ -47,6 +47,11 @@ Base revision: e292baf012d70813f9eab23081661bf1e168c3fb
 > I believe the diagnostic should be responsible for the accumulation (with +, or max etc) but the
 > output writer for the reset, so that the output interval determines the statistic. E.g. How would
 > you output weekly averages if not the output interval is weekly? [PR review, abridged]
+- 2026-10-28: Review: `Maximum` resets to -Inf instead of NaN, plain `max` so NaNs propagate.
+  Clarified the two `initialize!` methods of diagnostics (before/after variable allocation).
+
+> isn't the `initialize!` called before the variables are allocated?
+> Shouldn't the reset be to -Inf? Otherwise you'll have `max(NaN, x) = NaN`?
 
 ## Problem description
 
@@ -131,7 +136,7 @@ Implemented (`output/diagnostics.jl`):
   `PrimitiveDryModel` (default `(;)`). `initialize!(vars, model.diagnostics, model)` runs before
   the initial conditions so `StartFromFile` can overwrite them.
 - `Accumulate(; rate, name, namespace, units, desc)`: adds `elapsed_time * rate`, reset to 0.
-- `Maximum(; variable, group, namespace, name, units)`: running maximum, reset to NaN.
+- `Maximum(; variable, group, namespace, name, units)`: running maximum, reset to -Inf (NaNs propagate).
 - `Mean(; variable, group, namespace, name, units)`: incremental running mean with a step count
   (`<name>_count`), reset to NaN/0, readable at any time.
 - Diagnostics do not declare the variables they read: warn on initialization, skip silently.

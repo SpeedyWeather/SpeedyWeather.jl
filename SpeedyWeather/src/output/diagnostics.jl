@@ -3,7 +3,10 @@ abstract type AbstractDiagnostic <: AbstractModelComponent end
 export AbstractDiagnostic, Accumulate, Maximum, Mean, PrecipitationDiagnostics
 
 # fallbacks: no variables to initialize, nothing to diagnose or reset. Arguments other than the
-# diagnostic are untyped so that methods for custom diagnostics, typed or untyped, are never ambiguous
+# diagnostic are untyped so that methods for custom diagnostics, typed or untyped, are never ambiguous.
+# Two initialize! methods: `initialize!(diagnostic, model)` with `initialize!(model)` before the variables
+# are allocated (fallback for AbstractModelComponent), and `initialize!(vars, diagnostic, model)` after
+# allocation with the initial conditions (but before `StartFromFile`) to initialize `variables.output`
 initialize!(vars, ::AbstractDiagnostic, model) = nothing
 diagnostic!(vars, ::AbstractDiagnostic, model) = nothing
 reset_diagnostic!(vars, ::AbstractDiagnostic, model) = nothing
@@ -95,8 +98,8 @@ reset_diagnostic!(vars::AbstractVariables, accumulate::Accumulate, ::AbstractMod
     fill!(get_variable(vars.output, accumulate.namespace, accumulate.name), 0)
 
 """Diagnostic for the maximum of a 2D grid variable, e.g. the surface air temperature, over the
-output interval: The output writer resets the maximum after writing, so with daily output this
-is the daily maximum. NaN before the first time step after a reset.
+output interval: The output writer resets the maximum (to -Inf) after writing, so with daily output
+this is the daily maximum. NaNs in the variable propagate into the maximum.
 Silently skipped if the variable does not exist (warns on initialization). Fields are $(TYPEDFIELDS)"""
 @kwdef struct Maximum <: AbstractDiagnostic
     "[OPTION] Name of the 2D grid variable to take the maximum of"
@@ -133,12 +136,12 @@ function diagnostic!(vars::AbstractVariables, maximum::Maximum, ::AbstractModel)
     has_variable(getfield(vars, group), namespace, variable) || return nothing
     field = get_variable(getfield(vars, group), namespace, variable)
     running_maximum = get_variable(vars.output, namespace, name)
-    running_maximum .= ifelse.(isnan.(running_maximum), field, max.(running_maximum, field))
+    running_maximum .= max.(running_maximum, field)     # max(-Inf, x) = x after reset
     return nothing
 end
 
 reset_diagnostic!(vars::AbstractVariables, maximum::Maximum, ::AbstractModel) =
-    fill!(get_variable(vars.output, maximum.namespace, maximum.name), NaN)
+    fill!(get_variable(vars.output, maximum.namespace, maximum.name), -Inf)
 
 """Diagnostic for the time mean of a 2D grid variable, e.g. the surface air temperature, over the
 output interval: The output writer resets the mean after writing, so with weekly output this is

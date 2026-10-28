@@ -64,7 +64,7 @@ end
     @test length(snapshots) == 5                        # initial conditions + 4 outputs
     vars = simulation.variables.output
     @test all(vars.rain_large_scale .== 0)              # reset after the last output
-    @test all(isnan, vars.surface_air_temperature_maximum)
+    @test all(==(-Inf), vars.surface_air_temperature_maximum)
     @test all(isnan, vars.surface_air_temperature_mean)
     @test vars.surface_air_temperature_mean_count[] == 0
 
@@ -94,7 +94,7 @@ end
 
     @test temperature_max.name == :surface_air_temperature_maximum
     @test temperature_mean.name == :surface_air_temperature_mean
-    @test all(isnan, vars.output.surface_air_temperature_maximum)
+    @test all(==(-Inf), vars.output.surface_air_temperature_maximum)
     @test all(isnan, vars.output.surface_air_temperature_mean)
 
     surface_air_temperature = vars.parameterizations.surface_air_temperature
@@ -110,11 +110,16 @@ end
 
     # after a reset the first value is taken
     SpeedyWeather.reset_diagnostics!(vars, model)
-    @test all(isnan, vars.output.surface_air_temperature_maximum)
+    @test all(==(-Inf), vars.output.surface_air_temperature_maximum)
     surface_air_temperature.data .= temperature1
     SpeedyWeather.diagnostics!(vars, model)
     @test vars.output.surface_air_temperature_maximum.data ≈ temperature1
     @test vars.output.surface_air_temperature_mean.data ≈ temperature1
+
+    # NaNs propagate, e.g. to see where the model blew up
+    surface_air_temperature[1] = NaN
+    SpeedyWeather.diagnostics!(vars, model)
+    @test isnan(vars.output.surface_air_temperature_maximum[1])
 end
 
 @testset "Output variables in restart files" begin
