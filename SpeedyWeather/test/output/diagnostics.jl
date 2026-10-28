@@ -29,43 +29,47 @@
     @test all(simulation.variables.output.rain_convection .== 0)
 end
 
-@testset "DailyMaximum diagnostic" begin
+@testset "PeriodicMaximum diagnostic" begin
     spectral_grid = SpectralGrid(truncation = 15, nlayers = 4)
-    diagnostics = (; PrecipitationDiagnostics()..., temperature_max = DailyMaximum())
+    diagnostics = (; PrecipitationDiagnostics()..., temperature_max = PeriodicMaximum())
     model = PrimitiveWetModel(spectral_grid; diagnostics)
     model.feedback.verbose = false
     simulation = initialize!(model)
     vars = simulation.variables
-    daily_maximum = model.diagnostics.temperature_max
+    maximum_diagnostic = model.diagnostics.temperature_max
 
-    @test daily_maximum.name == :surface_air_temperature_daily_maximum
-    @test all(isnan, vars.output.surface_air_temperature_daily_maximum)
-    @test all(==(-Inf), vars.output.surface_air_temperature_daily_maximum_running)
+    @test maximum_diagnostic.name == :surface_air_temperature_maximum
+    @test all(isnan, vars.output.surface_air_temperature_maximum)
+    @test all(==(-Inf), vars.output.surface_air_temperature_maximum_running)
 
-    # within the day: running maximum of all values so far
+    # within the period: running maximum of all values so far
     clock = vars.prognostic.clock
     clock.time_step_counter = 1
     surface_air_temperature = vars.parameterizations.surface_air_temperature
     temperature1 = 280 .+ 10 .* rand(spectral_grid.npoints)
     temperature2 = 280 .+ 10 .* rand(spectral_grid.npoints)
     surface_air_temperature.data .= temperature1
-    SpeedyWeather.diagnostic!(vars, daily_maximum, model)
+    SpeedyWeather.diagnostic!(vars, maximum_diagnostic, model)
     surface_air_temperature.data .= temperature2
-    SpeedyWeather.diagnostic!(vars, daily_maximum, model)
-    @test vars.output.surface_air_temperature_daily_maximum_running.data ≈ max.(temperature1, temperature2)
-    @test all(isnan, vars.output.surface_air_temperature_daily_maximum)
+    SpeedyWeather.diagnostic!(vars, maximum_diagnostic, model)
+    @test vars.output.surface_air_temperature_maximum_running.data ≈ max.(temperature1, temperature2)
+    @test all(isnan, vars.output.surface_air_temperature_maximum)
 
-    # end of the day: pass on the maximum including this step's value, reset the running maximum
-    clock.time_step_counter = daily_maximum.schedule.every_n_steps
+    # end of the period: pass on the maximum including this step's value, reset the running maximum
+    clock.time_step_counter = maximum_diagnostic.schedule.every_n_steps
     surface_air_temperature.data .= 300
-    SpeedyWeather.diagnostic!(vars, daily_maximum, model)
-    @test all(vars.output.surface_air_temperature_daily_maximum .== 300)
-    @test all(==(-Inf), vars.output.surface_air_temperature_daily_maximum_running)
+    SpeedyWeather.diagnostic!(vars, maximum_diagnostic, model)
+    @test all(vars.output.surface_air_temperature_maximum .== 300)
+    @test all(==(-Inf), vars.output.surface_air_temperature_maximum_running)
+
+    # other periods via the schedule
+    six_hourly = PeriodicMaximum(name = :temperature_max_6h, schedule = PeriodicSchedule(every = Hour(6)))
+    @test six_hourly.schedule.every == Second(Hour(6))
 
     # and within a simulation
     simulation = initialize!(model)
     run!(simulation, period = Hour(30))
-    @test all(isfinite, simulation.variables.output.surface_air_temperature_daily_maximum)
+    @test all(isfinite, simulation.variables.output.surface_air_temperature_maximum)
 end
 
 @testset "Output variables in restart files" begin

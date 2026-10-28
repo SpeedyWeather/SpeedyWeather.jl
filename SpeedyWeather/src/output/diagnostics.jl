@@ -1,10 +1,11 @@
 abstract type AbstractDiagnostic <: AbstractModelComponent end
 
-export AbstractDiagnostic, Accumulate, DailyMaximum, PrecipitationDiagnostics
+export AbstractDiagnostic, Accumulate, PeriodicMaximum, PrecipitationDiagnostics
 
-# fallbacks: no variables to initialize, nothing to diagnose
-initialize!(::AbstractVariables, ::AbstractDiagnostic, ::AbstractModel) = nothing
-diagnostic!(::AbstractVariables, ::AbstractDiagnostic, ::AbstractModel) = nothing
+# fallbacks: no variables to initialize, nothing to diagnose. Arguments other than the diagnostic
+# are untyped so that methods for custom diagnostics, typed or untyped, are never ambiguous
+initialize!(vars, ::AbstractDiagnostic, model) = nothing
+diagnostic!(vars, ::AbstractDiagnostic, model) = nothing
 
 """$(TYPEDSIGNATURES)
 Calculate all diagnostics in `model.diagnostics`, called once per time step (including spin-up
@@ -60,63 +61,63 @@ function diagnostic!(vars::AbstractVariables, accumulate::Accumulate, model::Abs
     return nothing
 end
 
-"""Diagnostic for the daily maximum of a 2D grid variable, e.g. the surface air temperature.
-Keeps a running maximum `<name>_running` in `variables.output` which is copied into
-`variables.output.<name>` and reset at the end of every day (as determined by `schedule`).
-Before the first day has passed `<name>` is NaN.
+"""Diagnostic for the maximum of a 2D grid variable over a period, e.g. the daily maximum
+surface air temperature. Keeps a running maximum `<name>_running` in `variables.output` which is
+copied into `variables.output.<name>` and reset at the end of every period (as determined by
+`schedule`, daily by default). Before the first period has passed `<name>` is NaN.
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct DailyMaximum{S} <: AbstractDiagnostic
-    "[OPTION] Name of the 2D grid variable to take the daily maximum of"
+@kwdef struct PeriodicMaximum{S} <: AbstractDiagnostic
+    "[OPTION] Name of the 2D grid variable to take the maximum of"
     variable::Symbol = :surface_air_temperature
 
     "[OPTION] Variable group of `variable`, e.g. `:parameterizations` or `:grid`"
     group::Symbol = :parameterizations
 
-    "[OPTION] Namespace of `variable` and of the daily maximum, e.g. `:land`"
+    "[OPTION] Namespace of `variable` and of the maximum, e.g. `:land`"
     namespace::Symbol = Symbol()
 
-    "[OPTION] Name of the daily maximum in `variables.output`"
-    name::Symbol = Symbol(variable, :_daily_maximum)
+    "[OPTION] Name of the maximum in `variables.output`"
+    name::Symbol = Symbol(variable, :_maximum)
 
-    "[OPTION] Units of the daily maximum"
+    "[OPTION] Units of the maximum"
     units::String = "K"
 
-    "[OPTION] Schedule when the maximum is taken and reset, every day"
+    "[OPTION] Schedule when the maximum is taken and reset, every day by default"
     schedule::S = PeriodicSchedule(every = Day(1))
 end
 
-running_name(maximum::DailyMaximum) = Symbol(maximum.name, :_running)
+running_name(maximum::PeriodicMaximum) = Symbol(maximum.name, :_running)
 
-variables(maximum::DailyMaximum) = (
+variables(maximum::PeriodicMaximum) = (
     OutputVariable(
         maximum.name, Grid2D(), units = maximum.units, namespace = maximum.namespace,
-        desc = "Daily maximum of $(maximum.variable)"
+        desc = "Maximum of $(maximum.variable) over the last period"
     ),
     OutputVariable(
         running_name(maximum), Grid2D(), units = maximum.units, namespace = maximum.namespace,
-        desc = "Running maximum of $(maximum.variable) since the start of the day"
+        desc = "Running maximum of $(maximum.variable) since the start of the period"
     ),
 )
 
-initialize!(maximum::DailyMaximum, model::AbstractModel) = initialize!(maximum.schedule, model.time_stepping)
+initialize!(maximum::PeriodicMaximum, model::AbstractModel) = initialize!(maximum.schedule, model.time_stepping)
 
-function initialize!(vars::AbstractVariables, maximum::DailyMaximum, ::AbstractModel)
+function initialize!(vars::AbstractVariables, maximum::PeriodicMaximum, ::AbstractModel)
     fill!(get_variable(vars.output, maximum.namespace, maximum.name), NaN)                 # no maximum yet
     fill!(get_variable(vars.output, maximum.namespace, running_name(maximum)), -Inf)       # max(-Inf, x) = x
     return nothing
 end
 
-function diagnostic!(vars::AbstractVariables, maximum::DailyMaximum, ::AbstractModel)
+function diagnostic!(vars::AbstractVariables, maximum::PeriodicMaximum, ::AbstractModel)
     variable = get_variable(getfield(vars, maximum.group), maximum.namespace, maximum.variable)
-    daily_maximum = get_variable(vars.output, maximum.namespace, maximum.name)
+    period_maximum = get_variable(vars.output, maximum.namespace, maximum.name)
     running = get_variable(vars.output, maximum.namespace, running_name(maximum))
 
     running .= max.(running, variable)
 
-    # at the end of the day: pass on the running maximum and reset it, branchless for Reactant
-    end_of_day = isscheduled(maximum.schedule, vars.prognostic.clock)
-    daily_maximum .= ifelse.(end_of_day, running, daily_maximum)
-    running .= ifelse.(end_of_day, -Inf, running)
+    # at the end of the period: pass on the running maximum and reset it, branchless for Reactant
+    end_of_period = isscheduled(maximum.schedule, vars.prognostic.clock)
+    period_maximum .= ifelse.(end_of_period, running, period_maximum)
+    running .= ifelse.(end_of_period, -Inf, running)
     return nothing
 end
 

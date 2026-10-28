@@ -1,6 +1,6 @@
 # Output variable group and model diagnostics
 
-> Status: **in progress**. `OutputVariable`, `variables.output` and `model.diagnostics` with `Accumulate` and `DailyMaximum` are implemented; "rate since last output" and monthly means are future work.
+> Status: **in progress**. `OutputVariable`, `variables.output` and `model.diagnostics` with `Accumulate` and `PeriodicMaximum` are implemented; "rate since last output" and monthly means are future work.
 
 Date of initial draft: 2026-10-28
 
@@ -24,11 +24,17 @@ Base revision: e292baf012d70813f9eab23081661bf1e168c3fb
 - 2026-10-28: Option A chosen (the diagnostic owns its reset schedule). Option B dropped: a model has only one output writer.
 - 2026-10-28: Signed off: (1) `variables.output` is written to and restored from restart files,
   (2) parameterizations only write rates, accumulation moves into `Accumulate` diagnostics.
-  Requested in addition: a `DailyMaximum` diagnostic to illustrate a non-accumulating diagnostic.
+  Requested in addition: a `PeriodicMaximum` diagnostic to illustrate a non-accumulating diagnostic.
   Part 2 implemented in the same PR.
 
 > Yes to 1 and 2. Can you also implement something like a DailyMaximum diagnostic just to
 > illustrate how a non-accumulating diagnostic would be set up?
+- 2026-10-28: `DailyMaximum` renamed to `PeriodicMaximum` as its period is set by its `schedule`;
+  fallbacks of `diagnostic!`/`initialize!` untyped in all but the diagnostic to avoid method
+  ambiguities with custom diagnostics (docs build failure).
+
+> The CI for docs are failing, have a look? Also given that DailyMaximum takes a period as option,
+> what about naming it PeriodicMaximum?
 
 ## Problem description
 
@@ -117,7 +123,7 @@ Implemented (`output/diagnostics.jl`):
 - `PrecipitationDiagnostics()`: `Accumulate`s for large-scale and convective rain and snow and
   `land.river_runoff`. Convection and large-scale condensation no longer accumulate; the soil
   moisture filter writes a new `land.river_runoff_rate` [m/s] instead of accumulating.
-- `DailyMaximum(; variable, group, namespace, name, units, schedule)`: running maximum
+- `PeriodicMaximum(; variable, group, namespace, name, units, schedule)`: running maximum
   `<name>_running` (initialized to -Inf), copied to `<name>` (initialized to NaN) and reset when
   `schedule` (`PeriodicSchedule(every = Day(1))`) is scheduled, branchless for Reactant.
 - Restart files store `variables.output`, `StartFromFile` restores the entries present in both.
@@ -131,7 +137,7 @@ Not yet: "rate since last output" (a diagnostic resetting on the output schedule
 - Existing convection, large-scale condensation, land time stepping and output tests updated to
   the new paths and run; convection and soil moisture tests now check rates × Δt.
 - `test/output/diagnostics.jl`: `Accumulate` adds `Δt * rate` and works without convection,
-  `DailyMaximum` running maximum and end-of-day reset (unit and in a 30h run), restart round trip
+  `PeriodicMaximum` running maximum and end-of-day reset (unit and in a 30h run), restart round trip
   of `variables.output`.
 
 ## Documentation changes
@@ -144,7 +150,7 @@ Not yet: "rate since last output" (a diagnostic resetting on the output schedule
 
 Breaking for user code accessing `simulation.variables.parameterizations.rain_convection` etc.
 Passing `diagnostics` replaces the defaults, so precipitation needs `PrecipitationDiagnostics()...`
-merged in, otherwise e.g. `ConvectiveRain` output fails. `DailyMaximum` is 2D only.
+merged in, otherwise e.g. `ConvectiveRain` output fails. `PeriodicMaximum` is 2D only.
 Barotropic and shallow water models have no `diagnostics` yet.
 
 ## Future work

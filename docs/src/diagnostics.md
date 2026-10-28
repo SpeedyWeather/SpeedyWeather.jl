@@ -34,19 +34,20 @@ Accumulated variables are also written to restart files and restored with
 ## Adding diagnostics
 
 To add a diagnostic, merge it into the default diagnostics, e.g. the daily maximum
-surface air temperature with [`DailyMaximum`](@ref)
+surface air temperature with [`PeriodicMaximum`](@ref)
 
 ```@example diagnostics
-diagnostics = (; PrecipitationDiagnostics()..., temperature_max = DailyMaximum())
+diagnostics = (; PrecipitationDiagnostics()..., temperature_max = PeriodicMaximum())
 model = PrimitiveWetModel(spectral_grid; diagnostics)
 simulation = initialize!(model)
 run!(simulation, period = Day(2))
-simulation.variables.output.surface_air_temperature_daily_maximum
+simulation.variables.output.surface_air_temperature_maximum
 ```
 
-`DailyMaximum` keeps a running maximum, which it copies into `surface_air_temperature_daily_maximum`
-at the end of every day, and resets. Before the first day has passed the daily maximum is `NaN`.
-Pass `variable`, `group` and `units` to take the daily maximum of another 2D grid variable.
+`PeriodicMaximum` keeps a running maximum, which it copies into `surface_air_temperature_maximum`
+at the end of every period (a day by default), and resets. Before the first period has passed the
+maximum is `NaN`. Pass `schedule` for another period, e.g. `PeriodicSchedule(every = Hour(6))`,
+and `variable`, `group` and `units` to take the maximum of another 2D grid variable.
 Without `PrecipitationDiagnostics()` in `diagnostics` the precipitation is not accumulated, and
 precipitation output variables like `ConvectiveRain` are not available.
 
@@ -91,5 +92,5 @@ To write diagnostics into the netCDF output, define an output variable whose
 
 ```@docs; canonical=false
 Accumulate
-DailyMaximum
+PeriodicMaximum
 ```
