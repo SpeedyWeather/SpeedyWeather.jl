@@ -722,9 +722,12 @@ temperature profile close to the equilibrium climate of the `PrimitiveWetModel`.
 With the dimensionless log-pressure coordinate z = -ln(σ) (not a height in meters)
 the zonal wind is
 
-    u(φ, σ) = U(σ) sin²(2φ),    U(σ) = u₀ tanh(z / H)
+    u(φ, σ) = U(σ) sin²(2φ),    U(σ) = u₀ tanh(z / H) f(z)
+    f(z) = exp(-((z - z_jet) / D)²) for z > z_jet = -ln(σ_jet), 1 otherwise
 
-which is zero at the surface and increases about linearly with z in the troposphere.
+which is zero at the surface, increases about linearly with z in the troposphere and
+decays above the jet at about σ_jet with a decay scale D (`jet_decay`). Use `σ_jet = 0`
+for no decay (f = 1), so that the wind increases monotonically up to the model top.
 Balance then gives the temperature (JW eq. 6 is the special case U = u₀cos^(3/2)(ηᵥ))
 
     T(φ, σ) = T̄(σ) + (1/R_d) dU/dz (2A(φ)U + B(φ)RΩ)
@@ -741,11 +744,17 @@ with `PressureOnOrography`, which would overwrite the surface pressure. Combine 
 `ConstantRelativeHumidity` for humidity.
 $(TYPEDFIELDS)"""
 @kwdef struct BalancedZonalState{NF} <: AbstractInitialConditions
-    "[OPTION] Zonal wind speed for σ → 0, U = u₀ tanh(-ln(σ) / H) [m/s]"
+    "[OPTION] Zonal wind speed scale, U = u₀ tanh(z / H) f(z), z = -ln(σ) [m/s]"
     u₀::NF = 56
 
-    "[OPTION] Vertical scale of the zonal wind in z = -ln(σ), U = u₀ tanh(z / H) [1]"
+    "[OPTION] Vertical scale of the zonal wind in z = -ln(σ), U = u₀ tanh(z / H) f(z) [1]"
     H::NF = 2
+
+    "[OPTION] σ level above which the zonal wind decays, 0 for no decay [1]"
+    σ_jet::NF = 0.3
+
+    "[OPTION] Decay scale D in z = -ln(σ) above the jet, f(z) = exp(-((z - z_jet) / D)²) [1]"
+    jet_decay::NF = 1.5
 
     "[OPTION] Minimum global-mean temperature, isothermal stratosphere above [K]"
     Tmin::NF = 226
@@ -779,7 +788,8 @@ function initialize!(
     haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
     haskey(vars.prognostic, :temperature) || warn_undefvar(vars, :temperature) && return nothing
 
-    (; u₀, H, Tmin) = initial_conditions
+    (; u₀, H, Tmin, σ_jet, jet_decay) = initial_conditions
+    z_jet = -log(σ_jet)                 # = Inf for σ_jet = 0, i.e. no decay
     T₀ = model.atmosphere.reference_temperature
     Γ = lapse_rate(model.atmosphere)
     (; perturb_uₚ, perturb_radius) = initial_conditions
@@ -791,7 +801,7 @@ function initialize!(
     λc = initial_conditions.perturb_lon
     sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
     R = radius * perturb_radius         # spatial extent of perturbation
-    vor_ic = BalancedZonalVorticity(sinφc, cosφc, λc, radius, u₀, H, perturb_uₚ, R)
+    vor_ic = BalancedZonalVorticity(sinφc, cosφc, λc, radius, u₀, H, z_jet, jet_decay, perturb_uₚ, R)
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, zero(NF), perturb_uₚ, R)
     set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true)
 
@@ -811,17 +821,17 @@ function initialize!(
     launch!(
         architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
         balanced_zonal_temperature_kernel!, temp_grid, lnp_grid, model.geometry.σ_levels_full,
-        model.geometry.latds, initial_conditions, T₀, log(p₀), RΓg⁻¹, R_dry, aΩ,
+        model.geometry.latds, initial_conditions, z_jet, T₀, log(p₀), RΓg⁻¹, R_dry, aΩ,
     )
     set!(vars, model; temperature = temp_grid)
     return nothing
 end
 
 @kernel inbounds = true function balanced_zonal_temperature_kernel!(
-        temp_grid, lnp_grid, σ_levels_full, φ, initial_conditions, T₀, lnp₀, RΓg⁻¹, R_dry, aΩ,
+        temp_grid, lnp_grid, σ_levels_full, φ, initial_conditions, z_jet, T₀, lnp₀, RΓg⁻¹, R_dry, aΩ,
     )
     ij, k = @index(Global, NTuple)
-    (; u₀, H, Tmin) = initial_conditions
+    (; u₀, H, Tmin, jet_decay) = initial_conditions
 
     # plain sin/cos avoid AMDGPU hostcalls (see JablonowskiVorticity)
     φij = deg2rad(φ[ij])
@@ -829,15 +839,15 @@ end
     cosφ = cos(φij)
     NF = eltype(temp_grid)
 
-    # vertical coordinate x = -ln(p/p₀) with p = σpₛ
-    x = -(log(σ_levels_full[k]) + lnp_grid[ij] - lnp₀)
-    T̄ = max(T₀ * exp(-RΓg⁻¹ * x), Tmin)    # global-mean temperature [K]
-    U = u₀ * tanh(x / H)                    # zonal wind amplitude [m/s]
-    dUdx_R = u₀ / H * (1 - tanh(x / H)^2) / R_dry
+    # vertical coordinate z = -ln(p/p₀) with p = σpₛ
+    z = -(log(σ_levels_full[k]) + lnp_grid[ij] - lnp₀)
+    T̄ = max(T₀ * exp(-RΓg⁻¹ * z), Tmin)    # global-mean temperature [K]
+    U, dUdz = balanced_zonal_wind(z, u₀, H, z_jet, jet_decay)  # zonal wind amplitude [m/s]
+    dUdz_R = dUdz / R_dry
 
     A = -2sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63
     B = 8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - convert(NF, π) * 1 // 4
-    temp_grid[ij, k] = T̄ + dUdx_R * (2A * U + B * aΩ)
+    temp_grid[ij, k] = T̄ + dUdz_R * (2A * U + B * aΩ)
 end
 
 # <: Function so that it works with our `set!`
@@ -848,21 +858,37 @@ struct BalancedZonalVorticity{NF} <: Function
     radius::NF
     u₀::NF
     H::NF
+    z_jet::NF
+    jet_decay::NF
     perturb_uₚ::NF
     R::NF
 end
 
 Adapt.@adapt_structure BalancedZonalVorticity
 
+"""$(TYPEDSIGNATURES)
+Zonal wind amplitude U = u₀ tanh(z/H) f(z) of `BalancedZonalState` and its derivative dU/dz
+in z = -ln(σ), with f(z) = exp(-((z - z_jet)/D)²) above z_jet and 1 below."""
+@inline function balanced_zonal_wind(z, u₀, H, z_jet, D)
+    t = tanh(z / H)
+    above = z > z_jet
+    Δz = above ? (z - z_jet) / D : zero(z)
+    f = exp(-Δz^2)
+    dfdz = -2Δz / D * f
+    U = u₀ * t * f
+    dUdz = u₀ * ((1 - t^2) / H * f + t * dfdz)
+    return U, dUdz
+end
+
 @inline function (B::BalancedZonalVorticity)(λ, φ, σ)
-    (; sinφc, cosφc, λc, radius, u₀, H, perturb_uₚ, R) = B
+    (; sinφc, cosφc, λc, radius, u₀, H, z_jet, jet_decay, perturb_uₚ, R) = B
 
     # plain sin/cos avoid AMDGPU hostcalls (see JablonowskiVorticity)
     φ_rad = deg2rad(φ)
     sinφ, cosφ = sin(φ_rad), cos(φ_rad)
 
     # vorticity of u = U(σ) sin²(2φ), as in Jablonowski and Williamson eq. (3)
-    U = u₀ * tanh(-log(σ) / H)
+    U, _ = balanced_zonal_wind(-log(σ), u₀, H, z_jet, jet_decay)
     ζ = -4 * U / radius * sinφ * cosφ * (2 - 5sinφ^2)
 
     return ζ + jablonowski_vorticity_perturbation(φ_rad, λ, sinφc, cosφc, λc, radius, perturb_uₚ, R)

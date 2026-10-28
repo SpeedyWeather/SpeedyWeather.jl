@@ -190,11 +190,21 @@ end
         @test sum(temp_zonal_mean[:, k] .* weights) / sum(weights) ≈ T̄ rtol = 1.0e-3
 
         # vorticity of u = U(σ)sin²(2φ) in the southern hemisphere away from the perturbation
-        U = ic.u₀ * tanh(-log(σ[k]) / ic.H)
+        U, _ = SpeedyWeather.balanced_zonal_wind(-log(σ[k]), ic.u₀, ic.H, -log(ic.σ_jet), ic.jet_decay)
         ij = findfirst(φ .< -30)
         ζ = -4U / radius * sind(φ[ij]) * cosd(φ[ij]) * (2 - 5sind(φ[ij])^2)
         @test vor[ij, k] ≈ ζ rtol = 0.02
     end
+
+    # jet peaks in the upper troposphere, wind decays above
+    Ujet = [SpeedyWeather.balanced_zonal_wind(-log(σk), ic.u₀, ic.H, -log(ic.σ_jet), ic.jet_decay)[1] for σk in σ]
+    @test 0.1 < σ[argmax(Ujet)] < 0.4
+    @test Ujet[1] < maximum(Ujet) / 4
+
+    # σ_jet = 0 recovers the monotonic profile U = u₀ tanh(z / H)
+    U, dUdz = SpeedyWeather.balanced_zonal_wind(3.0, 56.0, 2.0, -log(0.0), 1.5)
+    @test U ≈ 56tanh(1.5)
+    @test dUdz ≈ 28 * (1 - tanh(1.5)^2)
 
     # warmer tropics than poles near the surface
     tropics, poles = abs.(φ) .< 10, abs.(φ) .> 80

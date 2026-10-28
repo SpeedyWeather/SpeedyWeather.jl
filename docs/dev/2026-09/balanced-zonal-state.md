@@ -88,6 +88,20 @@ Base revision: c7d631c658feefc851eb7af5b93aa5754430faf5
   `atmosphere.reference_temperature` (288 K) and `lapse_rate(atmosphere)`. Default
   `moist_lapse_rate` of `EarthAtmosphere` 5 → 5.7 K/km (also affects JW and `PressureOnOrography`
   in wet models). Notation: z = -ln σ, radius R.
+- 2026-10-28: follow-up prompt:
+  > At the moment the initial conditions for the zonal velocity peak at sigma=0, can this be
+  > lowered? [...] the jet should be around sigma=0.25 or so. This likely requires a temperature
+  > distribution where the equator-pole gradient changes sign [...] As long as there's a knob to
+  > get the balanced as is right now back
+
+  U = u₀ tanh(z/H) f(z) with f = exp(-((z - z_jet)/D)²) above z_jet = -ln σ_jet, new options
+  `σ_jet = 0.3`, `jet_decay = D = 1.5`; `σ_jet = 0` recovers the previous profile. Balance
+  stays exact (the temperature formula holds for any U(z)); above the jet dU/dz < 0 reverses the
+  meridional temperature gradient. Scanned (σ_jet, D) ∈ {(0.25, 1), (0.25, 1.5), (0.25, 2),
+  (0.3, 1.5), (0.3, 2), (0.35, 2.5)} at T31L16: lowering the jet and keeping the reversal small
+  compete; D = 1 gives a 54 K reversal, D = 2-2.5 peaks the jet at σ ≈ 0.15 with 27-35 K.
+  Chose (0.3, 1.5): jet ≈ 35 m/s at σ ≈ 0.2, reversal up to 40 K at σ ≈ 0.09. In a 20-day
+  T31L8 run the jet at 45° stays at σ ≈ 0.19 (33 m/s at day 20).
 
 ## Problem description
 

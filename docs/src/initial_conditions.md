@@ -254,10 +254,29 @@ Jablonowski-Williamson initial conditions [Jablonowski2006](@citep) to a differe
 profile of the zonal wind ``u``. With the dimensionless log-pressure coordinate ``z = -\ln \sigma`` (zero at the surface, increasing upwards, but not a height in meters),
 
 ```math
-u(\phi, \sigma) = U(\sigma) \sin^2(2\phi), \qquad U(\sigma) = u_0 \tanh(z/H)
+u(\phi, \sigma) = U(\sigma) \sin^2(2\phi), \qquad U(\sigma) = u_0 \tanh(z/H) f(z)
 ```
 
 which is zero at the surface and increases about linearly with ``z`` in the troposphere.
+Above ``z_{jet} = -\ln\sigma_{jet}`` the wind decays with
+
+```math
+f(z) = \exp\left(-\left(\frac{z - z_{jet}}{D}\right)^2\right) \quad \text{for } z > z_{jet},
+\qquad f(z) = 1 \quad \text{otherwise,}
+```
+
+so that the jet peaks in the upper troposphere (about ``\sigma = 0.2`` for the defaults
+`σ_jet = 0.3` and `jet_decay = D = 1.5`) and not at the model top. The decaying wind requires,
+through thermal wind balance, a reversed meridional temperature gradient above the jet, i.e. a
+polar lower stratosphere that is warmer than the tropical one, as observed and as in
+[Held1994](@citet). With the defaults the poles are up to about 40K warmer at
+``\sigma \approx 0.1``, which is more than in the real atmosphere. The initial
+conditions are still balanced, but whether the model's radiation maintains this
+stratosphere is a different question, so the jet may drift up or down over time.
+Use `σ_jet = 0` for ``f = 1``, i.e. a wind that increases monotonically up to the model top with
+the poles colder than the tropics at all heights. That is closer to the equilibrium climate of
+the `PrimitiveWetModel` at the moment, which lacks the stratospheric warming at the poles,
+e.g. from ozone.
 Thermal wind balance then determines the temperature
 
 ```math
@@ -325,6 +344,8 @@ about 2K). No formal optimisation was done; the parameters were read off these m
 | ``T_{min}`` | 226 K | Roughly isothermal global-mean stratosphere |
 | ``u_0`` | 56 m/s | Zonal-mean wind at 45°, about 40 m/s at ``\sigma = 0.2`` |
 | ``H`` | 2 | Wind growing about linearly in ``-\ln\sigma`` through the troposphere |
+| ``\sigma_{jet}`` | 0.3 | Jet at about ``\sigma = 0.2``, as in observations and [Held1994](@citet) |
+| ``D`` | 1.5 | Weak wind at the model top while keeping the reversed temperature gradient moderate |
 
 With ``u_0`` and ``H`` fixed by the wind, the meridional temperature contrast (about 45K equator to
 pole near the surface) is no longer free but follows from the balance, and it agrees with the
