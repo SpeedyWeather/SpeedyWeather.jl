@@ -105,28 +105,29 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     C_Q_ocean = neutral_transfer_coefficient(z, z₀M_ocean, z₀Q_ocean, κ)
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
-    # they call it Ri_a = Ri here
+    # they call it Ri_a = Ri_land/Ri_ocean here
     ΔΦ₀ = gravity * z     # geopotential height relative to surface
-    Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
+    Ri_land, Ri_ocean = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
     Ri_c = drag.critical_Richardson
     (; drag_min) = drag
 
     # clamp to get the cases, eq (12-14)
     # if Ri > Ri_c then C = 0
     # if Ri_c > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_c)^2
-    # if Ri_c < 0 then κ^2/log(z/z₀)^2
-    Ri = clamp(Ri, 0, Ri_c)
+    # if Ri < 0 then κ^2/log(z/z₀)^2
+    stability_land = (1 - clamp(Ri_land, 0, Ri_c) / Ri_c)^2
+    stability_ocean = (1 - clamp(Ri_ocean, 0, Ri_c) / Ri_c)^2
 
     # unpack for readability
     (; land, ocean) = vars.parameterizations
 
-    land.boundary_layer_drag_momentum[ij] = max(drag_min, C_M_land * (1 - Ri / Ri_c)^2)
-    land.boundary_layer_drag_heat[ij] = max(drag_min, C_H_land * (1 - Ri / Ri_c)^2)
-    land.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q_land * (1 - Ri / Ri_c)^2)
+    land.boundary_layer_drag_momentum[ij] = max(drag_min, C_M_land * stability_land)
+    land.boundary_layer_drag_heat[ij] = max(drag_min, C_H_land * stability_land)
+    land.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q_land * stability_land)
 
-    ocean.boundary_layer_drag_momentum[ij] = max(drag_min, C_M_ocean * (1 - Ri / Ri_c)^2)
-    ocean.boundary_layer_drag_heat[ij] = max(drag_min, C_H_ocean * (1 - Ri / Ri_c)^2)
-    ocean.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q_ocean * (1 - Ri / Ri_c)^2)
+    ocean.boundary_layer_drag_momentum[ij] = max(drag_min, C_M_ocean * stability_ocean)
+    ocean.boundary_layer_drag_heat[ij] = max(drag_min, C_H_ocean * stability_ocean)
+    ocean.boundary_layer_drag_humidity[ij] = max(drag_min, C_Q_ocean * stability_ocean)
 
     # For output reading
     vars.parameterizations.boundary_layer_drag_momentum[ij] =
@@ -159,22 +160,40 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Calculate the bulk Richardson number following Frierson, 2006.
-For vertical stability in the boundary layer."""
+Bulk Richardson number between the lowermost layer and the land and ocean surface following
+Frierson, 2006, eq. (15), Ri = ΔΦ₀ (Θ₁ - Θ₀) / (Θ₀ Vₛ²), with the virtual dry static energy
+Θ₁ = cₚTᵥ + ΔΦ₀ of the lowermost layer and Θ₀ = cₚTᵥ₀ of the surface. Over land Tᵥ₀ uses the
+uppermost soil layer temperature and humidity α q⋆ (as in `SurfaceLandHumidityFlux`), over ocean
+the sea surface temperature and q⋆ (as in `SurfaceOceanHumidityFlux`). Returns `(Ri_land, Ri_ocean)`."""
 @propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
     cₚ = atmosphere.heat_capacity
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, drag)
     NF = eltype(temp)
     surface = size(temp, 2)     # surface index = nlayers
-
-    Vₛ = vars.parameterizations.surface_wind_speed[ij]
-    T = temp[ij, surface]
-    q = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, drag)[ij, surface] : zero(NF)
-    Tᵥ = virtual_temperature(T, q, atmosphere)
+    ts_land = time_stepper(time_stepping, :land)
+    ts_ocean = time_stepper(time_stepping, :ocean)
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
-    Θ₀ = cₚ * Tᵥ          # virtual dry static energy at surface (z=0)
-    Θ₁ = Θ₀ + ΔΦ₀       # virtual dry static energy at first model level (z=z)
-    bulk_richardson = ΔΦ₀ * (Θ₁ - Θ₀) / (Θ₀ * Vₛ^2)
-    return bulk_richardson
+    Vₛ = vars.parameterizations.surface_wind_speed[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]
+    Tₙ = temp[ij, surface]
+    has_humidity = haskey(vars.grid, :humidity)
+    q = has_humidity ? get_prognostic_step(vars.grid.humidity, time_stepping, drag)[ij, surface] : zero(NF)
+    Θ₁ = cₚ * virtual_temperature(Tₙ, q, atmosphere) + ΔΦ₀  # virtual dry static energy at first model level (z=z)
+
+    # Land surface, use top soil layer
+    T_land = get_prognostic_step(vars.prognostic.land.soil_temperature, ts_land, drag)[ij, begin]
+    α = haskey(vars.parameterizations.land, :soil_moisture_availability) ?
+        vars.parameterizations.land.soil_moisture_availability[ij] : zero(NF)
+    q_land = has_humidity ? α * saturation_humidity(T_land, pₛ, atmosphere) : zero(NF)  # scale by alpha like in surface fluxes
+    Θ₀_land = cₚ * virtual_temperature(T_land, q_land, atmosphere)  # virtual dry static energy at land surface (z=0)
+
+    # Ocean surface, use sea surface temperature
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, ts_ocean, drag)[ij]
+    q_ocean = has_humidity ? saturation_humidity(SST, pₛ, atmosphere) : zero(NF)
+    Θ₀_ocean = cₚ * virtual_temperature(SST, q_ocean, atmosphere)  # virtual dry static energy at ocean surface (z=0)
+
+    Ri_land = ΔΦ₀ * (Θ₁ - Θ₀_land) / (Θ₀_land * Vₛ^2)
+    Ri_ocean = ΔΦ₀ * (Θ₁ - Θ₀_ocean) / (Θ₀_ocean * Vₛ^2)
+    return Ri_land, Ri_ocean
 end
