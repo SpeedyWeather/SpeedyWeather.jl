@@ -7,7 +7,7 @@ returns it. Meant to be hoisted to the top of the `j` loop in the CPU `_legendre
 so the recursion for `RecomputedLegendre` is amortised over every order and every layer of one
 ring — one recursion pass per ring per transform, run in `Float64` when `NF == Float64` and in
 double-single arithmetic otherwise (see `ScaledLegendre`), so CPU and GPU agree."""
-legendre_ring!(legendre::PrecomputedLegendre, j::Integer) = view(legendre.polynomials.data, :, j)
+legendre_ring!(legendre::PrecomputedLegendre, j::Integer) = view(legendre.polynomials, :, j)
 
 function legendre_ring!(legendre::RecomputedLegendre, j::Integer)
     (; lmax, ring, xhi, xlo, αhi, αlo, βhi, βlo, sectoral_hi, sectoral_lo, sectoral_scale) = legendre

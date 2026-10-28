@@ -227,12 +227,12 @@ function SpectralTransform(
 
     # DENSE COPY OF THE LEGENDRE POLYNOMIALS FOR REACTANT, see the struct field, empty elsewhere
     legendre_polynomials_dense = legendre isa PrecomputedLegendre ?
-        dense_legendre_polynomials(architecture, legendre.polynomials, mmax_truncation) :
+        dense_legendre_polynomials(architecture, LowerTriangularArray(legendre.polynomials, spectrum_polynomials), mmax_truncation) :
         on_architecture(architecture, zeros(NF, 0))
 
     # Reactant only uses the dense copy, so the polynomials are unused there (zero latitudes)
     if architecture isa ReactantDevice
-        polynomials = zeros(LowerTriangularArray{NF}, spectrum, 0)
+        polynomials = zeros(LowerTriangularArray{NF}, spectrum, 0).data
         (; polynomials_transposed) = legendre
         legendre = PrecomputedLegendre{NF, typeof(polynomials), typeof(polynomials_transposed)}(
             polynomials, polynomials_transposed,

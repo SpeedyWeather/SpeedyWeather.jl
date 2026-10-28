@@ -13,9 +13,11 @@ abstract type AbstractLegendrePolynomials{NF} end
 Legendre polynomials precomputed once for every spherical harmonic `(l, m)` and latitude ring `j`
 (northern hemisphere only, by symmetry), exactly as `SpectralTransform` has always done. Fields
 $(TYPEDFIELDS)"""
-struct PrecomputedLegendre{NF, LowerTriangularArrayType, VectorType} <: AbstractLegendrePolynomials{NF}
-    "Legendre polynomials λ_l^m(cos(colat_j)), stored as (lm, j)"
-    polynomials::LowerTriangularArrayType
+struct PrecomputedLegendre{NF, MatrixType, VectorType} <: AbstractLegendrePolynomials{NF}
+    "Legendre polynomials λ_l^m(cos(colat_j)), stored as (lm, j), the data of a `LowerTriangularArray`
+    but unwrapped so that its long type does not lengthen the `SpectralTransform` type name, see
+    test/type_name_length.jl"
+    polynomials::MatrixType
     "Transposed copy (j, lm), flattened so it needs no type parameter of its own; index it as
     [(lm - 1) * nlat_half + j]. Only the GPU inverse transform reads this layout (the forward
     transform reads `polynomials` directly); empty on CPU."
@@ -58,8 +60,8 @@ function PrecomputedLegendre(
         vec(permutedims(polynomials.data)) :
         on_architecture(architecture, zeros(NF, 0))
 
-    return PrecomputedLegendre{NF, typeof(polynomials), typeof(polynomials_transposed)}(
-        polynomials, polynomials_transposed,
+    return PrecomputedLegendre{NF, typeof(polynomials.data), typeof(polynomials_transposed)}(
+        polynomials.data, polynomials_transposed,
     )
 end
 

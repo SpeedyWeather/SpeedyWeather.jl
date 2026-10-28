@@ -397,7 +397,7 @@ function _legendre!(                        # GRID TO SPECTRAL
             (size(specs.data, 1), nlayers),
             forward_legendre_kernel!,
             specs.data,
-            legendre.polynomials.data,      # precomputed Legendre polynomials, (lm, j)
+            legendre.polynomials,           # precomputed Legendre polynomials, (lm, j)
             f_north,
             f_south,
             lon_offsets,

@@ -41,7 +41,7 @@ end
         @test isnothing(S.rfft_plans_batched)   # no FFT plans, XLA plans the FFTs
         # only the dense copy of the polynomials is used, the others are empty (`length`, not `isempty`: on a
         # concrete Reactant array `isempty` checks whether its buffer was deleted, not its length)
-        @test size(S.legendre.polynomials.data, 2) == 0
+        @test size(S.legendre.polynomials, 2) == 0
         @test length(S.legendre.polynomials_transposed) == 0
         @test S.fourier_dft == fourier_dft
         (; mmax) = S.spectrum
