@@ -8,6 +8,7 @@ export CUDAGPU, MetalGPU, ROCGPU
 export array_type, on_architecture, architecture, device
 export convert_to_device, ismatching, compatible_array_types, nonparametric_type
 export synchronize
+export memorysize
 
 """
     AbstractArchitecture
@@ -164,4 +165,38 @@ on_architecture(::CPU, a::StepRangeLen) = a
 @inline convert_to_device(::CPU, args) = args
 
 KernelAbstractions.synchronize(arch::AbstractArchitecture) = KernelAbstractions.synchronize(arch.device)
+"""
+    device_bytes(x) -> Int
+
+Bytes of `x` held in device (e.g. GPU) memory if `x` is a device array, 0 otherwise.
+Extended for `CuArray`, `ROCArray`, `MtlArray` and Reactant's concrete arrays in the
+respective extensions."""
+device_bytes(x) = 0
+
+"""
+    memorysize(x) -> Int
+
+Like `Base.summarysize(x)` (memory reachable from `x` in bytes) but also counting the memory
+of device arrays (e.g. `CuArray`), of which `Base.summarysize` only counts the host-side
+wrapper. Every mutable object (incl. arrays) is counted only once."""
+memorysize(x) = Base.summarysize(x) + _device_bytes(x, Base.IdSet{Any}())
+
+# recursively sum `device_bytes` over all objects reachable from `x`
+function _device_bytes(x, seen::Base.IdSet{Any})
+    x isa Union{Module, Function, Type, Symbol, String} && return 0
+    if ismutable(x)
+        x in seen && return 0
+        push!(seen, x)
+    end
+    nbytes = device_bytes(x)
+    nbytes > 0 && return nbytes
+    isbits(x) && return 0
+    if x isa Array                  # host arrays: recurse into elements only if they're not bits
+        isbitstype(eltype(x)) && return 0
+        return sum((_device_bytes(x[i], seen) for i in eachindex(x) if isassigned(x, i)); init = 0)
+    end
+    # other objects incl. wrappers (views, LowerTriangularArray, Field, ...): recurse into fields
+    return sum((_device_bytes(getfield(x, i), seen) for i in 1:nfields(x) if isdefined(x, i)); init = 0)
+end
+
 end

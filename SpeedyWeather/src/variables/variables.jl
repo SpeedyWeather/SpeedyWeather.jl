@@ -189,11 +189,11 @@ end
 # Exclude SubArray-backed memory from the pretty-print size: a fused parent's bytes are
 # already counted on `vars.fused.<sym>`, so charging them again on every view that aliases
 # it (e.g. `vars.tendencies.grid.u.data::SubArray`) would inflate the reported size.
-_pretty_size(x) = Base.summarysize(x)                # generic leaves (Clock, Ref, plain arrays, ...)
-_pretty_size(x::AbstractField) = is_view_entry(x) ? 0 : Base.summarysize(x.data)
-_pretty_size(x::LowerTriangularArray) = is_view_entry(x) ? 0 : Base.summarysize(x.data)
+_pretty_size(x) = memorysize(x)                     # generic leaves (Clock, Ref, plain arrays, ...)
+_pretty_size(x::AbstractField) = is_view_entry(x) ? 0 : memorysize(x.data)
+_pretty_size(x::LowerTriangularArray) = is_view_entry(x) ? 0 : memorysize(x.data)
 _pretty_size(x::SubArray) = 0
-_pretty_size(nt::NamedTuple) = isempty(nt) ? Base.summarysize(nt) : sum(_pretty_size, values(nt))
+_pretty_size(nt::NamedTuple) = isempty(nt) ? memorysize(nt) : sum(_pretty_size, values(nt))
 _pretty_size(v::Variables) = sum(_pretty_size, (getfield(v, k) for k in propertynames(v)))
 
 # pretty printing

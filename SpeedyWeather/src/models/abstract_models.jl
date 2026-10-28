@@ -76,7 +76,7 @@ initialize!(model::AbstractModel, ps::Union{ComponentVector, ParameterTable}; kw
 function Base.show(io::IO, M::AbstractModel)
     properties = propertynames(M)
     n = length(properties)
-    Msize = prettymemory(Base.summarysize(M))
+    Msize = prettymemory(memorysize(M))
     s = styled"{warning:$(model_type(M))}" * "{...} <: $(model_class(M)) " * styled"{note:($Msize)}"
     n == 0 ? print(io, s) : println(io, s)
     for (i, key) in enumerate(properties)
