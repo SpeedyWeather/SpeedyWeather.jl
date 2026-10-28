@@ -236,10 +236,10 @@ nothing # hide
 ```
 ![Large-scale precipitation](large-scale_precipitation_acc.png)
 
-Precipitation (rain, both large-scale and convective) are written into the
-`simulation.variables.parameterizations` which, however, accumulate all precipitation
-during simulation. In the NetCDF output, precipitation rate (in mm/hr) is calculated
-from accumulated precipitation as a post-processing step.
+Precipitation (rain, both large-scale and convective) is accumulated by [Diagnostics](@ref)
+in `simulation.variables.output`. With output these are reset after every output so that the
+NetCDF output contains the precipitation since the last output, but without output they
+accumulate all precipitation during the simulation.
 More interactively, you can also reset these accumulators and integrate for another 6 hours
 to get the precipitation only in that period.
 

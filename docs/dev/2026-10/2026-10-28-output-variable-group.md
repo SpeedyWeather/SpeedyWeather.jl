@@ -1,6 +1,6 @@
 # Output variable group and model diagnostics
 
-> Status: **in progress**. `OutputVariable`, `variables.output` and `model.diagnostics` with `Accumulate` and `PeriodicMaximum` are implemented; "rate since last output" and monthly means are future work.
+> Status: **in progress**. `OutputVariable`, `variables.output` and `model.diagnostics` (`Accumulate`, `Maximum`, `Mean`, reset by the output writer) are implemented, addressing review comments.
 
 Date of initial draft: 2026-10-28
 
@@ -35,6 +35,18 @@ Base revision: e292baf012d70813f9eab23081661bf1e168c3fb
 
 > The CI for docs are failing, have a look? Also given that DailyMaximum takes a period as option,
 > what about naming it PeriodicMaximum?
+- 2026-10-28: Review: reverses option A. Diagnostics only accumulate, the output writer resets
+  them after every output so that the output interval sets the period of the statistic.
+  `PeriodicMaximum` (two variables + schedule) becomes `Maximum` (one variable), new `Mean`;
+  the nested rate output variables (`ConvectiveRainRate` etc.) and their post-processing are
+  removed, precipitation output is the accumulation since the last output. Diagnostics no
+  longer declare the variables they read (warn on initialization, skip silently). `Δt` of the
+  accumulation is the model time of the step (`elapsed_time`, Δt/2 on leapfrog spin-up steps),
+  also for the river runoff rate. Compile-time unrolled loop over the diagnostics.
+
+> I believe the diagnostic should be responsible for the accumulation (with +, or max etc) but the
+> output writer for the reset, so that the output interval determines the statistic. E.g. How would
+> you output weekly averages if not the output interval is weekly? [PR review, abridged]
 
 ## Problem description
 
@@ -100,35 +112,35 @@ Each diagnostic
    so it is GPU-compatible;
 3. implements `reset!(vars, d)` and `finalize_period!(vars, d)` (e.g. sum → mean = sum/count).
 
-Who resets: the diagnostic owns its schedule (e.g. a `PeriodicSchedule`, or "since last output"
-bound to `model.output.interval` at `initialize!`), and the output writer only reads. A model has
-a single `output` writer, so accumulators are never shared between writers. Callbacks may also
-read `variables.output`, but they only read and never reset.
-
-With this, the post-hoc `AbstractRateOutputVariable` diff in NetCDF `finalize!` can be replaced by
-an on-the-fly "accumulated since last output / elapsed time" diagnostic that works for every writer.
+Who resets (revised in review): the diagnostic accumulates, the output writer resets all
+diagnostics after writing (`reset_diagnostics!`, called by NetCDF/Zarr/HEALPix, JLD2 and Array
+output). The output interval therefore sets the period: precipitation since the last output,
+daily maximum with daily output, weekly mean with weekly output. Without output no reset.
 
 Implemented (`output/diagnostics.jl`):
 
-- `AbstractDiagnostic`, `diagnostic!(vars, diagnostic, model)` and `initialize!(vars, diagnostic, model)`
-  fallbacks; `diagnostics!(vars, model)` called in `time_step!(simulation)` after the clock is
-  stepped (so spin-up steps are included, as before) and before `output!`.
+- `AbstractDiagnostic` with `variables(diagnostic)`, `initialize!(vars, diagnostic, model)`,
+  `diagnostic!(vars, diagnostic, model)` and `reset_diagnostic!(vars, diagnostic, model)`;
+  fallbacks untyped in all but the diagnostic to avoid method ambiguities with custom diagnostics.
+  `diagnostics!`/`reset_diagnostics!` unrolled at compile time over the `NamedTuple`.
+- `diagnostics!(vars, model)` is called in `time_step!(simulation)` after the time step and before
+  the clock is stepped (spin-up steps included), so `elapsed_time(time_stepping, clock)` is the
+  model time of this step: Δt/2, Δt/2, then Δt for `Leapfrog` (its clock rewinds by Δt/2 on the
+  second step), Δt otherwise. `time_step` would be the leapfrog integration step 2Δt.
 - `diagnostics::DG` field in `PrimitiveWetModel` (default `PrecipitationDiagnostics()`) and
-  `PrimitiveDryModel` (default `(;)`). `initialize!(model.diagnostics, model)` in the model's
-  `initialize!`, `initialize!(vars, model.diagnostics, model)` before the initial conditions so
-  `StartFromFile` can overwrite them.
-- `Accumulate(rate, name; namespace, units, desc)`: adds `Δt * rate` every time step, `Δt` being
-  `model.time_stepping.Δt` that the parameterizations used to compute their rates, so results are
-  unchanged. Also declares the rate so that it works (as zero) when the component is `nothing`.
+  `PrimitiveDryModel` (default `(;)`). `initialize!(vars, model.diagnostics, model)` runs before
+  the initial conditions so `StartFromFile` can overwrite them.
+- `Accumulate(; rate, name, namespace, units, desc)`: adds `elapsed_time * rate`, reset to 0.
+- `Maximum(; variable, group, namespace, name, units)`: running maximum, reset to NaN.
+- `Mean(; variable, group, namespace, name, units)`: incremental running mean with a step count
+  (`<name>_count`), reset to NaN/0, readable at any time.
+- Diagnostics do not declare the variables they read: warn on initialization, skip silently.
 - `PrecipitationDiagnostics()`: `Accumulate`s for large-scale and convective rain and snow and
   `land.river_runoff`. Convection and large-scale condensation no longer accumulate; the soil
-  moisture filter writes a new `land.river_runoff_rate` [m/s] instead of accumulating.
-- `PeriodicMaximum(; variable, group, namespace, name, units, schedule)`: running maximum
-  `<name>_running` (initialized to -Inf), copied to `<name>` (initialized to NaN) and reset when
-  `schedule` (`PeriodicSchedule(every = Day(1))`) is scheduled, branchless for Reactant.
+  moisture filter writes `land.river_runoff_rate` [m/s] = runoff / `elapsed_time`.
+- Output: `ConvectiveRain`, `LargeScaleRain`, … are the accumulation since the last output [mm];
+  `ConvectiveRainRate` etc., `AbstractRateOutputVariable` and the `finalize!` post-processing removed.
 - Restart files store `variables.output`, `StartFromFile` restores the entries present in both.
-
-Not yet: "rate since last output" (a diagnostic resetting on the output schedule) and monthly means.
 
 ## Testing and verification
 
@@ -136,9 +148,10 @@ Not yet: "rate since last output" (a diagnostic resetting on the output schedule
   and not in `vars.parameterizations`, `OutputVariable` type.
 - Existing convection, large-scale condensation, land time stepping and output tests updated to
   the new paths and run; convection and soil moisture tests now check rates × Δt.
-- `test/output/diagnostics.jl`: `Accumulate` adds `Δt * rate` and works without convection,
-  `PeriodicMaximum` running maximum and end-of-day reset (unit and in a 30h run), restart round trip
-  of `variables.output`.
+- `test/output/diagnostics.jl`: leapfrog `elapsed_time`; `Accumulate` adds `Δt * rate`, resets,
+  warns and skips without convection; `ArrayOutput` every 6h resets all diagnostics and the sum
+  over all outputs equals the accumulation of a run without output; `Maximum`/`Mean` unit tests;
+  restart round trip of `variables.output`.
 
 ## Documentation changes
 
@@ -150,12 +163,13 @@ Not yet: "rate since last output" (a diagnostic resetting on the output schedule
 
 Breaking for user code accessing `simulation.variables.parameterizations.rain_convection` etc.
 Passing `diagnostics` replaces the defaults, so precipitation needs `PrecipitationDiagnostics()...`
-merged in, otherwise e.g. `ConvectiveRain` output fails. `PeriodicMaximum` is 2D only.
+merged in, otherwise e.g. `ConvectiveRain` output fails. `Maximum` and `Mean` are 2D only.
+The precipitation rate output variables are removed (breaking), precipitation output is per output
+interval instead. Calendar periods (monthly means) require output at calendar intervals.
 Barotropic and shallow water models have no `diagnostics` yet.
 
 ## Future work
 
-- "Rate since last output" diagnostic bound to `model.output.interval`, replacing the post-hoc
-  `AbstractRateOutputVariable` diff in the NetCDF `finalize!`.
-- Time means over calendar periods (monthly mean temperature), needs a calendar-aware schedule.
+- Monthly means need monthly (calendar) output intervals.
+- 3D diagnostics.
 - `diagnostics` for barotropic and shallow water models.

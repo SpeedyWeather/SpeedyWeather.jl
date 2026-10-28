@@ -1,3 +1,17 @@
+@testset "Elapsed time of Leapfrog steps" begin
+    spectral_grid = SpectralGrid(truncation = 15, nlayers = 4)
+    time_stepping = Leapfrog(spectral_grid)
+    clock = Clock()
+    (; Δt) = time_stepping
+
+    # spin-up: Euler Δt/2, leapfrog Δt but rewinding the clock by Δt/2, then Δt
+    elapsed = map(0:3) do step_counter
+        clock.step_counter = step_counter
+        SpeedyWeather.elapsed_time(time_stepping, clock)
+    end
+    @test elapsed == [Δt / 2, Δt / 2, Δt, Δt]
+end
+
 @testset "Accumulate diagnostic" begin
     spectral_grid = SpectralGrid(truncation = 15, nlayers = 4)
     model = PrimitiveWetModel(spectral_grid)
@@ -19,57 +33,88 @@
     vars.parameterizations.rain_rate_large_scale .= 2
     vars.output.rain_large_scale .= 1
     SpeedyWeather.diagnostic!(vars, model.diagnostics.rain_large_scale, model)
-    @test all(vars.output.rain_large_scale .≈ 1 + 2 * model.time_stepping.Δt)
+    Δt = SpeedyWeather.elapsed_time(model.time_stepping, vars.prognostic.clock)
+    @test all(vars.output.rain_large_scale .≈ 1 + 2 * Δt)
 
-    # the rate is declared by the diagnostic too, so it also works without convection
+    # reset to zero
+    SpeedyWeather.reset_diagnostic!(vars, model.diagnostics.rain_large_scale, model)
+    @test all(vars.output.rain_large_scale .== 0)
+
+    # the rate is not declared by the diagnostic: warn and skip without convection
     model = PrimitiveWetModel(spectral_grid, convection = nothing)
     model.feedback.verbose = false
-    simulation = initialize!(model)
+    simulation = @test_logs (:warn, r"rain_rate_convection not defined") match_mode = :any initialize!(model)
+    @test !haskey(simulation.variables.parameterizations, :rain_rate_convection)
     run!(simulation, steps = 2)
     @test all(simulation.variables.output.rain_convection .== 0)
 end
 
-@testset "PeriodicMaximum diagnostic" begin
+@testset "Output writer resets diagnostics" begin
     spectral_grid = SpectralGrid(truncation = 15, nlayers = 4)
-    diagnostics = (; PrecipitationDiagnostics()..., temperature_max = PeriodicMaximum())
+    diagnostics = (; PrecipitationDiagnostics()..., temperature_max = Maximum(), temperature_mean = Mean())
+
+    # with output every 6 hours: precipitation since last output, reset after every output
+    output = ArrayOutput(interval = Hour(6), groups = (:output,))
+    model = PrimitiveWetModel(spectral_grid; output, diagnostics)
+    model.feedback.verbose = false
+    simulation = initialize!(model)
+    run!(simulation, period = Day(1), output = true)
+
+    snapshots = model.output.output
+    @test length(snapshots) == 5                        # initial conditions + 4 outputs
+    vars = simulation.variables.output
+    @test all(vars.rain_large_scale .== 0)              # reset after the last output
+    @test all(isnan, vars.surface_air_temperature_maximum)
+    @test all(isnan, vars.surface_air_temperature_mean)
+    @test vars.surface_air_temperature_mean_count[] == 0
+
+    last_output = snapshots[end].output
+    @test all(isfinite, last_output.surface_air_temperature_maximum)
+    @test all(last_output.surface_air_temperature_maximum .>= last_output.surface_air_temperature_mean)
+    @test last_output.surface_air_temperature_mean_count[] == 6 * 60 * 60 ÷ Int(model.time_stepping.Δt)
+
+    # summing over all output intervals yields the precipitation of a run without output (no reset)
+    rain_since_last_output = sum(snapshot.output.rain_large_scale for snapshot in snapshots[2:end])
+    model_no_output = PrimitiveWetModel(spectral_grid; output = ArrayOutput(interval = Hour(6)), diagnostics)
+    model_no_output.feedback.verbose = false
+    simulation_no_output = initialize!(model_no_output)
+    run!(simulation_no_output, period = Day(1), output = false)
+    rain_total = simulation_no_output.variables.output.rain_large_scale
+    @test rain_since_last_output ≈ rain_total rtol = 1.0e-4
+end
+
+@testset "Maximum and Mean diagnostics" begin
+    spectral_grid = SpectralGrid(truncation = 15, nlayers = 4)
+    diagnostics = (; temperature_max = Maximum(), temperature_mean = Mean())
     model = PrimitiveWetModel(spectral_grid; diagnostics)
     model.feedback.verbose = false
     simulation = initialize!(model)
     vars = simulation.variables
-    maximum_diagnostic = model.diagnostics.temperature_max
+    (; temperature_max, temperature_mean) = model.diagnostics
 
-    @test maximum_diagnostic.name == :surface_air_temperature_maximum
+    @test temperature_max.name == :surface_air_temperature_maximum
+    @test temperature_mean.name == :surface_air_temperature_mean
     @test all(isnan, vars.output.surface_air_temperature_maximum)
-    @test all(==(-Inf), vars.output.surface_air_temperature_maximum_running)
+    @test all(isnan, vars.output.surface_air_temperature_mean)
 
-    # within the period: running maximum of all values so far
-    clock = vars.prognostic.clock
-    clock.time_step_counter = 1
     surface_air_temperature = vars.parameterizations.surface_air_temperature
     temperature1 = 280 .+ 10 .* rand(spectral_grid.npoints)
     temperature2 = 280 .+ 10 .* rand(spectral_grid.npoints)
-    surface_air_temperature.data .= temperature1
-    SpeedyWeather.diagnostic!(vars, maximum_diagnostic, model)
-    surface_air_temperature.data .= temperature2
-    SpeedyWeather.diagnostic!(vars, maximum_diagnostic, model)
-    @test vars.output.surface_air_temperature_maximum_running.data ≈ max.(temperature1, temperature2)
+    for temperature in (temperature1, temperature2)
+        surface_air_temperature.data .= temperature
+        SpeedyWeather.diagnostics!(vars, model)
+    end
+    @test vars.output.surface_air_temperature_maximum.data ≈ max.(temperature1, temperature2)
+    @test vars.output.surface_air_temperature_mean.data ≈ (temperature1 .+ temperature2) ./ 2
+    @test vars.output.surface_air_temperature_mean_count[] == 2
+
+    # after a reset the first value is taken
+    SpeedyWeather.reset_diagnostics!(vars, model)
     @test all(isnan, vars.output.surface_air_temperature_maximum)
-
-    # end of the period: pass on the maximum including this step's value, reset the running maximum
-    clock.time_step_counter = maximum_diagnostic.schedule.every_n_steps
-    surface_air_temperature.data .= 300
-    SpeedyWeather.diagnostic!(vars, maximum_diagnostic, model)
-    @test all(vars.output.surface_air_temperature_maximum .== 300)
-    @test all(==(-Inf), vars.output.surface_air_temperature_maximum_running)
-
-    # other periods via the schedule
-    six_hourly = PeriodicMaximum(name = :temperature_max_6h, schedule = PeriodicSchedule(every = Hour(6)))
-    @test six_hourly.schedule.every == Second(Hour(6))
-
-    # and within a simulation
-    simulation = initialize!(model)
-    run!(simulation, period = Hour(30))
-    @test all(isfinite, simulation.variables.output.surface_air_temperature_maximum)
+    surface_air_temperature.data .= temperature1
+    SpeedyWeather.diagnostics!(vars, model)
+    @test vars.output.surface_air_temperature_maximum.data ≈ temperature1
+    @test vars.output.surface_air_temperature_mean.data ≈ temperature1
 end
 
 @testset "Output variables in restart files" begin

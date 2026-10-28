@@ -296,8 +296,8 @@ All length/height units are in meters but technically they just have to be consi
 ## Grouped variables
 
 For convenience we have defined several output groups, for example `OutputVariables.Precipitation()`
-definces both accumulated large-scale and convective precipitation as well as their rates and the
-cloud top height. Groups are
+defines both large-scale and convective precipitation (accumulated since the last output) as well as
+cloud top height and cloud cover. Groups are
 
 ```julia
 OutputVariables.Precipitation()

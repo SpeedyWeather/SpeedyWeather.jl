@@ -54,7 +54,7 @@ Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct RiverRunoff <: AbstractOutputVariable
     name::String = "roff"
     unit::String = "m"
-    long_name::String = "river runoff"
+    long_name::String = "river runoff accumulated since last output"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
