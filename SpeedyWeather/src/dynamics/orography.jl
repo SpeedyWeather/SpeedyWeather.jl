@@ -228,6 +228,7 @@ function initialize!(
     )
 
     orography_highres = on_architecture(S.architecture, field)
+    synchronize(S.architecture)
 
     # Interpolate/coarsen to desired resolution, jitted as one compiled function on Reactant
     interp = RingGrids.interpolator(orography, orography_highres)
