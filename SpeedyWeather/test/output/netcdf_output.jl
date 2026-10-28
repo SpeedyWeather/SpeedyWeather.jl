@@ -181,8 +181,8 @@ end
     @test haskey(ds, "v10")
 
     # Check that in most cases that u10 < u
-    @test sum(ds["u10"].var[:, :, end] .< ds["u"].var[:, :, end, end]) / length(ds["u10"].var[:, :, end]) < 0.9
-    @test sum(ds["v10"].var[:, :, end] .< ds["v"].var[:, :, end, end]) / length(ds["v10"].var[:, :, end]) < 0.9
+    @test sum(abs.(ds["u10"].var[:, :, end]) .< abs.(ds["u"].var[:, :, end, end])) / length(ds["u10"].var[:, :, end]) > 0.9
+    @test sum(abs.(ds["v10"].var[:, :, end]) .< abs.(ds["v"].var[:, :, end, end])) / length(ds["v10"].var[:, :, end]) > 0.9
 
     ## surface temperature should be within 60-130% of
     T₀ = model.atmosphere.reference_temperature     # in K
@@ -251,7 +251,7 @@ end
 
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
-    spectral_grid = SpectralGrid(nlayers=1)
+    spectral_grid = SpectralGrid(nlayers = 1)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path, id = "dense-output-test", interval = Hour(0))
     model = BarotropicModel(spectral_grid; output)
     model.feedback.verbose = false

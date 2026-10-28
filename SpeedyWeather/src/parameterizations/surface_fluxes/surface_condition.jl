@@ -115,7 +115,7 @@ regression expression.
 
 The slowdown factor is calculated as
 
-    f = clamp(1 - s, 0, 1)
+    f = max(1 - s, 0)
 
 where
 
@@ -239,7 +239,7 @@ end
     s = muladd(c4, log_z₀, s)
     s = muladd(c5, log(z), s)
 
-    return one(s) - s
+    return max(one(s) - s, zero(s))
 end
 
 export ConstantWindGust

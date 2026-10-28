@@ -453,9 +453,12 @@ Fields are $(TYPEDFIELDS)
     "[OPTION] Momentum roughness upper limit"
     @component max_ocean_momentum_roughness::MOMR
 
+    "[OPTION] Momentum roughness lower limit"
+    @param min_ocean_momentum_roughness::NF = 1.0e-5
+
     "[OPTION] coefficient for momentum roughness closure over ocean"
     @param m_c1::NF = 0.48786303
-    @param m_c2::NF = 3.374574
+    @param m_c2::NF = 1.2162691
     @param m_c3::NF = 0.5460857
     @param m_c4::NF = 0.45002246
     @param m_c5::NF = 0.9827853
