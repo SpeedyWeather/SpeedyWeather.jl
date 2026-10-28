@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- New variable group `variables.output` declared via `OutputVariable` for output-only variables, accumulated precipitation and river runoff moved there from `variables.parameterizations` [#1362](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1362)
 - Bump SpeedyWeatherInternals to v1.0.1 [#1361](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1361)
 - `ParameterEditing.parameters` and `reconstruct` support `Tuple`s, keying elements by their 1-based index; parameters nested in a tuple were previously dropped silently [#1352](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1352)
 - `DiagnosticClouds` convert the rain rate from m/s to mm/day correctly, the precipitation contribution to the cloud cover was 1e6 too small [#1351](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1351)
