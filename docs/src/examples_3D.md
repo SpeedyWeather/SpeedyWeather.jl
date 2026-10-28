@@ -228,7 +228,7 @@ We set `snow = false` in `ImplicitCondensation` and therefore deal with rain onl
 ```@example precipitation
 using CairoMakie
 
-(; rain_large_scale, rain_convection) = simulation.variables.parameterizations
+(; rain_large_scale, rain_convection) = simulation.variables.output
 m2mm = 1000     # convert from [m] to [mm]
 heatmap(m2mm*rain_large_scale, title="Large-scale precipiation (rain) [mm]: Accumulated over 10 days", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
@@ -245,8 +245,8 @@ to get the precipitation only in that period.
 
 ```@example precipitation
 # reset accumulators and simulate 6 hours
-simulation.variables.parameterizations.rain_large_scale .= 0
-simulation.variables.parameterizations.rain_convection .= 0
+simulation.variables.output.rain_large_scale .= 0
+simulation.variables.output.rain_convection .= 0
 run!(simulation, period=Hour(6))
 
 # visualise, rain_* arrays are flat copies, no need to read them out again!

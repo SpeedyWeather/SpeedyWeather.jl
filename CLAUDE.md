@@ -40,7 +40,7 @@ SpeedyWeather/src/
 | Type | Purpose |
 |------|---------|
 | `SpectralGrid` | Central config: resolution (`truncation`), grid type, `nlayers`, `NF`, architecture |
-| `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch) |
+| `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, output, scratch) |
 | `Simulation{V,M}` | Top-level container holding model + variables |
 | `Leapfrog` | Time stepper with Robert/Williams filters |
 | `SpectralTransform` | FFT/Legendre transform machinery |
@@ -62,7 +62,7 @@ and `finalize!`.
 
 ### Variables Structure
 
-`Variables` is a unified container with 7 groups, each a NamedTuple:
+`Variables` is a unified container with 8 groups, each a NamedTuple:
 
 | Group | Purpose |
 |-------|---------|
@@ -72,6 +72,7 @@ and `finalize!`.
 | `dynamics` | Working arrays for the dynamical core (pressure gradients, vertical velocity, etc.) |
 | `parameterizations` | Working arrays for parameterizations (fluxes, radiation, cloud properties, etc.) |
 | `particles` | Particle advection variables |
+| `output` | Output-only variables, e.g. accumulated precipitation (write-only for dynamics/parameterizations) |
 | `scratch` | Temporary storage (write-before-read) |
 
 Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
@@ -86,7 +87,7 @@ vars.dynamics.w                                 # Vertical velocity
 
 Model components define their variables via variable type categories:
 `PrognosticVariable`, `GridVariable`, `TendencyVariable`, `DynamicsVariable`,
-`ParameterizationVariable`, `ParticleVariable`, `ScratchVariable`.
+`ParameterizationVariable`, `ParticleVariable`, `OutputVariable`, `ScratchVariable`.
 These are collected and allocated automatically by the `Variables(model)` constructor.
 
 ## Typical Usage

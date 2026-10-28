@@ -144,7 +144,7 @@ end
     p = soil.infiltration_fraction
 
     soil_moisture = variables.prognostic.land.soil_moisture
-    R = variables.parameterizations.land.river_runoff
+    R = variables.output.land.river_runoff
     soil_moisture[ij, 1, :] .= 1.2     # 0.2 excess in top layer
     soil_moisture[ij, 2, :] .= 0.5
     R[ij] = 0

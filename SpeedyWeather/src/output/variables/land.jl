@@ -63,7 +63,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::RiverRunoff, simulation) =
-    simulation.variables.parameterizations.land.river_runoff
+    simulation.variables.output.land.river_runoff
 
 """Defines netCDF output for a specific variable, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""

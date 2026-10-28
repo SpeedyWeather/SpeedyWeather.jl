@@ -14,7 +14,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::ConvectiveRain, simulation) =
-    simulation.variables.parameterizations.rain_convection
+    simulation.variables.output.rain_convection
 
 # at finalize step postprocess the convective rain to get the rate
 finalize!(output::NetCDFOutput, variable::ConvectiveRain, args...) = output!(output, variable.rate, variable)
@@ -76,7 +76,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::LargeScaleRain, simulation) =
-    simulation.variables.parameterizations.rain_large_scale
+    simulation.variables.output.rain_large_scale
 
 # at finalize step postprocess the accumulated rain to get the rate
 finalize!(output::NetCDFOutput, variable::LargeScaleRain, args...) = output!(output, variable.rate, variable)
@@ -111,7 +111,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::LargeScaleSnow, simulation) =
-    simulation.variables.parameterizations.snow_large_scale
+    simulation.variables.output.snow_large_scale
 
 # at finalize step postprocess the convective snow to get the rate
 finalize!(output::NetCDFOutput, variable::LargeScaleSnow, args...) = output!(output, variable.rate, variable)
@@ -179,7 +179,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::ConvectiveSnow, simulation) =
-    simulation.variables.parameterizations.snow_convection
+    simulation.variables.output.snow_convection
 
 # at finalize step postprocess the convective snow to get the rate
 finalize!(output::NetCDFOutput, variable::ConvectiveSnow, args...) = output!(output, variable.rate, variable)

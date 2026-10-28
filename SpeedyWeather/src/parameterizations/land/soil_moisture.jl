@@ -161,7 +161,7 @@ function variables(::LandBucketMoisture, model::AbstractModel)
         PrognosticVariable(:soil_moisture, LandXYZT(pg), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         TendencyVariable(:soil_moisture, LandXYZT(tg), desc = "Tendency of soil moisture", units = "1/s", namespace = :land),
         
-        ParameterizationVariable(:river_runoff, Grid2D(), desc = "Accumulated river runoff from soil moisture", units = "m", namespace = :land),
+        OutputVariable(:river_runoff, Grid2D(), desc = "Accumulated river runoff from soil moisture", units = "m", namespace = :land),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
         ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
         ParameterizationVariable(:snow_melt_rate, Grid2D(), desc = "Snow melt rate + snow runoff", units = "m/s", namespace = :land),
@@ -285,7 +285,7 @@ moisture is capped at 0 from below. This needs to be done after the time step as
 water is only known for the new soil moisture."""
 function Base.filter!(vars::Variables, soil::LandBucketMoisture, model::PrimitiveEquation)
     soil_moisture = vars.prognostic.land.soil_moisture
-    R = vars.parameterizations.land.river_runoff            # accumulated [m]
+    R = vars.output.land.river_runoff            # accumulated [m]
     (; land_fraction) = model.land_sea_mask
 
     @boundscheck fields_match(soil_moisture, R, horizontal_only = true) ||

@@ -61,6 +61,7 @@ you do you may want to use another variable group. These are the hardcoded group
 - `dynamics` via `DynamicsVariable`
 - `parameterizations` via `ParameterizationVariable`
 - `particles` via `ParticleVariable`
+- `output` via `OutputVariable` (write-only, for output only, e.g. accumulated precipitation)
 - `scratch` via `ScratchVariable`
 
 each of them require `name::Symbol` and `dim::AbstractVariabelDim` with `namespace::Symbol`,
