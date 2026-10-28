@@ -5,6 +5,8 @@
 - Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Convert volumetric soil moisture climatology to fraction of field capacity, fixing too-dry bucket initial conditions and prescribed SeasonalSoilMoisture [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
+- Bump SpeedyWeatherInternals to v1.0.1 [#1361](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1361)
+- `ParameterEditing.parameters` and `reconstruct` support `Tuple`s, keying elements by their 1-based index; parameters nested in a tuple were previously dropped silently [#1352](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1352)
 - `DiagnosticClouds` convert the rain rate from m/s to mm/day correctly, the precipitation contribution to the cloud cover was 1e6 too small [#1351](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1351)
 - Full-grid `get_londlatds` built with loops to work around a Julia v1.13.2 miscompile causing segfaults [#1348](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1348)
 - Primitive equation models recompute the reference temperature profile of the semi-implicit solver from the current global-mean temperature, fixes the instability of long T256L8 runs [#1332](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1332)
