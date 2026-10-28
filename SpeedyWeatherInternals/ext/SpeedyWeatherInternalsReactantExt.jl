@@ -127,4 +127,7 @@ function _set_scalar!(::ReactantDevice, x::AbstractArray, i::Integer, v::Number)
     return x
 end
 
+# count device memory in `memorysize`, `Base.summarysize` only counts the wrapper
+Architectures.device_bytes(a::Reactant.AbstractConcreteArray) = length(a) * sizeof(eltype(a))
+
 end

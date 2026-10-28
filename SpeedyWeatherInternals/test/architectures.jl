@@ -175,3 +175,21 @@ end
     @test nt_gpu.x isa JLArray
     @test keys(nt_gpu) == (:x, :y)
 end
+
+# mock device array: data "on the device" is invisible to Base.summarysize
+mutable struct MockDeviceArray
+    n::Int
+end
+SpeedyWeatherInternals.Architectures.device_bytes(a::MockDeviceArray) = 4a.n
+
+@testset "memorysize" begin
+    a = rand(Float32, 100)
+    @test memorysize(a) == Base.summarysize(a)
+    d = MockDeviceArray(1000)
+    @test memorysize(d) == Base.summarysize(d) + 4000
+
+    # recurse into fields and vectors, count every device array once
+    v = [d, d]
+    nt = (; v, d, other = MockDeviceArray(10), a)
+    @test memorysize(nt) == Base.summarysize(nt) + 4000 + 40
+end
