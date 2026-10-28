@@ -283,6 +283,362 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
     return nothing
 end
 
+abstract type AbstractLearnedScattering end
+
+@parameterized @kwdef struct VisibleIsotropicScattering{NF} <: AbstractLearnedScattering
+    "Coefficient fit via symbolic regression"
+    @param c1::NF = 0.13926611446264833
+
+    "Coefficient fit via symbolic regression"
+    @param c2::NF = 0.049407226600965096
+
+    "Coefficient fit via symbolic regression"
+    @param c3::NF = 0.03012000138970739
+
+    "Coefficient fit via symbolic regression"
+    @param c4::NF = 0.007003960811839407
+
+    "Coefficient fit via symbolic regression"
+    @param c5::NF = 0.0030819533608978183
+
+    "Coefficient fit via symbolic regression"
+    @param c6::NF = 98.73431990602951
+
+    "Coefficient fit via symbolic regression"
+    @param c7::NF = 0.0007767787214513013
+
+    "Coefficient fit via symbolic regression"
+    @param c8::NF = 0.4746273568956652
+
+    "Coefficient fit via symbolic regression"
+    @param c9::NF = 0.004805110395235223
+
+    "Coefficient fit via symbolic regression"
+    @param c10::NF = 1.1381888960412316
+
+    "Coefficient fit via symbolic regression"
+    @param c11::NF = 0.0203040824498551
+
+end
+
+Adapt.@adapt_structure VisibleIsotropicScattering
+VisibleIsotropicScattering(SG::SpectralGrid; kwargs...) = VisibleIsotropicScattering{SG.NF}(; kwargs...)
+
+@inline function (c::VisibleIsotropicScattering)(p)
+    (; laiₗ, sm1, sm2, snow_cover, st2, t2m, vₕ, vₗ, ΔTₛ, noise) = p
+    (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11) = c
+    μ = (
+        -(c1 * vₕ) + vₗ * (-(c2 * laiₗ) - c2 * snow_cover - c2 * sm1 - c3) + snow_cover * (c4 - c5 * vₕ)
+            * (ΔTₛ + c6) - c1 * sm2 - c7 * t2m + c8
+    )
+    raw_σ = snow_cover * sm2 * (c9 * st2 - c10) + c11
+    σ = max(raw_σ, zero(raw_σ))
+    return μ + σ * noise
+end
+
+@parameterized @kwdef struct VisibleVolumetricScattering{NF} <: AbstractLearnedScattering
+    "Coefficient fit via symbolic regression"
+    @param c1::NF = 0.005137089001311701
+
+    "Coefficient fit via symbolic regression"
+    @param c2::NF = 8.359579016151135e-7
+
+    "Coefficient fit via symbolic regression"
+    @param c3::NF = 547.1867710914254
+
+    "Coefficient fit via symbolic regression"
+    @param c4::NF = 4.88214507804199
+
+    "Coefficient fit via symbolic regression"
+    @param c5::NF = 0.006321233141025383
+
+    "Coefficient fit via symbolic regression"
+    @param c6::NF = 547.1858817550591
+
+    "Coefficient fit via symbolic regression"
+    @param c7::NF = 7.789539669853218e-8
+
+    "Coefficient fit via symbolic regression"
+    @param c8::NF = 0.0012984891007226625
+
+    "Coefficient fit via symbolic regression"
+    @param c9::NF = 0.013366006624365259
+
+    "Coefficient fit via symbolic regression"
+    @param c10::NF = 0.037107779858204085
+
+    "Coefficient fit via symbolic regression"
+    @param c11::NF = 0.001076347986980297
+
+    "Coefficient fit via symbolic regression"
+    @param c12::NF = 0.02154070145308177
+
+    "Coefficient fit via symbolic regression"
+    @param c13::NF = 0.013735265859374146
+
+end
+
+Adapt.@adapt_structure VisibleVolumetricScattering
+VisibleVolumetricScattering(SG::SpectralGrid; kwargs...) = VisibleVolumetricScattering{SG.NF}(; kwargs...)
+
+@inline function (c::VisibleVolumetricScattering)(p)
+    (; geopotential, laiₗ, sm1, snow_cover, st1, t2m, vₕ, vₗ, ΔTₛ, noise) = p
+    (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13) = c
+    q0 = vₕ + vₗ
+    μ = (
+        q0 * (
+            -(c1 * laiₗ) + c2 * t2m * (
+                ΔTₛ + snow_cover * (
+                    -(c3 * snow_cover) + c4 * t2m + c5 *
+                        geopotential - c6
+                ) + c7 * geopotential^2
+            ) / (q0 + c8) - c9
+        ) + c8 * st1 - c10 * sm1 - c11 * t2m
+    )
+    raw_σ = c12 * vₗ * snow_cover + c13
+    σ = max(raw_σ, zero(raw_σ))
+    return μ + σ * noise
+end
+
+@parameterized @kwdef struct VisibleGeometricScattering{NF} <: AbstractLearnedScattering
+    "Coefficient fit via symbolic regression"
+    @param c1::NF = 98.30689271056275
+
+    "Coefficient fit via symbolic regression"
+    @param c2::NF = 0.0002465039456962893
+
+    "Coefficient fit via symbolic regression"
+    @param c3::NF = 1.74846262394399e-8
+
+    "Coefficient fit via symbolic regression"
+    @param c4::NF = 0.2655102008045942
+
+    "Coefficient fit via symbolic regression"
+    @param c5::NF = 0.00016722961466941218
+
+    "Coefficient fit via symbolic regression"
+    @param c6::NF = 1.8198639960846736e-6
+
+    "Coefficient fit via symbolic regression"
+    @param c7::NF = 0.009976526656995078
+
+    "Coefficient fit via symbolic regression"
+    @param c8::NF = 0.000145787380943221
+
+    "Coefficient fit via symbolic regression"
+    @param c9::NF = 0.012478157859566873
+
+    "Coefficient fit via symbolic regression"
+    @param c10::NF = 0.01037571803805248
+
+    "Coefficient fit via symbolic regression"
+    @param c11::NF = 0.007018418642708496
+
+    "Coefficient fit via symbolic regression"
+    @param c12::NF = 0.000694635309383557
+
+    "Coefficient fit via symbolic regression"
+    @param c13::NF = 0.005474843497829615
+
+end
+
+Adapt.@adapt_structure VisibleGeometricScattering
+VisibleGeometricScattering(SG::SpectralGrid; kwargs...) = VisibleGeometricScattering{SG.NF}(; kwargs...)
+
+@inline function (c::VisibleGeometricScattering)(p)
+    (; U₁₀, geopotential, laiₗ, sm1, snow_cover, snow_depth, vₕ, vₗ, ΔTₛ, noise) = p
+    (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13) = c
+    μ = (
+        snow_cover * (snow_depth * (ΔTₛ - U₁₀) + c1) * (
+            -(c2 * vₗ) + c3 * geopotential * (
+                vₕ + laiₗ * (vₗ + snow_depth) - c4
+            ) + c5
+        ) + (
+            c6 * geopotential + (-(c7 * vₕ) - c7 * vₗ) * (
+                laiₗ * sm1 + c8 * geopotential
+            ) + c9
+        ) * sqrt(vₗ) + c10
+    )
+    raw_σ = (
+        snow_cover * (c11 - c12 * snow_depth) + c13
+    )
+    σ = max(raw_σ, zero(raw_σ))
+    return μ + σ * noise
+end
+
+@parameterized @kwdef struct NIRIsotropicScattering{NF} <: AbstractLearnedScattering
+    "Coefficient fit via symbolic regression"
+    @param c1::NF = 0.13250859400402135
+
+    "Coefficient fit via symbolic regression"
+    @param c2::NF = 0.08409939463271902
+
+    "Coefficient fit via symbolic regression"
+    @param c3::NF = 0.03616646161624834
+
+    "Coefficient fit via symbolic regression"
+    @param c4::NF = 0.10051756565160144
+
+    "Coefficient fit via symbolic regression"
+    @param c5::NF = 0.200655651610176
+
+    "Coefficient fit via symbolic regression"
+    @param c6::NF = 0.13125739630648842
+
+    "Coefficient fit via symbolic regression"
+    @param c7::NF = 1.2330577987093237e-5
+
+    "Coefficient fit via symbolic regression"
+    @param c8::NF = 0.308490327357136
+
+    "Coefficient fit via symbolic regression"
+    @param c9::NF = 0.38361527926198996
+
+    "Coefficient fit via symbolic regression"
+    @param c10::NF = 0.5104495709936557
+
+    "Coefficient fit via symbolic regression"
+    @param c11::NF = 0.07677930381946513
+
+    "Coefficient fit via symbolic regression"
+    @param c12::NF = 0.052701989554117486
+
+    "Coefficient fit via symbolic regression"
+    @param c13::NF = 0.25930825098307064
+
+    "Coefficient fit via symbolic regression"
+    @param c14::NF = 0.047761528867464
+
+    "Coefficient fit via symbolic regression"
+    @param c15::NF = 0.29940528501431796
+
+    "Coefficient fit via symbolic regression"
+    @param c16::NF = 0.03240815843538468
+
+end
+
+Adapt.@adapt_structure NIRIsotropicScattering
+NIRIsotropicScattering(SG::SpectralGrid; kwargs...) = NIRIsotropicScattering{SG.NF}(; kwargs...)
+
+@inline function (c::NIRIsotropicScattering)(p)
+    (; geopotential, laiₗ, sm2, snow_cover, vₕ, vₗ, noise) = p
+    (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16) = c
+    μ = (
+        vₕ * (-(c1 * snow_cover) - c2) + laiₗ * (-(c3 * vₗ) + c4 * sm2) + c5 * snow_cover^3 + (
+            - (c6 * laiₗ) + c7 * geopotential * (c8 * snow_cover + sm2 - c9)
+        ) / (laiₗ + snow_cover + c10) - (c11 * sm2 - c12) / sqrt(c13 * sm2 + c14) + c15
+    )
+    raw_σ = c16
+    σ = max(raw_σ, zero(raw_σ))
+    return μ + σ * noise
+end
+
+@parameterized @kwdef struct NIRVolumetricScattering{NF} <: AbstractLearnedScattering
+    "Coefficient fit via symbolic regression"
+    @param c1::NF = 0.02644856368910439
+
+    "Coefficient fit via symbolic regression"
+    @param c2::NF = 2.7037305935790665
+
+    "Coefficient fit via symbolic regression"
+    @param c3::NF = 2.2973971005827364e-5
+
+    "Coefficient fit via symbolic regression"
+    @param c4::NF = 0.0063074532998523255
+
+    "Coefficient fit via symbolic regression"
+    @param c5::NF = 0.015870141431257815
+
+    "Coefficient fit via symbolic regression"
+    @param c6::NF = 7.900349778266809e-8
+
+    "Coefficient fit via symbolic regression"
+    @param c7::NF = 1.3580861013567708e-11
+
+    "Coefficient fit via symbolic regression"
+    @param c8::NF = 0.1966651392522715
+
+    "Coefficient fit via symbolic regression"
+    @param c9::NF = 0.026503362065879634
+
+end
+
+Adapt.@adapt_structure NIRVolumetricScattering
+NIRVolumetricScattering(SG::SpectralGrid; kwargs...) = NIRVolumetricScattering{SG.NF}(; kwargs...)
+
+@inline function (c::NIRVolumetricScattering)(p)
+    (; sm2, snow_cover, st1, st2, t2m, vₗ, noise) = p
+    (; c1, c2, c3, c4, c5, c6, c7, c8, c9) = c
+    μ = (
+        snow_cover * (c1 * vₗ + c2) + sm2 * (c3 * st1^2 - c4 * st2) + t2m * (
+            - (c5 * snow_cover) + t2m^2 * (c6 * snow_cover - c7 * st1)
+        ) + c8
+    )
+    raw_σ = c9
+    σ = max(raw_σ, zero(raw_σ))
+    return μ + σ * noise
+end
+
+@parameterized @kwdef struct NIRGeometricScattering{NF} <: AbstractLearnedScattering
+    "Coefficient fit via symbolic regression"
+    @param c1::NF = 0.00016970668634889394
+
+    "Coefficient fit via symbolic regression"
+    @param c2::NF = 4.1657057100227406e-10
+
+    "Coefficient fit via symbolic regression"
+    @param c3::NF = 1.8792166707362004e-7
+
+    "Coefficient fit via symbolic regression"
+    @param c4::NF = 2.0653707823044138e-5
+
+    "Coefficient fit via symbolic regression"
+    @param c5::NF = 0.04338449131472477
+
+    "Coefficient fit via symbolic regression"
+    @param c6::NF = 0.10172346530005257
+
+    "Coefficient fit via symbolic regression"
+    @param c7::NF = 0.07360077673775481
+
+    "Coefficient fit via symbolic regression"
+    @param c8::NF = 3.49400847746966e-5
+
+    "Coefficient fit via symbolic regression"
+    @param c9::NF = 0.005699938844269787
+
+    "Coefficient fit via symbolic regression"
+    @param c10::NF = 0.0008285983510980352
+
+    "Coefficient fit via symbolic regression"
+    @param c11::NF = 0.614697095826219
+
+    "Coefficient fit via symbolic regression"
+    @param c12::NF = 0.0790756374361683
+
+    "Coefficient fit via symbolic regression"
+    @param c13::NF = 0.009887490927614274
+
+end
+
+Adapt.@adapt_structure NIRGeometricScattering
+NIRGeometricScattering(SG::SpectralGrid; kwargs...) = NIRGeometricScattering{SG.NF}(; kwargs...)
+
+@inline function (c::NIRGeometricScattering)(p)
+    (; geopotential, laiₕ, sm2, snow_cover, st2, t2m, vₕ, vₗ, noise) = p
+    (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13) = c
+    μ = (
+        -(c1 * t2m) + geopotential * (c2 * st2^2 - c3 * st2 + c4) + (c5 - c6 * snow_cover) * (
+            vₕ * (
+                c7 * laiₕ - c8 * geopotential
+            ) + sm2 - c9 * t2m * (-(c10 * st2) + sm2) * (vₗ + 2 * sm2 - c11)
+        ) + c12
+    )
+    raw_σ = c13
+    σ = max(raw_σ, zero(raw_σ))
+    return μ + σ * noise
+end
+
 export LearnedLandAlbedo
 
 @parameterized @kwdef struct LearnedLandAlbedo{NF, Scheme <: AbstractSnowCover} <: AbstractAlbedo
@@ -290,7 +646,7 @@ export LearnedLandAlbedo
     "Visible wavelength weight to the broadband shortwave albedo"
     @param vis_weight::NF = 0.5143 (bounds = 0 .. 1,)
 
-    "Snow depth scaling for calculation snow cover fraction from snow depth"
+    "Snow depth scaling for calculating snow cover fraction from snow depth"
     @param snow_depth_scale::NF = 0.05 (bounds = Positive,)
 
     "Snow cover-albedo scheme"
@@ -298,6 +654,24 @@ export LearnedLandAlbedo
 
     "[OPTION] Switch on stochastic output for the learned albedo"
     noise::Bool = false
+
+    "Learned visible isotropic scattering expression"
+    @component visible_isotropic::VisibleIsotropicScattering{NF} = VisibleIsotropicScattering{NF}()
+
+    "Learned visible volumetric scattering expression"
+    @component visible_volumetric::VisibleVolumetricScattering{NF} = VisibleVolumetricScattering{NF}()
+
+    "Learned visible geometric scattering expression"
+    @component visible_geometric::VisibleGeometricScattering{NF} = VisibleGeometricScattering{NF}()
+
+    "Learned NIR isotropic scattering expression"
+    @component near_infrared_isotropic::NIRIsotropicScattering{NF} = NIRIsotropicScattering{NF}()
+
+    "Learned NIR volumetric scattering expression"
+    @component near_infrared_volumetric::NIRVolumetricScattering{NF} = NIRVolumetricScattering{NF}()
+
+    "Learned NIR geometric scattering expression"
+    @component near_infrared_geometric::NIRGeometricScattering{NF} = NIRGeometricScattering{NF}()
 end
 
 Adapt.@adapt_structure LearnedLandAlbedo
@@ -318,70 +692,17 @@ end
 
 initialize!(albedo::LearnedLandAlbedo, model::PrimitiveEquation) = nothing
 
-@propagate_inbounds function white_sky_albedo(f_iso, f_vol, f_geo)
-    # Calculates the SZA-independent White-Sky Albedo (WSA).
-    # Based on the Lucht et al. (2000) BRDF model approximation.
-    NF = typeof(f_iso)
 
-    # Coefficients taken from Lucht et al. (2000)
-    wsa_vol_const = NF(0.189184)
-    wsa_geo_const = NF(-1.377622)
-    return f_iso + (wsa_vol_const * f_vol) + (wsa_geo_const * f_geo)
-end
-
-@propagate_inbounds function black_sky_albedo(f_iso, f_vol, f_geo, θ)
-    # Calculate black sky albedo using the Lucht et al. (2000) polynomial
-    NF = typeof(f_iso)
-
-    # Coefficients taken from Lucht et al. (2000)
-    c_iso = NF(1.0)
-    c_vol = evalpoly(θ, (NF(-0.007574), NF(0.0), NF(-0.070987), NF(0.307588)))
-    c_geo = evalpoly(θ, (NF(-1.284909), NF(0.0), NF(-0.166314), NF(0.04184)))
-
-    return (c_iso * f_iso) + (c_vol * f_vol) + (c_geo * f_geo)
-end
-
-@inline _safe_sqrt(x) = x >= zero(x) ? sqrt(x) : oftype(x, NaN)
-
-@inline function visible_isotropic_scattering(vₕ, vₗ, laiₗ, sm2, st2, snow_cover, noise)
-    T = promote_type(Float32, typeof(vₕ), typeof(vₗ), typeof(laiₗ), typeof(sm2), typeof(st2), typeof(snow_cover), typeof(noise))
-    return (((noise * T(0.03896045440440107) + T(-0.1218158966586572)) * T(0.025728017593462257)) * snow_cover + T(-0.1346102784222333)) * vₕ + (((T(0.006908593126432138) * snow_cover + T(-0.13673067396327065)) + (T(0.683619830705067) + ((T(-0.0009017510759633551) * st2 + noise * T(0.0285256619975839)) + T(-0.1346102784222333) * sm2))) + T(-0.052392875442762124) * (vₗ * ((T(0.683619830705067) + laiₗ) + (T(-0.14487101003784875) + T(0.11589160767036352) * noise) * (T(-0.13673067396327065) * snow_cover)) + T(0.7161992148232291)))
-end
-
-@inline function visible_volumetric_scattering(vₕ, vₗ, laiₗ, sm1, st1, st2, geopotential, snow_cover, t2m, noise)
-    T = promote_type(Float32, typeof(vₕ), typeof(vₗ), typeof(laiₗ), typeof(sm1), typeof(st1), typeof(st2), typeof(geopotential), typeof(snow_cover), typeof(t2m), typeof(noise))
-    return (T(0.016140250524517893) * noise + T(-0.04410325379601232) * sm1) + ((((vₕ + vₗ) * (T(-0.01470440805972792) + (T(9.122606489165302e-5) * (t2m * T(0.008546824863390104) + noise)) * ((((T(0.0025200785769508103) * geopotential) * (geopotential * T(0.0025200785769508103))) * T(0.016140250524517893) + (T(0.005668214606309846) * snow_cover) * (((t2m - snow_cover) - snow_cover) * (st2 * ((t2m * T(0.008546824863390104)) * T(0.005668214606309846))) + T(0.016140250524517893) * geopotential)) / ((vₕ + T(0.0025200785769508103)) + vₗ))) + laiₗ * T(-0.005123590195731909)) + st1 * T(0.0014159332530380526)) + t2m * T(-0.0011845617711790535))
-end
-
-@inline function visible_geometric_scattering(vₕ, laiₗ, sm1, geopotential, snow_cover, noise)
-    T = promote_type(Float32, typeof(vₕ), typeof(laiₗ), typeof(sm1), typeof(geopotential), typeof(snow_cover), typeof(noise))
-    return T(0.013754593690262884) + (_safe_sqrt(_safe_sqrt(laiₗ)) * (T(9.906885493797509e-7) * geopotential + (T(0.006595930444019463) + (sm1 + (geopotential * laiₗ) * T(2.1805730417085534e-5)) * T(-0.018464047185435716))) + (((geopotential * T(4.3663667100446695e-7)) * snow_cover - T(0.04395703327526142)) * ((((laiₗ - vₕ * geopotential) * T(2.1805730417085534e-5) + (laiₗ - (vₕ - T(0.03334265669607637)) * (T(-2.161750513690768) + laiₗ))) - T(0.04395703327526142)) * (T(0.03334265669607637) + noise * T(0.019535615884723058))) + (noise + sm1) * T(0.008867523895391013)))
-end
-
-@inline function near_infrared_isotropic_scattering(vₕ, vₗ, laiₕ, sm2, snow_cover, t2m, noise)
-    T = promote_type(Float32, typeof(vₕ), typeof(vₗ), typeof(laiₕ), typeof(sm2), typeof(snow_cover), typeof(t2m), typeof(noise))
-    return T(-0.08235648263453457) * (_safe_sqrt(vₗ) + (snow_cover / t2m + T(-0.1892657831005156) * vₕ) * (T(-0.07359907041268714) * (noise * laiₕ + snow_cover))) + (((T(-0.09496896272780166) * vₕ + sm2 * (T(-0.741150547535996) + sm2)) + T(0.4934449209685155)) + noise * T(0.045780621419124166))
-end
-
-@inline function near_infrared_volumetric_scattering(vₗ, sm1, sm2, st1, st2, geopotential, snow_cover, t2m, noise)
-    T = promote_type(Float32, typeof(vₗ), typeof(sm1), typeof(sm2), typeof(st1), typeof(st2), typeof(geopotential), typeof(snow_cover), typeof(t2m), typeof(noise))
-    return (((((T(-0.0003633530764346828) * geopotential) * vₗ + t2m) * ((t2m * t2m) * (st1 * T(-1.5726052867019688e-11) + (snow_cover + sm1) * T(6.961606055872098e-10)) + snow_cover * T(-0.00014194486565677876)) + sm2 * ((T(-0.021328337298982213) * st2 + (st1 * T(7.673078268962595e-5)) * st1) * T(0.3118690306291605))) + T(0.02426093826350491) * snow_cover) + T(0.21359294919077146)) + T(0.03500057089164972) * noise
-end
-
-@inline function near_infrared_geometric_scattering(vₕ, vₗ, laiₕ, sm2, st1, st2, geopotential, snow_cover, noise)
-    T = promote_type(Float32, typeof(vₕ), typeof(vₗ), typeof(laiₕ), typeof(sm2), typeof(st1), typeof(st2), typeof(geopotential), typeof(snow_cover), typeof(noise))
-    return (st2 * ((geopotential * T(3.818568357356443e-10)) * st2 + (T(-0.008433043494284033) + T(0.008482159093250554)) * noise) + ((snow_cover * T(-0.0005895508304773011) + T(0.02588756791821848)) * ((((T(-0.0005895508304773011) * (st2 + st2)) * ((sm2 + (st2 + st2) * T(-0.0005895508304773011)) + (snow_cover * (T(-3.7415065307307705e-5) * geopotential) + snow_cover) * T(-0.008433043494284033))) * (((geopotential * T(7.820596733390864e-5) + snow_cover * T(-0.008433043494284033)) + vₗ) + (sm2 + vₗ)) + geopotential * (T(-3.7415065307307705e-5) * vₕ)) + (((T(0.02588756791821848) * laiₕ) * laiₕ) * vₕ + sm2)) + ((T(0.08179264552082091) + (st2 * (geopotential * T(-1.7057584346842938e-7)) + T(0.008482159093250554) * vₗ)) + st1 * T(-0.00020412859377729543)))) + (vₕ * T(0.009331484441448655) + geopotential * T(1.853145610962989e-5))
-end
-
-@propagate_inbounds function albedo!(ij, albedo, vars, scheme::LearnedLandAlbedo, model)
+@propagate_inbounds function land_albedo_predictors(ij, vars, scheme::LearnedLandAlbedo, model)
     # Unpack predictors for albedo parameter prediction
     (; land) = vars.parameterizations
 
-    NF = eltype(albedo)
+    NF = eltype(land.albedo)
     zero_value = zero(NF)
+    noise = zero_value #TODO: add noise from Gaussian noise field if scheme.noise == true
 
-    noise = zero_value
     t2m = vars.parameterizations.surface_air_temperature[ij]
+    U₁₀ = vars.parameterizations.surface_wind_speed[ij]
     vₕ = haskey(land, :high_vegetation_cover) ? land.high_vegetation_cover[ij] : zero_value
     vₗ = haskey(land, :low_vegetation_cover) ? land.low_vegetation_cover[ij] : zero_value
     laiₕ = haskey(land, :high_vegetation_leaf_area) ? land.high_vegetation_leaf_area[ij] : zero_value
@@ -391,16 +712,15 @@ end
     # Get snow depth and calculate snow cover
     ts = time_stepper(model.time_stepping, :land)
     if haskey(vars.prognostic, :land) && haskey(vars.prognostic.land, :snow_depth)
-        ts = time_stepper(model.time_stepping, :land)
-        snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, ts, DummyParameterization())
+        snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, ts, DummyParameterization())[ij]
 
         # how to compute snow cover from snow depth
         snow_cover_scheme = scheme.snow_cover
 
-        # compute snow-cover fraction using the chosen scheme and convert to percentage
-        # as the learned albedos use snow-cover in percentage
-        snow_cover = NF(100) * snow_cover_scheme(snow_depth[ij], scheme.snow_depth_scale)
+        # compute snow-cover fraction using the chosen scheme
+        snow_cover = snow_cover_scheme(snow_depth, scheme.snow_depth_scale)
     else
+        snow_depth = zero_value
         snow_cover = zero_value
     end
 
@@ -429,31 +749,61 @@ end
         st1 = st2 = zero_value
     end
 
-    # Calculate parameters!
-    vis_iso = visible_isotropic_scattering(vₕ, vₗ, laiₗ, sm2, st2, snow_cover, noise)
-    nir_iso = near_infrared_isotropic_scattering(vₕ, vₗ, laiₕ, sm2, snow_cover, t2m, noise)
+    # Change in soil temperature helps the model to detect seasonal shift
+    ΔTₛ = st1 - st2
 
-    vis_vol = visible_volumetric_scattering(vₕ, vₗ, laiₗ, sm1, st1, st2, geopotential, snow_cover, t2m, noise)
-    nir_vol = near_infrared_volumetric_scattering(vₗ, sm1, sm2, st1, st2, geopotential, snow_cover, t2m, noise)
+    # from precipitation schemes [m/s]
+    snow_fall_rate = haskey(vars.parameterizations, :snow_rate) ? vars.parameterizations.snow_rate[ij] : zero_value
 
-    vis_geo = visible_geometric_scattering(vₕ, laiₗ, sm1, geopotential, snow_cover, noise)
-    nir_geo = near_infrared_geometric_scattering(vₕ, vₗ, laiₕ, sm2, st1, st2, geopotential, snow_cover, noise)
+    return (; vₕ, vₗ, laiₕ, laiₗ, sm1, sm2, st1, st2, ΔTₛ, geopotential, snow_cover, t2m, U₁₀, snow_fall_rate, noise, snow_depth)
+end
 
-    # Near infrared parameter weight
-    nir_weight = 1 - scheme.vis_weight
+@propagate_inbounds function broadband_parameter(vis_weight, vis_param, nir_param)
+    # Blend parameters based on empirical VIS/NIR weights (Munday et al., in prep)
+    nir_weight = 1 - vis_weight
+    broadband_param = (vis_param * vis_weight) + (nir_param * nir_weight)
 
-    # Weight vis/nir parameters to get the shortwave broadband albedo
-    sw_iso = (vis_iso * scheme.vis_weight) + (nir_iso * nir_weight)
-    sw_vol = (vis_vol * scheme.vis_weight) + (nir_vol * nir_weight)
-    sw_geo = (vis_geo * scheme.vis_weight) + (nir_geo * nir_weight)
+    return broadband_param
+end
+
+@propagate_inbounds function white_sky_albedo(f_iso, f_vol, f_geo)
+    # Calculates the SZA-independent White-Sky Albedo (WSA).
+    # Based on the Lucht et al. (2000) BRDF model approximation.
+    NF = typeof(f_iso)
+
+    # Coefficients taken from Lucht et al. (2000)
+    wsa_vol_const = NF(0.189184)
+    wsa_geo_const = NF(-1.377622)
+    return f_iso + (wsa_vol_const * f_vol) + (wsa_geo_const * f_geo)
+end
+
+@propagate_inbounds function black_sky_albedo(f_iso, f_vol, f_geo, θ)
+    # Calculate black sky albedo using the Lucht et al. (2000) polynomial
+    NF = typeof(f_iso)
+
+    # Coefficients taken from Lucht et al. (2000)
+    c_iso = NF(1.0)
+    c_vol = evalpoly(θ, (NF(-0.007574), NF(0.0), NF(-0.070987), NF(0.307588)))
+    c_geo = evalpoly(θ, (NF(-1.284909), NF(0.0), NF(-0.166314), NF(0.04184)))
+
+    return (c_iso * f_iso) + (c_vol * f_vol) + (c_geo * f_geo)
+end
+
+@propagate_inbounds function albedo!(ij, albedo, vars, scheme::LearnedLandAlbedo, model)
+    (; land) = vars.parameterizations
+    albedo_predictors = land_albedo_predictors(ij, vars, scheme, model)
+
+    isotropic_parameter = broadband_parameter(scheme.vis_weight, scheme.visible_isotropic(albedo_predictors), scheme.near_infrared_isotropic(albedo_predictors))
+    volumetric_parameter = broadband_parameter(scheme.vis_weight, scheme.visible_volumetric(albedo_predictors), scheme.near_infrared_volumetric(albedo_predictors))
+    geometric_parameter = broadband_parameter(scheme.vis_weight, scheme.visible_geometric(albedo_predictors), scheme.near_infrared_geometric(albedo_predictors))
 
     # Get zenith angle in radians
     μ = vars.parameterizations.cos_zenith[ij]
     θ = acos(clamp(μ, zero(μ), one(μ))) # only need when the sun is up
 
     # Then from those we'll calculate the black and white sky albedos
-    black_sky = black_sky_albedo(sw_iso, sw_vol, sw_geo, θ)
-    white_sky = white_sky_albedo(sw_iso, sw_vol, sw_geo)
+    black_sky = black_sky_albedo(isotropic_parameter, volumetric_parameter, geometric_parameter, θ)
+    white_sky = white_sky_albedo(isotropic_parameter, volumetric_parameter, geometric_parameter)
     land.black_sky_albedo[ij] = black_sky
     land.white_sky_albedo[ij] = white_sky
 
