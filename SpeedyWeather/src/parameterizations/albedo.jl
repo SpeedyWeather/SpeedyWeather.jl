@@ -10,7 +10,7 @@ This is because every albedo needs to be used either as part of OceanLandAlbedo 
 is called over both land and ocean surfaces. If a surface namespace (`vars.parameterizations.land` or `.ocean`) 
 contains both `black_sky_albedo` and `white_sky_albedo`, a shortwave scheme that knows the direct-beam fraction 
 blends them into that namespace's albedo. Otherwise it leaves albedo alone."""
-abstract type AbstractAlbedo <: AbstractModelComponent end
+abstract type AbstractAlbedo <: AbstractParameterization end
 
 # all albedos need to define albedo fields for ocean and land separately and total
 function variables(::AbstractAlbedo)
@@ -285,6 +285,10 @@ end
 
 abstract type AbstractLearnedScattering end
 
+"""Visible radiation isotropic scattering parameter calculation. This expression was derived by
+distilling a trained neural network using symbolic regression. Isotropic scattering means that
+light at the surface is reflected equally in all directions, regardless of where the sun is.
+Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct VisibleIsotropicScattering{NF} <: AbstractLearnedScattering
     "Coefficient fit via symbolic regression"
     @param c1::NF = 0.13926611446264833
@@ -327,15 +331,25 @@ VisibleIsotropicScattering(SG::SpectralGrid; kwargs...) = VisibleIsotropicScatte
 @inline function (c::VisibleIsotropicScattering)(p)
     (; laiₗ, sm1, sm2, snow_cover, st2, t2m, vₕ, vₗ, ΔTₛ, noise) = p
     (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11) = c
+
+    # Mean calcuation
     μ = (
         -(c1 * vₕ) + vₗ * (-(c2 * laiₗ) - c2 * snow_cover - c2 * sm1 - c3) + snow_cover * (c4 - c5 * vₕ)
             * (ΔTₛ + c6) - c1 * sm2 - c7 * t2m + c8
     )
+
+    # Std deviation
     raw_σ = snow_cover * sm2 * (c9 * st2 - c10) + c11
-    σ = max(raw_σ, zero(raw_σ))
+    σ = max(raw_σ, zero(raw_σ))  # shouldn't be negative...
     return μ + σ * noise
 end
 
+"""Visible radiation volumetric scattering parameter calculation. This expression was derived by
+distilling a trained neural network using symbolic regression. Volumetric scattering represents the
+reflection mechanism of light interacting with horizontally homogenous vegation canopy at the surface - 
+light meets the canopy, bounces around a bit beneath the canopy and exits back towards the sky. This 
+does depend on where the sun is and the viewing angle.
+Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct VisibleVolumetricScattering{NF} <: AbstractLearnedScattering
     "Coefficient fit via symbolic regression"
     @param c1::NF = 0.005137089001311701
@@ -384,7 +398,10 @@ VisibleVolumetricScattering(SG::SpectralGrid; kwargs...) = VisibleVolumetricScat
 @inline function (c::VisibleVolumetricScattering)(p)
     (; geopotential, laiₗ, sm1, snow_cover, st1, t2m, vₕ, vₗ, ΔTₛ, noise) = p
     (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13) = c
+    # Vegetation cover term
     q0 = vₕ + vₗ
+
+    # Mean calculation
     μ = (
         q0 * (
             -(c1 * laiₗ) + c2 * t2m * (
@@ -395,11 +412,18 @@ VisibleVolumetricScattering(SG::SpectralGrid; kwargs...) = VisibleVolumetricScat
             ) / (q0 + c8) - c9
         ) + c8 * st1 - c10 * sm1 - c11 * t2m
     )
+
+    # Std devation calculation
     raw_σ = c12 * vₗ * snow_cover + c13
-    σ = max(raw_σ, zero(raw_σ))
+    σ = max(raw_σ, zero(raw_σ))  # can't be negative
     return μ + σ * noise
 end
 
+"""Visible radiation geometric-optical scattering parameter calculation. This expression was derived by
+distilling a trained neural network using symbolic regression. Geometric scattering represents the 
+reflection due to shadowcasting of 3D objects at the surface, like tree crowns or big rocks, and 
+obscuration of shadows due to viewing angle.
+Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct VisibleGeometricScattering{NF} <: AbstractLearnedScattering
     "Coefficient fit via symbolic regression"
     @param c1::NF = 98.30689271056275
@@ -448,6 +472,8 @@ VisibleGeometricScattering(SG::SpectralGrid; kwargs...) = VisibleGeometricScatte
 @inline function (c::VisibleGeometricScattering)(p)
     (; U₁₀, geopotential, laiₗ, sm1, snow_cover, snow_depth, vₕ, vₗ, ΔTₛ, noise) = p
     (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13) = c
+
+    # Mean calculation
     μ = (
         snow_cover * (snow_depth * (ΔTₛ - U₁₀) + c1) * (
             -(c2 * vₗ) + c3 * geopotential * (
@@ -459,13 +485,19 @@ VisibleGeometricScattering(SG::SpectralGrid; kwargs...) = VisibleGeometricScatte
             ) + c9
         ) * sqrt(vₗ) + c10
     )
+
+    # Std deviation
     raw_σ = (
         snow_cover * (c11 - c12 * snow_depth) + c13
     )
-    σ = max(raw_σ, zero(raw_σ))
+    σ = max(raw_σ, zero(raw_σ))  # can't be negative
     return μ + σ * noise
 end
 
+"""Near-infrared radiation isotropic scattering parameter calculation. This expression was derived by
+distilling a trained neural network using symbolic regression. Isotropic scattering means that
+light at the surface is reflected equally in all directions, regardless of where the sun is.
+Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct NIRIsotropicScattering{NF} <: AbstractLearnedScattering
     "Coefficient fit via symbolic regression"
     @param c1::NF = 0.13250859400402135
@@ -523,16 +555,25 @@ NIRIsotropicScattering(SG::SpectralGrid; kwargs...) = NIRIsotropicScattering{SG.
 @inline function (c::NIRIsotropicScattering)(p)
     (; geopotential, laiₗ, sm2, snow_cover, vₕ, vₗ, noise) = p
     (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16) = c
+
+    # Mean calculation
     μ = (
         vₕ * (-(c1 * snow_cover) - c2) + laiₗ * (-(c3 * vₗ) + c4 * sm2) + c5 * snow_cover^3 + (
             - (c6 * laiₗ) + c7 * geopotential * (c8 * snow_cover + sm2 - c9)
         ) / (laiₗ + snow_cover + c10) - (c11 * sm2 - c12) / sqrt(c13 * sm2 + c14) + c15
     )
-    raw_σ = c16
-    σ = max(raw_σ, zero(raw_σ))
+
+    # Std deviation, in this case a constant
+    σ = c16 
     return μ + σ * noise
 end
 
+"""Near-infrared radiation volumetric scattering parameter calculation. This expression was derived by
+distilling a trained neural network using symbolic regression. Volumetric scattering represents the
+reflection mechanism of light interacting with horizontally homogenous vegation canopy at the surface - 
+light meets the canopy, bounces around a bit beneath the canopy and exits back towards the sky. This 
+does depend on where the sun is and the viewing angle.
+Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct NIRVolumetricScattering{NF} <: AbstractLearnedScattering
     "Coefficient fit via symbolic regression"
     @param c1::NF = 0.02644856368910439
@@ -569,16 +610,24 @@ NIRVolumetricScattering(SG::SpectralGrid; kwargs...) = NIRVolumetricScattering{S
 @inline function (c::NIRVolumetricScattering)(p)
     (; sm2, snow_cover, st1, st2, t2m, vₗ, noise) = p
     (; c1, c2, c3, c4, c5, c6, c7, c8, c9) = c
+
+    # Mean calculation
     μ = (
         snow_cover * (c1 * vₗ + c2) + sm2 * (c3 * st1^2 - c4 * st2) + t2m * (
             - (c5 * snow_cover) + t2m^2 * (c6 * snow_cover - c7 * st1)
         ) + c8
     )
-    raw_σ = c9
-    σ = max(raw_σ, zero(raw_σ))
+
+    # Std deviation, in this case just a constant
+    σ = c9
     return μ + σ * noise
 end
 
+"""Near-infrared radiation geometric-optical scattering parameter calculation. This expression was derived by
+distilling a trained neural network using symbolic regression. Geometric scattering represents the 
+reflection due to shadowcasting of 3D objects at the surface, like tree crowns or big rocks, and 
+obscuration of shadows due to viewing angle.
+Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct NIRGeometricScattering{NF} <: AbstractLearnedScattering
     "Coefficient fit via symbolic regression"
     @param c1::NF = 0.00016970668634889394
@@ -627,6 +676,8 @@ NIRGeometricScattering(SG::SpectralGrid; kwargs...) = NIRGeometricScattering{SG.
 @inline function (c::NIRGeometricScattering)(p)
     (; geopotential, laiₕ, sm2, snow_cover, st2, t2m, vₕ, vₗ, noise) = p
     (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13) = c
+
+    # Mean calculation
     μ = (
         -(c1 * t2m) + geopotential * (c2 * st2^2 - c3 * st2 + c4) + (c5 - c6 * snow_cover) * (
             vₕ * (
@@ -634,15 +685,22 @@ NIRGeometricScattering(SG::SpectralGrid; kwargs...) = NIRGeometricScattering{SG.
             ) + sm2 - c9 * t2m * (-(c10 * st2) + sm2) * (vₗ + 2 * sm2 - c11)
         ) + c12
     )
-    raw_σ = c13
-    σ = max(raw_σ, zero(raw_σ))
+
+    # Std deviation, in this case a constant
+    σ = c13
     return μ + σ * noise
 end
 
 export LearnedLandAlbedo
 
-@parameterized @kwdef struct LearnedLandAlbedo{NF, Scheme <: AbstractSnowCover} <: AbstractAlbedo
-    # Put symbolic regression coefficients in here
+"""Learned albedo over land based on surface properties and some ambient conditions.
+This breaks the scheme down into visible and near-infrared components and calculates
+scattering parameters for each wavelength that depend on the properties of the surface. 
+The parameters are combined into representative broadband shortwave parameters, then used 
+to construct the white- and black-sky albedo, which combine depending on the optical 
+properties of the atmosphere - to finally produce the blue-sky albedo. 
+Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct LearnedLandAlbedo{NF, B, Scheme <: AbstractSnowCover} <: AbstractAlbedo
     "Visible wavelength weight to the broadband shortwave albedo"
     @param vis_weight::NF = 0.5143 (bounds = 0 .. 1,)
 
@@ -653,7 +711,7 @@ export LearnedLandAlbedo
     @param snow_cover::Scheme = SaturatingSnowCover() (group = :snow_cover,)
 
     "[OPTION] Switch on stochastic output for the learned albedo"
-    noise::Bool = false
+    noise::B = false
 
     "Learned visible isotropic scattering expression"
     @component visible_isotropic::VisibleIsotropicScattering{NF} = VisibleIsotropicScattering{NF}()
@@ -680,7 +738,7 @@ function LearnedLandAlbedo(
         snow_cover = SaturatingSnowCover(),
         kwargs...,
     )
-    return LearnedLandAlbedo{SG.NF, typeof(snow_cover)}(; snow_cover, kwargs...)
+    return LearnedLandAlbedo{SG.NF, Bool, typeof(snow_cover)}(; snow_cover, kwargs...)
 end
 
 function variables(::LearnedLandAlbedo)
@@ -732,8 +790,8 @@ initialize!(albedo::LearnedLandAlbedo, model::PrimitiveEquation) = nothing
         capacity = land.soil_moisture_capacity[ij]
 
         # Multiply by soil moisture capacity to get back volume of water in the layer
-        sm1 = soil_moisture[ij, begin] * capacity
-        sm2 = soil_moisture[ij, end] * capacity
+        sm1 = soil_moisture[ij, 1] * capacity
+        sm2 = soil_moisture[ij, 2] * capacity
     else
         sm1 = sm2 = zero_value
     end
@@ -743,8 +801,8 @@ initialize!(albedo::LearnedLandAlbedo, model::PrimitiveEquation) = nothing
         soil_temperature = get_prognostic_step(
             vars.prognostic.land.soil_temperature, ts, scheme,
         )
-        st1 = soil_temperature[ij, begin]
-        st2 = soil_temperature[ij, end]
+        st1 = soil_temperature[ij, 1]
+        st2 = soil_temperature[ij, 2]
     else
         st1 = st2 = zero_value
     end
@@ -799,7 +857,8 @@ end
 
     # Get zenith angle in radians
     μ = vars.parameterizations.cos_zenith[ij]
-    θ = acos(clamp(μ, zero(μ), one(μ))) # only need when the sun is up
+    μ = clamp(μ, zero(μ), one(μ))  # only need when the sun is up
+    θ = atan(sqrt(1 - μ^2), μ)  # = acos(μ) but Reactant-compatible (no acos in XLA)
 
     # Then from those we'll calculate the black and white sky albedos
     black_sky = black_sky_albedo(isotropic_parameter, volumetric_parameter, geometric_parameter, θ)
