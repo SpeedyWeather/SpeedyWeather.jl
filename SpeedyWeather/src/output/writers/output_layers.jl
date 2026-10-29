@@ -64,7 +64,7 @@ PressureLayers(SG::SpectralGrid, pressure::AbstractVector; kwargs...) =
     PressureLayers(SG; pressure, kwargs...)
 
 # custom show function to have the unit printing with hPa
-function Base.show(io::IO, layers::PressureLayers{V}) where V
+function Base.show(io::IO, layers::PressureLayers{V}) where {V}
     pressure = on_architecture(CPU(), layers.pressure) ./ 100
     println(io, styled"{warning:PressureLayers}", "{$V, ...}")
     println(io, styled"├ {info:pressure} = $pressure hPa")
@@ -155,14 +155,6 @@ define a `layers` field."""
 output_layers(output::AbstractOutput) = hasproperty(output, :layers) ? output.layers : ModelLayers()
 
 """$(TYPEDSIGNATURES)
-Extrapolation of `variable` beyond the model's vertical layers: its `extrapolation` field
-if it has one (e.g. [`TemperatureOutput`](@ref) descends dry-adiabatically below the
-lowest model layer), otherwise constant. Same `hasproperty` pattern as `transform` and
-`unscale` in the generic [`output!`](@ref)."""
-output_extrapolation(variable::AbstractOutputVariable) =
-    hasproperty(variable, :extrapolation) ? variable.extrapolation : ConstantExtrapolation()
-
-"""$(TYPEDSIGNATURES)
 Interpolate `field` onto the output writer's vertical `layers`, returning the field to
 write out. No-op on [`ModelLayers`](@ref) and for variables that are not 3D atmospheric
 variables (2D variables, soil variables). For [`PressureLayers`](@ref) this interpolates
@@ -178,7 +170,7 @@ function interpolate_layers!(
         simulation::AbstractSimulation,
     )
     # only 3D atmospheric variables, soil variables keep their own vertical dimension
-    (is3D(variable) && !is_land(variable)) || return field
+    (OutputVariables.is3D(variable) && !OutputVariables.is_land(variable)) || return field
 
     (; model) = simulation
     surface_pressure = simulation.variables.parameterizations.surface_pressure
@@ -186,7 +178,7 @@ function interpolate_layers!(
     interpolate_pressure_layers!(
         layers.scratch, field, surface_pressure, layers.pressure,
         model.geometry.vertical_coordinates, layers.interpolation,
-        output_extrapolation(variable),
+        OutputVariables.output_extrapolation(variable),
     )
     return layers.scratch
 end

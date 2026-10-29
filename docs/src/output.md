@@ -195,11 +195,11 @@ Temperature descends dry-adiabatically, everything else is held constant, which 
 defaults
 
 ```@example netcdf
-SpeedyWeather.output_extrapolation(SpeedyWeather.TemperatureOutput())
+OutputVariables.output_extrapolation(OutputVariables.Temperature())
 ```
 
 ```@example netcdf
-SpeedyWeather.output_extrapolation(SpeedyWeather.HumidityOutput())
+OutputVariables.output_extrapolation(OutputVariables.Humidity())
 ```
 
 κ = R_dry/cₚ of the dry adiabat is taken from the model's atmosphere at `initialize!`.
@@ -208,7 +208,7 @@ default) instead, while still extrapolating between the lowest model layer and t
 surface, use a `SubsurfaceMask`
 
 ```@example netcdf
-temp = SpeedyWeather.TemperatureOutput(
+temp = OutputVariables.Temperature(
     extrapolation = SpeedyWeather.SubsurfaceMask(
         above_surface = SpeedyWeather.DryAdiabaticExtrapolation(),
     ),
@@ -223,8 +223,17 @@ every variable is currently held constant.
 
 ## Output variables
 
-One can easily add or remove variables from being output with the `NetCDFOut` writer. The following
-variables are predefined (note they are not exported so you have to prefix `SpeedyWeather.`)
+One can easily add or remove variables from being output with the `NetCDFOutput` writer.
+All predefined output variables live in the module `OutputVariables`. The module is
+exported but its contents are not, so you always access them with the `OutputVariables.`
+prefix, e.g. `OutputVariables.Temperature()`. The following variables are predefined
+
+!!! info "Renamed output variables"
+    Before v0.24 output variables were defined as e.g. `SpeedyWeather.TemperatureOutput()`,
+    they are now `OutputVariables.Temperature()`, collections like
+    `SpeedyWeather.DynamicsOutput()` are now `OutputVariables.Dynamics()` and
+    `SpeedyWeather.AllOutputVariables()` is `OutputVariables.All()`. The old names
+    still work but are deprecated and will be removed in a future release.
 
 ```@example netcdf
 using InteractiveUtils # hide
@@ -232,30 +241,30 @@ subtypes(SpeedyWeather.AbstractOutputVariable)
 ```
 
 "Defined" here means that every such type contains information about a variables (long) name,
-its units, dimensions, any missing values and compression options. For `HumidityOutput` for example
+its units, dimensions, any missing values and compression options. For `OutputVariables.Humidity` for example
 we have
 
 ```@example netcdf
-SpeedyWeather.HumidityOutput()
+OutputVariables.Humidity()
 ```
 
-You can choose name and unit as you like, e.g. `SpeedyWeather.HumidityOutput(unit = "1")` or change
-the compression options, e.g. `SpeedyWeather.HumidityOutput(keepbits = 5)` but more customisation
+You can choose name and unit as you like, e.g. `OutputVariables.Humidity(unit = "1")` or change
+the compression options, e.g. `OutputVariables.Humidity(keepbits = 5)` but more customisation
 is discussed in [Customizing netCDF output](@ref).
 
 We can add new output variables with `add!`
 
 ```@example netcdf
 output = NetCDFOutput(spectral_grid)            # default variables
-add!(output, SpeedyWeather.DivergenceOutput())  # output also divergence
+add!(output, OutputVariables.Divergence())  # output also divergence
 output
 ```
 
 If you didn't create a `NetCDFOutput` separately, you can also apply this directly to `model`,
-either `add!(model, SpeedyWeather.DivergenceOutput())` or `add!(model.output, args...)`,
+either `add!(model, OutputVariables.Divergence())` or `add!(model.output, args...)`,
 which technically also just forwards to `add!(model.output.variables, args...)`.
 `output.variables` is a dictionary were the variable names (as `Symbol`s) are used as keys,
-so `output.variables[:div]` just returns the `SpeedyWeather.DivergenceOutput()` we have
+so `output.variables[:div]` just returns the `OutputVariables.Divergence()` we have
 just created using `:div` as key. With those keys one can also `delete!` a variable
 from netCDF output
 
@@ -263,7 +272,7 @@ from netCDF output
 delete!(output, :div)
 ```
 
-If you change the `name` of an output variable, i.e. `SpeedyWeather.DivergenceOutput(name="divergence")`
+If you change the `name` of an output variable, i.e. `OutputVariables.Divergence(name="divergence")`
 the key would change accordingly to `:divergence`.
 
 ### Surface variables
@@ -302,27 +311,27 @@ All length/height units are in meters but technically they just have to be consi
 
 ## Grouped variables
 
-For convenience we have defined several output groups, for example `SpeedyWeather.PrecipitationOutput()`
+For convenience we have defined several output groups, for example `OutputVariables.Precipitation()`
 definces both accumulated large-scale and convective precipitation as well as their rates and the
 cloud top height. Groups are
 
 ```julia
-SpeedyWeather.PrecipitationOutput()
-SpeedyWeather.BoundaryOutput()
-SpeedyWeather.RadiationOutput()
-SpeedyWeather.SurfaceFluxesOutput()
-SpeedyWeather.LandOutput()
-SpeedyWeather.OceanOutput()
+OutputVariables.Precipitation()
+OutputVariables.Boundary()
+OutputVariables.Radiation()
+OutputVariables.SurfaceFluxes()
+OutputVariables.Land()
+OutputVariables.Ocean()
 SpeedyWeather.AllOutputVariabesl()
 ```
 
 each of can but doesn't have to be splatted e.g.
 
 ```@example netcdf
-add!(model, SpeedyWeather.SurfaceFluxesOutput())
+add!(model, OutputVariables.SurfaceFluxes())
 ```
 
-or `SpeedyWeather.SurfaceFluxesOutput()...` are equivalent.
+or `OutputVariables.SurfaceFluxes()...` are equivalent.
 
 ## Output path, identification and number
 
@@ -385,7 +394,7 @@ model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 
 # Add mean sea-level pressure for visualisation
-add!(model, SpeedyWeather.MeanSeaLevelPressureOutput())
+add!(model, OutputVariables.MeanSeaLevelPressure())
 
 run!(simulation, period=Day(3), output=false) # some spin-up
 run!(simulation, period=Day(5), output=true)

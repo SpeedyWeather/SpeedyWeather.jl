@@ -212,6 +212,17 @@ end
     end
 end
 
+@testset "Default time step inside kernels" begin
+    # time steppers are adapted to a core struct inside kernels (GPU, Reactant), which has to
+    # return the same default time step, e.g. 2Δt for leapfrog used by the surface flux damping
+    @testset for TS in (Leapfrog, NCycleLorenz)
+        time_stepping = TS(SpectralGrid())
+        adapted = SpeedyWeather.Adapt.adapt(Array, time_stepping)
+        @test typeof(adapted) != typeof(time_stepping)
+        @test SpeedyWeather.default_time_step(adapted) == SpeedyWeather.default_time_step(time_stepping)
+    end
+end
+
 @testset "Set timestep manually" begin
     @testset for TS in (Leapfrog, NCycleLorenz)
         @testset for truncation in (32, 64, 128)
@@ -352,5 +363,25 @@ end
         for var in (:vorticity, :divergence, :temperature, :pressure)
             @test sim_step.variables.prognostic[var] ≈ sim_run.variables.prognostic[var]
         end
+    end
+end
+
+@testset "Implicit reference temperature profile is the global-mean temperature" begin
+    spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    (; implicit) = model
+    (; clock) = simulation.variables.prognostic
+    σ_levels = Array(model.geometry.σ_levels_full)
+    n = implicit.schedule.every_n_steps
+
+    for (i, ΔT) in enumerate((0, 5))
+        # new temperature: global mean 200 + 100σ + ΔT per layer, plus a wave with zero global mean
+        set!(simulation, temperature = (λ, φ, σ) -> 200 + 100σ + ΔT + 10 * cosd(λ) * cosd(φ))
+        SpeedyWeather.transform!(simulation.variables, model, initialize = true)   # computes the global mean
+
+        clock.time_step_counter = i * n     # a time step on which the reference profile is recomputed
+        SpeedyWeather.reinitialize!(implicit, model, simulation.variables)
+        @test Array(implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT atol = 0.01
     end
 end

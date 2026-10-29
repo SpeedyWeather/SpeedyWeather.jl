@@ -22,10 +22,10 @@ is loaded automatically. `amdgpu` runs require a ROCm-capable device —
 `gpu_graphs = true` to every `SpectralTransform` built for the `BenchmarkSuite`
 resolution/model suites, since `default_gpu_graphs` for AMDGPU's
 `ROCBackend` is `false` (HIP graphs are opt-in, verified only on datacenter/CDNA
-hardware). The Reactant variants additionally `using Reactant` and 
-`Reactant.set_default_backend("cpu" | "gpu")`; for those archs the suites fall 
-back to `MatrixSpectralTransform` since the FFT-based default is not yet covered
-by Reactant's MLIR pipeline.
+hardware). The Reactant variants additionally `using Reactant` and
+`Reactant.set_default_backend("cpu" | "gpu")`. The time loop is
+compiled once per configuration (`reactant_runner.jl`),
+the compile time is reported separately and not included in the SYPD.
 
 Per-architecture results are persisted to `assets/benchmark_results.json`.
 The `README.md` (kept at the benchmark root) is then regenerated from all
@@ -65,11 +65,9 @@ function pick_architecture(arg::AbstractString)
     elseif arg == "amdgpu"
         return (SpeedyWeather.GPU(), "gpu-amd")
     elseif arg == "reactant-cpu"
-        return error("Reactant benchmarks are not yet supported. Sorry")
-        #return (SpeedyWeather.ReactantDevice(), "reactant-cpu")
+        return (SpeedyWeather.ReactantDevice(), "reactant-cpu")
     elseif arg == "reactant-gpu"
-        return error("Reactant benchmarks are not yet supported. Sorry")
-        #return (SpeedyWeather.ReactantDevice(), "reactant-gpu")
+        return (SpeedyWeather.ReactantDevice(), "reactant-gpu")
     elseif arg == "cpu" || isempty(arg)
         arch_str = String(Sys.ARCH)
         label = (startswith(arch_str, "aarch") || arch_str == "arm64") ? "cpu-arm" : "cpu-x86"
@@ -93,10 +91,13 @@ TIMESTEP_MULTIPLIER > 0 || error("timestep multiplier must be > 0, got $TIMESTEP
 free_memory!() = SpeedyWeather.SpeedyTransforms.clear_fourier_graph_cache!(ARCH)
 
 include("benchmark_suite.jl")
+# The Reactant methods of the benchmark hooks need the `@compile` macro, only parse them once Reactant is loaded
+ARCH isa SpeedyWeather.ReactantDevice && include("reactant_runner.jl")
 include("define_benchmarks.jl")
 
 for suite in values(benchmarks)
     suite.architecture = ARCH
+    adapt_to_architecture!(suite, ARCH)
     # BenchmarkSuiteDynamics has no timed-run step count, so skip it there.
     hasproperty(suite, :timestep_multiplier) && (suite.timestep_multiplier = TIMESTEP_MULTIPLIER)
     # AMDGPU's `default_gpu_graphs` is `false` (HIP graphs are opt-in,
@@ -146,7 +147,8 @@ function machine_info()
     end
     if ARCH isa SpeedyWeather.ReactantDevice
         backend = ARCH_LABEL == "reactant-gpu" ? "gpu" : "cpu"
-        write(io, "\nReactant backend: `$backend` (via `Reactant.set_default_backend(\"$backend\")`).\n")
+        write(io, "\nReactant backend: `$backend` (via `Reactant.set_default_backend(\"$backend\")`), ")
+        write(io, "Reactant v$(pkgversion(Reactant)), Reactant_jll v$(pkgversion(Reactant.Reactant_jll)).\n")
     end
     return String(take!(io))
 end
@@ -166,6 +168,7 @@ function overview_data()
         "sypd" => map(json_safe, suite.SYPD),
         "memory" => map(json_safe, suite.memory),
         "dt" => map(json_safe, suite.Δt),
+        "compile_time" => map(json_safe, suite.compile_time),
         "spectral_transform" => string.(suite.spectral_transform),
     )
 end
@@ -241,7 +244,9 @@ function write_preamble(md)
     write(md, "- Physics: With physical parameterizations?, default: true (for primitive equation models)\n")
     write(md, "- Δt: time step [s].\n")
     write(md, "- SYPD: Speed of simulation, simulated years per wallclock day.\n")
-    write(md, "- Memory: Memory footprint of simulation, variables and constants.\n\n")
+    write(md, "- Memory: Memory footprint of simulation, variables and constants.\n")
+    write(md, "- Compile: One-off compilation of the time step (Reactant only), not included in the SYPD. ")
+    write(md, "Compiled code is cached within a session, so configurations compiled before (e.g. in an earlier suite) compile much faster.\n\n")
 
     write(md, "### Running the benchmarks\n\n")
     write(md, "Reproduce the benchmark suite by running, from `SpeedyWeather/benchmark`:\n\n")

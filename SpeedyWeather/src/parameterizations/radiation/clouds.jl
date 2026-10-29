@@ -121,7 +121,7 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
 
     # Precipitation contribution (rain rate is in m/s)
     rain_rate = vars.parameterizations.rain_rate[ij]
-    precip_term = min(precip_max, (86400 * rain_rate) / 1000)   # convert to mm/day
+    precip_term = min(precip_max, (1000 * 86400) * rain_rate)   # convert m/s to mm/day
     P = precip_weight * sqrt(precip_term)
 
     # from convection or large-scale condensation
