@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Update types in Terrarium extension, extend Enzyme extension's _make_zero_view! [#1289](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1289)
 - Calculate Bulk Richardson number relative to surface temperatures [#1363](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1363)
 - GPU and Metal CI on Julia v1.13 [#1260](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1260)
 - Bump SpeedyWeatherInternals to v1.0.1 [#1361](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1361)
