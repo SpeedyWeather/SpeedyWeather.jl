@@ -858,7 +858,7 @@ end
     # Get zenith angle in radians
     μ = vars.parameterizations.cos_zenith[ij]
     μ = clamp(μ, zero(μ), one(μ))  # only need when the sun is up
-    θ = atan(sqrt(1 - μ^2), μ)  # = acos(μ) but Reactant-compatible (no acos in XLA)
+    θ = atan(sqrt(1 - μ^2), μ)  # TODO: Workaround for acos, to be reverted back when Reactant raised correctly to stablehlo.acos
 
     # Then from those we'll calculate the black and white sky albedos
     black_sky = black_sky_albedo(isotropic_parameter, volumetric_parameter, geometric_parameter, θ)
