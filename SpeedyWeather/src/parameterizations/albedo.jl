@@ -332,7 +332,7 @@ VisibleIsotropicScattering(SG::SpectralGrid; kwargs...) = VisibleIsotropicScatte
     (; laiₗ, sm1, sm2, snow_cover, st2, t2m, vₕ, vₗ, ΔTₛ, noise) = p
     (; c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11) = c
 
-    # Mean calcuation
+    # Mean calculation
     μ = (
         -(c1 * vₕ) + vₗ * (-(c2 * laiₗ) - c2 * snow_cover - c2 * sm1 - c3) + snow_cover * (c4 - c5 * vₕ)
             * (ΔTₛ + c6) - c1 * sm2 - c7 * t2m + c8
@@ -346,7 +346,7 @@ end
 
 """Visible radiation volumetric scattering parameter calculation. This expression was derived by
 distilling a trained neural network using symbolic regression. Volumetric scattering represents the
-reflection mechanism of light interacting with horizontally homogenous vegation canopy at the surface - 
+reflection mechanism of light interacting with horizontally homogenous vegetation canopy at the surface - 
 light meets the canopy, bounces around a bit beneath the canopy and exits back towards the sky. This 
 does depend on where the sun is and the viewing angle.
 Fields are $(TYPEDFIELDS)"""
@@ -564,13 +564,13 @@ NIRIsotropicScattering(SG::SpectralGrid; kwargs...) = NIRIsotropicScattering{SG.
     )
 
     # Std deviation, in this case a constant
-    σ = c16 
+    σ = c16
     return μ + σ * noise
 end
 
 """Near-infrared radiation volumetric scattering parameter calculation. This expression was derived by
 distilling a trained neural network using symbolic regression. Volumetric scattering represents the
-reflection mechanism of light interacting with horizontally homogenous vegation canopy at the surface - 
+reflection mechanism of light interacting with horizontally homogenous vegetation canopy at the surface - 
 light meets the canopy, bounces around a bit beneath the canopy and exits back towards the sky. This 
 does depend on where the sun is and the viewing angle.
 Fields are $(TYPEDFIELDS)"""
@@ -765,7 +765,7 @@ initialize!(albedo::LearnedLandAlbedo, model::PrimitiveEquation) = nothing
     vₗ = haskey(land, :low_vegetation_cover) ? land.low_vegetation_cover[ij] : zero_value
     laiₕ = haskey(land, :high_vegetation_leaf_area) ? land.high_vegetation_leaf_area[ij] : zero_value
     laiₗ = haskey(land, :low_vegetation_leaf_area) ? land.low_vegetation_leaf_area[ij] : zero_value
-    geopotential = model.planet.gravity * model.orography.orography[ij]
+    geopotential = NF(9.80665) * model.orography.orography[ij]  # trained on Earth's gravity, so use Earth's gravity
 
     # Get snow depth and calculate snow cover
     ts = time_stepper(model.time_stepping, :land)

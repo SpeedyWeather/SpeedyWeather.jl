@@ -316,7 +316,7 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.Abstr
         ),
         SpeedyWeather.ParameterizationVariable(
             name = :soil_moisture_capacity, dims = SpeedyWeather.Grid2D(),
-            units = "m³/m³", desc = "Volumetric soil water content at soil_moisture = 1",
+            units = "m³/m³", desc = "Volumetric soil water content of a full layer [m³/m³]: field capacity (bucket models) or porosity (Terrarium)",
             namespace = :land,
         ),
     )

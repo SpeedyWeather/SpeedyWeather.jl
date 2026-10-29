@@ -55,10 +55,10 @@ end
     f = vars.parameterizations.surface_wind_slowdown[ij]
 
     # flux into lowermost layer [kg/m³ * m/s * m/s = kg/(m·s²) = Pa]
-    exchange = ρ * drag * V₀            # = -∂flux/∂u [kg/m²/s] w.r.t. lowermost layer u
+    exchange = ρ * drag * V₀            # = -∂flux/∂uₛ [kg/m²/s] w.r.t. surface wind uₛ
     flux_u_upward = -exchange * uₛ
     flux_v_upward = -exchange * vₛ
-    conductance = exchange * f  # relative to lower-most layer wind
+    conductance = exchange * f   # = -∂flux/∂u w.r.t. lowermost layer u, as uₛ = f*u
 
     # convert fluxes to tendencies
     pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]

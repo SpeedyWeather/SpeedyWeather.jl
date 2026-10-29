@@ -58,7 +58,7 @@ SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = Seas
 function variables(::SeasonalSoilMoisture)
     return (
         PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water at soil_moisture = 1", units = "m³/m³", namespace = :land),
+        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water content of a full layer [m³/m³]: field capacity (bucket models) or porosity (Terrarium)", units = "m³/m³", namespace = :land),
     )
 end
 
@@ -109,7 +109,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     masked_value = soil.ocean_moisture
     if soil.mask
         msm = monthly_soil_moisture.data    # unpack via .data due to broadcasting issues
-        msm[isnan.(msm)] .= masked_value
+        msm .= ifelse.(isnan.(msm), masked_value, msm)  # broadcast, logical indexing doesn't work on Reactant
         mask!(monthly_soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
 
@@ -185,7 +185,7 @@ function variables(::LandBucketMoisture, model::AbstractModel)
         PrognosticVariable(:soil_moisture, LandXYZT(pg), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         TendencyVariable(:soil_moisture, LandXYZT(tg), desc = "Tendency of soil moisture", units = "1/s", namespace = :land),
 
-        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water at soil_moisture = 1", units = "m³/m³", namespace = :land),
+        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water content of a full layer [m³/m³]: field capacity (bucket models) or porosity (Terrarium)", units = "m³/m³", namespace = :land),
         ParameterizationVariable(:river_runoff, Grid2D(), desc = "Accumulated river runoff from soil moisture", units = "m", namespace = :land),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
         ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
