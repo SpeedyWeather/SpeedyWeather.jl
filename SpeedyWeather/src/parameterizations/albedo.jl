@@ -790,8 +790,8 @@ initialize!(albedo::LearnedLandAlbedo, model::PrimitiveEquation) = nothing
         capacity = land.soil_moisture_capacity[ij]
 
         # Multiply by soil moisture capacity to get back volume of water in the layer
-        sm1 = soil_moisture[ij, 1] * capacity
-        sm2 = soil_moisture[ij, 2] * capacity
+        sm1 = soil_moisture[ij, begin] * capacity
+        sm2 = soil_moisture[ij, end] * capacity
     else
         sm1 = sm2 = zero_value
     end
@@ -801,8 +801,8 @@ initialize!(albedo::LearnedLandAlbedo, model::PrimitiveEquation) = nothing
         soil_temperature = get_prognostic_step(
             vars.prognostic.land.soil_temperature, ts, scheme,
         )
-        st1 = soil_temperature[ij, 1]
-        st2 = soil_temperature[ij, 2]
+        st1 = soil_temperature[ij, begin]
+        st2 = soil_temperature[ij, end]
     else
         st1 = st2 = zero_value
     end

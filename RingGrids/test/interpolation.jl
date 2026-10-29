@@ -555,3 +555,40 @@ end
     @test out_buffers.data == out_fallback.data
     @test all(iszero, I_buffers.locator.north_pole_average)
 end
+
+@testset "Interpolate ignoring NaN" begin
+    @testset for NF in (Float32, Float64)
+        grid_in, grid_out = FullGaussianGrid(16), OctahedralGaussianGrid(24)
+        lond_in, _ = RingGrids.get_londlatds(grid_in)
+        lond_out, latd_out = RingGrids.get_londlatds(grid_out)
+        no_data = 0 .<= lond_in .< 90               # NaN "continent" in the first layer only
+
+        A = randn(NF, grid_in, 2)
+        A.data[no_data, 1] .= NaN
+        plain = zeros(NF, grid_out, 2)
+        interpolator = RingGrids.interpolator(plain, A)
+        RingGrids.interpolate!(plain, A, interpolator)
+        B = zeros(NF, grid_out, 2)
+        interpolate_ignoring_nan!(B, A, interpolator)
+
+        # unchanged wherever the plain interpolation is valid, incl. the layer without NaNs
+        valid = .!isnan.(plain.data)
+        @test B.data[valid] ≈ plain.data[valid]
+
+        # NaN only without any valid neighbour, i.e. inside the continent but not next to it
+        # (away from the poles, which interpolate from the average over the first/last ring)
+        away_from_poles = abs.(latd_out) .< 80
+        inside = away_from_poles .& (20 .< lond_out .< 70)
+        outside = away_from_poles .& .!(0 .<= lond_out .< 90)
+        @test all(isnan, B.data[inside, 1])
+        @test any(isnan, plain.data[outside, 1])    # plain interpolation picks up NaNs next to the continent
+        @test !any(isnan, B.data[outside, 1])       # these are filled from the valid neighbours
+
+        # weights are renormalised over the valid neighbours: a constant stays constant
+        c = randn(NF)
+        A = fill!(Field(NF, grid_in, 2), c)
+        A.data[no_data, 1] .= NaN
+        interpolate_ignoring_nan!(B, A, interpolator)
+        @test all(b -> b ≈ c, filter(!isnan, B.data))
+    end
+end

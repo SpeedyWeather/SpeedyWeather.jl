@@ -4,6 +4,7 @@
 
 - Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
+- Soil moisture, land and sea surface temperature climatologies are interpolated ignoring missing values (new `RingGrids.interpolate_ignoring_nan!`), coastal points no longer get the ocean/land fallback [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Convert volumetric soil moisture climatology to fraction of field capacity, fixing too-dry bucket initial conditions and prescribed SeasonalSoilMoisture [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Calculate Bulk Richardson number relative to surface temperatures [#1363](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1363)
 - GPU and Metal CI on Julia v1.13 [#1260](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1260)

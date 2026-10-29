@@ -110,3 +110,15 @@ end
     @test any(W .== 1)
     @test all(isfinite, soil_moisture)
 end
+
+@testset "Coastal land initial conditions without ocean fallback" begin
+    # the climatologies are NaN over ocean, coastal land points have to interpolate
+    # from the surrounding land, not fall back to the ocean value
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    (; soil_moisture, soil_temperature) = simulation.variables.prognostic.land
+    mostly_land = model.land_sea_mask.land_fraction.data .>= 0.5
+    @test !any(soil_moisture.data[mostly_land, :, :] .== model.land.soil_moisture.ocean_moisture)
+    @test !any(soil_temperature.data[mostly_land, :, :] .== model.land.temperature.ocean_temperature)
+end
