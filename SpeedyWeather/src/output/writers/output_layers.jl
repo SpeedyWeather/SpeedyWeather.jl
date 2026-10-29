@@ -64,7 +64,7 @@ PressureLayers(SG::SpectralGrid, pressure::AbstractVector; kwargs...) =
     PressureLayers(SG; pressure, kwargs...)
 
 # custom show function to have the unit printing with hPa
-function Base.show(io::IO, layers::PressureLayers{V}) where V
+function Base.show(io::IO, layers::PressureLayers{V}) where {V}
     pressure = on_architecture(CPU(), layers.pressure) ./ 100
     println(io, styled"{warning:PressureLayers}", "{$V, ...}")
     println(io, styled"├ {info:pressure} = $pressure hPa")
@@ -98,14 +98,6 @@ define a `layers` field."""
 output_layers(output::AbstractOutput) = hasproperty(output, :layers) ? output.layers : ModelLayers()
 
 """$(TYPEDSIGNATURES)
-Extrapolation of `variable` beyond the model's vertical layers: its `extrapolation` field
-if it has one (e.g. [`TemperatureOutput`](@ref) descends dry-adiabatically below the
-lowest model layer), otherwise constant. Same `hasproperty` pattern as `transform` and
-`unscale` in the generic [`output!`](@ref)."""
-output_extrapolation(variable::AbstractOutputVariable) =
-    hasproperty(variable, :extrapolation) ? variable.extrapolation : ConstantExtrapolation()
-
-"""$(TYPEDSIGNATURES)
 Interpolate `field` onto the output writer's vertical `layers`, returning the field to
 write out. No-op on [`ModelLayers`](@ref) and for variables that are not 3D atmospheric
 variables (2D variables, soil variables). For [`PressureLayers`](@ref) this interpolates
@@ -120,7 +112,7 @@ function interpolate_layers!(
         simulation::AbstractSimulation,
     )
     # only 3D atmospheric variables, soil variables keep their own vertical dimension
-    (is3D(variable) && !is_land(variable)) || return field
+    (OutputVariables.is3D(variable) && !OutputVariables.is_land(variable)) || return field
 
     (; model) = simulation
     surface_pressure = simulation.variables.parameterizations.surface_pressure
@@ -128,7 +120,7 @@ function interpolate_layers!(
     interpolate_pressure_layers!(
         layers.scratch, field, surface_pressure, layers.pressure,
         model.geometry.vertical_coordinates, layers.interpolation,
-        output_extrapolation(variable),
+        OutputVariables.output_extrapolation(variable),
     )
     return layers.scratch
 end
@@ -136,25 +128,27 @@ end
 """$(TYPEDSIGNATURES)
 Set κ of any [`DryAdiabaticExtrapolation`](@ref) in `output.variables` from the model's
 atmosphere, so that the adiabatic descent below the lowest model layer uses the same
-κ = R_dry/cₚ as the model itself. Called at initialize!, no-op for a model without an
-atmosphere (Barotropic) or an output writer that has no output variables (JLD2Output)."""
+κ = R_dry/cₚ as the model itself, and convert all extrapolation parameters to the model's
+number format `NF`. The defaults (`κ = 2/7`, `missing_value = NaN`) are Float64 which
+e.g. Metal does not support inside the interpolation kernel, not even to convert it.
+Called at initialize!, no-op for a model without an atmosphere (Barotropic) or an output
+writer that has no output variables (JLD2Output). The `extrapolation` field of an output
+variable therefore has to accept any `AbstractVerticalExtrapolation`."""
 function sync_extrapolations!(output::AbstractOutput, model::AbstractModel)
     hasproperty(model, :atmosphere) && hasproperty(output, :variables) || return nothing
+    NF = model.spectral_grid.NF
     for variable in values(output.variables)
         hasproperty(variable, :extrapolation) || continue
-        variable.extrapolation = sync_extrapolation(variable.extrapolation, model.atmosphere)
+        variable.extrapolation = sync_extrapolation(variable.extrapolation, NF, model.atmosphere)
     end
     return nothing
 end
 
-sync_extrapolation(E::AbstractVerticalExtrapolation, ::AbstractAtmosphere) = E
-
-# keep the number format of the extrapolation so that the type of `variable.extrapolation`
-# doesn't change, κ is converted to the field's number format in `extrapolate_below` anyway
-sync_extrapolation(::DryAdiabaticExtrapolation{NF}, atmosphere::AbstractAtmosphere) where {NF} =
-    DryAdiabaticExtrapolation(NF(atmosphere.κ))
-sync_extrapolation(E::SubsurfaceMask, atmosphere::AbstractAtmosphere) =
-    SubsurfaceMask(sync_extrapolation(E.above_surface, atmosphere), E.missing_value)
+sync_extrapolation(E::AbstractVerticalExtrapolation, ::Type, ::AbstractAtmosphere) = E
+sync_extrapolation(::DryAdiabaticExtrapolation, ::Type{NF}, atmosphere::AbstractAtmosphere) where {NF} =
+    DryAdiabaticExtrapolation{NF}(atmosphere.κ)
+sync_extrapolation(E::SubsurfaceMask, ::Type{NF}, atmosphere::AbstractAtmosphere) where {NF} =
+    SubsurfaceMask(sync_extrapolation(E.above_surface, NF, atmosphere), convert(NF, E.missing_value))
 
 """$(TYPEDSIGNATURES)
 Define the vertical coordinate of 3D atmospheric variables in the output file or store

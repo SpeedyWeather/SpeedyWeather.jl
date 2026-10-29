@@ -150,7 +150,7 @@ primitive-equation models, also two grid steps (because the parameterizations ar
 previous grid state):
 
 ```julia
-prognostic_spectral_steps(::AbstractLeapfrog) = 2
+prognostic_steps(::AbstractLeapfrog) = 2
 prognostic_grid_steps(::AbstractLeapfrog, ::PrimitiveEquation) = 2
 tendency_steps(::AbstractLeapfrog) = 1
 ```
@@ -162,8 +162,8 @@ space):
 
 ```julia
 prognostic_steps(::NCycleLorenz) = 1
-tendency_grid_steps(::NCycleLorenz) = 1
-tendency_spectral_steps(::NCycleLorenz) = 2
+tendency_steps(::NCycleLorenz) = 2          # also for ocean and land variables, stepped directly on the grid
+tendency_grid_steps(::NCycleLorenz) = 1     # atmospheric grid tendencies only hold F
 ```
 
 Throughout the dynamical core and parameterizations a variable is then accessed with
@@ -196,11 +196,27 @@ ever needs one tendency step:
 which_tendency_step(var, ::AbstractNCycleLorenz, ::ResetTendencies) = 1
 ```
 
-`get_step(var, i)` is the low-level accessor used by all of the above; for a variable with a step
-dimension it returns a view of step `i`.
+`get_step(var, i)` is the low-level accessor used by all of the above. Which array dimension is
+the step dimension is taken from the variable's dimension tag (see
+[Array dimensions](@ref array_dimensions)): `get_step` selects the dimension tagged as time `T`,
+so for a variable tagged `XYT`, `XYZT`, `LMT` or `LMZT` it returns a view of step `i`. A variable
+*without* a time tag (`XY`, `XYZ`, `LM`, `LMZ`) has no step dimension to select from — the full
+variable is returned as a view and `i` is ignored. Model components can therefore call it
+unconditionally, whether or not the variable they are handed has steps. `get_steps(var)` returns
+all steps as a tuple of views (a 1-tuple for a variable without a step dimension), and
+`get_steps(var, Val(N))` does the same with a compile-time length, which is what Enzyme needs.
+
+Dispatching on whether a variable has a step dimension at all is done with the
+`AbstractFieldWithTime` / `LowerTriangularArrayWithTime` aliases, as `nsteps` does:
+
+```julia
+nsteps(var::Union{AbstractFieldWithTime, LowerTriangularArrayWithTime}) = size(var, ndims(var))
+nsteps(::Union{AbstractField, LowerTriangularArray}) = 1
+```
 
 ````@docs; canonical=false
 get_step
+SpeedyWeather.get_steps
 ````
 
 When writing a new time stepper you implement the `*_steps` methods (how many steps to store), the
@@ -211,6 +227,47 @@ Time steppers can also reorder how diffusion and the semi-implicit correction ar
 `diffusion_and_implicit!`: Leapfrog applies the implicit correction first, then horizontal
 diffusion, while the Lorenz N-cycle applies diffusion first, then the implicit correction
 (consistent with the ordering in [Hotta2016](@citet)).
+
+### Ocean, sea ice and land
+
+Dynamic ocean, sea ice and land components (e.g. `SlabOcean`, `ThermodynamicSeaIce`,
+`LandBucketTemperature`, `LandBucketMoisture`, `SnowModel`) write tendencies into `vars.tendencies.ocean`
+and `vars.tendencies.land`. The variables in these namespaces are time stepped with their own
+time stepper within the time stepping setup `model.time_stepping`,
+`SpeedyWeather.time_stepper(model.time_stepping, :ocean)` and `(model.time_stepping, :land)`
+(sea ice lives in the `:ocean` namespace). By default this is the time stepper of the atmosphere,
+but [`Leapfrog`](@ref) has `ocean` and `land` fields which default to
+[`EulerForward`](@ref), which steps the variables with **Euler forward over ``\Delta t``**:
+
+```julia
+time_stepping = Leapfrog(spectral_grid)                             # Euler forward for ocean and land
+time_stepping = Leapfrog(spectral_grid, land = nothing)             # leapfrog land as the atmosphere
+model = PrimitiveWetModel(spectral_grid; time_stepping)
+```
+
+[`NCycleLorenz`](@ref) has the same `ocean` and `land` fields, defaulting to `nothing`, i.e. the
+same N-cycle as the atmosphere. Any time stepper can be used for ocean and land, e.g.
+`Leapfrog(spectral_grid, land = NCycleLorenz(spectral_grid))`.
+
+The variables are allocated with the number of steps of their time stepper
+(`prognostic_steps` and `tendency_steps`, see `SpeedyWeather.get_nsteps(time_stepping, :land)`), so with
+`EulerForward` ocean and land variables have only one step, with `NCycleLorenz` one prognostic
+step and two tendency steps. The time step of `ocean` and `land` is always set
+to the ``\Delta t`` of the leapfrog (also with `set!(model, Δt=...)`), and on the first two
+leapfrog steps, which each only advance the clock by ``\Delta t/2``, also Euler steps with ``\Delta t/2``.
+
+Why not leapfrog? The tendencies are computed from surface fluxes (sensible and latent heat,
+longwave radiation) that the parameterizations evaluate at the previous (1st) step, and they
+contain stiff relaxation terms, e.g. the sensible heat flux feedback on the thin top soil layer has
+timescales of about an hour in strong winds. Leapfrogging those over ``2\Delta t`` from
+``t - \Delta t`` is an Euler step of ``2\Delta t``, which halves the stability limit compared to an
+Euler step of ``\Delta t`` and made long integrations unstable. Terms that are meant to act
+"within one time step" (e.g. restoring sea surface temperatures to freezing when sea ice forms)
+use `SpeedyWeather.time_step(model.time_stepping, :ocean, clock)` for the same reason.
+
+````@docs; canonical=false
+EulerForward
+````
 
 ## [Lorenz N-cycle](@id ncycle)
 
@@ -275,4 +332,111 @@ NCycleLorenzA
 NCycleLorenzB
 NCycleLorenzAB
 NCycleLorenzABBA
+````
+## [Periodic schedules](@id periodic_schedules)
+
+Many components don't need to do something on every time step but only periodically,
+e.g. the semi-implicit solver of the primitive equations, which recomputes its reference
+temperature profile (and with it the implicit operators) once a day by default.
+SpeedyWeather.jl has three schedules for this, all subtypes of `AbstractSchedule`
+and all used with `isscheduled(schedule, clock)`, which returns `true` on the time
+steps on which to execute
+
+| Schedule | Mutable | Periodic | Events | Initialized with | Primarily used for |
+| -------- | ------- | -------- | ------ | ---------------- | ------------------ |
+| [`Schedule`](@ref) | yes | `every::Second` | `times::Vector{DateTime}` | `initialize!(schedule, clock)` at every `run!` | callbacks, see [Schedules](@ref) |
+| [`PeriodicSchedule`](@ref) | yes | `every::Second` | – | `initialize!(schedule, time_stepping)` in `initialize!(model)` | model components |
+| [`StepSchedule`](@ref) | no | `every_n_steps::Int` | – | nothing to initialize | model components |
+
+The `Schedule` precomputes a `BitVector` of all time steps of a simulation, so that it can
+combine periodic execution with events at given times. But for that it needs the start
+time and the length of the simulation, which are only known in `run!`.
+`PeriodicSchedule` and `StepSchedule` are purely periodic and only need the time step, so
+they can be part of model components that are initialized with `initialize!(model)`
+before `run!` is called. A model component would typically use them as
+
+```julia
+@kwdef struct MyComponent <: SpeedyWeather.AbstractModelComponent
+    schedule::PeriodicSchedule = PeriodicSchedule(every = Day(1))
+    # other fields
+end
+
+function SpeedyWeather.initialize!(component::MyComponent, model::AbstractModel)
+    initialize!(component.schedule, model.time_stepping)    # converts every to every_n_steps
+    # initialize other things here
+end
+
+function SpeedyWeather.timestep!(vars::Variables, component::MyComponent, model::AbstractModel)
+    isscheduled(component.schedule, vars.prognostic.clock) || return nothing
+    # do something every day only
+end
+```
+
+### PeriodicSchedule vs StepSchedule
+
+A `PeriodicSchedule` is defined by a period of time, `every`, which is converted into a
+number of time steps `every_n_steps` with the model's time step on `initialize!`.
+`every` is rounded to a multiple of the time step, and is at least one time step;
+`every = Second(0)` means never. It also counts its executions in `counter`.
+
+```@example periodic_schedules
+using SpeedyWeather
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+time_stepping = Leapfrog(spectral_grid)
+periodic_schedule = PeriodicSchedule(every = Hour(6))
+initialize!(periodic_schedule, time_stepping)
+```
+
+so with a time step of `time_stepping.Δt_millisec` at T32 executing every 6 hours means every
+`periodic_schedule.every_n_steps` time steps. Changing the resolution therefore changes
+`every_n_steps` but not (up to rounding) `every`. A `StepSchedule` on the other hand is
+immutable and directly defined by the number of time steps `every_n_steps`, independent of the
+time step; `every_n_steps = 0` means never
+
+```@example periodic_schedules
+step_schedule = StepSchedule(every_n_steps = 4)
+```
+
+which is useful if something should execute every n-th time step regardless of resolution.
+`StepSchedule(1)` executes on every time step (but the first), e.g. for the semi-implicit solver
+to always recompute its reference temperature profile
+
+```julia
+implicit = ImplicitPrimitiveEquation(spectral_grid, schedule = StepSchedule(1))
+model = PrimitiveWetModel(spectral_grid; implicit)
+```
+
+### Scheduling and the leapfrog spin-up
+
+All schedules count the time steps with `clock.time_step_counter` which excludes the
+initial conditions and the spin-up of the [Leapfrog initialisation](@ref): the first
+Euler forward step with ``\Delta t/2`` does not count. With every 4th time step, i.e.
+`Schedule(every = 4Δt)`, `PeriodicSchedule(every = 4Δt)` or `StepSchedule(4)`, all three
+schedules execute on the same steps, after 4``\Delta t``, 8``\Delta t``, ... of simulated time.
+For the first 10 leapfrog time steps (clock shown after each step)
+
+| Time stepper step | Leapfrog step | `clock.step_counter` | `clock.time_step_counter` | Clock time | `isscheduled` |
+|---|---|---|---|---|---|
+| (initial) | - | 0 | 0 | 0 | |
+| 1 | Euler, ``\Delta t/2`` (spin-up) | 1 | 0 | ``\tfrac{1}{2}\Delta t`` | |
+| 2 | Leapfrog, ``\Delta t`` (spin-up end) | 2 | 1 | ``\Delta t`` | |
+| 3 | Leapfrog, ``2\Delta t`` | 3 | 2 | ``2\Delta t`` | |
+| 4 | Leapfrog, ``2\Delta t`` | 4 | 3 | ``3\Delta t`` | |
+| 5 | Leapfrog, ``2\Delta t`` | 5 | 4 | ``4\Delta t`` | ✅ |
+| 6 | Leapfrog, ``2\Delta t`` | 6 | 5 | ``5\Delta t`` | |
+| 7 | Leapfrog, ``2\Delta t`` | 7 | 6 | ``6\Delta t`` | |
+| 8 | Leapfrog, ``2\Delta t`` | 8 | 7 | ``7\Delta t`` | |
+| 9 | Leapfrog, ``2\Delta t`` | 9 | 8 | ``8\Delta t`` | ✅ |
+| 10 | Leapfrog, ``2\Delta t`` | 10 | 9 | ``9\Delta t`` | |
+
+Callbacks are evaluated after the clock is stepped forward, so they see the clock as in the table.
+Model components inside the time step, like the semi-implicit solver, are evaluated before the
+clock is stepped forward. They see the same clock one time stepper step later, e.g. the semi-implicit
+solver recomputes its reference temperature profile at the beginning of time stepper step 6,
+computing the tendencies at time ``4\Delta t``. With events, `Schedule(times = ...)`, a `Schedule`
+executes on the first time step on or after the given time, see [Scheduling logic](@ref).
+
+````@docs; canonical=false
+PeriodicSchedule
+StepSchedule
 ````

@@ -176,7 +176,7 @@ Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as a 
 This is because `Dates` functions assume an Earth calendar.
 Length of the seasonal cycle is instead controlled via a faster orbit time,
 see `Earth`."""
-function year_angle(::Type{T}, time::DateTime) where {T}
+function year_angle(::Type{T}, time::Dates.AbstractDateTime) where {T}
     seconds_of_year = (Dates.dayofyear(time) - 1) * LENGTH_OF_DAY + secondofday(time)
     seconds_in_year = Dates.daysinyear(time) * LENGTH_OF_DAY
     return T(2π) * T(seconds_of_year / seconds_in_year)
@@ -200,7 +200,7 @@ Fraction of day in `time` as angle in radians [-π...π], noon to noon, at longi
 Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as constant.
 This is because `Dates` functions assume an Earth date. Length of the daily cycle is instead
 controlled via a faster rotation time, see `Earth`."""
-function solar_hour_angle(::Type{T}, time::DateTime, λ = 0) where {T}
+function solar_hour_angle(::Type{T}, time::Dates.AbstractDateTime, λ = 0) where {T}
     day2rad = T(2π) / LENGTH_OF_DAY
     noon_in_sec = LENGTH_OF_DAY ÷ 2
     return (secondofday(time) - noon_in_sec) * day2rad + convert(T, λ)
@@ -215,8 +215,8 @@ depending on parameters in SolarZenith."""
 function cos_zenith!(
         cos_zenith::AbstractField{NF},
         S::SolarZenith,
-        rotation_time::DateTime,
-        orbit_time::DateTime,
+        rotation_time::Dates.AbstractDateTime,
+        orbit_time::Dates.AbstractDateTime,
         geometry::AbstractGeometry,
     ) where {NF}
 
@@ -292,8 +292,8 @@ depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
         cos_zenith::AbstractField{NF},
         S::SolarZenithSeason,
-        rotation_time::DateTime,        # not used, but to keep the same function barrier as SolarZenith
-        orbit_time::DateTime,
+        rotation_time::Dates.AbstractDateTime,        # not used, but to keep the same function barrier as SolarZenith
+        orbit_time::Dates.AbstractDateTime,
         geometry::AbstractGeometry,
     ) where {NF}
 

@@ -694,7 +694,9 @@ function Base.copyto!(
         M::AbstractArray
     ) where {T}    # copy from M
     @boundscheck size(L, as = Matrix) == size(M) || throw(BoundsError)
-    L.data .= convert.(T, M[lowertriangle_indices(M)])
+    # Skip `convert.()` when eltypes match
+    M_lt = M[lowertriangle_indices(M)]
+    L.data .= eltype(M_lt) == T ? M_lt : convert.(T, M_lt)
     return L
 end
 
@@ -709,7 +711,9 @@ function Base.copyto!(
     upper_triangle_indices = @. ~lower_triangle_indices # upper triangle without main diagonal
 
     M[upper_triangle_indices] .= zero(T)
-    M[lower_triangle_indices] = convert.(T, L.data)
+    # Skip `convert.()` when eltypes match (Reactant can't trace it).
+    L_data = M isa Array && !(L.data isa Array) ? Array(L.data) : L.data
+    M[lower_triangle_indices] = eltype(L_data) == T ? L_data : convert.(T, L_data)
 
     return M
 end
@@ -720,7 +724,7 @@ function Base.copyto!(
         V::AbstractArray{S, N}
     ) where {T, S, N} # copy from V
     @boundscheck size(L, as = Vector) == size(V) || throw(BoundsError)
-    L.data .= convert.(T, V)
+    L.data .= eltype(V) == T ? V : convert.(T, V)
     return L
 end
 
@@ -738,7 +742,8 @@ function Base.convert(
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where {T}
-    return LowerTriangularArray(T.(L.data), L.spectrum, L.dims)
+    data = eltype(L.data) === T ? L.data : T.(L.data)
+    return LowerTriangularArray(data, L.spectrum, L.dims)
 end
 
 function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, I::Integer...) where {T, N, ArrayType, SP}
@@ -807,11 +812,9 @@ end
 
 @kernel inbounds = true function zero_last_degree_kernel!(data, l_indices, lmax)
     I = @index(Global, Cartesian)
-
     l = l_indices[I[1]]
-    if l == lmax
-        data[I] = 0
-    end
+
+    data[I] = ifelse(l == lmax, zero(eltype(data)), data[I])
 end
 
 Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) =
@@ -875,6 +878,7 @@ find_L(x) = x
 find_L(::Tuple{}) = nothing
 find_L(a::LowerTriangularArray, rest) = a
 find_L(::Any, rest) = find_L(rest)
+find_L(ex::Base.Broadcast.Extruded) = find_L(ex.x)
 
 parent_or_not(x::Union{SubArray, Transpose}) = parent(x)
 parent_or_not(x) = x
@@ -914,10 +918,11 @@ Architectures.architecture(L::LowerTriangularArray) = architecture(L.spectrum)
 Architectures.on_architecture(L1::LowerTriangularArray, L2) = on_architecture(L1.spectrum, L2)
 function Architectures.on_architecture(arch::AbstractArchitecture, L::LowerTriangularArray)
     adapted_data = on_architecture(arch, L.data)
+    # keep the dimensions (e.g. LMT) of L, otherwise the default (LM) would be used
     if ismatching(L.spectrum, typeof(adapted_data)) # if matching, use the same spectrum
-        return LowerTriangularArray(adapted_data, on_architecture(arch, L.spectrum))
+        return LowerTriangularArray(adapted_data, on_architecture(arch, L.spectrum), L.dims)
     else # if not matching, create new spectrum with other architecture
         #@warn "Adapting LowerTriangularArray to new architecture with $(typeof(adapted_data))"
-        return LowerTriangularArray(adapted_data, Spectrum(L.spectrum, architecture = architecture(typeof(adapted_data))))
+        return LowerTriangularArray(adapted_data, Spectrum(L.spectrum, architecture = architecture(typeof(adapted_data))), L.dims)
     end
 end

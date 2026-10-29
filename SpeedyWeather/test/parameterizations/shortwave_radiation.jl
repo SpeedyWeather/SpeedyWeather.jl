@@ -177,12 +177,12 @@ end
     nlayers = spectral_grid.nlayers
     ij = 1
 
-    # cold air with humidity below the q threshold but RH > threshold: clouds form above the surface layer
+    # cold air with humidity below the q threshold but RH > threshold: clouds form at the cloud base
     vars.grid.temperature .= 240
     vars.grid.humidity .= clouds.specific_humidity_threshold_min / 2
     state = SpeedyWeather.clouds!(ij, vars, clouds, model)
     @test state.cloud_cover > 0
-    @test state.cloud_top == nlayers - 1
+    @test state.cloud_top == clouds.cloud_base[]
 
     # completely dry air, snow alone creates clouds
     vars.grid.humidity .= 0
@@ -212,7 +212,13 @@ end
             @test σ[cloud_base] <= clouds.σ_boundary_layer
             @test σ[cloud_base + 1] > clouds.σ_boundary_layer || cloud_base == nlayers - 1
         end
-        nlayers == 8 && @test (layer_top, cloud_base) == (2, 7)
+
+        # equally spaced 8 σ layers as in SPEEDY: top two layers stratosphere, lowest boundary layer
+        if nlayers == 8
+            model = PrimitiveWetModel(spectral_grid; geometry = Geometry(spectral_grid; vertical_coordinates = SigmaCoordinates(spectral_grid)))
+            initialize!(clouds, model)
+            @test (clouds.layer_top[], clouds.cloud_base[]) == (2, 7)
+        end
     end
 end
 
@@ -236,4 +242,65 @@ end
     sea_level, mountain = column(100000), column(70000)
     @test sum(sea_level) ≈ sum(mountain)                                   # same ozone column
     @test heating(mountain, 70000) <= 1.1 * heating(sea_level, 100000)     # not concentrated in thinner layers
+end
+
+@testset "Diagnostic cloud top at level of maximum relative humidity" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; shortwave = OneBandShortwave(spectral_grid)))
+    initialize!(model.radiation, model)
+    vars = Variables(model)
+    init_shortwave_state!(vars, model)
+
+    # relative humidity per layer, all above rh_min but maximum in layer 5
+    ij = 1
+    for k in 1:8    # nonzero geopotential for cloud top height, increasing upwards
+        vars.dynamics.geopotential[ij, k] = 1000 * (9 - k)
+    end
+    relative_humidity = [0.9, 0.5, 0.6, 0.7, 0.95, 0.8, 0.5, 0.99]
+    for k in 1:8
+        p = model.geometry.σ_levels_full[k] * 1.0e5
+        qsat = SpeedyWeather.saturation_humidity(280.0f0, p, model.atmosphere)
+        vars.grid.humidity[ij, k, :] .= relative_humidity[k] * qsat
+    end
+
+    # layer 1 (top) and 8 (surface) excluded, so maximum in layer 5 not the highest layer above rh_min
+    clouds_state = SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model)
+    @test clouds_state.cloud_top == 5
+    @test clouds_state.cloud_cover ≈ ((0.95 - 0.3) / (1 - 0.3))^2 rtol = 1.0e-4
+
+    # cloud cover and cloud top height [m] from geopotential stored for output
+    @test vars.parameterizations.cloud_cover[ij] == clouds_state.cloud_cover
+    g = model.planet.gravity
+    @test vars.parameterizations.cloud_top_height[ij] == vars.dynamics.geopotential[ij, 5] / g
+
+    # precipitation cloud top higher than humidity cloud top wins
+    vars.parameterizations.cloud_top[ij] = 3
+    @test SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model).cloud_top == 3
+    @test vars.parameterizations.cloud_top_height[ij] == vars.dynamics.geopotential[ij, 3] / g
+
+    # no cloud: height 0
+    vars.grid.humidity[ij, :, :] .= 0
+    vars.parameterizations.cloud_top[ij] = 9
+    @test SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model).cloud_top == 9
+    @test vars.parameterizations.cloud_top_height[ij] == 0
+end
+
+@testset "Diagnostic cloud cover from precipitation" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; shortwave = OneBandShortwave(spectral_grid)))
+    initialize!(model.radiation, model)
+    vars = Variables(model)
+    init_shortwave_state!(vars, model)
+    vars.grid.humidity .= 0     # no cloud cover from humidity
+
+    (; precipitation_weight, precipitation_max) = model.radiation.shortwave.clouds
+    ij = 1
+    mm_per_day = 1 / (1000 * 86400)     # [m/s], rain rate is in m/s
+
+    # cloud cover = weight * √(rain rate in mm/day), capped at precipitation_max
+    for (rain_rate, precipitation) in ((0, 0), (1, 1), (4, 4), (50, precipitation_max))
+        vars.parameterizations.rain_rate[ij] = rain_rate * mm_per_day
+        cloud_cover = SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model).cloud_cover
+        @test cloud_cover ≈ precipitation_weight * sqrt(precipitation) rtol = 1.0e-5
+    end
 end

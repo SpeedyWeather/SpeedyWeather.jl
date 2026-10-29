@@ -97,6 +97,10 @@ function OneBandGreyShortwave(
     return OneBandShortwave(clouds, transmissivity, radiative_transfer)
 end
 
+# variables of the shortwave scheme and those of its clouds component
+variables(radiation::OneBandShortwave) =
+    (invoke(variables, Tuple{AbstractShortwave}, radiation)..., variables(radiation.clouds)...)
+
 Base.show(io::IO, M::OneBandShortwave) = show(io, M, values = false)
 
 # initialize one after another
@@ -265,9 +269,10 @@ function TwoBandShortwave(
 end
 
 Base.show(io::IO, M::TwoBandShortwave) = show(io, M, values = false)
-
+# shortwave variables and those of the clouds and ozone components
 # shortwave variables and those of the ozone component
-variables(radiation::TwoBandShortwave) = (shortwave_variables()..., variables(radiation.ozone)...)
+variables(radiation::TwoBandShortwave) =
+    (shortwave_variables()..., variables(radiation.clouds)..., variables(radiation.ozone)...)
 
 function initialize!(radiation::TwoBandShortwave, model::PrimitiveEquation)
     initialize!(radiation.clouds, model)

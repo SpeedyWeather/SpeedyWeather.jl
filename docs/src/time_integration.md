@@ -40,9 +40,9 @@ A default time step of
 time_stepping.Δt_at_T32
 ```
 
-is used at T31 (`truncation=32`) spectral resolution (see [Available horizontal resolutions](@ref))
-which is then (almost) linearly scaled to higher (or lower) resolution. Creating a simulation
-at twice the resolution (T63) will approximately half the time step (20min if T31 runs at 40min).
+is used at T32 (`truncation=32`, 1-based) spectral resolution (see [Available horizontal resolutions](@ref))
+which is then linearly scaled to higher (or lower) resolution. Creating a simulation
+at twice the resolution (T64) will approximately half the time step (20min if T32 runs at 40min).
 This is such that in most cases the user does need to know what time step is stable. But if
 you want a shorter time step the easiest is to choose `Δt_at_T32` (write `\Delta` then hit tab,
 works in the Julia REPL and other interfaces) relative to its default. If you half that time step
@@ -111,9 +111,5 @@ nothing # hide
 
 where `;` matches the `time_stepping` keyword argument by name. If you name `leapfrog = Leapfrog(spectral_grid)` then you
 would need to change this to `time_stepping=leapfrog` in the function call arguments. The same
-keyword takes any time stepper, e.g. the `NCycleLorenz` created above
-
-```@example ncycle
-model = PrimitiveWetModel(spectral_grid; time_stepping)
-nothing # hide
-```
+keyword takes any time stepper, e.g. `time_stepping = NCycleLorenz(spectral_grid)` for the
+[Lorenz N-cycle](@ref ncycle).

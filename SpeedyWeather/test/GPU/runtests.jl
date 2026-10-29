@@ -44,6 +44,9 @@ include("spectral_transform.jl")
 # INTERPOLATION OF RINGGRIDS
 include("interpolate.jl")
 
+# 3D INTERPOLATION AND PARTICLE ADVECTION
+include("particle_advection_3d.jl")
+
 # SET FUNCTIONS, GPU SPECIFIC
 include("set.jl")
 
@@ -55,6 +58,9 @@ include("barotropic.jl")
 include("shallowwater.jl")
 include("primitive_wet.jl")
 
+# OUTPUT WRITERS, INTERPOLATION ON GPU
+include("output.jl")
+
 include("gpu_graphs_shared.jl")
 
 if gpu_backend === :CUDA
@@ -64,8 +70,8 @@ if gpu_backend === :CUDA
     # CUDA-GRAPHS ACCELERATED FOURIER TRANSFORM (CUDA-only feature)
     include("cuda_graphs.jl")
 
-    # REACTANT ON GPU (currently only works tested with CUDA)
-    #include("reactant.jl")
+    # REACTANT ON GPU (currently only tested with CUDA)
+    include("reactant.jl")
 
 elseif gpu_backend === :AMDGPU
 
@@ -76,4 +82,7 @@ elseif gpu_backend === :AMDGPU
 
 elseif gpu_backend === :Metal
     include("MetalGPU/metal.jl")
+
+    # REACTANT ON GPU: not yet, Reactant has no Metal backend (the jax-metal plugin is disabled,
+    # Reactant.jl#1967), include reactant.jl here once https://github.com/EnzymeAD/Reactant.jl/pull/2489 is in
 end
