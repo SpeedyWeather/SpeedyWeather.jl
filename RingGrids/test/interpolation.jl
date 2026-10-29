@@ -569,7 +569,7 @@ end
         interpolator = RingGrids.interpolator(plain, A)
         RingGrids.interpolate!(plain, A, interpolator)
         B = zeros(NF, grid_out, 2)
-        interpolate_ignoring_nan!(B, A, interpolator)
+        RingGrids.interpolate_ignoring_nan!(B, A, interpolator)
 
         # unchanged wherever the plain interpolation is valid, incl. the layer without NaNs
         valid = .!isnan.(plain.data)
@@ -588,7 +588,7 @@ end
         c = randn(NF)
         A = fill!(Field(NF, grid_in, 2), c)
         A.data[no_data, 1] .= NaN
-        interpolate_ignoring_nan!(B, A, interpolator)
+        RingGrids.interpolate_ignoring_nan!(B, A, interpolator)
         @test all(b -> b ≈ c, filter(!isnan, B.data))
     end
 end
