@@ -73,16 +73,17 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, lst, NF = Float32)
-    interpolate!(monthly_temperature, lst, interp)
+    @maybe_jit model.architecture interpolate!(monthly_temperature, lst, interp)
 
     # mask ocean points to fallback ocean temperature
     # set ocean "land" temperature points (100% ocean only)
     masked_value = land.ocean_temperature
     if land.mask
         # Replace NaN values in soil temperature with a fallback ocean temperature
-        # unpack via .data due to broadcasting issues
+        # unpack via .data due to broadcasting issues, broadcast instead of logical indexing,
+        # which falls back to scalar indexing on Reactant
         mtd = monthly_temperature.data
-        mtd[isnan.(mtd)] .= masked_value
+        mtd .= ifelse.(isnan.(mtd), masked_value, mtd)
 
         # but land-sea mask may not align so also set those 100% ocean points to
         # the same fallback ocean temperature
@@ -105,17 +106,9 @@ function timestep!(
         land::SeasonalLandTemperature,
         model,
     )
-    (; time) = vars.prognostic.clock
-
-    this_month = Dates.month(time)
-    next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
-
-    # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
     (; monthly_temperature) = land
     (; soil_temperature) = vars.prognostic.land
-    NF = eltype(soil_temperature)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time, eltype(soil_temperature))
 
     launch!(
         architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
@@ -208,8 +201,9 @@ function initialize!(
     if land.mask
         masked_value = land.ocean_temperature
         # TODO currently requries .data because of broadcasting issues
+        # broadcast instead of logical indexing, which falls back to scalar indexing on Reactant
         lst = vars.prognostic.land.soil_temperature.data
-        lst[isnan.(lst)] .= masked_value
+        lst .= ifelse.(isnan.(lst), masked_value, lst)
         mask!(vars.prognostic.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
     end
     return nothing

@@ -3,6 +3,10 @@
 ## Unreleased
 
 - Update types in Terrarium extension, extend Enzyme extension's _make_zero_view! [#1289](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1289)
+- Calculate Bulk Richardson number relative to surface temperatures [#1363](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1363)
+- GPU and Metal CI on Julia v1.13 [#1260](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1260)
+- Bump SpeedyWeatherInternals to v1.0.1 [#1361](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1361)
+- `ParameterEditing.parameters` and `reconstruct` support `Tuple`s, keying elements by their 1-based index; parameters nested in a tuple were previously dropped silently [#1352](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1352)
 - `DiagnosticClouds` convert the rain rate from m/s to mm/day correctly, the precipitation contribution to the cloud cover was 1e6 too small [#1351](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1351)
 - Full-grid `get_londlatds` built with loops to work around a Julia v1.13.2 miscompile causing segfaults [#1348](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1348)
 - Primitive equation models recompute the reference temperature profile of the semi-implicit solver from the current global-mean temperature, fixes the instability of long T256L8 runs [#1332](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1332)
@@ -13,6 +17,8 @@
 - Learned surface wind slowdown from bottom model layer [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 - Split boundary layer drag by momentum/heat/humidity and land/ocean [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 - [BREAKING] Output variables moved into the exported module `OutputVariables` and lost their `Output` suffix, e.g. `SpeedyWeather.TemperatureOutput()` is now `OutputVariables.Temperature()`, the old names are deprecated and forward with a warning [#1331](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1331)
+- Reactant: the `SpectralTransform` computes the Fourier transform as a truncated DFT: one batched matrix multiply per direction [#1317](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1317)
+- Reactant compatibility for all models incl. `PrimitiveDryModel` and `PrimitiveWetModel` (requires Reactant v0.2.292 for complex-valued kernels), CPU-vs-Reactant correctness tests for all models and output writers [#1304](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1304)
 - Bug fix: Enzyme's `make_zero` of a model works again with ProgressMeter v1.12 (parametric `ProgressCore`) [#1330](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1330)
 - Fix the centered vertical advection dropping the vertical advection of the reference temperature profile, which delayed the Jablonowski-Williamson baroclinic wave by about a day [#1286](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1286)
 - Primitive equation models transform U, V and the surface pressure gradient ∇ln(pₛ) to grid space in one batched transform, 2 instead of 3 spectral→grid transforms per time step [#1313](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1313)
