@@ -311,7 +311,7 @@ function initialize!(
     )
 
     (; coslat, sinlat) = model.geometry
-    σ = model.geometry.σ_levels_full
+    σ = model.geometry.σ_levels_full   # nominal σ; used for temp_relax_freq below, correct for any coordinate
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
     (; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     p₀ = model.atmosphere.reference_pressure
@@ -320,7 +320,8 @@ function initialize!(
     kₐ = oftype(σb, 1 / Second(relax_time_slow).value)
     kₛ = oftype(σb, 1 / Second(relax_time_fast).value)
 
-    # Precompute log(σ) for each layer
+    # Precompute log(σ) for each layer; only used by the cheap SigmaCoordinates kernel below,
+    # harmless (if unused) for SigmaPressureCoordinates
     @. log_σ = log(σ)
 
     # Held and Suarez equation 4
@@ -350,11 +351,42 @@ function forcing!(
     (; κ) = model.atmosphere
     p₀ = model.atmosphere.reference_pressure
     (; whichring) = temp.grid
+    _held_suarez_launch!(
+        model.geometry.vertical_coordinates,
+        temp_tend, temp, log_pₛ, temp_relax_freq, temp_equil_a, temp_equil_b,
+        Tmin, κ, p₀, log_σ, whichring,
+    )
+    return nothing
+end
+
+# SigmaCoordinates: keep the cheap precomputed log_σ kernel, no per grid point exp/log of
+# an actual pressure needed as p/pₛ = σ exactly.
+function _held_suarez_launch!(
+        ::SigmaCoordinates,
+        temp_tend, temp, log_pₛ, temp_relax_freq, temp_equil_a, temp_equil_b,
+        Tmin, κ, p₀, log_σ, whichring,
+    )
     launch!(
         architecture(temp_tend), RingGridWorkOrder, size(temp_tend), held_suarez_kernel!,
         temp_tend, temp, log_pₛ,
         temp_relax_freq, temp_equil_a, temp_equil_b,
         Tmin, κ, p₀, log_σ, whichring
+    )
+    return nothing
+end
+
+# SigmaPressureCoordinates: p = σ*pₛ no longer holds, compute the actual pressure per grid
+# point and layer via the coordinate-agnostic `pressure` accessor instead of log_σ.
+function _held_suarez_launch!(
+        coordinate::SigmaPressureCoordinates,
+        temp_tend, temp, log_pₛ, temp_relax_freq, temp_equil_a, temp_equil_b,
+        Tmin, κ, p₀, log_σ, whichring,
+    )
+    launch!(
+        architecture(temp_tend), RingGridWorkOrder, size(temp_tend), held_suarez_hybrid_kernel!,
+        temp_tend, temp, log_pₛ,
+        temp_relax_freq, temp_equil_a, temp_equil_b,
+        Tmin, κ, p₀, coordinate, whichring
     )
     return nothing
 end
@@ -383,5 +415,37 @@ end
     # `@fastmath` for the `^`: `(p / p₀)^κ` with a real exponent otherwise routes through
     # Float64 pow_body even when p, p₀, κ are all NF, which Metal's GPU compiler rejects
     Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p) * @fastmath((p / p₀)^κ))
+    temp_tend[ij, k] -= kₜ * (temp[ij, k] - Teq)  # Held and Suarez 1996, equation 2
+end
+
+# HYBRID SIGMA-PRESSURE COORDINATES ------------------------------------------------------
+# Generalisation of the kernel above: p = σ*pₛ no longer holds exactly, so the actual
+# pressure is computed per grid point and layer from the coordinate (docs/dev/2026-08/
+# hybrid-sigma-pressure-coordinates-part-2.md, §9). Reduces to the kernel above term by
+# term for the sigma limit (A ≡ 0, B ≡ σ). Costs one extra `exp`/`log` per grid point per
+# layer, hybrid path only.
+@kernel inbounds = true function held_suarez_hybrid_kernel!(
+        temp_tend,
+        temp,
+        log_pₛ,
+        temp_relax_freq,
+        temp_equil_a,
+        temp_equil_b,
+        Tmin,
+        κ,
+        p₀,
+        coordinate,
+        whichring,
+    )
+    ij, k = @index(Global, NTuple)
+    j = whichring[ij]                   # latitude ring index
+    kₜ = temp_relax_freq[k, j]          # (inverse) relaxation time scale (scaled)
+
+    pₛ = exp(log_pₛ[ij])
+    p = pressure(k, pₛ, coordinate)     # pressure [Pa]
+    log_p = log(p)
+
+    # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
+    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p) * (p / p₀)^κ)
     temp_tend[ij, k] -= kₜ * (temp[ij, k] - Teq)  # Held and Suarez 1996, equation 2
 end

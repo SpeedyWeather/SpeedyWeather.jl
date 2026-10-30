@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Generalise the dynamical core (mass-weighted vertical integrals, vertical velocity, vertical advection, and adiabatic conversion) to hybrid sigma-pressure coordinates, so `SigmaPressureCoordinates`/`CubicSigmaPressureCoordinates` are no longer restricted to the pure-sigma limit; `SigmaCoordinates` code paths are unchanged [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
+- Fix `get_σ_full`/`get_σ_half`/`get_σ_thickness` for `SigmaPressureCoordinates`, which returned the sigma (`B`) coefficients instead of the nominal sigma (`A + B`), causing `NaN`/`Inf` geopotential and adiabatic conversion coefficients for any non-degenerate hybrid coordinate [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
 - Fix flaky RingGrids meridionally-constant interpolation test (absolute instead of relative tolerance) [#1367](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1367)
 - Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
