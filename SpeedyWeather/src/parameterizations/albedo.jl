@@ -36,7 +36,7 @@ end
 Adapt.@adapt_structure OceanLandAlbedo
 function OceanLandAlbedo(
         SG::SpectralGrid;
-        ocean = OceanSeaIceAlbedo(SG),      # default ocean albedo
+        ocean = JinOceanAlbedo(SG),      # default ocean albedo
         land = LearnedLandAlbedo(SG),       # default land albedo
     )
     return OceanLandAlbedo(ocean, land)
@@ -871,6 +871,443 @@ end
 
     return nothing
 end
+
+abstract type AbstractOceanAlbedo end
+
+@parameterized @kwdef struct OceanDirectReflection{NF} <: AbstractOceanAlbedo
+
+    "Regression coefficient from Jin et al."
+    @param c0::NF = 0.0152
+
+    "Regression coefficient from Jin et al."
+    @param c1::NF = -1.7873
+
+    "Regression coefficient from Jin et al."
+    @param c2::NF = 6.8972
+
+    "Regression coefficient from Jin et al."
+    @param c3::NF = -8.5778
+
+    "Regression coefficient from Jin et al."
+    @param c4::NF = 4.071
+
+    "Regression coefficient from Jin et al."
+    @param c5::NF = -7.6446
+
+    "Regression coefficient from Jin et al."
+    @param c6::NF = 0.1643
+
+    "Regression coefficient from Jin et al."
+    @param c7::NF = -7.8409
+
+    "Regression coefficient from Jin et al."
+    @param c8::NF = -3.5639
+
+    "Regression coefficient from Jin et al."
+    @param c9::NF = -2.3588
+
+    "Regression coefficient from Jin et al."
+    @param c10::NF = 10.0538
+end
+
+Adapt.@adapt_structure OceanDirectReflection
+OceanDirectReflection(SG::SpectralGrid; kwargs...) = OceanDirectReflection{SG.NF}(; kwargs...)
+
+"""
+    fresnel_reflectance(n, μ)
+
+Unpolarized Fresnel reflectance of a flat air–water interface for light incident from air
+with cosine of incidence angle `μ` onto a medium of relative refractive index `n > 1`.
+Average of the perpendicular (s) and parallel (p) polarized reflectances. Returns
+((n-1)/(n+1))² at normal incidence (μ = 1) and 1 at grazing incidence (μ = 0)."""
+@inline function fresnel_reflectance(n, μ)
+    s = sqrt(n^2 - 1 + μ^2)                 # n cos θₜ via Snell's law, θₜ refraction angle
+    r_s = (μ - s) / (μ + s)                 # perpendicular (s) polarization
+    r_p = (n^2 * μ - s) / (n^2 * μ + s)     # parallel (p) polarization
+    return (r_s^2 + r_p^2) / 2
+end
+
+@inline function (c::OceanDirectReflection)(p)
+    (; μ, σ, n, n₀) = p
+    (; c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10) = c
+
+    # Formulation following Jin et al. 2011
+    # Albedo is simply the Fresnel reflectance when the surface roughness σ == 0
+    # and updates when windy/wavey with function f(μ, σ)
+
+    # Calculate surface roughness dependent (μ, σ)
+    term1 = c0 + c1 * μ + c2 * μ^2 + c3 * μ^3 + c4 * σ + c5 * μ * σ
+    term2 = exp(c6 + c7 * μ + c8 * μ^2 + c9 * σ + c10 * μ * σ)
+    f = term1 * term2
+
+    # Now fresnel reflectances
+    r = fresnel_reflectance(n, μ)
+    r₀ = fresnel_reflectance(n₀, μ)
+
+    albedo_direct_reflection = r - (r / r₀) * f
+
+    return albedo_direct_reflection
+end
+
+@parameterized @kwdef struct OceanDiffuseReflection{NF} <: AbstractOceanAlbedo
+    "Regression coefficient from Jin et al."
+    @param c0::NF = -0.1479
+
+    "Regression coefficient from Jin et al."
+    @param c1::NF = 0.1502
+
+    "Regression coefficient from Jin et al."
+    @param c2::NF = -0.0176
+
+end
+
+Adapt.@adapt_structure OceanDiffuseReflection
+OceanDiffuseReflection(SG::SpectralGrid; kwargs...) = OceanDiffuseReflection{SG.NF}(; kwargs...)
+
+@inline function (c::OceanDiffuseReflection)(p)
+    (; σ, n) = p
+    (; c0, c1, c2) = c
+
+    # Formulation following Jin et al. 2011
+    # Using the cloudy diffuse albedo parameterisation instead of isotropic diffuse
+    # since we define direct/diffuse from cloud cover fraction in SpeedyWeather
+    albedo_diffuse_reflection = c0 + c1 * n + c2 * n * σ
+
+    return albedo_diffuse_reflection
+end
+
+@parameterized @kwdef struct ConstantOceanVolumeAlbedo{NF} <: AbstractOceanAlbedo
+    "Broadband volume-scattering albedo for case 1 waters, Jin et al. eq. (15)"
+    @param albedo::NF = 0.006 (bounds = 0 .. 1,)
+end
+
+@inline (c::ConstantOceanVolumeAlbedo)(p, μ) = c.albedo
+
+Adapt.@adapt_structure ConstantOceanVolumeAlbedo
+ConstantOceanVolumeAlbedo(SG::SpectralGrid; kwargs...) = ConstantOceanVolumeAlbedo{SG.NF}(; kwargs...)
+
+@parameterized @kwdef struct SpectralOceanVolumeAlbedo{NF, VectorType} <: AbstractOceanAlbedo
+    "[OPTION] Chlorophyll concentration [mg/m³], clamped to ≥ 0.02 (M&M eq. 14 lower limit)"
+    @param chl::NF = 0.1 (bounds = Positive,)
+
+    "Regression coefficient from Jin et al."
+    @param r0::NF = 0.4817
+
+    "Regression coefficient from Jin et al."
+    @param r1::NF = 0.0149
+
+    "Regression coefficient from Jin et al."
+    @param r2::NF = 0.207
+
+    "Regression coefficient from Jin et al."
+    @param β0::NF = 0.6279
+
+    "Regression coefficient from Jin et al."
+    @param β1::NF = 0.2227
+
+    "Regression coefficient from Jin et al."
+    @param β2::NF = 0.0513
+
+    "Regression coefficient from Jin et al."
+    @param β3::NF = 0.2465
+
+    "Regression coefficient from Jin et al."
+    @param β4::NF = 0.3119
+
+    "Coefficient from Morel & Maritorena, eqn (13)"
+    @param b0::NF = 0.002
+
+    "Coefficient from Morel & Maritorena, eqn (13)"
+    @param b1::NF = 0.01
+
+    "Coefficient from Morel & Maritorena, eqn (13)"
+    @param b2::NF = 0.5
+
+    "Coefficient from Morel & Maritorena, eqn (13)"
+    @param b3::NF = 0.25
+
+    "Coefficient from Morel & Maritorena, eqn (13), reference wavelength [nm]"
+    @param b4::NF = 550
+
+    "Coefficient from Morel & Maritorena, eqn (12)"
+    @param b5::NF = 0.416
+
+    "Coefficient from Morel & Maritorena, eqn (12)"
+    @param b6::NF = 0.766
+
+    "Coefficient from Morel & Maritorena, eqn (14)"
+    @param b7::NF = 0.3
+
+    "Coefficient from Morel & Maritorena, eqn (16)"
+    @param a0::NF = 0.06
+
+    "Coefficient from Morel & Maritorena, eqn (16)"
+    @param a1::NF = 0.65
+
+    "Coefficient from Morel & Maritorena, eqn (17)"
+    @param a2::NF = 0.014
+
+    "Coefficient from Morel & Maritorena, eqn (17), reference wavelength [nm]"
+    @param a3::NF = 440
+
+    "Coefficient from Morel & Maritorena, eqn (16)"
+    @param a4::NF = 0.2
+
+    "Pure water absorption at 440 nm in the CDOM term, Pope & Fry (1997) as in Jin et al.'s code [m⁻¹]"
+    @param a_w_440::NF = 0.00635
+
+    "Band centre wavelengths [nm]"
+    wavelengths::VectorType
+
+    "Per-band R₀ intercept A in R₀ = A + Bμ, computed in initialize!"
+    R₀_intercept::VectorType
+
+    "Per-band R₀ slope B in R₀ = A + Bμ, computed in initialize!"
+    R₀_slope::VectorType
+end
+
+Adapt.@adapt_structure SpectralOceanVolumeAlbedo
+function SpectralOceanVolumeAlbedo(SG::SpectralGrid; wavelengths = [450, 550, 650], kwargs...)
+    (; NF, architecture) = SG
+    nbands = length(wavelengths)
+    on_arch(x) = on_architecture(architecture, x)
+    λs = on_arch(NF.(wavelengths))
+    return SpectralOceanVolumeAlbedo{NF, typeof(λs)}(;
+        wavelengths = λs,
+        R₀_intercept = on_arch(zeros(NF, nbands)),
+        R₀_slope = on_arch(zeros(NF, nbands)),
+        kwargs...,
+    )
+end
+
+"""$(TYPEDSIGNATURES) Linear interpolation of tabulated `ys` at ascending `xs`,
+clamped to the end values outside the table (no extrapolation)."""
+@inline function interpolate_table(xs::NTuple{N}, ys::NTuple{N}, x) where {N}
+    x <= xs[1] && return oftype(x, ys[1])
+    x >= xs[N] && return oftype(x, ys[N])
+    lo, hi = 1, N                       # binary search for xs[lo] ≤ x < xs[hi]
+    while hi - lo > 1
+        mid = (lo + hi) ÷ 2
+        xs[mid] <= x ? (lo = mid) : (hi = mid)
+    end
+    t = (x - xs[lo]) / (xs[hi] - xs[lo])
+    return oftype(x, (1 - t) * ys[lo] + t * ys[hi])
+end
+
+# Normalized phytoplankton absorption A_chl(λ), A_chl(440) = 1, from Jin et al. (2011) supplementary code
+const ACHL_WAVELENGTHS = Tuple(350.0:10.0:700.0)
+const ACHL = (
+    0.56, 0.57, 0.59, 0.61, 0.66, 0.687, 0.828, 0.913, 0.973, 1.0, 0.944, 0.917,
+    0.87, 0.798, 0.75, 0.668, 0.618, 0.528, 0.474, 0.416, 0.357, 0.294, 0.276, 0.291,
+    0.282, 0.236, 0.252, 0.276, 0.317, 0.334, 0.356, 0.441, 0.595, 0.502, 0.329, 0.215,
+)
+
+# Pure water absorption a_w(λ) [m⁻¹], from Jin et al. (2011) supplementary code:
+# Smith & Baker (1981) for λ ≤ 510 nm, Pope & Fry (1997) for 512.5–727.5 nm
+const AW_WAVELENGTHS = (Tuple(200.0:10.0:510.0)..., Tuple(512.5:2.5:730.0)..., Tuple(740.0:10.0:800.0)...)
+const AW = (
+    3.07, 1.99, 1.31, 0.927, 0.72, 0.559, 0.457, 0.373,
+    0.288, 0.215, 0.141, 0.105, 0.0844, 0.0678, 0.0561, 0.0463,
+    0.0379, 0.03, 0.022, 0.0191, 0.0171, 0.0162, 0.0153, 0.0144,
+    0.0145, 0.0145, 0.0156, 0.0156, 0.0176, 0.0196, 0.0257, 0.0357,
+    0.0372, 0.0396, 0.0399, 0.0409, 0.0416, 0.0417, 0.0428, 0.0434,
+    0.0447, 0.0452, 0.0466, 0.0474, 0.0489, 0.0511, 0.0537, 0.0565,
+    0.0593, 0.0596, 0.0606, 0.0619, 0.064, 0.0642, 0.0672, 0.0695,
+    0.0733, 0.0772, 0.0836, 0.0896, 0.0989, 0.11, 0.122, 0.1351,
+    0.1516, 0.1672, 0.1925, 0.2224, 0.247, 0.2577, 0.2629, 0.2644,
+    0.2665, 0.2678, 0.2707, 0.2755, 0.281, 0.2834, 0.2904, 0.2916,
+    0.2995, 0.3012, 0.3077, 0.3108, 0.322, 0.325, 0.335, 0.34,
+    0.358, 0.371, 0.393, 0.41, 0.424, 0.429, 0.436, 0.439,
+    0.448, 0.448, 0.461, 0.465, 0.478, 0.486, 0.502, 0.516,
+    0.538, 0.559, 0.592, 0.624, 0.663, 0.704, 0.756, 0.827,
+    0.914, 1.007, 1.119, 1.231, 1.356, 1.489, 1.678, 1.799,
+    2.38, 2.47, 2.55, 2.51, 2.36, 2.16, 2.07,
+)
+
+@inline A_chl(λnm) = interpolate_table(ACHL_WAVELENGTHS, ACHL, λnm)
+@inline a_w(λnm) = interpolate_table(AW_WAVELENGTHS, AW, λnm)
+
+# From Morel (1974) and Bricaud (1998)
+@inline b_w(λnm) = oftype(λnm, 0.00288) * (λnm / 500)^oftype(λnm, -4.32)
+
+"""$(TYPEDSIGNATURES) Coefficients A, B of the subsurface irradiance reflectance R₀ = A + Bμ
+at wavelength `λ` [nm] for chlorophyll `chl` [mg/m³], Jin et al. eqs. (8)–(9) with
+Morel & Maritorena (2001) eqs. (11)–(18). Called once per band at initialization."""
+function R₀_coefficients(c::SpectralOceanVolumeAlbedo, λ, chl)
+    (; β0, β1, β2, β3, β4, b0, b1, b2, b3, b4, b5, b6, b7, a0, a1, a2, a3, a4, a_w_440) = c
+    chl = max(chl, oftype(chl, 0.02))           # lower limit of M&M eq. (14)
+
+    # Backscattering, M&M eqs. (11)–(14)
+    v = chl > 2 ? zero(chl) : (log10(chl) - b7) / 2
+    bbp = (b0 + b1 * (b2 - b3 * log10(chl)) * (λ / b4)^v) * b5 * chl^b6
+    bbw = b_w(λ) / 2
+    bb = bbw + bbp
+    η_b = bbw / bb
+
+    # Absorption, M&M eqs. (16)–(18), with A_chl(440) = 1
+    # NOTE: Jin et al.'s supplementary code uses Smith & Baker (1981) a_w below 510 nm but
+    # the Pope & Fry (1997) value a_w(440) = 0.00635 in the CDOM term. Kept for parity;
+    # Pope & Fry throughout would be consistent with Morel & Maritorena (2001).
+    a_y440 = a4 * (a_w_440 + a0 * chl^a1)
+    a = a_w(λ) + a0 * A_chl(λ) * chl^a1 + a_y440 * exp(-a2 * (λ - a3))
+
+    # β = β0 - β1η - β2η² + (β3η - β4)μ is linear in μ, so R₀ = A + Bμ
+    A = (β0 - β1 * η_b - β2 * η_b^2) * bb / a
+    B = (β3 * η_b - β4) * bb / a
+    return A, B
+end
+
+function initialize!(scheme::SpectralOceanVolumeAlbedo, model::PrimitiveEquation)
+    λs = Array(scheme.wavelengths)              # compute on CPU
+    A = similar(λs)
+    B = similar(λs)
+    for k in eachindex(λs)
+        A[k], B[k] = R₀_coefficients(scheme, λs[k], scheme.chl)
+    end
+    copyto!(scheme.R₀_intercept, A)             # works for CPU and GPU arrays
+    copyto!(scheme.R₀_slope, B)
+    return nothing
+end
+
+@inline function (c::SpectralOceanVolumeAlbedo)(p, μ)
+    (; σ, αₛ, band) = p
+    (; r0, r1, r2) = c
+
+    r_w = r0 - r1 * σ - r2 * σ^2                                # Jin eq. (7)
+    R₀ = c.R₀_intercept[band] + c.R₀_slope[band] * μ            # Jin eqs. (8)–(9), precomputed
+    return R₀ * (1 - r_w) * (1 - αₛ) / (1 - r_w * R₀)           # Jin eq. (6)
+end
+
+export WhitecapFoam, NoFoam
+
+"""Whitecap (foam) correction following Koepke (1984) as used by Jin et al. (2011) eqs. (16)–(17):
+constant foam albedo and fractional whitecap coverage f = a * w^b from wind speed w [m/s].
+Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct WhitecapFoam{NF} <: AbstractOceanAlbedo
+    "[OPTION] Albedo of whitecaps/foam [1], Koepke (1984)"
+    @param albedo_foam::NF = 0.55 (bounds = 0 .. 1,)
+
+    "[OPTION] Whitecap coverage coefficient [(s/m)^b], Jin et al. eq. (16)"
+    @param coverage_coefficient::NF = 2.95e-6 (bounds = Positive,)
+
+    "[OPTION] Whitecap coverage wind speed exponent [1], Jin et al. eq. (16)"
+    @param coverage_exponent::NF = 3.52 (bounds = Positive,)
+end
+
+Adapt.@adapt_structure WhitecapFoam
+WhitecapFoam(SG::SpectralGrid; kwargs...) = WhitecapFoam{SG.NF}(; kwargs...)
+
+@inline function whitecap_coverage(foam::WhitecapFoam, w)
+    (; coverage_coefficient, coverage_exponent) = foam
+    # Fractional whitecap coverage in [0, 1] at wind speed `w` [m/s], Jin et al. eq. (16).
+    return min(coverage_coefficient * w^coverage_exponent, one(w))
+end
+
+@inline function (foam::WhitecapFoam)(α, w)
+    # Albedo `α` corrected for whitecaps at wind speed `w` [m/s], Jin et al. eq. (17).
+    f = whitecap_coverage(foam, w)
+    return f * foam.albedo_foam + (1 - f) * α
+end
+
+"""No whitecap correction."""
+@parameterized struct NoFoam <: AbstractOceanAlbedo end
+Adapt.@adapt_structure NoFoam
+NoFoam(SG::SpectralGrid) = NoFoam()
+@inline (::NoFoam)(α, w) = α
+
+export JinOceanAlbedo, ConstantOceanVolumeAlbedo, SpectralOceanVolumeAlbedo
+
+@parameterized @kwdef struct JinOceanAlbedo{NF, V, F} <: AbstractAlbedo
+    "Ratio of air-water refractive indices"
+    @param n::NF = 1.34
+
+    "Refractive index of water in visible spectrum"
+    @param n₀::NF = 1.34
+
+    "Effective cosine for diffuse incidence, Jin et al. eq. (10)"
+    @param μₑ::NF = 0.676
+
+    "[OPTION] Albedo over sea ice at concentration=1 [1]"
+    @param albedo_ice::NF = 0.6 (bounds = 0 .. 1,)
+
+    @component ocean_direct_reflection::OceanDirectReflection{NF} = OceanDirectReflection{NF}()
+
+    @component ocean_diffuse_reflection::OceanDiffuseReflection{NF} = OceanDiffuseReflection{NF}()
+
+    @component ocean_volume::V = ConstantOceanVolumeAlbedo{NF}()
+
+    @component foam::F = WhitecapFoam{NF}()
+end
+
+Adapt.@adapt_structure JinOceanAlbedo
+function JinOceanAlbedo(
+        SG::SpectralGrid;
+        ocean_volume = ConstantOceanVolumeAlbedo(SG),
+        foam = WhitecapFoam(SG),
+        kwargs...
+    )
+    ocean_volume isa SpectralOceanVolumeAlbedo &&
+        throw(ArgumentError("SpectralOceanVolumeAlbedo requires a spectral shortwave scheme"))
+    return JinOceanAlbedo{SG.NF, typeof(ocean_volume), typeof(foam)}(; ocean_volume, foam, kwargs...)
+end
+
+
+function variables(::JinOceanAlbedo)
+    return (
+        ParameterizationVariable(:black_sky_albedo, GridXY(), desc = "Black-sky ocean albedo", units = "1", namespace = :ocean),
+        ParameterizationVariable(:white_sky_albedo, GridXY(), desc = "White-sky ocean albedo", units = "1", namespace = :ocean),
+    )
+end
+
+function initialize!(albedo::JinOceanAlbedo, model::PrimitiveEquation)
+    initialize!(albedo.ocean_volume, model)
+    return nothing
+end
+
+initialize!(::ConstantOceanVolumeAlbedo, ::PrimitiveEquation) = nothing
+
+@propagate_inbounds function albedo!(ij, albedo, vars, scheme::JinOceanAlbedo, model)
+    (; ocean) = vars.parameterizations
+    (; n, n₀, μₑ) = scheme
+    NF = eltype(albedo)
+
+    # Cosine of solar zenith angle, only when the sun is up
+    μ = clamp(vars.parameterizations.cos_zenith[ij], zero(NF), one(NF))
+    w = vars.parameterizations.surface_wind_speed[ij]
+    σ = sqrt(NF(0.003) + NF(0.00512) * w)     # Cox & Munk, Jin et al. eq. (2)
+
+    p = (; μ, σ, n, n₀)
+
+    # Surface (Fresnel) reflection, Jin eqs. (1) and (5b)
+    αs_dir = scheme.ocean_direct_reflection(p)
+    αs_dif = scheme.ocean_diffuse_reflection(p)
+
+    # Ocean volume scattering, Jin eqs. (6) and (10)
+    αw_dir = scheme.ocean_volume((; p..., αₛ = αs_dir), μ)
+    αw_dif = scheme.ocean_volume((; p..., αₛ = αs_dif), μₑ)
+
+    # Direct (black-sky) and diffuse (white-sky) albedo, Jin eqs. (11)–(12),
+    # blended by the shortwave scheme via combine_surface_albedo!
+    black_sky = αs_dir + αw_dir
+    white_sky = αs_dif + αw_dif
+
+    # Whitecap (foam) correction, Jin et al. eqs. (16)–(17)
+    black_sky = scheme.foam(black_sky, w)
+    white_sky = scheme.foam(white_sky, w)
+
+    ℵ = haskey(vars.prognostic.ocean, :sea_ice_concentration) ? vars.prognostic.ocean.sea_ice_concentration[ij] : zero(NF)
+    black_sky += ℵ * (scheme.albedo_ice - black_sky)
+    white_sky += ℵ * (scheme.albedo_ice - white_sky)
+
+    ocean.black_sky_albedo[ij] = black_sky
+    ocean.white_sky_albedo[ij] = white_sky
+
+    # Fallback for radiation schemes with no direct/diffuse radiation fraction
+    albedo[ij] = white_sky
+
+    return nothing
+end
+
 
 """$(TYPEDSIGNATURES)
 Blend direct (black-sky) and diffuse (white-sky) albedo into the broadband `albedo` of
