@@ -423,7 +423,9 @@ function vertical_integration!(
         time_stepping::AbstractTimeStepper,
     )
     (; σ_levels_thick, nlayers) = geometry     # nominal Δσₖ, used only for the correction term
-    (; dpres_dx, dpres_dy, surface_pressure) = vars.dynamics
+    (; surface_pressure) = vars.dynamics
+    dpres_dx = get_prognostic_step(vars.dynamics.dpres_dx, time_stepping, DynamicalCore())
+    dpres_dy = get_prognostic_step(vars.dynamics.dpres_dy, time_stepping, DynamicalCore())
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
@@ -473,7 +475,9 @@ function vertical_integration!(
         time_stepping::AbstractTimeStepper,
     )
     (; σ_levels_thick, nlayers) = geometry
-    (; dpres_dx, dpres_dy, surface_pressure) = vars.dynamics
+    (; surface_pressure) = vars.dynamics
+    dpres_dx = get_prognostic_step(vars.dynamics.dpres_dx, time_stepping, DynamicalCore())
+    dpres_dy = get_prognostic_step(vars.dynamics.dpres_dy, time_stepping, DynamicalCore())
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
@@ -691,7 +695,9 @@ function vertical_velocity!(
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
     (; w) = vars.dynamics
 
-    (; dpres_dx, dpres_dy, u_mean_grid, v_mean_grid) = vars.dynamics
+    dpres_dx = get_prognostic_step(vars.dynamics.dpres_dx, time_stepping, DynamicalCore())
+    dpres_dy = get_prognostic_step(vars.dynamics.dpres_dy, time_stepping, DynamicalCore())
+    (; u_mean_grid, v_mean_grid) = vars.dynamics
     ūv̄∇lnp = vars.scratch.grid.a_2D             # use scratch memory
     @. ūv̄∇lnp = u_mean_grid * dpres_dx + v_mean_grid * dpres_dy
 
