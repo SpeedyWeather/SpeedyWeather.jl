@@ -24,6 +24,7 @@
         # AQUA PLANET: land_fraction == 0 everywhere -> pure ocean roughness
         model = Model(spectral_grid; boundary_layer, land_sea_mask = AquaPlanetMask(spectral_grid))
         initialize!(model.land_sea_mask, model)
+        initialize!(model.radiation, model)  # precomputes the free troposphere layers for clouds
         initialize!(boundary_layer, model)
         vars = Variables(model)
         SpeedyWeather.parameterization_tendencies!(vars, model)
@@ -52,6 +53,7 @@
         # ROCKY PLANET: land_fraction == 1 everywhere -> pure land roughness
         model = Model(spectral_grid; boundary_layer, land_sea_mask = RockyPlanetMask(spectral_grid))
         initialize!(model.land_sea_mask, model)
+        initialize!(model.radiation, model)  # precomputes the free troposphere layers for clouds
         vars = Variables(model)
         SpeedyWeather.parameterization_tendencies!(vars, model)
 
@@ -70,6 +72,7 @@
         # EARTH: fractional land-sea mask -> area-weighted blend of land and ocean
         model = Model(spectral_grid; boundary_layer)     # default EarthLandSeaMask
         initialize!(model.land_sea_mask, model)
+        initialize!(model.radiation, model)  # precomputes the free troposphere layers for clouds
         vars = Variables(model)
         SpeedyWeather.parameterization_tendencies!(vars, model)
 

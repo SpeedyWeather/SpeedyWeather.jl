@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
 - Fix flaky RingGrids meridionally-constant interpolation test (absolute instead of relative tolerance) [#1367](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1367)
 - Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
