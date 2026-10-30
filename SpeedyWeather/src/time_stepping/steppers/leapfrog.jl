@@ -4,7 +4,7 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
+mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
@@ -22,13 +22,19 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
 
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
+
+    "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for leapfrog as the atmosphere"
+    ocean::O
+
+    "[OPTION] Time stepper for the land variables, `nothing` for leapfrog as the atmosphere"
+    land::L
 end
 
 Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt))
 
 # HOW MANY STEPS DO VARIABLES NEED?
-# leapfrogging always needs 2 steps in spectral
-prognostic_spectral_steps(::AbstractLeapfrog) = 2
+# leapfrogging always needs 2 steps (in spectral, and for ocean/land if leapfrogged)
+prognostic_steps(::AbstractLeapfrog) = 2
 # but in 2D only 1 step in grid space
 prognostic_grid_steps(::AbstractLeapfrog, ::Union{<:Barotropic, <:ShallowWater}) = 1
 # but the parameterizations are evaluated at the previous step so 2
@@ -63,10 +69,12 @@ tendency_steps(::AbstractLeapfrog) = 1
 # Parameterizations should always be evaluated on the previous time step for Euler forward
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParameterization) = 1
 
-# by default use the first step here but you may extend for subtypes of AbstractOcean elsewhere
-# e.g. to leapfrog also a SlabOcean model's SST
+# ocean, sea ice or land components read the 1st step: prescribed ones have no step dimension,
+# with the default `EulerForward` for ocean and land there is only 1 step, and with `ocean/land = nothing`
+# (leapfrogged) the 1st step is the previous one, consistent with the parameterizations
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractOcean) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractSeaIce) = 1
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractLandComponent) = 1
 
 # particle advection using u, v at current not previous time step
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
@@ -89,6 +97,7 @@ end
 
 # copy step 1 -> step 2 for one variable; steps bound individually via get_step
 @inline function copy_step_forward!(var)
+    nsteps(var) > 1 || return nothing           # e.g. ocean/land variables with EulerForward
     var_old = get_step(var, 1)
     var_new = get_step(var, 2)
     var_new .= var_old
@@ -119,10 +128,12 @@ function move_prognostic_grid_variables_back!(
         model::AbstractModel,
     )
     # The atmospheric grid prognostics (vorticity, divergence, temperature, [humidity], pressure/η)
-    # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_grid` fuse parent.
-    # Together these cover exactly `tendency_and_uv_names`, so a single contiguous copy from the
-    # current step (2nd) to the previous step (1st) per fuse parent replaces the per-variable loop.
-    for fused in (vars.fused.grid, vars.fused.uv_grid)
+    # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_dpres_grad_grid` fuse
+    # parent. Together these cover exactly `tendency_and_uv_names`, so a single contiguous copy from
+    # the current step (2nd) to the previous step (1st) per fuse parent replaces the per-variable loop.
+    # For primitive equation models `:uv_dpres_grad_grid` also holds ∇ln(pₛ) (`dpres_dx`, `dpres_dy`),
+    # which is copied along but not used from the previous step.
+    for fused in (vars.fused.grid, vars.fused.uv_dpres_grad_grid)
         copy_step_back!(parent(fused))
     end
     # tracers, ocean and land grid variables are not part of the atmospheric fuse — copy
@@ -178,6 +189,8 @@ function Leapfrog(
         adjust_with_output = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
+        ocean = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
+        land = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
     )
     (; NF, truncation) = spectral_grid
 
@@ -187,6 +200,7 @@ function Leapfrog(
 
     return Leapfrog(
         Second(Δt_at_T32), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
+        ocean, land,
     )
 end
 
@@ -196,9 +210,18 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
-    calculate_Δt!(L, model)         # common among several time steppers
+    calculate_Δt!(L, model)         # common among several time steppers, also sets ocean/land Δt
     return nothing
 end
+
+# ocean and land use the time steppers in the respective fields, `nothing` means leapfrog like the atmosphere
+time_stepper(L::Leapfrog, ::Val{:ocean}) = something(L.ocean, L)
+time_stepper(L::Leapfrog, ::Val{:land}) = something(L.land, L)
+
+# the first Euler step and the first leapfrog step only advance the clock by Δt/2,
+# so non-leapfrog time steppers for ocean and land step Δt/2 there too
+time_step_scale(::Leapfrog, ::AbstractTimeStepper, clock::Clock) = ifelse(clock.step_counter <= 1, 2, 1)
+time_step_scale(::Leapfrog, ::AbstractLeapfrog, clock::Clock) = 1   # leapfrog does this itself
 
 """$(TYPEDSIGNATURES) Leapfrog is spun up with 1 Euler forward step that doesn't count for clock + output"""
 spin_up_steps(::AbstractLeapfrog) = 1
@@ -206,12 +229,12 @@ spin_up_steps(::AbstractLeapfrog) = 1
 function time_step!(clock::Clock, time_stepping::Leapfrog)
     Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based
     i = clock.step_counter          # 0-based as the clock is only stepped below
-    first_step = i == 0            
-    second_step = i == 1            
+    first_step = i == 0
+    second_step = i == 1
 
     step_scale = ifelse(first_step, 0.5, 1.0)       # first Euler step at Δt/2
     rewind_scale = ifelse(second_step, 0.5, 0.0)    # second step: Leapfrog at Δt, later steps: Leapfrog at 2Δt but clock by Δt
-    increase_counter = ifelse(first_step, 0, 1)     
+    increase_counter = ifelse(first_step, 0, 1)
 
     # rotation and orbit time are dilated, so rewind them by their dilated Δt/2
     Δt_rewind = dilate(Δt, rewind_scale)
@@ -222,7 +245,8 @@ function time_step!(clock::Clock, time_stepping::Leapfrog)
     return nothing
 end
 
-default_time_step(L::Leapfrog) = 2 * L.Δt
+# for any AbstractLeapfrog: inside kernels the Leapfrog is adapted to a LeapfrogCore
+default_time_step(L::AbstractLeapfrog) = 2 * L.Δt
 function time_step(L::Leapfrog, clock::Clock)
     (; Δt) = L
     return ifelse(
@@ -244,17 +268,17 @@ function update_prognostic!(
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
-        scale::Real = 1,
+        scale::Number = 1,
     )
     Δt = time_step(time_stepping, clock)
-    Δt /= oftype(Δt, scale)                         # scale time step on the fly *1/radius for atmospheric variables
-    lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index
+    Δt /= scale                                     # scale time step on the fly *1/radius for atmospheric variables
+    lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index, 1 or 2
     var_old = get_step(var, 1)                      # no tuple (get_steps) here: a tuple of step views
     var_new = get_step(var, 2)                      # breaks Enzyme's type analysis on Julia >= 1.11
-    var_lf = get_step(var, lf)                      # view on either t or t+dt to dis/enable Williams filter
     var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
 
-    @boundscheck lf == 1 || lf == 2 || throw(BoundsError())
+    # lf selects var_old (t) or var_new (t+dt) inside the kernel to dis/enable the Williams filter
+    # (not as a view here as lf depends on the clock, which is traced with Reactant)
     @boundscheck size(var_old) == size(var_new) == size(var_tend) || throw(BoundsError())
 
     (; robert_filter, williams_filter) = time_stepping          # coefficients for filters
@@ -269,16 +293,17 @@ function update_prognostic!(
 
     launch!(
         architecture(var_tend), SpectralWorkOrder, size(var_tend), leapfrog_kernel!,
-        var_old, var_new, var_lf, var_tend, Δt, w1, w2
+        var_old, var_new, lf, var_tend, Δt, w1, w2
     )
     return nothing
 end
 
-@kernel inbounds = true function leapfrog_kernel!(var_old, var_new, var_lf, tendency, Δt, w1, w2)
+@kernel inbounds = true function leapfrog_kernel!(var_old, var_new, lf, tendency, Δt, w1, w2)
     lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
     old = var_old[lmk]
+    var_lf = ifelse(lf == 1, old, var_new[lmk])     # on either t or t+dt, read before writing
     new = old + Δt * tendency[lmk]
-    update = old - 2var_lf[lmk] + new
-    var_old[lmk] = var_lf[lmk] + w1 * update
+    update = old - 2var_lf + new
+    var_old[lmk] = var_lf + w1 * update
     var_new[lmk] = new - w2 * update
 end

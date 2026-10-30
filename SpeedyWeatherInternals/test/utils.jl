@@ -17,3 +17,25 @@ end
     @test readable_secs(1.23) == CompoundPeriod(Second(1), Millisecond(230))
     @test readable_secs(0.123) == CompoundPeriod(Millisecond(120))
 end
+
+@testset "set_scalar!" begin
+    x = rand(Float32, 5)
+    set_scalar!(x, 2, 42.0f0)
+    @test x[2] == 42.0f0
+
+    y = rand(ComplexF32, 4)
+    set_scalar!(y, 1, zero(ComplexF32))
+    @test y[1] == 0
+end
+
+@testset "@maybe_jit without Reactant" begin
+    # just test that it works without error, even with kwargs
+    A = rand(10, 10)
+    arch = SpeedyWeatherInternals.Architectures.CPU()
+
+    res = @maybe_jit arch sum(A)
+    @test res == sum(A)
+
+    res2 = @maybe_jit arch sum(A; dims = 1)
+    @test res2 == sum(A; dims = 1)
+end

@@ -29,7 +29,7 @@ nothing # hide
 The Jablonowski-Williamson baroclinic wave test case [Jablonowski2006](@citep) using the
 [Primitive equation model](@ref primitive_equation_model) particularly the [`PrimitiveDryModel`](@ref),
 as we switch off all parameterizations (and ocean, sea_ice and land) with `dynamics_only = true`.
-We want to use 8 vertical levels, and a lower resolution of T31 on a
+We want to use 8 vertical levels, and a lower resolution of T32 on a
 [full Gaussian grid](@ref FullGaussianGrid).
 The Jablonowski-Williamson initial conditions are `ZonalWind` for vorticity and divergence
 (curl and divergence of ``u, v``), `JablonowskiTemperature` for temperature and

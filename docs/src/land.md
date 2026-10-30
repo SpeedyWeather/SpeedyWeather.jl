@@ -181,7 +181,7 @@ C_2 &= C_w W_2 \gamma + C_s
 \end{aligned}
 ```
 
-with ``\gamma = 0.24`` being the field capacity per meter soil.
+with ``\gamma = 0.3`` being the field capacity per meter soil.
 
 ## Land soil moisture
 
@@ -199,6 +199,9 @@ model constructor
 soil_moisture = LandBucketMoisture(spectral_grid)
 land = LandModel(spectral_grid; soil_moisture)
 ```
+
+`SeasonalSoilMoisture` reads volumetric soil moisture from the climatology
+and converts it to a fraction of the field capacity, capped at 1.
 
 ### LandBucketMoisture
 
@@ -223,7 +226,7 @@ The equations are
 
 for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
 defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
-with ``\gamma = 0.24`` the field capacity per meter soil and
+with ``\gamma = 0.3`` the field capacity per meter soil and
 ``\Delta z_1 = 0.1~m`` the top layer thickness by default, and
 ``\Delta z_2 = 4.0~m`` the layer below. The top layer is forced by precipitation
 ``P`` minus evaporation ``E`` minus river runoff ``R``. The second term is a
@@ -399,7 +402,7 @@ using a globally constant albedo of 0.1 for the ocean but a higher albedo
 over land which also increases to 0.5 towards the poles.
 
 You can always output the land-sea mask weighted albedo with
-`add!(model, SpeedyWeather.AlbedoOutput())` or inspect it as follows
+`add!(model, OutputVariables.Albedo())` or inspect it as follows
 
 ```@example land
 simulation = initialize!(model)
@@ -483,19 +486,19 @@ simulation.variables.prognostic.land.terrarium
 ### Output of Terrarium variables
 
 Any variable of the Terrarium state (prognostic, auxiliary/diagnostic, or input)
-can be written to SpeedyWeather's output with `TerrariumOutput`. Its name,
+can be written to SpeedyWeather's output with `OutputVariables.Terrarium`. Its name,
 units, long name and dimensionality are derived automatically from Terrarium's
 variable metadata. Add all prognostic and auxiliary Terrarium variables with
 
 ```@example terrarium
-add!(model, TerrariumOutput(terrarium_model)...)
+add!(model, OutputVariables.Terrarium(terrarium_model)...)
 ```
 
 or add a single variable (here renamed in the output file via `name`, any Terrarium
 variable name works, e.g. also `:saturation_water_ice` or `:sensible_heat_flux`) with
 
 ```@example terrarium
-add!(model, TerrariumOutput(terrarium_model, :temperature, name = "soil_temperature"))
+add!(model, OutputVariables.Terrarium(terrarium_model, :temperature, name = "soil_temperature"))
 nothing # hide
 ```
 
@@ -511,5 +514,5 @@ and, once Zarr.jl is loaded, with [`ZarrOutput`](@ref "Zarr Output"):
 using Zarr
 output = ZarrOutput(spectral_grid, PrimitiveWet)
 model = PrimitiveWetModel(spectral_grid; land, output, ...)
-add!(model, TerrariumOutput(terrarium_model)...)
+add!(model, OutputVariables.Terrarium(terrarium_model)...)
 ```

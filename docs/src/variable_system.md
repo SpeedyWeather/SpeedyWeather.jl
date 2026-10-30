@@ -203,10 +203,45 @@ simulation.variables.scratch.my_dict
 
 a dictionary as a variable!
 
-## Variable fusion 
+## Variable fusion
+
+!!! warning "Fused variables are an implementation detail"
+    Variable fusion is a performance optimization and not needed to work with variables
+    or to write custom parameterizations and model components. You should not access or modify
+    the fused arrays in `simulation.variables.fused` directly. Always access variables through
+    their usual names, e.g. `simulation.variables.prognostic.vorticity`.
 
 Variables can be "fused" together to be allocated as one block of contiguous memory.
-This is done primarly with GPU-optimiziation in mind, so that e.g. `transform!` calls can be batched together not just across levels,
-but also across different variables. All variables that are defined with the same `fuse = :fuse_name` keyword argument are allocated together.
-At the same time a `view` is defined that allows for the variable to be used as it would without the variable fusion.
-As this is primarily a performance optimization, it is not required to run basic custom parameterizations or model components. 
+This is done primarily with GPU optimization in mind: `transform!` calls can be batched together
+not just across layers but also across different variables, which reduces the number of kernel launches.
+Similarly, scaling all tendencies is done once on the fused array instead of once per variable.
+All variables that are defined with the same `fuse = :fuse_name` keyword argument are allocated together,
+stacked on top of each other in the vertical. Each variable is then a `view` into this fused array,
+so that it can be used as it would be without fusion. All fused arrays live in `simulation.variables.fused`,
+for example
+
+```@example variable_system
+simulation.variables.fused.prognostic
+```
+
+This is the `FusedParent` for the spectral prognostic variables. It is an array with many
+vertical layers divided into 5 slots: `vorticity` occupies the first slot with all its
+vertical layers, `divergence` the next, and so on (`temperature`, `humidity`, and the single layer
+of `pressure`). The slot map (which variable occupies which layers) is stored alongside
+
+```@example variable_system
+simulation.variables.fused.prognostic.slot_map
+```
+
+Other fused groups exist, e.g. `grid` for the grid-point copies of the prognostic variables
+(using the same slot order as `prognostic` so that one transform maps one onto the other)
+and `spectral_tendencies`/`grid_tendencies` for the tendencies.
+Their layout (which variables are fused, in which order) may change between versions.
+A few consequences you may notice:
+
+- A fused variable, e.g. `simulation.variables.prognostic.vorticity`, shares memory with its
+  fused parent, so changes to one are visible in the other.
+- The `.data` of a fused variable is a `SubArray` rather than an `Array`.
+- When printing `simulation.variables`, the memory of a fused variable is only counted once,
+  on its fused parent.
+- `copy!` between two `Variables` copies the fused parents and skips the views.

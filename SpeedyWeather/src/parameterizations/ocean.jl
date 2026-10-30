@@ -1,7 +1,7 @@
-# variable that AbstractOcean requires
+# variable that AbstractOcean requires, dynamic oceans should define it with a time dimension
 function variables(::AbstractOcean)
     return (
-        PrognosticVariable(:sea_surface_temperature, GridXYT(), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
+        PrognosticVariable(:sea_surface_temperature, GridXY(), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
     )
 end
 
@@ -17,7 +17,7 @@ export PrescribedOcean
 Prescribed ocean that declares the necessary allocations for the sea surface temperature,
 but all dynamics are expected to be externally set. Used for coupling to external ocean models.
 """
-struct PrescribedOcean <: AbstractOcean end
+struct PrescribedOcean <: AbstractPrescribedOcean end
 PrescribedOcean(::SpectralGrid) = PrescribedOcean() # added constructor, just to be consistent with call signatures
 initialize!(vars::Variables, ::PrescribedOcean, model) = nothing
 timestep!(vars::Variables, ::PrescribedOcean, model) = nothing
@@ -30,7 +30,7 @@ fields from file, and interpolates them in time on every time step
 and writes them to the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractOcean
+@kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractPrescribedOcean
     "Grid used for the model"
     grid::Grid
 
@@ -89,11 +89,12 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, sst, NF = Float32)
-    interpolate!(monthly_temperature, sst, interp)
+    @maybe_jit model.architecture RingGrids.interpolate_ignoring_nan!(monthly_temperature, sst, interp)
 
     if ocean.mask
+        # broadcast instead of logical indexing, which falls back to scalar indexing on Reactant
         mt = monthly_temperature.data
-        mt[isnan.(mt)] .= ocean.land_temperature
+        mt .= ifelse.(isnan.(mt), ocean.land_temperature, mt)
         mask!(monthly_temperature, model.land_sea_mask, :land; masked_value = ocean.land_temperature)
     end
 
@@ -108,17 +109,9 @@ function timestep!(
         ocean::SeasonalOceanClimatology,
         model::PrimitiveEquation,
     )
-    (; time) = vars.prognostic.clock
-
-    this_month = Dates.month(time)
-    next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
-
-    # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
     (; monthly_temperature) = ocean
     (; sea_surface_temperature) = vars.prognostic.ocean
-    NF = eltype(sea_surface_temperature)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time, eltype(sea_surface_temperature))
 
     launch!(
         architecture(sea_surface_temperature), ArrayWorkOrder, size(sea_surface_temperature),
@@ -129,12 +122,36 @@ function timestep!(
     return nothing
 end
 
+"""$(TYPEDSIGNATURES)
+Months and weight to interpolate a monthly climatology linearly in time at `time`,
+`(1 - weight) * monthly[this_month] + weight * monthly[next_month]` with the weight the
+fraction of the month's days passed (full days only). Returns `(this_month, next_month, weight)`,
+the weight of type `NF`, pass the variable's eltype as it's a kernel argument (Metal doesn't support
+`Float64`). Branch-free, so that it also works for the traced clock on Reactant
+(`Dates.daysinmonth` is overloaded for traced numbers in the Reactant extension)."""
+function monthly_interpolation(time, ::Type{NF} = Float64) where {NF}
+    year, this_month, day = Dates.yearmonthday(time)
+    next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
+
+    # linear interpolation weight between the two months, in NF via promotion as Reactant's traced
+    # numbers can't be `convert`ed
+    # TODO check whether this shifts the climatology by 1/2 a month
+    weight = (day - 1) * one(NF) / (Dates.daysinmonth(year, this_month) * one(NF))
+    return this_month, next_month, weight
+end
+
 @kernel inbounds = true function interpolate_monthly_climatology_kernel!(
         var, monthly, weight, this_month, next_month
     )
-    I = @index(Global, Cartesian)           # always launch over size(var)
-    ijk = ndims(monthly) == 2 ? I[1] : I    # if monthly is 2D, ignore vertical index
-    var[I] = (1 - weight) * monthly[ijk, this_month] + weight * monthly[ijk, next_month]
+    I = @index(Global, Cartesian)                       # always launch over size(var)
+    ijk = ndims(monthly) == 2 ? (I[1],) : (I[1], I[2])  # if monthly is 2D, ignore vertical index
+
+    # convert explicitly, with Reactant the scalar arguments are traced numbers that can't index
+    # or be converted implicitly
+    this_month = convert(Int, this_month)
+    next_month = convert(Int, next_month)
+    w = convert(eltype(var), weight)
+    var[I] = (1 - w) * monthly[ijk..., this_month] + w * monthly[ijk..., next_month]
 end
 
 # CONSTANT OCEAN CLIMATOLOGY
@@ -152,7 +169,7 @@ To be created like
 and the ocean time is set with `initialize!(model, time=time)`.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct ConstantOceanClimatology{NF} <: AbstractOcean
+@kwdef struct ConstantOceanClimatology{NF} <: AbstractPrescribedOcean
     "[OPTION] filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 
@@ -216,7 +233,7 @@ but vary in latitude following a coslat². To be created like
 
 Fields and options are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct AquaPlanet{NF} <: AbstractOcean
+@parameterized @kwdef struct AquaPlanet{NF} <: AbstractPrescribedOcean
     "[OPTION] Temperature on the Equator [K]"
     @param temperature_equator::NF = 302 (bounds = Positive,)
 
@@ -261,7 +278,7 @@ Tendencies are from net surface radiation and surface latent and sensible heat f
 The effective mixed-layer heat capacity is `specific_heat_capacity * mixed_layer_depth * density`.
 Initialised from seasonal SST climatology, with land points set to `land_temperature`.
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef mutable struct SlabOcean{NF} <: AbstractOcean
+@parameterized @kwdef mutable struct SlabOcean{NF} <: AbstractDynamicOcean
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
@@ -285,12 +302,12 @@ end
 SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 
 function variables(::SlabOcean, model::AbstractModel)
-    nsteps = get_nsteps(model.time_stepping, model)
-    pg = nsteps.prognostic_grid
-    tg = nsteps.tendency_grid
+    nsteps = get_nsteps(model.time_stepping, :ocean)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
     return (
-        PrognosticVariable(:sea_surface_temperature, GridXYT(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
-        TendencyVariable(:sea_surface_temperature, GridXYT(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),
+        PrognosticVariable(:sea_surface_temperature, OceanXYT(pg), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
+        TendencyVariable(:sea_surface_temperature, OceanXYT(tg), namespace = :ocean, desc = "Tendency of sea surface temperature", units = "K/s"),
 
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m^2"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
@@ -301,9 +318,6 @@ function variables(::SlabOcean, model::AbstractModel)
         ParameterizationVariable(:surface_sensible_heat_flux, Grid2D(), desc = "Surface sensible heat flux", units = "kg/s/m^2", namespace = :ocean),
     )
 end
-
-# leapfrog if possible
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::SlabOcean) = 2
 
 # nothing to initialize for SlabOcean model itself
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
@@ -319,13 +333,14 @@ function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEq
     # set land "sst" points (100% land only)
     if ocean_model.mask
         masked_value = ocean_model.land_temperature
+        # broadcast instead of logical indexing, which falls back to scalar indexing on Reactant
         sst = vars.prognostic.ocean.sea_surface_temperature.data
-        sst[isnan.(sst)] .= masked_value
+        sst .= ifelse.(isnan.(sst), masked_value, sst)
 
         # cap initial conditions at sea ice freezing temperature
         if hasproperty(model, :sea_ice) && hasproperty(model.sea_ice, :freezing_temperature)
             Tf = model.sea_ice.freezing_temperature
-            sst[sst .< Tf] .= Tf
+            sst .= max.(sst, Tf)
         end
 
         mask!(vars.prognostic.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
@@ -335,7 +350,7 @@ function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEq
 end
 
 function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEquation)
-    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, model.time_stepping, ocean_model)
+    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), ocean_model)
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
     C₀⁻¹ = inv(ocean_model.heat_capacity_mixed_layer)
@@ -349,6 +364,9 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     Rlu = vars.parameterizations.ocean.surface_longwave_up
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
+
+    @boundscheck size(dsst) == size(Rsd) == size(Rsu) == size(Rld) == size(Rlu) || throw(BoundsError())
+    @boundscheck size(dsst) == size(S) == size(H) || throw(BoundsError())
 
     launch!(
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,

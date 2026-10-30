@@ -1,6 +1,6 @@
-# Bulk Richardson number with the surface temperature and a working vertical diffusion
+# A working vertical diffusion with the surface temperature in its bulk Richardson number
 
-> Status: **in progress**. Richardson fix, working implicit vertical diffusion and Ri_c = 1 implemented; stable up to T85L16, but T31L24 blows up over Tibet through an explicit land–atmosphere coupling instability (limiter proposed, awaiting decision).
+> Status: **in progress**. Scope reduced to the vertical diffusion after the drag's Richardson number was fixed in #1363; implicit vertical diffusion implemented on top of main's Reactant masking, stability to be re-checked with the new drag.
 
 Date of initial draft: 2026-09-29
 
@@ -51,6 +51,18 @@ Base revision: c7d631c658feefc851eb7af5b93aa5754430faf5
   factor used Ri at the boundary-layer top (≈ Ri_c by construction), which made K ≈ 1 m²/s, so
   it now uses the surface Ri_N (Frierson eq. 20). T31L24 still blows up; diagnosed as explicit
   land–atmosphere coupling (see Known limitations).
+- 2026-10-30:
+  > With PR1363 merged can you overhaul PR1283, the latter's diff to main should probably now
+  > only really contain the vertical diffusion overhaul. Can you merge main and update PR
+  > description to match that it's only about vertical diffusion now?
+
+  #1363 computes the drag's bulk Richardson number relative to the land and ocean surface
+  (separately), so all changes to `BulkRichardsonDrag`/`bulk_richardson_surface` (items 2, 8 for
+  the drag, 9) are dropped in favour of main. `surface_skin_temperature` moved to
+  `vertical_diffusion.jl`, used by the diffusion only. The implicit solver is masked like main's
+  explicit one (`boundary_layers`, `ifelse`) for Reactant. Tests moved to
+  `test/parameterizations/vertical_diffusion.jl`, drag tests dropped. The stability table below
+  predates #1363 and needs redoing.
 
 ## Problem description
 
@@ -81,7 +93,7 @@ Surface bulk Richardson number (#1281):
    SST over ocean and the uppermost soil layer temperature over land, weighted by the land
    fraction. Where a surface type is undefined (NaN) the other one is used. If neither is
    available it falls back to the air temperature, which recovers the previous behaviour.
-2. `bulk_richardson_surface` (drag): Θ₀ = cₚ T_v(Tₛ), Θ₁ = cₚ T_v(T_N) + gz.
+2. ~~`bulk_richardson_surface` (drag)~~: dropped, done in #1363.
 3. `bulk_richardson!` (diffusion), surface layer: Θ₀ = cₚ T_v(Tₛ) + Φₛ, Θ₁ = cₚ T_v(T_N) + Φ_N,
    Ri_N = (Φ_N − Φₛ)(Θ₁ − Θ₀)/(cₚ T_v(Tₛ) V²).
 
@@ -100,19 +112,20 @@ Vertical diffusion (#1282):
 
 Both:
 
-8. Critical Richardson number 10 → 1 in `BulkRichardsonDrag` and `BulkRichardsonDiffusion`
+8. Critical Richardson number 10 → 1 in `BulkRichardsonDiffusion` (the drag stays at 10 as in main)
    (Frierson 2006, still to be checked against the paper). 10 was probably tuned to live with
    the always-stable bug.
-9. `BulkRichardsonDrag(SG::SpectralGrid; kwargs...)`, previously `, kwargs...`, which rejected
-   keyword arguments.
+9. ~~`BulkRichardsonDrag(SG::SpectralGrid; kwargs...)`~~: dropped, drag untouched.
+10. The implicit solve loops over `boundary_layers(kₕ, nlayers, architecture)` with layers above
+    the boundary layer masked (a = c = 0, so the solution there equals the input and the
+    tendency is unchanged), following main's Reactant-compatible explicit version.
 
 ## Testing and verification
 
-`test/parameterizations/boundary_layer.jl`:
+`test/parameterizations/vertical_diffusion.jl`:
 - `surface_skin_temperature` on ocean, land and coastal points.
-- Calm wind at an ocean point: a surface 10 K warmer than the air gives Ri < 0 and the neutral
-  maximum drag (κ/ln(z/z₀))². A surface 10 K colder gives `drag_min`. The diffusion finds a
-  boundary layer over the warm surface and none over the cold one.
+- At an ocean point the diffusion's surface Ri is < 0 for a surface 10 K warmer than the air,
+  > 0 for 10 K colder, with a boundary layer over the warm surface and none over the cold one.
 - The vertical diffusion changes u, conserves the column integral Σ tendency·Δσ, and reduces
   the vertical variance within the boundary layer.
 
@@ -124,7 +137,7 @@ Drag with this PR (T31L8, day 20): ≥ 99% of the maximum at 91% of ocean and 83
 at `drag_min` at 1% (ocean) and 8% (land). Surface minus lowermost-layer potential temperature
 is +3.5 K (ocean) and +5.1 K (land) on average; the diffusion doesn't change this.
 
-Stability, default `PrimitiveWetModel`, 20 days:
+Stability, default `PrimitiveWetModel`, 20 days (before #1363, to be redone):
 
 | | main | this PR |
 |---|---|---|

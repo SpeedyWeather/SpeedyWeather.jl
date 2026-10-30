@@ -23,6 +23,62 @@ variables via `variables(::MyRadiation)` (the standard radiation diagnostics suc
 and `surface_shortwave_down` are those of `variables(::AbstractShortwave)` and `variables(::AbstractLongwave)`),
 and is passed as `radiation = MyRadiation(spectral_grid)`.
 
+## Radiation schemes from NumericalRadiation.jl
+
+SpeedyWeather itself includes simple radiation schemes, described in the rest of this page:
+a uniform cooling, the Jeevanjee temperature-flux longwave, and one-band longwave and
+shortwave schemes with diagnostic clouds. More comprehensive schemes are provided by
+[NumericalRadiation.jl](https://github.com/NumericalEarth/NumericalRadiation.jl) through a
+package extension that is active as soon as both packages are loaded:
+
+- `ClearSkyEcCKDRadiation`: clear-sky correlated-k gas optics (ecCKD, the gas-optics models of
+  ECMWF's ecRad) with 32 or 64 longwave and 32, 64 or 96 shortwave g points, interpolated
+  from tabulated coefficients for every column. Longwave and shortwave are solved from one
+  gas-optics evaluation, with Rayleigh scattering in the shortwave. CO₂ follows the model's
+  greenhouse gases; ozone comes from an analytic default profile until SpeedyWeather has an
+  ozone field, other gases are prescribed with the scheme (`mole_fractions`).
+- `AnalyticBandLongwave`: NumericalRadiation's analytic 41-band clear-sky longwave scheme of
+  [Williams2026](@citet) for water vapour and CO₂, usable as it is as the longwave part of a
+  [`Radiation`](@ref); see its
+  [documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the
+  scheme's parameters.
+
+Both are NumericalRadiation's own scheme types, used like any other SpeedyWeather scheme; the
+extension adds constructors from a `SpectralGrid`. Add NumericalRadiation (version 0.1.1 or
+later) with `Pkg.add("NumericalRadiation")`:
+
+```julia
+using SpeedyWeather, NumericalRadiation
+
+spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+
+# ecCKD for both streams: the reference 32x32 model, or e.g. ClearSkyEcCKDRadiation(spectral_grid, "64x96")
+radiation = ClearSkyEcCKDRadiation(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; radiation)
+simulation = initialize!(model)
+run!(simulation, period = Day(10))
+simulation.variables.parameterizations.outgoing_longwave
+
+# or the analytic-band longwave next to the default one-band shortwave; keywords are the scheme's
+# parameters, e.g. the surface emissivities (SpeedyWeather has no field for them)
+longwave = AnalyticBandLongwave(spectral_grid; ocean_emissivity = 0.98, land_emissivity = 0.97)
+model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+```
+
+Both schemes take CO₂ from the model's `co2` component when present (see
+[Greenhouse gases](@ref)) and use 280 ppm otherwise.
+
+The first `ClearSkyEcCKDRadiation` downloads the ecCKD coefficient tables (a lazy artifact of
+NumericalRadiation). Its work arrays, optical depths per g point, interface fluxes and the
+surface emission, are parameterization variables in the `ecckd` namespace,
+`simulation.variables.parameterizations.ecckd`. The scheme is clear-sky, about 3x the cost
+of the one-band pair at T31 with 8 layers, and further gases of an ecCKD model are passed as
+`mole_fractions = (; ch4 = 1.8e-6)`; see NumericalRadiation's
+[documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the scheme.
+
+!!! warning "Work in progress"
+    NumericalRadiation is still in an early stage and not yet fully validated.
+
 ## Longwave radiation implementations
 
 Currently implemented is
@@ -156,7 +212,7 @@ around the sun. Both are controlled through the planet
 
 ```@example radiation
 using Dates
-spectral_grid = SpectralGrid(truncation=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 planet = Earth(spectral_grid, length_of_day=Hour(24), length_of_year=Day(365)+Hour(6))
 ```
 
@@ -268,17 +324,16 @@ transmissivity ``t=1``.
 
 **Cloud diagnosis:**
 Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column.
-The cloud base is set at the interface between the lowest two model layers, and the cloud top is the
-highest layer where both
+The cloud base is set at the interface between the lowest two model layers. The cloud top
+from relative humidity is the level ``k_{RH}`` of *maximum* relative humidity excess
+``\Delta \mathrm{RH} = \max_k (\mathrm{RH}_k - \mathrm{RH}_{cl})`` over the tropospheric layers
+``k = 2, ..., N-1`` (excluding the uppermost and the surface layer) with ``Q_k > Q_{cl}``
+(and ``\Delta \mathrm{RH} > 0``), following SPEEDY. The final cloud top is the higher (smaller ``k``) of ``k_{RH}``
+and the top of precipitation, i.e. the level of zero buoyancy of (deep) convection or the
+highest layer with large-scale condensation. The cloud cover (CLC) is then given by
 
 ```math
-\mathrm{RH}_k > \mathrm{RH}_{cl} \quad \text{and} \quad Q_k > Q_{cl}
-```
-
-are satisfied. The cloud cover (CLC) in a layer is then given by
-
-```math
-\mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \left(\frac{\mathrm{RH}_k - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right)\right]
+\mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \frac{\Delta \mathrm{RH}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right]
 ```
 
 where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are [large-scale](@ref "Large-scale precipitation")

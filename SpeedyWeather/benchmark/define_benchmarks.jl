@@ -19,12 +19,16 @@ benchmarks[:benchmark200] = BenchmarkSuite(
 ## Primitive WET MODELS RESOLUTION
 # Resolution sweep: L=8 from T31 → T255, plus L=16 and L=24 at the four highest
 # truncations. Each configuration is run with the default (FFT + Legendre)
-# SpectralTransform and additionally with MatrixSpectralTransform — except for
-# T255 which is too large for the dense matrix transform (memory + speed).
+# SpectralTransform and additionally with MatrixSpectralTransform up to an
+# architecture-dependent maximum truncation, as the dense matrix transform gets
+# too large (memory + speed) at high resolution: up to T171 on GPU (incl. Reactant GPU),
+# up to T86 on CPU (incl. Reactant CPU). `ARCH_LABEL` is set in manual_benchmarking.jl.
 let truncations = [32, 43, 64, 86, 128, 171, 256, 86, 128, 171, 256, 86, 128, 171, 256],
         nlayers = [8, 8, 8, 8, 8, 8, 8, 16, 16, 16, 16, 24, 24, 24, 24]
 
-    matrix_idx = findall(t -> t < 150, truncations) # no matrix transform for T > 150 (it's too large)
+    on_gpu = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-gpu")
+    max_truncation_matrix = on_gpu ? 180 : 86
+    matrix_idx = findall(t -> t <= max_truncation_matrix, truncations)
     truncations_matrix = truncations[matrix_idx]
     nlayers_matrix = nlayers[matrix_idx]
 
