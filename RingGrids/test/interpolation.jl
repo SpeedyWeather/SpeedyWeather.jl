@@ -124,8 +124,12 @@ end
 
             As = RingGrids.interpolate(λs, θs, A; NF)
 
+            # interpolating a field linear in longitude is exact up to rounding errors,
+            # use an absolute tolerance relative to the 360˚ range of values, an rtol
+            # would fail for longitudes close to 0˚E in the test below
+            atol = 360 * 4 * eps(NF)
             for (a, λ) in zip(As, λs)
-                @test a ≈ λ rtol = 1.0e-3
+                @test a ≈ λ atol = atol
             end
 
             f(λ) = λ > 180 ? λ - 360 : λ          # 0-360˚ to -180˚-180˚E
@@ -147,7 +151,7 @@ end
             As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
-                @test a ≈ λ rtol = 2.5e-3
+                @test a ≈ λ atol = atol
             end
         end
     end
