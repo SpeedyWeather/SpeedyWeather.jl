@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `ByrneOGormanLongwaveTransmissivity` with humidity-dependent optical depth, provisional Frierson `fₗ = 0.25` default [#1279](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1279)
+- `ByrneOGormanLongwaveTransmissivity` with humidity- and CO₂-dependent optical depth, default CO₂ of 280 ppm, Frierson `fₗ = 0.25` default [#1279](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1279)
 - Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Soil moisture, land and sea surface temperature climatologies are interpolated ignoring missing values (new internal `RingGrids.interpolate_ignoring_nan!`), coastal points no longer get the ocean/land fallback [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)

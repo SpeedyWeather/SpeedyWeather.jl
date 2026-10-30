@@ -167,8 +167,9 @@ Adapt.@adapt_structure OneBandLongwave
 # primitive wet model version
 function OneBandLongwave(
         SG::SpectralGrid;
-        # TODO calibrate properly: Frierson's fₗ = 0.1 yields a weak greenhouse effect and a too cold troposphere
-        # (~284K near-surface air), 0.25 yields ~288K and outgoing longwave ~240 W/m² as a provisional value
+        # fₗ = 0.25 (Frierson: 0.1) yields a normalized greenhouse effect 1 - OLR/σTₛ⁴ ≈ 0.39 close to Earth's
+        # ≈ 0.40 (0.36 for fₗ = 0.1). The remaining cold bias (~278K at T31L8) comes from too much reflected
+        # shortwave (~146 W/m²), so it is not compensated by a larger fₗ here. TODO recalibrate with #1262
         transmissivity = FriersonLongwaveTransmissivity(SG, fₗ = 0.25),
         radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
     )
