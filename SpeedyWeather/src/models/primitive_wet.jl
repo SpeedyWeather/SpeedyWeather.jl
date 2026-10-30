@@ -94,7 +94,7 @@ $(TYPEDFIELDS)"""
     @component large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     @component convection::CV = BettsMillerConvection(spectral_grid)
     @component radiation::RA = Radiation(spectral_grid)
-    @component greenhouse_gases::GHG = (;)
+    @component greenhouse_gases::GHG = (; co2 = CO2(spectral_grid))
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
