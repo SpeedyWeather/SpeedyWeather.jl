@@ -158,3 +158,142 @@ pressure layer."""
     w = interpolation_weight(p, p₁, p₂, interpolation)
     return (1 - w) * in_field[ij, k - 1] + w * in_field[ij, k]
 end
+
+# INTERPOLATION FROM MODEL LAYERS ONTO ISENTROPIC LAYERS
+
+"""$(TYPEDSIGNATURES)
+Dry potential temperature θ = T (p₀/p)^κ [K] of temperature `T` [K] at pressure `p` [Pa]."""
+@inline dry_potential_temperature(T, p, κ, p₀) = T * (p₀ / p)^κ
+
+"""$(TYPEDSIGNATURES)
+Interpolate `in_field` on the model's vertical layers onto the isentropic layers `θ` [K]
+(dry potential temperature), writing into the externally allocated `out_field`. All are
+fields on the same horizontal grid, `in_field` and `temperature` have `nlayers` vertical
+layers, `out_field` has `length(θ)` of them.
+
+The dry potential temperature θ(k) = T(k) (p₀/p(k))^κ on every model layer is computed
+from the absolute `temperature` [K], the `surface_pressure` [Pa] and the vertical
+`coordinates` (`SigmaCoordinates` or `SigmaPressureCoordinates`) with `κ = R_dry/cₚ` and
+the reference pressure `p₀` [Pa]. Between two layers θ is linear in ln(p), which gives the
+pressure p* of the isentrope in closed form; every variable is then interpolated linearly
+in ln(p) at p*, which is the same weight w = (θ - θ₁)/(θ₂ - θ₁). Each column is searched
+from the top, so the first crossing from the top is used where θ is not monotonic.
+
+Outside the column's θ range, p* is extrapolated with θ linear in ln(p) from the outermost
+two layers and `extrapolation` decides at p*, see [`extrapolate_above`](@ref),
+[`extrapolate_below`](@ref), as for pressure layers. If the outermost two layers are not
+stably stratified, the Lorenz condition is used: p* = pₛ below, p* = p_top above. An
+isentrope below ground (extrapolated p* > pₛ) also follows the Lorenz condition, p* = pₛ,
+except that a `SubsurfaceMask` masks it.
+
+Columns are independent, so this launches a kernel over the horizontal grid points and
+the isentropic layers and runs on CPU and GPU. `θ` therefore has to be on the same
+architecture as the fields. Requires at least 2 model layers."""
+function interpolate_isentropic_layers!(
+        out_field::AbstractField,                       # OUTPUT: (lonlat, nθ)
+        in_field::AbstractField,                        # INPUT: (lonlat, nlayers)
+        temperature::AbstractField,                     # INPUT: (lonlat, nlayers), [K]
+        surface_pressure::AbstractField,                # INPUT: (lonlat), [Pa]
+        θ::AbstractVector,                              # isentropic layers [K]
+        coordinates::AbstractVerticalCoordinates,       # of the model
+        κ::Real,                                        # R_dry/cₚ
+        p₀::Real,                                       # reference pressure [Pa]
+        extrapolation::AbstractVerticalExtrapolation = ConstantExtrapolation(),
+    )
+    grids_match(out_field, in_field, temperature, surface_pressure) ||
+        throw(DimensionMismatch(out_field, in_field))
+    size(out_field, 2) == length(θ) || throw(
+        DimensionMismatch(
+            "$(size(out_field, 2)) isentropic layers allocated in the output field, " *
+                "but $(length(θ)) isentropic layers requested."
+        )
+    )
+    nlayers = size(in_field, 2)
+    size(temperature, 2) == nlayers || throw(
+        DimensionMismatch(
+            "Temperature has $(size(temperature, 2)) layers but the field to interpolate $nlayers."
+        )
+    )
+    nlayers >= 2 || throw(ArgumentError("Interpolation onto isentropic layers requires at least 2 model layers."))
+
+    # κ, p₀ in the number format of the temperature, so that the kernel stays in it
+    T = eltype(temperature)
+    launch!(
+        architecture(in_field), RingGridWorkOrder, size(out_field),
+        interpolate_isentropic_layers_kernel!,
+        out_field, in_field, temperature, surface_pressure, θ, coordinates, nlayers,
+        convert(T, κ), convert(T, p₀), extrapolation,
+    )
+    return out_field
+end
+
+@kernel inbounds = true function interpolate_isentropic_layers_kernel!(
+        out_field, in_field, temperature, surface_pressure, θ, coordinates, nlayers,
+        κ, p₀, extrapolation,
+    )
+    ij, k = @index(Global, NTuple)
+    out_field[ij, k] = interpolate_isentropic_layer(
+        ij, θ[k], in_field, temperature, surface_pressure[ij], coordinates, nlayers,
+        κ, p₀, extrapolation,
+    )
+end
+
+"""$(TYPEDSIGNATURES)
+Value of `in_field` in column `ij` interpolated onto the isentrope `θ` [K], given the
+`temperature` [K], the surface pressure `pₛ` [Pa] in that column and the vertical
+`coordinates` of the model. Column-local, called from
+[`interpolate_isentropic_layers!`](@ref) for every grid point and isentropic layer."""
+@propagate_inbounds function interpolate_isentropic_layer(
+        ij, θ, in_field, temperature, pₛ, coordinates, nlayers, κ, p₀, extrapolation,
+    )
+    # search from the top for the first pair of layers k-1, k with θ between θ(k-1) and θ(k)
+    p₁ = pressure(1, pₛ, coordinates)
+    θ₁ = dry_potential_temperature(temperature[ij, 1], p₁, κ, p₀)
+    for k in 2:nlayers
+        p₂ = pressure(k, pₛ, coordinates)
+        θ₂ = dry_potential_temperature(temperature[ij, k], p₂, κ, p₀)
+        if min(θ₁, θ₂) <= θ <= max(θ₁, θ₂)
+            # θ linear in ln(p): ln(p*) = ln(p₁) + w*(ln(p₂) - ln(p₁)), variables linear in
+            # ln(p) at p* have the same weight w. θ₁ == θ₂ (== θ) takes layer k-1, avoids 0/0
+            w = ifelse(θ₁ == θ₂, zero(θ₁), (θ - θ₁) / (θ₂ - θ₁))
+            return (1 - w) * in_field[ij, k - 1] + w * in_field[ij, k]
+        end
+        p₁, θ₁ = p₂, θ₂
+    end
+
+    # no crossing: θ is outside the column's θ range, above the top or below the lowest layer
+    p_top = pressure(1, pₛ, coordinates)
+    θ_top = dry_potential_temperature(temperature[ij, 1], p_top, κ, p₀)
+
+    if θ > θ_top    # above the top-most layer
+        p₂ = pressure(2, pₛ, coordinates)
+        θ₂ = dry_potential_temperature(temperature[ij, 2], p₂, κ, p₀)
+        # extrapolate p* with θ linear in ln(p) from the top two layers if stably stratified
+        # (θ decreasing with p), otherwise the Lorenz condition p* = p_top
+        p = θ_top > θ₂ ? exp(log(p_top) + (θ - θ_top) * log(p_top / p₂) / (θ_top - θ₂)) : p_top
+        return extrapolate_above(in_field[ij, 1], p, p_top, extrapolation)
+    else            # below the lowest layer
+        p_bottom = pressure(nlayers, pₛ, coordinates)
+        θ_bottom = dry_potential_temperature(temperature[ij, nlayers], p_bottom, κ, p₀)
+        p₁ = pressure(nlayers - 1, pₛ, coordinates)
+        θ₁ = dry_potential_temperature(temperature[ij, nlayers - 1], p₁, κ, p₀)
+        # extrapolate p* with θ linear in ln(p) from the lowest two layers if stably
+        # stratified (θ decreasing with p), otherwise the Lorenz condition p* = pₛ
+        p = θ₁ > θ_bottom ? exp(log(p_bottom) + (θ - θ_bottom) * log(p_bottom / p₁) / (θ_bottom - θ₁)) : pₛ
+        return extrapolate_isentrope_below(in_field[ij, nlayers], p, p_bottom, pₛ, extrapolation)
+    end
+end
+
+"""$(TYPEDSIGNATURES)
+Value at the pressure `p` [Pa] of an isentrope below the bottom-most full model layer at
+`p_bottom` with value `ξ_bottom`, given the surface pressure `pₛ`. An isentrope below
+ground (`p > pₛ`) follows the Lorenz condition and is evaluated at the surface, `p = pₛ`,
+as an extrapolated `p` can be arbitrarily large for a weakly stratified lowest layer pair.
+Between the lowest layer and the surface `extrapolate_below` applies at `p`."""
+@inline extrapolate_isentrope_below(ξ_bottom, p, p_bottom, pₛ, E::AbstractVerticalExtrapolation) =
+    extrapolate_below(ξ_bottom, min(p, pₛ), p_bottom, pₛ, E)
+
+# a SubsurfaceMask still masks where the extrapolated p is below ground
+@inline extrapolate_isentrope_below(ξ_bottom, p, p_bottom, pₛ, E::SubsurfaceMask) =
+    p > pₛ ? convert(typeof(ξ_bottom), E.missing_value) :
+    extrapolate_below(ξ_bottom, p, p_bottom, pₛ, E.above_surface)

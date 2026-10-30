@@ -141,3 +141,95 @@ output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = PressureLayers(spect
 
 See [Output layers](@ref output_layers) for the details, including how a variable chooses
 its extrapolation below the lowest model layer.
+
+## [Vertical interpolation onto isentropic layers](@id isentropic_interpolation)
+
+Isentropic layers are surfaces of constant dry potential temperature
+``\theta = T (p_0/p)^\kappa``, with ``p_0`` the atmosphere's `reference_pressure`
+(1000 hPa) and ``\kappa = R_\text{dry}/c_p``. `SpeedyWeather.interpolate_isentropic_layers!`
+interpolates a field on model layers onto them
+
+```julia
+SpeedyWeather.interpolate_isentropic_layers!(
+    out_field,          # OUTPUT: (horizontal, nθ)
+    in_field,           # INPUT: (horizontal, nlayers) on model layers
+    temperature,        # INPUT: (horizontal, nlayers) absolute temperature [K]
+    surface_pressure,   # INPUT: (horizontal,) surface pressure [Pa]
+    θ,                  # isentropic layers [K]
+    coordinates,        # model.geometry.vertical_coordinates
+    κ, p₀,              # model.atmosphere.κ, model.atmosphere.reference_pressure
+    extrapolation,      # optional, ConstantExtrapolation() by default
+)
+```
+
+The potential temperature of every model layer follows from the temperature and the
+pressure of that layer, which, as for pressure layers, follows from the surface pressure
+and the vertical coordinates. Like `interpolate_pressure_layers!` this runs as a kernel
+over horizontal grid points and isentropic layers on CPU and GPU, and needs at least two
+model layers.
+
+### Interpolation
+
+Between two model layers at pressures ``p_1 < p_2`` with potential temperatures
+``\theta_1, \theta_2``, ``\theta`` is taken to be linear in ``\ln p``. The pressure ``p^*``
+of the isentrope ``\theta`` then follows in closed form
+
+```math
+\ln p^* = \ln p_1 + w (\ln p_2 - \ln p_1), \qquad w = \frac{\theta - \theta_1}{\theta_2 - \theta_1}
+```
+
+and every variable is interpolated linearly in ``\ln p`` at ``p^*``, as
+`LinearInLogPressure` does for pressure layers. That is the same weight ``w``,
+
+```math
+\xi(\theta) = (1 - w) \xi_1 + w \xi_2.
+```
+
+In a statically unstable column ``\theta`` is not monotonic and an isentrope can cross
+it more than once. Every column is searched from the top, so the first crossing from the
+top is used.
+
+### Extrapolation
+
+Isentropes often lie below the lowest model layer, and below the ground: e.g. 290 K is
+underground in the tropics. As for pressure layers, the `extrapolation` methods above
+decide, at the isentrope's pressure ``p^*``. Outside the column, ``p^*`` is extrapolated with
+``\theta`` linear in ``\ln p`` from the two outer-most model layers. So
+`DryAdiabaticExtrapolation` descends from the lowest model layer to ``p^*``.
+An isentrope below the ground, ``p^* > p_s``, follows the Lorenz condition: it is put at
+the surface, ``p^* = p_s``, as for a weakly stratified lowest layer pair the extrapolated
+``p^*`` can be arbitrarily large. `SubsurfaceMask` masks these isentropes instead. If the
+two outer-most layers are not stably stratified, no ``p^*`` can be extrapolated and the
+Lorenz condition is used as well, ``p^* = p_s`` below and ``p^*`` = the top-most layer's
+pressure above.
+
+### Example
+
+Continuing the example above, temperature and zonal wind on the 300 K and 330 K isentropes
+
+```@example vertical_interpolation
+u = SpeedyWeather.get_prognostic_step(variables.grid.u, model.time_stepping, model.output)
+θ = spectral_grid.NF[300, 330]                  # isentropic layers in K
+temp_θ = zeros(spectral_grid.NF, spectral_grid.grid, length(θ))
+u_θ = zeros(spectral_grid.NF, spectral_grid.grid, length(θ))
+
+(; κ, reference_pressure) = model.atmosphere
+coordinates = model.geometry.vertical_coordinates
+SpeedyWeather.interpolate_isentropic_layers!(
+    temp_θ, temp, temp, pₛ, θ, coordinates, κ, reference_pressure,
+    SpeedyWeather.DryAdiabaticExtrapolation(κ),
+)
+SpeedyWeather.interpolate_isentropic_layers!(u_θ, u, temp, pₛ, θ, coordinates, κ, reference_pressure)
+[sum(temp_θ[:, k]) / length(pₛ) for k in eachindex(θ)]   # mean temperature [K] per isentrope
+```
+
+## Output on isentropic layers
+
+Output writers take `IsentropicLayers` for their `layers` keyword argument, for models
+with temperature (`PrimitiveDry`, `PrimitiveWet`)
+
+```julia
+output = NetCDFOutput(spectral_grid, PrimitiveDry, layers = IsentropicLayers(spectral_grid, [300, 315, 330, 350]))
+```
+
+See [Output layers](@ref output_layers).

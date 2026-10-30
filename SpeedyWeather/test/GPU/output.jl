@@ -69,6 +69,42 @@ end
     end
 end
 
+@testset "GPU output: vertical interpolation onto isentropic layers" begin
+    arch = SpeedyWeather.GPU()
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8, architecture = arch)
+    spectral_grid_cpu = SpectralGrid(truncation = 31, nlayers = 8)
+    coordinates = SigmaCoordinates(spectral_grid)
+    coordinates_cpu = SigmaCoordinates(spectral_grid_cpu)
+    NF = spectral_grid.NF
+    κ, p₀ = NF(2 / 7), NF(1.0e5)
+
+    pₛ_cpu = fill!(zeros(NF, spectral_grid_cpu.grid), NF(1000.0e2))
+    in_field_cpu = 200 .+ rand(NF, spectral_grid_cpu.grid, spectral_grid.nlayers)
+    # stably stratified temperature, θ increasing with height
+    temperature_cpu = zeros(NF, spectral_grid_cpu.grid, spectral_grid.nlayers)
+    for k in 1:spectral_grid.nlayers, ij in eachgridpoint(temperature_cpu)
+        p = SpeedyWeather.pressure(k, NF(1000.0e2), coordinates_cpu)
+        temperature_cpu[ij, k] = (300 + 40 * log(p₀ / p) + rand(NF)) * (p / p₀)^κ
+    end
+    θ_cpu = NF[290, 310, 350, 500]     # below, inside, inside, above the model layers
+    out_cpu = zeros(NF, spectral_grid_cpu.grid, length(θ_cpu))
+
+    pₛ, in_field, θ = on_architecture(arch, pₛ_cpu), on_architecture(arch, in_field_cpu), on_architecture(arch, θ_cpu)
+    temperature = on_architecture(arch, temperature_cpu)
+    out = on_architecture(arch, out_cpu)
+
+    adiabatic = SpeedyWeather.DryAdiabaticExtrapolation(κ = NF(2 / 7))
+    for extrapolation in (
+            SpeedyWeather.ConstantExtrapolation(),
+            adiabatic,
+            SpeedyWeather.SubsurfaceMask(above_surface = adiabatic, missing_value = NF(NaN)),
+        )
+        SpeedyWeather.interpolate_isentropic_layers!(out, in_field, temperature, pₛ, θ, coordinates, κ, p₀, extrapolation)
+        SpeedyWeather.interpolate_isentropic_layers!(out_cpu, in_field_cpu, temperature_cpu, pₛ_cpu, θ_cpu, coordinates_cpu, κ, p₀, extrapolation)
+        @test on_architecture(SpeedyWeather.CPU(), out.data) ≈ out_cpu.data nans = true
+    end
+end
+
 @testset "GPU output: all variables, all writers" begin
     arch = SpeedyWeather.GPU()
     path = mktempdir(pwd(), prefix = "tmp_gpu_output_")

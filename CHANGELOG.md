@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Output on isentropic layers: `IsentropicLayers` for the `layers` keyword of the output writers, θ linear in ln(p) between model layers, the variables' pressure-layer extrapolation at the isentrope's pressure [#1338](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1338)
 - Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Soil moisture, land and sea surface temperature climatologies are interpolated ignoring missing values (new internal `RingGrids.interpolate_ignoring_nan!`), coastal points no longer get the ocean/land fallback [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
