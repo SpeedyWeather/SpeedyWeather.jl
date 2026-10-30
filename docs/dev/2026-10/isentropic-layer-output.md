@@ -248,7 +248,7 @@ step.
 ```julia
 function interpolate_layers!(layers::IsentropicLayers, field::AbstractField,
         variable::AbstractOutputVariable, simulation::AbstractSimulation)
-    (is3D(variable) && !is_land(variable)) || return field
+    (OutputVariables.is3D(variable) && !OutputVariables.is_land(variable)) || return field
     (; model, variables) = simulation
     temperature = get_prognostic_step(variables.grid.temperature, model.time_stepping, layers)
     interpolate_isentropic_layers!(
