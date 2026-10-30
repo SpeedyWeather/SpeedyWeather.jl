@@ -72,3 +72,16 @@ end
     # weight in the precision of the interpolated variable, as it's a kernel argument (no Float64 on Metal)
     @test SpeedyWeather.monthly_interpolation(DateTime(2000, 2, 29, 12), Float32) === (2, 3, 28.0f0 / 29.0f0)
 end
+
+@testset "Coastal ocean initial conditions without land fallback" begin
+    # the SST climatology is NaN over land, coastal ocean points have to interpolate from the
+    # surrounding ocean, not fall back to the land value. Excluding the Antarctic ice shelves
+    # (Ross, Weddell Sea), ocean in the land-sea mask but without any SST data nearby
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    (; sea_surface_temperature) = simulation.variables.prognostic.ocean
+    _, latds = RingGrids.get_londlatds(spectral_grid.grid)
+    mostly_ocean = (model.land_sea_mask.land_fraction.data .<= 0.5) .& (latds .> -75)
+    @test !any(sea_surface_temperature.data[mostly_ocean, :] .== model.ocean.land_temperature)
+end

@@ -115,12 +115,12 @@ $(TYPEDFIELDS)"""
     parameterizations::TS2 = (
         :solar_zenith,              # orbit or external forcing
         :vertical_diffusion,        # mixing
-        :convection,
-        :albedo,                    # radiation
-        :radiation,
         :boundary_layer,            # surface fluxes
         :surface_momentum_flux,
         :surface_heat_flux,
+        :convection,
+        :albedo,                    # radiation
+        :radiation,
         :stochastic_physics,        # perturbations
     )
 
