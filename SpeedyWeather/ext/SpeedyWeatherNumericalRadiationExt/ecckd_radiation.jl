@@ -334,8 +334,6 @@ Base.@propagate_inbounds function ecckd_shortwave!(ij, vars, fluxes, shortwave, 
     surface_down = fluxes.shortwave_down[nlayers + 1]
     vars.parameterizations.outgoing_shortwave[ij] = fluxes.shortwave_up[1]
     vars.parameterizations.surface_shortwave_down[ij] = surface_down
-    vars.parameterizations.ocean.surface_shortwave_down[ij] = surface_down
-    vars.parameterizations.land.surface_shortwave_down[ij] = surface_down
     vars.parameterizations.surface_shortwave_up[ij] = fluxes.shortwave_up[nlayers + 1]
     vars.parameterizations.ocean.surface_shortwave_up[ij] = albedo_ocean * surface_down
     vars.parameterizations.land.surface_shortwave_up[ij] = albedo_land * surface_down

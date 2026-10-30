@@ -124,8 +124,12 @@ end
 
             As = RingGrids.interpolate(λs, θs, A; NF)
 
+            # interpolating a field linear in longitude is exact up to rounding errors,
+            # use an absolute tolerance relative to the 360˚ range of values, an rtol
+            # would fail for longitudes close to 0˚E in the test below
+            atol = 360 * 4 * eps(NF)
             for (a, λ) in zip(As, λs)
-                @test a ≈ λ rtol = 1.0e-3
+                @test a ≈ λ atol = atol
             end
 
             f(λ) = λ > 180 ? λ - 360 : λ          # 0-360˚ to -180˚-180˚E
@@ -147,7 +151,7 @@ end
             As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
-                @test a ≈ λ rtol = 2.5e-3
+                @test a ≈ λ atol = atol
             end
         end
     end
@@ -554,4 +558,41 @@ end
     RingGrids.interpolate_2D!(out_fallback, field_in, RingGrids.interpolator(grid_out, grid_in))
     @test out_buffers.data == out_fallback.data
     @test all(iszero, I_buffers.locator.north_pole_average)
+end
+
+@testset "Interpolate ignoring NaN" begin
+    @testset for NF in (Float32, Float64)
+        grid_in, grid_out = FullGaussianGrid(16), OctahedralGaussianGrid(24)
+        lond_in, _ = RingGrids.get_londlatds(grid_in)
+        lond_out, latd_out = RingGrids.get_londlatds(grid_out)
+        no_data = 0 .<= lond_in .< 90               # NaN "continent" in the first layer only
+
+        A = randn(NF, grid_in, 2)
+        A.data[no_data, 1] .= NaN
+        plain = zeros(NF, grid_out, 2)
+        interpolator = RingGrids.interpolator(plain, A)
+        RingGrids.interpolate!(plain, A, interpolator)
+        B = zeros(NF, grid_out, 2)
+        RingGrids.interpolate_ignoring_nan!(B, A, interpolator)
+
+        # unchanged wherever the plain interpolation is valid, incl. the layer without NaNs
+        valid = .!isnan.(plain.data)
+        @test B.data[valid] ≈ plain.data[valid]
+
+        # NaN only without any valid neighbour, i.e. inside the continent but not next to it
+        # (away from the poles, which interpolate from the average over the first/last ring)
+        away_from_poles = abs.(latd_out) .< 80
+        inside = away_from_poles .& (20 .< lond_out .< 70)
+        outside = away_from_poles .& .!(0 .<= lond_out .< 90)
+        @test all(isnan, B.data[inside, 1])
+        @test any(isnan, plain.data[outside, 1])    # plain interpolation picks up NaNs next to the continent
+        @test !any(isnan, B.data[outside, 1])       # these are filled from the valid neighbours
+
+        # weights are renormalised over the valid neighbours: a constant stays constant
+        c = randn(NF)
+        A = fill!(Field(NF, grid_in, 2), c)
+        A.data[no_data, 1] .= NaN
+        RingGrids.interpolate_ignoring_nan!(B, A, interpolator)
+        @test all(b -> b ≈ c, filter(!isnan, B.data))
+    end
 end

@@ -3,6 +3,12 @@
 ## Unreleased
 
 - `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
+- Fix flaky RingGrids meridionally-constant interpolation test (absolute instead of relative tolerance) [#1367](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1367)
+- Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
+- Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
+- Soil moisture, land and sea surface temperature climatologies are interpolated ignoring missing values (new internal `RingGrids.interpolate_ignoring_nan!`), coastal points no longer get the ocean/land fallback [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
+- Convert volumetric soil moisture climatology to fraction of field capacity, fixing too-dry bucket initial conditions and prescribed SeasonalSoilMoisture [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
+- Update types in Terrarium extension, extend Enzyme extension's _make_zero_view! [#1289](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1289)
 - Calculate Bulk Richardson number relative to surface temperatures [#1363](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1363)
 - GPU and Metal CI on Julia v1.13 [#1260](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1260)
 - Bump SpeedyWeatherInternals to v1.0.1 [#1361](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1361)
