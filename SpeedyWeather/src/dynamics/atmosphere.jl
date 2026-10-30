@@ -67,7 +67,7 @@ $(TYPEDFIELDS)"""
     @param temperature_freezing::NF = 273.15 (bounds = Nonnegative,)
 
     "[OPTION] Reference moist-adiabatic temperature lapse rate [K/m]"
-    @param moist_lapse_rate::NF = 5 / 1000
+    @param moist_lapse_rate::NF = 5.7 / 1000
 
     "[OPTION] Reference dry-adiabatic temperature lapse rate [K/m]"
     @param dry_lapse_rate::NF = 9.8 / 1000
