@@ -550,9 +550,10 @@ quadruple the preindustrial CO2 at a given date (default: year 2000). Any callab
 `f(t::DateTime) -> concentration_in_ppm` can be wrapped in `CO2(f)` for a fully
 custom trajectory.
 
-!!! warning "Radiation schemes not yet CO2-aware"
-    The greenhouse gas concentrations are tracked as prognostic variables and evolve
-    correctly in time, but the radiation schemes (`OneBandLongwave`
-    etc.) have not yet been updated to use them. Changing CO2 therefore has no effect
-    on the radiative fluxes or temperature tendencies at this stage. This is work in
-    progress.
+By default, the primitive equation models have a constant `co2 = CO2(spectral_grid)` at the
+preindustrial 280 ppm. Use `greenhouse_gases = (;)` or `nothing` to remove it.
+
+!!! warning "Only some radiation schemes are CO2-aware"
+    `ByrneOGormanLongwaveTransmissivity` uses `greenhouse_gases.co2`: its dry optical depth grows
+    logarithmically with CO2. The default `FriersonLongwaveTransmissivity` and the shortwave
+    schemes do not use it yet, so with them, changing CO2 has no effect on the radiative fluxes.
