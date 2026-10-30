@@ -1210,12 +1210,12 @@ end
 end
 
 """No whitecap correction."""
-@parameterized struct NoFoam <: AbstractOceanAlbedo end
+struct NoFoam <: AbstractOceanAlbedo end
 Adapt.@adapt_structure NoFoam
 NoFoam(SG::SpectralGrid) = NoFoam()
 @inline (::NoFoam)(α, w) = α
 
-export JinOceanAlbedo, ConstantOceanVolumeAlbedo, SpectralOceanVolumeAlbedo
+export JinOceanAlbedo, ConstantOceanVolumeAlbedo
 
 @parameterized @kwdef struct JinOceanAlbedo{NF, V, F} <: AbstractAlbedo
     "Ratio of air-water refractive indices"
@@ -1298,6 +1298,11 @@ initialize!(::ConstantOceanVolumeAlbedo, ::PrimitiveEquation) = nothing
     ℵ = haskey(vars.prognostic.ocean, :sea_ice_concentration) ? vars.prognostic.ocean.sea_ice_concentration[ij] : zero(NF)
     black_sky += ℵ * (scheme.albedo_ice - black_sky)
     white_sky += ℵ * (scheme.albedo_ice - white_sky)
+
+    # Without a direct beam (sun below the horizon) the black-sky albedo would be the Fresnel
+    # reflection at grazing incidence (0.3-0.6), use the diffuse white-sky albedo instead.
+    # No effect on the shortwave fluxes (zero at night), but keeps the albedo output meaningful
+    black_sky = ifelse(μ > 0, black_sky, white_sky)
 
     ocean.black_sky_albedo[ij] = black_sky
     ocean.white_sky_albedo[ij] = white_sky
