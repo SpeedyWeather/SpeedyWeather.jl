@@ -190,7 +190,7 @@ function interpolate_layers!(
         simulation::AbstractSimulation,
     )
     # only 3D atmospheric variables, soil variables keep their own vertical dimension
-    (is3D(variable) && !is_land(variable)) || return field
+    (OutputVariables.is3D(variable) && !OutputVariables.is_land(variable)) || return field
 
     (; model, variables) = simulation
     surface_pressure = variables.parameterizations.surface_pressure
