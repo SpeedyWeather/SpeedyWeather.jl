@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Vertical diffusion works (was a no-op): surface bulk Richardson number from the surface (skin) temperature, diffusion coefficients in σ coordinates, implicit time stepping, critical Richardson number 1 [#1283](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1283)
 - Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Soil moisture, land and sea surface temperature climatologies are interpolated ignoring missing values (new internal `RingGrids.interpolate_ignoring_nan!`), coastal points no longer get the ocean/land fallback [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
