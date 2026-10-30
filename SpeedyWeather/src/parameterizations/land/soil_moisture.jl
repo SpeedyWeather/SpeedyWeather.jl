@@ -33,8 +33,14 @@ $(TYPEDFIELDS)"""
     "[OPTION] The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
 
+    "[OPTION] Apply land-sea mask to set ocean-only points and missing values?"
+    mask::Bool = true
+
+    "[OPTION] Soil moisture for ocean points/missing values, fraction of field capacity [1]"
+    ocean_moisture::NF = 0
+
     # to be filled from file
-    "Monthly soil moisture volume fraction [1], interpolated onto Grid"
+    "Monthly soil moisture fraction of field capacity [1], interpolated onto Grid"
     monthly_soil_moisture::GridVariable4D
 end
 
@@ -52,6 +58,7 @@ SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = Seas
 function variables(::SeasonalSoilMoisture)
     return (
         PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water content of a full layer [m³/m³]: field capacity (bucket models) or porosity (Terrarium)", units = "m³/m³", namespace = :land),
     )
 end
 
@@ -91,7 +98,21 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF = Float32)
-    interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
+    @maybe_jit model.architecture RingGrids.interpolate_ignoring_nan!(monthly_soil_moisture, soil_moisture_file, interp)
+
+    # the file contains volumetric soil moisture [m³/m³], convert to the fraction of field
+    # capacity used by all land models, capped at 1 as wetter soil drains (see LandBucketMoisture)
+    γ = model.land.thermodynamics.field_capacity
+    monthly_soil_moisture.data .= min.(monthly_soil_moisture.data ./ γ, 1)
+
+    # replace missing values with the fallback and set 100% ocean points to it, as for land temperature
+    masked_value = soil.ocean_moisture
+    if soil.mask
+        msm = monthly_soil_moisture.data    # unpack via .data due to broadcasting issues
+        msm .= ifelse.(isnan.(msm), masked_value, msm)  # broadcast, logical indexing doesn't work on Reactant
+        mask!(monthly_soil_moisture, model.land_sea_mask, :ocean; masked_value)
+    end
+
     return nothing
 end
 
@@ -100,6 +121,9 @@ function initialize!(
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
+    # Make the field capacity a parameterization variable for easy access later
+    vars.parameterizations.land.soil_moisture_capacity .= model.land.thermodynamics.field_capacity
+
     # initialize soil_moisture by "running" the step at the current time
     timestep!(vars, soil, model)
     return nothing
@@ -118,18 +142,9 @@ function timestep!(
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
-    (; time) = vars.prognostic.clock
-
-    this_month = Dates.month(time)
-    next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
-
-    # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
-    NF = eltype(vars.prognostic.land.soil_moisture)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
-
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = vars.prognostic.land
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time, eltype(soil_moisture))
 
     launch!(
         architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
@@ -155,7 +170,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
 
-    "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
+    "[OPTION] Initial soil moisture over ocean, fraction of field capacity [1]"
     @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
 end
 
@@ -169,7 +184,8 @@ function variables(::LandBucketMoisture, model::AbstractModel)
     return (
         PrognosticVariable(:soil_moisture, LandXYZT(pg), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         TendencyVariable(:soil_moisture, LandXYZT(tg), desc = "Tendency of soil moisture", units = "1/s", namespace = :land),
-        
+
+        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water content of a full layer [m³/m³]: field capacity (bucket models) or porosity (Terrarium)", units = "m³/m³", namespace = :land),
         ParameterizationVariable(:river_runoff, Grid2D(), desc = "Accumulated river runoff from soil moisture", units = "m", namespace = :land),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
         ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
@@ -199,19 +215,25 @@ function initialize!(
         model::PrimitiveEquation,
     )
     # create a seasonal model, initialize it and the variables
-    seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry)
+    seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry; soil.mask, soil.ocean_moisture)
     initialize!(seasonal_model, model)
     initialize!(vars, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
+    # seasonal model has already converted the climatology from volumetric soil moisture
+    # to fraction of field capacity!
 
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
     if soil.mask
         # TODO: broadcasting over views of Fields of GPUArrays doesn't work
+        # broadcast instead of logical indexing, which falls back to scalar indexing on Reactant
         sm = vars.prognostic.land.soil_moisture.data
-        sm[isnan.(sm)] .= masked_value
+        sm .= ifelse.(isnan.(sm), masked_value, sm)
         mask!(vars.prognostic.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
+
+    # Make the field capacity a parameterization variable for easy access later
+    vars.parameterizations.land.soil_moisture_capacity .= model.land.thermodynamics.field_capacity
     return nothing
 end
 

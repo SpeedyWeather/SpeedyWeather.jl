@@ -21,9 +21,10 @@ import Base: @propagate_inbounds
 using SpeedyWeatherInternals
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.KernelLaunching
-import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU,
+import SpeedyWeatherInternals.Utils: reactant_compile_options, REACTANT_EXCLUDED_PASSES
+import SpeedyWeatherInternals.Architectures: AbstractArchitecture, AbstractCPU, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
-export CPU, GPU, on_architecture, architecture                # export device functions
+export CPU, GPU, ReactantDevice, on_architecture, architecture        # export device functions
 export SpeedyWeatherInternals, Architectures, KernelLaunching, ArrayDimensions
 
 # INPUT OUTPUT
@@ -43,7 +44,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 
 # UTILITIES
 export Utils
-import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs, set_scalar!
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets
@@ -144,6 +145,7 @@ include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("time_stepping/clock.jl")
+include("time_stepping/schedules.jl")
 include("variables/set.jl")
 
 # MODEL COMPONENTS
@@ -211,7 +213,6 @@ include("parameterizations/land/vegetation.jl")
 include("parameterizations/land/rivers.jl")
 
 # OUTPUT
-include("output/schedule.jl")
 include("output/callbacks.jl")
 include("output/feedback.jl")
 include("output/vertical_interpolation.jl")

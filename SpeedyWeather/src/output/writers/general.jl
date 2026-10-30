@@ -150,14 +150,22 @@ interpolator (see [`HEALPixOutput`](@ref) for a simulation that already runs on 
 HEALPix grid)."""
 function interpolate_output!(output::AbstractOutput, dest::AbstractField, src::AbstractField)
     # move the model's field to the output's architecture if they differ (e.g. Reactant)
-    arch = architecture(dest)
-    src = ismatching(arch, architecture(src)) ? src : on_architecture(arch, src)
+    src = on_output_architecture(output, src)
 
     isnothing(output.interpolator) || return RingGrids.interpolate!(dest, src, output.interpolator)
 
     # No interpolator: the output grid is the model grid, copy straight over
     fields_match(dest, src) || throw(DimensionMismatch(dest, src))
     return copyto!(dest.data, src.data)
+end
+
+"""$(TYPEDSIGNATURES)
+`x` (an array or field of the model) on the architecture of `output`: `x` itself if that's the
+model's architecture, otherwise moved there. For Reactant the output is computed on the CPU, as
+computing with Reactant arrays outside of a compiled program compiles a program for every operation."""
+function on_output_architecture(output::AbstractOutput, x)
+    arch = architecture(output.field2D)
+    return ismatching(arch, architecture(x)) ? x : on_architecture(arch, x)
 end
 
 """$(TYPEDSIGNATURES)

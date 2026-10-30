@@ -148,8 +148,10 @@ function output!(
     # get log(surface pressure) field
     var = path_or_nothing(variable, simulation)
     isnothing(var) && return nothing       # silently escape early if variable is not defined
-    lnpₛ = get_prognostic_step(var, simulation.model.time_stepping, output)
-    h = simulation.model.orography.orography
+
+    # compute on the output's architecture, the model's except for Reactant (the CPU, see on_output_architecture)
+    lnpₛ = on_output_architecture(output, get_prognostic_step(var, simulation.model.time_stepping, output))
+    h = on_output_architecture(output, simulation.model.orography.orography)
     (; R_dry, κ) = simulation.model.atmosphere
     g = simulation.model.planet.gravity
     TS = simulation.model.time_stepping     # used to determine step of variables to write to file
@@ -174,7 +176,7 @@ function output!(
     end
 
     # calculate mean sea-level pressure on model grid
-    mslp = simulation.variables.scratch.grid.b_2D
+    mslp = on_output_architecture(output, simulation.variables.scratch.grid.b_2D)
     (; transform) = variable                            # to change units from log(Pa) to hPa
     @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)      # log Pa to hPa
 
