@@ -33,7 +33,10 @@
     sigma_sim = initialize!(sigma_model)
     run!(sigma_sim; period = Hour(1))    # `run!` leaves the prognostic state unscaled (scale = 1)
 
-    coord = SigmaPressureCoordinates(spectral_grid; transition = _ -> 1.0)
+    # use the same half levels as the default coordinate of `sigma_model`, whose default spacing
+    # differs from the (uniform) default of SigmaPressureCoordinates
+    σ_half = Vector(sigma_model.geometry.σ_levels_half)
+    coord = SigmaPressureCoordinates(spectral_grid, σ_half; transition = _ -> 1.0)
     hybrid_model = make_model(coord)
     hybrid_sim = initialize!(hybrid_model)
 
