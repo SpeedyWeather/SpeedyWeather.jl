@@ -347,6 +347,8 @@ end
 @testset "Held-Suarez with varying layers and sigma spacing" begin
     for nlayers in (16, 24)     # don't test more layers regularly on CI but 64 should work too
         spectral_grid = SpectralGrid(truncation = 32; nlayers)
+        (; Δt_at_T32) = Leapfrog(spectral_grid)
+        Δt_at_T32 *= 12 / nlayers       # slightly reduced time step for higher vertical resolutions
 
         σ_half_configs = (
             ("default", SpeedyWeather.sigma_half_spacing(nlayers)),
@@ -362,7 +364,7 @@ end
 
             for (name, coord) in coords
                 @testset "$name (nlayers=$nlayers)" begin
-                    @info "$name (nlayers=$nlayers)"
+                    @info "$name (nlayers=$nlayers, Δt=$Δt_at_T32)"
                     model = PrimitiveDryModel(
                         spectral_grid;
                         geometry = Geometry(spectral_grid; vertical_coordinates = coord),
@@ -370,14 +372,11 @@ end
                         drag = LinearDrag(spectral_grid),
                         dynamics_only = true,
                         orography = EarthOrography(spectral_grid),
+                        time_stepping = Leapfrog(spectral_grid; Δt_at_T32, adjust_with_output=false)
                     )
                     simulation = initialize!(model)
                     run!(simulation; period = Day(5))               # don't test longer on CI but otherwise could be Day(20) too
-                    if label == "default" && nlayers > 32           # current this blows up but that might be numerically expected
-                        @test_broken model.feedback.nans_detected == false
-                    else
-                        @test model.feedback.nans_detected == false
-                    end
+                    @test model.feedback.nans_detected == false
                 end
             end
         end

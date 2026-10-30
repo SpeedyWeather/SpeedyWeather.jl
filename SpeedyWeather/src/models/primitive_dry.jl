@@ -36,8 +36,7 @@ $(TYPEDFIELDS)"""
         SM,     # <:AbstractSurfaceMomentumFlux,
         SH,     # <:AbstractSurfaceHeatFlux,
         CV,     # <:AbstractConvection,
-        SW,     # <:AbstractShortwave,
-        LW,     # <:AbstractLongwave,
+        RA,     # <:AbstractRadiation,
         GHG,    # NamedTuple of <:AbstractGreenhouseGas,
         SP,     # <:AbstractStochasticPhysics,
         CP,     # <:AbstractParameterization,
@@ -85,12 +84,11 @@ $(TYPEDFIELDS)"""
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer::BL = BoundaryLayer(spectral_grid)
-    @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
+    @component vertical_diffusion::VD = nothing    # TODO overhaul BulkRichardsonDiffusion
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
-    @component shortwave_radiation::SW = OneBandGreyShortwave(spectral_grid)
-    @component longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
+    @component radiation::RA = DryRadiation(spectral_grid)
     @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
@@ -117,13 +115,12 @@ $(TYPEDFIELDS)"""
     parameterizations::TS2 = (
         :solar_zenith,              # orbit or external forcing
         :vertical_diffusion,        # mixing
-        :convection,
-        :albedo,                    # radiation
-        :shortwave_radiation,
-        :longwave_radiation,
         :boundary_layer,            # surface fluxes
         :surface_momentum_flux,
         :surface_heat_flux,
+        :convection,
+        :albedo,                    # radiation
+        :radiation,
         :stochastic_physics,        # perturbations
     )
 
@@ -166,10 +163,10 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         DynamicsVariable(:kinetic_energy, GridXYZT(tg), desc = "Kinetic energy intermediate, ½(u²+v²)", namespace = :grid, fuse = :grid_tendencies),
         DynamicsVariable(:kinetic_energy, SpectralXYZT(ts), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
 
-        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure", fuse = :dpres_grad),
-        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure", fuse = :dpres_grad),
-        DynamicsVariable(:dpres_dx_spec, Spectral2D(), desc = "Zonal gradient of lnpₛ in spectral space", fuse = :dpres_grad_spec),
-        DynamicsVariable(:dpres_dy_spec, Spectral2D(), desc = "Meridional gradient of lnpₛ in spectral space", fuse = :dpres_grad_spec),
+        DynamicsVariable(:dpres_dx, GridXYT(pg), desc = "Zonal gradient of the logarithm of surface pressure", fuse = :uv_dpres_grad_grid),
+        DynamicsVariable(:dpres_dy, GridXYT(pg), desc = "Meridional gradient of the logarithm of surface pressure", fuse = :uv_dpres_grad_grid),
+        DynamicsVariable(:dpres_dx_spec, Spectral2D(), desc = "Zonal gradient of lnpₛ in spectral space", fuse = :uv_dpres_grad_spectral),
+        DynamicsVariable(:dpres_dy_spec, Spectral2D(), desc = "Meridional gradient of lnpₛ in spectral space", fuse = :uv_dpres_grad_spectral),
         DynamicsVariable(:pres_flux, GridXYZ(), desc = "Pressure gradient flux, (u, v) ⋅ ∇lnp_s"),
         DynamicsVariable(:virtual_temperature, SpectralXYZ(), desc = "Virtual temperature", units = "K"),
         DynamicsVariable(:u_mean_grid, Grid2D(), desc = "Vertically integrated zonal velocity", units = "m/s"),
@@ -195,11 +192,13 @@ end
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
-at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
+at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!` 
+(except for its schedule)."""
 function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
-    # NUMERICS (implicit is initialized later)
+    # NUMERICS
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
+    initialize!(model.implicit, model)
     initialize!(model.horizontal_diffusion, model)
 
     # DYNAMICS
@@ -223,8 +222,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.boundary_layer, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.convection, model)
-    initialize!(model.shortwave_radiation, model)
-    initialize!(model.longwave_radiation, model)
+    initialize!(model.radiation, model)
     initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)

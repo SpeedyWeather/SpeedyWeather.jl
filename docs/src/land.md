@@ -84,7 +84,7 @@ model.land
 
 is now the land defined above used when integrating a SpeedyWeather `model`.
 
-In case a non-default number of soil layers is used, the `LandGeometry` also needs to be passed to the `NetCDFOutput` constructor to allocate the correct dimensions of the output variables, when an output is desired:
+In case a non-default number of soil layers is used, the `LandGeometry` also needs to be passed to the [`NetCDFOutput`](@ref) constructor to allocate the correct dimensions of the output variables, when an output is desired:
 
 ```julia
 output = NetCDFOutput("output.nc", model, land_geometry)
@@ -181,7 +181,7 @@ C_2 &= C_w W_2 \gamma + C_s
 \end{aligned}
 ```
 
-with ``\gamma = 0.24`` being the field capacity per meter soil.
+with ``\gamma = 0.3`` being the field capacity per meter soil.
 
 ## Land soil moisture
 
@@ -199,6 +199,9 @@ model constructor
 soil_moisture = LandBucketMoisture(spectral_grid)
 land = LandModel(spectral_grid; soil_moisture)
 ```
+
+`SeasonalSoilMoisture` reads volumetric soil moisture from the climatology
+and converts it to a fraction of the field capacity, capped at 1.
 
 ### LandBucketMoisture
 
@@ -223,14 +226,14 @@ The equations are
 
 for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
 defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
-with ``\gamma = 0.24`` the field capacity per meter soil and
+with ``\gamma = 0.3`` the field capacity per meter soil and
 ``\Delta z_1 = 0.1~m`` the top layer thickness by default, and
 ``\Delta z_2 = 4.0~m`` the layer below. The top layer is forced by precipitation
 ``P`` minus evaporation ``E`` minus river runoff ``R``. The second term is a
 diffusion term of soil moisture between the two layers, acting on a time scale
 of ``\tau = 2~``days.
 
-At the moment (and generally if not coupled to an ocean model) the river runoff
+At the moment (and generally if not coupled to an [ocean model](@ref "Ocean models")) the river runoff
 lets water disappear. ``W_1, W_2`` are bounded by ``[0, 1]`` so that if
 more precipitation ``P`` (or in combination with negative evaporation ``E``,
 meaning condensation) occurs than the land can hold we compute the excess water
@@ -295,14 +298,14 @@ in ``kg/m²/s``, where the `excess` term (negative for melting trying to remove 
 only appears when the naive tendency would overdraw the bucket.
 `snow_melt_rate` is zero over ocean points. Negative snow depth is clamped to zero (technically redundant given the conserving excess term above) and stored 
 as equivalent liquid water height, not physical snow thickness. The accumulation is 
-capped at 10m equivalent liquid water height, following how permanent snow area is treated 
-in [IFS Cycle 49r1](https://www.ecmwf.int/en/elibrary/81626-ifs-documentation-cy49r1-part-iv-physical-processes). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
+capped at 10m equivalent liquid water height, following how permanent snow area is treated
+in [IFSCycle49r1](@citep). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
 
 The snow budget links into other surface schemes:
 
 - `snow_melt_rate` provides a latent heat sink to the land temperature budget.
 - The same flux (converted to ``m/s`` by dividing by ``ρ_w``) feeds the soil moisture tendency alongside rain.
-- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see below).
+- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see [Albedo](@ref) below).
 
 Snow cover over land is diagnosed from snow depth using either a linear ramp
 ``σₛ = \min(S / \text{snow\_depth\_scale}, 1)`` or the default saturating form
@@ -399,7 +402,7 @@ using a globally constant albedo of 0.1 for the ocean but a higher albedo
 over land which also increases to 0.5 towards the poles.
 
 You can always output the land-sea mask weighted albedo with
-`add!(model, SpeedyWeather.AlbedoOutput())` or inspect it as follows
+`add!(model, OutputVariables.Albedo())` or inspect it as follows
 
 ```@example land
 simulation = initialize!(model)
@@ -473,8 +476,8 @@ model = PrimitiveWetModel(
 simulation = initialize!(model)
 ```
 
-Then the model can be run as any other `Simulation`.
-Terarrium's state variales are owned by SpeedyWeather's `Variables` and can be accessed via 
+Then the model can be run as any other [`Simulation`](@ref).
+Terarrium's state variales are owned by SpeedyWeather's [`Variables`](@ref "Variables") and can be accessed via 
 
 ```@example terrarium
 simulation.variables.prognostic.land.terrarium
@@ -483,19 +486,19 @@ simulation.variables.prognostic.land.terrarium
 ### Output of Terrarium variables
 
 Any variable of the Terrarium state (prognostic, auxiliary/diagnostic, or input)
-can be written to SpeedyWeather's output with `TerrariumOutput`. Its name,
+can be written to SpeedyWeather's output with `OutputVariables.Terrarium`. Its name,
 units, long name and dimensionality are derived automatically from Terrarium's
 variable metadata. Add all prognostic and auxiliary Terrarium variables with
 
 ```@example terrarium
-add!(model, TerrariumOutput(terrarium_model)...)
+add!(model, OutputVariables.Terrarium(terrarium_model)...)
 ```
 
 or add a single variable (here renamed in the output file via `name`, any Terrarium
 variable name works, e.g. also `:saturation_water_ice` or `:sensible_heat_flux`) with
 
 ```@example terrarium
-add!(model, TerrariumOutput(terrarium_model, :temperature, name = "soil_temperature"))
+add!(model, OutputVariables.Terrarium(terrarium_model, :temperature, name = "soil_temperature"))
 nothing # hide
 ```
 
@@ -504,13 +507,12 @@ Then run the simulation with `run!(simulation, output = true)` as usual.
 additional vertical dimension `soil_depth` with the depths of the
 Terrarium soil layer centres (in meters, positive down) as coordinates.
 Ocean grid points, where Terrarium does not simulate anything, are filled
-with NaN. Terrarium output variables are supported both with `NetCDFOutput`
-and, once Zarr.jl is loaded, with `ZarrOutput`:
+with NaN. Terrarium output variables are supported both with [`NetCDFOutput`](@ref)
+and, once Zarr.jl is loaded, with [`ZarrOutput`](@ref "Zarr Output"):
 
 ```julia
 using Zarr
 output = ZarrOutput(spectral_grid, PrimitiveWet)
 model = PrimitiveWetModel(spectral_grid; land, output, ...)
-add!(model, TerrariumOutput(terrarium_model)...)
+add!(model, OutputVariables.Terrarium(terrarium_model)...)
 ```
-

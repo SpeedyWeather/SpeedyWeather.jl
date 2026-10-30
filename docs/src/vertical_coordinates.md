@@ -3,7 +3,9 @@
 SpeedyWeather.jl supports two families of terrain-following vertical coordinates.
 Both are implemented as subtypes of `AbstractVerticalCoordinates` and are interchangeable
 in the model constructor. For more mathematical background on coordinate transformations
-see [Vertical coordinates](@ref) in the Primitive equation model documentation.
+see [Vertical coordinates](@ref vertical_coordinates_physics) in the Primitive equation model documentation. For a
+quick overview of setting the vertical resolution when creating a model see
+[Vertical coordinates and resolution](@ref) in [How to run SpeedyWeather.jl](@ref).
 
 ## [Sigma coordinates](@id sigma_coordinates_usage)
 
@@ -44,7 +46,8 @@ From a range:
 SigmaCoordinates(0:0.2:1)
 ```
 
-Frierson (2006) spacing with finer resolution near the surface and stratosphere:
+[Frierson2006](@citet) spacing with finer resolution near the surface and stratosphere,
+the default vertical coordinates of `Geometry`:
 
 ```@example vertical_coordinates
 FriersonSigmaCoordinates(spectral_grid)

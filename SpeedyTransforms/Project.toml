@@ -1,6 +1,6 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-version = "0.2.1"
+version = "1.0.0+DEV"
 authors = ["SpeedyTransforms contributors"]
 
 [deps]
@@ -26,7 +26,9 @@ StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 [weakdeps]
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 cuFFT = "533571aa-0936-420e-b4be-9c66f5f626ca"
 
 [sources]
@@ -38,6 +40,8 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 SpeedyTransformsAMDGPUExt = "AMDGPU"
 SpeedyTransformsCUDAExt = ["CUDA", "cuFFT"]
 SpeedyTransformsEnzymeExt = "Enzyme"
+SpeedyTransformsMetalExt = "Metal"
+SpeedyTransformsReactantExt = "Reactant"
 
 [compat]
 AMDGPU = "2.1.2"
@@ -49,16 +53,18 @@ DocStringExtensions = "0.9.5"
 Enzyme = "0.13"
 FFTW = "1.9.0"
 FastGaussQuadrature = "1.0.2"
-GPUArrays = "11.2.3"
+GPUArrays = "11.2.3, 12.1"
 GenericFFT = "0.1.6"
 KernelAbstractions = "0.9.38"
 LinearAlgebra = "1.10"
-LowerTriangularArrays = "0.1"
+LowerTriangularArrays = "1.0"
+Metal = "1.8"
 Primes = "0.5.7"
 Printf = "1.10"
 ProgressMeter = "1.11.0"
-RingGrids = "0.1"
-SpeedyWeatherInternals = "0.2"
+Reactant = "0.2.299"
+RingGrids = "1.0"
+SpeedyWeatherInternals = "1.0"
 Statistics = "1.10"
 StyledStrings = "1"
 cuFFT = "6"

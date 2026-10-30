@@ -330,18 +330,28 @@ function (::Type{S})(
     (; NF, spectrum, grid, nlayers) = spectral_grid
     (; lmax, mmax, architecture) = spectrum
     spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
-    # Scratch sized to the largest K the dycore can emit (PrimitiveWet's mega-batch) so any
-    # call ≤ this K works through `_fourier_serial!` even if K isn't pre-planned. `transform_batch`
-    # is independent — it just lists which Ks get a batched FFT plan.
-    scratch_nlayers = max(maximum(transform_batch), 4 * nlayers + 1)
+    # `nlayers` of the transform is the widest batch K a call may have: sized to the widest batch any
+    # model emits (`max_transform_batch`) or the largest pre-planned FFT batch, whichever is larger.
+    # For the FFT transform this is the scratch width on GPU (nothing is chunked there) and the
+    # `ismatching` limit on CPU (scratch is the largest planned K, wider calls are chunked); for the
+    # matrix transform it is the scratch width on all architectures (no chunking, one matrix multiply).
+    # `transform_batch` is independent — it just lists which Ks get a batched FFT plan.
+    scratch_nlayers = max(maximum(transform_batch), max_transform_batch(nlayers))
     return S(spectrum, grid; NF, nlayers = scratch_nlayers, transform_batch, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
+Largest batch dimension `K` (number of columns) any model emits in a single transform call: the
+`PrimitiveWetModel`'s grid → spectral tendency batch of 9 layer-variables plus surface pressure."""
+max_transform_batch(nlayers::Integer) = 9 * nlayers + 1
+
+"""$(TYPEDSIGNATURES)
 Chooses the transform based on resolution and architecture. For low-resolution
-GPU a MatrixSpectralTransform is returned, otherwise the SpectralTransform."""
+GPU a MatrixSpectralTransform is returned, otherwise the SpectralTransform. On Reactant
+always the SpectralTransform: it computes the Fourier transform as a truncated DFT up to
+`DFT_MAX_TRUNCATION` (matrix multiplies that XLA can accelerate more efficently)."""
 function WhichTransform(spectral_grid::SpectralGrid; kwargs...)
-    if (spectral_grid.truncation <= 64 && spectral_grid.architecture isa GPU) || spectral_grid.architecture isa ReactantDevice
+    if (spectral_grid.truncation <= 100 && spectral_grid.architecture isa GPU)
         return MatrixSpectralTransform(spectral_grid; kwargs...)
     else
         return SpectralTransform(spectral_grid; kwargs...)
@@ -353,18 +363,20 @@ Default `transform_batch` for a `SpectralGrid`. Architecture-dependent because:
 
 - On CPU, batched FFT plans give negligible speedup, default: `[1, nlayers]` — matches the pre-multiplexing system.
 
-- On GPU, batched plans are essential, default:
-  `[1, 2, nlayers, 2*nlayers, 4*nlayers + 1]` — covers single-layer (`1`), the surface-pressure
-  gradient pair (`2`), one variable (`L`), U/V together (`2L`), and the prognostic batch
-  (`4L + 1`), 6L+1 and 9L+1 (tendency batch)
+- On GPU, batched plans are essential, the default corresponds to the transforms needed for the models:
+  `[1, nlayers, 2*nlayers, 2*nlayers + 2, 4*nlayers + 1, 6*nlayers + 1, 9*nlayers + 1]` — covers
+  single-layer (`1`), one variable (`L`), the u, v tendencies of the barotropic model (`2L`), U/V
+  together with the surface-pressure gradient pair in primitive equation models (`2L + 2`), the
+  prognostic batch (`4L + 1`) and the tendency batches of the dry and wet primitive equation models
+  (`6L + 1`, `9L + 1`)
+
+On GPU, if a transform is hit with a K not in `transform_batch`, the transform plans are re-allocated to avoid 
+slow transform performance during model runs. 
 """
 default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_transform_batch(typeof(arch), nlayers)
-# CPU needs no `2`: unplanned K > 1 is split by `_transform_chunked!` rather than falling back.
 default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]
-
-# TODO: planning both 6L+1 and 9L+1 is slightly wasteful (we only need one of them for wet and dry model respectively)
 default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) =
-    Int[1, 2, nlayers, 2 * nlayers, 4 * nlayers + 1, 6 * nlayers + 1, 9 * nlayers + 1]
+    Int[1, nlayers, 2 * nlayers, 2 * nlayers + 2, 4 * nlayers + 1, 6 * nlayers + 1, max_transform_batch(nlayers)]
 
 function variables(::SpeedyTransforms.AbstractSpectralTransform)
     return (

@@ -121,6 +121,13 @@ end
     @test promote(Century(1), Millenium(1)) == (Century(1), Century(10))
 end
 
+@testset "secondofday" begin
+    for time in (DateTime(2000, 1, 1), DateTime(2001, 3, 1, 12, 30, 15), DateTime(2024, 12, 31, 23, 59, 59, 999), DateTime(1850, 7, 4, 6))
+        @test SpeedyWeather.secondofday(time) == div(Dates.value(Dates.Time(time).instant), 1_000_000_000)
+        @test SpeedyWeather.secondofday(time) == Dates.hour(time) * 3600 + Dates.minute(time) * 60 + Dates.second(time)
+    end
+end
+
 @testset "Century and Millenium" begin
 
     @testset "Parametric construction" begin

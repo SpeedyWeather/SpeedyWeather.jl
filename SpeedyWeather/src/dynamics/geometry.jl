@@ -1,8 +1,7 @@
 abstract type AbstractGeometry <: AbstractModelComponent end
 export Geometry
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Construct Geometry struct containing parameters and arrays describing an iso-latitude grid `<:AbstractGrid`
 and the vertical levels. Pass on `SpectralGrid` to calculate the following fields
 $(TYPEDFIELDS)
@@ -12,8 +11,12 @@ $(TYPEDFIELDS)
         IntType,            # <: Integer
         RefValueNF,         # <: Union{Base.RefValue{NF}, CUDA.RefValue{NF}}
         VectorIntType,
-        VectorType,
         VC,
+        VT1,                # These seemingly redundant extra VectorTypes are needed for Reactant compat
+        VTLat,              # which needs different types for different sizes of the array
+        VTGrid,
+        VTVert1,
+        VTVert2,
     } <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
@@ -43,43 +46,43 @@ $(TYPEDFIELDS)
 
     # ARRAYS OF LANGITUDES/LONGITUDES
     "Array of longitudes in degrees (0...360˚), empty for non-full grids"
-    lond::VectorType = get_lond(spectral_grid.Grid, nlat_half)
+    lond::VT1 = get_lond(spectral_grid.Grid, nlat_half)
 
     "Array of latitudes in degrees (90˚...-90˚)"
-    latd::VectorType = get_latd(spectral_grid.Grid, nlat_half)
+    latd::VTLat = get_latd(spectral_grid.Grid, nlat_half)
 
     "Array of latitudes in radians (π...-π)"
-    lat::VectorType = get_lat(spectral_grid.Grid, nlat_half)
+    lat::VTLat = get_lat(spectral_grid.Grid, nlat_half)
 
     "Array of colatitudes in radians (0...π)"
-    colat::VectorType = get_colat(spectral_grid.Grid, nlat_half)
+    colat::VTLat = get_colat(spectral_grid.Grid, nlat_half)
 
     "Longitude (0˚...360˚) for each grid point in ring order"
-    londs::VectorType = get_londlatds(spectral_grid.Grid, nlat_half)[1]
+    londs::VTGrid = get_londlatds(spectral_grid.Grid, nlat_half)[1]
 
     "Latitude (-90˚...˚90) for each grid point in ring order"
-    latds::VectorType = get_londlatds(spectral_grid.Grid, nlat_half)[2]
+    latds::VTGrid = get_londlatds(spectral_grid.Grid, nlat_half)[2]
 
     "Longitude (0...2π) for each grid point in ring order"
-    lons::VectorType = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[1]
+    lons::VTGrid = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[1]
 
     "Latitude (-π/2...π/2) for each grid point in ring order"
-    lats::VectorType = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[2]
+    lats::VTGrid = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[2]
 
     "sin of latitudes"
-    sinlat::VectorType = sind.(latd)
+    sinlat::VTLat = sind.(latd)
 
     "cos of latitudes"
-    coslat::VectorType = cosd.(latd)
+    coslat::VTLat = cosd.(latd)
 
     "= 1/cos(lat)"
-    coslat⁻¹::VectorType = 1 ./ coslat
+    coslat⁻¹::VTLat = 1 ./ coslat
 
     "= cos²(lat)"
-    coslat²::VectorType = coslat .^ 2
+    coslat²::VTLat = coslat .^ 2
 
     "= 1/cos²(lat)"
-    coslat⁻²::VectorType = 1 ./ coslat²
+    coslat⁻²::VTLat = 1 ./ coslat²
 
     "Vertical coordinates used"
     vertical_coordinates::VC
@@ -88,25 +91,24 @@ $(TYPEDFIELDS)
     "Nominal σ = A + B at half levels, σ_k+1/2, independent of surface pressure. Only the
     mass weight of a layer interface for `SigmaCoordinates`; for hybrid sigma-pressure
     coordinates use `pressure_sensitivity_half`/`pressure_thickness_ratio` instead."
-    σ_levels_half::VectorType
+    σ_levels_half::VTVert1
 
     "Nominal σ = A + B at full levels, σₖ, independent of surface pressure. Only the
     mass weight of a layer for `SigmaCoordinates`; for hybrid sigma-pressure coordinates
     use `pressure_thickness_ratio` instead."
-    σ_levels_full::VectorType = (σ_levels_half[2:end] + σ_levels_half[1:(end - 1)]) / 2
+    σ_levels_full::VTVert2 = (σ_levels_half[2:end] + σ_levels_half[1:(end - 1)]) / 2
 
     "Nominal σ level thicknesses, σₖ₊₁ - σₖ, independent of surface pressure. Only the
     mass weight of a layer for `SigmaCoordinates`; for hybrid sigma-pressure coordinates
     use `pressure_thickness_ratio` instead."
-    σ_levels_thick::VectorType = σ_levels_half[2:end] - σ_levels_half[1:(end - 1)]
+    σ_levels_thick::VTVert2 = σ_levels_half[2:end] - σ_levels_half[1:(end - 1)]
 end
 
 Adapt.@adapt_structure Geometry
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
-function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG))
+function Geometry(SG::SpectralGrid; vertical_coordinates = FriersonSigmaCoordinates(SG))
 
     (; nlayers) = SG
     error_message = "nlayers=$(SG.nlayers) does not match length nlayers=" *
@@ -115,7 +117,7 @@ function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG))
 
     (; NF, VectorIntType, VectorType) = SG
     σ_half = get_σ_half(vertical_coordinates)
-    return Geometry{typeof(SG), typeof(nlayers), Base.RefValue{NF}, VectorIntType, VectorType, typeof(vertical_coordinates)}(;
+    return Geometry{typeof(SG), typeof(nlayers), Base.RefValue{NF}, VectorIntType, typeof(vertical_coordinates), VectorType, VectorType, VectorType, VectorType, VectorType}(;
         spectral_grid = SG,
         vertical_coordinates,
         σ_levels_half = σ_half,

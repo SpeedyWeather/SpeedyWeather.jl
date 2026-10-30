@@ -316,16 +316,16 @@ function initialize!(
     (; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     p₀ = model.atmosphere.reference_pressure
 
-    # slow relaxation everywhere, fast in the tropics
-    kₐ = 1 / Second(relax_time_slow).value
-    kₛ = 1 / Second(relax_time_fast).value
+    # slow relaxation everywhere, fast in the tropics, in the number format of the forcing
+    kₐ = oftype(σb, 1 / Second(relax_time_slow).value)
+    kₛ = oftype(σb, 1 / Second(relax_time_fast).value)
 
     # Precompute log(σ) for each layer; only used by the cheap SigmaCoordinates kernel below,
     # harmless (if unused) for SigmaPressureCoordinates
     @. log_σ = log(σ)
 
     # Held and Suarez equation 4
-    temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(0, (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
+    temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(zero(σb), (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
 
     # Held and Suarez equation 3, split into max(Tmin, (a + b*ln(p))*(p/p₀)^κ)
     # precompute a, b to simplify online calculation
@@ -412,7 +412,9 @@ end
     p = exp(log_p)                      # pressure [Pa]
 
     # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
-    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p) * (p / p₀)^κ)
+    # `@fastmath` for the `^`: `(p / p₀)^κ` with a real exponent otherwise routes through
+    # Float64 pow_body even when p, p₀, κ are all NF, which Metal's GPU compiler rejects
+    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p) * @fastmath((p / p₀)^κ))
     temp_tend[ij, k] -= kₜ * (temp[ij, k] - Teq)  # Held and Suarez 1996, equation 2
 end
 

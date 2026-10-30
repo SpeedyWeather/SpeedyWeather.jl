@@ -3,7 +3,8 @@
 SpeedyWeather implements a dynamical variables system. This means there is no central list
 of all variables being allocated by every model and every model component can declare
 a set of variables as being required which will then be allocated when the
-model is initialized.
+model is initialized. (For the top-level container these variables end up in, see
+[The `Variables` struct](@ref).)
 
 In most cases you are advised to use and reuse as much as possible the variables
 required, including scratch arrays you can always write to (but don't read from them
@@ -93,7 +94,8 @@ tendency to the prognostic variables for some time steppers but not for others.
 
 ## Time stepped variables
 
-The prognostic variables _can but do not have to_ be subject to time stepping as defined in `model.time_stepping`.
+The prognostic variables _can but do not have to_ be subject to time stepping as defined in `model.time_stepping`
+(for the mechanics of the time stepper itself see [Time steppers and variable steps](@ref steps)).
 In the examples above, one likely want temperature to be time stepped but the random pattern
 should not in the same way as the time stepping is different (discrete vs continuous).
 So a random pattern is prognostic but the random processes should determine its temporal evolution,
@@ -136,7 +138,8 @@ end
 ## Variable dimensions
 
 Variable dimensions are being used to declare the type
-(and explicitly or implicitly also the size and element type) of a variable required.
+(and explicitly or implicitly also the size and element type) of a variable required
+(see also [Array dimensions](@ref array_dimensions) for how these dimensions are laid out).
 For example, `Grid2D` is a variable dimension declaring it to be of the grid as in
 `spectral_grid` but only 2D with no additional e.g. vertical dimension.
 
@@ -200,10 +203,45 @@ simulation.variables.scratch.my_dict
 
 a dictionary as a variable!
 
-## Variable fusion 
+## Variable fusion
+
+!!! warning "Fused variables are an implementation detail"
+    Variable fusion is a performance optimization and not needed to work with variables
+    or to write custom parameterizations and model components. You should not access or modify
+    the fused arrays in `simulation.variables.fused` directly. Always access variables through
+    their usual names, e.g. `simulation.variables.prognostic.vorticity`.
 
 Variables can be "fused" together to be allocated as one block of contiguous memory.
-This is done primarly with GPU-optimiziation in mind, so that e.g. `transform!` calls can be batched together not just across levels,
-but also across different variables. All variables that are defined with the same `fuse = :fuse_name` keyword argument are allocated together.
-At the same time a `view` is defined that allows for the variable to be used as it would without the variable fusion.
-As this is primarily a performance optimization, it is not required to run basic custom parameterizations or model components. 
+This is done primarily with GPU optimization in mind: `transform!` calls can be batched together
+not just across layers but also across different variables, which reduces the number of kernel launches.
+Similarly, scaling all tendencies is done once on the fused array instead of once per variable.
+All variables that are defined with the same `fuse = :fuse_name` keyword argument are allocated together,
+stacked on top of each other in the vertical. Each variable is then a `view` into this fused array,
+so that it can be used as it would be without fusion. All fused arrays live in `simulation.variables.fused`,
+for example
+
+```@example variable_system
+simulation.variables.fused.prognostic
+```
+
+This is the `FusedParent` for the spectral prognostic variables. It is an array with many
+vertical layers divided into 5 slots: `vorticity` occupies the first slot with all its
+vertical layers, `divergence` the next, and so on (`temperature`, `humidity`, and the single layer
+of `pressure`). The slot map (which variable occupies which layers) is stored alongside
+
+```@example variable_system
+simulation.variables.fused.prognostic.slot_map
+```
+
+Other fused groups exist, e.g. `grid` for the grid-point copies of the prognostic variables
+(using the same slot order as `prognostic` so that one transform maps one onto the other)
+and `spectral_tendencies`/`grid_tendencies` for the tendencies.
+Their layout (which variables are fused, in which order) may change between versions.
+A few consequences you may notice:
+
+- A fused variable, e.g. `simulation.variables.prognostic.vorticity`, shares memory with its
+  fused parent, so changes to one are visible in the other.
+- The `.data` of a fused variable is a `SubArray` rather than an `Array`.
+- When printing `simulation.variables`, the memory of a fused variable is only counted once,
+  on its fused parent.
+- `copy!` between two `Variables` copies the fused parents and skips the views.

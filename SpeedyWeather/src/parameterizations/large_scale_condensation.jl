@@ -104,7 +104,7 @@ large-scale precipitation vertically for output."""
             Δp = pressure_thickness(k, pₛ, coord)           # pressure thickness of layer Δp times 1/g/ρ [m]
             Δp_gρ = Δp / gρ
             Δp_Δtgρ = Δp_gρ / Δt                            # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
-            Δtgρ_Δp = inv(Δp_Δtgρ)                          # [s/m]
+            Δtgρ_Δp = 1 / Δp_Δtgρ                           # [s/m], TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
 
             # 1. Melting of snow from layer above
             δT_melt = max(temp[ij, k] - melting_threshold, 0)   # only if temperature above melting threshold
@@ -114,7 +114,7 @@ large-scale precipitation vertically for output."""
             snow_flux_down -= melt_rate                     # move melted snow to rain
             rain_flux_down += melt_rate                     # this can evaporate now too
             δq_melt = melt_rate * Δtgρ_Δp                   # convert back to humidity increase over timestep [kg/kg]
-            δT = -Lᵢ_cₚ * δq_melt                           # just to calculate the latent heat required (explicit in time)
+            δT = -Lᵢ_cₚ * δq_melt / Δt                      # latent heat required for melting [K/s] (explicit in time)
             # don't use δq_melt as humidity tendency as it's only snow->rain
 
             # 2. Reevaporation and condensation
@@ -129,10 +129,10 @@ large-scale precipitation vertically for output."""
             # Solve for melting of snow, condensation, reevaporation (and possibly sublimation) implicitly in time
             # implicit correction, Frierson et al. 2006 eq. (21)
             # derivative of qsat wrt to temp
-            T = temp[ij, k] + Δt * δT                       # use temperature minus latent heat for melting in gradient
-            dqsat_dT = sat_humid_k * relative_humidity_threshold * Lᵥ_cₚ / (Rᵥ * T^2)
+            T = temp[ij, k] + Δt * δT                       # use temperature after melting [K] in gradient
+            dqsat_dT = sat_humid_k * relative_humidity_threshold * Lᵥ / (Rᵥ * T^2)    # Clausius-Clapeyron [1/K]
             δq /= ((1 + Lᵥ_cₚ * dqsat_dT) * time_scale * Δt)
-            δT = -Lᵥ_cₚ * δq                                # latent heat release for enthalpy conservation
+            δT -= Lᵥ_cₚ * δq                                # add latent heat release to melting for enthalpy conservation
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
@@ -145,7 +145,8 @@ large-scale precipitation vertically for output."""
             snow = zero(rain)                   # start with zero snow but potentially swap below
 
             # decide whether to turn precip into snow (all rain freezes to snow)
-            rain, snow = let_it_snow && temp[ij, k] < freezing_threshold ? (snow, rain) : (rain, snow)
+            freeze = let_it_snow & (temp[ij, k] < freezing_threshold)
+            rain, snow = ifelse(freeze, snow, rain), ifelse(freeze, rain, snow)
             rain_flux_down += rain              # accumulate into downward fluxes [m/s] (used in layer below)
             snow_flux_down += snow              # accumulate into downward fluxes [m/s] (used in layer below)
 

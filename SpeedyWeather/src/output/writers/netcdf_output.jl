@@ -6,9 +6,12 @@ $(TYPEDFIELDS)"""
 @kwdef mutable struct NetCDFOutput{
         Field2D,
         Field3D,
+        HostField2D,
+        HostField3D,
         Interpolator,
         DT,
         S,
+        Layers,
     } <: AbstractOutput
 
     # FILE OPTIONS
@@ -57,16 +60,25 @@ $(TYPEDFIELDS)"""
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
 
+    "[OPTION] vertical layers to write 3D atmospheric variables on, `ModelLayers()` (default)
+    or `PressureLayers(spectral_grid)`, see [`AbstractOutputLayers`](@ref)"
+    layers::Layers = ModelLayers()
+
     # the netcdf file to be written into, will be created
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
     const interpolator::Interpolator
     const land_fraction::Field2D
 
-    # SCRATCH FIELDS TO INTERPOLATE ONTO
+    # SCRATCH FIELDS TO INTERPOLATE ONTO, on the model's architecture
     const field2D::Field2D
     const field3D::Field3D
     const field3Dland::Field3D
+
+    # HOST (CPU) COPIES OF THE SCRATCH FIELDS TO WRITE FROM, the same objects on CPU
+    const host2D::HostField2D
+    const host3D::HostField3D
+    const host3Dland::HostField3D
 end
 
 dataset_type(::NetCDFOutput) = NCDataset
@@ -78,38 +90,37 @@ the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argu
 non-default number of soil layers is used, it also needs the respective `nlayers_soil` to allocate those outputs.
 The output grid is optionally determined by keyword arguments `output_Grid` (its type, full grid required),
 `nlat_half` (resolution) and `output_NF` (number format, only used for variables not coordinates).
-By default, uses the full grid equivalent of the grid and resolution used in `SpectralGrid` `S`."""
+By default, uses the full grid equivalent of the grid and resolution used in `SpectralGrid` `S`.
+Interpolation and post-processing run on the architecture of `S`, e.g. on the GPU, the output grid
+is moved there accordingly, and only the interpolated fields are copied to the CPU for writing."""
 function NetCDFOutput(
         SG::SpectralGrid,
         Model::Type{<:AbstractModel} = Barotropic;
         nlayers_soil = DEFAULT_NLAYERS_SOIL,
-        output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
+        output_grid::AbstractFullGrid = RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half, output_architecture(SG.architecture)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),  # only needed for dispatch
+        layers::AbstractOutputLayers = ModelLayers(),        # needed to size field3D
         kwargs...
     )
 
-    # INPUT GRID (but on CPU)
-    input_grid = on_architecture(CPU(), SG.grid)
+    # OUTPUT GRID and MODEL GRID on the architecture to interpolate on, the model's (e.g. GPU)
+    arch = output_architecture(SG.architecture)
+    output_grid = on_architecture(arch, output_grid)
+    input_grid = on_architecture(arch, SG.grid)
 
-    # CREATE INTERPOLATOR
-    interpolator = RingGrids.interpolator(output_grid, input_grid, NF = DEFAULT_OUTPUT_NF)
+    # CREATE INTERPOLATOR, with pole-average buffers for the most layers any output field has
+    nlayers = max(get_nlayers(layers, SG), nlayers_soil)
+    interpolator = RingGrids.interpolator(output_grid, input_grid; NF = promote_type(SG.NF, output_NF), nlayers)
 
-    # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
-    (; nlayers) = SG
-
-    land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction
-    field2D = Field(output_NF, output_grid)
-    field3D = Field(output_NF, output_grid, nlayers)
-    field3Dland = Field(output_NF, output_grid, nlayers_soil)
+    # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT (+ host copies)
+    scratch = output_scratch_fields(output_NF, output_grid, get_nlayers(layers, SG), nlayers_soil)
 
     output = NetCDFOutput(;
         interval = Second(interval),    # convert to seconds for dispatch
+        layers,
         interpolator,
-        land_fraction,
-        field2D,
-        field3D,
-        field3Dland,
+        scratch...,
         kwargs...
     )
 
@@ -128,9 +139,13 @@ function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
     println(io, styled"├ {info:write restart file} = $(output.write_restart) (if active)")
 
     interp_type_str = string(typeof(output.interpolator))
-    interp_type_str_short = length(interp_type_str) > 70 ? string(first(interp_type_str, 70), "...}") : interp_type_str
-
+    interp_type_str_short = length(interp_type_str) > 64 ? string(first(interp_type_str, 64), "...}") : interp_type_str
     println(io, styled"├ {info:interpolator}::$interp_type_str_short")
+
+    layers_type_str = string(typeof(output.layers))
+    layers_type_str_short = length(layers_type_str) > 70 ? string(first(layers_type_str, 70), "...}") : layers_type_str
+    println(io, styled"├ {info:layers}::$layers_type_str_short")
+
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, styled"├ {info:interval} = $(output.interval)")
     print(io, styled"└ {info:variables}")
@@ -154,7 +169,7 @@ function initialize!(
     # only checked for models that have a land component and output variables that
     # actually use the soil vertical dimension (and its scratch field `field3Dland`)
     if hasfield(typeof(model), :land) && !isnothing(model.land) &&
-            any(var -> is_land(var) && is3D(var), values(output.variables))
+            any(var -> OutputVariables.is_land(var) && OutputVariables.is3D(var), values(output.variables))
         @assert get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
             " soil layers initialized for output, but $(get_nlayers(model.land)) soil layers initialized for model." *
             " Please construct NetCDFOutput with the same `nlayers_soil` as the model."
@@ -183,34 +198,31 @@ function initialize!(
 
     # DEFINE NETCDF DIMENSIONS SPACE
     # explictly move to CPU and convert to common format as determined by RingGrids.get_lond (Float64 default)
-    lond = get_lond(output.field2D)
-    latd = get_latd(output.field2D)
-    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
+    lond = get_lond(output.host2D)
+    latd = get_latd(output.host2D)
     soil_indices = collect(1:get_soil_layers(model))
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib = Dict("units" => "degrees_north", "long_name" => "latitude"))
-    defVar(dataset, "layer", σ, ("layer",), attrib = Dict("units" => "1", "long_name" => "sigma layer"))
+    define_vertical_coordinate!(dataset, output.layers, model)      # sigma or pressure layers
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
-    # VARIABLES, remove output variables not existent in simulation.variables
-    simulation = Simulation(vars, model)
-    nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
-    if !isempty(nonexisting_vars)
-        @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
-    end
-    delete!(output, nonexisting_vars...)
-
-    # then define every output variable in the netCDF file and write initial conditions
-    for (key, var) in output.variables
-        define_variable!(dataset, var, eltype(output.field2D))
-        output!(output, var, simulation)
-    end
-
-    # calculate land fraction on output grid
+    # LAND FRACTION on the output grid, before the initial conditions are written, which
+    # scale some variables by it
     if hasproperty(model, :land_sea_mask)
-        land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
-        interpolate!(output.land_fraction, land_fraction_cpu, output.interpolator)
+        interpolate_output!(output, output.land_fraction, model.land_sea_mask.land_fraction)
+    end
+
+    # VARIABLES: define every output variable in the netCDF file and write initial
+    # conditions, skipping any that don't exist in the simulation — the same check the
+    # generic `output!` makes at write time, applied here so a skipped variable doesn't
+    # leave an all-_FillValue phantom variable behind
+    simulation = Simulation(vars, model)
+    warn_nonexisting_variables(output, simulation)
+    for (key, var) in output.variables
+        OutputVariables.exists_in_simulation(var, simulation) || continue
+        define_variable!(dataset, var, eltype(output.field2D), vertical_dim_name = vertical_dimension_name(output, var))
+        output!(output, var, simulation)
     end
 
     return nothing
@@ -221,21 +233,23 @@ Base.close(output::NetCDFOutput) = NCDatasets.close(output.netcdf_file)
 function define_variable!(
         dataset::NCDataset,
         var::AbstractOutputVariable,
-        output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
+        output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF;
+        vertical_dim_name::String = vertical_dimension_name(var),
     )
     # hook for custom output variables to define their own (vertical) dimension
     define_dimension!(dataset, var)
 
-    missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
+    missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : OutputVariables.DEFAULT_MISSING_VALUE
     attributes = Dict("long_name" => var.long_name, "units" => var.unit, "_FillValue" => output_NF(missing_value))
 
-    # the vertical dimension depends on the variable, e.g. "layer" or "soil_layer"
-    all_dims = ("lon", "lat", vertical_dimension(var), "time")
+    # the vertical dimension depends on the variable and the output's layers,
+    # e.g. "layer", "pressure" or "soil_layer"
+    all_dims = ("lon", "lat", vertical_dim_name, "time")
     dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
     # pick defaults for compression if not defined
-    deflatelevel = hasproperty(var, :compression_level) ? var.compression_level : DEFAULT_COMPRESSION_LEVEL
-    shuffle = hasproperty(var, :shuffle) ? var.shuffle : DEFAULT_SHUFFLE
+    deflatelevel = hasproperty(var, :compression_level) ? var.compression_level : OutputVariables.DEFAULT_COMPRESSION_LEVEL
+    shuffle = hasproperty(var, :shuffle) ? var.shuffle : OutputVariables.DEFAULT_SHUFFLE
 
     return defVar(dataset, var.name, output_NF, dims, attrib = attributes; deflatelevel, shuffle)
 end

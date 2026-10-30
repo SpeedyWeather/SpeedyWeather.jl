@@ -130,7 +130,7 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    Δσₖ⁻¹ = inv(layer_thickness(thickness, ij, k))
+    Δσₖ⁻¹ = 1 / layer_thickness(thickness, ij, k)   # TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
 
     # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
     k⁻ = max(1, k - 1)

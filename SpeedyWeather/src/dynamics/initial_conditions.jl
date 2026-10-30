@@ -163,7 +163,9 @@ end
     l = l_indices[lm]
 
     # Skip zonal modes (m=0, which are the first lmax harmonics)
-    ξ[I] = ifelse(lm > lmax & l <= max_wavenumber, amplitude * l^power * random_values[I], 0)
+    # `@fastmath` for the `^`: `l^power` with a real exponent otherwise routes through
+    # Float64 pow_body even when power is NF, which Metal's GPU compiler rejects
+    ξ[I] = ifelse(lm > lmax & l <= max_wavenumber, amplitude * @fastmath(l^power) * random_values[I], zero(amplitude))
 end
 
 export RandomVelocity
@@ -231,8 +233,11 @@ function initialize!(
 
     @allowscalar ξ[1] = 0  # remove mean
 
-    # repeat over vertical layers
-    ξks = repeat(ξ, 1, nlayers)
+    # repeat over vertical layers (broadcast-assign instead of `repeat` because
+    # `repeat(::ConcretePJRTArray, …)` falls back to scalar indexing on Reactant)
+    ξks_data = similar(ξ.data, size(ξ.data, 1), nlayers)
+    ξks_data .= ξ.data
+    ξks = LowerTriangularArray(ξks_data, ξ.spectrum)
     set!(vars, model; vorticity = ξks)
 
     return nothing
@@ -384,7 +389,7 @@ end
     θ = lat[j]  # latitude in radians
 
     # Compute velocity per latitude, u as in Galewsky, 2004
-    u_θ = ifelse(θ₀ < θ < θ₁, umax / eₙ * exp(1 / (θ - θ₀) / (θ - θ₁)), 0)
+    u_θ = ifelse(θ₀ < θ < θ₁, umax / eₙ * exp(1 / (θ - θ₀) / (θ - θ₁)), zero(umax))
 
     # Store velocity with scaling for curl!
     u_grid[ij] = u_θ / radius * coslat⁻¹[j]
@@ -443,12 +448,13 @@ function initialize!(
     sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
     (; radius) = model.planet
     R = radius * perturb_radius         # spatial extent of perturbation
+    scratch_field = vars.scratch.grid.a
 
     vor_ic = JablonowskiVorticity(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
 
     # apply those to set the initial conditions for vor, div
-    set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true)
+    set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true, scratch_field)
     return nothing
 end
 

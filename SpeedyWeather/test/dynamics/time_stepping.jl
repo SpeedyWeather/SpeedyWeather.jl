@@ -212,6 +212,17 @@ end
     end
 end
 
+@testset "Default time step inside kernels" begin
+    # time steppers are adapted to a core struct inside kernels (GPU, Reactant), which has to
+    # return the same default time step, e.g. 2Δt for leapfrog used by the surface flux damping
+    @testset for TS in (Leapfrog, NCycleLorenz)
+        time_stepping = TS(SpectralGrid())
+        adapted = SpeedyWeather.Adapt.adapt(Array, time_stepping)
+        @test typeof(adapted) != typeof(time_stepping)
+        @test SpeedyWeather.default_time_step(adapted) == SpeedyWeather.default_time_step(time_stepping)
+    end
+end
+
 @testset "Set timestep manually" begin
     @testset for TS in (Leapfrog, NCycleLorenz)
         @testset for truncation in (32, 64, 128)
@@ -305,5 +316,72 @@ end
 
         SpeedyWeather.unscale_tendencies!(vars)
         @test Array(grid_parent.data) ≈ original         # round-trips to the identity
+    end
+end
+
+@testset "unscale! leaves the diagnosed vertical velocity scaled" begin
+    # `unscale!` undoes the radius scaling of vor, div but not of w = radius*σ̇, which the
+    # dycore uses scaled. ParticleAdvection3D accounts for it with a 1/radius in its vertical time step.
+    spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
+    model = PrimitiveWetModel(spectral_grid)
+    vars = Variables(model)
+
+    fill!(vars.dynamics.w.data, 2)
+    vars.prognostic.scale[] = 3
+    SpeedyWeather.unscale!(vars)
+    @test all(Array(vars.dynamics.w.data) .== 2)
+end
+
+@testset "Single time steps match run! from a reset clock" begin
+    # `initialize!(simulation; steps)` resets the clock, so the next steps are the leapfrog
+    # start (Δt/2, Δt, then 2Δt) while the implicit solver still has 2Δt from the spin-up.
+    # A loop over `time_step!(vars, time_stepping, model)` (as used for differentiation)
+    # has to reinitialize the solver like `run!` does, or it integrates a different model.
+    @testset for Model in (PrimitiveDryModel, PrimitiveWetModel)
+        # two identical simulations, both spun up so that the implicit solver is at 2Δt
+        function spun_up()
+            spectral_grid = SpectralGrid(truncation = 22, nlayers = 4, NF = Float64)
+            simulation = initialize!(Model(spectral_grid))
+            run!(simulation, steps = 5)
+            return simulation
+        end
+
+        steps = 4
+        sim_run = spun_up()
+        run!(sim_run; steps)
+
+        sim_step = spun_up()
+        initialize!(sim_step; steps)
+        (; variables, model) = sim_step
+        for _ in 1:steps
+            SpeedyWeather.time_step!(variables, model.time_stepping, model)
+            SpeedyWeather.time_step!(variables.prognostic.clock, model.time_stepping)
+        end
+        SpeedyWeather.unscale!(variables)
+
+        @test sim_step.variables.prognostic.clock.time == sim_run.variables.prognostic.clock.time
+        for var in (:vorticity, :divergence, :temperature, :pressure)
+            @test sim_step.variables.prognostic[var] ≈ sim_run.variables.prognostic[var]
+        end
+    end
+end
+
+@testset "Implicit reference temperature profile is the global-mean temperature" begin
+    spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    (; implicit) = model
+    (; clock) = simulation.variables.prognostic
+    σ_levels = Array(model.geometry.σ_levels_full)
+    n = implicit.schedule.every_n_steps
+
+    for (i, ΔT) in enumerate((0, 5))
+        # new temperature: global mean 200 + 100σ + ΔT per layer, plus a wave with zero global mean
+        set!(simulation, temperature = (λ, φ, σ) -> 200 + 100σ + ΔT + 10 * cosd(λ) * cosd(φ))
+        SpeedyWeather.transform!(simulation.variables, model, initialize = true)   # computes the global mean
+
+        clock.time_step_counter = i * n     # a time step on which the reference profile is recomputed
+        SpeedyWeather.reinitialize!(implicit, model, simulation.variables)
+        @test Array(implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT atol = 0.01
     end
 end

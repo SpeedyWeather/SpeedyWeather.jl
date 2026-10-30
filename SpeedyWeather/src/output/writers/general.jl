@@ -7,10 +7,8 @@ const DEFAULT_OUTPUT_INTERVAL = Hour(6)
 const OUTPUT_VARIABLES_DICT = Dict{Symbol, AbstractOutputVariable}
 OutputVariablesDict() = OUTPUT_VARIABLES_DICT()
 
-const DEFAULT_MISSING_VALUE = NaN
-const DEFAULT_COMPRESSION_LEVEL = 1
-const DEFAULT_SHUFFLE = false
-const DEFAULT_KEEPBITS = 15
+# defaults for missing value, compression and keepbits of output variables
+# are defined in the OutputVariables module, e.g. `OutputVariables.DEFAULT_KEEPBITS`
 
 """$(TYPEDSIGNATURES)
 Add `outputvariables` to a dictionary defining the variables subject to NetCDF output."""
@@ -39,6 +37,14 @@ end
 # also allow for tuples by splatting, similar to add!(::AbstractModel, ::Tuple)
 add!(output::AbstractOutput, tuple::Tuple) = add!(output, tuple...)
 
+# adding several tuples adds one after another
+function add!(output::AbstractOutput, tuples::Tuple...)
+    for tuple in tuples
+        add!(output, tuple)
+    end
+    return output
+end
+
 """$(TYPEDSIGNATURES)
 Delete output variables from `output` by their (short name) (Symbol or String), corresponding
 to the keys in the dictionary."""
@@ -55,7 +61,7 @@ function add_default!(
         output_variables::OUTPUT_VARIABLES_DICT,
         Model::Type{<:Barotropic},
     )
-    return add!(output_variables, VorticityOutput(), ZonalVelocityOutput(), MeridionalVelocityOutput())
+    return add!(output_variables, OutputVariables.Vorticity(), OutputVariables.ZonalVelocity(), OutputVariables.MeridionalVelocity())
 end
 
 """$(TYPEDSIGNATURES)
@@ -66,7 +72,7 @@ function add_default!(
         Model::Type{<:ShallowWater},
     )
     add_default!(variables, Barotropic)
-    return add!(variables, InterfaceDisplacementOutput())
+    return add!(variables, OutputVariables.InterfaceDisplacement())
 end
 
 """$(TYPEDSIGNATURES)
@@ -77,7 +83,7 @@ function add_default!(
         Model::Type{<:PrimitiveDry},
     )
     add_default!(variables, Barotropic)
-    return add!(variables, MeanSeaLevelPressureOutput(), TemperatureOutput())
+    return add!(variables, OutputVariables.MeanSeaLevelPressure(), OutputVariables.Temperature())
 end
 
 """$(TYPEDSIGNATURES)
@@ -88,7 +94,97 @@ function add_default!(
         Model::Type{<:PrimitiveWet},
     )
     add_default!(variables, PrimitiveDry)
-    return add!(variables, HumidityOutput())
+    return add!(variables, OutputVariables.Humidity())
+end
+
+"""$(TYPEDSIGNATURES)
+Architecture that gridded output writers interpolate and post-process on for a model that
+runs on `architecture`: the model's own, so that e.g. a GPU simulation is interpolated on the
+GPU, except for Reactant, I/O has be done outside of the compile context anyway, currently we 
+just use CPU for Reactant simulation output. That may change in the future."""
+output_architecture(architecture::AbstractArchitecture) = architecture
+output_architecture(::ReactantDevice) = CPU()
+
+"""$(TYPEDSIGNATURES)
+Allocate the scratch fields of a gridded output writer on `output_grid`, which is on the
+model's architecture so that interpolation and post-processing run where the model runs:
+`land_fraction`, `field2D`, `field3D` (`nlayers`) and `field3Dland` (`nlayers_soil`), all in
+`output_NF`. Also returns their host (CPU) copies `host2D`, `host3D`, `host3Dland` that the
+data is copied into for writing. On CPU these are the very same objects, so no copy is made.
+Returned as a NamedTuple to be splatted into the writer's keyword constructor."""
+function output_scratch_fields(
+        output_NF::Type{<:AbstractFloat},
+        output_grid::AbstractGrid,
+        nlayers::Integer,
+        nlayers_soil::Integer,
+    )
+    land_fraction = Field(output_NF, output_grid)       # to mask or scale quantity by whole cell fraction to ocean/land area fraction
+    field2D = Field(output_NF, output_grid)
+    field3D = Field(output_NF, output_grid, nlayers)
+    field3Dland = Field(output_NF, output_grid, nlayers_soil)
+    host2D, host3D, host3Dland = host_field(field2D), host_field(field3D), host_field(field3Dland)
+    return (; land_fraction, field2D, field3D, field3Dland, host2D, host3D, host3Dland)
+end
+
+"""$(TYPEDSIGNATURES)
+Host (CPU) equivalent of `field` to write from: `field` itself if it already is on the CPU,
+otherwise a newly allocated copy on the CPU."""
+host_field(field::AbstractField) = ismatching(CPU(), field.data) ? field : on_architecture(CPU(), field)
+
+"""$(TYPEDSIGNATURES)
+Scratch field on the output grid (on the model's architecture) to interpolate `variable`
+into, and its host (CPU) equivalent to write from, see [`output_scratch_fields`](@ref)."""
+function scratch_fields(output::AbstractOutput, variable::AbstractOutputVariable)
+    OutputVariables.is3D(variable) || return output.field2D, output.host2D
+    OutputVariables.is_land(variable) && return output.field3Dland, output.host3Dland
+    return output.field3D, output.host3D
+end
+
+"""$(TYPEDSIGNATURES)
+Move `src` (a field on the model grid and the model's architecture) onto the output grid of
+`output`, writing into `dest` (on the [`output_architecture`](@ref), `src` is moved there
+first if that differs from the model's). Interpolates with
+`output.interpolator`, or copies straight over when `output.interpolator === nothing`, i.e.
+when the output grid already is the model grid and `output` was constructed without an
+interpolator (see [`HEALPixOutput`](@ref) for a simulation that already runs on the output's
+HEALPix grid)."""
+function interpolate_output!(output::AbstractOutput, dest::AbstractField, src::AbstractField)
+    # move the model's field to the output's architecture if they differ (e.g. Reactant)
+    src = on_output_architecture(output, src)
+
+    isnothing(output.interpolator) || return RingGrids.interpolate!(dest, src, output.interpolator)
+
+    # No interpolator: the output grid is the model grid, copy straight over
+    fields_match(dest, src) || throw(DimensionMismatch(dest, src))
+    return copyto!(dest.data, src.data)
+end
+
+"""$(TYPEDSIGNATURES)
+`x` (an array or field of the model) on the architecture of `output`: `x` itself if that's the
+model's architecture, otherwise moved there. For Reactant the output is computed on the CPU, as
+computing with Reactant arrays outside of a compiled program compiles a program for every operation."""
+function on_output_architecture(output::AbstractOutput, x)
+    arch = architecture(output.field2D)
+    return ismatching(arch, architecture(x)) ? x : on_architecture(arch, x)
+end
+
+"""$(TYPEDSIGNATURES)
+Write `field` (on the output grid and the model's architecture) of `variable` into `output`:
+copy it into its `host` equivalent (no-op on CPU where `host === field`), round its
+mantissa bits for compression if `variable` has `keepbits` (on the host, as rounding is
+cheap there) and write via the backend-specific [`write_array!`](@ref)."""
+function write_output!(
+        output::AbstractOutput,
+        variable::AbstractOutputVariable,
+        field::AbstractField,
+        host::AbstractField,
+    )
+    host === field || copyto!(host.data, field.data)     # device to host
+    if hasproperty(variable, :keepbits)                  # round mantissabits for compression
+        round!(host, variable.keepbits)
+    end
+    write_array!(output, variable, host)
+    return nothing
 end
 
 function set!(output::AbstractOutput; active, reset_path = true)
@@ -154,21 +250,26 @@ function output!(
         simulation::AbstractSimulation,
     )
     # escape immediately after first call if variable doesn't have a time dimension
-    ~hastime(variable) && output.output_counter > 1 && return nothing
+    ~OutputVariables.hastime(variable) && output.output_counter > 1 && return nothing
 
-    # interpolate 2D/3D variables
-    var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
+    # scratch field to interpolate into (on the model's architecture) and its host equivalent
+    var, host = scratch_fields(output, variable)
 
-    ori = path_or_nothing(variable, simulation)         # original array as in simulation
+    ori = OutputVariables.path_or_nothing(variable, simulation)         # original array as in simulation
     isnothing(ori) && return nothing                    # silently escape early if variable is not defined in the simulation
     ts = simulation.model.time_stepping
 
     # decide on existence of step dimension by comparing dimensionality
-    has_step = (is3D(variable) && ndims(ori) == 3) ||   # 2D/3D variables have 1/2 array dimensions respectively
-        (is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
+    has_step = (OutputVariables.is3D(variable) && ndims(ori) == 3) ||   # 2D/3D variables have 1/2 array dimensions respectively
+        (OutputVariables.is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
     ori = has_step ? get_prognostic_step(ori, ts, output) : ori
-    raw = on_architecture(CPU(), ori)
-    RingGrids.interpolate!(var, raw, output.interpolator)
+
+    # interpolate onto the output's vertical layers (no-op on ModelLayers), on the model
+    # grid and the model's architecture, i.e. before the horizontal interpolation
+    ori = interpolate_layers!(output_layers(output), ori, variable, simulation)
+
+    # interpolate onto the output grid, and post-process below, on the model's architecture
+    interpolate_output!(output, var, ori)
 
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)
@@ -190,11 +291,7 @@ function output!(
         end
     end
 
-    if hasproperty(variable, :keepbits)     # round mantissabits for compression
-        round!(var, variable.keepbits)
-    end
-
-    write_array!(output, variable, var)
+    write_output!(output, variable, var, host)     # to host, round and write
     return nothing
 end
 

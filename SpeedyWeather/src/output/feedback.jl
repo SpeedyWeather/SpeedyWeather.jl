@@ -28,11 +28,11 @@ $(TYPEDFIELDS)"""
     "[OPTION] Show simulation time?"
     show_time::Bool = true
 
-    "[OPTION] Show maximum speed of the simulated flow [m/s]"
-    show_umax::Bool = true
+    "[OPTION] Show maximum speed of the simulated flow [m/s], `nothing` = yes except for Reactant (opt-in there)"
+    show_umax::Union{Bool, Nothing} = nothing
 
-    "[OPTION] Show temperature range of simulation [˚C]"
-    show_temperature_range::Bool = true
+    "[OPTION] Show temperature range of simulation [˚C], `nothing` = yes except for Reactant (opt-in there)"
+    show_temperature_range::Union{Bool, Nothing} = nothing
 
     "[OPTION] Interval in time steps between NaN checks, and between the progress meter diagnostics (maximum speed, temperature range)"
     interval::Int = 50
@@ -75,7 +75,7 @@ function initialize!(feedback::Feedback, variables::Variables, model::AbstractMo
     (; showspeed, description, verbose, feedback_dt) = feedback
     desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
     feedback.progress_meter = ProgressMeter.Progress(
-        clock.n_steps;          # use time stepper steps (regardless Δt) not time steps of size Δt
+        Int(clock.n_steps);     # use time stepper steps (regardless Δt) not time steps of size Δt, Int for Reactant's numbers
         enabled = verbose,
         showspeed,
         desc,
@@ -90,6 +90,13 @@ end
 
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
+# Show a diagnostic (maximum speed, temperature range) in the progress meter? `nothing` = the
+# architecture's default: not for Reactant (opt-in), `extrema` of Reactant arrays falls back to
+# scalar indexing, which is disallowed on GPU (and slow on CPU)
+show_diagnostic(option::Bool, architecture::AbstractArchitecture) = option
+show_diagnostic(::Nothing, architecture::AbstractArchitecture) = true
+show_diagnostic(::Nothing, architecture::ReactantDevice) = false
+
 function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
     (; counter, n, check_iterations, enabled) = feedback.progress_meter
     interval = max(1, feedback.interval)
@@ -97,8 +104,8 @@ function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
 
     every_nsteps = enabled ? check_iterations : interval
     if mod(counter, every_nsteps) == 0
-        feedback.show_umax && max_speed(vars)
-        feedback.show_temperature_range && temperature_range(vars)
+        show_diagnostic(feedback.show_umax, model.architecture) && max_speed(vars)
+        show_diagnostic(feedback.show_temperature_range, model.architecture) && temperature_range(vars)
     end
 
     progress!(feedback)
@@ -111,6 +118,20 @@ end
 
 # fallback for feedback = nothing
 progress!(::Nothing, vars::Variables, model::AbstractModel) = nothing
+
+"""$(TYPEDSIGNATURES)
+Feedback after `nsteps` time steps at once, e.g. after a compiled program of several time steps
+with Reactant: advance the progress meter by `nsteps` and check for NaNs (if `feedback.debug`)."""
+function progress!(feedback::Feedback, vars::Variables, model::AbstractModel, nsteps::Integer)
+    FEEDBACK_TIME[] = vars.prognostic.clock.time
+    show_diagnostic(feedback.show_umax, model.architecture) && max_speed(vars)
+    show_diagnostic(feedback.show_temperature_range, model.architecture) && temperature_range(vars)
+    ProgressMeter.next!(feedback.progress_meter; step = nsteps)
+    feedback.debug && nan_detection!(feedback, vars, model)
+    return nothing
+end
+
+progress!(::Nothing, vars::Variables, model::AbstractModel, nsteps::Integer) = nothing
 
 """
 $(TYPEDSIGNATURES)

@@ -1,11 +1,13 @@
 abstract type AbstractSoilMoisture <: AbstractLandComponent end
+abstract type AbstractDynamicSoilMoisture <: AbstractSoilMoisture end
+abstract type AbstractPrescribedSoilMoisture <: AbstractSoilMoisture end
 
 export SeasonalSoilMoisture
 
 """SeasonalSoilMoisture model that prescribes soil moisture from a monthly climatology file.
 The soil moisture is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
+@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractPrescribedSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
@@ -31,8 +33,14 @@ $(TYPEDFIELDS)"""
     "[OPTION] The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
 
+    "[OPTION] Apply land-sea mask to set ocean-only points and missing values?"
+    mask::Bool = true
+
+    "[OPTION] Soil moisture for ocean points/missing values, fraction of field capacity [1]"
+    ocean_moisture::NF = 0
+
     # to be filled from file
-    "Monthly soil moisture volume fraction [1], interpolated onto Grid"
+    "Monthly soil moisture fraction of field capacity [1], interpolated onto Grid"
     monthly_soil_moisture::GridVariable4D
 end
 
@@ -50,6 +58,7 @@ SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = Seas
 function variables(::SeasonalSoilMoisture)
     return (
         PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water content of a full layer [m³/m³]: field capacity (bucket models) or porosity (Terrarium)", units = "m³/m³", namespace = :land),
     )
 end
 
@@ -89,7 +98,21 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF = Float32)
-    interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
+    @maybe_jit model.architecture RingGrids.interpolate_ignoring_nan!(monthly_soil_moisture, soil_moisture_file, interp)
+
+    # the file contains volumetric soil moisture [m³/m³], convert to the fraction of field
+    # capacity used by all land models, capped at 1 as wetter soil drains (see LandBucketMoisture)
+    γ = model.land.thermodynamics.field_capacity
+    monthly_soil_moisture.data .= min.(monthly_soil_moisture.data ./ γ, 1)
+
+    # replace missing values with the fallback and set 100% ocean points to it, as for land temperature
+    masked_value = soil.ocean_moisture
+    if soil.mask
+        msm = monthly_soil_moisture.data    # unpack via .data due to broadcasting issues
+        msm .= ifelse.(isnan.(msm), masked_value, msm)  # broadcast, logical indexing doesn't work on Reactant
+        mask!(monthly_soil_moisture, model.land_sea_mask, :ocean; masked_value)
+    end
+
     return nothing
 end
 
@@ -98,6 +121,9 @@ function initialize!(
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
+    # Make the field capacity a parameterization variable for easy access later
+    vars.parameterizations.land.soil_moisture_capacity .= model.land.thermodynamics.field_capacity
+
     # initialize soil_moisture by "running" the step at the current time
     timestep!(vars, soil, model)
     return nothing
@@ -116,18 +142,9 @@ function timestep!(
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
-    (; time) = vars.prognostic.clock
-
-    this_month = Dates.month(time)
-    next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
-
-    # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
-    NF = eltype(vars.prognostic.land.soil_moisture)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
-
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = vars.prognostic.land
+    this_month, next_month, weight = monthly_interpolation(vars.prognostic.clock.time, eltype(soil_moisture))
 
     launch!(
         architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
@@ -143,7 +160,7 @@ export LandBucketMoisture
 """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@parameterized @kwdef struct LandBucketMoisture{NF} <: AbstractDynamicSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
@@ -153,12 +170,29 @@ $(TYPEDFIELDS)"""
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
 
-    "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
+    "[OPTION] Initial soil moisture over ocean, fraction of field capacity [1]"
     @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure LandBucketMoisture
 LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+
+function variables(::LandBucketMoisture, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, :land)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
+    return (
+        PrognosticVariable(:soil_moisture, LandXYZT(pg), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        TendencyVariable(:soil_moisture, LandXYZT(tg), desc = "Tendency of soil moisture", units = "1/s", namespace = :land),
+
+        ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water content of a full layer [m³/m³]: field capacity (bucket models) or porosity (Terrarium)", units = "m³/m³", namespace = :land),
+        ParameterizationVariable(:river_runoff, Grid2D(), desc = "Accumulated river runoff from soil moisture", units = "m", namespace = :land),
+        ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
+        ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
+        ParameterizationVariable(:snow_melt_rate, Grid2D(), desc = "Snow melt rate + snow runoff", units = "m/s", namespace = :land),
+    )
+end
+
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     nlayers = get_nlayers(model.land)
     @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *
@@ -181,19 +215,25 @@ function initialize!(
         model::PrimitiveEquation,
     )
     # create a seasonal model, initialize it and the variables
-    seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry)
+    seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry; soil.mask, soil.ocean_moisture)
     initialize!(seasonal_model, model)
     initialize!(vars, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
+    # seasonal model has already converted the climatology from volumetric soil moisture
+    # to fraction of field capacity!
 
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
     if soil.mask
         # TODO: broadcasting over views of Fields of GPUArrays doesn't work
+        # broadcast instead of logical indexing, which falls back to scalar indexing on Reactant
         sm = vars.prognostic.land.soil_moisture.data
-        sm[isnan.(sm)] .= masked_value
+        sm .= ifelse.(isnan.(sm), masked_value, sm)
         mask!(vars.prognostic.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
+
+    # Make the field capacity a parameterization variable for easy access later
+    vars.parameterizations.land.soil_moisture_capacity .= model.land.thermodynamics.field_capacity
     return nothing
 end
 
@@ -210,17 +250,18 @@ function timestep!(
         soil::LandBucketMoisture,
         model::PrimitiveEquation,
     )
-    (; soil_moisture) = vars.prognostic.land
-    (; Δt) = model.time_stepping                            # time step in [s]
+    ts = time_stepper(model.time_stepping, :land)
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, ts, soil)
+    soil_moisture_tendency = get_tendency_step(vars.tendencies.land.soil_moisture, ts, soil)
+
     ρ = model.atmosphere.water_density
     (; land_fraction) = model.land_sea_mask
 
     P = vars.parameterizations.rain_rate                    # precipitation (rain only) in [m/s]
     S = vars.parameterizations.land.snow_melt_rate          # [kg/m²/s] includes snow runoff leakage water
     H = vars.parameterizations.land.surface_humidity_flux   # [kg/m²/s], divide by density for [m/s], positive up
-    R = vars.parameterizations.land.river_runoff            # diagnosed here, accumulated [m]
 
-    @boundscheck fields_match(soil_moisture, P, S, H, R, horizontal_only = true) ||
+    @boundscheck fields_match(soil_moisture, P, S, H, horizontal_only = true) ||
         throw(DimensionMismatch(soil_moisture, P))
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
 
@@ -229,28 +270,26 @@ function timestep!(
     f₁ = γ * model.land.geometry.layer_thickness[1]
     f₂ = γ * model.land.geometry.layer_thickness[2]
 
-    p = soil.infiltration_fraction      # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
 
-    params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)  # pack into NamedTuple for kernel
+    params = (; ρ, f₁, f₂, τ⁻¹)         # pack into NamedTuple for kernel
 
     launch!(
-        architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, land_fraction, P, S, H, R, params
+        architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),), land_bucket_soil_moisture_kernel!,
+        soil_moisture_tendency, soil_moisture, land_fraction, P, S, H, params
     )
     return nothing
 end
 
 @kernel inbounds = true function land_bucket_soil_moisture_kernel!(
-        soil_moisture, land_fraction, P, S, H, R, params
+        soil_moisture_tendency, soil_moisture, land_fraction, P, S, H, params
     )
 
     ij = @index(Global, Linear)             # every grid point ij
 
     if land_fraction[ij] > 0               # at least partially land
-        (; ρ, Δt, f₁, f₂, p, τ⁻¹) = params
+        (; ρ, f₁, f₂, τ⁻¹) = params
         # precipitation (rain only, convection + large-scale) minus evaporation (or condensation, = humidity flux)
-        # river runoff via drain excess water below (that's just gone)
         # convert to [m/s] by dividing by density
 
         # Soil top sources and sinks
@@ -262,27 +301,64 @@ end
         D = τ⁻¹ * (soil_moisture[ij, 1] - soil_moisture[ij, 2])
 
         # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_moisture[ij, 1] += Δt / f₁ * F - Δt * D
-        soil_moisture[ij, 2] += Δt * f₁ / f₂ * D
-
-        # river runoff
-        W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
-        δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
-        soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
-        soil_moisture[ij, 2] += p * δW₁ * f₁ / f₂   # add fraction to lower layer
-        R[ij] += Δt * (1 - p) * δW₁ * f₁            # accumulate river runoff [m] of top layer
-
-        # remove excess water from lower layer (this disappears)
-        soil_moisture[ij, 2] = min(soil_moisture[ij, 2], 1)
+        # excess water above field capacity is handled after the time step in filter!
+        soil_moisture_tendency[ij, 1] = F / f₁ - D
+        soil_moisture_tendency[ij, 2] = D * f₁ / f₂
     end
 end
 
-function variables(::LandBucketMoisture)
-    return (
-        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        ParameterizationVariable(:river_runoff, Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),
-        ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
-        ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
-        ParameterizationVariable(:snow_melt_rate, Grid2D(), desc = "Snow melt rate + snow runoff", units = "m/s", namespace = :land),
+"""$(TYPEDSIGNATURES)
+Applied after the time step: Excess water above field capacity in the top layer is split into
+infiltration (fraction `p`) into the lower layer and river runoff (fraction `1-p`, accumulated
+in `river_runoff` [m]). Excess water in the lower layer is removed (this disappears), and soil
+moisture is capped at 0 from below. This needs to be done after the time step as the excess
+water is only known for the new soil moisture."""
+function Base.filter!(vars::Variables, soil::LandBucketMoisture, model::PrimitiveEquation)
+    soil_moisture = vars.prognostic.land.soil_moisture
+    R = vars.parameterizations.land.river_runoff            # accumulated [m]
+    (; land_fraction) = model.land_sea_mask
+
+    @boundscheck fields_match(soil_moisture, R, horizontal_only = true) ||
+        throw(DimensionMismatch(soil_moisture, R))
+    @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
+
+    # Water at field capacity [m], top and lower layer γ*z₁ and γ*z₂
+    γ = model.land.thermodynamics.field_capacity
+    f₁ = γ * model.land.geometry.layer_thickness[1]
+    f₂ = γ * model.land.geometry.layer_thickness[2]
+    p = soil.infiltration_fraction      # fraction of top layer runoff put into lower layer
+    params = (; f₁, f₂, p)
+
+    launch!(
+        architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
+        land_bucket_soil_moisture_filter_kernel!, soil_moisture, land_fraction, R, params
     )
+    return nothing
+end
+
+@kernel inbounds = true function land_bucket_soil_moisture_filter_kernel!(
+        soil_moisture, land_fraction, R, params
+    )
+    ij = @index(Global, Linear)             # every grid point ij
+    nsteps = size(soil_moisture, 3)         # apply to all steps, runoff only diagnosed from the last
+
+    for step in 1:nsteps
+        if land_fraction[ij] > 0            # at least partially land
+            (; f₁, f₂, p) = params
+
+            W₁ = soil_moisture[ij, 1, step]     # wrt to field capacity so maximum is 1
+            δW₁ = max(W₁ - 1, 0)                # excess moisture in top layer
+            soil_moisture[ij, 1, step] = W₁ - δW₁
+            soil_moisture[ij, 2, step] += p * δW₁ * f₁ / f₂     # add infiltration fraction to lower layer
+
+            # accumulate river runoff [m] = excess leftover of top layer
+            if step == nsteps
+                R[ij] += (1 - p) * δW₁ * f₁
+            end
+        end
+
+        # clamp soil moisture in [0, 1], removes excess water in lower layer
+        soil_moisture[ij, 1, step] = clamp(soil_moisture[ij, 1, step], 0, 1)
+        soil_moisture[ij, 2, step] = clamp(soil_moisture[ij, 2, step], 0, 1)
+    end
 end

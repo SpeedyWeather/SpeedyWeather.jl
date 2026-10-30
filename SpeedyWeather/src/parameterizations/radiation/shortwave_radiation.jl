@@ -31,7 +31,12 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
     planet = model.planet
     land_sea_mask = model.land_sea_mask.land_fraction
 
+    # Combine black/white sky albedos, though in the case of transparent atmosphere
+    # only black sky will be active
     cos_zenith = vars.parameterizations.cos_zenith[ij]
+    fraction_direct = one(cos_zenith)
+    combine_albedos!(ij, vars, fraction_direct)
+
     land_fraction = land_sea_mask[ij]
     albedo_ocean = vars.parameterizations.ocean.albedo[ij]
     albedo_land = vars.parameterizations.land.albedo[ij]
@@ -97,6 +102,10 @@ function OneBandGreyShortwave(
     )
     return OneBandShortwave(clouds, transmissivity, radiative_transfer)
 end
+
+# variables of the shortwave scheme and those of its clouds component
+variables(radiation::OneBandShortwave) =
+    (invoke(variables, Tuple{AbstractShortwave}, radiation)..., variables(radiation.clouds)...)
 
 Base.show(io::IO, M::OneBandShortwave) = show(io, M, values = false)
 
@@ -169,6 +178,11 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     pₛ = vars.parameterizations.surface_pressure[ij]
     nlayers = size(dTdt, 2)
     coordinate = model.geometry.vertical_coordinates
+
+    # Here we take fractional cloud cover as a proxy for direct/diffuse
+    # radiation fraction, and use it to combine black/white sky surface albedos
+    fraction_direct = 1 - cloud_cover
+    combine_albedos!(ij, vars, fraction_direct)
 
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     albedo_ocean = vars.parameterizations.ocean.albedo[ij]

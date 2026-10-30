@@ -19,7 +19,7 @@
     # for these resolutions just test idempotence as the roundup_fft may
     # give various other options than just the 3*2^n-matching
     @testset for dealiasing in [2, 3]
-        # T42, T85, T170, T341, T682, T1365 etc (1-based truncation = T + 1)
+        # T43, T86, T171, T342, T683, T1366 etc (1-based truncation = T + 1)
         truncations = [floor(Int, 2^(i + 2) / 3) + 1 for i in p]
         for truncation in truncations
             nlat_half = SpeedyTransforms.get_nlat_half(truncation, dealiasing)
@@ -218,6 +218,21 @@ end
     # transform!(L2, field3_f64, S)    # throws an error
 end
 
+@testset "Transform: allocating transform returns number format of S" begin
+    # the Fourier transform is pre-planned for the number format of S, so the allocating
+    # transform converts to it, that way a roundtrip also works with other input number formats
+    spectrum = Spectrum(31)
+    grid = OctahedralGaussianGrid(24)
+    S = SpectralTransform(spectrum, grid, NF = Float32)
+
+    L_f64 = randn(ComplexF64, spectrum)
+    field = transform(L_f64, S)     # Float64 -> Float32
+    @test eltype(field) == Float32
+
+    L = transform(field, S)         # Float32 -> Float32
+    @test eltype(L) == ComplexF32
+end
+
 @testset "Transform: NF flexibility for spectral outputs" begin
 
     # test Float32 -> Float64
@@ -395,6 +410,14 @@ end
     @test sort!(collect(keys(S.brfft_plans_batched))) == [2, 4]
     @test S.nlayers == 4
 
+    # (c) on CPU `ensure_batched_plans!` is a pure lookup — K=1 and unplanned K stay on the
+    # serial/chunked path and no plans are created on the fly (that is GPU-only, where the serial
+    # path is neither batched nor GPU-graph captured).
+    @test SpeedyTransforms.ensure_batched_plans!(S, 1) == false
+    @test SpeedyTransforms.ensure_batched_plans!(S, 3) == false
+    @test SpeedyTransforms.ensure_batched_plans!(S, 2) == true
+    @test sort!(collect(keys(S.rfft_plans_batched))) == [2, 4]
+
     # (b)+(c) roundtrip at each K — including K=3 which is NOT in the planned set
     # and must therefore go through the K=1 serial fallback via `_fourier!` dispatch.
     for K in (1, 2, 3, 4)
@@ -404,4 +427,24 @@ end
         grid_back = transform(spec_back, S)
         @test grid_back ≈ grid_out rtol = 1.0e-13
     end
+end
+
+@testset "Fourier transform as truncated DFT only on Reactant" begin
+    # the DFT (`fourier_dft = true`) is only implemented in SpeedyTransformsReactantExt (tested there,
+    # against FFTW): FFTs on the CPU by default, no DFT matrices, an error if requested
+    spectrum = Spectrum(truncation = 32)
+    @test SpeedyTransforms.default_fourier_dft(SpeedyTransforms.CPU(), spectrum) == false
+    S = SpectralTransform(spectrum)
+    @test S.fourier_dft == false
+    @test length(S.fourier_matrix_forward) == length(S.fourier_matrix_inverse) == 0
+    @test_throws ArgumentError SpectralTransform(spectrum; fourier_dft = true)
+end
+
+@testset "Clear Fourier graph cache" begin
+    # no GPU graphs on CPU: nothing to reclaim, but clearing (with/without GC) must still work
+    @test SpeedyTransforms.reclaim!(SpeedyTransforms.CPU()) === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!() === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!(SpeedyTransforms.CPU()) === nothing
+    @test SpeedyTransforms.clear_fourier_graph_cache!(gc = false) === nothing
+    @test isempty(SpeedyTransforms.GRAPH_CACHES)
 end

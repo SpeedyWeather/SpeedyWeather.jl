@@ -24,7 +24,7 @@ model = PrimitiveWetModel(spectral_grid; sea_ice=nothing)
 model.sea_ice
 ```
 
-Note that in SpeedyWeather the sea ice model and its albedo are defined
+Note that in SpeedyWeather the sea ice model and its [albedo](@ref "Albedo") are defined
 independently, means you can have a sea ice model without affecting the albedo
 and `sea_ice=nothing` but set the sea ice concentration manually and use its albedo
 effect, this will be discussed in `ThermodynamicSeaIce` below.
@@ -92,7 +92,8 @@ combined with other tendencies that push it outside those bounds), so `Thermodyn
 clamps it after the time step instead. SpeedyWeather calls `filter!(vars, model.sea_ice, model)`
 (and similarly for `model.ocean`, `model.land`) once every time step, after all prognostic
 variables have been updated, so that components can apply such corrections that don't fit
-naturally into a tendency.
+naturally into a tendency. (See also [Ocean models](@ref) and
+[Land surface model](@ref) for the respective `filter!` methods.)
 
 ### Usage
 
@@ -127,13 +128,13 @@ no insulation (i.e. no impact) in the case of no ice.
 And output is added like
 
 ```@example sea_ice
-add!(model, SpeedyWeather.SeaIceConcentrationOutput())
+add!(model, OutputVariables.SeaIceConcentration())
 ```
 
-or as part of `SpeedyWeather.OceanOutput()`
+or as part of `OutputVariables.Ocean()`
 
 ```@example sea_ice
-add!(model, SpeedyWeather.OceanOutput())
+add!(model, OutputVariables.Ocean())
 ```
 
 For more information see [Output variables](@ref).
