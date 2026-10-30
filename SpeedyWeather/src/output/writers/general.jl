@@ -181,10 +181,22 @@ function write_output!(
     )
     host === field || copyto!(host.data, field.data)     # device to host
     if hasproperty(variable, :keepbits)                  # round mantissabits for compression
+        canonicalize_nans!(host.data)                    # otherwise rounding may turn NaNs into -0.0
         round!(host, variable.keepbits)
     end
     write_array!(output, variable, host)
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Replace all NaNs in `A` by the canonical NaN of its element type (only the quiet bit set, e.g.
+`0x7fc00000` for `Float32`), in place. Bitrounding (`round!`) adds half a unit in the last place to the
+bit pattern, which carries into the sign bit for NaNs with all mantissa bits set (e.g. `0x7fffffff`, as
+produced on CUDA GPUs) and so turns them into -0.0. NaNs used as missing values (e.g. over ocean)
+therefore have to be canonicalized before rounding to remain NaN in the output."""
+function canonicalize_nans!(A::AbstractArray{T}) where {T <: AbstractFloat}
+    @. A = ifelse(isnan(A), T(NaN), A)
+    return A
 end
 
 function set!(output::AbstractOutput; active, reset_path = true)
