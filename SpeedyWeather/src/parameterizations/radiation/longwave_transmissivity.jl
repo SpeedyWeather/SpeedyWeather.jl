@@ -87,8 +87,10 @@ CO₂ [ppm] is read from `model.greenhouse_gases.co2` if present, otherwise `CO�
 In contrast to the `FriersonLongwaveTransmissivity` there is no prescribed latitude-vertical profile,
 the optical depth follows the model's humidity, introducing a water vapor feedback. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct ByrneOGormanLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
+    # TODO re-choose once the shortwave changes of #1262 land: Byrne and O'Gorman use 0.8678 but that
+    # yields a too cold planet (~272K) on main with too much reflected shortwave, 1.8 yields ~288K at T31L8
     "[OPTION] Optical depth of the dry atmosphere (well-mixed greenhouse gases) per p₀ at `reference_co2` [1]"
-    @param dry_absorption::NF = 0.8678 (bounds = Nonnegative,)
+    @param dry_absorption::NF = 1.8 (bounds = Nonnegative,)
 
     "[OPTION] Optical depth from water vapor per p₀ and per specific humidity [1/(kg/kg)]"
     @param water_vapor_absorption::NF = 1997.9 (bounds = Nonnegative,)
