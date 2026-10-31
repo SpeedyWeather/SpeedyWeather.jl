@@ -1,6 +1,6 @@
 # Humidity-dependent longwave transmissivity (Byrne and O'Gorman, 2013)
 
-> Status: **in progress**. Implemented and unit-tested, fₗ re-evaluated on current `main`; awaiting review.
+> Status: **in progress**. Implemented and unit-tested; constants chosen for ~288 K on current `main`, to be re-chosen after #1262.
 
 Date of initial draft: 2026-10-30
 
@@ -28,6 +28,9 @@ Base revision: 28069552f493ae7122c90588304b6b7ea427c743
   multiplier. The reference pressure is taken from `model.atmosphere`. The primitive equation models now
   default to `greenhouse_gases = (; co2 = CO2(spectral_grid))` at 280 ppm. Re-evaluated `fₗ` against the
   current `main` physics (see below) and kept 0.25.
+- 2026-10-31: On request, chose constants that avoid a too cold planet with the current shortwave, for both
+  transmissivities: Frierson τ₀ ×1.6 (`τ₀_equator = 9.6`, `τ₀_pole = 2.4`, `fₗ = 0.25`) and
+  Byrne–O'Gorman `dry_absorption = 1.8`. Both are marked TODO to be re-chosen once #1262 lands.
 
 ## Problem description
 
@@ -51,7 +54,10 @@ scaled by `μ` for CO₂ changes), `b` is the water vapor absorption and `q` is 
   optical depth.
 - Default `greenhouse_gases = (; co2 = CO2(spectral_grid))` (280 ppm) in `PrimitiveWetModel` and
   `PrimitiveDryModel`.
-- Default for `PrimitiveWetModel`: `FriersonLongwaveTransmissivity(SG, fₗ = 0.25)`. Re-evaluated below.
+- Default for `PrimitiveWetModel`: `FriersonLongwaveTransmissivity(SG, τ₀_equator = 9.6, τ₀_pole = 2.4, fₗ = 0.25)`.
+- Default `dry_absorption = 1.8` for Byrne–O'Gorman (paper: 0.8678).
+- Both are tuned against the current shortwave bias and **must be re-chosen once #1262 lands**. TODOs in the
+  code mark this.
 
 ### Re-evaluation of fₗ on current `main` (2026-10-30)
 
@@ -82,6 +88,28 @@ Conclusions:
   absorption is calibrated for a moister climate. It should be re-evaluated once the shortwave bias is
   addressed.
 
+### Constants against a too cold planet (2026-10-31)
+
+Same setup as above. Frierson: `fₗ` with τ₀ scaled from (6, 1.5). Byrne–O'Gorman: `dry_absorption`, `water_vapor_absorption`.
+
+| case | T lowest layer [K] | T 500 hPa [K] | OLR [W/m²] | OSR [W/m²] | PW [kg/m²] | precip [mm/day] |
+|---|---|---|---|---|---|---|
+| Frierson fₗ=0.25, τ₀×1.3 | 282.1 | 258.1 | 202.3 | 142.6 | 19.8 | 2.18 |
+| **Frierson fₗ=0.25, τ₀×1.6** | **287.5** | 264.8 | 210.9 | 126.4 | 29.9 | 2.36 |
+| Frierson fₗ=0.25, τ₀×2.0 | 290.2 | 267.8 | 205.0 | 127.0 | 35.2 | 2.27 |
+| Frierson fₗ=0.5, τ₀×1.6 | 294.0 | 275.4 | 208.1 | 117.7 | 53.8 | 1.79 |
+| Byrne a=1.5 | 284.8 | 263.6 | 210.4 | 130.8 | 26.9 | 2.13 |
+| **Byrne a=1.8** | **288.2** | 267.3 | 205.6 | 130.5 | 33.5 | 2.11 |
+| Byrne a=2.5 | 295.0 | 276.0 | 204.1 | 113.1 | 54.5 | 1.84 |
+| Byrne a=3.5 | 301.3 | 284.8 | 205.0 | 107.5 | 84.9 | 1.36 |
+| Byrne a=2.0, b=3000 | 293.4 | 273.3 | 201.7 | 117.7 | 46.9 | 2.03 |
+
+- Reflected shortwave decreases as the planet warms (less snow and sea ice). This feedback is why the
+  response is so strong: Byrne a=1.5→3.5 spans 285–301 K.
+- OLR stays at ~205 W/m² instead of Earth's ~240 W/m², because reflected shortwave is still higher than
+  Earth's ~100 W/m². The constants reach Earth-like temperatures only through a stronger greenhouse effect
+  that compensates the shortwave bias. This is the reason they must be re-chosen after #1262.
+
 ## Testing and verification
 
 - `ByrneOGormanLongwaveTransmissivity` is added to the generic transmissivity testset.
@@ -97,8 +125,8 @@ Docstrings; the greenhouse gas section in `docs/src/radiation.md` now says which
 
 ## Known limitations
 
-- `fₗ = 0.25` is chosen to match the normalized greenhouse effect, not calibrated against observations,
-  and it should be revisited together with #1262.
+- The Frierson τ₀ ×1.6 and Byrne–O'Gorman `dry_absorption = 1.8` defaults compensate the current
+  shortwave bias. They must be re-chosen once #1262 lands.
 - CO₂ is read from a `Ref` inside the column kernel, like the NumericalRadiation extension does; this is
   not tested on GPU yet.
 - `FriersonLongwaveTransmissivity` does not use CO₂.
