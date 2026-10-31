@@ -402,9 +402,22 @@ which is useful if something should execute every n-th time step regardless of r
 to always recompute its reference temperature profile
 
 ```julia
-implicit = ImplicitPrimitiveEquation(spectral_grid, schedule = StepSchedule(1))
+reference_temperature = GlobalMeanReferenceTemperature()
+implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = StepSchedule(1), reference_temperature)
 model = PrimitiveWetModel(spectral_grid; implicit)
 ```
+
+The schedule is only used with a reference temperature profile that is recomputed from the
+global-mean temperature. The semi-implicit solver linearises about a reference temperature
+profile ``T_k``, chosen with `reference_temperature`
+
+| Reference temperature | Profile ``T_k`` | Recomputed |
+|---|---|---|
+| `IsothermalReferenceTemperature(temperature = 300)` (default) | constant `temperature` | only when the time step changes |
+| `GlobalMeanReferenceTemperature(offset = 0)` | global-mean temperature + `offset` | on the `schedule` |
+
+A warm isothermal reference profile is the most stable choice (Simmons, Hoskins and Burridge, 1978),
+as also used in other spectral models, e.g. Isca with 300 K and the IFS with 350 K.
 
 ### Scheduling and the leapfrog spin-up
 

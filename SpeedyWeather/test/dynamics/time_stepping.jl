@@ -366,9 +366,14 @@ end
     end
 end
 
-@testset "Implicit reference temperature profile is the global-mean temperature" begin
+@testset "Implicit reference temperature profile: $reference_temperature" for reference_temperature in (
+        GlobalMeanReferenceTemperature(offset = 0.0f0),
+        GlobalMeanReferenceTemperature(offset = 20.0f0),
+        IsothermalReferenceTemperature(temperature = 280.0f0),
+    )
     spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
-    model = PrimitiveWetModel(spectral_grid)
+    implicit = ImplicitPrimitiveEquation(spectral_grid; reference_temperature)
+    model = PrimitiveWetModel(spectral_grid; implicit)
     simulation = initialize!(model)
     (; implicit) = model
     (; clock) = simulation.variables.prognostic
@@ -382,6 +387,14 @@ end
 
         clock.time_step_counter = i * n     # a time step on which the reference profile is recomputed
         SpeedyWeather.reinitialize!(implicit, model, simulation.variables)
-        @test Array(implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT atol = 0.01
+        if reference_temperature isa GlobalMeanReferenceTemperature
+            (; offset) = reference_temperature
+            @test Array(implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT .+ offset atol = 0.01
+        else
+            @test all(==(reference_temperature.temperature), Array(implicit.temp_profile))
+        end
     end
+
+    # an isothermal reference profile is only reinitialized on a new time step, not on the schedule
+    @test SpeedyWeather.rescheduled(reference_temperature) == (reference_temperature isa GlobalMeanReferenceTemperature)
 end

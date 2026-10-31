@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix the vertical advection part of the semi-implicit temperature operator, and choose the implicit reference temperature with `IsothermalReferenceTemperature` (300 K, new default) or `GlobalMeanReferenceTemperature` (plus offset) [#1369](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1369)
 - Fix flaky RingGrids meridionally-constant interpolation test (absolute instead of relative tolerance) [#1367](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1367)
 - Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
