@@ -1,4 +1,34 @@
 export ImplicitPrimitiveEquation
+export IsothermalReferenceTemperature, GlobalMeanReferenceTemperature
+
+abstract type AbstractReferenceTemperature end
+
+"""$(TYPEDSIGNATURES)
+Isothermal reference temperature profile for the semi-implicit time stepping, the
+implicit operators are therefore only reinitialized when the time step changes.
+$(TYPEDFIELDS)"""
+@kwdef struct IsothermalReferenceTemperature{NF} <: AbstractReferenceTemperature
+    "[OPTION] Temperature of the isothermal reference profile [K]"
+    temperature::NF = 300
+end
+
+"""$(TYPEDSIGNATURES)
+Global-mean temperature profile plus `offset` as reference temperature profile for the
+semi-implicit time stepping, recomputed on the `schedule` of the implicit solver.
+$(TYPEDFIELDS)"""
+@kwdef struct GlobalMeanReferenceTemperature{NF} <: AbstractReferenceTemperature
+    "[OPTION] Offset [K] added to the global-mean temperature profile"
+    offset::NF = 0
+end
+
+# reference temperature profile (broadcastable) from the current global-mean temperature profile
+reference_temperature(ref::IsothermalReferenceTemperature, temp_average) = ref.temperature
+reference_temperature(ref::GlobalMeanReferenceTemperature, temp_average) =
+    Base.Broadcast.broadcasted(+, temp_average, ref.offset)
+
+# whether the reference temperature profile has to be recomputed on the schedule
+rescheduled(::IsothermalReferenceTemperature) = false
+rescheduled(::GlobalMeanReferenceTemperature) = true
 
 """
 Struct that holds various precomputed arrays for the semi-implicit correction to
@@ -12,6 +42,7 @@ $(TYPEDFIELDS)"""
         IntType,
         NLAYERS,        # nlayers as a type parameter, see `nlayers_val` below
         ScheduleType,
+        ReferenceTemperatureType,
         RefNF,          # <: Base.RefValue{NF} or Base.RefValue{<:Number} for Reactant, see `scalar_ref`
     } <: AbstractImplicit
 
@@ -28,6 +59,9 @@ $(TYPEDFIELDS)"""
     # PARAMETERS
     "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
     centering::NF = 1.0
+
+    "[OPTION] Reference temperature profile to linearise about, isothermal or the global mean (plus offset)"
+    reference_temperature::ReferenceTemperatureType = IsothermalReferenceTemperature{NF}()
 
     "[OPTION] Schedule to recompute the reference temperature profile (and the implicit operators) from the current global-mean temperature"
     schedule::ScheduleType = PeriodicSchedule(every = Day(1))
@@ -78,13 +112,14 @@ Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(
         spectral_grid::SpectralGrid;
         schedule::AbstractSchedule = PeriodicSchedule(every = Day(1)),
+        reference_temperature::AbstractReferenceTemperature = IsothermalReferenceTemperature{spectral_grid.NF}(),
         kwargs...
     )
     (; NF, VectorType, MatrixType, TensorType, truncation, nlayers, architecture) = spectral_grid
     IntType = typeof(truncation)
     Δt = scalar_ref(architecture, zero(NF))
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, IntType, nlayers, typeof(schedule), typeof(Δt)}(;
-        truncation, nlayers, schedule, Δt, kwargs...
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, IntType, nlayers, typeof(schedule), typeof(reference_temperature), typeof(Δt)}(;
+        truncation, nlayers, schedule, reference_temperature, Δt, kwargs...
     )
 end
 
@@ -114,7 +149,9 @@ function reinitialize!(
     )
     (; clock) = vars.prognostic
     Δt = time_step(model.time_stepping, clock)
-    update = (implicit.Δt[] != Δt) | isscheduled(implicit.schedule, clock)
+    # an isothermal reference profile does not change, reinitialize only on a new time step
+    scheduled = isscheduled(implicit.schedule, clock) & rescheduled(implicit.reference_temperature)
+    update = (implicit.Δt[] != Δt) | scheduled
     implicit.Δt[] = Δt
     return reinitialize!(implicit, update, Δt, model, vars)
 end
@@ -131,7 +168,9 @@ function reinitialize!(
     update || return nothing
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
     scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
-    Tₖ = vars.dynamics.average_temperature_profile          # current global-mean temperature profile
+    # reference temperature profile, isothermal or from the current global-mean temperature profile
+    Tₖ = implicit.temp_profile
+    Tₖ .= reference_temperature(implicit.reference_temperature, vars.dynamics.average_temperature_profile)
     initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end
@@ -151,7 +190,7 @@ function initialize!(
         adiabatic_conversion::AbstractAdiabaticConversion,
     )
     (; nlayers) = implicit
-    (; σ_levels_full, σ_levels_thick) = geometry
+    (; σ_levels_half, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
     (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
@@ -196,12 +235,15 @@ function initialize!(
     k_below = min.(rows .+ 1, nlayers)
     ΔT_below = temp_profile[k_below] .- temp_profile[rows]
     ΔT_above = temp_profile[rows] .- temp_profile[k_above]
-    σₖ = σ_levels_full[rows]                    # should be Σ_r=1^k Δσᵣ for model top at >0hPa
-    σₖ_above = σ_levels_full[k_above]
+    σₖ₊½ = σ_levels_half[rows .+ 1]             # σ at the interface below layer k
+    σₖ₋½ = σ_levels_half[rows]                  # and above
     Δσᵣ = σ_levels_thick[cols]
 
-    L1 .= ΔT_below .* Δσᵣ .* σₖ .- Δσᵣ .* (rows .>= cols) .+
-        ΔT_above .* Δσᵣ .* σₖ_above .- Δσᵣ .* ((rows .- 1) .>= cols)
+    # centred vertical advection of Tₖ, -1/(2Δσₖ)*(σ̇ₖ₊½*ΔT_below + σ̇ₖ₋½*ΔT_above) as in
+    # vertical_advection!, with the linearised vertical velocity at k±½ per unit divergence in
+    # layer r as in vertical_velocity!: σ̇ₖ₊½ = σₖ₊½ D̄ - Σ_r=1^k Δσᵣ Dᵣ, D̄ = Σ_r Δσᵣ Dᵣ
+    L1 .= .-ΔT_below .* (Δσᵣ .* σₖ₊½ .- Δσᵣ .* (rows .>= cols)) .-
+        ΔT_above .* (Δσᵣ .* σₖ₋½ .- Δσᵣ .* ((rows .- 1) .>= cols))
 
     # L3[r, k]: _sum_above operator itself, lower triangle with σ_levels_thick[k]
     L3 .= σ_levels_thick[cols] .* (rows .> cols)
