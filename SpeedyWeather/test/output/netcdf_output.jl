@@ -137,6 +137,7 @@ end
         OutputVariables.ZonalVelocity10m(),
         OutputVariables.MeridionalVelocity10m(),
         OutputVariables.SurfaceTemperature(),
+        OutputVariables.PrecipitableWater(),
         #         OutputVariables.MeanSeaLevelPressure(),   # this should be default now
         #         OutputVariables.SurfacePressure(),        # don't output surface pressure too
     )
@@ -173,6 +174,12 @@ end
     @test maximum(cloud_top) > 1000
     cloud_cover = ds["cloud_cover"].var[:, :, end]
     @test all(0 .<= cloud_cover .<= 1)
+
+    # precipitable water [kg/m²], column-integrated on the model grid
+    @test ds["pw"].attrib["units"] == "kg/m^2"
+    pw = ds["pw"].var[:, :, end]
+    @test all(0 .<= pw .< 150)
+    @test maximum(pw) > 10
 
     ## test u10, v10 existence
     @test haskey(ds, "u")

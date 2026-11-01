@@ -233,6 +233,65 @@ end
 
 path(::Humidity, simulation) = simulation.variables.grid.humidity
 
+"""Defines netCDF output of the precipitable water (column-integrated water vapor) `∑ₖ qₖ Δpₖ / g`
+with specific humidity `qₖ` and pressure thickness `Δpₖ` of layer `k` and gravity `g`. The vertical
+integral is computed on the model grid with the surface pressure of every column before the
+interpolation onto the output grid. Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct PrecipitableWater <: AbstractOutputVariable
+    name::String = "pw"
+    unit::String = "kg/m^2"
+    long_name::String = "precipitable water"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+# not the precipitable water but the core variable to read in
+path(::PrecipitableWater, simulation) = simulation.variables.grid.humidity
+
+function output!(
+        output::AbstractOutput,
+        variable::PrecipitableWater,
+        simulation::AbstractSimulation,
+    )
+    # escape immediately after first call if variable doesn't have a time dimension
+    ~hastime(variable) && output.output_counter > 1 && return nothing
+
+    var = path_or_nothing(variable, simulation)
+    isnothing(var) && return nothing                # silently escape early if variable is not defined in the simulation
+
+    q = get_prognostic_step(var, simulation.model.time_stepping, output)
+    pₛ = simulation.variables.parameterizations.surface_pressure
+    coord = simulation.model.geometry.vertical_coordinates
+    pw = simulation.variables.scratch.grid.a_2D     # reuse scratch array to avoid allocations
+    g = simulation.model.planet.gravity
+
+    # vertical integral in a kernel so that the layer index stays an integer (Reactant traces numbers in broadcasts)
+    launch!(
+        architecture(pw), LinearWorkOrder, size(pw), precipitable_water_kernel!,
+        pw, q, pₛ, coord, inv(g),
+    )
+
+    # interpolate onto the output grid on the model's architecture, then to host, round and write
+    interpolate_output!(output, output.field2D, pw)
+    write_output!(output, variable, output.field2D, output.host2D)
+    return nothing
+end
+
+# column integral ∑ₖ qₖ Δpₖ / g at every grid point ij
+@kernel inbounds = true function precipitable_water_kernel!(pw, humidity, surface_pressure, coordinate, inv_gravity)
+    ij = @index(Global, Linear)
+    pₛ = surface_pressure[ij]
+    nlayers = size(humidity, 2)
+    column = zero(eltype(pw))
+    for k in 1:nlayers
+        column += humidity[ij, k] * pressure_thickness(k, pₛ, coordinate)
+    end
+    pw[ij] = column * inv_gravity
+end
+
 # collect all in one for convenience
 Dynamics() = (
     Vorticity(),
@@ -244,4 +303,5 @@ Dynamics() = (
     MeanSeaLevelPressure(),
     Temperature(),
     Humidity(),
+    PrecipitableWater(),
 )
