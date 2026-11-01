@@ -65,6 +65,9 @@ end
     @test all(t_2xco2 .< t_moist)
     @test prod(t_2xco2) ≈ prod(t_moist) * exp(-co2_sensitivity * log(2)) rtol = 1.0e-4
 
+    # default for the wet model
+    @test PrimitiveWetModel(spectral_grid).radiation.longwave.transmissivity isa ByrneOGormanLongwaveTransmissivity
+
     # without greenhouse gases: CO₂ at the reference concentration
     model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave), greenhouse_gases = nothing)
     vars = initialize!(model).variables

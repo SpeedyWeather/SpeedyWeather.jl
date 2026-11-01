@@ -27,14 +27,17 @@ end
 
 export FriersonLongwaveTransmissivity
 @parameterized @kwdef struct FriersonLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
+    # TODO re-choose once the shortwave changes of #1262 land: Frierson uses τ₀ = 6, 1.5 and fₗ = 0.1 but with
+    # too much reflected shortwave on main that yields a too cold planet (~273K lowest layer at T31L8), 1.6x
+    # larger τ₀ and fₗ = 0.25 yield ~288K, compensating a shortwave bias
     "[OPTION] Optical depth at the equator"
-    @param τ₀_equator::NF = 6 (bounds = Nonnegative,)
+    @param τ₀_equator::NF = 9.6 (bounds = Nonnegative,)
 
     "[OPTION] Optical depth at the poles"
-    @param τ₀_pole::NF = 1.5 (bounds = Nonnegative,)
+    @param τ₀_pole::NF = 2.4 (bounds = Nonnegative,)
 
     "[OPTION] Fraction to mix linear and quadratic profile"
-    @param fₗ::NF = 0.1 (bounds = 0 .. 1,)
+    @param fₗ::NF = 0.25 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure FriersonLongwaveTransmissivity

@@ -167,10 +167,7 @@ Adapt.@adapt_structure OneBandLongwave
 # primitive wet model version
 function OneBandLongwave(
         SG::SpectralGrid;
-        # TODO re-choose once the shortwave changes of #1262 land: with too much reflected shortwave on main
-        # (~145 W/m² at Frierson's defaults) the optical depth is increased by 1.6x and fₗ = 0.25 (Frierson: 0.1)
-        # to avoid a too cold planet (~288K lowest layer at T31L8 instead of ~273K), compensating a shortwave bias
-        transmissivity = FriersonLongwaveTransmissivity(SG, τ₀_equator = 9.6, τ₀_pole = 2.4, fₗ = 0.25),
+        transmissivity = ByrneOGormanLongwaveTransmissivity(SG),
         radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
     )
     return OneBandLongwave(transmissivity, radiative_transfer)

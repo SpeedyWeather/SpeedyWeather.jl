@@ -31,6 +31,9 @@ Base revision: 28069552f493ae7122c90588304b6b7ea427c743
 - 2026-10-31: On request, chose constants that avoid a too cold planet with the current shortwave, for both
   transmissivities: Frierson τ₀ ×1.6 (`τ₀_equator = 9.6`, `τ₀_pole = 2.4`, `fₗ = 0.25`) and
   Byrne–O'Gorman `dry_absorption = 1.8`. Both are marked TODO to be re-chosen once #1262 lands.
+- 2026-11-01: Rebased on `main`. `ByrneOGormanLongwaveTransmissivity` is now the default of
+  `OneBandLongwave` (the wet model). The tuned Frierson constants moved into the struct defaults so that
+  opting into Frierson also gives a ~288 K planet. Added a docs section on Byrne–O'Gorman.
 
 ## Problem description
 
@@ -54,7 +57,8 @@ scaled by `μ` for CO₂ changes), `b` is the water vapor absorption and `q` is 
   optical depth.
 - Default `greenhouse_gases = (; co2 = CO2(spectral_grid))` (280 ppm) in `PrimitiveWetModel` and
   `PrimitiveDryModel`.
-- Default for `PrimitiveWetModel`: `FriersonLongwaveTransmissivity(SG, τ₀_equator = 9.6, τ₀_pole = 2.4, fₗ = 0.25)`.
+- `ByrneOGormanLongwaveTransmissivity` is the default transmissivity of `OneBandLongwave` (wet model).
+- `FriersonLongwaveTransmissivity` struct defaults: `τ₀_equator = 9.6`, `τ₀_pole = 2.4`, `fₗ = 0.25`.
 - Default `dry_absorption = 1.8` for Byrne–O'Gorman (paper: 0.8678).
 - Both are tuned against the current shortwave bias and **must be re-chosen once #1262 lands**. TODOs in the
   code mark this.
@@ -130,9 +134,7 @@ Docstrings; the greenhouse gas section in `docs/src/radiation.md` now says which
 - CO₂ is read from a `Ref` inside the column kernel, like the NumericalRadiation extension does; this is
   not tested on GPU yet.
 - `FriersonLongwaveTransmissivity` does not use CO₂.
-- `ByrneOGormanLongwaveTransmissivity` is not the default yet.
 
 ## Future work
 
-- Decide on the default transmissivity after the isolated evaluation.
 - Add a section to the radiation docs.
