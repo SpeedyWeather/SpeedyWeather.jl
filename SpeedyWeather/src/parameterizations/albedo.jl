@@ -1209,6 +1209,16 @@ end
     return f * foam.albedo_foam + (1 - f) * α
 end
 
+# Correct both albedos together so WhitecapFoam computes coverage only once.
+@inline foam_albedos(foam, black_sky, white_sky, w) = (foam(black_sky, w), foam(white_sky, w))
+
+@inline function foam_albedos(foam::WhitecapFoam, black_sky, white_sky, w)
+    f = whitecap_coverage(foam, w)
+    black_sky = f * foam.albedo_foam + (1 - f) * black_sky
+    white_sky = f * foam.albedo_foam + (1 - f) * white_sky
+    return black_sky, white_sky
+end
+
 """No whitecap correction."""
 struct NoFoam <: AbstractOceanAlbedo end
 Adapt.@adapt_structure NoFoam
@@ -1292,8 +1302,7 @@ initialize!(::ConstantOceanVolumeAlbedo, ::PrimitiveEquation) = nothing
     white_sky = αs_dif + αw_dif
 
     # Whitecap (foam) correction, Jin et al. eqs. (16)–(17)
-    black_sky = scheme.foam(black_sky, w)
-    white_sky = scheme.foam(white_sky, w)
+    black_sky, white_sky = foam_albedos(scheme.foam, black_sky, white_sky, w)
 
     ℵ = haskey(vars.prognostic.ocean, :sea_ice_concentration) ? vars.prognostic.ocean.sea_ice_concentration[ij] : zero(NF)
     black_sky += ℵ * (scheme.albedo_ice - black_sky)
