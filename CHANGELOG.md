@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `OutputVariables.PrecipitableWater` output, column-integrated on the model grid before interpolation [#1370](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1370)
 - Fix flaky RingGrids meridionally-constant interpolation test (absolute instead of relative tolerance) [#1367](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1367)
 - Learned land surface albedo scheme [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
 - Fix double-counting wind slowdown in momentum surface flux [#1349](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1349)
