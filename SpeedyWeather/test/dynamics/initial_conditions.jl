@@ -158,7 +158,7 @@ end
 end
 
 @testset "BalancedZonalState" begin
-    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     @test PrimitiveWetModel(spectral_grid).initial_conditions.zonal isa BalancedZonalState    # default
 
     # without orography σ = p/p₀ so the profiles can be tested in σ
@@ -212,7 +212,7 @@ end
 end
 
 @testset "BalancedZonalState on orography" begin
-    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid)
     ic = BalancedZonalState(spectral_grid)
     vars = Variables(model)
@@ -325,7 +325,7 @@ end
 end
 
 @testset "ConstantRelativeHumidity vertical profile" begin
-    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid)
     humid_ic = ConstantRelativeHumidity(spectral_grid; relhumid_ref = 0.7, σ_moist = 0.3, σ_dry = 0.1)
     ic = (; zonal = BalancedZonalState(spectral_grid), pres = ConstantPressure(spectral_grid), humid = humid_ic)
@@ -352,7 +352,7 @@ end
 end
 
 @testset "No initial precipitation burst" begin
-    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid)
     model.feedback.verbose = false
     simulation = initialize!(model)

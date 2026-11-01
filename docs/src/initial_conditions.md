@@ -245,7 +245,7 @@ by the convection scheme within the first day.
 
 ```@example wet_initial_conditions
 using SpeedyWeather
-spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 InitialConditions(spectral_grid, PrimitiveWet)
 ```
 
@@ -334,7 +334,7 @@ initial conditions start from the climate the atmosphere is meant to have. Chang
 e.g. `EarthAtmosphere(spectral_grid, reference_temperature = 283)`, which also changes
 other components that use these reference values. The remaining parameters were chosen to be
 close to the equilibrium climate of the default `PrimitiveWetModel`, by comparing against zonal
-and time means over days 60-120 of a long run at T31L8, T63L8 and T31L16 (which agree within
+and time means over days 60-120 of a long run at T32L8, T64L8 and T32L16 (which agree within
 about 2K). No formal optimisation was done; the parameters were read off these means:
 
 | Parameter | Default | How it was chosen |

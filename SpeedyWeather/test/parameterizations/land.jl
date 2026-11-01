@@ -75,7 +75,7 @@ end
 end
 
 @testset "Initial snow depth from soil temperature" begin
-    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid)
     simulation = initialize!(model)
     snow_depth = simulation.variables.prognostic.land.snow_depth[:, 1].data          # first step
@@ -90,7 +90,7 @@ end
 end
 
 @testset "Soil temperature stepped with its tendency" begin
-    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid)
     simulation = initialize!(model)
     run!(simulation, period = Hour(3))      # past the leapfrog start
