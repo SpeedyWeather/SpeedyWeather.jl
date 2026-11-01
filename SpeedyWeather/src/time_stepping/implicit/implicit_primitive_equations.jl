@@ -75,7 +75,7 @@ $(TYPEDFIELDS)"""
 
     # PARAMETERS
     "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
-    centering::NF = 1.0
+    centering::NF = 0.5
 
     "[OPTION] Reference temperature profile to linearise about, isothermal or the global mean (plus offset)"
     reference_temperature::ReferenceTemperatureType = IsothermalReferenceTemperature{NF}()
