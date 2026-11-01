@@ -415,9 +415,13 @@ profile ``T_k``, chosen with `reference_temperature`
 |---|---|---|
 | `IsothermalReferenceTemperature(temperature = 300)` (default) | constant `temperature` | only when the time step changes |
 | `GlobalMeanReferenceTemperature(offset = 0)` | global-mean temperature + `offset` | on the `schedule` |
+| `MaximumReferenceTemperature(margin = 30)` | constant, maximum temperature + `margin` | on the `schedule` |
 
 A warm isothermal reference profile is the most stable choice (Simmons, Hoskins and Burridge, 1978),
-as also used in other spectral models, e.g. Isca with 300 K and the IFS with 350 K.
+as also used in other models, e.g. 300 K in Isca and the IFS. The warmer the reference temperature,
+the more the gravity waves treated implicitly are slowed down. `MaximumReferenceTemperature`
+therefore follows the model's climate, e.g. for a snowball Earth or a hot climate, with an
+isothermal reference temperature just above the warmest temperature in the model.
 
 ### Scheduling and the leapfrog spin-up
 

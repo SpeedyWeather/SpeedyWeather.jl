@@ -1,5 +1,5 @@
 export ImplicitPrimitiveEquation
-export IsothermalReferenceTemperature, GlobalMeanReferenceTemperature
+export IsothermalReferenceTemperature, GlobalMeanReferenceTemperature, MaximumReferenceTemperature
 
 abstract type AbstractReferenceTemperature end
 
@@ -21,14 +21,31 @@ $(TYPEDFIELDS)"""
     offset::NF = 0
 end
 
+"""$(TYPEDSIGNATURES)
+Isothermal reference temperature for the semi-implicit time stepping from the current
+maximum temperature of the model plus `margin`, recomputed on the `schedule` of the implicit
+solver. The semi-implicit scheme is stable for a warm isothermal reference temperature, warmer
+than the atmosphere (Simmons, Hoskins and Burridge, 1978), but the warmer the reference the more
+the gravity waves treated implicitly are slowed down. In contrast to `IsothermalReferenceTemperature`
+this follows the model's climate, e.g. for a snowball Earth or a hot climate.
+$(TYPEDFIELDS)"""
+@kwdef struct MaximumReferenceTemperature{NF} <: AbstractReferenceTemperature
+    "[OPTION] Margin [K] added to the maximum temperature"
+    margin::NF = 30
+end
+
 # reference temperature profile (broadcastable) from the current global-mean temperature profile
-reference_temperature(ref::IsothermalReferenceTemperature, temp_average) = ref.temperature
-reference_temperature(ref::GlobalMeanReferenceTemperature, temp_average) =
+# `temp_average` or the grid temperature `temp_grid` (full temperature, not the anomaly)
+reference_temperature(ref::IsothermalReferenceTemperature, temp_average, temp_grid) = ref.temperature
+reference_temperature(ref::GlobalMeanReferenceTemperature, temp_average, temp_grid) =
     Base.Broadcast.broadcasted(+, temp_average, ref.offset)
+reference_temperature(ref::MaximumReferenceTemperature, temp_average, temp_grid) =
+    maximum(temp_grid) + ref.margin
 
 # whether the reference temperature profile has to be recomputed on the schedule
 rescheduled(::IsothermalReferenceTemperature) = false
 rescheduled(::GlobalMeanReferenceTemperature) = true
+rescheduled(::MaximumReferenceTemperature) = true
 
 """
 Struct that holds various precomputed arrays for the semi-implicit correction to
@@ -170,7 +187,8 @@ function reinitialize!(
     scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
     # reference temperature profile, isothermal or from the current global-mean temperature profile
     Tₖ = implicit.temp_profile
-    Tₖ .= reference_temperature(implicit.reference_temperature, vars.dynamics.average_temperature_profile)
+    temp_grid = get_prognostic_step(vars.grid.temperature, model.time_stepping, implicit)
+    Tₖ .= reference_temperature(implicit.reference_temperature, vars.dynamics.average_temperature_profile, temp_grid)
     initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end

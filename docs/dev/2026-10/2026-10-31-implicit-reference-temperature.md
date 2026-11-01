@@ -19,6 +19,14 @@ Base revision: `c147266e`
 
 ## Revision log
 
+- 2026-11-01: `MaximumReferenceTemperature(margin)`, isothermal at the model's maximum temperature plus a
+  margin, recomputed on the schedule, to follow the model's climate (e.g. snowball Earth). Corrected the
+  IFS reference temperature: IFS documentation CY49R1 Part III, Ch. 2: "Tref = 300 K and prefs = 800 hPa".
+
+> Could you search the ECMWF documentation and tech memorandums to find a reference why IFS uses 350K? Is the
+> idea here to use isothermal but slightly warmer because … ? Ideally I would like to tie this to the actual
+> temperature in the model, e.g. to do snowball simulations too
+
 - 2026-10-31: initial draft. The reference pressure from mode 0 of ln(pₛ) only changes the operators for
   hybrid coordinates (σ-coordinate weights do not depend on pₛ), so it stays in #1236 together with the
   pressure gradient force and geopotential changes, which are hybrid-only too.
@@ -39,13 +47,18 @@ by 30-90% on `main`, it agrees to round-off with the fix.
 
 With the fixed operator, linearising about the (non-isothermal, cold-topped) global-mean temperature
 profile is unstable for Held-Suarez at T63 (NaN on day 1), consistent with Simmons, Hoskins & Burridge
-(1978). A warm isothermal reference (300 K, as in Isca/GFDL; IFS uses ~350 K) is stable at T31 and T63.
+(1978). A warm isothermal reference (300 K, as in Isca/GFDL and the IFS) is stable at T31 and T63.
 
 ## Background
 
 - Simmons, Hoskins & Burridge (1978), Simmons & Burridge (1981): a warm isothermal reference state
   makes the semi-implicit scheme stable for the fast gravity modes.
 - Isca `spectral_dynamics.F90`: `ref_temperature_implicit = 300`, full T advected explicitly.
+- IFS documentation CY49R1, Part III, Ch. 2: "The reference values adopted for the semi-implicit scheme
+  are Tref = 300 K and prefs = 800 hPa" (no rationale given).
+- Bénard (2003, MWR), summarising Simmons, Hoskins & Burridge (1978): for an isothermal atmosphere at T̄
+  and isothermal reference T*, stability requires 0 ≤ T̄ ≤ 2T*; "a large static-stability for the
+  reference-state is necessary"; a warm isothermal reference "was then widely adopted for NWP".
 - `docs/dev/2026-10/2026-10-19-implicit-reference-update.md`: periodic recomputation of the global-mean
   reference profile (#1332).
 
@@ -56,7 +69,9 @@ profile is unstable for Held-Suarez at T63 (NaN on day 1), consistent with Simmo
   - `IsothermalReferenceTemperature(temperature = 300)`: constant profile, only reinitialized when
     the time step changes (no scheduled recomputation needed),
   - `GlobalMeanReferenceTemperature(offset = 0)`: the global-mean profile plus an offset in Kelvin,
-    recomputed on the existing `schedule`.
+    recomputed on the existing `schedule`,
+  - `MaximumReferenceTemperature(margin = 30)`: isothermal at the model's maximum temperature plus
+    `margin`, recomputed on the `schedule`.
 - Default `IsothermalReferenceTemperature(300)` from the stability tests below.
 
 Stability with the fixed operator, 20 days at nlayers = 8:
@@ -67,6 +82,8 @@ Stability with the fixed operator, 20 days at nlayers = 8:
 | isothermal 250 K | stable | stable | stable | stable |
 | global mean | stable | NaN day 1 | stable | stable |
 | global mean + 30 K | stable | NaN day 2 | stable | stable |
+| maximum + 30 K (332-338 K) | stable | stable | stable | stable |
+| maximum + 10 K (312-317 K) | stable | stable | stable | stable |
 
 ## Testing and verification
 
