@@ -106,7 +106,8 @@ Base revision: 20467269399f40212fee413a545496226de999ca
 > transition could be done. As long as the Frierson idea of having thinner layers towards the surface
 > remains (the B part) you have freedom
 
-- 2026-11-02: removed `CubicSigmaPressureCoordinates` (exported since v0.22.0, breaking): its layers
+- 2026-11-02: removed `CubicSigmaPressureCoordinates` (not breaking in practice: hybrid coordinates were
+  only usable in the dynamical core with this PR): its layers
   cross over a mountain with a surface pressure of 500 hPa, so it is unusable over orography. Tests
   and docs use `RampSigmaPressureCoordinates`; the plot script defines the cubic transition inline.
 
