@@ -110,6 +110,7 @@
         entrainment = ConstantEntrainment(spectral_grid; entrainment_rate = 0.3)
 
         any_different = false
+        deeper_with_entrainment = 0
         for ij in 1:spectral_grid.npoints
             lzb_none = SpeedyWeather.pseudo_adiabat!(
                 ij, temp_ref_none, humid_ref_none, temp, humid, geopotential,
@@ -119,13 +120,16 @@
                 ij, temp_ref_ent, humid_ref_ent, temp, humid, geopotential,
                 pₛ[ij], coordinate, model.atmosphere, RH, entrainment,
             )
-            # entrainment dilutes the rising parcel with (cooler, drier) environmental air,
-            # which can only reduce or maintain its buoyancy, never increase the depth of
-            # convection: the LZB with entrainment is never above (i.e. never a smaller
-            # layer index than) the LZB without entrainment, for the same environment
-            @test lzb_ent >= lzb_none
+            # entrainment dilutes the rising parcel with environmental air, which generally
+            # reduces its buoyancy, so the LZB with entrainment is usually not above (i.e. not a
+            # smaller layer index than) the LZB without entrainment. But T and q are mixed linearly
+            # while the virtual temperature T(1+μq) is their product: for a parcel colder but
+            # moister than its environment the mixture's Tᵥ can exceed both, so a marginally
+            # non-buoyant parcel can become buoyant. Allow such rare columns
+            deeper_with_entrainment += lzb_ent < lzb_none
             any_different |= temp_ref_ent[ij, :] != temp_ref_none[ij, :]
         end
+        @test deeper_with_entrainment <= spectral_grid.npoints ÷ 100
         @test any_different   # entrainment must actually change the reference profile somewhere
     end
 
