@@ -27,14 +27,17 @@ end
 
 export FriersonLongwaveTransmissivity
 @parameterized @kwdef struct FriersonLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
+    # TODO re-choose once the shortwave changes of #1262 land: Frierson uses τ₀ = 6, 1.5 and fₗ = 0.1 but with
+    # too much reflected shortwave on main that yields a too cold planet (~273K lowest layer at T31L8), 1.6x
+    # larger τ₀ and fₗ = 0.25 yield ~288K, compensating a shortwave bias
     "[OPTION] Optical depth at the equator"
-    @param τ₀_equator::NF = 6 (bounds = Nonnegative,)
+    @param τ₀_equator::NF = 9.6 (bounds = Nonnegative,)
 
     "[OPTION] Optical depth at the poles"
-    @param τ₀_pole::NF = 1.5 (bounds = Nonnegative,)
+    @param τ₀_pole::NF = 2.4 (bounds = Nonnegative,)
 
     "[OPTION] Fraction to mix linear and quadratic profile"
-    @param fₗ::NF = 0.1 (bounds = 0 .. 1,)
+    @param fₗ::NF = 0.25 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure FriersonLongwaveTransmissivity
@@ -74,5 +77,65 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     end
 
     # return so the radiative_trasfer uses the right scratch array
+    return t
+end
+
+export ByrneOGormanLongwaveTransmissivity
+"""Longwave transmissivity with an optical depth that depends on specific humidity and CO₂, following
+Byrne and O'Gorman, 2013, J. Climate, https://doi.org/10.1175/JCLI-D-12-00262.1, as also used in Isca.
+The optical depth of layer k is `dτ = (a + c*log(CO₂/CO₂ᵣ) + b*q) * Δp / p₀` with pressure thickness `Δp`,
+specific humidity `q` [kg/kg], reference pressure `p₀` from `model.atmosphere`, a dry absorption `a` (well-mixed greenhouse gases
+at the reference concentration `CO₂ᵣ`), a CO₂ sensitivity `c` and a water vapor absorption `b`.
+CO₂ [ppm] is read from `model.greenhouse_gases.co2` if present, otherwise `CO₂ᵣ` is used.
+In contrast to the `FriersonLongwaveTransmissivity` there is no prescribed latitude-vertical profile,
+the optical depth follows the model's humidity, introducing a water vapor feedback. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct ByrneOGormanLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
+    # TODO re-choose once the shortwave changes of #1262 land: Byrne and O'Gorman use 0.8678 but that
+    # yields a too cold planet (~272K) on main with too much reflected shortwave, 1.8 yields ~288K at T31L8
+    "[OPTION] Optical depth of the dry atmosphere (well-mixed greenhouse gases) per p₀ at `reference_co2` [1]"
+    @param dry_absorption::NF = 1.8 (bounds = Nonnegative,)
+
+    "[OPTION] Optical depth from water vapor per p₀ and per specific humidity [1/(kg/kg)]"
+    @param water_vapor_absorption::NF = 1997.9 (bounds = Nonnegative,)
+
+    "[OPTION] Optical depth per p₀ per e-fold of CO₂ relative to `reference_co2` [1]"
+    @param co2_sensitivity::NF = 0.2023 (bounds = Nonnegative,)
+
+    "[OPTION] CO₂ concentration at which the dry optical depth is `dry_absorption` [ppm]"
+    reference_co2::NF = 360
+end
+
+Adapt.@adapt_structure ByrneOGormanLongwaveTransmissivity
+ByrneOGormanLongwaveTransmissivity(SG::SpectralGrid; kwargs...) = ByrneOGormanLongwaveTransmissivity{SG.NF}(; kwargs...)
+initialize!(::ByrneOGormanLongwaveTransmissivity, ::AbstractModel) = nothing
+
+# CO₂ [ppm] from the greenhouse gases if present, otherwise the reference
+co2_concentration(prognostic, reference_co2) =
+    haskey(prognostic, :greenhouse_gases) && haskey(prognostic.greenhouse_gases, :co2) ?
+    convert(typeof(reference_co2), prognostic.greenhouse_gases.co2[]) : reference_co2
+
+@propagate_inbounds function transmissivity!(ij, vars, transmissivity::ByrneOGormanLongwaveTransmissivity, model)
+    t = vars.scratch.grid.a                         # use scratch array to compute transmissivity t
+    nlayers = size(t, 2)
+    NF = eltype(t)
+
+    (; dry_absorption, water_vapor_absorption, co2_sensitivity, reference_co2) = transmissivity
+    (; reference_pressure) = model.atmosphere
+    coord = model.geometry.vertical_coordinates
+    pₛ = vars.parameterizations.surface_pressure[ij]
+    has_humidity = haskey(vars.grid, :humidity)     # dry models: only the dry optical depth
+
+    # dry optical depth per p₀, logarithmic in CO₂, clamped to be non-negative for very low CO₂
+    co2 = co2_concentration(vars.prognostic, reference_co2)
+    dry = max(dry_absorption + co2_sensitivity * log(co2 / reference_co2), zero(NF))
+
+    for k in 1:nlayers
+        q = has_humidity ?
+            max(get_prognostic_step(vars.grid.humidity, model.time_stepping, transmissivity)[ij, k], zero(NF)) :
+            zero(NF)
+        Δp = pressure_thickness(k, pₛ, coord)
+        dτ = (dry + water_vapor_absorption * q) * Δp / reference_pressure
+        t[ij, k] = exp(-dτ)
+    end
     return t
 end

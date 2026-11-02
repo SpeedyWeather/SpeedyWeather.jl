@@ -45,8 +45,9 @@ end
 CO2(SG::SpectralGrid, concentration::Real = DEFAULT_CO2) = CO2{SG.NF}(concentration)
 CO2(SG::SpectralGrid, concentration::Function) = CO2(concentration)
 
-@inline (C::CO2)(::DateTime) = C.concentration
-@inline (C::CO2{<:Function})(t::DateTime) = C.concentration(t)
+# untyped time argument to also support other time types, e.g. Reactant's
+@inline (C::CO2)(t) = C.concentration
+@inline (C::CO2{<:Function})(t) = C.concentration(t)
 
 export TwoTimesCO2, FourTimesCO2
 "$(TYPEDSIGNATURES) 2xCO2 scenario: Doubles preindustrial `DEFAULT_CO2` in the year 2000."
