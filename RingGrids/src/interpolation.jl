@@ -591,6 +591,23 @@ function interpolate!(
     return Aout                             # return the field wrapped around the interpolated data
 end
 
+"""$(TYPEDSIGNATURES)
+Interpolate `field_in` onto `field_out` ignoring NaNs in `field_in` (e.g. ocean in land
+climatologies): the interpolation weights are renormalised over the valid neighbours, so coastal
+points take their value from the surrounding land. Points without any valid neighbour remain NaN
+(0/0). Overwrites the NaNs in `field_in` with zeros."""
+function interpolate_ignoring_nan!(field_out::Field, field_in::Field, interpolator::AbstractInterpolator)
+    valid = .!isnan.(field_in.data)
+    weights_in = similar(field_in)
+    weights_in.data .= valid
+    field_in.data .= ifelse.(valid, field_in.data, zero(eltype(field_in)))
+    weights_out = similar(field_out)
+    interpolate!(field_out, field_in, interpolator)
+    interpolate!(weights_out, weights_in, interpolator)
+    field_out.data ./= weights_out.data
+    return field_out
+end
+
 # create grid on the fly
 interpolate(Grid::Type{<:AbstractGrid}, nlat_half::Integer, A::Field; kwargs...) =
     interpolate(Grid(nlat_half), A; kwargs...)

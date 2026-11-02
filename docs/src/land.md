@@ -181,7 +181,7 @@ C_2 &= C_w W_2 \gamma + C_s
 \end{aligned}
 ```
 
-with ``\gamma = 0.24`` being the field capacity per meter soil.
+with ``\gamma = 0.3`` being the field capacity per meter soil.
 
 ## Land soil moisture
 
@@ -199,6 +199,9 @@ model constructor
 soil_moisture = LandBucketMoisture(spectral_grid)
 land = LandModel(spectral_grid; soil_moisture)
 ```
+
+`SeasonalSoilMoisture` reads volumetric soil moisture from the climatology
+and converts it to a fraction of the field capacity, capped at 1.
 
 ### LandBucketMoisture
 
@@ -223,7 +226,7 @@ The equations are
 
 for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
 defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
-with ``\gamma = 0.24`` the field capacity per meter soil and
+with ``\gamma = 0.3`` the field capacity per meter soil and
 ``\Delta z_1 = 0.1~m`` the top layer thickness by default, and
 ``\Delta z_2 = 4.0~m`` the layer below. The top layer is forced by precipitation
 ``P`` minus evaporation ``E`` minus river runoff ``R``. The second term is a
@@ -297,6 +300,20 @@ only appears when the naive tendency would overdraw the bucket.
 as equivalent liquid water height, not physical snow thickness. The accumulation is 
 capped at 10m equivalent liquid water height, following how permanent snow area is treated
 in [IFSCycle49r1](@citep). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
+
+Snow needs time to accumulate from precipitation, so starting from snow-free land would put
+the model on the wrong side of the snow-albedo feedback: dark, cold land warms and melts what
+little snow falls. The initial snow depth is therefore estimated from the initial top-layer soil
+temperature ``T_1``
+
+```math
+S_0 = \min\left(r \max(T_{melt} - T_1, 0), S_{max}\right)
+```
+
+with `initial_snow_depth_rate` ``r = 5~mm/K`` and `initial_snow_depth_max` ``S_{max} = 0.2~m``,
+and zero over ocean. So land 10 K below ``T_{melt}`` starts fully snow covered and ``250~K`` land
+with about ``0.12~m``, comparable to observed winter maxima at high latitudes.
+Use `SnowModel(spectral_grid, initial_snow_depth_rate = 0)` to start without snow.
 
 The snow budget links into other surface schemes:
 
