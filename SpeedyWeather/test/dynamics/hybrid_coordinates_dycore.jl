@@ -142,7 +142,10 @@ end
     # pressure/sigma transition, not the pure-sigma transition = _ -> 1 used everywhere else
     # before this PR.
     spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
-    coord = CubicSigmaPressureCoordinates(spectral_grid; pressure_only_above = 0.2, σ_only_below = 0.8)
+    # Frierson σ spacing: with uniform spacing this steep transition squeezes the mid-level layers
+    # over high orography to ~1/4 of their sigma-coordinate thickness, which is unstable
+    σ_half = SpeedyWeather.sigma_half_spacing(spectral_grid.nlayers, SpeedyWeather.frierson_profile)
+    coord = CubicSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8)
     model = PrimitiveDryModel(
         spectral_grid;
         geometry = Geometry(spectral_grid; vertical_coordinates = coord),
