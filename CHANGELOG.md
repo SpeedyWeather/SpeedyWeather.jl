@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Count device (GPU) memory in printed sizes of model, simulation and variables [#1364](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1364)
 - Restrict FFTA compat in the docs to < 0.3.2, whose `plan_rfft` is ambiguous with FFTW's [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - `BalancedZonalState` jet peaks at σ ≈ 0.2 and decays above (`σ_jet`, `jet_decay`), `σ_jet = 0` for the previous monotonic profile [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - `BalancedZonalState` uses the atmosphere's `reference_temperature` and lapse rate, default `moist_lapse_rate` of `EarthAtmosphere` 5 → 5.7 K/km [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
