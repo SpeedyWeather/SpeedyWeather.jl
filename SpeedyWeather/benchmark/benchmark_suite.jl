@@ -1,4 +1,5 @@
 using BenchmarkTools
+using Statistics: median
 using SpeedyWeather: synchronize, ReactantDevice, MatrixSpectralTransform, SpectralTransform
 
 # The dense MatrixSpectralTransform is too large (memory and speed) above this truncation
@@ -55,6 +56,13 @@ end
 # Format a duration in seconds, "—" if not available (e.g. compile time without Reactant)
 format_seconds(t) = isfinite(t) ? @sprintf("%.1f s", t) : "—"
 
+# Spread of the timed runs, (slowest - fastest) / median wallclock time, from their SYPD
+# (∝ 1/time). "—" for a single run.
+function format_spread(SYPD, SYPD_min, SYPD_max, nrepeats)
+    nrepeats > 1 || return "—"
+    return @sprintf("%.0f%%", 100 * (SYPD / SYPD_min - SYPD / SYPD_max))
+end
+
 # Resolve a NamedTuple of per-run model kwargs against `spectral_grid`.
 # Convention: a `Type` value is instantiated with `spectral_grid` (every
 # component has a `T(spectral_grid)` constructor); a
@@ -85,7 +93,12 @@ abstract type AbstractBenchmarkSuite end
     # Use this to vary arbitrary model components, e.g.
     # `model_kwargs = [(convection = NoConvection,), (convection = BettsMillerConvection,)]`.
     model_kwargs::Vector = fill(NamedTuple(), nruns)
+    # median SYPD of the timed runs, and of the slowest and the fastest run
     SYPD::Vector{Float64} = fill(0.0, nruns)
+    SYPD_min::Vector{Float64} = fill(0.0, nruns)
+    SYPD_max::Vector{Float64} = fill(0.0, nruns)
+    # number of timed runs, see `repeats` and `max_repeat_time`
+    nrepeats::Vector{Int} = fill(0, nruns)
     Δt::Vector{Float64} = fill(0.0, nruns)
     memory::Vector{Int} = fill(0, nruns)
     # one-off compilation of the time step (Reactant only, NaN otherwise), excluded from SYPD
@@ -96,6 +109,10 @@ abstract type AbstractBenchmarkSuite end
     # Scale factor on `n_timesteps` for the timed run; >1 lengthens every run for
     # more robust (e.g. publication-ready) timings. Set by the driver for :benchmark201 only.
     timestep_multiplier::Real = 1
+    # Time every configuration up to `repeats` times from the same initial state, but no further
+    # run once all timed runs together would take longer than `max_repeat_time` [s]
+    repeats::Int = 5
+    max_repeat_time::Float64 = 30
 end
 
 default_nlayers(::Type{<:Barotropic}) = 1
@@ -202,20 +219,34 @@ function run_benchmark!(suite::BenchmarkSuite, i::Integer)
 
     # Time only the main time loop with a real wallclock timer rather than the
     # progress meter's `tlast - tinit`. The latter measures only up to the *last*
-    # progress-bar render (every `feedback_dt = 0.1 s`)
-    simulation = initialize!(model)
-    initialize!(simulation; period)
-    synchronize_device(architecture, simulation)
-    t0 = time()
-    runner.time_stepping(simulation)
-    synchronize_device(architecture, simulation)
-    time_elapsed = time() - t0
-    finalize!(simulation)
+    # progress-bar render (every `feedback_dt = 0.1 s`). Repeat from the same initial
+    # state, a new simulation each time, see `repeats` and `max_repeat_time`. Before each
+    # run the GC frees the previous simulation (incl. its device memory) outside the timed
+    # region; not `free_memory!`, which would also clear the cached Fourier graphs and so
+    # recapture them in the timed run.
+    simulation = nothing
+    times = Float64[]
+    while length(times) < suite.repeats && (isempty(times) || sum(times) + times[end] <= suite.max_repeat_time)
+        GC.gc()
+        simulation = initialize!(model)
+        initialize!(simulation; period)
+        synchronize_device(architecture, simulation)
+        t0 = time()
+        runner.time_stepping(simulation)
+        synchronize_device(architecture, simulation)
+        push!(times, time() - t0)
+        finalize!(simulation)
+        simulation = nothing
+    end
+    @info @sprintf("     %d timed run(s): median %.3g s, fastest %.3g s, slowest %.3g s", length(times), median(times), minimum(times), maximum(times))
 
-    sypd = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
+    sypd(time_elapsed) = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
 
     suite.Δt[i] = model.time_stepping.Δt
-    suite.SYPD[i] = sypd
+    suite.SYPD[i] = sypd(median(times))
+    suite.SYPD_min[i] = sypd(maximum(times))
+    suite.SYPD_max[i] = sypd(minimum(times))
+    suite.nrepeats[i] = length(times)
     suite.compile_time[i] = runner.compile_time
     suite.status[i] = "ok"
     return
@@ -242,7 +273,7 @@ function write_results(md, suite::BenchmarkSuite)
     column_header *= print_dynamics ? "| Dynamics " : ""
     column_header *= print_physics ? "| Physics " : ""
     column_header *= print_transform ? "| Transform " : ""
-    column_header *= "| Δt | SYPD | Memory"
+    column_header *= "| Δt | SYPD | Runs | Spread | Memory"
     column_header *= print_compile ? "| Compile |" : "|"
 
     ncolumns = length(findall('|', column_header)) - 1
@@ -264,9 +295,12 @@ function write_results(md, suite::BenchmarkSuite)
         row *= print_transform ? "| $(suite.spectral_transform[i]) " : ""
 
         Δt = round(Int, suite.Δt[i])
-        SYPD = suite.status[i] == "ok" ? format_sypd(suite.SYPD[i]) : suite.status[i]
+        ok = suite.status[i] == "ok"
+        SYPD = ok ? format_sypd(suite.SYPD[i]) : suite.status[i]
+        runs = ok ? suite.nrepeats[i] : "—"
+        spread = ok ? format_spread(suite.SYPD[i], suite.SYPD_min[i], suite.SYPD_max[i], suite.nrepeats[i]) : "—"
         memory = prettymemory(suite.memory[i])
-        row *= "| $Δt | $SYPD | $memory "
+        row *= "| $Δt | $SYPD | $runs | $spread | $memory "
         row *= print_compile ? "| $(format_seconds(suite.compile_time[i])) |" : "|"
 
         write(md, "$row\n")

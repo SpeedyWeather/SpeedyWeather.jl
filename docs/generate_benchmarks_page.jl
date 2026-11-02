@@ -229,7 +229,9 @@ function generate_benchmarks_page()
         write(io, "Running the benchmark script on a new architecture adds a column to the overview table, a series to each comparison figure, and a per-architecture section to this page.\n\n")
 
         write(io, "All simulations are benchmarked over several seconds (wallclock time) without output. ")
-        write(io, "Benchmarking excludes initialization. Timings can vary by ±50% between runs, so treat the numbers as rough rather than precise.\n\n")
+        write(io, "Benchmarking excludes initialization. Each configuration is timed up to 5 times (as long as all its timed runs together take at most 30 s), ")
+        write(io, "SYPD is the median and Spread shows how much the runs differ. ")
+        write(io, "Timings still vary between processes and machines, so treat the numbers as rough rather than precise.\n\n")
 
         write(io, "## Overview: PrimitiveWet resolution across architectures\n\n")
         write(io, "Simulated years per wallclock day (SYPD) for the `PrimitiveWetModel` resolution sweep, one column per architecture. ")

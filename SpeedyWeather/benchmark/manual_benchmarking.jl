@@ -11,6 +11,11 @@ Usage:
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-tpu   # Reactant on TPU
 
+Every configuration of the `BenchmarkSuite`s is timed up to 5 times from the same
+initial state, as long as all its timed runs together take at most 30 s
+(`repeats` and `max_repeat_time` in `benchmark_suite.jl`), and the median SYPD is
+reported with the spread of the runs.
+
 An optional second argument multiplies the number of timesteps per timed run of
 the main benchmark, the PrimitiveWet resolution sweep (`:benchmark201`), for
 longer, more robust publication-ready timings (default 1, the other suites are
@@ -253,7 +258,10 @@ function overview_data()
         "truncation" => collect(suite.truncation),
         "nlayers" => collect(suite.nlayers),
         "nlat" => collect(suite.nlat),
-        "sypd" => map(json_safe, suite.SYPD),
+        "sypd" => map(json_safe, suite.SYPD),        # median of the timed runs
+        "sypd_min" => map(json_safe, suite.SYPD_min),
+        "sypd_max" => map(json_safe, suite.SYPD_max),
+        "repeats" => collect(suite.nrepeats),
         "memory" => map(json_safe, suite.memory),
         "dt" => map(json_safe, suite.Δt),
         "compile_time" => map(json_safe, suite.compile_time),
@@ -303,11 +311,11 @@ function write_preamble(md)
 
     write(md, "All simulations are benchmarked over several seconds (wallclock time) without output. ")
     write(md, "Benchmarking excludes initialization and is started just before the main time loop and finishes right after. ")
-    write(md, "The benchmarking results here are not very robust; timings that change by ±50% are not uncommon. ")
-    write(md, "Proper benchmarking for performance optimization uses the minimum or median of many executions, while we run ")
-    write(md, "a simulation for several time steps which effectively represents the mean, susceptible to outliers. ")
-    write(md, "However, this is what a user will experience in most situations anyway and the following therefore presents a ")
-    write(md, "rough idea of how fast a SpeedyWeather simulation will run, and how much memory it requires.\n\n")
+    write(md, "Each configuration is timed up to 5 times from the same initial state, as long as all its timed runs together ")
+    write(md, "take at most 30 s, so short runs are timed 5 times and runs longer than 15 s once. ")
+    write(md, "SYPD is the median of these runs, and the Spread column shows how much they differ. ")
+    write(md, "Results still vary between processes and machines, e.g. by ±30% on a laptop, ")
+    write(md, "so the following presents a rough idea of how fast a SpeedyWeather simulation will run, and how much memory it requires.\n\n")
 
     write(md, "### Explanation\n\n")
     write(md, "Abbreviations in the tables below are as follows; omitted columns use defaults.\n")
@@ -319,7 +327,9 @@ function write_preamble(md)
     write(md, "- Dynamics: With dynamics?, default: true\n")
     write(md, "- Physics: With physical parameterizations?, default: true (for primitive equation models)\n")
     write(md, "- Δt: time step [s].\n")
-    write(md, "- SYPD: Speed of simulation, simulated years per wallclock day.\n")
+    write(md, "- SYPD: Speed of simulation, simulated years per wallclock day, median of the timed runs.\n")
+    write(md, "- Runs: Number of timed runs, up to 5 within 30 s of timed runs.\n")
+    write(md, "- Spread: (slowest − fastest) / median wallclock time of the timed runs, — for a single run.\n")
     write(md, "- Memory: Memory footprint of simulation, variables and constants.\n")
     write(md, "- Compile: One-off compilation of the time step (Reactant only), not included in the SYPD. ")
     write(md, "Compiled code is cached within a session, so configurations compiled before (e.g. in an earlier suite) compile much faster.\n")

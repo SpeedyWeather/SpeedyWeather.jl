@@ -78,6 +78,16 @@ available here.
 
 The matrix transform goes up to T128 on TPU (section 7).
 
+> What do you think about introducing a repeats similar to the Terrarium PR I was telling you about?
+> What do you estimate how would this impact overall runtime of the benchmarks?
+>
+> okay i follow the recommendation with 5 repeats
+
+Added repeated timed runs to the `BenchmarkSuite`s (section 8, 2026-11-03), following
+NumericalEarth/Terrarium.jl#222: up to 5 runs per configuration within 30 s of timed runs, the
+median SYPD and the spread are reported. The warm-up problem found there doesn't affect these benchmarks
+(section 8).
+
 ## Problem description
 
 This plan makes two changes to `SpeedyWeather/benchmark/manual_benchmarking.jl`:
@@ -411,14 +421,58 @@ What to expect on a TPU (not testable here):
   are T512 at 24 layers with `--hi-res`, and the reverse suite at T256. Neither is measured on a TPU
   yet.
 
+### 8. Repeated timed runs (added on request, see the revision log)
+
+**Background.** NumericalEarth/Terrarium.jl#222 found two problems in Terrarium's benchmark harness:
+- its warm-up ran through a different function than the timed run, so every new grid size compiled
+  inside the first timed run (about 1.8 s, most of its published native GPU numbers);
+- each configuration was timed once, so the variance was unknown.
+
+The first doesn't apply here: warm-up and timed run both call `runner.time_stepping`
+(`time_stepping!`, or on Reactant the same compiled program), and the 3 warm-up steps reach every
+code path of the time loop. The stored results confirm it: the default PrimitiveWet configuration
+(T32 L8) is timed in up to five suites of the same process and agrees within about 5 % on the GPUs
+and 8 % on the CPUs, without the slow first run that compilation would cause. The second does apply:
+the `BenchmarkSuite`s timed each configuration once.
+
+**Change.**
+- `BenchmarkSuite` gets `repeats = 5` and `max_repeat_time = 30` [s]. Each configuration is timed
+  until it has `repeats` runs, or until a further run would take all timed runs together beyond
+  `max_repeat_time`. There is always at least one run. Short runs (all GPU and Reactant runs, most CPU
+  runs) are timed 5 times, runs longer than 15 s once.
+- Every run starts from the same initial state, a new `initialize!(model)`, as the single timed run did.
+  `GC.gc()` frees the previous simulation before the next one is allocated, outside the timed region;
+  not `free_memory!`, which would also clear the cached Fourier graphs and recapture them in the timed run.
+- The suite stores the median SYPD (`SYPD`), the slowest and fastest (`SYPD_min`, `SYPD_max`) and the
+  number of runs (`nrepeats`). The README tables get the columns Runs and Spread,
+  (slowest − fastest) / median wallclock time; the JSON `overview` gets `sypd_min`, `sypd_max` and
+  `repeats`. `sypd` is now the median, so readers of older records still work.
+- The median, as in Terrarium.jl#222. The reverse suite keeps the minimum over its samples.
+- The README preamble and the docs page describe the repeats; the "±50 %" remark became a note that
+  results still vary between processes and machines.
+
+**Expected cost**, from the timed runs stored in README.md (Δt · steps / SYPD) plus the measured
+re-initialization (0.15 s at T32 L8 to 1.8 s at T256 L24 on the M3), in extra minutes per run of
+`manual_benchmarking.jl`:
+
+| Architecture | Timed today | 5 repeats within 30 s |
+| --- | --- | --- |
+| cpu-arm | 12.4 min | +11 min |
+| cpu-x86 | 8.8 min | +12 min |
+| gpu-nvidia | 0.9 min | +5 min |
+| gpu-amd | 4.0 min | +6 min |
+| reactant-gpu | 0.2 min (71 min compile) | +3 min |
+
+Without the budget, 5 repeats would add 37 to 51 minutes on the CPUs.
+
 ### Files
 
 | File | Change |
 | --- | --- |
-| `benchmark/manual_benchmarking.jl` | Architecture `reactant-tpu`, `ON_REACTANT`, `ON_ACCELERATOR`, Reactant devices in the machine info; flag parsing (`--reverse`, `--hi-res`, `--SPEEDY`, case-insensitive); `RESULTS_LABEL` and `meta.configuration` for `--SPEEDY`; conditional `using Enzyme` and include; multiplier for benchmark201 only; the `reverse` numbers in the record; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists the flags and the multiplier |
+| `benchmark/manual_benchmarking.jl` | `sypd_min`, `sypd_max`, `repeats` in the JSON overview and the text on repeated runs; architecture `reactant-tpu`, `ON_REACTANT`, `ON_ACCELERATOR`, Reactant devices in the machine info; flag parsing (`--reverse`, `--hi-res`, `--SPEEDY`, case-insensitive); `RESULTS_LABEL` and `meta.configuration` for `--SPEEDY`; conditional `using Enzyme` and include; multiplier for benchmark201 only; the `reverse` numbers in the record; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists the flags and the multiplier |
 | `benchmark/define_benchmarks.jl` | `:benchmark800`, behind `RUN_REVERSE`; T342 and T512 in `:benchmark201`, behind `RUN_HI_RES` on GPU and TPU (`ON_ACCELERATOR`); 1-based truncations in comments |
-| `docs/generate_benchmarks_page.jl` | `reactant-tpu` in `ARCH_ORDER` |
-| `benchmark/benchmark_suite.jl` | `speedy_components`, `SPEEDY_CONFIGURATION` and their use in `build_model`; the comment on `timestep_multiplier`; 1-based truncation in the heading of the individual-dynamics-functions tables |
+| `docs/generate_benchmarks_page.jl` | `reactant-tpu` in `ARCH_ORDER`; the text on repeated runs |
+| `benchmark/benchmark_suite.jl` | `speedy_components`, `SPEEDY_CONFIGURATION` and their use in `build_model`; the comment on `timestep_multiplier`; 1-based truncation in the heading of the individual-dynamics-functions tables; repeated timed runs (`repeats`, `max_repeat_time`, `SYPD_min`, `SYPD_max`, `nrepeats`), the Runs and Spread columns |
 | `benchmark/reverse_benchmark_suite.jl` | New file |
 | `benchmark/Project.toml` | Adds `Enzyme` |
 | `CHANGELOG.md` | One line under `## Unreleased` |
@@ -632,3 +686,20 @@ less informative than the H100 run, which is the next step.
 Not tested: `--SPEEDY` and `--hi-res` on a GPU (none here). The seasonal components use
 KernelAbstractions kernels with plain integer months there, so they are expected to work, but nothing
 tests them on GPU yet.
+
+### Verification of the repeated timed runs (2026-11-03, same machine)
+
+Only small configurations, after these benchmarks' local measurements had crashed the laptop earlier
+(memory). A scratchpad script includes `benchmark_suite.jl` and runs reduced suites at T32 with a
+quarter of the usual time steps; the repository's results were not touched.
+
+1. **Repeats.** ShallowWater and PrimitiveWet at T32 got 5 runs each (median 0.116 s and 2.19 s), with
+   `SYPD_min ≤ SYPD ≤ SYPD_max` and spreads of 33 % and 11 %.
+2. **Budget.** With `max_repeat_time = 4`, PrimitiveWet stopped after one run of 2.1 s, as a second run
+   would have taken the total beyond 4 s. With `repeats = 1` the spread shows "—".
+3. **Table.** The Runs and Spread columns render.
+4. **Driver and docs page.** Both parse; not run end to end, since that writes the results store.
+   Runic is clean.
+
+Not tested: a full run on any architecture, and the JSON fields `sypd_min`, `sypd_max` and `repeats` as
+written by the driver.
