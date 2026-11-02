@@ -104,6 +104,10 @@ and relaxes current vertical profiles to the adjusted references."""
         Qref -= ifelse(in_column, humid_ref_profile[ij, k], zero(NF)) * Δσ[k]  # eq (11) but in σ coordinates
     end
 
+    # Pq and PT multiplied by constants (cₚ/Lᵥ) to convert to equivalent precipitation units
+    P_dry = Pq / g
+    P_warm = PT * cₚ / (Lᵥ * g)
+
     # ADJUST PROFILES FOLLOWING FRIERSON 2007
     deep_convection = Pq > 0 && PT > 0
     shallow_convection = Pq <= 0 && PT > 0
@@ -162,7 +166,11 @@ and relaxes current vertical profiles to the adjusted references."""
         (rain_convection, snow_convection),
     )
 
+    # TODO: Extract PT and Pq for each vertical level
+
     # Store precipitation in diagnostic arrays
+    vars.parameterizations.P_warm[ij,k] += P_warm            # precipitation due to warming 
+    vars.parameterizations.P_dry[ij,k] += P_dry            # precipitation due to drying 
     vars.parameterizations.rain_convection[ij] += rain_convection            # accumulated rain [m] for output
     vars.parameterizations.snow_convection[ij] += snow_convection            # accumulated snow [m] for output
     rain_rate_convection = rain_convection / Δt                     # instantaneous rate [m/s] for coupling
@@ -180,6 +188,7 @@ and relaxes current vertical profiles to the adjusted references."""
     return nothing
 end
 
+
 function variables(::BettsMillerConvection)
     return (
         ParameterizationVariable(:rain_convection, Grid2D(), desc = "Convective precipitation (accumulated)", units = "m"),
@@ -189,6 +198,8 @@ function variables(::BettsMillerConvection)
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
         ParameterizationVariable(:snow_rate, Grid2D(), desc = "Snow rate (large-scale + convection)", units = "m/s"),
         ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
+        ParameterizationVariable(:P_warm, Grid3D(), desc = "Precipitation due to warming", units = "mm/s"),
+        ParameterizationVariable(:P_dry, Grid3D(), desc = "Precipitation due to drying", units = "mm/s"),
     )
 end
 
@@ -229,9 +240,15 @@ column then need no branch to skip those levels, they contribute zero on their o
     humid_ref_profile[ij, nlayers] = relative_humidity * sat_humid
 
     saturated::Bool = false           # did the parcel reach saturation yet?
-    buoyant::Bool = true              # is the parcel still buoyant?
+    buoyant::Bool = false             # is the parcel still buoyant?
+    found_lfc::Bool = false             # has the parcel reached the level of free convection?
+    found_lzb::Bool = false             # has the parcel reached the level of zero buoyancy?
     temp_virt_parcel::NF = virtual_temperature(temp_parcel, humid_parcel, atmosphere)
     level_zero_buoyancy::Int = 1      # in case the parcel is buoyant till the top
+    lifting_condensation_level::Int = 1 # index of the level where the parcel reaches saturation (LCL)
+    level_free_convection::Int = 1 # index of the level where the parcel first becomes neutrally buoyant (LFC)
+    CAPE::NF = 0 # Convective Available Potential Energy (CAPE)
+
 
     # single pass over the column with a fixed trip count (no while loop, see #1193): the parcel
     # ascent is only computed while buoyant, every level is written exactly once, either with
@@ -240,11 +257,12 @@ column then need no branch to skip those levels, they contribute zero on their o
         temp_env = temp_environment[ij, k]
         humid_env = humid_environment[ij, k]
 
-        if buoyant                          # calculate moist adiabat while buoyant till top
-            # defined on all paths: the compiler can't prove that the `else` below is only reached
+        if !found_lzb     # calculate moist adiabat while buoyant till top
+                        # defined on all paths: the compiler can't prove that the `else` below is only reached
             # via `!saturated` here, a possibly undefined variable leaves an UndefVarError check
             # in the kernel
             temp_parcel_dry = temp_parcel
+            
             if !saturated                   # if not saturated yet follow dry adiabat
                 # dry adiabatic ascent and saturation humidity of that temperature
                 temp_parcel_dry = temp_parcel * (σ[k] / σ[k + 1])^κ
@@ -253,9 +271,14 @@ column then need no branch to skip those levels, they contribute zero on their o
                 # set to saturated when the dry adiabatic ascent would reach saturation
                 # then follow moist adiabat instead (see below)
                 saturated = humid_parcel >= sat_humid
+
+                lcl_reached = !saturated && humid_parcel >= sat_humid
+                lifting_condensation_level = ifelse(lcl_reached, k, lifting_condensation_level)
+
             end
 
             if saturated
+
                 # calculate moist/pseudo adiabatic lapse rate, dT/dΦ = -Γ/cp
                 T, Tᵥ, q = temp_parcel, temp_virt_parcel, humid_parcel  # for brevity
                 A = q * Lᵥ / ((1 - q)^2 * R_dry)
@@ -289,8 +312,26 @@ column then need no branch to skip those levels, they contribute zero on their o
             temp_virt_parcel = virtual_temperature(temp_parcel, humid_parcel, atmosphere)
             buoyant = temp_virt_parcel > virtual_temperature(temp_env, humid_env, atmosphere)
 
-            # the LZB is the last buoyant level, i.e. one below the level buoyancy was lost
-            level_zero_buoyancy = ifelse(buoyant, k, k + 1)
+
+            # first level at which the parcel is buoyant
+            lfc_reached = buoyant && !found_lfc
+            level_free_convection = ifelse(lfc_reached, k, level_free_convection)
+            found_lfc = found_lfc || buoyant
+
+            # first level above the LFC at which buoyancy is lost
+            lzb_reached = found_lfc && !buoyant
+            level_zero_buoyancy = ifelse(lzb_reached, k + 1, level_zero_buoyancy)
+            found_lzb = lzb_reached
+
+            # # the LZB is the last buoyant level, i.e. one below the level buoyancy was lost
+            # level_zero_buoyancy = ifelse(buoyant, k, k + 1)
+
+            # TODO: Include a CAPE calculator which accumulates the buoyant energy of the parcel relative to the environment
+            # CAPE is accumulated only when the parcel is buoyant relative to the environment
+            if buoyant
+                CAPE += (temp_virt_parcel - temp_virt_ref) / temp_virt_ref * ΔΦ
+            end
+
         end
 
         # use dry/moist adiabatic ascent for reference profile, and its saturation humidity
@@ -300,7 +341,20 @@ column then need no branch to skip those levels, they contribute zero on their o
         humid_ref_profile[ij, k] = ifelse(buoyant, relative_humidity * sat_humid, humid_env)
     end
 
-    return level_zero_buoyancy
+    return level_zero_buoyancy, lifting_condensation_level, CAPE
+
+    # Store level_zero_buoyancy, lifting_condensation_level, and CAPE
+    vars.parameterizations.level_zero_buoyancy[ij] += level_zero_buoyancy
+    vars.parameterizations.lifting_condensation_level[ij] += lifting_condensation_level
+    vars.parameterizations.CAPE[ij] += CAPE # Convective Available Potential Energy (CAPE) 
+end
+
+function variables(::pseudo_adiabat)
+    return (
+        ParameterizationVariable(:level_zero_buoyancy, Grid2D(), desc = "Level of zero buoyancy", units = "1"),
+        ParameterizationVariable(:lifting_condensation_level, Grid2D(), desc = "Lifting condensation level", units = "1"),
+        ParameterizationVariable(:CAPE, Grid2D(), desc = "Convective Available Potential Energy (CAPE)", units = "J/kg"),
+    )
 end
 
 export BettsMillerDryConvection
