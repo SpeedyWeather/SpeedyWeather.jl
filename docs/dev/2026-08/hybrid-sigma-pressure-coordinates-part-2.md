@@ -96,6 +96,12 @@ Base revision: 20467269399f40212fee413a545496226de999ca
   backward Euler (time step ×12/nlayers above 12 levels); with uniform spacing stable at 8, NaN at 16-48.
   At 24 levels and T31 the ramp needs Δt = 1200 s, sigma (Frierson) 1800 s, both NaN at 2400 s.
 
+  ![Level lines over a mountain](hybrid-sigma-pressure-levels.png)
+  16 Frierson-spaced levels over a Gaussian mountain (surface pressure down to 500 hPa) for σ, the cubic
+  0.2-0.8 and the ramp transition: the cubic levels converge and cross at the mountain top (thinnest layer
+  -0.02 of its σ thickness), the ramp keeps them apart (0.46). Created with `hybrid-sigma-pressure-levels.jl`
+  (`julia --project=SpeedyWeather/test`).
+
 > Feel free to adjust this transition. This was originally implemented as a draft just to show how the
 > transition could be done. As long as the Frierson idea of having thinner layers towards the surface
 > remains (the B part) you have freedom
