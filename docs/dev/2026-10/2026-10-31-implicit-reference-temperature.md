@@ -19,6 +19,10 @@ Base revision: `c147266e`
 
 ## Revision log
 
+- 2026-11-02: reverted to `centering = 1` (backward Euler). Crank-Nicolson blows up on day 1 for Held-Suarez
+  with Earth orography at T32 with 16 uniformly spaced σ levels (CI, `vertical_coordinates.jl`), for both a
+  300 K and a 350 K reference; backward Euler is stable there.
+
 - 2026-11-01: default `centering = 0.5` (Crank-Nicolson) instead of 1 (backward Euler), stable in all tests.
 
 > In that PR could you also test whether we can set the centering now finally to 0.5 to have Crank Nicolson
@@ -90,11 +94,13 @@ Stability with the fixed operator, 20 days at nlayers = 8:
 | maximum + 30 K (332-338 K) | stable | stable | stable | stable |
 | maximum + 10 K (312-317 K) | stable | stable | stable | stable |
 
-Crank-Nicolson (`centering = 0.5`, new default) vs backward Euler (`centering = 1`) with the isothermal
+Crank-Nicolson (`centering = 0.5`) vs backward Euler (`centering = 1`) with the isothermal
 300 K reference, 30 days, nlayers = 8: stable for Held-Suarez and PrimitiveWet at T31, T63, T127 with
 both. Held-Suarez T127 over 200 days: stable with both, same temperature statistics (0.1% quantiles per
 layer within ~2 K). The occasional ~160 K minimum occurs with both centerings, in the top layer over
-the Andes (~22°S, 292°E), i.e. it is caused by the orography, not by the centering.
+the Andes (~22°S, 292°E), i.e. it is caused by the orography, not by the centering. However, with 16
+uniformly spaced σ levels (Held-Suarez, Earth orography, T32) Crank-Nicolson is unstable (NaN on day 1),
+so backward Euler remains the default.
 
 ## Testing and verification
 
