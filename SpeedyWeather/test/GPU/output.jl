@@ -82,7 +82,7 @@ end
     )
 
     for output in writers
-        add!(output, SpeedyWeather.AllOutputVariables()...)
+        add!(output, OutputVariables.All()...)
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)
 
@@ -104,7 +104,7 @@ end
         written = output isa NetCDFOutput ?
             NCDataset(file) do ds
                 ds["temp"].var[:, :, :, end]
-            end : zopen(file)["temp"][:, :, :, end]
+        end : zopen(file)["temp"][:, :, :, end]
 
         # in ˚C and rounded to keepbits=10, i.e. a relative error of ~1e-3 in K
         @test written .+ 273.15f0 ≈ expected rtol = 2.0e-3

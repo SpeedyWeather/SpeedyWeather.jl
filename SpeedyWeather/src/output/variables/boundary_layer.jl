@@ -1,6 +1,6 @@
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ZonalVelocity10mOutput <: AbstractOutputVariable
+@kwdef mutable struct ZonalVelocity10m <: AbstractOutputVariable
     name::String = "u10"
     unit::String = "m/s"
     long_name::String = "10m zonal wind speed"
@@ -11,11 +11,11 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 12
 end
 
-path(::ZonalVelocity10mOutput, simulation) = simulation.variables.grid.u
+path(::ZonalVelocity10m, simulation) = simulation.variables.grid.u
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MeridionalVelocity10mOutput <: AbstractOutputVariable
+@kwdef mutable struct MeridionalVelocity10m <: AbstractOutputVariable
     name::String = "v10"
     unit::String = "m/s"
     long_name::String = "10m meridional wind speed"
@@ -26,7 +26,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 12
 end
 
-path(::MeridionalVelocity10mOutput, simulation) = simulation.variables.grid.v
+path(::MeridionalVelocity10m, simulation) = simulation.variables.grid.v
 
 """$(TYPEDSIGNATURES)
 10m wind is defined using a logarithmic profile from the lowermost model layer.
@@ -39,7 +39,7 @@ path(::MeridionalVelocity10mOutput, simulation) = simulation.variables.grid.v
 """
 function output!(
         output::AbstractOutput,
-        variable::Union{ZonalVelocity10mOutput, MeridionalVelocity10mOutput},
+        variable::Union{ZonalVelocity10m, MeridionalVelocity10m},
         simulation::AbstractSimulation,
     )
     # escape immediately after first call if variable doesn't have a time dimension
@@ -56,9 +56,8 @@ function output!(
     u_or_v10 = simulation.variables.scratch.grid.b_2D
 
     # Compute z_bottom as z_surf + T_bottom * R/g * log(pₛ/p_full_bottom), start with z_surf
-    z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
+    z_bottom .= max.(simulation.model.orography.orography, zero(eltype(z_bottom)))   # [m] set negative values to zero
     T = get_prognostic_step(simulation.variables.grid.temperature, simulation.model.time_stepping, output)
-    T_bottom = field_view(T, :, nlayers)
     R_dry = simulation.model.atmosphere.R_dry
     g = simulation.model.planet.gravity
     coord = simulation.model.geometry.vertical_coordinates
@@ -66,10 +65,14 @@ function output!(
 
     # R/g * log(pₛ/p_full_bottom): for sigma coords this is constant (= Δp_geopot_full[end]/g);
     # for hybrid it varies per grid point since p_full_bottom = A*p_ref + B*pₛ.
-    @. z_bottom += T_bottom * (R_dry / g) * log(pₛ / pressure(nlayers, pₛ, coord))
+    # In a kernel so that the layer index stays an integer (Reactant traces numbers in broadcasts)
+    launch!(
+        architecture(z_bottom), LinearWorkOrder, size(z_bottom), bottom_layer_height_kernel!,
+        z_bottom, T, pₛ, coord, nlayers, R_dry / g
+    )
 
     # Compute u10, TODO should this be the same z₀ as in vertical diffusion or surface fluxes?
-    z₀ = simulation.variables.parameterizations.surface_roughness
+    z₀ = simulation.variables.parameterizations.momentum_roughness
 
     # include a max here as this will throw an error if the model blows up and have negative temperatures
     # if the max case is hit we divide by zero which yields inf so clearly flagged in any case
@@ -81,9 +84,16 @@ function output!(
     return nothing
 end
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+# add the height of the bottom layer k above the surface, T_k * R/g * log(pₛ/p_k), to z_bottom
+@kernel inbounds = true function bottom_layer_height_kernel!(z_bottom, temperature, surface_pressure, coordinate, k, R_dry_over_g)
+    ij = @index(Global, Linear)
+    pₛ = surface_pressure[ij]
+    z_bottom[ij] += temperature[ij, k] * R_dry_over_g * log(pₛ / pressure(k, pₛ, coordinate))
+end
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct SurfaceTemperatureOutput{F} <: AbstractOutputVariable
+@kwdef mutable struct SurfaceTemperature{F} <: AbstractOutputVariable
     name::String = "tsurf"
     unit::String = "degC"
     long_name::String = "Surface air temperature"
@@ -96,11 +106,11 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # not the actual surface temperature but the core variable to read in
-path(::SurfaceTemperatureOutput, simulation) = simulation.variables.grid.temperature
+path(::SurfaceTemperature, simulation) = simulation.variables.grid.temperature
 
 function output!(
         output::AbstractOutput,
-        variable::SurfaceTemperatureOutput,
+        variable::SurfaceTemperature,
         simulation::AbstractSimulation,
     )
     # escape immediately after first call if variable doesn't have a time dimension
@@ -134,12 +144,12 @@ function output!(
 end
 
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct BoundaryLayerDragOutput <: AbstractOutputVariable
-    name::String = "bld"
+@kwdef mutable struct MomentumBoundaryLayerDrag <: AbstractOutputVariable
+    name::String = "bld_m"
     unit::String = "1"
-    long_name::String = "Boundary layer drag coefficient"
+    long_name::String = "Momentum flux related boundary layer drag coefficient"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -147,15 +157,15 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::BoundaryLayerDragOutput, simulation) =
-    simulation.variables.parameterizations.boundary_layer_drag
+path(::MomentumBoundaryLayerDrag, simulation) =
+    simulation.variables.parameterizations.boundary_layer_drag_momentum
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LandSurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "lsr"
-    unit::String = "m"
-    long_name::String = "Land surface roughness length"
+@kwdef mutable struct HeatBoundaryLayerDrag <: AbstractOutputVariable
+    name::String = "bld_h"
+    unit::String = "1"
+    long_name::String = "Heat flux related boundary layer drag coefficient"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -163,15 +173,15 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::LandSurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.land.surface_roughness
+path(::HeatBoundaryLayerDrag, simulation) =
+    simulation.variables.parameterizations.boundary_layer_drag_heat
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct OceanSurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "osr"
-    unit::String = "m"
-    long_name::String = "Ocean surface roughness length"
+@kwdef mutable struct HumidityBoundaryLayerDrag <: AbstractOutputVariable
+    name::String = "bld_q"
+    unit::String = "1"
+    long_name::String = "Moisture flux related boundary layer drag coefficient"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -179,15 +189,15 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::OceanSurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.ocean.surface_roughness
+path(::HumidityBoundaryLayerDrag, simulation) =
+    simulation.variables.parameterizations.boundary_layer_drag_humidity
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct SurfaceRoughnessOutput <: AbstractOutputVariable
-    name::String = "sr"
+@kwdef mutable struct MomentumSurfaceRoughness <: AbstractOutputVariable
+    name::String = "sr_m"
     unit::String = "m"
-    long_name::String = "Surface roughness length"
+    long_name::String = "Momentum surface roughness length"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -195,14 +205,40 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::SurfaceRoughnessOutput, simulation) =
-    simulation.variables.parameterizations.surface_roughness
+path(::MomentumSurfaceRoughness, simulation) =
+    simulation.variables.parameterizations.momentum_roughness
+
+@kwdef mutable struct HeatSurfaceRoughness <: AbstractOutputVariable
+    name::String = "sr_h"
+    unit::String = "m"
+    long_name::String = "Heat surface roughness length"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::HeatSurfaceRoughness, simulation) =
+    simulation.variables.parameterizations.heat_roughness
+
+# collect in groups for convenience
+SurfaceRoughness() = (
+    MomentumSurfaceRoughness(),
+    HeatSurfaceRoughness(),
+)
+
+BoundaryLayerDrag() = (
+    MomentumBoundaryLayerDrag(),
+    HeatBoundaryLayerDrag(),
+    HumidityBoundaryLayerDrag(),
+)
 
 # collect all in one for convenience
-BoundaryLayerOutput() = (
-    ZonalVelocity10mOutput(),
-    MeridionalVelocity10mOutput(),
-    SurfaceTemperatureOutput(),
-    BoundaryLayerDragOutput(),
-    SurfaceRoughnessOutput(),
+BoundaryLayer() = (
+    ZonalVelocity10m(),
+    MeridionalVelocity10m(),
+    SurfaceTemperature(),
+    BoundaryLayerDrag()...,
+    SurfaceRoughness()...,
 )

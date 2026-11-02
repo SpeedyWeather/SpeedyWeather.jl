@@ -104,7 +104,7 @@ large-scale precipitation vertically for output."""
             Δp = pressure_thickness(k, pₛ, coord)           # pressure thickness of layer Δp times 1/g/ρ [m]
             Δp_gρ = Δp / gρ
             Δp_Δtgρ = Δp_gρ / Δt                            # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
-            Δtgρ_Δp = inv(Δp_Δtgρ)                          # [s/m]
+            Δtgρ_Δp = 1 / Δp_Δtgρ                           # [s/m], TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
 
             # 1. Melting of snow from layer above
             δT_melt = max(temp[ij, k] - melting_threshold, 0)   # only if temperature above melting threshold
@@ -145,7 +145,8 @@ large-scale precipitation vertically for output."""
             snow = zero(rain)                   # start with zero snow but potentially swap below
 
             # decide whether to turn precip into snow (all rain freezes to snow)
-            rain, snow = let_it_snow && temp[ij, k] < freezing_threshold ? (snow, rain) : (rain, snow)
+            freeze = let_it_snow & (temp[ij, k] < freezing_threshold)
+            rain, snow = ifelse(freeze, snow, rain), ifelse(freeze, rain, snow)
             rain_flux_down += rain              # accumulate into downward fluxes [m/s] (used in layer below)
             snow_flux_down += snow              # accumulate into downward fluxes [m/s] (used in layer below)
 

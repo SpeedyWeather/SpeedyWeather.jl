@@ -101,7 +101,7 @@ function Base.filter!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model
         (; freeze_rate, freezing_temperature) = sea_ice_model
         ocean = model.land_sea_mask.land_fraction.data .< 1     # at least partially ocean
 
-        ℵ.data .+= ocean .* freeze_rate .* max.(freezing_temperature .- sst.data, 0)
+        ℵ.data .+= ocean .* freeze_rate .* max.(freezing_temperature .- sst.data, zero(freezing_temperature))
 
         # only change SST if not prescribed (i.e. the ocean has an SST tendency)
         if haskey(vars.tendencies.ocean, :sea_surface_temperature)
@@ -109,7 +109,8 @@ function Base.filter!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model
         end
     end
 
-    # clamp sea ice concentration in [0, 1]
-    ℵ .= max.(min.(ℵ, 1), 0)
+    # clamp sea ice concentration in [0, 1], bounds of the same type as Reactant warns for mixed types
+    NF = eltype(ℵ)
+    ℵ .= max.(min.(ℵ, one(NF)), zero(NF))
     return nothing
 end

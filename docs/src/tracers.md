@@ -197,7 +197,7 @@ This follows equivalent to other [Output variables](@ref) but the
 tracer name as `Symbol` has to be provided
 
 ```@example tracers
-add!(model, SpeedyWeather.TracerOutput(:abc))
+add!(model, OutputVariables.Tracer(:abc))
 ```
 
 and other keyword arguments like `long_name::String` and `units::String`
