@@ -202,71 +202,6 @@ end
     @test minimum(Δp(5.7f4) ./ (0.57f0 .* Δp(1.0f5))) > 0.5
 end
 
-@testset "CubicSigmaPressureCoordinates" begin
-
-    spectral_grid = SpectralGrid(nlayers = 8)
-    pressure_only_above = 0.2f0
-    σ_only_below = 0.8f0
-
-    # no-SpectralGrid constructor
-    @test CubicSigmaPressureCoordinates() isa SigmaPressureCoordinates
-
-    # SpectralGrid only (uses default thresholds)
-    H = CubicSigmaPressureCoordinates(spectral_grid; pressure_only_above, σ_only_below)
-    @test H isa SigmaPressureCoordinates
-    @test SpeedyWeather.get_nlayers(H) == 8
-
-    # SpectralGrid + vector (second positional)
-    H_vec = CubicSigmaPressureCoordinates(spectral_grid, collect(range(0.0, 1.0, 9)); pressure_only_above, σ_only_below)
-    @test H_vec isa SigmaPressureCoordinates
-    @test SpeedyWeather.get_nlayers(H_vec) == 8
-
-    # SpectralGrid + function (second positional)
-    H_fn = CubicSigmaPressureCoordinates(spectral_grid, SpeedyWeather.frierson_profile; pressure_only_above, σ_only_below)
-    @test H_fn isa SigmaPressureCoordinates
-
-    # cubic_transition: pure pressure at top, pure sigma at bottom
-    @test SpeedyWeather.cubic_transition(0.0f0; pressure_only_above, σ_only_below) == 0.0f0
-    @test SpeedyWeather.cubic_transition(pressure_only_above; pressure_only_above, σ_only_below) == 0.0f0
-    @test SpeedyWeather.cubic_transition(σ_only_below; pressure_only_above, σ_only_below) == 1.0f0
-    @test SpeedyWeather.cubic_transition(1.0f0; pressure_only_above, σ_only_below) == 1.0f0
-
-    # cubic_transition: smooth and monotone in between
-    σ_mid = range(pressure_only_above, σ_only_below, 20)
-    t_mid = SpeedyWeather.cubic_transition.(σ_mid; pressure_only_above, σ_only_below)
-    @test all(0 .<= t_mid .<= 1)
-    @test all(diff(t_mid) .>= 0)
-
-    # C¹ continuity: near-zero derivative at both thresholds
-    ε = 1.0f-4
-    @test SpeedyWeather.cubic_transition(pressure_only_above + ε; pressure_only_above, σ_only_below) ≈ 0 atol = 1.0e-6
-    @test SpeedyWeather.cubic_transition(σ_only_below - ε; pressure_only_above, σ_only_below) ≈ 1 atol = 1.0e-2
-
-    # thresholds respected in the coordinate itself
-    B_half = Array(H.B_half)
-    A_half = Array(H.A_half)
-    σ_half = A_half + B_half
-    @test all(B_half[σ_half .<= pressure_only_above] .≈ 0)   # pure pressure above pressure_only_above
-    @test all(A_half[σ_half .>= σ_only_below] .≈ 0)          # pure sigma below σ_only_below
-
-    # custom thresholds keyword args
-    H2 = CubicSigmaPressureCoordinates(spectral_grid; pressure_only_above = 0.1, σ_only_below = 0.9)
-    B2 = Array(H2.B_half)
-    A2 = Array(H2.A_half)
-    σ2 = A2 + B2
-    @test all(B2[σ2 .<= 0.1] .≈ 0)
-    @test all(A2[σ2 .>= 0.9] .≈ 0)
-
-    # smoothstep coefficients are independent of thresholds: midpoint of transition always = 0.5
-    @test SpeedyWeather.cubic_transition(0.5f0; pressure_only_above = 0.0f0, σ_only_below = 1.0f0) ≈ 0.5f0
-    @test SpeedyWeather.cubic_transition(0.5f0; pressure_only_above = 0.3f0, σ_only_below = 0.7f0) ≈ 0.5f0
-
-    # works inside Geometry
-    G = Geometry(spectral_grid, vertical_coordinates = H)
-    @test G isa Geometry
-    @test length(G.σ_levels_half) == 9
-end
-
 @testset "pressure and pressure_thickness interface" begin
 
     nlayers = 4
@@ -455,7 +390,7 @@ end
 
 @testset "Nominal sigma regression (the NaN bug)" begin
     # Testing and verification item 2: get_σ_full/half/thickness of a
-    # CubicSigmaPressureCoordinates must equal the SigmaCoordinates values for the same
+    # RampSigmaPressureCoordinates must equal the SigmaCoordinates values for the same
     # σ_half (the fix), and the model components that consume σ_levels_* (geopotential,
     # adiabatic conversion) must come out finite after initialize! — this is the regression
     # test for the NaN bug documented in
@@ -463,7 +398,7 @@ end
     spectral_grid = SpectralGrid(nlayers = 8)
     σ_half = SpeedyWeather.sigma_half_spacing(8)
     σ = SigmaCoordinates(spectral_grid, σ_half)
-    H = CubicSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8)
+    H = RampSigmaPressureCoordinates(spectral_grid, σ_half)
 
     @test SpeedyWeather.get_σ_half(H) ≈ Array(SpeedyWeather.get_σ_half(σ))
     @test SpeedyWeather.get_σ_full(H) ≈ Array(SpeedyWeather.get_σ_full(σ))
@@ -485,7 +420,7 @@ end
     spectral_grid = SpectralGrid(nlayers = nlayers)
     σ_half = SpeedyWeather.sigma_half_spacing(nlayers)
     σ = SigmaCoordinates(spectral_grid, σ_half)
-    H = CubicSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8)
+    H = RampSigmaPressureCoordinates(spectral_grid, σ_half)
 
     for coord in (σ, H)
         for pₛ in (0.7e5, 1.0e5, 1.3e5)

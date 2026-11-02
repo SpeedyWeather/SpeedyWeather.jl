@@ -194,7 +194,7 @@ export SigmaPressureCoordinates
 (the nominal sigma level). The A/B split is controlled by a `transition` function:
 `transition(σ) = 0` gives pure pressure levels (terrain-independent, fixed in space),
 `transition(σ) = 1` gives pure sigma levels (terrain-following). See
-`CubicSigmaPressureCoordinates` for a ready-to-use constructor with a smooth transition.
+`RampSigmaPressureCoordinates` for a ready-to-use constructor with a smooth transition.
 $(TYPEDFIELDS)"""
 struct SigmaPressureCoordinates{NF, VectorTypeHalf, VectorTypeFull} <: AbstractVerticalCoordinates
     "[DERIVED] Reference pressure for the pressure component [Pa]"
@@ -404,34 +404,6 @@ for hybrid sigma-pressure `coordinate`. Returns `B_thickness[k]`. Equals Δσ_k 
 `SigmaCoordinates`."""
 @inline pressure_thickness_sensitivity(k::Integer, coordinate::SigmaPressureCoordinates) = coordinate.B_thickness[k]
 
-export CubicSigmaPressureCoordinates
-
-"""$(TYPEDSIGNATURES)
-Transition function for `CubicSigmaPressureCoordinates`. Returns 0 (pure pressure) for
-σ ≤ `pressure_only_above`, 1 (pure sigma) for σ ≥ `σ_only_below`, and a cubic smoothstep in between, giving C¹
-continuity at both thresholds. The smoothstep coefficients 3 and 2 are fixed by the C¹
-boundary conditions on the normalised variable t ∈ [0, 1] and do not depend on the thresholds."""
-function cubic_transition(σ; pressure_only_above = 0.2, σ_only_below = 0.8)
-    pressure_only_above = oftype(σ, pressure_only_above)
-    σ_only_below = oftype(σ, σ_only_below)
-    # the actual cubic transition
-    # values 3, 2 are fixed by f(0)=0, f(1)=1, f'(0)=0, f'(1)=0 on t ∈ [0,1]
-    t = min(one(σ), max(zero(σ), (σ - pressure_only_above) / (σ_only_below - pressure_only_above)))
-    return t * t * (3 - 2t)
-end
-
-"""$(TYPEDSIGNATURES)
-Sigma-pressure coordinate with a cubic smoothstep transition: pure pressure levels near the
-top of the atmosphere (σ ≤ `pressure_only_above`), pure sigma levels near the surface (σ ≥ `σ_only_below`), and
-a cubic smoothstep transition in between. The thresholds and transition shape are a pragmatic
-choice and do not follow any specific operational model's formulation. Note that the steep
-transition squeezes layers over high orography (e.g. to ~1/4 of their sigma-coordinate thickness
-at pₛ ≈ 570 hPa), which can be unstable, see `RampSigmaPressureCoordinates` instead."""
-CubicSigmaPressureCoordinates(SG::SpectralGrid, args...; pressure_only_above = 0.2, σ_only_below = 0.8, kwargs...) =
-    SigmaPressureCoordinates(SG, args...; transition = σ -> cubic_transition(σ; pressure_only_above, σ_only_below), kwargs...)
-
-CubicSigmaPressureCoordinates(args...; kwargs...) = CubicSigmaPressureCoordinates(SpectralGrid(), args...; kwargs...)
-
 export RampSigmaPressureCoordinates
 
 """$(TYPEDSIGNATURES)
@@ -452,10 +424,10 @@ end
 
 """$(TYPEDSIGNATURES)
 Sigma-pressure coordinate with pure pressure levels above σ = `pressure_only_above` and a B(σ)
-that grows linearly in σ below a ramp of width `ramp_width` (see `ramp_transition`). Compared to
-`CubicSigmaPressureCoordinates` this keeps the layers thick over high orography: at pₛ ≈ 570 hPa
-the thinnest layer is ~0.6 of its sigma-coordinate thickness (defaults), for 0.2-0.27 with the
-cubic transition. Near the surface B is proportional to σ so that the σ spacing (e.g. thinner
+that grows linearly in σ below a ramp of width `ramp_width` (see `ramp_transition`). This keeps the
+layers thick over high orography: at pₛ ≈ 570 hPa the thinnest layer is ~0.6 of its sigma-coordinate
+thickness (defaults), whereas steeper transitions (e.g. a cubic smoothstep from pure pressure at σ = 0.2
+to pure sigma at σ = 0.8) squeeze layers to ~1/4 or even make them cross. Near the surface B is proportional to σ so that the σ spacing (e.g. thinner
 layers towards the surface with the default Frierson spacing) carries over."""
 # σ_half as vector or σ spacing profile function as in SigmaPressureCoordinates
 RampSigmaPressureCoordinates(SG::SpectralGrid, σ_half_or_profile; pressure_only_above = 0.2, ramp_width = 0.3, kwargs...) =

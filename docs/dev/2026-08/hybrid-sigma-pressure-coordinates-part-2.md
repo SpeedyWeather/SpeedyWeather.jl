@@ -106,6 +106,13 @@ Base revision: 20467269399f40212fee413a545496226de999ca
 > transition could be done. As long as the Frierson idea of having thinner layers towards the surface
 > remains (the B part) you have freedom
 
+- 2026-11-02: removed `CubicSigmaPressureCoordinates` (exported since v0.22.0, breaking): its layers
+  cross over a mountain with a surface pressure of 500 hPa, so it is unusable over orography. Tests
+  and docs use `RampSigmaPressureCoordinates`; the plot script defines the cubic transition inline.
+
+> Great! Can you change cubic or remove it if that gives crossing layers? This looks generally
+> unusable to me and it's existence implies the opposite
+
 ## Problem description
 
 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137) ("Sigma-pressure
@@ -518,7 +525,7 @@ PR; per-function checks and the short integration are.
   | 24, Frierson | cubic 0-1 / B = σ² | 0.48 / 0.25 | ok | ok |
   | 24, uniform | B = σ² | 0.28 | NaN | ok (as σ coordinates) |
 
-- `RampSigmaPressureCoordinates` avoids the squeeze, but is still unstable with uniform σ spacing at
+- `CubicSigmaPressureCoordinates` was removed for this reason. `RampSigmaPressureCoordinates` avoids the squeeze, but is still unstable with uniform σ spacing at
   ≥ 16 levels (σ coordinates are stable there with backward Euler), and needs a shorter time step than
   σ coordinates at 24 levels (1200 s vs 1800 s at T31).
 - **Implicit solver** linearised at a single pᵣ, the semi-implicit correction is less well

@@ -129,7 +129,7 @@ end
     spectral_grid = SpectralGrid(nlayers = nlayers)
     σ_half = SpeedyWeather.sigma_half_spacing(nlayers)
     σ = SigmaCoordinates(spectral_grid, σ_half)
-    H = CubicSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8)
+    H = RampSigmaPressureCoordinates(spectral_grid, σ_half)
 
     for coord in (σ, H), pₛ in (0.7e5, 1.0e5, 1.3e5)
         total = sum(SpeedyWeather.pressure_thickness_ratio(k, pₛ, coord) for k in 1:nlayers)
@@ -159,16 +159,12 @@ function held_suarez_stays_finite(spectral_grid, coord; time_stepping = Leapfrog
     @test all(isfinite, Array(simulation.variables.prognostic.pressure))
 end
 
-@testset "PrimitiveDryModel + CubicSigmaPressureCoordinates + HeldSuarez stays finite" begin
+@testset "PrimitiveDryModel + RampSigmaPressureCoordinates + HeldSuarez stays finite" begin
     # item 6: the case that would have caught the NaN bug -- a genuine (non-degenerate)
     # pressure/sigma transition, not the pure-sigma transition = _ -> 1 used everywhere else
     # before this PR.
     spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
-    # Frierson σ spacing: with uniform spacing this steep transition squeezes the mid-level layers
-    # over high orography to ~1/4 of their sigma-coordinate thickness, which is unstable
-    σ_half = SpeedyWeather.sigma_half_spacing(spectral_grid.nlayers, SpeedyWeather.frierson_profile)
-    coord = CubicSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8)
-    held_suarez_stays_finite(spectral_grid, coord)
+    held_suarez_stays_finite(spectral_grid, RampSigmaPressureCoordinates(spectral_grid))
 end
 
 @testset "PrimitiveDryModel + RampSigmaPressureCoordinates (24 levels) + HeldSuarez stays finite" begin

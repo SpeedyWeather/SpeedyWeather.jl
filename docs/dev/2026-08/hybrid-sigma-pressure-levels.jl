@@ -3,9 +3,11 @@ const SW = SpeedyWeather
 nlayers = 16
 sg = SpectralGrid(truncation = 31; nlayers)
 σ_half = SW.sigma_half_spacing(nlayers, SW.frierson_profile)
+# cubic smoothstep from pure pressure at σ = 0.2 to pure sigma at σ = 0.8 (removed, layers cross)
+cubic(σ) = (t = clamp((σ - 0.2) / 0.6, 0, 1); t^2 * (3 - 2t))
 coords = (
     "Sigma (Frierson spacing)" => SigmaCoordinates(sg, σ_half),
-    "Cubic transition 0.2–0.8" => CubicSigmaPressureCoordinates(sg, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8),
+    "Cubic transition 0.2–0.8" => SigmaPressureCoordinates(sg, σ_half; transition = cubic),
     "Ramp transition (new)" => RampSigmaPressureCoordinates(sg, σ_half),
 )
 x = range(-3, 3, 400)                           # horizontal distance [arbitrary]

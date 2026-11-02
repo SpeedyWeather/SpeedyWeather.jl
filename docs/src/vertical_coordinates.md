@@ -116,43 +116,74 @@ Pure sigma levels everywhere (``f = 1``, equivalent to `SigmaCoordinates`):
 SigmaPressureCoordinates(spectral_grid; transition = _ -> 1.0)
 ```
 
-A ready-made `CubicSigmaPressureCoordinates` uses a cubic smoothstep transition:
-pure pressure above (in the vertical sense) a given sigma value called `pressure_only_above`,
-typically in the upper atmosphere, pure sigma below `sigma_only_below` typically between the 
-boundary layer and the mid-troposphere, and a smooth cubic interpolation in between.
-The bar on each full level shows the A/B split (█ = sigma fraction, ░ = pressure fraction):
+With p = A p_ref + B pₛ the layer thickness ΔA p_ref + ΔB pₛ shrinks where the surface pressure is
+low (ΔA < 0 in the transition zone). At pₛ = r p_ref a layer is (1 - (1-r)g)/r of its sigma-coordinate
+thickness with g = dB/dσ, so a steep transition (large g) squeezes the layers over high orography,
+e.g. a cubic smoothstep from pure pressure at σ = 0.2 to pure sigma at σ = 0.8 makes layers cross
+over a mountain with a surface pressure of 500 hPa, which is unstable.
+
+We can illustrate this with the half levels over a Gaussian mountain (surface pressure down to 500 hPa)
+for sigma coordinates, the cubic transition, and the ramp transition introduced below
 
 ```@example vertical_coordinates
-CubicSigmaPressureCoordinates(spectral_grid)
+using CairoMakie
+
+nlayers = 16
+grid16 = SpectralGrid(; nlayers)
+σ_frierson = SpeedyWeather.sigma_half_spacing(nlayers, SpeedyWeather.frierson_profile)
+
+# cubic smoothstep from pure pressure at σ = 0.2 to pure sigma at σ = 0.8
+cubic(σ) = (t = clamp((σ - 0.2) / 0.6, 0, 1); t^2 * (3 - 2t))
+
+coordinates = (
+    "Sigma (Frierson spacing)" => SigmaCoordinates(grid16, σ_frierson),
+    "Cubic transition" => SigmaPressureCoordinates(grid16, σ_frierson; transition = cubic),
+    "Ramp transition" => RampSigmaPressureCoordinates(grid16, σ_frierson),
+)
+
+x = range(-3, 3, 400)                   # horizontal distance
+pₛ = @. 1e5 - 5e4 * exp(-x^2)           # surface pressure [Pa] over the mountain
+
+fig = Figure(size = (1200, 480))
+for (i, (name, coordinate)) in enumerate(coordinates)
+    ax = Axis(fig[1, i]; title = name, xlabel = "horizontal distance",
+        ylabel = i == 1 ? "pressure [hPa]" : "", yreversed = true,
+        xgridvisible = false, ygridvisible = false)
+    band!(ax, x, pₛ ./ 100, fill(1000, length(x)); color = (:gray60, 0.6))
+    for k in 1:(nlayers + 1)    # all half levels from the top to the surface
+        p = [SpeedyWeather.pressure_half(k, pₛij, coordinate) for pₛij in pₛ] ./ 100
+        lines!(ax, x, p; color = :black, linewidth = k == nlayers + 1 ? 2 : 1)
+    end
+    ylims!(ax, 1010, 0)
+end
+save("hybrid_levels.png", fig) # hide
+nothing # hide
+```
+![Half levels over a mountain](hybrid_levels.png)
+
+The cubic transition squeezes the layers in the transition zone so much that they cross at the
+top of the mountain, the ramp transition keeps them apart.
+
+A ready-made `RampSigmaPressureCoordinates` minimizes this squeeze: B is zero above `pressure_only_above`
+(pure pressure), its slope increases linearly over `ramp_width` and is constant below, B linear in σ.
+At pₛ ≈ 570 hPa the thinnest layer is then about 0.6 of its sigma thickness. Near the surface B is
+proportional to σ so that the σ spacing carries over, by default Frierson's spacing with thinner layers
+towards the surface. The bar on each full level shows the A/B split (█ = sigma fraction, ░ = pressure fraction):
+
+```@example vertical_coordinates
+RampSigmaPressureCoordinates(spectral_grid)
 ```
 
 Custom thresholds can be set:
 
 ```@example vertical_coordinates
-CubicSigmaPressureCoordinates(spectral_grid; pressure_only_above = 0.1, σ_only_below = 0.9)
+RampSigmaPressureCoordinates(spectral_grid; pressure_only_above = 0.1, ramp_width = 0.2)
 ```
 
-Or custom sigma spacing too, to have, regardless sigma or sigma-pressure coordinates
-more layers near the surface and the top of the atmosphere:
+Or a custom sigma spacing:
 
 ```@example vertical_coordinates
-(; σ_half) = FriersonSigmaCoordinates(spectral_grid)
-CubicSigmaPressureCoordinates(spectral_grid;  σ_half)
-```
-
-With p = A p_ref + B pₛ the layer thickness ΔA p_ref + ΔB pₛ shrinks where the surface pressure is
-low (ΔA < 0 in the transition zone). At pₛ = r p_ref a layer is (1 - (1-r)g)/r of its sigma-coordinate
-thickness with g = dB/dσ, so a steep transition (large g) squeezes the layers over high orography.
-The cubic transition above squeezes mid-level layers over the Tibetan plateau (pₛ ≈ 570 hPa) to
-about a quarter of their sigma thickness, which can be unstable.
-
-`RampSigmaPressureCoordinates` minimizes this squeeze: B is zero above `pressure_only_above`,
-its slope increases linearly over `ramp_width` and is constant below, B linear in σ. At pₛ ≈ 570 hPa
-the thinnest layer is then about 0.6 of its sigma thickness. Near the surface B is proportional to σ so that
-the σ spacing carries over, by default Frierson's spacing with thinner layers towards the surface
-
-```@example vertical_coordinates
-RampSigmaPressureCoordinates(spectral_grid)
+RampSigmaPressureCoordinates(spectral_grid; σ_half = SpeedyWeather.sigma_half_spacing(spectral_grid.nlayers))
 ```
 
 ### Using hybrid coordinates in a model
