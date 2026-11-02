@@ -1,6 +1,6 @@
 # Fix the implicit temperature operator and make its reference temperature selectable
 
-> Status: **completed**. Operator fixed and tested, reference temperature selectable, isothermal 300 K default.
+> Status: **completed**. Operator fixed and tested, reference temperature selectable, isothermal 300 K and Crank-Nicolson default, warning for uniform σ spacing.
 
 Date of initial draft: 2026-10-31
 
@@ -18,6 +18,16 @@ Base revision: `c147266e`
 > plus x Kelvin?
 
 ## Revision log
+
+- 2026-11-02: `centering = 0.5` (Crank-Nicolson) as default again, stable with the default
+  `FriersonSigmaCoordinates`; a warning for centering < 1 with (near-)uniformly spaced σ levels, the CI
+  test with uniform levels uses `centering = 1`.
+
+> Update the plan doc and PR, revert to 0.5 if that's possible with Frierson spacing but maybe raise a
+> warning for uniform spacing if combined with 0.5 centering?
+
+> I don't necessarily mind retiring the uniform spacing in favour of Frierson spacing if that's always
+> stable, but I'm worried the Frierson spacing is masking another problem
 
 - 2026-11-02: reverted to `centering = 1` (backward Euler). Crank-Nicolson blows up on day 1 for Held-Suarez
   with Earth orography at T32 with 16 uniformly spaced σ levels (CI, `vertical_coordinates.jl`), for both a
@@ -102,6 +112,35 @@ the Andes (~22°S, 292°E), i.e. it is caused by the orography, not by the cente
 uniformly spaced σ levels (Held-Suarez, Earth orography, T32) Crank-Nicolson is unstable (NaN on day 1),
 so backward Euler remains the default.
 
+### Crank-Nicolson with uniform σ spacing
+
+All checks with one uninterrupted `run!`: repeated short `run!` calls restart the leapfrog with damping
+Euler steps and masked the instability in earlier tests.
+
+Crank-Nicolson, Held-Suarez with Earth orography at T32, 10 days: Frierson spacing stable at 8, 16 and
+24 levels; uniform spacing stable at 8, NaN at 16 and 24 levels. Defaults (Frierson, 8 levels) stable
+for Held-Suarez and PrimitiveWet at T31, T63, T127 over 30 days. Smallest stable centering with uniform
+spacing: 0.55 at 16 levels, 0.9 at 24 levels.
+
+Isolation, 24 uniform levels, centering 0.7, 5 days (NaN unless stated):
+
+| Change | Result |
+|---|---|
+| none / no forcing and drag / Robert-Williams 0.2, 1.0 | NaN |
+| reference temperature 250 K, 300 K, 350 K, global mean | NaN |
+| advect only T − Tₖ (before #1286) | NaN |
+| WENO vertical advection / no vertical advection of u, v | NaN |
+| no vertical advection of T | stable |
+| 1st-order upwind vertical advection | stable |
+| 4× stronger horizontal diffusion | stable |
+| flat orography / half the time step | stable |
+
+The implicit operators R, U, W and L all equal the linearised explicit tendencies to round-off for
+uniform and Frierson spacing, so the implicit solver is consistent. The instability grows from the
+explicit centred vertical advection of temperature over steep orography (New Guinea first, mid-levels,
+explosive after ~15 h), it does not depend on the reference temperature. Backward Euler damps it, and so
+does Frierson spacing, which may mask the underlying cause (see Future work).
+
 ## Testing and verification
 
 - Unit test: explicit temperature tendency of a resting atmosphere equals L·D (isothermal and
@@ -121,3 +160,6 @@ so backward Euler remains the default.
 ## Future work
 
 - Hybrid coordinate linearisation (reference surface pressure), in #1236.
+- Root cause of the Crank-Nicolson instability with uniform σ spacing: the explicit centred vertical
+  advection of temperature over steep orography. Check at which layers it starts and whether 4th-order
+  centred advection or T's vertical advection evaluated at the previous time step avoid it.

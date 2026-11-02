@@ -75,7 +75,7 @@ $(TYPEDFIELDS)"""
 
     # PARAMETERS
     "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
-    centering::NF = 1.0
+    centering::NF = 0.5
 
     "[OPTION] Reference temperature profile to linearise about, isothermal or the global mean (plus offset)"
     reference_temperature::ReferenceTemperatureType = IsothermalReferenceTemperature{NF}()
@@ -153,6 +153,21 @@ as they need the temperature profile of the initial conditions and the time step
 leapfrog start."""
 function initialize!(implicit::ImplicitPrimitiveEquation, model::PrimitiveEquation)
     initialize!(implicit.schedule, model.time_stepping)
+    warn_uniform_spacing(implicit, model.geometry)
+    return nothing
+end
+
+# Crank-Nicolson (centering = 0.5) does not damp gravity waves and with (near-)uniformly spaced
+# σ levels the explicit vertical advection of temperature over steep orography can then grow
+# (e.g. Held-Suarez, T32, 16-24 levels, Earth orography), backward Euler (centering = 1) or
+# the default FriersonSigmaCoordinates are stable, see docs/dev/2026-10/2026-10-31-implicit-reference-temperature.md
+function warn_uniform_spacing(implicit::ImplicitPrimitiveEquation, geometry::AbstractGeometry)
+    implicit.centering < 1 || return nothing
+    Δσ = on_architecture(CPU(), geometry.σ_levels_thick)
+    length(Δσ) > 1 || return nothing
+    uniform = maximum(Δσ) / minimum(Δσ) < 1.1
+    uniform && @warn "Semi-implicit centering = $(implicit.centering) < 1 with (near-)uniformly spaced σ levels " *
+        "can be unstable over steep orography. Use centering = 1 (backward Euler) or FriersonSigmaCoordinates."
     return nothing
 end
 

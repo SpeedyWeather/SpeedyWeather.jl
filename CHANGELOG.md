@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fix the vertical advection part of the semi-implicit temperature operator, and choose the implicit reference temperature with `IsothermalReferenceTemperature` (300 K, new default) `GlobalMeanReferenceTemperature` (plus offset) or `MaximumReferenceTemperature` (plus margin) [#1369](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1369)
+- Fix the vertical advection part of the semi-implicit temperature operator, and choose the implicit reference temperature with `IsothermalReferenceTemperature` (300 K, new default) `GlobalMeanReferenceTemperature` (plus offset) or `MaximumReferenceTemperature` (plus margin); Crank-Nicolson (`centering = 0.5`) as default, with a warning for uniform σ spacing [#1369](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1369)
 - `BalancedZonalState` jet peaks at σ ≈ 0.2 and decays above (`σ_jet`, `jet_decay`), `σ_jet = 0` for the previous monotonic profile [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - `BalancedZonalState` uses the atmosphere's `reference_temperature` and lapse rate, default `moist_lapse_rate` of `EarthAtmosphere` 5 → 5.7 K/km [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - Initial snow depth estimated from the top-layer soil temperature instead of 0, to start on the right side of the snow-albedo feedback [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)

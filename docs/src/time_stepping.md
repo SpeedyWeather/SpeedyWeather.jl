@@ -407,9 +407,10 @@ implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = StepSchedule(1), 
 model = PrimitiveWetModel(spectral_grid; implicit)
 ```
 
-The semi-implicit corrections are backward Euler by default, `centering = 1`, which damps the
-gravity waves. `centering = 0.5` (Crank-Nicolson) is centred in time but can be unstable, e.g.
-with many vertical levels over steep orography.
+The semi-implicit corrections are centred in time by default, `centering = 0.5` (Crank-Nicolson).
+`centering = 1` is backward Euler, which damps the gravity waves. With (near-)uniformly spaced
+σ levels, i.e. `SigmaCoordinates(spectral_grid)`, Crank-Nicolson can be unstable over steep
+orography (a warning is raised), use the default `FriersonSigmaCoordinates` or `centering = 1` there.
 The schedule is only used with a reference temperature profile that is recomputed from the
 global-mean temperature. The semi-implicit solver linearises about a reference temperature
 profile ``T_k``, chosen with `reference_temperature`

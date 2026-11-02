@@ -71,3 +71,14 @@ end
         @test temp_tend[2:10, :] ≈ LD rtol = 1.0e-10
     end
 end
+
+@testset "Warn for Crank-Nicolson with uniform σ spacing" begin
+    spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
+    uniform = Geometry(spectral_grid; vertical_coordinates = SigmaCoordinates(spectral_grid))
+    frierson = Geometry(spectral_grid; vertical_coordinates = FriersonSigmaCoordinates(spectral_grid))
+    crank_nicolson = ImplicitPrimitiveEquation(spectral_grid; centering = 0.5)
+    backward_euler = ImplicitPrimitiveEquation(spectral_grid; centering = 1)
+    @test_logs (:warn,) SpeedyWeather.warn_uniform_spacing(crank_nicolson, uniform)
+    @test_logs SpeedyWeather.warn_uniform_spacing(crank_nicolson, frierson)
+    @test_logs SpeedyWeather.warn_uniform_spacing(backward_euler, uniform)
+end
