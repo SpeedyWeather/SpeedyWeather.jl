@@ -174,6 +174,34 @@ end
     @test length(G3.σ_levels_full) == 3
 end
 
+@testset "RampSigmaPressureCoordinates" begin
+    spectral_grid = SpectralGrid(nlayers = 8)
+    @test RampSigmaPressureCoordinates() isa SigmaPressureCoordinates
+
+    # default uses Frierson's σ spacing
+    H = RampSigmaPressureCoordinates(spectral_grid)
+    @test Array(H.A_half) .+ Array(H.B_half) ≈ SpeedyWeather.sigma_half_spacing(8, SpeedyWeather.frierson_profile)
+    @test RampSigmaPressureCoordinates(spectral_grid, SpeedyWeather.frierson_profile) isa SigmaPressureCoordinates
+    @test RampSigmaPressureCoordinates(spectral_grid, collect(range(0, 1, 9))) isa SigmaPressureCoordinates
+
+    # transition: pure pressure above, B(1) = 1, B monotonic
+    a, w = 0.2, 0.3
+    B(σ) = σ * SpeedyWeather.ramp_transition(σ; pressure_only_above = a, ramp_width = w)
+    @test B(0.0) == 0
+    @test B(a) == 0
+    @test B(1.0) ≈ 1
+    σs = range(0, 1, 101)
+    @test issorted(B.(σs))
+    # slope dB/dσ ≤ g_max = 1/(1 - a - w/2), constant below the ramp
+    g_max = 1 / (1 - a - w / 2)
+    @test all(diff(B.(σs)) ./ step(σs) .<= g_max * (1 + 1e-10))
+    @test (B(0.9) - B(0.8)) / 0.1 ≈ g_max
+
+    # layers over high orography (pₛ = 570 hPa) stay ≥ 0.5 of their sigma-coordinate thickness
+    Δp(pₛ) = [SpeedyWeather.pressure_thickness(k, pₛ, H) for k in 1:8]
+    @test minimum(Δp(5.7f4) ./ (0.57f0 .* Δp(1.0f5))) > 0.5
+end
+
 @testset "CubicSigmaPressureCoordinates" begin
 
     spectral_grid = SpectralGrid(nlayers = 8)

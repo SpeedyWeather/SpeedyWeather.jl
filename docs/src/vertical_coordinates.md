@@ -140,10 +140,25 @@ more layers near the surface and the top of the atmosphere:
 CubicSigmaPressureCoordinates(spectral_grid;  σ_half)
 ```
 
+With p = A p_ref + B pₛ the layer thickness ΔA p_ref + ΔB pₛ shrinks where the surface pressure is
+low (ΔA < 0 in the transition zone). At pₛ = r p_ref a layer is (1 - (1-r)g)/r of its sigma-coordinate
+thickness with g = dB/dσ, so a steep transition (large g) squeezes the layers over high orography.
+The cubic transition above squeezes mid-level layers over the Tibetan plateau (pₛ ≈ 570 hPa) to
+about a quarter of their sigma thickness, which can be unstable.
+
+`RampSigmaPressureCoordinates` minimizes this squeeze: B is zero above `pressure_only_above`,
+its slope increases linearly over `ramp_width` and is constant below, B linear in σ. At pₛ ≈ 570 hPa
+the thinnest layer is then about 0.6 of its sigma thickness. Near the surface B is proportional to σ so that
+the σ spacing carries over, by default Frierson's spacing with thinner layers towards the surface
+
+```@example vertical_coordinates
+RampSigmaPressureCoordinates(spectral_grid)
+```
+
 ### Using hybrid coordinates in a model
 
 ```@example vertical_coordinates
-S = CubicSigmaPressureCoordinates(spectral_grid)
+S = RampSigmaPressureCoordinates(spectral_grid)
 geometry = Geometry(spectral_grid; vertical_coordinates = S)
 model = PrimitiveDryModel(spectral_grid; geometry)
 simulation = initialize!(model)

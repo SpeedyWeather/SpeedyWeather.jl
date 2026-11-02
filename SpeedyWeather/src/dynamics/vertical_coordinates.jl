@@ -424,8 +424,45 @@ end
 Sigma-pressure coordinate with a cubic smoothstep transition: pure pressure levels near the
 top of the atmosphere (σ ≤ `pressure_only_above`), pure sigma levels near the surface (σ ≥ `σ_only_below`), and
 a cubic smoothstep transition in between. The thresholds and transition shape are a pragmatic
-choice and do not follow any specific operational model's formulation."""
+choice and do not follow any specific operational model's formulation. Note that the steep
+transition squeezes layers over high orography (e.g. to ~1/4 of their sigma-coordinate thickness
+at pₛ ≈ 570 hPa), which can be unstable, see `RampSigmaPressureCoordinates` instead."""
 CubicSigmaPressureCoordinates(SG::SpectralGrid, args...; pressure_only_above = 0.2, σ_only_below = 0.8, kwargs...) =
     SigmaPressureCoordinates(SG, args...; transition = σ -> cubic_transition(σ; pressure_only_above, σ_only_below), kwargs...)
 
 CubicSigmaPressureCoordinates(args...; kwargs...) = CubicSigmaPressureCoordinates(SpectralGrid(), args...; kwargs...)
+
+export RampSigmaPressureCoordinates
+
+"""$(TYPEDSIGNATURES)
+Transition function for `RampSigmaPressureCoordinates`, returning B(σ)/σ. The slope g = dB/dσ
+is 0 for σ ≤ `pressure_only_above` (pure pressure), increases linearly over `ramp_width` and is
+constant g_max = 1/(1 - pressure_only_above - ramp_width/2) below, so that B(1) = 1. As the
+pressure thickness of a layer at surface pressure pₛ = r*p_ref relative to sigma coordinates is
+(1 - (1-r)g)/r, a constant g (B linear in σ) minimizes the squeeze of layers over high orography
+for a given `pressure_only_above`, the ramp avoids a jump in layer thickness."""
+function ramp_transition(σ; pressure_only_above = 0.2, ramp_width = 0.3)
+    a = oftype(σ, pressure_only_above)
+    w = oftype(σ, ramp_width)
+    x = σ - a
+    g_max = 1 / (1 - a - w / 2)
+    B = ifelse(x <= 0, zero(σ), ifelse(x <= w, g_max * x^2 / (2w), g_max * (w / 2 + (x - w))))
+    return ifelse(σ > 0, B / σ, zero(σ))
+end
+
+"""$(TYPEDSIGNATURES)
+Sigma-pressure coordinate with pure pressure levels above σ = `pressure_only_above` and a B(σ)
+that grows linearly in σ below a ramp of width `ramp_width` (see `ramp_transition`). Compared to
+`CubicSigmaPressureCoordinates` this keeps the layers thick over high orography: at pₛ ≈ 570 hPa
+the thinnest layer is ~0.6 of its sigma-coordinate thickness (defaults), for 0.2-0.27 with the
+cubic transition. Near the surface B is proportional to σ so that the σ spacing (e.g. thinner
+layers towards the surface with the default Frierson spacing) carries over."""
+# σ_half as vector or σ spacing profile function as in SigmaPressureCoordinates
+RampSigmaPressureCoordinates(SG::SpectralGrid, σ_half_or_profile; pressure_only_above = 0.2, ramp_width = 0.3, kwargs...) =
+    SigmaPressureCoordinates(SG, σ_half_or_profile; transition = σ -> ramp_transition(σ; pressure_only_above, ramp_width), kwargs...)
+
+# default with Frierson's σ spacing (as FriersonSigmaCoordinates) for thinner layers towards the surface
+RampSigmaPressureCoordinates(SG::SpectralGrid; σ_half = sigma_half_spacing(SG.nlayers, frierson_profile), kwargs...) =
+    RampSigmaPressureCoordinates(SG, σ_half; kwargs...)
+
+RampSigmaPressureCoordinates(args...; kwargs...) = RampSigmaPressureCoordinates(SpectralGrid(), args...; kwargs...)

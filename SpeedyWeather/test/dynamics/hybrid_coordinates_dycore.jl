@@ -137,17 +137,11 @@ end
     end
 end
 
-@testset "PrimitiveDryModel + CubicSigmaPressureCoordinates + HeldSuarez stays finite" begin
-    # item 6: the case that would have caught the NaN bug -- a genuine (non-degenerate)
-    # pressure/sigma transition, not the pure-sigma transition = _ -> 1 used everywhere else
-    # before this PR.
-    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
-    # Frierson σ spacing: with uniform spacing this steep transition squeezes the mid-level layers
-    # over high orography to ~1/4 of their sigma-coordinate thickness, which is unstable
-    σ_half = SpeedyWeather.sigma_half_spacing(spectral_grid.nlayers, SpeedyWeather.frierson_profile)
-    coord = CubicSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8)
+"""Short Held-Suarez integration with Earth orography for `coord` must stay finite."""
+function held_suarez_stays_finite(spectral_grid, coord; time_stepping = Leapfrog(spectral_grid))
     model = PrimitiveDryModel(
         spectral_grid;
+        time_stepping,
         geometry = Geometry(spectral_grid; vertical_coordinates = coord),
         orography = EarthOrography(spectral_grid),
         forcing = HeldSuarez(spectral_grid),
@@ -163,4 +157,25 @@ end
     @test all(isfinite, Array(simulation.variables.prognostic.divergence))
     @test all(isfinite, Array(simulation.variables.prognostic.temperature))
     @test all(isfinite, Array(simulation.variables.prognostic.pressure))
+end
+
+@testset "PrimitiveDryModel + CubicSigmaPressureCoordinates + HeldSuarez stays finite" begin
+    # item 6: the case that would have caught the NaN bug -- a genuine (non-degenerate)
+    # pressure/sigma transition, not the pure-sigma transition = _ -> 1 used everywhere else
+    # before this PR.
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+    # Frierson σ spacing: with uniform spacing this steep transition squeezes the mid-level layers
+    # over high orography to ~1/4 of their sigma-coordinate thickness, which is unstable
+    σ_half = SpeedyWeather.sigma_half_spacing(spectral_grid.nlayers, SpeedyWeather.frierson_profile)
+    coord = CubicSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.2, σ_only_below = 0.8)
+    held_suarez_stays_finite(spectral_grid, coord)
+end
+
+@testset "PrimitiveDryModel + RampSigmaPressureCoordinates (24 levels) + HeldSuarez stays finite" begin
+    # the ramp transition keeps layers thick over high orography, also with more levels;
+    # time step reduced for the higher vertical resolution as in vertical_coordinates.jl
+    spectral_grid = SpectralGrid(truncation = 31, nlayers = 24)
+    (; Δt_at_T32) = Leapfrog(spectral_grid)
+    time_stepping = Leapfrog(spectral_grid; Δt_at_T32 = Δt_at_T32 * 12 / 24)
+    held_suarez_stays_finite(spectral_grid, RampSigmaPressureCoordinates(spectral_grid); time_stepping)
 end

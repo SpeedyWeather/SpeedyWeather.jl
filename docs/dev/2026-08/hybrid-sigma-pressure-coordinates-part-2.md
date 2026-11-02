@@ -88,6 +88,18 @@ Base revision: 20467269399f40212fee413a545496226de999ca
 
 > Do generalise the initial conditions to hybrid coordinates too
 
+- 2026-11-02: new `RampSigmaPressureCoordinates` (`ramp_transition`): B = 0 above
+  `pressure_only_above` (0.2), slope dB/dσ increasing linearly over `ramp_width` (0.3), then constant,
+  i.e. B linear in σ, which minimizes the squeeze over orography (thinnest layer ≈0.59 of its σ
+  thickness at 570 hPa vs 0.2-0.27 for the cubic). Default Frierson σ spacing. Held-Suarez with Earth
+  orography at T32, 10 days: stable at 8, 16, 24, 48 levels with Frierson spacing for Crank-Nicolson and
+  backward Euler (time step ×12/nlayers above 12 levels); with uniform spacing stable at 8, NaN at 16-48.
+  At 24 levels and T31 the ramp needs Δt = 1200 s, sigma (Frierson) 1800 s, both NaN at 2400 s.
+
+> Feel free to adjust this transition. This was originally implemented as a draft just to show how the
+> transition could be done. As long as the Frierson idea of having thinner layers towards the surface
+> remains (the B part) you have freedom
+
 ## Problem description
 
 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137) ("Sigma-pressure
@@ -500,6 +512,9 @@ PR; per-function checks and the short integration are.
   | 24, Frierson | cubic 0-1 / B = σ² | 0.48 / 0.25 | ok | ok |
   | 24, uniform | B = σ² | 0.28 | NaN | ok (as σ coordinates) |
 
+- `RampSigmaPressureCoordinates` avoids the squeeze, but is still unstable with uniform σ spacing at
+  ≥ 16 levels (σ coordinates are stable there with backward Euler), and needs a shorter time step than
+  σ coordinates at 24 levels (1200 s vs 1800 s at T31).
 - **Implicit solver** linearised at a single pᵣ, the semi-implicit correction is less well
   conditioned where pₛ departs far from pᵣ.
 - **Betts-Miller convection** and **`BulkRichardsonDiffusion`** remain nominal-σ
@@ -511,7 +526,7 @@ PR; per-function checks and the short integration are.
 
 ## Future work
 
-- Default transition of `CubicSigmaPressureCoordinates` that keeps layers thick enough over
-  high orography, or a check/warning for the minimum layer thickness at a low pₛ.
+- A check/warning for the minimum layer thickness at a low pₛ for user-defined transitions.
+- Why hybrid coordinates with uniform σ spacing remain less stable than σ coordinates.
 - Pressure-based Betts-Miller and vertical diffusion.
 - GPU benchmarks for the hybrid path (`SpeedyWeather/benchmark/`).
