@@ -1,6 +1,7 @@
 # Hybrid sigma-pressure coordinates, part 2: the dynamical core
 
-> Status: **in progress**. Sections 1-8 and 10 (dynamical core generalisation and the
+> Status: **in progress**. Dynamical core made consistent (exact geopotential, hybrid pressure
+> gradient force, linearisation at 0.8·mean pₛ, hybrid initial conditions), see revision log 2026-11-02. Sections 1-8 and 10 (dynamical core generalisation and the
 > nominal-σ fix) and section 9 (parameterizations/forcings) are implemented; tests
 > (accessor identities, nominal-σ regression, mass consistency, hybrid-vs-sigma
 > backwards-compatibility of the dycore, and a short CubicSigmaPressureCoordinates +
@@ -59,6 +60,33 @@ Base revision: 20467269399f40212fee413a545496226de999ca
   Confirmed section 9 (parameterizations/forcings) landed concurrently
   (`3bed667e`/`1fe290b1`/`464757f2`) and all touched test suites pass with
   `--check-bounds=yes`.
+
+- 2026-11-02: merged main and #1369 (implicit temperature operator fix, isothermal reference
+  temperature, Crank-Nicolson default). With the momentum equation still in σ form
+  (RTᵥ∇ln pₛ in every layer, nominal-σ spectral geopotential) but continuity, vertical velocity
+  and the temperature equation hybrid, the cubic hybrid Held-Suarez run blew up over Tibet.
+  Made the dynamical core consistent:
+  - exact spectral geopotential for hybrid coordinates: the existing exact grid geopotential
+    kernel, evaluated on the `LinearDynamicalCore` step (as the spectral virtual temperature for
+    σ coordinates, required by the semi-implicit scheme), transformed to spectral space;
+  - pressure gradient force RTᵥ∇ln pₖ = RTᵥ(Bₖpₛ/pₖ)∇ln pₛ in a kernel shared with σ coordinates
+    (factor 1 there), its linear part R Tₖ cₖ ∇ln pₛ treated semi-implicitly;
+  - implicit operators R, U, L, W for hybrid coordinates linearised at
+    pᵣ = 0.8·exp(global mean ln pₛ) (`surface_pressure_factor`, from the l=m=0 mode as the
+    reference temperature), U including cₖ and ∂Φ/∂ln pₛ of the exact geopotential, L with B at
+    the interfaces. 0.8 (≈780 hPa, IFS uses 800 hPa) is stable, ≈970 hPa is not;
+  - default initial conditions (`ZonalWind`, `JablonowskiTemperature`, `BalancedZonalState`,
+    `ConstantRelativeHumidity`) evaluated at η = p/pₛ per grid point for hybrid coordinates,
+    surface pressure initialized first. σ coordinates unchanged.
+  The explicit tendencies match the implicit operators for small perturbations (R, U to
+  3e-10/5e-8 from the nonlinearity in pₛ, L and W to round-off). The remaining instabilities
+  come from the coordinate design, see Known limitations.
+
+> Yes please make the hybrid geopotential exact and change the pressure-gradient force
+> accordingly. I believe this can be done in a way that we reuse as much code as possible in
+> the sigma coordinates case?
+
+> Do generalise the initial conditions to hybrid coordinates too
 
 ## Problem description
 
@@ -457,14 +485,23 @@ PR; per-function checks and the short integration are.
 
 ## Known limitations
 
-- **Spectral geopotential** still uses the precomputed `Δp_geopot_*` constants, i.e. the
-  ratio `ln(p_{k+½}/p_k)` evaluated at pₛ = p_ref. Exact in the pure-pressure and pure-sigma
-  limits, approximate only in the blend zone. The grid geopotential (used by the
-  parameterizations) *is* exact from #1137, so the two differ slightly for hybrid
-  coordinates.
-- **Implicit solver** operators are the linearisation about pₛ = p_ref. Correct as a
-  linearisation (see Background) but the semi-implicit correction is less well conditioned
-  for hybrid coordinates when pₛ departs far from p_ref.
+- **Layer squeeze over orography.** In the transition zone ΔAₖ < 0, so the layer thickness
+  ΔAₖp_ref + ΔBₖpₛ shrinks where pₛ is low. With `CubicSigmaPressureCoordinates(pressure_only_above = 0.2,
+  σ_only_below = 0.8)` mid-level layers over Tibet (pₛ ≈ 570 hPa) shrink to 0.2-0.27 of their σ
+  thickness, which is unstable (Held-Suarez, T32, Earth orography) with uniform σ spacing at 8 levels and
+  with 24 levels. Gentler transitions (cubic 0-1, or B = σ²) are stable where σ coordinates are:
+
+  | Levels, spacing | Transition | thinnest layer/σ at 570 hPa | CN | BE |
+  |---|---|---|---|---|
+  | 8, uniform | cubic 0.2-0.8 | 0.27 | NaN | NaN |
+  | 8, uniform | cubic 0-1 | 0.51 | ok | ok |
+  | 8, Frierson | cubic 0.2-0.8 | 0.27 | ok | ok |
+  | 24, Frierson | cubic 0.2-0.8 | 0.20 | NaN | NaN |
+  | 24, Frierson | cubic 0-1 / B = σ² | 0.48 / 0.25 | ok | ok |
+  | 24, uniform | B = σ² | 0.28 | NaN | ok (as σ coordinates) |
+
+- **Implicit solver** linearised at a single pᵣ, the semi-implicit correction is less well
+  conditioned where pₛ departs far from pᵣ.
 - **Betts-Miller convection** and **`BulkRichardsonDiffusion`** remain nominal-σ
   formulations. Reference profiles and the ∂σ(K ∂σ) operator would need to be rederived in
   pressure to be fully coordinate-agnostic.
@@ -474,9 +511,7 @@ PR; per-function checks and the short integration are.
 
 ## Future work
 
-- Exact spectral geopotential for hybrid coordinates (compute in grid space and transform;
-  costs one extra 3D transform per step, and removes the `spectral_geopotential` variable
-  TODO in `geopotential.jl`).
-- Reference-state-dependent implicit operators, or a two-reference-pressure linearisation.
+- Default transition of `CubicSigmaPressureCoordinates` that keeps layers thick enough over
+  high orography, or a check/warning for the minimum layer thickness at a low pₛ.
 - Pressure-based Betts-Miller and vertical diffusion.
 - GPU benchmarks for the hybrid path (`SpeedyWeather/benchmark/`).
