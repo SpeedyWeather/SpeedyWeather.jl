@@ -223,7 +223,7 @@ function initialize!(
         adiabatic_conversion::AbstractAdiabaticConversion,
     )
     (; nlayers) = implicit
-    (; σ_levels_half, σ_levels_thick) = geometry
+    (; σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
     (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
@@ -268,8 +268,11 @@ function initialize!(
     k_below = min.(rows .+ 1, nlayers)
     ΔT_below = temp_profile[k_below] .- temp_profile[rows]
     ΔT_above = temp_profile[rows] .- temp_profile[k_above]
-    σₖ₊½ = σ_levels_half[rows .+ 1]             # σ at the interface below layer k
-    σₖ₋½ = σ_levels_half[rows]                  # and above
+    # ∂p/∂pₛ at the interfaces below/above layer k, σ for SigmaCoordinates, B for hybrid
+    # coordinates as in vertical_velocity!, all other weights are the nominal σ (exact at pₛ = p_ref)
+    B_half = pressure_sensitivity_half(geometry.vertical_coordinates)
+    σₖ₊½ = B_half[rows .+ 1]
+    σₖ₋½ = B_half[rows]
     Δσᵣ = σ_levels_thick[cols]
 
     # centred vertical advection of Tₖ, -1/(2Δσₖ)*(σ̇ₖ₊½*ΔT_below + σ̇ₖ₋½*ΔT_above) as in

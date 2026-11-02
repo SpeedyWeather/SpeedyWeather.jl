@@ -166,6 +166,11 @@ Sensitivity of the pressure at half level `k` (interface k-½) to `surface_press
 @inline pressure_sensitivity_half(k::Integer, coordinate::SigmaCoordinates) = coordinate.σ_half[k]
 
 """$(TYPEDSIGNATURES)
+Vector of the sensitivities of the pressure at all half levels to surface pressure, ∂p_{k-½}/∂pₛ,
+for sigma `coordinate`. Equals `σ_half` for `SigmaCoordinates`."""
+pressure_sensitivity_half(coordinate::SigmaCoordinates) = coordinate.σ_half
+
+"""$(TYPEDSIGNATURES)
 Sensitivity of the pressure thickness of full level `k` to `surface_pressure`, ∂Δp_k/∂pₛ,
 for sigma `coordinate`. Equals Δσ_k for `SigmaCoordinates`."""
 @inline pressure_thickness_sensitivity(k::Integer, coordinate::SigmaCoordinates) = coordinate.σ_thickness[k]
@@ -387,6 +392,11 @@ Sensitivity of the pressure at half level `k` (interface k-½) to `surface_press
 ∂p_{k-½}/∂pₛ, for hybrid sigma-pressure `coordinate`. Returns `B_half[k]`. Equals
 σ_half[k] for `SigmaCoordinates`."""
 @inline pressure_sensitivity_half(k::Integer, coordinate::SigmaPressureCoordinates) = coordinate.B_half[k]
+
+"""$(TYPEDSIGNATURES)
+Vector of the sensitivities of the pressure at all half levels to surface pressure, ∂p_{k-½}/∂pₛ,
+for hybrid sigma-pressure `coordinate`. Returns `B_half`."""
+pressure_sensitivity_half(coordinate::SigmaPressureCoordinates) = coordinate.B_half
 
 """$(TYPEDSIGNATURES)
 Sensitivity of the pressure thickness of full level `k` to `surface_pressure`, ∂Δp_k/∂pₛ,
