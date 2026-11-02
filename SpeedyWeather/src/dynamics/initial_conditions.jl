@@ -22,11 +22,9 @@ end
 
 """$(TYPEDSIGNATURES) Default initial conditions for the PrimitiveWetModel."""
 function InitialConditions(spectral_grid, ::Type{<:PrimitiveWet})
-    vordiv = ZonalWind(spectral_grid)
-    pres = PressureOnOrography(spectral_grid)
-    temp = JablonowskiTemperature(spectral_grid)
+    zonal = BalancedZonalState(spectral_grid)   # includes surface pressure
     humid = ConstantRelativeHumidity(spectral_grid)
-    return (; vordiv, pres, temp, humid)
+    return (; zonal, humid)
 end
 
 """$(TYPEDSIGNATURES)
@@ -481,11 +479,6 @@ Adapt.@adapt_structure JablonowskiVorticity
     # argument reduction / NaN-Inf handling
     φ_rad = deg2rad(φ)
     sinφ, cosφ = sin(φ_rad), cos(φ_rad)
-    cosΔλ = cos(deg2rad(λ - λc))
-
-    # great circle distance to perturbation
-    X = clamp(sinφc * sinφ + cosφc * cosφ * cosΔλ, 0, 1)
-    r = radius * acos(X)
 
     # Eq (3), the unperturbed zonal wind
     # NOTE: `x^(3//2)` does NOT stay in Float32. Base computes a fractional power as
@@ -495,11 +488,24 @@ Adapt.@adapt_structure JablonowskiVorticity
     cosηᵥ = cos((η - η₀) * π / 2)
     ζ = -4 * u₀ / radius * (cosηᵥ * sqrt(cosηᵥ)) * sinφ * cosφ * (2 - 5sinφ^2)
 
-    # Eq (12), the perturbation
-    perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
-        (tan(φ_rad) - 2 * (radius / R)^2 * acos(X) * (sinφc * cosφ - cosφc * sinφ * cosΔλ) / sqrt(1 - X^2))
+    return ζ + jablonowski_vorticity_perturbation(φ_rad, λ, sinφc, cosφc, λc, radius, perturb_uₚ, R)
+end
 
-    return ζ + perturbation
+"""$(TYPEDSIGNATURES)
+Vorticity of the Gaussian zonal wind perturbation centred at `sinφc, cosφc, λc` in
+Jablonowski and Williamson, 2006, eq. (12). `φ_rad` in radians, `λ, λc` in degrees."""
+@inline function jablonowski_vorticity_perturbation(φ_rad, λ, sinφc, cosφc, λc, radius, perturb_uₚ, R)
+    # plain sin/cos/tan avoid AMDGPU hostcalls (see JablonowskiVorticity)
+    sinφ, cosφ = sin(φ_rad), cos(φ_rad)
+    cosΔλ = cos(deg2rad(λ - λc))
+
+    # great circle distance to perturbation
+    X = clamp(sinφc * sinφ + cosφc * cosφ * cosΔλ, 0, 1)
+    r = radius * acos(X)
+
+    # Eq (12), the perturbation
+    return perturb_uₚ / radius * exp(-(r / R)^2) *
+        (tan(φ_rad) - 2 * (radius / R)^2 * acos(X) * (sinφc * cosφ - cosφc * sinφ * cosΔλ) / sqrt(1 - X^2))
 end
 
 # <: Function so that it works with our `set!`
@@ -711,6 +717,187 @@ end
     )
 end
 
+export BalancedZonalState
+
+"""
+Zonal wind and temperature in thermal wind balance, generalising the Jablonowski and
+Williamson, 2006 (JW) initial conditions to a vertical wind profile and a global-mean
+temperature profile close to the equilibrium climate of the `PrimitiveWetModel`.
+With the dimensionless log-pressure coordinate z = -ln(σ) (not a height in meters)
+the zonal wind is
+
+    u(φ, σ) = U(σ) sin²(2φ),    U(σ) = u₀ tanh(z / H) f(z)
+    f(z) = exp(-((z - z_jet) / D)²) for z > z_jet = -ln(σ_jet), 1 otherwise
+
+which is zero at the surface, increases about linearly with z in the troposphere and
+decays above the jet at about σ_jet with a decay scale D (`jet_decay`). Use `σ_jet = 0`
+for no decay (f = 1), so that the wind increases monotonically up to the model top.
+Balance then gives the temperature (JW eq. 6 is the special case U = u₀cos^(3/2)(ηᵥ))
+
+    T(φ, σ) = T̄(σ) + (1/R_d) dU/dz (2A(φ)U + B(φ)RΩ)
+    A(φ) = -2sin⁶(φ)(cos²(φ) + 1/3) + 10/63
+    B(φ) = 8/5 cos³(φ)(sin²(φ) + 2/3) - π/4
+
+A and B have zero global mean, so T̄(σ) = max(T₀ σ^(R_dΓ/g), Tmin) is the global-mean
+temperature profile, with T₀ = `atmosphere.reference_temperature` and Γ = `lapse_rate(atmosphere)`
+(the moist lapse rate for wet atmospheres). Sets vorticity (including the JW perturbation to trigger baroclinic
+instability), divergence (JW perturbation), surface pressure and temperature. The surface
+pressure is hydrostatic with T₀ - Γh on orography of height h and temperature is evaluated with
+p/p₀ = σpₛ/p₀ instead of σ, so that both are consistent over orography. Do not combine
+with `PressureOnOrography`, which would overwrite the surface pressure. Combine with
+`ConstantRelativeHumidity` for humidity.
+$(TYPEDFIELDS)"""
+@kwdef struct BalancedZonalState{NF} <: AbstractInitialConditions
+    "[OPTION] Zonal wind speed scale, U = u₀ tanh(z / H) f(z), z = -ln(σ) [m/s]"
+    u₀::NF = 56
+
+    "[OPTION] Vertical scale of the zonal wind in z = -ln(σ), U = u₀ tanh(z / H) f(z) [1]"
+    H::NF = 2
+
+    "[OPTION] σ level above which the zonal wind decays, 0 for no decay [1]"
+    σ_jet::NF = 0.3
+
+    "[OPTION] Decay scale D in z = -ln(σ) above the jet, f(z) = exp(-((z - z_jet) / D)²) [1]"
+    jet_decay::NF = 1.5
+
+    "[OPTION] Minimum global-mean temperature, isothermal stratosphere above [K]"
+    Tmin::NF = 226
+
+    # PERTURBATION
+    "[OPTION] perturbation centred at [˚N]"
+    perturb_lat::NF = 40
+
+    "[OPTION] perturbation centred at [˚E]"
+    perturb_lon::NF = 20
+
+    "[OPTION] perturbation strength [m/s]"
+    perturb_uₚ::NF = 1
+
+    "[OPTION] radius of Gaussian perturbation in units of Earth's radius [1]"
+    perturb_radius::NF = 1 / 10
+end
+
+BalancedZonalState(SG::SpectralGrid; kwargs...) = BalancedZonalState{SG.NF}(; kwargs...)
+
+# fallback for models without temperature
+initialize!(::Variables, ::BalancedZonalState, ::AbstractModel) = nothing
+
+"""$(TYPEDSIGNATURES)
+Initialize vorticity, divergence and temperature with `BalancedZonalState`."""
+function initialize!(
+        vars::Variables,
+        initial_conditions::BalancedZonalState{NF},
+        model::PrimitiveEquation,
+    ) where {NF}
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+    haskey(vars.prognostic, :temperature) || warn_undefvar(vars, :temperature) && return nothing
+
+    (; u₀, H, Tmin, σ_jet, jet_decay) = initial_conditions
+    z_jet = -log(σ_jet)                 # = Inf for σ_jet = 0, i.e. no decay
+    T₀ = model.atmosphere.reference_temperature
+    Γ = lapse_rate(model.atmosphere)
+    (; perturb_uₚ, perturb_radius) = initial_conditions
+    (; radius, rotation, gravity) = model.planet
+    (; R_dry) = model.atmosphere
+    (; grid, nlayers) = model.spectral_grid
+
+    # VORTICITY AND DIVERGENCE
+    λc = initial_conditions.perturb_lon
+    sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
+    R = radius * perturb_radius         # spatial extent of perturbation
+    vor_ic = BalancedZonalVorticity(sinφc, cosφc, λc, radius, u₀, H, z_jet, jet_decay, perturb_uₚ, R)
+    div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, zero(NF), perturb_uₚ, R)
+    set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true)
+
+    # SURFACE PRESSURE, hydrostatic with the global-mean temperature T₀ - Γh on orography
+    # so that the temperature below is consistent with it (otherwise gravity waves)
+    (; orography) = model.orography
+    p₀ = model.atmosphere.reference_pressure
+    RΓg⁻¹ = R_dry * Γ / gravity
+    lnp_grid = similar(orography)
+    @. lnp_grid = log(p₀) + log(1 - Γ / T₀ * orography) / RΓg⁻¹
+    set!(vars, model; pressure = lnp_grid)
+
+    # TEMPERATURE, evaluated at p/p₀ = σpₛ/p₀ (not σ) so that it is hydrostatically
+    # consistent with the surface pressure on orography
+    temp_grid = zeros(NF, grid, nlayers)
+    aΩ = radius * rotation
+    launch!(
+        architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
+        balanced_zonal_temperature_kernel!, temp_grid, lnp_grid, model.geometry.σ_levels_full,
+        model.geometry.latds, initial_conditions, z_jet, T₀, log(p₀), RΓg⁻¹, R_dry, aΩ,
+    )
+    set!(vars, model; temperature = temp_grid)
+    return nothing
+end
+
+@kernel inbounds = true function balanced_zonal_temperature_kernel!(
+        temp_grid, lnp_grid, σ_levels_full, φ, initial_conditions, z_jet, T₀, lnp₀, RΓg⁻¹, R_dry, aΩ,
+    )
+    ij, k = @index(Global, NTuple)
+    (; u₀, H, Tmin, jet_decay) = initial_conditions
+
+    # plain sin/cos avoid AMDGPU hostcalls (see JablonowskiVorticity)
+    φij = deg2rad(φ[ij])
+    sinφ = sin(φij)
+    cosφ = cos(φij)
+    NF = eltype(temp_grid)
+
+    # vertical coordinate z = -ln(p/p₀) with p = σpₛ
+    z = -(log(σ_levels_full[k]) + lnp_grid[ij] - lnp₀)
+    T̄ = max(T₀ * exp(-RΓg⁻¹ * z), Tmin)    # global-mean temperature [K]
+    U, dUdz = balanced_zonal_wind(z, u₀, H, z_jet, jet_decay)  # zonal wind amplitude [m/s]
+    dUdz_R = dUdz / R_dry
+
+    A = -2sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63
+    B = 8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - convert(NF, π) * 1 // 4
+    temp_grid[ij, k] = T̄ + dUdz_R * (2A * U + B * aΩ)
+end
+
+# <: Function so that it works with our `set!`
+struct BalancedZonalVorticity{NF} <: Function
+    sinφc::NF
+    cosφc::NF
+    λc::NF
+    radius::NF
+    u₀::NF
+    H::NF
+    z_jet::NF
+    jet_decay::NF
+    perturb_uₚ::NF
+    R::NF
+end
+
+Adapt.@adapt_structure BalancedZonalVorticity
+
+"""$(TYPEDSIGNATURES)
+Zonal wind amplitude U = u₀ tanh(z/H) f(z) of `BalancedZonalState` and its derivative dU/dz
+in z = -ln(σ), with f(z) = exp(-((z - z_jet)/D)²) above z_jet and 1 below."""
+@inline function balanced_zonal_wind(z, u₀, H, z_jet, D)
+    t = tanh(z / H)
+    above = z > z_jet
+    Δz = above ? (z - z_jet) / D : zero(z)
+    f = exp(-Δz^2)
+    dfdz = -2Δz / D * f
+    U = u₀ * t * f
+    dUdz = u₀ * ((1 - t^2) / H * f + t * dfdz)
+    return U, dUdz
+end
+
+@inline function (B::BalancedZonalVorticity)(λ, φ, σ)
+    (; sinφc, cosφc, λc, radius, u₀, H, z_jet, jet_decay, perturb_uₚ, R) = B
+
+    # plain sin/cos avoid AMDGPU hostcalls (see JablonowskiVorticity)
+    φ_rad = deg2rad(φ)
+    sinφ, cosφ = sin(φ_rad), cos(φ_rad)
+
+    # vorticity of u = U(σ) sin²(2φ), as in Jablonowski and Williamson eq. (3)
+    U, _ = balanced_zonal_wind(-log(σ), u₀, H, z_jet, jet_decay)
+    ζ = -4 * U / radius * sinφ * cosφ * (2 - 5sinφ^2)
+
+    return ζ + jablonowski_vorticity_perturbation(φ_rad, λ, sinφc, cosφc, λc, radius, perturb_uₚ, R)
+end
+
 export StartFromFile
 
 """
@@ -834,9 +1021,22 @@ function initialize!(
 end
 
 export ConstantRelativeHumidity
+
+"""Humidity as a fraction of saturation, relative humidity is `relhumid_ref` below `σ_moist`
+and decreases linearly to zero at `σ_dry` for a dry stratosphere. `σ_moist = σ_dry = 0` for
+a vertically constant relative humidity, `σ_moist = 1, σ_dry = 0.02` for the relative humidity
+of Manabe and Wetherald, 1967, decreasing linearly with σ. Uses temperature and pressure
+so has to be applied after those initial conditions.
+$(TYPEDFIELDS)"""
 @kwdef struct ConstantRelativeHumidity{NF} <: AbstractInitialConditions
-    """[OPTION] Relative humidity as fraction of saturation [1]"""
+    """[OPTION] Relative humidity as fraction of saturation below σ_moist [1]"""
     relhumid_ref::NF = 0.7
+
+    """[OPTION] σ below which (towards the surface) relative humidity is relhumid_ref [1]"""
+    σ_moist::NF = 0.25
+
+    """[OPTION] σ above which (towards the top) relative humidity is zero [1]"""
+    σ_dry::NF = 0.1
 end
 
 ConstantRelativeHumidity(SG::SpectralGrid; kwargs...) = ConstantRelativeHumidity{SG.NF}(; kwargs...)
@@ -851,7 +1051,7 @@ function initialize!(
     )
     haskey(vars.prognostic, :humidity) || warn_undefvar(vars, :humidity) && return nothing
 
-    (; relhumid_ref) = IC
+    (; relhumid_ref, σ_moist, σ_dry) = IC
     (; σ_levels_full) = model.geometry
     (; atmosphere) = model
 
@@ -868,7 +1068,7 @@ function initialize!(
     launch!(
         architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
         constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
-        σ_levels_full, relhumid_ref, atmosphere,
+        σ_levels_full, relhumid_ref, σ_moist, σ_dry, atmosphere,
     )
     set!(vars, model; humidity = humid_grid)
 
@@ -881,6 +1081,8 @@ end
         pres_grid,
         σ_levels_full,
         relhumid_ref,
+        σ_moist,
+        σ_dry,
         atmosphere,
     )
     ij, k = @index(Global, NTuple)
@@ -889,8 +1091,12 @@ end
     pₖ = σ_levels_full[k] * pres_grid[ij]
     T = temp_grid[ij, k]
 
+    # Relative humidity decreasing linearly from relhumid_ref at σ_moist to 0 at σ_dry
+    σ = σ_levels_full[k]
+    relhumid = σ >= σ_moist ? relhumid_ref : relhumid_ref * max(0, (σ - σ_dry) / (σ_moist - σ_dry))
+
     # Set humidity as fraction of saturation
-    humid_grid[ij, k] = relhumid_ref * saturation_humidity(T, pₖ, atmosphere)
+    humid_grid[ij, k] = relhumid * saturation_humidity(T, pₖ, atmosphere)
 end
 
 export RandomWaves
