@@ -167,7 +167,8 @@ function SpeedyWeather.reinitialize!(
     temp_profile .= ifelse.(update, Tₖ, temp_profile)
 
     scale = vars.prognostic.scale[]         # implicit solver needs to be initialized with scaled time step
-    initialize!(implicit, Δt / scale, temp_profile, geometry, geopotential, atmosphere, adiabatic_conversion)
+    pₛ = SpeedyWeather.linearisation_surface_pressure(implicit, vars)
+    initialize!(implicit, Δt / scale, temp_profile, geometry, geopotential, atmosphere, adiabatic_conversion, pₛ)
     return nothing
 end
 

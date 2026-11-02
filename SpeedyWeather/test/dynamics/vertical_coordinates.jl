@@ -332,15 +332,17 @@ end
 
 @testset "Reference pressure mismatch warning" begin
     spectral_grid = SpectralGrid(nlayers = 4)
+    # backward Euler to avoid the warning for Crank-Nicolson with the uniform default σ spacing
+    implicit = ImplicitPrimitiveEquation(spectral_grid; centering = 1)
 
     # mismatched: coordinate has 5e4 Pa, atmosphere defaults to 1e5 Pa
     S = SigmaPressureCoordinates(spectral_grid; reference_pressure = 5.0e4)
-    model = PrimitiveDryModel(spectral_grid; geometry = Geometry(spectral_grid; vertical_coordinates = S))
+    model = PrimitiveDryModel(spectral_grid; implicit, geometry = Geometry(spectral_grid; vertical_coordinates = S))
     @test_logs (:warn, r"Reference pressure") initialize!(model)
 
     # matched: no warning expected
     S_match = SigmaPressureCoordinates(spectral_grid; reference_pressure = 1.0e5)
-    model_match = PrimitiveDryModel(spectral_grid; geometry = Geometry(spectral_grid; vertical_coordinates = S_match))
+    model_match = PrimitiveDryModel(spectral_grid; implicit, geometry = Geometry(spectral_grid; vertical_coordinates = S_match))
     @test_logs initialize!(model_match)
 end
 

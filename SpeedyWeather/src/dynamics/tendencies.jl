@@ -136,7 +136,7 @@ function dynamics_tendencies!(
     linear_virtual_temperature!(vars, model)
 
     # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
-    geopotential!(vars, geopotential, orography)
+    spectral_geopotential!(vars, geometry.vertical_coordinates, model)
 
     # get ū, v̄, D̄ on grid; D̄ in spectral
     vertical_integration!(vars, geometry, time_stepping)
@@ -767,9 +767,18 @@ function linear_pressure_gradient!(
     # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
     # -∇² is applied in bernoulli_potential!
     # TODO: Broadcast issue with LTA, conflicting broadcast styles
-    Φ.data .+= R_dry .* Tₖ' .* lnpₛ.data
+    # cₖ = linearised Bₖpₛ/pₖ of the pressure gradient force RTᵥ∇ln(pₖ), = 1 for SigmaCoordinates
+    c = implicit.pressure_gradient_factor
+    Φ.data .+= R_dry .* (Tₖ .* c)' .* lnpₛ.data
 
     return nothing
+end
+
+# Bₖpₛ/pₖ in the pressure gradient force RTᵥ∇ln(pₖ) = RTᵥ*(Bₖpₛ/pₖ)*∇ln(pₛ), = 1 for SigmaCoordinates
+@inline pressure_gradient_factor(k, surface_pressure, ij, ::SigmaCoordinates) = true
+@inline function pressure_gradient_factor(k, surface_pressure, ij, coordinate::SigmaPressureCoordinates)
+    pₛ = surface_pressure[ij]
+    return pressure_sensitivity(k, coordinate) * pₛ / pressure(k, pₛ, coordinate)
 end
 
 """
@@ -835,7 +844,8 @@ function vordiv_grid_tendencies!(
     launch!(
         arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
         u_tend_grid, v_tend_grid, u, v, vor, temp, humid,
-        dpres_dx, dpres_dy, Tₖ, f, scale, coslat⁻¹, whichring, atmosphere,
+        dpres_dx, dpres_dy, Tₖ, implicit.pressure_gradient_factor, vars.dynamics.surface_pressure,
+        geometry.vertical_coordinates, f, scale, coslat⁻¹, whichring, atmosphere,
     )
     return nothing
 end
@@ -876,6 +886,9 @@ vordiv_spectral_tendencies!(vars::Variables, model::PrimitiveEquation) =
         dpres_dx,               # Input: zonal gradient of log surface pressure
         dpres_dy,               # Input: meridional gradient of log surface pressure
         Tₖ,                     # Input: reference temperature profile
+        c,                      # Input: linearised Bₖpₛ/pₖ, = 1 for SigmaCoordinates
+        surface_pressure,       # Input: surface pressure [Pa] (hybrid coordinates only)
+        coordinate,             # Input: vertical coordinates
         f,                      # Input: coriolis parameter
         scale,                  # Input: Scaling of vorticity, apply to Coriolis on the fly too
         coslat⁻¹,               # Input: 1/cos(latitude) for scaling
@@ -891,7 +904,10 @@ vordiv_spectral_tendencies!(vars::Variables, model::PrimitiveEquation) =
     # compute virtual temperature on the fly, temp_grid is anomaly
     (; R_dry) = atmosphere
     Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ[k], humid_grid[ij, k], atmosphere)
-    RTᵥ = R_dry * (Tᵥ - Tₖ[k])    # dry gas constant * virtual temperature anomaly
+    # pressure gradient force RTᵥ∇ln(pₖ) = RTᵥ*(Bₖpₛ/pₖ)*∇ln(pₛ) (factor 1 for SigmaCoordinates)
+    # minus its linear part R*Tₖ*cₖ*∇ln(pₛ) which is treated semi-implicitly
+    Bpₛ_p = pressure_gradient_factor(k, surface_pressure, ij, coordinate)
+    RTᵥ = R_dry * (Tᵥ * Bpₛ_p - Tₖ[k] * c[k])
     u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k] * ω - RTᵥ * dpres_dx[ij]) * coslat⁻¹j
     v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k] * ω - RTᵥ * dpres_dy[ij]) * coslat⁻¹j
 end
@@ -1611,6 +1627,15 @@ function temperature_average!(
     )
     # average from l=m=0 harmonic divided by norm of the sphere
     @. vars.dynamics.average_temperature_profile = real(temp[1, :]) / S.norm_sphere
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Calculates the global mean of the logarithm of surface pressure from the l=m=0 harmonic
+and stores the result in `vars.dynamics.average_log_surface_pressure` (1-element vector)."""
+function log_surface_pressure_average!(vars::Variables, pres::LowerTriangularArray, S::AbstractSpectralTransform)
+    haskey(vars.dynamics, :average_log_surface_pressure) || return nothing
+    vars.dynamics.average_log_surface_pressure .= real.(view(pres.data, 1:1)) ./ S.norm_sphere
     return nothing
 end
 

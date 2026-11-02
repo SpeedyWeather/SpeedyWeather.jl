@@ -182,6 +182,7 @@ function SpeedyTransforms.transform!(
 
     # include humidity effect into temp for everything stability-related
     temperature_average!(vars, temp, S)
+    log_surface_pressure_average!(vars, pres, S)
     geopotential!(vars, model)                  # calculate geopotential
 
     for (name, tracer) in model.tracers
