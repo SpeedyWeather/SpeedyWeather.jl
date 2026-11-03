@@ -5,7 +5,7 @@ using SpeedyWeatherInternals
 using Reactant
 
 import SpeedyWeatherInternals.Architectures: Architectures, CPU, ReactantDevice, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type, device
-import SpeedyWeatherInternals.Utils: _jit, _set_scalar!, reactant_compile_options, REACTANT_EXCLUDED_PASSES, XLA_DISABLED_HLO_PASSES
+import SpeedyWeatherInternals.Utils: _jit, _set_scalar!, reactant_compile_options, REACTANT_EXCLUDED_PASSES
 
 # grab the proper KernelAbstractions backend for Reactant
 const ReactantKernelAbstractionsExt = Base.get_extension(
@@ -107,11 +107,8 @@ for ArrayType in (:ConcretePJRTArray, :ConcreteIFRTArray)
 end
 
 # Compile options for all compilations with Reactant (`@maybe_jit` here, the compiled time loop in
-# SpeedyWeatherReactantExt), `xla_debug_options` are merged into the default ones
-function reactant_compile_options(; xla_debug_options = (;), kwargs...)
-    xla_debug_options = merge((; xla_disable_hlo_passes = XLA_DISABLED_HLO_PASSES), xla_debug_options)
-    return Reactant.CompileOptions(; raise = true, excluded_passes = REACTANT_EXCLUDED_PASSES, xla_debug_options, kwargs...)
-end
+# SpeedyWeatherReactantExt)
+reactant_compile_options(; kwargs...) = Reactant.CompileOptions(; raise = true, excluded_passes = REACTANT_EXCLUDED_PASSES, kwargs...)
 
 # For @maybe_jit macro - extend _jit for ReactantDevice.
 # If we are already inside a Reactant compile/trace context, call f directly (no nested @jit).

@@ -52,7 +52,9 @@ NCDatasets = "0.12, 0.13, 0.14"
 Pkg = "1.10"
 Printf = "1.10"
 Random = "1.10"
-Reactant = "0.2.299"
+# < 0.2.303: XLA in 0.2.303 fails to compile some multi-output concatenate fusions on GPU (RET_CHECK in
+# concatenate_kernel_emitter.cc), https://github.com/EnzymeAD/Reactant.jl/issues/3681
+Reactant = "0.2.299 - 0.2.302"
 SpeedyWeatherInternals = "1.0"
 Statistics = "1.10"
 StyledStrings = "1"

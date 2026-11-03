@@ -91,21 +91,13 @@ name here, remove it once fixed upstream. None currently (`cse_slice` was exclud
 v0.2.293 to v0.2.296, see docs/dev/2026-10/reactant-issue-draft-gather-index-cycle.md)."""
 const REACTANT_EXCLUDED_PASSES = String[] # TODO: currenlty untested if concat_multipad is needed
 
-"""XLA HLO passes disabled in every compilation with Reactant (`xla_disable_hlo_passes` of the XLA debug
-options, see `reactant_compile_options`), to work around XLA bugs: remove a pass once fixed upstream.
-`multi_output_fusion`: since Reactant v0.2.303 (XLA with openxla/xla#50225) XLA's GPU concatenate emitter
-fails on some multi-output fusions (`RET_CHECK failure (concatenate_kernel_emitter.cc:200)`), e.g. in the
-time loop of the PrimitiveWetModel at T32, see https://github.com/EnzymeAD/Reactant.jl/issues/3681."""
-const XLA_DISABLED_HLO_PASSES = ["multi_output_fusion"]
-
 """
-    reactant_compile_options(; xla_debug_options = (;), kwargs...)
+    reactant_compile_options(; kwargs...)
 
 Compile options (a `Reactant.CompileOptions`) for all compilations with Reactant: the KernelAbstractions
-kernels are raised to StableHLO (`raise = true`), the patterns in `REACTANT_EXCLUDED_PASSES` are
-excluded and the XLA passes in `XLA_DISABLED_HLO_PASSES` disabled; `xla_debug_options` are merged into
-the latter (and can override it), `kwargs` are passed on to `Reactant.CompileOptions` and can override
-the others. Defined in the Reactant extension."""
+kernels are raised to StableHLO (`raise = true`) and the patterns in `REACTANT_EXCLUDED_PASSES` are
+excluded; `kwargs` are passed on to `Reactant.CompileOptions` and can override both. Defined in the
+Reactant extension."""
 function reactant_compile_options end
 
 """

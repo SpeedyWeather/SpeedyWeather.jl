@@ -115,19 +115,3 @@
     end
 
 end
-
-@testset "reactant_compile_options" begin
-    disabled = SpeedyWeather.SpeedyWeatherInternals.Utils.XLA_DISABLED_HLO_PASSES
-    options = SpeedyWeather.reactant_compile_options()
-    @test options.xla_debug_options.xla_disable_hlo_passes == disabled
-    @test "multi_output_fusion" in disabled
-
-    # further XLA debug options are merged, not replacing the disabled passes
-    options = SpeedyWeather.reactant_compile_options(; xla_debug_options = (; xla_dump_hlo_as_text = true))
-    @test options.xla_debug_options.xla_disable_hlo_passes == disabled
-    @test options.xla_debug_options.xla_dump_hlo_as_text
-
-    # but can override them
-    options = SpeedyWeather.reactant_compile_options(; xla_debug_options = (; xla_disable_hlo_passes = String[]))
-    @test isempty(options.xla_debug_options.xla_disable_hlo_passes)
-end
