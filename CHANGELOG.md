@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add compat for JLArrays 0.4 [#1375](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1375)
 - Fix initial snow depth on Reactant GPU, broadcasting over a view fell back to scalar indexing [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - NumericalRadiation extension for NumericalRadiation 0.2: gases renamed to chemical formula [#1329](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1329)
 - Count device (GPU) memory in printed sizes of model, simulation and variables [#1364](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1364)
