@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-<<<<<<< HEAD
+- Benchmarks: completely revised with more options and opt-in experiments for publication [#1337](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1337)
+- NumericalRadiation extension for NumericalRadiation 0.2: gases renamed to chemical formula [#1329](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1329)
 - Count device (GPU) memory in printed sizes of model, simulation and variables [#1364](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1364)
 - Restrict FFTA compat in the docs to < 0.3.2, whose `plan_rfft` is ambiguous with FFTW's [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - `BalancedZonalState` jet peaks at σ ≈ 0.2 and decays above (`σ_jet`, `jet_decay`), `σ_jet = 0` for the previous monotonic profile [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
@@ -30,9 +31,6 @@
 - Learned surface wind slowdown from bottom model layer [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 - Split boundary layer drag by momentum/heat/humidity and land/ocean [#1184](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1184)
 - [BREAKING] Output variables moved into the exported module `OutputVariables` and lost their `Output` suffix, e.g. `SpeedyWeather.TemperatureOutput()` is now `OutputVariables.Temperature()`, the old names are deprecated and forward with a warning [#1331](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1331)
-=======
-- Benchmarks: opt-in reverse-mode (AD) benchmarks with Reactant (`--reverse`), the timestep multiplier only lengthens the PrimitiveWet resolution sweep [#XXXX](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/XXXX)
->>>>>>> c38fd4d7 (add reverse mode benchmark)
 - Reactant: the `SpectralTransform` computes the Fourier transform as a truncated DFT: one batched matrix multiply per direction [#1317](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1317)
 - Reactant compatibility for all models incl. `PrimitiveDryModel` and `PrimitiveWetModel` (requires Reactant v0.2.292 for complex-valued kernels), CPU-vs-Reactant correctness tests for all models and output writers [#1304](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1304)
 - Bug fix: Enzyme's `make_zero` of a model works again with ProgressMeter v1.12 (parametric `ProgressCore`) [#1330](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1330)
