@@ -340,17 +340,9 @@ Kernels are spread across ~36 files in `SpeedyWeather/src/dynamics/`,
 
 ### Branch-free code for Reactant
 
-On Reactant, broadcasts are compiled, also eagerly in `initialize!` on concrete arrays. This includes
-`set!(var, f::Function)`, which broadcasts `f` over the grid. The broadcast function is then traced with
-`TracedRNumber`s, and a branch on a value (`if`, `? :`, `&&`, `||`, early `return`) fails with
-`TypeError: non-boolean (Reactant.TracedRNumber{Bool}) used in boolean context`.
-Functions used in broadcasts, or passed to `set!`, must therefore be branch-free: use
-`ifelse(cond, a, b)`, `max`, `min` or `clamp` instead. Branches inside `@kernel`s launched with
-`launch!` are fine. Don't broadcast over a `view` of a raw Reactant array (`view(field.data, …)`)
-either: on Reactant GPU this falls back to scalar indexing. Broadcast over a `Field` (e.g.
-`field_view(field, :, 1, :)`) or index a copy (`field.data[:, 1, :]`) instead. Eagerly (outside
-`@compile`) neither problem shows on Reactant's CPU backend, which runs such broadcasts on the host
-without tracing, so initialization code that passes the CPU Reactant tests can still fail on GPU.
+Write functions that are broadcast or passed to `set!` branch-free, so that Reactant can trace them:
+use `ifelse(cond, a, b)`, `min`, `max` or `clamp` instead of `if`, `? :`, `&&`, `||` or an early
+`return` on a value. Branches inside `@kernel`s are fine.
 
 ## Benchmarks
 
