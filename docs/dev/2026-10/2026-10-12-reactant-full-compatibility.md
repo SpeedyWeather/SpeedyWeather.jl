@@ -1,6 +1,6 @@
 # Full Reactant compatibility incl. the primitive equation models
 
-> Status: **in progress**. See "Reactant 0.2.296 to 0.2.298 and the remaining workarounds (2026-10-22)" first: CI's Reactant tests are capped at Reactant 0.2.296 until Enzyme-JAX#3683 is released, and three workarounds can go with 0.2.297. All models run on Reactant (`raise = true`, central compile options), on the CPU backend and on CUDA; the time loop is one compiled program per output interval and can be differentiated through several time steps.
+> Status: **in progress**. See "Reactant 0.2.296 to 0.2.298 and the remaining workarounds (2026-10-22)" first: Reactant 0.2.298 segfaults, 0.2.299 fixes it and CI's Reactant tests now require it; three workarounds can go with 0.2.299 once the model tests pass with it. All models run on Reactant (`raise = true`, central compile options), on the CPU backend and on CUDA; the time loop is one compiled program per output interval and can be differentiated through several time steps.
 
 Date of initial draft: 2026-10-12
 
@@ -1083,7 +1083,8 @@ CI failures after merging `main` (#1331, `OutputVariables` module) into this bra
   that on the scatter `split_complex_scatter` makes from `A[:, 1] .= b` with a complex `A`: the shallow water
   initial conditions, `η .+= η_perturb` into a leapfrog step. MWE (12-line StableHLO, `Float32`, only
   `scatter_op_canon`) and issue draft: `reactant-issue-scatter-index-eval-segfault-mwe.jl`,
-  `reactant-issue-draft-scatter-index-eval-segfault.md`. Fix proposed upstream: Enzyme-JAX#3683 (open).
+  `reactant-issue-draft-scatter-index-eval-segfault.md`. Fixed upstream by Enzyme-JAX#3683, released in
+  0.2.299 (see below).
   Meanwhile `SpeedyWeather/test/reactant/Project.toml` caps Reactant at 0.2.296 (`d0c66f25`). The packages'
   compat (`Reactant = "0.2.294"` in all five) still allows 0.2.298 for users.
 
@@ -1100,7 +1101,7 @@ The MWEs of our issue drafts on the CPU backend (fresh environments with only Re
 | `componentwise_ifelse` for complex `ifelse` in kernels (SpeedyWeatherInternals `Utils`, `lower_triangular_array.jl:818`, `spectral_gradients.jl:122-127, 559-561`) | Reactant.jl#3475, fixed by Enzyme-JAX#3643 | fails to raise | MWE fixed | MWE fixed |
 | real and imaginary accumulators kept separately (`tendencies.jl:363`, vertical integration; `implicit_primitive_equations.jl:353-431`) | Reactant.jl#3465, fixed by Enzyme-JAX#3636 | NaN | MWE fixed | MWE fixed |
 | `REACTANT_EXCLUDED_PASSES = ["cse_slice"]` (`utility_functions.jl:110`) | Reactant.jl#3501 (open), presumably fixed by Enzyme-JAX#3672 | never returns (killed after 300 s) | MWE terminates (0.01 s) | MWE terminates |
-| Reactant ≤ 0.2.296 in `test/reactant/Project.toml` | Enzyme-JAX#3683 (open) | fine | MWE fine | segfault |
+| Reactant ≤ 0.2.296 in `test/reactant/Project.toml` (now ≥ 0.2.299) | Enzyme-JAX#3683, in 0.2.299 | fine | MWE fine | segfault |
 
 Fixed means the MWE only, the model tests haven't run with 0.2.297. Quick path:
 1. Allow 0.2.297 in `test/reactant/Project.toml` (`"0.2.294 - 0.2.297"`) and run `test/reactant` and the
@@ -1113,6 +1114,20 @@ Fixed means the MWE only, the model tests haven't run with 0.2.297. Quick path:
 
 On `mg/reactant-dft` the `concat_multipad`/`slice_pad` exclusion (Reactant.jl#3503) can presumably go as
 well: Enzyme-JAX#3648 is in 0.2.297 (commit check only, MWE not rerun).
+
+> 0.2.299 was just released that should fix the segfault (and include the previous fixes of 0.2.298 and 0.2.297
+
+Reactant 0.2.299 (2026-10-22 15:38, `Reactant_jll` 0.0.428, Enzyme-JAX `77bc08be`) contains Enzyme-JAX#3683
+(the segfault fix), #3636, #3643, #3648, #3672 and Reactant.jl#3377 (kernel operand layouts). On the CPU
+backend the scatter segfault MWE (StableHLO and Julia forms) and the shallow water `initialize!` with
+SpeedyWeather work, and the complex `ifelse`, complex accumulator store and gather-index-cycle MWEs are fixed
+as on 0.2.297. `test/reactant/Project.toml` now requires `Reactant = "0.2.299"` instead of capping at 0.2.296,
+so CI can't resolve 0.2.298 again. The quick path above applies with 0.2.299 in place of 0.2.297: run
+`test/reactant` and the GPU standard script with 0.2.299 (not done yet), then remove the three workarounds
+and raise the packages' lower compat bound to 0.2.299. Until then the packages' compat
+(`Reactant = "0.2.294"`) still allows 0.2.298 for users; excluding it would be
+`Reactant = "0.2.294 - 0.2.297, 0.2.299"`. With #3377 released, non-raised kernels on CUDA can be evaluated
+(see "Workarounds that stay").
 
 ### Workarounds that stay
 
