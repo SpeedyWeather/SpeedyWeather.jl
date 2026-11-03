@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- NumericalRadiation extension for NumericalRadiation 0.2: gases renamed to chemical formula [#1329](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1329)
 - Count device (GPU) memory in printed sizes of model, simulation and variables [#1364](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1364)
 - Restrict FFTA compat in the docs to < 0.3.2, whose `plan_rfft` is ambiguous with FFTW's [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - `BalancedZonalState` jet peaks at σ ≈ 0.2 and decays above (`σ_jet`, `jet_decay`), `σ_jet = 0` for the previous monotonic profile [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)

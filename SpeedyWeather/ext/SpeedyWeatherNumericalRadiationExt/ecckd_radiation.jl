@@ -7,15 +7,16 @@
 An `ClearSkyEcCKDRadiation` in the number format of the spectral grid from tabulated `gas_optics`;
 `kwargs` (`ozone`, `mole_fractions`, `surface_emissivity`) as for `NumericalRadiation.ClearSkyEcCKDRadiation`.
 CO₂ follows the model's `greenhouse_gases.co2` when present, else the scheme's prescribed
-`mole_fractions.co2` (280 ppm by default)."""
+`mole_fractions.CO₂` (280 ppm by default)."""
 ClearSkyEcCKDRadiation(SG::SpeedyWeather.SpectralGrid, gas_optics::EcCKDTabulatedGasOpticsModel; kwargs...) =
     ClearSkyEcCKDRadiation{SG.NF}(gas_optics; kwargs...)
 
 """$(TYPEDSIGNATURES)
 Load the reference ecCKD `model_pair` (`"32x32"` by default, or e.g. `"64x96"`) with the gases
-`names`; the tables are read with NCDatasets, a dependency of SpeedyWeather."""
+`names` (by chemical formula, `:dry_air` for the ecCKD files' `composite`); the tables are
+read with NCDatasets, a dependency of SpeedyWeather."""
 ClearSkyEcCKDRadiation(SG::SpeedyWeather.SpectralGrid, model_pair::Union{AbstractString, Symbol} = "32x32";
-               names = (:composite, :h2o, :o3, :co2), kwargs...) =
+               names = (:dry_air, :H₂O, :O₃, :CO₂), kwargs...) =
     ClearSkyEcCKDRadiation(SG.NF, model_pair; names, kwargs...)
 
 SpeedyWeather.initialize!(::ClearSkyEcCKDRadiation, ::SpeedyWeather.PrimitiveEquation) = nothing
@@ -36,9 +37,9 @@ function SpeedyWeather.variables(rad::ClearSkyEcCKDRadiation{NF}, model::SpeedyW
         SpeedyWeather.variables(SpeedyWeather.TransparentShortwave())...,
         SpeedyWeather.variables(SpeedyWeather.UniformCooling{NF}())...,
         # column state
-        PV(:pressure_layers, layers, desc = "Layer pressure", units = "Pa", namespace = ns),
-        PV(:pressure_interfaces, interfaces, desc = "Interface pressure", units = "Pa", namespace = ns),
-        PV(:temperature_interfaces, interfaces, desc = "Interface temperature", units = "K", namespace = ns),
+        PV(:layer_pressures, layers, desc = "Layer pressure", units = "Pa", namespace = ns),
+        PV(:interface_pressures, interfaces, desc = "Interface pressure", units = "Pa", namespace = ns),
+        PV(:interface_temperatures, interfaces, desc = "Interface temperature", units = "K", namespace = ns),
         PV(:gas_amounts, SpeedyWeather.Grid4D(n = ngas), desc = "Layer gas amounts", units = "mol/m^2", namespace = ns),
         # optical properties per g point
         PV(:longwave_optical_depth, SpeedyWeather.Grid4D(n = ng_lw), desc = "Longwave optical depth", units = "1", namespace = ns),
@@ -112,20 +113,20 @@ end
 @inline mole_fraction(x::Number, p) = x
 @inline mole_fraction(f, p) = f(p)
 
-# amount [mol/m²] of gas `name` in a layer with `dry` mol/m² of dry air, `h2o` mol/m² water vapour
-@inline gas_amount(::Val{:composite}, rad, dry, h2o, co2, p) = dry
-@inline gas_amount(::Val{:h2o}, rad, dry, h2o, co2, p) = h2o
-@inline gas_amount(::Val{:co2}, rad, dry, h2o, co2, p) = mole_fraction(co2, p) * dry
-@inline gas_amount(::Val{name}, rad, dry, h2o, co2, p) where name =
-    mole_fraction(getproperty(rad.mole_fractions, name), p) * dry
+# amount [mol/m²] of gas `name` in a layer with `dry_air` mol/m² of dry air, `H₂O` mol/m² water vapour
+@inline gas_amount(::Val{:dry_air}, rad, dry_air, H₂O, CO₂, p) = dry_air
+@inline gas_amount(::Val{:H₂O}, rad, dry_air, H₂O, CO₂, p) = H₂O
+@inline gas_amount(::Val{:CO₂}, rad, dry_air, H₂O, CO₂, p) = mole_fraction(CO₂, p) * dry_air
+@inline gas_amount(::Val{name}, rad, dry_air, H₂O, CO₂, p) where name =
+    mole_fraction(getproperty(rad.mole_fractions, name), p) * dry_air
 
 """$(TYPEDSIGNATURES)
 Fill `amounts` (shape `(nlayers, ngas)`, gas order `names`) with layer molar
 amounts [mol/m²] from specific humidity `q`, layer pressures `p`, interface
-pressures `p_half`, the CO₂ mole fraction `co2` (a number, or a function of pressure) and the host's `constants`
+pressures `p_half`, the CO₂ mole fraction `CO₂` (a number, or a function of pressure) and the host's `constants`
 (gravity and the molar masses of dry air and water)."""
-@generated function gas_amounts!(amounts, ::Val{names}, rad, q, p, p_half, co2, constants) where names
-    assignments = [:(amounts[k, $j] = gas_amount(Val($(QuoteNode(name))), rad, dry, h2o, co2, p[k]))
+@generated function gas_amounts!(amounts, ::Val{names}, rad, q, p, p_half, CO₂, constants) where names
+    assignments = [:(amounts[k, $j] = gas_amount(Val($(QuoteNode(name))), rad, dry_air, H₂O, CO₂, p[k]))
                    for (j, name) in enumerate(names)]
     return quote
         Base.@_propagate_inbounds_meta
@@ -133,8 +134,8 @@ pressures `p_half`, the CO₂ mole fraction `co2` (a number, or a function of pr
         for k in eachindex(q)
             moist_mass = (p_half[k + 1] - p_half[k]) / gravity     # kg/m² of moist air
             water_mass = q[k] * moist_mass
-            dry = (moist_mass - water_mass) / dry_air_molar_mass
-            h2o = water_mass / water_molar_mass
+            dry_air = (moist_mass - water_mass) / dry_air_molar_mass
+            H₂O = water_mass / water_molar_mass
             $(assignments...)
         end
         return amounts
@@ -203,15 +204,15 @@ amounts in the work arrays `W` and return them as a `ColumnAtmosphere`. The
 blended skin temperature is carried in `surface.temperature` for the solvers'
 boundary conditions only. CO₂ is
 taken from the model's greenhouse gases when present, else from the scheme's prescribed
-`mole_fractions.co2`."""
+`mole_fractions.CO₂`."""
 Base.@propagate_inbounds function ecckd_column_atmosphere!(ij, W, rad::ClearSkyEcCKDRadiation{NF}, T, q, pₛ,
                                                            surface, vars, model) where NF
     nlayers = length(T)
     coordinates = model.geometry.vertical_coordinates
 
-    p = column(W.pressure_layers, ij)
-    p_half = column(W.pressure_interfaces, ij)
-    T_half = column(W.temperature_interfaces, ij)
+    p = column(W.layer_pressures, ij)
+    p_half = column(W.interface_pressures, ij)
+    T_half = column(W.interface_temperatures, ij)
     for k in 1:nlayers
         p[k] = SpeedyWeather.pressure(k, pₛ, coordinates)
         p_half[k] = SpeedyWeather.pressure_half(k, pₛ, coordinates)
@@ -219,21 +220,21 @@ Base.@propagate_inbounds function ecckd_column_atmosphere!(ij, W, rad::ClearSkyE
     p_half[nlayers + 1] = SpeedyWeather.pressure_half(nlayers + 1, pₛ, coordinates)
     interface_temperatures!(T_half, T, p, p_half)
 
-    co2 = let prognostic = vars.prognostic
+    CO₂ = let prognostic = vars.prognostic
         if hasproperty(prognostic, :greenhouse_gases) && haskey(prognostic.greenhouse_gases, :co2)
             NF(prognostic.greenhouse_gases.co2[]) * NF(1e-6)        # [ppm] → mole fraction
         else
-            rad.mole_fractions.co2                                  # number or function of pressure
+            rad.mole_fractions.CO₂                                  # number or function of pressure
         end
     end
     names = Val(NumericalRadiation.gas_names(rad.gas_optics))
     amounts = @view W.gas_amounts[ij, :, :]
     constants = physical_constants(model)
-    gas_amounts!(amounts, names, rad, q, p, p_half, co2, constants)
+    gas_amounts!(amounts, names, rad, q, p, p_half, CO₂, constants)
 
     return ColumnAtmosphere(
-        pressure_layers = p, pressure_interfaces = p_half,
-        temperature_layers = T, temperature_interfaces = T_half,
+        layer_pressures = p, interface_pressures = p_half,
+        layer_temperatures = T, interface_temperatures = T_half,
         gases = gas_views(amounts, names),
         surface = (; temperature = surface.temperature),
         geometry = (; cos_zenith = surface.cos_zenith),
@@ -266,7 +267,7 @@ Base.@propagate_inbounds function ecckd_longwave!(ij, vars, fluxes, longwave, at
                                                   rad::ClearSkyEcCKDRadiation{NF}, surface) where NF
     (; gas_optics) = rad
     W = vars.parameterizations.ecckd
-    nlayers = length(atmosphere.temperature_layers)
+    nlayers = length(atmosphere.layer_temperatures)
     f = surface.land_fraction
 
     # per-g-point surface emission over ocean and land, evaluated lazily from the
@@ -309,7 +310,7 @@ the sunlit hemisphere (zero fluxes at night) and the shortwave diagnostics."""
 Base.@propagate_inbounds function ecckd_shortwave!(ij, vars, fluxes, shortwave, atmosphere,
                                                    rad::ClearSkyEcCKDRadiation{NF}, surface, model) where NF
     W = vars.parameterizations.ecckd
-    nlayers = length(atmosphere.temperature_layers)
+    nlayers = length(atmosphere.layer_temperatures)
     (; cos_zenith, albedo, albedo_ocean, albedo_land) = surface
 
     if cos_zenith > 0
