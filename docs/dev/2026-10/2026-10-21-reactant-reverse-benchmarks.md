@@ -119,6 +119,11 @@ Julia's standard library has no argument parser, so the driver now uses ArgParse
 `--repeats ≥ 1` and `--length > 0` before any backend is loaded. Option names are now exact: `--SPEEDY`
 and `--speedy` both work, other spellings no longer do (before, flags were case-insensitive).
 
+> yes also add those
+
+`--SPEEDY` also uses SPEEDY.f90's constant near-surface wind: `ConstantWindSlowdown` (0.95) and
+`ConstantWindGust` with 5 m/s instead of its default 0.5 m/s (section 6).
+
 ## Problem description
 
 This plan makes two changes to `SpeedyWeather/benchmark/manual_benchmarking.jl`:
@@ -366,7 +371,11 @@ was removed on request (see the revision log).
   - Land surface temperature: `SeasonalLandTemperature` instead of `LandBucketTemperature`.
   - Soil moisture: `SeasonalSoilMoisture` instead of `LandBucketMoisture` (PrimitiveWet only).
   - Surface roughness (added 2026-11-03): `ConstantSurfaceRoughness` (0.5 m over land, 1e-4 m over the
-    ocean) instead of `LearnedSurfaceRoughness`, in an otherwise default `BoundaryLayer`.
+    ocean) instead of `LearnedSurfaceRoughness`.
+  - Surface wind (added 2026-11-03): `ConstantWindSlowdown` (0.95) and `ConstantWindGust` (5 m/s, set
+    explicitly, the default is 0.5 m/s) instead of `LearnedWindSlowdown` and `BeljaarsWindGust`, SPEEDY.f90's
+    defaults as cited in `docs/src/surface_fluxes.md` (Kucharski et al. 2006). The drag stays the default
+    `BulkRichardsonDrag`.
 - **Stored separately.** The results go under the label `<arch>-speedy`, with
   `meta.configuration = "SPEEDY"` and a note at the top of the section. Default and SPEEDY results
   therefore coexist; the overview table gets its own column and the docs page its own line. `--SPEEDY` can
@@ -386,7 +395,7 @@ was removed on request (see the revision log).
 | Vegetation, albedo | Climatologies, snow and sea-ice albedo | `VegetationClimatology`, `OceanLandAlbedo` | Already the default |
 | Surface fluxes | Bulk formulae | Implemented after the SPEEDY documentation | Already the default |
 | Surface roughness | No roughness lengths, constant drag coefficients over land and sea | `LearnedSurfaceRoughness` (default), `ConstantSurfaceRoughness` | Constant (added 2026-11-03) |
-| Surface wind | Lowest-level wind times a constant factor, plus constant gustiness | `LearnedWindSlowdown` (default), `ConstantWindSlowdown`; `BeljaarsWindGust` (default), `ConstantWindGust` | Default kept |
+| Surface wind | Lowest-level wind times 0.95, plus 5 m/s gustiness | `LearnedWindSlowdown` (default), `ConstantWindSlowdown`; `BeljaarsWindGust` (default), `ConstantWindGust` | Constant, 0.95 and 5 m/s (added 2026-11-03) |
 | Shortwave | Two bands, diagnostic clouds | `OneBandShortwave` with SPEEDY's `DiagnosticClouds` | Already the default |
 | Longwave | Four bands | One band, Frierson or constant transmissivity | No equivalent |
 | Convection | Simplified mass flux | `BettsMillerConvection` only | No equivalent |

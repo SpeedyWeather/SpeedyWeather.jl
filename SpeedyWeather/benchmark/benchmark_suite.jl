@@ -8,8 +8,10 @@ const MAX_MATRIX_TRUNCATION = 150
 const SPEEDY_CONFIGURATION = "Configuration `--SPEEDY`, closer to SPEEDY.f90: the primitive equation models use seasonal " *
     "prescribed climatologies of sea surface temperature (`SeasonalOceanClimatology`), land surface temperature " *
     "(`SeasonalLandTemperature`) and soil moisture (`SeasonalSoilMoisture`, wet model only) instead of the slab ocean " *
-    "and the land bucket model, and constant surface roughness lengths over land and ocean (`ConstantSurfaceRoughness`) " *
-    "instead of the learned ones; sea ice stays thermodynamic, driven by the prescribed sea surface temperature."
+    "and the land bucket model, constant surface roughness lengths over land and ocean (`ConstantSurfaceRoughness`) " *
+    "instead of the learned ones, and SPEEDY.f90's near-surface wind of 0.95 times the lowermost-layer wind " *
+    "(`ConstantWindSlowdown`) with 5 m/s gusts (`ConstantWindGust`) instead of the learned wind slowdown and " *
+    "Beljaars gusts; sea ice stays thermodynamic, driven by the prescribed sea surface temperature."
 
 # Model components of the SPEEDY.f90-like configuration (`--SPEEDY`) by model type, see `SPEEDY_CONFIGURATION`
 speedy_components(_, _) = (;)      # Barotropic, ShallowWater unchanged
@@ -26,8 +28,17 @@ speedy_components(::Type{<:PrimitiveWet}, spectral_grid) = (;
     boundary_layer = speedy_boundary_layer(spectral_grid),
 )
 
-# the default boundary layer but with constant instead of learned surface roughness lengths
-speedy_boundary_layer(spectral_grid) = BoundaryLayer(spectral_grid; surface_roughness = ConstantSurfaceRoughness(spectral_grid))
+# the default boundary layer but with SPEEDY.f90's constant wind slowdown (0.95) and gusts (5 m/s),
+# Kucharski et al. 2006, and constant instead of learned surface roughness lengths
+speedy_boundary_layer(spectral_grid) = BoundaryLayer(
+    spectral_grid;
+    surface_condition = SurfaceCondition(
+        spectral_grid;
+        wind_slowdown = ConstantWindSlowdown(spectral_grid, wind_slowdown = 0.95),
+        wind_gust = ConstantWindGust(spectral_grid, wind_gust = 5),
+    ),
+    surface_roughness = ConstantSurfaceRoughness(spectral_grid),
+)
 
 # Build the model with the spectral transform of `transform_kind` for `arch`
 # (`:default` for FFT+Legendre, `:matrix` for MatrixSpectralTransform).
