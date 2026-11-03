@@ -220,16 +220,21 @@ function run_benchmark!(suite::BenchmarkSuite, i::Integer)
     # Time only the main time loop with a real wallclock timer rather than the
     # progress meter's `tlast - tinit`. The latter measures only up to the *last*
     # progress-bar render (every `feedback_dt = 0.1 s`). Repeat from the same initial
-    # state, a new simulation each time, see `repeats` and `max_repeat_time`. Before each
-    # run the GC frees the previous simulation (incl. its device memory) outside the timed
-    # region; not `free_memory!`, which would also clear the cached Fourier graphs and so
-    # recapture them in the timed run.
+    # state, see `repeats` and `max_repeat_time`: initialize once (with Reactant every
+    # `initialize!` compiles again, `@maybe_jit`) and run a deepcopy of the initialized
+    # variables each time (`copy!` would share the clock's device numbers with Reactant).
+    # Before each run the GC frees the previous copy (incl. its device memory) outside the
+    # timed region; not `free_memory!`, which would also clear the cached Fourier graphs and
+    # so recapture them in the timed run.
+    simulation = initialize!(model)
+    initialize!(simulation; period)
+    initial_variables = simulation.variables    # initial state of every timed run, never run itself
     simulation = nothing
     times = Float64[]
     while length(times) < suite.repeats && (isempty(times) || sum(times) + times[end] <= suite.max_repeat_time)
         GC.gc()
-        simulation = initialize!(model)
-        initialize!(simulation; period)
+        simulation = Simulation(deepcopy(initial_variables), model)
+        initialize!(model.feedback, simulation.variables, model)    # a new progress meter
         synchronize_device(architecture, simulation)
         t0 = time()
         runner.time_stepping(simulation)

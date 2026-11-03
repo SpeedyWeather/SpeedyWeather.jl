@@ -88,6 +88,15 @@ NumericalEarth/Terrarium.jl#222: up to 5 runs per configuration within 30 s of t
 median SYPD and the spread are reported. The warm-up problem found there doesn't affect these benchmarks
 (section 8).
 
+> re-audit the benchmark. does it run? Do you see any problems? Please don't launch expensive
+> simulations on this laptop though
+
+The repeats now run a deepcopy of the variables initialized once, instead of re-initializing the model
+for every repeat, which with Reactant would compile several times per repeat (section 8). The reduced
+driver runs end to end on the CPU (see "Audit" in the protocol). Three older problems were found, not
+fixed yet: HIP graphs were never forced on for `gpu-amd`, the timed run has two more steps than SYPD
+counts, and a failed configuration shows SYPD 0.0 in the overview.
+
 ## Problem description
 
 This plan makes two changes to `SpeedyWeather/benchmark/manual_benchmarking.jl`:
@@ -440,9 +449,16 @@ the `BenchmarkSuite`s timed each configuration once.
   until it has `repeats` runs, or until a further run would take all timed runs together beyond
   `max_repeat_time`. There is always at least one run. Short runs (all GPU and Reactant runs, most CPU
   runs) are timed 5 times, runs longer than 15 s once.
-- Every run starts from the same initial state, a new `initialize!(model)`, as the single timed run did.
-  `GC.gc()` frees the previous simulation before the next one is allocated, outside the timed region;
-  not `free_memory!`, which would also clear the cached Fourier graphs and recapture them in the timed run.
+- Every run starts from the same initial state. The model and the timed run's simulation are initialized
+  once, as for the single timed run before, and every run gets a `deepcopy` of the initialized variables
+  (`Simulation(deepcopy(initial_variables), model)`) and a new progress meter. Changed after the audit
+  (see the revision log): first every repeat called `initialize!(model)` and
+  `initialize!(simulation; period)`, but with Reactant both compile again on every call (`@maybe_jit`
+  uses `@jit`, which doesn't cache), several compilations per repeat. `copy!(::Variables, ::Variables)`
+  is not an option either: it assigns the clock's fields, which with Reactant are device numbers that the
+  compiled program updates in place, so the initial state would change with every run.
+- `GC.gc()` frees the previous copy before the next one is allocated, outside the timed region; not
+  `free_memory!`, which would also clear the cached Fourier graphs and recapture them in the timed run.
 - The suite stores the median SYPD (`SYPD`), the slowest and fastest (`SYPD_min`, `SYPD_max`) and the
   number of runs (`nrepeats`). The README tables get the columns Runs and Spread,
   (slowest − fastest) / median wallclock time; the JSON `overview` gets `sypd_min`, `sypd_max` and
@@ -703,3 +719,30 @@ quarter of the usual time steps; the repository's results were not touched.
 
 Not tested: a full run on any architecture, and the JSON fields `sypd_min`, `sypd_max` and `repeats` as
 written by the driver.
+
+### Audit (2026-11-03, same machine, small configurations only)
+
+**End to end.** The driver ran as `manual_benchmarking.jl cpu 0.25` on a scratchpad copy of
+`SpeedyWeather/benchmark` with the package paths pointed at the repository and reduced suites:
+benchmark100 (Barotropic, PrimitiveWet at T32), benchmark201 (PrimitiveWet T32 with both transforms)
+and benchmark700. It finished in 5 minutes with a peak of 1.7 GB, before and after the change of the
+repeats. It wrote the Runs and Spread columns, the JSON fields `sypd_min`, `sypd_max` and `repeats`, and
+regenerated the overview with the older records of the other architectures, which lack these fields.
+PrimitiveWet T32 at full length (7 s per run) got 4 runs, as the budget intends. The repository's
+`benchmark_results.json` and README.md were unchanged (checksums).
+
+**Not run:** Reactant and GPU (none here, and a Reactant compile is too heavy for the laptop), the
+reverse suite, `--hi-res`, `--SPEEDY`, and the docs page generator, which only had a text change.
+
+**Problems found:**
+1. **Fixed: repeats re-initialized the model** with Reactant compilations on every repeat, see section 8.
+2. **HIP graphs were never forced on for `gpu-amd`.** The driver sets `suite.gpu_graphs` only if
+   `hasproperty(suite, :gpu_graphs)`, and no suite has that field, neither here nor on main since #1288.
+   `SpeedyTransformsAMDGPUExt` defaults to `gpu_graphs = false`, so the stored `gpu-amd` results ran
+   without HIP graphs, although the README says they are forced on. A fix would add the field and pass
+   `SpectralTransform(spectral_grid; gpu_graphs)` in `build_model`.
+3. **The timed run has two more steps than SYPD counts.** The period is `(nsteps + 1)·Δt`, the clock
+   runs `ceil(period / Δt)` steps plus one spin-up step, and SYPD divides by `nsteps`. That
+   underestimates SYPD by 4 % at 50 steps (the high resolutions) and 0.2 % at 1200. Also on main.
+4. **A failed configuration keeps SYPD 0**, so the README overview shows "0.0" instead of "—". The docs
+   figures skip it already. Storing NaN on failure would give `null` in the JSON and "—" in the tables.

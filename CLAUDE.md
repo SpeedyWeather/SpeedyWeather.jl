@@ -351,6 +351,9 @@ in that file serve as the baseline. When running benchmarks, compare new results
 the existing README.md values: deviations of +/- 20% are normal and acceptable, but
 larger regressions should be reported to the user.
 
+Each configuration of the main suites is timed up to 5 times, as long as all its timed runs together
+take at most 30 s, and the median SYPD is reported with the spread of the runs.
+
 The reverse-mode (AD) benchmarks with Reactant are opt-in, as they take hours: add the flag
 `--reverse` (e.g. `manual_benchmarking.jl reactant-gpu --reverse`). Runs without it keep the
 stored reverse-mode results. The flag `--hi-res` adds T342 and T512 to the PrimitiveWet
