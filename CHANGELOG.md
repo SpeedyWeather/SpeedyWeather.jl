@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fix NaN forward-mode derivatives of the learned ocean roughness at zero neutral wind speed (extended differentiability tests) [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+- Fix NaN forward-mode derivatives of the learned ocean roughness at zero neutral wind speed (extended differentiability tests) [#1377](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1377)
 - Fix initial snow depth on Reactant GPU, broadcasting over a view fell back to scalar indexing [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - NumericalRadiation extension for NumericalRadiation 0.2: gases renamed to chemical formula [#1329](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1329)
 - Count device (GPU) memory in printed sizes of model, simulation and variables [#1364](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1364)
