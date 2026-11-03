@@ -14,14 +14,20 @@ Usage:
 Every configuration of the `BenchmarkSuite`s is timed up to 5 times from the same
 initial state, as long as all its timed runs together take at most 30 s
 (`repeats` and `max_repeat_time` in `benchmark_suite.jl`), and the median SYPD is
-reported with the spread of the runs.
+reported with the spread of the runs. The option `--repeats N` times every
+configuration exactly N times instead, without the 30 s budget (not the
+reverse-mode suite, which keeps its up to 3 samples).
 
-An optional second argument multiplies the number of timesteps per timed run of
-the main benchmark, the PrimitiveWet resolution sweep (`:benchmark201`), for
-longer, more robust publication-ready timings (default 1, the other suites are
-not affected), e.g.
+The option `--length X` (or a second positional argument, as before) multiplies
+the number of timesteps per timed run of the main benchmark, the PrimitiveWet
+resolution sweep (`:benchmark201`), for longer, more robust publication-ready
+timings (default 1, the other suites are not affected), e.g.
 
-    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl gpu 10         # 10× longer benchmark201
+    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl gpu --repeats 5 --length 10   # 5 runs each, 10× longer benchmark201
+
+Options take a value, as `--repeats 5` or `--repeats=5`. The settings are stated at
+the top of each architecture's section and stored in its `meta`. The arguments are
+parsed with ArgParse.jl, `manual_benchmarking.jl --help` lists them all.
 
 The flag `--reverse` (Reactant only, anywhere among the arguments) additionally
 runs the reverse-mode (AD) benchmarks of `reverse_benchmark_suite.jl`, which
@@ -43,8 +49,8 @@ results are stored separately, as the architecture label with a `-speedy` suffix
 don't trace.
 
 A run replaces all results stored for its label, including those of suites that a
-flag added in an earlier run. Flags can be combined and are case-insensitive, e.g.
-`reactant-gpu 10 --reverse --hi-res`. Truncations are 1-based throughout
+flag added in an earlier run. Flags and options can be combined in any order, e.g.
+`reactant-gpu --length 10 --reverse --hi-res`; `--SPEEDY` can also be written `--speedy`. Truncations are 1-based throughout
 (T32, …, T256) as in the model code.
 
 The CPU label is auto-derived from `Sys.ARCH` (`cpu-arm` for aarch64/arm64,
@@ -78,17 +84,54 @@ import Pkg
 cd(@__DIR__)
 Pkg.activate(".")
 
-# Arguments starting with `--` are flags (case-insensitive), the others are positional: architecture, then multiplier
-const FLAGS = lowercase.(filter(startswith("--"), ARGS))
-const POSITIONAL_ARGS = filter(!startswith("--"), ARGS)
-for flag in FLAGS
-    flag in ("--reverse", "--hi-res", "--speedy") || error("Unknown flag `$flag`. Known flags: --reverse, --hi-res, --SPEEDY.")
-end
-const RUN_REVERSE = "--reverse" in FLAGS
-const RUN_HI_RES = "--hi-res" in FLAGS
-const RUN_SPEEDY = "--speedy" in FLAGS
+# Command-line arguments, `manual_benchmarking.jl --help` lists them. Parsed before any backend is
+# loaded, so that wrong arguments fail within seconds
+using ArgParse
 
-const ARCH_ARG = length(POSITIONAL_ARGS) >= 1 ? lowercase(POSITIONAL_ARGS[1]) : ""
+const ARCHITECTURES = ("cpu", "gpu", "amdgpu", "reactant-cpu", "reactant-gpu", "reactant-tpu")
+const ARGUMENT_SETTINGS = ArgParseSettings(
+    description = "Run the SpeedyWeather benchmark suite on one architecture and update README.md " *
+        "and assets/benchmark_results.json, see the comment at the top of manual_benchmarking.jl.",
+)
+@add_arg_table! ARGUMENT_SETTINGS begin
+    "architecture"
+    help = "cpu (labelled cpu-arm or cpu-x86), gpu, amdgpu, reactant-cpu, reactant-gpu or reactant-tpu"
+    default = "cpu"
+    range_tester = architecture -> lowercase(architecture) in ARCHITECTURES
+    "multiplier"
+    help = "same as --length, as before"
+    arg_type = Float64
+    required = false
+    range_tester = multiplier -> multiplier > 0
+    "--length"
+    help = "multiply the number of time steps of the timed runs of the PrimitiveWet resolution sweep (benchmark201) by X"
+    arg_type = Float64
+    metavar = "X"
+    range_tester = multiplier -> multiplier > 0
+    "--repeats"
+    help = "exactly N timed runs per configuration, instead of up to 5 within 30 s (not the reverse-mode suite)"
+    arg_type = Int
+    metavar = "N"
+    range_tester = repeats -> repeats >= 1
+    "--reverse"
+    help = "also run the reverse-mode (AD) benchmarks, Reactant only, takes hours"
+    action = :store_true
+    "--hi-res"
+    help = "add T342 and T512 to the PrimitiveWet resolution sweep, GPU and TPU only"
+    action = :store_true
+    dest_name = "hi_res"
+    "--SPEEDY", "--speedy"
+    help = "SPEEDY.f90-like configuration (prescribed seasonal climatologies, constant surface roughness), not with Reactant yet"
+    action = :store_true
+    dest_name = "speedy"
+end
+const ARGUMENTS = parse_args(ARGUMENT_SETTINGS)
+
+const RUN_REVERSE = ARGUMENTS["reverse"]
+const RUN_HI_RES = ARGUMENTS["hi_res"]
+const RUN_SPEEDY = ARGUMENTS["speedy"]
+
+const ARCH_ARG = lowercase(ARGUMENTS["architecture"])
 const ON_REACTANT = ARCH_ARG in ("reactant-cpu", "reactant-gpu", "reactant-tpu")
 RUN_REVERSE && !ON_REACTANT &&
     error("The reverse-mode benchmarks (--reverse) need Reactant, use reactant-cpu, reactant-gpu or reactant-tpu.")
@@ -96,6 +139,17 @@ RUN_REVERSE && !ON_REACTANT &&
 # interpolation kernel indexes the months with a traced number
 RUN_SPEEDY && ON_REACTANT &&
     error("The SPEEDY configuration (--SPEEDY) doesn't run with Reactant yet, use cpu, gpu or amdgpu.")
+
+# `--length X` (or a second positional argument): a multiplier on the number of time steps per timed
+# run of the main benchmark (:benchmark201) only, for longer, more robust (e.g. publication-ready)
+# timings; defaults to 1. Example: `julia manual_benchmarking.jl gpu --length 10`.
+isnothing(ARGUMENTS["multiplier"]) || isnothing(ARGUMENTS["length"]) ||
+    error("Give the multiplier either as `--length X` or as the second argument, not both.")
+const TIMESTEP_MULTIPLIER = something(ARGUMENTS["length"], ARGUMENTS["multiplier"], 1.0)
+
+# `--repeats N`: exactly N timed runs per configuration of the `BenchmarkSuite`s, without the time
+# budget. `nothing` for the default: up to `repeats` runs within `max_repeat_time` (benchmark_suite.jl)
+const REPEATS = ARGUMENTS["repeats"]
 
 # Conditionally load backend packages BEFORE `using SpeedyWeather` so that
 # SpeedyWeather's extensions register the right array types and overloads.
@@ -146,12 +200,8 @@ const RESULTS_LABEL = RUN_SPEEDY ? "$ARCH_LABEL-speedy" : ARCH_LABEL
 @info "Running benchmarks for architecture: $ARCH_LABEL ($(typeof(ARCH)))"
 RUN_HI_RES && !ON_ACCELERATOR && @warn "--hi-res only adds GPU and TPU configurations (T342, T512 are too slow on CPU), ignored on $ARCH_LABEL."
 
-# Optional second argument: a multiplier on the number of timesteps per timed run
-# of the main benchmark (:benchmark201) only. Lengthens its runs for more robust
-# (e.g. publication-ready) timings; defaults to 1. Example: `julia manual_benchmarking.jl gpu 10`.
-const TIMESTEP_MULTIPLIER = length(POSITIONAL_ARGS) >= 2 ? parse(Float64, POSITIONAL_ARGS[2]) : 1.0
-TIMESTEP_MULTIPLIER > 0 || error("timestep multiplier must be > 0, got $TIMESTEP_MULTIPLIER")
-@info "Timestep multiplier (benchmark201 only): $TIMESTEP_MULTIPLIER"
+@info "Timestep multiplier (benchmark201 only, --length): $TIMESTEP_MULTIPLIER"
+@info "Timed runs per configuration: $(isnothing(REPEATS) ? "default, up to 5 within 30 s, set exactly with --repeats N" : "$REPEATS (--repeats)")"
 @info "Reverse-mode benchmarks: $(RUN_REVERSE ? "on" : "off, enable with --reverse")"
 @info "High resolutions T342, T512 in benchmark201 (GPU, TPU only): $(RUN_HI_RES && ON_ACCELERATOR ? "on" : "off")"
 @info "SPEEDY.f90-like configuration: $(RUN_SPEEDY ? "on, results stored as $RESULTS_LABEL" : "off, enable with --SPEEDY")"
@@ -190,6 +240,11 @@ for (key, suite) in benchmarks
     adapt_to_architecture!(suite, ARCH)
     # The multiplier only lengthens the main benchmark, the PrimitiveWet resolution sweep
     key == :benchmark201 && (suite.timestep_multiplier = TIMESTEP_MULTIPLIER)
+    # `--repeats N`: exactly N timed runs, no time budget (the reverse suite keeps its own samples)
+    if !isnothing(REPEATS) && suite isa BenchmarkSuite
+        suite.repeats = REPEATS
+        suite.max_repeat_time = Inf
+    end
     # AMDGPU's `default_gpu_graphs` is `false` (HIP graphs are opt-in,
     # so force it on explicitly for this arch;
     # leave every other arch on its own `SpectralTransform` default (`nothing`).
@@ -205,9 +260,21 @@ for key in SUITE_KEYS
 end
 
 
+# The run's settings for repeats (`--repeats`) and the multiplier (`--length`), at the top of the section
+function settings_markdown()
+    suite = benchmarks[:benchmark201]
+    runs = isnothing(REPEATS) ?
+        "up to $(suite.repeats) timed runs per configuration, as long as they take at most $(round(Int, suite.max_repeat_time)) s together" :
+        "$REPEATS timed runs per configuration (`--repeats $REPEATS`)"
+    longer = TIMESTEP_MULTIPLIER == 1 ? "" :
+        @sprintf(", the PrimitiveWet resolution sweep %g× longer (`--length %g`)", TIMESTEP_MULTIPLIER, TIMESTEP_MULTIPLIER)
+    return "\nSettings: $runs$longer.\n"
+end
+
 function arch_markdown()
     io = IOBuffer()
     RUN_SPEEDY && write(io, "\n$SPEEDY_CONFIGURATION\n")
+    write(io, settings_markdown())
     for key in SUITE_KEYS
         write_results(io, benchmarks[key])
     end
@@ -276,6 +343,8 @@ arch_record = Dict(
         "timestamp" => Dates.format(Dates.now(), Dates.RFC1123Format),
         "arch_type" => string(typeof(ARCH)),
         "configuration" => RUN_SPEEDY ? "SPEEDY" : "default",
+        "repeats" => REPEATS,               # `nothing` (null) for the default, up to 5 within 30 s
+        "length" => TIMESTEP_MULTIPLIER,
         "machine_info" => machine_info(),
     ),
     "markdown" => arch_markdown(),
@@ -312,8 +381,9 @@ function write_preamble(md)
 
     write(md, "All simulations are benchmarked over several seconds (wallclock time) without output. ")
     write(md, "Benchmarking excludes initialization and is started just before the main time loop and finishes right after. ")
-    write(md, "Each configuration is timed up to 5 times from the same initial state, as long as all its timed runs together ")
-    write(md, "take at most 30 s, so short runs are timed 5 times and runs longer than 15 s once. ")
+    write(md, "By default each configuration is timed up to 5 times from the same initial state, as long as all its timed runs together ")
+    write(md, "take at most 30 s, so short runs are timed 5 times and runs longer than 15 s once; `--repeats N` times every configuration ")
+    write(md, "exactly N times. Each architecture's section states its settings. ")
     write(md, "SYPD is the median of these runs, and the Spread column shows how much they differ. ")
     write(md, "Results still vary between processes and machines, e.g. by ±30% on a laptop, ")
     write(md, "so the following presents a rough idea of how fast a SpeedyWeather simulation will run, and how much memory it requires.\n\n")
@@ -329,7 +399,7 @@ function write_preamble(md)
     write(md, "- Physics: With physical parameterizations?, default: true (for primitive equation models)\n")
     write(md, "- Δt: time step [s].\n")
     write(md, "- SYPD: Speed of simulation, simulated years per wallclock day, median of the timed runs.\n")
-    write(md, "- Runs: Number of timed runs, up to 5 within 30 s of timed runs.\n")
+    write(md, "- Runs: Number of timed runs, see the settings of each architecture.\n")
     write(md, "- Spread: (slowest − fastest) / median wallclock time of the timed runs, — for a single run.\n")
     write(md, "- Memory: Memory footprint of simulation, variables and constants.\n")
     write(md, "- Compile: One-off compilation of the time step (Reactant only), not included in the SYPD. ")
@@ -348,9 +418,10 @@ function write_preamble(md)
     write(md, "julia --project=. manual_benchmarking.jl reactant-gpu   # Reactant on CUDA GPU\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-tpu   # Reactant on TPU\n")
     write(md, "```\n\n")
-    write(md, "An optional second argument, e.g. `manual_benchmarking.jl gpu 10`, multiplies the number of time steps of the ")
+    write(md, "Options and flags, in any order (`manual_benchmarking.jl --help` lists them): `--length X`, e.g. `manual_benchmarking.jl gpu --length 10`, multiplies the number of time steps of the ")
     write(md, "timed runs of the PrimitiveWet resolution sweep (the overview below) for more robust timings; the other suites are not affected. ")
-    write(md, "Flags, in any order: `--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-gpu --reverse`) additionally runs the ")
+    write(md, "`--repeats N` times every configuration exactly N times instead of up to 5 times within 30 s. ")
+    write(md, "`--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-gpu --reverse`) additionally runs the ")
     write(md, "reverse-mode benchmarks, which take hours. `--hi-res` (GPU and TPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. ")
     write(md, "`--SPEEDY` (not with Reactant yet) runs the primitive equation models in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of ")
     write(md, "sea surface temperature, land surface temperature and soil moisture, constant surface roughness), stored as a separate architecture with a `-speedy` suffix.\n\n")

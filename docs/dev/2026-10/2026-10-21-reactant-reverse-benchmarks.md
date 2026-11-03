@@ -102,6 +102,23 @@ counts, and a failed configuration shows SYPD 0.0 in the overview.
 
 `--SPEEDY` now also uses `ConstantSurfaceRoughness` instead of `LearnedSurfaceRoughness` (section 6).
 
+> make the number of trials another command line argument, so e.g. "--repeats 5 --length 10"
+
+New options with a value (section 8): `--repeats N` gives exactly N timed runs per configuration of the
+`BenchmarkSuite`s, without the 30 s budget; the reverse suite keeps its samples. `--length X` is the
+multiplier of section 1, the second positional argument still works (both together is an error). The
+settings are written at the top of each architecture's section and into `meta` (`repeats`, `length`),
+which also covers "record the multiplier" from the future work.
+
+> is there no standard julia library for the argument parsing?
+>
+> use ArgParse.jl
+
+Julia's standard library has no argument parser, so the driver now uses ArgParse.jl (added to
+`benchmark/Project.toml`) instead of the hand-written one. It adds `--help` and checks the architecture,
+`--repeats ≥ 1` and `--length > 0` before any backend is loaded. Option names are now exact: `--SPEEDY`
+and `--speedy` both work, other spellings no longer do (before, flags were case-insensitive).
+
 ## Problem description
 
 This plan makes two changes to `SpeedyWeather/benchmark/manual_benchmarking.jl`:
@@ -352,8 +369,8 @@ was removed on request (see the revision log).
     ocean) instead of `LearnedSurfaceRoughness`, in an otherwise default `BoundaryLayer`.
 - **Stored separately.** The results go under the label `<arch>-speedy`, with
   `meta.configuration = "SPEEDY"` and a note at the top of the section. Default and SPEEDY results
-  therefore coexist; the overview table gets its own column and the docs page its own line. Flags are
-  case-insensitive.
+  therefore coexist; the overview table gets its own column and the docs page its own line. `--SPEEDY` can
+  also be written `--speedy` (case-insensitive before ArgParse.jl, see the revision log).
 - **Not with Reactant yet.** `--SPEEDY` with `reactant-*` errors at startup, see "SPEEDY configuration
   with Reactant" below.
 
@@ -473,6 +490,11 @@ the `BenchmarkSuite`s timed each configuration once.
   (slowest − fastest) / median wallclock time; the JSON `overview` gets `sypd_min`, `sypd_max` and
   `repeats`. `sypd` is now the median, so readers of older records still work.
 - The median, as in Terrarium.jl#222. The reverse suite keeps the minimum over its samples.
+- **Options** (added later, see the revision log). `--repeats N` sets `repeats = N` and
+  `max_repeat_time = Inf` on every `BenchmarkSuite`, so every configuration gets exactly N runs. `--length X`
+  is the multiplier of section 1 as a named option. The driver parses options with a value (`--repeats 5`
+  or `--repeats=5`), so the value isn't taken for the architecture. Each architecture's section starts
+  with a "Settings:" line, and `meta` stores `repeats` (`null` for the default) and `length`.
 - The README preamble and the docs page describe the repeats; the "±50 %" remark became a note that
   results still vary between processes and machines.
 
@@ -494,12 +516,12 @@ Without the budget, 5 repeats would add 37 to 51 minutes on the CPUs.
 
 | File | Change |
 | --- | --- |
-| `benchmark/manual_benchmarking.jl` | `sypd_min`, `sypd_max`, `repeats` in the JSON overview and the text on repeated runs; architecture `reactant-tpu`, `ON_REACTANT`, `ON_ACCELERATOR`, Reactant devices in the machine info; flag parsing (`--reverse`, `--hi-res`, `--SPEEDY`, case-insensitive); `RESULTS_LABEL` and `meta.configuration` for `--SPEEDY`; conditional `using Enzyme` and include; multiplier for benchmark201 only; the `reverse` numbers in the record; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists the flags and the multiplier |
+| `benchmark/manual_benchmarking.jl` | `sypd_min`, `sypd_max`, `repeats` in the JSON overview and the text on repeated runs; architecture `reactant-tpu`, `ON_REACTANT`, `ON_ACCELERATOR`, Reactant devices in the machine info; argument parsing with ArgParse.jl (`--reverse`, `--hi-res`, `--SPEEDY`, `--repeats`, `--length`); `RESULTS_LABEL` and `meta.configuration` for `--SPEEDY`; conditional `using Enzyme` and include; multiplier for benchmark201 only; the `reverse` numbers in the record; check at startup that the results store is readable; usage header; the README "Running the benchmarks" section lists the flags and the multiplier |
 | `benchmark/define_benchmarks.jl` | `:benchmark800`, behind `RUN_REVERSE`; T342 and T512 in `:benchmark201`, behind `RUN_HI_RES` on GPU and TPU (`ON_ACCELERATOR`); 1-based truncations in comments |
 | `docs/generate_benchmarks_page.jl` | `reactant-tpu` in `ARCH_ORDER`; the text on repeated runs |
 | `benchmark/benchmark_suite.jl` | `speedy_components`, `SPEEDY_CONFIGURATION` and their use in `build_model`; the comment on `timestep_multiplier`; 1-based truncation in the heading of the individual-dynamics-functions tables; repeated timed runs (`repeats`, `max_repeat_time`, `SYPD_min`, `SYPD_max`, `nrepeats`), the Runs and Spread columns |
 | `benchmark/reverse_benchmark_suite.jl` | New file |
-| `benchmark/Project.toml` | Adds `Enzyme` |
+| `benchmark/Project.toml` | Adds `Enzyme` and `ArgParse` |
 | `CHANGELOG.md` | One line under `## Unreleased` |
 
 No package source changes, so no version bumps.

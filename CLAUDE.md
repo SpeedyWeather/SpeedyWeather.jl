@@ -352,12 +352,15 @@ the existing README.md values: deviations of +/- 20% are normal and acceptable, 
 larger regressions should be reported to the user.
 
 Each configuration of the main suites is timed up to 5 times, as long as all its timed runs together
-take at most 30 s, and the median SYPD is reported with the spread of the runs.
+take at most 30 s, and the median SYPD is reported with the spread of the runs. `--repeats N` times
+every configuration exactly N times instead, and `--length X` makes the timed runs of the PrimitiveWet
+resolution sweep X times longer (e.g. `manual_benchmarking.jl gpu --repeats 5 --length 10`).
 
 The reverse-mode (AD) benchmarks with Reactant are opt-in, as they take hours: add the flag
-`--reverse` (e.g. `manual_benchmarking.jl reactant-gpu --reverse`). Runs without it keep the
-stored reverse-mode results. The flag `--hi-res` adds T342 and T512 to the PrimitiveWet
-resolution sweep, on GPU only. Truncations in the benchmarks are 1-based (T32, …, T256), as in
+`--reverse` (e.g. `manual_benchmarking.jl reactant-gpu --reverse`). A run without it drops the
+stored reverse-mode results of that architecture. The flag `--hi-res` adds T342 and T512 to the
+PrimitiveWet resolution sweep, on GPU and TPU only. `--SPEEDY` runs a SPEEDY.f90-like configuration
+(prescribed seasonal climatologies, constant surface roughness), stored separately. Truncations in the benchmarks are 1-based (T32, …, T256), as in
 the model code.
 
 ## Code Style
