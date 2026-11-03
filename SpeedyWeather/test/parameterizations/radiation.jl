@@ -12,8 +12,13 @@ function init_radiation_state!(vars, model)
     vars.parameterizations.surface_pressure .= 1.0e5
     haskey(vars.parameterizations, :cloud_top) && (vars.parameterizations.cloud_top .= model.spectral_grid.nlayers + 1)
     haskey(vars.parameterizations, :rain_rate) && (vars.parameterizations.rain_rate .= 0)
-    vars.parameterizations.ocean.albedo .= 0.5
-    vars.parameterizations.land.albedo .= 0.3
+    # surfaces with direct (black-sky) and diffuse (white-sky) albedo, e.g. JinOceanAlbedo or LearnedLandAlbedo,
+    # are blended into the albedo by the shortwave scheme, so set those too
+    for (surface, albedo) in ((vars.parameterizations.ocean, 0.5), (vars.parameterizations.land, 0.3))
+        surface.albedo .= albedo
+        haskey(surface, :black_sky_albedo) && (surface.black_sky_albedo .= albedo)
+        haskey(surface, :white_sky_albedo) && (surface.white_sky_albedo .= albedo)
+    end
     vars.prognostic.ocean.sea_surface_temperature .= 290
     vars.prognostic.land.soil_temperature .= 285
     SpeedyWeather.parameterization!(vars, model.solar_zenith, model)
