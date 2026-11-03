@@ -359,9 +359,9 @@ resolution sweep X times longer (e.g. `manual_benchmarking.jl gpu --repeats 5 --
 The reverse-mode (AD) benchmarks with Reactant are opt-in, as they take hours: add the flag
 `--reverse` (e.g. `manual_benchmarking.jl reactant-gpu --reverse`). A run without it drops the
 stored reverse-mode results of that architecture. The flag `--hi-res` adds T342 and T512 to the
-PrimitiveWet resolution sweep, on GPU and TPU only. `--SPEEDY` runs a SPEEDY.f90-like configuration
-(prescribed seasonal climatologies, constant surface roughness, wind slowdown and gusts), stored
-separately. Truncations in the benchmarks are 1-based (T32, …, T256), as in
+PrimitiveWet resolution sweep, on GPU and TPU only. `--SPEEDY` adds a suite of the PrimitiveWet
+model over the same resolutions in a SPEEDY.f90-like configuration (prescribed seasonal climatologies,
+constant surface roughness, wind slowdown and gusts), on every architecture including Reactant. Truncations in the benchmarks are 1-based (T32, …, T256), as in
 the model code.
 
 ## Code Style

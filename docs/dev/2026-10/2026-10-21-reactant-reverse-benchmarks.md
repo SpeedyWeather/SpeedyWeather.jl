@@ -124,6 +124,20 @@ and `--speedy` both work, other spellings no longer do (before, flags were case-
 `--SPEEDY` also uses SPEEDY.f90's constant near-surface wind: `ConstantWindSlowdown` (0.95) and
 `ConstantWindGust` with 5 m/s instead of its default 0.5 m/s (section 6).
 
+> make SPEEDY just add a new benchmark category instead that optionally gets added ('ike --reverse).
+> the SPEEDY option should also work with Reactant as well
+
+`--SPEEDY` now adds the suite `:benchmark900` (PrimitiveDry T32, PrimitiveWet T32, T64, T128) instead
+of changing every suite and storing a separate `<arch>-speedy` record; its numbers go into the record's
+`speedy` field. It's no longer refused on Reactant: the two blockers of section 6 had been fixed in #1304
+meanwhile. New test `test/reactant/test_speedy.jl` (section 6).
+
+> the speedy suite should have the same truncations as the main benchmark suite :benchmark201 and only
+> run for the primitivewetmodel
+
+The SPEEDY suite now runs only the PrimitiveWet model, over the same resolutions as `:benchmark201`
+with the default transform (`resolution_sweep()`, shared by both suites); no matrix transform rows.
+
 ## Problem description
 
 This plan makes two changes to `SpeedyWeather/benchmark/manual_benchmarking.jl`:
@@ -363,10 +377,23 @@ was removed on request (see the revision log).
 
 ### 6. The `--SPEEDY` flag (added on request, see the revision log)
 
-- **What changes.** `build_model` gives every primitive equation model of every suite (including the
-  dynamics-functions and reverse suites) SPEEDY.f90-like components, `speedy_components` in
-  `benchmark_suite.jl`. Components given per run (`model_kwargs`) take precedence. Barotropic and
-  ShallowWater models are unchanged.
+Revised on 2026-11-03: `--SPEEDY` first gave every primitive equation model of every suite the SPEEDY
+components and stored the results under a separate label `<arch>-speedy`. It now adds one suite,
+like `--reverse`, and also runs on Reactant.
+
+- **The suite** `:benchmark900`, "SPEEDY.f90-like configuration", only with `--SPEEDY`
+  (`define_benchmarks.jl`): the PrimitiveWet model over the resolutions of the PrimitiveWet resolution
+  sweep (`:benchmark201`) with the default transform, incl. L16, L24 and the `--hi-res` rows, so the two
+  compare row by row; `resolution_sweep()` gives both suites the same configurations. Changed on request
+  from a first version with PrimitiveDry at T32 and PrimitiveWet at T32, T64 and T128.
+- It's a regular `BenchmarkSuite`, so `--repeats` applies. The components are its `model_kwargs`,
+  `speedy_components(Model)` in `benchmark_suite.jl`, functions of the spectral grid. The other suites
+  keep the default configuration. A new `description` field of `BenchmarkSuite` writes
+  `SPEEDY_CONFIGURATION` below the suite's heading.
+- **Results.** Its table is part of the architecture's section, and its numbers go into the `speedy`
+  field of the record (the same fields as `overview`, plus `model`), like `reverse`. No separate label,
+  `meta.configuration` and note at the top of the section any more. A run without `--SPEEDY` drops them.
+- **The components:**
   - Ocean: `SeasonalOceanClimatology` (monthly SST climatology, linear in time) instead of `SlabOcean`.
   - Land surface temperature: `SeasonalLandTemperature` instead of `LandBucketTemperature`.
   - Soil moisture: `SeasonalSoilMoisture` instead of `LandBucketMoisture` (PrimitiveWet only).
@@ -376,12 +403,8 @@ was removed on request (see the revision log).
     explicitly, the default is 0.5 m/s) instead of `LearnedWindSlowdown` and `BeljaarsWindGust`, SPEEDY.f90's
     defaults as cited in `docs/src/surface_fluxes.md` (Kucharski et al. 2006). The drag stays the default
     `BulkRichardsonDrag`.
-- **Stored separately.** The results go under the label `<arch>-speedy`, with
-  `meta.configuration = "SPEEDY"` and a note at the top of the section. Default and SPEEDY results
-  therefore coexist; the overview table gets its own column and the docs page its own line. `--SPEEDY` can
-  also be written `--speedy` (case-insensitive before ArgParse.jl, see the revision log).
-- **Not with Reactant yet.** `--SPEEDY` with `reactant-*` errors at startup, see "SPEEDY configuration
-  with Reactant" below.
+- `--SPEEDY` can also be written `--speedy` (case-insensitive before ArgParse.jl, see the revision log).
+- **On Reactant too**, see "SPEEDY configuration with Reactant" below.
 
 **Review: SPEEDY.f90 against SpeedyWeather's options.**
 
@@ -410,7 +433,19 @@ the full Gaussian grid has about 45 % more grid points than the octahedral one a
 rings. SPEEDY's σ levels only apply to the L8 configurations, and a grid setting must not override the
 Grids suite (`:benchmark400`).
 
-**SPEEDY configuration with Reactant.** Two blockers in the package source, found with
+**SPEEDY configuration with Reactant.** Update 2026-11-03: both blockers below were fixed in #1304
+(`dd279db9` on main), so `--SPEEDY` is no longer refused on Reactant:
+- `monthly_interpolation` (`parameterizations/ocean.jl`), shared by the three seasonal components, uses
+  `Dates.yearmonthday`; `Dates.daysinmonth` has a branch-free method for traced numbers in
+  SpeedyWeatherReactantExt. Tested in `test/reactant/utilities.jl`.
+- `interpolate_monthly_climatology_kernel!` converts the traced months to `Int` inside the kernel.
+
+Nothing ran these components in a Reactant model, though. The new `test/reactant/test_speedy.jl` builds
+the SPEEDY components on CPU and Reactant at T32 and compares after 4 time steps: the prescribed sea
+surface temperature, soil temperature and soil moisture to `rtol = 1e-5` (they depend only on the time),
+the atmosphere with the usual tolerances, and the 5 m/s gusts and 0.5 m land roughness.
+
+Original analysis (2026-10-21), two blockers in the package source, found with
 `spike/speedy_config.jl` and `spike/speedy_fix_prototype.jl` (scratchpad):
 1. **`Dates.month` of the traced clock branches** on traced values ("non-boolean
    `TracedRNumber{Bool}` used in boolean context"), and so do `firstdayofmonth` and `daysinmonth`. All
@@ -426,8 +461,8 @@ Grids suite (`:benchmark400`).
    select the two months outside the kernel (a dynamic slice with Reactant, a view elsewhere) and pass
    only the slices and the weight. Not prototyped yet.
 
-Both are changes to `SpeedyWeather/src/parameterizations` and need tests in `test/reactant`. They are
-left for a decision.
+Both are changes to `SpeedyWeather/src/parameterizations` and need tests in `test/reactant`. They were
+left for a decision, and later done in #1304 as described above.
 
 ### 7. The `reactant-tpu` architecture (added on request, see the revision log)
 

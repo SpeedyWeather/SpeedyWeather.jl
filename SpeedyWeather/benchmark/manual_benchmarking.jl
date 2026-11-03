@@ -39,16 +39,16 @@ The flag `--hi-res` adds T342 and T512 at 8, 16 and 24 layers to the main
 benchmark (`:benchmark201`), on GPU and TPU architectures only (ignored with a
 warning on CPU, too slow).
 
-The flag `--SPEEDY` runs all primitive equation models in a configuration closer
-to the original SPEEDY.f90: seasonal prescribed climatologies of sea surface
-temperature, land surface temperature and soil moisture instead of the slab ocean
-and the land bucket model, constant instead of learned surface roughness
-lengths, and a constant wind slowdown (0.95) and gusts (5 m/s) as in SPEEDY.f90
-instead of the learned wind slowdown and Beljaars gusts (`speedy_components` in
-`benchmark_suite.jl`). Its
-results are stored separately, as the architecture label with a `-speedy` suffix
-(e.g. `gpu-nvidia-speedy`). Not with Reactant yet: the seasonal climatologies
-don't trace.
+The flag `--SPEEDY` additionally runs a suite (`:benchmark900`) of the PrimitiveWet
+model over the resolutions of the main benchmark (`:benchmark201`, default
+transform) in a configuration closer to the original SPEEDY.f90: seasonal
+prescribed climatologies of sea surface temperature, land surface temperature and
+soil moisture instead of the slab ocean and the land bucket model, constant
+instead of learned surface roughness lengths, and a constant wind slowdown (0.95)
+and gusts (5 m/s) as in SPEEDY.f90 instead of the learned wind slowdown and
+Beljaars gusts (`speedy_components` in `benchmark_suite.jl`). Its section and its
+numbers (the `speedy` field of the record) are part of the architecture's results,
+like those of `--reverse`. On every architecture, including Reactant.
 
 A run replaces all results stored for its label, including those of suites that a
 flag added in an earlier run. Flags and options can be combined in any order, e.g.
@@ -123,7 +123,7 @@ const ARGUMENT_SETTINGS = ArgParseSettings(
     action = :store_true
     dest_name = "hi_res"
     "--SPEEDY", "--speedy"
-    help = "SPEEDY.f90-like configuration (prescribed seasonal climatologies, constant surface roughness, wind slowdown and gusts), not with Reactant yet"
+    help = "also run the PrimitiveWet resolution sweep in a SPEEDY.f90-like configuration (prescribed seasonal climatologies, constant surface roughness, wind slowdown and gusts)"
     action = :store_true
     dest_name = "speedy"
 end
@@ -137,10 +137,6 @@ const ARCH_ARG = lowercase(ARGUMENTS["architecture"])
 const ON_REACTANT = ARCH_ARG in ("reactant-cpu", "reactant-gpu", "reactant-tpu")
 RUN_REVERSE && !ON_REACTANT &&
     error("The reverse-mode benchmarks (--reverse) need Reactant, use reactant-cpu, reactant-gpu or reactant-tpu.")
-# The seasonal climatologies don't trace yet: Dates.month branches on the traced clock, and the
-# interpolation kernel indexes the months with a traced number
-RUN_SPEEDY && ON_REACTANT &&
-    error("The SPEEDY configuration (--SPEEDY) doesn't run with Reactant yet, use cpu, gpu or amdgpu.")
 
 # `--length X` (or a second positional argument): a multiplier on the number of time steps per timed
 # run of the main benchmark (:benchmark201) only, for longer, more robust (e.g. publication-ready)
@@ -197,8 +193,6 @@ end
 const ARCH, ARCH_LABEL = pick_architecture(ARCH_ARG)
 # GPU or TPU: higher resolutions (`--hi-res`, reverse mode), larger matrix transforms than on CPU (T128 on TPU)
 const ON_ACCELERATOR = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-gpu", "reactant-tpu")
-# the results of the SPEEDY.f90-like configuration (`--SPEEDY`) are stored separately from the default configuration
-const RESULTS_LABEL = RUN_SPEEDY ? "$ARCH_LABEL-speedy" : ARCH_LABEL
 @info "Running benchmarks for architecture: $ARCH_LABEL ($(typeof(ARCH)))"
 RUN_HI_RES && !ON_ACCELERATOR && @warn "--hi-res only adds GPU and TPU configurations (T342, T512 are too slow on CPU), ignored on $ARCH_LABEL."
 
@@ -206,7 +200,7 @@ RUN_HI_RES && !ON_ACCELERATOR && @warn "--hi-res only adds GPU and TPU configura
 @info "Timed runs per configuration: $(isnothing(REPEATS) ? "default, up to 5 within 30 s, set exactly with --repeats N" : "$REPEATS (--repeats)")"
 @info "Reverse-mode benchmarks: $(RUN_REVERSE ? "on" : "off, enable with --reverse")"
 @info "High resolutions T342, T512 in benchmark201 (GPU, TPU only): $(RUN_HI_RES && ON_ACCELERATOR ? "on" : "off")"
-@info "SPEEDY.f90-like configuration: $(RUN_SPEEDY ? "on, results stored as $RESULTS_LABEL" : "off, enable with --SPEEDY")"
+@info "SPEEDY.f90-like configuration suite: $(RUN_SPEEDY ? "on" : "off, enable with --SPEEDY")"
 
 # Free (device) memory between benchmark runs, called outside the timed region
 free_memory!() = SpeedyWeather.SpeedyTransforms.clear_fourier_graph_cache!(ARCH)
@@ -230,6 +224,8 @@ load_results()
 
 # The reverse-mode suite (`--reverse`), its numbers are also stored in the `reverse` field of the arch record
 const REVERSE_SUITE_KEY = :benchmark800
+# The SPEEDY.f90-like configuration suite (`--SPEEDY`), its numbers also in the `speedy` field
+const SPEEDY_SUITE_KEY = :benchmark900
 
 include("benchmark_suite.jl")
 # The Reactant methods of the benchmark hooks need the `@compile` macro, only parse them once Reactant is loaded
@@ -275,7 +271,6 @@ end
 
 function arch_markdown()
     io = IOBuffer()
-    RUN_SPEEDY && write(io, "\n$SPEEDY_CONFIGURATION\n")
     write(io, settings_markdown())
     for key in SUITE_KEYS
         write_results(io, benchmarks[key])
@@ -320,11 +315,11 @@ end
 # already renders missing/non-finite entries as "—".
 json_safe(x) = (x isa Number && isfinite(x)) ? x : nothing
 
-# Pull the structured numbers needed for the cross-architecture comparison
-# from the PrimitiveWet resolution suite (:benchmark201).
-function overview_data()
-    suite = benchmarks[:benchmark201]
+# The structured numbers of a `BenchmarkSuite`: for the cross-architecture comparison from the
+# PrimitiveWet resolution suite (:benchmark201, the `overview` field), and the SPEEDY suite (`speedy`)
+function suite_data(suite::BenchmarkSuite)
     return Dict(
+        "model" => string.(nameof.(suite.model)),
         "truncation" => collect(suite.truncation),
         "nlayers" => collect(suite.nlayers),
         "nlat" => collect(suite.nlat),
@@ -344,25 +339,25 @@ arch_record = Dict(
         "speedyweather_version" => string(SpeedyWeather.pkgversion(SpeedyWeather)),
         "timestamp" => Dates.format(Dates.now(), Dates.RFC1123Format),
         "arch_type" => string(typeof(ARCH)),
-        "configuration" => RUN_SPEEDY ? "SPEEDY" : "default",
         "repeats" => REPEATS,               # `nothing` (null) for the default, up to 5 within 30 s
         "length" => TIMESTEP_MULTIPLIER,
         "machine_info" => machine_info(),
     ),
     "markdown" => arch_markdown(),
-    "overview" => overview_data(),
+    "overview" => suite_data(benchmarks[:benchmark201]),
 )
 RUN_REVERSE && (arch_record["reverse"] = reverse_data(benchmarks[REVERSE_SUITE_KEY]))
+RUN_SPEEDY && (arch_record["speedy"] = suite_data(benchmarks[SPEEDY_SUITE_KEY]))
 
 # Merge into the JSON store, replacing everything stored for this label before
 mkpath(ASSETS_DIR)
 all_results = load_results()
-all_results[RESULTS_LABEL] = arch_record
+all_results[ARCH_LABEL] = arch_record
 
 open(RESULTS_JSON, "w") do io
     JSON3.pretty(io, all_results)
 end
-@info "Wrote results for $RESULTS_LABEL → $RESULTS_JSON"
+@info "Wrote results for $ARCH_LABEL → $RESULTS_JSON"
 
 # Regenerate README.md from the JSON store
 
@@ -425,8 +420,8 @@ function write_preamble(md)
     write(md, "`--repeats N` times every configuration exactly N times instead of up to 5 times within 30 s. ")
     write(md, "`--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-gpu --reverse`) additionally runs the ")
     write(md, "reverse-mode benchmarks, which take hours. `--hi-res` (GPU and TPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. ")
-    write(md, "`--SPEEDY` (not with Reactant yet) runs the primitive equation models in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of ")
-    write(md, "sea surface temperature, land surface temperature and soil moisture, constant surface roughness, wind slowdown and gusts), stored as a separate architecture with a `-speedy` suffix.\n\n")
+    write(md, "`--SPEEDY` additionally runs the PrimitiveWet model over the resolutions of the resolution sweep in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of ")
+    write(md, "sea surface temperature, land surface temperature and soil moisture, constant surface roughness, wind slowdown and gusts).\n\n")
     write(md, "Each run replaces its own architecture's section in this `README.md` (including suites added by flags in an earlier run); ")
     write(md, "results for other architectures are preserved via `benchmark_results.json`.\n\n")
     return

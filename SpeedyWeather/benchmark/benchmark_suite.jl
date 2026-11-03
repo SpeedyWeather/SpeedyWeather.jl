@@ -5,27 +5,23 @@ using SpeedyWeather: synchronize, ReactantDevice, MatrixSpectralTransform, Spect
 # The dense MatrixSpectralTransform is too large (memory and speed) above this truncation
 const MAX_MATRIX_TRUNCATION = 150
 
-const SPEEDY_CONFIGURATION = "Configuration `--SPEEDY`, closer to SPEEDY.f90: the primitive equation models use seasonal " *
+const SPEEDY_CONFIGURATION = "The PrimitiveWet model in a configuration closer to SPEEDY.f90, at the resolutions " *
+    "of the PrimitiveWet resolution sweep with the default transform: seasonal " *
     "prescribed climatologies of sea surface temperature (`SeasonalOceanClimatology`), land surface temperature " *
-    "(`SeasonalLandTemperature`) and soil moisture (`SeasonalSoilMoisture`, wet model only) instead of the slab ocean " *
+    "(`SeasonalLandTemperature`) and soil moisture (`SeasonalSoilMoisture`) instead of the slab ocean " *
     "and the land bucket model, constant surface roughness lengths over land and ocean (`ConstantSurfaceRoughness`) " *
     "instead of the learned ones, and SPEEDY.f90's near-surface wind of 0.95 times the lowermost-layer wind " *
     "(`ConstantWindSlowdown`) with 5 m/s gusts (`ConstantWindGust`) instead of the learned wind slowdown and " *
     "Beljaars gusts; sea ice stays thermodynamic, driven by the prescribed sea surface temperature."
 
-# Model components of the SPEEDY.f90-like configuration (`--SPEEDY`) by model type, see `SPEEDY_CONFIGURATION`
-speedy_components(_, _) = (;)      # Barotropic, ShallowWater unchanged
-speedy_components(::Type{<:PrimitiveDry}, spectral_grid) = (;
-    ocean = SeasonalOceanClimatology(spectral_grid),
-    land = DryLandModel(spectral_grid; temperature = SeasonalLandTemperature(spectral_grid)),
-    boundary_layer = speedy_boundary_layer(spectral_grid),
-)
-speedy_components(::Type{<:PrimitiveWet}, spectral_grid) = (;
-    ocean = SeasonalOceanClimatology(spectral_grid),
-    land = LandModel(
+# Model components of the SPEEDY.f90-like configuration (`--SPEEDY` suite), see `SPEEDY_CONFIGURATION`,
+# as `model_kwargs` of a `BenchmarkSuite`: functions of the spectral grid
+speedy_components(::Type{<:PrimitiveWet}) = (;
+    ocean = SeasonalOceanClimatology,
+    land = spectral_grid -> LandModel(
         spectral_grid; temperature = SeasonalLandTemperature(spectral_grid), soil_moisture = SeasonalSoilMoisture(spectral_grid)
     ),
-    boundary_layer = speedy_boundary_layer(spectral_grid),
+    boundary_layer = speedy_boundary_layer,
 )
 
 # the default boundary layer but with SPEEDY.f90's constant wind slowdown (0.95) and gusts (5 m/s),
@@ -42,9 +38,7 @@ speedy_boundary_layer(spectral_grid) = BoundaryLayer(
 
 # Build the model with the spectral transform of `transform_kind` for `arch`
 # (`:default` for FFT+Legendre, `:matrix` for MatrixSpectralTransform).
-# With `--SPEEDY` (`RUN_SPEEDY`, set by the driver) the SPEEDY.f90-like components, components in `kwargs` take precedence.
 function build_model(Model, spectral_grid, arch; transform_kind::Symbol = :default, kwargs...)
-    kwargs = RUN_SPEEDY ? merge(speedy_components(Model, spectral_grid), kwargs) : kwargs
     if arch isa ReactantDevice
         transform_kind in (:default, :matrix) || error("Unknown transform_kind = $transform_kind. Use :default or :matrix.")
         # `:default` explicitly the FFT-based SpectralTransform: the models' default on Reactant
@@ -95,6 +89,8 @@ end
 abstract type AbstractBenchmarkSuite end
 @kwdef mutable struct BenchmarkSuite <: AbstractBenchmarkSuite
     title::String
+    # written below the title in the README, e.g. the configuration of the models
+    description::String = ""
     nruns::Int = 1
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
@@ -277,6 +273,7 @@ end
 function write_results(md, suite::BenchmarkSuite)
 
     write(md, "\n### $(suite.title)\n\n")
+    isempty(suite.description) || write(md, "$(suite.description)\n\n")
 
     print_NF = any(suite.NF .!= suite.NF[1])
     print_Grid = any(suite.Grid .!= suite.Grid[1])
