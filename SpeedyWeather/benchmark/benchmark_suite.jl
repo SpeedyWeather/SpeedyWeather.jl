@@ -8,20 +8,26 @@ const MAX_MATRIX_TRUNCATION = 150
 const SPEEDY_CONFIGURATION = "Configuration `--SPEEDY`, closer to SPEEDY.f90: the primitive equation models use seasonal " *
     "prescribed climatologies of sea surface temperature (`SeasonalOceanClimatology`), land surface temperature " *
     "(`SeasonalLandTemperature`) and soil moisture (`SeasonalSoilMoisture`, wet model only) instead of the slab ocean " *
-    "and the land bucket model; sea ice stays thermodynamic, driven by the prescribed sea surface temperature."
+    "and the land bucket model, and constant surface roughness lengths over land and ocean (`ConstantSurfaceRoughness`) " *
+    "instead of the learned ones; sea ice stays thermodynamic, driven by the prescribed sea surface temperature."
 
 # Model components of the SPEEDY.f90-like configuration (`--SPEEDY`) by model type, see `SPEEDY_CONFIGURATION`
 speedy_components(_, _) = (;)      # Barotropic, ShallowWater unchanged
 speedy_components(::Type{<:PrimitiveDry}, spectral_grid) = (;
     ocean = SeasonalOceanClimatology(spectral_grid),
     land = DryLandModel(spectral_grid; temperature = SeasonalLandTemperature(spectral_grid)),
+    boundary_layer = speedy_boundary_layer(spectral_grid),
 )
 speedy_components(::Type{<:PrimitiveWet}, spectral_grid) = (;
     ocean = SeasonalOceanClimatology(spectral_grid),
     land = LandModel(
         spectral_grid; temperature = SeasonalLandTemperature(spectral_grid), soil_moisture = SeasonalSoilMoisture(spectral_grid)
     ),
+    boundary_layer = speedy_boundary_layer(spectral_grid),
 )
+
+# the default boundary layer but with constant instead of learned surface roughness lengths
+speedy_boundary_layer(spectral_grid) = BoundaryLayer(spectral_grid; surface_roughness = ConstantSurfaceRoughness(spectral_grid))
 
 # Build the model with the spectral transform of `transform_kind` for `arch`
 # (`:default` for FFT+Legendre, `:matrix` for MatrixSpectralTransform).

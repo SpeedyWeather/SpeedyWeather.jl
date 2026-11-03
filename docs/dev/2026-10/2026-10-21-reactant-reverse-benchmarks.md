@@ -97,6 +97,11 @@ driver runs end to end on the CPU (see "Audit" in the protocol). Three older pro
 fixed yet: HIP graphs were never forced on for `gpu-amd`, the timed run has two more steps than SYPD
 counts, and a failed configuration shows SYPD 0.0 in the overview.
 
+> we need to add a constant surface roughness parameterization to the SPEEDY config, don't use the
+> learned one
+
+`--SPEEDY` now also uses `ConstantSurfaceRoughness` instead of `LearnedSurfaceRoughness` (section 6).
+
 ## Problem description
 
 This plan makes two changes to `SpeedyWeather/benchmark/manual_benchmarking.jl`:
@@ -343,6 +348,8 @@ was removed on request (see the revision log).
   - Ocean: `SeasonalOceanClimatology` (monthly SST climatology, linear in time) instead of `SlabOcean`.
   - Land surface temperature: `SeasonalLandTemperature` instead of `LandBucketTemperature`.
   - Soil moisture: `SeasonalSoilMoisture` instead of `LandBucketMoisture` (PrimitiveWet only).
+  - Surface roughness (added 2026-11-03): `ConstantSurfaceRoughness` (0.5 m over land, 1e-4 m over the
+    ocean) instead of `LearnedSurfaceRoughness`, in an otherwise default `BoundaryLayer`.
 - **Stored separately.** The results go under the label `<arch>-speedy`, with
   `meta.configuration = "SPEEDY"` and a note at the top of the section. Default and SPEEDY results
   therefore coexist; the overview table gets its own column and the docs page its own line. Flags are
@@ -361,6 +368,8 @@ was removed on request (see the revision log).
 | Snow | Depth climatology | `SnowModel` only | Default kept |
 | Vegetation, albedo | Climatologies, snow and sea-ice albedo | `VegetationClimatology`, `OceanLandAlbedo` | Already the default |
 | Surface fluxes | Bulk formulae | Implemented after the SPEEDY documentation | Already the default |
+| Surface roughness | No roughness lengths, constant drag coefficients over land and sea | `LearnedSurfaceRoughness` (default), `ConstantSurfaceRoughness` | Constant (added 2026-11-03) |
+| Surface wind | Lowest-level wind times a constant factor, plus constant gustiness | `LearnedWindSlowdown` (default), `ConstantWindSlowdown`; `BeljaarsWindGust` (default), `ConstantWindGust` | Default kept |
 | Shortwave | Two bands, diagnostic clouds | `OneBandShortwave` with SPEEDY's `DiagnosticClouds` | Already the default |
 | Longwave | Four bands | One band, Frierson or constant transmissivity | No equivalent |
 | Convection | Simplified mass flux | `BettsMillerConvection` only | No equivalent |

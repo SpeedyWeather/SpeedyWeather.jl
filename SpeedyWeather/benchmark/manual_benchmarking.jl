@@ -36,7 +36,8 @@ warning on CPU, too slow).
 The flag `--SPEEDY` runs all primitive equation models in a configuration closer
 to the original SPEEDY.f90: seasonal prescribed climatologies of sea surface
 temperature, land surface temperature and soil moisture instead of the slab ocean
-and the land bucket model (`speedy_components` in `benchmark_suite.jl`). Its
+and the land bucket model, and constant instead of learned surface roughness
+lengths (`speedy_components` in `benchmark_suite.jl`). Its
 results are stored separately, as the architecture label with a `-speedy` suffix
 (e.g. `gpu-nvidia-speedy`). Not with Reactant yet: the seasonal climatologies
 don't trace.
@@ -352,7 +353,7 @@ function write_preamble(md)
     write(md, "Flags, in any order: `--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-gpu --reverse`) additionally runs the ")
     write(md, "reverse-mode benchmarks, which take hours. `--hi-res` (GPU and TPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. ")
     write(md, "`--SPEEDY` (not with Reactant yet) runs the primitive equation models in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of ")
-    write(md, "sea surface temperature, land surface temperature and soil moisture), stored as a separate architecture with a `-speedy` suffix.\n\n")
+    write(md, "sea surface temperature, land surface temperature and soil moisture, constant surface roughness), stored as a separate architecture with a `-speedy` suffix.\n\n")
     write(md, "Each run replaces its own architecture's section in this `README.md` (including suites added by flags in an earlier run); ")
     write(md, "results for other architectures are preserved via `benchmark_results.json`.\n\n")
     return
