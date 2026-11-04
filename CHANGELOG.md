@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Require Reactant 0.2.305, 0.2.303 and 0.2.304 fail to compile some multi-output concatenate fusions on GPU ([Reactant.jl#3681](https://github.com/EnzymeAD/Reactant.jl/issues/3681)); fixes another issue with initialization on Reactant GPU models [#1378](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1378)
 - Add compat for JLArrays 0.4 [#1375](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1375)
 - Fix initial snow depth on Reactant GPU, broadcasting over a view fell back to scalar indexing [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - NumericalRadiation extension for NumericalRadiation 0.2: gases renamed to chemical formula [#1329](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1329)

@@ -74,12 +74,17 @@ end
     end
 end
 
-@testset "Initial snow depth from soil temperature" begin
+@testset "Initial snow depth from $name soil temperature" for (name, LandTemperature, SoilMoisture) in (
+        ("dynamic", LandBucketTemperature, LandBucketMoisture),
+        ("prescribed", SeasonalLandTemperature, SeasonalSoilMoisture),    # without time steps
+    )
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
-    model = PrimitiveWetModel(spectral_grid)
+    land_model = LandModel(spectral_grid; temperature = LandTemperature(spectral_grid), soil_moisture = SoilMoisture(spectral_grid))
+    model = PrimitiveWetModel(spectral_grid; land = land_model)
     simulation = initialize!(model)
     snow_depth = simulation.variables.prognostic.land.snow_depth[:, 1].data          # first step
-    soil_temperature = simulation.variables.prognostic.land.soil_temperature[:, 1, 1].data
+    soil_temperature_data = simulation.variables.prognostic.land.soil_temperature.data
+    soil_temperature = ndims(soil_temperature_data) == 3 ? soil_temperature_data[:, 1, 1] : soil_temperature_data[:, 1]
     (; melting_threshold, initial_snow_depth_max) = model.land.snow
     land = model.land_sea_mask.land_fraction.data .> 0
 
