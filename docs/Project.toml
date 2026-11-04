@@ -26,10 +26,10 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 
 [compat]
 Documenter = "1.11"
-# < 1.5: DocumenterVitepress can't render the CitationSiteNode introduced in 1.5,
+DocumenterCitations = "1"
+# >= 0.3.7: renders DocumenterCitations 1.5's CitationSiteNode,
 # https://github.com/LuxDL/DocumenterVitepress.jl/issues/391
-DocumenterCitations = "1 - 1.4"
-DocumenterVitepress = "0.3"
+DocumenterVitepress = "0.3.7"
 # < 0.3.2: not used directly, pulled in by Makie → KernelDensity; FFTA 0.3.2's plan_rfft is
 # ambiguous with FFTW's (used by SpeedyTransforms), https://github.com/JuliaMath/FFTA.jl/issues/146
 FFTA = "0.3.0 - 0.3.1"
