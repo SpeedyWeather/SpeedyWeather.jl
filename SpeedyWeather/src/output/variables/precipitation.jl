@@ -198,6 +198,153 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> 1000x     # [m] to [mm]
 end
 
+
+# TODO: Im not sure what compression level, shuffle, or keepbits to use - currently set to default
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct LevelZeroBuoyancy <: AbstractOutputVariable
+    name::String = "level_zero_buoyancy"
+    unit::String = "1"
+    long_name::String = "level of zero buoyancy"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 15
+end
+
+path(::LevelZeroBuoyancy, simulation) =
+    simulation.variables.parameterizations.level_zero_buoyancy
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct LevelFreeConvection <: AbstractOutputVariable
+    name::String = "level_free_convection"
+    unit::String = "1"
+    long_name::String = "level of free convection"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 15
+end
+
+path(::LevelFreeConvection, simulation) =
+    simulation.variables.parameterizations.level_free_convection
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct LiftingCondensationLevel <: AbstractOutputVariable
+    name::String = "lifting_condensation_level"
+    unit::String = "1"
+    long_name::String = "lifting condensation level"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 15
+end
+
+path(::LiftingCondensationLevel, simulation) =
+    simulation.variables.parameterizations.lifting_condensation_level
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct CAPE <: AbstractOutputVariable
+    name::String = "CAPE"
+    unit::String = "J/kg"
+    long_name::String = "convective available potential energy"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 15
+end
+
+path(::CAPE, simulation) =
+    simulation.variables.parameterizations.CAPE
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct CAPEPerLayer <: AbstractOutputVariable
+    name::String = "CAPE_per_layer"
+    unit::String = "J/kg"
+    long_name::String = "convective available potential energy per vertical layer"
+    dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 10
+end
+
+path(::CAPEPerLayer, simulation) =
+    simulation.variables.parameterizations.CAPE_per_layer
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct PT <: AbstractOutputVariable
+    name::String = "PT"
+    unit::String = "mm/s"
+    long_name::String = "precipitable water due to warming"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 15
+end
+
+path(::PT, simulation) =
+    simulation.variables.parameterizations.PT
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct Pq <: AbstractOutputVariable
+    name::String = "Pq"
+    unit::String = "mm/s"
+    long_name::String = "precipitable water due to drying"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 15
+end
+
+path(::Pq, simulation) =
+    simulation.variables.parameterizations.Pq
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct PTPerLayer <: AbstractOutputVariable
+    name::String = "PT_per_layer"
+    unit::String = "mm/s"
+    long_name::String = "precipitable water due to warming per vertical layer"
+    dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 10
+end
+
+path(::PTPerLayer, simulation) =
+    simulation.variables.parameterizations.PT_per_layer
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct PqPerLayer <: AbstractOutputVariable
+    name::String = "Pq_per_layer"
+    unit::String = "mm/s"
+    long_name::String = "precipitable water due to drying per vertical layer"
+    dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 10
+end
+
+path(::PqPerLayer, simulation) =
+    simulation.variables.parameterizations.Pq_per_layer
+
 # collect all in one for convenience
 Precipitation() = (
     ConvectiveRain(),
@@ -206,4 +353,13 @@ Precipitation() = (
     LargeScaleSnow(),
     CloudTop(),
     CloudCover(),
+    PT(),
+    PTPerLayer(),
+    Pq(),
+    PqPerLayer(),
+    LevelFreeConvection(),
+    LevelZeroBuoyancy(),
+    LiftingCondensationLevel(),
+    CAPE(),
+    CAPEPerLayer()
 )
