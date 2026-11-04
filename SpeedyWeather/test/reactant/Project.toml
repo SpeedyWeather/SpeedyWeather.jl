@@ -12,6 +12,4 @@ Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 SpeedyWeather = {path = "../.."}
 
 [compat]
-# < 0.2.303: XLA in 0.2.303 fails to compile some multi-output concatenate fusions on GPU (RET_CHECK in
-# concatenate_kernel_emitter.cc), https://github.com/EnzymeAD/Reactant.jl/issues/3681
-Reactant = "0.2.299 - 0.2.302"
+Reactant = "0.2.305"

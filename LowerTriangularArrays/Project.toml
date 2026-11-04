@@ -32,9 +32,7 @@ GPUArrays = "11.2.3, 12.1"
 KernelAbstractions = "0.9.38"
 LinearAlgebra = "1.10"
 Random = "1.10"
-# < 0.2.303: XLA in 0.2.303 fails to compile some multi-output concatenate fusions on GPU (RET_CHECK in
-# concatenate_kernel_emitter.cc), https://github.com/EnzymeAD/Reactant.jl/issues/3681
-Reactant = "0.2.299 - 0.2.302"
+Reactant = "0.2.305"
 SpeedyWeatherInternals = "1.0"
 StyledStrings = "1"
 julia = "1.10"
