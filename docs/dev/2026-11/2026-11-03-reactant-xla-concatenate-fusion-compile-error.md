@@ -1,8 +1,8 @@
 # Reactant GPU: XLA fails to compile the PrimitiveWet time loop (concatenate fusion)
 
-> Status: **in progress**. Cause: an XLA regression in Reactant 0.2.303 (openxla/xla#50225), reported as
-> EnzymeAD/Reactant.jl#3681; Reactant capped at 0.2.302 (the XLA-flag workaround costs up to half the speed).
-> Open: CI decisions (4b), lifting the cap once #3681 is fixed.
+> Status: **completed** (except the CI decisions, step 4b). Cause: an XLA regression in Reactant 0.2.303
+> (openxla/xla#50225), reported as EnzymeAD/Reactant.jl#3681, fixed in Reactant 0.2.305 by an XLA patch carried by
+> Enzyme-JAX; compat now `Reactant = "0.2.305"`, speed unchanged (see [Reactant 0.2.305](#reactant-02305-2026-11-04)).
 
 Date of initial draft: 2026-11-03
 
@@ -124,19 +124,88 @@ runs, all finite), Slurm 2884389 (0.2.304) and 2884390 (0.2.302), PrimitiveWet L
 | T32 | RET_CHECK | 15344 | **29733** | 15540 |
 | T43 | 17182 | 8758 (−49%) | 16980 | 8701 |
 | T64 | 9543 | 5201 (−45%) | 9792 | 5225 |
-| T128 | 2094 | 1435 (−31%) | | |
-| T256 | 369 | 302 (−18%) | | |
+| T128 | 2094 | 1435 (−31%) | 2221 | 1442 |
+| T256 | 369 | 302 (−18%) | 374 | 308 |
 
-(blank: not yet in when this was written; see the job logs `xla_concat/speed/speed_*.log`.) Disabling the pass costs
-up to half the speed (it halves compile time too), on both versions; 0.2.302 and 0.2.304 are equally fast where both
-compile. **Decision: no workaround, Reactant capped at 0.2.302.** The workaround (committed in 75eaf319) is removed
+Other models (same jobs, SYPD):
+
+| Model | 0.2.304 default | 0.2.304 no `multi_output_fusion` | 0.2.302 default | 0.2.302 no `multi_output_fusion` |
+|---|---|---|---|---|
+| PrimitiveDry T32 L8 | 34334 | 22081 (−36%) | 34387 | 22315 |
+| ShallowWater T32 | 132066 | 114016 (−14%) | 126385 | 114490 |
+| ShallowWater T128 | 13315 | 12190 (−8%) | 12980 | 12171 |
+| Barotropic T32 | 144922 | 140551 (−3%) | 148658 | 142065 |
+
+Logs: `xla_concat/speed/speed_*.log`. Disabling the pass costs up to half the speed for the primitive equation models
+(less for the single-layer ones; it halves compile time), on both versions; 0.2.302 and 0.2.304 are equally fast
+where both compile. **Decision: no workaround, Reactant capped at 0.2.302.** The workaround (committed in 75eaf319) is removed
 again (uncommitted on `mg/fix-reactant`); `Reactant = "0.2.299 - 0.2.302"` with a comment referencing #3681 in the
 `[compat]` of LowerTriangularArrays, RingGrids, SpeedyTransforms, SpeedyWeatherInternals, SpeedyWeather and
 `SpeedyWeather/test/reactant` (all already `+DEV`/`-DEV`). A scratch env with the capped SpeedyWeather resolves to
 Reactant 0.2.302 / Reactant_jll 0.0.435. The benchmark env's (untracked) Manifest still has 0.2.304 and needs a
 `Pkg.resolve()`.
 
+### Lifting the cap
+
+> okay stop the tests now. There's also already an upstream PR now that might fix this issue in XLA. We will see when
+> this gets used also by Reactant
+
+Tests stopped (all runs and Slurm jobs had finished). When a new Reactant release is out:
+
+1. Check whether its Reactant_jll contains the XLA fix: jll README `revision:` (Reactant.jl commit) →
+   `deps/ReactantExtra/WORKSPACE` `ENZYMEXLA_COMMIT` → Enzyme-JAX `workspace.bzl` `JAX_COMMIT` → JAX `MODULE.bazel`
+   (`strip_prefix = "xla-<commit>"`), then compare that XLA commit with the fix PR's merge commit (as done for the
+   bisect above). Or simply:
+2. Run the MWE `docs/dev/2026-11/reactant-issue-concat-fusion-ret-check-mwe.jl` on a GPU in an env with only that
+   Reactant version (`xla_concat/mwe/env_<version>` as template), and the T32 PrimitiveWet compile
+   (`xla_concat/compile_check.jl gpu wet`).
+3. If both compile: widen `Reactant = "0.2.299 - 0.2.302"` in the six `Project.toml`s (remove the #3681 comments),
+   rerun the reactant-gpu benchmark rows at T32.
+
+### Reactant 0.2.305 (2026-11-04)
+
+> a new reactant version was released that may contain an upstream fix, please check
+
+Reactant 0.2.305 / Reactant_jll 0.0.441 (Reactant.jl `021faa12`, Enzyme-JAX `8f13d338`, JAX `9564ca1d`, XLA
+`f824cdd4`):
+
+- The MWE (`reactant-issue-concat-fusion-ret-check-mwe.jl`) and all `mwe3` variants compile on the A40; XLA still forms
+  the same two-root `input_concatenate_fusion` (`kind=kInput`), so the emitter now accepts it, nothing is masked.
+- The saved StableHLO module of the T32 PrimitiveWet time loop (`a40_timeloop_post_xla_compile.mlir`) compiles
+  standalone (`compile_module.jl`).
+- The fix is not in upstream XLA `f824cdd4` itself (the concatenate emitter, `UseConcatenateFusion` and the
+  multi-output fusion code are unchanged since #50225), but an XLA patch carried by Enzyme-JAX `8f13d338`:
+  `patches/xla_concat_epilogue_indexing.patch`. It simplifies the identity map in
+  `ComputeEpilogueInputToOutputIndexing` also when the root is the hero, so size-1 dimensions are folded to constants
+  in both cases ("making semantically equal indexings compare unequal" otherwise), as guessed in #3681. Its regression
+  tests (`multiple_roots_size_one_dims.hlo`, `EpilogueIndexing_SizeOneDimensionsAgreeWithAndWithoutEpilogue`) are
+  the MWE's HLO.
+- Env with SpeedyWeather and 0.2.305: `xla_concat/env_r0305` (copy of `env_fix`, everything else preserved, resolves
+  with `PRESERVE_ALL`). **T32 PrimitiveWet time loop compiles with the default options** (`compile_check.jl gpu wet`,
+  A40, 363 s) and stays finite over 10 steps.
+- So the cap can be lifted: `Reactant = "0.2.305"` (floor, excludes the broken 0.2.303/0.2.304) or
+  `"0.2.299 - 0.2.302, 0.2.305"`.
+
+> make the changes on mg/fix-reactant and run a short h100 speed check
+
+`Reactant = "0.2.305"` in the six `Project.toml`s (the #3681 comments removed), CHANGELOG bullet of #1378 reworded;
+a scratch env with the new compat resolves to 0.2.305 / jll 0.0.441. H100 (Slurm 2895469, `speed_check.jl` with
+`ONLY=1,2,3,4,6`, defaults), SYPD, all finite:
+
+| L8 | 0.2.305 | 0.2.302 | 0.2.304 |
+|---|---|---|---|
+| PrimitiveWet T32 | 30442 | 29733 | RET_CHECK |
+| PrimitiveWet T43 | 17223 | 16980 | 17182 |
+| PrimitiveWet T64 | 9596 | 9792 | 9543 |
+| PrimitiveWet T128 | 2098 | 2221 | 2094 |
+| PrimitiveDry T32 | 34572 | 34387 | 34334 |
+
+All within ±6%, no regression.
+
 ## Handoff 2026-11-03
+
+> Superseded: all runs listed here finished and are collected in the Results sections above; current state in the
+> status line at the top and in [Lifting the cap](#lifting-the-cap).
 
 **Where things are.** `X=/p/tmp/maxgelbr/code/Speedy2/claude_reactant_gpu_2026-10-13/snow-init-2026-11-03/xla_concat`.
 Three runs were left running detached (`setsid`) on login02's A40 and survive the session; each writes
