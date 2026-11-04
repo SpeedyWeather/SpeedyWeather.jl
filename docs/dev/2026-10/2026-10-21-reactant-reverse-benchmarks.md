@@ -138,6 +138,15 @@ meanwhile. New test `test/reactant/test_speedy.jl` (section 6).
 The SPEEDY suite now runs only the PrimitiveWet model, over the same resolutions as `:benchmark201`
 with the default transform (`resolution_sweep()`, shared by both suites); no matrix transform rows.
 
+> Add another new flag `--suites` that allows to just run certain suites, take the same code/approach as
+> https://github.com/NumericalEarth/Terrarium.jl/pull/186/changes for that
+
+New option `--suites`, as in Terrarium.jl#186 (section 8): comma-separated suite keys, default all.
+Unknown keys are an error that lists the known ones (benchmark800 and benchmark900 only exist with
+`--reverse` and `--SPEEDY`). A partial run warns that it replaces the architecture's stored record with
+just these suites. The `overview`, `reverse` and `speedy` fields are only written for suites that ran.
+Unlike Terrarium, the selected suites keep the sorted order, so README sections stay stable.
+
 ## Problem description
 
 This plan makes two changes to `SpeedyWeather/benchmark/manual_benchmarking.jl`:
@@ -539,6 +548,7 @@ the `BenchmarkSuite`s timed each configuration once.
   is the multiplier of section 1 as a named option. The driver parses options with a value (`--repeats 5`
   or `--repeats=5`), so the value isn't taken for the architecture. Each architecture's section starts
   with a "Settings:" line, and `meta` stores `repeats` (`null` for the default) and `length`.
+  `--suites` (added later) runs only the given suites, see the revision log.
 - The README preamble and the docs page describe the repeats; the "±50 %" remark became a note that
   results still vary between processes and machines.
 

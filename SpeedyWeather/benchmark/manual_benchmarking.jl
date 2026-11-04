@@ -25,6 +25,10 @@ timings (default 1, the other suites are not affected), e.g.
 
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl gpu --repeats 5 --length 10   # 5 runs each, 10× longer benchmark201
 
+The option `--suites` restricts the run to specific suites, given as comma-separated
+keys, e.g. `--suites benchmark201,benchmark900` (default: all suites). A partial run
+replaces the architecture's stored results with just the suites it ran.
+
 Options take a value, as `--repeats 5` or `--repeats=5`. The settings are stated at
 the top of each architecture's section and stored in its `meta`. The arguments are
 parsed with ArgParse.jl, `manual_benchmarking.jl --help` lists them all.
@@ -115,6 +119,12 @@ const ARGUMENT_SETTINGS = ArgParseSettings(
     arg_type = Int
     metavar = "N"
     range_tester = repeats -> repeats >= 1
+    "--suites"
+    help = "comma-separated suite keys to run, e.g. `benchmark201,benchmark900` (benchmark800 needs --reverse, " *
+        "benchmark900 --SPEEDY). Default: all suites. A partial run replaces this architecture's stored results " *
+        "with just these suites."
+    arg_type = String
+    default = ""
     "--reverse"
     help = "also run the reverse-mode (AD) benchmarks, Reactant only, takes hours"
     action = :store_true
@@ -148,6 +158,7 @@ const TIMESTEP_MULTIPLIER = something(ARGUMENTS["length"], ARGUMENTS["multiplier
 # `--repeats N`: exactly N timed runs per configuration of the `BenchmarkSuite`s, without the time
 # budget. `nothing` for the default: up to `repeats` runs within `max_repeat_time` (benchmark_suite.jl)
 const REPEATS = ARGUMENTS["repeats"]
+const SUITES_ARG = ARGUMENTS["suites"]
 
 # Conditionally load backend packages BEFORE `using SpeedyWeather` so that
 # SpeedyWeather's extensions register the right array types and overloads.
@@ -249,8 +260,20 @@ for (key, suite) in benchmarks
     hasproperty(suite, :gpu_graphs) && (suite.gpu_graphs = ARCH_LABEL == "gpu-amd" ? true : nothing)
 end
 
-# Deterministic suite ordering (sort by key for reproducible README sections).
-const SUITE_KEYS = sort!(collect(keys(benchmarks)))
+# Deterministic suite order, so README sections are stable across runs. `--suites` narrows the run to
+# a subset (in the same order); because each run replaces this architecture's whole stored record, a
+# partial run drops the suites it did not run — warn when that is the case.
+const ALL_SUITE_KEYS = sort!(collect(keys(benchmarks)))
+const SUITE_KEYS = if isempty(strip(SUITES_ARG))
+    ALL_SUITE_KEYS
+else
+    requested = [Symbol(strip(s)) for s in split(SUITES_ARG, ',') if !isempty(strip(s))]
+    unknown = setdiff(requested, ALL_SUITE_KEYS)
+    isempty(unknown) || error("Unknown suite(s): $(join(unknown, ", ")). Known suites: $(join(ALL_SUITE_KEYS, ", ")).")
+    filter(in(requested), ALL_SUITE_KEYS)
+end
+SUITE_KEYS == ALL_SUITE_KEYS ||
+    @warn "Running only $(join(SUITE_KEYS, ", ")): this replaces $ARCH_LABEL's stored results with just these suites."
 
 for key in SUITE_KEYS
     @info "→ Running suite $key: $(benchmarks[key].title)"
@@ -263,7 +286,7 @@ function settings_markdown()
     suite = benchmarks[:benchmark201]
     runs = isnothing(REPEATS) ?
         "up to $(suite.repeats) timed runs per configuration, as long as they take at most $(round(Int, suite.max_repeat_time)) s together" :
-        "$REPEATS timed runs per configuration (`--repeats $REPEATS`)"
+        "$REPEATS timed run$(REPEATS == 1 ? "" : "s") per configuration (`--repeats $REPEATS`)"
     longer = TIMESTEP_MULTIPLIER == 1 ? "" :
         @sprintf(", the PrimitiveWet resolution sweep %g× longer (`--length %g`)", TIMESTEP_MULTIPLIER, TIMESTEP_MULTIPLIER)
     return "\nSettings: $runs$longer.\n"
@@ -344,10 +367,11 @@ arch_record = Dict(
         "machine_info" => machine_info(),
     ),
     "markdown" => arch_markdown(),
-    "overview" => suite_data(benchmarks[:benchmark201]),
 )
-RUN_REVERSE && (arch_record["reverse"] = reverse_data(benchmarks[REVERSE_SUITE_KEY]))
-RUN_SPEEDY && (arch_record["speedy"] = suite_data(benchmarks[SPEEDY_SUITE_KEY]))
+# the structured numbers of the suites that ran (`--suites`)
+:benchmark201 in SUITE_KEYS && (arch_record["overview"] = suite_data(benchmarks[:benchmark201]))
+REVERSE_SUITE_KEY in SUITE_KEYS && (arch_record["reverse"] = reverse_data(benchmarks[REVERSE_SUITE_KEY]))
+SPEEDY_SUITE_KEY in SUITE_KEYS && (arch_record["speedy"] = suite_data(benchmarks[SPEEDY_SUITE_KEY]))
 
 # Merge into the JSON store, replacing everything stored for this label before
 mkpath(ASSETS_DIR)
@@ -418,6 +442,8 @@ function write_preamble(md)
     write(md, "Options and flags, in any order (`manual_benchmarking.jl --help` lists them): `--length X`, e.g. `manual_benchmarking.jl gpu --length 10`, multiplies the number of time steps of the ")
     write(md, "timed runs of the PrimitiveWet resolution sweep (the overview below) for more robust timings; the other suites are not affected. ")
     write(md, "`--repeats N` times every configuration exactly N times instead of up to 5 times within 30 s. ")
+    write(md, "`--suites benchmark201,benchmark900` restricts the run to specific suites (default: all); ")
+    write(md, "a partial run replaces that architecture's stored results with just the suites it ran. ")
     write(md, "`--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-gpu --reverse`) additionally runs the ")
     write(md, "reverse-mode benchmarks, which take hours. `--hi-res` (GPU and TPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. ")
     write(md, "`--SPEEDY` additionally runs the PrimitiveWet model over the resolutions of the resolution sweep in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of ")

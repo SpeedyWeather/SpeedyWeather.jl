@@ -355,6 +355,8 @@ Each configuration of the main suites is timed up to 5 times, as long as all its
 take at most 30 s, and the median SYPD is reported with the spread of the runs. `--repeats N` times
 every configuration exactly N times instead, and `--length X` makes the timed runs of the PrimitiveWet
 resolution sweep X times longer (e.g. `manual_benchmarking.jl gpu --repeats 5 --length 10`).
+`--suites benchmark201,benchmark900` runs only those suites; a partial run replaces the architecture's
+stored results with just these suites.
 
 The reverse-mode (AD) benchmarks with Reactant are opt-in, as they take hours: add the flag
 `--reverse` (e.g. `manual_benchmarking.jl reactant-gpu --reverse`). A run without it drops the
