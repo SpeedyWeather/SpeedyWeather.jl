@@ -104,7 +104,7 @@ large-scale precipitation vertically for output."""
             Δp = pressure_thickness(k, pₛ, coord)           # pressure thickness of layer Δp times 1/g/ρ [m]
             Δp_gρ = Δp / gρ
             Δp_Δtgρ = Δp_gρ / Δt                            # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
-            Δtgρ_Δp = 1 / Δp_Δtgρ                           # [s/m], TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
+            Δtgρ_Δp = inv(Δp_Δtgρ)                          # [s/m]
 
             # 1. Melting of snow from layer above
             δT_melt = max(temp[ij, k] - melting_threshold, 0)   # only if temperature above melting threshold

@@ -34,4 +34,7 @@ Architectures.on_architecture(::GPU, a::StepRangeLen) = a
 @inline Architectures.convert_to_device(::GPU, args) = rocconvert(args)
 @inline Architectures.convert_to_device(::GPU, args::Tuple) = map(rocconvert, args)
 
+# count device memory in `memorysize`, `Base.summarysize` only counts the wrapper
+Architectures.device_bytes(a::ROCArray) = sizeof(a)
+
 end

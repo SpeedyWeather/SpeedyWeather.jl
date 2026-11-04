@@ -875,8 +875,7 @@ Zonal wind amplitude U = u₀ tanh(z/H) f(z) of `BalancedZonalState` and its der
 in z = -ln(σ), with f(z) = exp(-((z - z_jet)/D)²) above z_jet and 1 below."""
 @inline function balanced_zonal_wind(z, u₀, H, z_jet, D)
     t = tanh(z / H)
-    above = z > z_jet
-    Δz = above ? (z - z_jet) / D : zero(z)
+    Δz = ifelse(z > z_jet, (z - z_jet) / D, zero(z))
     f = exp(-Δz^2)
     dfdz = -2Δz / D * f
     U = u₀ * t * f
