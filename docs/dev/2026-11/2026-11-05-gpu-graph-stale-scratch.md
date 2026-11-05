@@ -1,6 +1,6 @@
 # Stale GPU-graph replays in the batched Fourier transform, and the benchmark's repeat loop
 
-> Status: **in progress**. Both fixes implemented (Fix 1 on `mg/fix-gpu-graphs-issue`, Fix 2 on `mg/benchmark-reverse`); verification under way.
+> Status: **in progress**. Both fixes implemented and verified on the A40 (Fix 1 on `mg/fix-gpu-graphs-issue`, Fix 2 uncommitted on `mg/benchmark-reverse`); the full H100 benchmark run is still to do.
 
 Date of initial draft: 2026-11-05
 
@@ -397,6 +397,44 @@ shell). Load `using CUDA` before SpeedyWeather, and don't load the system `cuda`
   - 0 × `ILLEGAL_ADDRESS` or `0x000002bc`;
   - a small spread between fastest and slowest in the "timed run(s)" lines. Job 2921098 had ShallowWater T256 at
     median 3.82 s, fastest 0.814 s.
+
+### Results (login03 A40, 2026-11-05)
+
+Julia 1.12.2, CUDA test environment. Fix 1 was checked on `mg/fix-gpu-graphs-issue` and Fix 2 in a worktree of
+`mg/benchmark-reverse`.
+
+**Fix 1**
+
+- **New testset** "another scratch memory doesn't replay a stale graph": 6 of 10 tests fail before the fix and all 10
+  pass after it. The other four CUDA graph testsets pass.
+- **`gpu-graph-two-scratch.jl`:** before the fix the scratch 2 line was 1.79; after it all four lines are `0.0`.
+- **`gpu-graph-stale-repeats.jl`,** with the benchmark's old `deepcopy` loop (`MODE=keep`): 0 of 10 repeats NaN and 0
+  stale replays for both ShallowWater T256 and PrimitiveWet T128 L8. New graphs are still captured in every repeat
+  (+6 and +3), which Fix 2 addresses.
+- **Full GPU suite:** all testsets except `reactant.jl` pass. That file failed with a Reactant MLIR `CompilationError`
+  because the gitignored Manifest of `SpeedyWeather/test/GPU/CUDA` pins Reactant 0.2.291, while
+  `SpeedyWeather/Project.toml` requires 0.2.305. It was rerun in a freshly resolved environment.
+- **SpeedyTransforms CPU tests:** 4118 passed and 4 errored. The errors are Enzyme `test_forward` assertions on Julia
+  1.12, and the base commit `6875c835` gives the identical result.
+- **Performance, base `6875c835` against the fix:** same package environment, interleaved, 2 rounds each.
+  - Fourier transforms (graph replay) at T32, T64 and T128 L8: the same within 0.3%, e.g. 762.6 µs and 762.6 µs for a
+    forward Fourier transform at T128 L8.
+  - Full transforms: the same within 1%.
+  - Time stepping (200 steps, median of 5): ShallowWater T64 0.555 s and 0.555 s, T128 1.294 s and 1.294 s;
+    PrimitiveWet T32 0.252 s and 0.244–0.248 s, T64 0.391 s and 0.390–0.391 s.
+  - No regression: the key computes two more pointers and hashes a longer tuple, which is negligible next to a graph
+    launch.
+
+**Fix 2**
+
+- **`MODE=copy` without Fix 1:** 0 NaN and 0 graphs captured during the 10 repeats. Every repeat replays the warm-up's
+  graphs: 6 for ShallowWater T256, 3 for PrimitiveWet's time loop. The same holds with Fix 1.
+- **`gpu --suites benchmark100,benchmark200 --repeats 10`:**
+  - 0 × "NaN or Inf detected", 0 × "failed on", 0 × illegal address or `CUFFT_EXEC_FAILED`.
+  - Small spreads between repeats, e.g. median 2.69 s, fastest 2.69 s, slowest 2.70 s.
+- **`reactant-gpu` and `cpu`** with `--suites benchmark100 --repeats 2`: all configurations ok, no NaN.
+- The README and `benchmark_results.json` were restored afterwards.
+- The full H100 run is still to do.
 
 ## Documentation changes
 
