@@ -166,9 +166,9 @@ end
 
         # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue.
         # `@fastmath` for the `^`: `eigenvalue_norm^power` with a real exponent otherwise routes
-        # through Base's `Float64` `pow_body`, which does not compile on GPUs without Float64 (Metal)
-        ∇²ⁿ[l_plus_1, k] = @fastmath -eigenvalue_norm^power / time_scale
-        ∇²ⁿ_div[l_plus_1, k] = @fastmath -eigenvalue_norm^p / time_scale_div
+        # through Base's `Float64` `pow_body`, which does not compile on GPUs without Float64 (Metal).
+        ∇²ⁿ[l_plus_1, k] = -(@fastmath eigenvalue_norm^power) / time_scale
+        ∇²ⁿ_div[l_plus_1, k] = -(@fastmath eigenvalue_norm^p) / time_scale_div
 
         # and implicit part of the diffusion (= 1/(1-Δtν∇²ⁿ))
         ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - Δt * ∇²ⁿ[l_plus_1, k])

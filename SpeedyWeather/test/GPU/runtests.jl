@@ -58,6 +58,9 @@ include("barotropic.jl")
 include("shallowwater.jl")
 include("primitive_wet.jl")
 
+# COPY! AND DEEPCOPY OF THE VARIABLES, CPU <-> GPU, FUSED VARIABLES REMAIN VIEWS OF THEIR PARENTS
+include("copy_variables.jl")
+
 # OUTPUT WRITERS, INTERPOLATION ON GPU
 include("output.jl")
 
