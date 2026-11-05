@@ -318,57 +318,59 @@ end
     @test fused_nt.probe.slot_map.u == 1:4
 end
 
+# The grid tendencies u, v, temperature, pressure share the fused parent `:grid_tendencies` with
+# working arrays of the dynamics (dynamics.grid.uT_anomaly, vT_anomaly, kinetic_energy)
 @testset "view ↔ parent aliasing round trips" begin
-    model = _testmodel(nlayers = 4)
-    sim = initialize!(model)
-    v = sim.variables
-    buf = v.fused.tend_grid
-    nlayers = model.spectral_grid.nlayers
+    v = Variables(_testmodel(nlayers = 4))
+    (; slot_map) = v.fused.grid_tendencies
+    buf = parent(v.fused.grid_tendencies)
 
     # Write through parent, read through views
     fill!(buf, eltype(buf)(7))
     @test all(v.tendencies.grid.u.data .== 7)
     @test all(v.tendencies.grid.v.data .== 7)
     @test all(v.tendencies.grid.temperature.data .== 7)
+    @test all(v.dynamics.grid.kinetic_energy.data .== 7)
 
-    # Write through one view, verify the right slot is touched in parent and other views untouched
+    # Write through one view, verify only its slots are touched in the parent and other views untouched
     fill!(buf, zero(eltype(buf)))
     fill!(v.tendencies.grid.u, eltype(buf)(3))
-    @test all(buf.data[:, 1:nlayers] .== 3)
-    @test all(buf.data[:, (nlayers + 1):end] .== 0)
+    @test all(buf.data[:, slot_map.u] .== 3)
+    @test all(buf.data[:, setdiff(axes(buf.data, 2), slot_map.u)] .== 0)
     @test all(v.tendencies.grid.v.data .== 0)
 end
 
 @testset "reset_tendencies! zeros fused tendency slots through views" begin
     model = _testmodel(nlayers = 4)
-    sim = initialize!(model)
-    v = sim.variables
-    buf = v.fused.tend_grid
-    nlayers = model.spectral_grid.nlayers
+    v = Variables(model)
+    (; slot_map) = v.fused.grid_tendencies
+    buf = parent(v.fused.grid_tendencies)
 
     fill!(buf, eltype(buf)(99))
-    SpeedyWeather.reset_tendencies!(v)
+    SpeedyWeather.reset_tendencies!(v, model.time_stepping)
 
     # Tendency views must be zero
     @test all(v.tendencies.grid.u.data .== 0)
     @test all(v.tendencies.grid.v.data .== 0)
     @test all(v.tendencies.grid.temperature.data .== 0)
+    @test all(v.tendencies.grid.pressure.data .== 0)
 
-    # The first 3·nlayers slots of the parent (the tendency slots: u, v, T) are zero
-    @test all(buf.data[:, 1:(3 * nlayers)] .== 0)
-    # Non-tendency fused slots (scratch a, b) were NOT touched by reset_tendencies!
-    @test all(buf.data[:, (3 * nlayers + 1):end] .== 99)
+    # The tendency slots of the parent are zero, the slots of the dynamics' working arrays untouched
+    tendency_slots = vcat(slot_map.u, slot_map.v, slot_map.temperature, slot_map.pressure)
+    other_slots = setdiff(axes(buf.data, 2), tendency_slots)
+    @test !isempty(other_slots)
+    @test all(buf.data[:, tendency_slots] .== 0)
+    @test all(buf.data[:, other_slots] .== 99)
 end
 
 @testset "fused parent lives at vars.fused.<sym>; standalone variables unaffected" begin
-    model = _testmodel(nlayers = 4)
-    sim = initialize!(model)
-    v = sim.variables
+    v = Variables(_testmodel(nlayers = 4))
 
-    @test haskey(v.fused, :tend_grid)
+    @test haskey(v.fused, :grid_tendencies)
+    @test v.fused.grid_tendencies isa FusedParent
     # Parent is not duplicated under other groups
-    @test !haskey(v.tendencies.grid, :tend_grid)
-    @test !haskey(v.scratch.grid, :tend_grid)
+    @test !haskey(v.tendencies.grid, :grid_tendencies)
+    @test !haskey(v.dynamics.grid, :grid_tendencies)
     @test !haskey(v.scratch, :fused)
 
     # Standalone (non-fused) tendency variables still work normally
