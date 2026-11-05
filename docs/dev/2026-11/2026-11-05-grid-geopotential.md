@@ -1,6 +1,6 @@
 # Compute the geopotential once, in grid space
 
-> Status: **in progress**. Grid geopotential wired into the dynamical core, stability being checked.
+> Status: **in progress**. Implemented and verified against main; draft PR open for review.
 
 Date of initial draft: 2026-11-05
 
@@ -31,6 +31,9 @@ Base revision: e82a6571
   grid step unchanged when the leapfrog update did not advance the previous spectral step.
   With that, branch and main agree to round-off over the first steps, with or without the
   Robert/Williams filter, i.e. the filtered-vs-unfiltered previous step is a negligible effect.
+- 2026-11-05: with that fix, tracers were left at zero in the previous grid step after
+  initialization (their transform came after the initial step-2→1 copy, previously masked by
+  the move-back of the first Euler step). Tracers are now transformed before that copy.
 
 ## Problem description
 
@@ -69,6 +72,22 @@ Primitive equation models compute the geopotential Φ twice per time step:
   geopotential a step dimension.
 
 ## Testing and verification
+
+Results (T32, 8 layers unless noted; scripts compare against main at the base revision):
+
+- Φ: transformed grid Φ vs. old spectral Φ agree to Float32 round-off (max 6e-2 m²/s² of 9e5).
+- First 5 time steps (T63 dry, dynamics only): max |Δu| vs. main ≈ 2e-4 m/s, with
+  Robert filter 0 or 0.1.
+- 30–100 day runs (Held-Suarez, dynamics only, T63 dry, PrimitiveWet default): stable,
+  max|u|, rms u, mean T, pₛ range and the fraction of divergence variance at l > 0.8 lmax
+  (noise metric) indistinguishable from main.
+- Stability limit unchanged: Held-Suarez and PrimitiveWet stable at Δt = 50 min, unstable at
+  60 min (and 80 min), on both main and this branch.
+- New test: previous grid step equals transform of previous spectral step over the
+  Leapfrog start (fails on main, passes here). Geopotential test updated for the Bernoulli path.
+- Full `Pkg.test("SpeedyWeather")` passes (Zarr output tests re-run after a disk-quota failure).
+
+Planned:
 
 - Compare Φ (grid vs. transformed old spectral) and the divergence tendency after one step
   against main.
