@@ -4,25 +4,10 @@
 # longer be a view of the copy's fused parent, the batched transforms then read stale data), and `copy!`
 # between CPU and GPU would `copyto!` between a `SubArray` and a GPU array (scalar indexing).
 
-# The arrays of all variables (except the scratch, which `copy!` skips) on the CPU as "group.name" => Array
-function variables_on_host(vars)
-    arrays = Dict{String, Array}()
-    for group in SpeedyWeather.ALL_VARIABLE_GROUPS
-        group in (:scratch, :fused) || _variables_on_host!(arrays, getfield(vars, group), string(group))
-    end
-    return arrays
-end
-
-function _variables_on_host!(arrays, variables::NamedTuple, prefix)
-    for (name, variable) in pairs(variables)
-        path = string(prefix, ".", name)
-        if variable isa NamedTuple
-            _variables_on_host!(arrays, variable, path)
-        elseif variable isa Union{SpeedyWeather.RingGrids.AbstractField, LowerTriangularArray}
-            arrays[path] = Array(on_architecture(SpeedyWeather.CPU(), variable).data)
-        end
-    end
-    return arrays
+# The groups `copy!` copies (not the scratch) on the CPU, to compare with `==`. Without the fused parents
+# (compared through their views) and the clock and scale, which `==` compares by identity (mutable)
+variables_on_cpu(vars) = map((:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles)) do group
+    on_architecture(SpeedyWeather.CPU(), Base.structdiff(getfield(vars, group), NamedTuple{(:clock, :scale)}))
 end
 
 # UTILITIES to check copying and deepcopy of Variables, even with array types where SubArray don't exists (CuArray, JLArray, ..)
@@ -99,13 +84,13 @@ end
     simulation = initialize!(model)
     run!(simulation, steps = 3)                     # non-trivial data in all groups
     vars = simulation.variables
-    reference = variables_on_host(vars)
+    reference = variables_on_cpu(vars)
 
     gpu_model = PrimitiveWetModel(SpectralGrid(architecture = SpeedyWeather.GPU()); feedback = nothing)
     vars_gpu = copy!(Variables(gpu_model), vars)    # CPU → GPU
-    @test variables_on_host(vars_gpu) == reference
+    @test variables_on_cpu(vars_gpu) == reference
     vars_gpu2 = copy!(Variables(gpu_model), vars_gpu)   # GPU → GPU
-    @test variables_on_host(vars_gpu2) == reference
+    @test variables_on_cpu(vars_gpu2) == reference
     vars_back = copy!(Variables(model), vars_gpu2)  # GPU → CPU
-    @test variables_on_host(vars_back) == reference
+    @test variables_on_cpu(vars_back) == reference
 end

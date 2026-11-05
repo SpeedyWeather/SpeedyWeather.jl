@@ -103,25 +103,10 @@
     end
 end
 
-# The arrays of all variables (except the scratch, which `copy!` skips) on the CPU as "group.name" => Array
-function variables_on_host(vars)
-    arrays = Dict{String, Array}()
-    for group in SpeedyWeather.ALL_VARIABLE_GROUPS
-        group in (:scratch, :fused) || _variables_on_host!(arrays, getfield(vars, group), string(group))
-    end
-    return arrays
-end
-
-function _variables_on_host!(arrays, variables::NamedTuple, prefix)
-    for (name, variable) in pairs(variables)
-        path = string(prefix, ".", name)
-        if variable isa NamedTuple
-            _variables_on_host!(arrays, variable, path)
-        elseif variable isa Union{SpeedyWeather.RingGrids.AbstractField, LowerTriangularArray}
-            arrays[path] = Array(on_architecture(SpeedyWeather.CPU(), variable).data)
-        end
-    end
-    return arrays
+# The groups `copy!` copies (not the scratch) on the CPU, to compare with `==`. Without the fused parents
+# (compared through their views) and the clock and scale, which `==` compares by identity (mutable)
+variables_on_cpu(vars) = map((:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles)) do group
+    on_architecture(SpeedyWeather.CPU(), Base.structdiff(getfield(vars, group), NamedTuple{(:clock, :scale)}))
 end
 
 # On JLArrays (as on CUDA) a contiguous view of a fused parent is not a `SubArray` but another JLArray sharing
@@ -135,14 +120,14 @@ using JLArrays
     simulation = initialize!(model)
     run!(simulation, steps = 3)                     # non-trivial data in all groups
     vars = simulation.variables
-    reference = variables_on_host(vars)
+    reference = variables_on_cpu(vars)
 
     architecture = SpeedyWeather.GPU(JLArrays.JLBackend())
     jlarray_model = PrimitiveWetModel(SpectralGrid(truncation = 11, nlayers = 4; architecture))
     vars_jlarray = copy!(Variables(jlarray_model), vars)        # CPU → JLArray
-    @test variables_on_host(vars_jlarray) == reference
+    @test variables_on_cpu(vars_jlarray) == reference
     vars_jlarray2 = copy!(Variables(jlarray_model), vars_jlarray)   # JLArray → JLArray
-    @test variables_on_host(vars_jlarray2) == reference
+    @test variables_on_cpu(vars_jlarray2) == reference
     vars_back = copy!(Variables(model), vars_jlarray2)          # JLArray → CPU
-    @test variables_on_host(vars_back) == reference
+    @test variables_on_cpu(vars_back) == reference
 end

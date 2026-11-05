@@ -16,7 +16,7 @@ Reactant.set_default_backend("gpu")
     @test !any(isnan, on_architecture(SpeedyWeather.CPU(), simulation.variables.prognostic.vorticity))
 end
 
-# `fill_fused_parents!`, `fused_members` and `variables_on_host` are defined in copy_variables.jl
+# `fill_fused_parents!`, `fused_members` and `variables_on_cpu` are defined in copy_variables.jl
 @testset "Reactant GPU: deepcopy keeps every fused variable a view of its copied parent" begin
     spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice())
     vars = Variables(PrimitiveWetModel(spectral_grid; feedback = nothing))
@@ -53,11 +53,11 @@ end
     simulation = initialize!(model)
     run!(simulation, steps = 3)                     # non-trivial data in all groups
     vars = simulation.variables
-    reference = variables_on_host(vars)
+    reference = variables_on_cpu(vars)
 
     reactant_model = PrimitiveWetModel(SpectralGrid(architecture = SpeedyWeather.ReactantDevice()); feedback = nothing)
     vars_reactant = copy!(Variables(reactant_model), vars)  # CPU → Reactant
-    @test variables_on_host(vars_reactant) == reference
+    @test variables_on_cpu(vars_reactant) == reference
     vars_back = copy!(Variables(model), vars_reactant)      # Reactant → CPU
-    @test variables_on_host(vars_back) == reference
+    @test variables_on_cpu(vars_back) == reference
 end
