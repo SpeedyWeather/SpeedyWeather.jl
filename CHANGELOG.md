@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix an issue that GPU graphs corrupted easily after model multiple execution with different instances of Variables [#1382](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1382)
 - Fix `copy!` and `deepcopy!` for `Variables` to silently fail on GPUArrays (e.g. `CuArray` and `JLArrays`) [#1380](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1380)
 - Fix NaN forward-mode derivatives of the learned ocean roughness at zero neutral wind speed (extended differentiability tests) [#1377](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1377)
 - Fix the vertical advection part of the semi-implicit temperature operator, and choose the implicit reference temperature with `IsothermalReferenceTemperature` (300 K, new default) `GlobalMeanReferenceTemperature` (plus offset) or `MaximumReferenceTemperature` (plus margin); Crank-Nicolson (`centering = 0.5`) as default, with a warning for uniform σ spacing [#1369](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1369)
