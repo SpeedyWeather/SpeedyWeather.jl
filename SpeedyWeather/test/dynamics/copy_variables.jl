@@ -102,3 +102,47 @@
         @test result === vars_copy
     end
 end
+
+# The arrays of all variables (except the scratch, which `copy!` skips) on the CPU as "group.name" => Array
+function variables_on_host(vars)
+    arrays = Dict{String, Array}()
+    for group in SpeedyWeather.ALL_VARIABLE_GROUPS
+        group in (:scratch, :fused) || _variables_on_host!(arrays, getfield(vars, group), string(group))
+    end
+    return arrays
+end
+
+function _variables_on_host!(arrays, variables::NamedTuple, prefix)
+    for (name, variable) in pairs(variables)
+        path = string(prefix, ".", name)
+        if variable isa NamedTuple
+            _variables_on_host!(arrays, variable, path)
+        elseif variable isa Union{SpeedyWeather.RingGrids.AbstractField, LowerTriangularArray}
+            arrays[path] = Array(on_architecture(SpeedyWeather.CPU(), variable).data)
+        end
+    end
+    return arrays
+end
+
+# On JLArrays (as on CUDA) a contiguous view of a fused parent is not a `SubArray` but another JLArray sharing
+# the parent's memory: `copy!` has to skip it (copying its parent instead), `copyto!` between it and a `SubArray`
+# on the CPU would fall back to scalar indexing
+using JLArrays
+
+@testset "copy! between CPU and JLArray variables" begin
+    spectral_grid = SpectralGrid(truncation = 11, nlayers = 4)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    run!(simulation, steps = 3)                     # non-trivial data in all groups
+    vars = simulation.variables
+    reference = variables_on_host(vars)
+
+    architecture = SpeedyWeather.GPU(JLArrays.JLBackend())
+    jlarray_model = PrimitiveWetModel(SpectralGrid(truncation = 11, nlayers = 4; architecture))
+    vars_jlarray = copy!(Variables(jlarray_model), vars)        # CPU → JLArray
+    @test variables_on_host(vars_jlarray) == reference
+    vars_jlarray2 = copy!(Variables(jlarray_model), vars_jlarray)   # JLArray → JLArray
+    @test variables_on_host(vars_jlarray2) == reference
+    vars_back = copy!(Variables(model), vars_jlarray2)          # JLArray → CPU
+    @test variables_on_host(vars_back) == reference
+end

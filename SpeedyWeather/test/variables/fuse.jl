@@ -318,8 +318,6 @@ end
     @test fused_nt.probe.slot_map.u == 1:4
 end
 
-# Activate these test once we actually use fused variables in the model
-#=
 @testset "view ↔ parent aliasing round trips" begin
     model = _testmodel(nlayers = 4)
     sim = initialize!(model)
@@ -377,4 +375,62 @@ end
     @test haskey(v.tendencies, :vorticity)   # spectral tendency, not fused
     @test !(v.tendencies.vorticity.data isa SubArray)
 end
-=#
+
+# UTILITIES to check copying and deepcopy of Variables, even with array types where SubArray don't exists (CuArray, JLArray, ..)
+
+# Test fill: Write `offset + i` into fused parent `i`: a variable that then holds this value everywhere is a view of parent `i`
+function fill_fused_parents!(vars, offset)
+    for (i, fuse_name) in enumerate(keys(vars.fused))
+        data = parent(vars.fused[fuse_name]).data
+        fill!(data, eltype(data)(offset + i))
+    end
+    return vars
+end
+
+# Read the test fill: The variables holding `offset + i` everywhere, i.e. the views of fused parent `i`, as "group.name" => fuse symbol
+function fused_members(vars, offset)
+    members = Dict{String, Symbol}()
+    fuse_names = collect(keys(vars.fused))
+    for group in SpeedyWeather.ALL_VARIABLE_GROUPS
+        group === :fused || _fused_members!(members, getfield(vars, group), string(group), fuse_names, offset)
+    end
+    return members
+end
+
+function _fused_members!(members, variables::NamedTuple, prefix, fuse_names, offset)
+    for (name, variable) in pairs(variables)
+        path = string(prefix, ".", name)
+        if variable isa NamedTuple
+            _fused_members!(members, variable, path, fuse_names, offset)
+        elseif variable isa Union{SpeedyWeather.RingGrids.AbstractField, LowerTriangularArray}
+            data = on_architecture(SpeedyWeather.CPU(), variable).data
+            isempty(data) && continue
+            for (i, fuse_name) in enumerate(fuse_names)
+                all(==(eltype(data)(offset + i)), data) && (members[path] = fuse_name)
+            end
+        end
+    end
+    return members
+end
+
+# On JLArrays (as on CUDA) a contiguous view of a fused parent is not a `SubArray` but another JLArray sharing
+# the parent's memory, and JLArrays' `deepcopy` doesn't use deepcopy's `IdDict`: the default `deepcopy` detaches
+# every fused variable from its parent there
+using JLArrays
+
+@testset "deepcopy keeps every fused variable a view of its copied parent" for Model in (BarotropicModel, PrimitiveWetModel),
+        architecture in (SpeedyWeather.CPU(), SpeedyWeather.GPU(JLArrays.JLBackend()))
+
+    spectral_grid = SpectralGrid(truncation = 11, nlayers = Model <: Barotropic ? 1 : 4, architecture = architecture)
+    vars = Variables(Model(spectral_grid))
+    # mark the original's parents with 1000 + i before the deepcopy, so the copy starts with these values
+    members = fused_members(fill_fused_parents!(vars, 1000), 1000)
+    @test !isempty(members)
+
+    # mark the copy's parents with 2000 + i: a view of a copied parent then holds 2000 + i, a detached
+    # copy of a fused variable still the 1000 + i it was copied with
+    copied = deepcopy(vars)
+    fill_fused_parents!(copied, 2000)
+    @test fused_members(copied, 2000) == members    # every fused variable of the copy is a view of its parent
+    @test fused_members(vars, 1000) == members      # the original still holds 1000 + i: no shared memory
+end
