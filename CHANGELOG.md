@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fix an issue that GPU graphs corrupted easily after model multiple execution with different instances of Variables [#1382](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1382)
+- Restore tag trigger for the documentation workflow so releases deploy versioned docs again [#1383](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1383)
 - Allow DocStringExtensions 0.10 in all sub-packages, and DocumenterCitations 1.5 in the docs (requires DocumenterVitepress ≥ 0.3.7) [#1379](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1379)
 - Fix `copy!` and `deepcopy!` for `Variables` to silently fail on GPUArrays (e.g. `CuArray` and `JLArrays`) [#1380](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1380)
 - Fix NaN forward-mode derivatives of the learned ocean roughness at zero neutral wind speed (extended differentiability tests) [#1377](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1377)
