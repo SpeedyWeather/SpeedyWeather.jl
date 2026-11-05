@@ -413,7 +413,8 @@ Julia 1.12.2, CUDA test environment. Fix 1 was checked on `mg/fix-gpu-graphs-iss
   (+6 and +3), which Fix 2 addresses.
 - **Full GPU suite:** all testsets except `reactant.jl` pass. That file failed with a Reactant MLIR `CompilationError`
   because the gitignored Manifest of `SpeedyWeather/test/GPU/CUDA` pins Reactant 0.2.291, while
-  `SpeedyWeather/Project.toml` requires 0.2.305. It was rerun in a freshly resolved environment.
+  `SpeedyWeather/Project.toml` requires 0.2.305. In a freshly resolved environment (Reactant 0.2.305),
+  `copy_variables.jl` and `reactant.jl` pass, so the whole suite passes.
 - **SpeedyTransforms CPU tests:** 4118 passed and 4 errored. The errors are Enzyme `test_forward` assertions on Julia
   1.12, and the base commit `6875c835` gives the identical result.
 - **Performance, base `6875c835` against the fix:** same package environment, interleaved, 2 rounds each.
