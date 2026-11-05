@@ -14,10 +14,12 @@ InitialConditions(spectral_grid, ::Type{<:ShallowWater}) = (; vordiv = ZonalJet(
 
 """$(TYPEDSIGNATURES) Default initial conditions for the PrimitiveDryModel."""
 function InitialConditions(spectral_grid, ::Type{<:PrimitiveDry})
-    vordiv = ZonalWind(spectral_grid)
+    # surface pressure first, so that vorticity and temperature can be evaluated at η = p/pₛ
+    # for hybrid coordinates (for sigma coordinates the order doesn't matter)
     pres = PressureOnOrography(spectral_grid)
+    vordiv = ZonalWind(spectral_grid)
     temp = JablonowskiTemperature(spectral_grid)
-    return (; vordiv, pres, temp)
+    return (; pres, vordiv, temp)
 end
 
 """$(TYPEDSIGNATURES) Default initial conditions for the PrimitiveWetModel."""
@@ -448,12 +450,80 @@ function initialize!(
     R = radius * perturb_radius         # spatial extent of perturbation
     scratch_field = vars.scratch.grid.a
 
-    vor_ic = JablonowskiVorticity(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
 
-    # apply those to set the initial conditions for vor, div
-    set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true, scratch_field)
+    if model.geometry.vertical_coordinates isa SigmaPressureCoordinates
+        # η = p/pₛ varies horizontally with pₛ for hybrid coordinates: curl of the gridded
+        # zonal wind u(φ, η) of Jablonowski and Williamson eq. (3) plus the perturbation
+        vor_perturbation = JablonowskiVorticityPerturbation(sinφc, cosφc, λc, radius, perturb_uₚ, R)
+        hybrid_zonal_wind_vorticity!(vars, model, η -> u₀ * jablonowski_cos32(η, η₀), vor_perturbation)
+        set!(vars, model; divergence = div_ic, static_func = true, scratch_field)
+    else
+        vor_ic = JablonowskiVorticity(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
+        # apply those to set the initial conditions for vor, div
+        set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true, scratch_field)
+    end
     return nothing
+end
+
+# cos(ηᵥ)^(3/2) with ηᵥ = (η - η₀)π/2, as x*sqrt(x) to stay in the number format (see JablonowskiVorticity)
+@inline function jablonowski_cos32(η, η₀)
+    cosηᵥ = cos((η - η₀) * π / 2)
+    return cosηᵥ * sqrt(cosηᵥ)
+end
+
+# <: Function so that it works with our `set!`, vorticity of the Jablonowski and Williamson perturbation
+struct JablonowskiVorticityPerturbation{NF} <: Function
+    sinφc::NF
+    cosφc::NF
+    λc::NF
+    radius::NF
+    perturb_uₚ::NF
+    R::NF
+end
+
+Adapt.@adapt_structure JablonowskiVorticityPerturbation
+
+@inline (J::JablonowskiVorticityPerturbation)(λ, φ, η) =
+    jablonowski_vorticity_perturbation(deg2rad(φ), λ, J.sinφc, J.cosφc, J.λc, J.radius, J.perturb_uₚ, J.R)
+
+"""$(TYPEDSIGNATURES)
+Surface pressure [Pa] on the grid from the (already initialized) first step of the
+prognostic logarithm of surface pressure."""
+function initial_surface_pressure(vars::Variables, model::PrimitiveEquation)
+    pₛ = transform(get_step(vars.prognostic.pressure, 1), model.spectral_transform)
+    pₛ .= exp.(pₛ)
+    return pₛ
+end
+
+"""$(TYPEDSIGNATURES)
+Vorticity of a zonal wind u = U(η) sin²(2φ)... for hybrid coordinates where η = pₖ/pₛ depends on the
+horizontal through the surface pressure: `zonal_wind(η, φ)` is evaluated on the grid at η = pₖ/pₛ,
+its curl taken in spectral space, and the vorticity `perturbation(λ, φ, η)` added."""
+function hybrid_zonal_wind_vorticity!(vars::Variables, model::PrimitiveEquation, U, perturbation)
+    (; grid, nlayers, NF) = model.spectral_grid
+    coordinate = model.geometry.vertical_coordinates
+    (; radius) = model.planet
+    pₛ = initial_surface_pressure(vars, model)
+    u_grid = zeros(NF, grid, nlayers)
+    launch!(
+        architecture(u_grid), RingGridWorkOrder, size(u_grid), hybrid_zonal_wind_kernel!,
+        u_grid, pₛ, coordinate, model.geometry.latds, model.geometry.coslat⁻¹, u_grid.grid.whichring, radius, U,
+    )
+    u = transform(u_grid, model.spectral_transform)
+    vor = zero(u)
+    curl!(vor, u, zero(u), model.spectral_transform)    # u is scaled by coslat⁻¹/radius for curl!
+    set!(vars, model; vorticity = vor)
+    set!(vars, model; vorticity = perturbation, static_func = true, add = true)
+    return nothing
+end
+
+@kernel inbounds = true function hybrid_zonal_wind_kernel!(u_grid, pₛ, coordinate, latds, coslat⁻¹, whichring, radius, U)
+    ij, k = @index(Global, NTuple)
+    η = pressure_ratio(k, pₛ[ij], coordinate)
+    φ = deg2rad(latds[ij])
+    u = U(η) * sin(2φ)^2                                 # Jablonowski and Williamson eq. (3)
+    u_grid[ij, k] = u / radius * coslat⁻¹[whichring[ij]]  # scaled for curl!
 end
 
 
@@ -646,6 +716,20 @@ function initialize!(
     (; grid, nlayers) = model.spectral_grid
     (; radius, rotation, gravity) = model.planet
 
+    # for hybrid coordinates η = p/pₛ varies horizontally, evaluate the profile per grid point
+    if model.geometry.vertical_coordinates isa SigmaPressureCoordinates
+        temp_grid = zeros(NF, grid, nlayers)
+        pₛ = initial_surface_pressure(vars, model)
+        launch!(
+            architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
+            jablonowski_temperature_hybrid_kernel!, temp_grid, pₛ, model.geometry.vertical_coordinates,
+            model.geometry.latds, initial_conditions, T₀, R_dry * Γ / gravity, R_dry, radius * rotation,
+        )
+        set!(vars, model; temperature = temp_grid)
+        return nothing
+    end
+
+    # Jablonowski and Williamson's η = σ for sigma coordinates
     (; σ_levels_full) = model.geometry
     σ_levels_full_cpu = on_architecture(CPU(), σ_levels_full)
     φ = model.geometry.latds
@@ -692,7 +776,7 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    # Jablonowski and Williamson use η for σ coordinates
+    # Jablonowski and Williamson's η = σ for sigma coordinates
     η = σ_levels_full[k]
     ηᵥ = (η - η₀) * π * 1 // 2  # auxiliary variable for vertical coordinate
 
@@ -712,6 +796,33 @@ end
 
     # Jablonowski and Williamson, eq. (6)
     temp_grid[ij, k] = Tη[k] + A1 * (
+        (-2sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63) * A2 +
+            (8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - convert(NF, π) * 1 // 4) * aΩ
+    )
+end
+
+# Jablonowski and Williamson eq. (4-6) with η = p/pₛ at every grid point for hybrid coordinates
+@kernel inbounds = true function jablonowski_temperature_hybrid_kernel!(
+        temp_grid, pₛ, coordinate, φ, initial_conditions, T₀, RΓg⁻¹, R_dry, aΩ,
+    )
+    ij, k = @index(Global, NTuple)
+    (; u₀, η₀, ΔT, Tmin, σ_tropopause) = initial_conditions
+    NF = eltype(temp_grid)
+
+    η = pressure_ratio(k, pₛ[ij], coordinate)
+    Tη = T₀ * η^RΓg⁻¹                                           # eq. 4
+    Tη += ifelse(η < σ_tropopause, ΔT * (σ_tropopause - η)^5, zero(NF))   # eq. 5
+    Tη = max(Tη, Tmin)
+
+    ηᵥ = (η - η₀) * π * 1 // 2
+    cosηᵥ = cos(ηᵥ)
+    sqrt_cosηᵥ = sqrt(cosηᵥ)
+    A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt_cosηᵥ
+    A2 = 2u₀ * cosηᵥ * sqrt_cosηᵥ
+
+    φij = deg2rad(φ[ij])
+    sinφ, cosφ = sin(φij), cos(φij)
+    temp_grid[ij, k] = Tη + A1 * (
         (-2sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63) * A2 +
             (8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - convert(NF, π) * 1 // 4) * aΩ
     )
@@ -805,9 +916,7 @@ function initialize!(
     λc = initial_conditions.perturb_lon
     sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
     R = radius * perturb_radius         # spatial extent of perturbation
-    vor_ic = BalancedZonalVorticity(sinφc, cosφc, λc, radius, u₀, H, z_jet, jet_decay, perturb_uₚ, R)
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, zero(NF), perturb_uₚ, R)
-    set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true)
 
     # SURFACE PRESSURE, hydrostatic with the global-mean temperature T₀ - Γh on orography
     # so that the temperature below is consistent with it (otherwise gravity waves)
@@ -818,13 +927,25 @@ function initialize!(
     @. lnp_grid = log(p₀) + log(1 - Γ / T₀ * orography) / RΓg⁻¹
     set!(vars, model; pressure = lnp_grid)
 
+    coordinate = model.geometry.vertical_coordinates
+    if coordinate isa SigmaPressureCoordinates
+        # σ = p/pₛ varies horizontally with pₛ for hybrid coordinates, curl of the gridded wind
+        vor_perturbation = JablonowskiVorticityPerturbation(sinφc, cosφc, λc, radius, perturb_uₚ, R)
+        U(σ) = first(balanced_zonal_wind(-log(σ), u₀, H, z_jet, jet_decay))
+        hybrid_zonal_wind_vorticity!(vars, model, U, vor_perturbation)
+        set!(vars, model; divergence = div_ic, static_func = true)
+    else
+        vor_ic = BalancedZonalVorticity(sinφc, cosφc, λc, radius, u₀, H, z_jet, jet_decay, perturb_uₚ, R)
+        set!(vars, model; vorticity = vor_ic, divergence = div_ic, static_func = true)
+    end
+
     # TEMPERATURE, evaluated at p/p₀ = σpₛ/p₀ (not σ) so that it is hydrostatically
     # consistent with the surface pressure on orography
     temp_grid = zeros(NF, grid, nlayers)
     aΩ = radius * rotation
     launch!(
         architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
-        balanced_zonal_temperature_kernel!, temp_grid, lnp_grid, model.geometry.σ_levels_full,
+        balanced_zonal_temperature_kernel!, temp_grid, lnp_grid, coordinate,
         model.geometry.latds, initial_conditions, z_jet, T₀, log(p₀), RΓg⁻¹, R_dry, aΩ,
     )
     set!(vars, model; temperature = temp_grid)
@@ -832,7 +953,7 @@ function initialize!(
 end
 
 @kernel inbounds = true function balanced_zonal_temperature_kernel!(
-        temp_grid, lnp_grid, σ_levels_full, φ, initial_conditions, z_jet, T₀, lnp₀, RΓg⁻¹, R_dry, aΩ,
+        temp_grid, lnp_grid, coordinate, φ, initial_conditions, z_jet, T₀, lnp₀, RΓg⁻¹, R_dry, aΩ,
     )
     ij, k = @index(Global, NTuple)
     (; u₀, H, Tmin, jet_decay) = initial_conditions
@@ -843,8 +964,9 @@ end
     cosφ = cos(φij)
     NF = eltype(temp_grid)
 
-    # vertical coordinate z = -ln(p/p₀) with p = σpₛ
-    z = -(log(σ_levels_full[k]) + lnp_grid[ij] - lnp₀)
+    # vertical coordinate z = -ln(p/p₀) with p = σpₛ, σ = p/pₛ (σₖ for SigmaCoordinates)
+    σ = pressure_ratio(k, exp(lnp_grid[ij]), coordinate)
+    z = -(log(σ) + lnp_grid[ij] - lnp₀)
     T̄ = max(T₀ * exp(-RΓg⁻¹ * z), Tmin)    # global-mean temperature [K]
     U, dUdz = balanced_zonal_wind(z, u₀, H, z_jet, jet_decay)  # zonal wind amplitude [m/s]
     dUdz_R = dUdz / R_dry
@@ -1051,7 +1173,7 @@ function initialize!(
     haskey(vars.prognostic, :humidity) || warn_undefvar(vars, :humidity) && return nothing
 
     (; relhumid_ref, σ_moist, σ_dry) = IC
-    (; σ_levels_full) = model.geometry
+    coordinate = model.geometry.vertical_coordinates
     (; atmosphere) = model
 
     # get pressure [Pa] on grid
@@ -1067,7 +1189,7 @@ function initialize!(
     launch!(
         architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
         constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
-        σ_levels_full, relhumid_ref, σ_moist, σ_dry, atmosphere,
+        coordinate, relhumid_ref, σ_moist, σ_dry, atmosphere,
     )
     set!(vars, model; humidity = humid_grid)
 
@@ -1078,7 +1200,7 @@ end
         humid_grid,
         temp_grid,
         pres_grid,
-        σ_levels_full,
+        coordinate,
         relhumid_ref,
         σ_moist,
         σ_dry,
@@ -1086,12 +1208,13 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    # Compute pressure at this level
-    pₖ = σ_levels_full[k] * pres_grid[ij]
+    # Compute pressure at this level (actual pressure, not σ*pₛ, for hybrid coordinates)
+    pₖ = pressure(k, pres_grid[ij], coordinate)
     T = temp_grid[ij, k]
 
-    # Relative humidity decreasing linearly from relhumid_ref at σ_moist to 0 at σ_dry
-    σ = σ_levels_full[k]
+    # Relative humidity decreasing linearly from relhumid_ref at σ_moist to 0 at σ_dry,
+    # σ = pₖ/pₛ (σₖ for SigmaCoordinates)
+    σ = pressure_ratio(k, pres_grid[ij], coordinate)
     relhumid = σ >= σ_moist ? relhumid_ref : relhumid_ref * max(0, (σ - σ_dry) / (σ_moist - σ_dry))
 
     # Set humidity as fraction of saturation

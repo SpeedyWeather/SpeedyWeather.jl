@@ -157,6 +157,42 @@ end
     return nothing
 end
 
+# spectral geopotential for the dynamical core: from the spectral virtual temperature with the
+# precomputed (constant) integration coefficients for SigmaCoordinates
+spectral_geopotential!(vars::Variables, ::SigmaCoordinates, model::PrimitiveEquation) =
+    geopotential!(vars, model.geopotential, model.orography)
+
+# for hybrid coordinates the integration coefficients ln(p_{k+½}/pₖ) depend on surface pressure,
+# compute the exact geopotential in grid-point space (as for the parameterizations) and transform
+# to spectral space. As the geopotential is part of the linear gravity-wave terms treated
+# semi-implicitly it is evaluated on the same time step as the spectral virtual temperature
+# for SigmaCoordinates (`LinearDynamicalCore`, the previous step for Leapfrog), also for pₛ
+function spectral_geopotential!(vars::Variables, coordinate::SigmaPressureCoordinates, model::PrimitiveEquation)
+    linear = LinearDynamicalCore()
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, linear)
+    q = haskey(vars.grid, :humidity) ?
+        get_prognostic_step(vars.grid.humidity, model.time_stepping, linear) :
+        fill!(vars.scratch.grid.a, 0)
+    Φ_grid = vars.scratch.grid.b
+    pₛ = vars.scratch.grid.a_2D
+    pₛ .= exp.(get_prognostic_step(vars.grid.pressure, model.time_stepping, linear))
+    g = model.planet.gravity
+    (; orography) = model.orography
+    G = model.geopotential
+
+    arch = architecture(T)
+    if typeof(arch) <: AbstractCPU
+        geopotential_grid_cpu!(Φ_grid, T, q, orography, pₛ, g, G, model.atmosphere, coordinate)
+    else    # GPU and Reactant
+        launch!(
+            arch, LinearWorkOrder, (size(T, 1),), geopotential_grid_kernel!,
+            Φ_grid, T, q, orography, pₛ, g, G, model.atmosphere, coordinate,
+        )
+    end
+    transform!(vars.dynamics.spectral_geopotential, Φ_grid, vars.scratch.transform_memory, model.spectral_transform)
+    return nothing
+end
+
 """
 $(TYPEDSIGNATURES)
 Compute spectral geopotential `geopot` from spectral temperature `temp`

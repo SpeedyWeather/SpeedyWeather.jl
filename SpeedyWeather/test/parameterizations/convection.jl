@@ -100,7 +100,7 @@
         humid = SpeedyWeather.get_prognostic_step(vars.grid.humidity, model.time_stepping, model.convection)
         geopotential = vars.dynamics.geopotential
         pₛ = vars.parameterizations.surface_pressure
-        σ = model.geometry.σ_levels_full
+        coordinate = model.geometry.vertical_coordinates
         RH = model.convection.relative_humidity
 
         temp_ref_none = similar(vars.scratch.grid.a)
@@ -114,11 +114,11 @@
         for ij in 1:spectral_grid.npoints
             lzb_none = SpeedyWeather.pseudo_adiabat!(
                 ij, temp_ref_none, humid_ref_none, temp, humid, geopotential,
-                pₛ[ij], σ, model.atmosphere, RH, NoEntrainment(),
+                pₛ[ij], coordinate, model.atmosphere, RH, NoEntrainment(),
             )
             lzb_ent = SpeedyWeather.pseudo_adiabat!(
                 ij, temp_ref_ent, humid_ref_ent, temp, humid, geopotential,
-                pₛ[ij], σ, model.atmosphere, RH, entrainment,
+                pₛ[ij], coordinate, model.atmosphere, RH, entrainment,
             )
             # entrainment dilutes the rising parcel with environmental air, which generally
             # reduces its buoyancy, so the LZB with entrainment is usually not above (i.e. not a
@@ -146,14 +146,14 @@
         humid = SpeedyWeather.get_prognostic_step(vars.grid.humidity, model.time_stepping, model.convection)
         geopotential = vars.dynamics.geopotential
         pₛ = vars.parameterizations.surface_pressure
-        σ = model.geometry.σ_levels_full
+        coordinate = model.geometry.vertical_coordinates
         temp_ref_profile = vars.scratch.grid.a
         humid_ref_profile = vars.scratch.grid.b
 
         for ij in (1, spectral_grid.npoints ÷ 2, spectral_grid.npoints)
             lzb = SpeedyWeather.pseudo_adiabat!(
                 ij, temp_ref_profile, humid_ref_profile, temp, humid, geopotential,
-                pₛ[ij], σ, model.atmosphere, model.convection.relative_humidity, model.convection.entrainment,
+                pₛ[ij], coordinate, model.atmosphere, model.convection.relative_humidity, model.convection.entrainment,
             )
             @test 1 <= lzb <= nlayers
             @test !any(isnan, view(temp_ref_profile, ij, :))
@@ -168,7 +168,7 @@
         for ij in (1, spectral_grid.npoints ÷ 2, spectral_grid.npoints)
             temp_parcel = temp[ij, nlayers]
             lzb = SpeedyWeather.dry_adiabat!(
-                ij, temp_ref_profile_dry, temp, temp_parcel, σ, model.atmosphere, NoEntrainment(),
+                ij, temp_ref_profile_dry, temp, temp_parcel, pₛ[ij], coordinate, model.atmosphere, NoEntrainment(),
             )
             @test 1 <= lzb <= nlayers
             @test !any(isnan, view(temp_ref_profile_dry, ij, :))
