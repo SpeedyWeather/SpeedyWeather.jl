@@ -97,12 +97,10 @@ const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parame
 Adapt.@adapt_structure Variables
 
 """$(TYPEDSIGNATURES)
-Transfer all arrays in `vars` to `arch` using `on_architecture` for each group."""
-function Architectures.on_architecture(arch::AbstractArchitecture, vars::Variables)
-    return Variables(;
-        (k => on_architecture(arch, getfield(vars, k)) for k in fieldnames(Variables))...
-    )
-end
+Transfer all arrays in `vars` to `arch` using `on_architecture`. Every fused variable is
+created anew as the same view of its transferred fused parent, see [`map_variables`](@ref)."""
+Architectures.on_architecture(arch::AbstractArchitecture, vars::Variables) =
+    map_variables(variable -> on_architecture(arch, variable), vars)
 
 """$(TYPEDSIGNATURES)
 Copy all entries from `src` to `dest` by recursing over the variable groups
@@ -135,10 +133,10 @@ is_view_entry(a::LowerTriangularArray) = a.data isa SubArray
 is_view_entry(a::SubArray) = true
 is_view_entry(::AbstractArray) = false
 
-# FUSED VARIABLES, shared by `copy!` and `deepcopy` of `Variables`. A fused variable is a view of a fused parent
-# (`vars.fused.<fuse symbol>`). On CPU and Reactant it is a `SubArray`, but on CUDA a contiguous view of a
-# fused parent, e.g. the members `(:, k)` or `(:, slot)` of a parent without step dimension, is another
-# `CuArray` sharing the parent's memory, so it cannot be recognised by its type alone.
+# FUSED VARIABLES, shared by `copy!`, `deepcopy` and `on_architecture` of `Variables`. A fused variable is a
+# view of a fused parent (`vars.fused.<fuse symbol>`). On CPU and Reactant it is a `SubArray`, but on CUDA a
+# contiguous view of a fused parent, e.g. the members `(:, k)` or `(:, slot)` of a parent without step
+# dimension, is another `CuArray` sharing the parent's memory, so it cannot be recognised by its type alone.
 
 """$(TYPEDSIGNATURES)
 Where the variable `name` sits in the fused parents `fused`: `(fuse_name, indices)` such that `variable.data` is
@@ -255,35 +253,37 @@ deepcopy's `IdDict`. On CUDA a contiguous view of a fused parent is not a `SubAr
 sharing the parent's memory, which the default `deepcopy` copies into independent memory (and GPUArrays'
 generic `deepcopy` of a GPU array, e.g. for JLArrays, does not use the `IdDict` at all). The batched
 transforms would then read the copied parent while the time stepping writes into the detached copy of
-the variable. Here the fused parents are copied first, every fused variable (see
-[`fused_view_location`](@ref)) is created anew as the same view of its copied parent, and all other
-variables are deep-copied as usual."""
-function Base.deepcopy_internal(vars::Variables, stackdict::IdDict)
-    copied_fused = map(fused_parent -> Base.deepcopy_internal(fused_parent, stackdict), vars.fused)
+the variable. Here every fused variable is created anew as the same view of its copied
+parent, see [`map_variables`](@ref)."""
+Base.deepcopy_internal(vars::Variables, stackdict::IdDict) =
+    map_variables(variable -> Base.deepcopy_internal(variable, stackdict), vars)
+
+"""$(TYPEDSIGNATURES)
+New `Variables` from `f` applied to the fused parents `vars.fused` and to all other variables
+that are not fused variables. Every fused variable (see [`fused_view_location`](@ref)) is
+created anew as the same view of its mapped parent instead, so that it remains a view of it.
+Applying `f` to each variable on its own would detach it from its parent whenever `f` copies
+(e.g. `deepcopy`, `on_architecture` to another architecture)."""
+function map_variables(f, vars::Variables)
+    mapped_fused = map(f, vars.fused)
     groups = map(fieldnames(Variables)) do group
-        group === :fused && return group => copied_fused
-        return group => deepcopy_group(getfield(vars, group), vars.fused, copied_fused, stackdict)
+        group === :fused && return group => mapped_fused
+        return group => map_group(f, getfield(vars, group), vars.fused, mapped_fused)
     end
     return Variables(; groups...)
 end
 
-# Deepcopy a (possibly nested) NamedTuple of variables, fused variables are created as views of their copied parents
-function deepcopy_group(variables::NamedTuple{names}, fused::NamedTuple, copied_fused::NamedTuple, stackdict::IdDict) where {names}
+# `map_variables` for a (possibly nested) NamedTuple of variables
+function map_group(f, variables::NamedTuple{names}, fused::NamedTuple, mapped_fused::NamedTuple) where {names}
     return NamedTuple{names}(
         map(names, values(variables)) do name, variable
-            variable isa NamedTuple && return deepcopy_group(variable, fused, copied_fused, stackdict)
-            copied_view = copy_fused_view(name, variable, fused, copied_fused)
-            return isnothing(copied_view) ? Base.deepcopy_internal(variable, stackdict) : copied_view
+            variable isa NamedTuple && return map_group(f, variable, fused, mapped_fused)
+            location = fused_view_location(name, variable, fused)
+            isnothing(location) && return f(variable)
+            fuse_name, indices = location           # a fused variable: the same view of the mapped parent
+            return wrapped_view(parent(mapped_fused[fuse_name]), indices...)
         end
     )
-end
-
-# The same view of the copied fused parent if `variable` is the fused variable `name`, `nothing` otherwise
-function copy_fused_view(name, variable, fused::NamedTuple, copied_fused::NamedTuple)
-    location = fused_view_location(name, variable, fused)
-    isnothing(location) && return nothing
-    fuse_name, indices = location
-    return wrapped_view(parent(copied_fused[fuse_name]), indices...)
 end
 
 # Exclude SubArray-backed memory from the pretty-print size: a fused parent's bytes are

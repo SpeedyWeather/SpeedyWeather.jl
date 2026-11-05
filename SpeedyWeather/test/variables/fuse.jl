@@ -436,3 +436,16 @@ using JLArrays
     @test fused_members(copied, 2000) == members    # every fused variable of the copy is a view of its parent
     @test fused_members(vars, 1000) == members      # the original still holds 1000 + i: no shared memory
 end
+
+@testset "on_architecture keeps every fused variable a view of its transferred parent" for (from, to) in ((SpeedyWeather.CPU(), SpeedyWeather.GPU(JLArrays.JLBackend())), (SpeedyWeather.GPU(JLArrays.JLBackend()), SpeedyWeather.CPU()))
+    vars = Variables(PrimitiveWetModel(SpectralGrid(truncation = 11, nlayers = 4, architecture = from)))
+    # mark the original's parents with 1000 + i, so the transferred variables start with these values
+    members = fused_members(fill_fused_parents!(vars, 1000), 1000)
+    @test !isempty(members)
+
+    # mark the transferred parents with 2000 + i: their views then hold 2000 + i, detached variables 1000 + i
+    transferred = on_architecture(to, vars)
+    fill_fused_parents!(transferred, 2000)
+    @test fused_members(transferred, 2000) == members  # every fused variable is a view of its transferred parent
+    @test fused_members(vars, 1000) == members          # the original still holds 1000 + i: no shared memory
+end
