@@ -139,7 +139,7 @@ function SpeedyTransforms.transform!(
 
     # retain previous time step for vertical advection and parameterizations
     # if not initial step do before transforms i.e before that step is overwritten
-    initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
+    initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model, vars.prognostic.clock)
 
     # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
@@ -198,4 +198,4 @@ end
 
 # only needed for Leapfrog to retain a copy of the current time step moved to the previous
 # fallback is nothing for other time steppers
-move_prognostic_grid_variables_back!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
+move_prognostic_grid_variables_back!(::Variables, ::AbstractTimeStepper, ::AbstractModel, args...; kwargs...) = nothing

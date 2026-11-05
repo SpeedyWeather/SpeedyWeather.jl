@@ -121,11 +121,35 @@ end
     return Expr(:block, calls..., :(return nothing))
 end
 
+# On the first Euler step and the first leapfrog step (lf == 1) the leapfrog kernel leaves the
+# 1st (previous) spectral step unchanged, so the 1st grid step must remain unchanged too
+# for grid and spectral previous steps to describe the same time (e.g. the geopotential which
+# enters the semi-implicit dynamics). Branch-free (ifelse) as the clock is traced in Reactant.
+function move_prognostic_grid_variables_back!(
+        vars::Variables,
+        time_stepping::Leapfrog,
+        model::AbstractModel,
+        clock::Clock,
+    )
+    lf = prognostic_step(time_stepping, clock)
+    return move_prognostic_grid_variables_back!(vars, time_stepping, model; move = lf == 2)
+end
+
 # copy grid prognostics from 2nd to 1st step to retain these fields for the previous time step
 function move_prognostic_grid_variables_back!(
         vars::Variables,
         time_stepping::AbstractLeapfrog,
         model::AbstractModel,
+        ::Clock,
+    )
+    return move_prognostic_grid_variables_back!(vars, time_stepping, model)
+end
+
+function move_prognostic_grid_variables_back!(
+        vars::Variables,
+        time_stepping::AbstractLeapfrog,
+        model::AbstractModel;
+        move::Bool = true,
     )
     # The atmospheric grid prognostics (vorticity, divergence, temperature, [humidity], pressure/η)
     # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_dpres_grad_grid` fuse
@@ -134,11 +158,11 @@ function move_prognostic_grid_variables_back!(
     # For primitive equation models `:uv_dpres_grad_grid` also holds ∇ln(pₛ) (`dpres_dx`, `dpres_dy`),
     # which is copied along but not used from the previous step.
     for fused in (vars.fused.grid, vars.fused.uv_dpres_grad_grid)
-        copy_step_back!(parent(fused))
+        copy_step_back!(parent(fused), move)
     end
     # tracers, ocean and land grid variables are not part of the atmospheric fuse — copy
     # per-variable, unrolled per name (literal-Symbol getfield; steps bound individually)
-    move_grid_tracers_back!(vars)
+    move_grid_tracers_back!(vars, move)
     # does not have to be done for ocean/land as they don't have spectral variables
     # the grid variables are already in prognostic and the time stepper takes care
     # of moving them back during the update
@@ -146,16 +170,17 @@ function move_prognostic_grid_variables_back!(
 end
 
 # copy step 2 -> step 1 for one variable (retain current step as the previous one);
-@inline function copy_step_back!(var)
+# with `move = false` leave the 1st step unchanged (branch-free for Reactant)
+@inline function copy_step_back!(var, move = true)
     var_old = get_step(var, 1)
     var_new = get_step(var, 2)
-    var_old .= var_new
+    var_old .= ifelse.(move, var_new, var_old)
     return nothing
 end
 
-@generated function move_grid_tracers_back!(vars::Variables{Po, G, T}) where {Po, G, T}
+@generated function move_grid_tracers_back!(vars::Variables{Po, G, T}, move = true) where {Po, G, T}
     calls = [
-        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name)))))
+        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name))), move))
             for name in _namespace_names(T, :tracers)
     ]
     return Expr(:block, calls..., :(return nothing))
