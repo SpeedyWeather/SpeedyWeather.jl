@@ -149,7 +149,7 @@ function move_prognostic_grid_variables_back!(
         vars::Variables,
         time_stepping::AbstractLeapfrog,
         model::AbstractModel;
-        move::Bool = true,
+        move = true,
     )
     # The atmospheric grid prognostics (vorticity, divergence, temperature, [humidity], pressure/η)
     # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_dpres_grad_grid` fuse
