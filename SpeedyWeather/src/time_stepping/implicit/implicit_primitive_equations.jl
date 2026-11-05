@@ -457,7 +457,7 @@ end
     # Gauss-Jordan elimination: reduce S_scratch[l, :, :] to I, applying the same row operations
     # to S⁻¹[l, :, :] (I → S⁻¹)
     for pivot in 1:nlayers
-        pivot⁻¹ = 1 / S_scratch[l, pivot, pivot]    # TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
+        pivot⁻¹ = inv(S_scratch[l, pivot, pivot])
 
         # scale pivot row
         for r in 1:nlayers

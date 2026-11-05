@@ -457,7 +457,7 @@ Fields are $(TYPEDFIELDS)
     @param min_ocean_momentum_roughness::NF = 1.0e-5
 
     "[OPTION] coefficient for momentum roughness closure over ocean"
-    @param m_c1::NF = 0.48786303
+    @param m_c1::NF = 0.48786303 (bounds = Positive,)   # uₙ^m_c1 → 0 as uₙ → 0⁺
     @param m_c2::NF = 1.2162691
     @param m_c3::NF = 0.5460857
     @param m_c4::NF = 0.45002246
@@ -470,7 +470,7 @@ Fields are $(TYPEDFIELDS)
     @param h_c1::NF = -8.207549
     @param h_c2::NF = 0.18300448 (bounds = Nonnegative,)
     @param h_c3::NF = 0.08970642
-    @param h_c4::NF = -1.6667988
+    @param h_c4::NF = -1.6667988 (bounds = Negative,)   # exp(h_c4/uₙ) → 0 as uₙ → 0⁺
 end
 
 Adapt.@adapt_structure LearnedOceanRoughness
@@ -524,13 +524,19 @@ end
     return nothing
 end
 
+# uₙ is often exactly 0 (clamped neutral wind). There uₙ^m_c1 and exp(h_c4/uₙ) are 0 (m_c1 > 0, h_c4 < 0),
+# but their derivatives divide by uₙ, and AD's ∞ · 0 gives NaN. So select 0 with ifelse and evaluate
+# the unused branch at uₙ = 1 to avoid dividing by zero. Branch-free for Reactant.
+@inline safe_wind_speed(uₙ) = ifelse(uₙ > 0, uₙ, one(uₙ))
+
 # Ocean momentum roughness
 @inline function ocean_momentum_roughness(scheme, uₙ::NF, log_αᵪ::NF, ℵ::NF) where {NF <: AbstractFloat}
 
     num = muladd(scheme.m_c3, uₙ, log_αᵪ + exp(scheme.m_c2))
     den = exp(muladd(scheme.m_c4, uₙ, - scheme.m_c5)) + scheme.m_c6
+    uₙ_pow = ifelse(uₙ > 0, safe_wind_speed(uₙ)^scheme.m_c1, zero(uₙ))  # uₙ^m_c1, 0 at uₙ = 0
 
-    z₀ = exp(uₙ^scheme.m_c1 - num / den + muladd(scheme.m_c7, log_αᵪ, -scheme.m_c8))
+    z₀ = exp(uₙ_pow - num / den + muladd(scheme.m_c7, log_αᵪ, -scheme.m_c8))
 
     z_max = scheme.max_ocean_momentum_roughness(uₙ)
     z₀ = min(z₀, z_max)
@@ -542,7 +548,8 @@ end
 
 # Ocean heat roughness
 @inline function ocean_heat_roughness(scheme, uₙ::NF, ℵ::NF) where {NF <: AbstractFloat}
-    z₀ = exp(scheme.h_c1 * (uₙ + scheme.h_c2)^scheme.h_c3 - exp(scheme.h_c4 / uₙ))
+    exp_term = ifelse(uₙ > 0, exp(scheme.h_c4 / safe_wind_speed(uₙ)), zero(uₙ))  # exp(h_c4/uₙ), 0 at uₙ = 0
+    z₀ = exp(scheme.h_c1 * (uₙ + scheme.h_c2)^scheme.h_c3 - exp_term)
     return muladd(ℵ, scheme.sea_ice_heat_roughness - z₀, z₀)    # weight by sea-ice concentration
 end
 
