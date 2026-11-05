@@ -110,7 +110,8 @@ end
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     scheme = LearnedOceanRoughness(spectral_grid)
 
-    for uₙ in (1.0, 5.0, 10.0, 20.0, 40.0, 60.0)
+    # uₙ = 0 where the neutral wind speed is clamped, there the formula evaluates to its limit uₙ → 0⁺
+    for uₙ in (0.0, 1.0e-6, 1.0, 5.0, 10.0, 20.0, 40.0, 60.0)
         α = log(scheme.charnock(uₙ))
 
         A = uₙ^scheme.m_c1
@@ -128,6 +129,28 @@ end
         @test z₀_actual > 0
         @test z₀_actual <= z₀_max
     end
+
+    # continuous at uₙ = 0
+    z₀(uₙ) = SpeedyWeather.ocean_momentum_roughness(scheme, uₙ, log(scheme.charnock(uₙ)), 0.0)
+    @test z₀(0.0) ≈ z₀(1.0e-12) rtol = 1.0e-4
+end
+
+@testset "Learned ocean heat roughness" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    scheme = LearnedOceanRoughness(spectral_grid)
+
+    for uₙ in (0.0, 1.0e-6, 1.0, 5.0, 10.0, 20.0, 40.0, 60.0)
+        z₀_expected = exp(scheme.h_c1 * (uₙ + scheme.h_c2)^scheme.h_c3 - exp(scheme.h_c4 / uₙ))
+        z₀_actual = SpeedyWeather.ocean_heat_roughness(scheme, uₙ, 0.0)
+
+        @test z₀_actual ≈ z₀_expected
+        @test isfinite(z₀_actual)
+        @test z₀_actual > 0
+    end
+
+    # continuous at uₙ = 0
+    z₀(uₙ) = SpeedyWeather.ocean_heat_roughness(scheme, uₙ, 0.0)
+    @test z₀(0.0) ≈ z₀(1.0e-12) rtol = 1.0e-4
 end
 
 @testset "No neutral wind speed" begin
