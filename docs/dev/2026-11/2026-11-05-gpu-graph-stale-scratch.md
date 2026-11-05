@@ -44,6 +44,14 @@ identical on `origin/main` (`6875c835`, which includes #1380).
   - **Reproducers:** copied next to this plan on `mg/fix-gpu-graphs-issue`, and run with the CUDA test environment.
     - `gpu-graph-two-scratch.jl` uses a reference with its own scratch memory and different coefficients per call.
     - `gpu-graph-stale-repeats.jl` understands both key types and has the new `MODE=copy`.
+  - **Correction, who is affected:** `initialize!(model)` doesn't create new scratch memory. `TransformScratchMemory`
+    is allocated as `model.spectral_transform.scratch_memory`, so every `initialize!(model)` shares the transform's
+    scratch memory. Only copies of the `Variables` (`deepcopy`, as in the benchmark's repeat loop) bring new scratch
+    memory and expose the bug. The fix is unchanged.
+  - **Reproducer bug:** the original `device_pointers!` in `gpu-graph-stale-repeats.jl` didn't recurse into `Field`s
+    and `LowerTriangularArray`s, which are `AbstractArray`s with a bits eltype. So most field addresses were missing
+    from a copy's address ranges, and the counts of replayed and stale graphs were undercounts. The original's
+    conclusion holds (stale replays did happen). Fixed in the copy here.
 
 ## Problem description
 
@@ -95,6 +103,10 @@ That assumption is wrong. In a model the scratch memory is `vars.scratch.transfo
 
 - every `initialize!(model)` creates new `Variables`;
 - so does `deepcopy(vars)`.
+
+(Correction, see the revision log: `initialize!(model)` gives the new `Variables` the transform's own scratch memory,
+`allocate(::AbstractVariable{TransformScratchMemory}, model) = model.spectral_transform.scratch_memory`, so only copies
+of the `Variables`, e.g. `deepcopy(vars)`, come with new scratch memory.)
 
 When a new copy's field lands at an address that the memory pool recycled from a freed copy, the cache finds the old
 graph under that key and replays it. The replayed graph writes the Fourier output into the old scratch memory,
@@ -156,9 +168,11 @@ exposed by the same repeat loop.
 
 ### Who else is affected
 
-- **Re-initialising on GPU:** any GPU run that creates new `Variables` for the same model, i.e. `initialize!(model)`
-  twice, several simulations from one model, or `deepcopy(vars)`, with `gpu_graphs = true`. That is the default on
-  CUDA.
+- **Copies of the variables on GPU:** any GPU run with `gpu_graphs = true` (the default on CUDA) that transforms with
+  `Variables` whose scratch memory isn't the transform's own, i.e. copies of `Variables` such as `deepcopy(vars)`, or a
+  `ScratchMemory` passed to `transform!` explicitly. `initialize!(model)` twice, or several simulations from one model,
+  is safe on its own: all of them use the transform's scratch memory, so a replay at a recycled field address writes
+  into the scratch memory that is in use.
 - **AMDGPU:** the AMDGPU extension uses the same key. HIP graphs are off by default, so only runs with an explicit
   `gpu_graphs = true` are affected. The benchmark meant to force them on for gpu-amd (`manual_benchmarking.jl:257`),
   but that switch has no effect (see the revision log).
@@ -400,9 +414,11 @@ shell). Load `using CUDA` before SpeedyWeather, and don't load the system `cuda`
   slower, e.g. for an ensemble of many simulations from one model.
 - **Invalid gpu-nvidia results.** gpu-nvidia results from runs after `6a240474` (Nov 3) are invalid, even where no NaN
   was reported. None are committed: the stored gpu-nvidia entry in `benchmark_results.json` is from 2026-10-20.
-- **The Oct 20 baseline is unchecked.** It used a single timed run after a second `initialize!(model)`, so it could
-  also have replayed warm-up graphs at recycled addresses. Its log (`benchmarks-2618118.log`) has 12 NaN warnings.
-  Whether these are stale replays or genuine blow-ups of high-resolution L16/L24 configurations is unverified.
+- **The Oct 20 baseline is not affected by this bug.** It used a single timed run after a second `initialize!(model)`.
+  The benchmark code of that time (last changed in `e410eed05`, Oct 17) has no `deepcopy`. A second `initialize!`
+  shares the transform's scratch memory (see the revision log), so a replay at a recycled field address there was
+  correct. The 12 NaN warnings in its log (`benchmarks-2618118.log`) are therefore not stale replays. Whether they are
+  genuine blow-ups of high-resolution L16/L24 configurations is still unverified.
 
 ## Future work
 
