@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Geopotential computed once in grid space and used by both dynamical core (via the Bernoulli potential) and parameterizations, spectral geopotential removed; Leapfrog keeps the previous grid step during the first two steps, consistent with the spectral one [#1381](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1381)
+- Restore tag trigger for the documentation workflow so releases deploy versioned docs again [#1383](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1383)
+- Allow DocStringExtensions 0.10 in all sub-packages, and DocumenterCitations 1.5 in the docs (requires DocumenterVitepress ≥ 0.3.7) [#1379](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1379)
 - Fix `copy!` and `deepcopy!` for `Variables` to silently fail on GPUArrays (e.g. `CuArray` and `JLArrays`) [#1380](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1380)
 - Fix NaN forward-mode derivatives of the learned ocean roughness at zero neutral wind speed (extended differentiability tests) [#1377](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1377)
 - Fix the vertical advection part of the semi-implicit temperature operator, and choose the implicit reference temperature with `IsothermalReferenceTemperature` (300 K, new default) `GlobalMeanReferenceTemperature` (plus offset) or `MaximumReferenceTemperature` (plus margin); Crank-Nicolson (`centering = 0.5`) as default, with a warning for uniform σ spacing [#1369](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1369)
