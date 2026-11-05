@@ -102,3 +102,32 @@
         @test result === vars_copy
     end
 end
+
+# The groups `copy!` copies (not the scratch) on the CPU, to compare with `==`. Without the fused parents
+# (compared through their views) and the clock and scale, which `==` compares by identity (mutable)
+variables_on_cpu(vars) = map((:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles)) do group
+    on_architecture(SpeedyWeather.CPU(), Base.structdiff(getfield(vars, group), NamedTuple{(:clock, :scale)}))
+end
+
+# On JLArrays (as on CUDA) a contiguous view of a fused parent is not a `SubArray` but another JLArray sharing
+# the parent's memory: `copy!` has to skip it (copying its parent instead), `copyto!` between it and a `SubArray`
+# on the CPU would fall back to scalar indexing
+using JLArrays
+
+@testset "copy! between CPU and JLArray variables" begin
+    spectral_grid = SpectralGrid(truncation = 11, nlayers = 4)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    run!(simulation, steps = 3)                     # non-trivial data in all groups
+    vars = simulation.variables
+    reference = variables_on_cpu(vars)
+
+    architecture = SpeedyWeather.GPU(JLArrays.JLBackend())
+    jlarray_model = PrimitiveWetModel(SpectralGrid(truncation = 11, nlayers = 4; architecture))
+    vars_jlarray = copy!(Variables(jlarray_model), vars)        # CPU → JLArray
+    @test variables_on_cpu(vars_jlarray) == reference
+    vars_jlarray2 = copy!(Variables(jlarray_model), vars_jlarray)   # JLArray → JLArray
+    @test variables_on_cpu(vars_jlarray2) == reference
+    vars_back = copy!(Variables(model), vars_jlarray2)          # JLArray → CPU
+    @test variables_on_cpu(vars_back) == reference
+end
