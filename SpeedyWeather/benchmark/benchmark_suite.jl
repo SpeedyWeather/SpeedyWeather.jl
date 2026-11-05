@@ -162,6 +162,15 @@ compiled_call(arch, f, args...) = () -> (f(args...); synchronize(arch))
 """Adapt `suite` to what `arch` supports, by default unchanged."""
 adapt_to_architecture!(suite, arch) = suite
 
+"""Reset `simulation` to the initial state `initial_variables` for a timed run and return the
+simulation to run. By default copied into the variables of `simulation`, so that every timed run
+steps the same buffers as the warm-up and replays the GPU graphs captured there (they are per
+buffer, see `graph_key` in SpeedyTransforms) instead of capturing new ones in the timed region."""
+function reset_simulation!(arch, simulation, initial_variables, model)
+    copy!(simulation.variables, initial_variables)
+    return simulation
+end
+
 # Run every configuration of a suite. Each run lives in its own `run_benchmark!`
 # call so that its model and simulation go out of scope on return; `free_memory!`
 # (defined by the driver script) then collects them and hands device memory back
@@ -234,27 +243,28 @@ function run_benchmark!(suite::BenchmarkSuite, i::Integer)
     # progress meter's `tlast - tinit`. The latter measures only up to the *last*
     # progress-bar render (every `feedback_dt = 0.1 s`). Repeat from the same initial
     # state, see `repeats` and `max_repeat_time`: initialize once (with Reactant every
-    # `initialize!` compiles again, `@maybe_jit`) and run a deepcopy of the initialized
-    # variables each time (`copy!` would share the clock's device numbers with Reactant).
-    # Before each run the GC frees the previous copy (incl. its device memory) outside the
-    # timed region; not `free_memory!`, which would also clear the cached Fourier graphs and
-    # so recapture them in the timed run.
-    simulation = initialize!(model)
-    initialize!(simulation; period)
-    initial_variables = simulation.variables    # initial state of every timed run, never run itself
-    simulation = nothing
+    # `initialize!` compiles again, `@maybe_jit`) and reset the warm-up's simulation to it
+    # before each run, see `reset_simulation!`. Every timed run thereby steps the warm-up's
+    # buffers and replays the GPU graphs of the Fourier transform captured in the warm-up;
+    # none are captured in the timed region. (Graphs are per buffer: new variables would
+    # capture new ones. Hence also no `free_memory!` here, it would clear the graphs.)
+    # After the reset the GC frees what is left over, e.g. Reactant's previous copy, outside
+    # the timed region.
+    initial_simulation = initialize!(model)
+    initialize!(initial_simulation; period)
+    initial_variables = initial_simulation.variables    # initial state of every timed run, never run itself
+    initial_simulation = nothing
     times = Float64[]
     while length(times) < suite.repeats && (isempty(times) || sum(times) + times[end] <= suite.max_repeat_time)
+        simulation = reset_simulation!(architecture, simulation, initial_variables, model)
         GC.gc()
-        simulation = Simulation(deepcopy(initial_variables), model)
         initialize!(model.feedback, simulation.variables, model)    # a new progress meter
         synchronize_device(architecture, simulation)
         t0 = time()
         runner.time_stepping(simulation)
         synchronize_device(architecture, simulation)
         push!(times, time() - t0)
-        finalize!(simulation)
-        simulation = nothing
+        finalize!(simulation)   # but keep `simulation`, the next run resets it
     end
     @info @sprintf("     %d timed run(s): median %.3g s, fastest %.3g s, slowest %.3g s", length(times), median(times), minimum(times), maximum(times))
 
