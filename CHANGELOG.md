@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Jablonowski-Williamson docs example uses backward Euler (`centering = 1`) to damp spurious gravity waves [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - Removes `@Const` from kernels to workaround bug in Reactant 0.2.306 [#1385](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1385)
 - Restore tag trigger for the documentation workflow so releases deploy versioned docs again [#1383](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1383)
 - Allow DocStringExtensions 0.10 in all sub-packages, and DocumenterCitations 1.5 in the docs (requires DocumenterVitepress ≥ 0.3.7) [#1379](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1379)
