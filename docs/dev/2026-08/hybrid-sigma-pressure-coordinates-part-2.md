@@ -114,6 +114,16 @@ Base revision: 20467269399f40212fee413a545496226de999ca
 > Great! Can you change cubic or remove it if that gives crossing layers? This looks generally
 > unusable to me and it's existence implies the opposite
 
+- 2026-11-06: merged #1381 (geopotential computed once in grid space and used by the dynamical
+  core via the Bernoulli potential). This replaces the hybrid-only `spectral_geopotential!` of this
+  PR (grid geopotential + transform): the shared grid geopotential is already exact for hybrid
+  coordinates and evaluated on the previous (geopotential) leapfrog step. Only the linearised factor
+  cₖ of R·Tₖ·cₖ·ln pₛ (now added to the spectral Bernoulli potential) remains hybrid-specific here.
+  Linear consistency (R, U, L, W) and the ramp Held-Suarez stability at 8 and 24 levels unchanged.
+
+> Can you already merge in 1381 as that changes the way how the geopotential is calculated and
+> hopefully makes this PR simpler?
+
 ## Problem description
 
 [#1137](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1137) ("Sigma-pressure
