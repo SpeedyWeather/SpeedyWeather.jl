@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Snow falling into the slab ocean cools it by melting and warming the meltwater, snow over 100% ocean melts into it [#PRNUM](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/PRNUM)
 - Revert the FFTA < 0.3.2 docs compat restriction, fixed upstream in FFTA 0.3.3 [#1387](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1387)
 - Jablonowski-Williamson docs example uses backward Euler (`centering = 1`) to damp spurious gravity waves [#1386](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1386)
 - Removes `@Const` from kernels to workaround bug in Reactant 0.2.306 [#1385](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1385)

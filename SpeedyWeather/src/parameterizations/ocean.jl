@@ -274,7 +274,11 @@ timestep!(vars::Variables, ocean_model::AquaPlanet, model::PrimitiveEquation) = 
 export SlabOcean
 
 """Interactive slab ocean model that evolves sea surface temperature with the central time stepper.
-Tendencies are from net surface radiation and surface latent and sensible heat fluxes.
+Tendencies are from net surface radiation and surface latent and sensible heat fluxes,
+and from snow falling into the ocean, which melts and warms to the SST, cooling the mixed layer by
+`ρ_w s (Lᵢ + c (SST - melting_temperature))` [W/m²] for a snow rate `s` [m/s] (heat needed to warm
+the snow up to its melting temperature is neglected). Over 100% ocean, snow on the ground
+(from a land snow model) also melts within one time step.
 The effective mixed-layer heat capacity is `specific_heat_capacity * mixed_layer_depth * density`.
 Initialised from seasonal SST climatology, with land points set to `land_temperature`.
 Fields are $(TYPEDFIELDS)"""
@@ -287,6 +291,9 @@ Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
+
+    "[OPTION] Melting temperature of snow falling into the ocean [K]"
+    melting_temperature::NF = 273.15
 
     "[OPTION] Mask initial sea surface temperature with land-sea mask?"
     mask::Bool = true
@@ -350,12 +357,18 @@ function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEq
 end
 
 function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEquation)
-    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), ocean_model)
+    ocean_time_stepper = time_stepper(model.time_stepping, :ocean)
+    dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, ocean_time_stepper, ocean_model)
+    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, ocean_time_stepper, ocean_model)
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
+    Lᵢ = latent_heat_fusion(model.atmosphere)   # zero for dry atmospheres
+    (; specific_heat_capacity, melting_temperature) = ocean_model
+    ρ_water = ocean_model.density               # snow rate and depth are in liquid water equivalent
     C₀⁻¹ = inv(ocean_model.heat_capacity_mixed_layer)
+    Δt = time_step(model.time_stepping, :ocean, vars.prognostic.clock)
     (; land_fraction) = model.land_sea_mask
-    params = (; C₀⁻¹, Lᵥ)                                       # pack into NamedTuple for kernel
+    params = (; C₀⁻¹, Lᵥ, Lᵢ, ρ_water, c = specific_heat_capacity, melting_temperature, Δt)
 
     # Frierson et al. 2006, eq (1), all W/m² except humidity flux in kg/m²/s
     Rsd = vars.parameterizations.surface_shortwave_down         # before albedo
@@ -365,20 +378,38 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
 
+    # snow falling into the ocean [m/s] and snow on the ground over 100% ocean [m], if defined
+    snow_rate = haskey(vars.parameterizations, :snow_rate) ? vars.parameterizations.snow_rate : nothing
+    snow_depth = haskey(vars.prognostic, :land) && haskey(vars.prognostic.land, :snow_depth) ?
+        get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), ocean_model) :
+        nothing
+
     @boundscheck size(dsst) == size(Rsd) == size(Rsu) == size(Rld) == size(Rlu) || throw(BoundsError())
     @boundscheck size(dsst) == size(S) == size(H) || throw(BoundsError())
 
     launch!(
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,
-        dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params
+        dsst, sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, snow_rate, snow_depth, params
     )
     return nothing
 end
 
-@kernel inbounds = true function slab_ocean_kernel!(dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params)
+@kernel inbounds = true function slab_ocean_kernel!(
+        dsst, sst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, snow_rate, snow_depth, params
+    )
     ij = @index(Global, Linear)         # every grid point ij
     if land_fraction[ij] < 1            # at least partially ocean
-        (; C₀⁻¹, Lᵥ) = params
-        dsst[ij] = C₀⁻¹ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij])
+        (; C₀⁻¹, Lᵥ, Lᵢ, ρ_water, c, melting_temperature, Δt) = params
+
+        # snow into the ocean [m/s]: snowfall, and over 100% ocean all snow on the ground (removed
+        # by the snow model's filter! after this time step)
+        s = isnothing(snow_rate) ? zero(eltype(dsst)) : snow_rate[ij]
+        if !isnothing(snow_depth) && land_fraction[ij] == 0
+            s += max(snow_depth[ij], 0) / Δt
+        end
+
+        # melt the snow and warm the meltwater from melting temperature to SST [W/m²]
+        Q_snow = ρ_water * s * (Lᵢ + c * (sst[ij] - melting_temperature))
+        dsst[ij] = C₀⁻¹ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij] - Q_snow)
     end
 end
