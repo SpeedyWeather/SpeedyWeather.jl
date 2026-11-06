@@ -67,6 +67,16 @@ ArrayDimensions.hasvertical(L), ArrayDimensions.hastime(L)
 or through dispatch on the tag types and their unions like
 `ArrayDimensions.DimensionsWithTime` and `ArrayDimensions.DimensionsWithVertical`.
 
+!!! note "Writing your own `...WithTime`-style alias"
+    These aliases are `where` clauses over the array type, e.g.
+    `Field{T, N, A, G, Dims} where {..., Dims <: DimensionsWithTime}`. If you write one yourself,
+    repeat *all* parameter bounds of the underlying type declaration. A `where` clause with looser
+    bounds than the declaration is not a subtype of it, so the alias would silently fail to
+    dispatch: a method on the alias and a fallback on the plain type end up unordered and Julia
+    picks by definition order rather than by the tag. `LowerTriangularArray` declares
+    `ArrayType <: AbstractArray{T, N}` and `S <: AbstractSpectrum`, so its aliases must spell those
+    out; `AbstractField` declares its parameters unbounded, so its aliases need not.
+
 The tags are preserved through `similar`, `zero`, views and broadcasting; indexing
 into a tagged dimension with an integer drops it accordingly, e.g. `L[:, 1]` of an
 `LMZ`-tagged array returns an `LM`-tagged one.

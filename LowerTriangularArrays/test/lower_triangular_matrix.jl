@@ -348,6 +348,35 @@ end
     end
 end
 
+@testset "rand, randn constructors with rng" begin
+    for f in (rand, randn)
+        s = (5, 5)
+        spectrum = Spectrum(s...)
+
+        # same seed = same coefficients, reproducibility
+        @test f(Random.Xoshiro(123), spectrum) == f(Random.Xoshiro(123), spectrum)
+        @test f(Random.Xoshiro(123), spectrum, 2) == f(Random.Xoshiro(123), spectrum, 2)
+
+        # rng doesn't change type or size compared to no rng
+        for NF in (Float32, Float64)
+            L1 = f(Random.Xoshiro(123), NF, spectrum, 2)
+            L2 = f(NF, spectrum, 2)
+            @test typeof(L1) == typeof(L2)
+            @test size(L1) == size(L2)
+
+            L1 = f(Random.Xoshiro(123), LowerTriangularArray{NF}, s...)
+            L2 = f(LowerTriangularArray{NF}, s...)
+            @test typeof(L1) == typeof(L2)
+            @test size(L1) == size(L2)
+
+            L1 = f(Random.Xoshiro(123), LowerTriangularMatrix{NF}, s...)
+            L2 = f(LowerTriangularMatrix{NF}, s...)
+            @test typeof(L1) == typeof(L2)
+            @test size(L1) == size(L2)
+        end
+    end
+end
+
 @testset "LowerTriangularArray: fill, copy, randn, convert, repeat" begin
     @testset for NF in (Float32, Float64)
         mmax = 32
@@ -392,6 +421,21 @@ end
             end
         end
     end
+end
+
+@testset "convert(LowerTriangularMatrix{T}, L) skips no-op cast" begin
+    # Regression: under Reactant, `T.(L.data)` with `eltype(L.data) === T` traces as a
+    # self-recursive `copy(::Broadcasted)` that blows the Julia stack. Same-eltype convert
+    # must pass `L.data` through identity-ically.
+    spectrum = Spectrum(8, 8)
+    L = randn(LowerTriangularMatrix{ComplexF32}, spectrum)
+
+    L_same = convert(LowerTriangularMatrix{ComplexF32}, L)
+    @test L_same.data === L.data   # identity, no broadcast/copy
+
+    L_cast = convert(LowerTriangularMatrix{ComplexF64}, L)
+    @test eltype(L_cast) === ComplexF64
+    @test L_cast.data !== L.data
 end
 
 @testset "LowerTriangularMatrix: fill, copy, randn, convert" begin

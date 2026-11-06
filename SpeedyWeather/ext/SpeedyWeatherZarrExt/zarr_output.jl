@@ -11,27 +11,25 @@ function ZarrOutput(
         SG::SpectralGrid,
         Model::Type{<:AbstractModel} = Barotropic;
         nlayers_soil = DEFAULT_NLAYERS_SOIL,
-        output_grid::AbstractFullGrid = on_architecture(
-            CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)
-        ),
+        output_grid::AbstractFullGrid = RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half, SpeedyWeather.output_architecture(SG.architecture)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
         compressor = nothing,
+        layers::SpeedyWeather.AbstractOutputLayers = SpeedyWeather.ModelLayers(),
         kwargs...
     )
 
-    # INPUT GRID (but on CPU)
-    input_grid = on_architecture(CPU(), SG.grid)
+    # OUTPUT GRID and MODEL GRID on the architecture to interpolate on, the model's (e.g. GPU)
+    arch = SpeedyWeather.output_architecture(SG.architecture)
+    output_grid = on_architecture(arch, output_grid)
+    input_grid = on_architecture(arch, SG.grid)
 
-    # CREATE INTERPOLATOR
-    interpolator = RingGrids.interpolator(output_grid, input_grid, NF = DEFAULT_OUTPUT_NF)
+    # CREATE INTERPOLATOR, with pole-average buffers for the most layers any output field has
+    nlayers = max(SpeedyWeather.get_nlayers(layers, SG), nlayers_soil)
+    interpolator = RingGrids.interpolator(output_grid, input_grid; NF = promote_type(SG.NF, output_NF), nlayers)
 
-    # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
-    (; nlayers) = SG
-    land_fraction = Field(output_NF, output_grid)
-    field2D = Field(output_NF, output_grid)
-    field3D = Field(output_NF, output_grid, nlayers)
-    field3Dland = Field(output_NF, output_grid, nlayers_soil)
+    # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT (+ host copies)
+    scratch = output_scratch_fields(output_NF, output_grid, SpeedyWeather.get_nlayers(layers, SG), nlayers_soil)
 
     # Concrete type parameters: pick the compressor's type (defaulting to
     # the type of `default_zarr_compressor()` for the `nothing` case so that
@@ -43,17 +41,16 @@ function ZarrOutput(
     interval_sec = Second(interval)
     DT = DateTime
     S = typeof(interval_sec)
-    F2 = typeof(field2D)
-    F3 = typeof(field3D)
+    F2, F3 = typeof(scratch.field2D), typeof(scratch.field3D)
+    H2, H3 = typeof(scratch.host2D), typeof(scratch.host3D)
     Itp = typeof(interpolator)
+    L = typeof(layers)
 
-    output = ZarrOutput{F2, F3, Itp, DT, S, C, Z}(;
+    output = ZarrOutput{F2, F3, H2, H3, Itp, DT, S, C, Z, L}(;
         interval = interval_sec,
+        layers,
         interpolator,
-        land_fraction,
-        field2D,
-        field3D,
-        field3Dland,
+        scratch...,
         compressor,
         kwargs...
     )
@@ -129,6 +126,12 @@ function initialize!(
     # metadata writes from parallel processes corrupt the store. `zopen` only reads the
     # metadata and slice-assignments below only touch this member's own chunk files
     # (the ensemble axis is chunked with size 1).
+    # LAND FRACTION on the output grid, before the initial conditions are written, which
+    # scale some variables by it
+    if hasproperty(model, :land_sea_mask)
+        SpeedyWeather.interpolate_output!(output, output.land_fraction, model.land_sea_mask.land_fraction)
+    end
+
     if ensemble && output.ensemble_index != 1
         wait_for_ensemble_store(output, store_path)
         g = Zarr.zopen(store_path, "w")
@@ -185,12 +188,6 @@ function initialize!(
         output!(output, var, simulation)
     end
 
-    # calculate land fraction on output grid
-    if hasproperty(model, :land_sea_mask)
-        land_fraction_cpu = on_architecture(CPU(), model.land_sea_mask.land_fraction)
-        SpeedyWeather.interpolate_output!(output, output.land_fraction, land_fraction_cpu)
-    end
-
     # consolidate the store metadata (.zmetadata) for faster opening with xarray etc.;
     # the schema is complete at this point and all later writes (any ensemble member,
     # any time step) only touch chunk files, so the consolidated view stays valid
@@ -208,9 +205,8 @@ group `g` for `output`, shared by the ensemble and non-ensemble store layouts.
 Must only ever be called by the ensemble creator (member 1) or a non-ensemble run."""
 function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::AbstractModel)
     assert_ensemble_creator(output)
-    lond = get_lond(output.field2D)
-    latd = get_latd(output.field2D)
-    σ = convert.(eltype(lond), on_architecture(CPU(), model.geometry.σ_levels_full))
+    lond = get_lond(output.host2D)
+    latd = get_latd(output.host2D)
     soil_indices = collect(1:get_soil_layers(model))
 
     write_coordinate!(
@@ -221,10 +217,7 @@ function write_zarr_coordinates!(g::Zarr.ZGroup, output::ZarrOutput, model::Abst
         g, "lat", collect(latd);
         attrs = Dict("units" => "degrees_north", "long_name" => "latitude", "_ARRAY_DIMENSIONS" => ["lat"])
     )
-    write_coordinate!(
-        g, "layer", collect(σ);
-        attrs = Dict("units" => "1", "long_name" => "sigma layer", "_ARRAY_DIMENSIONS" => ["layer"])
-    )
+    define_vertical_coordinate!(g, output.layers, model)     # sigma or pressure layers
     write_coordinate!(
         g, "soil_layer", collect(soil_indices);
         attrs = Dict("units" => "1", "long_name" => "soil layer index", "_ARRAY_DIMENSIONS" => ["soil_layer"])
@@ -358,8 +351,8 @@ function define_variable!(
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
 
     # Shape per dimension; `false` means the dimension is collapsed away.
-    nlon = length(get_lond(output.field2D))
-    nlat = length(get_latd(output.field2D))
+    nlon = length(get_lond(output.host2D))
+    nlat = length(get_latd(output.host2D))
     nz = get_nlayers(output, var)
     full_shape = (nlon, nlat, nz, n_outputs)
 
@@ -371,8 +364,9 @@ function define_variable!(
     cz = output.vertical_chunk > 0 ? min(output.vertical_chunk, nz) : nz
     full_chunks = (cx, cy, cz, max(output.time_chunk, 1))
 
-    # the vertical dimension depends on the variable, e.g. "layer" or "soil_layer"
-    all_dims = ("lon", "lat", vertical_dimension(var), "time")
+    # the vertical dimension depends on the variable and the output's layers,
+    # e.g. "layer", "pressure" or "soil_layer"
+    all_dims = ("lon", "lat", vertical_dimension_name(output, var), "time")
 
     # Pick out the active dims as flagged by var.dims_xyzt.
     active = var.dims_xyzt

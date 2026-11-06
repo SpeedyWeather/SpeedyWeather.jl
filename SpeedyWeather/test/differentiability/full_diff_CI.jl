@@ -1,5 +1,3 @@
-# Enzyme and Julia 1.11 still has some problems, and the test below is broken
-# in Julia 1.11
 import Pkg
 Pkg.activate(@__DIR__)
 using SpeedyWeather, Enzyme, FiniteDifferences, Test
@@ -31,8 +29,10 @@ using SpeedyWeather, Enzyme, FiniteDifferences, Test
     # differentiate time_step!(vars, time_stepping, model), the inner time step
     # without clock/output/feedback; pass the time_stepping of model (and its shadow)
     # explicitly to keep the aliasing with the model (and its shadow) consistent
+    # TODO: set_runtime_activity(Reverse) gives a segfault in 1.11 (but not 1.10)
+    # related to https://github.com/EnzymeAD/Enzyme.jl/issues/3532
     autodiff(
-        set_runtime_activity(Reverse), SpeedyWeather.time_step!, Const,
+        Reverse, SpeedyWeather.time_step!, Const,
         Duplicated(vars, dvars),
         Duplicated(model.time_stepping, dmodel.time_stepping),
         Duplicated(model, dmodel),

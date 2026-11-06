@@ -9,7 +9,7 @@ const SWTerrariumOutputExt = Base.get_extension(SpeedyWeather, :SpeedyWeatherTer
 @assert SWTerrariumOutputExt !== nothing "SpeedyWeatherTerrariumExt failed to load"
 const TerrariumOutputVariable = SWTerrariumOutputExt.TerrariumOutputVariable
 
-@testset "TerrariumOutput" begin
+@testset "OutputVariables.Terrarium" begin
     # Small coupled setup as in test/parameterizations/terrarium_coupling.jl
     ring_grid = SpeedyWeather.RingGrids.FullGaussianGrid(12)
     spectral_grid = SpectralGrid(ring_grid)
@@ -38,7 +38,7 @@ const TerrariumOutputVariable = SWTerrariumOutputExt.TerrariumOutputVariable
 
     @testset "constructors + metadata" begin
         # 3D (subsurface) variable: metadata derived from Terrarium descriptors
-        st = TerrariumOutput(terrarium_model, :temperature)
+        st = OutputVariables.Terrarium(terrarium_model, :temperature)
         @test st isa TerrariumOutputVariable
         @test st isa SpeedyWeather.AbstractOutputVariable
         @test st.name == "temperature"
@@ -50,22 +50,22 @@ const TerrariumOutputVariable = SWTerrariumOutputExt.TerrariumOutputVariable
         @test st.unit == "°C"
 
         # 2D (surface) variable
-        skin = TerrariumOutput(terrarium_model, :skin_temperature)
+        skin = OutputVariables.Terrarium(terrarium_model, :skin_temperature)
         @test skin.dims_xyzt == (true, true, false, true)
         @test skin.nlayers == 1
 
         # kwargs override derived metadata
-        renamed = TerrariumOutput(terrarium_model, :temperature, name = "soil_temperature", keepbits = 10)
+        renamed = OutputVariables.Terrarium(terrarium_model, :temperature, name = "soil_temperature", keepbits = 10)
         @test renamed.name == "soil_temperature"
         @test renamed.keepbits == 10
 
         # unknown and unsupported (Face-located) variables throw
-        @test_throws ArgumentError TerrariumOutput(terrarium_model, :not_a_variable)
-        @test_throws ArgumentError TerrariumOutput(terrarium_model, :hydraulic_conductivity)
+        @test_throws ArgumentError OutputVariables.Terrarium(terrarium_model, :not_a_variable)
+        @test_throws ArgumentError OutputVariables.Terrarium(terrarium_model, :hydraulic_conductivity)
 
         # collect-all constructor: tuple of variables, no unsupported ones,
         # inputs excluded by default
-        variables = TerrariumOutput(terrarium_model)
+        variables = OutputVariables.Terrarium(terrarium_model)
         @test variables isa Tuple
         names = [var.name for var in variables]
         @test "temperature" in names
@@ -74,7 +74,7 @@ const TerrariumOutputVariable = SWTerrariumOutputExt.TerrariumOutputVariable
         @test "hydraulic_conductivity" ∉ names
         @test "air_temperature" ∉ names    # input variable
 
-        with_inputs = TerrariumOutput(terrarium_model, inputs = true)
+        with_inputs = OutputVariables.Terrarium(terrarium_model, inputs = true)
         @test "air_temperature" in [var.name for var in with_inputs]
     end
 
@@ -95,7 +95,7 @@ const TerrariumOutputVariable = SWTerrariumOutputExt.TerrariumOutputVariable
             surface_humidity_flux = SurfaceHumidityFlux(spectral_grid, land = PrescribedLandHumidityFlux()),
             time_stepping = Leapfrog(spectral_grid, Δt_at_T32 = Minute(15)),
         )
-        add!(model, TerrariumOutput(terrarium_model)...)
+        add!(model, OutputVariables.Terrarium(terrarium_model)...)
 
         simulation = SpeedyWeather.initialize!(model)
         SpeedyWeather.run!(simulation, period = Hour(1), output = true)
@@ -103,7 +103,7 @@ const TerrariumOutputVariable = SWTerrariumOutputExt.TerrariumOutputVariable
         NCDataset(SpeedyWeather.get_output_path(simulation)) do ds
             # shared soil depth dimension with layer-centre depths as coordinates
             @test ds.dim["soil_depth"] == Nz
-            @test Vector(ds["soil_depth"][:]) ≈ TerrariumOutput(terrarium_model, :temperature).depths
+            @test Vector(ds["soil_depth"][:]) ≈ OutputVariables.Terrarium(terrarium_model, :temperature).depths
             @test ds["soil_depth"].attrib["units"] == "m"
             @test ds["soil_depth"].attrib["positive"] == "down"
 
@@ -138,7 +138,7 @@ const TerrariumOutputVariable = SWTerrariumOutputExt.TerrariumOutputVariable
             surface_humidity_flux = SurfaceHumidityFlux(spectral_grid, land = PrescribedLandHumidityFlux()),
             time_stepping = Leapfrog(spectral_grid, Δt_at_T32 = Minute(15)),
         )
-        add!(model, TerrariumOutput(terrarium_model)...)
+        add!(model, OutputVariables.Terrarium(terrarium_model)...)
 
         simulation = SpeedyWeather.initialize!(model)
         SpeedyWeather.run!(simulation, period = Hour(1), output = true)
@@ -147,7 +147,7 @@ const TerrariumOutputVariable = SWTerrariumOutputExt.TerrariumOutputVariable
 
         # shared soil depth dimension with layer-centre depths as coordinates
         @test length(g["soil_depth"]) == Nz
-        @test Vector(g["soil_depth"][:]) ≈ TerrariumOutput(terrarium_model, :temperature).depths
+        @test Vector(g["soil_depth"][:]) ≈ OutputVariables.Terrarium(terrarium_model, :temperature).depths
         @test g["soil_depth"].attrs["units"] == "m"
         @test g["soil_depth"].attrs["positive"] == "down"
 

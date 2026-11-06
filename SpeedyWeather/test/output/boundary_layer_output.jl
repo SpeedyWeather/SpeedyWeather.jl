@@ -9,12 +9,11 @@ using NCDatasets
     model = PrimitiveWetModel(spectral_grid; output)
     model.feedback.verbose = false
 
-    # the three surface roughness output writers under test
+    # the surface roughness and boundary layer drag output groups under test
     add!(
         model,
-        SpeedyWeather.SurfaceRoughnessOutput(),
-        SpeedyWeather.LandSurfaceRoughnessOutput(),
-        SpeedyWeather.OceanSurfaceRoughnessOutput(),
+        OutputVariables.SurfaceRoughness(),
+        OutputVariables.BoundaryLayerDrag(),
     )
 
     simulation = initialize!(model)
@@ -22,7 +21,7 @@ using NCDatasets
     @test simulation.model.feedback.nans_detected == false
 
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
-    for key in ("sr", "lsr", "osr")
+    for key in ("sr_h", "sr_m", "bld_h", "bld_m", "bld_q")
         @test haskey(ds, key)
 
         # 2D + time variable (no vertical dimension)

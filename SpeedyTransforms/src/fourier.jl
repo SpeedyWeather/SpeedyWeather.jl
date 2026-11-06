@@ -110,7 +110,9 @@ function _apply_serial_fft!(
     k_grid = eachlayer(field)[k]     # Precomputed ring index (as a Cartesian index)
 
     if not_equator
-        view(f_out, 1:nfreq, k, j) .= rfft_plan * view(field.data, ilons, k_grid)
+        # `view_only_on_cpu` materialises the ring on GPU: the GPU FFT libraries (Metal in
+        # particular) mishandle a strided/offset view as FFT input, see `_apply_batched_fft!`
+        view(f_out, 1:nfreq, k, j) .= rfft_plan * view_only_on_cpu(field.data, ilons, k_grid)
     else
         fill!(view(f_out, 1:nfreq, k, j), 0)
     end
@@ -134,7 +136,9 @@ function _apply_serial_fft!(
 
     if not_equator
         dest = view(field.data, ilons, k_grid)
-        rhs = brfft_plan * view(g_in, 1:nfreq, k, j)
+        # `view_only_on_cpu` materialises the input on GPU: the GPU FFT libraries (Metal in
+        # particular) mishandle a strided/offset view as FFT input, see `_apply_batched_fft!`
+        rhs = brfft_plan * view_only_on_cpu(g_in, 1:nfreq, k, j)
         add ? (dest .+= rhs) : (dest .= rhs)
     end
     return nothing
@@ -308,6 +312,34 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
             _apply_serial_fft!(field, g_south, S, j, k, nfreq, ilons; not_equator = not_equator, add = add)
         end
     end
+end
+
+"""$(TYPEDSIGNATURES)
+Forward and inverse matrices of the Fourier transform as a truncated DFT (`fourier_dft = true`), only
+implemented on Reactant, see SpeedyTransformsReactantExt. Empty vectors on other architectures."""
+function dense_fourier_matrices(
+        architecture::AbstractArchitecture, ::Type{NF}, fourier_dft::Bool, nlons, lon_offsets, solid_angles, mmax,
+    ) where {NF}
+    empty_vector() = on_architecture(architecture, zeros(NF, 0))
+    return empty_vector(), empty_vector()
+end
+
+"""$(TYPEDSIGNATURES)
+Generate the per-ring FFT plans for `architecture` from the arrays they will be applied to, see the
+method below. Architectures without plans (Reactant, XLA plans the FFTs of a compiled program
+itself) extend this."""
+function plan_FFTs(
+        architecture::AbstractArchitecture,
+        planned_K::AbstractVector{<:Integer},
+        ::Type{NF},
+        grid::AbstractGrid,
+        nlayers::Integer,
+        scratch_memory_north::AbstractArray,
+        rings,
+        nlons::Vector{<:Int},
+    ) where {NF}
+    fake_grid_data = on_architecture(architecture, zeros(NF, grid, nlayers))
+    return plan_FFTs(planned_K, fake_grid_data, scratch_memory_north, rings, nlons)
 end
 
 """$(TYPEDSIGNATURES)

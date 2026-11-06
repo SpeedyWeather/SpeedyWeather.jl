@@ -297,6 +297,13 @@ actual schedule inside a `Schedule`, implemented as `BitVector`
 indicating whether to execute on a given time step (`true`) or not
 (`false`).
 
+A `Schedule` is initialized with the clock at the start of every `run!`
+as its `BitVector` depends on the start and length of the simulation.
+For model components there are also the purely periodic [`PeriodicSchedule`](@ref)
+and [`StepSchedule`](@ref) that only need the time step, see
+[Periodic schedules](@ref periodic_schedules) in the time stepping section,
+which also illustrates how schedules behave during a leapfrog spin-up.
+
 Let's show how to use a `Schedule` inside a callback
 
 ```@example schedule

@@ -1,5 +1,8 @@
 abstract type AbstractSchedule <: AbstractModelComponent end
 
+# otherwise one needs to write SpeedyWeather.isscheduled inside custom callbacks or components
+export isscheduled
+
 export Schedule
 
 """
@@ -80,9 +83,6 @@ function initialize!(scheduler::Schedule, clock::Clock)
     return scheduler
 end
 
-# otherwise one needs to write SpeedyWeather.isscheduled inside custom callbacks
-export isscheduled
-
 """
 $(TYPEDSIGNATURES)
 Evaluate whether (e.g. a callback) should be scheduled at the timestep given
@@ -93,4 +93,90 @@ function isscheduled(S::Schedule, clock::Clock)
     is_scheduled = S.schedule[clock.time_step_counter]
     S.counter += is_scheduled
     return is_scheduled
+end
+
+export PeriodicSchedule
+
+"""
+A periodic schedule, to execute something every period `every` (first time step excluded),
+rounded to a multiple of the time step. Unlike `Schedule` it does not need the clock (start
+time or length of the simulation) and can therefore be initialized with the time stepper only,
+e.g. in `initialize!(model)`, converting `every` into `every_n_steps`. Use as
+
+    @kwdef struct MyComponent
+        schedule::PeriodicSchedule = PeriodicSchedule(every = Day(1))
+    end
+
+with `isscheduled(component.schedule, clock) || return nothing`.
+Fields
+$(TYPEDFIELDS)"""
+@kwdef mutable struct PeriodicSchedule <: AbstractSchedule
+    "[OPTION] Execute every time period, rounded to a multiple of the time step, `Second(0)` = never"
+    every::Second = Day(1)
+
+    "[DERIVED] `every` in time steps (at least 1), 0 = never"
+    every_n_steps::Int = 0
+
+    "[DERIVED] Count up the number of executions"
+    counter::Int = 0
+end
+
+"""$(TYPEDSIGNATURES)
+A `PeriodicSchedule` executing `every` period."""
+PeriodicSchedule(every::Period) = PeriodicSchedule(; every = Second(every))
+
+"""$(TYPEDSIGNATURES)
+Initialize a `PeriodicSchedule` with the time step of `time_stepping`: precomputes `every_n_steps`
+from `schedule.every` (at least 1, 0 = never for `every = Second(0)`) and resets the counter."""
+function initialize!(schedule::PeriodicSchedule, time_stepping::AbstractTimeStepper)
+    (; every) = schedule
+    Δt = time_stepping.Δt_millisec
+    schedule.every_n_steps = every > Second(0) ? max(1, round(Int, Millisecond(every) / Δt)) : 0
+    schedule.counter = 0
+    return schedule
+end
+
+"""$(TYPEDSIGNATURES)
+Whether `schedule` executes on the time step of `clock`, i.e. every `every_n_steps` time steps
+(spin-up steps excluded). Counts the executions."""
+function isscheduled(schedule::PeriodicSchedule, clock::Clock)
+    is_scheduled = isscheduled(schedule.every_n_steps, clock)
+    count_execution!(schedule, is_scheduled)
+    return is_scheduled
+end
+
+# count the executions of a schedule, see SpeedyWeatherReactantExt for a traced `is_scheduled`
+count_execution!(schedule::AbstractSchedule, is_scheduled::Bool) = (schedule.counter += is_scheduled; nothing)
+
+export StepSchedule
+
+"""
+An immutable schedule executing every `every_n_steps` time steps (first time step and spin-up
+steps excluded), 0 = never, 1 = every time step. Needs no initialization. Use as
+`isscheduled(component.schedule, clock) || return nothing`.
+Fields
+$(TYPEDFIELDS)"""
+@kwdef struct StepSchedule <: AbstractSchedule
+    "[OPTION] Execute every n time steps, 0 = never"
+    every_n_steps::Int = 1
+end
+
+"""$(TYPEDSIGNATURES)
+A `StepSchedule` executing every `every_n_steps` time steps."""
+StepSchedule(every_n_steps::Integer) = StepSchedule(; every_n_steps)
+
+"""$(TYPEDSIGNATURES)
+Nothing to initialize for a `StepSchedule`."""
+initialize!(schedule::StepSchedule, ::AbstractTimeStepper) = schedule
+
+"""$(TYPEDSIGNATURES)
+Whether `schedule` executes on the time step of `clock`, i.e. every `every_n_steps` time steps
+(spin-up steps excluded)."""
+isscheduled(schedule::StepSchedule, clock::Clock) = isscheduled(schedule.every_n_steps, clock)
+
+# every n time steps of size Δt (spin-up steps excluded), 0 = never
+function isscheduled(every_n_steps::Integer, clock::Clock)
+    every_n_steps > 0 || return false
+    n = clock.time_step_counter
+    return (n > 0) & (n % every_n_steps == 0)
 end

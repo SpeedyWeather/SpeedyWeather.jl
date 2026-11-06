@@ -51,7 +51,7 @@ model constructor, otherwise it will not be part of your model and the default i
 Note that the choice of `interval` can affect the actual [time step](@ref time_stepping) that is used for the model
 integration, which is explained in the following (see also
 [Adjust with output](@ref) for the equivalent option on the time stepper itself).
-Example, we run the model at a resolution of T42 and the time step is going to be
+Example, we run the model at a resolution of T43 and the time step is going to be
 ```@example netcdf
 spectral_grid = SpectralGrid(truncation=43, nlayers=1)
 time_stepping = Leapfrog(spectral_grid)
@@ -136,10 +136,88 @@ The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings
 but have always as many longitude points as there are around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
 
+## [Output layers](@id output_layers)
+
+By default, 3D variables are written on the model's vertical layers, sigma or hybrid
+sigma-pressure depending on the model's
+[Vertical coordinates](@ref vertical_coordinates_page), on a dimension called `layer`.
+Pass `layers = PressureLayers(spectral_grid)` to write them on pressure layers instead
+
+```@example netcdf
+spectral_grid = SpectralGrid(nlayers = 8)
+output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = PressureLayers(spectral_grid))
+output.layers
+```
+
+or choose the layers yourself, in Pa
+
+```@example netcdf
+output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = PressureLayers(spectral_grid, [850, 500, 200] .* 100))
+nothing # hide
+```
+
+The vertical dimension in the file is then called `pressure` and holds the layers in hPa,
+and every 3D atmospheric variable (temperature, humidity, wind, vorticity, ...) is written
+on it. 2D variables and soil variables with their own `soil_layer` dimension are
+unaffected. The interpolation happens column-wise on the model's own grid — and so on the
+GPU for a GPU simulation — before the horizontal interpolation onto the output grid, see
+[Vertical interpolation onto pressure layers](@ref vertical_interpolation). The default
+`PressureLayers(spectral_grid)` writes the layers 50, 100, 200, 300, 500, 700, 850, 925 and 1000 hPa.
+
+`PressureLayers` takes the model's `SpectralGrid` because it allocates the pressure layers
+and one scratch field on the model's grid and architecture, shared by all output variables.
+It interpolates linearly in log(pressure) by default, pass
+`interpolation = SpeedyWeather.LinearInPressure()` for linear in pressure instead. The
+same interpolation is used for every variable.
+
+### Below the lowest model layer
+
+Pressure layers can lie below the lowest model layer, which sits some tens of hPa above
+the surface, and below the surface itself over orography. What happens there is a
+per-variable choice, through an optional `extrapolation` field on the output variable.
+Temperature descends dry-adiabatically, everything else is held constant, which are the
+defaults
+
+```@example netcdf
+OutputVariables.output_extrapolation(OutputVariables.Temperature())
+```
+
+```@example netcdf
+OutputVariables.output_extrapolation(OutputVariables.Humidity())
+```
+
+κ = R_dry/cₚ of the dry adiabat is taken from the model's atmosphere at `initialize!`.
+To mask everything below the surface with the variable's `missing_value` (`NaN` by
+default) instead, while still extrapolating between the lowest model layer and the
+surface, use a `SubsurfaceMask`
+
+```@example netcdf
+temp = OutputVariables.Temperature(
+    extrapolation = SpeedyWeather.SubsurfaceMask(
+        above_surface = SpeedyWeather.DryAdiabaticExtrapolation(),
+    ),
+)
+add!(output, temp)
+nothing # hide
+```
+
+Note that masking happens *before* the horizontal interpolation onto the output grid, so
+the masked region grows by the four-point interpolation stencil. Above the model top
+every variable is currently held constant.
+
 ## Output variables
 
-One can easily add or remove variables from being output with the `NetCDFOut` writer. The following
-variables are predefined (note they are not exported so you have to prefix `SpeedyWeather.`)
+One can easily add or remove variables from being output with the `NetCDFOutput` writer.
+All predefined output variables live in the module `OutputVariables`. The module is
+exported but its contents are not, so you always access them with the `OutputVariables.`
+prefix, e.g. `OutputVariables.Temperature()`. The following variables are predefined
+
+!!! info "Renamed output variables"
+    Before v0.24 output variables were defined as e.g. `SpeedyWeather.TemperatureOutput()`,
+    they are now `OutputVariables.Temperature()`, collections like
+    `SpeedyWeather.DynamicsOutput()` are now `OutputVariables.Dynamics()` and
+    `SpeedyWeather.AllOutputVariables()` is `OutputVariables.All()`. The old names
+    still work but are deprecated and will be removed in a future release.
 
 ```@example netcdf
 using InteractiveUtils # hide
@@ -147,30 +225,30 @@ subtypes(SpeedyWeather.AbstractOutputVariable)
 ```
 
 "Defined" here means that every such type contains information about a variables (long) name,
-its units, dimensions, any missing values and compression options. For `HumidityOutput` for example
+its units, dimensions, any missing values and compression options. For `OutputVariables.Humidity` for example
 we have
 
 ```@example netcdf
-SpeedyWeather.HumidityOutput()
+OutputVariables.Humidity()
 ```
 
-You can choose name and unit as you like, e.g. `SpeedyWeather.HumidityOutput(unit = "1")` or change
-the compression options, e.g. `SpeedyWeather.HumidityOutput(keepbits = 5)` but more customisation
+You can choose name and unit as you like, e.g. `OutputVariables.Humidity(unit = "1")` or change
+the compression options, e.g. `OutputVariables.Humidity(keepbits = 5)` but more customisation
 is discussed in [Customizing netCDF output](@ref).
 
 We can add new output variables with `add!`
 
 ```@example netcdf
 output = NetCDFOutput(spectral_grid)            # default variables
-add!(output, SpeedyWeather.DivergenceOutput())  # output also divergence
+add!(output, OutputVariables.Divergence())  # output also divergence
 output
 ```
 
 If you didn't create a `NetCDFOutput` separately, you can also apply this directly to `model`,
-either `add!(model, SpeedyWeather.DivergenceOutput())` or `add!(model.output, args...)`,
+either `add!(model, OutputVariables.Divergence())` or `add!(model.output, args...)`,
 which technically also just forwards to `add!(model.output.variables, args...)`.
 `output.variables` is a dictionary were the variable names (as `Symbol`s) are used as keys,
-so `output.variables[:div]` just returns the `SpeedyWeather.DivergenceOutput()` we have
+so `output.variables[:div]` just returns the `OutputVariables.Divergence()` we have
 just created using `:div` as key. With those keys one can also `delete!` a variable
 from netCDF output
 
@@ -178,7 +256,7 @@ from netCDF output
 delete!(output, :div)
 ```
 
-If you change the `name` of an output variable, i.e. `SpeedyWeather.DivergenceOutput(name="divergence")`
+If you change the `name` of an output variable, i.e. `OutputVariables.Divergence(name="divergence")`
 the key would change accordingly to `:divergence`.
 
 ### Surface variables
@@ -217,27 +295,27 @@ All length/height units are in meters but technically they just have to be consi
 
 ## Grouped variables
 
-For convenience we have defined several output groups, for example `SpeedyWeather.PrecipitationOutput()`
+For convenience we have defined several output groups, for example `OutputVariables.Precipitation()`
 definces both accumulated large-scale and convective precipitation as well as their rates and the
 cloud top height. Groups are
 
 ```julia
-SpeedyWeather.PrecipitationOutput()
-SpeedyWeather.BoundaryOutput()
-SpeedyWeather.RadiationOutput()
-SpeedyWeather.SurfaceFluxesOutput()
-SpeedyWeather.LandOutput()
-SpeedyWeather.OceanOutput()
+OutputVariables.Precipitation()
+OutputVariables.Boundary()
+OutputVariables.Radiation()
+OutputVariables.SurfaceFluxes()
+OutputVariables.Land()
+OutputVariables.Ocean()
 SpeedyWeather.AllOutputVariabesl()
 ```
 
 each of can but doesn't have to be splatted e.g.
 
 ```@example netcdf
-add!(model, SpeedyWeather.SurfaceFluxesOutput())
+add!(model, OutputVariables.SurfaceFluxes())
 ```
 
-or `SpeedyWeather.SurfaceFluxesOutput()...` are equivalent.
+or `OutputVariables.SurfaceFluxes()...` are equivalent.
 
 ## Output path, identification and number
 
@@ -300,7 +378,7 @@ model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 
 # Add mean sea-level pressure for visualisation
-add!(model, SpeedyWeather.MeanSeaLevelPressureOutput())
+add!(model, OutputVariables.MeanSeaLevelPressure())
 
 run!(simulation, period=Day(3), output=false) # some spin-up
 run!(simulation, period=Day(5), output=true)

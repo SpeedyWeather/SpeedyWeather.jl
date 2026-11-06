@@ -17,12 +17,13 @@ SpeedyWeather.jl is a global atmospheric model developed as a research playgroun
 with an everything-flexible attitude as long as it is speedy. Technically it is a climate model with simple,
 yet interactive representations of ocean, land and sea-ice. It is fast on CPU and GPU, easy to use and easy to extend, making 
 atmospheric modelling an interactive experience -- in the terminal, in a notebook or conventionally through scripts.
-With minimal code redundancies, it supports
+With little code redundancies, it supports
 
 **Dynamics and physics**
 - Different physical equations (barotropic vorticity, shallow water, primitive equations, with and without humidity)
 - Particle and tracer advection in 2D/3D for all equations
 - Physics parameterizations for convection, precipitation, boundary layer, radiation, etc.
+- Learned surface parameterizations for roughness and albedo
 - Parameterizations can be easily changed and customized using modular fused GPU kernels
 - Various more or less realistic planets and what-if scenarios by easily modifying initial and boundary conditions
 - A slab ocean and thermodynamic sea ice model
@@ -33,8 +34,9 @@ With minimal code redundancies, it supports
 - Different resolutions (for example T16 to T1024 in spectral matched flexibly with various 800km to 10km grids)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
 - Fast on single CPUs (x86, arm) for laptop prototyping, live demos and education
-- GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs (Metal is WIP)
-- Automatic differentiation via Enzyme.jl for sensitivity analysis, parameter calibration and ML-physics hybrid modelling (limited to Julia 1.10 currently) 
+- GPU acceleration (typically 5-50x faster) on Nvidia and AMD GPUs, with Metal support for Apple Silicon
+- Automatic differentiation via Enzyme.jl for sensitivity analysis, parameter calibration and ML-physics hybrid modelling (limited to Julia 1.10 and 1.11 currently) 
+- MLIR/OpenXLA compilation with Reactant for GPU and TPU support and more efficient AD
 - A very fast and flexible spherical harmonics transform library SpeedyTransforms.jl for CPU and GPU
 
 **User interface**
@@ -81,8 +83,7 @@ On our TODO list are
 - Radiation depending on greenhouse gas concentrations to represent climate change
 - Better cloud parameterizations + aerosols
 - Exoplanet support with more flexibility on the atmospheric composition
-- 3D particle advection
-- Semi-Lagrangian tracer advection
+- Semi-Lagrangian advection
 - Hybrid sigma-pressure vertical coordinates
 - 3rd and 4th order time stepping (Lorenz N-Cycle scheme)
 - Interactive visualisations on native HEALPix/OctaHEALPix grids
@@ -90,7 +91,6 @@ On our TODO list are
 Currently in development, but already (partially) available are
 
 - Better CPU multi-threading support
-- MLIR/OpenXLA compilation with Reactant
 
 ## Contributing
 
@@ -120,7 +120,7 @@ showing
 
 Hurray🥳 In a second we just simulated 10 days of the Earth's atmosphere at a speed of almost 1400 simulated years
 per wallclock day. Also printed is the model time, the maximum wind speed and the temperature range (on any layer).
-This simulation used a T31 spectral resolution on an
+This simulation used a T32 spectral resolution on an
 [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#OctahedralGaussianGrid)
 (~400km resolution) solving the primitive equations on 8 vertical layers,
 storing [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/output).
@@ -139,28 +139,26 @@ humidity
 
 ![speedyweather_pluto](https://github.com/user-attachments/assets/5d485015-8c28-4c44-9c2b-c3acdf335788)
 
-(Note that in SpeedyWeather v0.19 the variable paths have changed so the respective line
+(Note that from SpeedyWeather v0.19 the variable paths have changed so the respective line
 now needs to be written as `q = get_step(simulation.variables.grid.humidity)[:, end]`)
 
 ## Gallery
 
-Specific humidity in the primitive equation model simulated at T340 spectral resolution (about 40km)
-with 16 vertical levels (shown here is level 15, just above the surface) on the octahedral Gaussian grid
-computed in single precision multi-threaded on 16 CPUs. With convection, large-scale condensation, surface fluxes
-and some simplified radiation (the daily cycle is visible)
+This is a 1/4˚ (~28km) resolution (T512 spectral resolution) of our default model, taking about 4min for 10 days
+on 1 Nvidia GPU. This is the default complexity, including learned surface parameterisations and interactive
+ocean, sea ice and land models. 
 
-https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/614f04cf-5080-4c89-9fd6-35efd54103a7
+**10m zonal wind**
 
-Relative vorticity in the shallow water model, simulated at T1023 spectral resolution (about 10km) on an
-[octahedral Clenshaw-Curtis grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#OctahedralClenshawGrid)
-with more than 4 million grid points
+https://github.com/user-attachments/assets/44da0ffa-4e86-46fd-bafb-e504b926c0bd
 
-https://user-images.githubusercontent.com/25530332/190443050-d5b8d093-86c0-46c9-b515-8420059ac8dc.mp4
+**Surface sensible heat fluxes**
 
-Surface temperature in the primitive equation model without surface fluxes or radiation
-at T511 (~20km resolution) and 31 vertical levels. The simulation was multi-threaded in Float32 (single precision).
+https://github.com/user-attachments/assets/627c2d97-41b3-4793-9af8-454a13e610df
 
-https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/95897b82-9b81-4980-934b-cfdcf4d5a4b0
+**Surface air temperature**
+
+https://github.com/user-attachments/assets/565ceb13-9229-4f85-8f9d-bedf31a429bb
 
 SpeedyWeather.jl can also solve the 2D barotropic vorticity equations on the sphere.
 Here, we use Float32 (single precision) at a resolution of T340 (40km) on
@@ -177,21 +175,20 @@ resolves gravity waves with a timestep of CFL=1.2-1.4 despite a single-stage RAW
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/510c38c7-12cb-42d5-b905-c66b4eaa514d
 
 Advection of 5000 particles with wind in the lower-most layer of the primitive equation model at
-T85 (150km) resolution and 8 vertical layers.
+T86 (150km) resolution and 8 vertical layers.
 
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a6192374-24d9-4065-9fcc-8b719190472f
 
 ## Data visualisation
 
-Difficult to plot spherical data? SpeedyWeather also includes extensions for Makie and GeoMakie
+Difficult to plot spherical data? SpeedyWeather also includes extensions for
+[Makie](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/examples_2D#Visualisation-via-Makie) and
+[GeoMakie](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#Interactively-exploring-the-grids)
+(particularly the `globe` function, see its usage also in 
+[TravellingSailorProblem.jl](https://github.com/SpeedyWeather/TravellingSailorProblem.jl)
 making it supereasy to create plots and interactively investigate a variables from a simulation.
-Two examples, a variable from a simulation
-
-https://github.com/user-attachments/assets/543cddf8-bcd9-41a7-83e3-184dba994069
-
-or visualising cell centres and faces of the HEALPixGrid via our `globe` function
-
-https://github.com/user-attachments/assets/fa0636e3-30d7-4fbe-af29-dba047e8bded
+We also extend [Browzarr](https://browzarr.io/latest/)/[Browzarr.jl](https://github.com/EarthyScience/Browzarr.jl)
+via the browser, launched simply via `using Browzarr; browzarr(simulation)` after output has been written.
 
 ## History
 
@@ -225,7 +222,7 @@ the spherical harmonic transform between spectral space (for which LowerTriangul
 
 These modules can also be used independently of SpeedyWeather. They are registered, so just install and use them as every other package, e.g:
 ```julia
-(@v1.11) pkg> add RingGrids
+(@v1.13) pkg> add RingGrids
 julia> using RingGrids
 ```
 check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/ringgrids),
@@ -236,32 +233,14 @@ check out their documentation: [RingGrids](https://speedyweather.github.io/Speed
 
 SpeedyWeather.jl is registered in Julia's registry, so open the package manager with `]` and
 ```julia
-(@v1.11) pkg> add SpeedyWeather
+(@v1.13) pkg> add SpeedyWeather
 ```
 which will install the [latest release]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/releases))
 and all dependencies automatically. For more information see the
 [Installation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/installation) in the documentation.
-Please use the current minor version of Julia,
-compatibilities with older versions are not guaranteed.
+Ideally use the current minor version of Julia, we test on Julia v1.10 - latest release.
 
 ## Benchmarks
-
-The primitive equations at 400km resolution with 8 vertical layers can be simulated by
-SpeedyWeather.jl at 2300 simulated years per day (SYPD) on a single core of newer CPUs with arm architecture
-(M4 MacBooks in this case). At that speed, simulating one year takes about 40 seconds
-without output. The complex fused-multiply adds of the spectral transform compile efficiently to
-the large vector extensions of the newer arm chips in single precision.
-Another considerable speed-up comes from the reduced grids minimizing the number of columns for
-which expensive parameterizations like convection have to be computed. The parameterizations
-take up 40-60% of the total simulation time, depending on the grid. Particularly the
-`OctaminimalGaussianGrid`, `OctaHEALPixGrid` and the `HEALPixGrid` are increasingly faster,
-at a small accuracy sacrifice of the then inexact spectral transforms. 
-
-On older CPUs, like the Intel CPU MacBooks, the speed drops to about 500-600 SYPD,
-which is still 2x faster than Fortran SPEEDY which is reported to reach 240 SYPD.
-With GPU support being a work in progress we do not expect a performance increase for 
-the lower resolutions but aim to provide the ability to also run the model very efficiently
-at high resolution!
 
 For an overview of typical simulation speeds a user can expect under different model setups see
 [Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/SpeedyWeather/benchmark).
@@ -293,7 +272,7 @@ The bibtex entry for the paper is:
 
 If you are using the differentiability of our model, please cite additionally 
 
-Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615. https://doi.org/10.1029/2025MS005615
+> Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615, doi:[10.1029/2025MS005615](https://doi.org/10.1029/2025MS005615)
 
 with the bibtex entry 
 

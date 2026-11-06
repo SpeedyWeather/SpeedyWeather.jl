@@ -131,7 +131,7 @@ in the horizontal and to clamp vertical σ coordinates into [0,1]."""
     # NB: avoid `isodd(x ÷ 180)` here: `÷` on floats returns a non-integer-typed value, so
     # `isodd` falls back to a generic path with an exact Float->Int conversion (InexactError
     # throw on failure) that triggers AMDGPU hostcalls (same failure class as the `sind`/
-    # `cosd` note in `advect_2D`). `x ÷ 180` is non-negative here (x = abs(lat) + ... >= 0),
+    # `cosd` note in `advect_3D`). `x ÷ 180` is non-negative here (x = abs(lat) + ... >= 0),
     # so `isodd(x ÷ 180) == (mod(x, 360) >= 180)` without ever leaving floating point.
     pole_crossed = mod(abs(lat) - 2eps(lat) + 90, 360) >= 180
     lat = 90 - abs(mod(lat + 90, 360) - 180)   # new latitude is wrapped around poles

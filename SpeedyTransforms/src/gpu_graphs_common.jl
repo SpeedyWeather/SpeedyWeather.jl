@@ -182,9 +182,22 @@ get_cache(::Type{E}, S::SpectralTransform, nlayers::Integer) where {E} =
     get!(() -> build_cache(E, S, nlayers), GRAPH_CACHES, cache_key(S, nlayers))::GPUFourierGraphCache
 
 """$(TYPEDSIGNATURES)
-Clear all cached GPU-graphs Fourier buffers and graphs (frees the associated GPU memory).
-Mainly useful for tests/benchmarks."""
-clear_fourier_graph_cache!() = (empty!(GRAPH_CACHES); nothing)
+Trim the memory pool of the backend. EXTENSION POINT, does nothing by default."""
+reclaim!(::AbstractArchitecture) = nothing
+
+"""$(TYPEDSIGNATURES)
+Clear all cached GPU-graphs Fourier buffers and graphs. With `gc = true` (default) also
+run a full GC and [`reclaim!`](@ref) the device memory of the cleared caches' architectures
+and of any `architectures` passed on. Mainly useful for tests/benchmarks."""
+function clear_fourier_graph_cache!(architectures::AbstractArchitecture...; gc::Bool = true)
+    architectures = unique!(AbstractArchitecture[architectures..., (cache.arch for cache in values(GRAPH_CACHES))...])
+    empty!(GRAPH_CACHES)
+    if gc
+        GC.gc(true)
+        foreach(reclaim!, architectures)
+    end
+    return nothing
+end
 
 # =====================================================================================
 # Allocation-free fused loops (capturable). They write exactly the regions the generic

@@ -38,8 +38,7 @@ $(TYPEDFIELDS)"""
         HF,     # <:AbstractSurfaceHumidityFlux,
         LSC,    # <:AbstractCondensation,
         CV,     # <:AbstractConvection,
-        SW,     # <:AbstractShortwave,
-        LW,     # <:AbstractLongwave,
+        RA,     # <:AbstractRadiation,
         GHG,    # NamedTuple of <:AbstractGreenhouseGas,
         SP,     # <:AbstractStochasticPhysics,
         CP,     # <:AbstractParameterization
@@ -88,14 +87,13 @@ $(TYPEDFIELDS)"""
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer::BL = BoundaryLayer(spectral_grid)
-    @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
+    @component vertical_diffusion::VD = nothing    # TODO overhaul BulkRichardsonDiffusion
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
     @component large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     @component convection::CV = BettsMillerConvection(spectral_grid)
-    @component shortwave_radiation::SW = OneBandShortwave(spectral_grid)
-    @component longwave_radiation::LW = OneBandLongwave(spectral_grid)
+    @component radiation::RA = Radiation(spectral_grid)
     @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
@@ -124,15 +122,14 @@ $(TYPEDFIELDS)"""
     parameterizations::TS2 = (
         :solar_zenith,              # external forcing
         :vertical_diffusion,        # mixing and precipitation
-        :large_scale_condensation,
-        :convection,
-        :albedo,                    # radiation
-        :shortwave_radiation,
-        :longwave_radiation,
         :boundary_layer,            # surface fluxes
         :surface_momentum_flux,
         :surface_heat_flux,
         :surface_humidity_flux,
+        :large_scale_condensation,
+        :convection,
+        :albedo,                    # radiation
+        :radiation,
         :stochastic_physics,        # perturbations
     )
 
@@ -169,11 +166,13 @@ end
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
-at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
+at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`
+(except for its schedule)."""
 function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
-    # NUMERICS (implicit is initialized later)
+    # NUMERICS
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
+    initialize!(model.implicit, model)
     initialize!(model.horizontal_diffusion, model)
 
     # DYNAMICS
@@ -198,8 +197,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)
-    initialize!(model.shortwave_radiation, model)
-    initialize!(model.longwave_radiation, model)
+    initialize!(model.radiation, model)
     initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)

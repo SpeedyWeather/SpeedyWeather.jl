@@ -38,9 +38,15 @@ function soil_moisture_availability!(
         vegetation::NoVegetation,
         model::PrimitiveWet,
     )
+    # escape immediately if no soil moisture defined, then soil_moisture_availability stays 0
+    haskey(vars.prognostic.land, :soil_moisture) || return nothing
+
     # view on the top layer of soil moisture
-    soil_moisture_top = field_view(vars.prognostic.land.soil_moisture, :, 1)
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), vegetation)
+    soil_moisture_top = field_view(soil_moisture, :, 1)
     (; soil_moisture_availability) = vars.parameterizations.land
+
+    @boundscheck size(soil_moisture_availability) == size(soil_moisture_top) || throw(BoundsError())
 
     # Fortran SPEEDY documentation eq. 51 with vegetation = 0
     W_cap = model.land.thermodynamics.field_capacity
@@ -48,15 +54,15 @@ function soil_moisture_availability!(
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    soil_moisture_availability .= D_top * soil_moisture_top * W_cap /
-        (D_top * W_cap + D_root * (W_cap - W_wilt))
+    r = D_top * W_cap / (D_top * W_cap + D_root * (W_cap - W_wilt))
+    soil_moisture_availability .= r * soil_moisture_top
+
     return nothing
 end
 
 function variables(::NoVegetation)
     return (
-        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
+        ParameterizationVariable(:soil_moisture_availability, GridXY(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end
 
@@ -83,27 +89,47 @@ export VegetationClimatology
     "[OPTION] variable name in netcdf file for low vegetation"
     varname_vegl::String = "vegl"
 
+    "[OPTION] variable name in netcdf file for high vegetation LAI"
+    varname_lai_hv::String = "lai_hv"
+
+    "[OPTION] variable name in netcdf file for low vegetation LAI"
+    varname_lai_lv::String = "lai_lv"
+
     "[OPTION] Grid the soil moisture file comes on"
     FieldType::Type{<:AbstractField} = FullGaussianField
 
     # to be filled from file
     "High vegetation cover [1], interpolated onto Grid"
-    high_cover::GridVariable2D
+    high_vegetation_cover::GridVariable2D
 
     "Low vegetation cover [1], interpolated onto Grid"
-    low_cover::GridVariable2D
+    low_vegetation_cover::GridVariable2D
+
+    "High vegetation leaf area index [1], interpolated onto Grid"
+    high_vegetation_leaf_area::GridVariable2D
+
+    "Low vegetation leaf area index [1], interpolated onto Grid"
+    low_vegetation_leaf_area::GridVariable2D
 end
 
 # TODO to adapt create a ManualVegetationClimatology component like AlbedoClimatology is adapted to ManualAlbedo
 # do all vegetations need a low_veg_factor?
-# Adapt.adapt_structure(to, veg::VegetationClimatology) = adapt(to, ManualVegetationClimatology(veg.high_cover, veg.low_cover))
+# Adapt.adapt_structure(to, veg::VegetationClimatology) = adapt(to, ManualVegetationClimatology(veg.high_vegetation_cover, veg.low_vegetation_cover))
 
 # generator function
 function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
     (; NF, GridVariable2D, grid) = SG
-    high_cover = zeros(GridVariable2D, grid)
-    low_cover = zeros(GridVariable2D, grid)
-    return VegetationClimatology{NF, GridVariable2D}(; high_cover, low_cover, kwargs...)
+    high_vegetation_cover = zeros(GridVariable2D, grid)
+    low_vegetation_cover = zeros(GridVariable2D, grid)
+    high_vegetation_leaf_area = zeros(GridVariable2D, grid)
+    low_vegetation_leaf_area = zeros(GridVariable2D, grid)
+    return VegetationClimatology{NF, GridVariable2D}(;
+        high_vegetation_cover,
+        low_vegetation_cover,
+        high_vegetation_leaf_area,
+        low_vegetation_leaf_area,
+        kwargs...
+    )
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
@@ -127,15 +153,40 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
         version = vegetation.version
     )
 
+    lai_hv = get_asset(
+        vegetation.path;
+        from_assets = vegetation.from_assets,
+        name = vegetation.varname_lai_hv,
+        ArrayType = vegetation.FieldType,
+        FileFormat = NCDataset,
+        version = vegetation.version
+    )
+
+    lai_lv = get_asset(
+        vegetation.path;
+        from_assets = vegetation.from_assets,
+        name = vegetation.varname_lai_lv,
+        ArrayType = vegetation.FieldType,
+        FileFormat = NCDataset,
+        version = vegetation.version
+    )
+
     vegh = on_architecture(model.architecture, vegh)
     vegl = on_architecture(model.architecture, vegl)
+    lai_hv = on_architecture(model.architecture, lai_hv)
+    lai_lv = on_architecture(model.architecture, lai_lv)
+    high_lai = vegetation.high_vegetation_leaf_area
+    low_lai = vegetation.low_vegetation_leaf_area
 
     # interpolate onto grid
-    high_vegetation_cover = vegetation.high_cover
-    low_vegetation_cover = vegetation.low_cover
+    high_vegetation_cover = vegetation.high_vegetation_cover
+    low_vegetation_cover = vegetation.low_vegetation_cover
     interpolator = RingGrids.interpolator(high_vegetation_cover, vegh, NF = Float32)
     interpolate!(high_vegetation_cover, vegh, interpolator)
-    return interpolate!(low_vegetation_cover, vegl, interpolator)
+    interpolate!(high_lai, lai_hv, interpolator)
+    interpolate!(low_vegetation_cover, vegl, interpolator)
+    interpolate!(low_lai, lai_lv, interpolator)
+    return nothing
 end
 
 function initialize!(
@@ -171,25 +222,31 @@ function soil_moisture_availability!(
         vegetation::VegetationClimatology,
         model::PrimitiveWet,
     )
-    (; vegetation_high, vegetation_low, soil_moisture_availability) = vars.parameterizations.land
-    (; soil_moisture) = vars.prognostic.land
+    # escape immediately if no soil moisture defined, then soil_moisture_availability stays 0
+    haskey(vars.prognostic.land, :soil_moisture) || return nothing
+
+    (; high_vegetation_cover, low_vegetation_cover, high_vegetation_leaf_area, low_vegetation_leaf_area, soil_moisture_availability) = vars.parameterizations.land
+    soil_moisture = get_prognostic_step(vars.prognostic.land.soil_moisture, time_stepper(model.time_stepping, :land), vegetation)
     (; low_veg_factor) = vegetation
 
     # copy over vegetation fields into diagnostic variables
-    vegetation_high .= vegetation.high_cover
-    vegetation_low .= vegetation.low_cover
+    high_vegetation_cover .= vegetation.high_vegetation_cover
+    low_vegetation_cover .= vegetation.low_vegetation_cover
+    high_vegetation_leaf_area .= vegetation.high_vegetation_leaf_area
+    low_vegetation_leaf_area .= vegetation.low_vegetation_leaf_area
 
     W_cap = model.land.thermodynamics.field_capacity
     W_wilt = model.land.thermodynamics.wilting_point
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    @boundscheck fields_match(vegetation_high, vegetation_low, soil_moisture_availability) ||
-        throw(DimensionMismatch(vegetation_high, soil_moisture_availability))
+    @boundscheck fields_match(high_vegetation_cover, low_vegetation_cover, soil_moisture_availability) ||
+        throw(DimensionMismatch(high_vegetation_cover, soil_moisture_availability))
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only = true) ||
         throw(DimensionMismatch(soil_moisture, soil_moisture_availability))
-    @boundscheck size(soil_moisture, 2) >= 2                # defined for two layers
-    @boundscheck size(soil_moisture_availability, 2) == 1   # 2D only
+    @boundscheck ndims(soil_moisture) == 2 || throw(BoundsError())              # step correctly chosen, IJ x K array only
+    @boundscheck size(soil_moisture, 2) >= 2 || throw(BoundsError())            # defined for two layers
+    @boundscheck size(soil_moisture_availability, 2) == 1 || throw(BoundsError())   # 2D only
 
     # precalculate denominator
     r = 1 / (D_top * W_cap + D_root * (W_cap - W_wilt))
@@ -200,14 +257,14 @@ function soil_moisture_availability!(
     launch!(
         architecture(soil_moisture_availability), LinearWorkOrder,
         size(soil_moisture_availability), soil_moisture_availability_kernel!,
-        soil_moisture_availability, soil_moisture, vegetation_high, vegetation_low, params
+        soil_moisture_availability, soil_moisture, high_vegetation_cover, low_vegetation_cover, params
     )
 
     return nothing
 end
 
 @kernel inbounds = true function soil_moisture_availability_kernel!(
-        soil_moisture_availability, soil_moisture, vegetation_high, vegetation_low, params
+        soil_moisture_availability, soil_moisture, high_vegetation_cover, low_vegetation_cover, params
     )
 
     ij = @index(Global, Linear)    # every grid point ij
@@ -215,7 +272,7 @@ end
     (; low_veg_factor, r, W_cap, W_wilt, D_top, D_root) = params
 
     # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
-    veg = max(0, vegetation_high[ij] + low_veg_factor * vegetation_low[ij])
+    veg = clamp(high_vegetation_cover[ij] + low_veg_factor * low_vegetation_cover[ij], 0, 1)
 
     # Fortran SPEEDY documentation eq. 51, original formulation
     # soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
@@ -230,9 +287,10 @@ end
 
 function variables(::VegetationClimatology)
     return (
-        PrognosticVariable(:soil_moisture, LandXYZ(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        ParameterizationVariable(:vegetation_high, Grid2D(), desc = "Vegetation high cover", units = "1", namespace = :land),
-        ParameterizationVariable(:vegetation_low, Grid2D(), desc = "Vegetation low cover", units = "1", namespace = :land),
-        ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
+        ParameterizationVariable(:high_vegetation_cover, GridXY(), desc = "Vegetation high cover", units = "1", namespace = :land),
+        ParameterizationVariable(:low_vegetation_cover, GridXY(), desc = "Vegetation low cover", units = "1", namespace = :land),
+        ParameterizationVariable(:high_vegetation_leaf_area, GridXY(), desc = "Leaf Area Index of high vegetation", units = "1", namespace = :land),
+        ParameterizationVariable(:low_vegetation_leaf_area, GridXY(), desc = "Leaf Area Index of low vegetation", units = "1", namespace = :land),
+        ParameterizationVariable(:soil_moisture_availability, GridXY(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end

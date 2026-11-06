@@ -59,6 +59,9 @@ const CUDA_GRAPH_BACKEND = GraphBackend(
     GPU(CUDA.CUDABackend(always_inline = true)),
 )
 
+# trim CUDA's memory pool, see `clear_fourier_graph_cache!`
+SpeedyTransforms.reclaim!(::GPU{<:CUDA.CUDABackend}) = (CUDA.reclaim(); nothing)
+
 # =====================================================================================
 # Method overrides: dispatch on CuArray scratch (more specific than the generic
 # AbstractArray{<:Complex,3} methods in fourier.jl)

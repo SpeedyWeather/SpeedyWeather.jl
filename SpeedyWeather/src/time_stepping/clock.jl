@@ -48,6 +48,11 @@ end
 # default constructor (extended e.g. by ReactantExt)
 Clock(architecture::AbstractArchitecture) = Clock()
 
+"""$(TYPEDSIGNATURES)
+Reference to a scalar `x` that can change during the simulation, e.g. the time step the
+implicit solver was initialized with. Extended by ReactantExt to hold a traceable number."""
+scalar_ref(::AbstractArchitecture, x::Number) = Ref(x)
+
 # we don't want to adapt the clock, it has to stay mutable,
 # we just explicitly transfer nothing to the kernels
 Adapt.adapt_structure(to, ::Clock) = nothing
@@ -64,7 +69,7 @@ Time step `Δt` dilated by `dilation`, rounded to whole milliseconds. Used to ad
 dilate(Δt::Millisecond, dilation) = Millisecond(round(Int, Δt.value * dilation))
 @inline dilate(Δt, dilation) = dilate(convert(Millisecond, Δt), dilation)
 
-function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
+function time_step!(clock::Clock, Δt; increase_counter = true)
     clock.time += Δt
     clock.step_counter += 1                     # always increased, counts time stepper steps
     clock.time_step_counter += increase_counter # spin up steps may not count for clock
@@ -144,7 +149,10 @@ end
 """$(TYPEDSIGNATURES)
 Initialize the clock with setting the start time and resetting the (time) step counters."""
 function initialize!(clock::Clock)
-    clock.start = clock.time        # store the start time
+    # store the start time as a copy of the value, never as the same object: with Reactant's tracked
+    # numbers `clock.start = clock.time` would make both fields share one buffer, and a compiled
+    # `time_step!` then writes the unchanged `start` back over the advanced `time`
+    clock.start = convert(typeof(clock.start), DateTime(clock.time))
     clock.step_counter = 0          # reset counter for time stepper steps, regardless step size
     clock.time_step_counter = 0     # reset counter for steps of size Δt
     return clock
@@ -224,8 +232,9 @@ Base.promote_rule(::Type{<:Millenium}, ::Type{Second}) = Second
 Dates.coarserperiod(::Type{Year}) = (Century, 100)
 Dates.coarserperiod(::Type{Century}) = (Millenium, 10)
 
-# secondofday: seconds since midnight for a DateTime
-secondofday(dt::DateTime) = div(Dates.value(Dates.Time(dt).instant), 1_000_000_000)
+# secondofday: seconds since midnight for a DateTime, via its value in milliseconds as in Dates.Time(dt)
+# which also works for other AbstractDateTimes, e.g. traced dates in Reactant
+secondofday(dt::Dates.AbstractDateTime) = div(Dates.value(dt) % 86_400_000, 1000)
 
 # conversion rules for floating point -> time types
 Dates.Second(x::AbstractFloat) = convert(Second, x)

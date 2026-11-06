@@ -139,13 +139,13 @@ nothing # hide
 Sea surface temperature output is added like
 
 ```@example ocean
-add!(model, SpeedyWeather.SeaSurfaceTemperatureOutput())
+add!(model, OutputVariables.SeaSurfaceTemperature())
 ```
 
 or collectively with sea ice concentration
 
 ```@example ocean
-add!(model, SpeedyWeather.OceanOutput())
+add!(model, OutputVariables.Ocean())
 ```
 
 All output variable groups are defined as tuples which are implicitly splatted (`...`).

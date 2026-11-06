@@ -24,12 +24,14 @@ end
 # implement make_zero where the default one fails
 
 # this lock is part of the ProgressMeter that's part of the Feedback of all models
+# dispatch on T <: ProgressCore as ProgressMeter v1.12 made it parametric (ProgressCore{O<:IO})
+# and Type{} is invariant, so Type{ProgressCore} would not match Type{ProgressCore{IO}}
 @inline function Enzyme.make_zero(
-        ::Type{ProgressMeter.ProgressCore},
+        ::Type{T},
         seen::IdDict,
-        prev::ProgressMeter.ProgressCore,
+        prev::T,
         ::Val{copy_if_inactive} = Val(false),
-    )::ProgressMeter.ProgressCore where {copy_if_inactive}
+    )::T where {T <: ProgressMeter.ProgressCore, copy_if_inactive}
     return prev
 end
 
@@ -61,7 +63,18 @@ _make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ScratchMemory) =
 _make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ColumnScratchMemory) =
     (_make_zero_view!(x.north); _make_zero_view!(x.south); nothing)
 _make_zero_view!(x::Base.RefValue) = (x[] isa Number && (x[] = zero(x[])); nothing)
-_make_zero_view!(x) = nothing
+# Anything else (e.g. a coupled component's own state, such as Terrarium's `StateVariables`) is not
+# view-backed, so let Enzyme zero it in place; silently skipping it would leave the shadow as a copy
+# of the primal.
+_make_zero_view!(x) = (Enzyme.make_zero!(x); nothing)
+
+###
+# `reinitialize!` (called by every `time_step!`) recomputes the implicit solver whenever the
+# time step changes, i.e. in the leapfrog start (Δt/2, Δt, then 2Δt). The solver's operators are
+# treated as constants of the differentiated step, as they are when the solver is initialized
+# outside of `autodiff`: the call runs on the primal only, and the shadows of the operators are
+# left untouched.
+EnzymeRules.inactive(::typeof(SpeedyWeather.reinitialize!), args...) = nothing
 
 ###
 # TODO
