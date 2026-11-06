@@ -133,7 +133,7 @@ end
         ∇²ⁿ_implicit,
         ∇²ⁿ_div,
         ∇²ⁿ_div_implicit,
-        @Const(σ_levels_full),
+        σ_levels_full,
         truncation,
         power,
         power_stratosphere,

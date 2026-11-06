@@ -348,15 +348,17 @@ end
 
 # Compute S⁻¹ for each spectral degree l via Gauss-Jordan elimination, S = I - ξ²*eigenvalue*(R*L + U*Wᵀ)
 # S_scratch[l, :, :] stores S during elimination, S⁻¹[l, :, :] tracks the identity → inverse transformation
+# No @Const on the inputs: Reactant wraps @Const arrays in a `Const` with a non-concrete field, so the
+# 2D indexing R[k, j] falls back to dynamic dispatch, which fails to compile with GPUCompiler 2
 @kernel inbounds = true function implicit_invert_S_kernel!(
         S⁻¹,                            # Output: (truncation+1) × nlayers × nlayers tensor
         S_scratch,                      # Scratch: same shape as S⁻¹, stores S per l
-        @Const(R),                      # Input: divergence operator matrix
-        @Const(L),                      # Input: temperature operator matrix
-        @Const(U),                      # Input: divergence vector
-        @Const(W),                      # Input: pressure vector
-        @Const(ξ),                      # Input: semi-implicit time step coefficient
-        @Const(nlayers),                # Input: number of layers
+        R,                              # Input: divergence operator matrix
+        L,                              # Input: temperature operator matrix
+        U,                              # Input: divergence vector
+        W,                              # Input: pressure vector
+        ξ,                              # Input: semi-implicit time step coefficient
+        nlayers,                        # Input: number of layers
     )
     l = @index(Global, Linear)          # spectral degree (1-based)
 
