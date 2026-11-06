@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Geopotential computed once in grid space and used by both dynamical core (via the Bernoulli potential) and parameterizations, spectral geopotential removed; Leapfrog keeps the previous grid step during the first two steps, consistent with the spectral one [#1381](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1381)
+- `JablonowskiTemperature` uses Jablonowski and Williamson's stable lapse rate Γ = 5 K/km (new option `lapse_rate`) instead of the dry-adiabatic lapse rate of `PrimitiveDryModel`, fixing the baroclinic wave breaking up; docs example back to default centering [#1389](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1389)
+- Revert the FFTA < 0.3.2 docs compat restriction, fixed upstream in FFTA 0.3.3 [#1387](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1387)
 - Jablonowski-Williamson docs example uses backward Euler (`centering = 1`) to damp spurious gravity waves [#1386](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1386)
 - Removes `@Const` from kernels to workaround bug in Reactant 0.2.306 [#1385](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1385)
 - Restore tag trigger for the documentation workflow so releases deploy versioned docs again [#1383](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1383)
@@ -15,7 +17,6 @@
 - Fix initial snow depth on Reactant GPU, broadcasting over a view fell back to scalar indexing [#1376](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1376)
 - NumericalRadiation extension for NumericalRadiation 0.2: gases renamed to chemical formula [#1329](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1329)
 - Count device (GPU) memory in printed sizes of model, simulation and variables [#1364](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1364)
-- Restrict FFTA compat in the docs to < 0.3.2, whose `plan_rfft` is ambiguous with FFTW's [#1372](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1372)
 - `BalancedZonalState` jet peaks at σ ≈ 0.2 and decays above (`σ_jet`, `jet_decay`), `σ_jet = 0` for the previous monotonic profile [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - `BalancedZonalState` uses the atmosphere's `reference_temperature` and lapse rate, default `moist_lapse_rate` of `EarthAtmosphere` 5 → 5.7 K/km [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - Initial snow depth estimated from the top-layer soil temperature instead of 0, to start on the right side of the snow-albedo feedback [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
