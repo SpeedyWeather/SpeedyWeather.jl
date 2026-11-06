@@ -20,10 +20,7 @@ initial_conditions = (;                             # collect initial conditions
     temperature = JablonowskiTemperature(spectral_grid),
     pressure = ConstantPressure(spectral_grid))
 
-# backward Euler (centering=1) damps the gravity waves radiated by the initial perturbation
-implicit = ImplicitPrimitiveEquation(spectral_grid, centering = 1)
-
-model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, implicit, dynamics_only = true)
+model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, dynamics_only = true)
 simulation = initialize!(model)
 run!(simulation, period = Day(9))
 nothing # hide
@@ -38,16 +35,10 @@ The Jablonowski-Williamson initial conditions are `ZonalWind` for vorticity and 
 (curl and divergence of ``u, v``), `JablonowskiTemperature` for temperature and
 `ConstantPressure` for pressure. The orography is just a `ZonalRidge`.
 There is no forcing and the initial conditions are baroclinically unstable which kicks
-off a wave propagating eastward.
-
-The semi-implicit time stepping uses `centering = 1` (backward Euler) here instead of the
-default `centering = 0.5` (Crank-Nicolson, see [`ImplicitPrimitiveEquation`](@ref)).
-The localized perturbation in the northern hemisphere is not in balance and radiates
-gravity waves that also reach the southern hemisphere. Crank-Nicolson does not damp these,
-so they seed the (equally baroclinically unstable) southern-hemisphere jet, which
-then breaks up within about 3 days. Backward Euler damps the gravity waves and delays
-this by more than a day, but note that eventually the southern-hemisphere jet
-will also become unstable. The wave in the northern hemisphere becomes obvious when visualised with
+off a wave propagating eastward. `JablonowskiTemperature` uses the stable tropospheric
+lapse rate of ``\Gamma = 5~\text{K/km}`` from Jablonowski and Williamson
+(option `lapse_rate`), independent of the lapse rate of the model's atmosphere.
+This wave becomes obvious when visualised with
 
 ```@example jablonowski
 using CairoMakie
