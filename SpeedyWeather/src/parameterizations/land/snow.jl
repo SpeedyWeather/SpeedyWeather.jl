@@ -158,10 +158,12 @@ end
 """$(TYPEDSIGNATURES)
 Keep snow depth within [0, `snow_depth_cap`] after the time step. Conservation of mass is
 violated here by removing excess snow above the depth cap, done after the time step so that
-this excess does not add to the melt rate."""
+this excess does not add to the melt rate. Snow over 100% ocean is removed as it melts into the
+ocean (a `SlabOcean` takes the heat for that melting in the same time step)."""
 function Base.filter!(vars::Variables, snow::SnowModel, model::PrimitiveEquation)
     snow_depth = vars.prognostic.land.snow_depth
     (; snow_depth_cap) = snow
     snow_depth .= clamp.(snow_depth, 0, snow_depth_cap)     # all steps
+    mask!(snow_depth, model.land_sea_mask, :ocean, masked_value = 0)
     return nothing
 end
