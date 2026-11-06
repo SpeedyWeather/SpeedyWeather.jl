@@ -232,7 +232,14 @@ end
 # Terrarium sub-step for a SpeedyWeather step of length `period`: the step itself (one Terrarium step per
 # SpeedyWeather step, keeping both clocks in sync) unless a sub-step `Δt` is given."""
 @inline terrarium_time_step(::Nothing, period) = period
-@inline terrarium_time_step(Δt, period) = Δt
+@inline terrarium_time_step(Δt::Period, period) = min(Millisecond(Δt), period)
+@inline terrarium_time_step(Δt::Real, period) = min(Δt, Dates.value(period) / 1000)
+
+# Length of the current SpeedyWeather step for the land: the land time step of `time_stepping`, which for
+# `Leapfrog` is Δt/2 on the first two steps, when the clock only advances by Δt/2, and Δt afterwards.
+# `clock.Δt` is always the full Δt, so integrating the land over it would run the land clock ahead.
+terrarium_period(time_stepping, clock) =
+    Millisecond(round(Int, 1000 * SpeedyWeather.time_step(time_stepping, :land, clock)))
 
 """$(TYPEDSIGNATURES)
 Construct a [`TerrariumLand`](@ref) from a Terrarium land model and a
@@ -365,6 +372,8 @@ function SpeedyWeather.initialize!(
         state, land.initializers,
     )
     Terrarium.initialize!(integrator)
+    # Terrarium releases up to 0.1.10 reset the clock to its zero time in `initialize!`, so sync it again
+    state.clock.time = vars.prognostic.clock.time
 
     Tsoil = interior(state.temperature)[:, 1, end] .+ NF(273.15)
     sat = @view interior(state.saturation_water_ice)[:, 1, end]
@@ -441,7 +450,7 @@ function SpeedyWeather.timestep!(
         state.clock, tmodel, land.inputs,
         state, land.initializers,
     )
-    period = vars.prognostic.clock.Δt
+    period = terrarium_period(model.time_stepping, vars.prognostic.clock)
     Terrarium.run!(integrator; period, Δt = terrarium_time_step(land.Δt, period))
 
     # Push Terrarium output back into SpeedyWeather coupling variables.
@@ -522,7 +531,7 @@ function SpeedyWeather.timestep!(
         state.clock, land_model, InputSources(NF),
         state, land.initializers,
     )
-    period = vars.prognostic.clock.Δt
+    period = terrarium_period(model.time_stepping, vars.prognostic.clock)
     Terrarium.run!(integrator; period, Δt = terrarium_time_step(land.Δt, period))
 
     # Surface soil temperature from the bottom of the column (last z-index)

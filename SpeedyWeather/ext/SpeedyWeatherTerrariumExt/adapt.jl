@@ -5,9 +5,12 @@
 
 # Replace the Terrarium state in the prognostic land namespace, if there is one; a no-op otherwise.
 exclude_terrarium_state(prognostic::NamedTuple) =
-    haskey(prognostic, :land) ? merge(prognostic, (land = exclude_terrarium_state(prognostic.land),)) : prognostic
-exclude_terrarium_state(land::NamedTuple) = haskey(land, :terrarium) ? merge(land, (terrarium = nothing,)) : land
-exclude_terrarium_state(land) = land
+    haskey(prognostic, :land) ? merge(prognostic, (land = exclude_terrarium_land_state(prognostic.land),)) : prognostic
+
+# The land namespace is a `NamedTuple` too, so it needs a function of its own: a second
+# `exclude_terrarium_state(::NamedTuple)` method would overwrite the one above.
+exclude_terrarium_land_state(land::NamedTuple) = haskey(land, :terrarium) ? merge(land, (terrarium = nothing,)) : land
+exclude_terrarium_land_state(land) = land
 
 # More specific than SpeedyWeather's generic `Adapt.@adapt_structure Variables`, so it applies whenever this
 # extension is loaded and otherwise adapts every group of variables as before.
