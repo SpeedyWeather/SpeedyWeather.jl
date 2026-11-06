@@ -10,7 +10,7 @@ const TerrariumLand = SWTerrarium.TerrariumLand
 const AbstractTerrariumLandModel = SWTerrarium.AbstractTerrariumLandModel
 
 # helper: build the coupled wet model from a given Terrarium land mask (boolean Field)
-function build_terrarium_wet_model(ring_grid, land_sea_mask, terrarium_mask; kwargs...)
+function build_terrarium_wet_model(ring_grid, land_sea_mask, terrarium_mask; Δt = 300.0, kwargs...)
     spectral_grid = SpectralGrid(ring_grid)
     Nz = 4
     Δz_min = 0.05
@@ -28,7 +28,7 @@ function build_terrarium_wet_model(ring_grid, land_sea_mask, terrarium_mask; kwa
     terrarium_model = Terrarium.LandModel(
         column_grid; initializer = soil_initializer, vegetation = nothing, soil,
     )
-    land = SpeedyWeather.LandModel(spectral_grid, terrarium_model; Δt = 300.0, kwargs...)
+    land = SpeedyWeather.LandModel(spectral_grid, terrarium_model; Δt, kwargs...)
     model = PrimitiveWetModel(
         spectral_grid;
         land,
@@ -88,6 +88,30 @@ end
     mask = SWTerrarium.land_mask(model.land)
     @test all(0 .< land_vars.soil_moisture_capacity[mask] .<= 1)   # porosity is a volume fraction
     @test all(isfinite, land_vars.albedo)                           # LearnedLandAlbedo now sees real soil moisture
+end
+
+@testset "Terrarium coupling: synchronized time steps and Adapt" begin
+    ring_grid = SpeedyWeather.RingGrids.FullGaussianGrid(12)
+    spectral_grid = SpectralGrid(ring_grid)
+    land_sea_mask = EarthLandSeaMask(spectral_grid)
+    SpeedyWeather.load_mask!(land_sea_mask)
+
+    # by default (`Δt = nothing`), Terrarium takes one step per SpeedyWeather step of the same length
+    model = build_terrarium_wet_model(ring_grid, land_sea_mask, land_sea_mask.land_fraction .> 0; Δt = nothing)
+    @test isnothing(model.land.Δt)
+    sim = SpeedyWeather.initialize!(model)
+    nsteps = 3
+    SpeedyWeather.run!(sim, steps = nsteps)
+    terrarium_clock = sim.variables.prognostic.land.terrarium.clock
+    @test terrarium_clock.iteration == nsteps
+    @test terrarium_clock.time == sim.variables.prognostic.clock.time
+
+    # adapting the variables (e.g. into kernel arguments) drops the Terrarium state and keeps everything else
+    adapted = SpeedyWeather.Adapt.adapt(Array, sim.variables)
+    @test isnothing(adapted.prognostic.land.terrarium)
+    @test adapted.prognostic.land.soil_temperature == sim.variables.prognostic.land.soil_temperature
+    @test adapted.grid.temperature == sim.variables.grid.temperature
+    @test sim.variables.prognostic.land.terrarium isa Terrarium.StateVariables
 end
 
 @testset "Terrarium coupling (dry): initialize + run + NaN check" begin
