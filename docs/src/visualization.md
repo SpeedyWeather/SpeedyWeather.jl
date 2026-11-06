@@ -46,17 +46,27 @@ Mutating variants of `heatmap` are also provided which can be used to plot into 
 
 ```@example visualization
 grid = FullGaussianGrid(24)
-fig = Figure(size = (800, 400))
-field = randn(grid)
-ax, hm = heatmap!(fig[1, 1], field; title = "Time step 1")
-field = randn(grid)
-heatmap!(ax, field; title = "Time step 2")
+fig = Figure(size = (600, 600))
+field1 = randn(grid)
+ax1, hm1 = heatmap!(fig[1, 1], field1; title = "Time step 1")
+field2 = randn(grid)
+ax2, hm2 = heatmap!(fig[2, 1], field2; title = "Time step 2")
+fig
+```
+
+Passing an existing `Axis` instead plots into that axis, e.g. to update a panel.
+Axis attributes like the title are then set on the axis directly:
+
+```@example visualization
+field3 = randn(grid)
+ax2.title = "Time step 3"
+heatmap!(ax2, field3)
 fig
 ```
 
 Note that the mutating `heatmap!` returns different types depending on the type of the first argument:
 - `heatmap!(pos::GridPosition, field; ...)` returns `(ax, hm)` where `ax` is the `Axis` and `hm` is the `HeatMap`
-- `heatmap!(ax::Axis, field; ...)` returns the `HeatMap` object
+- `heatmap!(ax::Axis, field; ...)` returns the `HeatMap` object; all keyword arguments are passed on to `Makie.heatmap!`
 
 ## [Globe Plots](@id globe_plots)
 
@@ -100,11 +110,12 @@ Available options:
 - `coastlines::Bool` - Add coastlines
 - `background::Bool` - Add Earth background image
 
-Like heatmaps, globe plots have mutating variants that allow :
+Like heatmaps, globe plots have mutating variants that plot into an existing `Figure` or `Axis`:
 
 ```@example visualization
 fig = Figure(size = (800, 800))
 ax, plotdata = globe!(fig[1, 1], FullGaussianGrid, 24; interactive = false)
+fig
 ```
 
 `plotdata` is a NamedTuple with keys `:background`, `:centers`, `:faces`, and `:coastlines`.
@@ -127,14 +138,15 @@ v_field = randn(grid)
 fig = Figure(size = (1000, 300))
 _, hm1 = heatmap!(fig[1, 1], u_field; title = "Zonal wind",     colormap = :balance, colorrange = (-3, 3))
 _, hm2 = heatmap!(fig[1, 2], v_field; title = "Meridional wind", colormap = :balance, colorrange = (-3, 3))
-Colorbar(fig[1, 3], hm, ticklabelsize = 10)
+Colorbar(fig[1, 3], hm1, ticklabelsize = 10)
 resize_to_layout!(fig)
+fig
 ```
 
 ## Tips
 
-Use `heatmap!` and `globe!` when updating plots repeatedly—they skip figure and axis
-allocation. When interpolation from a reduced grid happens many times (e.g. in an animation
+Use the `Axis` variants of `heatmap!` and `globe!` when updating plots repeatedly; they
+skip figure and axis allocation. When interpolation from a reduced grid happens many times (e.g. in an animation
 loop), pre-interpolate once with `RingGrids.interpolate` and plot the resulting full field directly.
 
 For the Makie backend, `GLMakie` supports interactive zoom and rotation in 3D globe plots,
@@ -144,8 +156,10 @@ terminal previews.
 ## API Reference
 
 ```@autodocs
-Modules = [RingGrids]
-Pages = ["RingGridsMakieExt.jl", "RingGridsGeoMakieExt.jl"]
+Modules = [
+    Base.get_extension(RingGrids, :RingGridsMakieExt),
+    Base.get_extension(RingGrids, :RingGridsGeoMakieExt),
+]
 ```
 
 ## References
