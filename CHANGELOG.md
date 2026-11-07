@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix an issue that GPU graphs corrupted easily after model multiple execution with different instances of Variables [#1382](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1382)
 - Add mutating variants of `heatmap` and `globe` for `RingGrids` `Field`s [#1223](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1223)
 - `JablonowskiTemperature` uses Jablonowski and Williamson's stable lapse rate Γ = 5 K/km (new option `lapse_rate`) instead of the dry-adiabatic lapse rate of `PrimitiveDryModel`, fixing the baroclinic wave breaking up; docs example back to default centering [#1389](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1389)
 - Revert the FFTA < 0.3.2 docs compat restriction, fixed upstream in FFTA 0.3.3 [#1387](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1387)

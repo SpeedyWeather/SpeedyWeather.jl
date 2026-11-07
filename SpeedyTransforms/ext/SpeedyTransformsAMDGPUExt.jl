@@ -29,9 +29,9 @@ SpeedyTransforms.reclaim!(::GPU{<:AMDGPU.ROCBackend}) = (AMDGPU.reclaim(); nothi
 # loop of the batched Fourier transform once and replays it with a single `launch`, eliminating
 # per-operation CPU launch overhead on the GPU-launch-bound Fourier transform. See
 # SpeedyTransformsCUDAExt.jl for the full rationale (packed buffer, single gather/scatter
-# kernel per direction, etc.) — identical here, only the capture/instantiate/launch primitives
-# differ (`AMDGPU.HIP.capture`/`instantiate`/`launch` instead of `CUDA.capture`/`instantiate`/
-# `launch`).
+# kernel per direction, graphs keyed by the field and scratch buffers, etc.) — identical here,
+# only the capture/instantiate/launch primitives differ (`AMDGPU.HIP.capture`/`instantiate`/`launch`
+# instead of `CUDA.capture`/`instantiate`/`launch`).
 #
 # The backend-agnostic parts of this (kernels, cache struct, allocation-free loops,
 # capture/replay control flow, the `GraphBackend` struct itself) live in
@@ -97,9 +97,9 @@ function _fourier_batched!(
         )
     end
     # the cache is selected by (and sized for) this transform size (= its FFT plan set); within
-    # it the only thing that varies between calls is the field buffer, so that is the graph key
+    # it what varies between calls are the caller's buffers, field and scratch, so they are the graph key
     cache = get_cache(AMDGPU.HIP.HIPGraphExec, S, size(field, 2))
-    run_graph!(cache.forward_execs, graph_key(field.data), () -> forward_loop!(cache, f_north, f_south, field, S), HIP_GRAPH_BACKEND)
+    run_graph!(cache.forward_execs, graph_key(field, f_north, f_south), () -> forward_loop!(cache, f_north, f_south, field, S), HIP_GRAPH_BACKEND)
     return nothing
 end
 
@@ -124,7 +124,7 @@ function _fourier_batched!(
     cache = get_cache(AMDGPU.HIP.HIPGraphExec, S, size(field, 2))
     # `add` is part of the graph key: a captured graph bakes in overwrite-vs-accumulate, so replaying
     # the wrong one would silently produce incorrect results.
-    run_graph!(cache.inverse_execs, (graph_key(field.data), add), () -> inverse_loop!(cache, field, g_north, g_south, S, add), HIP_GRAPH_BACKEND)
+    run_graph!(cache.inverse_execs, (graph_key(field, g_north, g_south), add), () -> inverse_loop!(cache, field, g_north, g_south, S, add), HIP_GRAPH_BACKEND)
     return nothing
 end
 
