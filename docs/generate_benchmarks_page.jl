@@ -21,7 +21,7 @@ const DOCS_ASSETS_DIR = joinpath(@__DIR__, "src", "assets", "benchmarks")
 const DOCS_PAGE_PATH = joinpath(@__DIR__, "src", "benchmarks.md")
 
 # Stable arch ordering — matches manual_benchmarking.jl
-const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "gpu-amd", "reactant-cpu", "reactant-gpu", "reactant-tpu"]
+const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "gpu-amd", "reactant-cpu", "reactant-nvidia-gpu", "reactant-amd-gpu", "reactant-tpu"]
 
 function sorted_arch_labels(results)
     known = filter(in(keys(results)), ARCH_ORDER)
@@ -51,13 +51,21 @@ function overview_nlayers(all_results, labels)
     return sort!(collect(s))
 end
 
+# Average resolution in degrees (as `SpectralGrid` shows it) of the grid with `nlat` rings,
+# the resolution sweep runs on the default grid
+resolution_degrees(nlat::Integer) = RingGrids.average_resolution(SpeedyWeather.DEFAULT_GRID, (nlat + 1) ÷ 2)
+
+# two significant digits below 10°, e.g. "3.5°", "0.7°", otherwise whole degrees, e.g. "11°"
+format_degrees(degrees) = degrees < 10 ? "$(round(degrees, sigdigits = 2))°" : "$(round(Int, degrees))°"
+
 # Render one SYPD-vs-T comparison figure for a given `nlayers_target`.
 # Each architecture contributes two lines: standard Legendre+FFT (LT+FFT, solid
 # circles) and the matrix transform (MT, dashed diamonds). Lines for the same
-# architecture share a colour. Returns the path saved to, or `nothing` if no
-# architecture had data at that L.
+# architecture share a colour. The points of the top line (the one with the most
+# points, of those the fastest) are labelled with their resolution in degrees.
+# Returns the path saved to, or `nothing` if no architecture had data at that L.
 function write_overview_figure(all_results, labels, nlayers_target, png_path)
-    fig = Figure(size = (720, 480))
+    fig = Figure(size = (980, 480))
     ax = Axis(
         fig[1, 1];
         xlabel = "Spectral truncation T",
@@ -71,6 +79,8 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
     # AND marker (scatterlines' auto-legend entry only renders as a solid line).
     legend_elems = Any[]
     legend_labels = String[]
+    top_line = (xs = Int[], ys = Float64[], nlats = Int[])
+    xmax, ymax = 0, 0.0
     for (j, label) in enumerate(labels)
         ov = get(all_results[label], "overview", nothing)
         ov === nothing && continue
@@ -83,6 +93,7 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
             )
             xs = Int[]
             ys = Float64[]
+            nlats = Int[]
             for i in eachindex(ov["truncation"])
                 Int(ov["nlayers"][i]) == nlayers_target || continue
                 String(transforms[i]) == kind || continue
@@ -90,14 +101,19 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
                 (s isa Number && isfinite(s) && s > 0) || continue
                 push!(xs, Int(ov["truncation"][i]))
                 push!(ys, Float64(s))
+                push!(nlats, Int(ov["nlat"][i]))
             end
             isempty(xs) && continue
+            xmax, ymax = max(xmax, maximum(xs)), max(ymax, maximum(ys))
             order = sortperm(xs)
             scatterlines!(
                 ax, xs[order], ys[order];
                 color = color, marker = marker, linestyle = linestyle,
                 linewidth = 2, markersize = 10,
             )
+            if (length(xs), sum(log, ys)) > (length(top_line.xs), sum(log, top_line.ys; init = -Inf))
+                top_line = (xs = xs[order], ys = ys[order], nlats = nlats[order])
+            end
             push!(
                 legend_elems, [
                     LineElement(color = color, linestyle = linestyle, linewidth = 2),
@@ -109,8 +125,18 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
         end
     end
     plotted_anything || return nothing
-    # `patchsize` widens the swatch so the dash pattern reads clearly.
-    axislegend(ax, legend_elems, legend_labels; position = :rt, patchsize = (70, 15))
+    # resolution labels above and right of each point of the top line, where the line has
+    # already descended (SYPD decreases with T); the axis is extended up and right to fit them
+    for (x, y, nlat) in zip(top_line.xs, top_line.ys, top_line.nlats)
+        text!(
+            ax, x, y; text = format_degrees(resolution_degrees(nlat)),
+            align = (:left, :bottom), offset = (4, 4), fontsize = 12, color = (:black, 0.6),
+        )
+    end
+    ylims!(ax, nothing, max(2.5 * maximum(top_line.ys), 1.5 * ymax))
+    xlims!(ax, nothing, 1.1 * xmax)
+    # next to the axis, as it has many entries. `patchsize` widens the swatch so the dash pattern reads clearly.
+    Legend(fig[1, 2], legend_elems, legend_labels; patchsize = (70, 15))
     save(png_path, fig)
     return png_path
 end
@@ -237,7 +263,8 @@ function generate_benchmarks_page()
         write(io, "Simulated years per wallclock day (SYPD) for the `PrimitiveWetModel` resolution sweep, one column per architecture. ")
         write(io, "Each (T, L) configuration is reported for both the standard Legendre transform and fast Fourier transform (LT+FFT) ")
         write(io, "and the single matrix transform (MT). ")
-        write(io, "Empty cells (—) mean the architecture has either not been benchmarked yet or did not run that specific configuration.\n\n")
+        write(io, "Empty cells (—) mean the architecture has either not been benchmarked yet or did not run that specific configuration. ")
+        write(io, "The labels in the figures give the average grid spacing of each resolution in degrees.\n\n")
 
         for (L, link) in figure_links
             write(io, "![PrimitiveWet L=$L across architectures]($link)\n\n")

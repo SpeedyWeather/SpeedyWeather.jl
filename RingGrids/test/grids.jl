@@ -26,6 +26,27 @@ import Random
     end
 end
 
+@testset "Average resolution" begin
+    for G in (
+            FullClenshawGrid,
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+            FullHEALPixGrid,
+            FullOctaHEALPixGrid,
+        )
+        grid = G(24)
+        degrees = average_resolution(grid)
+        @test degrees == average_resolution(G, 24)
+        @test get_npoints(grid) * deg2rad(degrees)^2 ≈ 4π     # npoints squares of that side cover the sphere
+        @test average_resolution(G(48)) < degrees             # more rings, finer
+    end
+    @test average_resolution(OctahedralGaussianGrid(24)) ≈ 3.61 atol = 0.01     # T32's grid, as SpectralGrid shows it
+end
+
 @testset "Field types" begin
     # full ones
     for F in (
