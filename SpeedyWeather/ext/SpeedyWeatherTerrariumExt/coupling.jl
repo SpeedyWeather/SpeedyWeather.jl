@@ -59,7 +59,8 @@ on this abstract type:
   freshly-allocated state and seeds the soil mirrors.
 * [`timestep!`](@ref) pushes SpeedyWeather atmospheric forcings into the
   Terrarium inputs, runs the Terrarium integrator for the duration of the
-  SpeedyWeather step using `land.Δt` as the sub-step, and
+  SpeedyWeather step using `land.Δt` as the sub-step (by default `nothing`:
+  one Terrarium step per SpeedyWeather step, so that both clocks stay in sync), and
   copies soil temperatures, moisture and surface fluxes back into the
   SpeedyWeather variables.
 """
@@ -217,7 +218,7 @@ struct TerrariumLand{
     initializers::IT
     "Preconstructed Terrarium fields forwarded to `Terrarium.initialize`"
     fields::FL
-    "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
+    "Terrarium-internal sub-step (seconds or a `Period`) used to integrate within each SpeedyWeather step; `nothing` takes a single step of the SpeedyWeather step length. A sub-step should divide the SpeedyWeather step, since only whole sub-steps are taken"
     Δt::TT
     "Indices of the common land sea mask, used for allocation-free copying between SpeedyWeather and Terrarium"
     mask_indices::MI
@@ -226,6 +227,19 @@ struct TerrariumLand{
     "Fallback soil moisture (saturation fraction) [1] for grid points outside the Terrarium land mask (ocean-only cells)"
     ocean_moisture::NF
 end
+
+# Terrarium sub-step for a SpeedyWeather step of length `period`: the step itself (one Terrarium step per
+# SpeedyWeather step, keeping both clocks in sync) unless a sub-step `Δt` is given. A given sub-step is capped
+# at `period`, which is shorter than Δt on the first `Leapfrog` steps (see `terrarium_period`).
+@inline terrarium_time_step(::Nothing, period) = period
+@inline terrarium_time_step(Δt::Period, period) = min(Millisecond(Δt), period)
+@inline terrarium_time_step(Δt::Real, period) = min(Δt, Dates.value(period) / 1000)
+
+# Length of the current SpeedyWeather step for the land: the land time step of `time_stepping`, which for
+# `Leapfrog` is Δt/2 on the first two steps, when the clock only advances by Δt/2, and Δt afterwards.
+# `clock.Δt` is always the full Δt, so integrating the land over it would run the land clock ahead.
+terrarium_period(time_stepping, clock) =
+    Millisecond(round(Int, 1000 * SpeedyWeather.time_step(time_stepping, :land, clock)))
 
 """$(TYPEDSIGNATURES)
 
@@ -238,7 +252,7 @@ function TerrariumLand(
         boundary_conditions::NamedTuple = (;),
         initializers::NamedTuple = (;),
         fields::NamedTuple = (;),
-        Δt = Minute(5),
+        Δt = nothing,
         ocean_temperature::Real = 285,
         ocean_moisture::Real = 0,
     ) where {NF}
@@ -359,6 +373,8 @@ function SpeedyWeather.initialize!(
         state, land.initializers,
     )
     Terrarium.initialize!(integrator)
+    # Terrarium releases up to 0.1.10 reset the clock to its zero time in `initialize!`, so sync it again
+    state.clock.time = vars.prognostic.clock.time
 
     Tsoil = interior(state.temperature)[:, 1, end] .+ NF(273.15)
     sat = @view interior(state.saturation_water_ice)[:, 1, end]
@@ -435,7 +451,8 @@ function SpeedyWeather.timestep!(
         state.clock, tmodel, land.inputs,
         state, land.initializers,
     )
-    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
+    period = terrarium_period(model.time_stepping, vars.prognostic.clock)
+    Terrarium.run!(integrator; period, Δt = terrarium_time_step(land.Δt, period))
 
     # Push Terrarium output back into SpeedyWeather coupling variables.
     # The Terrarium state itself is mutated in place above and remains in
@@ -515,7 +532,8 @@ function SpeedyWeather.timestep!(
         state.clock, land_model, InputSources(NF),
         state, land.initializers,
     )
-    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
+    period = terrarium_period(model.time_stepping, vars.prognostic.clock)
+    Terrarium.run!(integrator; period, Δt = terrarium_time_step(land.Δt, period))
 
     # Surface soil temperature from the bottom of the column (last z-index)
     vars.prognostic.land.soil_temperature[mask, 1] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
