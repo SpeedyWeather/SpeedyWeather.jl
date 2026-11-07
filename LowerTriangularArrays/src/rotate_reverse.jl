@@ -25,7 +25,7 @@ function rotate!(L::LowerTriangularArray, degree::Real)
     return L
 end
 
-@kernel inbounds = true function rotate_kernel!(data, @Const(rotation), @Const(m_indices))
+@kernel inbounds = true function rotate_kernel!(data, rotation, m_indices)
     I = @index(Global, NTuple)
     m = m_indices[I[1]]     # order m of the harmonic at running index lm = I[1]
     data[I...] *= rotation[m]
@@ -50,7 +50,7 @@ function Base._reverse!(L::LowerTriangularArray, ::Val{:lat})
     return L
 end
 
-@kernel inbounds = true function reverse_lat_kernel!(data, @Const(l_indices), @Const(m_indices))
+@kernel inbounds = true function reverse_lat_kernel!(data, l_indices, m_indices)
     I = @index(Global, NTuple)
     lm = I[1]
     if isodd(l_indices[lm] + m_indices[lm])     # odd harmonics only
