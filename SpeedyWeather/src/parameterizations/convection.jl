@@ -241,6 +241,10 @@ column then need no branch to skip those levels, they contribute zero on their o
         humid_env = humid_environment[ij, k]
 
         if buoyant                          # calculate moist adiabat while buoyant till top
+            # defined on all paths: the compiler can't prove that the `else` below is only reached
+            # via `!saturated` here, a possibly undefined variable leaves an UndefVarError check
+            # in the kernel
+            temp_parcel_dry = temp_parcel
             if !saturated                   # if not saturated yet follow dry adiabat
                 # dry adiabatic ascent and saturation humidity of that temperature
                 temp_parcel_dry = temp_parcel * (σ[k] / σ[k + 1])^κ

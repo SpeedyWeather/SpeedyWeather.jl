@@ -43,3 +43,30 @@
         end
     end
 end
+
+@testset "PeriodicSchedule and StepSchedule" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+    time_stepping = Leapfrog(spectral_grid)
+    clock = Clock()
+    initialize!(clock, time_stepping, Day(1))
+
+    periodic = PeriodicSchedule(Hour(6))
+    initialize!(periodic, time_stepping)
+    n = periodic.every_n_steps
+    @test n == round(Int, Millisecond(Hour(6)) / time_stepping.Δt_millisec)
+
+    never = initialize!(PeriodicSchedule(every = Second(0)), time_stepping)
+    @test never.every_n_steps == 0
+
+    step = StepSchedule(3)
+    @test initialize!(step, time_stepping) === step
+
+    executions = 0
+    for _ in 1:clock.n_time_steps
+        @test !isscheduled(never, clock)
+        @test isscheduled(step, clock) == (clock.time_step_counter > 0 && clock.time_step_counter % 3 == 0)
+        executions += isscheduled(periodic, clock)
+        SpeedyWeather.time_step!(clock, clock.Δt)
+    end
+    @test executions == periodic.counter == clock.n_time_steps ÷ n - (clock.n_time_steps % n == 0)
+end

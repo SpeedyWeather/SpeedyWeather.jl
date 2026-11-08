@@ -121,6 +121,27 @@ function fill_fallback!(vars::Variables, land::AbstractTerrariumLandModel)
 end
 
 """$(TYPEDSIGNATURES)
+Copy the porosity of the topmost Terrarium soil layer into `soil_moisture_capacity`.
+Terrarium's soil moisture is a saturation (volumetric water content / porosity), so
+`soil_moisture * soil_moisture_capacity` is the volumetric soil water [m³/m³]."""
+function soil_moisture_capacity!(vars::Variables, land::AbstractTerrariumLandModel)
+    haskey(vars.parameterizations.land, :soil_moisture_capacity) || return nothing
+    state = vars.prognostic.land.terrarium
+    soil = land.model.soil
+    porosity = Terrarium.kernel_operation2D(
+        Terrarium.porosity_top, state, land.model.grid,
+        Terrarium.get_stratigraphy(soil), Terrarium.get_biogeochemistry(soil),
+    )
+    porosity_field = Terrarium.Field(porosity)
+    Terrarium.compute!(porosity_field)
+    RingGrids.copy_unmasked!(
+        vars.parameterizations.land.soil_moisture_capacity,
+        @view(interior(porosity_field)[:, 1, 1]), land.mask_indices,
+    )
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
 
 Warn if the SpeedyWeather land-sea mask and the Terrarium land mask disagree. Terrarium
 allocates a soil column only where its Boolean mask is `true`, whereas SpeedyWeather weights
@@ -281,16 +302,24 @@ function SpeedyWeather.variables(land_model::AbstractTerrariumLandModel{NF, <:Te
     )
 end
 
+# The soil mirrors are declared on SpeedyWeather's land vertical dimension (like the built-in
+# land models), which has a single effective surface layer for Terrarium (see `geometry`),
+# so that they are compatible with the layered land output variables.
 function SpeedyWeather.variables(::AbstractTerrariumLandModel, ::Terrarium.AbstractSoil)
     return (
         SpeedyWeather.PrognosticVariable(
-            name = :soil_temperature, dims = SpeedyWeather.Grid2D(),
+            name = :soil_temperature, dims = SpeedyWeather.LandXYZ(),
             units = "K", desc = "Soil temperature mirrored from Terrarium",
             namespace = :land,
         ),
         SpeedyWeather.PrognosticVariable(
-            name = :soil_moisture, dims = SpeedyWeather.Grid2D(),
+            name = :soil_moisture, dims = SpeedyWeather.LandXYZ(),
             units = "1", desc = "Soil moisture (saturation fraction) mirrored from Terrarium",
+            namespace = :land,
+        ),
+        SpeedyWeather.ParameterizationVariable(
+            name = :soil_moisture_capacity, dims = SpeedyWeather.Grid2D(),
+            units = "m³/m³", desc = "Volumetric soil water content of a full layer [m³/m³]: field capacity (bucket models) or porosity (Terrarium)",
             namespace = :land,
         ),
     )
@@ -323,9 +352,10 @@ function SpeedyWeather.initialize!(
     # which was set from the `time` kwarg of `initialize!(model; time=...)`.
     state.clock.time = vars.prognostic.clock.time
 
-    # initialize the "ModelIntegrator"
+    # initialize the "ModelIntegrator"; the land model's input sources must be passed here, since
+    # `Terrarium.initialize!` resets all input fields to their declared defaults before applying sources
     integrator = ModelIntegrator(
-        state.clock, land.model, InputSources(NF),
+        state.clock, land.model, land.inputs,
         state, land.initializers,
     )
     Terrarium.initialize!(integrator)
@@ -346,6 +376,7 @@ function SpeedyWeather.initialize!(
     end
     if haskey(vars.prognostic.land, :soil_moisture)
         RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, sat, indices)
+        soil_moisture_capacity!(vars, land)
     end
     if haskey(vars.prognostic.land, :snow_depth)
         RingGrids.copy_unmasked!(vars.prognostic.land.snow_depth, state.snow_water_equivalent, indices)
@@ -386,7 +417,10 @@ function SpeedyWeather.timestep!(
     # Push forcings into Terrarium inputs (copy_unmasked! avoids allocations)
     inputs = state.inputs
     RingGrids.copy_unmasked!(inputs.air_temperature, Tair, indices)
-    Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
+    # K -> °C, in place on the interior array. `set!(f, f - c)` would build a lazy Oceananigans
+    # `BinaryOperation` and materialize it through the dynamic broadcasting machinery, which
+    # Enzyme can only differentiate via runtime generic rules (and gets wrong).
+    interior(inputs.air_temperature) .-= NF(273.15)
     RingGrids.copy_unmasked!(inputs.air_pressure, pres, indices)
     RingGrids.copy_unmasked!(inputs.specific_humidity, humid, indices)
     RingGrids.copy_unmasked!(inputs.rainfall, rain, indices)
@@ -414,6 +448,7 @@ function SpeedyWeather.timestep!(
     end
     if haskey(vars.prognostic.land, :soil_moisture)
         RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, @view(interior(state.saturation_water_ice)[:, 1, end]), indices)
+        soil_moisture_capacity!(vars, land)
     end
     if haskey(vars.prognostic.land, :sensible_heat_flux)
         RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, @view(interior(state.sensible_heat_flux)[:, 1, 1]), indices)
@@ -472,7 +507,7 @@ function SpeedyWeather.timestep!(
     Tair = vars.grid.temperature[mask, end, l]
     inputs = state.inputs
     Terrarium.set!(inputs.air_temperature, Tair)
-    Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))
+    interior(inputs.air_temperature) .-= NF(273.15)   # K -> °C, in place (see timestep!)
 
     # Same reasoning as in TerrariumLand.timestep!: free to construct, empty
     # InputSources(NF) so SpeedyWeather owns the input-update cycle.
@@ -483,6 +518,6 @@ function SpeedyWeather.timestep!(
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
 
     # Surface soil temperature from the bottom of the column (last z-index)
-    vars.prognostic.land.soil_temperature[mask] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
+    vars.prognostic.land.soil_temperature[mask, 1] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
     return nothing
 end

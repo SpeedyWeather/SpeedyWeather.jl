@@ -178,3 +178,12 @@ u_old, u_new = get_steps(simulation.variables.grid.u)   # Leapfrog: previous and
 
 Consistently with `get_step`, a variable without a step dimension yields a 1-tuple holding the
 full variable — the vertical layers of an `XYZ` variable are *not* steps and are never splatted. 
+
+## Fused variables
+
+You may notice `simulation.variables.fused` when inspecting the variables. For performance reasons,
+some variables are stored as views into larger *fused* arrays, which stack several variables in the vertical
+so that, e.g., spectral transforms can be done for all of them in one batch.
+This is an internal implementation detail: you can treat all variables as independent
+and should always access them through their usual names, e.g. `simulation.variables.prognostic.vorticity`,
+not through `simulation.variables.fused`. See [Variable fusion](@ref) for details.

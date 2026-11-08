@@ -68,9 +68,37 @@ function readable_secs(secs::Real)
 end
 
 """
+    set_scalar!(x::AbstractArray, i, v)
+
+Sets the value of `x[i]` to `v` in a GPU compatible way. This uses `@allowscalar` with
+Reactant and `x[i:i] .= v` as a workaround for Enzyme compatibility otherwise.
+"""
+set_scalar!(x::AbstractArray, i, v) = _set_scalar!(architecture(x), x, i, v)
+
+function _set_scalar!(arch::AbstractArchitecture, x::AbstractArray, i::Integer, v::Number)
+    x[i:i] .= v
+    return x
+end
+
+"""
 $(TYPEDSIGNATURES)
 Fallback for `@maybe_jit` when Reactant is not available. Just calls `f(args...; kwargs...)`."""
 _jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)
+
+"""Optimization patterns of Reactant excluded from every compilation (`@maybe_jit`, the compiled time
+loop, see `reactant_compile_options`), to work around Reactant limitations and bugs: add a pattern's
+name here, remove it once fixed upstream. None currently (`cse_slice` was excluded for Reactant
+v0.2.293 to v0.2.296, see docs/dev/2026-10/reactant-issue-draft-gather-index-cycle.md)."""
+const REACTANT_EXCLUDED_PASSES = String[] # TODO: currenlty untested if concat_multipad is needed
+
+"""
+    reactant_compile_options(; kwargs...)
+
+Compile options (a `Reactant.CompileOptions`) for all compilations with Reactant: the KernelAbstractions
+kernels are raised to StableHLO (`raise = true`) and the patterns in `REACTANT_EXCLUDED_PASSES` are
+excluded; `kwargs` are passed on to `Reactant.CompileOptions` and can override both. Defined in the
+Reactant extension."""
+function reactant_compile_options end
 
 """
     @maybe_jit arch expr

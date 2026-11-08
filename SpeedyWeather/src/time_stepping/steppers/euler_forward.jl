@@ -48,10 +48,10 @@ function update_prognostic!(
         time_stepping::EulerForward,
         implicit,
         ::AbstractModel,
-        scale::Real = 1,
+        scale::Number = 1,
     )
     Δt = time_step(time_stepping, clock)
-    Δt /= oftype(Δt, scale)
+    Δt /= scale     # radius scale of type NF or integer scale, no `oftype` as it can be traced (Reactant)
     @boundscheck size(var) == size(tendency) || throw(BoundsError())
     launch!(architecture(var), LinearWorkOrder, size(var), euler_forward_kernel!, var, tendency, Δt)
     return nothing

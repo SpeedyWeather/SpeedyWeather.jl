@@ -338,6 +338,14 @@ Kernels are spread across ~36 files in `SpeedyWeather/src/dynamics/`,
 `parameterizations/`, `SpeedyTransforms/src/`, `RingGrids/src/`, and
 `LowerTriangularArrays/src/`.
 
+### Branch-free code for Reactant
+
+Write functions that are broadcast or passed to `set!` branch-free, so that Reactant can trace them:
+use `ifelse(cond, a, b)`, `min`, `max` or `clamp` instead of `if`, `? :`, `&&`, `||` or an early
+`return` on a value. Branches inside `@kernel`s are fine.
+
+To ensure differentiability avoid potential division by zero even within branches that aren't taken in an `ifelse`. These cases might cause `NaN`s in the gradients / differentiated models. 
+
 ## Benchmarks
 
 Benchmarks live in `SpeedyWeather/benchmark/`. Run the full suite with:
@@ -366,6 +374,9 @@ Labelling a PR `benchmark-performance` runs it on the PR merged into main vs mai
   them, e.g. `temperature` not `temp`, `surface_pressure` not `surf_pres`,
   `layer_thickness` not `lyr_thk`, `spectral_grid` not `sg`. Established physics/maths
   shorthand that is itself the conventional name (e.g. `coslat`, `vor`, `div`) is fine.
+* Spectral truncations are 1-based: always use the new 1-based truncations `T32`, `T64`, `T128`, …
+  (e.g. `SpectralGrid(truncation = 32)`) in code, tests and docs, never the old 0-based
+  `T31`, `T63`, `T127`, ….
 
 
 ## Pull Request Convention

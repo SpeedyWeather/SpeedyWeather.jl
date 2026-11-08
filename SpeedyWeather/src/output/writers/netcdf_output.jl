@@ -169,7 +169,7 @@ function initialize!(
     # only checked for models that have a land component and output variables that
     # actually use the soil vertical dimension (and its scratch field `field3Dland`)
     if hasfield(typeof(model), :land) && !isnothing(model.land) &&
-            any(var -> is_land(var) && is3D(var), values(output.variables))
+            any(var -> OutputVariables.is_land(var) && OutputVariables.is3D(var), values(output.variables))
         @assert get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
             " soil layers initialized for output, but $(get_nlayers(model.land)) soil layers initialized for model." *
             " Please construct NetCDFOutput with the same `nlayers_soil` as the model."
@@ -220,7 +220,7 @@ function initialize!(
     simulation = Simulation(vars, model)
     warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
-        exists_in_simulation(var, simulation) || continue
+        OutputVariables.exists_in_simulation(var, simulation) || continue
         define_variable!(dataset, var, eltype(output.field2D), vertical_dim_name = vertical_dimension_name(output, var))
         output!(output, var, simulation)
     end
@@ -239,7 +239,7 @@ function define_variable!(
     # hook for custom output variables to define their own (vertical) dimension
     define_dimension!(dataset, var)
 
-    missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
+    missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : OutputVariables.DEFAULT_MISSING_VALUE
     attributes = Dict("long_name" => var.long_name, "units" => var.unit, "_FillValue" => output_NF(missing_value))
 
     # the vertical dimension depends on the variable and the output's layers,
@@ -248,8 +248,8 @@ function define_variable!(
     dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
     # pick defaults for compression if not defined
-    deflatelevel = hasproperty(var, :compression_level) ? var.compression_level : DEFAULT_COMPRESSION_LEVEL
-    shuffle = hasproperty(var, :shuffle) ? var.shuffle : DEFAULT_SHUFFLE
+    deflatelevel = hasproperty(var, :compression_level) ? var.compression_level : OutputVariables.DEFAULT_COMPRESSION_LEVEL
+    shuffle = hasproperty(var, :shuffle) ? var.shuffle : OutputVariables.DEFAULT_SHUFFLE
 
     return defVar(dataset, var.name, output_NF, dims, attrib = attributes; deflatelevel, shuffle)
 end

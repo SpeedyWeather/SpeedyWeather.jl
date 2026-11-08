@@ -67,7 +67,7 @@ dispatch we need to constrain the first argument's type to
 the simulation object.
 
 ```@example netcdf_custom
-SpeedyWeather.path(::VerticalVelocityOutput, simulation) =
+OutputVariables.path(::VerticalVelocityOutput, simulation) =
     simulation.variables.dynamics.w
 ```
 

@@ -132,3 +132,23 @@ end
     @test SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model).cloud_top == 9
     @test vars.parameterizations.cloud_top_height[ij] == 0
 end
+
+@testset "Diagnostic cloud cover from precipitation" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; shortwave = OneBandShortwave(spectral_grid)))
+    initialize!(model.radiation, model)
+    vars = Variables(model)
+    init_shortwave_state!(vars, model)
+    vars.grid.humidity .= 0     # no cloud cover from humidity
+
+    (; precipitation_weight, precipitation_max) = model.radiation.shortwave.clouds
+    ij = 1
+    mm_per_day = 1 / (1000 * 86400)     # [m/s], rain rate is in m/s
+
+    # cloud cover = weight * √(rain rate in mm/day), capped at precipitation_max
+    for (rain_rate, precipitation) in ((0, 0), (1, 1), (4, 4), (50, precipitation_max))
+        vars.parameterizations.rain_rate[ij] = rain_rate * mm_per_day
+        cloud_cover = SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model).cloud_cover
+        @test cloud_cover ≈ precipitation_weight * sqrt(precipitation) rtol = 1.0e-5
+    end
+end
