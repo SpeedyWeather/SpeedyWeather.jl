@@ -130,8 +130,6 @@ function dynamics_tendencies!(
     # calculate (u_k, v_k)⋅∇ln(p_s), ∇ln(pₛ) is computed in transform! together with u, v
     pressure_gradient_flux!(vars, time_stepping)
 
-    # geopotential Φ was calculated in grid space in transform! and enters the Bernoulli potential there
-
     # get ū, v̄, D̄ on grid; D̄ in spectral
     vertical_integration!(vars, geometry, time_stepping)
 
