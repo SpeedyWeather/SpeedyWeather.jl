@@ -177,8 +177,14 @@ end
 # before the next run. This happens outside the timed region, so it does not
 # affect the measured SYPD but prevents memory piling up across many runs.
 # A configuration that errors is recorded as failed without losing the rest of the suite.
+# One with a `status` already, set by the driver for what the architecture doesn't support
+# (e.g. Float64 on Metal), is skipped and keeps that status.
 function run_benchmark_suite!(suite::AbstractBenchmarkSuite)
     for i in 1:suite.nruns
+        if hasproperty(suite, :status) && !isempty(suite.status[i])
+            @info "Skipping benchmark $i of $(suite.title): $(suite.status[i])"
+            continue
+        end
         try
             run_benchmark!(suite, i)
         catch err

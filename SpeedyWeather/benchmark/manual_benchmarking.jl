@@ -7,6 +7,7 @@ Usage:
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl                       # CPU, auto-labelled
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl gpu                   # CUDA GPU
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl amdgpu                # AMDGPU (HIP graphs forced on)
+    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl metal                 # Apple GPU (Metal)
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-cpu          # Reactant on CPU
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-nvidia-gpu   # Reactant on NVIDIA GPU (CUDA)
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl reactant-amd-gpu      # Reactant on AMD GPU (ROCm)
@@ -67,7 +68,11 @@ is loaded automatically. `amdgpu` runs require a ROCm-capable device —
 `gpu_graphs = true` to every `SpectralTransform` built for the `BenchmarkSuite`
 resolution/model suites, since `default_gpu_graphs` for AMDGPU's
 `ROCBackend` is `false` (HIP graphs are opt-in, verified only on datacenter/CDNA
-hardware). The Reactant variants additionally `using Reactant` and
+hardware). `metal` runs on an Apple GPU (labelled gpu-apple), `using Metal` is
+loaded automatically. Metal has no Float64, so Float64 configurations are recorded
+as not supported instead of being run. AMDGPU and Metal aren't dependencies of the
+benchmark environment: add the one needed on that machine (`Pkg.add("Metal")` with
+this environment active) without committing it. The Reactant variants additionally `using Reactant` and
 `Reactant.set_default_backend("cpu" | "gpu" | "tpu")`, "gpu" for both
 `reactant-nvidia-gpu` and `reactant-amd-gpu`: the GPU vendor is that of the
 installed Reactant_jll build, which is checked against the label (CUDA or ROCm)
@@ -97,14 +102,14 @@ Pkg.activate(".")
 # loaded, so that wrong arguments fail within seconds
 using ArgParse
 
-const ARCHITECTURES = ("cpu", "gpu", "amdgpu", "reactant-cpu", "reactant-nvidia-gpu", "reactant-amd-gpu", "reactant-tpu")
+const ARCHITECTURES = ("cpu", "gpu", "amdgpu", "metal", "reactant-cpu", "reactant-nvidia-gpu", "reactant-amd-gpu", "reactant-tpu")
 const ARGUMENT_SETTINGS = ArgParseSettings(
     description = "Run the SpeedyWeather benchmark suite on one architecture and update README.md " *
         "and assets/benchmark_results.json, see the comment at the top of manual_benchmarking.jl.",
 )
 @add_arg_table! ARGUMENT_SETTINGS begin
     "architecture"
-    help = "cpu (labelled cpu-arm or cpu-x86), gpu, amdgpu, reactant-cpu, reactant-nvidia-gpu, reactant-amd-gpu or reactant-tpu"
+    help = "cpu (labelled cpu-arm or cpu-x86), gpu, amdgpu, metal, reactant-cpu, reactant-nvidia-gpu, reactant-amd-gpu or reactant-tpu"
     default = "cpu"
     range_tester = architecture -> lowercase(architecture) in ARCHITECTURES
     "multiplier"
@@ -177,6 +182,9 @@ end
 if ARCH_ARG == "amdgpu"
     using AMDGPU
 end
+if ARCH_ARG == "metal"
+    using Metal
+end
 if ON_REACTANT
     using Reactant
     Reactant.set_default_backend(REACTANT_BACKENDS[ARCH_ARG])       # "cpu", "gpu" or "tpu"
@@ -201,6 +209,8 @@ function pick_architecture(arg::AbstractString)
         return (SpeedyWeather.GPU(), "gpu-nvidia")
     elseif arg == "amdgpu"
         return (SpeedyWeather.GPU(), "gpu-amd")
+    elseif arg == "metal"
+        return (SpeedyWeather.GPU(), "gpu-apple")
     elseif haskey(REACTANT_BACKENDS, arg)       # labelled as the argument
         return (SpeedyWeather.ReactantDevice(), arg)
     elseif arg == "cpu" || isempty(arg)
@@ -214,7 +224,7 @@ end
 
 const ARCH, ARCH_LABEL = pick_architecture(ARCH_ARG)
 # GPU or TPU: higher resolutions (`--hi-res`, reverse mode), larger matrix transforms than on CPU (T128 on TPU)
-const ON_ACCELERATOR = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-nvidia-gpu", "reactant-amd-gpu", "reactant-tpu")
+const ON_ACCELERATOR = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "gpu-apple", "reactant-nvidia-gpu", "reactant-amd-gpu", "reactant-tpu")
 @info "Running benchmarks for architecture: $ARCH_LABEL ($(typeof(ARCH)))"
 RUN_HI_RES && !ON_ACCELERATOR && @warn "--hi-res only adds GPU and TPU configurations (T342, T512 are too slow on CPU), ignored on $ARCH_LABEL."
 
@@ -269,6 +279,10 @@ for (key, suite) in benchmarks
     # so force it on explicitly for this arch;
     # leave every other arch on its own `SpectralTransform` default (`nothing`).
     hasproperty(suite, :gpu_graphs) && (suite.gpu_graphs = ARCH_LABEL == "gpu-amd" ? true : nothing)
+    # Metal has no Float64: mark those configurations, `run_benchmark_suite!` skips them
+    if ARCH_LABEL == "gpu-apple" && suite isa BenchmarkSuite
+        suite.status[suite.NF .== Float64] .= "not supported (Float64)"
+    end
 end
 
 # Deterministic suite order, so README sections are stable across runs. `--suites` narrows the run to
@@ -323,6 +337,14 @@ function machine_info()
             AMDGPU.versioninfo(io)
         catch err
             write(io, "(AMDGPU.versioninfo() failed: $err)\n")
+        end
+        write(io, "```\n")
+    elseif ARCH_LABEL == "gpu-apple"
+        write(io, "\n```julia\njulia> Metal.versioninfo()\n")
+        try
+            Metal.versioninfo(io)
+        catch err
+            write(io, "(Metal.versioninfo() failed: $err)\n")
         end
         write(io, "```\n")
     elseif ARCH isa SpeedyWeather.GPU || ARCH_LABEL == "reactant-nvidia-gpu"
@@ -397,7 +419,7 @@ end
 # Regenerate README.md from the JSON store
 
 # Stable ordering for arch sections in the README.
-const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "gpu-amd", "reactant-cpu", "reactant-nvidia-gpu", "reactant-amd-gpu", "reactant-tpu"]
+const ARCH_ORDER = ["cpu-arm", "cpu-x86", "gpu-nvidia", "gpu-amd", "gpu-apple", "reactant-cpu", "reactant-nvidia-gpu", "reactant-amd-gpu", "reactant-tpu"]
 
 function sorted_arch_labels(results)
     known = filter(in(keys(results)), ARCH_ORDER)
@@ -446,6 +468,7 @@ function write_preamble(md)
     write(md, "julia --project=. manual_benchmarking.jl                       # CPU (auto-labelled cpu-arm or cpu-x86)\n")
     write(md, "julia --project=. manual_benchmarking.jl gpu                   # CUDA GPU\n")
     write(md, "julia --project=. manual_benchmarking.jl amdgpu                # AMDGPU (HIP graphs forced on)\n")
+    write(md, "julia --project=. manual_benchmarking.jl metal                 # Apple GPU (Metal)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-cpu          # Reactant on CPU\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-nvidia-gpu   # Reactant on NVIDIA GPU (CUDA)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-amd-gpu      # Reactant on AMD GPU (ROCm)\n")

@@ -30,6 +30,7 @@ Reproduce the benchmark suite by running, from `SpeedyWeather/benchmark`:
 julia --project=. manual_benchmarking.jl                       # CPU (auto-labelled cpu-arm or cpu-x86)
 julia --project=. manual_benchmarking.jl gpu                   # CUDA GPU
 julia --project=. manual_benchmarking.jl amdgpu                # AMDGPU (HIP graphs forced on)
+julia --project=. manual_benchmarking.jl metal                 # Apple GPU (Metal)
 julia --project=. manual_benchmarking.jl reactant-cpu          # Reactant on CPU
 julia --project=. manual_benchmarking.jl reactant-nvidia-gpu   # Reactant on NVIDIA GPU (CUDA)
 julia --project=. manual_benchmarking.jl reactant-amd-gpu      # Reactant on AMD GPU (ROCm)
