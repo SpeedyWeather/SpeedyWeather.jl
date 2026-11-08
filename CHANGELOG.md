@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Geopotential computed once in grid space and used by both dynamical core (via the Bernoulli potential) and parameterizations, spectral geopotential removed; Leapfrog keeps the previous grid step during the first two steps, consistent with the spectral one [#1381](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1381)
 - Fix an issue that GPU graphs corrupted easily after model multiple execution with different instances of Variables [#1382](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1382)
 - Add mutating variants of `heatmap` and `globe` for `RingGrids` `Field`s [#1223](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1223)
 - `JablonowskiTemperature` uses Jablonowski and Williamson's stable lapse rate Γ = 5 K/km (new option `lapse_rate`) instead of the dry-adiabatic lapse rate of `PrimitiveDryModel`, fixing the baroclinic wave breaking up; docs example back to default centering [#1389](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1389)
