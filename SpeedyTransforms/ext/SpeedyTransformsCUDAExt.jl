@@ -34,14 +34,17 @@ import SpeedyWeatherInternals.Architectures: GPU
 #     between the strided grid/scratch layout and the packed buffer in one launch.
 #     This collapses the graph from ~6*nlat_half nodes to ~2*nlat_half + 4.
 #
-# The captured graph bakes in the device pointers of the input `field.data`,  and the
-# scratch buffers (`scratch_memory.north/.south`) and the packed work
-# buffer `GPUFourierGraphCache`. In the SpeedyWeather time loop the same variable buffers are reused every
-# timestep, so a graph captured for a given `field` is replayed on all subsequent steps.
+# The captured graph bakes in the device pointers of the input `field.data`, of the
+# scratch buffers (`scratch_memory.north/.south`) and of the packed work buffers in
+# `GPUFourierGraphCache`. In the SpeedyWeather time loop the same variable buffers are reused every
+# timestep, so a graph captured for a given field and scratch memory is replayed on all subsequent steps.
 # Caches are held per transform SIZE (keyed by the FFT plan, so an `S` that batches
 # several layer counts gets one cache each); within a cache, graphs are keyed by the device
-# pointer of `field.data` (see `graph_key`), keying on the wrapper object identity wouldn't
-# work as a view on a CuArray is again a CuArray and not a SubArray which causes problems here.
+# pointers of `field.data` and of both scratch arrays (see `graph_key`): the field and the
+# scratch memory are the caller's (in a simulation both are part of the `Variables`), so new
+# `Variables` for the same model must not replay graphs captured with the buffers of earlier ones.
+# Keying on the wrapper object identity wouldn't work as a view on a CuArray is again a CuArray
+# (a new wrapper every time step), not a SubArray.
 #
 # The backend-agnostic parts of this (kernels, cache struct, allocation-free loops,
 # capture/replay control flow, the `GraphBackend` struct itself) live in
@@ -86,9 +89,9 @@ function _fourier_batched!(
         )
     end
     # the cache is selected by (and sized for) this transform size (= its FFT plan set); within
-    # it the only thing that varies between calls is the field buffer, so that is the graph key
+    # it what varies between calls are the caller's buffers, field and scratch, so they are the graph key
     cache = get_cache(CuGraphExec, S, size(field, 2))
-    run_graph!(cache.forward_execs, graph_key(field.data), () -> forward_loop!(cache, f_north, f_south, field, S), CUDA_GRAPH_BACKEND)
+    run_graph!(cache.forward_execs, graph_key(field, f_north, f_south), () -> forward_loop!(cache, f_north, f_south, field, S), CUDA_GRAPH_BACKEND)
     return nothing
 end
 
@@ -112,7 +115,7 @@ function _fourier_batched!(
     cache = get_cache(CuGraphExec, S, size(field, 2))
     # `add` is part of the graph key: a captured graph bakes in overwrite-vs-accumulate, so replaying
     # the wrong one would silently produce incorrect results.
-    run_graph!(cache.inverse_execs, (graph_key(field.data), add), () -> inverse_loop!(cache, field, g_north, g_south, S, add), CUDA_GRAPH_BACKEND)
+    run_graph!(cache.inverse_execs, (graph_key(field, g_north, g_south), add), () -> inverse_loop!(cache, field, g_north, g_south, S, add), CUDA_GRAPH_BACKEND)
     return nothing
 end
 

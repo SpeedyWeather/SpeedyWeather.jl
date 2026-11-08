@@ -11,12 +11,15 @@ module OutputVariables
 using DocStringExtensions
 import GPUArrays
 import Dates: Hour
+import KernelAbstractions: @kernel, @index
+import SpeedyWeatherInternals.Architectures: architecture
+import SpeedyWeatherInternals.KernelLaunching: launch!, LinearWorkOrder
 
 # abstract types and generic functions from SpeedyWeather extended or used here
 import ..SpeedyWeather: AbstractOutput, AbstractOutputVariable, AbstractSimulation,
     AbstractVerticalExtrapolation, DryAdiabaticExtrapolation, NetCDFOutput,
     define_variable!, field_view, finalize!, get_prognostic_step,
-    interpolate_output!, output!, pressure, ConstantExtrapolation,
+    interpolate_output!, on_output_architecture, output!, pressure, ConstantExtrapolation,
     virtual_temperature, write_output!
 
 # defaults for output variables that don't define these fields themselves

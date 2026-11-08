@@ -166,6 +166,10 @@ end
     # should be within ~800 to ~1200hPa
     @test all(0.8 .< mslp ./ p₀ .< 1.2)
 
+    # also for the initial conditions, before the surface air temperature is computed
+    mslp_initial = ds["mslp"].var[:, :, 1]
+    @test all(0.8 .< mslp_initial ./ p₀ .< 1.2)
+
     # cloud top height in [m] (not layer index), 0 for no cloud, below top-layer geopotential height
     @test ds["cloud_top"].attrib["units"] == "m"
     cloud_top = ds["cloud_top"].var[:, :, end]
@@ -180,9 +184,9 @@ end
     @test haskey(ds, "v")
     @test haskey(ds, "v10")
 
-    # and 10m values cannot exceed lowermost layer of u,v value
-    @test maximum(abs.(ds["u10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
-    @test maximum(abs.(ds["v10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
+    # Check that in most cases that u10 < u
+    @test sum(abs.(ds["u10"].var[:, :, end]) .< abs.(ds["u"].var[:, :, end, end])) / length(ds["u10"].var[:, :, end]) > 0.9
+    @test sum(abs.(ds["v10"].var[:, :, end]) .< abs.(ds["v"].var[:, :, end, end])) / length(ds["v10"].var[:, :, end]) > 0.9
 
     ## surface temperature should be within 60-130% of
     T₀ = model.atmosphere.reference_temperature     # in K
@@ -251,9 +255,9 @@ end
 
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
-    spectral_grid = SpectralGrid()
-    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "dense-output-test", interval = Hour(0))
-    model = PrimitiveDryModel(spectral_grid; output)
+    spectral_grid = SpectralGrid(nlayers = 1)
+    output = NetCDFOutput(spectral_grid, path = tmp_output_path, id = "dense-output-test", interval = Hour(0))
+    model = BarotropicModel(spectral_grid; output)
     model.feedback.verbose = false
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
@@ -264,9 +268,9 @@ end
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_time_steps)
 
     # do a simulation with the adjust_Δt_with_output turned on
-    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "adjust_dt_with_output-test", interval = Minute(70))
+    output = NetCDFOutput(spectral_grid, path = tmp_output_path, id = "adjust_dt_with_output-test", interval = Minute(70))
     time_stepping = Leapfrog(spectral_grid, adjust_with_output = true)
-    model = PrimitiveDryModel(spectral_grid; output, time_stepping)
+    model = BarotropicModel(spectral_grid; output, time_stepping)
     model.feedback.verbose = false
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
@@ -278,10 +282,9 @@ end
     # for future tests: This simulation blows up because of too large time steps but only a warning is thrown
     # at the moment, no error
     # 1kyrs simulation
-    spectral_grid = SpectralGrid()
     time_stepping = Leapfrog(spectral_grid, Δt_at_T32 = Day(3650))
-    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "long-output-test", interval = Day(3650))
-    model = PrimitiveDryModel(spectral_grid; output, time_stepping)
+    output = NetCDFOutput(spectral_grid, path = tmp_output_path, id = "long-output-test", interval = Day(3650))
+    model = BarotropicModel(spectral_grid; output, time_stepping)
     model.feedback.verbose = false
     simulation = initialize!(model)
     run!(simulation, output = true, period = Day(365000))

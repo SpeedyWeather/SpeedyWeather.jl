@@ -100,14 +100,15 @@ between two latitude rings."""
     ij_cs::VectorIntType = zeros(Int, npoints_output)   # pixel index ij for bottom left point c on ring j+1
     ij_ds::VectorIntType = zeros(Int, npoints_output)   # pixel index ij for bottom right point d on ring j+1
 
-    # distances to adjacent grid points (i.e. the averaging weights)
-    Δys::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between rings
-    Δabs::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between a, b
-    Δcds::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between c, d
+    # distances to adjacent grid points (i.e. the averaging weights), allocated on the CPU and
+    # converted to VectorType as not all array types (e.g. Reactant's) have an undef constructor
+    Δys::VectorType = zeros(eltype(VectorType), npoints_output)     # distance fractions between rings
+    Δabs::VectorType = zeros(eltype(VectorType), npoints_output)    # distance fractions between a, b
+    Δcds::VectorType = zeros(eltype(VectorType), npoints_output)    # distance fractions between c, d
 
     # pole ring averages per vertical layer for 3D interpolation
-    north_pole_average::VectorType = zero(VectorType(undef, nlayers))
-    south_pole_average::VectorType = zero(VectorType(undef, nlayers))
+    north_pole_average::VectorType = zeros(eltype(VectorType), nlayers)
+    south_pole_average::VectorType = zeros(eltype(VectorType), nlayers)
 end
 
 Adapt.@adapt_structure AnvilLocator
@@ -260,9 +261,13 @@ function interpolator(
         kwargs...
     )
     I = interpolator(grid_in, get_npoints(grid_out); kwargs...)
+    NF = eltype(I)
     londs, latds = get_londlatds(grid_out)
-    londs = on_architecture(architecture(grid_out), londs)
-    latds = on_architecture(architecture(grid_out), latds)
+    # Convert on host (Float64 → NF) before the device transfer so the kernel sees
+    # the same eltype as `lon_offsets`; otherwise `find_grid_indices!` falls into
+    # its `convert.(NF, λs)` branch which Reactant cannot trace.
+    londs = on_architecture(architecture(grid_out), convert(Vector{NF}, londs))
+    latds = on_architecture(architecture(grid_out), convert(Vector{NF}, latds))
 
     update_locator!(I, londs, latds, unsafe = false)
     return I
@@ -302,7 +307,7 @@ function interpolate(
         kwargs...
     ) where {NF}
     (; npoints_output) = I.locator                                      # number of points to interpolate onto
-    Aout = array_type(architecture(A), NF, 1)(undef, npoints_output)    # preallocate: onto θs, λs interpolated values of A
+    Aout = similar(A.data, NF, npoints_output)                          # preallocate: onto θs, λs interpolated values of A
     return interpolate_2D!(Aout, A.data, I.locator, I.geometry, architecture(A)) # perform interpolation, store in Aout
 end
 
@@ -385,8 +390,12 @@ end
 
     k = @index(Global, Linear)
 
-    a, b = ij_as[k] == 0 ? (A_northpole, A_northpole) : (A[ij_as[k]], A[ij_bs[k]])
-    c, d = ij_cs[k] == -1 ? (A_southpole, A_southpole) : (A[ij_cs[k]], A[ij_ds[k]])
+    # pole averages are numbers, or 0-dimensional arrays when traced by Reactant: [] for both,
+    # otherwise the branches below differ in type and Reactant can't raise the kernel (raise = true)
+    northpole = A_northpole[]
+    southpole = A_southpole[]
+    a, b = ij_as[k] == 0 ? (northpole, northpole) : (A[ij_as[k]], A[ij_bs[k]])
+    c, d = ij_cs[k] == -1 ? (southpole, southpole) : (A[ij_cs[k]], A[ij_ds[k]])
 
     Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
 end
@@ -519,8 +528,8 @@ function interpolate_2D!(
     # (e.g. a field wrapping a strided view) keeps the per-layer loop.
     if is_flattenable(Aout.data) && is_flattenable(A.data)
         interpolate_2D!(
-            reshape(Aout.data, size(Aout.data, 1), :),
-            reshape(A.data, size(A.data, 1), :),
+            flatten_layers(Aout.data),
+            flatten_layers(A.data),
             locator,
             geometry,
             architecture(A),
@@ -541,6 +550,12 @@ would reshape into a slow wrapper type, so the batched interpolation is not used
 is_flattenable(x::DenseArray) = true
 is_flattenable(x::SubArray) = Base.iscontiguous(x)
 is_flattenable(x::AbstractArray) = false
+
+"""$(TYPEDSIGNATURES)
+Collapse all trailing dimensions of `x` into one, `reshape(x, size(x, 1), :)` but returning
+matrices unchanged instead of wrapping them into a reshaped array."""
+flatten_layers(x::AbstractMatrix) = x
+flatten_layers(x::AbstractArray) = reshape(x, size(x, 1), :)
 
 """
 $(TYPEDSIGNATURES)
@@ -574,6 +589,23 @@ function interpolate!(
     I = interpolator(Aout, A; kwargs...)    # create interpolator instance from field A to Aout
     interpolate!(Aout, A, I)                # perform interpolation returns
     return Aout                             # return the field wrapped around the interpolated data
+end
+
+"""$(TYPEDSIGNATURES)
+Interpolate `field_in` onto `field_out` ignoring NaNs in `field_in` (e.g. ocean in land
+climatologies): the interpolation weights are renormalised over the valid neighbours, so coastal
+points take their value from the surrounding land. Points without any valid neighbour remain NaN
+(0/0). Overwrites the NaNs in `field_in` with zeros."""
+function interpolate_ignoring_nan!(field_out::Field, field_in::Field, interpolator::AbstractInterpolator)
+    valid = .!isnan.(field_in.data)
+    weights_in = similar(field_in)
+    weights_in.data .= valid
+    field_in.data .= ifelse.(valid, field_in.data, zero(eltype(field_in)))
+    weights_out = similar(field_out)
+    interpolate!(field_out, field_in, interpolator)
+    interpolate!(weights_out, weights_in, interpolator)
+    field_out.data ./= weights_out.data
+    return field_out
 end
 
 # create grid on the fly
@@ -641,7 +673,7 @@ function update_locator!(
 end
 
 function find_rings!(
-        js::AbstractVector{<:Integer},  # Out: ring indices j
+        js::AbstractVector,             # Out: ring indices j
         Δys::AbstractVector,            # Out: distance fractions to ring further south
         θs::AbstractVector,             # latitudes to interpolate onto
         latd::AbstractVector;           # latitudes of the rings on the original grid
@@ -716,12 +748,12 @@ DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
 end
 
 function find_rings_unsafe!(
-        js::AbstractArray{<:Integer},  # Out: vector of ring indices
+        js::AbstractArray,             # Out: vector of ring indices
         Δys::AbstractArray,            # distance fractions to ring further south
         θs::AbstractArray,             # latitudes of points to interpolate onto
-        latd::AbstractArray{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
+        latd::AbstractArray,           # latitudes of rings (90˚ to -90˚, strictly decreasing)
         architecture::AbstractArchitecture
-    ) where {NF <: AbstractFloat}
+    )
 
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
@@ -807,8 +839,10 @@ function find_grid_indices!(
     (; Δabs, Δcds) = locator
     (; nlons, ring_starts, lon_offsets, nlat) = geometry
 
-    # Convert λs to the same type as lon_offsets if needed
-    λs_converted = convert.(eltype(lon_offsets), λs)
+    # Skip the broadcast convert when eltypes already match: `convert.(T, λs)` is
+    # incompatible with Reactant tracing, so we only run it when truly needed.
+    T = eltype(lon_offsets)
+    λs_converted = eltype(λs) == T ? λs : convert.(T, λs)
 
     launch!(
         architecture,
@@ -853,7 +887,7 @@ $(TYPEDSIGNATURES)
 Computes the average at the North and South pole from a given grid `A` and it's precomputed
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
 on the northern-most ring. Similar for the South pole."""
-@inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF <: AbstractFloat}
+@inline function average_on_poles(A::AbstractVector, rings)
     # TODO: doing the computation below causes allocations, doing it with views causes scalarindexing on GPU
     A_northpole = mean(A[rings[1]])     # average of all grid points around the north pole
     A_southpole = mean(A[rings[end]])   # same for south pole
@@ -873,12 +907,13 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Method for a layered `A`, returning a vector of pole averages, one per layer, for the batched
-interpolation kernel. Indexing rather than viewing matches the single-layer methods above: it
-allocates, but a view would trigger scalar indexing on GPU."""
-@inline function average_on_poles(A::AbstractMatrix{NF}, rings) where {NF <: AbstractFloat}
-    A_northpole = vec(mean(A[rings[1], :], dims = 1))    # per layer, around the north pole
-    A_southpole = vec(mean(A[rings[end], :], dims = 1))  # same for south pole
+Method for a layered `A`, returning `1 × nlayers` matrices of pole averages, one per layer and
+indexed linearly by the batched interpolation kernel (no `vec` as Reactant's lazily reshaped
+arrays can't be passed to kernels). Indexing rather than viewing matches the single-layer methods
+above: it allocates, but a view would trigger scalar indexing on GPU."""
+@inline function average_on_poles(A::AbstractMatrix, rings)
+    A_northpole = mean(A[rings[1], :], dims = 1)    # per layer, around the north pole
+    A_southpole = mean(A[rings[end], :], dims = 1)  # same for south pole
     return A_northpole, A_southpole
 end
 
@@ -887,8 +922,8 @@ $(TYPEDSIGNATURES)
 Method for a layered `A::AbstractMatrix{T<:Integer}` which rounds the averaged values
 to return the same number format `NF`."""
 @inline function average_on_poles(A::AbstractMatrix{NF}, rings) where {NF <: Integer}
-    A_northpole = vec(mean(A[rings[1], :], dims = 1))
-    A_southpole = vec(mean(A[rings[end], :], dims = 1))
+    A_northpole = mean(A[rings[1], :], dims = 1)
+    A_southpole = mean(A[rings[end], :], dims = 1)
     return round.(NF, A_northpole), round.(NF, A_southpole)
 end
 

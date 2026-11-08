@@ -7,6 +7,17 @@ function time_stepping!(simulation::AbstractSimulation)
     return simulation
 end
 
+"""$(TYPEDSIGNATURES)
+Perform `n` time steps of `simulation`. Extended in the Reactant extension to 
+implement a time stepping loop that can be differentiated with checkpointing
+schemes used."""
+function time_steps!(simulation::AbstractSimulation, n::Integer; kwargs...)
+    for _ in 1:n # This function is extended in the Reactant extension to implement the features described in the docstring
+        time_step!(simulation)
+    end
+    return nothing
+end
+
 # dispatch over time stepper
 time_step!(simulation::AbstractSimulation) = time_step!(simulation, simulation.model.time_stepping)
 

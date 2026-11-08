@@ -16,13 +16,15 @@ Simulation(model::AbstractModel; kwargs...) = initialize!(model; kwargs...)
 
 function Base.show(io::IO, S::AbstractSimulation)
     vsize = prettymemory(_pretty_size(S.variables))
-    Msize = prettymemory(Base.summarysize(S.model))
-    Ssize = prettymemory(Base.summarysize(S))
+    Msize = prettymemory(memorysize(S.model))
+    Ssize = prettymemory(memorysize(S))
     println(io, styled"{warning:Simulation}", "{...} ", styled"{note:($Ssize)}")
     println(io, "├ ", styled"{info:variables}" * "::Variables{...} " * styled"{note:($vsize)}")
     print(io, "└ ", styled"{info:model}" * "::$(model_type(S.model)){...} " * styled"{note:($Msize)}")
     return nothing
 end
+
+Base.show(io::IO, ::Type{<:Simulation{V, M}}) where {V, M} = print(io, "Simulation{Variables{…}, $(nameof(M)){…}}")
 
 unpack(sim::AbstractSimulation) = (sim.variables, sim.model)
 
@@ -79,7 +81,7 @@ function initialize!(
     scale_prognostic!(variables, model.planet.radius)
 
     # TRANSFORM variables from spectral to grid (= set the diagnostic variables in the correct initial state)
-    transform!(variables, model, initialize = true)
+    @maybe_jit model.architecture transform!(variables, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays
 
     # OUTPUT, CALLBACKS, FEEDBACK only initialize output and callbacks now, just before the simulation starts

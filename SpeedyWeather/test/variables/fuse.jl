@@ -318,63 +318,134 @@ end
     @test fused_nt.probe.slot_map.u == 1:4
 end
 
-# Activate these test once we actually use fused variables in the model
-#=
+# The grid tendencies u, v, temperature, pressure share the fused parent `:grid_tendencies` with
+# working arrays of the dynamics (dynamics.grid.uT_anomaly, vT_anomaly, kinetic_energy)
 @testset "view ↔ parent aliasing round trips" begin
-    model = _testmodel(nlayers = 4)
-    sim = initialize!(model)
-    v = sim.variables
-    buf = v.fused.tend_grid
-    nlayers = model.spectral_grid.nlayers
+    v = Variables(_testmodel(nlayers = 4))
+    (; slot_map) = v.fused.grid_tendencies
+    buf = parent(v.fused.grid_tendencies)
 
     # Write through parent, read through views
     fill!(buf, eltype(buf)(7))
     @test all(v.tendencies.grid.u.data .== 7)
     @test all(v.tendencies.grid.v.data .== 7)
     @test all(v.tendencies.grid.temperature.data .== 7)
+    @test all(v.dynamics.grid.kinetic_energy.data .== 7)
 
-    # Write through one view, verify the right slot is touched in parent and other views untouched
+    # Write through one view, verify only its slots are touched in the parent and other views untouched
     fill!(buf, zero(eltype(buf)))
     fill!(v.tendencies.grid.u, eltype(buf)(3))
-    @test all(buf.data[:, 1:nlayers] .== 3)
-    @test all(buf.data[:, (nlayers + 1):end] .== 0)
+    @test all(buf.data[:, slot_map.u] .== 3)
+    @test all(buf.data[:, setdiff(axes(buf.data, 2), slot_map.u)] .== 0)
     @test all(v.tendencies.grid.v.data .== 0)
 end
 
 @testset "reset_tendencies! zeros fused tendency slots through views" begin
     model = _testmodel(nlayers = 4)
-    sim = initialize!(model)
-    v = sim.variables
-    buf = v.fused.tend_grid
-    nlayers = model.spectral_grid.nlayers
+    v = Variables(model)
+    (; slot_map) = v.fused.grid_tendencies
+    buf = parent(v.fused.grid_tendencies)
 
     fill!(buf, eltype(buf)(99))
-    SpeedyWeather.reset_tendencies!(v)
+    SpeedyWeather.reset_tendencies!(v, model.time_stepping)
 
     # Tendency views must be zero
     @test all(v.tendencies.grid.u.data .== 0)
     @test all(v.tendencies.grid.v.data .== 0)
     @test all(v.tendencies.grid.temperature.data .== 0)
+    @test all(v.tendencies.grid.pressure.data .== 0)
 
-    # The first 3·nlayers slots of the parent (the tendency slots: u, v, T) are zero
-    @test all(buf.data[:, 1:(3 * nlayers)] .== 0)
-    # Non-tendency fused slots (scratch a, b) were NOT touched by reset_tendencies!
-    @test all(buf.data[:, (3 * nlayers + 1):end] .== 99)
+    # The tendency slots of the parent are zero, the slots of the dynamics' working arrays untouched
+    tendency_slots = vcat(slot_map.u, slot_map.v, slot_map.temperature, slot_map.pressure)
+    other_slots = setdiff(axes(buf.data, 2), tendency_slots)
+    @test !isempty(other_slots)
+    @test all(buf.data[:, tendency_slots] .== 0)
+    @test all(buf.data[:, other_slots] .== 99)
 end
 
 @testset "fused parent lives at vars.fused.<sym>; standalone variables unaffected" begin
-    model = _testmodel(nlayers = 4)
-    sim = initialize!(model)
-    v = sim.variables
+    v = Variables(_testmodel(nlayers = 4))
 
-    @test haskey(v.fused, :tend_grid)
+    @test haskey(v.fused, :grid_tendencies)
+    @test v.fused.grid_tendencies isa FusedParent
     # Parent is not duplicated under other groups
-    @test !haskey(v.tendencies.grid, :tend_grid)
-    @test !haskey(v.scratch.grid, :tend_grid)
+    @test !haskey(v.tendencies.grid, :grid_tendencies)
+    @test !haskey(v.dynamics.grid, :grid_tendencies)
     @test !haskey(v.scratch, :fused)
 
     # Standalone (non-fused) tendency variables still work normally
     @test haskey(v.tendencies, :vorticity)   # spectral tendency, not fused
     @test !(v.tendencies.vorticity.data isa SubArray)
 end
-=#
+
+# UTILITIES to check copying and deepcopy of Variables, even with array types where SubArray don't exists (CuArray, JLArray, ..)
+
+# Test fill: Write `offset + i` into fused parent `i`: a variable that then holds this value everywhere is a view of parent `i`
+function fill_fused_parents!(vars, offset)
+    for (i, fuse_name) in enumerate(keys(vars.fused))
+        data = parent(vars.fused[fuse_name]).data
+        fill!(data, eltype(data)(offset + i))
+    end
+    return vars
+end
+
+# Read the test fill: The variables holding `offset + i` everywhere, i.e. the views of fused parent `i`, as "group.name" => fuse symbol
+function fused_members(vars, offset)
+    members = Dict{String, Symbol}()
+    fuse_names = collect(keys(vars.fused))
+    for group in SpeedyWeather.ALL_VARIABLE_GROUPS
+        group === :fused || _fused_members!(members, getfield(vars, group), string(group), fuse_names, offset)
+    end
+    return members
+end
+
+function _fused_members!(members, variables::NamedTuple, prefix, fuse_names, offset)
+    for (name, variable) in pairs(variables)
+        path = string(prefix, ".", name)
+        if variable isa NamedTuple
+            _fused_members!(members, variable, path, fuse_names, offset)
+        elseif variable isa Union{SpeedyWeather.RingGrids.AbstractField, LowerTriangularArray}
+            data = on_architecture(SpeedyWeather.CPU(), variable).data
+            isempty(data) && continue
+            for (i, fuse_name) in enumerate(fuse_names)
+                all(==(eltype(data)(offset + i)), data) && (members[path] = fuse_name)
+            end
+        end
+    end
+    return members
+end
+
+# On JLArrays (as on CUDA) a contiguous view of a fused parent is not a `SubArray` but another JLArray sharing
+# the parent's memory, and JLArrays' `deepcopy` doesn't use deepcopy's `IdDict`: the default `deepcopy` detaches
+# every fused variable from its parent there
+using JLArrays
+
+@testset "deepcopy keeps every fused variable a view of its copied parent" for Model in (BarotropicModel, PrimitiveWetModel),
+        architecture in (SpeedyWeather.CPU(), SpeedyWeather.GPU(JLArrays.JLBackend()))
+
+    spectral_grid = SpectralGrid(truncation = 11, nlayers = Model <: Barotropic ? 1 : 4, architecture = architecture)
+    vars = Variables(Model(spectral_grid))
+    # mark the original's parents with 1000 + i before the deepcopy, so the copy starts with these values
+    members = fused_members(fill_fused_parents!(vars, 1000), 1000)
+    @test !isempty(members)
+
+    # mark the copy's parents with 2000 + i: a view of a copied parent then holds 2000 + i, a detached
+    # copy of a fused variable still the 1000 + i it was copied with
+    copied = deepcopy(vars)
+    fill_fused_parents!(copied, 2000)
+    @test fused_members(copied, 2000) == members    # every fused variable of the copy is a view of its parent
+    @test fused_members(vars, 1000) == members      # the original still holds 1000 + i: no shared memory
+end
+
+@testset "on_architecture keeps every fused variable a view of its transferred parent" for (from, to) in ((SpeedyWeather.CPU(), SpeedyWeather.GPU(JLArrays.JLBackend())), (SpeedyWeather.GPU(JLArrays.JLBackend()), SpeedyWeather.CPU()))
+    vars = Variables(PrimitiveWetModel(SpectralGrid(truncation = 11, nlayers = 4, architecture = from)))
+    # mark the original's parents with 1000 + i, so the transferred variables start with these values
+    members = fused_members(fill_fused_parents!(vars, 1000), 1000)
+    @test !isempty(members)
+
+    # mark the transferred parents with 2000 + i: their views then hold 2000 + i, detached variables 1000 + i
+    transferred = on_architecture(to, vars)
+    fill_fused_parents!(transferred, 2000)
+    @test fused_members(transferred, 2000) == members  # every fused variable is a view of its transferred parent
+    @test fused_members(vars, 1000) == members          # the original still holds 1000 + i: no shared memory
+end

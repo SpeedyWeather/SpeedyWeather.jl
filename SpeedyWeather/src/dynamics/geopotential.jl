@@ -83,13 +83,13 @@ function geopotential!(
     (; vertical_coordinates) = model.geometry
 
     arch = architecture(T)
-    if typeof(arch) <: GPU
+    if typeof(arch) <: AbstractCPU
+        geopotential_grid_cpu!(Φ, T, q, orography, pₛ, g, G, atmosphere, vertical_coordinates)
+    else    # GPU and Reactant
         launch!(
             arch, LinearWorkOrder, (size(T, 1),), geopotential_grid_kernel!,
             Φ, T, q, orography, pₛ, g, G, atmosphere, vertical_coordinates,
         )
-    else
-        geopotential_grid_cpu!(Φ, T, q, orography, pₛ, g, G, atmosphere, vertical_coordinates)
     end
     return nothing
 end
