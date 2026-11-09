@@ -1,6 +1,7 @@
 module SpeedyTransforms
 
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 using StyledStrings
 using Printf
 import ProgressMeter

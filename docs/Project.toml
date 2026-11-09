@@ -24,7 +24,8 @@ SpeedyWeather = {path = "../SpeedyWeather"}
 SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 
 [compat]
-Documenter = "1.11"
+CairoMakie = "0.12 - 0.15" 
+Documenter = "1.20"
 DocumenterCitations = "1"
 # >= 0.3.7: renders DocumenterCitations 1.5's CitationSiteNode,
 # https://github.com/LuxDL/DocumenterVitepress.jl/issues/391
