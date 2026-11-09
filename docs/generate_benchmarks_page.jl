@@ -52,8 +52,13 @@ function overview_nlayers(all_results, labels)
 end
 
 # Average resolution in degrees (as `SpectralGrid` shows it) of the grid with `nlat` rings,
-# the resolution sweep runs on the default grid
-resolution_degrees(nlat::Integer) = RingGrids.average_resolution(SpeedyWeather.DEFAULT_GRID, (nlat + 1) ÷ 2)
+# the resolution sweep runs on the default grid. Inverts `get_nlat`: grids with an odd number
+# of rings have nlat_half = (nlat + 1) ÷ 2 (Equator included), otherwise nlat_half = nlat ÷ 2
+function resolution_degrees(nlat::Integer)
+    Grid = SpeedyWeather.DEFAULT_GRID
+    nlat_half = (nlat + RingGrids.nlat_odd(Grid)) ÷ 2
+    return RingGrids.average_resolution(Grid, nlat_half)
+end
 
 # two significant digits below 10°, e.g. "3.5°", "0.7°", otherwise whole degrees, e.g. "11°"
 format_degrees(degrees) = degrees < 10 ? "$(round(degrees, sigdigits = 2))°" : "$(round(Int, degrees))°"
