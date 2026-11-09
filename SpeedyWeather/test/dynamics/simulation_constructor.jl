@@ -20,3 +20,25 @@
     @test simulation1.variables.prognostic.vorticity == simulation2.variables.prognostic.vorticity
     @test simulation1.variables.prognostic.clock.time == simulation2.variables.prognostic.clock.time
 end
+
+@testset "Printing Simulation types" begin
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
+    simulation = Simulation(BarotropicModel(spectral_grid))
+
+    # concrete simulation types are printed shortened
+    @test sprint(show, typeof(simulation)) == "Simulation{Variables{…}, BarotropicModel{…}}"
+
+    # partially specified types and types with unbound type variables (as in method signatures,
+    # stack traces and docstrings) are printed as usual and don't throw
+    @test sprint(show, SpeedyWeather.Simulation) == "Simulation"
+    @test sprint(show, SpeedyWeather.Simulation{Int}) == "Simulation{Int64}"
+    simulation_typevars = Base.unwrap_unionall(SpeedyWeather.Simulation)
+    @test startswith(sprint(show, simulation_typevars), "Simulation{V, M")
+    @test startswith(sprint(show, Tuple{Type{simulation_typevars}}), "Tuple{Type{Simulation{V, M")
+
+    # the docstring of the Simulation struct (TYPEDSIGNATURES lists its constructors) can be parsed
+    multidoc = Docs.meta(SpeedyWeather)[Docs.Binding(SpeedyWeather, :Simulation)]
+    for docstr in values(multidoc.docs)
+        @test Docs.parsedoc(docstr) isa Any
+    end
+end
