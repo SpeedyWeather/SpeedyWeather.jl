@@ -19,19 +19,19 @@ short_name(s::Type{<:AbstractLegendreShortcut}) = string(s)
 short_name(s::AbstractLegendreShortcut) = short_name(typeof(s))
 
 struct LegendreShortcutLinear <: AbstractLegendreShortcut end
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Linear Legendre shortcut, truncates the Legendre loop over order m to nlon/2."""
 LegendreShortcutLinear(nlon::Integer, latd::Real = 0) = nlon ÷ 2
 short_name(::Type{<:LegendreShortcutLinear}) = "linear"
 
 struct LegendreShortcutQuadratic <: AbstractLegendreShortcut end
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Quadratic Legendre shortcut, truncates the Legendre loop over order m to nlon/3."""
 LegendreShortcutQuadratic(nlon::Integer, latd::Real = 0) = nlon ÷ 3
 short_name(::Type{<:LegendreShortcutQuadratic}) = "quadratic"
 
 struct LegendreShortcutCubic <: AbstractLegendreShortcut end
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Cubic Legendre shortcut, truncates the Legendre loop over order m to nlon/4."""
 LegendreShortcutCubic(nlon::Integer, latd::Real = 0) = nlon ÷ 4
 short_name(::Type{<:LegendreShortcutCubic}) = "cubic"

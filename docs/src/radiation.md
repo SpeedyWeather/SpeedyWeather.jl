@@ -337,7 +337,7 @@ highest layer with large-scale condensation. The cloud cover (CLC) is then given
 ```
 
 where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are [large-scale](@ref "Large-scale precipitation")
-and [convective](@ref "Convective precipitation") precipitation,
+and [convective](@ref "Convective precipitation") precipitation in mm/day,
 and $\mathrm{RH}_{cl}$ is a threshold.
 
 **Stratocumulus clouds:**

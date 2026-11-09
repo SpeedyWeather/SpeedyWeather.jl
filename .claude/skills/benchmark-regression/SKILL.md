@@ -47,8 +47,9 @@ nvidia-smi -L > /dev/null 2>&1 && ARCHS="$ARCHS gpu"                            
 echo $ARCHS
 ```
 
-Tell the user which architectures will be benchmarked. The harness does not support Apple GPUs
-(Metal), so on a Mac this is the CPU only.
+Tell the user which architectures will be benchmarked. `regression.jl` supports cpu, gpu and
+amdgpu only (not the `metal` architecture of `manual_benchmarking.jl`), so on a Mac this is the
+CPU only.
 
 ## 2. Check
 

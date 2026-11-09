@@ -404,3 +404,19 @@ end
     # a constant isothermal reference profile is only reinitialized on a new time step, not on the schedule
     @test SpeedyWeather.rescheduled(reference_temperature) == !(reference_temperature isa IsothermalReferenceTemperature)
 end
+
+@testset "Leapfrog: previous grid step matches previous spectral step" begin
+    # during the Leapfrog start (Euler step, first leapfrog step) the previous spectral step
+    # is not advanced, so the previous grid step must not be either
+    spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
+    model = PrimitiveDryModel(spectral_grid; time_stepping = Leapfrog(spectral_grid, robert_filter = 0))
+    simulation = initialize!(model)
+    initialize!(simulation; steps = 4)
+    (; variables) = simulation
+    for _ in 1:4
+        SpeedyWeather.time_step!(variables, model.time_stepping, model)
+        SpeedyWeather.time_step!(variables.prognostic.clock, model.time_stepping)
+        temperature_grid = transform(get_step(variables.prognostic.temperature, 1), model.spectral_transform)
+        @test get_step(variables.grid.temperature, 1) ≈ temperature_grid rtol = 1.0e-5
+    end
+end

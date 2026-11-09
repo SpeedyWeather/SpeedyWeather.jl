@@ -122,7 +122,8 @@ end
 # environment with only what the debug mode loads, SpeedyWeather from `tree`
 function write_project(env, tree, arch)
     deps = TOML.parsefile(joinpath(BENCHMARK_DIR, "Project.toml"))["deps"]
-    project_deps = Dict(name => deps[name] for name in ("BenchmarkTools", "Dates", "JSON3", "Printf", "SpeedyWeather"))
+    names = ("ArgParse", "BenchmarkTools", "Dates", "JSON3", "Printf", "SpeedyWeather", "Statistics")
+    project_deps = Dict(name => deps[name] for name in names)
     arch == "gpu" && (project_deps["CUDA"] = deps["CUDA"])
     arch == "amdgpu" && (project_deps["AMDGPU"] = AMDGPU_UUID)
     sources = Dict("SpeedyWeather" => Dict("path" => joinpath(tree, "SpeedyWeather")))
@@ -264,7 +265,7 @@ function comparison_table(candidate::Measurement, references, threshold)
         print(io, markdown_row(["**geomean $(GROUP_LABELS[group])**", empty_cells..., changes...]))
     end
 
-    println(io, "\nSYPD = simulated years per wallclock day, higher is better; best of N runs.")
+    println(io, "\nSYPD = simulated years per wallclock day, higher is better; median of up to 5 timed runs, best of N benchmarks.")
     for m in measurements
         println(io, "- $(m.name): $(short(revision(m))), v$(m.meta.speedyweather_version), $(get(m.meta, :arch_label, "?")), N=$(length(m.files))")
     end
