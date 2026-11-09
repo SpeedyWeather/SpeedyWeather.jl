@@ -122,7 +122,7 @@ function get_vertices(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
     return seast, swest, nwest, neast
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Return a 5xN matrix `polygons` (or grid cells) of `NTuple{2, Float64}` where the first 4 rows
 are the vertices (E, S, W, N) of every grid points ij in 1:N, row 5 is duplicated north vertex
 to close the grid cell. Use keyword argument `add_nan=true` (default `false`) to add a 6th row

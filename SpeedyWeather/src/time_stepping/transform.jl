@@ -2,7 +2,7 @@
 SpeedyTransforms.transform!(vars::Variables, model::AbstractModel; kwargs...) =
     transform!(vars, model.time_stepping, model; kwargs...)
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Propagate the spectral state of the prognostic variables of `vars` to the
 grid variables `vars` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u, v."""
@@ -52,7 +52,7 @@ function SpeedyTransforms.transform!(
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Propagate the spectral state of the prognostic variables of `vars` to the
 grid variables in `vars` for the shallow water model. Updates grid vorticity,
 grid divergence, grid interface displacement (`pres_grid`) and the velocities
@@ -109,7 +109,7 @@ function SpeedyTransforms.transform!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Propagate the spectral state of the prognostic variables of `vars` to the
 grid variables in `vars` for primitive equation models. Updates grid vorticity,
 grid divergence, grid temperature, pressure (`pres_grid`) and the velocities

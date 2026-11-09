@@ -3,6 +3,7 @@ module RingGrids
 # DOCUMENTATION
 using StyledStrings
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 import Printf
 
 # NUMERICS
