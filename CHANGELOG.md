@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Benchmarks: completely revised with more options and opt-in experiments for publication [#1337](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1337)
 - Require DocStringExtensions v0.10 and show default argument values in docstrings of methods with default (keyword) arguments via `$(TypedMethodSignatures(defaults = true))` [#1310](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1310)
 - Fixes an issue with the `show` of `Simulation` failing in documentation builds [#1392](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1392)
 - Geopotential computed once in grid space and used by both dynamical core (via the Bernoulli potential) and parameterizations, spectral geopotential removed; Leapfrog keeps the previous grid step during the first two steps, consistent with the spectral one [#1381](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1381)
