@@ -29,12 +29,14 @@ end
     @test sprint(show, typeof(simulation)) == "Simulation{Variables{…}, BarotropicModel{…}}"
 
     # partially specified types and types with unbound type variables (as in method signatures,
-    # stack traces and docstrings) are printed as usual and don't throw
-    @test sprint(show, SpeedyWeather.Simulation) == "Simulation"
-    @test sprint(show, SpeedyWeather.Simulation{Int}) == "Simulation{Int64}"
+    # stack traces and docstrings) are printed as usual and don't throw. Print as seen from within
+    # SpeedyWeather, otherwise names are module-qualified depending on what's loaded into Main
+    show_unqualified(x) = sprint(show, x; context = :module => SpeedyWeather)
+    @test show_unqualified(SpeedyWeather.Simulation) == "Simulation"
+    @test show_unqualified(SpeedyWeather.Simulation{Int}) == "Simulation{Int64}"
     simulation_typevars = Base.unwrap_unionall(SpeedyWeather.Simulation)
-    @test startswith(sprint(show, simulation_typevars), "Simulation{V, M")
-    @test startswith(sprint(show, Tuple{Type{simulation_typevars}}), "Tuple{Type{Simulation{V, M")
+    @test show_unqualified(simulation_typevars) == "Simulation{V, M<:AbstractModel}"
+    @test show_unqualified(Tuple{Type{simulation_typevars}}) == "Tuple{Type{Simulation{V, M<:AbstractModel}}}"
 
     # the docstring of the Simulation struct (TYPEDSIGNATURES lists its constructors) can be parsed
     multidoc = Docs.meta(SpeedyWeather)[Docs.Binding(SpeedyWeather, :Simulation)]
