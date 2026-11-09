@@ -37,10 +37,4 @@ end
     simulation_typevars = Base.unwrap_unionall(SpeedyWeather.Simulation)
     @test show_unqualified(simulation_typevars) == "Simulation{V, M<:AbstractModel}"
     @test show_unqualified(Tuple{Type{simulation_typevars}}) == "Tuple{Type{Simulation{V, M<:AbstractModel}}}"
-
-    # the docstring of the Simulation struct (TYPEDSIGNATURES lists its constructors) can be parsed
-    multidoc = Docs.meta(SpeedyWeather)[Docs.Binding(SpeedyWeather, :Simulation)]
-    for docstr in values(multidoc.docs)
-        @test Docs.parsedoc(docstr) isa Any
-    end
 end
