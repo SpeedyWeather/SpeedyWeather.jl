@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Release SpeedyWeatherInternals 1.0.2 with DocStringExtensions v0.10 compat, fixing unsatisfiable requirements of the v0.24.0 release [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+
 ## 0.24.0
 
 - Benchmarks: completely revised with more options and opt-in experiments for publication [#1337](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1337)

@@ -1,6 +1,6 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-version = "1.0.1"
+version = "1.0.1+DEV"
 authors = ["SpeedyTransforms contributors"]
 
 [deps]
@@ -64,7 +64,7 @@ Printf = "1.10"
 ProgressMeter = "1.11.0"
 Reactant = "0.2.305"
 RingGrids = "1.0"
-SpeedyWeatherInternals = "1.0"
+SpeedyWeatherInternals = "1.0.2"
 Statistics = "1.10"
 StyledStrings = "1"
 cuFFT = "6"
