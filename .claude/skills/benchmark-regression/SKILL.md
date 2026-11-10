@@ -1,6 +1,6 @@
 ---
 name: benchmark-regression
-description: Check whether the current branch or PR of SpeedyWeather.jl has a performance regression. Runs the quick debug mode of the benchmark suite (PrimitiveWet resolution sweep, 8 layers, truncation ≤ 128) on the branch's HEAD and as references on origin/main, the latest release and the latest benchmarked revision, on the CPU and on an NVIDIA or AMD GPU if one is available; if the branch is significantly slower, bisects to the culprit commit and writes a markdown summary with a table, the culprit and a plain-language hypothesis, ready to paste as a GitHub comment. Use when asked to check a branch or PR for performance regressions, compare benchmark performance across versions, or find the commit that made the model slower. Optional argument - an architecture (cpu, gpu, amdgpu) to benchmark only that one.
+description: Check whether the current branch or PR of SpeedyWeather.jl has a performance regression. Runs the quick debug mode of the benchmark suite (PrimitiveWet with the default transform, T32–T128 with 8 layers, T32 and T128 with 16 layers) on the branch's HEAD and as references on origin/main, the latest release and the latest benchmarked revision, on the CPU and on an NVIDIA or AMD GPU if one is available; if the branch is significantly slower, bisects to the culprit commit and writes a markdown summary with a table, the culprit and a plain-language hypothesis, ready to paste as a GitHub comment. Use when asked to check a branch or PR for performance regressions, compare benchmark performance across versions, or find the commit that made the model slower. Optional argument - an architecture (cpu, gpu, amdgpu) to benchmark only that one.
 ---
 
 # Benchmark regression check for a branch
@@ -20,9 +20,9 @@ user can paste into a GitHub comment. It never posts anything to GitHub itself.
   to source files, tell the user they are not included and ask whether to continue or commit first.
 - **One benchmark at a time**, also across architectures, and no other heavy work (tests, builds,
   other agents) in parallel — contention makes the timings meaningless.
-- On Apple silicon (M3) each revision takes ~10 min (~7.5 min benchmark, 2–4 min precompile):
-  ~40 min for the four revisions without a regression; a confirmed regression adds ~30 min and
-  a bisection ~10 min per step (≈ log₂ of the commits in range). A GPU comes on top, as a second
+- On Apple silicon (M3) each revision takes ~6–8 min (~4 min benchmark, 2–4 min precompile):
+  ~30 min for the four revisions without a regression; a confirmed regression adds ~15 min and
+  a bisection ~7 min per step (≈ log₂ of the commits in range). A GPU comes on top, as a second
   check after the CPU one. Run it with `run_in_background` and wait for the completion
   notification; don't poll.
 - Every Bash call starts a fresh shell: repeat the variable block at the top of each call.
@@ -63,8 +63,8 @@ Fetching once keeps the references identical on all architectures. Per architect
 benchmarks the branch (`HEAD`) and as references `origin/main`, the latest release tag and the
 latest benchmarked revision of this architecture (the first-parent commit that introduced its
 stored results in `SpeedyWeather/benchmark/assets/benchmark_results.json`). A **regression** is a
-geometric-mean SYPD ratio branch / reference below 0.85 for all configurations or for one of the
-two transforms (LT+FFT, MT), on any architecture. It is confirmed by benchmarking both a second
+geometric-mean SYPD ratio branch / reference below 0.85 over all configurations, on any
+architecture. It is confirmed by benchmarking both a second
 time (best of both runs counts) and then bisected (first parent) from the most recent regressed
 reference, or from where the branch forked off it. On `main` itself the candidate is main and main
 is no reference.
@@ -91,8 +91,10 @@ Only if there is a culprit. Read what it changed — `git -C "$REPO" show --stat
 time step: `dynamics/`, `parameterizations/`, time stepping, `SpeedyTransforms`, `RingGrids`,
 `LowerTriangularArrays`. Typical causes: new work or allocations inside the time loop, type
 instabilities, changed default parameters or components (e.g. a new parameterization enabled by
-default, shorter time step), changed loop order or memory layout. Whether only MT or only LT+FFT
-regressed points at the transforms; both regressed points at dynamics or physics. Whether only the
+default, shorter time step), changed loop order or memory layout. A slowdown that grows with the
+truncation points at the horizontal (spectral transforms, grid-point loops); one that is larger at
+16 than at 8 layers (T32, T128) points at the vertical (column physics, vertical advection and
+integration); a similar slowdown everywhere at a per-time-step overhead. Whether only the
 GPU regressed points at GPU-specific code: kernels and their launch (`launch!`, work orders,
 workgroup sizes), GPU graphs, host–device transfers, scalar indexing or new device allocations;
 only the CPU points at the CPU branches of `arch isa GPU` dispatches. Write 2–3 short sentences in

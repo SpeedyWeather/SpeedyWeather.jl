@@ -1,6 +1,7 @@
 const USAGE = """
 Check SpeedyWeather.jl for performance regression with the debug mode of the benchmark suite
-(`manual_benchmarking.jl --debug`: PrimitiveWet resolution sweep, 8 layers, truncation ≤ 128).
+(`manual_benchmarking.jl --debug`: PrimitiveWet with the default transform, T32–T128 with 8 layers,
+T32 and T128 with 16 layers).
 
 Usage: julia SpeedyWeather/benchmark/regression/regression.jl <command> [options]
 
@@ -11,9 +12,9 @@ Usage: julia SpeedyWeather/benchmark/regression/regression.jl <command> [options
         the latest release and the latest benchmarked revision of this arch (or only those given
         with --references), and write report.md and summary.json to DIR (default WORKDIR/results),
         naming the candidate in the headline by its git ref or by --branch-name. A regression (geometric mean of the SYPD
-        ratios candidate / reference < threshold, for all configurations or one of the two
-        transforms) is confirmed by running both again, and with --bisect traced to its first bad
-        commit. Exits with 1 on a regression with --fail-on-regression.
+        ratios candidate / reference < threshold, for all configurations or, if both transforms
+        were benchmarked, one of them) is confirmed by running both again, and with --bisect traced
+        to its first bad commit. Exits with 1 on a regression with --fail-on-regression.
     benchmark REVISION|TREE OUTPUT.json [--arch cpu]
         Debug benchmark of one git revision, or of an existing checkout as is.
     bisect --good REV --bad REV --reference FILE[,FILE...] --cutoff X [--group all|default|matrix]
@@ -212,6 +213,28 @@ revision(m::Measurement) = string(get(m.meta, :revision, "?"))
 
 in_group(key, group) = group == "all" || key[3] == group
 
+# configurations (truncation, nlayers, transform) sorted by transform, layers, truncation
+configuration_order(key) = (key[3] != "default", key[2], key[1])
+
+"""The groups to compare the geometric means of: all configurations, and every transform on its
+own only if the `measurements` have several (the debug mode benchmarks only the default one)."""
+function groups(measurements...)
+    transforms = unique(key[3] for m in measurements for key in keys(m.sypd))
+    return [group for group in GROUPS if group == "all" || (length(transforms) > 1 && group in transforms)]
+end
+
+"""The configurations of `m`, e.g. "LT+FFT at L8: T32, T64; L16: T32"."""
+function configurations_summary(m::Measurement)
+    configurations = sort!(collect(keys(m.sypd)), by = configuration_order)
+    parts = map(unique(key[3] for key in configurations)) do transform
+        layers = map(unique(key[2] for key in configurations if key[3] == transform)) do nlayers
+            "L$nlayers: T" * join([key[1] for key in configurations if key[3] == transform && key[2] == nlayers], ", T")
+        end
+        "$(GROUP_LABELS[transform]) at " * join(layers, "; ")
+    end
+    return join(parts, ", ")
+end
+
 function geomean_ratio(candidate::Measurement, reference::Measurement, group)
     common = [key for key in keys(candidate.sypd) if haskey(reference.sypd, key) && in_group(key, group)]
     isempty(common) && return nothing
@@ -222,7 +245,7 @@ end
 below `threshold`) the worst group and a bisect cutoff halfway (geometrically) between both."""
 function compare(candidate::Measurement, reference::Measurement, threshold)
     ratios = Pair{String, Float64}[]
-    for group in GROUPS
+    for group in groups(candidate, reference)
         ratio = geomean_ratio(candidate, reference, group)
         isnothing(ratio) || push!(ratios, group => ratio)
     end
@@ -245,10 +268,15 @@ markdown_row(cells) = "| " * join(cells, " | ") * " |\n"
 function comparison_table(candidate::Measurement, references, threshold)
     measurements = [references; candidate]
     configurations = collect(union((keys(m.sypd) for m in measurements)...))
-    sort!(configurations, by = key -> (key[3] != "default", key[1], key[2]))
-    layers = length(unique(key[2] for key in configurations)) > 1     # column only if it varies
+    sort!(configurations, by = configuration_order)
+    # the columns L and Transform only if they vary
+    layers = length(unique(key[2] for key in configurations)) > 1
+    transforms = length(unique(key[3] for key in configurations)) > 1
     io = IOBuffer()
-    header = ["T", (layers ? ["L"] : [])..., "Transform", (m.name for m in measurements)..., ("$(candidate.name) vs $(m.name)" for m in references)...]
+    header = [
+        "T", (layers ? ["L"] : [])..., (transforms ? ["Transform"] : [])...,
+        (m.name for m in measurements)..., ("$(candidate.name) vs $(m.name)" for m in references)...,
+    ]
     print(io, markdown_row(header), "|", " --- |"^length(header), "\n")
     for key in configurations
         sypds = [format_sypd(get(m.sypd, key, nothing)) for m in measurements]
@@ -256,12 +284,11 @@ function comparison_table(candidate::Measurement, references, threshold)
             both = haskey(candidate.sypd, key) && haskey(reference.sypd, key)
             format_change(both ? candidate.sypd[key] / reference.sypd[key] : nothing, threshold)
         end
-        transform = key[3] == "matrix" ? "MT" : "LT+FFT"
-        print(io, markdown_row([key[1], (layers ? [key[2]] : [])..., transform, sypds..., changes...]))
+        print(io, markdown_row([key[1], (layers ? [key[2]] : [])..., (transforms ? [GROUP_LABELS[key[3]]] : [])..., sypds..., changes...]))
     end
-    for group in GROUPS
+    for group in groups(measurements...)
         changes = [format_change(geomean_ratio(candidate, reference, group), threshold) for reference in references]
-        empty_cells = fill("", length(measurements) + (layers ? 2 : 1))
+        empty_cells = fill("", length(measurements) + layers + transforms)
         print(io, markdown_row(["**geomean $(GROUP_LABELS[group])**", empty_cells..., changes...]))
     end
 
@@ -467,7 +494,7 @@ function check(;
         report = IOBuffer()
         println(report, "## Benchmark regression check$of on $label: $headline\n")
         date = Libc.strftime("%Y-%m-%d", time())
-        println(report, "`manual_benchmarking.jl --debug` (PrimitiveWet, L8, T ≤ 128) on $label, $(device_name(label, tested.meta)), Julia $VERSION, $date.\n")
+        println(report, "`manual_benchmarking.jl --debug` (PrimitiveWet $(configurations_summary(tested))) on $label, $(device_name(label, tested.meta)), Julia $VERSION, $date.\n")
         print(report, comparison_table(tested, measured, threshold))
         println(report, "\nRegression = geometric-mean SYPD ratio $candidate_name / reference < $threshold:")
         print(report, verdict_lines(comparisons, threshold))

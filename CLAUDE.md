@@ -374,8 +374,9 @@ model over the same resolutions in a SPEEDY.f90-like configuration (prescribed s
 constant surface roughness, wind slowdown and gusts), on every architecture including Reactant. Truncations in the benchmarks are 1-based (T32, …, T256), as in
 the model code.
 
-For a quick check whether performance regressed, `manual_benchmarking.jl --debug` runs only
-the PrimitiveWet resolution sweep with 8 layers up to T128 and does not touch the stored results.
+For a quick check whether performance regressed, `manual_benchmarking.jl --debug` runs only a
+short PrimitiveWet resolution sweep with the default transform (T32–T128 with 8 layers, T32 and
+T128 with 16 layers) and does not touch the stored results.
 `julia SpeedyWeather/benchmark/regression/regression.jl check` runs it on main, the latest
 release and the latest benchmarked revision and compares them (also run weekly by
 `.github/workflows/benchmark_regression.yml`; the `benchmark-regression` skill builds on it).

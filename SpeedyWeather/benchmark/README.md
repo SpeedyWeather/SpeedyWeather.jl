@@ -35,7 +35,7 @@ julia --project=. manual_benchmarking.jl reactant-cpu          # Reactant on CPU
 julia --project=. manual_benchmarking.jl reactant-nvidia-gpu   # Reactant on NVIDIA GPU (CUDA)
 julia --project=. manual_benchmarking.jl reactant-amd-gpu      # Reactant on AMD GPU (ROCm)
 julia --project=. manual_benchmarking.jl reactant-tpu          # Reactant on TPU
-julia --project=. manual_benchmarking.jl --debug               # quick regression check: PrimitiveWet, L8, T ≤ 128, not stored
+julia --project=. manual_benchmarking.jl --debug               # quick regression check, not stored: PrimitiveWet LT+FFT at L8: T32, T43, T64, T86, T128; L16: T32, T128
 julia regression/regression.jl check                           # debug mode on main, latest release and latest benchmarked revision
 ```
 

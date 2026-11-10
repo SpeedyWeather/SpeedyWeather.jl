@@ -61,9 +61,11 @@ flag added in an earlier run. Flags and options can be combined in any order, e.
 `reactant-nvidia-gpu --length 10 --reverse --hi-res`; `--SPEEDY` can also be written `--speedy`. Truncations are 1-based throughout
 (T32, …, T256) as in the model code.
 
-Debug mode (`--debug`) is a quick check whether the performance has regressed: it
-only runs the PrimitiveWet resolution sweep (`:benchmark201`) with 8 layers up to
-truncation 128, prints the results and leaves the `README.md` and
+Debug mode (`--debug`) is a quick check whether the performance has regressed: instead
+of all suites it only runs a short PrimitiveWet resolution sweep with the default
+transform (LT+FFT): T32, T43, T64, T86 and T128 with 8 layers, and T32 and T128 with 16
+layers (`DEBUG_TRUNCATIONS`, `DEBUG_NLAYERS`), under the key of the resolution sweep
+(`:benchmark201`). It prints the results and leaves the `README.md` and
 `assets/benchmark_results.json` untouched. With `--output FILE` the results are
 additionally written to FILE as JSON, e.g. to compare revisions (as
 `regression/regression.jl` does). `--repeats` and `--length` apply as usual, the
@@ -158,8 +160,9 @@ const ARGUMENT_SETTINGS = ArgParseSettings(
     action = :store_true
     dest_name = "speedy"
     "--debug"
-    help = "quick check whether the performance regressed: only the PrimitiveWet resolution sweep (benchmark201) with " *
-        "8 layers up to T128, the results are printed, README.md and assets/benchmark_results.json are left untouched"
+    help = "quick check whether the performance regressed: only a short PrimitiveWet resolution sweep with the default " *
+        "transform (T32-T128 with 8 layers, T32 and T128 with 16 layers), the results are printed, README.md and " *
+        "assets/benchmark_results.json are left untouched"
     action = :store_true
     "--output"
     help = "with --debug: additionally write the results as JSON to FILE, e.g. to compare revisions"
@@ -172,14 +175,19 @@ const RUN_REVERSE = ARGUMENTS["reverse"]
 const RUN_HI_RES = ARGUMENTS["hi_res"]
 const RUN_SPEEDY = ARGUMENTS["speedy"]
 
-# Debug mode (`--debug`): only the PrimitiveWet resolution sweep with these layers, up to this truncation
+# Debug mode (`--debug`): only the PrimitiveWet model with the default transform at these
+# (truncation, nlayers): the resolution sweep up to T128 with 8 layers, and two configurations with 16 layers
 const DEBUG_MODE = ARGUMENTS["debug"]
-const DEBUG_MAX_TRUNCATION = 128
-const DEBUG_NLAYERS = 8
+const DEBUG_TRUNCATIONS = [32, 43, 64, 86, 128, 32, 128]
+const DEBUG_NLAYERS = [8, 8, 8, 8, 8, 16, 16]
+# for the messages, "PrimitiveWet LT+FFT at L8: T32, …, T128; L16: T32, T128"
+const DEBUG_SUMMARY = "PrimitiveWet LT+FFT at " * join(
+    ("L$nlayers: T" * join(DEBUG_TRUNCATIONS[DEBUG_NLAYERS .== nlayers], ", T") for nlayers in unique(DEBUG_NLAYERS)), "; "
+)
 const OUTPUT_PATH = isnothing(ARGUMENTS["output"]) ? nothing : abspath(CALLER_DIRECTORY, ARGUMENTS["output"])
 isnothing(OUTPUT_PATH) || DEBUG_MODE || error("--output FILE is only supported together with --debug.")
 DEBUG_MODE && (RUN_REVERSE || RUN_HI_RES || RUN_SPEEDY || !isempty(strip(ARGUMENTS["suites"]))) &&
-    error("--debug only runs the PrimitiveWet resolution sweep up to T$DEBUG_MAX_TRUNCATION, it can't be combined with --reverse, --hi-res, --SPEEDY or --suites.")
+    error("--debug only runs its own short PrimitiveWet sweep, it can't be combined with --reverse, --hi-res, --SPEEDY or --suites.")
 
 const ARCH_ARG = lowercase(ARGUMENTS["architecture"])
 # Reactant's backend per architecture argument, the GPU vendor is that of the installed Reactant_jll build
@@ -296,15 +304,20 @@ ARCH isa SpeedyWeather.ReactantDevice && include("reactant_runner.jl")
 RUN_REVERSE && include("reverse_benchmark_suite.jl")
 include("define_benchmarks.jl")
 
-# Debug mode: only the configurations of the PrimitiveWet resolution sweep with DEBUG_NLAYERS up to DEBUG_MAX_TRUNCATION
+# Debug mode: instead of all suites only the short sweep of DEBUG_TRUNCATIONS, DEBUG_NLAYERS (default transform),
+# under the key of the resolution sweep as its numbers are stored as the `overview` (read by regression/regression.jl)
 if DEBUG_MODE
-    resolution_suite = benchmarks[:benchmark201]
-    debug_runs = findall(
-        i -> resolution_suite.truncation[i] <= DEBUG_MAX_TRUNCATION && resolution_suite.nlayers[i] == DEBUG_NLAYERS,
-        1:resolution_suite.nruns,
+    debug_nruns = length(DEBUG_TRUNCATIONS)
+    benchmarks = Dict{Symbol, AbstractBenchmarkSuite}(
+        :benchmark201 => BenchmarkSuite(
+            title = "Primitive wet model, resolution (debug mode)",
+            nruns = debug_nruns,
+            model = fill(PrimitiveWetModel, debug_nruns),
+            truncation = DEBUG_TRUNCATIONS,
+            nlayers = DEBUG_NLAYERS,
+        ),
     )
-    benchmarks = Dict{Symbol, AbstractBenchmarkSuite}(:benchmark201 => select_runs(resolution_suite, debug_runs))
-    @info "Debug mode: running only :benchmark201 with L = $DEBUG_NLAYERS, T ≤ $DEBUG_MAX_TRUNCATION ($(length(debug_runs)) runs)"
+    @info "Debug mode: running only $DEBUG_SUMMARY ($debug_nruns runs)"
 end
 
 for (key, suite) in benchmarks
@@ -455,8 +468,6 @@ if DEBUG_MODE
     if !isnothing(OUTPUT_PATH)
         meta = arch_record["meta"] = Dict{String, Any}(arch_record["meta"])
         meta["arch_label"] = ARCH_LABEL
-        meta["debug_max_truncation"] = DEBUG_MAX_TRUNCATION
-        meta["debug_nlayers"] = DEBUG_NLAYERS
         # where the monorepo packages were loaded from, to verify the benchmarked revision
         meta["package_dirs"] = Dict(
             string(name) => pkgdir(getfield(SpeedyWeather, name))
@@ -537,7 +548,7 @@ function write_preamble(md)
     write(md, "julia --project=. manual_benchmarking.jl reactant-nvidia-gpu   # Reactant on NVIDIA GPU (CUDA)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-amd-gpu      # Reactant on AMD GPU (ROCm)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-tpu          # Reactant on TPU\n")
-    write(md, "julia --project=. manual_benchmarking.jl --debug               # quick regression check: PrimitiveWet, L$DEBUG_NLAYERS, T ≤ $DEBUG_MAX_TRUNCATION, not stored\n")
+    write(md, "julia --project=. manual_benchmarking.jl --debug               # quick regression check, not stored: $DEBUG_SUMMARY\n")
     write(md, "julia regression/regression.jl check                           # debug mode on main, latest release and latest benchmarked revision\n")
     write(md, "```\n\n")
     write(md, "Options and flags, in any order (`manual_benchmarking.jl --help` lists them): `--length X`, e.g. `manual_benchmarking.jl gpu --length 10`, multiplies the number of time steps of the ")
