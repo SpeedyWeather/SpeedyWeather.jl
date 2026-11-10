@@ -16,6 +16,7 @@ Base revision: 03800ef2
 ## Revision log
 
 - Initial draft.
+- The other packages are not released yet (unreleased v0.24.0), so no `+DEV` bumps for them; CHANGELOG line goes into the 0.24.0 section.
 
 ## Problem description
 
@@ -33,8 +34,8 @@ Inside the monorepo `[sources]` path entries mask the problem, so CI did not cat
 
 - `SpeedyWeatherInternals` version `1.0.1+DEV` → `1.0.2` (to be registered).
 - `SpeedyWeatherInternals = "1.0.2"` compat lower bound in LowerTriangularArrays, RingGrids,
-  SpeedyTransforms and SpeedyWeather, so they can never resolve to an old SpeedyWeatherInternals;
-  these get `+DEV` and pick up the bound with their next patch release.
+  SpeedyTransforms and SpeedyWeather, so they can never resolve to an old SpeedyWeatherInternals.
+  These versions (1.0.1, 0.24.0) are not registered yet, so they are released with this bound, no `+DEV`.
 
 ## Testing and verification
 
@@ -46,8 +47,7 @@ None.
 
 ## Known limitations
 
-Already registered LowerTriangularArrays/RingGrids/SpeedyTransforms 1.0.1 keep the loose `"1.0"` bound,
-which is fine once 1.0.2 exists.
+None.
 
 ## Future work
 
