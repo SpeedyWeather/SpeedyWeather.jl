@@ -93,7 +93,7 @@ An illustration of adiabat reference line is below
 
 ## Learned convective trigger
 
-An optional `LearnedConvectionTrigger` gates Betts-Miller convection using the environmental
+An optional `LearnedConvectionTrigger` replaces the Betts-Miller on/off criteria using the environmental
 (previous time step) temperature in K and specific humidity in kg/kg:
 
 ```julia
@@ -103,9 +103,13 @@ convection = BettsMillerConvection(spectral_grid; trigger)
 model = PrimitiveWetModel(spectral_grid; convection)
 ```
 
-The original Betts-Miller criteria still select physically admissible deep or shallow
-adjustments; the learned trigger can suppress either. `trigger = nothing` (default)
-preserves the original scheme. The classifier is deterministic: its PySR expression returns
+With the learned trigger configured, the classifier alone decides whether to adjust a column;
+there is no additional `PT > 0` gate. For an accepted column, positive net drying (`Pq > 0`)
+selects the precipitating adjustment; otherwise the non-precipitating adjustment conserves
+column moisture. The parcel ascent still defines the reference profiles and adjustment depth.
+The temperature and humidity corrections retain the column energy and moisture budgets.
+`trigger = nothing` (default) preserves the original Betts-Miller criteria and adjustments.
+The classifier is deterministic: its PySR expression returns
 a logit, and convection requires a positive logit, equivalent to a probability above 0.5.
 No stochastic draw is made.
 

@@ -67,6 +67,78 @@
         end
     end
 
+    @testset "ML replaces the physical on/off criteria" begin
+        spectral_grid = SpectralGrid(truncation = 7, nlayers = 24, NF = Float64)
+        geometry = Geometry(spectral_grid)
+        atmosphere = EarthAtmosphere(spectral_grid)
+        model = (; geometry, atmosphere, planet = Earth(spectral_grid), time_stepping = EulerForward(spectral_grid))
+        nlayers = spectral_grid.nlayers
+        σ = geometry.σ_levels_full
+        Δσ = geometry.σ_levels_thick
+        # The wet fixture has PT == 0 and Pq > 0. The second fixture has PT < 0:
+        # moisture makes the lifted parcel virtually buoyant despite its lower T.
+        for wet in (true, false)
+            T = fill(300.0, nlayers)
+            q = zeros(nlayers)
+            if wet
+                T[1:end-1] .= 301
+                q .= 0.03
+                q[end] = 0.04
+            else
+                q[end] = 0.02
+            end
+            vars = (
+                grid = (; temperature = reshape(copy(T), 1, nlayers, 1), humidity = reshape(copy(q), 1, nlayers, 1)),
+                tendencies = (; grid = (; temperature = zeros(1, nlayers, 1), humidity = zeros(1, nlayers, 1))),
+                dynamics = (; geopotential = reshape(-atmosphere.R_dry .* T .* log.(σ), 1, nlayers)),
+                scratch = (; grid = (; a = zeros(1, nlayers), b = zeros(1, nlayers))),
+                parameterizations = (
+                    surface_pressure = [1.0e5], rain_convection = [0.0], snow_convection = [0.0],
+                    rain_rate_convection = [0.0], snow_rate_convection = [0.0],
+                    rain_rate = [0.0], snow_rate = [0.0], cloud_top = [nlayers + 1],
+                ),
+            )
+            # Deliberately map these columns to a known accepted feature vector.
+            # This tests the coupling independently of the classifier's skill.
+            t_mean = [245.06016575811805, 41.82535069647731, -5.468058282704101,
+                -2.583673702119638, 1.8256633228157173, -0.1829393592716407]
+            q_mean = [0.0027977503305968415, 0.0034685521790958898, 0.0020090165867202524,
+                -4.118595780749046e-5, 0.0001369833605204781, -0.00023787588637710037]
+            projection = zeros(6, nlayers)
+            projection[:, end-1:end] .= hcat(t_mean, q_mean) / hcat(T[end-1:end], q[end-1:end])
+            trigger = LearnedConvectionTrigger(projection)
+            learned = BettsMillerConvection(spectral_grid; trigger, snow = false)
+            original = BettsMillerConvection(spectral_grid; snow = false)
+            temp = SpeedyWeather.get_prognostic_step(vars.grid.temperature, model.time_stepping, learned)
+            humid = SpeedyWeather.get_prognostic_step(vars.grid.humidity, model.time_stepping, learned)
+            @test SpeedyWeather.convecting(1, temp, humid, trigger)
+            SpeedyWeather.pseudo_adiabat!(1, vars.scratch.grid.a, vars.scratch.grid.b, temp, humid,
+                vars.dynamics.geopotential, 1.0e5, σ, atmosphere, learned.relative_humidity, learned.entrainment)
+            Pq = sum((q .- vec(vars.scratch.grid.b)) .* Δσ)
+            PT = -sum((T .- vec(vars.scratch.grid.a)) .* Δσ)
+            @test PT <= 0
+            @test (Pq > 0) == wet
+            # Default Betts-Miller must reject these columns without adding tendencies.
+            SpeedyWeather.convection!(1, vars, original, model)
+            @test all(iszero, vars.tendencies.grid.temperature)
+            @test all(iszero, vars.tendencies.grid.humidity)
+            @test iszero(vars.parameterizations.rain_convection[1])
+            # The ML decision must activate an adjustment in both cases, with rain
+            # selected by the moisture budget rather than the old PT > 0 criterion.
+            SpeedyWeather.convection!(1, vars, learned, model)
+            dT = vec(vars.tendencies.grid.temperature)
+            dq = vec(vars.tendencies.grid.humidity)
+            rain = vars.parameterizations.rain_convection[1]
+            @test all(isfinite, dT) && all(isfinite, dq) && isfinite(rain)
+            @test any(!iszero, dT) || any(!iszero, dq)
+            @test wet ? rain > 0 : iszero(rain)
+            water = sum(dq .* Δσ) + rain / model.time_stepping.Δt * model.planet.gravity * atmosphere.water_density / 1.0e5
+            energy = atmosphere.heat_capacity * sum(dT .* Δσ) + atmosphere.latent_heat_condensation * sum(dq .* Δσ)
+            @test water ≈ 0 atol = 1e-15
+            @test energy ≈ 0 atol = 1e-10
+        end
+    end
+
     @testset "Gate suppresses tendencies and precipitation" begin
         spectral_grid = SpectralGrid(truncation = 64, nlayers = 24)
         model = PrimitiveWetModel(spectral_grid)

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add an optional standardised Chebyshev/PySR trigger for Betts-Miller convection.
+- Use the learned trigger as the sole convection on/off decision when configured, retaining moisture-budget closure and the original default Betts-Miller behaviour.
 
 ## 0.24.0
 

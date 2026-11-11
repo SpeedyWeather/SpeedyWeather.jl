@@ -2,7 +2,7 @@ abstract type AbstractConvection <: AbstractParameterization end
 
 export LearnedConvectionTrigger
 
-"""Optional learned gate for [`BettsMillerConvection`](@ref), using environmental temperature
+"""Optional replacement trigger for [`BettsMillerConvection`](@ref), using environmental temperature
 [K] and specific humidity [kg/kg]. Fits Chebyshev polynomials at x = 2σ - 1 and standardises
 coefficients c₀…c₅ before evaluating the exported PySR logit. Convection requires P > 0.5.
 The unweighted degree-six fit preserves the original projection supplied with the expression:
@@ -108,7 +108,7 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
     "[OPTION] Entrainment profile mixing environmental air into the rising parcel"
     @component entrainment::Entrainment = LinearEntrainment(DEFAULT_NF)
 
-    "[OPTION] Additional learned trigger; nothing uses only the Betts-Miller criteria"
+    "[OPTION] Replacement learned trigger; nothing uses the original Betts-Miller criteria"
     @component trigger::Trigger = nothing
 
     "[OPTION] Convert convective rain below freezing to snow?"
@@ -200,15 +200,18 @@ and relaxes current vertical profiles to the adjusted references."""
         Qref -= ifelse(in_column, humid_ref_profile[ij, k], zero(NF)) * Δσ[k]  # eq (11) but in σ coordinates
     end
 
-    # ADJUST PROFILES FOLLOWING FRIERSON 2007
-    deep_convection = Pq > 0 && PT > 0
-    shallow_convection = Pq <= 0 && PT > 0
-
-    # Keep the physical deep/shallow criteria: their profile corrections and budgets
-    # require them even when the learned gate accepts a column.
-    no_convection = !(deep_convection || shallow_convection)
-    no_convection && return nothing
-    convecting(ij, temp, humid, convection.trigger) || return nothing
+    # Without a replacement trigger, preserve the original Betts-Miller criteria.
+    # With one, the classifier alone decides whether to adjust the column. Pq then
+    # selects the moisture-budget closure, not whether convection is allowed:
+    # positive net drying precipitates; otherwise use the non-precipitating closure.
+    if convection.trigger === nothing
+        deep_convection = Pq > 0 && PT > 0
+        shallow_convection = Pq <= 0 && PT > 0
+        (deep_convection || shallow_convection) || return nothing
+    else
+        convecting(ij, temp, humid, convection.trigger) || return nothing
+        deep_convection = Pq > 0
+    end
 
     # height of zero buoyancy level in σ coordinates
     Δσ_lzb = σ_half[nlayers + 1] - σ_half[level_zero_buoyancy]
@@ -216,7 +219,8 @@ and relaxes current vertical profiles to the adjusted references."""
     # branchless selection between the deep (eq 5-6) and shallow "qref" (eq 11-15) corrections;
     # fq = 1 for deep convection, i.e. no humidity profile correction there
     ΔT = ifelse(deep_convection, (PT - Pq * Lᵥ / cₚ) / Δσ_lzb, PT / Δσ_lzb)
-    fq = ifelse(deep_convection, one(NF), 1 - Pq / Qref)
+    # A completely dry reference column has Pq == Qref == 0 and needs no rescaling.
+    fq = ifelse(deep_convection || iszero(Qref), one(NF), 1 - Pq / Qref)
 
     # Initialize rain accumulation for this grid point
     rain_convection::NF = 0
