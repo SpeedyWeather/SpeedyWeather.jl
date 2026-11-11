@@ -59,11 +59,9 @@ architecture_rng(architecture, seed; draw_on_cpu::Bool = false) =
     (draw_on_cpu || architecture isa CPU) ? Random.Xoshiro(seed) : GPUArrays.RNG{array_type(architecture)}(seed)
 
 """$(TYPEDSIGNATURES)
-Complex normals, unit variance in real and imaginary part, one per element of `pattern`, on its
-architecture, drawn from `rng`."""
-function complex_normals(pattern::LowerTriangularArray, rng::Random.AbstractRNG)
-    r = similar(pattern.data)
-    Random.randn!(rng, r)
+Fill `r` in place with complex normals drawn from `rng`, unit variance in real and imaginary part."""
+function complex_normals!(r::LowerTriangularArray, rng::Random.AbstractRNG)
+    Random.randn!(rng, r.data)
 
     # Julia's randn(Complex) has total variance E|z|² = 1, i.e. variance 1/2 in real and imaginary part
     # each. The noise factors of the random processes are normalised for unit variance in each part,
@@ -71,7 +69,7 @@ function complex_normals(pattern::LowerTriangularArray, rng::Random.AbstractRNG)
     # Written as 2/√2 to keep the random
     # numbers of earlier versions bit for bit; drawing real normals directly into `reinterpret(real, r)`
     # would be the same stream but rounded differently
-    r .*= convert(real(eltype(r)), 2 / sqrt(2))
+    r.data .*= convert(real(eltype(r)), 2 / sqrt(2))
     return r
 end
 
@@ -83,7 +81,7 @@ independently. Transformed after every time step to grid space with a
 `clamp` applied to limit extrema. For reproducability `seed` can be
 provided and an independent `random_number_generator` is used
 that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
-@kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType} <: AbstractRandomProcess
+@kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType, SpectralVariable2D} <: AbstractRandomProcess
     truncation::IntType
 
     "[OPTION] Time scale of the AR1 process"
@@ -109,6 +107,9 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
 
     "Precomputed noise factors [1] for every total wavenumber l"
     noise_factors::VectorType = zeros(NF, truncation + 1)
+
+    "Buffer for the random numbers drawn every time step"
+    random_numbers::SpectralVariable2D
 end
 
 # generator function
@@ -120,9 +121,10 @@ function SpectralAR1Process(
         kwargs...,
     )
     RNG = typeof(random_number_generator)
-    (; truncation) = SG
-    return SpectralAR1Process{SG.NF, SG.VectorType, typeof(seed), RNG, typeof(truncation)}(;
-        truncation, seed, random_number_generator, kwargs...,
+    (; truncation, SpectralVariable2D, spectrum) = SG
+    random_numbers = zeros(SpectralVariable2D, spectrum)
+    return SpectralAR1Process{SG.NF, SG.VectorType, typeof(seed), RNG, typeof(truncation), SpectralVariable2D}(;
+        truncation, seed, random_number_generator, random_numbers, kwargs...,
     )
 end
 
@@ -170,7 +172,7 @@ function random_process!(
         process::SpectralAR1Process{NF},
     ) where {NF}
     a = process.autoregressive_factor[]
-    r = complex_normals(random_pattern, process.random_number_generator)
+    r = complex_normals!(process.random_numbers, process.random_number_generator)
     launch!(
         architecture(random_pattern), SpectralWorkOrder, size(random_pattern), spectral_ar1_kernel!,
         random_pattern, r, process.noise_factors, random_pattern.spectrum.l_indices, a
@@ -301,24 +303,24 @@ function random_process!(
         pattern::LowerTriangularArray,
         process::SpectralWhiteNoiseProcess{NF},
     ) where {NF}
-    r = complex_normals(pattern, process.random_number_generator)
+    complex_normals!(pattern, process.random_number_generator)
 
     # linear index over all slots, l_indices and m_indices are per lm
     nlm = size(pattern, 1)
     launch!(
         architecture(pattern), SpectralWorkOrder, size(pattern), white_noise_kernel!,
-        pattern, r, process.noise_factors, pattern.spectrum.l_indices, pattern.spectrum.m_indices, nlm,
+        pattern, process.noise_factors, pattern.spectrum.l_indices, pattern.spectrum.m_indices, nlm,
     )
     return nothing
 end
 
 @kernel inbounds = true function white_noise_kernel!(
-        pattern, r, noise_factors, l_indices, m_indices, nlm,
+        pattern, noise_factors, l_indices, m_indices, nlm,
     )
     i = @index(Global, Linear)
     lm = mod1(i, nlm)
     l = l_indices[lm]
-    x = noise_factors[l] * r[i]
+    x = noise_factors[l] * pattern[i]
 
     # m = 0 is real (a real grid field has real zonal-mean coefficients), and carries √2 × the
     # real part to restore the variance of the dropped imaginary part, keeping the pattern homogeneous
