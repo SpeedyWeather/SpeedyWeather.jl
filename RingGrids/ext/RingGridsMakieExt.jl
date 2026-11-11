@@ -3,7 +3,7 @@ module RingGridsMakieExt
 using RingGrids
 using Makie
 using DocStringExtensions
-import RingGrids: TYPEDSIGNATURES
+using RingGrids: TYPEDSIGNATURES
 
 function default_title(field::RingGrids.AbstractField)
     Grid = RingGrids.nonparametric_type(field.grid)

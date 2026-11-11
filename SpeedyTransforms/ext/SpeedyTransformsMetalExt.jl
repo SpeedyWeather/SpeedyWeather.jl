@@ -4,7 +4,7 @@ import Metal: Metal, MtlArray
 import AbstractFFTs
 import LinearAlgebra
 using DocStringExtensions
-import SpeedyTransforms: TYPEDSIGNATURES
+using SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids

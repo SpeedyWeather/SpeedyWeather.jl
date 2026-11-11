@@ -4,7 +4,7 @@ import CUDA: CUDA, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
 using cuFFT
 import AbstractFFTs
 using DocStringExtensions
-import SpeedyTransforms: TYPEDSIGNATURES
+using SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids

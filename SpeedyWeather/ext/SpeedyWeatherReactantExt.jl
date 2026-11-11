@@ -3,7 +3,7 @@ module SpeedyWeatherReactantExt
 using SpeedyWeather
 using Reactant
 using DocStringExtensions
-import SpeedyWeather: TYPEDSIGNATURES
+using SpeedyWeather: TYPEDSIGNATURES
 using Dates
 
 using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, time_step!, time_steps!

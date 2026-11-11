@@ -3,7 +3,7 @@ module SpeedyTransformsAMDGPUExt
 import AMDGPU: AMDGPU, ROCArray
 import AbstractFFTs
 using DocStringExtensions
-import SpeedyTransforms: TYPEDSIGNATURES
+using SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids

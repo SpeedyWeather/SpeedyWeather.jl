@@ -3,7 +3,7 @@ module SpeedyWeatherGeoMakieExt
 using SpeedyWeather
 using GeoMakie
 using SpeedyWeather.DocStringExtensions
-import SpeedyWeather: TYPEDSIGNATURES
+using SpeedyWeather: TYPEDSIGNATURES
 using SpeedyWeather.NCDatasets
 
 # Additional globe dispatches for Speedy types
