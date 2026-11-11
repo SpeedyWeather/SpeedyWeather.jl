@@ -50,6 +50,7 @@ function time_step!(
     reinitialize!(model, vars)
     reset_tendencies!(vars, time_stepping)      # set the tendencies back to zero for accumulation
 
+    wiener_increment!(vars, time_stepping, model)   # stochastic time steppers only, e.g. StochasticLeapfrog
     dynamics_tendencies!(vars, model)
     diffusion_and_implicit!(vars, model)        # dispatch over time stepper and implicit so that the order can be changed
     update_prognostic!(vars, model)             # step prognostic variables forward
@@ -58,6 +59,12 @@ function time_step!(
 
     return nothing
 end
+
+"""$(TYPEDSIGNATURES)
+Add the stochastic (Wiener) increment of a stochastic time stepper to the tendencies, called
+after the parameterizations and before the dynamical core, i.e. where a forcing would add to
+the tendencies. Deterministic time steppers do nothing, see `StochasticLeapfrog`."""
+wiener_increment!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
 
 # dispatch over time stepper here so that other time stepper can change the order
 diffusion_and_implicit!(vars, model) =
@@ -98,6 +105,7 @@ function time_step!(
     end
 
     if model.dynamics                           # switch on/off all dynamics
+        wiener_increment!(vars, time_stepping, model)   # stochastic time steppers only, e.g. StochasticLeapfrog
         dynamics_tendencies!(vars, model)       # dynamical core
         diffusion_and_implicit!(vars, model)    # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space

@@ -2,9 +2,15 @@ export Leapfrog
 
 abstract type AbstractLeapfrog <: AbstractTimeStepper end
 
+"""Supertype of the leapfrog time steppers that start with an Euler step and apply the
+Robert-Williams filter: `Leapfrog` and `StochasticLeapfrog`. Subtypes have (at least) the
+fields of `Leapfrog`, the methods for the clock, the time step, the filter and the ocean
+and land time steppers are shared."""
+abstract type AbstractFilteredLeapfrog <: AbstractLeapfrog end
+
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
+mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractFilteredLeapfrog
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
@@ -30,7 +36,7 @@ mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
     land::L
 end
 
-Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt))
+Adapt.adapt_structure(to, L::AbstractFilteredLeapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt))
 
 # HOW MANY STEPS DO VARIABLES NEED?
 # leapfrogging always needs 2 steps (in spectral, and for ocean/land if leapfrogged)
@@ -132,7 +138,7 @@ spectral step is not advanced and so the previous grid step is left unchanged. B
 as the clock is traced with Reactant."""
 function move_prognostic_grid_variables_back!(
         vars::Variables,
-        time_stepping::Leapfrog,
+        time_stepping::AbstractFilteredLeapfrog,
         model::AbstractModel,
         clock::Clock,
     )
@@ -248,18 +254,18 @@ function initialize!(L::Leapfrog, model::AbstractModel)
 end
 
 # ocean and land use the time steppers in the respective fields, `nothing` means leapfrog like the atmosphere
-time_stepper(L::Leapfrog, ::Val{:ocean}) = something(L.ocean, L)
-time_stepper(L::Leapfrog, ::Val{:land}) = something(L.land, L)
+time_stepper(L::AbstractFilteredLeapfrog, ::Val{:ocean}) = something(L.ocean, L)
+time_stepper(L::AbstractFilteredLeapfrog, ::Val{:land}) = something(L.land, L)
 
 # the first Euler step and the first leapfrog step only advance the clock by Δt/2,
 # so non-leapfrog time steppers for ocean and land step Δt/2 there too
-time_step_scale(::Leapfrog, ::AbstractTimeStepper, clock::Clock) = ifelse(clock.step_counter <= 1, 2, 1)
-time_step_scale(::Leapfrog, ::AbstractLeapfrog, clock::Clock) = 1   # leapfrog does this itself
+time_step_scale(::AbstractFilteredLeapfrog, ::AbstractTimeStepper, clock::Clock) = ifelse(clock.step_counter <= 1, 2, 1)
+time_step_scale(::AbstractFilteredLeapfrog, ::AbstractLeapfrog, clock::Clock) = 1   # leapfrog does this itself
 
 """$(TYPEDSIGNATURES) Leapfrog is spun up with 1 Euler forward step that doesn't count for clock + output"""
 spin_up_steps(::AbstractLeapfrog) = 1
 
-function time_step!(clock::Clock, time_stepping::Leapfrog)
+function time_step!(clock::Clock, time_stepping::AbstractFilteredLeapfrog)
     Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based
     i = clock.step_counter          # 0-based as the clock is only stepped below
     first_step = i == 0
@@ -280,7 +286,7 @@ end
 
 # for any AbstractLeapfrog: inside kernels the Leapfrog is adapted to a LeapfrogCore
 default_time_step(L::AbstractLeapfrog) = 2 * L.Δt
-function time_step(L::Leapfrog, clock::Clock)
+function time_step(L::AbstractFilteredLeapfrog, clock::Clock)
     (; Δt) = L
     return ifelse(
         clock.step_counter == 0, Δt / 2,        # first step Euler with Δt/2
@@ -292,13 +298,13 @@ function time_step(L::Leapfrog, clock::Clock)
 end
 
 # on 1st Euler step + 2nd Leapfrog step disable filters; with RAW filters afterwards
-prognostic_step(::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, 1, 2)
+prognostic_step(::AbstractFilteredLeapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, 1, 2)
 
 function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
         clock::Clock,
-        time_stepping::Leapfrog,
+        time_stepping::AbstractFilteredLeapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
         scale::Number = 1,

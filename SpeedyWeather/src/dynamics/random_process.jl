@@ -1,4 +1,23 @@
+"""$(TYPEDSIGNATURES)
+Implementation of random processes for stochastic forcings and parameterizations in SpeedyWeather.
+Any random process <: AbstractRandomProcess has to implement the following interface:
+ - `variables(process)` defines the variables of `model.random_process`, by convention the
+   spectral `vars.prognostic.random_pattern` and its grid counterpart `vars.grid.random_pattern`
+ - `initialize!(process, model)` precomputes and (re)seeds the random number generator
+ - `random_process!(pattern, process)` advances the process with `pattern` as its state, i.e.
+   draws the next pattern into the array `pattern` (for processes with memory like the AR1
+   the previous pattern is read from it). Any model component can own a process and its
+   own pattern this way, e.g. the `StochasticLeapfrog` time stepper
+ - `random_process!(vars, process)` advances `model.random_process` at the end of every time
+   step, defaults to the spectral `vars.prognostic.random_pattern`
+ - `transform!(vars, process, spectral_transform)` makes `vars.grid.random_pattern` from it."""
 abstract type AbstractRandomProcess <: AbstractModelComponent end
+
+"""$(TYPEDSIGNATURES)
+Advance the random process of the model, `model.random_process`, in its default variable
+`vars.prognostic.random_pattern` by one time step."""
+random_process!(vars::Variables, process::AbstractRandomProcess) =
+    random_process!(vars.prognostic.random_pattern, process)
 
 """$(TYPEDSIGNATURES)
 General transform for `random processes <: AbstractRandomProcess`.
@@ -111,11 +130,9 @@ function initialize!(
 end
 
 function random_process!(
-        vars::Variables,
+        random_pattern::LowerTriangularArray,
         process::SpectralAR1Process{NF},
     ) where {NF}
-
-    (; random_pattern) = vars.prognostic
     a = process.autoregressive_factor[]
     RNG = process.random_number_generator
     s = convert(NF, 2 / sqrt(2))              # to scale: std(real(randn(Complex))) = √2/2 to 1
@@ -145,4 +162,213 @@ end
     l = l_indices[lm]
     ξ = noise_factors[l]
     random_pattern[lm] = a * random_pattern[lm] + ξ * r[lm]
+end
+
+export SpectralWhiteNoiseProcess, GridWhiteNoiseProcess
+
+"""Random process that is white in time in spectral space: the pattern is redrawn
+from scratch every time step, it has no memory. Same units and `standard_deviation`
+semantics as `SpectralAR1Process`.
+
+Differences to `SpectralAR1Process` beyond the missing memory
+- `wavenumber = 0` (default) gives a spectrally flat pattern, `wavenumber > 0` the
+  ECMWF shaping (Tech Memorandum 598, Appendix 8) of the AR1 process.
+- Neither the global mean (l = 0) nor the last degree l = lmax (not a resolved degree
+  in SpeedyWeather, its coefficients do not survive a grid round trip) get noise.
+- The m = 0 coefficients are real, with their real part scaled by √2 so that the
+  pattern is statistically homogeneous and a band-limited grid field: a spectral to
+  grid to spectral round trip returns it to rounding.
+- No clamp by default, `clamp = (-Inf, Inf)`: clamping makes the increment
+  non-Gaussian and the grid pattern no longer band-limited.
+- `n_patterns > 1` draws that many independent patterns (`Spectral3D`/`Grid3D` with
+  `n_patterns` slots), so that different variables and layers can be forced independently.
+
+Fields are $(TYPEDFIELDS)"""
+@kwdef struct SpectralWhiteNoiseProcess{NF, VectorType, S, RNG, IntType} <: AbstractRandomProcess
+    truncation::IntType
+
+    "[OPTION] Wavenumber (0-based) of the spectral shaping, 0 = spectrally flat"
+    wavenumber::IntType = 0
+
+    "[OPTION] Number of independent patterns, 1 = a single pattern as `SpectralAR1Process`"
+    n_patterns::IntType = 1
+
+    "[OPTION] Standard deviation of the pattern in grid space"
+    standard_deviation::NF = 1 / 3
+
+    "[OPTION] Range to clamp values into after every transform into grid space, default no clamping"
+    clamp::NTuple{2, NF} = (-Inf, Inf)
+
+    "[OPTION] Random number generator seed, 0 = randomly seed from Julia's GLOBAL_RNG"
+    seed::S = 0
+
+    "Independent random number generator for this random process"
+    random_number_generator::RNG = Random.Xoshiro(seed)
+
+    "[DERIVED] Noise factors [1] for every total wavenumber l"
+    noise_factors::VectorType = zeros(NF, truncation + 1)
+end
+
+# generator function
+function SpectralWhiteNoiseProcess(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    (; truncation) = SG
+    return SpectralWhiteNoiseProcess{SG.NF, SG.VectorType, SeedType, RNG, typeof(truncation)}(; truncation, kwargs...)
+end
+
+Adapt.@adapt_structure SpectralWhiteNoiseProcess
+
+function variables(process::SpectralWhiteNoiseProcess)
+    n = process.n_patterns
+    return n <= 1 ? (
+            PrognosticVariable(:random_pattern, Spectral2D(), desc = "Random pattern for the random process", units = "1"),
+            GridVariable(:random_pattern, Grid2D(), desc = "Random pattern for the random process", units = "1"),
+        ) : (
+            PrognosticVariable(:random_pattern, Spectral3D(; n), desc = "Independent random patterns", units = "1"),
+            GridVariable(:random_pattern, Grid3D(; n), desc = "Independent random patterns", units = "1"),
+        )
+end
+
+function initialize!(process::SpectralWhiteNoiseProcess, model::AbstractModel)
+    σ = process.standard_deviation
+    k = process.wavenumber
+    NF = eltype(process.noise_factors)
+    ls = 1:length(process.noise_factors)    # 1-based degree l + 1
+
+    # no noise on the global mean (l = 0) and the last degree l = lmax
+    live = (ls .> 1) .& (ls .< length(ls))
+
+    # variance budget: degree l has 2l + 1 orders, all degrees 1 ≤ l < lmax are live,
+    # ECMWF Tech Memorandum 598, Appendix 8, eqs. 17-18 without the AR1's (1 - a²) factor
+    # as a white draw has no memory, spectrally flat is the limit k → ∞
+    # noise factors are built on the host as `live` is a CPU BitVector, then copied
+    if k <= 0
+        denom = 2 * sum(2l + 1 for l in 1:(process.truncation - 1))
+        F₀ = sqrt(σ^2 / denom) * model.spectral_transform.norm_sphere
+        copyto!(process.noise_factors, NF[live[i] ? NF(F₀) : zero(NF) for i in ls])
+    else
+        denom0 = 2 * sum(
+            (2l + 1) * exp(-l * (l + 1) / (k * (k + 1)))
+                for l in 1:(process.truncation - 1)
+        )
+        F₀ = sqrt(σ^2 / denom0) * model.spectral_transform.norm_sphere
+        dn = NF(2k * (k + 1))
+        copyto!(
+            process.noise_factors,
+            NF[live[i] ? NF(F₀) * exp(-NF(i) * NF(i - 1) / dn) : zero(NF) for i in ls],
+        )
+    end
+
+    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
+    seed = process.seed == 0 ? rand(UInt) : process.seed
+    Random.seed!(process.random_number_generator, seed)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Draw a new white noise `pattern` (all its slots) from `process`, independently of
+the previous pattern."""
+function random_process!(
+        pattern::LowerTriangularArray,
+        process::SpectralWhiteNoiseProcess{NF},
+    ) where {NF}
+    RNG = process.random_number_generator
+    s = convert(NF, 2 / sqrt(2))       # std(real(randn(Complex))) = √2/2 -> 1
+
+    # draw all complex normals on CPU through the seeded RNG to keep reproducibility,
+    # then transfer to the device in one go (GPU has no compatible Random.Xoshiro RNG)
+    arch = architecture(pattern)
+    n = length(pattern)
+    r_cpu = Vector{Complex{NF}}(undef, n)
+    @inbounds for i in 1:n
+        r_cpu[i] = s * randn(RNG, Complex{NF})
+    end
+    r = on_architecture(arch, r_cpu)
+
+    # linear index over all slots, l_indices and m_indices are per lm
+    nlm = size(pattern, 1)
+    launch!(
+        arch, SpectralWorkOrder, size(pattern), white_noise_kernel!,
+        pattern, r, process.noise_factors, pattern.spectrum.l_indices, pattern.spectrum.m_indices, nlm,
+    )
+    return nothing
+end
+
+@kernel inbounds = true function white_noise_kernel!(
+        pattern, r, noise_factors, l_indices, m_indices, nlm,
+    )
+    i = @index(Global, Linear)
+    lm = mod1(i, nlm)
+    l = l_indices[lm]
+    x = noise_factors[l] * r[i]
+
+    # m = 0 is real (a real grid field has real zonal-mean coefficients), and carries √2 × the
+    # real part to restore the variance of the dropped imaginary part, keeping the pattern homogeneous
+    if m_indices[lm] == 1
+        rt2 = oftype(real(x), 1.4142135623730951)
+        pattern[i] = complex(rt2 * real(x))
+    else
+        pattern[i] = x
+    end
+end
+
+"""Random process that is white in time and in space on the grid: every grid point
+of every pattern is an independent normal with standard deviation `standard_deviation`,
+redrawn every time step. As a random process it fills `vars.grid.random_pattern` directly
+(nothing is transformed). On a reduced grid the boxes differ in area, so the pattern is
+uniform in the grid coordinates, not statistically homogeneous on the sphere.
+Fields are $(TYPEDFIELDS)"""
+@kwdef struct GridWhiteNoiseProcess{NF, S, RNG, IntType} <: AbstractRandomProcess
+    "[OPTION] Number of independent patterns"
+    n_patterns::IntType = 1
+
+    "[OPTION] Standard deviation of the pattern at every grid point"
+    standard_deviation::NF = 1 / 3
+
+    "[OPTION] Random number generator seed, 0 = randomly seed from Julia's GLOBAL_RNG"
+    seed::S = 0
+
+    "Independent random number generator for this random process"
+    random_number_generator::RNG = Random.Xoshiro(seed)
+end
+
+function GridWhiteNoiseProcess(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    IntType = typeof(SG.truncation)
+    return GridWhiteNoiseProcess{SG.NF, SeedType, RNG, IntType}(; kwargs...)
+end
+
+Adapt.@adapt_structure GridWhiteNoiseProcess
+
+function variables(process::GridWhiteNoiseProcess)
+    n = process.n_patterns
+    dims = n <= 1 ? Grid2D() : Grid3D(; n)
+    return (GridVariable(:random_pattern, dims, desc = "Random pattern for the random process", units = "1"),)
+end
+
+function initialize!(process::GridWhiteNoiseProcess, model::AbstractModel)
+    seed = process.seed == 0 ? rand(UInt) : process.seed
+    Random.seed!(process.random_number_generator, seed)
+    return nothing
+end
+
+# the pattern is drawn in grid space, nothing to transform
+SpeedyTransforms.transform!(::Variables, ::GridWhiteNoiseProcess, ::AbstractSpectralTransform) = nothing
+
+# as `model.random_process` the pattern lives on the grid
+random_process!(vars::Variables, process::GridWhiteNoiseProcess) =
+    random_process!(vars.grid.random_pattern, process)
+
+"""$(TYPEDSIGNATURES)
+Draw a new white noise `pattern` (all its slots) from `process`."""
+function random_process!(pattern::AbstractField, process::GridWhiteNoiseProcess{NF}) where {NF}
+    data = parent(pattern)
+    # drawn on CPU through the seeded RNG for reproducibility, then copied to the device
+    r_cpu = Array{NF}(undef, size(data))
+    Random.randn!(process.random_number_generator, r_cpu)
+    r_cpu .*= process.standard_deviation
+    copyto!(data, r_cpu)
+    return nothing
 end
