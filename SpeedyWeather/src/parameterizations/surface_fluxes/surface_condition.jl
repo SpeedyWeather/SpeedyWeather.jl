@@ -115,7 +115,7 @@ regression expression.
 
 The slowdown factor is calculated as
 
-    f = clamp(1 - s, 0, 1)
+    f = max(1 - s, 0)
 
 where
 
@@ -132,6 +132,12 @@ roughness from the previous timestep, and we fall back to the fixed
 roughness length on the first time step. With `use_computed_roughness = false`
 the roughness length z₀ is a fixed land-sea mask-weighted value
 (`land_roughness`, `ocean_roughness`).
+
+While called the wind slowdown, this is a multiplicative factor that 
+can actually take values > 1 rather than strictly `[0, 1)` (i.e., 
+winds can speed up near the surface under certain conditions). However,
+on average, the effect is that the surface winds are slowed down relative to 
+the bottom model level.
 
 Fields are $(TYPEDFIELDS)
 """
@@ -233,7 +239,7 @@ end
     s = muladd(c4, log_z₀, s)
     s = muladd(c5, log(z), s)
 
-    return clamp(one(s) - s, zero(s), one(s))
+    return max(one(s) - s, zero(s))
 end
 
 export ConstantWindGust

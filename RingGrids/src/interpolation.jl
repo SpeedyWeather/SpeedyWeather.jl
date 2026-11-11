@@ -30,7 +30,7 @@ GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; NF = el
 Adapt.@adapt_structure GridGeometry
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Precomputed arrays describing the geometry of the Grid with resolution `nlat_half`.
 Contains longitudes, latitudes of grid points, their ring index j and their
 unravelled indices ij."""
@@ -131,7 +131,7 @@ function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLoc
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Zero generator function for the 4-point average AnvilLocator. Use `update_locator!` to
 update the grid indices used for interpolation and their weights. The number format
 NF is the format used for the calculations within the interpolation, the input data
@@ -591,6 +591,23 @@ function interpolate!(
     return Aout                             # return the field wrapped around the interpolated data
 end
 
+"""$(TYPEDSIGNATURES)
+Interpolate `field_in` onto `field_out` ignoring NaNs in `field_in` (e.g. ocean in land
+climatologies): the interpolation weights are renormalised over the valid neighbours, so coastal
+points take their value from the surrounding land. Points without any valid neighbour remain NaN
+(0/0). Overwrites the NaNs in `field_in` with zeros."""
+function interpolate_ignoring_nan!(field_out::Field, field_in::Field, interpolator::AbstractInterpolator)
+    valid = .!isnan.(field_in.data)
+    weights_in = similar(field_in)
+    weights_in.data .= valid
+    field_in.data .= ifelse.(valid, field_in.data, zero(eltype(field_in)))
+    weights_out = similar(field_out)
+    interpolate!(field_out, field_in, interpolator)
+    interpolate!(weights_out, weights_in, interpolator)
+    field_out.data ./= weights_out.data
+    return field_out
+end
+
 # create grid on the fly
 interpolate(Grid::Type{<:AbstractGrid}, nlat_half::Integer, A::Field; kwargs...) =
     interpolate(Grid(nlat_half), A; kwargs...)
@@ -611,7 +628,7 @@ end
 interpolate(Grid::Type{<:AbstractGrid}, A::Field; kwargs...) = interpolate(Grid(A.grid.nlat_half, architecture(A)), A; kwargs...)
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Locate the interpolation points `(λs, θs)` on the grid described by `I.geometry`, updating
 `I.locator` in place with the ring indices and interpolation weights required by
 `interpolate!`. This is the precomputation step of the interpolation, separate from the

@@ -272,7 +272,7 @@ end
     (; low_veg_factor, r, W_cap, W_wilt, D_top, D_root) = params
 
     # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
-    veg = max(0, high_vegetation_cover[ij] + low_veg_factor * low_vegetation_cover[ij])
+    veg = clamp(high_vegetation_cover[ij] + low_veg_factor * low_vegetation_cover[ij], 0, 1)
 
     # Fortran SPEEDY documentation eq. 51, original formulation
     # soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +

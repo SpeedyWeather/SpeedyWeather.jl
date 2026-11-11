@@ -3,6 +3,7 @@ module RingGrids
 # DOCUMENTATION
 using StyledStrings
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 import Printf
 
 # NUMERICS
@@ -84,7 +85,8 @@ export grids_match,
     get_nlat,
     get_nlat_half,
     get_npoints,
-    get_npoints2D
+    get_npoints2D,
+    average_resolution
 
 # COORDINATES
 export get_londlatds,
@@ -149,8 +151,9 @@ const DEFAULT_ARRAYTYPE = Array
 const DEFAULT_ARCHITECTURE = CPU
 
 # to be defined in GeoMakie extension
-export globe
+export globe, globe!
 function globe end
+function globe! end
 
 include("utility_functions.jl")
 

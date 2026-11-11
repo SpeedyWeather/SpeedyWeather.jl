@@ -121,11 +121,43 @@ end
     return Expr(:block, calls..., :(return nothing))
 end
 
-# copy grid prognostics from 2nd to 1st step to retain these fields for the previous time step
+"""$(TYPEDSIGNATURES)
+Retain the previous time step of the grid prognostic variables before the new spectral state is
+transformed to the grid: copy the 2nd (current) grid step to the 1st (previous) step whenever
+the leapfrog update has also moved the previous spectral step forward, such that the 1st grid
+step is always the grid-point equivalent of the 1st spectral step. The previous step is read by
+the parameterizations, vertical advection and the geopotential (which enters the semi-implicit
+dynamics). During the leapfrog start (Euler step and first leapfrog step, `lf == 1`) the previous
+spectral step is not advanced and so the previous grid step is left unchanged. Branch-free (`ifelse`)
+as the clock is traced with Reactant."""
+function move_prognostic_grid_variables_back!(
+        vars::Variables,
+        time_stepping::Leapfrog,
+        model::AbstractModel,
+        clock::Clock,
+    )
+    lf = prognostic_step(time_stepping, clock)
+    return move_prognostic_grid_variables_back!(vars, time_stepping, model; move = lf == 2)
+end
+
+# other leapfrog-like time steppers: always move the grid variables back, ignoring the clock
 function move_prognostic_grid_variables_back!(
         vars::Variables,
         time_stepping::AbstractLeapfrog,
         model::AbstractModel,
+        ::Clock,
+    )
+    return move_prognostic_grid_variables_back!(vars, time_stepping, model)
+end
+
+"""$(TYPEDSIGNATURES)
+Copy the grid prognostic variables from the 2nd (current) to the 1st (previous) step to retain
+them as the previous time step. With `move = false` the 1st step is left unchanged."""
+function move_prognostic_grid_variables_back!(
+        vars::Variables,
+        time_stepping::AbstractLeapfrog,
+        model::AbstractModel;
+        move = true,
     )
     # The atmospheric grid prognostics (vorticity, divergence, temperature, [humidity], pressure/η)
     # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_dpres_grad_grid` fuse
@@ -134,11 +166,11 @@ function move_prognostic_grid_variables_back!(
     # For primitive equation models `:uv_dpres_grad_grid` also holds ∇ln(pₛ) (`dpres_dx`, `dpres_dy`),
     # which is copied along but not used from the previous step.
     for fused in (vars.fused.grid, vars.fused.uv_dpres_grad_grid)
-        copy_step_back!(parent(fused))
+        copy_step_back!(parent(fused), move)
     end
     # tracers, ocean and land grid variables are not part of the atmospheric fuse — copy
     # per-variable, unrolled per name (literal-Symbol getfield; steps bound individually)
-    move_grid_tracers_back!(vars)
+    move_grid_tracers_back!(vars, move)
     # does not have to be done for ocean/land as they don't have spectral variables
     # the grid variables are already in prognostic and the time stepper takes care
     # of moving them back during the update
@@ -146,16 +178,17 @@ function move_prognostic_grid_variables_back!(
 end
 
 # copy step 2 -> step 1 for one variable (retain current step as the previous one);
-@inline function copy_step_back!(var)
+# with `move = false` leave the 1st step unchanged (branch-free for Reactant)
+@inline function copy_step_back!(var, move = true)
     var_old = get_step(var, 1)
     var_new = get_step(var, 2)
-    var_old .= var_new
+    var_old .= ifelse.(move, var_new, var_old)
     return nothing
 end
 
-@generated function move_grid_tracers_back!(vars::Variables{Po, G, T}) where {Po, G, T}
+@generated function move_grid_tracers_back!(vars::Variables{Po, G, T}, move = true) where {Po, G, T}
     calls = [
-        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name)))))
+        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name))), move))
             for name in _namespace_names(T, :tracers)
     ]
     return Expr(:block, calls..., :(return nothing))
@@ -168,7 +201,7 @@ function diffusion_and_implicit!(vars, ::AbstractLeapfrog, ::AbstractImplicit, m
     return nothing
 end
 
-"""($TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Immutable core struct used to adapt only the time step fields for use in kernels"""
 struct LeapfrogCore{NF, MS} <: AbstractLeapfrog
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
@@ -180,7 +213,7 @@ end
 
 Adapt.@adapt_structure LeapfrogCore
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(

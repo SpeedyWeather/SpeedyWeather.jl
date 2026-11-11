@@ -74,6 +74,43 @@ end
     end
 end
 
+@testset "Initial snow depth from $name soil temperature" for (name, LandTemperature, SoilMoisture) in (
+        ("dynamic", LandBucketTemperature, LandBucketMoisture),
+        ("prescribed", SeasonalLandTemperature, SeasonalSoilMoisture),    # without time steps
+    )
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    land_model = LandModel(spectral_grid; temperature = LandTemperature(spectral_grid), soil_moisture = SoilMoisture(spectral_grid))
+    model = PrimitiveWetModel(spectral_grid; land = land_model)
+    simulation = initialize!(model)
+    snow_depth = simulation.variables.prognostic.land.snow_depth[:, 1].data          # first step
+    soil_temperature_data = simulation.variables.prognostic.land.soil_temperature.data
+    soil_temperature = ndims(soil_temperature_data) == 3 ? soil_temperature_data[:, 1, 1] : soil_temperature_data[:, 1]
+    (; melting_threshold, initial_snow_depth_max) = model.land.snow
+    land = model.land_sea_mask.land_fraction.data .> 0
+
+    @test all(0 .<= snow_depth .<= initial_snow_depth_max)
+    @test all(snow_depth[.!land] .== 0)                                     # no snow over ocean
+    @test all(snow_depth[land .& (soil_temperature .>= melting_threshold)] .== 0)
+    @test any(snow_depth[land] .> 0)                                        # some snow over cold land
+end
+
+@testset "Soil temperature stepped with its tendency" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    run!(simulation, period = Hour(3))      # past the leapfrog start
+    vars = simulation.variables
+
+    soil_temperature_before = copy(vars.prognostic.land.soil_temperature.data)
+    SpeedyWeather.time_step!(vars, model.time_stepping, model)
+    Δt = SpeedyWeather.time_step(model.time_stepping, :land, vars.prognostic.clock)
+    land = model.land_sea_mask.land_fraction.data .> 0
+
+    # Euler forward, nothing else (e.g. a filter!) changes the soil temperature
+    Δsoil_temperature = vars.prognostic.land.soil_temperature.data .- soil_temperature_before
+    @test Δsoil_temperature[land, :, 1] ≈ Δt * vars.tendencies.land.soil_temperature.data[land, :, 1]
+end
+
 @testset "LandGeometry default constructor" begin
     SG = SpectralGrid(truncation = 22, nlayers = 2)
     geom = LandGeometry(SG)
@@ -82,4 +119,43 @@ end
     SG = SpectralGrid(truncation = 22, nlayers = 5)
     geom = LandGeometry(SG)
     @test geom.layer_thickness isa Vector{<:AbstractFloat}
+end
+
+@testset "Seasonal soil moisture as fraction of field capacity" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+
+    # prescribed: converted and capped (volumetric file values never reach 1, so a 1 proves the conversion)
+    land = LandModel(spectral_grid; soil_moisture = SeasonalSoilMoisture(spectral_grid))
+    model = PrimitiveWetModel(spectral_grid; land)
+    simulation = initialize!(model)
+    (; soil_moisture) = simulation.variables.prognostic.land
+    (; soil_moisture_capacity, soil_moisture_availability) = simulation.variables.parameterizations.land
+    land_points = model.land_sea_mask.land_fraction.data .== 1
+    W = soil_moisture.data[land_points, :]
+    @test all(0 .<= W .<= 1)
+    @test any(W .== 1)
+    @test all(soil_moisture_capacity.data .== model.land.thermodynamics.field_capacity)
+
+    run!(simulation, steps = 2)
+    @test all(soil_moisture_availability.data .<= 1)     # guards against #771
+
+    # bucket: initialized from the converted climatology
+    model = PrimitiveWetModel(spectral_grid)              # LandBucketMoisture by default
+    simulation = initialize!(model)
+    W = simulation.variables.prognostic.land.soil_moisture.data[land_points, :, :]
+    @test all(0 .<= W .<= 1)
+    @test any(W .== 1)
+    @test all(isfinite, soil_moisture)
+end
+
+@testset "Coastal land initial conditions without ocean fallback" begin
+    # the climatologies are NaN over ocean, coastal land points have to interpolate
+    # from the surrounding land, not fall back to the ocean value
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    (; soil_moisture, soil_temperature) = simulation.variables.prognostic.land
+    mostly_land = model.land_sea_mask.land_fraction.data .>= 0.5
+    @test !any(soil_moisture.data[mostly_land, :, :] .== model.land.soil_moisture.ocean_moisture)
+    @test !any(soil_temperature.data[mostly_land, :, :] .== model.land.temperature.ocean_temperature)
 end

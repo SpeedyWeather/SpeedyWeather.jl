@@ -5,7 +5,8 @@
 """Initialized PrimitiveWetModel simulation on `arch` whose implicit solver uses `schedule`."""
 function implicit_test_simulation(arch, schedule)
     spectral_grid = SpectralGrid(; architecture = arch, nlayers = nlayers_for_model(PrimitiveWetModel), truncation = TRUNCATION)
-    implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = deepcopy(schedule))
+    reference_temperature = GlobalMeanReferenceTemperature{spectral_grid.NF}()     # recomputed on the schedule
+    implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = deepcopy(schedule), reference_temperature)
     return initialize!(create_model(PrimitiveWetModel, arch; implicit))
 end
 

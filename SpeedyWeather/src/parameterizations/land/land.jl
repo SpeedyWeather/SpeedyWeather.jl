@@ -97,6 +97,9 @@ function timestep!(
 end
 
 function initialize!(vars::Variables, land_model::AbstractLand, model::PrimitiveEquation)
+    # soil temperature first, snow uses it for its initial conditions
+    initialize!(vars, land_model.temperature, model)
+
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
     if model isa PrimitiveWet && land_model isa AbstractWetLand
         initialize!(vars, land_model.snow, model)
@@ -104,7 +107,6 @@ function initialize!(vars::Variables, land_model::AbstractLand, model::Primitive
         initialize!(vars, land_model.vegetation, model)
         initialize!(vars, land_model.rivers, model)
     end
-    initialize!(vars, land_model.temperature, model)
     return nothing
 end
 

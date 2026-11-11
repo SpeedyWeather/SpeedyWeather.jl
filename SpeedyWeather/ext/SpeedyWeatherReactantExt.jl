@@ -3,6 +3,7 @@ module SpeedyWeatherReactantExt
 using SpeedyWeather
 using Reactant
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 using Dates
 
 using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, time_step!, time_steps!
@@ -24,7 +25,7 @@ const ReactantSimulation = Union{
 # the whole run is one program (as Oceananigans' compiled `run!`).
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Time loop of a simulation with Reactant. Without output the whole run is one compiled program
 ([`time_steps!`](@ref), a traced loop). With output every `m` time steps, the `m` time steps between
 two outputs are one program, called once per output interval; the spin-up steps of the time
@@ -161,7 +162,9 @@ function SpeedyWeather.reinitialize!(
     )
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
     (; temp_profile) = implicit
-    Tₖ = vars.dynamics.average_temperature_profile          # current global-mean temperature profile
+    # reference temperature profile, isothermal or from the current global-mean temperature profile
+    temp_grid = SpeedyWeather.get_prognostic_step(vars.grid.temperature, model.time_stepping, implicit)
+    Tₖ = SpeedyWeather.reference_temperature(implicit.reference_temperature, vars.dynamics.average_temperature_profile, temp_grid)
     temp_profile .= ifelse.(update, Tₖ, temp_profile)
 
     scale = vars.prognostic.scale[]         # implicit solver needs to be initialized with scaled time step
