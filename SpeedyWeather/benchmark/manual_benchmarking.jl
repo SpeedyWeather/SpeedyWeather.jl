@@ -61,6 +61,20 @@ flag added in an earlier run. Flags and options can be combined in any order, e.
 `reactant-nvidia-gpu --length 10 --reverse --hi-res`; `--SPEEDY` can also be written `--speedy`. Truncations are 1-based throughout
 (T32, …, T256) as in the model code.
 
+Debug mode (`--debug`) is a quick check whether the performance has regressed: instead
+of all suites it only runs a short PrimitiveWet resolution sweep with the default
+transform (LT+FFT): T32, T43, T64, T86 and T128 with 8 layers, and T32 and T128 with 16
+layers (`DEBUG_TRUNCATIONS`, `DEBUG_NLAYERS`), under the key of the resolution sweep
+(`:benchmark201`). It prints the results and leaves the `README.md` and
+`assets/benchmark_results.json` untouched. With `--output FILE` the results are
+additionally written to FILE as JSON, e.g. to compare revisions (as
+`regression/regression.jl` does). `--repeats` and `--length` apply as usual, the
+flags adding or selecting suites (`--reverse`, `--SPEEDY`, `--hi-res`, `--suites`) can't
+be combined with it, e.g.
+
+    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl --debug
+    julia --project=SpeedyWeather/benchmark manual_benchmarking.jl gpu --debug --output main.json
+
 The CPU label is auto-derived from `Sys.ARCH` (`cpu-arm` for aarch64/arm64,
 `cpu-x86` otherwise). GPU runs require a CUDA-capable device — `using CUDA`
 is loaded automatically. `amdgpu` runs require a ROCm-capable device —
@@ -95,6 +109,7 @@ and additionally renders comparison figures — see `docs/make.jl`.
 =#
 
 import Pkg
+const CALLER_DIRECTORY = pwd()     # a relative `--output FILE` is relative to it, not to this script
 cd(@__DIR__)
 Pkg.activate(".")
 
@@ -144,12 +159,35 @@ const ARGUMENT_SETTINGS = ArgParseSettings(
     help = "also run the PrimitiveWet resolution sweep in a SPEEDY.f90-like configuration (prescribed seasonal climatologies, constant surface roughness, wind slowdown and gusts)"
     action = :store_true
     dest_name = "speedy"
+    "--debug"
+    help = "quick check whether the performance regressed: only a short PrimitiveWet resolution sweep with the default " *
+        "transform (T32-T128 with 8 layers, T32 and T128 with 16 layers), the results are printed, README.md and " *
+        "assets/benchmark_results.json are left untouched"
+    action = :store_true
+    "--output"
+    help = "with --debug: additionally write the results as JSON to FILE, e.g. to compare revisions"
+    arg_type = String
+    metavar = "FILE"
 end
 const ARGUMENTS = parse_args(ARGUMENT_SETTINGS)
 
 const RUN_REVERSE = ARGUMENTS["reverse"]
 const RUN_HI_RES = ARGUMENTS["hi_res"]
 const RUN_SPEEDY = ARGUMENTS["speedy"]
+
+# Debug mode (`--debug`): only the PrimitiveWet model with the default transform at these
+# (truncation, nlayers): the resolution sweep up to T128 with 8 layers, and two configurations with 16 layers
+const DEBUG_MODE = ARGUMENTS["debug"]
+const DEBUG_TRUNCATIONS = [32, 43, 64, 86, 128, 32, 128]
+const DEBUG_NLAYERS = [8, 8, 8, 8, 8, 16, 16]
+# for the messages, "PrimitiveWet LT+FFT at L8: T32, …, T128; L16: T32, T128"
+const DEBUG_SUMMARY = "PrimitiveWet LT+FFT at " * join(
+    ("L$nlayers: T" * join(DEBUG_TRUNCATIONS[DEBUG_NLAYERS .== nlayers], ", T") for nlayers in unique(DEBUG_NLAYERS)), "; "
+)
+const OUTPUT_PATH = isnothing(ARGUMENTS["output"]) ? nothing : abspath(CALLER_DIRECTORY, ARGUMENTS["output"])
+isnothing(OUTPUT_PATH) || DEBUG_MODE || error("--output FILE is only supported together with --debug.")
+DEBUG_MODE && (RUN_REVERSE || RUN_HI_RES || RUN_SPEEDY || !isempty(strip(ARGUMENTS["suites"]))) &&
+    error("--debug only runs its own short PrimitiveWet sweep, it can't be combined with --reverse, --hi-res, --SPEEDY or --suites.")
 
 const ARCH_ARG = lowercase(ARGUMENTS["architecture"])
 # Reactant's backend per architecture argument, the GPU vendor is that of the installed Reactant_jll build
@@ -233,6 +271,7 @@ RUN_HI_RES && !ON_ACCELERATOR && @warn "--hi-res only adds GPU and TPU configura
 @info "Reverse-mode benchmarks: $(RUN_REVERSE ? "on" : "off, enable with --reverse")"
 @info "High resolutions T342, T512 in benchmark201 (GPU, TPU only): $(RUN_HI_RES && ON_ACCELERATOR ? "on" : "off")"
 @info "SPEEDY.f90-like configuration suite: $(RUN_SPEEDY ? "on" : "off, enable with --SPEEDY")"
+@info "Debug mode: $(DEBUG_MODE ? "on, results not stored" * (isnothing(OUTPUT_PATH) ? "" : " but written to $OUTPUT_PATH") : "off, enable with --debug")"
 
 # Free (device) memory between benchmark runs, called outside the timed region
 free_memory!() = SpeedyWeather.SpeedyTransforms.clear_fourier_graph_cache!(ARCH)
@@ -252,7 +291,7 @@ function load_results()
         error("Could not parse $RESULTS_JSON. Fix it or remove it (which loses the stored results of all architectures).")
     end
 end
-load_results()
+DEBUG_MODE || load_results()     # the debug mode doesn't touch the store
 
 # The reverse-mode suite (`--reverse`), its numbers are also stored in the `reverse` field of the arch record
 const REVERSE_SUITE_KEY = :benchmark800
@@ -264,6 +303,22 @@ include("benchmark_suite.jl")
 ARCH isa SpeedyWeather.ReactantDevice && include("reactant_runner.jl")
 RUN_REVERSE && include("reverse_benchmark_suite.jl")
 include("define_benchmarks.jl")
+
+# Debug mode: instead of all suites only the short sweep of DEBUG_TRUNCATIONS, DEBUG_NLAYERS (default transform),
+# under the key of the resolution sweep as its numbers are stored as the `overview` (read by regression/regression.jl)
+if DEBUG_MODE
+    debug_nruns = length(DEBUG_TRUNCATIONS)
+    benchmarks = Dict{Symbol, AbstractBenchmarkSuite}(
+        :benchmark201 => BenchmarkSuite(
+            title = "Primitive wet model, resolution (debug mode)",
+            nruns = debug_nruns,
+            model = fill(PrimitiveWetModel, debug_nruns),
+            truncation = DEBUG_TRUNCATIONS,
+            nlayers = DEBUG_NLAYERS,
+        ),
+    )
+    @info "Debug mode: running only $DEBUG_SUMMARY ($debug_nruns runs)"
+end
 
 for (key, suite) in benchmarks
     suite.architecture = ARCH
@@ -406,6 +461,26 @@ arch_record = Dict(
 REVERSE_SUITE_KEY in SUITE_KEYS && (arch_record["reverse"] = reverse_data(benchmarks[REVERSE_SUITE_KEY]))
 SPEEDY_SUITE_KEY in SUITE_KEYS && (arch_record["speedy"] = suite_data(benchmarks[SPEEDY_SUITE_KEY]))
 
+# Debug mode: print the results and write them to `--output` (if given) to compare
+# revisions, but leave benchmark_results.json and README.md untouched
+if DEBUG_MODE
+    print(arch_record["markdown"])
+    if !isnothing(OUTPUT_PATH)
+        meta = arch_record["meta"] = Dict{String, Any}(arch_record["meta"])
+        meta["arch_label"] = ARCH_LABEL
+        # where the monorepo packages were loaded from, to verify the benchmarked revision
+        meta["package_dirs"] = Dict(
+            string(name) => pkgdir(getfield(SpeedyWeather, name))
+                for name in (:SpeedyWeather, :SpeedyWeatherInternals, :LowerTriangularArrays, :RingGrids, :SpeedyTransforms)
+                if isdefined(SpeedyWeather, name)
+        )
+        mkpath(dirname(OUTPUT_PATH))
+        open(io -> JSON3.pretty(io, arch_record), OUTPUT_PATH, "w")
+        @info "Wrote debug results → $OUTPUT_PATH"
+    end
+    exit()
+end
+
 # Merge into the JSON store, replacing everything stored for this label before
 mkpath(ASSETS_DIR)
 all_results = load_results()
@@ -473,6 +548,8 @@ function write_preamble(md)
     write(md, "julia --project=. manual_benchmarking.jl reactant-nvidia-gpu   # Reactant on NVIDIA GPU (CUDA)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-amd-gpu      # Reactant on AMD GPU (ROCm)\n")
     write(md, "julia --project=. manual_benchmarking.jl reactant-tpu          # Reactant on TPU\n")
+    write(md, "julia --project=. manual_benchmarking.jl --debug               # quick regression check, not stored: $DEBUG_SUMMARY\n")
+    write(md, "julia regression/regression.jl check                           # debug mode on main, latest release and latest benchmarked revision\n")
     write(md, "```\n\n")
     write(md, "Options and flags, in any order (`manual_benchmarking.jl --help` lists them): `--length X`, e.g. `manual_benchmarking.jl gpu --length 10`, multiplies the number of time steps of the ")
     write(md, "timed runs of the PrimitiveWet resolution sweep (the overview below) for more robust timings; the other suites are not affected. ")
@@ -485,6 +562,7 @@ function write_preamble(md)
     write(md, "sea surface temperature, land surface temperature and soil moisture, constant surface roughness, wind slowdown and gusts).\n\n")
     write(md, "Each run replaces its own architecture's section in this `README.md` (including suites added by flags in an earlier run); ")
     write(md, "results for other architectures are preserved via `benchmark_results.json`.\n\n")
+    write(md, "A pull request labelled `benchmark-performance` is benchmarked against main with the same debug mode on every push, and the comparison is posted as a comment.\n\n")
     return
 end
 
