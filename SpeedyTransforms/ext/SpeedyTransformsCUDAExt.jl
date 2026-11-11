@@ -3,7 +3,6 @@ module SpeedyTransformsCUDAExt
 import CUDA: CUDA, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
 using cuFFT
 import AbstractFFTs
-using DocStringExtensions
 using SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms

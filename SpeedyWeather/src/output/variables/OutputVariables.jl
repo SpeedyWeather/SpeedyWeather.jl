@@ -8,7 +8,8 @@ variables are returned as tuples, e.g. `OutputVariables.Dynamics()`, `OutputVari
 or all of them with `OutputVariables.All()`."""
 module OutputVariables
 
-using DocStringExtensions
+using DocStringExtensions: TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 import GPUArrays
 import Dates: Hour
 import KernelAbstractions: @kernel, @index

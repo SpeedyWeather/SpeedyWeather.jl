@@ -2,7 +2,6 @@ module RingGridsGeoMakieExt
 
 using RingGrids
 using GeoMakie
-using RingGrids.DocStringExtensions
 using RingGrids: TYPEDSIGNATURES
 
 import GeoMakie.Makie.GeometryBasics: Polygon, Point

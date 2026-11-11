@@ -2,7 +2,6 @@ module RingGridsMakieExt
 
 using RingGrids
 using Makie
-using DocStringExtensions
 using RingGrids: TYPEDSIGNATURES
 
 function default_title(field::RingGrids.AbstractField)

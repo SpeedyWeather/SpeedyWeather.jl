@@ -4,7 +4,7 @@ using SpeedyWeather
 using Terrarium
 
 using Dates
-using DocStringExtensions
+using DocStringExtensions: TYPEDEF, TYPEDFIELDS
 using SpeedyWeather: TYPEDSIGNATURES
 
 include("coupling.jl")

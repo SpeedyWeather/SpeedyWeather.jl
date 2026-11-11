@@ -2,7 +2,6 @@ module SpeedyTransformsAMDGPUExt
 
 import AMDGPU: AMDGPU, ROCArray
 import AbstractFFTs
-using DocStringExtensions
 using SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms

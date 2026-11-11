@@ -2,7 +2,6 @@ module SpeedyWeatherReactantExt
 
 using SpeedyWeather
 using Reactant
-using DocStringExtensions
 using SpeedyWeather: TYPEDSIGNATURES
 using Dates
 

@@ -1,7 +1,6 @@
 module SpeedyWeatherUnicodePlotsExt
 
 using SpeedyWeather, UnicodePlots
-using DocStringExtensions
 using SpeedyWeather: TYPEDSIGNATURES
 
 import SpeedyWeather.RingGrids: AbstractField2D, AbstractFullField2D, interpolate, full_grid_type, get_nlat

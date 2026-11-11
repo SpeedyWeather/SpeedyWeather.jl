@@ -1,6 +1,6 @@
 module Utils
 
-using DocStringExtensions
+using DocStringExtensions: DocStringExtensions
 
 # DocStringExtensions v0.10 can show default values of (keyword) arguments in signatures,
 # v0.9 can't (its `TypedMethodSignatures` has no `defaults` keyword) so fall back to the plain one

@@ -1,7 +1,7 @@
 module ParameterEditing
 
 # STRUCTURE
-using DocStringExtensions
+using DocStringExtensions: SIGNATURES
 
 # ARRAYS
 import ComponentArrays: ComponentArray, ComponentVector, Axis, labels, label2index, getaxes
