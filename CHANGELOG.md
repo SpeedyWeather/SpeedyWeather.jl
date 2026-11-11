@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Introduces a `StochasticLeapfrog` integrator that uses a Wiener process for a stochastic integration of the model, revised `AbstractRandomProcess` to accomodate for that [#1397](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1397)
+
 ## 0.24.0
 
 - Release SpeedyWeatherInternals 1.0.2 with DocStringExtensions v0.10 compat, fixing unsatisfiable requirements of the v0.24.0 release [#1395](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1395)
