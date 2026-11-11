@@ -1,3 +1,43 @@
+# LAYER THICKNESS WEIGHTS FOR THE VERTICAL ADVECTION STENCIL ----------------------------
+#
+# The vertical advection kernel needs 1/δ_k (Δp_k/pₛ, pressure_thickness_ratio) instead of
+# the constant 1/Δσ_k for hybrid sigma-pressure coordinates, but δ_k is spatially varying
+# (needs `ij` and `surface_pressure`) while Δσ_k is a plain per-layer constant. These two
+# tiny wrapper types let `vertical_advection_kernel!` stay a single method for both
+# coordinates: `layer_thickness(thickness, ij, k)` dispatches to a constant-array lookup for
+# `SigmaCoordinates` (compiling to exactly what it did before) or to
+# `pressure_thickness_ratio` for `SigmaPressureCoordinates`. Both wrappers are `isbits` and
+# `Adapt`-able so they pass through `launch!`/kernel argument adaption unchanged.
+struct SigmaLayerThickness{VectorType}
+    "Nominal σ layer thickness Δσ_k, one value per layer"
+    Δσ::VectorType
+end
+
+Adapt.@adapt_structure SigmaLayerThickness
+
+struct HybridLayerThickness{C, F}
+    "Hybrid sigma-pressure vertical coordinate"
+    coordinate::C
+    "Surface pressure [Pa] at the dynamical core time step, one value per grid point"
+    surface_pressure::F
+end
+
+Adapt.@adapt_structure HybridLayerThickness
+
+"""$(TYPEDSIGNATURES)
+Layer thickness weight δ_k = Δp_k/pₛ at grid point `ij`, layer `k`. Equals the constant
+Δσ_k for `SigmaLayerThickness` (sigma coordinates); is pₛ-dependent for
+`HybridLayerThickness` (hybrid sigma-pressure coordinates)."""
+@inline layer_thickness(t::SigmaLayerThickness, ij, k) = t.Δσ[k]
+@inline layer_thickness(t::HybridLayerThickness, ij, k) =
+    pressure_thickness_ratio(k, t.surface_pressure[ij], t.coordinate)
+
+# construct the appropriate wrapper from the model's vertical coordinate
+layer_thickness_weight(::SigmaCoordinates, geometry::Geometry, surface_pressure) =
+    SigmaLayerThickness(geometry.σ_levels_thick)
+layer_thickness_weight(coordinate::SigmaPressureCoordinates, geometry::Geometry, surface_pressure) =
+    HybridLayerThickness(coordinate, surface_pressure)
+
 abstract type AbstractVerticalAdvection <: AbstractModelComponent end
 abstract type VerticalAdvection{NF, B} <: AbstractVerticalAdvection end
 
@@ -22,16 +62,18 @@ end
 
 function vertical_advection!(vars::Variables, model)
 
-    Δσ = model.geometry.σ_levels_thick
+    # δ_k(pₛ) = Δp_k/pₛ for hybrid sigma-pressure coordinates, the constant Δσ_k for sigma
+    # coordinates (see the SigmaLayerThickness/HybridLayerThickness wrapper types above).
+    thickness = layer_thickness_weight(model.geometry.vertical_coordinates, model.geometry, vars.dynamics.surface_pressure)
     advection_scheme = model.vertical_advection
     (; w) = vars.dynamics
 
     # unrolled over compile-time variable names (instead of a loop over runtime symbols)
     # to avoid Union-typed variables which Enzyme cannot differentiate
-    vertical_advection!(Val(:u), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:v), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:u), vars, w, thickness, advection_scheme, model)
+    vertical_advection!(Val(:v), vars, w, thickness, advection_scheme, model)
+    vertical_advection!(Val(:temperature), vars, w, thickness, advection_scheme, model)
+    vertical_advection!(Val(:humidity), vars, w, thickness, advection_scheme, model)
 
     for (name, tracer) in model.tracers
         if tracer.active
@@ -39,7 +81,7 @@ function vertical_advection!(vars::Variables, model)
             ξ = vars.grid.tracers[name]
             s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
             s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme, model)
-            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
+            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, thickness, advection_scheme)
         end
     end
     return nothing
@@ -47,7 +89,7 @@ end
 
 # var is a compile-time constant so that haskey and getproperty constant-fold to
 # concrete variables (type-stable, required for Enzyme differentiability)
-@inline function vertical_advection!(::Val{var}, vars::Variables, w, Δσ, advection_scheme, model) where {var}
+@inline function vertical_advection!(::Val{var}, vars::Variables, w, thickness, advection_scheme, model) where {var}
     haskey(vars.tendencies.grid, var) || return nothing
     # Pass the full step-dimensioned fields plus the step index, rather than a `get_*_step`
     # view. The stencil kernel reads ξ at many vertical offsets per point, and indexing a
@@ -57,7 +99,7 @@ end
     ξ = vars.grid[var]
     s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
     s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme)
-    return _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
+    return _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, thickness, advection_scheme)
 end
 
 function _vertical_advection!(
@@ -66,7 +108,7 @@ function _vertical_advection!(
         w::AbstractField,           # vertical velocity at k+1/2
         ξ::AbstractField,           # ξ (full, with step dimension)
         s_prog::Integer,            # step of ξ to advect
-        Δσ,                         # layer thickness on σ levels
+        thickness,                  # SigmaLayerThickness or HybridLayerThickness, layer thickness weight δ_k(pₛ)
         adv::VerticalAdvection      # vertical advection scheme of order B
     )
     grids_match(ξ_tend, w, ξ) || throw(DimensionMismatch(ξ_tend, w, ξ))
@@ -78,17 +120,17 @@ function _vertical_advection!(
     launch!(
         arch, RingGridWorkOrder, (size(ξ_tend, 1), size(ξ_tend, 2)),
         vertical_advection_kernel!,
-        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
+        ξ_tend, s_tend, w, ξ, s_prog, thickness, nlayers, adv
     )
     return nothing
 end
 
 @kernel inbounds = true function vertical_advection_kernel!(
-        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
+        ξ_tend, s_tend, w, ξ, s_prog, thickness, nlayers, adv
     )
     ij, k = @index(Global, NTuple)
 
-    Δσₖ⁻¹ = inv(Δσ[k])
+    Δσₖ⁻¹ = inv(layer_thickness(thickness, ij, k))
 
     # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
     k⁻ = max(1, k - 1)

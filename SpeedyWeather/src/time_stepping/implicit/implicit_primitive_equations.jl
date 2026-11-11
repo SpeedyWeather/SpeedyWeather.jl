@@ -90,6 +90,12 @@ $(TYPEDFIELDS)"""
     "[DERIVED] Reference temperature profile, the global-mean temperature when last (re)initialized"
     temp_profile::VectorType = zeros(NF, nlayers)
 
+    "[OPTION] Hybrid coordinates: linearise about the surface pressure factor*exp(global mean of ln(pₛ))"
+    surface_pressure_factor::NF = 0.8
+
+    "[DERIVED] Linearised factor Bₖpₛ/pₖ of the pressure gradient force RTᵥ∇ln(pₖ), 1 for SigmaCoordinates"
+    pressure_gradient_factor::VectorType = ones(NF, nlayers)
+
     "[DERIVED] divergence: operator for the geopotential calculation"
     R::MatrixType = zeros(NF, nlayers, nlayers)
 
@@ -143,6 +149,7 @@ end
 function variables(implicit::ImplicitPrimitiveEquation)
     return (
         DynamicsVariable(:average_temperature_profile, VectorDim(implicit.nlayers), desc = "Average vertical temperature profile", units = "K"),
+        DynamicsVariable(:average_log_surface_pressure, VectorDim(1), desc = "Global mean of the logarithm of surface pressure", units = "log(Pa)"),
     )
 end
 
@@ -204,9 +211,15 @@ function reinitialize!(
     Tₖ = implicit.temp_profile
     temp_grid = get_prognostic_step(vars.grid.temperature, model.time_stepping, implicit)
     Tₖ .= reference_temperature(implicit.reference_temperature, vars.dynamics.average_temperature_profile, temp_grid)
-    initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
+    pₛ = linearisation_surface_pressure(implicit, vars)
+    initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion, pₛ)
     return nothing
 end
+
+# surface pressure [Pa] to linearise about for hybrid coordinates, factor*exp(global mean of ln(pₛ)),
+# a 1-element vector to avoid scalar indexing on GPU (and a traced value for Reactant)
+linearisation_surface_pressure(implicit, vars) =
+    implicit.surface_pressure_factor .* exp.(vars.dynamics.average_log_surface_pressure)
 
 """$(TYPEDSIGNATURES)
 Initialize the implicit terms for the PrimitiveEquation models. The operators are constructed
@@ -221,12 +234,16 @@ function initialize!(
         geopotential::AbstractGeopotential,
         atmosphere::AbstractAtmosphere,
         adiabatic_conversion::AbstractAdiabaticConversion,
+        surface_pressure = nothing,                         # 1-element vector [Pa] to linearise about (hybrid only)
     )
     (; nlayers) = implicit
-    (; σ_levels_half, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
-    (; Δp_geopot_half, Δp_geopot_full) = geopotential
-    (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
+
+    # layer weights δₖ = Δpₖ/pₛ, ∂p/∂pₛ at interfaces, adiabatic conversion and geopotential coefficients,
+    # all at the linearisation surface pressure for hybrid coordinates (constant for SigmaCoordinates)
+    (; δ, B_half, 𝒜, ℬ, Δp_geopot_full, Δp_geopot_half) = linearised_coefficients(
+        geometry.vertical_coordinates, surface_pressure, geometry, geopotential, adiabatic_conversion, R_dry
+    )
     (; temp_profile, L, R, U, W, L0, L1, L2, L3, L4) = implicit
 
     # use current vertical temperature profile
@@ -256,21 +273,28 @@ function initialize!(
     # vertical geopotential integration as matrix operator, otherwise equivalent to geopotential! with zero orography
     # R[row, k] = -Δp_geopot_full[k] for row <= k, additionally -Δp_geopot_half[k] for row < k
     R .= .-Δp_geopot_full[cols] .* (rows .<= cols) .- Δp_geopot_half[cols] .* (rows .< cols)
-    U .= .-R_dry .* temp_profile                # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
+    # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence, for hybrid coordinates with the
+    # linearised factor cₖ = Bₖpₛ/pₖ of the pressure gradient force and the linearised pₛ-dependence
+    # gₖ = ∂Φₖ/∂ln(pₛ) of the geopotential (c = 1, g = 0 for SigmaCoordinates)
+    c, g = linearised_pressure_gradient(geometry.vertical_coordinates, surface_pressure, R_dry, temp_profile)
+    implicit.pressure_gradient_factor .= c
+    U .= .-R_dry .* temp_profile .* c .- g
 
     # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
-    L0 .= 1 ./ (2 .* σ_levels_thick)
-    L2 .= κ .* temp_profile .* σ_lnp_A          # factor in front of the div_sum_above term
-    L4 .= κ .* temp_profile .* σ_lnp_B          # factor in front of div term in Dlnps/Dt
+    L0 .= 1 ./ (2 .* δ)
+    L2 .= κ .* temp_profile .* 𝒜                # factor in front of the div_sum_above term
+    L4 .= κ .* temp_profile .* ℬ                # factor in front of div term in Dlnps/Dt
 
     # L1[k, r]: vertical advection operator, layer indices above/below clamped to 1:nlayers
     k_above = max.(1, rows .- 1)
     k_below = min.(rows .+ 1, nlayers)
     ΔT_below = temp_profile[k_below] .- temp_profile[rows]
     ΔT_above = temp_profile[rows] .- temp_profile[k_above]
-    σₖ₊½ = σ_levels_half[rows .+ 1]             # σ at the interface below layer k
-    σₖ₋½ = σ_levels_half[rows]                  # and above
-    Δσᵣ = σ_levels_thick[cols]
+    # ∂p/∂pₛ at the interfaces below/above layer k, σ for SigmaCoordinates, B for hybrid
+    # coordinates as in vertical_velocity!, all other weights are the nominal σ (exact at pₛ = p_ref)
+    σₖ₊½ = B_half[rows .+ 1]
+    σₖ₋½ = B_half[rows]
+    Δσᵣ = δ[cols]
 
     # centred vertical advection of Tₖ, -1/(2Δσₖ)*(σ̇ₖ₊½*ΔT_below + σ̇ₖ₋½*ΔT_above) as in
     # vertical_advection!, with the linearised vertical velocity at k±½ per unit divergence in
@@ -279,19 +303,73 @@ function initialize!(
         ΔT_above .* (Δσᵣ .* σₖ₋½ .- Δσᵣ .* ((rows .- 1) .>= cols))
 
     # L3[r, k]: _sum_above operator itself, lower triangle with σ_levels_thick[k]
-    L3 .= σ_levels_thick[cols] .* (rows .> cols)
+    L3 .= δ[cols] .* (rows .> cols)
 
     # combine all operators into L = Diagonal(L0)*L1 + Diagonal(L2)*L3 + Diagonal(L4)
     L .= L0 .* L1 .+ L2 .* L3 .+ L4 .* (rows .== cols)
 
     # PRESSURE OPERATOR (called πᵣ in Hoskins and Simmons, 1975 Appendix 1)
-    W .= .-σ_levels_thick                       # the -D̄ term in the log surface pres equation
+    W .= .-δ                       # the -D̄ term in the log surface pres equation
 
     # solving the equations above for δD yields
     # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
     invert_S!(implicit, ξ, architecture(implicit.S⁻¹))
     return nothing
+end
+
+# constant coefficients for SigmaCoordinates, independent of the surface pressure
+function linearised_coefficients(::SigmaCoordinates, surface_pressure, geometry, geopotential, adiabatic_conversion, R_dry)
+    (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
+    (; Δp_geopot_full, Δp_geopot_half) = geopotential
+    return (; δ = geometry.σ_levels_thick, B_half = geometry.σ_levels_half, 𝒜 = σ_lnp_A, ℬ = σ_lnp_B, Δp_geopot_full, Δp_geopot_half)
+end
+
+# pressure ratios σᵣ = p/pₛ at half and full levels for hybrid coordinates at surface pressure pₛ,
+# without a surface pressure (`nothing`) at the reference pressure of the coordinate (σᵣ = A + B)
+function linearisation_pressure_ratios(coordinate::SigmaPressureCoordinates, surface_pressure)
+    p_ref = coordinate.reference_pressure
+    pₛ = isnothing(surface_pressure) ? p_ref : surface_pressure
+    σᵣ_half = coordinate.A_half .* (p_ref ./ pₛ) .+ coordinate.B_half
+    σᵣ_full = coordinate.A_full .* (p_ref ./ pₛ) .+ coordinate.B_full
+    return σᵣ_half, σᵣ_full
+end
+
+# the σ-coordinate expressions with the pressure ratios σᵣ = p/pₛ at the linearisation surface pressure,
+# as the explicit tendencies (adiabatic conversion, geopotential) evaluate them at the actual pₛ
+function linearised_coefficients(coordinate::SigmaPressureCoordinates, surface_pressure, geometry, geopotential, adiabatic_conversion, R_dry)
+    σᵣ_half, σᵣ_full = linearisation_pressure_ratios(coordinate, surface_pressure)
+    σᵣ_above = σᵣ_half[1:(end - 1)]
+    σᵣ_below = σᵣ_half[2:end]
+    δ = σᵣ_below .- σᵣ_above                                                # Δpₖ/pₛ
+    log_ratio = log.(σᵣ_below ./ σᵣ_above)                                  # Inf at a zero top, masked below
+    top = σᵣ_above .<= 0
+    𝒜 = ifelse.(top, zero(eltype(δ)), .-log_ratio ./ δ)                     # eq. 3.12, sum above empty at the top
+    α = ifelse.(top, log(eltype(δ)(2)), 1 .- σᵣ_above ./ δ .* log_ratio)    # eq. 3.12 and 3.19
+    Δp_geopot_full = R_dry .* log.(σᵣ_below ./ σᵣ_full)                     # R*ln(p_{k+½}/pₖ)
+    Δp_geopot_half = ifelse.(top, zero(eltype(δ)), R_dry .* log.(σᵣ_full ./ σᵣ_above))  # R*ln(pₖ/p_{k-½}), top unused
+    return (; δ, B_half = coordinate.B_half, 𝒜, ℬ = .-α, Δp_geopot_full, Δp_geopot_half)
+end
+
+# the pressure gradient force and geopotential don't depend on pₛ beyond R*Tₖ*ln(pₛ) for sigma coordinates
+linearised_pressure_gradient(::SigmaCoordinates, surface_pressure, R_dry, temp_profile) = (true, false)
+
+# For hybrid coordinates the sensitivity s = ∂ln(p)/∂ln(pₛ) = Bpₛ/p is B/σᵣ at the linearisation
+# surface pressure (= 1 at the surface). The geopotential Φₖ integrates R*T*ln(p_below/p_above)
+# from the surface, as R below, with derivatives R*(s_below - s_above) of each of these coefficients.
+function linearised_pressure_gradient(coordinate::SigmaPressureCoordinates, surface_pressure, R_dry, temp_profile)
+    σᵣ_half, σᵣ_full = linearisation_pressure_ratios(coordinate, surface_pressure)
+    (; B_half, B_full) = coordinate
+    nlayers = length(B_full)
+    s_full = B_full ./ σᵣ_full
+    s_half = ifelse.(σᵣ_half .> 0, B_half ./ σᵣ_half, true)                 # model top not used
+    rows = (1:nlayers)
+    cols = (1:nlayers)'
+    ds_full = R_dry .* (s_half[2:(nlayers + 1)] .- s_full)     # ∂/∂ln(pₛ) of R*ln(p_{k+½}/pₖ)
+    ds_half = R_dry .* (s_full .- s_half[1:nlayers])           # ∂/∂ln(pₛ) of R*ln(pₖ/p_{k-½})
+    M = ds_full[cols] .* (rows .<= cols) .+ ds_half[cols] .* (rows .< cols)
+    g = M * temp_profile
+    return s_full, g
 end
 
 # S⁻¹ via LU decomposition on the CPU, but Reactant traces `initialize!` inside the time step
