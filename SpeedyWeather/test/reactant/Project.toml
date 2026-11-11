@@ -12,4 +12,4 @@ Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 SpeedyWeather = {path = "../.."}
 
 [compat]
-Reactant = "0.2.299"
+Reactant = "0.2.305"

@@ -1,6 +1,7 @@
 module Utils
 
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 using StyledStrings
 using ..Architectures
 

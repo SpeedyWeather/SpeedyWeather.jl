@@ -33,9 +33,12 @@ We want to use 8 vertical levels, and a lower resolution of T32 on a
 [full Gaussian grid](@ref FullGaussianGrid).
 The Jablonowski-Williamson initial conditions are `ZonalWind` for vorticity and divergence
 (curl and divergence of ``u, v``), `JablonowskiTemperature` for temperature and
-`ZeroInitially` for pressure. The orography is just a `ZonalRidge`.
+`ConstantPressure` for pressure. The orography is just a `ZonalRidge`.
 There is no forcing and the initial conditions are baroclinically unstable which kicks
-off a wave propagating eastward. This wave becomes obvious when visualised with
+off a wave propagating eastward. `JablonowskiTemperature` uses the stable tropospheric
+lapse rate of ``\Gamma = 5~\text{K/km}`` from Jablonowski and Williamson
+(option `lapse_rate`), independent of the lapse rate of the model's atmosphere.
+This wave becomes obvious when visualised with
 
 ```@example jablonowski
 using CairoMakie

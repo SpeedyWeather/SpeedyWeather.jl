@@ -17,17 +17,29 @@ benchmarks[:benchmark200] = BenchmarkSuite(
 )
 
 ## Primitive WET MODELS RESOLUTION
-# Resolution sweep: L=8 from T31 → T255, plus L=16 and L=24 at the four highest
-# truncations. Each configuration is run with the default (FFT + Legendre)
+# Resolution sweep: L=8 from T32 → T256, plus L=16 and L=24 at the four highest
+# truncations. With `--hi-res` on GPU and TPU additionally T342 and T512 for all three layer
+# counts (not on CPU, too slow). Returns `(truncations, nlayers)` of the PrimitiveWet resolution
+# sweep (benchmark201) and the SPEEDY suite (benchmark900).
+# `ARCH_LABEL`, `ON_ACCELERATOR` and `RUN_HI_RES` are set in manual_benchmarking.jl.
+function resolution_sweep()
+    hi_res = RUN_HI_RES && ON_ACCELERATOR ? [342, 512] : Int[]
+    truncations_L8 = vcat([32, 43, 64, 86, 128, 171, 256], hi_res)
+    truncations_L16_L24 = vcat([86, 128, 171, 256], hi_res)
+    truncations = vcat(truncations_L8, truncations_L16_L24, truncations_L16_L24)
+    nlayers = vcat(fill(8, length(truncations_L8)), fill(16, length(truncations_L16_L24)), fill(24, length(truncations_L16_L24)))
+    return truncations, nlayers
+end
+
+# Each configuration of the sweep is run with the default (FFT + Legendre)
 # SpectralTransform and additionally with MatrixSpectralTransform up to an
 # architecture-dependent maximum truncation, as the dense matrix transform gets
-# too large (memory + speed) at high resolution: up to T171 on GPU (incl. Reactant GPU),
-# up to T86 on CPU (incl. Reactant CPU). `ARCH_LABEL` is set in manual_benchmarking.jl.
-let truncations = [32, 43, 64, 86, 128, 171, 256, 86, 128, 171, 256, 86, 128, 171, 256],
-        nlayers = [8, 8, 8, 8, 8, 8, 8, 16, 16, 16, 16, 24, 24, 24, 24]
+# too large (memory + speed) at high resolution: up to T171 on GPU (incl. Reactant GPU), up to T128
+# on TPU (T171 needs ~17 GB, more than some TPU chips have), up to T86 on CPU (incl. Reactant CPU).
+let
+    truncations, nlayers = resolution_sweep()
 
-    on_gpu = ARCH_LABEL in ("gpu-nvidia", "gpu-amd", "reactant-gpu")
-    max_truncation_matrix = on_gpu ? 180 : 86
+    max_truncation_matrix = ARCH_LABEL == "reactant-tpu" ? 128 : ON_ACCELERATOR ? 180 : 86
     matrix_idx = findall(t -> t <= max_truncation_matrix, truncations)
     truncations_matrix = truncations[matrix_idx]
     nlayers_matrix = nlayers[matrix_idx]
@@ -91,3 +103,39 @@ benchmarks[:benchmark700] = BenchmarkSuiteDynamics(
     title = "Individual dynamics functions",
     nruns = 1,
 )
+
+## SPEEDY.F90-LIKE CONFIGURATION, opt-in with `--SPEEDY`
+# The PrimitiveWet model with prescribed seasonal climatologies and constant surface roughness, wind
+# slowdown and gusts (`speedy_components` in benchmark_suite.jl), over the same resolutions as the
+# PrimitiveWet resolution sweep (benchmark201) with the default transform, to compare row by row.
+if RUN_SPEEDY
+    let
+        truncations, nlayers = resolution_sweep()
+        nruns = length(truncations)
+        benchmarks[SPEEDY_SUITE_KEY] = BenchmarkSuite(
+            title = "SPEEDY.f90-like configuration",
+            description = SPEEDY_CONFIGURATION,
+            nruns = nruns,
+            model = fill(PrimitiveWetModel, nruns),
+            truncation = truncations,
+            nlayers = nlayers,
+            model_kwargs = fill(speedy_components(PrimitiveWetModel), nruns),
+        )
+    end
+end
+
+## REVERSE MODE (AD) WITH REACTANT, opt-in with `--reverse` (reverse_benchmark_suite.jl)
+# Forward and reverse-mode gradient over 50, 100, 200, 2000 time steps of the PrimitiveWet model, L8,
+# SpectralTransform. On Reactant CPU only up to T128, above the 2000-step gradient takes too long.
+if RUN_REVERSE
+    let truncations = ON_ACCELERATOR ? [32, 64, 128, 256] : [32, 64, 128],
+            nsteps = [50, 100, 200, 2000]
+
+        benchmarks[REVERSE_SUITE_KEY] = BenchmarkSuiteReverse(
+            title = "Primitive wet model, reverse mode (AD) with Reactant",
+            nruns = length(truncations) * length(nsteps),
+            truncation = repeat(truncations, inner = length(nsteps)),
+            nsteps = repeat(nsteps, outer = length(truncations)),
+        )
+    end
+end

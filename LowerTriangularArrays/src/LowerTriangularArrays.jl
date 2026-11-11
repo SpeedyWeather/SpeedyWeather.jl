@@ -2,6 +2,7 @@ module LowerTriangularArrays
 
 # DOCUMENTATION
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 using StyledStrings
 
 # NUMERICS

@@ -131,7 +131,7 @@ end
 
 variables(model::PrimitiveDry) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
-"""($TYPEDSIGNATURES) All variables needed for the primitive dry model itself (components excluded)."""
+"""$(TypedMethodSignatures(defaults = true)) All variables needed for the primitive dry model itself (components excluded)."""
 function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
     pg = nsteps.prognostic_grid
     ps = nsteps.prognostic_spectral
@@ -168,7 +168,6 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         DynamicsVariable(:dpres_dx_spec, Spectral2D(), desc = "Zonal gradient of lnpₛ in spectral space", fuse = :uv_dpres_grad_spectral),
         DynamicsVariable(:dpres_dy_spec, Spectral2D(), desc = "Meridional gradient of lnpₛ in spectral space", fuse = :uv_dpres_grad_spectral),
         DynamicsVariable(:pres_flux, GridXYZ(), desc = "Pressure gradient flux, (u, v) ⋅ ∇lnp_s"),
-        DynamicsVariable(:virtual_temperature, SpectralXYZ(), desc = "Virtual temperature", units = "K"),
         DynamicsVariable(:u_mean_grid, Grid2D(), desc = "Vertically integrated zonal velocity", units = "m/s"),
         DynamicsVariable(:v_mean_grid, Grid2D(), desc = "Vertically integrated meridional velocity", units = "m/s"),
         DynamicsVariable(:div_mean_grid, Grid2D(), desc = "Vertically integrated divergence", units = "1/s"),
@@ -187,7 +186,7 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!` 

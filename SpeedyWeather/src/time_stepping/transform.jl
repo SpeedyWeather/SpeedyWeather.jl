@@ -2,7 +2,7 @@
 SpeedyTransforms.transform!(vars::Variables, model::AbstractModel; kwargs...) =
     transform!(vars, model.time_stepping, model; kwargs...)
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Propagate the spectral state of the prognostic variables of `vars` to the
 grid variables `vars` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u, v."""
@@ -52,7 +52,7 @@ function SpeedyTransforms.transform!(
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Propagate the spectral state of the prognostic variables of `vars` to the
 grid variables in `vars` for the shallow water model. Updates grid vorticity,
 grid divergence, grid interface displacement (`pres_grid`) and the velocities
@@ -109,7 +109,7 @@ function SpeedyTransforms.transform!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Propagate the spectral state of the prognostic variables of `vars` to the
 grid variables in `vars` for primitive equation models. Updates grid vorticity,
 grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
@@ -139,7 +139,7 @@ function SpeedyTransforms.transform!(
 
     # retain previous time step for vertical advection and parameterizations
     # if not initial step do before transforms i.e before that step is overwritten
-    initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
+    initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model, vars.prognostic.clock)
 
     # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
@@ -171,6 +171,12 @@ function SpeedyTransforms.transform!(
         unscale_coslat = true
     )
 
+    for (name, tracer) in model.tracers
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
+        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
+    end
+
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
     # only do after transforms to avoid copying uninitialized zeros
     initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
@@ -184,12 +190,6 @@ function SpeedyTransforms.transform!(
     temperature_average!(vars, temp, S)
     geopotential!(vars, model)                  # calculate geopotential
 
-    for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
-        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
-        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
-    end
-
     # transform random pattern for random process unless random_process=nothing
     transform!(vars, model.random_process, S)
 
@@ -198,4 +198,4 @@ end
 
 # only needed for Leapfrog to retain a copy of the current time step moved to the previous
 # fallback is nothing for other time steppers
-move_prognostic_grid_variables_back!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
+move_prognostic_grid_variables_back!(::Variables, ::AbstractTimeStepper, ::AbstractModel, args...; kwargs...) = nothing

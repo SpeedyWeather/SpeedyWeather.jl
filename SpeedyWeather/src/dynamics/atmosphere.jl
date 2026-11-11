@@ -67,7 +67,7 @@ $(TYPEDFIELDS)"""
     @param temperature_freezing::NF = 273.15 (bounds = Nonnegative,)
 
     "[OPTION] Reference moist-adiabatic temperature lapse rate [K/m]"
-    @param moist_lapse_rate::NF = 5 / 1000
+    @param moist_lapse_rate::NF = 5.7 / 1000
 
     "[OPTION] Reference dry-adiabatic temperature lapse rate [K/m]"
     @param dry_lapse_rate::NF = 9.8 / 1000
@@ -144,8 +144,7 @@ where T is in Kelvin, Lᵥ the the latent heat of condensation and Rᵥ the gas 
     (; R_vapor) = A
     T₀ = A.temperature_freezing
     # no `convert(eltype(T₀), T)` here as that is not traceable by Reactant if T is traced
-    # TODO: `inv` fails in kernels on Reactant+CUDA https://github.com/EnzymeAD/Reactant.jl/issues/2560
-    return e₀ * exp(Lᵥ / R_vapor * (1 / T₀ - 1 / T))
+    return e₀ * exp(Lᵥ / R_vapor * (inv(T₀) - inv(T)))
 end
 
 @inline saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)

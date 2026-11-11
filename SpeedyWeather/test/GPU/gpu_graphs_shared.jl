@@ -106,10 +106,48 @@ function test_gpu_graphs(ext, prefix)
         end
     end
 
+    # A captured graph also bakes in the scratch memory the caller passes (in a model:
+    # `vars.scratch.transform_memory`, part of the Variables, not of the model, so new Variables for
+    # the same model bring a new one). The same field with another scratch memory must capture a new
+    # graph, not replay the one recorded with the first: that would write the Fourier output into
+    # (or read it from) the first scratch while the Legendre transform uses the second.
+    @testset "$prefix Graphs: another scratch memory doesn't replay a stale graph" begin
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(SpeedyWeather.GPU())
+            architecture = SpeedyWeather.GPU()
+            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture)
+            (; NF, grid, spectrum, nlayers) = spectral_grid
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
+            S_reference = SpectralTransform(spectral_grid; gpu_graphs = false)     # with its own scratch memory
+            scratches = [SpeedyTransforms.ScratchMemory(NF, architecture, grid, nlayers) for _ in 1:2]
+            n_graphs(execs) = sum(length(getfield(c, execs)) for c in values(SpeedyTransforms.GRAPH_CACHES); init = 0)
+
+            # the same field and coefficients (= buffer addresses) for every call, only the scratch
+            # memory changes. New data for every call, so that a graph replayed with the other scratch
+            # memory can't find matching data there. The first round captures a graph per direction
+            # and scratch memory (its result comes from the warm-up), the second one replays them.
+            field = zeros(NF, grid, nlayers)
+            coeffs = zeros(Complex{NF}, spectrum, nlayers)
+            SpeedyTransforms.clear_fourier_graph_cache!()
+            for round in 1:2, scratch in scratches
+                copyto!(field.data, rand(NF, grid, nlayers).data)
+                transform!(coeffs, field, scratch, S)                           # grid → spectral
+                @test Array(coeffs.data) ≈ Array(transform(field, S_reference).data)
+
+                copyto!(coeffs.data, rand(Complex{NF}, spectrum, nlayers).data)
+                transform!(field, coeffs, scratch, S)                           # spectral → grid
+                @test Array(field.data) ≈ Array(transform(coeffs, S_reference).data)
+            end
+            @test n_graphs(:forward_execs) == 2     # one graph per direction and scratch memory
+            @test n_graphs(:inverse_execs) == 2
+
+            SpeedyTransforms.clear_fourier_graph_cache!()
+        end
+    end
+
     # `add=true` (accumulate onto the field instead of overwriting; used by the Enzyme adjoint
     # rules). Two hazards, both regressions guarded here:
     #  1. A captured graph bakes in overwrite-vs-accumulate, so the two modes must NOT share a
-    #     graph — the cache is therefore keyed by (field buffer, add). Sharing would silently
+    #     graph — the cache is therefore keyed by (field and scratch buffers, add). Sharing would silently
     #     give wrong results.
     #  2. `run_graph!` warms up and then captures; capture only RECORDS (it does not execute), so
     #     the warmup alone produces the call's result. Launching the graph as well would apply the
