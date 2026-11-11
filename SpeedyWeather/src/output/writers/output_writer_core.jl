@@ -46,7 +46,7 @@ function Base.setproperty!(output::AbstractOutput, s::Symbol, v)
     return setfield!(output, s, v)
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Initialize the `OutputWriterCore` from the option fields of `output` and `model`:
 determine the run folder (skipped for in-memory writers when `create_folder=false`),
 compute the output frequency from `model.time_stepping`, reset the output counter,

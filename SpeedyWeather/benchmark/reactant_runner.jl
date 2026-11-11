@@ -47,6 +47,11 @@ function device_bytes(x, seen = Base.IdSet{Any}())
     return sum((device_bytes(getfield(x, i), seen) for i in 1:nfields(x) if isdefined(x, i)); init = 0)
 end
 
+# A new simulation with a deepcopy of the initial state for every timed run: `copy!` into the
+# warm-up's variables would share the clock's device numbers with `initial_variables`. Reactant has
+# no GPU graphs of the Fourier transform, so new buffers for every timed run don't matter.
+reset_simulation!(::ReactantDevice, simulation, initial_variables, model) = Simulation(deepcopy(initial_variables), model)
+
 # Compile `f(args...)` once, `sync = true` so that every call waits for the device to finish
 function compiled_call(::ReactantDevice, f, args...)
     compiled_f = @compile compile_options = SpeedyWeather.reactant_compile_options(; sync = true) f(args...)

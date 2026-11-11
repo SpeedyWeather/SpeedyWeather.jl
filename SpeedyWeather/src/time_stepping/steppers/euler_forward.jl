@@ -17,7 +17,7 @@ mutable struct EulerForward{NF, S, B, MS} <: AbstractTimeStepper
     Δt::NF
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Generator function for an EulerForward struct using `spectral_grid`
 for the resolution information."""
 function EulerForward(
@@ -39,7 +39,7 @@ end
 
 # 1 prognostic and 1 tendency step, and read step 1, are the fallbacks in steps.jl
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Euler forward step `var += Δt/scale * tendency`."""
 function update_prognostic!(
         var::AbstractArray,

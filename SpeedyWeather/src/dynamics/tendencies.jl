@@ -47,6 +47,7 @@ function spectral_tendencies!(vars::Variables, model::PrimitiveEquation)
     vordiv_spectral_tendencies!(vars, model)
     temperature_spectral_tendency!(vars, model)
     humidity_spectral_tendency!(vars, model)         # no-op for PrimitiveDry
+    linear_pressure_gradient!(vars, model)           # Bernoulli potential += R*Tₖ*lnpₛ
     bernoulli_spectral_potential!(vars, model)
     surface_pressure_spectral_tendency!(vars, model)
     return nothing
@@ -124,25 +125,16 @@ function dynamics_tendencies!(
     drag!(vars, model)
     scale_tendencies!(vars, model)
 
-    (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit, time_stepping) = model
+    (; geometry, spectral_transform, implicit, time_stepping) = model
 
     # calculate (u_k, v_k)⋅∇ln(p_s), ∇ln(pₛ) is computed in transform! together with u, v
     pressure_gradient_flux!(vars, time_stepping)
-
-    # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
-    linear_virtual_temperature!(vars, model)
-
-    # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
-    geopotential!(vars, geopotential, orography)
 
     # get ū, v̄, D̄ on grid; D̄ in spectral
     vertical_integration!(vars, geometry, time_stepping)
 
     # calculate vertical velocity σ̇ in sigma coordinates for the vertical mass flux M = pₛ * σ̇
     vertical_velocity!(vars, geometry, time_stepping)
-
-    # add the RTₖlnpₛ term to geopotential
-    linear_pressure_gradient!(vars, atmosphere, implicit, time_stepping)
 
     # use σ̇ for the vertical advection of u, v, T, q
     # this advects the full temperature T = T' + Tₖ, i.e. it includes the vertical advection
@@ -469,14 +461,19 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Add the linear contribution of the pressure gradient to the geopotential.
-The pressure gradient in the divergence equation takes the form
+Add the linear contribution of the pressure gradient to the (spectral) Bernoulli potential,
+which already holds the transformed kinetic energy and geopotential. The pressure gradient in the divergence equation takes the form
 
     -∇⋅(Rd * Tᵥ * ∇lnpₛ) = -∇⋅(Rd * Tᵥ' * ∇lnpₛ) - ∇²(Rd * Tₖ * lnpₛ)
 
-So that the second term inside the Laplace operator can be added to the geopotential.
+So that the second term inside the Laplace operator can be added to the Bernoulli potential.
 Rd is the gas constant, Tᵥ the virtual temperature, Tᵥ' its anomaly wrt to the
 average or reference temperature Tₖ, and ln(pₛ) is the logarithm of surface pressure."""
+function linear_pressure_gradient!(vars::Variables, model::PrimitiveEquation)
+    (; atmosphere, implicit, time_stepping) = model
+    return linear_pressure_gradient!(vars, atmosphere, implicit, time_stepping)
+end
+
 function linear_pressure_gradient!(
         vars::Variables,
         atmosphere::AbstractAtmosphere,
@@ -489,14 +486,14 @@ function linear_pressure_gradient!(
     # for Leapfrog this term is evaluated at the previous time step and the
     # implicit corrections will move it to the current as done for all linear gravity-wave related terms
     lnpₛ = get_prognostic_step(vars.prognostic.pressure, time_stepping, LinearDynamicalCore())
-    Φ = vars.dynamics.spectral_geopotential
+    bernoulli = get_step(vars.dynamics.kinetic_energy)
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
-    # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
-    # -∇² is applied in bernoulli_potential!
+    # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the Bernoulli potential on which the operator
+    # -∇² is applied in bernoulli_spectral_potential!
     # TODO: Broadcast issue with LTA, conflicting broadcast styles
-    Φ.data .+= R_dry .* Tₖ' .* lnpₛ.data
+    bernoulli.data .+= R_dry .* Tₖ' .* lnpₛ.data
 
     return nothing
 end
@@ -815,7 +812,7 @@ function tracer_advection!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 
 Compute the gridded contribution to the horizontal advection. 
 
@@ -881,7 +878,7 @@ end
     A_tend_grid[ij, k] = kernel_func(A_grid[ij, k], div_grid[ij, k], A_tend_grid[ij, k])
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Computes `∇⋅((u, v)*A)` with the option to add/overwrite `A_tend` and to
 `flip_sign` of the flux divergence by doing so.
 
@@ -941,7 +938,7 @@ function flux_grid_divergence!(
 end
 
 #TODO: just call `divergence!` directly instead or keep this to have the *_spectral_ *_grid_ symmetry?
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Purely spectral half of `flux_divergence!`: Just computes the actual divergence"""
 function flux_spectral_divergence!(
         A_tend::LowerTriangularArray,
@@ -1016,7 +1013,7 @@ function vorticity_flux_grid_tendencies!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 
 Compute the vorticity advection as the curl/div of the vorticity fluxes
 
@@ -1160,21 +1157,22 @@ function bernoulli_grid_potential!(vars::Variables, model::ShallowWater, time_st
 end
 
 """$(TYPEDSIGNATURES)
-Gridded contribution of `bernoulli_potential!` for PrimitiveEquation: writes `kinetic_energy_grid = ½(u²+v²)`."""
+Gridded contribution of `bernoulli_potential!` for PrimitiveEquation: writes `kinetic_energy_grid = ½(u²+v²)+Φ`
+with the grid-point geopotential Φ calculated in `transform!`, shared with the parameterizations."""
 function bernoulli_grid_potential!(vars::Variables, ::Union{PrimitiveEquation, AbstractSpectralTransform}, time_stepping::AbstractTimeStepper)
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
+    Φ = vars.dynamics.geopotential
     bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
     half = convert(eltype(bernoulli_grid), 0.5)
-    @. bernoulli_grid = half * (u^2 + v^2)
+    @. bernoulli_grid = half * (u^2 + v^2) + Φ
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Spectral half of `bernoulli_potential!`. `kinetic_energy` is assumed to already hold the spec
 transform of `kinetic_energy_grid` (from the mega-batched transform). Adds `-∇²(KE)` into
-`div_tend`. For SW, geopotential is already absorbed into `kinetic_energy_grid` on the grid
-side; for PrimitiveEquation, the spectral geopotential is added here first."""
+`div_tend`. The geopotential is already absorbed into `kinetic_energy_grid` on the grid side."""
 function bernoulli_spectral_potential!(vars::Variables, model::ShallowWater)
     _bernoulli_spectral_potential!(vars, model.spectral_transform, model.time_stepping)
     return nothing
@@ -1186,10 +1184,6 @@ function bernoulli_spectral_potential!(vars::Variables, model::PrimitiveEquation
 end
 
 function bernoulli_spectral_potential!(vars::Variables, S::AbstractSpectralTransform, time_stepper::AbstractTimeStepper)
-    # PrimitiveEquation path: add spectral geopotential to KE before the Laplacian.
-    bernoulli = get_step(vars.dynamics.kinetic_energy)
-    geopot = vars.dynamics.spectral_geopotential
-    bernoulli .+= geopot
     _bernoulli_spectral_potential!(vars, S, time_stepper)
     return nothing
 end

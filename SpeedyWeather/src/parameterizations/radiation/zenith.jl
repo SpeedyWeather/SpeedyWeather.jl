@@ -104,7 +104,7 @@ Adapt.@adapt_structure NoTimeCorrection
 NoTimeCorrection(::SpectralGrid; kwargs...) = NoTimeCorrection()
 (STC::NoTimeCorrection)(g) = zero(g)
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Chooses from SolarZenith (daily and seasonal cycle) or SolarZenithSeason
 given the parameters in model.planet. In both cases the seasonal cycle can
 be disabled, calculating the solar declination from the initial time
@@ -182,20 +182,20 @@ function year_angle(::Type{T}, time::Dates.AbstractDateTime) where {T}
     return T(2π) * T(seconds_of_year / seconds_in_year)
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Angle of year [radians] of `orbit_time` for the solar zenith `S`, or of its initial time
 if the seasonal cycle is disabled, see `year_angle`."""
 year_angle(::Type{T}, S::AbstractZenith, orbit_time::DateTime) where {T} =
     year_angle(T, S.seasonal_cycle ? orbit_time : S.initial_time[])
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Solar declination angle δ [radians] at `orbit_time` for the solar zenith `S`, following its
 `solar_declination` and seasonal cycle settings. Can be used to synchronize other seasonal
 cycles with the solar zenith angle."""
 solar_declination(::Type{T}, S::AbstractZenith, orbit_time::DateTime) where {T} =
     S.solar_declination(year_angle(T, S, orbit_time))
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Fraction of day in `time` as angle in radians [-π...π], noon to noon, at longitude `λ`.
 Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as constant.
 This is because `Dates` functions assume an Earth date. Length of the daily cycle is instead

@@ -49,10 +49,10 @@ CO2(SG::SpectralGrid, concentration::Function) = CO2(concentration)
 @inline (C::CO2{<:Function})(t::DateTime) = C.concentration(t)
 
 export TwoTimesCO2, FourTimesCO2
-"$(TYPEDSIGNATURES) 2xCO2 scenario: Doubles preindustrial `DEFAULT_CO2` in the year 2000."
+"$(TypedMethodSignatures(defaults = true)) 2xCO2 scenario: Doubles preindustrial `DEFAULT_CO2` in the year 2000."
 TwoTimesCO2(t0 = DateTime(2000)) = CO2(t -> t > t0 ? 2DEFAULT_CO2 : DEFAULT_CO2)
 
-"$(TYPEDSIGNATURES) 4xCO2 scenario: Quadruples preindustrial `DEFAULT_CO2` in the year 2000."
+"$(TypedMethodSignatures(defaults = true)) 4xCO2 scenario: Quadruples preindustrial `DEFAULT_CO2` in the year 2000."
 FourTimesCO2(t0 = DateTime(2000)) = CO2(t -> t > t0 ? 4DEFAULT_CO2 : DEFAULT_CO2)
 
 export ExponentialCO2

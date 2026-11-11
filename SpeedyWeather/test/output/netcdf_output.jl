@@ -166,6 +166,10 @@ end
     # should be within ~800 to ~1200hPa
     @test all(0.8 .< mslp ./ p₀ .< 1.2)
 
+    # also for the initial conditions, before the surface air temperature is computed
+    mslp_initial = ds["mslp"].var[:, :, 1]
+    @test all(0.8 .< mslp_initial ./ p₀ .< 1.2)
+
     # cloud top height in [m] (not layer index), 0 for no cloud, below top-layer geopotential height
     @test ds["cloud_top"].attrib["units"] == "m"
     cloud_top = ds["cloud_top"].var[:, :, end]
