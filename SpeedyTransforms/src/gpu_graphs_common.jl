@@ -18,8 +18,9 @@
 
 """Maximum number of cached graphs per direction per `SpectralTransform`. Prevents
 unbounded growth (and host-side capture cost) when the transform is called with a stream
-of freshly-allocated `field` buffers (e.g. the allocating `transform(field, S)`). Beyond
-this many distinct buffers the allocation-free loop is run directly without capturing."""
+of freshly-allocated buffers (e.g. the allocating `transform(field, S)`, or new `Variables`
+for the same model). Beyond this many distinct (field, scratch) buffer sets the allocation-free
+loop is run directly without capturing."""
 const MAX_GRAPHS = 64
 
 # =====================================================================================
@@ -80,12 +81,17 @@ end
 # for the FFTs, device-side gather/scatter metadata, and the instantiated GPU graphs.
 # =====================================================================================
 
+# Graph-cache key: the addresses of all buffers a captured graph bakes in that the caller
+# passes in, see `graph_key`
+const GraphKey = Tuple{UInt, UInt, UInt, NTuple{3, Int}}
+
 """$(TYPEDSIGNATURES)
 Cache (one per transform SIZE, i.e. per FFT plan) holding the pre-allocated packed
 work buffers, the per-ring reshaped views and FFT plans used by the transforms, the device
-gather/scatter index metadata, and the instantiated GPU graphs (one per distinct `field`
-buffer and direction). A graph value of `nothing` marks a buffer for which capture failed
-(fall back to direct loop). `E` is the backend's graph-exec type (e.g. `CuGraphExec`)."""
+gather/scatter index metadata, and the instantiated GPU graphs (one per distinct (field,
+scratch) buffer set and direction, see [`graph_key`](@ref)). A graph value of `nothing` marks
+a buffer set for which capture failed (fall back to direct loop). `E` is the backend's
+graph-exec type (e.g. `CuGraphExec`)."""
 struct GPUFourierGraphCache{PR, PC, RV, CV, RFP, BFP, IV, A, E}
     packed_real::PR             # device Vector{NF}          — all rings' dense real blocks
     packed_complex::PC          # device Vector{Complex{NF}} — all rings' dense complex blocks
@@ -107,10 +113,10 @@ struct GPUFourierGraphCache{PR, PC, RV, CV, RFP, BFP, IV, A, E}
     has_equator::Bool           # whether the grid has a ring on the equator that needs special handling
     j_equator::Int              # latitude index of the equator ring (if any)
     arch::A                     # SpeedyWeather GPU architecture (for launch!)
-    forward_execs::Dict{UInt, Union{Nothing, E}} # forward graphs, keyed by field buffer
-    # inverse graphs, keyed by (field buffer, `add`): a captured graph bakes in whether the scatter
-    # overwrites or accumulates, so the two modes must never share a graph.
-    inverse_execs::Dict{Tuple{UInt, Bool}, Union{Nothing, E}}
+    forward_execs::Dict{GraphKey, Union{Nothing, E}}    # forward graphs, keyed by field + scratch buffers
+    # inverse graphs, keyed by (field + scratch buffers, `add`): a captured graph bakes in whether the
+    # scatter overwrites or accumulates, so the two modes must never share a graph.
+    inverse_execs::Dict{Tuple{GraphKey, Bool}, Union{Nothing, E}}
 end
 
 # One cache per (SpectralTransform, transform size), keyed by the *forward FFT plan set*
@@ -166,8 +172,8 @@ function build_cache(::Type{E}, S::SpectralTransform, nlayers::Integer) where {E
         dev(istart_n), dev(istart_s), dev(nlons_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, j_equator,
         arch,
-        Dict{UInt, Union{Nothing, E}}(),
-        Dict{Tuple{UInt, Bool}, Union{Nothing, E}}(),
+        Dict{GraphKey, Union{Nothing, E}}(),
+        Dict{Tuple{GraphKey, Bool}, Union{Nothing, E}}(),
     )
 end
 
@@ -185,7 +191,7 @@ get_cache(::Type{E}, S::SpectralTransform, nlayers::Integer) where {E} =
 Trim the memory pool of the backend. EXTENSION POINT, does nothing by default."""
 reclaim!(::AbstractArchitecture) = nothing
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Clear all cached GPU-graphs Fourier buffers and graphs. With `gc = true` (default) also
 run a full GC and [`reclaim!`](@ref) the device memory of the cleared caches' architectures
 and of any `architectures` passed on. Mainly useful for tests/benchmarks."""
@@ -239,7 +245,7 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Allocation-free, fused inverse (spectral → grid) batched Fourier loop: one gather kernel
 packs all rings from the scratch, per-ring in-place inverse FFTs run on reshaped views,
 one scatter kernel writes the grid field. `add` accumulates onto `field` instead of overwriting it
@@ -343,14 +349,30 @@ function run_graph!(execs::AbstractDict, key, loop!::F, backend::GraphBackend) w
     return nothing
 end
 
-# Stable per-buffer graph-cache key: the device address of `field.data`.
-#
-# The time stepping fetches the grid field for each transform via `get_prognostic_step` /
-# `get_tendency_step`, i.e. a `field_view`/`get_step` on a step-dimensioned grid variable. On
-# the GPU `view(::CuArray, :, :, step)` returns again a fresh `CuArray` wrapper each call
-# , so keying the cache on the wrapper's object identity would capture a
-# new graph every timestep and the cache would grow without bound. The wrapper churns but it
-# always aliases the same device memory at the same offset, so the device pointer — exactly what
-# the captured graph bakes in — is stable; we key on that instead. (Safe because model buffers live
-# for the whole run, so an address is never freed and recycled under a stale graph.)
-@inline graph_key(data) = reinterpret(UInt, pointer(data))
+# address of a device array (or of a view into one, e.g. the per-step views of the time stepping)
+@inline device_address(data) = reinterpret(UInt, pointer(data))
+
+"""$(TYPEDSIGNATURES)
+Graph-cache key of a call with the grid `field` and the scratch memory arrays `north`, `south`:
+the device addresses of all buffers a captured graph bakes in that the caller passes in, and
+the size of the scratch arrays. The remaining buffers a graph uses (packed work buffers, index
+arrays, FFT plans) belong to the `GPUFourierGraphCache` and live as long as the graph.
+
+Addresses, not the wrappers' object identity: the time stepping fetches the grid field for each
+transform via `get_prognostic_step` / `get_tendency_step`, i.e. a `field_view`/`get_step` on a
+step-dimensioned grid variable. On the GPU `view(::CuArray, :, :, step)` returns a fresh
+`CuArray` wrapper each call, so keying on the wrapper would capture a new graph every time step
+and the cache would grow without bound. The wrapper churns but always aliases the same device
+memory at the same offset, so its address (exactly what the graph bakes in) is stable.
+
+The scratch memory is part of the key because it is not owned by the transform: in a simulation
+it is `vars.scratch.transform_memory`, part of the `Variables`, and every new `Variables` for the
+same model (another `initialize!(model)`, a `deepcopy`) brings new scratch memory, while the
+memory pool may hand its field a recycled address. Keyed on the field alone, such a call would
+replay a graph that writes into (or reads from) the freed scratch memory of earlier `Variables`.
+A graph is therefore only replayed when all of its caller-provided buffers are those of the
+current call. The scratch size is included because the gather/scatter kernels index the scratch
+arrays with their size, and scratch memory with another number of layers could be allocated at
+a recycled address."""
+@inline graph_key(field::AbstractField, north::AbstractArray, south::AbstractArray)::GraphKey =
+    (device_address(field.data), device_address(north), device_address(south), size(north))

@@ -25,9 +25,6 @@ Geopotential(SG::SpectralGrid) = Geopotential(
 function variables(::Geopotential)
     return (
         DynamicsVariable(:geopotential, GridXYZ(), desc = "Geopotential", units = "m^2/s^2"),
-        # TODO only the grid should be necessary, remove this when adapting the geopotential calculation
-        # in the dynamical core to only need grid geopotential
-        DynamicsVariable(:spectral_geopotential, SpectralXYZ(), desc = "Geopotential", units = "m^2/s^2"),
     )
 end
 
@@ -59,7 +56,13 @@ function initialize!(G::Geopotential, model::PrimitiveEquation)
     return nothing
 end
 
-# calculate geopotential in grid-point space for parameterizations
+"""
+$(TYPEDSIGNATURES)
+Calculate the geopotential in grid-point space, used by both the dynamical core
+(in the Bernoulli potential) and the parameterizations. The time step is chosen
+by `which_prognostic_step(var, time_stepping, ::AbstractGeopotential)` which for Leapfrog
+is the previous step, as the linear (gravity wave) terms of the dynamical core
+are evaluated there before the semi-implicit correction."""
 function geopotential!(
         vars::Variables,
         model::PrimitiveEquation,
@@ -155,57 +158,6 @@ end
         geopotential[ij, k] = geopotential_half_below + R * Tᵥ * log(p_half_below / pₖ)
     end
     return nothing
-end
-
-"""
-$(TYPEDSIGNATURES)
-Compute spectral geopotential `geopot` from spectral temperature `temp`
-and spectral surface geopotential `geopot_surf` (orography*gravity)."""
-function geopotential!(
-        vars::Variables,
-        G::Geopotential,
-        orography::AbstractOrography,
-    )
-    Tᵥ = vars.dynamics.virtual_temperature
-    Φ = vars.dynamics.spectral_geopotential     # spectral geopotential to fill
-    Φₛ = orography.surface_geopotential         # = orography*gravity
-    (; Δp_geopot_half, Δp_geopot_full) = G      # = R*Δlnp either on half or full levels
-    nlayers = size(Φ, 2)                        # number of vertical levels
-
-    @boundscheck nlayers == length(Δp_geopot_full) || throw(BoundsError)
-
-    # for PrimitiveDry virtual temperature = absolute temperature here
-    # note these are not anomalies here as they are only in grid-point fields
-
-    # BOTTOM FULL LAYER, broadcasting across LTA/Array so use .data here
-    @views Φ.data[:, nlayers] .= Φₛ.data .+ Tᵥ.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
-
-    # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    arch = architecture(Φ)
-    launch!(
-        arch, SpectralWorkOrder, (size(Φ, 1),), geopotential_spectral_kernel!,
-        Φ, Tᵥ, Δp_geopot_half, Δp_geopot_full, nlayers
-    )
-    return nothing
-end
-
-@kernel inbounds = true function geopotential_spectral_kernel!(
-        geopotential,               # Output: spectral geopotential
-        virtual_temperature,        # Input: spectral virtual temperature
-        Δp_geopot_half,             # Input: integration constant for half levels
-        Δp_geopot_full,             # Input: integration constant for full levels
-        nlayers,                    # Input: number of vertical layers
-    )
-    lm = @index(Global, Linear)     # global index: harmonic lm
-
-    Φ = geopotential                # for brevity
-    Tᵥ = virtual_temperature
-
-    # Integrate from bottom to top over all layers except bottom (already computed)
-    for k in (nlayers - 1):-1:1
-        Φ_k½ = Φ[lm, k + 1] + Tᵥ[lm, k + 1] * Δp_geopot_half[k + 1]     # 1st half layer integration
-        Φ[lm, k] = Φ_k½ + Tᵥ[lm, k] * Δp_geopot_full[k]                 # 2nd onto full layer
-    end
 end
 
 """

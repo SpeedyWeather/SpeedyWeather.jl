@@ -6,7 +6,7 @@
 """Grids `HEALPixOutput` can write, both equal-area and ring-ordered north to south."""
 const OUTPUT_HEALPIX_GRIDS = Union{HEALPixGrid, OctaHEALPixGrid}
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Resolution parameter `nlat_half` for an output grid of type `Grid`, from the user's
 `nlat_half` keyword or the model grid's own `nlat_half`. `HEALPixGrid` is only defined for
 even `nlat_half` (`nside = nlat_half ÷ 2`), so an odd value is rounded up; `OctaHEALPixGrid`
@@ -22,7 +22,7 @@ function healpix_nlat_half(
     return n + 1
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Resolve the output grid of a [`HEALPixOutput`](@ref) from the keyword arguments and the model
 grid `model_grid`, on CPU (the constructor moves it onto the model's architecture). In order of precedence:
 
@@ -117,7 +117,7 @@ function healpix_store_attributes(grid::OUTPUT_HEALPIX_GRIDS)
     return attrs
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Constructor for [`HEALPixOutput`](@ref). Builds the output `HEALPixGrid` and the scratch fields 
 to write from, and pre-fills `output.variables` with the defaults for `Model`.
 
@@ -337,7 +337,7 @@ function write_healpix_coordinates!(g::Zarr.ZGroup, output::HEALPixOutput, model
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Define a Zarr array for output `var` in the Zarr group `g` in the flat HEALPix layout:
 `(cell, vertical, time)` with the dimensions `var` doesn't have collapsed away. The time
 axis is pre-allocated to its final length `n_outputs`; unwritten chunks read back as the

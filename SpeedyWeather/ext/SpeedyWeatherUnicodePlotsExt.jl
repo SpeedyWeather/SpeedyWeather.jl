@@ -2,6 +2,7 @@ module SpeedyWeatherUnicodePlotsExt
 
 using SpeedyWeather, UnicodePlots
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 
 import SpeedyWeather.RingGrids: AbstractField2D, AbstractFullField2D, interpolate, full_grid_type, get_nlat
 
@@ -11,7 +12,7 @@ function default_title(field::RingGrids.AbstractField)
     return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 A UnicodePlots heatmap visualising the elements in a LowerTriangularMatrix.
 Takes by default the `mode=abs` absolute value of every element to show the magnitude
 of complex spherical harmonic coefficients."""
@@ -60,7 +61,7 @@ function UnicodePlots.heatmap(
     return heatmap(RingGrids.field_view(field, inds...); title, kwargs...)
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 A UnicodePlots heatmap visualising the data of an `AbstractField`.
 General method that interpolates (from a reduced grid) onto a full grid
 so that it can be visualised as a matrix."""
@@ -69,7 +70,7 @@ function UnicodePlots.heatmap(A::AbstractField2D; title::String = default_title(
     return UnicodePlots.heatmap(A_full; title)
 end
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 A UnicodePlots heatmap visualising the data on an `AbstractFullGrid`."""
 function UnicodePlots.heatmap(A::RingGrids.AbstractFullField2D; title::String = default_title(A))
 

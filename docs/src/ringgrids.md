@@ -180,7 +180,9 @@ is a vector for consistency. As shown in the examples above, one can therefore i
 But a field has through `field.grid` all the geometric information available to plot
 it on a map, SpeedyWeather also implements extensions for [Makie's](https://github.com/MakieOrg/Makie.jl)
 and [UnicodePlots's](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap`, also see
-[Visualisation via Makie](@ref) and [Visualisation via UnicodePlots](@ref).
+[Visualisation via Makie](@ref) and [Visualisation via UnicodePlots](@ref). For heatmap
+and interactive 3D globe plots, including the mutating `heatmap!` and `globe!` variants
+for making multi-faceted figures, see the dedicated [Visualization](@ref) page.
 
 ```@example ringgrids
 import CairoMakie: heatmap   # triggers loading of Makie extension, or use UnicodePlots instead!

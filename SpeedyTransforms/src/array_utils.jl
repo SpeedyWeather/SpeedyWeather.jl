@@ -2,7 +2,7 @@
 # created originally as a workaround for direct allocations for Reactant
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Create a Field similar to the `spec` (similar to underlying `spec.data` field) 
 as an output field for spectral transforms.
 """
@@ -11,7 +11,7 @@ function Base.similar(spec::LowerTriangularArray, grid::AbstractGrid, T::DataTyp
 end
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Create a LowerTriangularArray similar to the `field` (similar to underlying `field.data` field) 
 as an output field for spectral transforms.
 """
