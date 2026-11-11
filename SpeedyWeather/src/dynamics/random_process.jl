@@ -64,7 +64,14 @@ architecture, drawn from `rng`."""
 function complex_normals(pattern::LowerTriangularArray, rng::Random.AbstractRNG)
     r = similar(pattern.data)
     Random.randn!(rng, r)
-    r .*= convert(real(eltype(r)), 2 / sqrt(2))     # to scale: std(real(randn(Complex))) = √2/2 to 1
+
+    # Julia's randn(Complex) has total variance E|z|² = 1, i.e. variance 1/2 in real and imaginary part
+    # each. The noise factors of the random processes are normalised for unit variance in each part,
+    # so multiply by √2 to get the grid-point standard deviation the process specifies.
+    # Written as 2/√2 to keep the random
+    # numbers of earlier versions bit for bit; drawing real normals directly into `reinterpret(real, r)`
+    # would be the same stream but rounded differently
+    r .*= convert(real(eltype(r)), 2 / sqrt(2))
     return r
 end
 
