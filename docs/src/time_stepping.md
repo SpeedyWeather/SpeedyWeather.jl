@@ -402,9 +402,30 @@ which is useful if something should execute every n-th time step regardless of r
 to always recompute its reference temperature profile
 
 ```julia
-implicit = ImplicitPrimitiveEquation(spectral_grid, schedule = StepSchedule(1))
+reference_temperature = GlobalMeanReferenceTemperature()
+implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = StepSchedule(1), reference_temperature)
 model = PrimitiveWetModel(spectral_grid; implicit)
 ```
+
+The semi-implicit corrections are centred in time by default, `centering = 0.5` (Crank-Nicolson).
+`centering = 1` is backward Euler, which damps the gravity waves. With (near-)uniformly spaced
+σ levels, i.e. `SigmaCoordinates(spectral_grid)`, Crank-Nicolson can be unstable over steep
+orography (a warning is raised), use the default `FriersonSigmaCoordinates` or `centering = 1` there.
+The schedule is only used with a reference temperature profile that is recomputed from the
+global-mean temperature. The semi-implicit solver linearises about a reference temperature
+profile ``T_k``, chosen with `reference_temperature`
+
+| Reference temperature | Profile ``T_k`` | Recomputed |
+|---|---|---|
+| `IsothermalReferenceTemperature(temperature = 300)` (default) | constant `temperature` | only when the time step changes |
+| `GlobalMeanReferenceTemperature(offset = 0)` | global-mean temperature + `offset` | on the `schedule` |
+| `MaximumReferenceTemperature(margin = 30)` | constant, maximum temperature + `margin` | on the `schedule` |
+
+A warm isothermal reference profile is the most stable choice (Simmons, Hoskins and Burridge, 1978),
+as also used in other models, e.g. 300 K in Isca and the IFS. The warmer the reference temperature,
+the more the gravity waves treated implicitly are slowed down. `MaximumReferenceTemperature`
+therefore follows the model's climate, e.g. for a snowball Earth or a hot climate, with an
+isothermal reference temperature just above the warmest temperature in the model.
 
 ### Scheduling and the leapfrog spin-up
 

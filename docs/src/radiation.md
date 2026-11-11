@@ -44,7 +44,7 @@ package extension that is active as soon as both packages are loaded:
   scheme's parameters.
 
 Both are NumericalRadiation's own scheme types, used like any other SpeedyWeather scheme; the
-extension adds constructors from a `SpectralGrid`. Add NumericalRadiation (version 0.1.1 or
+extension adds constructors from a `SpectralGrid`. Add NumericalRadiation (version 0.2 or
 later) with `Pkg.add("NumericalRadiation")`:
 
 ```julia
@@ -73,7 +73,7 @@ NumericalRadiation). Its work arrays, optical depths per g point, interface flux
 surface emission, are parameterization variables in the `ecckd` namespace,
 `simulation.variables.parameterizations.ecckd`. The scheme is clear-sky, about 3x the cost
 of the one-band pair at T31 with 8 layers, and further gases of an ecCKD model are passed as
-`mole_fractions = (; ch4 = 1.8e-6)`; see NumericalRadiation's
+`mole_fractions = (; CH₄ = 1.8e-6)`; see NumericalRadiation's
 [documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the scheme.
 
 !!! warning "Work in progress"
@@ -367,7 +367,7 @@ highest layer with large-scale condensation. The cloud cover (CLC) is then given
 ```
 
 where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are [large-scale](@ref "Large-scale precipitation")
-and [convective](@ref "Convective precipitation") precipitation,
+and [convective](@ref "Convective precipitation") precipitation in mm/day,
 and $\mathrm{RH}_{cl}$ is a threshold.
 
 **Stratocumulus clouds:**

@@ -10,6 +10,7 @@ module SpeedyWeatherNumericalRadiationExt
 using SpeedyWeather
 using NumericalRadiation
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 
 import NumericalRadiation: AtmosphereProfile, ColumnGrid, SurfaceState,
     PhysicalConstants, LongwaveDiagnostics, solve_longwave!, AnalyticBandLongwave
