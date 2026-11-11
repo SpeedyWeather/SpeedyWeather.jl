@@ -91,6 +91,36 @@ An illustration of adiabat reference line is below
 
 ![image](https://github.com/user-attachments/assets/ea8d8a0b-20c5-47cc-88ff-47112eeeb200)
 
+## Learned convective trigger
+
+An optional `LearnedConvectionTrigger` gates Betts-Miller convection using the environmental
+(previous time step) temperature in K and specific humidity in kg/kg:
+
+```julia
+spectral_grid = SpectralGrid(nlayers = 8)
+trigger = LearnedConvectionTrigger(spectral_grid)
+convection = BettsMillerConvection(spectral_grid; trigger)
+model = PrimitiveWetModel(spectral_grid; convection)
+```
+
+The original Betts-Miller criteria still select physically admissible deep or shallow
+adjustments; the learned trigger can suppress either. `trigger = nothing` (default)
+preserves the original scheme. The classifier is deterministic: its PySR expression returns
+a logit, and convection requires a positive logit, equivalent to a probability above 0.5.
+No stochastic draw is made.
+
+At initialization, the trigger builds a QR-based, unweighted least-squares projection
+on the model's full sigma levels, mapped to `x = 2σ - 1`. The degree-six fit requires at
+least seven layers. It fits coefficients c₀ through c₆ and passes c₀ through c₅ to the
+classifier, after applying the exported `(coefficient - mean) / std` standardisation by
+feature name. The projection is stored in the model's precision and moved with the model
+by `Adapt`; each column evaluation uses scalar sums and fixed tuples.
+
+This preserves the draft's fitting convention, including its unused c₆. Confirm that this
+is also the training convention: fitting degree five or adding layer-thickness weights
+changes the features. A fixed coefficient count allows evaluation at different vertical
+resolutions, but accuracy still requires validation on profiles sampled at those resolutions.
+
 ## Entrainment
 
 A real convective plume mixes with the environmental air around it as it rises, which dilutes

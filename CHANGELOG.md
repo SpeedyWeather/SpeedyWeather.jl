@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an optional standardised Chebyshev/PySR trigger for Betts-Miller convection.
+
 ## 0.24.0
 
 - Release SpeedyWeatherInternals 1.0.2 with DocStringExtensions v0.10 compat, fixing unsatisfiable requirements of the v0.24.0 release [#1395](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1395)

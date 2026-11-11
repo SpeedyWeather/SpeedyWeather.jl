@@ -1,11 +1,104 @@
 abstract type AbstractConvection <: AbstractParameterization end
 
+export LearnedConvectionTrigger
+
+"""Optional learned gate for [`BettsMillerConvection`](@ref), using environmental temperature
+[K] and specific humidity [kg/kg]. Fits Chebyshev polynomials at x = 2σ - 1 and standardises
+coefficients c₀…c₅ before evaluating the exported PySR logit. Convection requires P > 0.5.
+The unweighted degree-six fit preserves the original projection supplied with the expression:
+c₆ is fitted but unused. At least seven layers are required. Fields are $(TYPEDFIELDS)"""
+struct LearnedConvectionTrigger{MatrixType} <: AbstractParameterization
+    "[DERIVED] Projection from model levels to Chebyshev coefficients c₀…c₅"
+    projection::MatrixType
+end
+
+Adapt.@adapt_structure LearnedConvectionTrigger
+LearnedConvectionTrigger(SG::SpectralGrid) = LearnedConvectionTrigger(
+    on_architecture(SG.architecture, zeros(SG.NF, 6, SG.nlayers))
+)
+
+# Only called on the host at initialization, never inside the column kernel.
+function chebvander(x::AbstractVector{T}, degree::Integer) where {T <: Real}
+    V = Matrix{T}(undef, length(x), degree + 1)
+    V[:, 1] .= one(T)
+    degree >= 1 && (V[:, 2] .= x)
+    for k in 3:(degree + 1)
+        @views @. V[:, k] = 2x * V[:, k - 1] - V[:, k - 2]
+    end
+    return V
+end
+
+function initialize!(trigger::LearnedConvectionTrigger, model::PrimitiveEquation)
+    # Geometry owns the actual grid, which can differ from the constructor's default grid.
+    σ = Array(model.geometry.σ_levels_full)
+    nlayers = length(σ)
+    nlayers >= 7 || throw(ArgumentError("LearnedConvectionTrigger requires at least seven layers"))
+    size(trigger.projection) == (6, nlayers) || throw(DimensionMismatch("trigger and model must have the same number of layers"))
+
+    # Preserve the original unweighted least-squares features. Thickness weighting would
+    # change the learned inputs and needs retraining. QR avoids squaring the condition
+    # number through V'V; build in Float64 before converting to the model's precision.
+    V = chebvander(2 .* Float64.(σ) .- 1, 6)
+    P = LinearAlgebra.qr(V) \ Matrix{Float64}(LinearAlgebra.I, nlayers, nlayers)
+    # Keep the degree-six fit even though the expression only consumes its first six terms.
+    copyto!(trigger.projection, on_architecture(model.spectral_grid.architecture, eltype(trigger.projection).(P[1:6, :])))
+    return nothing
+end
+
+"""Project one environmental column, returning c₀…c₅ without allocating in the kernel."""
+@propagate_inbounds function chebyshev_projection(ij, profile, projection)
+    return ntuple(Val(6)) do j
+        coefficient = zero(eltype(profile))
+        for k in axes(projection, 2)
+            coefficient += projection[j, k] * profile[ij, k]
+        end
+        coefficient
+    end
+end
+
+@inline function learned_convection_logit(t, q)
+    NF = typeof(t[1])
+    # Training metadata is reordered by coefficient NAME, not its shuffled feature order.
+    # Cast constants before arithmetic to keep Float32 simulations in Float32.
+    t_mean = (
+        245.06016575811805, 41.82535069647731, -5.468058282704101,
+        -2.583673702119638, 1.8256633228157173, -0.1829393592716407,
+    )
+    t_std = (
+        10.742484108475601, 20.193051958292635, 13.50237977263115,
+        8.761061887086523, 4.79222373752904, 2.3348637844543667,
+    )
+    q_mean = (
+        0.0027977503305968415, 0.0034685521790958898, 0.0020090165867202524,
+        -4.118595780749046e-5, 0.0001369833605204781, -0.00023787588637710037,
+    )
+    q_std = (
+        0.002218712083825191, 0.0031575491893514125, 0.002113051901874061,
+        0.0008579501524223445, 0.0008291460913819926, 0.0007737742755982443,
+    )
+    t_c0, t_c1, t_c2, t_c3, t_c4, t_c5 = ntuple(i -> (t[i] - NF(t_mean[i])) / NF(t_std[i]), Val(6))
+    q_c0, q_c1, q_c2, q_c3, q_c4, q_c5 = ntuple(i -> (q[i] - NF(q_mean[i])) / NF(q_std[i]), Val(6))
+
+    # Exported PySR expression: abs2(x) is square(x) for these real-valued features.
+    return ((((q_c2 + ((abs2((t_c2 / NF(0.8764418)) + t_c3) - t_c0) + (((t_c2 + t_c3) + q_c1) / NF(0.5775984)))) - (abs2((abs2(t_c0 + t_c1) - (q_c0 * NF(0.62932795))) / -NF(1.4776102)) - (t_c4 + NF(0.4954758)))) - abs2(((t_c1 - t_c5) * -NF(0.36403883)) + -NF(0.54792297))) * (tanh((((abs2(t_c0 + t_c3) + t_c4) * NF(0.4118729)) + t_c2) + t_c3) + NF(1.4210068))) + (abs2(t_c1 + (t_c2 + tanh((t_c1 + -NF(1.0577308)) + (t_c1 + abs2(((t_c0 - q_c0) * NF(0.5444511)) - -NF(1.0714839)))))) * -NF(1.3961734))
+end
+
+# `nothing` preserves the original scheme and compiles away the optional gate.
+@inline convecting(ij, temp, humid, ::Nothing) = true
+@propagate_inbounds function convecting(ij, temp, humid, trigger::LearnedConvectionTrigger)
+    t = chebyshev_projection(ij, temp, trigger.projection)
+    q = chebyshev_projection(ij, humid, trigger.projection)
+    # sigmoid(logit) > 0.5 iff logit > 0; avoid exp and its overflow for extreme profiles.
+    # This is a deterministic gate. Stochastic sampling requires a calibrated uniform draw.
+    return learned_convection_logit(t, q) > 0
+end
+
 export BettsMillerConvection
 
 """The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct BettsMillerConvection{NF, Entrainment <: AbstractEntrainment} <: AbstractConvection
+@parameterized @kwdef struct BettsMillerConvection{NF, Entrainment <: AbstractEntrainment, Trigger} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
@@ -14,6 +107,9 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
 
     "[OPTION] Entrainment profile mixing environmental air into the rising parcel"
     @component entrainment::Entrainment = LinearEntrainment(DEFAULT_NF)
+
+    "[OPTION] Additional learned trigger; nothing uses only the Betts-Miller criteria"
+    @component trigger::Trigger = nothing
 
     "[OPTION] Convert convective rain below freezing to snow?"
     snow::Bool = true
@@ -25,9 +121,9 @@ end
 Adapt.@adapt_structure BettsMillerConvection
 
 # generator function
-BettsMillerConvection(SG::SpectralGrid; entrainment = LinearEntrainment(SG), kwargs...) =
-    BettsMillerConvection{SG.NF, typeof(entrainment)}(; entrainment, kwargs...)
-initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
+BettsMillerConvection(SG::SpectralGrid; entrainment = LinearEntrainment(SG), trigger = nothing, kwargs...) =
+    BettsMillerConvection{SG.NF, typeof(entrainment), typeof(trigger)}(; entrainment, trigger, kwargs...)
+initialize!(convection::BettsMillerConvection, model::PrimitiveEquation) = initialize!(convection.trigger, model)
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, convection_scheme::BettsMillerConvection, model) =
@@ -108,9 +204,11 @@ and relaxes current vertical profiles to the adjusted references."""
     deep_convection = Pq > 0 && PT > 0
     shallow_convection = Pq <= 0 && PT > 0
 
-    # escape immediately for no convection
+    # Keep the physical deep/shallow criteria: their profile corrections and budgets
+    # require them even when the learned gate accepts a column.
     no_convection = !(deep_convection || shallow_convection)
     no_convection && return nothing
+    convecting(ij, temp, humid, convection.trigger) || return nothing
 
     # height of zero buoyancy level in σ coordinates
     Δσ_lzb = σ_half[nlayers + 1] - σ_half[level_zero_buoyancy]
