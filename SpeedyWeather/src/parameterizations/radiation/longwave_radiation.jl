@@ -216,10 +216,10 @@ Fields are $(TYPEDFIELDS)"""
     "[OPTION] Emissivity for surface flux over land [1]"
     @param emissivity_land::NF = 0.98 (bounds = 0 .. 1,)
 
-    "[OPTION] Additional emissivity of the stratosphere, emitting directly to space (SPEEDY epslw) [1]"
+    "[OPTION] Additional emissivity of the stratosphere, emitting directly to space [1]"
     @param stratospheric_emissivity::NF = 0 (bounds = 0 .. 1,)
 
-    "[OPTION] Lower boundary of the stratosphere for the stratospheric emission (SPEEDY σ = 0.14 at 1000 hPa) [Pa]"
+    "[OPTION] Lower boundary of the stratosphere for the stratospheric emission [Pa]"
     stratosphere_pressure::NF = 14000
 end
 
@@ -280,15 +280,12 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     ϵ_strat = longwave.stratospheric_emissivity
     p_strat = longwave.stratosphere_pressure
     coord = model.geometry.vertical_coordinates
-    if ϵ_strat > 0
-        for k in 1:nlayers
-            p_top = pressure_above(k, pₛ, coord)
-            p_top >= p_strat && break                                   # below the stratosphere
-            overlap = (min(pressure_below(k, pₛ, coord), p_strat) - p_top) / p_strat
-            E = ϵ_strat * overlap * σ * T[ij, k]^4
-            dTdt[ij, k] -= flux_to_tendency(E / cₚ, pₛ, k, model)
-            U += E
-        end
+    for k in 1:nlayers                                                  # overlap = 0 below the stratosphere
+        p_top = pressure_above(k, pₛ, coord)
+        overlap = max(0, min(pressure_below(k, pₛ, coord), p_strat) - p_top) / p_strat
+        E = ϵ_strat * overlap * σ * T[ij, k]^4
+        dTdt[ij, k] -= flux_to_tendency(E / cₚ, pₛ, k, model)
+        U += E
     end
     vars.parameterizations.outgoing_longwave[ij] = U
 

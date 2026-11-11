@@ -318,7 +318,7 @@ export TwoBandShortwaveRadiativeTransfer
 
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct TwoBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
-    "[OPTION] Fraction of incoming solar radiation in the near-infrared band (SPEEDY fband2) [1]"
+    "[OPTION] Fraction of incoming solar radiation in the near-infrared band [1]"
     @param near_infrared_fraction::NF = 0.05 (bounds = 0 .. 1,)
 end
 Adapt.@adapt_structure TwoBandShortwaveRadiativeTransfer

@@ -44,22 +44,22 @@ export DiagnosticClouds
     "[OPTION] Cap on precip contributing to cloud cover [mm/day]"
     @param precipitation_max::NF = 10 (bounds = Positive,)
 
-    "[OPTION] Cloud albedo for visible band at CLC=1 (SPEEDY albcl) [1]"
+    "[OPTION] Cloud albedo for visible band at CLC=1 [1]"
     @param cloud_albedo::NF = 0.43 (bounds = 0 .. 1,)
 
     "[OPTION] Stratocumulus cloud albedo (surface reflection/absorption) [1]"
     @param stratocumulus_albedo::NF = 0.5 (bounds = 0 .. 1,)
 
-    "[OPTION] Static stability lower threshold for stratocumulus, as dry static energy gradient Δs/ΔΦ (GSES0 in SPEEDY) [1]"
+    "[OPTION] Static stability lower threshold for stratocumulus, as dry static energy gradient Δs/ΔΦ [1]"
     @param stratocumulus_stability_min::NF = 0.25 (bounds = Nonnegative,)
 
-    "[OPTION] Static stability upper threshold for stratocumulus, as dry static energy gradient Δs/ΔΦ (GSES1 in SPEEDY) [1]"
+    "[OPTION] Static stability upper threshold for stratocumulus, as dry static energy gradient Δs/ΔΦ [1]"
     @param stratocumulus_stability_max::NF = 0.4 (bounds = Nonnegative,)
 
     "[OPTION] Maximum stratocumulus cloud cover (called CLSMAX in the paper) [1]"
     @param stratocumulus_cover_max::NF = 0.6 (bounds = 0 .. 1,)
 
-    "[OPTION] Minimum stratocumulus cloud cover over land (for surface RH = 1, called CLSMINL in SPEEDY) [1]"
+    "[OPTION] Minimum stratocumulus cloud cover over land (for surface RH = 1) [1]"
     @param stratocumulus_cover_min_land::NF = 0.15 (bounds = 0 .. 1,)
 
     "[OPTION] Clouds only form in layers below the tropopause (σ ≥ σ_tropopause) [1]"
@@ -71,7 +71,7 @@ export DiagnosticClouds
     "[OPTION] Enable stratocumulus cloud parameterization?"
     use_stratocumulus::Bool = true
 
-    "[OPTION] Stratocumulus cloud factor (SPEEDY clfact) [1]"
+    "[OPTION] Stratocumulus cloud factor [1]"
     @param stratocumulus_cloud_factor::NF = 1.2 (bounds = Nonnegative,)
 
     "[DERIVED] Highest layer in which clouds can form, first layer below the tropopause, set in `initialize!`"
@@ -86,8 +86,7 @@ DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF, Base.Ref
 
 # the free troposphere layers only depend on the vertical coordinates, precompute them
 function initialize!(clouds::DiagnosticClouds, model::AbstractModel)
-    vertical_coordinates = Adapt.adapt(Array, model.geometry.vertical_coordinates)  # on CPU
-    clouds.layer_top[], clouds.cloud_base[] = free_troposphere_layers(clouds, vertical_coordinates)
+    clouds.layer_top[], clouds.cloud_base[] = free_troposphere_layers(clouds, model.geometry.vertical_coordinates)
     return nothing
 end
 
@@ -202,7 +201,8 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
         above = cloud_base
         ΔΦ = geopotential[ij, above] - geopotential[ij, surface]
         Δs = cₚ * (temp[ij, above] - temp[ij, surface]) + ΔΦ
-        GSE = ΔΦ > 0 ? Δs / ΔΦ : zero(NF)
+        stable_layers = ΔΦ > 0              # guard against division by zero, also in the branch not taken
+        GSE = ifelse(stable_layers, Δs / ifelse(stable_layers, ΔΦ, one(NF)), zero(NF))
 
         # normalized static stability factor
         static_stability = clamp((GSE - stab_min) / (stab_max - stab_min), 0, 1)
@@ -231,13 +231,12 @@ Uses the surface pressure-independent `sigma(k, vertical_coordinates)`, so this 
 in `initialize!` for any vertical coordinates."""
 function free_troposphere_layers(clouds::DiagnosticClouds, vertical_coordinates::AbstractVerticalCoordinates)
     nlayers = get_nlayers(vertical_coordinates)
-    layer_top = 1
-    cloud_base = 0
-    for k in 1:(nlayers - 1)
-        σ = sigma(k, vertical_coordinates)
-        layer_top = σ < clouds.σ_tropopause ? k + 1 : layer_top
-        cloud_base = σ <= clouds.σ_boundary_layer ? k : cloud_base
-    end
+    # σ increases monotonically downwards, so layer indices are counts of layers above
+    # a threshold, vectorized on the architecture of the vertical coordinates (no scalar indexing)
+    σ = sigma_full(vertical_coordinates)
+    σ_above_surface = view(σ, 1:(nlayers - 1))                  # exclude the surface layer
+    layer_top = count(<(clouds.σ_tropopause), σ_above_surface) + 1
+    cloud_base = count(<=(clouds.σ_boundary_layer), σ_above_surface)
     cloud_base = max(cloud_base, min(layer_top, nlayers - 1), 1)
     layer_top = min(layer_top, cloud_base)
     return layer_top, cloud_base

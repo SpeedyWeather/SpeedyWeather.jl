@@ -40,10 +40,10 @@ export BackgroundShortwaveTransmissivity
 """BackgroundShortwaveTransmissivity <: AbstractShortwaveTransmissivity
 $(TYPEDFIELDS)."""
 @parameterized @kwdef struct BackgroundShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
-    "[OPTION] Zenith correction amplitude (SPEEDY azen) [1]"
+    "[OPTION] Zenith correction amplitude [1]"
     @param zenith_amplitude::NF = 1 (bounds = Nonnegative,)
 
-    "[OPTION] Zenith correction exponent (SPEEDY nzen)"
+    "[OPTION] Zenith correction exponent"
     @param zenith_exponent::NF = 2 (bounds = Nonnegative,)
 
     # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absdry, fband weights)
@@ -152,31 +152,31 @@ atmosphere with a zenith angle correction factor `1 + zenith_amplitude*(1 - cos_
 Absorptivities are per 10^5 Pa. Humidity-dependent absorptivities per kg/kg (SPEEDY uses g/kg).
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct TwoBandShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
-    "[OPTION] Zenith correction amplitude (SPEEDY azen) [1]"
+    "[OPTION] Zenith correction amplitude [1]"
     @param zenith_amplitude::NF = 1 (bounds = Nonnegative,)
 
-    "[OPTION] Zenith correction exponent (SPEEDY nzen) [1]"
+    "[OPTION] Zenith correction exponent [1]"
     @param zenith_exponent::NF = 2 (bounds = Nonnegative,)
 
-    "[OPTION] Absorptivity of dry air, visible band (SPEEDY absdry) [per 10^5 Pa]"
+    "[OPTION] Absorptivity of dry air, visible band [per 10^5 Pa]"
     @param absorptivity_dry_air::NF = 0.033 (bounds = Nonnegative,)
 
     "[OPTION] Constant aerosol concentration?"
     aerosols::Bool = true
 
-    "[OPTION] Absorptivity of aerosols, visible band, scaled with σ² (SPEEDY absaer) [per 10^5 Pa]"
+    "[OPTION] Absorptivity of aerosols, visible band, scaled with σ² [per 10^5 Pa]"
     @param absorptivity_aerosol::NF = 0.033 (bounds = Nonnegative,)
 
-    "[OPTION] Absorptivity of water vapor, visible band (SPEEDY abswv1) [per kg/kg per 10^5 Pa]"
+    "[OPTION] Absorptivity of water vapor, visible band [per kg/kg per 10^5 Pa]"
     @param absorptivity_water_vapor::NF = 22 (bounds = Nonnegative,)
 
-    "[OPTION] Absorptivity of water vapor, near-infrared band (SPEEDY abswv2) [per kg/kg per 10^5 Pa]"
+    "[OPTION] Absorptivity of water vapor, near-infrared band [per kg/kg per 10^5 Pa]"
     @param absorptivity_water_vapor_near_infrared::NF = 15000 (bounds = Nonnegative,)
 
-    "[OPTION] Cloud absorptivity per cloud-base humidity, visible band (SPEEDY abscl1) [per kg/kg per 10^5 Pa]"
+    "[OPTION] Cloud absorptivity per cloud-base humidity, visible band [per kg/kg per 10^5 Pa]"
     @param absorptivity_cloud_base::NF = 15 (bounds = Nonnegative,)
 
-    "[OPTION] Maximum cloud absorptivity, visible band (SPEEDY abscl2) [per 10^5 Pa]"
+    "[OPTION] Maximum cloud absorptivity, visible band [per 10^5 Pa]"
     @param absorptivity_cloud_limit::NF = 0.15 (bounds = Nonnegative,)
 end
 

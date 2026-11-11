@@ -128,6 +128,10 @@ end
 Sigma coordinate (fraction of surface pressure) at full level `k` for sigma `coordinate`."""
 @propagate_inbounds sigma(k::Integer, coordinate::SigmaCoordinates) = coordinate.σ_full[k]
 
+"""$(TYPEDSIGNATURES)
+Sigma coordinates at all full levels as vector, `sigma(k, coordinate)` for all `k`."""
+sigma_full(coordinate::SigmaCoordinates) = coordinate.σ_full
+
 export FriersonSigmaCoordinates
 
 """$(TYPEDSIGNATURES)
@@ -288,6 +292,10 @@ Sigma coordinate (fraction of surface pressure) at full level `k` for hybrid sig
 `coordinate`. Returns `A[k] + B[k]`, which equals the nominal sigma level regardless of the
 pressure-sigma transition, and is independent of surface pressure."""
 @propagate_inbounds sigma(k::Integer, coordinate::SigmaPressureCoordinates) = coordinate.A_full[k] + coordinate.B_full[k]
+
+"""$(TYPEDSIGNATURES)
+Sigma coordinates at all full levels as vector, `sigma(k, coordinate)` for all `k`."""
+sigma_full(coordinate::SigmaPressureCoordinates) = coordinate.A_full .+ coordinate.B_full
 
 export CubicSigmaPressureCoordinates
 

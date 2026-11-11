@@ -37,7 +37,7 @@ heating rate does not depend on surface pressure (e.g. over high orography) and 
 absorption is retained for any surface pressure > `pressure_lower`. Fields are
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SeasonalOzone{NF} <: AbstractOzone
-    "[OPTION] Reference fraction of TOA shortwave flux absorbed by ozone (SPEEDY epssw) [1]"
+    "[OPTION] Reference fraction of TOA shortwave flux absorbed by ozone [1]"
     @param absorption::NF = 0.02 (bounds = 0 .. 1,)
 
     "[OPTION] Fraction of `absorption` in the upper stratosphere [1]"
@@ -46,16 +46,16 @@ $(TYPEDFIELDS)"""
     "[OPTION] Fraction of `absorption` in the lower stratosphere (at the equator, excluding latitudinal and seasonal terms) [1]"
     @param lower_fraction::NF = 0.4 (bounds = Nonnegative,)
 
-    "[OPTION] Amplitude of hemispheric seasonal asymmetry in lower stratospheric ozone (SPEEDY coz1) [1]"
+    "[OPTION] Amplitude of hemispheric seasonal asymmetry in lower stratospheric ozone [1]"
     @param seasonal_amplitude::NF = 1 (bounds = Nonnegative,)
 
-    "[OPTION] Amplitude of the equator-to-pole contrast of lower stratospheric ozone (SPEEDY coz2) [1]"
+    "[OPTION] Amplitude of the equator-to-pole contrast of lower stratospheric ozone [1]"
     @param latitudinal_amplitude::NF = 1.8 (bounds = Nonnegative,)
 
-    "[OPTION] Lower boundary of the upper stratosphere (SPEEDY σ = 0.05 at 1000 hPa) [Pa]"
+    "[OPTION] Lower boundary of the upper stratosphere [Pa]"
     @param pressure_upper::NF = 5000 (bounds = Nonnegative,)
 
-    "[OPTION] Lower boundary of the lower stratosphere (SPEEDY σ = 0.14 at 1000 hPa) [Pa]"
+    "[OPTION] Lower boundary of the lower stratosphere [Pa]"
     @param pressure_lower::NF = 14000 (bounds = Nonnegative,)
 end
 
@@ -78,7 +78,8 @@ function ozone_absorption!(vars, ozone::SeasonalOzone, model)
     # 0 for the northern summer half-year, 1 at the northern winter solstice
     δ = solar_declination(NF, model.solar_zenith, vars.prognostic.clock.orbit_time)
     δₘₐₓ = abs(deg2rad(convert(NF, model.planet.axial_tilt)))
-    northern_winter = δₘₐₓ > 0 ? clamp(-δ / δₘₐₓ, 0, 1) : zero(NF)
+    tilted = δₘₐₓ > 0               # guard against division by zero, also in the branch not taken
+    northern_winter = ifelse(tilted, clamp(-δ / ifelse(tilted, δₘₐₓ, one(NF)), 0, 1), zero(NF))
     seasonal_term = ozone.seasonal_amplitude * northern_winter
     lower = ozone.absorption * ozone.lower_fraction
 
