@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Snow falling into the slab ocean cools it by melting and warming the meltwater, snow over 100% ocean melts into it [#1391](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1391)
 - Benchmark regression check: debug mode of the benchmark suite, `regression.jl` comparing a revision with main, the latest release and the latest benchmarked revision (bisecting a regression), run weekly and on PRs labelled `benchmark-performance`, plus a Claude skill [#1299](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1299)
 
 ## 0.24.0

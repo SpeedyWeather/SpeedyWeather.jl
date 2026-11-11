@@ -85,3 +85,53 @@ end
     mostly_ocean = (model.land_sea_mask.land_fraction.data .<= 0.5) .& (latds .> -75)
     @test !any(sea_surface_temperature.data[mostly_ocean, :] .== model.ocean.land_temperature)
 end
+
+@testset "Snow melting into the slab ocean" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 5)
+    model = PrimitiveWetModel(spectral_grid; ocean = SlabOcean(spectral_grid))
+    model.feedback.verbose = false
+    simulation = initialize!(model, time = DateTime(2000, 5, 1))
+    vars = simulation.variables
+    ocean = model.ocean
+    ocean_stepper = SpeedyWeather.time_stepper(model.time_stepping, :ocean)
+    land_stepper = SpeedyWeather.time_stepper(model.time_stepping, :land)
+    land_fraction = model.land_sea_mask.land_fraction.data
+    all_ocean = land_fraction .== 0
+
+    dsst = SpeedyWeather.get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, ocean_stepper, ocean)
+    sst = SpeedyWeather.get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, ocean_stepper, ocean)
+    snow_depth = SpeedyWeather.get_prognostic_step(vars.prognostic.land.snow_depth, land_stepper, ocean)
+
+    # reference tendency without snow
+    vars.parameterizations.snow_rate .= 0
+    snow_depth.data[all_ocean] .= 0
+    SpeedyWeather.timestep!(vars, ocean, model)
+    dsst_reference = copy(dsst.data)
+
+    # snowfall cools by melting and warming the meltwater
+    (; latent_heat_fusion) = model.atmosphere
+    water_density = ocean.density
+    s = 1.0e-7                                          # snow rate [m/s]
+    vars.parameterizations.snow_rate .= s
+    SpeedyWeather.timestep!(vars, ocean, model)
+    Q = water_density * s .* (latent_heat_fusion .+ ocean.specific_heat_capacity .* (sst.data .- ocean.melting_temperature))
+    expected = dsst_reference .- Q ./ ocean.heat_capacity_mixed_layer
+    ocean_points = land_fraction .< 1
+    @test dsst.data[ocean_points] ≈ expected[ocean_points]
+
+    # snow on the ground over 100% ocean also melts into the ocean, then removed by filter!
+    vars.parameterizations.snow_rate .= 0
+    snow_depth.data[all_ocean] .= 0.2
+    SpeedyWeather.timestep!(vars, ocean, model)
+    @test all(dsst.data[all_ocean] .< dsst_reference[all_ocean])
+    @test dsst.data[.!all_ocean] ≈ dsst_reference[.!all_ocean]
+
+    filter!(vars, model.land.snow, model)
+    @test all(vars.prognostic.land.snow_depth.data[all_ocean, :] .== 0)
+
+    # and a short run from global snow stays finite without snow over ocean
+    vars.prognostic.land.snow_depth .= 0.2
+    run!(simulation, period = Day(1))
+    @test !model.feedback.nans_detected
+    @test all(vars.prognostic.land.snow_depth.data[all_ocean, :] .== 0)
+end
