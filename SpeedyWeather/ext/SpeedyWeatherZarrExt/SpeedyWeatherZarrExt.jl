@@ -3,7 +3,7 @@ module SpeedyWeatherZarrExt
 using SpeedyWeather
 using Zarr
 using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+import SpeedyWeather: TYPEDSIGNATURES
 
 import SpeedyWeather: ZarrOutput, HEALPixOutput, AbstractZarrOutput,
     AbstractOutput, AbstractOutputVariable,

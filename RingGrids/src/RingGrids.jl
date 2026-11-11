@@ -3,7 +3,15 @@ module RingGrids
 # DOCUMENTATION
 using StyledStrings
 using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+
+# DocStringExtensions v0.10 can show default values of (keyword) arguments in signatures,
+# v0.9 can't (its `TypedMethodSignatures` has no `defaults` keyword) so fall back to the plain one
+const TYPEDSIGNATURES = if hasmethod(DocStringExtensions.TypedMethodSignatures, Tuple{}, (:defaults,))
+    DocStringExtensions.TypedMethodSignatures(defaults = true)
+else
+    DocStringExtensions.TYPEDSIGNATURES
+end
+
 import Printf
 
 # NUMERICS

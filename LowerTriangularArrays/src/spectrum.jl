@@ -29,7 +29,7 @@ end
 Adapt.@adapt_structure Spectrum
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Create a `Spectrum` from the spectral truncation `lmax` and `mmax`. Both are 
 assumed to be one-based, i.e. `lmax=5` and `mmax=5` will create a spectrum 
 with T4 truncation. 
@@ -61,7 +61,7 @@ function Spectrum(
     )
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Create a `Spectrum` for the spectral `truncation` (1-based).
 E.g. `truncation = 4` will create a `Spectrum` with 4 zonal and meridional wavenumbers.
 With kwarg `one_degree_more=true` the `Spectrum` wil have a meridional wavenumber `lmax`
@@ -71,7 +71,7 @@ Spectrum(truncation::Integer; one_degree_more = false, kwargs...) =
 
 Spectrum(; truncation::Integer, kwargs...) = Spectrum(truncation; kwargs...)
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Create a `Spectrum` from another `Spectrum` but with a new architecture."""
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE()) =
     Spectrum(

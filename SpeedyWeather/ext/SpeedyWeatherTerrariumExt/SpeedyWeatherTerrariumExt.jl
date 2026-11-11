@@ -5,7 +5,7 @@ using Terrarium
 
 using Dates
 using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+import SpeedyWeather: TYPEDSIGNATURES
 
 include("coupling.jl")
 include("output.jl")

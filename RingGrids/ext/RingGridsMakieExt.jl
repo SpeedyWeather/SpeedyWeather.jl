@@ -3,7 +3,7 @@ module RingGridsMakieExt
 using RingGrids
 using Makie
 using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+import RingGrids: TYPEDSIGNATURES
 
 function default_title(field::RingGrids.AbstractField)
     Grid = RingGrids.nonparametric_type(field.grid)
@@ -22,7 +22,7 @@ function Makie.heatmap(
 end
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Defines Makie's `heatmap` function for a`field::AbstractField2D` via interpolation
 to `::AbstractFullField2D` (which can be reshaped into a matrix.)
 """
@@ -37,7 +37,7 @@ end
 
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Defines Makie's `heatmap` function for a `field::AbstractFullField2D` which can be reshaped into a matrix."""
 function Makie.heatmap(
         field::RingGrids.AbstractFullField2D;

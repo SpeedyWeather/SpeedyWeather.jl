@@ -4,7 +4,7 @@ import Metal: Metal, MtlArray
 import AbstractFFTs
 import LinearAlgebra
 using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+import SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids
@@ -254,7 +254,7 @@ function SpeedyTransforms._fourier_batched!(
     return nothing
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Metal fused single-graph inverse (spectral → grid) batched Fourier transform — see the
 module-level comment."""
 function SpeedyTransforms._fourier_batched!(

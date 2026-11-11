@@ -4,7 +4,7 @@ import CUDA: CUDA, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
 using cuFFT
 import AbstractFFTs
 using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+import SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids
@@ -95,7 +95,7 @@ function _fourier_batched!(
     return nothing
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 CUDA-Graphs accelerated inverse (spectral → grid) batched Fourier transform.
 Replays a cached CUDA graph of the fused gather + per-ring inverse cuFFTs + scatter; see
 [`run_graph!`](@ref)."""

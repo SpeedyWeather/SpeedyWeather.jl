@@ -1,6 +1,6 @@
 name = "RingGrids"
 uuid = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["RingGrids contributors"]
 
 [deps]
@@ -39,7 +39,7 @@ RingGridsReactantExt = "Reactant"
 [compat]
 Adapt = "4.3.0"
 Artifacts = "1.10"
-DocStringExtensions = "0.10"
+DocStringExtensions = "0.9, 0.10"
 Downloads = "1.6.0"
 FastGaussQuadrature = "1.0.2"
 FiniteDifferences = "0.12"
