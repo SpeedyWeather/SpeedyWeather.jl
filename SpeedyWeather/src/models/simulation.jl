@@ -11,7 +11,7 @@ struct Simulation{V, M <: AbstractModel} <: AbstractSimulation{M}
     model::M
 end
 
-"""($TYPEDSIGNATURES) Same as `initialize!(model)` which returns a `Simulation`."""
+"""$(TYPEDSIGNATURES) Same as `initialize!(model)` which returns a `Simulation`."""
 Simulation(model::AbstractModel; kwargs...) = initialize!(model; kwargs...)
 
 function Base.show(io::IO, S::AbstractSimulation)
@@ -24,7 +24,12 @@ function Base.show(io::IO, S::AbstractSimulation)
     return nothing
 end
 
-Base.show(io::IO, ::Type{<:Simulation{V, M}}) where {V, M} = print(io, "Simulation{Variables{…}, $(nameof(M)){…}}")
+function Base.show(io::IO, S::Type{<:Simulation})
+    isconcretetype(S) || return invoke(show, Tuple{IO, Type}, io, S)
+    M = S.parameters[2]
+    model_name = M isa Union{DataType, UnionAll} ? nameof(M) : M
+    return print(io, "Simulation{Variables{…}, $(model_name){…}}")
+end
 
 unpack(sim::AbstractSimulation) = (sim.variables, sim.model)
 
@@ -33,7 +38,7 @@ const DEFAULT_TIMESTEPS = -1    # -1 means unspecified = use the period kwarg
 
 export run!
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized."""
 function run!(
         simulation::AbstractSimulation;
@@ -50,7 +55,7 @@ end
 # fallback to be extended when UnicodePlots extension is loaded
 unicodeplot(x) = nothing
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Initializes a `simulation`. Scales the variables, initializes
 the output, stores initial conditions, initializes the progress meter feedback,
 callbacks and performs the first two initial time steps to spin up the

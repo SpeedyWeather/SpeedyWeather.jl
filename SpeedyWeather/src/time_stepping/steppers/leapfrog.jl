@@ -121,10 +121,15 @@ end
     return Expr(:block, calls..., :(return nothing))
 end
 
-# On the first Euler step and the first leapfrog step (lf == 1) the leapfrog kernel leaves the
-# 1st (previous) spectral step unchanged, so the 1st grid step must remain unchanged too
-# for grid and spectral previous steps to describe the same time (e.g. the geopotential which
-# enters the semi-implicit dynamics). Branch-free (ifelse) as the clock is traced in Reactant.
+"""$(TYPEDSIGNATURES)
+Retain the previous time step of the grid prognostic variables before the new spectral state is
+transformed to the grid: copy the 2nd (current) grid step to the 1st (previous) step whenever
+the leapfrog update has also moved the previous spectral step forward, such that the 1st grid
+step is always the grid-point equivalent of the 1st spectral step. The previous step is read by
+the parameterizations, vertical advection and the geopotential (which enters the semi-implicit
+dynamics). During the leapfrog start (Euler step and first leapfrog step, `lf == 1`) the previous
+spectral step is not advanced and so the previous grid step is left unchanged. Branch-free (`ifelse`)
+as the clock is traced with Reactant."""
 function move_prognostic_grid_variables_back!(
         vars::Variables,
         time_stepping::Leapfrog,
@@ -135,7 +140,7 @@ function move_prognostic_grid_variables_back!(
     return move_prognostic_grid_variables_back!(vars, time_stepping, model; move = lf == 2)
 end
 
-# copy grid prognostics from 2nd to 1st step to retain these fields for the previous time step
+# other leapfrog-like time steppers: always move the grid variables back, ignoring the clock
 function move_prognostic_grid_variables_back!(
         vars::Variables,
         time_stepping::AbstractLeapfrog,
@@ -145,6 +150,9 @@ function move_prognostic_grid_variables_back!(
     return move_prognostic_grid_variables_back!(vars, time_stepping, model)
 end
 
+"""$(TYPEDSIGNATURES)
+Copy the grid prognostic variables from the 2nd (current) to the 1st (previous) step to retain
+them as the previous time step. With `move = false` the 1st step is left unchanged."""
 function move_prognostic_grid_variables_back!(
         vars::Variables,
         time_stepping::AbstractLeapfrog,
@@ -193,7 +201,7 @@ function diffusion_and_implicit!(vars, ::AbstractLeapfrog, ::AbstractImplicit, m
     return nothing
 end
 
-"""($TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Immutable core struct used to adapt only the time step fields for use in kernels"""
 struct LeapfrogCore{NF, MS} <: AbstractLeapfrog
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
@@ -205,7 +213,7 @@ end
 
 Adapt.@adapt_structure LeapfrogCore
 
-"""$(TYPEDSIGNATURES)
+"""$(TypedMethodSignatures(defaults = true))
 Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(

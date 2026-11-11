@@ -2,6 +2,7 @@ module SpeedyWeather
 
 # STRUCTURE
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 using StyledStrings
 
 # NUMERICS
@@ -110,7 +111,7 @@ export power_spectrum
 import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 
 # to be defined in GeoMakie extension
-export animate, globe
+export animate, globe, globe!
 function animate end
 
 # output variables, e.g. OutputVariables.Temperature()

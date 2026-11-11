@@ -64,6 +64,14 @@ On **Metal**, `gpu_graphs` is **disabled by default** and not currently supporte
 transform instead batches north/south ring pairs into single Metal Performance Shaders Graph
 (`MPSGraph`) calls to reduce CPU/GPU communication overhead.
 
+A captured graph is only valid for the buffers it was captured with, so graphs are cached per
+set of buffers: the grid field and the scratch memory of the transform (`vars.scratch.transform_memory`
+in a simulation). Every new set of variables for the same model, e.g. from another `initialize!(model)`
+or a `deepcopy` of the variables, therefore captures new graphs. Graphs of freed variables stay
+cached; after many re-initializations the cache is full (`SpeedyTransforms.MAX_GRAPHS` graphs per
+direction and transform size) and transforms on new buffers run without graphs, which is correct but
+slower. `SpeedyTransforms.clear_fourier_graph_cache!()` empties the cache.
+
 ## Architectures Utilities 
 
 In order to easily transfer our structures between CPU (e.g. for plotting and output) and GPU,

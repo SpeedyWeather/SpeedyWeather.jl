@@ -59,7 +59,7 @@ Fields, representing model components, are $(TYPEDFIELDS)"""
     feedback::FB = Feedback()
 end
 
-"""($TYPEDSIGNATURES) All variables needed for the shallow water model itself (components excluded)."""
+"""$(TYPEDSIGNATURES) All variables needed for the shallow water model itself (components excluded)."""
 function variables(model::ShallowWater)
     nsteps = get_nsteps(model.time_stepping, model)
     pg = nsteps.prognostic_grid
@@ -95,7 +95,7 @@ function variables(model::ShallowWater)
 end
 
 """ 
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Calls all `initialize!` functions for most components (=fields) of `model`,
 except for `model.output` and `model.feedback` which are always initialized
 in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""

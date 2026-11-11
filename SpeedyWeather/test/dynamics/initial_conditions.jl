@@ -155,6 +155,23 @@ end
 
     @test !any(isnan.(temp_custom))
     @test temp_custom != temp  # Different parameters should give different results
+
+    # stably stratified with the JW lapse rate also in the dry model (dry-adiabatic lapse_rate(atmosphere)),
+    # global-mean T ∝ σ^(R_dry*Γ/g) with R_dry*Γ/g < κ in the troposphere
+    model_dry = PrimitiveDryModel(spectral_grid)
+    vars_dry = Variables(model_dry)
+    initialize!(vars_dry, ic, model_dry)
+    temp_dry = SpeedyWeather.get_step(vars_dry.prognostic.temperature, 1)
+    T_mean = real.(Array(temp_dry[1, :]))       # l=m=0 coefficient ∝ global mean, normalisation cancels below
+    σ = Array(model_dry.geometry.σ_levels_full)
+    k = findall(σ .> 0.3)                       # troposphere
+    dlnT_dlnσ = diff(log.(T_mean[k])) ./ diff(log.(σ[k]))
+    @test all(dlnT_dlnσ .< 0.8 * model_dry.atmosphere.κ)
+
+    # lapse rate option is used
+    vars_lapse = Variables(model_dry)
+    initialize!(vars_lapse, JablonowskiTemperature(spectral_grid; lapse_rate = 0.0065), model_dry)
+    @test SpeedyWeather.get_step(vars_lapse.prognostic.temperature, 1) != temp_dry
 end
 
 @testset "BalancedZonalState" begin

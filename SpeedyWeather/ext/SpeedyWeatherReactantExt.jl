@@ -3,6 +3,7 @@ module SpeedyWeatherReactantExt
 using SpeedyWeather
 using Reactant
 using DocStringExtensions
+using DocStringExtensions: TypedMethodSignatures
 using Dates
 
 using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, time_step!, time_steps!
@@ -24,7 +25,7 @@ const ReactantSimulation = Union{
 # the whole run is one program (as Oceananigans' compiled `run!`).
 
 """
-$(TYPEDSIGNATURES)
+$(TypedMethodSignatures(defaults = true))
 Time loop of a simulation with Reactant. Without output the whole run is one compiled program
 ([`time_steps!`](@ref), a traced loop). With output every `m` time steps, the `m` time steps between
 two outputs are one program, called once per output interval; the spin-up steps of the time

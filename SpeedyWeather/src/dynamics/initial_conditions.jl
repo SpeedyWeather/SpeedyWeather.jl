@@ -682,6 +682,9 @@ $(TYPEDFIELDS)"""
     "max amplitude of zonal wind [m/s]"
     u₀::NF = 35
 
+    "temperature lapse rate [K/m] of the tropospheric profile, Jablonowski uses Γ = 0.005 [K/m]"
+    lapse_rate::NF = 0.005
+
     "temperature difference used for stratospheric lapse rate [K], Jablonowski uses ΔT = 4.8e5 [K]"
     ΔT::NF = 0
 
@@ -710,7 +713,9 @@ function initialize!(
     (; u₀, η₀, ΔT, Tmin) = initial_conditions
     (; σ_tropopause) = initial_conditions
 
-    Γ = lapse_rate(model.atmosphere)
+    # use the stably stratified lapse rate of Jablonowski and Williamson, not the (dry-adiabatic
+    # for PrimitiveDry) lapse_rate(model.atmosphere) which would be neutrally stratified
+    Γ = initial_conditions.lapse_rate
     (; R_dry) = model.atmosphere
     T₀ = model.atmosphere.reference_temperature
     (; grid, nlayers) = model.spectral_grid

@@ -4,9 +4,22 @@
 
 - Replace `CubicSigmaPressureCoordinates` (its steep transition makes layers cross over high orography) by `RampSigmaPressureCoordinates` [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
 - Generalise the dynamical core (mass-weighted vertical integrals, vertical velocity, vertical advection, and adiabatic conversion) to hybrid sigma-pressure coordinates, so `SigmaPressureCoordinates`/`CubicSigmaPressureCoordinates` are no longer restricted to the pure-sigma limit; `SigmaCoordinates` code paths are unchanged [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
-- Exact spectral geopotential and pressure gradient force RTᵥ∇ln(pₖ) for hybrid coordinates, semi-implicit operators linearised at 0.8·exp(mean ln pₛ), default initial conditions at η = p/pₛ, `RampSigmaPressureCoordinates` that keep layers thick over orography [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
+- Pressure gradient force RTᵥ∇ln(pₖ) for hybrid coordinates, consistent with the grid geopotential, semi-implicit operators linearised at 0.8·exp(mean ln pₛ), default initial conditions at η = p/pₛ, `RampSigmaPressureCoordinates` that keep layers thick over orography [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
 - Fix `get_σ_full`/`get_σ_half`/`get_σ_thickness` for `SigmaPressureCoordinates`, which returned the sigma (`B`) coefficients instead of the nominal sigma (`A + B`), causing `NaN`/`Inf` geopotential and adiabatic conversion coefficients for any non-degenerate hybrid coordinate [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
+
+## 0.24.0
+
+- Release SpeedyWeatherInternals 1.0.2 with DocStringExtensions v0.10 compat, fixing unsatisfiable requirements of the v0.24.0 release [#1395](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1395)
+- Benchmarks: completely revised with more options and opt-in experiments for publication [#1337](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1337)
+- Require DocStringExtensions v0.10 and show default argument values in docstrings of methods with default (keyword) arguments via `$(TypedMethodSignatures(defaults = true))` [#1310](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1310)
+- Fixes an issue with the `show` of `Simulation` failing in documentation builds [#1392](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1392)
 - Geopotential computed once in grid space and used by both dynamical core (via the Bernoulli potential) and parameterizations, spectral geopotential removed; Leapfrog keeps the previous grid step during the first two steps, consistent with the spectral one [#1381](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1381)
+- Fix an issue that GPU graphs corrupted easily after model multiple execution with different instances of Variables [#1382](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1382)
+- Add mutating variants of `heatmap` and `globe` for `RingGrids` `Field`s [#1223](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1223)
+- `JablonowskiTemperature` uses Jablonowski and Williamson's stable lapse rate Γ = 5 K/km (new option `lapse_rate`) instead of the dry-adiabatic lapse rate of `PrimitiveDryModel`, fixing the baroclinic wave breaking up; docs example back to default centering [#1389](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1389)
+- Revert the FFTA < 0.3.2 docs compat restriction, fixed upstream in FFTA 0.3.3 [#1387](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1387)
+- Jablonowski-Williamson docs example uses backward Euler (`centering = 1`) to damp spurious gravity waves [#1386](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1386)
+- Removes `@Const` from kernels to workaround bug in Reactant 0.2.306 [#1385](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1385)
 - Restore tag trigger for the documentation workflow so releases deploy versioned docs again [#1383](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1383)
 - Allow DocStringExtensions 0.10 in all sub-packages, and DocumenterCitations 1.5 in the docs (requires DocumenterVitepress ≥ 0.3.7) [#1379](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1379)
 - Fix `copy!` and `deepcopy!` for `Variables` to silently fail on GPUArrays (e.g. `CuArray` and `JLArrays`) [#1380](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1380)
@@ -17,7 +30,6 @@
 - Fix initial snow depth on Reactant GPU, broadcasting over a view fell back to scalar indexing [#1376](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1376)
 - NumericalRadiation extension for NumericalRadiation 0.2: gases renamed to chemical formula [#1329](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1329)
 - Count device (GPU) memory in printed sizes of model, simulation and variables [#1364](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1364)
-- Restrict FFTA compat in the docs to < 0.3.2, whose `plan_rfft` is ambiguous with FFTW's [#1381](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1381)
 - `BalancedZonalState` jet peaks at σ ≈ 0.2 and decays above (`σ_jet`, `jet_decay`), `σ_jet = 0` for the previous monotonic profile [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - `BalancedZonalState` uses the atmosphere's `reference_temperature` and lapse rate, default `moist_lapse_rate` of `EarthAtmosphere` 5 → 5.7 K/km [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
 - Initial snow depth estimated from the top-layer soil temperature instead of 0, to start on the right side of the snow-albedo feedback [#1284](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1284)
