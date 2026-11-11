@@ -185,14 +185,14 @@ end
 """$(TypedMethodSignatures(defaults = true))
 Angle of year [radians] of `orbit_time` for the solar zenith `S`, or of its initial time
 if the seasonal cycle is disabled, see `year_angle`."""
-year_angle(::Type{T}, S::AbstractZenith, orbit_time::DateTime) where {T} =
+year_angle(::Type{T}, S::AbstractZenith, orbit_time::Dates.AbstractDateTime) where {T} =
     year_angle(T, ifelse(S.seasonal_cycle, orbit_time, S.initial_time[]))
 
 """$(TypedMethodSignatures(defaults = true))
 Solar declination angle δ [radians] at `orbit_time` for the solar zenith `S`, following its
 `solar_declination` and seasonal cycle settings. Can be used to synchronize other seasonal
 cycles with the solar zenith angle."""
-solar_declination(::Type{T}, S::AbstractZenith, orbit_time::DateTime) where {T} =
+solar_declination(::Type{T}, S::AbstractZenith, orbit_time::Dates.AbstractDateTime) where {T} =
     S.solar_declination(year_angle(T, S, orbit_time))
 
 """$(TypedMethodSignatures(defaults = true))
