@@ -18,6 +18,17 @@ end
 
 const STOCHASTIC_TEST_MODELS = (BarotropicModel, ShallowWaterModel, PrimitiveDryModel, PrimitiveWetModel)
 
+@testset "StochasticLeapfrog is a Leapfrog with noise" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
+    L = StochasticLeapfrog(spectral_grid; seed = 1)
+    @test L isa Leapfrog
+    @test L isa StochasticLeapfrog
+    @test L.noise isa AdditiveWienerNoise
+    @test !(Leapfrog(spectral_grid) isa StochasticLeapfrog)
+    @test Leapfrog(spectral_grid; noise = AdditiveWienerNoise(spectral_grid)) isa StochasticLeapfrog
+    @test_throws ArgumentError StochasticLeapfrog(spectral_grid; noise = AdditiveWienerNoise(spectral_grid), seed = 1)
+end
+
 @testset "StochasticLeapfrog with zero amplitudes is Leapfrog" begin
     for Model in STOCHASTIC_TEST_MODELS
         nlayers = Model <: Union{BarotropicModel, ShallowWaterModel} ? 1 : 4
@@ -40,14 +51,16 @@ end
         spectral_grid = SpectralGrid(; truncation = 21, nlayers)
         # 2D models: a stronger vorticity noise so that 10 steps clearly differ from Leapfrog
         kw = Model <: Union{BarotropicModel, ShallowWaterModel} ? (; vorticity = 1.0e-7, divergence = 1.0e-8, pressure = 1.0e-3) : (;)
-        sims = map((1, 1, 2)) do seed
-            model = Model(spectral_grid; time_stepping = StochasticLeapfrog(spectral_grid; seed, kw...))
+        sims = map(((1, false), (1, false), (2, false), (1, true), (1, true))) do (seed, draw_on_cpu)
+            model = Model(spectral_grid; time_stepping = StochasticLeapfrog(spectral_grid; seed, draw_on_cpu, kw...))
             simulation = seeded_initialize!(model)
             run!(simulation, steps = 10)
             simulation
         end
         @test same_state(sims[1], sims[2])                  # same seed
         @test !same_state(sims[1], sims[3])                 # other seed
+        @test same_state(sims[4], sims[5])                  # same seed, drawn on the CPU
+        @test same_state(sims[1], sims[4])                  # on CPU drawing on the architecture is drawing on the CPU
         @test !any(isnan, sims[1].variables.prognostic.vorticity)
 
         sim_lf = seeded_initialize!(Model(spectral_grid; time_stepping = Leapfrog(spectral_grid)))

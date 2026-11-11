@@ -1,4 +1,4 @@
-using Statistics
+using Statistics, Random
 
 @testset "Spectral white noise process: standard deviation, structure, round trip" begin
     for truncation in (32, 64)
@@ -91,7 +91,20 @@ end
     @test std(pattern.data) ≈ σ rtol = 5.0e-2
     @test mean(pattern.data) ≈ 0 atol = 2.0e-2
 
+    # the next draw is new, a reinitialized process repeats the first
+    SpeedyWeather.random_process!(simulation.variables, random_process)
+    @test pattern != simulation.variables.grid.random_pattern
     simulation = initialize!(model)
     SpeedyWeather.random_process!(simulation.variables, random_process)
     @test pattern == simulation.variables.grid.random_pattern
+end
+
+@testset "Random number generator per architecture" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+    @test SpeedyWeather.architecture_rng(SpeedyWeather.CPU(), 1) isa Random.Xoshiro
+    @test SpeedyWeather.architecture_rng(SpeedyWeather.CPU(), 1; draw_on_cpu = true) isa Random.Xoshiro
+    for Process in (SpectralAR1Process, SpectralWhiteNoiseProcess, GridWhiteNoiseProcess)
+        @test Process(spectral_grid; seed = 1).random_number_generator isa Random.Xoshiro
+        @test Process(spectral_grid; seed = 1, draw_on_cpu = true).random_number_generator isa Random.Xoshiro
+    end
 end

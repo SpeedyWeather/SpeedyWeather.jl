@@ -10,7 +10,12 @@ Any random process <: AbstractRandomProcess has to implement the following inter
    own pattern this way, e.g. the `StochasticLeapfrog` time stepper
  - `random_process!(vars, process)` advances `model.random_process` at the end of every time
    step, defaults to the spectral `vars.prognostic.random_pattern`
- - `transform!(vars, process, spectral_transform)` makes `vars.grid.random_pattern` from it."""
+ - `transform!(vars, process, spectral_transform)` makes `vars.grid.random_pattern` from it.
+
+Random numbers are drawn on the architecture of the model: the processes' `random_number_generator`
+is a `Random.Xoshiro` on CPU and the counter-based `GPUArrays.RNG` on GPU, which draws in a kernel
+on the device. `draw_on_cpu = true` uses a `Xoshiro` also on GPU: drawn on the CPU and copied over,
+slower, but the same numbers on every architecture."""
 abstract type AbstractRandomProcess <: AbstractModelComponent end
 
 """$(TYPEDSIGNATURES)
@@ -46,6 +51,23 @@ spectral to grid space."""
 SpeedyTransforms.transform!(::Variables, ::Nothing, ::AbstractSpectralTransform) = nothing
 random_process!(::Variables, process::Nothing) = nothing
 
+"""$(TYPEDSIGNATURES)
+Random number generator for drawing on `architecture`: `Random.Xoshiro` on CPU, the counter-based
+`GPUArrays.RNG` on GPU (random numbers generated in a kernel on the device). With `draw_on_cpu = true`
+always a `Xoshiro`, its numbers are drawn on the CPU and copied to the device."""
+architecture_rng(architecture, seed; draw_on_cpu::Bool = false) =
+    (draw_on_cpu || architecture isa CPU) ? Random.Xoshiro(seed) : GPUArrays.RNG{array_type(architecture)}(seed)
+
+"""$(TYPEDSIGNATURES)
+Complex normals, unit variance in real and imaginary part, one per element of `pattern`, on its
+architecture, drawn from `rng`."""
+function complex_normals(pattern::LowerTriangularArray, rng::Random.AbstractRNG)
+    r = similar(pattern.data)
+    Random.randn!(rng, r)
+    r .*= convert(real(eltype(r)), 2 / sqrt(2))     # to scale: std(real(randn(Complex))) = √2/2 to 1
+    return r
+end
+
 export SpectralAR1Process
 
 """First-order auto-regressive random process (AR1) in spectral space,
@@ -72,7 +94,7 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
     seed::S = 0
 
-    "Independent random number generator for this random process"
+    "Independent random number generator for this random process, see `architecture_rng`"
     random_number_generator::RNG = Random.Xoshiro(seed)
 
     "Precomputed auto-regressive factor [1], function of time scale and model time step"
@@ -83,11 +105,18 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
 end
 
 # generator function
-function SpectralAR1Process(SG::SpectralGrid; kwargs...)
-    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
-    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+function SpectralAR1Process(
+        SG::SpectralGrid;
+        seed = 0,
+        draw_on_cpu::Bool = false,
+        random_number_generator = architecture_rng(SG.architecture, seed; draw_on_cpu),
+        kwargs...,
+    )
+    RNG = typeof(random_number_generator)
     (; truncation) = SG
-    return SpectralAR1Process{SG.NF, SG.VectorType, SeedType, RNG, typeof(truncation)}(; truncation, kwargs...)
+    return SpectralAR1Process{SG.NF, SG.VectorType, typeof(seed), RNG, typeof(truncation)}(;
+        truncation, seed, random_number_generator, kwargs...,
+    )
 end
 
 function variables(::SpectralAR1Process)
@@ -134,22 +163,9 @@ function random_process!(
         process::SpectralAR1Process{NF},
     ) where {NF}
     a = process.autoregressive_factor[]
-    RNG = process.random_number_generator
-    s = convert(NF, 2 / sqrt(2))              # to scale: std(real(randn(Complex))) = √2/2 to 1
-
-    arch = architecture(random_pattern)
-    n = length(random_pattern)                # total number of harmonics
-
-    # draw all complex normals on CPU through the seeded RNG to keep reproducibility,
-    # then transfer to the device in one go (GPU has no compatible Random.Xoshiro RNG)
-    r_cpu = Vector{Complex{NF}}(undef, n)
-    @inbounds for i in 1:n
-        r_cpu[i] = s * randn(RNG, Complex{NF})
-    end
-    r = on_architecture(arch, r_cpu)
-
+    r = complex_normals(random_pattern, process.random_number_generator)
     launch!(
-        arch, SpectralWorkOrder, size(random_pattern), spectral_ar1_kernel!,
+        architecture(random_pattern), SpectralWorkOrder, size(random_pattern), spectral_ar1_kernel!,
         random_pattern, r, process.noise_factors, random_pattern.spectrum.l_indices, a
     )
     return nothing
@@ -202,7 +218,7 @@ Fields are $(TYPEDFIELDS)"""
     "[OPTION] Random number generator seed, 0 = randomly seed from Julia's GLOBAL_RNG"
     seed::S = 0
 
-    "Independent random number generator for this random process"
+    "Independent random number generator for this random process, see `architecture_rng`"
     random_number_generator::RNG = Random.Xoshiro(seed)
 
     "[DERIVED] Noise factors [1] for every total wavenumber l"
@@ -210,14 +226,19 @@ Fields are $(TYPEDFIELDS)"""
 end
 
 # generator function
-function SpectralWhiteNoiseProcess(SG::SpectralGrid; kwargs...)
-    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
-    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+function SpectralWhiteNoiseProcess(
+        SG::SpectralGrid;
+        seed = 0,
+        draw_on_cpu::Bool = false,
+        random_number_generator = architecture_rng(SG.architecture, seed; draw_on_cpu),
+        kwargs...,
+    )
+    RNG = typeof(random_number_generator)
     (; truncation) = SG
-    return SpectralWhiteNoiseProcess{SG.NF, SG.VectorType, SeedType, RNG, typeof(truncation)}(; truncation, kwargs...)
+    return SpectralWhiteNoiseProcess{SG.NF, SG.VectorType, typeof(seed), RNG, typeof(truncation)}(;
+        truncation, seed, random_number_generator, kwargs...,
+    )
 end
-
-Adapt.@adapt_structure SpectralWhiteNoiseProcess
 
 function variables(process::SpectralWhiteNoiseProcess)
     n = process.n_patterns
@@ -273,23 +294,12 @@ function random_process!(
         pattern::LowerTriangularArray,
         process::SpectralWhiteNoiseProcess{NF},
     ) where {NF}
-    RNG = process.random_number_generator
-    s = convert(NF, 2 / sqrt(2))       # std(real(randn(Complex))) = √2/2 -> 1
-
-    # draw all complex normals on CPU through the seeded RNG to keep reproducibility,
-    # then transfer to the device in one go (GPU has no compatible Random.Xoshiro RNG)
-    arch = architecture(pattern)
-    n = length(pattern)
-    r_cpu = Vector{Complex{NF}}(undef, n)
-    @inbounds for i in 1:n
-        r_cpu[i] = s * randn(RNG, Complex{NF})
-    end
-    r = on_architecture(arch, r_cpu)
+    r = complex_normals(pattern, process.random_number_generator)
 
     # linear index over all slots, l_indices and m_indices are per lm
     nlm = size(pattern, 1)
     launch!(
-        arch, SpectralWorkOrder, size(pattern), white_noise_kernel!,
+        architecture(pattern), SpectralWorkOrder, size(pattern), white_noise_kernel!,
         pattern, r, process.noise_factors, pattern.spectrum.l_indices, pattern.spectrum.m_indices, nlm,
     )
     return nothing
@@ -305,12 +315,8 @@ end
 
     # m = 0 is real (a real grid field has real zonal-mean coefficients), and carries √2 × the
     # real part to restore the variance of the dropped imaginary part, keeping the pattern homogeneous
-    if m_indices[lm] == 1
-        rt2 = oftype(real(x), 1.4142135623730951)
-        pattern[i] = complex(rt2 * real(x))
-    else
-        pattern[i] = x
-    end
+    rt2 = oftype(real(x), 1.4142135623730951)
+    pattern[i] = ifelse(m_indices[lm] == 1, complex(rt2 * real(x)), x)
 end
 
 """Random process that is white in time and in space on the grid: every grid point
@@ -329,18 +335,21 @@ Fields are $(TYPEDFIELDS)"""
     "[OPTION] Random number generator seed, 0 = randomly seed from Julia's GLOBAL_RNG"
     seed::S = 0
 
-    "Independent random number generator for this random process"
+    "Independent random number generator for this random process, see `architecture_rng`"
     random_number_generator::RNG = Random.Xoshiro(seed)
+
 end
 
-function GridWhiteNoiseProcess(SG::SpectralGrid; kwargs...)
-    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
-    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
-    IntType = typeof(SG.truncation)
-    return GridWhiteNoiseProcess{SG.NF, SeedType, RNG, IntType}(; kwargs...)
+function GridWhiteNoiseProcess(
+        SG::SpectralGrid;
+        seed = 0,
+        draw_on_cpu::Bool = false,
+        random_number_generator = architecture_rng(SG.architecture, seed; draw_on_cpu),
+        kwargs...,
+    )
+    RNG = typeof(random_number_generator)
+    return GridWhiteNoiseProcess{SG.NF, typeof(seed), RNG, typeof(SG.truncation)}(; seed, random_number_generator, kwargs...)
 end
-
-Adapt.@adapt_structure GridWhiteNoiseProcess
 
 function variables(process::GridWhiteNoiseProcess)
     n = process.n_patterns
@@ -363,12 +372,9 @@ random_process!(vars::Variables, process::GridWhiteNoiseProcess) =
 
 """$(TYPEDSIGNATURES)
 Draw a new white noise `pattern` (all its slots) from `process`."""
-function random_process!(pattern::AbstractField, process::GridWhiteNoiseProcess{NF}) where {NF}
+function random_process!(pattern::AbstractField, process::GridWhiteNoiseProcess)
     data = parent(pattern)
-    # drawn on CPU through the seeded RNG for reproducibility, then copied to the device
-    r_cpu = Array{NF}(undef, size(data))
-    Random.randn!(process.random_number_generator, r_cpu)
-    r_cpu .*= process.standard_deviation
-    copyto!(data, r_cpu)
+    Random.randn!(process.random_number_generator, data)
+    data .*= process.standard_deviation
     return nothing
 end

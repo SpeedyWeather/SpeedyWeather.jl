@@ -26,7 +26,9 @@ models in a 1500-year stochastic control run: climate-neutral, stable, humidity 
 clipping rather than by the climate (see the docstring of `StochasticLeapfrog`). They are not
 universal, check them for other resolutions, time steps or models.
 Every variable of the model gets a pattern slot (also with amplitude zero), so switching one
-amplitude on or off does not change the noise realisation of the others.
+amplitude on or off does not change the noise realisation of the others. The noise is drawn on
+the model's architecture (see `architecture_rng`); `draw_on_cpu = true` draws it on the CPU also
+on GPU (slower, but the same numbers as on CPU).
 
 Fields are $(TYPEDFIELDS)"""
 struct AdditiveWienerNoise{NF, F, VectorType, SP, GP} <: AbstractWienerNoise
@@ -64,7 +66,7 @@ end
 """$(TypedMethodSignatures(defaults = true))
 Additive Wiener noise for the prognostic variables, amplitudes per variable. `seed` seeds
 both white noise processes (they draw from independent streams), `wavenumber` and
-`standard_deviation` are passed on to the `SpectralWhiteNoiseProcess`."""
+`standard_deviation` are passed on to the `SpectralWhiteNoiseProcess`, `draw_on_cpu` to both."""
 function AdditiveWienerNoise(
         SG::SpectralGrid;
         vorticity = 3.0e-8,
@@ -77,11 +79,12 @@ function AdditiveWienerNoise(
         seed = 0,
         wavenumber = 0,
         standard_deviation = 1 / 3,
+        draw_on_cpu = false,
     )
     NF = SG.NF
     taper = on_architecture(SG.architecture, zeros(NF, SG.nlayers))
-    spectral = SpectralWhiteNoiseProcess(SG; seed, wavenumber, standard_deviation)
-    grid = GridWhiteNoiseProcess(SG; seed, standard_deviation)
+    spectral = SpectralWhiteNoiseProcess(SG; seed, wavenumber, standard_deviation, draw_on_cpu)
+    grid = GridWhiteNoiseProcess(SG; seed, standard_deviation, draw_on_cpu)
     return AdditiveWienerNoise{NF, typeof(tapering), typeof(taper), typeof(spectral), typeof(grid)}(
         NF(vorticity), NF(divergence), NF(temperature), NF(humidity), NF(pressure),
         NF(sea_surface_temperature), tapering, taper, spectral, grid,
@@ -191,45 +194,17 @@ in the variables (`vars.prognostic.wiener_pattern`, `vars.grid.wiener_pattern`,
 deterministic and a simulation continued with another `run!` continues with the stored pattern.
 The noise realisation is reproducible through `seed`, independent of other random processes.
 
-Use as `time_stepping = StochasticLeapfrog(spectral_grid; seed = 123)`, keyword arguments
-other than those of `Leapfrog` are passed on to `AdditiveWienerNoise`, or provide the noise
-`StochasticLeapfrog(spectral_grid; noise = AdditiveWienerNoise(spectral_grid; ...))`.
-All amplitudes zero gives the same trajectory as `Leapfrog`.
-
-Fields are $(TYPEDFIELDS)"""
-mutable struct StochasticLeapfrog{NF, S, B, MS, O, L, N} <: AbstractFilteredLeapfrog
-    "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
-    Δt_at_T32::S
-
-    "[OPTION] Adjust `Δt_at_T32` with the output `interval` to output exactly after integer time steps"
-    adjust_with_output::B
-
-    "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"
-    robert_filter::NF
-
-    "[OPTION] Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
-    williams_filter::NF
-
-    "[DERIVED] Time step Δt in milliseconds at specified resolution"
-    Δt_millisec::MS
-
-    "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt::NF
-
-    "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for leapfrog as the atmosphere"
-    ocean::O
-
-    "[OPTION] Time stepper for the land variables, `nothing` for leapfrog as the atmosphere"
-    land::L
-
-    "[OPTION] Additive Wiener noise added to the tendencies every time step"
-    noise::N
-end
+`StochasticLeapfrog` is a `Leapfrog` whose `noise` field holds an `AbstractWienerNoise` (a type
+alias, not a new time stepper): every method of `Leapfrog` applies, only the Wiener increment is
+added. Use as `time_stepping = StochasticLeapfrog(spectral_grid; seed = 123)`, keyword arguments
+other than those of `Leapfrog` are passed on to `AdditiveWienerNoise`, or equivalently
+`Leapfrog(spectral_grid; noise = AdditiveWienerNoise(spectral_grid; seed = 123))`.
+All amplitudes zero gives the same trajectory as `Leapfrog` without noise."""
+const StochasticLeapfrog{NF, S, B, MS, O, L, N <: AbstractWienerNoise} = Leapfrog{NF, S, B, MS, O, L, N}
 
 """$(TypedMethodSignatures(defaults = true))
-Generator function for a StochasticLeapfrog struct using `spectral_grid` for the resolution
-information. Further keyword arguments are passed on to `AdditiveWienerNoise` unless `noise`
-is provided."""
+Leapfrog with additive Wiener noise. Keyword arguments of `Leapfrog` are passed on to it, all
+others to `AdditiveWienerNoise` unless `noise` is provided."""
 function StochasticLeapfrog(
         spectral_grid::SpectralGrid;
         Δt_at_T32 = Minute(40),
@@ -246,24 +221,8 @@ function StochasticLeapfrog(
     elseif !isempty(kwargs)
         throw(ArgumentError("Provide either `noise` or its keyword arguments $(keys(kwargs)), not both."))
     end
-
-    (; NF, truncation) = spectral_grid
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
-    Δt::NF = Δt_millisec.value / 1000
-
-    return StochasticLeapfrog(
-        Second(Δt_at_T32), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
-        ocean, land, noise,
-    )
+    return Leapfrog(spectral_grid; Δt_at_T32, adjust_with_output, robert_filter, williams_filter, ocean, land, noise)
 end
-
-function initialize!(L::StochasticLeapfrog, model::AbstractModel)
-    calculate_Δt!(L, model)         # as for Leapfrog, also sets ocean/land Δt
-    initialize!(L.noise, model)     # seeds the random number generators
-    return nothing
-end
-
-variables(L::StochasticLeapfrog, model::AbstractModel) = variables(L.noise, model)
 
 """$(TYPEDSIGNATURES)
 Add the Wiener increment of this time step (drawn at the end of the previous one) to the
