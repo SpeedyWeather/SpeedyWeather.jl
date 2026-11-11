@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Benchmark regression check: debug mode of the benchmark suite, `regression.jl` comparing a revision with main, the latest release and the latest benchmarked revision (bisecting a regression), run weekly and on PRs labelled `benchmark-performance`, plus a Claude skill [#1299](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1299)
+
 ## 0.24.0
 
 - Release SpeedyWeatherInternals 1.0.2 with DocStringExtensions v0.10 compat, fixing unsatisfiable requirements of the v0.24.0 release [#1395](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1395)
