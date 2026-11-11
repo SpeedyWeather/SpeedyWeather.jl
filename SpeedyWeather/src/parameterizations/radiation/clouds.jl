@@ -166,13 +166,11 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
         humidity_k = humid[ij, k]
         pₖ = pressure(k, pₛ, vertical_coordinates)
         qsat = saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
-        if (humidity_k > q_min || k == cloud_base) && qsat > 0
-            rh_excess = humidity_k / qsat - rh_min
-            if rh_excess > rh_excess_max
-                rh_excess_max = rh_excess
-                cloud_top_humidity = k
-            end
-        end
+        valid = ((humidity_k > q_min) | (k == cloud_base)) & (qsat > 0)
+        rh_excess = humidity_k / ifelse(qsat > 0, qsat, one(NF)) - rh_min  # avoid division by zero
+        new_max = valid & (rh_excess > rh_excess_max)
+        rh_excess_max = ifelse(new_max, rh_excess, rh_excess_max)
+        cloud_top_humidity = ifelse(new_max, k, cloud_top_humidity)
     end
     humidity_term = min(1, rh_excess_max / (rh_max - rh_min))^2
 
@@ -180,7 +178,7 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
     cloud_cover = min(1, P + humidity_term)
     # highest of humidity and precipitation cloud top, but kept within the free troposphere
     cloud_top = min(cloud_top_humidity, cloud_top_precipitation)
-    cloud_top = cloud_top <= nlayers ? clamp(cloud_top, layer_top, cloud_base) : cloud_top
+    cloud_top = ifelse(cloud_top <= nlayers, clamp(cloud_top, layer_top, cloud_base), cloud_top)
     vars.parameterizations.cloud_top[ij] = cloud_top
 
     # store cloud cover and cloud top height [m] (0 for no cloud) for output
@@ -190,33 +188,31 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
     Φ_top = geopotential[ij, k_top]
     vars.parameterizations.cloud_top_height[ij] = ifelse(cloud_top <= nlayers, Φ_top / model.planet.gravity, zero(NF))
 
-    # Stratocumulus parameterization
-    stratocumulus_cover::NF = 0         # fallback for no stratocumulus
-    if clouds.use_stratocumulus && cloud_base < nlayers
-        # Static stability as vertical gradient of dry static energy s = cₚT + Φ between the
-        # surface layer and the cloud base layer above the boundary layer, normalized by the
-        # geopotential difference, i.e. GSE = Δs/ΔΦ = 1 + cₚΔT/ΔΦ, 0 for dry adiabatic,
-        # 1 for isothermal. With 8 layers (as in SPEEDY) these are the lowest two layers
-        surface = nlayers
-        above = cloud_base
-        ΔΦ = geopotential[ij, above] - geopotential[ij, surface]
-        Δs = cₚ * (temp[ij, above] - temp[ij, surface]) + ΔΦ
-        stable_layers = ΔΦ > 0              # guard against division by zero, also in the branch not taken
-        GSE = ifelse(stable_layers, Δs / ifelse(stable_layers, ΔΦ, one(NF)), zero(NF))
+    # Stratocumulus parameterization, computed always and switched off with ifelse (branch-free)
+    # Static stability as vertical gradient of dry static energy s = cₚT + Φ between the
+    # surface layer and the cloud base layer above the boundary layer, normalized by the
+    # geopotential difference, i.e. GSE = Δs/ΔΦ = 1 + cₚΔT/ΔΦ, 0 for dry adiabatic,
+    # 1 for isothermal. With 8 layers (as in SPEEDY) these are the lowest two layers
+    surface = nlayers
+    above = cloud_base
+    ΔΦ = geopotential[ij, above] - geopotential[ij, surface]
+    Δs = cₚ * (temp[ij, above] - temp[ij, surface]) + ΔΦ
+    stable_layers = ΔΦ > 0              # guard against division by zero, also in the branch not taken
+    GSE = ifelse(stable_layers, Δs / ifelse(stable_layers, ΔΦ, one(NF)), zero(NF))
 
-        # normalized static stability factor
-        static_stability = clamp((GSE - stab_min) / (stab_max - stab_min), 0, 1)
+    # normalized static stability factor
+    static_stability = clamp((GSE - stab_min) / (stab_max - stab_min), 0, 1)
 
-        stratocumulus_cover_ocean = static_stability * max(cover_max - cloud_factor * cloud_cover, 0)
-        pN = pressure(surface, pₛ, vertical_coordinates)
-        qsat_surface = saturation_humidity(temp[ij, surface], pN, model.atmosphere)
-        rh_surface = humid[ij, surface] / qsat_surface      # relative humidity at surface
-        stratocumulus_cover_land = max(stratocumulus_cover_ocean, cover_min_land) * rh_surface
+    stratocumulus_cover_ocean = static_stability * max(cover_max - cloud_factor * cloud_cover, 0)
+    pN = pressure(surface, pₛ, vertical_coordinates)
+    qsat_surface = saturation_humidity(temp[ij, surface], pN, model.atmosphere)
+    rh_surface = humid[ij, surface] / ifelse(qsat_surface > 0, qsat_surface, one(NF))  # relative humidity at surface
+    stratocumulus_cover_land = max(stratocumulus_cover_ocean, cover_min_land) * rh_surface
 
-        stratocumulus_cover =
-            (1 - land_fraction) * stratocumulus_cover_ocean +
-            land_fraction * stratocumulus_cover_land
-    end
+    stratocumulus_cover_land_sea =
+        (1 - land_fraction) * stratocumulus_cover_ocean +
+        land_fraction * stratocumulus_cover_land
+    stratocumulus_cover = ifelse(clouds.use_stratocumulus & (cloud_base < nlayers), stratocumulus_cover_land_sea, zero(NF))
 
     return (; cloud_cover, cloud_top, cloud_base, stratocumulus_cover)
 end

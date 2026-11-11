@@ -200,11 +200,9 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
 
     for k in 1:nlayers
         # 1. cloud reflection?
-        if k == cloud_top
-            R = cloud_albedo * cloud_cover
-            U_reflected = D * R
-            D *= (1 - R)
-        end
+        R = ifelse(k == cloud_top, cloud_albedo * cloud_cover, zero(D))
+        U_reflected += D * R                    # nonzero only in the cloud-top layer
+        D *= (1 - R)
 
         # 2. ozone absorption in stratosphere layers above σ₀, distribution scaled by layer thickness
         O₃ = O₃_absorption * radiation.ozone_distribution(σ[k]) * Δσ[k]
@@ -365,14 +363,12 @@ no reflection by clouds or the surface."""
 
     for k in 1:nlayers
         # 1. reflection (visible only) at the top of layer k
-        if k == cloud_top
-            U_cloud = D * cloud_albedo * cloud_cover
-            D -= U_cloud
-        end
-        if k == boundary_layer_top
-            U_stratocumulus = D * stratocumulus_albedo * stratocumulus_cover
-            D -= U_stratocumulus
-        end
+        R_cloud = ifelse(k == cloud_top, cloud_albedo * cloud_cover, zero(D))
+        U_cloud += D * R_cloud                  # nonzero only in the cloud-top layer
+        D -= D * R_cloud
+        R_stratocumulus = ifelse(k == boundary_layer_top, stratocumulus_albedo * stratocumulus_cover, zero(D))
+        U_stratocumulus += D * R_stratocumulus  # nonzero only at the top of the boundary layer
+        D -= D * R_stratocumulus
 
         # 2. ozone absorption (visible), fraction of TOA flux, corrected for slant path
         O₃ = ozone_absorption(ij, k, vars, ozone, model) * D_toa * zenith_factor

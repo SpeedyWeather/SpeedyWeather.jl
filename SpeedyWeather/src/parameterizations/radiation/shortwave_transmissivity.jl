@@ -117,7 +117,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
         q = humid[ij, k]
 
         # Aerosol factor: use mid-level sigma, squared (aerosol loading increases toward surface)
-        aerosol_factor = transmissivity.aerosols ? sigma(k, coord)^2 : zero(NF)
+        aerosol_factor = ifelse(transmissivity.aerosols, sigma(k, coord)^2, zero(NF))
 
         # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
         layer_absorptivity = (
@@ -127,9 +127,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
         )
 
         # Add cloud absorption from cloud top to cloud base
-        if cloud_top <= k <= cloud_base
-            layer_absorptivity += cloud_absorptivity_term * cloud_cover
-        end
+        layer_absorptivity += ifelse(cloud_top <= k <= cloud_base, cloud_absorptivity_term * cloud_cover, zero(NF))
 
         # Compute differential optical depth with zenith correction
         # Normalize pressure to 1e5 Pa since absorptivities are per 1e5 Pa
@@ -220,16 +218,14 @@ the lowest layer above the boundary layer. Returns a NamedTuple `(; visible, nea
 
     for k in 1:nlayers
         q = humid[ij, k]
-        aerosol_factor = transmissivity.aerosols ? sigma(k, coord)^2 : zero(NF)
+        aerosol_factor = ifelse(transmissivity.aerosols, sigma(k, coord)^2, zero(NF))
 
         absorptivity_visible = transmissivity.absorptivity_dry_air +
             transmissivity.absorptivity_aerosol * aerosol_factor +
             transmissivity.absorptivity_water_vapor * q
 
         # clouds absorb from cloud top down to the cloud base, never in the boundary layer
-        if cloud_top <= k <= cloud_base
-            absorptivity_visible += cloud_absorptivity
-        end
+        absorptivity_visible += ifelse(cloud_top <= k <= cloud_base, cloud_absorptivity, zero(NF))
 
         absorptivity_near_infrared = transmissivity.absorptivity_water_vapor_near_infrared * q
 
