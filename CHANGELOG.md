@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90 implementation, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
+
 ## 0.24.1
 
 - Allow DocStringExtensions v0.9 again (compat "0.9, 0.10"), default values in signatures are only shown with v0.10 via a version-dependent `SpeedyWeatherInternals.Utils.TYPEDSIGNATURES`, DocStringExtensions names are imported explicitly [#1398](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1398)
