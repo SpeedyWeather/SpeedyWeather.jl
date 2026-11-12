@@ -158,5 +158,5 @@ end
     # Reobtain F_explicit + L_implicit by undoing the Lorenz tendency average
     # and store in F tendencies so it can be plugged into Lorenz time stepping as normal
     F_div[lm, k] = (δdiv - (1 - w) * G_div[lm, k]) / w
-    F_η[lm, k] = (δη - (1 - w) * G_η[lm]) / w
+    F_η[lm] = (δη - (1 - w) * G_η[lm]) / w
 end

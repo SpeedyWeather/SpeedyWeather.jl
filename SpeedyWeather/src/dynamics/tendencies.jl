@@ -486,7 +486,7 @@ function linear_pressure_gradient!(
     # for Leapfrog this term is evaluated at the previous time step and the
     # implicit corrections will move it to the current as done for all linear gravity-wave related terms
     lnpₛ = get_prognostic_step(vars.prognostic.pressure, time_stepping, LinearDynamicalCore())
-    bernoulli = get_step(vars.dynamics.kinetic_energy)
+    bernoulli = get_tendency_step(vars.dynamics.kinetic_energy, time_stepping, DynamicalCore())
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
@@ -716,8 +716,8 @@ Here, the previosuly computed gridded tendency contribution are accumulated and 
 tendency computed with divergence is computed via the `flux_spectral_divergence!` function."""
 function temperature_spectral_tendency!(vars::Variables, S::AbstractSpectralTransform, time_stepping::AbstractTimeStepper)
     temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, DynamicalCore())
-    uT_spec = get_step(vars.dynamics.uT_anomaly)
-    vT_spec = get_step(vars.dynamics.vT_anomaly)
+    uT_spec = get_tendency_step(vars.dynamics.uT_anomaly, time_stepping, DynamicalCore())
+    vT_spec = get_tendency_step(vars.dynamics.vT_anomaly, time_stepping, DynamicalCore())
     flux_spectral_divergence!(temp_tend, uT_spec, vT_spec, S; add = true, flipsign = true)
     return nothing
 end
@@ -788,8 +788,8 @@ Adds `-∇⋅(uq, vq)` to the previously computed gridded and transformed tenden
 function humidity_spectral_tendency!(vars::Variables, model::PrimitiveWet)
     S = model.spectral_transform
     humid_tend = get_tendency_step(vars.tendencies.humidity, model.time_stepping, DynamicalCore())
-    uq_spec = get_step(vars.dynamics.uq)
-    vq_spec = get_step(vars.dynamics.vq)
+    uq_spec = get_tendency_step(vars.dynamics.uq, model.time_stepping, DynamicalCore())
+    vq_spec = get_tendency_step(vars.dynamics.vq, model.time_stepping, DynamicalCore())
     horizontal_spectral_advection!(humid_tend, uq_spec, vq_spec, S)
     return nothing
 end
@@ -1120,7 +1120,7 @@ function bernoulli_potential!(
     )
     bernoulli_grid_potential!(vars, S, TS)
 
-    bernoulli = get_step(vars.dynamics.kinetic_energy)
+    bernoulli = get_tendency_step(vars.dynamics.kinetic_energy, TS, DynamicalCore())
     bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
     scratch_memory = vars.scratch.transform_memory
 
@@ -1189,7 +1189,7 @@ function bernoulli_spectral_potential!(vars::Variables, S::AbstractSpectralTrans
 end
 
 function _bernoulli_spectral_potential!(vars::Variables, S::AbstractSpectralTransform, time_stepper::AbstractTimeStepper)
-    bernoulli = get_step(vars.dynamics.kinetic_energy)
+    bernoulli = get_tendency_step(vars.dynamics.kinetic_energy, time_stepper, DynamicalCore())
     div_tend = get_tendency_step(vars.tendencies.divergence, time_stepper, DynamicalCore())
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)
     return nothing
@@ -1229,8 +1229,8 @@ function volume_flux_divergence_spectral!(
         model::ShallowWater,
     )
     η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, ContinuityEquation())
-    uh = get_step(vars.dynamics.uh)
-    vh = get_step(vars.dynamics.vh)
+    uh = get_tendency_step(vars.dynamics.uh, model.time_stepping, DynamicalCore())
+    vh = get_tendency_step(vars.dynamics.vh, model.time_stepping, DynamicalCore())
     flux_spectral_divergence!(η_tend, uh, vh, model.spectral_transform; add = true, flipsign = true)
     return nothing
 end

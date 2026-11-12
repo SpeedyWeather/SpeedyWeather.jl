@@ -74,7 +74,7 @@ function variables(model::ShallowWater)
         TendencyVariable(:divergence, SpectralXYZT(ts), desc = "Tendency of divergence", units = "1/s²"),
         TendencyVariable(:divergence, GridXYZT(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
 
-        TendencyVariable(:η, SpectralXYT(ps), desc = "Tendency of interface displacement", units = "m/s"),
+        TendencyVariable(:η, SpectralXYT(ts), desc = "Tendency of interface displacement", units = "m/s"),
         TendencyVariable(:η, GridXYT(tg), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
 
         GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse = :grid),
