@@ -80,8 +80,10 @@ evolving `wavenumbers` with respectice `time_scales` and `standard_deviations`
 independently. Transformed after every time step to grid space with a
 `clamp` applied to limit extrema. For reproducability `seed` can be
 provided and an independent `random_number_generator` is used
-that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
-@kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType, SpectralVariable2D} <: AbstractRandomProcess
+that is reseeded on every `initialize!`. `n_patterns > 1` evolves that many
+independent patterns (`Spectral3D`/`Grid3D` with `n_patterns` slots).
+Fields are: $(TYPEDFIELDS)"""
+@kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType, SpectralVariable} <: AbstractRandomProcess
     truncation::IntType
 
     "[OPTION] Time scale of the AR1 process"
@@ -89,6 +91,9 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
 
     "[OPTION] Wavenumber (0-based) of the AR1 process"
     wavenumber::IntType = 12
+
+    "[OPTION] Number of independent patterns, 1 = a single pattern"
+    n_patterns::IntType = 1
 
     "[OPTION] Standard deviation of the AR1 process"
     standard_deviation::NF = 1 / 3
@@ -108,32 +113,43 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
     "Precomputed noise factors [1] for every total wavenumber l"
     noise_factors::VectorType = zeros(NF, truncation + 1)
 
-    "Buffer for the random numbers drawn every time step"
-    random_numbers::SpectralVariable2D
+    "Buffer for the random numbers drawn every time step, same size as the pattern"
+    random_numbers::SpectralVariable
 end
 
 # generator function
 function SpectralAR1Process(
         SG::SpectralGrid;
         seed = 0,
+        n_patterns = 1,
         draw_on_cpu::Bool = false,
         random_number_generator = architecture_rng(SG.architecture, seed; draw_on_cpu),
         kwargs...,
     )
     RNG = typeof(random_number_generator)
-    (; truncation, SpectralVariable2D, spectrum) = SG
-    random_numbers = zeros(SpectralVariable2D, spectrum)
-    return SpectralAR1Process{SG.NF, SG.VectorType, typeof(seed), RNG, typeof(truncation), SpectralVariable2D}(;
-        truncation, seed, random_number_generator, random_numbers, kwargs...,
+    (; truncation, spectrum) = SG
+    random_numbers = n_patterns <= 1 ? zeros(SG.SpectralVariable2D, spectrum) :
+        zeros(SG.SpectralVariable3D, spectrum, n_patterns)
+    return SpectralAR1Process{SG.NF, SG.VectorType, typeof(seed), RNG, typeof(truncation), typeof(random_numbers)}(;
+        truncation, n_patterns, seed, random_number_generator, random_numbers, kwargs...,
     )
 end
 
-function variables(::SpectralAR1Process)
-    return (
-        PrognosticVariable(:random_pattern, Spectral2D(), desc = "Random pattern for the random process", units = "1"),
-        GridVariable(:random_pattern, Grid2D(), desc = "Random pattern for the random process", units = "1"),
-    )
+"""$(TYPEDSIGNATURES)
+Variables of a spectral random process: the spectral `random_pattern` and its grid counterpart,
+2D for a single pattern, 3D with `n` slots for `n > 1` independent patterns."""
+function random_pattern_variables(n::Integer)
+    desc = "Random pattern for the random process"
+    return n <= 1 ? (
+            PrognosticVariable(:random_pattern, Spectral2D(); desc, units = "1"),
+            GridVariable(:random_pattern, Grid2D(); desc, units = "1"),
+        ) : (
+            PrognosticVariable(:random_pattern, Spectral3D(; n); desc, units = "1"),
+            GridVariable(:random_pattern, Grid3D(; n); desc, units = "1"),
+        )
 end
+
+variables(process::SpectralAR1Process) = random_pattern_variables(process.n_patterns)
 
 function initialize!(
         process::SpectralAR1Process,
@@ -173,20 +189,23 @@ function random_process!(
     ) where {NF}
     a = process.autoregressive_factor[]
     r = complex_normals!(process.random_numbers, process.random_number_generator)
+
+    # linear index over all patterns, l_indices are per lm
+    nlm = size(random_pattern, 1)
     launch!(
         architecture(random_pattern), SpectralWorkOrder, size(random_pattern), spectral_ar1_kernel!,
-        random_pattern, r, process.noise_factors, random_pattern.spectrum.l_indices, a
+        random_pattern, r, process.noise_factors, random_pattern.spectrum.l_indices, a, nlm,
     )
     return nothing
 end
 
 @kernel inbounds = true function spectral_ar1_kernel!(
-        random_pattern, r, noise_factors, l_indices, a
+        random_pattern, r, noise_factors, l_indices, a, nlm,
     )
-    lm = @index(Global, Linear)
-    l = l_indices[lm]
+    i = @index(Global, Linear)
+    l = l_indices[mod1(i, nlm)]
     ξ = noise_factors[l]
-    random_pattern[lm] = a * random_pattern[lm] + ξ * r[lm]
+    random_pattern[i] = a * random_pattern[i] + ξ * r[i]
 end
 
 export SpectralWhiteNoiseProcess, GridWhiteNoiseProcess
@@ -205,8 +224,6 @@ Differences to `SpectralAR1Process` beyond the missing memory
   grid to spectral round trip returns it to rounding.
 - No clamp by default, `clamp = (-Inf, Inf)`: clamping makes the increment
   non-Gaussian and the grid pattern no longer band-limited.
-- `n_patterns > 1` draws that many independent patterns (`Spectral3D`/`Grid3D` with
-  `n_patterns` slots), so that different variables and layers can be forced independently.
 
 Fields are $(TYPEDFIELDS)"""
 @kwdef struct SpectralWhiteNoiseProcess{NF, VectorType, S, RNG, IntType} <: AbstractRandomProcess
@@ -215,7 +232,7 @@ Fields are $(TYPEDFIELDS)"""
     "[OPTION] Wavenumber (0-based) of the spectral shaping, 0 = spectrally flat"
     wavenumber::IntType = 0
 
-    "[OPTION] Number of independent patterns, 1 = a single pattern as `SpectralAR1Process`"
+    "[OPTION] Number of independent patterns, 1 = a single pattern"
     n_patterns::IntType = 1
 
     "[OPTION] Standard deviation of the pattern in grid space"
@@ -249,16 +266,7 @@ function SpectralWhiteNoiseProcess(
     )
 end
 
-function variables(process::SpectralWhiteNoiseProcess)
-    n = process.n_patterns
-    return n <= 1 ? (
-            PrognosticVariable(:random_pattern, Spectral2D(), desc = "Random pattern for the random process", units = "1"),
-            GridVariable(:random_pattern, Grid2D(), desc = "Random pattern for the random process", units = "1"),
-        ) : (
-            PrognosticVariable(:random_pattern, Spectral3D(; n), desc = "Independent random patterns", units = "1"),
-            GridVariable(:random_pattern, Grid3D(; n), desc = "Independent random patterns", units = "1"),
-        )
-end
+variables(process::SpectralWhiteNoiseProcess) = random_pattern_variables(process.n_patterns)
 
 function initialize!(process::SpectralWhiteNoiseProcess, model::AbstractModel)
     σ = process.standard_deviation

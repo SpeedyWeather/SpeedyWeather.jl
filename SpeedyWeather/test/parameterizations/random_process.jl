@@ -62,3 +62,29 @@ end
         end
     end
 end
+
+@testset "Random process independent patterns" begin
+    # equal-area HEALPixGrid for unweighted standard deviation
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1, Grid = HEALPixGrid)
+    σ = 1 / 4
+    random_process = SpectralAR1Process(spectral_grid; seed = 123, n_patterns = 3, standard_deviation = σ)
+    model = BarotropicModel(spectral_grid; random_process)
+    simulation = initialize!(model)
+    spec = simulation.variables.prognostic.random_pattern
+    grid = simulation.variables.grid.random_pattern
+    @test size(spec, 2) == 3
+    @test size(grid, 2) == 3
+
+    for _ in 1:100
+        SpeedyWeather.random_process!(simulation.variables, random_process)
+    end
+    transform!(grid, spec, model.spectral_transform)
+
+    # every pattern is an AR1 process with the same standard deviation, independent of the others
+    c(a, b) = real(sum(a .* conj.(b))) / sqrt(sum(abs2, a) * sum(abs2, b))
+    for k in 1:3
+        @test std(grid.data[:, k]) ≈ σ rtol = 1.0e-1
+    end
+    @test abs(c(spec.data[:, 1], spec.data[:, 2])) < 0.2
+    @test abs(c(spec.data[:, 2], spec.data[:, 3])) < 0.2
+end
