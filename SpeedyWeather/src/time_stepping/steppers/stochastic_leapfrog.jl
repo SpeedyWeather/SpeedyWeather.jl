@@ -1,5 +1,67 @@
 export StochasticLeapfrog, AdditiveWienerNoise
 
+# IMPLEMENTATION NOTES (status 2026-11-12, work in progress, to be revised before the PR)
+#
+# Origin: ported from the FokkerPlanckSensitivities.jl project (SpectralWhiteNoiseProcess +
+# GridWhiteNoiseProcess under a CombinedNoiseProcess driving an additive forcing). Every design
+# choice below that looks arbitrary reproduces that code BITWISE; checked by the project's
+# speedy/checks/upstream_wiener_equivalence.jl (run with `julia +1.11 --project=speedy-upstream`),
+# which runs the project's original files next to this one (production T32 PrimitiveWet config,
+# continued run!, other seed, zero amplitudes vs Leapfrog, T8 barotropic, default RNG). Tests in
+# test/dynamics/stochastic_leapfrog.jl and test/parameterizations/{random_process,white_noise_process}.jl.
+#
+# Design
+# - `StochasticLeapfrog` is a type alias of `Leapfrog` with an `AbstractWienerNoise` in its `noise`
+#   field (no new stepper type). `random_process!(vars, time_stepping, model)` is the hook in both
+#   `time_step!` methods (no-op for other steppers); `update_random!` advances random processes.
+# - Amplitudes are a NamedTuple keyed by tendency name (any name the model time steps works,
+#   e.g. η, soil_temperature); unknown non-default names warn in `initialize!`.
+# - Variables are inferred from the model's tendencies. `tendency_names(vars)` & co. need the
+#   `Variables`, which do not exist when `variables(noise, model)` is called, hence
+#   `tendency_variables(model)` collects the same definitions from the model and its components
+#   (excluding the time stepper to avoid recursion); at runtime `wiener_tendencies!` loops over
+#   `tendency_names`, `ocean_tendency_names`, `land_tendency_names`.
+# - Atmosphere: one spectral pattern, one slot per layer of every variable, variables with layers
+#   first, then single-layer ones (tendency_names order is vor, div, temp, pres, humid, the project
+#   had pres last). Zero amplitudes keep their slots (realisation independent of other amplitudes).
+# - Grid or spectral: the noise goes where the dynamical core reads the tendency, i.e. the grid
+#   tendency for members of the fused `:grid_tendencies` (temperature, humidity, pressure, whose
+#   spectral tendencies the batched transform overwrites), the spectral tendency otherwise.
+# - Ocean/land: one grid-point pattern, slots ONLY for nonzero amplitudes (the project forced the
+#   SST only; extra slots would shift its random stream). Inconsistent with the atmosphere rule,
+#   revisit once bitwise reproduction is no longer required.
+# - The pattern is drawn at the end of a step and applied in the next (stored in the variables, so
+#   the first step of a new simulation is deterministic) because the project's random process was
+#   updated at the end of the step. Not needed otherwise: drawing and applying within the same step
+#   would make the pattern scratch memory.
+#
+# Placement in the time step (reviewed 2026-11-12). The noise is added before the dynamical core,
+# where the project's forcing was. In general the position matters in exactly two places, both
+# implicit parts of the time stepping that act on the whole tendency:
+# 1. implicit horizontal diffusion, tendency = (tendency + expl*x) * impl, damps the noise within
+#    the step (drift-implicit, stochastic theta method). Scalar leapfrog+RAW test of an OU process
+#    dx = -νx dt + a dW (project: speedy/checks/leapfrog_noise_placement.jl), stationary variance
+#    / exact a²/2ν, noise before vs after the implicit
+#    terms: 2Δtν = 0.1: 1.28 vs 1.54; 0.34 (T32's smallest scale, impl = 0.744): 1.39 vs 2.49;
+#    3: 0.75 vs 12.0. Added after (e.g. in update_prognostic!), the small-scale noise is no longer
+#    controlled by the diffusion.
+# 2. the semi-implicit gravity-wave correction (centering 0.5) divides the noise in fast gravity
+#    wave modes by (1 - iαω2Δt): energy input ×1/(1+(αω2Δt)²), ≈0.07 for external waves at T32's
+#    smallest scales (estimate). Added after, the noise fully excites modes the scheme slows down.
+# Not affected: radius scaling, grid vs spectral (band-limited pattern), leapfrog and RAW filter
+# (the noise is in the tendency either way). Wiener scaling: a/√Δt in the tendency gives the
+# nominal diffusion a²σ²/2 for leapfrog+RAW (scalar test: 1.00; a/√(2Δt) would give 0.50).
+# NEXT (not done, changes results, not bitwise): add the noise right before the implicit terms
+# instead, by dispatching `diffusion_and_implicit!(vars, ::StochasticLeapfrog, implicit, model)`
+# (already the per-stepper hook for the order). Same scheme as now, but all atmospheric noise in
+# spectral space (tendencies are already radius-scaled there: amplitudes ×R, vor/div ×R²): no grid
+# pattern, no transform per step, no grid/spectral rule, no hook in `time_step!`. Mind the method
+# ambiguity with `diffusion_and_implicit!(vars, ::AbstractTimeStepper, ::Nothing, model)`.
+#
+# Open: `wiener_tendencies!` loops over runtime Symbols (type-unstable: ~21 KB, ~80 μs per step at
+# T32 L8 on CPU, ~1% of a step), an @generated driver like `update_prognostic_atmosphere!` would
+# fix it; GPU untested; full test suite not run; CHANGELOG to mention random_process! -> update_random!.
+
 """Supertype of the noise components of stochastic time steppers, see `StochasticLeapfrog`."""
 abstract type AbstractWienerNoise <: AbstractModelComponent end
 

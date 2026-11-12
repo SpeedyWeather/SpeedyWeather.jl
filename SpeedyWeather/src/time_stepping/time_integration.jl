@@ -65,6 +65,9 @@ Add the stochastic (Wiener) increment of a stochastic time stepper to the tenden
 after the parameterizations and before the dynamical core, i.e. where a forcing would add to
 the tendencies. Deterministic time steppers do nothing, see `StochasticLeapfrog`."""
 random_process!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
+# NOTE (2026-11-12): placed where the FokkerPlanckSensitivities.jl project added its noise (bitwise
+# reproduction). Planned: move into a `diffusion_and_implicit!` method of `StochasticLeapfrog` and
+# remove this hook, see the implementation notes in time_stepping/steppers/stochastic_leapfrog.jl
 
 # dispatch over time stepper here so that other time stepper can change the order
 diffusion_and_implicit!(vars, model) =
