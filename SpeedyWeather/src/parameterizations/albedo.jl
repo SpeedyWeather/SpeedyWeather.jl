@@ -872,10 +872,38 @@ end
     return nothing
 end
 
-abstract type AbstractOceanAlbedo end
+# JinOceanAlbedo is composed of components with three different roles: surface reflection,
+# ocean volume scattering and whitecaps (foam). Each role has its own abstract type (none of
+# them are albedos themselves, i.e. they cannot be used as `ocean` in `OceanLandAlbedo`)
+# so that the components of `JinOceanAlbedo` can be constrained to their role.
 
-@parameterized @kwdef struct OceanDirectReflection{NF} <: AbstractOceanAlbedo
+"""Surface reflection of the ocean, a component of `JinOceanAlbedo` (not an albedo itself).
+Subtypes `R <: AbstractOceanReflection` are callable as `R(p)` with `p` a NamedTuple of the
+cosine of the solar zenith angle `μ`, the surface roughness `σ` and the refractive indices
+`n`, `n₀` and return the surface reflection albedo [1]."""
+abstract type AbstractOceanReflection end
 
+"""Volume scattering of the ocean (light scattered back from below the surface), a component of
+`JinOceanAlbedo` (not an albedo itself). Subtypes `V <: AbstractOceanVolumeAlbedo` are callable as
+`V(p, μ)` with `p` a NamedTuple of the surface roughness `σ` and the surface reflection albedo `αₛ`,
+and `μ` the cosine of the (effective) incidence angle, and return the volume albedo [1]."""
+abstract type AbstractOceanVolumeAlbedo end
+
+"""Whitecap (foam) correction of the ocean albedo, a component of `JinOceanAlbedo` (not an albedo
+itself). Subtypes `F <: AbstractFoam` are callable as `F(α, w)` and return the albedo `α` [1]
+corrected for whitecaps at wind speed `w` [m/s]."""
+abstract type AbstractFoam end
+
+# components of JinOceanAlbedo need no initialization unless a method is defined for them
+initialize!(::AbstractOceanReflection, ::PrimitiveEquation) = nothing
+initialize!(::AbstractOceanVolumeAlbedo, ::PrimitiveEquation) = nothing
+initialize!(::AbstractFoam, ::PrimitiveEquation) = nothing
+
+"""Direct-beam surface reflection of the ocean following Jin et al. (2011), eq. (1): the
+Fresnel reflectance of the air-water interface with a correction for the roughness of the
+wind-driven surface, a regression in the cosine of the solar zenith angle μ and the surface
+roughness σ. Component of `JinOceanAlbedo`. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct OceanDirectReflection{NF} <: AbstractOceanReflection
     "Regression coefficient from Jin et al."
     @param c0::NF = 0.0152
 
@@ -913,9 +941,7 @@ end
 Adapt.@adapt_structure OceanDirectReflection
 OceanDirectReflection(SG::SpectralGrid; kwargs...) = OceanDirectReflection{SG.NF}(; kwargs...)
 
-"""
-    fresnel_reflectance(n, μ)
-
+"""$(TYPEDSIGNATURES)
 Unpolarized Fresnel reflectance of a flat air–water interface for light incident from air
 with cosine of incidence angle `μ` onto a medium of relative refractive index `n > 1`.
 Average of the perpendicular (s) and parallel (p) polarized reflectances. Returns
@@ -927,15 +953,17 @@ Average of the perpendicular (s) and parallel (p) polarized reflectances. Return
     return (r_s^2 + r_p^2) / 2
 end
 
+"""$(TYPEDSIGNATURES)
+Direct-beam surface reflection albedo [1] following Jin et al. (2011), eq. (1),
+`r(n, μ) - r(n, μ)/r(n₀, μ) * f(μ, σ)` with `r` the Fresnel reflectance and `f(μ, σ)`
+the regression that corrects for the roughness of a windy, wavy surface. The cosine of the
+solar zenith angle `μ`, the surface roughness `σ` and the refractive indices `n`, `n₀`
+are taken from the NamedTuple `p`."""
 @inline function (c::OceanDirectReflection)(p)
     (; μ, σ, n, n₀) = p
     (; c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10) = c
 
-    # Formulation following Jin et al. 2011
-    # Albedo is simply the Fresnel reflectance when the surface roughness σ == 0
-    # and updates when windy/wavey with function f(μ, σ)
-
-    # Calculate surface roughness dependent (μ, σ)
+    # Roughness correction f(μ, σ)
     term1 = c0 + c1 * μ + c2 * μ^2 + c3 * μ^3 + c4 * σ + c5 * μ * σ
     term2 = exp(c6 + c7 * μ + c8 * μ^2 + c9 * σ + c10 * μ * σ)
     f = term1 * term2
@@ -949,7 +977,12 @@ end
     return albedo_direct_reflection
 end
 
-@parameterized @kwdef struct OceanDiffuseReflection{NF} <: AbstractOceanAlbedo
+"""Diffuse surface reflection of the ocean following Jin et al. (2011), eq. (5b), a linear
+regression in the refractive index n and the surface roughness σ. This is the parameterization
+for diffuse radiation under clouds rather than for isotropic diffuse radiation, as SpeedyWeather
+splits the shortwave radiation into direct and diffuse by cloud cover.
+Component of `JinOceanAlbedo`. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct OceanDiffuseReflection{NF} <: AbstractOceanReflection
     "Regression coefficient from Jin et al."
     @param c0::NF = -0.1479
 
@@ -958,35 +991,50 @@ end
 
     "Regression coefficient from Jin et al."
     @param c2::NF = -0.0176
-
 end
 
 Adapt.@adapt_structure OceanDiffuseReflection
 OceanDiffuseReflection(SG::SpectralGrid; kwargs...) = OceanDiffuseReflection{SG.NF}(; kwargs...)
 
+"""$(TYPEDSIGNATURES)
+Diffuse surface reflection albedo [1] following Jin et al. (2011), eq. (5b), from the
+refractive index `n` and the surface roughness `σ` in the NamedTuple `p`."""
 @inline function (c::OceanDiffuseReflection)(p)
     (; σ, n) = p
     (; c0, c1, c2) = c
-
-    # Formulation following Jin et al. 2011
-    # Using the cloudy diffuse albedo parameterisation instead of isotropic diffuse
-    # since we define direct/diffuse from cloud cover fraction in SpeedyWeather
-    albedo_diffuse_reflection = c0 + c1 * n + c2 * n * σ
-
-    return albedo_diffuse_reflection
+    return c0 + c1 * n + c2 * n * σ
 end
 
-@parameterized @kwdef struct ConstantOceanVolumeAlbedo{NF} <: AbstractOceanAlbedo
-    "Broadband volume-scattering albedo for case 1 waters, Jin et al. eq. (15)"
+export ConstantOceanVolumeAlbedo
+
+"""Constant broadband volume-scattering albedo of the ocean for case 1 waters, Jin et al. (2011),
+eq. (15), independent of the incidence angle. For shortwave schemes without spectral bands.
+Component of `JinOceanAlbedo`. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct ConstantOceanVolumeAlbedo{NF} <: AbstractOceanVolumeAlbedo
+    "[OPTION] Broadband volume-scattering albedo for case 1 waters, Jin et al. eq. (15) [1]"
     @param albedo::NF = 0.006 (bounds = 0 .. 1,)
 end
-
-@inline (c::ConstantOceanVolumeAlbedo)(p, μ) = c.albedo
 
 Adapt.@adapt_structure ConstantOceanVolumeAlbedo
 ConstantOceanVolumeAlbedo(SG::SpectralGrid; kwargs...) = ConstantOceanVolumeAlbedo{SG.NF}(; kwargs...)
 
-@parameterized @kwdef struct SpectralOceanVolumeAlbedo{NF, VectorType} <: AbstractOceanAlbedo
+"""$(TYPEDSIGNATURES) Constant volume-scattering albedo [1], independent of `p` and `μ`."""
+@inline (c::ConstantOceanVolumeAlbedo)(p, μ) = c.albedo
+
+"""Spectral volume-scattering albedo of the ocean following Jin et al. (2011), eqs. (6)–(9),
+with the backscattering and absorption of case 1 waters from Morel & Maritorena (2001)
+depending on the chlorophyll concentration, evaluated at the centre `wavelengths` [nm]
+of the shortwave bands.
+
+!!! warning "Future work, not yet usable"
+    This requires a spectral shortwave radiation scheme that computes a surface albedo per band
+    and passes the band index as `band` in the NamedTuple `p` when calling `V(p, μ)`. No shortwave
+    scheme in SpeedyWeather does this yet, so `JinOceanAlbedo` throws an `ArgumentError` when
+    constructed or initialized with a `SpectralOceanVolumeAlbedo`.
+    Use `ConstantOceanVolumeAlbedo` instead.
+
+Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct SpectralOceanVolumeAlbedo{NF, VectorType} <: AbstractOceanVolumeAlbedo
     "[OPTION] Chlorophyll concentration [mg/m³], clamped to ≥ 0.02 (M&M eq. 14 lower limit)"
     @param chl::NF = 0.1 (bounds = Positive,)
 
@@ -1068,14 +1116,12 @@ end
 
 Adapt.@adapt_structure SpectralOceanVolumeAlbedo
 function SpectralOceanVolumeAlbedo(SG::SpectralGrid; wavelengths = [450, 550, 650], kwargs...)
-    (; NF, architecture) = SG
+    (; NF, VectorType, architecture) = SG
     nbands = length(wavelengths)
-    on_arch(x) = on_architecture(architecture, x)
-    λs = on_arch(NF.(wavelengths))
-    return SpectralOceanVolumeAlbedo{NF, typeof(λs)}(;
-        wavelengths = λs,
-        R₀_intercept = on_arch(zeros(NF, nbands)),
-        R₀_slope = on_arch(zeros(NF, nbands)),
+    return SpectralOceanVolumeAlbedo{NF, VectorType}(;
+        wavelengths = on_architecture(architecture, NF.(wavelengths)),
+        R₀_intercept = on_architecture(architecture, zeros(NF, nbands)),
+        R₀_slope = on_architecture(architecture, zeros(NF, nbands)),
         kwargs...,
     )
 end
@@ -1157,6 +1203,7 @@ function R₀_coefficients(c::SpectralOceanVolumeAlbedo, λ, chl)
     return A, B
 end
 
+"""$(TYPEDSIGNATURES) Precompute the coefficients of R₀ = A + Bμ for every band."""
 function initialize!(scheme::SpectralOceanVolumeAlbedo, model::PrimitiveEquation)
     λs = Array(scheme.wavelengths)              # compute on CPU
     A = similar(λs)
@@ -1169,6 +1216,9 @@ function initialize!(scheme::SpectralOceanVolumeAlbedo, model::PrimitiveEquation
     return nothing
 end
 
+"""$(TYPEDSIGNATURES) Volume-scattering albedo [1] of band `p.band`, Jin et al. (2011), eq. (6).
+In contrast to other `AbstractOceanVolumeAlbedo`s this needs the band index `band` in `p`, see
+`SpectralOceanVolumeAlbedo` (future work)."""
 @inline function (c::SpectralOceanVolumeAlbedo)(p, μ)
     (; σ, αₛ, band) = p
     (; r0, r1, r2) = c
@@ -1182,8 +1232,8 @@ export WhitecapFoam, NoFoam
 
 """Whitecap (foam) correction following Koepke (1984) as used by Jin et al. (2011) eqs. (16)–(17):
 constant foam albedo and fractional whitecap coverage f = a * w^b from wind speed w [m/s].
-Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct WhitecapFoam{NF} <: AbstractOceanAlbedo
+Component of `JinOceanAlbedo`. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct WhitecapFoam{NF} <: AbstractFoam
     "[OPTION] Albedo of whitecaps/foam [1], Koepke (1984)"
     @param albedo_foam::NF = 0.55 (bounds = 0 .. 1,)
 
@@ -1197,20 +1247,20 @@ end
 Adapt.@adapt_structure WhitecapFoam
 WhitecapFoam(SG::SpectralGrid; kwargs...) = WhitecapFoam{SG.NF}(; kwargs...)
 
+"""$(TYPEDSIGNATURES) Fractional whitecap coverage in [0, 1] at wind speed `w` [m/s], Jin et al. (2011), eq. (16)."""
 @inline function whitecap_coverage(foam::WhitecapFoam, w)
     (; coverage_coefficient, coverage_exponent) = foam
-    # Fractional whitecap coverage in [0, 1] at wind speed `w` [m/s], Jin et al. eq. (16).
     return min(coverage_coefficient * w^coverage_exponent, one(w))
 end
 
+"""$(TYPEDSIGNATURES) Albedo `α` corrected for whitecaps at wind speed `w` [m/s], Jin et al. (2011), eq. (17)."""
 @inline function (foam::WhitecapFoam)(α, w)
-    # Albedo `α` corrected for whitecaps at wind speed `w` [m/s], Jin et al. eq. (17).
     f = whitecap_coverage(foam, w)
     return f * foam.albedo_foam + (1 - f) * α
 end
 
 # Correct both albedos together so WhitecapFoam computes coverage only once.
-@inline foam_albedos(foam, black_sky, white_sky, w) = (foam(black_sky, w), foam(white_sky, w))
+@inline foam_albedos(foam::AbstractFoam, black_sky, white_sky, w) = (foam(black_sky, w), foam(white_sky, w))
 
 @inline function foam_albedos(foam::WhitecapFoam, black_sky, white_sky, w)
     f = whitecap_coverage(foam, w)
@@ -1219,15 +1269,25 @@ end
     return black_sky, white_sky
 end
 
-"""No whitecap correction."""
-struct NoFoam <: AbstractOceanAlbedo end
+"""No whitecap correction, component of `JinOceanAlbedo`."""
+struct NoFoam <: AbstractFoam end
 Adapt.@adapt_structure NoFoam
 NoFoam(SG::SpectralGrid) = NoFoam()
+
+"""$(TYPEDSIGNATURES) Albedo `α` unchanged, no whitecap correction."""
 @inline (::NoFoam)(α, w) = α
 
-export JinOceanAlbedo, ConstantOceanVolumeAlbedo
+export JinOceanAlbedo
 
-@parameterized @kwdef struct JinOceanAlbedo{NF, V, F} <: AbstractAlbedo
+"""Ocean albedo following Jin et al. (2011, Optics Express 19(27), 26429), depending on the
+solar zenith angle and the surface wind speed. The direct (black-sky) and diffuse (white-sky)
+albedos are computed from the surface (Fresnel) reflection of the air-water interface,
+roughened by wind, plus the volume scattering of the ocean below, with a correction for
+whitecaps (foam) at high wind speeds. The shortwave radiation scheme blends both with the
+fraction of direct radiation. Sea ice is blended in linearly with its concentration
+as in `OceanSeaIceAlbedo`. To be used as `ocean` albedo in `OceanLandAlbedo` (the default).
+Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct JinOceanAlbedo{NF, V <: AbstractOceanVolumeAlbedo, F <: AbstractFoam} <: AbstractAlbedo
     "Ratio of air-water refractive indices"
     @param n::NF = 1.34
 
@@ -1237,15 +1297,19 @@ export JinOceanAlbedo, ConstantOceanVolumeAlbedo
     "Effective cosine for diffuse incidence, Jin et al. eq. (10)"
     @param μₑ::NF = 0.676
 
-    "[OPTION] Albedo over sea ice at concentration=1 [1]"
+    "[OPTION] Albedo over sea ice at concentration=1 [1], same default as in `OceanSeaIceAlbedo`"
     @param albedo_ice::NF = 0.6 (bounds = 0 .. 1,)
 
+    "Direct-beam surface reflection"
     @component ocean_direct_reflection::OceanDirectReflection{NF} = OceanDirectReflection{NF}()
 
+    "Diffuse surface reflection"
     @component ocean_diffuse_reflection::OceanDiffuseReflection{NF} = OceanDiffuseReflection{NF}()
 
+    "[OPTION] Ocean volume scattering, `ConstantOceanVolumeAlbedo` (`SpectralOceanVolumeAlbedo` is future work)"
     @component ocean_volume::V = ConstantOceanVolumeAlbedo{NF}()
 
+    "[OPTION] Whitecap (foam) correction, `WhitecapFoam` or `NoFoam`"
     @component foam::F = WhitecapFoam{NF}()
 end
 
@@ -1256,11 +1320,21 @@ function JinOceanAlbedo(
         foam = WhitecapFoam(SG),
         kwargs...
     )
-    ocean_volume isa SpectralOceanVolumeAlbedo &&
-        throw(ArgumentError("SpectralOceanVolumeAlbedo requires a spectral shortwave scheme"))
-    return JinOceanAlbedo{SG.NF, typeof(ocean_volume), typeof(foam)}(; ocean_volume, foam, kwargs...)
+    # construct first so that the type constraints on ocean_volume and foam are checked first
+    albedo = JinOceanAlbedo{SG.NF, typeof(ocean_volume), typeof(foam)}(; ocean_volume, foam, kwargs...)
+    check_ocean_volume_supported(albedo.ocean_volume)
+    return albedo
 end
 
+# SpectralOceanVolumeAlbedo is future work: no shortwave scheme computes a surface albedo
+# per band yet. Checked in the constructor and in initialize! to also catch the @kwdef constructor
+check_ocean_volume_supported(::AbstractOceanVolumeAlbedo) = nothing
+check_ocean_volume_supported(::SpectralOceanVolumeAlbedo) = throw(
+    ArgumentError(
+        "SpectralOceanVolumeAlbedo is future work and cannot be used yet: it requires a spectral " *
+            "shortwave radiation scheme with a surface albedo per band. Use ConstantOceanVolumeAlbedo instead."
+    )
+)
 
 function variables(::JinOceanAlbedo)
     return (
@@ -1270,11 +1344,13 @@ function variables(::JinOceanAlbedo)
 end
 
 function initialize!(albedo::JinOceanAlbedo, model::PrimitiveEquation)
+    check_ocean_volume_supported(albedo.ocean_volume)
+    initialize!(albedo.ocean_direct_reflection, model)
+    initialize!(albedo.ocean_diffuse_reflection, model)
     initialize!(albedo.ocean_volume, model)
+    initialize!(albedo.foam, model)
     return nothing
 end
-
-initialize!(::ConstantOceanVolumeAlbedo, ::PrimitiveEquation) = nothing
 
 @propagate_inbounds function albedo!(ij, albedo, vars, scheme::JinOceanAlbedo, model)
     (; ocean) = vars.parameterizations
@@ -1321,7 +1397,6 @@ initialize!(::ConstantOceanVolumeAlbedo, ::PrimitiveEquation) = nothing
 
     return nothing
 end
-
 
 """$(TYPEDSIGNATURES)
 Blend direct (black-sky) and diffuse (white-sky) albedo into the broadband `albedo` of
