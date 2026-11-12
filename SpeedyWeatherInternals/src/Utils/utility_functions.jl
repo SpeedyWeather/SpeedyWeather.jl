@@ -11,7 +11,7 @@ function isdecreasing(v::AbstractVector)
 end
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Prints to `io` all fields of a struct `A` identified by their
 `keys`."""
 function print_fields(io::IO, A, keys; arrays::Bool = false, values::Bool = true)

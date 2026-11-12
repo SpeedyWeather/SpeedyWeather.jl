@@ -3,7 +3,7 @@ module SpeedyTransformsReactantExt
 using Reactant
 using Reactant: Ops, TracedUtils
 import AbstractFFTs
-using DocStringExtensions
+using SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids

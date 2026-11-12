@@ -445,7 +445,7 @@ _copy_entry!(dest::FusedParent, src::FusedParent) = _copy_entry!(dest.parent, sr
 _canonical_fuse_member(name::Symbol) =
     name === :u_tendency ? :u : name === :v_tendency ? :v : name
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Assert that two fuse parents `a` and `b` declare members in matching order — i.e. they
 agree both on which member names exist and on each member's layer-axis slot range. This
 is what lets a mega-batched `transform!` map slot k of one parent to slot k of the other
@@ -625,7 +625,7 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
     return nothing
 end
 
-"""$(TypedMethodSignatures(defaults = true)) Allocates all variables within a group given a tuple of variables
+"""$(TYPEDSIGNATURES) Allocates all variables within a group given a tuple of variables
 expected to be `<: AbstractVariable` definitions. Determines the namespaces,
 allocates the arrays with zeros and collects them into NamedTuples. Members of a
 fuse group are returned as views of a shared parent (allocated via `build_fuse_parents`),
@@ -726,7 +726,7 @@ function filter_variables(vars, VariableType)
     return group
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Helper function to warn when a variable is not defined in the Variables. Reports on
 group (prognostic etc.) and namespace therein (e.g. ocean, land, etc.) and lists the defined variables in that group and namespace.
 Returns true to allow for short-circuiting with `&& return nothing` to exit a function early."""
