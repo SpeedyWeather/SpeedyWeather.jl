@@ -374,6 +374,15 @@ model over the same resolutions in a SPEEDY.f90-like configuration (prescribed s
 constant surface roughness, wind slowdown and gusts), on every architecture including Reactant. Truncations in the benchmarks are 1-based (T32, …, T256), as in
 the model code.
 
+For a quick check whether performance regressed, `manual_benchmarking.jl --debug` runs only a
+short PrimitiveWet resolution sweep with the default transform (T32–T128 with 8 layers, T32 and
+T128 with 16 layers) and does not touch the stored results.
+`julia SpeedyWeather/benchmark/regression/regression.jl check` runs it on main, the latest
+release and the latest benchmarked revision and compares them (also run weekly by
+`.github/workflows/benchmark_regression.yml`; the `benchmark-regression` skill builds on it).
+Labelling a PR `benchmark-performance` runs it on the PR merged into main vs main on every push
+(`.github/workflows/benchmark_pr.yml`), and `benchmark_pr_comment.yml` posts the report on the PR.
+
 ## Code Style
 
 * The project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for formatting.
@@ -414,7 +423,10 @@ that submodule must be bumped according to its size:
 
 Bump the version of every submodule whose source you actually touched in the PR.
 A change confined to `SpeedyWeather/` does not require bumping
-`LowerTriangularArrays`, etc.
+`LowerTriangularArrays`, etc. 
+
+When `SpeedyWeather` depends on a new functionality of one of its submodule, also
+bump the compatibility entry accordingly. 
 
 ## Implementation plans
 

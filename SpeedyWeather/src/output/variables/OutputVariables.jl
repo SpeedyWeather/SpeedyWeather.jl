@@ -8,7 +8,8 @@ variables are returned as tuples, e.g. `OutputVariables.Dynamics()`, `OutputVari
 or all of them with `OutputVariables.All()`."""
 module OutputVariables
 
-using DocStringExtensions
+using DocStringExtensions: TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 import GPUArrays
 import Dates: Hour
 import KernelAbstractions: @kernel, @index
@@ -19,7 +20,7 @@ import SpeedyWeatherInternals.KernelLaunching: launch!, LinearWorkOrder
 import ..SpeedyWeather: AbstractOutput, AbstractOutputVariable, AbstractSimulation,
     AbstractVerticalExtrapolation, DryAdiabaticExtrapolation, NetCDFOutput,
     define_variable!, field_view, finalize!, get_prognostic_step,
-    interpolate_output!, on_output_architecture, output!, pressure, ConstantExtrapolation,
+    interpolate_output!, on_output_architecture, output!, pressure, pressure_thickness, ConstantExtrapolation,
     virtual_temperature, write_output!
 
 # defaults for output variables that don't define these fields themselves

@@ -142,7 +142,7 @@ function humidity_tendency!(
 end
 
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 
 #TODO: OLD VERSION / SEQUENTIAL VERSION: MIGHT BE DELETED
 
@@ -176,7 +176,7 @@ end
 
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 
 SEQUENTIAL VERSION
 

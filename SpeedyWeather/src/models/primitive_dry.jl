@@ -131,7 +131,7 @@ end
 
 variables(model::PrimitiveDry) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
-"""$(TypedMethodSignatures(defaults = true)) All variables needed for the primitive dry model itself (components excluded)."""
+"""$(TYPEDSIGNATURES) All variables needed for the primitive dry model itself (components excluded)."""
 function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
     pg = nsteps.prognostic_grid
     ps = nsteps.prognostic_spectral
@@ -186,7 +186,7 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
 end
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!` 

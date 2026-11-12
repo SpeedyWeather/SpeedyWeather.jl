@@ -100,7 +100,7 @@ end
 
 Adapt.@adapt_structure Geometry
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
 function Geometry(SG::SpectralGrid; vertical_coordinates = FriersonSigmaCoordinates(SG))
 
