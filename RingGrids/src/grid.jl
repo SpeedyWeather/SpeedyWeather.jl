@@ -9,12 +9,12 @@ function Base.show(io::IO, grid::AbstractGrid)
     nlat = get_nlat(grid)
     npoints = get_npoints(grid)
     full_or_reduced = isfull(grid) ? "full" : "reduced"
-    res = sqrt(4π / npoints) * 360 / 2π
+    res = average_resolution(grid)
     digits = round(Int, log10(1 / res)) + 2
-    average_resolution = Printf.@sprintf("%.*f˚", digits, res)
+    resolution_string = Printf.@sprintf("%.*f˚", digits, res)
 
     println(io, styled"$nlat-ring {warning:$Grid_}\{...\}")
-    println(io, styled"├ {info:nlat_half} = $nlat_half {note:($npoints points, ~$average_resolution, $full_or_reduced)}")
+    println(io, styled"├ {info:nlat_half} = $nlat_half {note:($npoints points, ~$resolution_string, $full_or_reduced)}")
     print(io, styled"└ {info:architecture} = $(grid.architecture)")
     return nothing
 end
@@ -45,13 +45,19 @@ get_nlat(grid::AbstractGrid) = get_nlat(typeof(grid), grid.nlat_half)
 Equivalent to length of the underlying data array."""
 get_npoints(grid::Grid, args...) where {Grid <: AbstractGrid} = get_npoints(Grid, grid.nlat_half, args...)
 get_npoints(G::Type{<:AbstractGrid}, nlat_half::Integer, k::Integer...) = prod(k) * get_npoints(G, nlat_half)
+
+"""$(TYPEDSIGNATURES) Average resolution of `grid` in degrees: the side length of a square with the
+average area of a grid cell, so that `npoints` such squares cover the sphere, 360˚/√(π npoints)."""
+average_resolution(grid::AbstractGrid) = average_resolution(typeof(grid), grid.nlat_half)
+average_resolution(G::Type{<:AbstractGrid}, nlat_half::Integer) = 360 / sqrt(π * get_npoints(G, nlat_half))
+
 get_quadrature_weights(grid::AbstractGrid) = get_quadrature_weights(typeof(grid), grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Size of the matrix of the horizontal grid if representable as such (not all grids)."""
 matrix_size(grid::Grid) where {Grid <: AbstractGrid} = matrix_size(Grid, get_nlat_half(grid))
 
 # CONSTRUCTORS
-"""$(TypedMethodSignatures(defaults = true)) Create a new `grid` of type `Grid` with resolution parameter `nlat_half`.
+"""$(TYPEDSIGNATURES) Create a new `grid` of type `Grid` with resolution parameter `nlat_half`.
 `architecture` is the device type (CPU/GPU). Precomputes the ring indices `rings`."""
 function (::Type{Grid})(nlat_half::Integer, architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE()) where {Grid <: AbstractGrid}
     Grid_ = nonparametric_type(Grid)                # strip away parameters of type, obtain from arguments
@@ -142,7 +148,7 @@ get_nlons(grid::AbstractGrid) = get_nlons(typeof(grid), grid.nlat_half)
 get_lat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = get_latd(Grid, nlat_half) * (π / 180)
 get_colat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = π / 2 .- get_lat(Grid, nlat_half)
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
 Provide grid `Grid` and its resolution parameter `nlat_half`. For keyword argument
 `both_hemispheres=false` only the northern hemisphere (incl Equator) is returned."""

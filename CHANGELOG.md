@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.24.1
+
+- Allow DocStringExtensions v0.9 again (compat "0.9, 0.10"), default values in signatures are only shown with v0.10 via a version-dependent `SpeedyWeatherInternals.Utils.TYPEDSIGNATURES`, DocStringExtensions names are imported explicitly [#1398](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1398)
+- `OutputVariables.PrecipitableWater` output, column-integrated on the model grid before interpolation [#1370](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1370)
+- Benchmark regression check: debug mode of the benchmark suite, `regression.jl` comparing a revision with main, the latest release and the latest benchmarked revision (bisecting a regression), run weekly and on PRs labelled `benchmark-performance`, plus a Claude skill [#1299](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1299)
+
+## 0.24.0
+
+- Release SpeedyWeatherInternals 1.0.2 with DocStringExtensions v0.10 compat, fixing unsatisfiable requirements of the v0.24.0 release [#1395](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1395)
+- Benchmarks: completely revised with more options and opt-in experiments for publication [#1337](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1337)
 - Require DocStringExtensions v0.10 and show default argument values in docstrings of methods with default (keyword) arguments via `$(TypedMethodSignatures(defaults = true))` [#1310](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1310)
 - Fixes an issue with the `show` of `Simulation` failing in documentation builds [#1392](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1392)
 - Geopotential computed once in grid space and used by both dynamical core (via the Bernoulli potential) and parameterizations, spectral geopotential removed; Leapfrog keeps the previous grid step during the first two steps, consistent with the spectral one [#1381](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1381)

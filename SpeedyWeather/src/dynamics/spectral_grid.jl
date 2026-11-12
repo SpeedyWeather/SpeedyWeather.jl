@@ -142,10 +142,10 @@ function Base.show(io::IO, SG::SpectralGrid)
 
     # resolution information
     radius = DEFAULT_RADIUS
-    average_resolution = sqrt(4π * radius^2 / npoints) / 1000  # in [km]
+    average_degrees = average_resolution(grid)                  # in [˚]
+    average_km = deg2rad(average_degrees) * radius / 1000       # in [km]
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
     radius_str = @sprintf("%.0f", radius / 1000)
-    average_degrees = 360 / sqrt(npoints * π)
 
     # number of spherical harmonics
     nharmonics = LowerTriangularArrays.nonzeros(SG.spectrum)
@@ -155,7 +155,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, styled"├ {info:Number format}: $NF")
     println(io, styled"├ {info:Spectral}:      T$truncation LowerTriangularMatrix, $nharmonics harmonics")
     println(io, styled"├ {info:Grid}:          $nlat-ring $Grid, $npoints grid points")
-    println(io, styled"├ {info:Resolution}:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
+    println(io, styled"├ {info:Resolution}:    $(s(average_degrees))°, $(s(average_km))km (at $(radius_str)km radius)")
     println(io, styled"├ {info:Vertical}:      $nlayers-layer atmosphere")
     print(io, styled"└ {info:Architecture}:  $architecture using $ArrayType")
     return nothing
@@ -163,7 +163,7 @@ end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
 # and calculates all derived fields
-"""$(TypedMethodSignatures(defaults = true)) 
+"""$(TYPEDSIGNATURES) 
 Initialize a SpectralGrid from a given truncation and all [OPTION] parameters of SpectralGrid."""
 function SpectralGrid(;
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
@@ -201,7 +201,7 @@ function SpectralGrid(;
 end
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Initialize a SpectralGrid from a given grid.
 """
 function SpectralGrid(
@@ -318,7 +318,7 @@ end
 # also allow spectral grid to be passed on as first and only positional argument to model constructors
 (M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(; spectral_grid = SG, kwargs...)
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct.
 `transform_batch` is forwarded as the list of FFT batch sizes K to pre-plan."""
 function (::Type{S})(
