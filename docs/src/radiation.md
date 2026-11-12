@@ -220,8 +220,8 @@ as
 ```
 
 For details see [Frierson2006](@citet). The default constants differ from Frierson's
-(``\tau_{0e} = 6``, ``\tau_{0p} = 1.5``, ``f_l = 0.1``) to avoid a too cold planet with the
-current shortwave radiation. They will be re-chosen once the shortwave radiation changes.
+(``\tau_{0e} = 6``, ``\tau_{0p} = 1.5``, ``f_l = 0.1``): ``\tau_0`` is 1.4x larger and ``f_l = 0.25``
+to avoid a too cold planet with the `TwoBandShortwave` radiation.
 
 Use the Frierson transmissivity, which prescribes the optical depth independent of humidity and CO₂, with
 
@@ -248,8 +248,8 @@ responds to both the model's humidity (a water vapor feedback) and CO₂. The pa
 ByrneOGormanLongwaveTransmissivity(spectral_grid)
 ```
 
-The dry absorption ``a = 1.8`` is larger than Byrne and O'Gorman's 0.8678 to avoid a too cold planet with
-the current shortwave radiation. It will be re-chosen once the shortwave radiation changes.
+The dry absorption ``a = 1.3`` is larger than Byrne and O'Gorman's 0.8678 to avoid a too cold planet with
+the `TwoBandShortwave` radiation.
 
 ## [Solar zenith angle, length of day and year](@id zenith)
 

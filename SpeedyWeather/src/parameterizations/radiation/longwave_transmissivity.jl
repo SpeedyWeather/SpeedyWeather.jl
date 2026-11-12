@@ -27,14 +27,13 @@ end
 
 export FriersonLongwaveTransmissivity
 @parameterized @kwdef struct FriersonLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
-    # TODO re-choose once the shortwave changes of #1262 land: Frierson uses τ₀ = 6, 1.5 and fₗ = 0.1 but with
-    # too much reflected shortwave on main that yields a too cold planet (~273K lowest layer at T31L8), 1.6x
-    # larger τ₀ and fₗ = 0.25 yield ~288K, compensating a shortwave bias
+    # Frierson uses τ₀ = 6, 1.5 and fₗ = 0.1, which yields a too cold planet (~276K lowest layer at T31L8)
+    # with TwoBandShortwave, 1.4x larger τ₀ and fₗ = 0.25 yield ~287K (~288K at the surface)
     "[OPTION] Optical depth at the equator"
-    @param τ₀_equator::NF = 9.6 (bounds = Nonnegative,)
+    @param τ₀_equator::NF = 8.4 (bounds = Nonnegative,)
 
     "[OPTION] Optical depth at the poles"
-    @param τ₀_pole::NF = 2.4 (bounds = Nonnegative,)
+    @param τ₀_pole::NF = 2.1 (bounds = Nonnegative,)
 
     "[OPTION] Fraction to mix linear and quadratic profile"
     @param fₗ::NF = 0.25 (bounds = 0 .. 1,)
@@ -90,10 +89,10 @@ CO₂ [ppm] is read from `model.greenhouse_gases.co2` if present, otherwise `CO�
 In contrast to the `FriersonLongwaveTransmissivity` there is no prescribed latitude-vertical profile,
 the optical depth follows the model's humidity, introducing a water vapor feedback. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct ByrneOGormanLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
-    # TODO re-choose once the shortwave changes of #1262 land: Byrne and O'Gorman use 0.8678 but that
-    # yields a too cold planet (~272K) on main with too much reflected shortwave, 1.8 yields ~288K at T31L8
+    # Byrne and O'Gorman use 0.8678, which yields a too cold planet (~280K lowest layer at T31L8)
+    # with TwoBandShortwave, 1.3 yields ~286K (~288K at the surface)
     "[OPTION] Optical depth of the dry atmosphere (well-mixed greenhouse gases) per p₀ at `reference_co2` [1]"
-    @param dry_absorption::NF = 1.8 (bounds = Nonnegative,)
+    @param dry_absorption::NF = 1.3 (bounds = Nonnegative,)
 
     "[OPTION] Optical depth from water vapor per p₀ and per specific humidity [1/(kg/kg)]"
     @param water_vapor_absorption::NF = 1997.9 (bounds = Nonnegative,)
