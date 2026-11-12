@@ -423,7 +423,10 @@ that submodule must be bumped according to its size:
 
 Bump the version of every submodule whose source you actually touched in the PR.
 A change confined to `SpeedyWeather/` does not require bumping
-`LowerTriangularArrays`, etc.
+`LowerTriangularArrays`, etc. 
+
+When `SpeedyWeather` depends on a new functionality of one of its submodule, also
+bump the compatibility entry accordingly. 
 
 ## Implementation plans
 
