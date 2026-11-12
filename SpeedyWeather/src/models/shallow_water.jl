@@ -59,7 +59,7 @@ Fields, representing model components, are $(TYPEDFIELDS)"""
     feedback::FB = Feedback()
 end
 
-"""($TYPEDSIGNATURES) All variables needed for the shallow water model itself (components excluded)."""
+"""$(TYPEDSIGNATURES) All variables needed for the shallow water model itself (components excluded)."""
 function variables(model::ShallowWater)
     nsteps = get_nsteps(model.time_stepping, model)
     pg = nsteps.prognostic_grid

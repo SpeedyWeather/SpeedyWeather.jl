@@ -369,7 +369,9 @@ end
                         drag = LinearDrag(spectral_grid),
                         dynamics_only = true,
                         orography = EarthOrography(spectral_grid),
-                        time_stepping = Leapfrog(spectral_grid; Δt_at_T32, adjust_with_output=false)
+                        time_stepping = Leapfrog(spectral_grid; Δt_at_T32, adjust_with_output=false),
+                        # Crank-Nicolson is unstable with uniform σ spacing over orography, use backward Euler there
+                        implicit = ImplicitPrimitiveEquation(spectral_grid; centering = label == "default" ? 1 : 0.5),
                     )
                     simulation = initialize!(model)
                     run!(simulation; period = Day(5))               # don't test longer on CI but otherwise could be Day(20) too
@@ -377,5 +379,12 @@ end
                 end
             end
         end
+    end
+end
+
+@testset "sigma_full" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8)
+    for coordinates in (SigmaCoordinates(spectral_grid), SigmaPressureCoordinates(spectral_grid))
+        @test SpeedyWeather.sigma_full(coordinates) == [SpeedyWeather.sigma(k, coordinates) for k in 1:8]
     end
 end

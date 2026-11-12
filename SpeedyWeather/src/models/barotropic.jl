@@ -61,7 +61,7 @@ end
 
 variables(model::Barotropic) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
-"""($TYPEDSIGNATURES) All variables needed for the barotropic model itself (components excluded)."""
+"""$(TYPEDSIGNATURES) All variables needed for the barotropic model itself (components excluded)."""
 function variables(::Type{<:Barotropic}, nsteps = DEFAULT_NSTEPS)
     pg = nsteps.prognostic_grid
     ps = nsteps.prognostic_spectral

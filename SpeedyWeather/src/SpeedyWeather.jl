@@ -1,7 +1,8 @@
 module SpeedyWeather
 
 # STRUCTURE
-using DocStringExtensions
+using DocStringExtensions: TYPEDEF, TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 using StyledStrings
 
 # NUMERICS
@@ -110,7 +111,7 @@ export power_spectrum
 import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 
 # to be defined in GeoMakie extension
-export animate, globe
+export animate, globe, globe!
 function animate end
 
 # output variables, e.g. OutputVariables.Temperature()
@@ -191,6 +192,7 @@ include("parameterizations/surface_fluxes/humidity.jl")
 include("parameterizations/entrainment.jl")
 include("parameterizations/convection.jl")
 include("parameterizations/radiation/zenith.jl")
+include("parameterizations/radiation/ozone.jl")
 include("parameterizations/radiation/shortwave_radiation.jl")
 include("parameterizations/radiation/shortwave_transmissivity.jl")
 include("parameterizations/radiation/clouds.jl")

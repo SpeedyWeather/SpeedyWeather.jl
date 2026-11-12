@@ -53,7 +53,10 @@ initialized first), growing linearly by `initial_snow_depth_rate` per Kelvin bel
 land puts the model on the wrong side of the snow-albedo feedback as snow accumulates only slowly."""
 function initialize!(vars::Variables, snow::SnowModel, model::PrimitiveEquation)
     (; melting_threshold, initial_snow_depth_rate, initial_snow_depth_max) = snow
-    soil_temperature = vars.prognostic.land.soil_temperature.data[:, 1, :]
+    # top layer, all steps; a prescribed soil temperature has no steps (indexing it with 3 indices
+    # would reshape, which falls back to scalar indexing on Reactant GPU)
+    soil_temperature_data = vars.prognostic.land.soil_temperature.data
+    soil_temperature = ndims(soil_temperature_data) == 3 ? soil_temperature_data[:, 1, :] : soil_temperature_data[:, 1]
     snow_depth = vars.prognostic.land.snow_depth
     snow_depth.data .= initial_snow_depth.(soil_temperature, melting_threshold, initial_snow_depth_rate, initial_snow_depth_max)
     mask!(snow_depth, model.land_sea_mask, :ocean, masked_value = 0)

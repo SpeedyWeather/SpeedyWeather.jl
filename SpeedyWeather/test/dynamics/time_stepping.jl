@@ -366,9 +366,15 @@ end
     end
 end
 
-@testset "Implicit reference temperature profile is the global-mean temperature" begin
+@testset "Implicit reference temperature profile: $reference_temperature" for reference_temperature in (
+        GlobalMeanReferenceTemperature(offset = 0.0f0),
+        GlobalMeanReferenceTemperature(offset = 20.0f0),
+        IsothermalReferenceTemperature(temperature = 280.0f0),
+        MaximumReferenceTemperature(margin = 30.0f0),
+    )
     spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
-    model = PrimitiveWetModel(spectral_grid)
+    implicit = ImplicitPrimitiveEquation(spectral_grid; reference_temperature)
+    model = PrimitiveWetModel(spectral_grid; implicit)
     simulation = initialize!(model)
     (; implicit) = model
     (; clock) = simulation.variables.prognostic
@@ -382,6 +388,35 @@ end
 
         clock.time_step_counter = i * n     # a time step on which the reference profile is recomputed
         SpeedyWeather.reinitialize!(implicit, model, simulation.variables)
-        @test Array(implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT atol = 0.01
+        if reference_temperature isa GlobalMeanReferenceTemperature
+            (; offset) = reference_temperature
+            @test Array(implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT .+ offset atol = 0.01
+        elseif reference_temperature isa MaximumReferenceTemperature
+            # isothermal at max(T) + margin
+            temp_grid = Array(SpeedyWeather.get_prognostic_step(simulation.variables.grid.temperature, model.time_stepping, implicit))
+            expected = maximum(temp_grid) + reference_temperature.margin
+            @test all(==(expected), Array(implicit.temp_profile))
+        else
+            @test all(==(reference_temperature.temperature), Array(implicit.temp_profile))
+        end
+    end
+
+    # a constant isothermal reference profile is only reinitialized on a new time step, not on the schedule
+    @test SpeedyWeather.rescheduled(reference_temperature) == !(reference_temperature isa IsothermalReferenceTemperature)
+end
+
+@testset "Leapfrog: previous grid step matches previous spectral step" begin
+    # during the Leapfrog start (Euler step, first leapfrog step) the previous spectral step
+    # is not advanced, so the previous grid step must not be either
+    spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
+    model = PrimitiveDryModel(spectral_grid; time_stepping = Leapfrog(spectral_grid, robert_filter = 0))
+    simulation = initialize!(model)
+    initialize!(simulation; steps = 4)
+    (; variables) = simulation
+    for _ in 1:4
+        SpeedyWeather.time_step!(variables, model.time_stepping, model)
+        SpeedyWeather.time_step!(variables.prognostic.clock, model.time_stepping)
+        temperature_grid = transform(get_step(variables.prognostic.temperature, 1), model.spectral_transform)
+        @test get_step(variables.grid.temperature, 1) ≈ temperature_grid rtol = 1.0e-5
     end
 end
