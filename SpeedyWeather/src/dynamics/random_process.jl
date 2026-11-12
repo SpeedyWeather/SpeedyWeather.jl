@@ -4,11 +4,11 @@ Any random process <: AbstractRandomProcess has to implement the following inter
  - `variables(process)` defines the variables of `model.random_process`, by convention the
    spectral `vars.prognostic.random_pattern` and its grid counterpart `vars.grid.random_pattern`
  - `initialize!(process, model)` precomputes and (re)seeds the random number generator
- - `random_process!(pattern, process)` advances the process with `pattern` as its state, i.e.
+ - `update_random!(pattern, process)` advances the process with `pattern` as its state, i.e.
    draws the next pattern into the array `pattern` (for processes with memory like the AR1
    the previous pattern is read from it). Any model component can own a process and its
    own pattern this way, e.g. the `StochasticLeapfrog` time stepper
- - `random_process!(vars, process)` advances `model.random_process` at the end of every time
+ - `update_random!(vars, process)` advances `model.random_process` at the end of every time
    step, defaults to the spectral `vars.prognostic.random_pattern`
  - `transform!(vars, process, spectral_transform)` makes `vars.grid.random_pattern` from it.
 
@@ -21,8 +21,8 @@ abstract type AbstractRandomProcess <: AbstractModelComponent end
 """$(TYPEDSIGNATURES)
 Advance the random process of the model, `model.random_process`, in its default variable
 `vars.prognostic.random_pattern` by one time step."""
-random_process!(vars::Variables, process::AbstractRandomProcess) =
-    random_process!(vars.prognostic.random_pattern, process)
+update_random!(vars::Variables, process::AbstractRandomProcess) =
+    update_random!(vars.prognostic.random_pattern, process)
 
 """$(TYPEDSIGNATURES)
 General transform for `random processes <: AbstractRandomProcess`.
@@ -49,7 +49,7 @@ end
 `random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
 SpeedyTransforms.transform!(::Variables, ::Nothing, ::AbstractSpectralTransform) = nothing
-random_process!(::Variables, process::Nothing) = nothing
+update_random!(::Variables, process::Nothing) = nothing
 
 """$(TYPEDSIGNATURES)
 Random number generator for drawing on `architecture`: `Random.Xoshiro` on CPU, the counter-based
@@ -183,7 +183,7 @@ function initialize!(
     return nothing
 end
 
-function random_process!(
+function update_random!(
         random_pattern::LowerTriangularArray,
         process::SpectralAR1Process{NF},
     ) where {NF}
@@ -307,7 +307,7 @@ end
 """$(TYPEDSIGNATURES)
 Draw a new white noise `pattern` (all its slots) from `process`, independently of
 the previous pattern."""
-function random_process!(
+function update_random!(
         pattern::LowerTriangularArray,
         process::SpectralWhiteNoiseProcess{NF},
     ) where {NF}
@@ -384,12 +384,12 @@ end
 SpeedyTransforms.transform!(::Variables, ::GridWhiteNoiseProcess, ::AbstractSpectralTransform) = nothing
 
 # as `model.random_process` the pattern lives on the grid
-random_process!(vars::Variables, process::GridWhiteNoiseProcess) =
-    random_process!(vars.grid.random_pattern, process)
+update_random!(vars::Variables, process::GridWhiteNoiseProcess) =
+    update_random!(vars.grid.random_pattern, process)
 
 """$(TYPEDSIGNATURES)
 Draw a new white noise `pattern` (all its slots) from `process`."""
-function random_process!(pattern::AbstractField, process::GridWhiteNoiseProcess)
+function update_random!(pattern::AbstractField, process::GridWhiteNoiseProcess)
     data = parent(pattern)
     Random.randn!(process.random_number_generator, data)
     data .*= process.standard_deviation

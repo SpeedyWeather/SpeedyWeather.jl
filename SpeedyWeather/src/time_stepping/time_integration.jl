@@ -50,7 +50,7 @@ function time_step!(
     reinitialize!(model, vars)
     reset_tendencies!(vars, time_stepping)      # set the tendencies back to zero for accumulation
 
-    wiener_increment!(vars, time_stepping, model)   # stochastic time steppers only, e.g. StochasticLeapfrog
+    random_process!(vars, time_stepping, model)   # stochastic time steppers only, e.g. StochasticLeapfrog
     dynamics_tendencies!(vars, model)
     diffusion_and_implicit!(vars, model)        # dispatch over time stepper and implicit so that the order can be changed
     update_prognostic!(vars, model)             # step prognostic variables forward
@@ -64,7 +64,7 @@ end
 Add the stochastic (Wiener) increment of a stochastic time stepper to the tendencies, called
 after the parameterizations and before the dynamical core, i.e. where a forcing would add to
 the tendencies. Deterministic time steppers do nothing, see `StochasticLeapfrog`."""
-wiener_increment!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
+random_process!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
 
 # dispatch over time stepper here so that other time stepper can change the order
 diffusion_and_implicit!(vars, model) =
@@ -105,7 +105,7 @@ function time_step!(
     end
 
     if model.dynamics                           # switch on/off all dynamics
-        wiener_increment!(vars, time_stepping, model)   # stochastic time steppers only, e.g. StochasticLeapfrog
+        random_process!(vars, time_stepping, model)   # stochastic time steppers only, e.g. StochasticLeapfrog
         dynamics_tendencies!(vars, model)       # dynamical core
         diffusion_and_implicit!(vars, model)    # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
@@ -153,7 +153,7 @@ function update_prognostic!(
     update_prognostic_namespaces!(vars, clock, time_stepping, model.implicit, model)
 
     # evolve the random pattern in time
-    random_process!(vars, model.random_process)
+    update_random!(vars, model.random_process)
 
     # allow ocean, sea ice and land to "filter" variables, e.g. cap sea ice concentration at [0, 1]
     hasproperty(model, :ocean) && filter!(vars, model.ocean, model)

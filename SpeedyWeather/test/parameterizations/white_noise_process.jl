@@ -19,7 +19,7 @@ using Statistics, Random
                 grid = simulation.variables.grid.random_pattern
                 stds = zeros(20)
                 for i in eachindex(stds)
-                    SpeedyWeather.random_process!(simulation.variables, random_process)
+                    SpeedyWeather.update_random!(simulation.variables, random_process)
                     transform!(grid, spec, model.spectral_transform)
                     stds[i] = std(grid)
                     @test mean(grid) ≈ 0 atol = 1.0e-2
@@ -40,7 +40,7 @@ end
     random_process = SpectralWhiteNoiseProcess(spectral_grid; seed = 123)
     model = BarotropicModel(spectral_grid; random_process)
     simulation = initialize!(model)
-    SpeedyWeather.random_process!(simulation.variables, random_process)
+    SpeedyWeather.update_random!(simulation.variables, random_process)
     spec = simulation.variables.prognostic.random_pattern
     grid = simulation.variables.grid.random_pattern
     transform!(grid, spec, model.spectral_transform)        # no clamp by default anyway
@@ -58,9 +58,9 @@ end
         spec = simulation.variables.prognostic.random_pattern
         @test size(spec, 2) == 3
 
-        SpeedyWeather.random_process!(simulation.variables, random_process)
+        SpeedyWeather.update_random!(simulation.variables, random_process)
         spec1 = copy(spec)
-        SpeedyWeather.random_process!(simulation.variables, random_process)
+        SpeedyWeather.update_random!(simulation.variables, random_process)
 
         # memoryless: consecutive draws and the patterns among themselves are uncorrelated
         c(a, b) = real(sum(a .* conj.(b))) / sqrt(sum(abs2, a) * sum(abs2, b))
@@ -70,7 +70,7 @@ end
 
         # reinitialize: same seed, same draws; seed = 0 takes a random seed
         simulation = initialize!(model)
-        SpeedyWeather.random_process!(simulation.variables, random_process)
+        SpeedyWeather.update_random!(simulation.variables, random_process)
         if seed != 0
             @test spec1 == simulation.variables.prognostic.random_pattern
         else
@@ -85,17 +85,17 @@ end
     random_process = GridWhiteNoiseProcess(spectral_grid; seed = 123, standard_deviation = σ, n_patterns = 2)
     model = BarotropicModel(spectral_grid; random_process)
     simulation = initialize!(model)
-    SpeedyWeather.random_process!(simulation.variables, random_process)
+    SpeedyWeather.update_random!(simulation.variables, random_process)
     pattern = copy(simulation.variables.grid.random_pattern)
     @test size(pattern, 2) == 2
     @test std(pattern.data) ≈ σ rtol = 5.0e-2
     @test mean(pattern.data) ≈ 0 atol = 2.0e-2
 
     # the next draw is new, a reinitialized process repeats the first
-    SpeedyWeather.random_process!(simulation.variables, random_process)
+    SpeedyWeather.update_random!(simulation.variables, random_process)
     @test pattern != simulation.variables.grid.random_pattern
     simulation = initialize!(model)
-    SpeedyWeather.random_process!(simulation.variables, random_process)
+    SpeedyWeather.update_random!(simulation.variables, random_process)
     @test pattern == simulation.variables.grid.random_pattern
 end
 

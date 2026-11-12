@@ -16,7 +16,7 @@ using Statistics
                 # instead of running the model, just run the random process
                 nsteps = 100
                 for _ in 1:nsteps
-                    SpeedyWeather.random_process!(simulation.variables, random_process)
+                    SpeedyWeather.update_random!(simulation.variables, random_process)
                 end
 
                 # transform to grid space (don't clamp)
@@ -43,7 +43,7 @@ end
         # instead of running the model, just run the random process
         nsteps = 100
         for _ in 1:nsteps
-            SpeedyWeather.random_process!(simulation.variables, random_process)
+            SpeedyWeather.update_random!(simulation.variables, random_process)
         end
 
         spec1 = copy(simulation.variables.prognostic.random_pattern)
@@ -52,7 +52,7 @@ end
         simulation = initialize!(model)
         nsteps = 100
         for _ in 1:nsteps
-            SpeedyWeather.random_process!(simulation.variables, random_process)
+            SpeedyWeather.update_random!(simulation.variables, random_process)
         end
 
         if seed != 0    # non-zero seed is actual seed
@@ -76,7 +76,7 @@ end
     @test size(grid, 2) == 3
 
     for _ in 1:100
-        SpeedyWeather.random_process!(simulation.variables, random_process)
+        SpeedyWeather.update_random!(simulation.variables, random_process)
     end
     transform!(grid, spec, model.spectral_transform)
 
