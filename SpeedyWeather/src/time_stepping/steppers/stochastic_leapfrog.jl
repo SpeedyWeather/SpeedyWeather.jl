@@ -11,134 +11,129 @@ any parameter of the model. With time step `Δt` the tendency receives `a/√Δt
 so the state receives an increment ∝ `a√Δt ⋅ ξ` per step, a Wiener increment whose variance
 is independent of the time step.
 
-- vorticity, divergence (and η in the ShallowWaterModel) are forced in spectral space by a
-  `SpectralWhiteNoiseProcess` (spectrally flat by default), so the noise covariance is diagonal
-  in the spectral coefficients.
-- temperature, humidity and surface pressure are forced in grid space with the grid
-  transform of the same kind of spectral pattern. The pattern is band-limited, so the forcing
-  arrives in the spectral tendencies with the spectrum of the pattern.
-- the sea surface temperature (if the ocean has a tendency for it) is forced by a
-  `GridWhiteNoiseProcess`, independently at every grid point.
+The amplitudes are given per variable by the name of its tendency, e.g.
+`AdditiveWienerNoise(spectral_grid; vorticity = 3e-8, η = 1e-3, soil_temperature = 1e-4)`,
+variables not listed get no noise. Units are those of the variable per √s, e.g. 1/s^(3/2) for
+vorticity and divergence, K/s^(1/2) for temperature. Which variables there are is inferred from
+the tendencies of the model (`tendency_names`, `ocean_tendency_names`, `land_tendency_names`):
+
+- atmospheric variables are forced with one `SpectralWhiteNoiseProcess` (spectrally flat by
+  default) that has a pattern slot for every layer of every variable (variables with layers first,
+  then single-layer variables, each in the order of `tendency_names`), also for zero amplitudes,
+  so that switching one amplitude on or off does not change the noise realisation of the others.
+  The noise is added where the dynamical core reads the tendency: in grid space (the grid
+  transform of the pattern) for the variables whose grid tendencies the dynamical core transforms
+  to spectral space (temperature, humidity, surface pressure in the primitive equation models),
+  in spectral space otherwise (vorticity, divergence, η), so the noise covariance is diagonal
+  in the spectral coefficients. Variables with layers are tapered with `tapering(σ)`.
+- ocean and land variables (e.g. sea surface temperature) with a nonzero amplitude are forced by a
+  `GridWhiteNoiseProcess`, independently at every grid point and layer.
 
 The amplitudes multiply a pattern of standard deviation `standard_deviation` (1/3 by default,
 as for `SpectralAR1Process`). The defaults are the amplitudes used for T32 L8 PrimitiveWet
 models in a 1500-year stochastic control run: climate-neutral, stable, humidity bounded by
 clipping rather than by the climate (see the docstring of `StochasticLeapfrog`). They are not
-universal, check them for other resolutions, time steps or models.
-Every variable of the model gets a pattern slot (also with amplitude zero), so switching one
-amplitude on or off does not change the noise realisation of the others. The noise is drawn on
+universal, check them for other resolutions, time steps or models. The noise is drawn on
 the model's architecture (see `architecture_rng`); `draw_on_cpu = true` draws it on the CPU also
 on GPU (slower, but the same numbers as on CPU).
 
 Fields are $(TYPEDFIELDS)"""
-struct AdditiveWienerNoise{NF, F, VectorType, SP, GP} <: AbstractWienerNoise
-    "[OPTION] Noise amplitude for vorticity [1/s^(3/2)]"
-    vorticity::NF
+struct AdditiveWienerNoise{NF, A <: NamedTuple, F, VectorType, SP, GP} <: AbstractWienerNoise
+    "[OPTION] Noise amplitude per variable, by the name of its tendency, zero for all others"
+    amplitudes::A
 
-    "[OPTION] Noise amplitude for divergence [1/s^(3/2)]"
-    divergence::NF
-
-    "[OPTION] Noise amplitude for temperature [K/s^(1/2)]"
-    temperature::NF
-
-    "[OPTION] Noise amplitude for specific humidity [kg/kg/s^(1/2)]"
-    humidity::NF
-
-    "[OPTION] Noise amplitude for the logarithm of surface pressure [1/s^(1/2)], or for the interface displacement η [m/s^(1/2)] in the ShallowWaterModel"
-    pressure::NF
-
-    "[OPTION] Noise amplitude for the sea surface temperature [K/s^(1/2)]"
-    sea_surface_temperature::NF
-
-    "[OPTION] Vertical tapering as a function of sigma, for vorticity, divergence, temperature and humidity"
+    "[OPTION] Vertical tapering as a function of sigma, for atmospheric variables with layers"
     tapering::F
 
     "[DERIVED] Vertical tapering per layer"
     taper::VectorType
 
-    "[OPTION] White noise process in spectral space for vorticity, divergence, temperature, humidity, pressure"
+    "[OPTION] White noise process in spectral space for the atmospheric variables"
     spectral::SP
 
-    "[OPTION] White noise process in grid space for the sea surface temperature"
+    "[OPTION] White noise process in grid space for the ocean and land variables"
     grid::GP
 end
 
+"""Default amplitudes of `AdditiveWienerNoise`, for T32 L8 PrimitiveWet models."""
+const DEFAULT_WIENER_AMPLITUDES = (
+    vorticity = 3.0e-8,                 # [1/s^(3/2)]
+    divergence = 3.0e-8,                # [1/s^(3/2)]
+    temperature = 3.0e-3,               # [K/s^(1/2)]
+    humidity = 3.0e-8,                  # [kg/kg/s^(1/2)]
+    sea_surface_temperature = 1.0e-3,   # [K/s^(1/2)]
+)
+
 """$(TypedMethodSignatures(defaults = true))
-Additive Wiener noise for the prognostic variables, amplitudes per variable. `seed` seeds
-both white noise processes (they draw from independent streams), `wavenumber` and
+Additive Wiener noise for the prognostic variables, all keyword arguments other than the ones
+listed are noise amplitudes by variable name, added to (or replacing) `DEFAULT_WIENER_AMPLITUDES`.
+`seed` seeds both white noise processes (they draw from independent streams), `wavenumber` and
 `standard_deviation` are passed on to the `SpectralWhiteNoiseProcess`, `draw_on_cpu` to both."""
 function AdditiveWienerNoise(
         SG::SpectralGrid;
-        vorticity = 3.0e-8,
-        divergence = 3.0e-8,
-        temperature = 3.0e-3,
-        humidity = 3.0e-8,
-        pressure = 0,
-        sea_surface_temperature = 1.0e-3,
         tapering = σ -> 1,
         seed = 0,
         wavenumber = 0,
         standard_deviation = 1 / 3,
         draw_on_cpu = false,
+        amplitudes...,
     )
     NF = SG.NF
+    amplitudes = map(NF, merge(DEFAULT_WIENER_AMPLITUDES, amplitudes))
     taper = on_architecture(SG.architecture, zeros(NF, SG.nlayers))
     spectral = SpectralWhiteNoiseProcess(SG; seed, wavenumber, standard_deviation, draw_on_cpu)
     grid = GridWhiteNoiseProcess(SG; seed, standard_deviation, draw_on_cpu)
-    return AdditiveWienerNoise{NF, typeof(tapering), typeof(taper), typeof(spectral), typeof(grid)}(
-        NF(vorticity), NF(divergence), NF(temperature), NF(humidity), NF(pressure),
-        NF(sea_surface_temperature), tapering, taper, spectral, grid,
+    return AdditiveWienerNoise{NF, typeof(amplitudes), typeof(tapering), typeof(taper), typeof(spectral), typeof(grid)}(
+        amplitudes, tapering, taper, spectral, grid,
     )
 end
+
+"""$(TYPEDSIGNATURES) Noise amplitude of the variable `name`, zero if not given."""
+amplitude(noise::AdditiveWienerNoise{NF}, name::Symbol) where {NF} = get(noise.amplitudes, name, zero(NF))
 
 """$(TYPEDSIGNATURES)
-Slots of the spectral noise pattern per variable: `vorticity`, `divergence`, `temperature`,
-`humidity` are offsets (slot = offset + layer), `pressure` is the slot itself, `nothing` if the
-model does not have that variable, `n` is the total number of slots."""
-function wiener_slots(model::AbstractModel)
-    nlayers = model.spectral_grid.nlayers
-    return wiener_slots(model, nlayers)
+The tendency variables of `model`, i.e. the definitions behind `tendency_names` and co., as they
+are needed before the `Variables` exist. Collected from the model and its components except the
+time stepper (its variables include the noise patterns, which are defined from these)."""
+function tendency_variables(model::AbstractModel)
+    components = (getproperty(model, name) for name in propertynames(model) if name != :time_stepping)
+    all = (variables(model)..., Iterators.flatten(variables(c, model) for c in components)...)
+    return unique(v -> (v.namespace, v.name), filter(v -> v isa TendencyVariable, collect(all)))
 end
 
-wiener_slots(::Barotropic, nlayers) =
-    (vorticity = 0, divergence = nothing, temperature = nothing, humidity = nothing, pressure = nothing, n = nlayers)
-wiener_slots(::ShallowWater, nlayers) =
-    (vorticity = 0, divergence = nlayers, temperature = nothing, humidity = nothing, pressure = 2nlayers + 1, n = 2nlayers + 1)
-wiener_slots(::PrimitiveDry, nlayers) =
-    (vorticity = 0, divergence = nlayers, temperature = 2nlayers, humidity = nothing, pressure = 3nlayers + 1, n = 3nlayers + 1)
-wiener_slots(::PrimitiveWet, nlayers) =
-    (vorticity = 0, divergence = nlayers, temperature = 2nlayers, humidity = 3nlayers, pressure = 4nlayers + 1, n = 4nlayers + 1)
-
-"""$(TYPEDSIGNATURES) Does the ocean of `model` have a tendency for the sea surface temperature?"""
-function has_sea_surface_temperature_tendency(model::AbstractModel)
-    hasproperty(model, :ocean) || return false
-    return any(variables(model.ocean, model)) do var
-        var isa TendencyVariable && var.name == :sea_surface_temperature && var.namespace == :ocean
-    end
-end
+# number of pattern slots of a tendency (of one time step): its atmosphere, land or ocean layers, else 1
+nslots(tendency) = size(tendency.data, 2)
+nslots(v::TendencyVariable, model::AbstractModel) = nslots(get_step(allocate(v, model), 1))
+has_layers(tendency) = ndims(tendency.data) == 2
 
 function variables(noise::AdditiveWienerNoise, model::AbstractModel)
-    n = wiener_slots(model).n
-    spectral = (
-        PrognosticVariable(
-            :wiener_pattern, Spectral3D(; n), units = "1",
-            desc = "Pattern of the Wiener increment of the next time step, one slot per variable and layer",
-        ),
+    tendencies = tendency_variables(model)
+    atmosphere = filter(v -> v.namespace == Symbol(), tendencies)
+    surface = filter(v -> v.namespace in (:ocean, :land) && !iszero(amplitude(noise, v.name)), tendencies)
+    n = sum(v -> nslots(v, model), atmosphere)
+
+    # forced in grid space: variables whose grid tendencies the dynamical core transforms to spectral
+    on_grid = any(tendencies) do v
+        v.namespace == :grid && v.fuse == :grid_tendencies && any(a -> a.name == v.name, atmosphere)
+    end
+
+    spectral = PrognosticVariable(
+        :wiener_pattern, Spectral3D(; n), units = "1",
+        desc = "Pattern of the Wiener increment of the next time step, one slot per variable and layer",
     )
-    # temperature, humidity and pressure are forced in grid space, with the grid transform of the pattern
-    grid = model isa PrimitiveEquation ? (
+    grid = on_grid ? (
             GridVariable(
                 :wiener_pattern, Grid3D(; n), units = "1",
                 desc = "Pattern of the Wiener increment of the next time step on the grid",
             ),
         ) : ()
-    sst = has_sea_surface_temperature_tendency(model) ? (
+    surface = isempty(surface) ? () : (
             PrognosticVariable(
-                :wiener_pattern_grid, Grid2D(), units = "1",
-                desc = "Grid-point pattern of the Wiener increment of the sea surface temperature of the next time step",
+                :wiener_pattern_surface, Grid3D(; n = sum(v -> nslots(v, model), surface)), units = "1",
+                desc = "Grid-point pattern of the Wiener increment of ocean and land variables of the next time step",
             ),
-        ) : ()
-    return (spectral..., grid..., sst...)
+        )
+    return (spectral, grid..., surface...)
 end
 
 function initialize!(noise::AdditiveWienerNoise, model::AbstractModel)
@@ -158,13 +153,10 @@ function initialize!(noise::AdditiveWienerNoise, model::AbstractModel)
         wiener_taper_kernel!, noise.taper, noise.tapering, coord,
     )
 
-    # models with an ocean that has no sea surface temperature tendency (e.g. prescribed), models
-    # without ocean (Barotropic, ShallowWater) ignore the sea surface temperature amplitude
-    if noise.sea_surface_temperature != 0 && hasproperty(model, :ocean) && !has_sea_surface_temperature_tendency(model)
-        @warn "AdditiveWienerNoise: sea_surface_temperature = $(noise.sea_surface_temperature) but " *
-            "the ocean $(typeof(model.ocean).name.name) has no sea surface temperature tendency, " *
-            "the sea surface temperature is not forced. Set sea_surface_temperature = 0 to silence."
-    end
+    # amplitudes for variables this model does not time step are ignored, warn unless a default
+    names = [v.name for v in tendency_variables(model) if v.namespace in (Symbol(), :ocean, :land)]
+    ignored = filter(name -> !(name in names || haskey(DEFAULT_WIENER_AMPLITUDES, name)), keys(noise.amplitudes))
+    isempty(ignored) || @warn "AdditiveWienerNoise: the model has no tendency for $ignored, amplitude ignored."
     return nothing
 end
 
@@ -190,7 +182,7 @@ effectively injects is not the nominal `a²σ²/2` and should be measured where 
 
 The pattern `ξ` applied in a time step is drawn at the end of the previous time step and stored
 in the variables (`vars.prognostic.wiener_pattern`, `vars.grid.wiener_pattern`,
-`vars.prognostic.wiener_pattern_grid`), so the first time step of a new simulation is
+`vars.prognostic.wiener_pattern_surface`), so the first time step of a new simulation is
 deterministic and a simulation continued with another `run!` continues with the stored pattern.
 The noise realisation is reproducible through `seed`, independent of other random processes.
 
@@ -227,125 +219,81 @@ end
 """$(TYPEDSIGNATURES)
 Add the Wiener increment of this time step (drawn at the end of the previous one) to the
 tendencies, then draw the pattern for the next time step."""
-function wiener_increment!(vars::Variables, L::StochasticLeapfrog, model::AbstractModel)
+function random_process!(vars::Variables, L::StochasticLeapfrog, model::AbstractModel)
     wiener_tendencies!(vars, L.noise, L, model)
     wiener_draw!(vars, L.noise, model)
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
-Add the stored noise pattern times `amplitude/√Δt` to the tendencies."""
+Add the stored noise patterns times `amplitude/√Δt` to the tendencies, see `AdditiveWienerNoise`
+for which variable is forced where."""
 function wiener_tendencies!(
         vars::Variables,
         noise::AdditiveWienerNoise,
         L::AbstractTimeStepper,
         model::AbstractModel,
     )
-    slots = wiener_slots(model)
-    (; taper) = noise
     isdt = 1 / sqrt(L.Δt)               # Δt in [s], the Wiener increment scaling
     R = vars.prognostic.scale[]         # radius scaling of vorticity and divergence
 
-    # VORTICITY, DIVERGENCE in spectral space. scale_tendencies! multiplies every tendency
-    # by the radius R and the time step is Δt/R, but vorticity and divergence are stored
-    # scaled by R, so their tendency needs R once more here
-    spec = vars.prognostic.wiener_pattern
-    wiener_spectral!(vars.tendencies.vorticity, spec, noise.vorticity * isdt * R, taper, slots.vorticity, L, noise)
-    isnothing(slots.divergence) ||
-        wiener_spectral!(vars.tendencies.divergence, spec, noise.divergence * isdt * R, taper, slots.divergence, L, noise)
+    # ATMOSPHERE, slots of the spectral pattern: variables with layers first, then single-layer ones
+    on_grid = haskey(vars.fused, :grid_tendencies) ? keys(vars.fused.grid_tendencies.slot_map) : ()
+    offset = 0
+    for layers in (true, false), name in tendency_names(vars)
+        tendency = get_tendency_step(getfield(vars.tendencies, name), L, noise)
+        has_layers(tendency) == layers || continue
 
-    # TEMPERATURE, HUMIDITY in grid space, their spectral tendencies are overwritten by the
-    # batched transform of the grid tendencies in the dynamical core
-    if !isnothing(slots.temperature)
-        grid = vars.grid.wiener_pattern
-        wiener_grid!(vars.tendencies.grid.temperature, grid, noise.temperature * isdt, taper, slots.temperature, L, noise)
-        isnothing(slots.humidity) ||
-            wiener_grid!(vars.tendencies.grid.humidity, grid, noise.humidity * isdt, taper, slots.humidity, L, noise)
+        # scale_tendencies! multiplies every tendency by the radius R and the time step is Δt/R,
+        # vorticity and divergence are stored scaled by R (scale_prognostic!), so need R once more
+        a = amplitude(noise, name) * isdt * (name in (:vorticity, :divergence) ? R : one(R))
+        taper = layers ? noise.taper : nothing
+
+        # the grid tendency if the dynamical core transforms it to (and overwrites) the spectral one
+        if name in on_grid
+            grid_tendency = get_tendency_step(getfield(vars.tendencies.grid, name), L, noise)
+            wiener!(grid_tendency, vars.grid.wiener_pattern, a, taper, offset)
+        else
+            wiener!(tendency, vars.prognostic.wiener_pattern, a, taper, offset)
+        end
+        offset += nslots(tendency)
     end
 
-    # PRESSURE (log surface pressure on the grid, or η in spectral space for ShallowWater), no taper
-    if !isnothing(slots.pressure) && noise.pressure != 0
-        wiener_pressure!(vars, noise.pressure * isdt, slots.pressure, L, noise, model)
-    end
-
-    # SEA SURFACE TEMPERATURE, unscaled: ocean variables are stepped with the unscaled time step
-    if noise.sea_surface_temperature != 0 && haskey(vars.prognostic, :wiener_pattern_grid)
-        dsst = get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, L, noise)
-        launch!(
-            architecture(dsst), RingGridWorkOrder, size(dsst), wiener_surface_kernel!,
-            dsst, vars.prognostic.wiener_pattern_grid, noise.sea_surface_temperature * isdt,
-        )
+    # OCEAN, LAND, slots of the grid-point pattern for variables with a nonzero amplitude, not
+    # radius-scaled: ocean and land variables are stepped with the unscaled time step
+    offset = 0
+    for (namespace, names) in ((:ocean, ocean_tendency_names(vars)), (:land, land_tendency_names(vars))), name in names
+        a = amplitude(noise, name)
+        iszero(a) && continue
+        tendency = get_tendency_step(getfield(getfield(vars.tendencies, namespace), name), L, noise)
+        wiener!(tendency, vars.prognostic.wiener_pattern_surface, a * isdt, nothing, offset)
+        offset += nslots(tendency)
     end
     return nothing
 end
 
-function wiener_spectral!(tendency, pattern, amplitude, taper, offset, L, noise)
-    iszero(amplitude) && return nothing
-    tend = get_tendency_step(tendency, L, noise)
-    launch!(
-        architecture(tend), SpectralWorkOrder, size(tend), wiener_layered_kernel!,
-        tend, pattern, amplitude, taper, offset,
-    )
+# tendency[i, k] += a * taper[k] * pattern[i, offset + k] for every spectral or grid index i, layer k
+function wiener!(tendency, pattern, a, taper, offset)
+    iszero(a) && return nothing
+    workorder = tendency isa LowerTriangularArray ? SpectralWorkOrder : RingGridWorkOrder
+    launch!(architecture(tendency), workorder, size(tendency), wiener_kernel!, tendency, pattern, a, taper, offset)
     return nothing
 end
 
-function wiener_grid!(tendency, pattern, amplitude, taper, offset, L, noise)
-    iszero(amplitude) && return nothing
-    tend = get_tendency_step(tendency, L, noise)
-    launch!(
-        architecture(tend), RingGridWorkOrder, size(tend), wiener_layered_kernel!,
-        tend, pattern, amplitude, taper, offset,
-    )
-    return nothing
-end
-
-# log surface pressure, forced in grid space with the transformed pattern
-function wiener_pressure!(vars, amplitude, slot, L, noise, ::PrimitiveEquation)
-    tend = get_tendency_step(vars.tendencies.grid.pressure, L, noise)
-    launch!(
-        architecture(tend), RingGridWorkOrder, size(tend), wiener_slot_kernel!,
-        tend, vars.grid.wiener_pattern, amplitude, slot,
-    )
-    return nothing
-end
-
-# interface displacement η, forced in spectral space (its spectral tendency accumulates)
-function wiener_pressure!(vars, amplitude, slot, L, noise, ::ShallowWater)
-    tend = get_tendency_step(vars.tendencies.η, L, noise)
-    launch!(
-        architecture(tend), SpectralWorkOrder, size(tend), wiener_slot_kernel!,
-        tend, vars.prognostic.wiener_pattern, amplitude, slot,
-    )
-    return nothing
-end
-
-# tendency[i, k] += a * taper[k] * pattern[i, offset + k] for every (spectral or grid) index i and layer k
-@kernel inbounds = true function wiener_layered_kernel!(tend, pattern, a, taper, offset)
+@kernel inbounds = true function wiener_kernel!(tendency, pattern, a, taper, offset)
     I = @index(Global, NTuple)
     i = I[1]
     k = length(I) > 1 ? I[2] : 1
-    t = taper[k]
-    tend[i, k] += a * t * pattern[i, offset + k]
-end
-
-# single-layer variables, one slot of the pattern
-@kernel inbounds = true function wiener_slot_kernel!(tend, pattern, a, slot)
-    i = @index(Global, Linear)
-    tend[i] += a * pattern[i, slot]
-end
-
-# grid-point pattern for surface variables
-@kernel inbounds = true function wiener_surface_kernel!(tend, pattern, a)
-    ij = @index(Global, Linear)
-    tend[ij] += a * pattern[ij]
+    t = isnothing(taper) ? one(a) : taper[k]
+    tendency[I...] += a * t * pattern[i, offset + k]
 end
 
 """$(TYPEDSIGNATURES)
 Draw the noise patterns for the next time step, transform the spectral one to grid space."""
 function wiener_draw!(vars::Variables, noise::AdditiveWienerNoise, model::AbstractModel)
-    random_process!(vars.prognostic.wiener_pattern, noise.spectral)
-    haskey(vars.prognostic, :wiener_pattern_grid) &&
-        random_process!(vars.prognostic.wiener_pattern_grid, noise.grid)
+    update_random!(vars.prognostic.wiener_pattern, noise.spectral)
+    haskey(vars.prognostic, :wiener_pattern_surface) &&
+        update_random!(vars.prognostic.wiener_pattern_surface, noise.grid)
     if haskey(vars.grid, :wiener_pattern)
         transform!(
             vars.grid.wiener_pattern, vars.prognostic.wiener_pattern,

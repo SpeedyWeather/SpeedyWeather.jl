@@ -35,7 +35,7 @@ end
         spectral_grid = SpectralGrid(; truncation = 21, nlayers)
         zero_noise = AdditiveWienerNoise(
             spectral_grid; seed = 1, vorticity = 0, divergence = 0, temperature = 0,
-            humidity = 0, pressure = 0, sea_surface_temperature = 0,
+            humidity = 0, sea_surface_temperature = 0,
         )
         sim_lf = seeded_initialize!(Model(spectral_grid; time_stepping = Leapfrog(spectral_grid)))
         sim_sl = seeded_initialize!(Model(spectral_grid; time_stepping = StochasticLeapfrog(spectral_grid; noise = zero_noise)))
@@ -50,7 +50,8 @@ end
         nlayers = Model <: Union{BarotropicModel, ShallowWaterModel} ? 1 : 4
         spectral_grid = SpectralGrid(; truncation = 21, nlayers)
         # 2D models: a stronger vorticity noise so that 10 steps clearly differ from Leapfrog
-        kw = Model <: Union{BarotropicModel, ShallowWaterModel} ? (; vorticity = 1.0e-7, divergence = 1.0e-8, pressure = 1.0e-3) : (;)
+        kw = Model <: BarotropicModel ? (; vorticity = 1.0e-7) :
+            Model <: ShallowWaterModel ? (; vorticity = 1.0e-7, divergence = 1.0e-8, η = 1.0e-3) : (;)
         sims = map(((1, false), (1, false), (2, false), (1, true), (1, true))) do (seed, draw_on_cpu)
             model = Model(spectral_grid; time_stepping = StochasticLeapfrog(spectral_grid; seed, draw_on_cpu, kw...))
             simulation = seeded_initialize!(model)
@@ -76,21 +77,51 @@ end
     @test !simulation.model.feedback.nans_detected
 end
 
+@testset "StochasticLeapfrog: noise variables from the tendencies of the model" begin
+    for Model in STOCHASTIC_TEST_MODELS
+        nlayers = Model <: Union{BarotropicModel, ShallowWaterModel} ? 1 : 4
+        spectral_grid = SpectralGrid(; truncation = 21, nlayers)
+        model = Model(spectral_grid; time_stepping = StochasticLeapfrog(spectral_grid; seed = 1))
+        vars = SpeedyWeather.Variables(model)
+        primitive = Model <: Union{PrimitiveDryModel, PrimitiveWetModel}
+
+        # a slot per layer of every (atmospheric) prognostic variable
+        n = sum(name -> size(get_step(vars.tendencies[name], 1).data, 2), SpeedyWeather.tendency_names(vars))
+        @test size(vars.prognostic.wiener_pattern, 2) == n
+        @test n == (Model <: BarotropicModel ? nlayers : Model <: ShallowWaterModel ? 2nlayers + 1 :
+            Model <: PrimitiveDryModel ? 3nlayers + 1 : 4nlayers + 1)
+
+        # temperature, humidity, pressure forced in grid space; among ocean and land variables only
+        # the sea surface temperature has a (default) amplitude
+        @test haskey(vars.grid, :wiener_pattern) == primitive
+        @test haskey(vars.prognostic, :wiener_pattern_surface) == primitive
+        primitive && @test size(vars.prognostic.wiener_pattern_surface, 2) == 1
+    end
+
+    # amplitudes for variables the model does not have are ignored, with a warning
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 1)
+    model = BarotropicModel(spectral_grid; time_stepping = StochasticLeapfrog(spectral_grid; seed = 1, η = 1))
+    @test_logs (:warn, r"no tendency for \(:η,\)") initialize!(model)
+end
+
 @testset "StochasticLeapfrog: increment a/√Δt per variable, slot and layer" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
     noise = AdditiveWienerNoise(
-        spectral_grid; seed = 1, vorticity = 2, divergence = 3, temperature = 5,
-        humidity = 7, pressure = 11, sea_surface_temperature = 13, tapering = σ -> σ,
+        spectral_grid; seed = 1, vorticity = 2, divergence = 3, temperature = 5, humidity = 7,
+        pressure = 11, sea_surface_temperature = 13, soil_temperature = 17, tapering = σ -> σ,
     )
     L = StochasticLeapfrog(spectral_grid; noise)
     model = PrimitiveWetModel(spectral_grid; time_stepping = L)
     simulation = initialize!(model)
     SpeedyWeather.initialize!(simulation)       # scales vorticity, divergence by the radius
     vars = simulation.variables
-    slots = SpeedyWeather.wiener_slots(model)
     nlayers = spectral_grid.nlayers
-    @test slots.n == 4nlayers + 1
-    @test size(vars.prognostic.wiener_pattern, 2) == slots.n
+    nsoil = size(get_step(vars.tendencies.land.soil_temperature, 1).data, 2)
+
+    # variables with layers first (vorticity, divergence, temperature, humidity), then pressure;
+    # surface: sea surface temperature, then soil temperature (the others have no amplitude)
+    @test size(vars.prognostic.wiener_pattern, 2) == 4nlayers + 1
+    @test size(vars.prognostic.wiener_pattern_surface, 2) == 1 + nsoil
     @test noise.taper ≈ model.geometry.σ_levels_full
 
     for Δt in (Minute(20), Minute(40))
@@ -101,19 +132,25 @@ end
 
         isdt = 1 / sqrt(L.Δt)
         R = vars.prognostic.scale[]
-        spec = vars.prognostic.wiener_pattern
-        grid = vars.grid.wiener_pattern
+        a = noise.amplitudes
+        spec = vars.prognostic.wiener_pattern.data
+        grid = vars.grid.wiener_pattern.data
+        surface = vars.prognostic.wiener_pattern_surface.data
         tend(x) = get_step(x, 1).data      # the (only) tendency step, as plain array
         for k in 1:nlayers
             t = noise.taper[k]
-            @test tend(vars.tendencies.vorticity)[:, k] == (noise.vorticity * isdt * R * t) .* spec.data[:, k]
-            @test tend(vars.tendencies.divergence)[:, k] == (noise.divergence * isdt * R * t) .* spec.data[:, nlayers + k]
-            @test tend(vars.tendencies.grid.temperature)[:, k] == (noise.temperature * isdt * t) .* grid.data[:, 2nlayers + k]
-            @test tend(vars.tendencies.grid.humidity)[:, k] == (noise.humidity * isdt * t) .* grid.data[:, 3nlayers + k]
+            @test tend(vars.tendencies.vorticity)[:, k] == (a.vorticity * isdt * R * t) .* spec[:, k]
+            @test tend(vars.tendencies.divergence)[:, k] == (a.divergence * isdt * R * t) .* spec[:, nlayers + k]
+            @test tend(vars.tendencies.grid.temperature)[:, k] == (a.temperature * isdt * t) .* grid[:, 2nlayers + k]
+            @test tend(vars.tendencies.grid.humidity)[:, k] == (a.humidity * isdt * t) .* grid[:, 3nlayers + k]
         end
-        @test tend(vars.tendencies.grid.pressure) == (noise.pressure * isdt) .* grid.data[:, 4nlayers + 1]
+        @test tend(vars.tendencies.grid.pressure) == (a.pressure * isdt) .* grid[:, 4nlayers + 1]
         sst = tend(vars.tendencies.ocean.sea_surface_temperature)
-        @test sst == (noise.sea_surface_temperature * isdt) .* vars.prognostic.wiener_pattern_grid.data
+        @test sst == (a.sea_surface_temperature * isdt) .* surface[:, 1]
         @test any(!iszero, sst)
+        for k in 1:nsoil
+            @test tend(vars.tendencies.land.soil_temperature)[:, k] == (a.soil_temperature * isdt) .* surface[:, 1 + k]
+        end
+        @test all(iszero, tend(vars.tendencies.ocean.sea_ice_concentration))
     end
 end
