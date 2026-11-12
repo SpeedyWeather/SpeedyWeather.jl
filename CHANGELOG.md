@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 0.24.1
+
+- Allow DocStringExtensions v0.9 again (compat "0.9, 0.10"), default values in signatures are only shown with v0.10 via a version-dependent `SpeedyWeatherInternals.Utils.TYPEDSIGNATURES`, DocStringExtensions names are imported explicitly [#1398](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1398)
 - `OutputVariables.PrecipitableWater` output, column-integrated on the model grid before interpolation [#1370](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1370)
 - Benchmark regression check: debug mode of the benchmark suite, `regression.jl` comparing a revision with main, the latest release and the latest benchmarked revision (bisecting a regression), run weekly and on PRs labelled `benchmark-performance`, plus a Claude skill [#1299](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1299)
 

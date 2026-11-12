@@ -1,8 +1,8 @@
 module SpeedyWeather
 
 # STRUCTURE
-using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+using DocStringExtensions: TYPEDEF, TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 using StyledStrings
 
 # NUMERICS
