@@ -294,6 +294,7 @@ and divergence are stored scaled by R in addition (`scale_prognostic!`), so need
 @generated function wiener_atmosphere!(vars::Variables{Po, G, T}, noise, L, isdt, R) where {Po, G, T}
     calls = Expr[]
     for layers in (true, false), name in _tendency_names(T)
+        # R: tendencies are radius-scaled (time step Δt/R); R²: vorticity, divergence are also stored × R
         a = name in (:vorticity, :divergence) ? :(amplitude(noise, $(QuoteNode(name))) * isdt * R * R) :
             :(amplitude(noise, $(QuoteNode(name))) * isdt * R)
         push!(
