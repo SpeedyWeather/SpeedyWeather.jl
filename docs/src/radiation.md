@@ -318,7 +318,8 @@ scales the total incoming radiation.
 
 ## Shortwave radiation
 
-Currently implemented schemes:
+The surface albedo used by the shortwave radiation schemes is a separate model component,
+`model.albedo`, see [Albedo](@ref). Currently implemented shortwave schemes:
 
 ```@example radiation
 using SpeedyWeather

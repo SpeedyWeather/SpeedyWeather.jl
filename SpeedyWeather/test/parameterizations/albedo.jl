@@ -106,3 +106,66 @@ end
         end
     end
 end
+
+@testset "JinOceanAlbedo" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    ocean_albedo = JinOceanAlbedo(spectral_grid)
+    @test isbitstype(typeof(ocean_albedo))      # GPU-compatible
+
+    @testset for Model in (PrimitiveWetModel, PrimitiveDryModel)
+        model = Model(spectral_grid; albedo = OceanLandAlbedo(spectral_grid; ocean = ocean_albedo))
+        simulation = initialize!(model)
+        run!(simulation, steps = 4)
+        vars = simulation.variables
+
+        ocean_points = model.land_sea_mask.land_fraction.data .< 1
+        (; albedo, white_sky_albedo, black_sky_albedo) = vars.parameterizations.ocean
+        for ocean_surface_albedo in (albedo, white_sky_albedo, black_sky_albedo)
+            @test all(isfinite, ocean_surface_albedo)
+            @test all(0 .<= ocean_surface_albedo.data[ocean_points] .<= 1)
+        end
+
+        # no direct beam at night: black-sky falls back to the diffuse white-sky albedo,
+        # so the blended albedo is the white-sky albedo whatever the cloud cover
+        night = vars.parameterizations.cos_zenith.data .== 0
+        @test any(night)
+        @test black_sky_albedo.data[night] == white_sky_albedo.data[night]
+        @test albedo.data[night] ≈ white_sky_albedo.data[night]
+    end
+end
+
+@testset "JinOceanAlbedo components" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    NF = spectral_grid.NF
+
+    # Fresnel reflectance is ((n-1)/(n+1))² at normal and 1 at grazing incidence
+    n = NF(1.34)
+    @test SpeedyWeather.fresnel_reflectance(n, one(NF)) ≈ ((n - 1) / (n + 1))^2
+    @test SpeedyWeather.fresnel_reflectance(n, zero(NF)) ≈ 1
+
+    # components are constrained to their role
+    @test_throws TypeError JinOceanAlbedo(spectral_grid; foam = ConstantOceanVolumeScattering(spectral_grid))
+    @test_throws TypeError JinOceanAlbedo(spectral_grid; volume_scattering = WhitecapFoam(spectral_grid))
+
+    # whitecaps brighten the ocean at high wind speeds, NoFoam leaves the albedo unchanged
+    α, w = NF(0.06), NF(20)
+    foam = WhitecapFoam(spectral_grid)
+    @test foam(α, w) > α
+    @test NoFoam(spectral_grid)(α, w) == α
+    @test all(SpeedyWeather.foam_albedos(foam, α, α, w) .≈ foam(α, w))
+    @test SpeedyWeather.foam_albedos(NoFoam(), α, α, w) == (α, α)
+
+    # SpectralOceanVolumeScattering is future work: works standalone, but not (yet) within JinOceanAlbedo
+    model = PrimitiveDryModel(spectral_grid)
+    volume = SpeedyWeather.SpectralOceanVolumeScattering(spectral_grid)
+    initialize!(volume, model)
+    @test all(isfinite, volume.R₀_intercept)
+    @test all(isfinite, volume.R₀_slope)
+    for band in eachindex(volume.wavelengths)
+        @test 0 < volume((; σ = NF(0.1), αₛ = NF(0.05), band), NF(0.5)) < 1
+    end
+
+    @test_throws ArgumentError JinOceanAlbedo(spectral_grid; volume_scattering = volume)
+    albedo = JinOceanAlbedo(spectral_grid)
+    initialize!(albedo, model)
+end
