@@ -1,8 +1,8 @@
-# dispatch over model.implicit and time stepping
+# dispatch over model.time_stepping.implicit and time stepping
 implicit_correction!(vars::Variables, model::AbstractModel) =
-    implicit_correction!(vars, model.implicit, model.time_stepping, model)
+    implicit_correction!(vars, model.time_stepping.implicit, model.time_stepping, model)
 
-# model.implicit=nothing (for BarotropicModel)
+# model.time_stepping.implicit=nothing (for BarotropicModel)
 initialize!(::Nothing, ::Variables, ::AbstractModel) = nothing
 implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
 
@@ -31,6 +31,7 @@ end
 $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
 ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(; kwargs...)
+default_implicit(SG::SpectralGrid, ::Type{<:ShallowWater}) = ImplicitShallowWater(SG)
 initialize!(::ImplicitShallowWater, ::Variables, ::AbstractModel) = nothing
 
 """

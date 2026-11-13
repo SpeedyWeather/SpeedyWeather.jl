@@ -6,10 +6,11 @@
         run!(simulation, steps = 3)     # to have a non-trivial average temperature profile
 
         (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-        Tₖ = simulation.variables.dynamics.average_temperature_profile
+        temp = get_step(simulation.variables.prognostic.temperature, 1)
+        Tₖ = collect(SpeedyWeather.global_mean_temperature(temp, model.spectral_transform.norm_sphere))
         Δt = NF(2 * 1800 / model.planet.radius)    # some (scaled) time step
 
-        implicit = deepcopy(model.implicit)
+        implicit = deepcopy(model.time_stepping.implicit)
         SpeedyWeather.initialize!(implicit, Δt, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
         implicit_gauss_jordan = deepcopy(implicit)
         ξ = implicit.centering * Δt
@@ -41,9 +42,9 @@ end
         nlayers = spectral_grid.nlayers
 
         Tₖ = collect(range(NF(T_top), NF(290), nlayers))
-        model.implicit.temp_profile .= Tₖ
+        model.time_stepping.implicit.temp_profile .= Tₖ
         (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-        SpeedyWeather.initialize!(model.implicit, one(NF), Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
+        SpeedyWeather.initialize!(model.time_stepping.implicit, one(NF), Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
 
         # zonal (m=0, real) divergence modes l=1:9, uniform T = Tₖ and pₛ = 1000 hPa, in both steps
         D = zeros(Complex{NF}, spectral_grid.spectrum, nlayers)
@@ -67,7 +68,7 @@ end
 
         temp_tend = SpeedyWeather.get_tendency_step(vars.tendencies.temperature, model.time_stepping, SpeedyWeather.DynamicalCore())
         div = SpeedyWeather.get_step(vars.prognostic.divergence, 2)     # radius-scaled
-        LD = transpose(model.implicit.L * transpose(div[2:10, :]))
+        LD = transpose(model.time_stepping.implicit.L * transpose(div[2:10, :]))
         @test temp_tend[2:10, :] ≈ LD rtol = 1.0e-10
     end
 end

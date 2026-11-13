@@ -44,7 +44,6 @@ $(TYPEDFIELDS)"""
         CP,     # <:AbstractParameterization
         TS,     # <:AbstractTimeStepper,
         ST,     # <:SpectralTransform{NF},
-        IM,     # <:AbstractImplicit,
         HD,     # <:AbstractHorizontalDiffusion,
         VA,     # <:AbstractVerticalAdvection,
         HO,     # <:AbstractHoleFilling,
@@ -99,9 +98,8 @@ $(TYPEDFIELDS)"""
     @component custom_parameterization::CP = nothing
 
     # NUMERICS
-    time_stepping::TS = Leapfrog(spectral_grid)
+    time_stepping::TS = Leapfrog(spectral_grid, implicit = default_implicit(spectral_grid, PrimitiveWet))
     spectral_transform::ST = WhichTransform(spectral_grid)
-    implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
     hole_filling::HO = ClipNegatives(spectral_grid)
@@ -166,13 +164,13 @@ end
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
-at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`
+at in `time_stepping!` and `model.time_stepping.implicit` which is done in `first_timesteps!`
 (except for its schedule)."""
 function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # NUMERICS
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
-    initialize!(model.implicit, model)
+    initialize!(model.time_stepping.implicit, model)
     initialize!(model.horizontal_diffusion, model)
 
     # DYNAMICS
@@ -219,7 +217,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
 end
 
 function reinitialize!(model::PrimitiveWetModel, vars::AbstractVariables)
-    reinitialize!(model.implicit, model, vars)
+    reinitialize!(model.time_stepping.implicit, model, vars)
     return nothing
 end
 

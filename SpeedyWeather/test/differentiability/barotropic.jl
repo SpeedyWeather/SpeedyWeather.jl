@@ -124,7 +124,7 @@ end
     tendency = deepcopy(vars2.tendencies.vorticity)
     dtendency = make_zero(tendency)
 
-    implicit = model.implicit                   # `nothing` for the BarotropicModel
+    implicit = model.time_stepping.implicit                   # `nothing` for the BarotropicModel
 
     @info "Running reverse-mode AD"
     @time autodiff(

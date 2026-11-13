@@ -321,27 +321,26 @@ the semi-implicit leapfrog with Robert-Williams filter. Treating the linear term
 Lorenz average instead ("Daisuke's version", with ``L`` evaluated Crank-Nicolson on every substep) is neutral for
 gravity waves but unstable once gravity waves are Doppler-shifted by advection or coupled through
 the Coriolis force. For the 3-cycle with variants A and B the default is therefore a centering
-that varies within the cycle, optimised in a linear stability analysis to
+that varies within the cycle, optimised in a linear stability analysis for stability first:
+stable for Doppler-shifted gravity waves, with Coriolis coupling, and with a reference layer
+thickness that is larger than the actual one (e.g. over orography), also combined, up to the
+explicit stability limit of the 3-cycle (``\omega\Delta t \approx 0.58``). Among those, the centerings
+damp gravity waves with ``\omega\Delta t \le 1`` by at most 2% (A) or 5% (B) per step, fast gravity
+waves are damped more strongly.
 
-- be (almost) neutral for gravity waves with ``\omega\Delta t \lesssim 1`` and to only damp faster ones,
-- be stable for Doppler-shifted gravity waves, with Coriolis coupling, and with a reference layer
-  thickness that is larger than the actual one (e.g. over orography).
-
-| Variant | Weights ``w_k`` | Default ``\theta_k`` | Gravity wave damping per step (``\omega\Delta t \le 1.5``) |
-| ------- | --------------- | --------------------- | --------------------------------------------------- |
-| `NCycleLorenzA` | 1, 3/2, 3 | 0.116, 1.039, 0.462 | ≥ 0.997 |
-| `NCycleLorenzB` | 1, 3, 3/2 | 1.386, 0.468, -0.464 | ≥ 0.998 |
+| Variant | Weights ``w_k`` | Default ``\theta_k`` |
+| ------- | --------------- | --------------------- |
+| `NCycleLorenzA` | 1, 3/2, 3 | -1.03, 0.70, 1.05 |
+| `NCycleLorenzB` | 1, 3, 3/2 | 1.222, 1.142, -0.905 |
 
 The centering is specific to the order of the weights, so A and B need different ones.
 For other cycle lengths or variants `implicit.centering` is used on every substep. The centering
 can be chosen with the `implicit_centering` option, e.g.
 `NCycleLorenz(spectral_grid, steps=3, implicit_centering=(0.5, 0.5, 0.5))`.
-In linear analysis the Lorenz 3-cycle is limited to ``\omega\Delta t < \sqrt{3}/3 \approx 0.58`` for the
-explicitly treated terms (e.g. advection), compared to ``\omega\Delta t < 1`` for leapfrog, identically
-for A and B. In the shallow water model, however, variant B with its centering ran stably at
-longer time steps than A (up to 40min at T32 for the Galewsky jet at T85, leapfrog up to 50min,
-A up to 25min) while preserving gravity wave energy similar to leapfrog (see [Gravity waves on the sphere](@ref)).
-The default time step of `NCycleLorenz` is 30min at T32.
+In the shallow water model these defaults were stable for all time steps tested up to 60min at T32
+(gravity waves at T128) and up to 40min for the Galewsky jet at T85 (leapfrog up to 50min),
+but the Lorenz N-cycle dampens gravity waves more than leapfrog
+(see [Gravity waves on the sphere](@ref)). The default time step of `NCycleLorenz` is 30min at T32.
 
 Four weight variants are available, following the naming in [Hotta2016](@citet), selected via the
 `variant` option:
@@ -443,7 +442,8 @@ to always recompute its reference temperature profile
 ```julia
 reference_temperature = GlobalMeanReferenceTemperature()
 implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = StepSchedule(1), reference_temperature)
-model = PrimitiveWetModel(spectral_grid; implicit)
+time_stepping = Leapfrog(spectral_grid; implicit)
+model = PrimitiveWetModel(spectral_grid; time_stepping)
 ```
 
 The semi-implicit corrections are centred in time by default, `centering = 0.5` (Crank-Nicolson).

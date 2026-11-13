@@ -274,7 +274,7 @@ before this correction.
 
 The centering ``\theta_k`` can vary within the cycle, chosen with the `implicit_centering` option of
 [`NCycleLorenz`](@ref). The default for the 3-cycle is
-``\theta = (0.116, 1.039, 0.462)`` with variant A and ``\theta = (1.386, 0.468, -0.464)`` with variant B,
+``\theta = (-1.03, 0.70, 1.05)`` with variant A and ``\theta = (1.222, 1.142, -0.905)`` with variant B,
 otherwise ``\theta_k = \alpha`` (`implicit.centering`) on every
 substep, see [Implicit centering of the Lorenz N-cycle](@ref).
 

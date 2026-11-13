@@ -1,6 +1,6 @@
 # NCycleLorenz for the shallow water model: bug fixes and implicit centering
 
-> Status: **in progress**. Bugs fixed and per-substep implicit centering implemented for the 3-cycle variants A and B; N=4, AB, ABBA left for review.
+> Status: **in progress**. Bugs fixed, robust per-substep implicit centering for the 3-cycle variants A and B, implicit solver moved into the time stepper; N=4, AB, ABBA left for review.
 
 Date of initial draft: 2026-11-12
 
@@ -42,6 +42,34 @@ Base revision: 069fb09f3d4fa539fbeb27ea4c352010d6737961
   are not enough (rounded to (1.39, 0.47, -0.46) it amplifies with 1.0014).
 - In the model B turned out more stable than A (table below), although linearly both have the
   same explicit limit.
+
+> Can you update the docs example with the gravity waves into a 1km high Gaussian blob in the
+> Pacific somewhere, maybe 5˚ large and run the simulation as long as it takes for the wave to be
+> roughly 1/4 around the globe so it's like a ring around the planet / Can you rechoose the A/B
+> centerings so that it's more stable and relax the gravity wave energy constraint somewhat. It's
+> okay for NCycleLorenz to not preserve wave energy as much as Leapfrog but it being
+> unpredictably unstable is a no go.
+
+- Docs example: Gaussian blob, 1000 m, σ = 5˚ at 160˚W, 10˚N, 10 hours, plotting η.
+- Centerings re-optimised for stability margin (see "Robust centerings" below).
+
+> In the mean time, can you reorganize model.time_stepping and model.implicit. The latter is
+> dependent on the former but currently exist as independent model components, I suggest to
+> arrange them as model.time_stepping.implicit for all time steppers and then set implicit =
+> nothing for Barotropic and the implicit solvers otherwise. Adapt the current function calls and
+> barriers to this new order and label the PR as breaking
+
+- Implicit solver moved into the time steppers (see "Implicit solver as part of the time stepper").
+
+> Are the variables that ImplicitPrimitiveEquation requires actually still used? / Can you just
+> remove the average temperature profile calculation? When the GlobalMeanReferenceTemperature
+> needs it it could just calculate at that step and directly write into the vector in implicit?
+> The callback is just an example, calculate the global surface temperature differently
+
+- Removed `vars.dynamics.average_temperature_profile` and `temperature_average!` (computed every
+  step in `transform!`). `GlobalMeanReferenceTemperature` computes the global-mean profile from the
+  l=m=0 harmonic of the spectral temperature when the reference profile is recomputed
+  (`global_mean_temperature`), `GlobalSurfaceTemperatureCallback` likewise for the lowest layer.
 
 ## Problem description
 
@@ -120,8 +148,8 @@ than the actual one (H - H_b), which semi-implicit leapfrog handles unconditiona
 | Lawson / integrating factor | 1, 1 | stable | unstable (1.04-1.5) | - |
 | Milan's version, per-substep θ = (1, 1, 0), N=3 | exactly 1 (all-pass) | stable to 0.55 | stable | unstable (1.1-2.6) |
 | Milan's version, θ = (0.069, 1.028, 0.48), A (first version of this PR) | 1, 0.9997 | stable to ≈0.3 | stable | unstable for ω_LΔt ≳ 5 (1.03 at 10) |
-| **Milan's version, θ = (0.116, 1.039, 0.462), A (this PR)** | ≥ 0.997 for ωΔt ≤ 1.5 | stable to 0.4 | stable | stable |
-| **Milan's version, θ = (1.386, 0.468, -0.464), B (this PR)** | ≥ 0.998 for ωΔt ≤ 1.5 | stable to 0.4 | stable | stable |
+| Milan's version, θ = (0.116, 1.039, 0.462), A (second version of this PR) | ≥ 0.997 for ωΔt ≤ 1.5 | stable to 0.4 | stable | stable |
+| Milan's version, θ = (1.386, 0.468, -0.464), B (second version of this PR) | ≥ 0.998 for ωΔt ≤ 1.5 | stable to 0.4 | stable | stable |
 | Milan's version, θ = 0.5, B (main) | ≥ 0.72 | unstable (1.12) | stable | stable |
 
 Variant A vs B: the weights are the same in a different order, A = (1, 3/2, 3), B = (1, 3, 3/2),
@@ -141,7 +169,7 @@ but in the experiments this was not the limiting factor (not changed here).
 
 ### Experiments: docs gravity wave example (T128, 2 days, var(η)/var(η₀))
 
-| Δt at T32 | Leapfrog | main (θ=0.5) | A, θ = (0.069, 1.028, 0.48) | **A, θ = (0.116, 1.039, 0.462)** | **B, θ = (1.386, 0.468, -0.464)** |
+| Δt at T32 | Leapfrog | main (θ=0.5) | A, θ = (0.069, 1.028, 0.48) | A, θ = (0.116, 1.039, 0.462) | B, θ = (1.386, 0.468, -0.464) |
 |---|---|---|---|---|---|
 | 10 min | 0.36 | 0.011 | 0.43 | 0.43 | 0.39 |
 | 15 min | | | | 0.41 | 0.36 |
@@ -211,15 +239,76 @@ Afterwards round and re-check (two decimals are not enough, three are).
 - Galewsky jet: `ShallowWaterModel` with `ZonalJet` initial conditions and default orography, T85,
   20 days; stable = no NaNs detected.
 
+### Robust centerings (current defaults)
+
+The previous defaults, optimised for gravity wave energy, turned out unpredictably unstable in
+the model: A with (0.116, 1.039, 0.462) blew up in the Gaussian blob example at Δt_T32 = 30 and
+40 min but not at 50, in the random waves example at 30 and 40 but not at 50 and 60.
+
+Re-optimised with stability first (method as in "Methods" with these changes):
+- Extended test set, each maximised over ω_LΔt ∈ [0, 40]: pure gravity waves; orography
+  β ∈ {0.1, 0.3, 0.5, 0.7, 0.9, 1}; Doppler ω_EΔt; Doppler combined with orography
+  ``E = iω_E - βiω_L``, β ∈ {0.3, 0.7}; f-plane with ``fΔt = ω_EΔt``; with ω_EΔt (5 values) up to
+  a level ω_E,max.
+- Objective: the largest ω_E,max on the ladder 0.300, 0.325, ..., 0.575 for which all cases are
+  stable (≤ 1 + 1e-6), subject to gravity wave amplification ≥ d_min for ω_LΔt ∈ [0.05, 1] and
+  ≤ 1 for ω_LΔt ∈ [0.05, 40]. Tie-break among equal ω_E,max by high-frequency damping. 28
+  starts, 600 iterations, step 0.4 halved every 150.
+- d_min ∈ {0.99, 0.98, 0.95} all reach the full explicit limit ω_E,max = 0.575; optima are well
+  defined (top starts agree). A tie-break favouring *little* damping over ω_LΔt ≤ 10 found
+  optima with large centerings (e.g. A (7.2, -4.1, 10.1)) that damped even more in the model,
+  so the linear gravity wave damping does not predict the energy loss in the model; only the
+  stability transfers.
+
+Model sweep (variance of η relative to initial, X = blew up; gravity waves T128 2 days with
+random waves or the Gaussian blob, Galewsky jet T85 20 days), Δt_T32 = 20/30/40/50/60 min:
+
+| Scheme | Random waves | Gaussian blob | Galewsky jet |
+|---|---|---|---|
+| Leapfrog | 0.38/0.35/0.29/0.23/0.18 | 0.46/0.46/0.45/0.44/0.36 | stable to 50 |
+| A (0.116, 1.039, 0.462) (previous) | 0.38/X/X/0.16/0.18 | 0.47/8.19/7.46/0.40/0.34 | stable to 20 |
+| B (1.386, 0.468, -0.464) (previous) | 0.32/0.25/0.19/0.17/0.15 | 0.46/0.43/0.36/0.41/0.32 | stable to 40 |
+| **A (-1.03, 0.70, 1.05)** | 0.03/0.17/0.12/0.07/0.04 | 0.10/0.10/0.11/0.15/0.13 | stable to 40 |
+| **B (1.222, 1.142, -0.905)** | 0.18/0.11/0.08/0.04/0.02 | 0.18/0.22/0.22/0.23/0.18 | stable to 40 |
+
+The previous B centering was not unstable in these tests but only reaches ω_E,max = 0.425
+in the linear analysis, so it was replaced as well. Rounding: (1.2, 1.14, -0.91) is linearly
+unstable, use three decimals for B.
+
+### Implicit solver as part of the time stepper
+
+The implicit solver depends on the time stepper (e.g. ξ = 2αΔt for leapfrog, ξ = wθ_kΔt for the
+Lorenz N-cycle), so it moves from `model.implicit` to `model.time_stepping.implicit`:
+
+- `Leapfrog`, `NCycleLorenz` and `EulerForward` get a field `implicit`. Default for `Leapfrog` and
+  `NCycleLorenz` is the placeholder `DefaultImplicit()`, for `EulerForward` (ocean/land) `nothing`.
+- `default_implicit(spectral_grid, M)`: `nothing` for `Barotropic`, `ImplicitShallowWater` for
+  `ShallowWater`, `ImplicitPrimitiveEquation` for `PrimitiveEquation`.
+- The generic model constructor `M(spectral_grid; kwargs...)` replaces a `DefaultImplicit()` in
+  `time_stepping` by `default_implicit(spectral_grid, M)` (`resolve_implicit`, rebuilding the
+  time stepper with `with_implicit`), so `Leapfrog(spectral_grid)` passed to any model works as
+  before. Passing `implicit` to a model constructor throws an `ArgumentError` pointing to the
+  time stepper. The models' default `time_stepping` is constructed with
+  `implicit = default_implicit(spectral_grid, <model type>)`.
+- `variables(time_stepping, model)` collects the variables of the implicit solver (e.g. the
+  average temperature profile of `ImplicitPrimitiveEquation`), previously collected as a model
+  component.
+- All uses of `model.implicit` now read `model.time_stepping.implicit`; function barriers that
+  took `implicit` as an argument are unchanged.
+- Breaking: models no longer have an `implicit` field (one type parameter less) and the
+  constructor keyword `implicit` is removed.
+
 ## Summary of changes
 
 - Fix η tendency allocation for the shallow water model (`ts` steps).
 - Read fused spectral intermediates with `get_tendency_step` (shallow water and primitive models).
 - `NCycleLorenz` option `implicit_centering`: per-substep centering, default
-  `(0.116, 1.039, 0.462)` for `steps=3` with `NCycleLorenzA`, `(1.386, 0.468, -0.464)` with
-  `NCycleLorenzB`, `nothing` (= `implicit.centering`
+  `(-1.03, 0.70, 1.05)` for `steps=3` with `NCycleLorenzA`, `(1.222, 1.142, -0.905)` with
+  `NCycleLorenzB` (robust centerings), `nothing` (= `implicit.centering`
   on every substep) otherwise. Used by the shallow water implicit solver.
-- Docs: Lorenz N-cycle algorithm as implemented, section on implicit centering.
+- Docs: Lorenz N-cycle algorithm as implemented, section on implicit centering, implicit solver
+  section in `time_integration.md`, gravity wave example from a Gaussian blob.
+- Breaking: implicit solver as part of the time stepper, `model.time_stepping.implicit`.
 
 ## Testing and verification
 
@@ -234,9 +323,10 @@ Afterwards round and re-check (two decimals are not enough, three are).
 
 ## Known limitations
 
-- Variant A still needs a shorter time step than leapfrog (≈0.5x for the gravity wave example and
-  the Galewsky jet at T85). Variant B gets to ≈0.8x (jet) and ≈1x (gravity waves) but its
-  centering is a less well-defined optimum. The default variant is unchanged (A).
+- With the robust centerings both variants are stable up to Δt_T32 = 40 min for the Galewsky jet
+  at T85 (leapfrog 50 min) and at all tested time steps (up to 60 min) for gravity waves, but they
+  damp gravity waves considerably more than leapfrog (η variance kept 0.02-0.23 vs 0.18-0.46).
+  The default variant is unchanged (A).
 - AB and ABBA: the centering tuple has length N and is indexed by `step_counter mod N`, so A and B
   cycles cannot get different centerings; they use `implicit.centering` on every substep.
 - The implicit primitive equation solver does not use the per-substep centering.

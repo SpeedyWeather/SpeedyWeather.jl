@@ -61,7 +61,7 @@ end
 
 # dispatch over time stepper here so that other time stepper can change the order
 diffusion_and_implicit!(vars, model) =
-    diffusion_and_implicit!(vars, model.time_stepping, model.implicit, model)
+    diffusion_and_implicit!(vars, model.time_stepping, model.time_stepping.implicit, model)
 
 # implicit = nothing just call diffusion
 diffusion_and_implicit!(vars, ::AbstractTimeStepper, ::Nothing, model) = horizontal_diffusion!(vars, model)
@@ -129,7 +129,7 @@ function update_prognostic!(
     scale = prognostic.scale[]
 
     # atmospheric variables (unrolled per name so it's compile-time)
-    update_prognostic_atmosphere!(vars, clock, time_stepping, model.implicit, model, scale)
+    update_prognostic_atmosphere!(vars, clock, time_stepping, model.time_stepping.implicit, model, scale)
 
     # and time stepping for tracers if active.
     # TODO: might need to revise this to be a compile-time / generated loop
@@ -137,12 +137,12 @@ function update_prognostic!(
         if tracer.active
             var = prognostic.tracers[name]
             tendency = tendencies.tracers[name]
-            update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model, scale)
+            update_prognostic!(var, tendency, clock, time_stepping, model.time_stepping.implicit, model, scale)
         end
     end
 
     # ocean and land variables with their own time steppers (unrolled per name)
-    update_prognostic_namespaces!(vars, clock, time_stepping, model.implicit, model)
+    update_prognostic_namespaces!(vars, clock, time_stepping, model.time_stepping.implicit, model)
 
     # evolve the random pattern in time
     random_process!(vars, model.random_process)

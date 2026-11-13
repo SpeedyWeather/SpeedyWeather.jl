@@ -74,7 +74,7 @@ end
 
         # change the stratification, not just the mean, of the reference profile
         profile_change = 10 .* model.geometry.σ_levels_full
-        model.implicit.temp_profile .+= profile_change
+        model.time_stepping.implicit.temp_profile .+= profile_change
         tendency_changed_profile = grid_temperature_tendency()
 
         divergence = SpeedyWeather.get_prognostic_step(

@@ -315,12 +315,12 @@ spectral_grid = SpectralGrid(truncation=128, nlayers=1)
 
 # model components
 implicit = ImplicitShallowWater(spectral_grid, centering=0.5)
+time_stepping = Leapfrog(spectral_grid; implicit)
 orography = EarthOrography(spectral_grid, smoothing=false)
 initial_conditions = nothing                    # start from rest, set η below
-time_stepping = Leapfrog(spectral_grid)
 
 # construct, initialize
-model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit, time_stepping)
+model = ShallowWaterModel(spectral_grid; orography, initial_conditions, time_stepping)
 simulation = initialize!(model)
 
 # 1km high Gaussian blob of interface displacement η in the central Pacific
@@ -338,7 +338,8 @@ to start from rest but with a Gaussian blob of the interface displacement ``\eta
 around the globe. We set the `centering` parameter of the
 [semi-implicit time integration](@ref implicit_swm) to ``0.5`` to have a centred
 implicit scheme (Crank-Nicolson) which dampens the gravity waves less than a
-backward implicit scheme (`centering = 1`) would do.
+backward implicit scheme (`centering = 1`) would do. The implicit solver is part of the
+time stepper and therefore passed on to `Leapfrog`.
 But we also want to keep orography, and particularly no smoothing on it, to have the orography
 as rough as possible. The interface displacement is set with a function of longitude ``\lambda``
 and latitude ``\phi`` in degrees, using `spherical_distance` (with `radius=360/2π` to return

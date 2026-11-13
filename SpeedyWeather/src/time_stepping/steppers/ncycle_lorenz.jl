@@ -34,7 +34,7 @@ with F the full tendency, L the linear gravity-wave terms, w the weight and θ�
 centering of substep k (see `implicit_centering`).
 $(TYPEDFIELDS)
 """
-mutable struct NCycleLorenz{NF, V, IntType, C, S, MS, B, O, L} <: AbstractNCycleLorenz
+mutable struct NCycleLorenz{NF, V, IntType, C, S, MS, B, I, O, L} <: AbstractNCycleLorenz
     "[OPTION] Number of steps N in a cycle (3 or 4 recommended, 4 is more stable)"
     steps::IntType
 
@@ -55,6 +55,9 @@ mutable struct NCycleLorenz{NF, V, IntType, C, S, MS, B, O, L} <: AbstractNCycle
 
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
+
+    "[OPTION] Implicit solver for the gravity waves, `DefaultImplicit()` is replaced by the model's default"
+    implicit::I
 
     "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for the same N-cycle as the atmosphere"
     ocean::O
@@ -105,6 +108,7 @@ function NCycleLorenz(
         implicit_centering = default_implicit_centering(steps, variant),
         Δt_at_T32 = Minute(30),
         adjust_with_output = true,
+        implicit = DefaultImplicit(),
         ocean = nothing,    # default can't be NCycleLorenz, creates an infinite loop
         land = nothing,
     )
@@ -115,19 +119,21 @@ function NCycleLorenz(
     Δt::NF = Δt_millisec.value / 1000
 
     implicit_centering = isnothing(implicit_centering) ? nothing : NTuple{steps, NF}(implicit_centering)
-    return NCycleLorenz(steps, variant, implicit_centering, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt, ocean, land)
+    return NCycleLorenz(steps, variant, implicit_centering, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt, implicit, ocean, land)
 end
 
 """$(TYPEDSIGNATURES)
 Default implicit centering per substep of the cycle. For the 3-cycle with variant A or B these
-are centerings optimized in a linear stability analysis such that the semi-implicit scheme (with
-the linear terms inside the Lorenz average) is (almost) neutral for gravity waves with ωΔt ≲ 1
-while remaining stable with Doppler-shifted gravity waves, Coriolis coupling and a reference layer
-thickness larger than the actual one (e.g. over orography). `nothing` otherwise, meaning
+are centerings optimized in a linear stability analysis for stability rather than for preserving
+gravity wave energy: the semi-implicit scheme (with the linear terms inside the Lorenz average)
+remains stable with Doppler-shifted gravity waves, Coriolis coupling and a reference layer
+thickness larger than the actual one (e.g. over orography), also combined, up to the explicit
+stability limit of the 3-cycle, while damping gravity waves by at most 2% (A) or 5% (B) per
+step for ωΔt ≤ 1 and fast gravity waves more strongly. `nothing` otherwise, meaning
 `implicit.centering` is used on every substep."""
 default_implicit_centering(steps, variant) = nothing
-default_implicit_centering(steps, ::NCycleLorenzA) = steps == 3 ? (0.116, 1.039, 0.462) : nothing
-default_implicit_centering(steps, ::NCycleLorenzB) = steps == 3 ? (1.386, 0.468, -0.464) : nothing
+default_implicit_centering(steps, ::NCycleLorenzA) = steps == 3 ? (-1.03, 0.7, 1.05) : nothing
+default_implicit_centering(steps, ::NCycleLorenzB) = steps == 3 ? (1.222, 1.142, -0.905) : nothing
 
 """$(TYPEDSIGNATURES)
 Implicit centering for the current substep of the cycle, `implicit.centering` if

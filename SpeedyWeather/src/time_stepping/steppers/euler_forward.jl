@@ -3,7 +3,7 @@ export EulerForward
 """Euler forward time stepping, used by default for the ocean and land namespaces
 with `Leapfrog` (see its `ocean` and `land` fields). Defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct EulerForward{NF, S, B, MS} <: AbstractTimeStepper
+mutable struct EulerForward{NF, S, B, MS, I} <: AbstractTimeStepper
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
@@ -15,6 +15,9 @@ mutable struct EulerForward{NF, S, B, MS} <: AbstractTimeStepper
 
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
+
+    "[OPTION] Implicit solver, `nothing` for none, `DefaultImplicit()` is replaced by the model's default"
+    implicit::I
 end
 
 """$(TYPEDSIGNATURES)
@@ -24,11 +27,12 @@ function EulerForward(
         spectral_grid::SpectralGrid;
         Δt_at_T32 = Minute(40),
         adjust_with_output = true,
+        implicit = nothing,
     )
     (; NF, truncation) = spectral_grid
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
     Δt::NF = Δt_millisec.value / 1000
-    return EulerForward(Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt)
+    return EulerForward(Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt, implicit)
 end
 
 """$(TYPEDSIGNATURES) Initialize `E` by recalculating the time step for the resolution of `model`."""

@@ -90,7 +90,7 @@ end
     dX = rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
     dX .= real.(dX)             # make them real only to better tell them apart
     dX1 = get_step(dX, 1)
-    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.time_stepping.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Euler step does not count as time step but as step
@@ -106,7 +106,7 @@ end
     # new time step, new random tendencies
     dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
     dX .= im * imag.(dX)          # make them imaginary only to better tell them apart
-    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.time_stepping.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Leapfrog step does count!
@@ -121,7 +121,7 @@ end
 
     # new time step, new random tendencies
     dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
-    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.time_stepping.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Leapfrog step does count!
@@ -137,7 +137,7 @@ end
 
     # new time step, new random tendencies
     dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
-    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.time_stepping.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Leapfrog step does count!
@@ -374,9 +374,10 @@ end
     )
     spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
     implicit = ImplicitPrimitiveEquation(spectral_grid; reference_temperature)
-    model = PrimitiveWetModel(spectral_grid; implicit)
+    time_stepping = Leapfrog(spectral_grid; implicit)
+    model = PrimitiveWetModel(spectral_grid; time_stepping)
     simulation = initialize!(model)
-    (; implicit) = model
+    (; implicit) = model.time_stepping
     (; clock) = simulation.variables.prognostic
     σ_levels = Array(model.geometry.σ_levels_full)
     n = implicit.schedule.every_n_steps
@@ -427,7 +428,7 @@ end
     clock = Clock()
 
     # default centerings for the 3-cycle variants A and B, implicit.centering otherwise
-    for (variant, centering) in ((NCycleLorenzA(), (0.116, 1.039, 0.462)), (NCycleLorenzB(), (1.386, 0.468, -0.464)))
+    for (variant, centering) in ((NCycleLorenzA(), (-1.03, 0.7, 1.05)), (NCycleLorenzB(), (1.222, 1.142, -0.905)))
         L = NCycleLorenz(spectral_grid; steps = 3, variant)
         @test L.implicit_centering == Float32.(centering)
         for (i, θ) in enumerate(L.implicit_centering)
@@ -452,20 +453,18 @@ end
         return sum((m == 1 ? 1 : 2) * abs2(η[lm]) for (lm, (l, m)) in enumerate(zip(l_indices, m_indices)) if l > 1)
     end
 
-    variance_ratio = Dict()
-    for (name, TS) in (("Leapfrog", Leapfrog), ("NCycleLorenzA", sg -> NCycleLorenz(sg)), ("NCycleLorenzB", sg -> NCycleLorenz(sg, variant = NCycleLorenzB())))
+    # the default implicit centerings of the 3-cycle are chosen for stability (not energy preservation):
+    # stable and damping, not amplifying, also at long time steps
+    @testset for variant in (NCycleLorenzA(), NCycleLorenzB()), Δt_at_T32 in (Minute(30), Minute(60))
         spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         initial_conditions = RandomWaves(spectral_grid, lmin = 5, lmax = 15)
-        time_stepping = TS(spectral_grid)
+        time_stepping = NCycleLorenz(spectral_grid; variant, Δt_at_T32, adjust_with_output = false)
         model = ShallowWaterModel(spectral_grid; initial_conditions, time_stepping)
         simulation = initialize!(model)
         variance0 = η_variance(get_step(simulation.variables.prognostic.η, 1))
-        run!(simulation, period = Day(1))
+        run!(simulation, period = Day(2))
         @test !simulation.model.feedback.nans_detected
-        variance_ratio[name] = η_variance(get_step(simulation.variables.prognostic.η, 1)) / variance0
+        variance_ratio = η_variance(get_step(simulation.variables.prognostic.η, 1)) / variance0
+        @test 0 < variance_ratio < 1
     end
-
-    # NCycleLorenz used to damp gravity waves much stronger than Leapfrog
-    @test variance_ratio["NCycleLorenzA"] > variance_ratio["Leapfrog"] / 2
-    @test variance_ratio["NCycleLorenzB"] > variance_ratio["Leapfrog"] / 2
 end

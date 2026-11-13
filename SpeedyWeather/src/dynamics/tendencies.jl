@@ -125,7 +125,8 @@ function dynamics_tendencies!(
     drag!(vars, model)
     scale_tendencies!(vars, model)
 
-    (; geometry, spectral_transform, implicit, time_stepping) = model
+    (; geometry, spectral_transform, time_stepping) = model
+    (; implicit) = time_stepping
 
     # calculate (u_k, v_k)⋅∇ln(p_s), ∇ln(pₛ) is computed in transform! together with u, v
     pressure_gradient_flux!(vars, time_stepping)
@@ -470,7 +471,8 @@ So that the second term inside the Laplace operator can be added to the Bernoull
 Rd is the gas constant, Tᵥ the virtual temperature, Tᵥ' its anomaly wrt to the
 average or reference temperature Tₖ, and ln(pₛ) is the logarithm of surface pressure."""
 function linear_pressure_gradient!(vars::Variables, model::PrimitiveEquation)
-    (; atmosphere, implicit, time_stepping) = model
+    (; atmosphere, time_stepping) = model
+    (; implicit) = time_stepping
     return linear_pressure_gradient!(vars, atmosphere, implicit, time_stepping)
 end
 
@@ -505,7 +507,8 @@ function vordiv_tendencies!(
         vars::Variables,
         model::PrimitiveEquation,
     )
-    (; coriolis, atmosphere, geometry, implicit, spectral_transform, time_stepping) = model
+    (; coriolis, atmosphere, geometry, spectral_transform, time_stepping) = model
+    (; implicit) = time_stepping
     return vordiv_tendencies!(vars, coriolis, atmosphere, geometry, implicit, spectral_transform, time_stepping)
 end
 
@@ -567,7 +570,7 @@ function vordiv_grid_tendencies!(
 end
 
 vordiv_grid_tendencies!(vars::Variables, model::PrimitiveEquation) =
-    vordiv_grid_tendencies!(vars, model.coriolis, model.atmosphere, model.geometry, model.implicit, model.time_stepping)
+    vordiv_grid_tendencies!(vars, model.coriolis, model.atmosphere, model.geometry, model.time_stepping.implicit, model.time_stepping)
 
 """$(TYPEDSIGNATURES)
 
@@ -672,7 +675,8 @@ Compute the gridded contribution to the temperature tendency:
 * adds the adiabatic + T'D terms to `temp_tend_grid` via `_temperature_tendency_kernel!`
 * writes `(uT_anomaly_grid, vT_anomaly_grid) = (u·T', v·T')` for the flux divergence."""
 function temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation)
-    (; adiabatic_conversion, atmosphere, implicit, time_stepping) = model
+    (; adiabatic_conversion, atmosphere, time_stepping) = model
+    (; implicit) = time_stepping
     temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, DynamicalCore())
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
@@ -1133,7 +1137,7 @@ function bernoulli_potential!(
     # Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
     # average or reference temperature Tₖ, pₛ is the surface pressure.
     # broadcast 1D Tₖ (1 value per layer) over 2D pₛ (one value per grid point) to 3D
-    # Tₖ = model.implicit.temp_profile                # average layer temperature (1D)
+    # Tₖ = model.time_stepping.implicit.temp_profile                # average layer temperature (1D)
     # pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
     # RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
 
@@ -1235,19 +1239,6 @@ function volume_flux_divergence_spectral!(
     return nothing
 end
 
-
-"""$(TYPEDSIGNATURES)
-Calculates the average temperature of a layer from the l=m=0 harmonic
-and stores the result in `diagn.temp_average`"""
-function temperature_average!(
-        vars::Variables,
-        temp::LowerTriangularArray,
-        S::AbstractSpectralTransform,
-    )
-    # average from l=m=0 harmonic divided by norm of the sphere
-    @. vars.dynamics.average_temperature_profile = real(temp[1, :]) / S.norm_sphere
-    return nothing
-end
 
 function reset_tendencies!(vars::Variables, time_stepping::AbstractTimeStepper; value = 0)
     _reset_tendencies!(vars.tendencies, time_stepping, value)

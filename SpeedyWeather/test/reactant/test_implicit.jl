@@ -7,12 +7,14 @@ function implicit_test_simulation(arch, schedule)
     spectral_grid = SpectralGrid(; architecture = arch, nlayers = nlayers_for_model(PrimitiveWetModel), truncation = TRUNCATION)
     reference_temperature = GlobalMeanReferenceTemperature{spectral_grid.NF}()     # recomputed on the schedule
     implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = deepcopy(schedule), reference_temperature)
-    return initialize!(create_model(PrimitiveWetModel, arch; implicit))
+    time_stepping = Leapfrog(spectral_grid; implicit)
+    return initialize!(create_model(PrimitiveWetModel, arch; time_stepping))
 end
 
-function set_temperature_profiles!(implicit, vars, reference, average)
+function set_temperature_profiles!(implicit, vars, reference, average, norm_sphere)
     implicit.temp_profile .= reference
-    vars.dynamics.average_temperature_profile .= average
+    # global-mean temperature profile from the l=m=0 harmonic, all layers and steps
+    view(vars.prognostic.temperature.data, 1:1, :, :) .= average * norm_sphere
     return nothing
 end
 
@@ -22,12 +24,14 @@ A leapfrog step (time step 2Δt) with the time step the implicit solver was init
 only the schedule decides whether the reference profile is updated."""
 function reference_temperature_after_reinitialize!(simulation, time_step_counter)
     vars, model = SpeedyWeather.unpack(simulation)
-    (; implicit, time_stepping, architecture) = model
+    (; time_stepping, architecture) = model
+    (; implicit) = time_stepping
+    (; norm_sphere) = model.spectral_transform
     NF = eltype(implicit.temp_profile)
 
     copy!(vars.prognostic.clock, Clock(step_counter = 2, time_step_counter = time_step_counter, Δt = time_stepping.Δt_millisec))
     implicit.Δt[] = SpeedyWeather.scalar_ref(architecture, 2 * time_stepping.Δt)[]
-    @maybe_jit architecture set_temperature_profiles!(implicit, vars, NF(250), NF(300))
+    @maybe_jit architecture set_temperature_profiles!(implicit, vars, NF(250), NF(300), norm_sphere)
     @maybe_jit architecture SpeedyWeather.reinitialize!(implicit, model, vars)
     return Array(on_architecture(SpeedyWeather.CPU(), implicit.temp_profile))
 end

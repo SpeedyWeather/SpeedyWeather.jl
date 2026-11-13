@@ -113,3 +113,22 @@ where `;` matches the `time_stepping` keyword argument by name. If you name `lea
 would need to change this to `time_stepping=leapfrog` in the function call arguments. The same
 keyword takes any time stepper, e.g. `time_stepping = NCycleLorenz(spectral_grid)` for the
 [Lorenz N-cycle](@ref ncycle).
+
+## Implicit solver
+
+The semi-implicit solver for the gravity waves depends on the time stepper and is therefore
+part of it, as its `implicit` field, i.e. `model.time_stepping.implicit`. By default
+(`implicit = DefaultImplicit()`) it is chosen by the model when the time stepper is passed on
+to the model constructor: `nothing` (no implicit solver) for the `BarotropicModel`,
+[`ImplicitShallowWater`](@ref) for the `ShallowWaterModel` and [`ImplicitPrimitiveEquation`](@ref)
+for the primitive equation models. To change it, pass it on to the time stepper, e.g.
+
+```@example leapfrog
+implicit = ImplicitPrimitiveEquation(spectral_grid, centering = 1)    # backward Euler
+time_stepping = Leapfrog(spectral_grid; implicit)
+model = PrimitiveDryModel(spectral_grid; time_stepping)
+model.time_stepping.implicit
+```
+
+see [Semi-implicit time integration](@ref implicit_swm) (shallow water) and
+[Semi-implicit time stepping](@ref implicit_primitive) (primitive equations).
