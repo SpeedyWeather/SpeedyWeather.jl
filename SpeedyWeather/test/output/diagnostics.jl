@@ -7,7 +7,7 @@
     # spin-up: Euler Δt/2, leapfrog Δt but rewinding the clock by Δt/2, then Δt
     elapsed = map(0:3) do step_counter
         clock.step_counter = step_counter
-        SpeedyWeather.elapsed_time(time_stepping, clock)
+        SpeedyWeather.clock_increment(time_stepping, clock)
     end
     @test elapsed == [Δt / 2, Δt / 2, Δt, Δt]
 end
@@ -33,7 +33,7 @@ end
     vars.parameterizations.rain_rate_large_scale .= 2
     vars.output.rain_large_scale .= 1
     SpeedyWeather.diagnostic!(vars, model.diagnostics.rain_large_scale, model)
-    Δt = SpeedyWeather.elapsed_time(model.time_stepping, vars.prognostic.clock)
+    Δt = SpeedyWeather.clock_increment(model.time_stepping, vars.prognostic.clock)
     @test all(vars.output.rain_large_scale .≈ 1 + 2 * Δt)
 
     # reset to zero

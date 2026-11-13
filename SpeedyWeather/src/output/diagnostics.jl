@@ -89,7 +89,7 @@ function diagnostic!(vars::AbstractVariables, accumulate::Accumulate, model::Abs
     has_variable(vars.parameterizations, namespace, rate) || return nothing
     rate_field = get_variable(vars.parameterizations, namespace, rate)
     accumulated = get_variable(vars.output, namespace, name)
-    Δt = elapsed_time(model.time_stepping, vars.prognostic.clock)   # model time [s] of this time step
+    Δt = clock_increment(model.time_stepping, vars.prognostic.clock)   # model time [s] of this time step
     accumulated .+= Δt .* rate_field
     return nothing
 end

@@ -327,7 +327,7 @@ function Base.filter!(vars::Variables, soil::LandBucketMoisture, model::Primitiv
     f₁ = γ * model.land.geometry.layer_thickness[1]
     f₂ = γ * model.land.geometry.layer_thickness[2]
     p = soil.infiltration_fraction      # fraction of top layer runoff put into lower layer
-    Δt = elapsed_time(model.time_stepping, vars.prognostic.clock)   # model time [s] of this step to convert runoff [m] into a rate [m/s]
+    Δt = clock_increment(model.time_stepping, vars.prognostic.clock)   # model time [s] of this step to convert runoff [m] into a rate [m/s]
     params = (; f₁, f₂, p, Δt)
 
     launch!(

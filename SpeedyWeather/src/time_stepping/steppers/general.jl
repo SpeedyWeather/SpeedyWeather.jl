@@ -13,7 +13,7 @@ time_step(time_stepping::AbstractTimeStepper, clock) = default_time_step(time_st
 tendencies are integrated over (e.g. 2Δt for leapfrog), this sums to the simulated period
 and is used to integrate rates over time, e.g. precipitation. Extend for time steppers with
 changing time steps, e.g. `Leapfrog` on its spin-up steps."""
-elapsed_time(time_stepping::AbstractTimeStepper, clock) = time_stepping.Δt
+clock_increment(time_stepping::AbstractTimeStepper, clock) = time_stepping.Δt
 
 """$(TYPEDSIGNATURES)
 Time stepper for `:atmosphere`, `:ocean` (incl sea ice) or `:land` within the `time_stepping`

@@ -41,7 +41,7 @@ Base revision: e292baf012d70813f9eab23081661bf1e168c3fb
   the nested rate output variables (`ConvectiveRainRate` etc.) and their post-processing are
   removed, precipitation output is the accumulation since the last output. Diagnostics no
   longer declare the variables they read (warn on initialization, skip silently). `Δt` of the
-  accumulation is the model time of the step (`elapsed_time`, Δt/2 on leapfrog spin-up steps),
+  accumulation is the model time of the step (`clock_increment`, Δt/2 on leapfrog spin-up steps),
   also for the river runoff rate. Compile-time unrolled loop over the diagnostics.
 
 > I believe the diagnostic should be responsible for the accumulation (with +, or max etc) but the
@@ -52,6 +52,10 @@ Base revision: e292baf012d70813f9eab23081661bf1e168c3fb
 
 > isn't the `initialize!` called before the variables are allocated?
 > Shouldn't the reset be to -Inf? Otherwise you'll have `max(NaN, x) = NaN`?
+
+> What about `time_since_output`? ... Yes clock_increment is good!
+- 2026-11-13: `elapsed_time` renamed to `clock_increment` (review: read as total simulated time);
+  it is the model time the clock advances in one step, also used by the soil-moisture filter.
 
 ## Problem description
 
@@ -129,20 +133,20 @@ Implemented (`output/diagnostics.jl`):
   fallbacks untyped in all but the diagnostic to avoid method ambiguities with custom diagnostics.
   `diagnostics!`/`reset_diagnostics!` unrolled at compile time over the `NamedTuple`.
 - `diagnostics!(vars, model)` is called in `time_step!(simulation)` after the time step and before
-  the clock is stepped (spin-up steps included), so `elapsed_time(time_stepping, clock)` is the
+  the clock is stepped (spin-up steps included), so `clock_increment(time_stepping, clock)` is the
   model time of this step: Δt/2, Δt/2, then Δt for `Leapfrog` (its clock rewinds by Δt/2 on the
   second step), Δt otherwise. `time_step` would be the leapfrog integration step 2Δt.
 - `diagnostics::DG` field in `PrimitiveWetModel` (default `PrecipitationDiagnostics()`) and
   `PrimitiveDryModel` (default `(;)`). `initialize!(vars, model.diagnostics, model)` runs before
   the initial conditions so `StartFromFile` can overwrite them.
-- `Accumulate(; rate, name, namespace, units, desc)`: adds `elapsed_time * rate`, reset to 0.
+- `Accumulate(; rate, name, namespace, units, desc)`: adds `clock_increment * rate`, reset to 0.
 - `Maximum(; variable, group, namespace, name, units)`: running maximum, reset to -Inf (NaNs propagate).
 - `Mean(; variable, group, namespace, name, units)`: incremental running mean with a step count
   (`<name>_count`), reset to NaN/0, readable at any time.
 - Diagnostics do not declare the variables they read: warn on initialization, skip silently.
 - `PrecipitationDiagnostics()`: `Accumulate`s for large-scale and convective rain and snow and
   `land.river_runoff`. Convection and large-scale condensation no longer accumulate; the soil
-  moisture filter writes `land.river_runoff_rate` [m/s] = runoff / `elapsed_time`.
+  moisture filter writes `land.river_runoff_rate` [m/s] = runoff / `clock_increment`.
 - Output: `ConvectiveRain`, `LargeScaleRain`, … are the accumulation since the last output [mm];
   `ConvectiveRainRate` etc., `AbstractRateOutputVariable` and the `finalize!` post-processing removed.
 - Restart files store `variables.output`, `StartFromFile` restores the entries present in both.
@@ -153,7 +157,7 @@ Implemented (`output/diagnostics.jl`):
   and not in `vars.parameterizations`, `OutputVariable` type.
 - Existing convection, large-scale condensation, land time stepping and output tests updated to
   the new paths and run; convection and soil moisture tests now check rates × Δt.
-- `test/output/diagnostics.jl`: leapfrog `elapsed_time`; `Accumulate` adds `Δt * rate`, resets,
+- `test/output/diagnostics.jl`: leapfrog `clock_increment`; `Accumulate` adds `Δt * rate`, resets,
   warns and skips without convection; `ArrayOutput` every 6h resets all diagnostics and the sum
   over all outputs equals the accumulation of a run without output; `Maximum`/`Mean` unit tests;
   restart round trip of `variables.output`.
