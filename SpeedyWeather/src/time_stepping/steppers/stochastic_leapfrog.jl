@@ -334,32 +334,73 @@ function wiener_tendencies!(
     )
     isdt = 1 / sqrt(L.Δt)               # Δt in [s], the Wiener increment scaling
     R = vars.prognostic.scale[]         # radius scaling
-
-    # ATMOSPHERE, slots of the spectral pattern: variables with layers first, then single-layer ones
-    offset = 0
-    for layers in (true, false), name in tendency_names(vars)
-        tendency = get_tendency_step(getfield(vars.tendencies, name), L, noise)
-        has_layers(tendency) == layers || continue
-
-        # after the dynamical core the tendencies are scaled with the radius R (scale_tendencies!,
-        # the time step is Δt/R), vorticity and divergence are stored scaled by R in addition
-        # (scale_prognostic!), so need R once more
-        a = amplitude(noise, name) * isdt * R * (name in (:vorticity, :divergence) ? R : one(R))
-        wiener!(tendency, vars.prognostic.wiener_pattern, a, layers ? noise.taper : nothing, offset)
-        offset += nslots(tendency)
-    end
-
-    # OCEAN, LAND, slots of the grid-point pattern for variables with a nonzero amplitude, not
-    # radius-scaled: ocean and land variables are stepped with the unscaled time step
-    offset = 0
-    for (namespace, names) in ((:ocean, ocean_tendency_names(vars)), (:land, land_tendency_names(vars))), name in names
-        a = amplitude(noise, name)
-        iszero(a) && continue
-        tendency = get_tendency_step(getfield(getfield(vars.tendencies, namespace), name), L, noise)
-        wiener!(tendency, vars.prognostic.wiener_pattern_surface, a * isdt, nothing, offset)
-        offset += nslots(tendency)
-    end
+    wiener_atmosphere!(vars, noise, L, isdt, R)
+    wiener_surface!(vars, noise, L, isdt)
     return nothing
+end
+
+# The drivers below are unrolled over the variable names, which are compile-time constants (they
+# come from the type of the `Variables`), so that every `getfield` infers concretely; a loop over
+# `tendency_names(vars)` would dispatch at runtime on every variable. Same pattern as
+# `update_prognostic_atmosphere!` and `update_prognostic_namespaces!`.
+
+"""$(TYPEDSIGNATURES)
+Add the noise to the atmospheric tendencies. Slots of the spectral pattern: variables with layers
+first, then single-layer variables, each in the order of `tendency_names`. After the dynamical core
+the tendencies are scaled with the radius R (`scale_tendencies!`, the time step is Δt/R), vorticity
+and divergence are stored scaled by R in addition (`scale_prognostic!`), so need R once more."""
+@generated function wiener_atmosphere!(vars::Variables{Po, G, T}, noise, L, isdt, R) where {Po, G, T}
+    calls = Expr[]
+    for layers in (true, false), name in _tendency_names(T)
+        a = name in (:vorticity, :divergence) ? :(amplitude(noise, $(QuoteNode(name))) * isdt * R * R) :
+            :(amplitude(noise, $(QuoteNode(name))) * isdt * R)
+        push!(
+            calls, :(
+                offset = wiener_slots!(
+                    getfield(vars.tendencies, $(QuoteNode(name))), vars.prognostic.wiener_pattern,
+                    $a, noise.taper, offset, Val($layers), L, noise,
+                )
+            )
+        )
+    end
+    return Expr(:block, :(offset = 0), calls..., :(return nothing))
+end
+
+# add the noise to the tendency `var` if its layers match the pass `layers` (with layers first, then
+# without), return the next slot of the pattern; `has_layers` of a concrete type is a constant
+@inline function wiener_slots!(var, pattern, a, taper, offset, ::Val{layers}, L, noise) where {layers}
+    tendency = get_tendency_step(var, L, noise)
+    has_layers(tendency) == layers || return offset
+    wiener!(tendency, pattern, a, layers ? taper : nothing, offset)
+    return offset + nslots(tendency)
+end
+
+"""$(TYPEDSIGNATURES)
+Add the noise to the ocean and land tendencies. Slots of the grid-point pattern only for variables
+with a nonzero amplitude, not radius-scaled: ocean and land variables are stepped with the unscaled
+time step. Without any such variable there is no `wiener_pattern_surface` and nothing to do."""
+@generated function wiener_surface!(vars::Variables{Po, G, T}, noise, L, isdt) where {Po, G, T}
+    :wiener_pattern_surface in fieldnames(Po) || return :(return nothing)
+    calls = Expr[]
+    for namespace in (:ocean, :land), name in _namespace_names(T, namespace)
+        push!(
+            calls, :(
+                offset = wiener_surface_slots!(
+                    getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),
+                    vars.prognostic.wiener_pattern_surface, amplitude(noise, $(QuoteNode(name))),
+                    isdt, offset, L, noise,
+                )
+            )
+        )
+    end
+    return Expr(:block, :(offset = 0), calls..., :(return nothing))
+end
+
+@inline function wiener_surface_slots!(var, pattern, a, isdt, offset, L, noise)
+    iszero(a) && return offset
+    tendency = get_tendency_step(var, L, noise)
+    wiener!(tendency, pattern, a * isdt, nothing, offset)
+    return offset + nslots(tendency)
 end
 
 # tendency[i, k] += a * taper[k] * pattern[i, offset + k] for every spectral or grid index i, layer k
