@@ -1,6 +1,7 @@
 # IMPLEMENTATION NOTES (status 2026-11-12, see also time_stepping/steppers/stochastic_leapfrog.jl)
 # - Renamed `random_process!(vars, process)` -> `update_random!` (breaking for user-defined processes);
-#   `random_process!(vars, time_stepping, model)` is now the time stepper's noise hook.
+#   `random_process!(vars, time_stepping, model)` now adds the noise of a stochastic time stepper
+#   (called in `time_step!` before `diffusion_and_implicit!`, see time_stepping/steppers/stochastic_leapfrog.jl).
 # - Two levels: `update_random!(pattern, process)` on an array (any component can own a process and its
 #   pattern), `update_random!(vars, process)` for `model.random_process` (default: the spectral
 #   `vars.prognostic.random_pattern`, `GridWhiteNoiseProcess`: `vars.grid.random_pattern`).

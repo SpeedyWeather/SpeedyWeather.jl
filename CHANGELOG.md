@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Introduces a `StochasticLeapfrog` integrator that uses a Wiener process for a stochastic integration of the model, revised `AbstractRandomProcess` to accomodate for that [#1397](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1397)
+- Introduces a `StochasticLeapfrog` integrator that uses a Wiener process for a stochastic integration of the model, revised `AbstractRandomProcess` to accomodate for that (`random_process!(vars, process)` is now `update_random!`) [#1397](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1397)
 
 ## 0.24.0
 

@@ -9,6 +9,7 @@ SpeedyWeather.jl supports several time integration schemes, selected by passing 
 
 - [`Leapfrog`](@ref leapfrog), a 2-step leapfrog scheme with a Robert-Asselin and Williams filter
   (the default for `ShallowWaterModel`, `PrimitiveDryModel` and `PrimitiveWetModel`), described below.
+- [`StochasticLeapfrog`](@ref stochastic_leapfrog), the leapfrog scheme with additive Wiener noise.
 - [`NCycleLorenz`](@ref ncycle), a family of semi-implicit Lorenz N-cycle schemes
   ([Hotta2016](@citep); the default for `BarotropicModel`).
 
@@ -133,6 +134,74 @@ weights ``w_1 = \tfrac{\nu\alpha}{2}`` and ``w_2 = \tfrac{\nu(1-\alpha)}{2}`` (b
 on the unfiltered initial steps) and applies the leapfrog step, the Robert-Asselin and the
 Williams filter in a single kernel per spectral coefficient (and vertical layer).
 
+## [Stochastic leapfrog](@id stochastic_leapfrog)
+
+`StochasticLeapfrog` is the leapfrog scheme above with additive Wiener noise, it integrates
+the stochastic differential equation
+```math
+dx = F(x)dt + a dW
+```
+for every prognostic variable ``x`` with the deterministic tendencies ``F`` of the model and
+white noise of a fixed amplitude ``a`` (`AdditiveWienerNoise`: independent in time, between
+variables and between layers, spectrally flat by default). Every time step a new pattern
+``\xi_i`` of unit variance is drawn and ``a\xi_i / \sqrt{\Delta t}`` is added to the tendencies,
+so that the state receives increments ``\propto a\sqrt{\Delta t}\xi_i``, whose variance grows
+linearly in time independent of the time step.
+
+The scheme is *drift-implicit*: the noise is treated explicitly and is added to the complete
+explicit tendencies right before the implicit terms of the time stepping. Splitting the
+tendencies ``F = N + L`` into the terms ``N`` that are treated explicitly and the linear terms
+``L`` that are treated implicitly (the [horizontal diffusion](@ref diffusion) with ``\alpha = 1``
+and the gravity waves of the [semi-implicit time stepping](@ref implicit_primitive) with the
+centering ``\alpha = \tfrac{1}{2}`` by default), a time step is
+```math
+x_{i+1} = x_{i-1} + 2\Delta t (1 - 2\Delta t \alpha L)^{-1}
+\left[ N(x_i) + L x_{i-1} + \frac{a}{\sqrt{\Delta t}} \xi_i \right]
+```
+followed by the [Robert-Asselin and Williams filter](@ref "Robert-Asselin and Williams filter").
+The noise is therefore on the right-hand side of the implicit solves like every explicit
+tendency and the implicit terms damp it within the time step, as they do in the exact solution
+of the linear problem, in which the noise enters as ``\int e^{L(t-s)} a dW(s)``.
+Implementation-wise, `time_step!` calls `random_process!(vars, time_stepping, model)` between the
+dynamical core and `diffusion_and_implicit!`, which for `StochasticLeapfrog` adds the noise to
+the spectral tendencies and does nothing for the other time steppers.
+
+This is how stiff linear terms are treated in the standard schemes for stochastic
+differential equations
+
+- The implicit Euler schemes of [KloedenPlaten1992](@citet) (chapter 12) and the stochastic
+  theta method [Higham2000](@citep) evaluate the drift (partly) at the new time step and add
+  the Wiener increment ``\Delta W_i`` explicitly,
+  ``x_{i+1} = x_i + \Delta t [\theta F(x_{i+1}) + (1-\theta) F(x_i)] + a \Delta W_i``.
+- The stochastic semi-implicit leapfrog scheme analysed for geophysical models by
+  [EwaldTemam2005](@citet), in its weak version [EwaldWeakSchemes](@citep)
+  ``x_{i+1} = x_{i-1} + 2\Delta t N(x_i) + 2\Delta t L x_{i+1} + a(\Delta W_{i-1} + \Delta W_i)``.
+
+Two properties of the scheme here are worth knowing
+
+- One increment ``2a\sqrt{\Delta t}\xi_i`` is added per leapfrog step, not the sum of two
+  increments as in [EwaldTemam2005](@citet). The physical mode (the mean of the two interleaved
+  leapfrog sequences) receives the same ``a\sqrt{\Delta t}(\xi_{i-1} + \xi_i)``, but the noise
+  also excites the computational mode, which the time filter damps. The filter is hence
+  part of the stochastic scheme.
+- The alternative of adding the noise after the implicit terms (a split-step scheme,
+  [HighamMaoStuart2002](@citealp)) converges to the same equation for ``\Delta t \to 0`` and
+  injects exactly the specified noise covariance. However, it leaves the noise undamped in the
+  stiff modes, which are implicit because they are stiff: the smallest scales
+  (``2\Delta t \nu \approx 0.3`` at the truncation wavenumber with the default resolution and diffusion) and the
+  fast gravity waves. The two variants agree where ``2\Delta t L`` is small, i.e. on the large scales.
+
+The diffusion the noise injects is the nominal ``a^2\sigma^2/2`` (``\sigma`` is the standard
+deviation of the pattern) only for modes for which neither the implicit terms nor the time
+filter matter, it should be measured for the scales of interest. Ocean and land variables have
+no implicit terms and are stepped with `EulerForward` (see [Ocean, sea ice and land](@ref)),
+for them the scheme is the Euler-Maruyama method with grid-point white noise.
+
+````@docs; canonical=false
+StochasticLeapfrog
+AdditiveWienerNoise
+````
+
 ## [Time steppers and variable steps](@id steps)
 
 Different time integration schemes need to store a different number of past states of the
@@ -226,7 +295,9 @@ When writing a new time stepper you implement the `*_steps` methods (how many st
 Time steppers can also reorder how diffusion and the semi-implicit correction are applied via
 `diffusion_and_implicit!`: Leapfrog applies the implicit correction first, then horizontal
 diffusion, while the Lorenz N-cycle applies diffusion first, then the implicit correction
-(consistent with the ordering in [Hotta2016](@citet)).
+(consistent with the ordering in [Hotta2016](@citet)). Right before, a stochastic time stepper
+adds its noise to the complete explicit tendencies with `random_process!`, see
+[Stochastic leapfrog](@ref stochastic_leapfrog).
 
 ### Ocean, sea ice and land
 

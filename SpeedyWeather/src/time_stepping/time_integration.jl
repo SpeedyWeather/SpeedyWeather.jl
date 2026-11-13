@@ -50,8 +50,8 @@ function time_step!(
     reinitialize!(model, vars)
     reset_tendencies!(vars, time_stepping)      # set the tendencies back to zero for accumulation
 
-    random_process!(vars, time_stepping, model)   # stochastic time steppers only, e.g. StochasticLeapfrog
     dynamics_tendencies!(vars, model)
+    random_process!(vars, time_stepping, model) # stochastic time steppers only: noise before the implicit terms
     diffusion_and_implicit!(vars, model)        # dispatch over time stepper and implicit so that the order can be changed
     update_prognostic!(vars, model)             # step prognostic variables forward
     transform!(vars, model)                     # new spectral state to grid
@@ -61,13 +61,12 @@ function time_step!(
 end
 
 """$(TYPEDSIGNATURES)
-Add the stochastic (Wiener) increment of a stochastic time stepper to the tendencies, called
-after the parameterizations and before the dynamical core, i.e. where a forcing would add to
-the tendencies. Deterministic time steppers do nothing, see `StochasticLeapfrog`."""
+Add the noise (Wiener increment) of a stochastic time stepper to the tendencies. Called after
+the dynamical core, when the explicit tendencies are complete, and before the implicit terms
+(horizontal diffusion, semi-implicit correction), which therefore act on the noise like on
+every explicit tendency (drift-implicit, see `StochasticLeapfrog`). Deterministic time
+steppers do nothing."""
 random_process!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
-# NOTE (2026-11-12): placed where the FokkerPlanckSensitivities.jl project added its noise (bitwise
-# reproduction). Planned: move into a `diffusion_and_implicit!` method of `StochasticLeapfrog` and
-# remove this hook, see the implementation notes in time_stepping/steppers/stochastic_leapfrog.jl
 
 # dispatch over time stepper here so that other time stepper can change the order
 diffusion_and_implicit!(vars, model) =
@@ -108,8 +107,8 @@ function time_step!(
     end
 
     if model.dynamics                           # switch on/off all dynamics
-        random_process!(vars, time_stepping, model)   # stochastic time steppers only, e.g. StochasticLeapfrog
         dynamics_tendencies!(vars, model)       # dynamical core
+        random_process!(vars, time_stepping, model) # stochastic time steppers only: noise before the implicit terms
         diffusion_and_implicit!(vars, model)    # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
         parameterization_tendencies_only!(vars, model)

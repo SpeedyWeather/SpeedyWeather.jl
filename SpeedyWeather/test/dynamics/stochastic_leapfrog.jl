@@ -91,9 +91,9 @@ end
         @test n == (Model <: BarotropicModel ? nlayers : Model <: ShallowWaterModel ? 2nlayers + 1 :
             Model <: PrimitiveDryModel ? 3nlayers + 1 : 4nlayers + 1)
 
-        # temperature, humidity, pressure forced in grid space; among ocean and land variables only
-        # the sea surface temperature has a (default) amplitude
-        @test haskey(vars.grid, :wiener_pattern) == primitive
+        # all atmospheric variables are forced in spectral space; among ocean and land variables
+        # only the sea surface temperature has a (default) amplitude
+        @test !haskey(vars.grid, :wiener_pattern)
         @test haskey(vars.prognostic, :wiener_pattern_surface) == primitive
         primitive && @test size(vars.prognostic.wiener_pattern_surface, 2) == 1
     end
@@ -126,7 +126,7 @@ end
 
     for Δt in (Minute(20), Minute(40))
         set!(L, Δt)
-        SpeedyWeather.wiener_draw!(vars, noise, model)  # a pattern to apply
+        SpeedyWeather.wiener_draw!(vars, noise)         # a pattern to apply
         SpeedyWeather.reset_tendencies!(vars, L)
         SpeedyWeather.wiener_tendencies!(vars, noise, L, model)
 
@@ -134,17 +134,18 @@ end
         R = vars.prognostic.scale[]
         a = noise.amplitudes
         spec = vars.prognostic.wiener_pattern.data
-        grid = vars.grid.wiener_pattern.data
         surface = vars.prognostic.wiener_pattern_surface.data
         tend(x) = get_step(x, 1).data      # the (only) tendency step, as plain array
         for k in 1:nlayers
             t = noise.taper[k]
-            @test tend(vars.tendencies.vorticity)[:, k] == (a.vorticity * isdt * R * t) .* spec[:, k]
-            @test tend(vars.tendencies.divergence)[:, k] == (a.divergence * isdt * R * t) .* spec[:, nlayers + k]
-            @test tend(vars.tendencies.grid.temperature)[:, k] == (a.temperature * isdt * t) .* grid[:, 2nlayers + k]
-            @test tend(vars.tendencies.grid.humidity)[:, k] == (a.humidity * isdt * t) .* grid[:, 3nlayers + k]
+            # spectral tendencies, radius-scaled as after the dynamical core (vorticity, divergence twice)
+            @test tend(vars.tendencies.vorticity)[:, k] == (a.vorticity * isdt * R * R * t) .* spec[:, k]
+            @test tend(vars.tendencies.divergence)[:, k] == (a.divergence * isdt * R * R * t) .* spec[:, nlayers + k]
+            @test tend(vars.tendencies.temperature)[:, k] == (a.temperature * isdt * R * t) .* spec[:, 2nlayers + k]
+            @test tend(vars.tendencies.humidity)[:, k] == (a.humidity * isdt * R * t) .* spec[:, 3nlayers + k]
         end
-        @test tend(vars.tendencies.grid.pressure) == (a.pressure * isdt) .* grid[:, 4nlayers + 1]
+        @test tend(vars.tendencies.pressure) == (a.pressure * isdt * R) .* spec[:, 4nlayers + 1]
+        @test all(iszero, tend(vars.tendencies.grid.temperature))   # nothing in grid space
         sst = tend(vars.tendencies.ocean.sea_surface_temperature)
         @test sst == (a.sea_surface_temperature * isdt) .* surface[:, 1]
         @test any(!iszero, sst)
@@ -153,4 +154,53 @@ end
         end
         @test all(iszero, tend(vars.tendencies.ocean.sea_ice_concentration))
     end
+end
+
+@testset "StochasticLeapfrog: noise before the implicit terms" begin
+    # drift-implicit: random_process! adds the noise to the tendencies, then the implicit terms
+    # (diffusion_and_implicit!) act on tendency + noise; deterministic time steppers add nothing
+    for Model in (BarotropicModel, ShallowWaterModel, PrimitiveWetModel)
+        nlayers = Model <: PrimitiveWetModel ? 4 : 1
+        spectral_grid = SpectralGrid(; truncation = 21, nlayers)
+        kw = Model <: PrimitiveWetModel ? (; pressure = 1.0e-5) : (; vorticity = 1.0e-7)
+        L = StochasticLeapfrog(spectral_grid; seed = 1, kw...)
+        model = Model(spectral_grid; time_stepping = L)
+        simulation = seeded_initialize!(model)
+        run!(simulation, steps = 3)             # initializes the implicit solver, a pattern is stored
+        vars = simulation.variables
+        pattern = copy(vars.prognostic.wiener_pattern.data)
+        names = SpeedyWeather.tendency_names(vars)
+        tendencies() = [copy(get_step(vars.tendencies[name], 1).data) for name in names]
+
+        SpeedyWeather.reset_tendencies!(vars, L)
+        SpeedyWeather.random_process!(vars, L, model)
+        noise_only = tendencies()
+        @test any(t -> any(!iszero, t), noise_only)
+        @test vars.prognostic.wiener_pattern.data != pattern    # a new pattern for the next step
+        SpeedyWeather.diffusion_and_implicit!(vars, model)
+        @test tendencies() != noise_only                        # the implicit terms act on the noise
+
+        # the same increment as the stored pattern gives
+        vars.prognostic.wiener_pattern.data .= pattern
+        SpeedyWeather.reset_tendencies!(vars, L)
+        SpeedyWeather.wiener_tendencies!(vars, L.noise, L, model)
+        @test tendencies() == noise_only
+
+        # no noise from deterministic time steppers
+        SpeedyWeather.reset_tendencies!(vars, L)
+        SpeedyWeather.random_process!(vars, Leapfrog(spectral_grid), model)
+        @test all(t -> all(iszero, t), tendencies())
+    end
+end
+
+@testset "StochasticLeapfrog: noise conserves the global means" begin
+    # no noise on l = 0: with surface pressure noise the mass is conserved as without
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
+    L = StochasticLeapfrog(spectral_grid; seed = 1, pressure = 1.0e-4)
+    simulation = seeded_initialize!(PrimitiveWetModel(spectral_grid; time_stepping = L))
+    mean_pressure() = Array(get_step(simulation.variables.prognostic.pressure, 1).data)[1]
+    p0 = mean_pressure()
+    run!(simulation, steps = 10)
+    @test mean_pressure() == p0
+    @test !simulation.model.feedback.nans_detected
 end
