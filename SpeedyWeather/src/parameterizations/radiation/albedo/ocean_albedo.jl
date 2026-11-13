@@ -185,12 +185,12 @@ end
     p = (; μ, σ, n, n₀)
 
     # Surface (Fresnel) reflection, Jin eqs. (1) and (5b)
-    αs_dir = scheme.ocean_direct_reflection(p)
-    αs_dif = scheme.ocean_diffuse_reflection(p)
+    αs_dir = scheme.direct_reflection(p)
+    αs_dif = scheme.diffuse_reflection(p)
 
     # Ocean volume scattering, Jin eqs. (6) and (10)
-    αw_dir = scheme.ocean_volume((; p..., αₛ = αs_dir), μ)
-    αw_dif = scheme.ocean_volume((; p..., αₛ = αs_dif), μₑ)
+    αw_dir = scheme.volume_scattering((; p..., αₛ = αs_dir), μ)
+    αw_dif = scheme.volume_scattering((; p..., αₛ = αs_dif), μₑ)
 
     # Direct (black-sky) and diffuse (white-sky) albedo, Jin eqs. (11) - (12),
     # blended by the shortwave scheme via combine_surface_albedo!
