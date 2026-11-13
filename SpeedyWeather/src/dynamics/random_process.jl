@@ -15,7 +15,9 @@ Any random process <: AbstractRandomProcess has to implement the following inter
 Random numbers are drawn on the architecture of the model: the processes' `random_number_generator`
 is a `Random.Xoshiro` on CPU and the counter-based `GPUArrays.RNG` on GPU, which draws in a kernel
 on the device. `draw_on_cpu = true` uses a `Xoshiro` also on GPU: drawn on the CPU and copied over,
-slower, but the same numbers on every architecture."""
+slower, but the same numbers on every architecture. Processes with the same seed draw the same
+numbers; components owning processes salt their seeds (`salt_seed!`) to draw independent streams
+from those of `model.random_process` (unsalted) with the same seed."""
 abstract type AbstractRandomProcess <: AbstractModelComponent end
 
 """$(TYPEDSIGNATURES)
@@ -57,6 +59,25 @@ Random number generator for drawing on `architecture`: `Random.Xoshiro` on CPU, 
 always a `Xoshiro`, its numbers are drawn on the CPU and copied to the device."""
 architecture_rng(architecture, seed; draw_on_cpu::Bool = false) =
     (draw_on_cpu || architecture isa CPU) ? Random.Xoshiro(seed) : GPUArrays.RNG{array_type(architecture)}(seed)
+
+"""$(TYPEDSIGNATURES)
+Seed derived from `seed` and `salt`, so that components owning their own random processes draw
+independent streams although given the same `seed`. Mixed with the splitmix64 finalizer, a fixed
+function unlike `Base.hash`, which may change between Julia versions."""
+function salted_seed(seed::Integer, salt::UInt64)
+    z = ((seed % UInt64) ⊻ salt) + 0x9e3779b97f4a7c15
+    z = (z ⊻ (z >> 30)) * 0xbf58476d1ce4e5b9
+    z = (z ⊻ (z >> 27)) * 0x94d049bb133111eb
+    return z ⊻ (z >> 31)
+end
+
+"""$(TYPEDSIGNATURES)
+Reseed the random number generator of `process` (after its `initialize!`) with its seed salted by
+`salt`, see `salted_seed`. With `seed = 0` the process keeps its random seed."""
+function salt_seed!(process::AbstractRandomProcess, salt::UInt64)
+    iszero(process.seed) || Random.seed!(process.random_number_generator, salted_seed(process.seed, salt))
+    return process
+end
 
 """$(TYPEDSIGNATURES)
 Fill `r` in place with complex normals drawn from `rng`, unit variance in real and imaginary part."""

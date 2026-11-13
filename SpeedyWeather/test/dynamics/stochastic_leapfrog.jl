@@ -167,3 +167,19 @@ end
     @test mean_pressure() == p0
     @test !simulation.model.feedback.nans_detected
 end
+
+@testset "StochasticLeapfrog: noise independent of model.random_process with the same seed" begin
+    @test SpeedyWeather.salted_seed(1, SpeedyWeather.WIENER_SPECTRAL_SALT) ==
+        SpeedyWeather.salted_seed(1, SpeedyWeather.WIENER_SPECTRAL_SALT)
+    @test SpeedyWeather.salted_seed(1, SpeedyWeather.WIENER_SPECTRAL_SALT) !=
+        SpeedyWeather.salted_seed(1, SpeedyWeather.WIENER_GRID_SALT)
+
+    # one layer: one slot, the same process and seed would draw the identical pattern unsalted
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 1)
+    random_process = SpectralWhiteNoiseProcess(spectral_grid; seed = 1)
+    time_stepping = StochasticLeapfrog(spectral_grid; seed = 1)
+    simulation = seeded_initialize!(BarotropicModel(spectral_grid; random_process, time_stepping))
+    run!(simulation, steps = 3)
+    vars = simulation.variables
+    @test vars.prognostic.wiener_pattern.data[:, 1] != vars.prognostic.random_pattern.data
+end

@@ -65,7 +65,8 @@ const DEFAULT_WIENER_AMPLITUDES = (
 """$(TypedMethodSignatures(defaults = true))
 Additive Wiener noise for the prognostic variables, all keyword arguments other than the ones
 listed are noise amplitudes by variable name, added to (or replacing) `DEFAULT_WIENER_AMPLITUDES`.
-`seed` seeds both white noise processes (they draw from independent streams), `wavenumber` and
+`seed` seeds both white noise processes (salted: independent streams, also of other random
+processes with the same seed, e.g. `model.random_process`), `wavenumber` and
 `standard_deviation` are passed on to the `SpectralWhiteNoiseProcess`, `draw_on_cpu` to both."""
 function AdditiveWienerNoise(
         SG::SpectralGrid;
@@ -123,15 +124,18 @@ function variables(noise::AdditiveWienerNoise, model::AbstractModel)
     return (spectral, surface...)
 end
 
+# seed salts of the two white noise processes, see `salted_seed`, ASCII "WIENERSP" and "WIENERGR"
+const WIENER_SPECTRAL_SALT = 0x5749454e45525350
+const WIENER_GRID_SALT = 0x5749454e45524752
+
 function initialize!(noise::AdditiveWienerNoise, model::AbstractModel)
     initialize!(noise.spectral, model)
     initialize!(noise.grid, model)
 
-    # with the same seed both processes would draw the same normals, derive a distinct
-    # (but reproducible) stream for the grid process
-    if noise.spectral.seed == noise.grid.seed && noise.grid.seed != 0
-        Random.seed!(noise.grid.random_number_generator, hash(noise.grid.seed, UInt(0x9e3779b97f4a7c15)))
-    end
+    # salt the seeds: streams independent of each other and of other random processes
+    # with the same seed, e.g. model.random_process
+    salt_seed!(noise.spectral, WIENER_SPECTRAL_SALT)
+    salt_seed!(noise.grid, WIENER_GRID_SALT)
 
     # vertical tapering, in a kernel as a comprehension would scalar-index the vertical coordinates on GPU
     coord = model.geometry.vertical_coordinates
