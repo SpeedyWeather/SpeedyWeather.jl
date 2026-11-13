@@ -344,7 +344,7 @@ Write functions that are broadcast or passed to `set!` branch-free, so that Reac
 use `ifelse(cond, a, b)`, `min`, `max` or `clamp` instead of `if`, `? :`, `&&`, `||` or an early
 `return` on a value. Branches inside `@kernel`s are fine.
 
-To ensure differentiability avoid potential division by zero even within branches that aren't taken in an `ifelse`. These cases might cause `NaN`s in the gradients / differentiated models. 
+To ensure differentiability avoid potential division by zero even within branches that aren't taken in an `ifelse`. These cases might cause `NaN`s in the gradients / differentiated models. Guard numerator and denominator separately, `ifelse(c, x, 0) / ifelse(c, y, 1)`, never with a nested `ifelse(c, x / ifelse(c, y, 1), 0)`: LLVM removes the inner `ifelse` because `c` is known to be true in the taken branch, leaving an unguarded `x / y`.
 
 ## Benchmarks
 

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - `ByrneOGormanLongwaveTransmissivity` with humidity- and CO₂-dependent optical depth as new longwave default, default CO₂ of 280 ppm, longwave optical depths calibrated for ~288 K with `TwoBandShortwave` [#1279](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1279)
+- Fix the differentiability of `TwoBandShort` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
 - `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90 implementation, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
 
 ## 0.24.1

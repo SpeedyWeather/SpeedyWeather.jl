@@ -197,8 +197,12 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
     above = cloud_base
     ΔΦ = geopotential[ij, above] - geopotential[ij, surface]
     Δs = cₚ * (temp[ij, above] - temp[ij, surface]) + ΔΦ
-    stable_layers = ΔΦ > 0              # guard against division by zero, also in the branch not taken
-    GSE = ifelse(stable_layers, Δs / ifelse(stable_layers, ΔΦ, one(NF)), zero(NF))
+    # Guard against division by zero (ΔΦ = 0 for a single layer, as above == surface) by
+    # always dividing with guarded numerator and denominator. Do not write this as
+    # ifelse(c, Δs / ifelse(c, ΔΦ, 1), 0): LLVM removes the inner ifelse as c is known to be true
+    # in the taken branch, so 0/0 = NaN is computed and propagates into the reverse-mode gradients
+    stable_layers = ΔΦ > 0
+    GSE = ifelse(stable_layers, Δs, zero(NF)) / ifelse(stable_layers, ΔΦ, one(NF))
 
     # normalized static stability factor
     static_stability = clamp((GSE - stab_min) / (stab_max - stab_min), 0, 1)
