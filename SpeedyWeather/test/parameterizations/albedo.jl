@@ -145,7 +145,7 @@ end
 
     # components are constrained to their role
     @test_throws TypeError JinOceanAlbedo(spectral_grid; foam = ConstantOceanVolumeScattering(spectral_grid))
-    @test_throws TypeError JinOceanAlbedo(spectral_grid; ocean_volume = WhitecapFoam(spectral_grid))
+    @test_throws TypeError JinOceanAlbedo(spectral_grid; volume_scattering = WhitecapFoam(spectral_grid))
 
     # whitecaps brighten the ocean at high wind speeds, NoFoam leaves the albedo unchanged
     α, w = NF(0.06), NF(20)
@@ -165,7 +165,7 @@ end
         @test 0 < volume((; σ = NF(0.1), αₛ = NF(0.05), band), NF(0.5)) < 1
     end
 
-    @test_throws ArgumentError JinOceanAlbedo(spectral_grid; ocean_volume = volume)
-    jin_spectral = JinOceanAlbedo{NF, typeof(volume), WhitecapFoam{NF}}(; ocean_volume = volume)
-    @test_throws ArgumentError initialize!(jin_spectral, model)
+    @test_throws ArgumentError JinOceanAlbedo(spectral_grid; volume_scattering = volume)
+    albedo = JinOceanAlbedo(spectral_grid)
+    initialize!(albedo, model)
 end

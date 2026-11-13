@@ -34,7 +34,7 @@ initialize!(::AbstractFoam, ::PrimitiveEquation) = nothing
 
 export WhitecapFoam, NoFoam
 
-"""Whitecap (foam) correction following Koepke (1984) as used by Jin et al. (2011) eqs. (16)–(17):
+"""Whitecap (foam) correction following Koepke (1984) as used by Jin et al. (2011) eqs. (16) - (17):
 constant foam albedo and fractional whitecap coverage f = a * w^b from wind speed w [m/s].
 Component of `JinOceanAlbedo`. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct WhitecapFoam{NF} <: AbstractFoam
@@ -104,26 +104,26 @@ Fields are $(TYPEDFIELDS)"""
     F <: AbstractFoam
 } <: AbstractAlbedo
 
-    "Ratio of air-water refractive indices"
+    "[OPTION] Ratio of air-water refractive indices"
     @param n::NF = 1.34
 
-    "Refractive index of water in visible spectrum"
+    "[OPTION] Refractive index of water in visible spectrum"
     @param n₀::NF = 1.34
 
-    "Effective cosine for diffuse incidence, Jin et al. eq. (10)"
+    "[OPTION] Effective cosine for diffuse incidence, Jin et al. eq. (10)"
     @param μₑ::NF = 0.676
 
     "[OPTION] Albedo over sea ice at concentration=1 [1], same default as in `OceanSeaIceAlbedo`"
     @param albedo_ice::NF = 0.6 (bounds = 0 .. 1,)
 
-    "Direct-beam surface reflection"
-    @component ocean_direct_reflection::SDIR
+    "[OPTION] Direct-beam surface reflection"
+    @component direct_reflection::SDIR
 
-    "Diffuse surface reflection"
-    @component ocean_diffuse_reflection::SDIF
+    "[OPTION] Diffuse surface reflection"
+    @component diffuse_reflection::SDIF
 
-    "[OPTION] Ocean volume scattering, `ConstantOceanVolumeScattering` (`SpectralOceanVolumeScattering` is future work)"
-    @component ocean_volume::V
+    "[OPTION] Ocean volume scattering"
+    @component volume_scattering::V
 
     "[OPTION] Whitecap (foam) correction, `WhitecapFoam` or `NoFoam`"
     @component foam::F
@@ -132,17 +132,17 @@ end
 Adapt.@adapt_structure JinOceanAlbedo
 function JinOceanAlbedo(
         SG::SpectralGrid;
-        ocean_direct_reflection = OceanDirectReflection(SG),
-        ocean_diffuse_reflection = OceanDiffuseReflection(SG),
-        ocean_volume = ConstantOceanVolumeScattering(SG),
+        direct_reflection = OceanDirectReflection(SG),
+        diffuse_reflection = OceanDiffuseReflection(SG),
+        volume_scattering = ConstantOceanVolumeScattering(SG),
         foam = WhitecapFoam(SG),
         kwargs...
     )
     # construct first so that the type constraints on ocean_volume and foam are checked first
-    albedo = JinOceanAlbedo{SG.NF, typeof(ocean_direct_reflection), typeof(ocean_diffuse_reflection), typeof(ocean_volume), typeof(foam)}(;
-        ocean_direct_reflection, ocean_diffuse_reflection, ocean_volume, foam, kwargs...
+    albedo = JinOceanAlbedo{SG.NF, typeof(direct_reflection), typeof(diffuse_reflection), typeof(volume_scattering), typeof(foam)}(;
+        direct_reflection, diffuse_reflection, volume_scattering, foam, kwargs...
     )
-    check_ocean_volume_supported(albedo.ocean_volume)
+    check_ocean_volume_supported(albedo.volume_scattering)
     return albedo
 end
 
@@ -164,10 +164,10 @@ function variables(::JinOceanAlbedo)
 end
 
 function initialize!(albedo::JinOceanAlbedo, model::PrimitiveEquation)
-    check_ocean_volume_supported(albedo.ocean_volume)
-    initialize!(albedo.ocean_direct_reflection, model)
-    initialize!(albedo.ocean_diffuse_reflection, model)
-    initialize!(albedo.ocean_volume, model)
+    check_ocean_volume_supported(albedo.volume_scattering)
+    initialize!(albedo.direct_reflection, model)
+    initialize!(albedo.diffuse_reflection, model)
+    initialize!(albedo.volume_scattering, model)
     initialize!(albedo.foam, model)
     return nothing
 end
@@ -192,12 +192,12 @@ end
     αw_dir = scheme.ocean_volume((; p..., αₛ = αs_dir), μ)
     αw_dif = scheme.ocean_volume((; p..., αₛ = αs_dif), μₑ)
 
-    # Direct (black-sky) and diffuse (white-sky) albedo, Jin eqs. (11)–(12),
+    # Direct (black-sky) and diffuse (white-sky) albedo, Jin eqs. (11) - (12),
     # blended by the shortwave scheme via combine_surface_albedo!
     black_sky = αs_dir + αw_dir
     white_sky = αs_dif + αw_dif
 
-    # Whitecap (foam) correction, Jin et al. eqs. (16)–(17)
+    # Whitecap (foam) correction, Jin et al. eqs. (16) - (17)
     black_sky, white_sky = foam_albedos(scheme.foam, black_sky, white_sky, w)
 
     ℵ = haskey(vars.prognostic.ocean, :sea_ice_concentration) ? vars.prognostic.ocean.sea_ice_concentration[ij] : zero(NF)
