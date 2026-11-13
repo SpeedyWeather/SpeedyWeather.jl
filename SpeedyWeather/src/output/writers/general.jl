@@ -217,6 +217,7 @@ function output!(output::AbstractOutput, simulation::AbstractSimulation)
     (; clock) = simulation.variables.prognostic
     output!(output, clock.time)                         # increase counter, write time
     output!(output, output.variables, simulation)       # write variables
+    reset_diagnostics!(simulation)                      # so that diagnostics are taken over the output interval
     return output
 end
 

@@ -49,6 +49,7 @@ $(TYPEDFIELDS)"""
         VA,     # <:AbstractVerticalAdvection,
         HO,     # <:AbstractHoleFilling,
         OU,     # <:AbstractOutput,
+        DG,     # NamedTuple of <:AbstractDiagnostic,
         FB,     # <:AbstractFeedback,
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
@@ -108,6 +109,7 @@ $(TYPEDFIELDS)"""
 
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, PrimitiveWet)
+    diagnostics::DG = PrecipitationDiagnostics()
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 
@@ -204,6 +206,8 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.surface_humidity_flux, model)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
+
+    initialize!(model.diagnostics, model)
 
     # allocate all variables
     variables = Variables(model)

@@ -107,7 +107,9 @@ Base.close(output::JLD2Output) = close(output.jld2_file)
 function output!(output::JLD2Output, simulation::AbstractSimulation)
     (; clock) = simulation.variables.prognostic
     do_output!(output.core, clock, output) || return nothing
-    return output_jld2!(output, simulation)
+    output_jld2!(output, simulation)
+    reset_diagnostics!(simulation)          # so that diagnostics are taken over the output interval
+    return nothing
 end
 
 # Fused tendency/scratch fields share storage via SubArray views. JLD2 cannot
@@ -256,6 +258,7 @@ function output!(output::ArrayOutput, simulation::AbstractSimulation)
     # output_counter is advanced by do_output! (and set to 1 for the IC in initialize!)
     i = output.output_counter
     getfield(output, :output)[i] = deepcopy(filter_groups(simulation.variables, output))
+    reset_diagnostics!(simulation)          # so that diagnostics are taken over the output interval
     return nothing
 end
 
