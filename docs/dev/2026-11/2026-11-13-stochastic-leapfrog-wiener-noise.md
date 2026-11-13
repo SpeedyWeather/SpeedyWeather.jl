@@ -30,6 +30,12 @@ Base revision: `24fdb6847a3bdd49f7e23e94a5b64de06dd89d48` (branch point). HEAD w
 >   switched to typeset LaTeX. The `# IMPLEMENTATION NOTES` block was removed from the source
 >   (`1066382e`). The PrimitiveDry cases and the "noise before the implicit terms" testset were
 >   removed from `test/dynamics/stochastic_leapfrog.jl` to shorten the tests (`c8946a7b`).
+> - 2026-11-13, seed salting (`0add2735`): the noise's spectral and grid processes reseed with
+>   `salted_seed(seed, salt)` (splitmix64), so they draw independent streams also from
+>   `model.random_process` with the same seed. Before, the same seed gave overlapping streams: the
+>   AR1's draw in step k equalled slot k of the Wiener noise's first draw. `model.random_process`
+>   stays unsalted, so SPPT runs are unchanged. The Wiener realisations change, so the origin
+>   project's gate no longer matches the noise patterns bitwise.
 
 ## Problem description
 
@@ -216,6 +222,15 @@ JULIA_LOAD_PATH="@:$PWD/SpeedyWeather/test:@stdlib" julia +1.12 --project=Speedy
       tendencies instead of `time_stepper(L, Val(:ocean/:land))`. Harmless today (every stepper
       falls back to tendency step 1) but inconsistent with `ocean.jl` and `soil_temperature.jl`.
 - [x] `# IMPLEMENTATION NOTES` block removed from `stochastic_leapfrog.jl` (`1066382e`).
+- [x] Seed salting (`0add2735`).
+- [ ] Proposed: one explicit `update_random!(vars, model)` in both `time_step!` methods, after
+      `update_prognostic!` and **before** `transform!`. It would advance `model.random_process`
+      (moved out of `update_prognostic!`) and the time stepper's noise
+      (`update_random!(vars, model.time_stepping)`, which is `wiener_draw!` for
+      `StochasticLeapfrog`); `random_process!` would then only add the noise. Checked with
+      redefined methods: drawing the Wiener pattern after `update_prognostic!` gives a
+      bit-identical trajectory with SPPT active, step 1 included. Advancing after `transform!`
+      would delay SPPT by one step.
 - [ ] Write the PR description (the body is currently empty).
 - [ ] Maybe: an Ewald-style `ΔWⁿ⁻¹ + ΔWⁿ` increment option.
 
