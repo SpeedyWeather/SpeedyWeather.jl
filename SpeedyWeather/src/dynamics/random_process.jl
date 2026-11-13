@@ -1,19 +1,3 @@
-# IMPLEMENTATION NOTES (status 2026-11-12, see also time_stepping/steppers/stochastic_leapfrog.jl)
-# - Renamed `random_process!(vars, process)` -> `update_random!` (breaking for user-defined processes);
-#   `random_process!(vars, time_stepping, model)` now adds the noise of a stochastic time stepper
-#   (called in `time_step!` before `diffusion_and_implicit!`, see time_stepping/steppers/stochastic_leapfrog.jl).
-# - Two levels: `update_random!(pattern, process)` on an array (any component can own a process and its
-#   pattern), `update_random!(vars, process)` for `model.random_process` (default: the spectral
-#   `vars.prognostic.random_pattern`, `GridWhiteNoiseProcess`: `vars.grid.random_pattern`).
-# - Random numbers come from `architecture_rng`: Xoshiro on CPU, GPUArrays.RNG (counter-based, drawn
-#   in a kernel) on GPU, `draw_on_cpu = true` for Xoshiro everywhere. On CPU the numbers equal the
-#   earlier per-element draws bitwise (randn! over an array = the element loop, in memory order).
-# - No allocation per draw: the AR1 keeps a `random_numbers` buffer (it needs its previous pattern),
-#   the white-noise processes draw into the pattern and scale in place (no memory). One randn! per
-#   pattern covers all its slots (`n_patterns`), slot after slot.
-# - SpectralWhiteNoiseProcess and GridWhiteNoiseProcess are ported from the FokkerPlanckSensitivities.jl
-#   project, bitwise-checked there (speedy/checks/upstream_wiener_equivalence.jl).
-
 """$(TYPEDSIGNATURES)
 Implementation of random processes for stochastic forcings and parameterizations in SpeedyWeather.
 Any random process <: AbstractRandomProcess has to implement the following interface:
