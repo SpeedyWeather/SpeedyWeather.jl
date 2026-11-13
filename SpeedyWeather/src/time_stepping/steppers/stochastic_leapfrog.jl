@@ -339,7 +339,7 @@ time step. Without any such variable there is no `wiener_pattern_surface` and no
                 offset = wiener_surface_slots!(
                     getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),
                     vars.prognostic.wiener_pattern_surface, amplitude(noise, $(QuoteNode(name))),
-                    isdt, offset, L, noise,
+                    isdt, offset, time_stepper(L, Val($(QuoteNode(namespace)))), noise,
                 )
             )
         )
@@ -347,9 +347,10 @@ time step. Without any such variable there is no `wiener_pattern_surface` and no
     return Expr(:block, :(offset = 0), calls..., :(return nothing))
 end
 
-@inline function wiener_surface_slots!(var, pattern, a, isdt, offset, L, noise)
+# `time_stepping` is the ocean or land time stepper, e.g. EulerForward, which decides the tendency step
+@inline function wiener_surface_slots!(var, pattern, a, isdt, offset, time_stepping, noise)
     iszero(a) && return offset
-    tendency = get_tendency_step(var, L, noise)
+    tendency = get_tendency_step(var, time_stepping, noise)
     wiener!(tendency, pattern, a * isdt, nothing, offset)
     return offset + nslots(tendency)
 end

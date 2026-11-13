@@ -1,6 +1,6 @@
 # StochasticLeapfrog: additive Wiener noise, upstreamed from FokkerPlanckSensitivities.jl
 
-> Status: **in progress**. Implemented and unit-tested on `mg/gfdt-upstream` (draft PR #1397). Still open: rebase onto `main`, full test suite, GPU, docs build, cleanup before review.
+> Status: **completed**. PR #1397 was declared finished for now on 2026-11-13; the remaining unchecked items below are deferred.
 
 Date of initial draft: 2026-11-13 (this status document; work on the branch started 2026-11-11)
 
@@ -203,36 +203,43 @@ JULIA_LOAD_PATH="@:$PWD/SpeedyWeather/test:@stdlib" julia +1.12 --project=Speedy
 
 ## Open items (before un-drafting #1397)
 
-- [ ] **Rebase or merge `origin/main`**, which is 6 commits ahead (two-band shortwave #1262, NaN
-      gradient fix #1401, precipitable water #1370, …). Expect conflicts in `CHANGELOG.md` and
-      `SpeedyWeather/Project.toml`. `main` is already at `version = "0.25.0-DEV"`, which also covers
-      the version bump required for a new public type; keep it. The branch currently reads `0.24.0`.
-- [ ] Push: local commits are ahead of `origin/mg/gfdt-upstream`.
+- [x] Merged `origin/main` (`261ddd67`), now at `version = "0.25.0-DEV"`. Merge fix-up in
+      `59cce3ca`: the branch's two `$(TypedMethodSignatures(defaults = true))` became
+      `$(TYPEDSIGNATURES)` (main's convention since #1398, DocStringExtensions v0.9 and v0.10).
+      Pushed.
 - [ ] Run the full `Pkg.test("SpeedyWeather")`, GPU tests, and the docs build. GPU could be tried
-      locally with Metal (`SpeedyWeather/test/GPU/MetalGPU`).
+      locally with Metal (`SpeedyWeather/test/GPU/MetalGPU`). After the merge, 694/694 of the
+      stochastic, random process, SPPT and time stepping tests passed, and `dispatch.jl` 4/4.
 - [x] Type instability in `wiener_tendencies!`: fixed with `@generated` drivers (`772a26d1`), see
       Testing and verification.
 - [ ] Ocean/land slots exist only for nonzero amplitudes, unlike the atmosphere rule. This is a
       leftover of the bitwise reproduction, which was dropped on 2026-11-13, so it can now be made
       consistent.
-- [ ] Draw-at-end-of-step plus storing the pattern in prognostics was also only needed for bitwise
-      reproduction. Drawing and applying in the same step would make the pattern scratch memory.
-      Decide whether to change this (it changes first-step determinism and restart semantics).
-- [ ] `wiener_surface_slots!` passes `L` (the Leapfrog) to `get_tendency_step` for ocean/land
-      tendencies instead of `time_stepper(L, Val(:ocean/:land))`. Harmless today (every stepper
-      falls back to tendency step 1) but inconsistent with `ocean.jl` and `soil_temperature.jl`.
+- [x] Closed: the pattern stays drawn at the end of a step and stored in the prognostic
+      variables, as `model.random_process` is since the single `update_random!`.
+- [x] `wiener_surface_slots!` now gets the ocean/land time stepper
+      (`time_stepper(L, Val(:ocean/:land))`) for `get_tendency_step`, as in `ocean.jl` and
+      `soil_temperature.jl`.
 - [x] `# IMPLEMENTATION NOTES` block removed from `stochastic_leapfrog.jl` (`1066382e`).
 - [x] Seed salting (`0add2735`).
-- [ ] Proposed: one explicit `update_random!(vars, model)` in both `time_step!` methods, after
-      `update_prognostic!` and **before** `transform!`. It would advance `model.random_process`
-      (moved out of `update_prognostic!`) and the time stepper's noise
-      (`update_random!(vars, model.time_stepping)`, which is `wiener_draw!` for
-      `StochasticLeapfrog`); `random_process!` would then only add the noise. Checked with
-      redefined methods: drawing the Wiener pattern after `update_prognostic!` gives a
-      bit-identical trajectory with SPPT active, step 1 included. Advancing after `transform!`
-      would delay SPPT by one step.
+- [x] One explicit `update_random!(vars, model)` in both `time_step!` methods, after
+      `update_prognostic!` and **before** `transform!` (`ce28a2bd`). It advances
+      `model.random_process` (no longer in `update_prognostic!`) and the time stepper's noise
+      (`update_random!(vars, model.time_stepping)`, `wiener_draw!` for `StochasticLeapfrog`).
+      `random_process!` only adds the noise. Bit-identical to before (SPPT alone and with
+      `StochasticLeapfrog`, 20 steps from step 1). Advancing after `transform!` would delay SPPT
+      by one step.
+- [ ] Your TODO in `stochastic_leapfrog.jl`: maybe rewrite `wiener_atmosphere!` on the fused
+      variable system.
+- [x] Decided: `random_process!` keeps its name.
+- [ ] `SpectralAR1Process(…; wavenumber = 0)` silently gives NaN noise factors (`k(k+1) = 0`), so
+      an `ArgumentError` check would help. Its docstring's first sentence is stale (fields
+      `wavenumbers`, `time_scales` do not exist, typos).
+- [ ] Update the origin project's gate (`speedy/checks/upstream_wiener_equivalence.jl`): the seed
+      salting changed the Wiener realisations.
+- [ ] Maybe extend the CHANGELOG entry: `update_random!(vars, model)` once per time step, seed salting.
 - [ ] Write the PR description (the body is currently empty).
-- [ ] Maybe: an Ewald-style `ΔWⁿ⁻¹ + ΔWⁿ` increment option.
+- [x] Decided: no Ewald-style `ΔWⁿ⁻¹ + ΔWⁿ` increment option.
 
 ## Known limitations
 
