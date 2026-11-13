@@ -62,7 +62,7 @@ const DEFAULT_WIENER_AMPLITUDES = (
     sea_surface_temperature = 1.0e-3,   # [K/s^(1/2)]
 )
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Additive Wiener noise for the prognostic variables, all keyword arguments other than the ones
 listed are noise amplitudes by variable name, added to (or replacing) `DEFAULT_WIENER_AMPLITUDES`.
 `seed` seeds both white noise processes (salted: independent streams, also of other random
@@ -235,7 +235,7 @@ References
   Springer, doi:10.1007/978-3-662-12616-5"""
 const StochasticLeapfrog{NF, S, B, MS, O, L, N <: AbstractWienerNoise} = Leapfrog{NF, S, B, MS, O, L, N}
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Leapfrog with additive Wiener noise. Keyword arguments of `Leapfrog` are passed on to it, all
 others to `AdditiveWienerNoise` unless `noise` is provided."""
 function StochasticLeapfrog(
@@ -293,6 +293,7 @@ end
 # `tendency_names(vars)` would dispatch at runtime on every variable. Same pattern as
 # `update_prognostic_atmosphere!` and `update_prognostic_namespaces!`.
 
+#TODO: might update the function below to use the fused vairbales systems
 """$(TYPEDSIGNATURES)
 Add the noise to the atmospheric tendencies. Slots of the spectral pattern: variables with layers
 first, then single-layer variables, each in the order of `tendency_names`. After the dynamical core
