@@ -323,9 +323,9 @@ initial_conditions = nothing                    # start from rest, set η below
 model = ShallowWaterModel(spectral_grid; orography, initial_conditions, time_stepping)
 simulation = initialize!(model)
 
-# 1km high Gaussian blob of interface displacement η in the central Pacific
+# 5km high Gaussian blob of interface displacement η in the central Pacific
 λ₀, φ₀, σ = 200, 10, 5      # longitude, latitude, width [˚]
-A = 1000                    # amplitude [m]
+A = 5000                    # amplitude [m]
 set!(simulation, η = (λ, φ) -> A*exp(-spherical_distance((λ, φ), (λ₀, φ₀), radius=360/2π)^2/2σ^2))
 
 run!(simulation, period=Hour(10))
@@ -334,7 +334,7 @@ nothing # hide
 
 How are gravity waves propagating around the globe? We want to use the shallow water model
 to start from rest but with a Gaussian blob of the interface displacement ``\eta``
-(the "sea surface height") of 1000m in the central Pacific and let the gravity waves propagate
+(the "sea surface height") of 5000m in the central Pacific and let the gravity waves propagate
 around the globe. We set the `centering` parameter of the
 [semi-implicit time integration](@ref implicit_swm) to ``0.5`` to have a centred
 implicit scheme (Crank-Nicolson) which dampens the gravity waves less than a
@@ -347,7 +347,7 @@ degrees) to the blob's centre at 160˚W, 10˚N. Our layer thickness in meters is
 ```@example gravity_wave_setup
 model.atmosphere.layer_thickness
 ```
-so a 1000m blob is a strong perturbation. But the semi-implicit time integration can handle that
+so a 5000m blob is a very strong perturbation, more than half the layer thickness. But the semi-implicit time integration can handle that
 even with fairly large time steps of
 ```@example gravity_wave_setup
 model.time_stepping.Δt
@@ -366,12 +366,12 @@ nothing # hide
 ```
 ![Gravity waves plot](gravity_waves.png)
 
-The ring of the leading wave front has an amplitude of about 100m and is distorted where
+The ring of the leading wave front has an amplitude of about 500m and is distorted where
 it travelled over mountains: the layer is thinner there, so the gravity waves are slower.
 Behind the leading front there are more rings from the waves dispersing on the sphere
 and being reflected from mountains. The dynamic layer thickness ``h = \eta + H - H_b``
 (interface displacement ``\eta``, layer thickness at rest ``H`` and orography ``H_b``)
-is dominated by the orography
+is dominated by the orography, but the ring of the wave front is visible too
 
 ```@example gravity_wave_setup
 H = model.atmosphere.layer_thickness

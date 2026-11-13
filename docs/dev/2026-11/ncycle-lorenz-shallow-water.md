@@ -50,7 +50,8 @@ Base revision: 069fb09f3d4fa539fbeb27ea4c352010d6737961
 > okay for NCycleLorenz to not preserve wave energy as much as Leapfrog but it being
 > unpredictably unstable is a no go.
 
-- Docs example: Gaussian blob, 1000 m, σ = 5˚ at 160˚W, 10˚N, 10 hours, plotting η.
+- Docs example: Gaussian blob, 5000 m (1000 m first, but then the ring is not visible in the
+  layer thickness h), σ = 5˚ at 160˚W, 10˚N, 10 hours, plotting η and h.
 - Centerings re-optimised for stability margin (see "Robust centerings" below).
 
 > In the mean time, can you reorganize model.time_stepping and model.implicit. The latter is
