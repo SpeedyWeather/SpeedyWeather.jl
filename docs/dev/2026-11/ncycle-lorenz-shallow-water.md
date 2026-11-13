@@ -85,8 +85,8 @@ with ``G_ζ ← w F_ζ + (1-w) G_ζ`` for vorticity. `implicit_correction!` stor
 (``G ← wF + (1-w)G``, ``u ← u + ΔtG``) gives the same result for all variables. Horizontal
 diffusion ``F ← (F + ν∇²ⁿu)/(1 - Δtν∇²ⁿ)`` is applied before the implicit correction.
 
-Daisuke's version as tested here (`impl.jl`, ``μ = 0``): ``G ← wF_E + (1-w)G`` with
-``F_E = F - Lu``, ``u ← u + Δt(1-αΔtL)^{-1}(G + Lu)``. The Lawson variant (``μ = 1``) additionally
+Daisuke's version as tested here: ``G ← wF_E + (1-w)G`` with
+``F_E = F - Lu``, ``u ← u + Δt(1-αΔtL)^{-1}(G + Lu)``. The Lawson variant additionally
 applies ``R = (1-αΔtL)^{-1}(1+(1-α)ΔtL)`` to state and memory, ``u ← R(u + ΔtG)``, ``G ← RG``.
 
 ### Bugs found
@@ -107,7 +107,7 @@ applies ``R = (1-αΔtL)^{-1}(1+(1-α)ΔtL)`` to state and memory, ``u ← R(u +
 ### Linear stability analysis
 
 Oscillation equation `x' = iω_E x + iω_L x` (explicit + implicit part), per-step amplification
-over a full cycle (scripts in `ncycle-lorenz-shallow-water/`). Test cases: pure gravity wave
+over a full cycle (see "Methods" below to reproduce). Test cases: pure gravity wave
 (ω_E = 0), Doppler shift (ω_E > 0), f-plane (Coriolis explicit, gravity waves implicit), and
 "orography" ω_E = -β ω_L, β ∈ (0, 0.9): the reference layer thickness H used for L is larger
 than the actual one (H - H_b), which semi-implicit leapfrog handles unconditionally.
@@ -159,6 +159,58 @@ beyond Δt_T32 ≈ 10-20 min in the gravity wave example.
 
 Why B is more stable than A in the model while linearly equal is not understood yet.
 
+### Methods
+
+Analysis scripts are not committed; this section describes them so they can be recreated.
+
+**Linear stability analysis.** Units Δt = 1. Explicit part ``E`` and implicit part ``L`` are
+matrices (scalars for the 1-variable cases), ``I`` identity. The state over a substep is the pair
+``(x, G)``, so each substep is a linear map on the stacked vector ``[x; G]``; the cycle matrix ``T``
+is the product of the N substep maps (in order k = 0..N-1), and the amplification per step is
+``ρ(T)^{1/N}`` (spectral radius). Since ``w_0 = 1`` erases ``G`` at the start of a cycle, for a pure
+gravity wave the cycle reduces to a scalar map ``x ↦ R(iω_L)x`` (the ``[1,1]`` element of ``T``).
+
+- Milan's version with centering ``θ_k``, weight ``w``: ``S = (I - wθ_kL)^{-1}``,
+  ``δ = S(w(E+L)x + (1-w)G)``, ``x ← x + δ``, ``G ← δ``, i.e. substep matrix
+  ``[[I + Sw(E+L), S(1-w)], [Sw(E+L), S(1-w)]]``.
+- Daisuke's version: ``S = (I - αL)^{-1}``, ``G ← wEx + (1-w)G``, ``x ← x + S(G + Lx)``.
+- Lawson variant: ``R = S(I + (1-α)L)``, ``G̃ = wEx + (1-w)G``, ``x ← R(x + G̃)``, ``G ← RG̃``.
+- Leapfrog reference: state ``(x_{n-1}, x_n)``,
+  ``(I - 2αL)x_{n+1} = (I + 2(1-α)L)x_{n-1} + 2Ex_n``, then the RAW filter with
+  ``d = ν/2(x_{n-1} - 2x_n + x_{n+1})``, ``x_n ← x_n + α_W d``, ``x_{n+1} ← x_{n+1} - (1-α_W)d``,
+  ``ν = 0.1``, ``α_W = 0.53``; for the "physical mode" take the eigenvalue closest to ``exp(i(ω_E+ω_L))``.
+- Weights: A ``w_k = N/(N-k)``, B ``w_k = N/k``, ``w_0 = 1``.
+
+Test cases (each maximised over ``ω_LΔt`` on a grid of 30 points in [0, 3] and 40 in [3, 40]):
+pure gravity wave ``E = 0, L = iω_L``; Doppler ``E = iω_E``, ``ω_EΔt ∈ {0.1, 0.2, 0.3, 0.4}``;
+f-plane with ``x = (ζ, D, η)``, ``E = [[0, -f, 0], [f, 0, 0], [0, 0, 0]]``,
+``L = [[0, 0, 0], [0, 0, ω_L], [0, -ω_L, 0]]``, ``fΔt ∈ {0.1, 0.35}``; orography ``E = -βL``,
+``β ∈ {0.1, 0.2, 0.3, 0.5, 0.7, 0.9}``. Explicit limit: largest ``ω_EΔt`` with ``L = 0``, ``θ = 0`` and
+amplification ≤ 1.
+
+Hyperdiffusion: scalar ``x' = -νx`` applied as in the code, tendency ``-νx/(1 + νΔt·c)`` then Lorenz
+weighting, with ``c = 1`` (current) or ``c = w`` (weighted).
+
+**Optimisation of the centering.** Objective: maximise the minimum gravity-wave amplification
+per step over ``ω_LΔt ∈ [0.05, 1.5]`` (15 points), subject to the maximum amplification over all
+test cases (incl. pure gravity waves up to ``ω_LΔt = 40``) being ≤ 1 + 1e-6, implemented as a
+penalty of 1000 × excess. Random search: 28 starts ``θ ~ 0.6 + 0.8·N(0, 1)`` (componentwise),
+2000 iterations of Gaussian perturbations with step 0.4 halved every 400 iterations, accepting
+improvements only. Rank the starts by objective and check that the best ones agree.
+The A optimum was reproduced by all top starts; for B the top starts disagree.
+Afterwards round and re-check (two decimals are not enough, three are).
+
+**Model experiments.** Experimental formulations were implemented by defining a new
+`AbstractImplicit` subtype and its `implicit_correction!(vars, implicit, ::AbstractNCycleLorenz,
+::ShallowWater)` in a script, modifying the prognostic variables in place where needed.
+- Gravity waves: the docs example (T128, 1 layer, `RandomWaves(lmin=10, lmax=30)` with amplitude
+  2000 m, `EarthOrography(smoothing=false)`, `ImplicitShallowWater(centering=0.5)`), 2 days,
+  `adjust_with_output=false`, `Random.seed!(1234)`. Metric: ``Σ_{l>0} c_m |η_{lm}|²`` with
+  ``c_m = 1`` for m = 0 and 2 otherwise, relative to the initial value, from a callback; NaN or
+  growth > 10 counts as unstable.
+- Galewsky jet: `ShallowWaterModel` with `ZonalJet` initial conditions and default orography, T85,
+  20 days; stable = no NaNs detected.
+
 ## Summary of changes
 
 - Fix η tendency allocation for the shallow water model (`ts` steps).
@@ -174,7 +226,7 @@ Why B is more stable than A in the model while linearly equal is not understood 
 - Unit tests: default/explicit `implicit_centering` per substep; shallow water gravity waves with
   `NCycleLorenz` (variants A and B) run without NaNs and keep at least half the η variance of
   leapfrog after 1 day.
-- Experiment scripts in `ncycle-lorenz-shallow-water/` (`one.jl`, `one_theta.jl`, `jet1.jl`).
+- Model experiments as described in "Methods" below.
 
 ## Documentation changes
 

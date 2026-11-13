@@ -457,6 +457,13 @@ Base revision: <SHA1 of HEAD when plan was drafted>
 
 The revision log should, to the greatest extent possible, briefly summarize changes to the plan that are made on-the-fly during development.
 
+Do not commit analysis or experiment scripts next to the plan (or anywhere else outside the
+package's `src/`, `test/`, `benchmark/`): they are code that cannot be maintained. If a plan relies
+on a novel analysis (e.g. a linear stability analysis, an optimisation, or model experiments with
+a non-standard setup), describe it in the plan in enough detail (equations, parameters, test
+cases, grids, metrics, algorithm and its settings) that the scripts can be recreated from the plan
+alone, e.g. in a "Methods" subsection.
+
 The remainder of the plan document may be adapted on a case-by-case basis but should generally follow this structure:
 
 ```md
