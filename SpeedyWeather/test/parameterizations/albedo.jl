@@ -12,6 +12,7 @@ import Statistics: mean
             model = Model(spectral_grid; albedo)
 
             initialize!(albedo, model)
+            initialize!(model.radiation, model)  # precomputes the free troposphere layers for clouds
             vars = Variables(model)
             SpeedyWeather.parameterization_tendencies!(vars, model)
 
@@ -42,6 +43,7 @@ end
                 model = Model(spectral_grid; albedo)
 
                 initialize!(albedo, model)
+                initialize!(model.radiation, model)  # precomputes the free troposphere layers for clouds
                 vars = Variables(model)
                 SpeedyWeather.parameterization_tendencies!(vars, model)
 

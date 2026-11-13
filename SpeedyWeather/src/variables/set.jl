@@ -1,7 +1,7 @@
 export set!
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Sets new values for variables defined through keyword matching the keys in a NamedTuple.
 Spectral variables can be set at timestep index `step`. If `add==true` they are added to the 
 current value instead. If a `AbstractSpectralTransform` S is provided, it is used when needed to set 
@@ -73,7 +73,7 @@ function set!(
     return nothing
 end
 
-"""$(TypedMethodSignatures(defaults = true)) set the `variables`, default is in the group `prognostic`."""
+"""$(TYPEDSIGNATURES) set the `variables`, default is in the group `prognostic`."""
 set!(variables::Variables, args...; group::Symbol = :prognostic, kwargs...) =
     set!(getfield(variables, group), args...; kwargs...)
 

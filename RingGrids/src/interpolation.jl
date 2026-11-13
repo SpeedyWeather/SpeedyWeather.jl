@@ -30,7 +30,7 @@ GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; NF = el
 Adapt.@adapt_structure GridGeometry
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Precomputed arrays describing the geometry of the Grid with resolution `nlat_half`.
 Contains longitudes, latitudes of grid points, their ring index j and their
 unravelled indices ij."""
@@ -131,7 +131,7 @@ function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLoc
 end
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Zero generator function for the 4-point average AnvilLocator. Use `update_locator!` to
 update the grid indices used for interpolation and their weights. The number format
 NF is the format used for the calculations within the interpolation, the input data
@@ -628,7 +628,7 @@ end
 interpolate(Grid::Type{<:AbstractGrid}, A::Field; kwargs...) = interpolate(Grid(A.grid.nlat_half, architecture(A)), A; kwargs...)
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Locate the interpolation points `(λs, θs)` on the grid described by `I.geometry`, updating
 `I.locator` in place with the ring indices and interpolation weights required by
 `interpolate!`. This is the precomputation step of the interpolation, separate from the

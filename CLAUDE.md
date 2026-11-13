@@ -344,7 +344,7 @@ Write functions that are broadcast or passed to `set!` branch-free, so that Reac
 use `ifelse(cond, a, b)`, `min`, `max` or `clamp` instead of `if`, `? :`, `&&`, `||` or an early
 `return` on a value. Branches inside `@kernel`s are fine.
 
-To ensure differentiability avoid potential division by zero even within branches that aren't taken in an `ifelse`. These cases might cause `NaN`s in the gradients / differentiated models. 
+To ensure differentiability avoid potential division by zero even within branches that aren't taken in an `ifelse`. These cases might cause `NaN`s in the gradients / differentiated models. Guard numerator and denominator separately, `ifelse(c, x, 0) / ifelse(c, y, 1)`, never with a nested `ifelse(c, x / ifelse(c, y, 1), 0)`: LLVM removes the inner `ifelse` because `c` is known to be true in the taken branch, leaving an unguarded `x / y`.
 
 ## Benchmarks
 
@@ -373,6 +373,15 @@ PrimitiveWet resolution sweep, on GPU and TPU only. `--SPEEDY` adds a suite of t
 model over the same resolutions in a SPEEDY.f90-like configuration (prescribed seasonal climatologies,
 constant surface roughness, wind slowdown and gusts), on every architecture including Reactant. Truncations in the benchmarks are 1-based (T32, …, T256), as in
 the model code.
+
+For a quick check whether performance regressed, `manual_benchmarking.jl --debug` runs only a
+short PrimitiveWet resolution sweep with the default transform (T32–T128 with 8 layers, T32 and
+T128 with 16 layers) and does not touch the stored results.
+`julia SpeedyWeather/benchmark/regression/regression.jl check` runs it on main, the latest
+release and the latest benchmarked revision and compares them (also run weekly by
+`.github/workflows/benchmark_regression.yml`; the `benchmark-regression` skill builds on it).
+Labelling a PR `benchmark-performance` runs it on the PR merged into main vs main on every push
+(`.github/workflows/benchmark_pr.yml`), and `benchmark_pr_comment.yml` posts the report on the PR.
 
 ## Code Style
 
@@ -414,7 +423,10 @@ that submodule must be bumped according to its size:
 
 Bump the version of every submodule whose source you actually touched in the PR.
 A change confined to `SpeedyWeather/` does not require bumping
-`LowerTriangularArrays`, etc.
+`LowerTriangularArrays`, etc. 
+
+When `SpeedyWeather` depends on a new functionality of one of its submodule, also
+bump the compatibility entry accordingly. 
 
 ## Implementation plans
 

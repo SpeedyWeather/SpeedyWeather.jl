@@ -261,8 +261,9 @@ the key would change accordingly to `:divergence`.
 
 ### Surface variables
 
-Mean sea-Level pressure (`mslp`), surface temperature (`tsurf`) and 10m winds (`u10`, `v10`) are computed
-specifically for the output. If these output variables are not requested then they will not be computed.
+Mean sea-Level pressure (`mslp`), surface temperature (`tsurf`), 10m winds (`u10`, `v10`) and
+precipitable water (`pw`) are computed specifically for the output. If these output variables are not
+requested then they will not be computed.
 
 **Mean sea-level pressure** is computed as
 
@@ -272,6 +273,16 @@ p_{surf} \exp\left(\frac{g h}{R_d T_v}\right)
 
 with gravity ``g``, orographic height ``h``, dry gas constant ``R_d`` and ``T_v`` virtual temperature
 at the surface.
+
+**Precipitable water** (`OutputVariables.PrecipitableWater()`) is the column-integrated water vapor [kg/m²]
+
+```math
+\frac{1}{g} \sum_k q_k \Delta p_k
+```
+
+with specific humidity ``q_k`` and pressure thickness ``\Delta p_k`` of layer ``k``, using the
+surface pressure of every column. The vertical integral is computed on the model grid before
+the interpolation onto the output grid.
 
 **Surface temperature** is computed assuming an adiabatic descent from the lowermost model
 level

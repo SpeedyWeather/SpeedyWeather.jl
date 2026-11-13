@@ -16,13 +16,13 @@ end
 
 Adapt.@adapt_structure Radiation
 
-"""$(TypedMethodSignatures(defaults = true)) Bundle `shortwave` and `longwave` into one `Radiation` component,
-defaulting to `OneBandShortwave` and `OneBandLongwave` (the `PrimitiveWetModel` defaults).
+"""$(TYPEDSIGNATURES) Bundle `shortwave` and `longwave` into one `Radiation` component,
+defaulting to `TwoBandShortwave` and `OneBandLongwave` (the `PrimitiveWetModel` defaults).
 For a dry model use `shortwave = OneBandGreyShortwave(spectral_grid)` and
 `longwave = OneBandGreyLongwave(spectral_grid)`."""
 function Radiation(
         SG::SpectralGrid;
-        shortwave = OneBandShortwave(SG),
+        shortwave = TwoBandShortwave(SG),
         longwave = OneBandLongwave(SG),
     )
     return Radiation(shortwave, longwave)
@@ -30,7 +30,7 @@ end
 
 export DryRadiation
 
-"""$(TypedMethodSignatures(defaults = true)) `Radiation` but with longwave/shortwave defaults for the PrimitiveDryModel."""
+"""$(TYPEDSIGNATURES) `Radiation` but with longwave/shortwave defaults for the PrimitiveDryModel."""
 function DryRadiation(
         SG::SpectralGrid;
         shortwave = OneBandGreyShortwave(SG),
@@ -49,6 +49,13 @@ end
 
 variables(radiation::Radiation, model::AbstractModel) =
     (variables(radiation.shortwave, model)..., variables(radiation.longwave, model)...)
+
+# global (non-column) parts, e.g. the ozone update of `TwoBandShortwave`
+function parameterization!(vars::Variables, radiation::Radiation, model::PrimitiveEquation)
+    parameterization!(vars, radiation.shortwave, model)
+    parameterization!(vars, radiation.longwave, model)
+    return nothing
+end
 
 @propagate_inbounds function parameterization!(ij, vars, radiation::Radiation, model)
     parameterization!(ij, vars, radiation.shortwave, model)     # shortwave first,

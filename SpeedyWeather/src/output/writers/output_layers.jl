@@ -34,7 +34,7 @@ struct PressureLayers{V, I, F} <: AbstractOutputLayers
     scratch::F
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Vertical output layers at the given `pressure` [Pa], $(DEFAULT_PRESSURE_LAYERS ./ 100) hPa
 by default. Allocates the pressure vector and one scratch field (shared by all output
 variables) on `SG`'s architecture and in its number format, so that the vertical
