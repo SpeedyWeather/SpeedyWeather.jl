@@ -82,6 +82,25 @@ independently. Transformed after every time step to grid space with a
 provided and an independent `random_number_generator` is used
 that is reseeded on every `initialize!`. `n_patterns > 1` evolves that many
 independent patterns (`Spectral3D`/`Grid3D` with `n_patterns` slots).
+
+Every time step the coefficients `ξ` of degree l of the pattern are updated as
+
+    ξ ← a ξ + Fₗ r,   a = exp(-Δt / time_scale)
+
+with complex normals `r` (unit variance in real and imaginary part) and the noise factors
+(ECMWF Tech Memorandum 598, Appendix 8)
+
+    Fₗ = F₀ exp(-l(l+1) / (2k(k+1))),   F₀ = σ √(1 - a²) norm_sphere / √(2 ∑ₗ (2l+1) exp(-l(l+1) / (k(k+1))))
+
+with `k = wavenumber`, `σ = standard_deviation` and the sum over the degrees that get noise,
+1 ≤ l ≤ lmax (only the global mean l = 0 gets none). `F₀` normalises the stationary pattern
+to the grid-point standard deviation `σ`, the factor √(1 - a²) compensates for the memory
+(the stationary variance is Fₗ²/(1 - a²)). The variance decays like a Gaussian in l: the
+large scales keep their variance, at l = k it has dropped to 1/e, so features have a size
+of about radius/k (k = 12: about 500 km). This limits the noise to the large scales, e.g. for
+the SPPT stochastic physics scheme. `wavenumber` has to be positive: unlike for
+`SpectralWhiteNoiseProcess`, 0 does not give a spectrally flat pattern.
+
 Fields are: $(TYPEDFIELDS)"""
 @kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType, SpectralVariable} <: AbstractRandomProcess
     truncation::IntType
@@ -227,7 +246,8 @@ semantics as `SpectralAR1Process`.
   may be used e.g. in the SPPT stochastic physics scheme to limit the noise to the large scales.
   With this option the pattern is white in time, but coloured in space.
   `wavenumber = 0` stands for k → ∞ (exp → 1, the same variance at every degree),
-  not for wavenumber zero (used e.g. for the GFDT sensitivity computations)
+  not for wavenumber zero (used e.g. for the GFDT sensitivity computations). With k > 0
+  the pattern is correlated in space but remains white in time (independent draws).
 - Neither the global mean (l = 0) nor the last degree l = lmax (not a resolved degree
   in SpeedyWeather, its coefficients do not survive a grid round trip) get noise.
 - The m = 0 coefficients are real, with their real part scaled by √2 so that the
