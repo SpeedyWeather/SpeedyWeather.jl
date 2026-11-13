@@ -26,18 +26,23 @@ abstract type AbstractNCycleLorenz <: AbstractTimeStepper end
 
 A semi-implicit Lorenz N-cycle time integration scheme following Hotta et al. (2016).
 
-# Algorithm (per substep of a cycle)
-1. G = w*F_E(x) + (1-w)*G                   (weighted tendency accumulation)
-2. dx = (I - α*Δt*L_I)^(-1) * (G + L_I*x)   (implicit solve)
-3. x = x + Δt*dx                            (state update)
+# Algorithm (per substep k of a cycle)
+1. G = (I - w*θₖ*Δt*L)^(-1) * (w*F(x) + (1-w)*G)  (weighted tendency accumulation with implicit solve)
+2. x = x + Δt*G                                  (state update)
+
+with F the full tendency, L the linear gravity-wave terms, w the weight and θₖ the implicit
+centering of substep k (see `implicit_centering`).
 $(TYPEDFIELDS)
 """
-mutable struct NCycleLorenz{NF, V, IntType, S, MS, B, O, L} <: AbstractNCycleLorenz
+mutable struct NCycleLorenz{NF, V, IntType, C, S, MS, B, O, L} <: AbstractNCycleLorenz
     "[OPTION] Number of steps N in a cycle (3 or 4 recommended, 4 is more stable)"
     steps::IntType
 
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
     variant::V
+
+    "[OPTION] Implicit centering per substep of the cycle (length `steps`), `nothing` uses `implicit.centering` on every substep"
+    implicit_centering::C
 
     "[OPTION] Time step for T32 resolution, scale linearly with resolution"
     Δt_at_T32::S
@@ -97,6 +102,7 @@ function NCycleLorenz(
         spectral_grid::SpectralGrid;
         steps = 3,
         variant = NCycleLorenzA(),
+        implicit_centering = default_implicit_centering(steps, variant),
         Δt_at_T32 = Minute(30),
         adjust_with_output = true,
         ocean = nothing,    # default can't be NCycleLorenz, creates an infinite loop
@@ -108,7 +114,26 @@ function NCycleLorenz(
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
     Δt::NF = Δt_millisec.value / 1000
 
-    return NCycleLorenz(steps, variant, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt, ocean, land)
+    implicit_centering = isnothing(implicit_centering) ? nothing : NTuple{steps, NF}(implicit_centering)
+    return NCycleLorenz(steps, variant, implicit_centering, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt, ocean, land)
+end
+
+"""$(TYPEDSIGNATURES)
+Default implicit centering per substep of the cycle. For the 3-cycle with variant A these are
+optimized centerings that make the semi-implicit scheme (with the linear terms inside the Lorenz
+average) neutral for gravity waves up to ωΔt ≈ 1 while remaining stable with Doppler-shifted
+gravity waves, Coriolis coupling and a reference layer thickness larger than the actual one
+(e.g. over orography). `nothing` otherwise, meaning `implicit.centering` is used on every substep."""
+default_implicit_centering(steps, variant) = nothing
+default_implicit_centering(steps, ::NCycleLorenzA) = steps == 3 ? (0.069, 1.028, 0.48) : nothing
+
+"""$(TYPEDSIGNATURES)
+Implicit centering for the current substep of the cycle, `implicit.centering` if
+`time_stepping.implicit_centering` is `nothing`."""
+implicit_centering(::AbstractNCycleLorenz, implicit, clock) = implicit.centering
+function implicit_centering(L::NCycleLorenz, implicit, clock)
+    isnothing(L.implicit_centering) && return implicit.centering
+    return L.implicit_centering[current_substep(L, clock) + 1]
 end
 
 """$(TYPEDSIGNATURES)

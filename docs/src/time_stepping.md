@@ -273,26 +273,32 @@ EulerForward
 
 The Lorenz N-cycle [`NCycleLorenz`](@ref) is a semi-implicit time integration following
 [Hotta2016](@citet). Over a cycle of ``N`` substeps it advances the state ``x``,
-per substep, as
+per substep ``k = 0, \dots, N-1``, as
 
 ```math
 \begin{aligned}
-G &= w\,F_E(x) + (1-w)\,G \\
-dx &= (I - \alpha\,\Delta t\,L_I)^{-1} (G + L_I x) \\
-x &= x + \Delta t\,dx
+G &= w_k\,\left(F_E(x) + L\left(x + \theta_k (x^{new} - x)\right)\right) + (1-w_k)\,G \\
+x^{new} &= x + \Delta t\,G
 \end{aligned}
 ```
 
-where ``F_E`` are the explicit tendencies, ``L_I`` the linear (gravity-wave) terms treated
-implicitly, and ``w`` a substep-dependent weight coefficient. Only one prognostic step is stored
-(the state is updated in place), but two tendencies are kept: ``F`` (the current tendency) and
-``G`` (the weighted accumulation that carries memory across substeps), hence
-`tendency_spectral_steps(::NCycleLorenz) = 2`. In SpeedyWeather's implementation the implicit
-solve ``(I - \alpha\,\Delta t\,L_I)^{-1}(G + L_I x)`` is folded into the same `implicit_correction!`
-step used by Leapfrog (see [Semi-implicit time stepping](@ref implicit_primitive) for the
-primitive equations and [Semi-implicit time integration](@ref implicit_swm) for the shallow water
-model -- both implicit solves are shared between time steppers), so `update_prognostic!` for
-`NCycleLorenz` itself only performs the weighted accumulation and the explicit state update
+where ``F_E`` are the explicit tendencies, ``L`` the linear (gravity-wave) terms treated
+implicitly, ``w_k`` a substep-dependent weight coefficient and ``\theta_k`` the implicit centering
+of substep ``k``. The linear terms are therefore part of the weighted Lorenz average and evaluated
+at ``x + \theta_k (x^{new} - x)`` with ``\theta_k = 0`` forward (explicit), ``\theta_k = 1/2`` centred and
+``\theta_k = 1`` backward. As ``x^{new}`` depends on ``G`` this requires the solve
+
+```math
+G = (I - w_k \theta_k \Delta t L)^{-1} \left(w_k F(x) + (1-w_k) G\right)
+```
+
+with ``F = F_E + Lx`` the full tendency, which is done in `implicit_correction!`. Only one prognostic
+step is stored (the state is updated in place), but two tendencies are kept: ``F`` (the current
+tendency) and ``G`` (the weighted accumulation that carries memory across substeps), hence
+`tendency_spectral_steps(::NCycleLorenz) = 2`. To reuse the same `update_prognostic!` for all
+variables, the implicit solve stores ``(G - (1-w_k) G_{old})/w_k`` back into ``F`` so that
+`update_prognostic!` for `NCycleLorenz` only performs the weighted accumulation and the
+explicit state update
 
 ```math
 \begin{aligned}
@@ -301,8 +307,31 @@ x &= x + \Delta t\,G
 \end{aligned}
 ```
 
-for every spectral coefficient (and vertical layer), with the implicit correction applied to
-``G`` beforehand by `diffusion_and_implicit!`.
+for every spectral coefficient (and vertical layer).
+
+### Implicit centering of the Lorenz N-cycle
+
+With the same centering ``\theta_k = 1/2`` on every substep the semi-implicit Lorenz N-cycle
+strongly damps gravity waves: over a cycle the amplification per substep of a gravity wave with
+frequency ``\omega`` is only about 0.75-0.9 for ``\omega \Delta t = 0.5-1``, compared to about 0.997 for
+the semi-implicit leapfrog with Robert-Williams filter. Treating the linear terms outside of the
+Lorenz average instead (with ``L`` evaluated Crank-Nicolson on every substep) is neutral for
+gravity waves but unstable once gravity waves are Doppler-shifted by advection or coupled through
+the Coriolis force. For the 3-cycle with variant A the default is therefore a centering
+that varies within the cycle, ``\theta = (0.069, 1.028, 0.48)``, which was optimised in a linear
+stability analysis to
+
+- be (almost) neutral for gravity waves with ``\omega\Delta t \lesssim 1`` and to only damp faster ones,
+- be stable for Doppler-shifted gravity waves, with Coriolis coupling, and with a reference layer
+  thickness that is larger than the actual one (e.g. over orography).
+
+For other cycle lengths or variants `implicit.centering` is used on every substep. The centering
+can be chosen with the `implicit_centering` option, e.g.
+`NCycleLorenz(spectral_grid, steps=3, implicit_centering=(0.5, 0.5, 0.5))`.
+With these centerings the 3-cycle preserves gravity wave energy about as well as leapfrog
+(see [Gravity waves on the sphere](@ref)), but the Lorenz 3-cycle is limited to
+``\omega\Delta t < \sqrt{3}/3 \approx 0.58`` for the explicitly treated terms (e.g. advection), compared to ``\omega\Delta t < 1``
+for leapfrog. The default time step of `NCycleLorenz` is therefore shorter, 30min at T32.
 
 Four weight variants are available, following the naming in [Hotta2016](@citet), selected via the
 `variant` option:

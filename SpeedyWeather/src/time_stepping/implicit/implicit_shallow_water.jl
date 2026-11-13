@@ -107,10 +107,12 @@ function implicit_correction!(
         time_stepping::AbstractNCycleLorenz,
         model::ShallowWater
     )
-    # implicit timestep ξ = α*Δt, depending on centering (0.5 Crank Nicolson, 1 backward Euler)
+    # implicit timestep ξ = w*θ*Δt with weight w and centering θ of the current substep
     (; Δt) = time_stepping
-    w = weight_coefficient(time_stepping, vars.prognostic.clock)
-    ξ = w * implicit.centering * Δt / vars.prognostic.scale[]
+    (; clock) = vars.prognostic
+    w = weight_coefficient(time_stepping, clock)
+    θ = implicit_centering(time_stepping, implicit, clock)
+    ξ = w * θ * Δt / vars.prognostic.scale[]
 
     # use Hotta et al. 2016 notation for current tendency F and previous (averaged) tendency G
     F_div = get_step(vars.tendencies.divergence, 1)    # no tuple (get_steps) here: a tuple of step
