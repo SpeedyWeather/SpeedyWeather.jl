@@ -292,7 +292,10 @@ at ``x + \theta_k (x^{new} - x)`` with ``\theta_k = 0`` forward (explicit), ``\t
 G = (I - w_k \theta_k \Delta t L)^{-1} \left(w_k F(x) + (1-w_k) G\right)
 ```
 
-with ``F = F_E + Lx`` the full tendency, which is done in `implicit_correction!`. Only one prognostic
+with ``F = F_E + Lx`` the full tendency, which is done in `implicit_correction!`, see
+[Semi-implicit Lorenz N-cycle](@ref implicit_swm_ncycle) for the shallow water equations.
+This is "Milan's version" in [#917](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/917);
+"Daisuke's version" ([Hotta2016](@citet)) keeps the linear terms outside of the Lorenz average. Only one prognostic
 step is stored (the state is updated in place), but two tendencies are kept: ``F`` (the current
 tendency) and ``G`` (the weighted accumulation that carries memory across substeps), hence
 `tendency_spectral_steps(::NCycleLorenz) = 2`. To reuse the same `update_prognostic!` for all
@@ -312,10 +315,10 @@ for every spectral coefficient (and vertical layer).
 ### Implicit centering of the Lorenz N-cycle
 
 With the same centering ``\theta_k = 1/2`` on every substep the semi-implicit Lorenz N-cycle
-strongly damps gravity waves: over a cycle the amplification per substep of a gravity wave with
+("Milan's version" with ``\theta_k = \alpha``) strongly damps gravity waves: over a cycle the amplification per substep of a gravity wave with
 frequency ``\omega`` is only about 0.75-0.9 for ``\omega \Delta t = 0.5-1``, compared to about 0.997 for
 the semi-implicit leapfrog with Robert-Williams filter. Treating the linear terms outside of the
-Lorenz average instead (with ``L`` evaluated Crank-Nicolson on every substep) is neutral for
+Lorenz average instead ("Daisuke's version", with ``L`` evaluated Crank-Nicolson on every substep) is neutral for
 gravity waves but unstable once gravity waves are Doppler-shifted by advection or coupled through
 the Coriolis force. For the 3-cycle with variant A the default is therefore a centering
 that varies within the cycle, ``\theta = (0.069, 1.028, 0.48)``, which was optimised in a linear

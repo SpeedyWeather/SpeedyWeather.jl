@@ -228,6 +228,61 @@ Some notes on the semi-implicit time stepping
 - With increasing ``\alpha > 1/2`` these waves are also slowed down, such that for ``\alpha = 1`` they quickly disappear in several hours.
 - Using the [scaled shallow water equations](@ref scaled_swm) the time step ``\delta t`` has to be the scaled time step ``\tilde{\Delta t} = \delta t/R`` which is divided by the radius ``R``. Then we use the normalized eigenvalues ``-l(l+1)`` which also omit the ``1/R^2`` scaling, see [scaled shallow water equations](@ref scaled_swm) for more details.
 
+
+### [Semi-implicit Lorenz N-cycle](@id implicit_swm_ncycle)
+
+With the [Lorenz N-cycle](@ref ncycle) the linear terms ``N_I`` are treated inside the weighted
+Lorenz average ("Milan's version" in
+[#917](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/917)). On substep
+``k = \mathrm{mod}(i, N)`` of the cycle, with weight ``w = w_k`` and implicit centering
+``\theta = \theta_k``, the accumulated tendency ``G`` is updated and used to step forward as
+
+```math
+\begin{aligned}
+G_{new} &= w\left(N_E(V_i) + N_I\left(V_i + \theta (V_{i+1} - V_i)\right)\right) + (1-w)\,G_{old} \\
+V_{i+1} &= V_i + \Delta t\,G_{new}
+\end{aligned}
+```
+
+so the linear terms are evaluated at ``V_i`` for ``\theta = 0`` (explicit), centred for ``\theta = 1/2``
+and at ``V_{i+1}`` for ``\theta = 1``. With ``V_{i+1} - V_i = \Delta t\,G_{new}``, the full right-hand side
+``N(V_i) = N_E(V_i) + N_I(V_i)`` and ``\xi = w\theta\Delta t`` this is
+
+```math
+G_{new} = R + \xi N_I(G_{new}), \quad R = w N(V_i) + (1-w)\,G_{old}
+```
+
+i.e. the same implicit problem as for leapfrog with ``\delta V \to G_{new}``, ``G \to R`` and
+``\xi = 2\alpha\Delta t \to w\theta\Delta t``. For divergence and interface displacement, per harmonic
+with Laplacian eigenvalue ``\nabla^2``,
+
+```math
+\begin{aligned}
+R_\mathcal{D} &= w N_\mathcal{D} + (1-w)\,G_{\mathcal{D},old}, \qquad
+R_\eta = w N_\eta + (1-w)\,G_{\eta,old} \\
+G_{\mathcal{D},new} &= \frac{R_\mathcal{D} - \xi g \nabla^2 R_\eta}{1 - \xi^2 g H \nabla^2} \\
+G_{\eta,new} &= R_\eta - \xi H\,G_{\mathcal{D},new}
+\end{aligned}
+```
+
+Vorticity has no linear gravity wave terms, ``G_{\zeta,new} = R_\zeta``. To use the same time stepping
+for all variables, `implicit_correction!` writes back
+``N \gets (G_{new} - (1-w)\,G_{old})/w`` into the current tendency, so that
+`update_prognostic!` then computes ``G_{new} = wN + (1-w)G_{old}`` and ``V_{i+1} = V_i + \Delta t\,G_{new}``
+as for every other variable. Horizontal diffusion is applied (implicitly with ``\Delta t``) to ``N``
+before this correction.
+
+The centering ``\theta_k`` can vary within the cycle, chosen with the `implicit_centering` option of
+[`NCycleLorenz`](@ref). The default for the 3-cycle with variant A is
+``\theta = (0.069, 1.028, 0.48)``, otherwise ``\theta_k = \alpha`` (`implicit.centering`) on every
+substep, see [Implicit centering of the Lorenz N-cycle](@ref).
+
+"Daisuke's version", the formulation of [Hotta2016](@citet), instead keeps the linear terms
+outside of the Lorenz average, ``G_{new} = w N_E(V_i) + (1-w) G_{old}`` and
+``V_{i+1} = V_i + \Delta t\left(G_{new} + N_I(V_i + \alpha(V_{i+1} - V_i))\right)``, i.e. Crank-Nicolson
+for the linear terms on every substep with ``\xi = \alpha\Delta t`` and no weight. While neutral for
+gravity waves, it is unstable for Doppler-shifted gravity waves and with Coriolis coupling and is
+therefore not used.
 ## [Scaled shallow water equations](@id scaled_swm)
 
 Similar to the [scaled barotropic vorticity equations](@ref scaling),

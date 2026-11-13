@@ -22,6 +22,12 @@ Base revision: 069fb09f3d4fa539fbeb27ea4c352010d6737961
 > Can you open a PR with this? Bundle all your findings together! Don't bother making N=4 even
 > better for now I want to have a look first
 
+> Can you clarify how your changes compare to the Daisuke's version and Milan's version that I
+> wrote down in the originating issue? / Yes map to the issue and document the exact mathematical
+> formulation of the implicit too
+
+- Mapped all formulations to the names in #917 and wrote down the exact implicit solve
+  (here and in `docs/src/shallowwater.md`).
 - Plan written after the investigation (exploratory work), bundling bug fixes, the analysis and
   the per-substep centering for N=3. N=4 centerings are only reported, not made default.
 
@@ -31,6 +37,45 @@ Base revision: 069fb09f3d4fa539fbeb27ea4c352010d6737961
 be more diffusive and to need a shorter time step than `Leapfrog`.
 
 ## Background
+
+### Mapping to the formulations in #917
+
+Originating issue: [#917](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/917). Notation per
+substep k of the cycle, state ``u_i``, weight ``w = w_k``, explicit tendency ``F_E``, linear
+gravity-wave terms ``L``, full tendency ``F = F_E + Lu``, accumulated tendency ``G``.
+
+| Name in #917 | Formulation | Status |
+|---|---|---|
+| 0. Semi-implicit leapfrog | ``(u_{i+1}-u_{i-1})/2Δt = (1-2αΔtL)^{-1}[F(u_i) - L(u_i - u_{i-1})]`` | unchanged |
+| 2. Daisuke's version (Hotta et al. 2016) | ``(u_{i+1}-u_i)/Δt = (1-αΔtL)^{-1}[wF_E(u_i) + (1-w)G + Lu_i]``, ``G \gets wF_E + (1-w)G`` | never on main, was described in the docs; unstable (Doppler shift, Coriolis) |
+| 3. Milan's version | ``G \gets (1-wαΔtL)^{-1}[wF(u_i) + (1-w)G]``, ``u_{i+1} = u_i + ΔtG`` | on main; stable but damps gravity waves |
+| **This PR** | ``G \gets (1-wθ_kΔtL)^{-1}[wF(u_i) + (1-w)G]``, ``u_{i+1} = u_i + ΔtG`` | Milan's version with centering ``θ_k`` per substep; ``θ_k = α`` recovers it exactly |
+
+Equivalently, this PR evaluates the linear terms inside the Lorenz average at
+``u_i + θ_k(u_{i+1} - u_i)``:
+``G \gets w(F_E(u_i) + L(u_i + θ_k(u_{i+1}-u_i))) + (1-w)G``.
+
+#### Exact implicit solve (shallow water)
+
+``L``: ``∂D/∂t = -g∇²η``, ``∂η/∂t = -HD`` (D divergence, η interface displacement, H layer
+thickness at rest, ∇² the eigenvalue ``-l(l+1)`` per harmonic of the radius-scaled equations).
+With ``ξ = wθ_kΔt`` (divided by the radius scaling), per harmonic and substep:
+
+```
+R_D = w F_D + (1-w) G_D
+R_η = w F_η + (1-w) G_η
+G_D ← (R_D - ξ g ∇² R_η) / (1 - ξ² g H ∇²)
+G_η ← R_η - ξ H G_D
+```
+
+with ``G_ζ ← w F_ζ + (1-w) G_ζ`` for vorticity. `implicit_correction!` stores
+``F ← (G_new - (1-w)G_old)/w`` so that the shared `update_prognostic!`
+(``G ← wF + (1-w)G``, ``u ← u + ΔtG``) gives the same result for all variables. Horizontal
+diffusion ``F ← (F + ν∇²ⁿu)/(1 - Δtν∇²ⁿ)`` is applied before the implicit correction.
+
+Daisuke's version as tested here (`impl.jl`, ``μ = 0``): ``G ← wF_E + (1-w)G`` with
+``F_E = F - Lu``, ``u ← u + Δt(1-αΔtL)^{-1}(G + Lu)``. The Lawson variant (``μ = 1``) additionally
+applies ``R = (1-αΔtL)^{-1}(1+(1-α)ΔtL)`` to state and memory, ``u ← R(u + ΔtG)``, ``G ← RG``.
 
 ### Bugs found
 
@@ -58,11 +103,11 @@ than the actual one (H - H_b), which semi-implicit leapfrog handles unconditiona
 | Scheme | Gravity wave damping/step at ωΔt=0.5, 1 | Doppler | f-plane | orography β |
 |---|---|---|---|---|
 | Leapfrog + RAW, α=0.5 | 0.9994, 0.997 | stable to ω_EΔt≈1 | stable | stable |
-| N-cycle as in code, θ=0.5 (N=3) | 0.90, 0.75 | unstable (1.07) | stable | stable |
-| L outside Lorenz average (docs), α=0.5 | 1, 1 | unstable (1.2-1.5) | unstable | - |
+| Milan's version (on main), θ=0.5 (N=3) | 0.90, 0.75 | unstable (1.07) | stable | stable |
+| Daisuke's version, α=0.5 | 1, 1 | unstable (1.2-1.5) | unstable | - |
 | Lawson / integrating factor | 1, 1 | stable | unstable (1.04-1.5) | - |
-| Code, per-substep θ = (1, 1, 0), N=3 | exactly 1 (all-pass) | stable to 0.55 | stable | unstable (1.1-2.6) |
-| **Code, θ = (0.069, 1.028, 0.48), N=3** | 1, 0.9997 | stable to ≈0.3 | stable | stable |
+| Milan's version, per-substep θ = (1, 1, 0), N=3 | exactly 1 (all-pass) | stable to 0.55 | stable | unstable (1.1-2.6) |
+| **Milan's version, θ = (0.069, 1.028, 0.48), N=3 (this PR)** | 1, 0.9997 | stable to ≈0.3 | stable | stable |
 
 The explicit Lorenz N-cycle itself is limited to ω_EΔt < √3/3 ≈ 0.58 (N=3) and ≈ 0.71 (N=4)
 per tendency evaluation, compared to 1 for leapfrog. The robust optimum for N=4 found so far,
@@ -74,7 +119,7 @@ but in the experiments this was not the limiting factor (not changed here).
 
 ### Experiments: docs gravity wave example (T128, 2 days, var(η)/var(η₀))
 
-| Δt at T32 | Leapfrog | NCycle N=3 (old, θ=0.5) | NCycle N=3, θ = (0.069, 1.028, 0.48) |
+| Δt at T32 | Leapfrog | NCycle N=3, Milan's version θ=0.5 (main) | NCycle N=3, θ = (0.069, 1.028, 0.48) |
 |---|---|---|---|
 | 10 min | 0.36 | 0.011 | 0.43 |
 | 20 min | 0.38 | 0.011 | 0.31 |
@@ -83,7 +128,7 @@ but in the experiments this was not the limiting factor (not changed here).
 | 60 min | 0.18 | 0.011 | - |
 
 Galewsky jet (`ZonalJet`, 20 days): T85 stable up to Δt_T32 = 20 min (old 25 min, leapfrog ≥ 40 min),
-T31 up to 30 min (leapfrog ≥ 40 min). The L-outside-average and Lawson variants were unstable
+T31 up to 30 min (leapfrog ≥ 40 min). Daisuke's version and the Lawson variant were unstable
 beyond Δt_T32 ≈ 10-20 min in the gravity wave example.
 
 ## Summary of changes
