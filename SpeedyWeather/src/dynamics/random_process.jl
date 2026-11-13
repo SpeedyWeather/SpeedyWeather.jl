@@ -225,6 +225,7 @@ semantics as `SpectralAR1Process`.
   Fₗ² decays like a Gaussian in l: the large scales keep their
   variance, at l = k it has dropped to 1/e, so features have a size of about radius/k. This
   may be used e.g. in the SPPT stochastic physics scheme to limit the noise to the large scales.
+  With this option the pattern is white in time, but coloured in space.
   `wavenumber = 0` stands for k → ∞ (exp → 1, the same variance at every degree),
   not for wavenumber zero (used e.g. for the GFDT sensitivity computations)
 - Neither the global mean (l = 0) nor the last degree l = lmax (not a resolved degree
@@ -287,10 +288,8 @@ function initialize!(process::SpectralWhiteNoiseProcess, model::AbstractModel)
     # no noise on the global mean (l = 0) and the last degree l = lmax
     live = (ls .> 1) .& (ls .< length(ls))
 
-    # variance budget: degree l has 2l + 1 orders, all degrees 1 ≤ l < lmax are live,
-    # ECMWF Tech Memorandum 598, Appendix 8, eqs. 17-18 without the AR1's (1 - a²) factor
-    # as a white draw has no memory, spectrally flat is the limit k → ∞
-    # noise factors are built on the host as `live` is a CPU BitVector, then copied
+    # computes the noise factors for the wavenumbers as explained in the docstring of 
+    # `SpectralWhiteNoiseProcess`
     if k <= 0
         denom = 2 * sum(2l + 1 for l in 1:(process.truncation - 1))
         F₀ = sqrt(σ^2 / denom) * model.spectral_transform.norm_sphere
