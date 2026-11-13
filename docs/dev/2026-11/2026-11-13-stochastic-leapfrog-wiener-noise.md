@@ -25,6 +25,11 @@ Base revision: `24fdb6847a3bdd49f7e23e94a5b64de06dd89d48` (branch point). HEAD w
 >   stays **explicit in `time_step!`** (the user did not want it hidden inside a
 >   `diffusion_and_implicit!` method). All atmospheric noise is now spectral. Results match the
 >   origin project only to rounding. Docs and references added.
+> - 2026-11-13, later: `wiener_tendencies!` made type-stable (`772a26d1`), with a JET guard in
+>   `test/dynamics/dispatch.jl`. Noise-factor formulas and the `StochasticLeapfrog` docstring
+>   switched to typeset LaTeX. The `# IMPLEMENTATION NOTES` block was removed from the source
+>   (`1066382e`). The PrimitiveDry cases and the "noise before the implicit terms" testset were
+>   removed from `test/dynamics/stochastic_leapfrog.jl` to shorten the tests (`c8946a7b`).
 
 ## Problem description
 
@@ -78,8 +83,9 @@ All changes are in `SpeedyWeather/` plus the docs. The other submodules are unto
 
 ### `src/time_stepping/steppers/stochastic_leapfrog.jl` (new)
 
-The file starts with a long `# IMPLEMENTATION NOTES` block marked "to be revised before the PR".
-That block is the most detailed design record; read it first.
+Until `1066382e` the file started with a long `# IMPLEMENTATION NOTES` block, the most detailed
+design record. It is summarised in this document; the full text is in the history:
+`git show 772a26d1:SpeedyWeather/src/time_stepping/steppers/stochastic_leapfrog.jl`.
 
 - `StochasticLeapfrog` is a **type alias**: a `Leapfrog` whose `noise` is an `AbstractWienerNoise`.
   It is not a new stepper type. The constructor `StochasticLeapfrog(spectral_grid; seed, amplitudes...)`
@@ -104,6 +110,10 @@ That block is the most detailed design record; read it first.
 - Scaling: the tendency receives `a/√Δt · taper · ξ`, with `Δt = L.Δt` in seconds. Atmospheric
   tendencies are radius-scaled at that point, so the amplitude is multiplied by `R`, and by `R²`
   for vorticity and divergence. Ocean/land amplitudes are not scaled.
+- `wiener_tendencies!` dispatches to two `@generated` drivers, `wiener_atmosphere!` and
+  `wiener_surface!`. They are unrolled over the names from the `Variables` type, like
+  `update_prognostic_atmosphere!`. The per-variable work is in `wiener_slots!` and
+  `wiener_surface_slots!`.
 
 ### `src/time_stepping/time_integration.jl`
 
@@ -162,11 +172,27 @@ wrote this document**):
   amplitudes gave a bitwise-equal `Leapfrog`; barotropic T8 Float64 matched to 2.9e-15 after 100 days.
 - Not run: the full test suite, GPU, and the docs build.
 
-Commands, run from the repository root:
+Type-stability fix (2026-11-13, measured on this Mac, T32 L8 PrimitiveWet, every noise path active):
+
+| | before | after |
+|---|---|---|
+| trajectory after 20 steps | reference | bitwise identical |
+| allocations per `wiener_tendencies!` call | 22.4 KB | 3.5 KB (KernelAbstractions launches, ~560 B each) |
+| time per call (noisy) | ~53 μs | ~27 μs |
+| JET runtime-dispatch reports in the `StochasticLeapfrog` `time_step!` | 46 | 0 |
+
+After the fix the stochastic tests passed 492/492 (stochastic leapfrog, white noise, random
+process, SPPT; before the test shortening in `c8946a7b`). `dispatch.jl` passed 4/4, including
+the new `StochasticLeapfrog` testset.
+
+Commands, run from the repository root. `SpeedyWeather/test/Manifest.toml` is stale (July, no
+SpeedyWeather entry), so the JET test below stacks the test env behind the package env instead of
+resolving it:
 
 ```bash
 julia +1.12 --project=SpeedyWeather --check-bounds=yes -e 'using Test, SpeedyWeather; include("SpeedyWeather/test/dynamics/stochastic_leapfrog.jl")'
 julia +1.12 --project=SpeedyWeather --check-bounds=yes -e 'using Test, SpeedyWeather; include("SpeedyWeather/test/parameterizations/white_noise_process.jl"); include("SpeedyWeather/test/parameterizations/random_process.jl"); include("SpeedyWeather/test/parameterizations/stochastic_physics.jl")'
+JULIA_LOAD_PATH="@:$PWD/SpeedyWeather/test:@stdlib" julia +1.12 --project=SpeedyWeather --check-bounds=yes -e 'using Test, SpeedyWeather; include("SpeedyWeather/test/dynamics/dispatch.jl")'
 ```
 
 ## Open items (before un-drafting #1397)
@@ -175,22 +201,21 @@ julia +1.12 --project=SpeedyWeather --check-bounds=yes -e 'using Test, SpeedyWea
       gradient fix #1401, precipitable water #1370, …). Expect conflicts in `CHANGELOG.md` and
       `SpeedyWeather/Project.toml`. `main` is already at `version = "0.25.0-DEV"`, which also covers
       the version bump required for a new public type; keep it. The branch currently reads `0.24.0`.
-- [ ] Push: HEAD `68927750` is 1 commit ahead of `origin/mg/gfdt-upstream`.
-- [ ] Run the full `Pkg.test("SpeedyWeather")`, GPU tests, and the docs build.
-- [ ] Type instability: `wiener_tendencies!` loops over runtime Symbols (about 21 KB allocated and
-      about 80 μs per step at T32 L8 on CPU, roughly 1% of a step). Fix with an `@generated` driver
-      like `update_prognostic_atmosphere!`.
+- [ ] Push: local commits are ahead of `origin/mg/gfdt-upstream`.
+- [ ] Run the full `Pkg.test("SpeedyWeather")`, GPU tests, and the docs build. GPU could be tried
+      locally with Metal (`SpeedyWeather/test/GPU/MetalGPU`).
+- [x] Type instability in `wiener_tendencies!`: fixed with `@generated` drivers (`772a26d1`), see
+      Testing and verification.
 - [ ] Ocean/land slots exist only for nonzero amplitudes, unlike the atmosphere rule. This is a
       leftover of the bitwise reproduction, which was dropped on 2026-11-13, so it can now be made
       consistent.
 - [ ] Draw-at-end-of-step plus storing the pattern in prognostics was also only needed for bitwise
       reproduction. Drawing and applying in the same step would make the pattern scratch memory.
       Decide whether to change this (it changes first-step determinism and restart semantics).
-- [ ] `wiener_tendencies!` passes `L` (the Leapfrog) to `get_tendency_step` for ocean/land
+- [ ] `wiener_surface_slots!` passes `L` (the Leapfrog) to `get_tendency_step` for ocean/land
       tendencies instead of `time_stepper(L, Val(:ocean/:land))`. Harmless today (every stepper
       falls back to tendency step 1) but inconsistent with `ocean.jl` and `soil_temperature.jl`.
-- [ ] Condense or remove the `# IMPLEMENTATION NOTES` block at the top of `stochastic_leapfrog.jl`
-      (moving the useful parts into docstrings or this document).
+- [x] `# IMPLEMENTATION NOTES` block removed from `stochastic_leapfrog.jl` (`1066382e`).
 - [ ] Write the PR description (the body is currently empty).
 - [ ] Maybe: an Ewald-style `ΔWⁿ⁻¹ + ΔWⁿ` increment option.
 
