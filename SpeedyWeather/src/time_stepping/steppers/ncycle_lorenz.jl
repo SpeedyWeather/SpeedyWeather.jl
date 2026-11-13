@@ -91,7 +91,7 @@ end
 
 Adapt.@adapt_structure NCycleLorenzCore
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Generator function for NCycleLorenz struct using `spectral_grid` for resolution."""
 function NCycleLorenz(
         spectral_grid::SpectralGrid;

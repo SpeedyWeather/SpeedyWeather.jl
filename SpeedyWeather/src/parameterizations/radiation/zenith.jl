@@ -104,7 +104,7 @@ Adapt.@adapt_structure NoTimeCorrection
 NoTimeCorrection(::SpectralGrid; kwargs...) = NoTimeCorrection()
 (STC::NoTimeCorrection)(g) = zero(g)
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Chooses from SolarZenith (daily and seasonal cycle) or SolarZenithSeason
 given the parameters in model.planet. In both cases the seasonal cycle can
 be disabled, calculating the solar declination from the initial time
@@ -182,7 +182,20 @@ function year_angle(::Type{T}, time::Dates.AbstractDateTime) where {T}
     return T(2π) * T(seconds_of_year / seconds_in_year)
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
+Angle of year [radians] of `orbit_time` for the solar zenith `S`, or of its initial time
+if the seasonal cycle is disabled, see `year_angle`."""
+year_angle(::Type{T}, S::AbstractZenith, orbit_time::Dates.AbstractDateTime) where {T} =
+    year_angle(T, ifelse(S.seasonal_cycle, orbit_time, S.initial_time[]))
+
+"""$(TYPEDSIGNATURES)
+Solar declination angle δ [radians] at `orbit_time` for the solar zenith `S`, following its
+`solar_declination` and seasonal cycle settings. Can be used to synchronize other seasonal
+cycles with the solar zenith angle."""
+solar_declination(::Type{T}, S::AbstractZenith, orbit_time::Dates.AbstractDateTime) where {T} =
+    S.solar_declination(year_angle(T, S, orbit_time))
+
+"""$(TYPEDSIGNATURES)
 Fraction of day in `time` as angle in radians [-π...π], noon to noon, at longitude `λ`.
 Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as constant.
 This is because `Dates` functions assume an Earth date. Length of the daily cycle is instead
@@ -212,8 +225,7 @@ function cos_zenith!(
         throw(DimensionMismatch(geometry.spectral_grid.grid, cos_zenith.grid))
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
-    time_of_year = S.seasonal_cycle ? orbit_time : S.initial_time[]
-    g = year_angle(NF, time_of_year)
+    g = year_angle(NF, S, orbit_time)
 
     # time correction [radians] due to the equation of time (sunrise/set oscillation)
     tc = S.time_correction(g)
@@ -290,8 +302,7 @@ function cos_zenith!(
         throw(DimensionMismatch(geometry.spectral_grid.grid, cos_zenith.grid))
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
-    time_of_year = S.seasonal_cycle ? orbit_time : S.initial_time[]
-    g = year_angle(NF, time_of_year)
+    g = year_angle(NF, S, orbit_time)
 
     # solar declination angle [radians] changing from tropic of cancer to capricorn
     # throughout the year measured by g [radians]

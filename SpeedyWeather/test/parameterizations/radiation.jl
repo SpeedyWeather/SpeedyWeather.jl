@@ -21,13 +21,13 @@ function init_radiation_state!(vars, model)
 end
 
 @testset "Radiation bundle" begin
-    shortwaves = (TransparentShortwave, OneBandShortwave, OneBandGreyShortwave, Nothing)
+    shortwaves = (TransparentShortwave, OneBandShortwave, TwoBandShortwave, OneBandGreyShortwave, Nothing)
     longwaves = (UniformCooling, JeevanjeeRadiation, OneBandLongwave, OneBandGreyLongwave, Nothing)
 
     @testset "Bit-identical to separate schemes" begin
         # full matrix in Float32 (the default), spot check of the default pair in Float64
         cases = [(Float32, SW, LW) for SW in shortwaves for LW in longwaves]
-        push!(cases, (Float64, OneBandShortwave, OneBandLongwave))
+        push!(cases, (Float64, TwoBandShortwave, OneBandLongwave))
 
         @testset for (NF, SW, LW) in cases
             spectral_grid = SpectralGrid(; NF, truncation = 32, nlayers = 8)
@@ -84,7 +84,7 @@ end
 
         # defaults
         model = PrimitiveWetModel(spectral_grid)
-        @test model.radiation isa Radiation{<:OneBandShortwave, <:OneBandLongwave}
+        @test model.radiation isa Radiation{<:TwoBandShortwave, <:OneBandLongwave}
         @test :radiation in model.parameterizations
         model = PrimitiveDryModel(spectral_grid)
         @test model.radiation.shortwave isa OneBandShortwave     # the grey variant is a OneBandShortwave

@@ -3,6 +3,14 @@
 ## Unreleased
 
 - New variable group `variables.output` declared via `OutputVariable` for output-only variables, accumulated precipitation and river runoff moved there from `variables.parameterizations`. New `model.diagnostics` with `Accumulate` (parameterizations only write rates), `Maximum` and `Mean`, reset by the output writer so precipitation output is since the last output (rate output variables removed), output variables are written to restart files [#1362](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1362)
+- Fix the differentiability of `TwoBandShort` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
+- `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90 implementation, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
+
+## 0.24.1
+
+- Allow DocStringExtensions v0.9 again (compat "0.9, 0.10"), default values in signatures are only shown with v0.10 via a version-dependent `SpeedyWeatherInternals.Utils.TYPEDSIGNATURES`, DocStringExtensions names are imported explicitly [#1398](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1398)
+- `OutputVariables.PrecipitableWater` output, column-integrated on the model grid before interpolation [#1370](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1370)
+- Benchmark regression check: debug mode of the benchmark suite, `regression.jl` comparing a revision with main, the latest release and the latest benchmarked revision (bisecting a regression), run weekly and on PRs labelled `benchmark-performance`, plus a Claude skill [#1299](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1299)
 
 ## 0.24.0
 

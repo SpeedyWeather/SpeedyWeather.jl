@@ -35,11 +35,15 @@ julia --project=. manual_benchmarking.jl reactant-cpu          # Reactant on CPU
 julia --project=. manual_benchmarking.jl reactant-nvidia-gpu   # Reactant on NVIDIA GPU (CUDA)
 julia --project=. manual_benchmarking.jl reactant-amd-gpu      # Reactant on AMD GPU (ROCm)
 julia --project=. manual_benchmarking.jl reactant-tpu          # Reactant on TPU
+julia --project=. manual_benchmarking.jl --debug               # quick regression check, not stored: PrimitiveWet LT+FFT at L8: T32, T43, T64, T86, T128; L16: T32, T128
+julia regression/regression.jl check                           # debug mode on main, latest release and latest benchmarked revision
 ```
 
 Options and flags, in any order (`manual_benchmarking.jl --help` lists them): `--length X`, e.g. `manual_benchmarking.jl gpu --length 10`, multiplies the number of time steps of the timed runs of the PrimitiveWet resolution sweep (the overview below) for more robust timings; the other suites are not affected. `--repeats N` times every configuration exactly N times instead of up to 5 times within 30 s. `--suites benchmark201,benchmark900` restricts the run to specific suites (default: all); a partial run replaces that architecture's stored results with just the suites it ran. `--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-nvidia-gpu --reverse`) additionally runs the reverse-mode benchmarks, which take hours. `--hi-res` (GPU and TPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. `--SPEEDY` additionally runs the PrimitiveWet model over the resolutions of the resolution sweep in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of sea surface temperature, land surface temperature and soil moisture, constant surface roughness, wind slowdown and gusts).
 
 Each run replaces its own architecture's section in this `README.md` (including suites added by flags in an earlier run); results for other architectures are preserved via `benchmark_results.json`.
+
+A pull request labelled `benchmark-performance` is benchmarked against main with the same debug mode on every push, and the comparison is posted as a comment.
 
 ## Overview: PrimitiveWet resolution across architectures
 
