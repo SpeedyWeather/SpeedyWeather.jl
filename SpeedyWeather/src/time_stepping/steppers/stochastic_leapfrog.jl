@@ -258,15 +258,18 @@ function StochasticLeapfrog(
 end
 
 """$(TYPEDSIGNATURES)
-Add the Wiener increment of this time step (drawn at the end of the previous one) to the
-tendencies, then draw the pattern for the next time step. Called in `time_step!` after the
-dynamical core and before the implicit terms of the time stepping (`diffusion_and_implicit!`),
-which therefore act on the noise like on every explicit tendency."""
+Add the Wiener increment of this time step (pattern drawn at the end of the previous one) to the
+tendencies. Called in `time_step!` after the dynamical core and before the implicit terms of the
+time stepping (`diffusion_and_implicit!`), which therefore act on the noise like on every explicit
+tendency."""
 function random_process!(vars::Variables, L::StochasticLeapfrog, model::AbstractModel)
     wiener_tendencies!(vars, L.noise, L, model)
-    wiener_draw!(vars, L.noise)
     return nothing
 end
+
+"""$(TYPEDSIGNATURES)
+Draw the noise patterns for the next time step, called in `time_step!` via `update_random!(vars, model)`."""
+update_random!(vars::Variables, L::StochasticLeapfrog) = wiener_draw!(vars, L.noise)
 
 """$(TYPEDSIGNATURES)
 Add the stored noise patterns times `amplitude/√Δt` to the tendencies: of the atmospheric

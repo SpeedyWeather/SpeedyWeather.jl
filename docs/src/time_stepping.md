@@ -164,7 +164,10 @@ tendency and the implicit terms damp it within the time step, as they do in the 
 of the linear problem, in which the noise enters as ``\int e^{L(t-s)} a dW(s)``.
 Implementation-wise, `time_step!` calls `random_process!(vars, time_stepping, model)` between the
 dynamical core and `diffusion_and_implicit!`, which for `StochasticLeapfrog` adds the noise to
-the spectral tendencies and does nothing for the other time steppers.
+the spectral tendencies and does nothing for the other time steppers. The pattern for the next
+time step is drawn after `update_prognostic!` by `update_random!(vars, model)`, which advances
+all random processes once per time step, including `model.random_process` of the
+stochastic physics.
 
 This is how stiff linear terms are treated in the standard schemes for stochastic
 differential equations

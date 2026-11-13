@@ -8,8 +8,10 @@ Any random process <: AbstractRandomProcess has to implement the following inter
    draws the next pattern into the array `pattern` (for processes with memory like the AR1
    the previous pattern is read from it). Any model component can own a process and its
    own pattern this way, e.g. the `StochasticLeapfrog` time stepper
- - `update_random!(vars, process)` advances `model.random_process` at the end of every time
-   step, defaults to the spectral `vars.prognostic.random_pattern`
+ - `update_random!(vars, process)` advances `model.random_process`, defaults to the spectral
+   `vars.prognostic.random_pattern`. Called once per time step in `time_step!` (after
+   `update_prognostic!`) through `update_random!(vars, model)`, which also advances the
+   processes of other components, e.g. of the `StochasticLeapfrog` time stepper
  - `transform!(vars, process, spectral_transform)` makes `vars.grid.random_pattern` from it.
 
 Random numbers are drawn on the architecture of the model: the processes' `random_number_generator`

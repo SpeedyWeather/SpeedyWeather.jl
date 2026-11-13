@@ -54,6 +54,7 @@ function time_step!(
     random_process!(vars, time_stepping, model) # stochastic time steppers only: noise before the implicit terms
     diffusion_and_implicit!(vars, model)        # dispatch over time stepper and implicit so that the order can be changed
     update_prognostic!(vars, model)             # step prognostic variables forward
+    update_random!(vars, model)                 # draw the random patterns for the next time step
     transform!(vars, model)                     # new spectral state to grid
     particle_advection!(vars, model)            # TODO move up?
 
@@ -67,6 +68,21 @@ the dynamical core, when the explicit tendencies are complete, and before the im
 every explicit tendency (drift-implicit, see `StochasticLeapfrog`). Deterministic time
 steppers do nothing."""
 random_process!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
+
+"""$(TYPEDSIGNATURES)
+Advance all random processes by one time step, i.e. draw the random patterns for the next time
+step: of `model.random_process` (e.g. for SPPT) and of the noise of a stochastic time stepper
+(e.g. `StochasticLeapfrog`). Called once per time step in `time_step!` after `update_prognostic!`
+and before `transform!`, which transforms the pattern of `model.random_process` to grid space for
+the parameterizations of the next time step."""
+function update_random!(vars::Variables, model::AbstractModel)
+    update_random!(vars, model.random_process)
+    update_random!(vars, model.time_stepping)
+    return nothing
+end
+
+# deterministic time steppers have no random process
+update_random!(::Variables, ::AbstractTimeStepper) = nothing
 
 # dispatch over time stepper here so that other time stepper can change the order
 diffusion_and_implicit!(vars, model) =
@@ -116,6 +132,7 @@ function time_step!(
     end
 
     update_prognostic!(vars, model)             # the actual time step
+    update_random!(vars, model)                 # draw the random patterns for the next time step
     transform!(vars, model)                     # transform spectral back to grid
     particle_advection!(vars, model)
 
@@ -153,9 +170,6 @@ function update_prognostic!(
 
     # ocean and land variables with their own time steppers (unrolled per name)
     update_prognostic_namespaces!(vars, clock, time_stepping, model.implicit, model)
-
-    # evolve the random pattern in time
-    update_random!(vars, model.random_process)
 
     # allow ocean, sea ice and land to "filter" variables, e.g. cap sea ice concentration at [0, 1]
     hasproperty(model, :ocean) && filter!(vars, model.ocean, model)
