@@ -223,9 +223,10 @@ semantics as `SpectralAR1Process`.
   with `σ = standard_deviation` and the sum over the degrees that get noise, 1 ≤ l < lmax.
   `F₀` normalises the pattern to the grid-point standard deviation `σ`. The variance
   Fₗ² decays like a Gaussian in l: the large scales keep their
-  variance, at l = k it has dropped to 1/e, so features have a size of about radius/k.
+  variance, at l = k it has dropped to 1/e, so features have a size of about radius/k. This
+  may be used e.g. in the SPPT stochastic physics scheme to limit the noise to the large scales.
   `wavenumber = 0` stands for k → ∞ (exp → 1, the same variance at every degree),
-  not for wavenumber zero.
+  not for wavenumber zero (used e.g. for the GFDT sensitivity computations)
 - Neither the global mean (l = 0) nor the last degree l = lmax (not a resolved degree
   in SpeedyWeather, its coefficients do not survive a grid round trip) get noise.
 - The m = 0 coefficients are real, with their real part scaled by √2 so that the
