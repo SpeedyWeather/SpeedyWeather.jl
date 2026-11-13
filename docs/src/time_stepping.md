@@ -187,8 +187,8 @@ Two properties of the scheme here are worth knowing
   leapfrog sequences) receives the same ``a\sqrt{\Delta t}(\xi_{i-1} + \xi_i)``, but the noise
   also excites the computational mode, which the time filter damps. The filter is hence
   part of the stochastic scheme.
-- The alternative of adding the noise after the implicit terms (a split-step scheme,
-  [HighamMaoStuart2002](@citealp)) converges to the same equation for ``\Delta t \to 0`` and
+- The alternative of adding the noise after the implicit terms, a split-step scheme
+  [HighamMaoStuart2002](@citep), converges to the same equation for ``\Delta t \to 0`` and
   injects exactly the specified noise covariance. However, it leaves the noise undamped in the
   stiff modes, which are implicit because they are stiff: the smallest scales
   (``2\Delta t \nu \approx 0.3`` at the truncation wavenumber with the default resolution and diffusion) and the
