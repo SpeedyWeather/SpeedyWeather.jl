@@ -154,47 +154,56 @@ end
 
 """Leapfrog time stepping with additive Wiener noise, i.e. the stochastic differential equation
 
-    dx = F(x) dt + a dW
+```math
+dx = F(x) \\, dt + a \\, dW
+```
 
-with the deterministic tendencies F of the model, white noise patterns of fixed amplitude `a`
-(see `AdditiveWienerNoise`) and the semi-implicit leapfrog scheme of `Leapfrog` (Euler start,
-Robert-Asselin-Williams filter, implicit diffusion and gravity waves).
+with the deterministic tendencies ``F`` of the model, white noise patterns of fixed amplitude
+``a`` (see `AdditiveWienerNoise`) and the semi-implicit leapfrog scheme of `Leapfrog` (Euler
+start, Robert-Asselin-Williams filter, implicit diffusion and gravity waves).
 
-The scheme is drift-implicit: the noise is explicit and added to the tendencies as `a/√Δt ⋅ ξ`
-with a new pattern `ξ` (standard deviation `standard_deviation`) every time step, right before
-the implicit terms, i.e. after the parameterizations and the dynamical core. Schematically,
-with the linear terms `L` that are treated implicitly,
+The scheme is drift-implicit: the noise is explicit and added to the tendencies as
+``\\frac{a}{\\sqrt{\\Delta t}} \\xi`` with a new pattern ``\\xi`` (standard deviation
+`standard_deviation`) every time step, right before the implicit terms, i.e. after the
+parameterizations and the dynamical core. Schematically, with the linear terms ``L`` that are
+treated implicitly,
 
-    xⁿ⁺¹ = xⁿ⁻¹ + 2Δt (1 - 2Δt α L)⁻¹ [F(xⁿ, xⁿ⁻¹) + a/√Δt ⋅ ξⁿ]
+```math
+x^{n+1} = x^{n-1} + 2\\Delta t \\, (1 - 2\\Delta t \\, \\alpha L)^{-1}
+\\left[ F(x^n, x^{n-1}) + \\frac{a}{\\sqrt{\\Delta t}} \\xi^n \\right]
+```
 
-(`α = 1` for the horizontal diffusion, `α = centering` for the gravity waves of the semi-implicit
-correction; for the first Euler step `Δt/2` instead of `2Δt`). The noise is on the right-hand
-side of the implicit solves like every explicit tendency, so the implicit terms damp it within
-the time step, as the exact solution `∫exp(L(t-s)) a dW(s)` of the linear problem does. This
-is how stiff linear terms are treated in the standard schemes for stochastic differential
-equations:
+(``\\alpha = 1`` for the horizontal diffusion, ``\\alpha`` = `centering` for the gravity waves of
+the semi-implicit correction; for the first Euler step ``\\Delta t/2`` instead of ``2\\Delta t``).
+The noise is on the right-hand side of the implicit solves like every explicit tendency, so the
+implicit terms damp it within the time step, as the exact solution
+``\\int e^{L(t-s)} a \\, dW(s)`` of the linear problem does. This is how stiff linear terms are
+treated in the standard schemes for stochastic differential equations:
 
 - the implicit Euler schemes of Kloeden and Platen (1992, chapter 12) and the stochastic
   theta method (Higham, 2000) evaluate (part of) the drift at the new time step and add the
-  Wiener increment explicitly, `xⁿ⁺¹ = xⁿ + Δt[θ F(xⁿ⁺¹) + (1-θ) F(xⁿ)] + a ΔWⁿ`,
+  Wiener increment explicitly,
+  ``x^{n+1} = x^n + \\Delta t [\\theta F(x^{n+1}) + (1-\\theta) F(x^n)] + a \\Delta W^n``,
 - the stochastic semi-implicit leapfrog scheme of Ewald and Témam (2005) and its weak version
-  (Ewald), `xⁿ⁺¹ = xⁿ⁻¹ + 2Δt F₁(xⁿ) + 2Δt F₂(xⁿ⁺¹) + a (ΔWⁿ⁻¹ + ΔWⁿ)` with the implicit part `F₂`.
+  (Ewald),
+  ``x^{n+1} = x^{n-1} + 2\\Delta t F_1(x^n) + 2\\Delta t F_2(x^{n+1}) + a (\\Delta W^{n-1} + \\Delta W^n)``
+  with the implicit part ``F_2``.
 
-Here one increment `2a√Δt ⋅ ξⁿ` is added per leapfrog step instead of Ewald and Témam's sum of
-two: the physical mode (the mean of the two interleaved leapfrog sequences) receives the
-same `a√Δt (ξⁿ⁻¹ + ξⁿ)`, the computational mode that is excited in addition is damped by the
-time filter. The alternative of adding the noise after the implicit terms is a valid scheme
-too (split-step, Higham, Mao and Stuart, 2002) and converges to the same equation for `Δt → 0`,
-but it leaves the noise in the stiff modes (the smallest scales, fast gravity waves) undamped
-by the terms that are implicit because they are stiff. Ocean and land variables have no
-implicit terms and are stepped with `EulerForward`, for them the scheme is the
-Euler-Maruyama method.
+Here one increment ``2a\\sqrt{\\Delta t} \\, \\xi^n`` is added per leapfrog step instead of Ewald
+and Témam's sum of two: the physical mode (the mean of the two interleaved leapfrog sequences)
+receives the same ``a\\sqrt{\\Delta t} \\, (\\xi^{n-1} + \\xi^n)``, the computational mode that is
+excited in addition is damped by the time filter. The alternative of adding the noise after the
+implicit terms is a valid scheme too (split-step, Higham, Mao and Stuart, 2002) and converges to
+the same equation for ``\\Delta t \\to 0``, but it leaves the noise in the stiff modes (the
+smallest scales, fast gravity waves) undamped by the terms that are implicit because they are
+stiff. Ocean and land variables have no implicit terms and are stepped with `EulerForward`, for
+them the scheme is the Euler-Maruyama method.
 
-The diffusion this scheme injects per variable is the nominal `a²σ²/2` (`σ` the
-`standard_deviation`) only where neither the implicit terms nor the time filter matter, and
+The diffusion this scheme injects per variable is the nominal ``a^2 \\sigma^2 / 2`` (``\\sigma``
+the `standard_deviation`) only where neither the implicit terms nor the time filter matter, and
 should be measured where it matters (e.g. 1.33× nominal for a T8 barotropic model).
 
-The pattern `ξ` applied in a time step is drawn at the end of the previous time step and stored
+The pattern ``\\xi`` applied in a time step is drawn at the end of the previous time step and stored
 in the variables (`vars.prognostic.wiener_pattern`, `vars.prognostic.wiener_pattern_surface`),
 so the first time step of a new simulation is deterministic and a simulation continued with
 another `run!` continues with the stored pattern. The noise realisation is reproducible
