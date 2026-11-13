@@ -144,7 +144,7 @@ end
     @test SpeedyWeather.fresnel_reflectance(n, zero(NF)) ≈ 1
 
     # components are constrained to their role
-    @test_throws TypeError JinOceanAlbedo(spectral_grid; foam = ConstantOceanVolumeAlbedo(spectral_grid))
+    @test_throws TypeError JinOceanAlbedo(spectral_grid; foam = ConstantOceanVolumeScattering(spectral_grid))
     @test_throws TypeError JinOceanAlbedo(spectral_grid; ocean_volume = WhitecapFoam(spectral_grid))
 
     # whitecaps brighten the ocean at high wind speeds, NoFoam leaves the albedo unchanged
@@ -155,9 +155,9 @@ end
     @test all(SpeedyWeather.foam_albedos(foam, α, α, w) .≈ foam(α, w))
     @test SpeedyWeather.foam_albedos(NoFoam(), α, α, w) == (α, α)
 
-    # SpectralOceanVolumeAlbedo is future work: works standalone, but not (yet) within JinOceanAlbedo
+    # SpectralOceanVolumeScattering is future work: works standalone, but not (yet) within JinOceanAlbedo
     model = PrimitiveDryModel(spectral_grid)
-    volume = SpeedyWeather.SpectralOceanVolumeAlbedo(spectral_grid)
+    volume = SpeedyWeather.SpectralOceanVolumeScattering(spectral_grid)
     initialize!(volume, model)
     @test all(isfinite, volume.R₀_intercept)
     @test all(isfinite, volume.R₀_slope)
