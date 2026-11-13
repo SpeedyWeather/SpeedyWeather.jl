@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fix `ShallowWaterModel` with `NCycleLorenz` (η tendency steps, fused spectral intermediates read at the tendency step), per-substep `implicit_centering` for `NCycleLorenz` that preserves gravity waves like leapfrog [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+- Fix `ShallowWaterModel` with `NCycleLorenz` (η tendency steps, fused spectral intermediates read at the tendency step), per-substep `implicit_centering` for `NCycleLorenz` that preserves gravity waves like leapfrog [#1402](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1402)
 - `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90 implementation, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
 
 ## 0.24.1
