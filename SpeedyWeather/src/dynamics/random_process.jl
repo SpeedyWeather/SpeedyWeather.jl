@@ -214,9 +214,18 @@ export SpectralWhiteNoiseProcess, GridWhiteNoiseProcess
 from scratch every time step, it has no memory. Same units and `standard_deviation`
 semantics as `SpectralAR1Process`.
 
-Differences to `SpectralAR1Process` beyond the missing memory
-- `wavenumber = 0` (default) gives a spectrally flat pattern, `wavenumber > 0` the
-  ECMWF shaping (Tech Memorandum 598, Appendix 8) of the AR1 process.
+- `wavenumber = 0` (default) gives a spectrally flat pattern, `wavenumber = k > 0` the
+  ECMWF shaping (Tech Memorandum 598, Appendix 8) of the AR1 process: the real and
+  imaginary parts of the m > 0 coefficients of degree l have the standard deviation
+
+      Fₗ = F₀ exp(-l(l+1) / (2k(k+1))),   F₀ = σ norm_sphere / √(2 ∑ₗ (2l+1) exp(-l(l+1) / (k(k+1))))
+
+  with `σ = standard_deviation` and the sum over the degrees that get noise, 1 ≤ l < lmax.
+  `F₀` normalises the pattern to the grid-point standard deviation `σ`. The variance
+  Fₗ² decays like a Gaussian in l: the large scales keep their
+  variance, at l = k it has dropped to 1/e, so features have a size of about radius/k.
+  `wavenumber = 0` stands for k → ∞ (exp → 1, the same variance at every degree),
+  not for wavenumber zero.
 - Neither the global mean (l = 0) nor the last degree l = lmax (not a resolved degree
   in SpeedyWeather, its coefficients do not survive a grid round trip) get noise.
 - The m = 0 coefficients are real, with their real part scaled by √2 so that the
