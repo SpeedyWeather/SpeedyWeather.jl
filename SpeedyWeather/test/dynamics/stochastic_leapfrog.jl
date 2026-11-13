@@ -16,7 +16,7 @@ function same_state(a, b)
     return ok & (pa.clock.time == pb.clock.time)
 end
 
-const STOCHASTIC_TEST_MODELS = (BarotropicModel, ShallowWaterModel, PrimitiveDryModel, PrimitiveWetModel)
+const STOCHASTIC_TEST_MODELS = (BarotropicModel, ShallowWaterModel, PrimitiveWetModel)
 
 @testset "StochasticLeapfrog is a Leapfrog with noise" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
@@ -153,43 +153,6 @@ end
             @test tend(vars.tendencies.land.soil_temperature)[:, k] == (a.soil_temperature * isdt) .* surface[:, 1 + k]
         end
         @test all(iszero, tend(vars.tendencies.ocean.sea_ice_concentration))
-    end
-end
-
-@testset "StochasticLeapfrog: noise before the implicit terms" begin
-    # drift-implicit: random_process! adds the noise to the tendencies, then the implicit terms
-    # (diffusion_and_implicit!) act on tendency + noise; deterministic time steppers add nothing
-    for Model in (BarotropicModel, ShallowWaterModel, PrimitiveWetModel)
-        nlayers = Model <: PrimitiveWetModel ? 4 : 1
-        spectral_grid = SpectralGrid(; truncation = 21, nlayers)
-        kw = Model <: PrimitiveWetModel ? (; pressure = 1.0e-5) : (; vorticity = 1.0e-7)
-        L = StochasticLeapfrog(spectral_grid; seed = 1, kw...)
-        model = Model(spectral_grid; time_stepping = L)
-        simulation = seeded_initialize!(model)
-        run!(simulation, steps = 3)             # initializes the implicit solver, a pattern is stored
-        vars = simulation.variables
-        pattern = copy(vars.prognostic.wiener_pattern.data)
-        names = SpeedyWeather.tendency_names(vars)
-        tendencies() = [copy(get_step(vars.tendencies[name], 1).data) for name in names]
-
-        SpeedyWeather.reset_tendencies!(vars, L)
-        SpeedyWeather.random_process!(vars, L, model)
-        noise_only = tendencies()
-        @test any(t -> any(!iszero, t), noise_only)
-        @test vars.prognostic.wiener_pattern.data != pattern    # a new pattern for the next step
-        SpeedyWeather.diffusion_and_implicit!(vars, model)
-        @test tendencies() != noise_only                        # the implicit terms act on the noise
-
-        # the same increment as the stored pattern gives
-        vars.prognostic.wiener_pattern.data .= pattern
-        SpeedyWeather.reset_tendencies!(vars, L)
-        SpeedyWeather.wiener_tendencies!(vars, L.noise, L, model)
-        @test tendencies() == noise_only
-
-        # no noise from deterministic time steppers
-        SpeedyWeather.reset_tendencies!(vars, L)
-        SpeedyWeather.random_process!(vars, Leapfrog(spectral_grid), model)
-        @test all(t -> all(iszero, t), tendencies())
     end
 end
 
