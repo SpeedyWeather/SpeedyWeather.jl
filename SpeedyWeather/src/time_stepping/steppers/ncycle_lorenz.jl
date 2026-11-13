@@ -119,13 +119,15 @@ function NCycleLorenz(
 end
 
 """$(TYPEDSIGNATURES)
-Default implicit centering per substep of the cycle. For the 3-cycle with variant A these are
-optimized centerings that make the semi-implicit scheme (with the linear terms inside the Lorenz
-average) neutral for gravity waves up to ωΔt ≈ 1 while remaining stable with Doppler-shifted
-gravity waves, Coriolis coupling and a reference layer thickness larger than the actual one
-(e.g. over orography). `nothing` otherwise, meaning `implicit.centering` is used on every substep."""
+Default implicit centering per substep of the cycle. For the 3-cycle with variant A or B these
+are centerings optimized in a linear stability analysis such that the semi-implicit scheme (with
+the linear terms inside the Lorenz average) is (almost) neutral for gravity waves with ωΔt ≲ 1
+while remaining stable with Doppler-shifted gravity waves, Coriolis coupling and a reference layer
+thickness larger than the actual one (e.g. over orography). `nothing` otherwise, meaning
+`implicit.centering` is used on every substep."""
 default_implicit_centering(steps, variant) = nothing
-default_implicit_centering(steps, ::NCycleLorenzA) = steps == 3 ? (0.069, 1.028, 0.48) : nothing
+default_implicit_centering(steps, ::NCycleLorenzA) = steps == 3 ? (0.116, 1.039, 0.462) : nothing
+default_implicit_centering(steps, ::NCycleLorenzB) = steps == 3 ? (1.386, 0.468, -0.464) : nothing
 
 """$(TYPEDSIGNATURES)
 Implicit centering for the current substep of the cycle, `implicit.centering` if

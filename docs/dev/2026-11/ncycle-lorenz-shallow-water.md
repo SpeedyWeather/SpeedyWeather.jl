@@ -1,6 +1,6 @@
 # NCycleLorenz for the shallow water model: bug fixes and implicit centering
 
-> Status: **in progress**. Bugs fixed and per-substep implicit centering implemented for the 3-cycle; N=4 left for review.
+> Status: **in progress**. Bugs fixed and per-substep implicit centering implemented for the 3-cycle variants A and B; N=4, AB, ABBA left for review.
 
 Date of initial draft: 2026-11-12
 
@@ -30,6 +30,18 @@ Base revision: 069fb09f3d4fa539fbeb27ea4c352010d6737961
   (here and in `docs/src/shallowwater.md`).
 - Plan written after the investigation (exploratory work), bundling bug fixes, the analysis and
   the per-substep centering for N=3. N=4 centerings are only reported, not made default.
+
+> [Review comment on #1402 on variant A vs B, then:] With this per-substep centering, is there
+> a preference for variant A or B? / yes please switch to the more robust A centering but can you
+> also implement the B centering so it's at least default when `variant = NCycleLorenzB()`
+
+- The A centering (0.069, 1.028, 0.48) was from an optimisation without the orography
+  constraint and is weakly unstable over orography for ω_LΔt ≳ 5 (1.0005 at β=0.1, ω_LΔt=5;
+  1.03 at ω_LΔt=10). Replaced by the robust optimum (0.116, 1.039, 0.462).
+- Added the robust B optimum (1.386, 0.468, -0.464) as default for `NCycleLorenzB`. Two decimals
+  are not enough (rounded to (1.39, 0.47, -0.46) it amplifies with 1.0014).
+- In the model B turned out more stable than A (table below), although linearly both have the
+  same explicit limit.
 
 ## Problem description
 
@@ -107,7 +119,17 @@ than the actual one (H - H_b), which semi-implicit leapfrog handles unconditiona
 | Daisuke's version, α=0.5 | 1, 1 | unstable (1.2-1.5) | unstable | - |
 | Lawson / integrating factor | 1, 1 | stable | unstable (1.04-1.5) | - |
 | Milan's version, per-substep θ = (1, 1, 0), N=3 | exactly 1 (all-pass) | stable to 0.55 | stable | unstable (1.1-2.6) |
-| **Milan's version, θ = (0.069, 1.028, 0.48), N=3 (this PR)** | 1, 0.9997 | stable to ≈0.3 | stable | stable |
+| Milan's version, θ = (0.069, 1.028, 0.48), A (first version of this PR) | 1, 0.9997 | stable to ≈0.3 | stable | unstable for ω_LΔt ≳ 5 (1.03 at 10) |
+| **Milan's version, θ = (0.116, 1.039, 0.462), A (this PR)** | ≥ 0.997 for ωΔt ≤ 1.5 | stable to 0.4 | stable | stable |
+| **Milan's version, θ = (1.386, 0.468, -0.464), B (this PR)** | ≥ 0.998 for ωΔt ≤ 1.5 | stable to 0.4 | stable | stable |
+| Milan's version, θ = 0.5, B (main) | ≥ 0.72 | unstable (1.12) | stable | stable |
+
+Variant A vs B: the weights are the same in a different order, A = (1, 3/2, 3), B = (1, 3, 3/2),
+so the centering has to be optimised per variant (A's centering applied to B is unstable). The
+explicit amplification of A and B is identical for linear constant-coefficient problems (limit
+ω_EΔt < 0.57 for both). The A optimum is well defined (all optimiser runs converge to it), the B
+optimum less so (other runs land at e.g. (10.6, -5.1, 10.3)) and has a negative centering on the
+last substep. Phase speed at ωΔt = 0.6 relative to exact: A 0.84, B 0.82.
 
 The explicit Lorenz N-cycle itself is limited to ω_EΔt < √3/3 ≈ 0.58 (N=3) and ≈ 0.71 (N=4)
 per tendency evaluation, compared to 1 for leapfrog. The robust optimum for N=4 found so far,
@@ -119,31 +141,39 @@ but in the experiments this was not the limiting factor (not changed here).
 
 ### Experiments: docs gravity wave example (T128, 2 days, var(η)/var(η₀))
 
-| Δt at T32 | Leapfrog | NCycle N=3, Milan's version θ=0.5 (main) | NCycle N=3, θ = (0.069, 1.028, 0.48) |
-|---|---|---|---|
-| 10 min | 0.36 | 0.011 | 0.43 |
-| 20 min | 0.38 | 0.011 | 0.31 |
-| 30 min | 0.35 | 0.011 | 0.30 |
-| 40 min | 0.29 | 0.011 | unstable |
-| 60 min | 0.18 | 0.011 | - |
+| Δt at T32 | Leapfrog | main (θ=0.5) | A, θ = (0.069, 1.028, 0.48) | **A, θ = (0.116, 1.039, 0.462)** | **B, θ = (1.386, 0.468, -0.464)** |
+|---|---|---|---|---|---|
+| 10 min | 0.36 | 0.011 | 0.43 | 0.43 | 0.39 |
+| 15 min | | | | 0.41 | 0.36 |
+| 20 min | 0.38 | 0.011 | 0.31 | 0.38 | 0.32 |
+| 25 min | | | | 0.24 | 0.25 |
+| 30 min | 0.35 | 0.011 | 0.30 | unstable | 0.25 |
+| 40 min | 0.29 | 0.011 | unstable | | 0.19 |
+| 50 min | 0.23 | 0.011 | | | 0.17 |
+| 60 min | 0.18 | 0.011 | | | 0.15 |
 
-Galewsky jet (`ZonalJet`, 20 days): T85 stable up to Δt_T32 = 20 min (old 25 min, leapfrog ≥ 40 min),
-T31 up to 30 min (leapfrog ≥ 40 min). Daisuke's version and the Lawson variant were unstable
+Galewsky jet (`ZonalJet`, 20 days, T85), largest stable Δt_T32 tested:
+leapfrog 50 min (60 unstable), B 40 min (45 unstable), A 25 min (30 unstable), main 25 min,
+A with (0.069, 1.028, 0.48) 20 min. Daisuke's version and the Lawson variant were unstable
 beyond Δt_T32 ≈ 10-20 min in the gravity wave example.
+
+Why B is more stable than A in the model while linearly equal is not understood yet.
 
 ## Summary of changes
 
 - Fix η tendency allocation for the shallow water model (`ts` steps).
 - Read fused spectral intermediates with `get_tendency_step` (shallow water and primitive models).
 - `NCycleLorenz` option `implicit_centering`: per-substep centering, default
-  `(0.069, 1.028, 0.48)` for `steps=3` with `NCycleLorenzA`, `nothing` (= `implicit.centering`
+  `(0.116, 1.039, 0.462)` for `steps=3` with `NCycleLorenzA`, `(1.386, 0.468, -0.464)` with
+  `NCycleLorenzB`, `nothing` (= `implicit.centering`
   on every substep) otherwise. Used by the shallow water implicit solver.
 - Docs: Lorenz N-cycle algorithm as implemented, section on implicit centering.
 
 ## Testing and verification
 
 - Unit tests: default/explicit `implicit_centering` per substep; shallow water gravity waves with
-  `NCycleLorenz` run without NaNs and keep at least half the η variance of leapfrog after 1 day.
+  `NCycleLorenz` (variants A and B) run without NaNs and keep at least half the η variance of
+  leapfrog after 1 day.
 - Experiment scripts in `ncycle-lorenz-shallow-water/` (`one.jl`, `one_theta.jl`, `jet1.jl`).
 
 ## Documentation changes
@@ -152,11 +182,16 @@ beyond Δt_T32 ≈ 10-20 min in the gravity wave example.
 
 ## Known limitations
 
-- NCycleLorenz still needs a shorter time step than leapfrog (≈0.75x in the gravity wave
-  example, ≈0.5x for the Galewsky jet at T85), from the explicit stability limit of the 3-cycle.
+- Variant A still needs a shorter time step than leapfrog (≈0.5x for the gravity wave example and
+  the Galewsky jet at T85). Variant B gets to ≈0.8x (jet) and ≈1x (gravity waves) but its
+  centering is a less well-defined optimum. The default variant is unchanged (A).
+- AB and ABBA: the centering tuple has length N and is indexed by `step_counter mod N`, so A and B
+  cycles cannot get different centerings; they use `implicit.centering` on every substep.
 - The implicit primitive equation solver does not use the per-substep centering.
 - Implicit hyperdiffusion uses Δt instead of wΔt.
 
 ## Future work
 
+- Consider `NCycleLorenzB` as default variant; understand why it is more stable than A in the model.
+- Centering indexed over the full AB/ABBA sequence.
 - N=4 centering (higher explicit limit ≈0.71), weighted implicit diffusion, primitive equations.

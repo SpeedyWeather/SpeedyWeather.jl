@@ -426,15 +426,17 @@ end
     implicit = ImplicitShallowWater(spectral_grid, centering = 0.5)
     clock = Clock()
 
-    # default centerings for the 3-cycle variant A, implicit.centering otherwise
-    L = NCycleLorenz(spectral_grid, steps = 3)
-    @test L.implicit_centering == Float32.((0.069, 1.028, 0.48))
-    for (i, θ) in enumerate(L.implicit_centering)
-        clock.step_counter = i - 1
-        @test SpeedyWeather.implicit_centering(L, implicit, clock) == θ
+    # default centerings for the 3-cycle variants A and B, implicit.centering otherwise
+    for (variant, centering) in ((NCycleLorenzA(), (0.116, 1.039, 0.462)), (NCycleLorenzB(), (1.386, 0.468, -0.464)))
+        L = NCycleLorenz(spectral_grid; steps = 3, variant)
+        @test L.implicit_centering == Float32.(centering)
+        for (i, θ) in enumerate(L.implicit_centering)
+            clock.step_counter = i - 1
+            @test SpeedyWeather.implicit_centering(L, implicit, clock) == θ
+        end
     end
 
-    for L in (NCycleLorenz(spectral_grid, steps = 4), NCycleLorenz(spectral_grid, variant = NCycleLorenzB()))
+    for L in (NCycleLorenz(spectral_grid, steps = 4), NCycleLorenz(spectral_grid, variant = NCycleLorenzAB()))
         @test isnothing(L.implicit_centering)
         @test SpeedyWeather.implicit_centering(L, implicit, clock) == implicit.centering
     end
@@ -451,7 +453,7 @@ end
     end
 
     variance_ratio = Dict()
-    for TS in (Leapfrog, NCycleLorenz)
+    for (name, TS) in (("Leapfrog", Leapfrog), ("NCycleLorenzA", sg -> NCycleLorenz(sg)), ("NCycleLorenzB", sg -> NCycleLorenz(sg, variant = NCycleLorenzB())))
         spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         initial_conditions = RandomWaves(spectral_grid, lmin = 5, lmax = 15)
         time_stepping = TS(spectral_grid)
@@ -460,9 +462,10 @@ end
         variance0 = η_variance(get_step(simulation.variables.prognostic.η, 1))
         run!(simulation, period = Day(1))
         @test !simulation.model.feedback.nans_detected
-        variance_ratio[TS] = η_variance(get_step(simulation.variables.prognostic.η, 1)) / variance0
+        variance_ratio[name] = η_variance(get_step(simulation.variables.prognostic.η, 1)) / variance0
     end
 
     # NCycleLorenz used to damp gravity waves much stronger than Leapfrog
-    @test variance_ratio[NCycleLorenz] > variance_ratio[Leapfrog] / 2
+    @test variance_ratio["NCycleLorenzA"] > variance_ratio["Leapfrog"] / 2
+    @test variance_ratio["NCycleLorenzB"] > variance_ratio["Leapfrog"] / 2
 end

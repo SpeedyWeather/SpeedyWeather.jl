@@ -320,21 +320,28 @@ frequency ``\omega`` is only about 0.75-0.9 for ``\omega \Delta t = 0.5-1``, com
 the semi-implicit leapfrog with Robert-Williams filter. Treating the linear terms outside of the
 Lorenz average instead ("Daisuke's version", with ``L`` evaluated Crank-Nicolson on every substep) is neutral for
 gravity waves but unstable once gravity waves are Doppler-shifted by advection or coupled through
-the Coriolis force. For the 3-cycle with variant A the default is therefore a centering
-that varies within the cycle, ``\theta = (0.069, 1.028, 0.48)``, which was optimised in a linear
-stability analysis to
+the Coriolis force. For the 3-cycle with variants A and B the default is therefore a centering
+that varies within the cycle, optimised in a linear stability analysis to
 
 - be (almost) neutral for gravity waves with ``\omega\Delta t \lesssim 1`` and to only damp faster ones,
 - be stable for Doppler-shifted gravity waves, with Coriolis coupling, and with a reference layer
   thickness that is larger than the actual one (e.g. over orography).
 
+| Variant | Weights ``w_k`` | Default ``\theta_k`` | Gravity wave damping per step (``\omega\Delta t \le 1.5``) |
+| ------- | --------------- | --------------------- | --------------------------------------------------- |
+| `NCycleLorenzA` | 1, 3/2, 3 | 0.116, 1.039, 0.462 | ≥ 0.997 |
+| `NCycleLorenzB` | 1, 3, 3/2 | 1.386, 0.468, -0.464 | ≥ 0.998 |
+
+The centering is specific to the order of the weights, so A and B need different ones.
 For other cycle lengths or variants `implicit.centering` is used on every substep. The centering
 can be chosen with the `implicit_centering` option, e.g.
 `NCycleLorenz(spectral_grid, steps=3, implicit_centering=(0.5, 0.5, 0.5))`.
-With these centerings the 3-cycle preserves gravity wave energy about as well as leapfrog
-(see [Gravity waves on the sphere](@ref)), but the Lorenz 3-cycle is limited to
-``\omega\Delta t < \sqrt{3}/3 \approx 0.58`` for the explicitly treated terms (e.g. advection), compared to ``\omega\Delta t < 1``
-for leapfrog. The default time step of `NCycleLorenz` is therefore shorter, 30min at T32.
+In linear analysis the Lorenz 3-cycle is limited to ``\omega\Delta t < \sqrt{3}/3 \approx 0.58`` for the
+explicitly treated terms (e.g. advection), compared to ``\omega\Delta t < 1`` for leapfrog, identically
+for A and B. In the shallow water model, however, variant B with its centering ran stably at
+longer time steps than A (up to 40min at T32 for the Galewsky jet at T85, leapfrog up to 50min,
+A up to 25min) while preserving gravity wave energy similar to leapfrog (see [Gravity waves on the sphere](@ref)).
+The default time step of `NCycleLorenz` is 30min at T32.
 
 Four weight variants are available, following the naming in [Hotta2016](@citet), selected via the
 `variant` option:
