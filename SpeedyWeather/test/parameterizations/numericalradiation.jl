@@ -36,7 +36,7 @@ end
 
     # longwave only, no other parameterizations
     radiation = Radiation(spectral_grid; shortwave = nothing, longwave)
-    model = PrimitiveWetModel(spectral_grid; radiation, parameterizations = (:radiation,))
+    model = PrimitiveWetModel(spectral_grid; radiation, parameterizations = (:radiation,), greenhouse_gases = nothing)
     initialize!(model.radiation, model)
     variables = Variables(model)
     set_test_state!(variables, model)
