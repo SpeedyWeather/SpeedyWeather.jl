@@ -85,15 +85,21 @@ independent patterns (`Spectral3D`/`Grid3D` with `n_patterns` slots).
 
 Every time step the coefficients `ξ` of degree l of the pattern are updated as
 
-    ξ ← a ξ + Fₗ r,   a = exp(-Δt / time_scale)
+```math
+\\xi \\leftarrow a \\, \\xi + F_l \\, r, \\qquad a = \\exp\\left(-\\frac{\\Delta t}{\\tau}\\right)
+```
 
-with complex normals `r` (unit variance in real and imaginary part) and the noise factors
-(ECMWF Tech Memorandum 598, Appendix 8)
+with the time step `Δt`, `τ = time_scale`, complex normals `r` (unit variance in real and
+imaginary part) and the noise factors (ECMWF Tech Memorandum 598, Appendix 8)
 
-    Fₗ = F₀ exp(-l(l+1) / (2k(k+1))),   F₀ = σ √(1 - a²) norm_sphere / √(2 ∑ₗ (2l+1) exp(-l(l+1) / (k(k+1))))
+```math
+F_l = F_0 \\exp\\left(-\\frac{l(l+1)}{2k(k+1)}\\right), \\qquad
+F_0 = \\frac{\\sigma \\sqrt{1 - a^2} \\sqrt{4\\pi}}{\\sqrt{2 \\sum_{l=1}^{l_\\mathrm{max}} (2l+1) \\exp\\left(-\\frac{l(l+1)}{k(k+1)}\\right)}}
+```
 
-with `k = wavenumber`, `σ = standard_deviation` and the sum over the degrees that get noise,
-1 ≤ l ≤ lmax (only the global mean l = 0 gets none). `F₀` normalises the stationary pattern
+with `k = wavenumber`, `σ = standard_deviation`, `√(4π) = norm_sphere` (the normalisation of
+the spherical harmonics) and the sum over the degrees that get noise, 1 ≤ l ≤ lmax (only the
+global mean l = 0 gets none). `F₀` normalises the stationary pattern
 to the grid-point standard deviation `σ`, the factor √(1 - a²) compensates for the memory
 (the stationary variance is Fₗ²/(1 - a²)). The variance decays like a Gaussian in l: the
 large scales keep their variance, at l = k it has dropped to 1/e, so features have a size
@@ -237,9 +243,13 @@ semantics as `SpectralAR1Process`.
   ECMWF shaping (Tech Memorandum 598, Appendix 8) of the AR1 process: the real and
   imaginary parts of the m > 0 coefficients of degree l have the standard deviation
 
-      Fₗ = F₀ exp(-l(l+1) / (2k(k+1))),   F₀ = σ norm_sphere / √(2 ∑ₗ (2l+1) exp(-l(l+1) / (k(k+1))))
+  ```math
+  F_l = F_0 \\exp\\left(-\\frac{l(l+1)}{2k(k+1)}\\right), \\qquad
+  F_0 = \\frac{\\sigma \\sqrt{4\\pi}}{\\sqrt{2 \\sum_{l=1}^{l_\\mathrm{max}-1} (2l+1) \\exp\\left(-\\frac{l(l+1)}{k(k+1)}\\right)}}
+  ```
 
-  with `σ = standard_deviation` and the sum over the degrees that get noise, 1 ≤ l < lmax.
+  with `σ = standard_deviation`, `√(4π) = norm_sphere` and the sum over the degrees that get
+  noise, 1 ≤ l < lmax.
   `F₀` normalises the pattern to the grid-point standard deviation `σ`. The variance
   Fₗ² decays like a Gaussian in l: the large scales keep their
   variance, at l = k it has dropped to 1/e, so features have a size of about radius/k. This
