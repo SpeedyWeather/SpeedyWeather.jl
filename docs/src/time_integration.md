@@ -5,6 +5,8 @@ SpeedyWeather.jl supports several time integration schemes, selected by passing 
 
 - [`Leapfrog`](@ref leapfrog), a 2-step leapfrog scheme with a Robert-Asselin and Williams filter
   (the default for `ShallowWaterModel`, `PrimitiveDryModel` and `PrimitiveWetModel`).
+- [`StochasticLeapfrog`](@ref stochastic_leapfrog), the leapfrog scheme with additive Wiener noise
+  on the prognostic variables,
 - [`NCycleLorenz`](@ref ncycle), a family of semi-implicit Lorenz N-cycle schemes
   (the default for `BarotropicModel`).
 
@@ -79,6 +81,25 @@ than relying on a stored 2nd step.
 
 For time steppers that need no such initialisation `spin_up_steps` is `0`, e.g. the
 [Lorenz N-cycle](@ref ncycle).
+
+## Stochastic leapfrog
+
+`StochasticLeapfrog` adds white noise of a fixed amplitude to the tendencies of the prognostic
+variables in every time step, turning the model into a stochastic differential equation.
+It is a `Leapfrog` with a `noise` component, so all options above apply. Other keyword
+arguments are passed on to the noise, `AdditiveWienerNoise`: a `seed` for reproducibility
+and noise amplitudes by the name of the variable, in units of the variable per ``\sqrt{s}``
+
+```@example leapfrog
+stochastic_leapfrog = StochasticLeapfrog(spectral_grid, seed = 123, temperature = 1e-3, humidity = 0)
+```
+
+Variables that are not listed keep their default amplitude, which are chosen for the
+default resolution of the primitive equation models (8 layers), check them for other resolutions or models.
+An amplitude of zero switches the noise for that variable off, with all amplitudes zero the
+simulation is the same as with `Leapfrog`. The noise is added before the implicit terms of
+the time stepping (horizontal diffusion, semi-implicit gravity waves), see
+[Stochastic leapfrog](@ref stochastic_leapfrog) for the scheme and references.
 
 ## Lorenz N-cycle options
 
