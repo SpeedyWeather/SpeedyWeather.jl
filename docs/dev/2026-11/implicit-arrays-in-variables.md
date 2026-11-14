@@ -19,11 +19,14 @@ Base revision: caed82d6 (main), to be implemented on top of
 ## Revision log
 
 - Initial draft.
+- Updated to #1402 replacing the `DefaultImplicit()` placeholder by time stepper constructors with
+  the model type.
 
 ## Problem description
 
 With #1402 the implicit solver is part of the time stepper, `model.time_stepping.implicit`
-(`DefaultImplicit()` is replaced by the model's default on construction). `ImplicitShallowWater`
+(time steppers created with the model type, e.g. `Leapfrog(spectral_grid, ShallowWaterModel)`,
+use `default_implicit(spectral_grid, Model)`, `check_implicit` warns on mismatch). `ImplicitShallowWater`
 only holds an option (`centering`), but `ImplicitPrimitiveEquation` mixes options and state:
 
 | Kind | Fields of `ImplicitPrimitiveEquation` |
@@ -107,8 +110,8 @@ Relevant code (on the #1402 branch):
    the reference temperature. Optionally compute them once in `initialize!` (still variables), not
    on every `reinitialize!`. Not required for this PR.
 8. **ShallowWater**: `ImplicitShallowWater` already holds options only; no variables needed. Check
-   that `default_implicit` and `DefaultImplicit` (from #1402) no longer need the `SpectralGrid` for
-   any implicit solver and simplify if so.
+   whether `default_implicit` (from #1402) still needs the `SpectralGrid` for any implicit solver
+   (only for the number format then) and simplify if so.
 9. **Reactant**: `implicit.Δt` becomes the scalar variable (no `scalar_ref`), the Reactant method
    of `reinitialize!` writes into variables; remove what becomes unnecessary in the extension.
 10. **Breaking**: `model.time_stepping.implicit.temp_profile` (etc.) → `vars.dynamics.implicit.temp_profile`.
