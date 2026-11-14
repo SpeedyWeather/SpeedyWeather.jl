@@ -32,6 +32,7 @@ $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
 ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(; kwargs...)
 default_implicit(SG::SpectralGrid, ::Type{<:ShallowWater}) = ImplicitShallowWater(SG)
+check_implicit(::ImplicitShallowWater, ::ShallowWater) = nothing
 initialize!(::ImplicitShallowWater, ::Variables, ::AbstractModel) = nothing
 
 """

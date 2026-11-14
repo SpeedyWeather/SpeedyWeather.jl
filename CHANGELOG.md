@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Breaking:** the implicit solver is now part of the time stepper, `model.time_stepping.implicit` instead of `model.implicit`, passed on as e.g. `Leapfrog(spectral_grid; implicit)`; `DefaultImplicit()` is replaced by the model's default on construction; `vars.dynamics.average_temperature_profile` removed [#1402](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1402)
+- **Breaking:** the implicit solver is now part of the time stepper, `model.time_stepping.implicit` instead of `model.implicit`, created with the model type for its default solver, e.g. `Leapfrog(spectral_grid, ShallowWaterModel)`, or with `Leapfrog(spectral_grid; implicit)`, without either no implicit solver (warning on initialization for models with gravity waves); `vars.dynamics.average_temperature_profile` removed [#1402](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1402)
 - Fix `ShallowWaterModel` with `NCycleLorenz` (η tendency steps, fused spectral intermediates read at the tendency step), per-substep `implicit_centering` for `NCycleLorenz`, defaults chosen via an order condition (`effective_centering`), new default `steps = 4` [#1402](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1402)
 - Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)
 - Fix the differentiability of `TwoBandShortwave` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)

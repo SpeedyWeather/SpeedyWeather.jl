@@ -35,7 +35,7 @@ function build_terrarium_wet_model(ring_grid, land_sea_mask, terrarium_mask; kwa
         land_sea_mask,
         surface_heat_flux = SurfaceHeatFlux(spectral_grid, land = PrescribedLandHeatFlux()),
         surface_humidity_flux = SurfaceHumidityFlux(spectral_grid, land = PrescribedLandHumidityFlux()),
-        time_stepping = Leapfrog(spectral_grid, Δt_at_T32 = Minute(15)),
+        time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel, Δt_at_T32 = Minute(15)),
     )
     return model
 end
@@ -121,7 +121,7 @@ end
     @test SpeedyWeather.get_nlayers(land) == 1
 
     land_sea_mask = RockyPlanetMask(land.spectral_grid)
-    time_stepping = Leapfrog(land.spectral_grid, Δt_at_T32 = Minute(15))
+    time_stepping = Leapfrog(land.spectral_grid, PrimitiveDryModel, Δt_at_T32 = Minute(15))
 
     model = PrimitiveDryModel(
         land.spectral_grid;

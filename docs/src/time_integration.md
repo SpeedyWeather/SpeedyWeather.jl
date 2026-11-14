@@ -21,8 +21,11 @@ component and passing it on to the model constructor
 ```@example leapfrog
 using SpeedyWeather
 spectral_grid = SpectralGrid()
-time_stepping = Leapfrog(spectral_grid)
+time_stepping = Leapfrog(spectral_grid, PrimitiveDryModel)
 ```
+
+The model type as second argument chooses the default [implicit solver](@ref implicit_solver)
+for that model, here for a `PrimitiveDryModel`.
 
 and with `?Leapfrog` you see a summary of the fields, only manually change those marked `[OPTION]`.
 We will discuss some options in the following.
@@ -111,19 +114,23 @@ model = PrimitiveDryModel(spectral_grid; time_stepping)
 nothing # hide
 ```
 
-where `;` matches the `time_stepping` keyword argument by name. If you name `leapfrog = Leapfrog(spectral_grid)` then you
+where `;` matches the `time_stepping` keyword argument by name. If you name `leapfrog = Leapfrog(spectral_grid, PrimitiveDryModel)` then you
 would need to change this to `time_stepping=leapfrog` in the function call arguments. The same
-keyword takes any time stepper, e.g. `time_stepping = NCycleLorenz(spectral_grid)` for the
+keyword takes any time stepper, e.g. `time_stepping = NCycleLorenz(spectral_grid, PrimitiveDryModel)` for the
 [Lorenz N-cycle](@ref ncycle).
 
-## Implicit solver
+## [Implicit solver](@id implicit_solver)
 
 The semi-implicit solver for the gravity waves depends on the time stepper and is therefore
-part of it, as its `implicit` field, i.e. `model.time_stepping.implicit`. By default
-(`implicit = DefaultImplicit()`) it is chosen by the model when the time stepper is passed on
-to the model constructor: `nothing` (no implicit solver) for the `BarotropicModel`,
-[`ImplicitShallowWater`](@ref) for the `ShallowWaterModel` and [`ImplicitPrimitiveEquation`](@ref)
-for the primitive equation models. To change it, pass it on to the time stepper, e.g.
+part of it, as its `implicit` field, i.e. `model.time_stepping.implicit`. Creating a time stepper
+with the model type as second argument, e.g. `Leapfrog(spectral_grid, ShallowWaterModel)` or
+`NCycleLorenz(spectral_grid, PrimitiveWetModel)`, uses the default implicit solver of that model:
+`nothing` (no implicit solver) for the `BarotropicModel`, [`ImplicitShallowWater`](@ref) for the
+`ShallowWaterModel` and [`ImplicitPrimitiveEquation`](@ref) for the primitive equation models.
+Without the model type, `Leapfrog(spectral_grid)`, there is no implicit solver (`implicit = nothing`)
+and a model with gravity waves warns on `initialize!` as they then need a very short time step to
+be stable. A solver that does not match the model warns too. The default `time_stepping` of every
+model is created with its model type. To change the implicit solver, pass it on to the time stepper, e.g.
 
 ```@example leapfrog
 implicit = ImplicitPrimitiveEquation(spectral_grid, centering = 1)    # backward Euler

@@ -148,6 +148,7 @@ function ImplicitPrimitiveEquation(
 end
 
 default_implicit(SG::SpectralGrid, ::Type{<:PrimitiveEquation}) = ImplicitPrimitiveEquation(SG)
+check_implicit(::ImplicitPrimitiveEquation, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES)
 Initialize the `schedule` of `implicit` with the time step of `model`.

@@ -410,7 +410,7 @@ end
     # during the Leapfrog start (Euler step, first leapfrog step) the previous spectral step
     # is not advanced, so the previous grid step must not be either
     spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
-    model = PrimitiveDryModel(spectral_grid; time_stepping = Leapfrog(spectral_grid, robert_filter = 0))
+    model = PrimitiveDryModel(spectral_grid; time_stepping = Leapfrog(spectral_grid, PrimitiveDryModel, robert_filter = 0))
     simulation = initialize!(model)
     initialize!(simulation; steps = 4)
     (; variables) = simulation
@@ -494,7 +494,7 @@ end
     @testset for (steps, variant) in ((4, NCycleLorenzA()), (3, NCycleLorenzA()), (3, NCycleLorenzB())), Δt_at_T32 in (Minute(30), Minute(60))
         spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         initial_conditions = RandomWaves(spectral_grid, lmin = 5, lmax = 15)
-        time_stepping = NCycleLorenz(spectral_grid; steps, variant, Δt_at_T32, adjust_with_output = false)
+        time_stepping = NCycleLorenz(spectral_grid, ShallowWaterModel; steps, variant, Δt_at_T32, adjust_with_output = false)
         model = ShallowWaterModel(spectral_grid; initial_conditions, time_stepping)
         simulation = initialize!(model)
         variance0 = η_variance(get_step(simulation.variables.prognostic.η, 1))

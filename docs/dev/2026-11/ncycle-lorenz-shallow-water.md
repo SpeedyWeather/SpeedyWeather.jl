@@ -62,6 +62,13 @@ Base revision: 069fb09f3d4fa539fbeb27ea4c352010d6737961
 
 - Implicit solver moved into the time steppers (see "Implicit solver as part of the time stepper").
 
+> Can you not create a constructor that takes the model type as argument choosing the right
+> implicit solver by default in models/primitive_dry.jl etc? If model type is not provided use
+> nothing by default and check at initialisation that solver and model match otherwise throw warning?
+
+- Replaced the `DefaultImplicit()` placeholder (which copied the time stepper) by constructors with
+  the model type and `check_implicit` on initialization.
+
 > Are the variables that ImplicitPrimitiveEquation requires actually still used? / Can you just
 > remove the average temperature profile calculation? When the GlobalMeanReferenceTemperature
 > needs it it could just calculate at that step and directly write into the vector in implicit?
@@ -371,16 +378,21 @@ unstable, use three decimals for B.
 The implicit solver depends on the time stepper (e.g. ξ = 2αΔt for leapfrog, ξ = wθ_kΔt for the
 Lorenz N-cycle), so it moves from `model.implicit` to `model.time_stepping.implicit`:
 
-- `Leapfrog`, `NCycleLorenz` and `EulerForward` get a field `implicit`. Default for `Leapfrog` and
-  `NCycleLorenz` is the placeholder `DefaultImplicit()`, for `EulerForward` (ocean/land) `nothing`.
+- `Leapfrog`, `NCycleLorenz` and `EulerForward` get a field `implicit`, default `nothing`.
 - `default_implicit(spectral_grid, M)`: `nothing` for `Barotropic`, `ImplicitShallowWater` for
   `ShallowWater`, `ImplicitPrimitiveEquation` for `PrimitiveEquation`.
-- The generic model constructor `M(spectral_grid; kwargs...)` replaces a `DefaultImplicit()` in
-  `time_stepping` by `default_implicit(spectral_grid, M)` (`resolve_implicit`, rebuilding the
-  time stepper with `with_implicit`), so `Leapfrog(spectral_grid)` passed to any model works as
-  before. Passing `implicit` to a model constructor throws an `ArgumentError` pointing to the
-  time stepper. The models' default `time_stepping` is constructed with
-  `implicit = default_implicit(spectral_grid, <model type>)`.
+- Constructors with the model type, `Leapfrog(spectral_grid, M; kwargs...)` and
+  `NCycleLorenz(spectral_grid, M; kwargs...)`, use `implicit = default_implicit(spectral_grid, M)`
+  unless `implicit` is passed on. The models' default `time_stepping` is created this way.
+- `check_implicit(implicit, model)` in every model's `initialize!(model)` warns if there is no
+  implicit solver for a model with gravity waves (`nothing` for ShallowWater/PrimitiveEquation) or
+  the solver does not match the model. Not in the time stepper's `initialize!` as time steppers for
+  ocean and land (also `NCycleLorenz`) have no implicit solver.
+- First implemented with a placeholder `DefaultImplicit()` replaced by the model constructor, which
+  required rebuilding (copying) the time stepper, so `model.time_stepping !== time_stepping` and
+  e.g. `set!(time_stepping, Δt = ...)` after the model construction had no effect. Replaced by the
+  constructors with the model type (no copy).
+- Passing `implicit` to a model constructor throws an `ArgumentError` pointing to the time stepper.
 - `variables(time_stepping, model)` collects the variables of the implicit solver (e.g. the
   average temperature profile of `ImplicitPrimitiveEquation`), previously collected as a model
   component.

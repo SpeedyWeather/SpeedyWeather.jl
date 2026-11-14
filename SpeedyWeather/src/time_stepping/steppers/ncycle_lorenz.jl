@@ -56,7 +56,7 @@ mutable struct NCycleLorenz{NF, V, IntType, C, S, MS, B, I, O, L} <: AbstractNCy
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
 
-    "[OPTION] Implicit solver for the gravity waves, `DefaultImplicit()` is replaced by the model's default"
+    "[OPTION] Implicit solver for the gravity waves, `nothing` for none (default unless the model type is passed on to the constructor)"
     implicit::I
 
     "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for the same N-cycle as the atmosphere"
@@ -108,7 +108,7 @@ function NCycleLorenz(
         implicit_centering = default_implicit_centering(steps, variant),
         Δt_at_T32 = Minute(30),
         adjust_with_output = true,
-        implicit = DefaultImplicit(),
+        implicit = nothing,
         ocean = nothing,    # default can't be NCycleLorenz, creates an infinite loop
         land = nothing,
     )
@@ -120,6 +120,15 @@ function NCycleLorenz(
 
     implicit_centering = isnothing(implicit_centering) ? nothing : NTuple{steps, NF}(implicit_centering)
     return NCycleLorenz(steps, variant, implicit_centering, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt, implicit, ocean, land)
+end
+
+"""$(TYPEDSIGNATURES)
+Generator function for an NCycleLorenz struct with the default implicit solver for models of type
+`Model`, e.g. `NCycleLorenz(spectral_grid, ShallowWaterModel)` uses `ImplicitShallowWater`,
+see `default_implicit`. An `implicit` keyword argument takes precedence."""
+function NCycleLorenz(spectral_grid::SpectralGrid, Model::Type{<:AbstractModel}; kwargs...)
+    haskey(kwargs, :implicit) && return NCycleLorenz(spectral_grid; kwargs...)
+    return NCycleLorenz(spectral_grid; implicit = default_implicit(spectral_grid, Model), kwargs...)
 end
 
 """$(TYPEDSIGNATURES)

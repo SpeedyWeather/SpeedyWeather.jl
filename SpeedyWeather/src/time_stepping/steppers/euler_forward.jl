@@ -16,7 +16,7 @@ mutable struct EulerForward{NF, S, B, MS, I} <: AbstractTimeStepper
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
 
-    "[OPTION] Implicit solver, `nothing` for none, `DefaultImplicit()` is replaced by the model's default"
+    "[OPTION] Implicit solver, `nothing` for none"
     implicit::I
 end
 

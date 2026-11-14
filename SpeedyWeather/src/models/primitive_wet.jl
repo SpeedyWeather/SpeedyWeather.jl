@@ -98,7 +98,7 @@ $(TYPEDFIELDS)"""
     @component custom_parameterization::CP = nothing
 
     # NUMERICS
-    time_stepping::TS = Leapfrog(spectral_grid, implicit = default_implicit(spectral_grid, PrimitiveWet))
+    time_stepping::TS = Leapfrog(spectral_grid, PrimitiveWet)
     spectral_transform::ST = WhichTransform(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
@@ -170,6 +170,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # NUMERICS
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
+    check_implicit(model.time_stepping.implicit, model)
     initialize!(model.time_stepping.implicit, model)
     initialize!(model.horizontal_diffusion, model)
 

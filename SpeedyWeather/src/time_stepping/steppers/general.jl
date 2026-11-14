@@ -4,25 +4,25 @@ one more step in the main time loop."""
 spin_up_steps(::AbstractTimeStepper) = 0
 
 """$(TYPEDSIGNATURES)
-Default implicit solver for a model of type `M`, used to replace the `DefaultImplicit()`
-placeholder of a time stepper (its `implicit` field) on model construction. `nothing` (no implicit
-solver) unless extended for a model type."""
+Default implicit solver for a model of type `M`, used by the time stepper constructors that take
+the model type, e.g. `Leapfrog(spectral_grid, ShallowWaterModel)`. `nothing` (no implicit solver)
+unless extended for a model type: `ImplicitShallowWater` for `ShallowWater` and
+`ImplicitPrimitiveEquation` for `PrimitiveEquation` models."""
 default_implicit(::SpectralGrid, ::Type{<:AbstractModel}) = nothing
 
 """$(TYPEDSIGNATURES)
-Return a copy of `time_stepping` with its `implicit` field replaced by `implicit`.
-Requires `implicit` to be a field and the default constructor taking all fields."""
-function with_implicit(time_stepping::AbstractTimeStepper, implicit)
-    hasfield(typeof(time_stepping), :implicit) || return time_stepping
-    fields = map(f -> f == :implicit ? implicit : getfield(time_stepping, f), fieldnames(typeof(time_stepping)))
-    return Base.typename(typeof(time_stepping)).wrapper(fields...)
-end
-
-"""$(TYPEDSIGNATURES)
-Replace the `DefaultImplicit()` placeholder of `time_stepping.implicit` with the
-`default_implicit` of model type `M`, otherwise return `time_stepping` unchanged."""
-resolve_implicit(time_stepping::AbstractTimeStepper, spectral_grid::SpectralGrid, M::Type{<:AbstractModel}) =
-    implicit_solver(time_stepping) isa DefaultImplicit ? with_implicit(time_stepping, default_implicit(spectral_grid, M)) : time_stepping
+Warn if the implicit solver `implicit` (of the time stepper) does not match `model`, e.g. no
+implicit solver (`nothing`) for a model with gravity waves, which then have to be resolved
+explicitly with a short time step. Methods for matching solvers are defined with the solvers."""
+check_implicit(implicit, model::AbstractModel) =
+    @warn "Implicit solver $(nameof(typeof(implicit))) is not meant for $(nameof(typeof(model))), " *
+    "create the time stepper with the model type, e.g. `Leapfrog(spectral_grid, $(nameof(typeof(model))))`, " *
+    "or pass on a matching `implicit` solver."
+check_implicit(::Nothing, ::Barotropic) = nothing     # no gravity waves, no implicit solver needed
+check_implicit(::Nothing, model::AbstractModel) =
+    @warn "No implicit solver for $(nameof(typeof(model))), gravity waves are integrated explicitly " *
+    "which requires a short time step. Create the time stepper with the model type, e.g. " *
+    "`Leapfrog(spectral_grid, $(nameof(typeof(model))))`, to use the default implicit solver."
 
 # the implicit solver is part of the time stepper, collect its variables (e.g. reference temperature profile)
 variables(time_stepping::AbstractTimeStepper, model::AbstractModel) = variables(implicit_solver(time_stepping), model)

@@ -240,8 +240,8 @@ but [`Leapfrog`](@ref) has `ocean` and `land` fields which default to
 [`EulerForward`](@ref), which steps the variables with **Euler forward over ``\Delta t``**:
 
 ```julia
-time_stepping = Leapfrog(spectral_grid)                             # Euler forward for ocean and land
-time_stepping = Leapfrog(spectral_grid, land = nothing)             # leapfrog land as the atmosphere
+time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel)                  # Euler forward for ocean and land
+time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel, land = nothing)  # leapfrog land as the atmosphere
 model = PrimitiveWetModel(spectral_grid; time_stepping)
 ```
 

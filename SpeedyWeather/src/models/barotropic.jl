@@ -47,7 +47,7 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS
-    time_stepping::TS = NCycleLorenz(spectral_grid, implicit = default_implicit(spectral_grid, Barotropic))
+    time_stepping::TS = NCycleLorenz(spectral_grid, Barotropic)
     spectral_transform::ST = WhichTransform(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
@@ -102,6 +102,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     arch = model.architecture
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
+    check_implicit(model.time_stepping.implicit, model)
     initialize!(model.coriolis, model)
     initialize!(model.forcing, model)
     initialize!(model.drag, model)

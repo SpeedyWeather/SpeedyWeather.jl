@@ -395,7 +395,7 @@ model = PrimitiveWetModel(
     land_sea_mask,
     surface_heat_flux     = SurfaceHeatFlux(spectral_grid, land = PrescribedLandHeatFlux()),
     surface_humidity_flux = SurfaceHumidityFlux(spectral_grid, land = PrescribedLandHumidityFlux()),
-    time_stepping         = Leapfrog(spectral_grid, Δt_at_T32 = Minute(15)),
+    time_stepping         = Leapfrog(spectral_grid, PrimitiveWetModel, Δt_at_T32 = Minute(15)),
 )
 
 simulation = initialize!(model)

@@ -47,7 +47,7 @@ Fields, representing model components, are $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS
-    time_stepping::TS = Leapfrog(spectral_grid, implicit = default_implicit(spectral_grid, ShallowWater))
+    time_stepping::TS = Leapfrog(spectral_grid, ShallowWater)
     spectral_transform::ST = WhichTransform(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
@@ -106,6 +106,7 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     # initialize components
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
+    check_implicit(model.time_stepping.implicit, model)
     initialize!(model.coriolis, model)
     initialize!(model.orography, model)
     initialize!(model.forcing, model)
