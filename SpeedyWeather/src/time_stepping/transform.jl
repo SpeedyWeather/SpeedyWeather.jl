@@ -129,7 +129,6 @@ function SpeedyTransforms.transform!(
 
     vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
     div = get_prognostic_step(vars.prognostic.divergence, time_stepping, S)
-    temp = get_prognostic_step(vars.prognostic.temperature, time_stepping, S)
     pres = get_prognostic_step(vars.prognostic.pressure, time_stepping, S)
 
     scratch_memory = vars.scratch.transform_memory
@@ -186,8 +185,6 @@ function SpeedyTransforms.transform!(
     log_pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, DummyParameterization())    # log Pa
     vars.parameterizations.surface_pressure .= exp.(log_pₛ)                                     # in Pa
 
-    # include humidity effect into temp for everything stability-related
-    temperature_average!(vars, temp, S)
     geopotential!(vars, model)                  # calculate geopotential
 
     # transform random pattern for random process unless random_process=nothing

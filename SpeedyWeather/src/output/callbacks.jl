@@ -140,15 +140,23 @@ function initialize!(
         model::PrimitiveEquation,
     ) where {NF}
     callback.temperature = Vector{NF}(undef, vars.prognostic.clock.n_steps + 1)     # replace with vector of correct length
-    nlayers = model.geometry.nlayers
-    callback.temperature[1] = vars.dynamics.average_temperature_profile[nlayers]    # set initial conditions
+    callback.temperature[1] = global_surface_temperature(callback, vars, model)    # set initial conditions
     callback.step_counter = 1                                                       # (re)set counter to 1
     return nothing
 end
 
+"""$(TYPEDSIGNATURES)
+Global mean temperature of the lowermost layer from the l=m=0 harmonic of the spectral temperature."""
+function global_surface_temperature(callback::GlobalSurfaceTemperatureCallback, vars::Variables, model::PrimitiveEquation)
+    temp = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, callback)
+    nlayers = model.geometry.nlayers
+    temp_lm0 = Array(view(temp.data, 1:1, nlayers))[1]                              # l=m=0 coefficient, works on GPU
+    return real(temp_lm0) / model.spectral_transform.norm_sphere
+end
+
 """
 $(TYPEDSIGNATURES)
-Pulls the average temperature from the lowermost layer and stores it in the next
+Computes the global mean temperature of the lowermost layer and stores it in the next
 element of the callback.temperature vector."""
 function callback!(
         callback::GlobalSurfaceTemperatureCallback,
@@ -157,8 +165,7 @@ function callback!(
     )
     callback.step_counter += 1
     i = callback.step_counter
-    nlayers = model.geometry.nlayers
-    callback.temperature[i] = vars.dynamics.average_temperature_profile[nlayers]
+    callback.temperature[i] = global_surface_temperature(callback, vars, model)
     return nothing
 end
 

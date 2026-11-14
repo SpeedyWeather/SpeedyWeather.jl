@@ -23,7 +23,6 @@ Fields, representing model components, are $(TYPEDFIELDS)"""
         RP,     # <:AbstractRandomProcess,
         TS,     # <:AbstractTimeStepper,
         ST,     # <:SpectralTransform{NF},
-        IM,     # <:AbstractImplicit,
         HD,     # <:AbstractHorizontalDiffusion,
         OU,     # <:AbstractOutput,
         FB,     # <:AbstractFeedback,
@@ -48,9 +47,8 @@ Fields, representing model components, are $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS
-    time_stepping::TS = Leapfrog(spectral_grid)
+    time_stepping::TS = Leapfrog(spectral_grid, implicit = default_implicit(spectral_grid, ShallowWater))
     spectral_transform::ST = WhichTransform(spectral_grid)
-    implicit::IM = ImplicitShallowWater(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
@@ -74,7 +72,7 @@ function variables(model::ShallowWater)
         TendencyVariable(:divergence, SpectralXYZT(ts), desc = "Tendency of divergence", units = "1/s²"),
         TendencyVariable(:divergence, GridXYZT(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
 
-        TendencyVariable(:η, SpectralXYT(ps), desc = "Tendency of interface displacement", units = "m/s"),
+        TendencyVariable(:η, SpectralXYT(ts), desc = "Tendency of interface displacement", units = "m/s"),
         TendencyVariable(:η, GridXYT(tg), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
 
         GridVariable(:divergence, GridXYZT(pg), desc = "Divergence", units = "1/s", fuse = :grid),
@@ -98,7 +96,7 @@ end
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for most components (=fields) of `model`,
 except for `model.output` and `model.feedback` which are always initialized
-in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
+in `time_stepping!` and `model.time_stepping.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     (; spectral_grid) = model
 
@@ -113,7 +111,7 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     initialize!(model.forcing, model)
     initialize!(model.drag, model)
     initialize!(model.horizontal_diffusion, model)
-    # model.implicit is initialized in first_timesteps!
+    # model.time_stepping.implicit is initialized in first_timesteps!
     initialize!(model.random_process, model)
     initialize!(model.particle_advection, model)
 

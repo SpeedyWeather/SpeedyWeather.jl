@@ -369,9 +369,11 @@ end
                         drag = LinearDrag(spectral_grid),
                         dynamics_only = true,
                         orography = EarthOrography(spectral_grid),
-                        time_stepping = Leapfrog(spectral_grid; Δt_at_T32, adjust_with_output=false),
                         # Crank-Nicolson is unstable with uniform σ spacing over orography, use backward Euler there
-                        implicit = ImplicitPrimitiveEquation(spectral_grid; centering = label == "default" ? 1 : 0.5),
+                        time_stepping = Leapfrog(
+                            spectral_grid; Δt_at_T32, adjust_with_output=false,
+                            implicit = ImplicitPrimitiveEquation(spectral_grid; centering = label == "default" ? 1 : 0.5),
+                        ),
                     )
                     simulation = initialize!(model)
                     run!(simulation; period = Day(5))               # don't test longer on CI but otherwise could be Day(20) too

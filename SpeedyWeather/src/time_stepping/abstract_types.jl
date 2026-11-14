@@ -1,5 +1,11 @@
 abstract type AbstractTimeStepper <: AbstractModelComponent end
 abstract type AbstractImplicit <: AbstractModelComponent end
+
+"""Placeholder for the implicit solver of a time stepper, replaced by the model's default
+(`default_implicit`) when the model is constructed, e.g. `nothing` for the `BarotropicModel`,
+`ImplicitShallowWater` for the `ShallowWaterModel` and `ImplicitPrimitiveEquation` for the
+primitive equation models."""
+struct DefaultImplicit <: AbstractImplicit end
 abstract type AbstractDynamicalCoreComponent <: AbstractModelComponent end
 
 # DUMMY TYPES

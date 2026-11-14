@@ -316,7 +316,20 @@ function SpectralGrid(
 end
 
 # also allow spectral grid to be passed on as first and only positional argument to model constructors
-(M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(; spectral_grid = SG, kwargs...)
+# the `DefaultImplicit()` placeholder of a time stepper is replaced by the default implicit solver of `M`
+function (M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...)
+    haskey(kwargs, :implicit) && throw(
+        ArgumentError(
+            "The implicit solver is part of the time stepper, pass it on as " *
+                "`time_stepping = Leapfrog(spectral_grid; implicit)` instead of `$(nameof(M))(spectral_grid; implicit)`"
+        )
+    )
+    if haskey(kwargs, :time_stepping)
+        time_stepping = resolve_implicit(kwargs[:time_stepping], SG, M)
+        return M(; spectral_grid = SG, kwargs..., time_stepping)
+    end
+    return M(; spectral_grid = SG, kwargs...)
+end
 
 """$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct.

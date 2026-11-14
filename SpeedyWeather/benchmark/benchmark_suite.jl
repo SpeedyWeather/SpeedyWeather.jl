@@ -431,7 +431,8 @@ function run_benchmark!(suite::BenchmarkSuiteDynamics, i::Integer)
     simulation = initialize!(model)
 
     vars, model = SpeedyWeather.unpack(simulation)
-    (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit, time_stepping) = model
+    (; orography, geometry, spectral_transform, geopotential, atmosphere, time_stepping) = model
+    (; implicit) = time_stepping
 
     # Each function is called through `compiled_call` (compiled once with Reactant), each
     # benchmark sample also waits for the device. Building the call inside `safe_benchmark!`

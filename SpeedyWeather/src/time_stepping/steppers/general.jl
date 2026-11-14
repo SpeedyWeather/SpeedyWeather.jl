@@ -2,6 +2,34 @@
 e.g. Leapfrog starts with 1 Euler step that isn't counted for the clock but requires
 one more step in the main time loop."""
 spin_up_steps(::AbstractTimeStepper) = 0
+
+"""$(TYPEDSIGNATURES)
+Default implicit solver for a model of type `M`, used to replace the `DefaultImplicit()`
+placeholder of a time stepper (its `implicit` field) on model construction. `nothing` (no implicit
+solver) unless extended for a model type."""
+default_implicit(::SpectralGrid, ::Type{<:AbstractModel}) = nothing
+
+"""$(TYPEDSIGNATURES)
+Return a copy of `time_stepping` with its `implicit` field replaced by `implicit`.
+Requires `implicit` to be a field and the default constructor taking all fields."""
+function with_implicit(time_stepping::AbstractTimeStepper, implicit)
+    hasfield(typeof(time_stepping), :implicit) || return time_stepping
+    fields = map(f -> f == :implicit ? implicit : getfield(time_stepping, f), fieldnames(typeof(time_stepping)))
+    return Base.typename(typeof(time_stepping)).wrapper(fields...)
+end
+
+"""$(TYPEDSIGNATURES)
+Replace the `DefaultImplicit()` placeholder of `time_stepping.implicit` with the
+`default_implicit` of model type `M`, otherwise return `time_stepping` unchanged."""
+resolve_implicit(time_stepping::AbstractTimeStepper, spectral_grid::SpectralGrid, M::Type{<:AbstractModel}) =
+    implicit_solver(time_stepping) isa DefaultImplicit ? with_implicit(time_stepping, default_implicit(spectral_grid, M)) : time_stepping
+
+# the implicit solver is part of the time stepper, collect its variables (e.g. reference temperature profile)
+variables(time_stepping::AbstractTimeStepper, model::AbstractModel) = variables(implicit_solver(time_stepping), model)
+
+"""$(TYPEDSIGNATURES)
+The implicit solver of `time_stepping`, `nothing` for time steppers without an `implicit` field."""
+implicit_solver(time_stepping::AbstractTimeStepper) = hasfield(typeof(time_stepping), :implicit) ? getfield(time_stepping, :implicit) : nothing
 default_time_step(L::AbstractTimeStepper) = L.Δt
 
 """$(TYPEDSIGNATURES) Time step [s] of `time_stepping` at the current `clock`,

@@ -84,10 +84,12 @@ For time steppers that need no such initialisation `spin_up_steps` is `0`, e.g. 
 
 Like `Leapfrog`, the Lorenz N-cycle is controlled by creating a custom `NCycleLorenz`
 component and passing it on to the model constructor. The cycle length `steps` (3 or 4
-recommended) and the weight `variant` ([`NCycleLorenzA`](@ref) (default), [`NCycleLorenzB`](@ref),
+recommended, 4 is the default) and the weight `variant` ([`NCycleLorenzA`](@ref) (default), [`NCycleLorenzB`](@ref),
 [`NCycleLorenzAB`](@ref) or [`NCycleLorenzABBA`](@ref), see [Lorenz N-cycle](@ref ncycle) for what
 distinguishes them) are the two options you are most likely to change, the time step options
-(`Δt_at_T32`, `adjust_with_output`) behave the same as for `Leapfrog` above.
+(`Δt_at_T32`, `adjust_with_output`) behave the same as for `Leapfrog` above. The implicit
+centering per substep, `implicit_centering`, has defaults for the 4-cycle with variant A and the
+3-cycle with variants A and B, see [Implicit centering of the Lorenz N-cycle](@ref ncycle_centering).
 
 ```@example ncycle
 using SpeedyWeather
@@ -113,3 +115,22 @@ where `;` matches the `time_stepping` keyword argument by name. If you name `lea
 would need to change this to `time_stepping=leapfrog` in the function call arguments. The same
 keyword takes any time stepper, e.g. `time_stepping = NCycleLorenz(spectral_grid)` for the
 [Lorenz N-cycle](@ref ncycle).
+
+## Implicit solver
+
+The semi-implicit solver for the gravity waves depends on the time stepper and is therefore
+part of it, as its `implicit` field, i.e. `model.time_stepping.implicit`. By default
+(`implicit = DefaultImplicit()`) it is chosen by the model when the time stepper is passed on
+to the model constructor: `nothing` (no implicit solver) for the `BarotropicModel`,
+[`ImplicitShallowWater`](@ref) for the `ShallowWaterModel` and [`ImplicitPrimitiveEquation`](@ref)
+for the primitive equation models. To change it, pass it on to the time stepper, e.g.
+
+```@example leapfrog
+implicit = ImplicitPrimitiveEquation(spectral_grid, centering = 1)    # backward Euler
+time_stepping = Leapfrog(spectral_grid; implicit)
+model = PrimitiveDryModel(spectral_grid; time_stepping)
+model.time_stepping.implicit
+```
+
+see [Semi-implicit time integration](@ref implicit_swm) (shallow water) and
+[Semi-implicit time stepping](@ref implicit_primitive) (primitive equations).

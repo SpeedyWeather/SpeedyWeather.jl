@@ -273,26 +273,35 @@ EulerForward
 
 The Lorenz N-cycle [`NCycleLorenz`](@ref) is a semi-implicit time integration following
 [Hotta2016](@citet). Over a cycle of ``N`` substeps it advances the state ``x``,
-per substep, as
+per substep ``k = 0, \dots, N-1``, as
 
 ```math
 \begin{aligned}
-G &= w\,F_E(x) + (1-w)\,G \\
-dx &= (I - \alpha\,\Delta t\,L_I)^{-1} (G + L_I x) \\
-x &= x + \Delta t\,dx
+G &= w_k\,\left(F_E(x) + L\left(x + \theta_k (x^{new} - x)\right)\right) + (1-w_k)\,G \\
+x^{new} &= x + \Delta t\,G
 \end{aligned}
 ```
 
-where ``F_E`` are the explicit tendencies, ``L_I`` the linear (gravity-wave) terms treated
-implicitly, and ``w`` a substep-dependent weight coefficient. Only one prognostic step is stored
-(the state is updated in place), but two tendencies are kept: ``F`` (the current tendency) and
-``G`` (the weighted accumulation that carries memory across substeps), hence
-`tendency_spectral_steps(::NCycleLorenz) = 2`. In SpeedyWeather's implementation the implicit
-solve ``(I - \alpha\,\Delta t\,L_I)^{-1}(G + L_I x)`` is folded into the same `implicit_correction!`
-step used by Leapfrog (see [Semi-implicit time stepping](@ref implicit_primitive) for the
-primitive equations and [Semi-implicit time integration](@ref implicit_swm) for the shallow water
-model -- both implicit solves are shared between time steppers), so `update_prognostic!` for
-`NCycleLorenz` itself only performs the weighted accumulation and the explicit state update
+where ``F_E`` are the explicit tendencies, ``L`` the linear (gravity-wave) terms treated
+implicitly, ``w_k`` a substep-dependent weight coefficient and ``\theta_k`` the implicit centering
+of substep ``k``. The linear terms are therefore part of the weighted Lorenz average and evaluated
+at ``x + \theta_k (x^{new} - x)`` with ``\theta_k = 0`` forward (explicit), ``\theta_k = 1/2`` centred and
+``\theta_k = 1`` backward. As ``x^{new}`` depends on ``G`` this requires the solve
+
+```math
+G = (I - w_k \theta_k \Delta t L)^{-1} \left(w_k F(x) + (1-w_k) G\right)
+```
+
+with ``F = F_E + Lx`` the full tendency, which is done in `implicit_correction!`, see
+[Semi-implicit Lorenz N-cycle](@ref implicit_swm_ncycle) for the shallow water equations.
+This is "Milan's version" in [#917](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/917);
+"Daisuke's version" ([Hotta2016](@citet)) keeps the linear terms outside of the Lorenz average. Only one prognostic
+step is stored (the state is updated in place), but two tendencies are kept: ``F`` (the current
+tendency) and ``G`` (the weighted accumulation that carries memory across substeps), hence
+`tendency_spectral_steps(::NCycleLorenz) = 2`. To reuse the same `update_prognostic!` for all
+variables, the implicit solve stores ``(G - (1-w_k) G_{old})/w_k`` back into ``F`` so that
+`update_prognostic!` for `NCycleLorenz` only performs the weighted accumulation and the
+explicit state update
 
 ```math
 \begin{aligned}
@@ -301,8 +310,99 @@ x &= x + \Delta t\,G
 \end{aligned}
 ```
 
-for every spectral coefficient (and vertical layer), with the implicit correction applied to
-``G`` beforehand by `diffusion_and_implicit!`.
+for every spectral coefficient (and vertical layer).
+
+### [Implicit centering of the Lorenz N-cycle](@id ncycle_centering)
+
+The centering ``\theta_k`` of substep ``k`` decides where within the substep the linear
+(gravity wave) terms are evaluated: ``L(x + \theta_k (x^{new} - x))``, i.e. ``\theta_k \Delta t`` after the
+current state ``x``. For a single forward step ``\theta = 1/2`` would be Crank-Nicolson: second-order
+accurate and neutral for gravity waves. But the Lorenz N-cycle is not a sequence of independent
+forward steps, the weighted accumulation ``G = wF + (1-w)G`` extrapolates the tendencies
+(weights ``w_k > 1`` and therefore negative weights ``1-w_k`` on the previous ones) and what matters is
+the composite over the whole cycle.
+
+**Effective centering.** For the oscillation equation ``\dot x = (\lambda_E + \lambda_I)x``, split into
+an explicit part ``a = \lambda_E \Delta t`` and an implicit part ``b = \lambda_I \Delta t``, a cycle
+of ``N`` substeps maps ``x \to R(a, b)\,x``. Expanding ``R`` in ``a`` and ``b`` and comparing with the exact
+``e^{N(a+b)}`` shows that the explicit Lorenz cycle is exact to order ``N`` but the implicit terms
+introduce a single error at second order (the coefficients of ``ab`` and ``b^2``), which is *linear*
+in the centerings: ``\kappa\, c \cdot \theta`` with
+
+| ``N`` | Variant | Weights ``w_k`` | ``c \cdot \theta`` | ``\kappa`` |
+| ----- | ------- | --------------- | ------------------ | ---------- |
+| 3 | A | 1, 3/2, 3 | ``\theta_0 - \theta_1 + 2\theta_2`` | 3/2 |
+| 3 | B | 1, 3, 3/2 | ``\theta_1 + \theta_2`` | 3/2 |
+| 4 | A | 1, 4/3, 2, 4 | ``\theta_1 - \theta_2 + \theta_3`` | 4 |
+| 4 | B | 1, 4, 2, 4/3 | ``\theta_1 + \theta_2 + \theta_3`` | 4/3 |
+
+Comparing instead with a ``\theta``-method over the whole cycle (time step ``N\Delta t``) with centering
+``\alpha``, ``R = (1 + (1-\alpha)Nb)/(1 - \alpha N b)``, whose second-order error is ``N^2(\alpha - 1/2)\,b^2``,
+defines an effective centering of the cycle
+
+```math
+\alpha_{\text{eff}} = \frac{1}{2} + \frac{\kappa\, c \cdot \theta}{N^2}
+```
+
+computed by `SpeedyWeather.effective_centering(variant, θ)`. ``\alpha_\text{eff} = 1/2`` is second-order
+accurate like Crank-Nicolson; ``\alpha_\text{eff} > 1/2`` damps gravity waves at second order like an
+off-centred Crank-Nicolson. "Crank-Nicolson on average" therefore means ``c \cdot \theta = 0``, a
+weighted sum with weights of both signs, not a mean of the ``\theta_k`` equal to 1/2. In particular, the
+same ``\theta_k = 1/2`` on every substep has ``\alpha_\text{eff} = 2/3`` (N=3) or ``5/8`` (N=4), which is why
+it damps gravity waves strongly. Note also that fully explicit, ``\theta_k = 0``, has
+``\alpha_\text{eff} = 1/2``: implicitness is not needed for accuracy, only for stability of the fast
+gravity waves.
+
+**Signs of the centerings.** A centering ``\theta_k < 0`` evaluates the linear terms before the current
+state, a single such substep amplifies gravity waves, but within the cycle it can be compensated by
+other substeps (as negative coefficients in Runge-Kutta methods). Every substep solves
+``(1 - w_k\theta_k\Delta t L)``, so the cycle's amplification ``R(0, b)`` has poles at ``b = 1/(w_k\theta_k)``.
+For ``\theta_k > 0`` they are in the right half-plane, for ``\theta_k < 0`` on the negative real axis.
+For the gravity wave terms, whose eigenvalues are imaginary, this does not matter, but a damping
+term (e.g. diffusion) solved implicitly with ``\theta_k < 0`` would blow up for decay rates near
+``1/(w_k|\theta_k|\Delta t)``. Centerings ``\theta_k \geq 0`` are therefore preferable (A-stable). Centerings
+``\theta_k > 1`` ("more backward than backward Euler") damp but are otherwise unproblematic. Restricting
+to ``0 \leq \theta_k \leq 1`` is not possible for second order with variant B
+(``\theta_1 = \theta_2 = 0`` is then required, i.e. no implicitness on those substeps).
+
+**Choosing the centerings.** Instead of trial and error the centerings are chosen as follows:
+fix ``\alpha_\text{eff}`` (1/2 for second order, slightly larger for additional damping), which is one
+linear constraint on ``\theta``, and use the remaining ``N-1`` degrees of freedom to maximise the
+explicit stability of the cycle: the largest ``\omega_E\Delta t`` up to which the cycle is stable
+(amplification ``\leq 1``) for ``\omega_L\Delta t \in [0, 40]`` with
+
+- gravity waves, ``\lambda_E = 0``, ``\lambda_I = i\omega_L``;
+- Doppler-shifted gravity waves, ``\lambda_E = i\omega_E``;
+- a reference layer thickness larger than the actual one (e.g. over orography),
+  ``\lambda_E = -\beta\lambda_I`` with ``\beta \in (0, 1]``, also combined with a Doppler shift;
+- Coriolis coupling on an f-plane, vorticity, divergence and interface displacement with
+  Coriolis explicit (``f\Delta t = \omega_E\Delta t``) and gravity waves implicit.
+
+The explicit stability limit of the Lorenz cycle itself (``\lambda_I = 0``) is
+``\omega_E\Delta t \approx 0.58`` for ``N=3`` and ``\approx 0.70`` for ``N=4``, compared to 1 for leapfrog, which
+no centering can increase. The default centerings
+
+| ``N`` | Variant | Default ``\theta_k`` | ``\alpha_\text{eff}`` | Stable up to ``\omega_E\Delta t`` |
+| ----- | ------- | --------------------- | --------------------- | ------------------------------- |
+| 4 (default) | A | 2.06, 0.93, 1.02, 0.09 | 1/2 | 0.70 |
+| 3 | A | -1.03, 0.70, 1.05 | 0.56 | 0.575 |
+| 3 | B | 1.63, 0.55, -0.55 | 1/2 | 0.55 |
+
+are stable in all these test cases up to (almost) the explicit limit of the cycle. The 4-cycle with
+variant A is second-order accurate, A-stable (all ``\theta_k \geq 0``) and has the largest explicit stability
+limit, so it is the default. No robust second-order centering was found for the 3-cycle with
+variant A. The centerings are specific to the order of the weights, so A and B need different ones,
+and for other cycle lengths and variants `implicit.centering` is used on every substep. The
+centering can be chosen with the `implicit_centering` option, e.g.
+`NCycleLorenz(spectral_grid, steps=3, implicit_centering=(0.5, 0.5, 0.5))`.
+
+In the shallow water model (Gaussian blob and random gravity waves at T32-T256 with
+``\Delta t`` at T32 of 20-60min, and the Galewsky jet) the 4-cycle with variant A was stable for all
+gravity wave cases and preserved gravity wave energy about as well as leapfrog at T128 and T256
+for ``\Delta t \lesssim 40``min at T32, damping more at lower resolution or longer time steps. For the
+Galewsky jet, limited by advection, it required about 0.75x the time step of leapfrog
+(e.g. 30min vs 40min at T32 at T128 and T256), consistent with the ratio of the explicit
+stability limits. The default time step of `NCycleLorenz` is 30min at T32.
 
 Four weight variants are available, following the naming in [Hotta2016](@citet), selected via the
 `variant` option:
@@ -322,7 +422,7 @@ where every substep already advances the state by a full ``\Delta t`` (as in the
 ``x = x + \Delta t\,G`` above). SpeedyWeather.jl uses the latter, so the computational cost of the
 Lorenz N-cycle is independent of ``N`` but, like leapfrog, inversely proportional to ``\Delta t``.
 
-The cycle length ``N`` is set with `steps` (3 or 4 recommended, 4 is more stable). The current
+The cycle length ``N`` is set with `steps` (3 or 4 recommended, 4 (default) is more stable and less diffusive). The current
 substep ``k`` is `current_substep(L, clock) = mod(clock.step_counter, L.steps)`, and the weight for
 that substep is computed by `weight_coefficient`, dispatched on the `variant`.
 
@@ -404,7 +504,8 @@ to always recompute its reference temperature profile
 ```julia
 reference_temperature = GlobalMeanReferenceTemperature()
 implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = StepSchedule(1), reference_temperature)
-model = PrimitiveWetModel(spectral_grid; implicit)
+time_stepping = Leapfrog(spectral_grid; implicit)
+model = PrimitiveWetModel(spectral_grid; time_stepping)
 ```
 
 The semi-implicit corrections are centred in time by default, `centering = 0.5` (Crank-Nicolson).

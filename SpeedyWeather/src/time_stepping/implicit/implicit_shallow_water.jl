@@ -1,8 +1,8 @@
-# dispatch over model.implicit and time stepping
+# dispatch over model.time_stepping.implicit and time stepping
 implicit_correction!(vars::Variables, model::AbstractModel) =
-    implicit_correction!(vars, model.implicit, model.time_stepping, model)
+    implicit_correction!(vars, model.time_stepping.implicit, model.time_stepping, model)
 
-# model.implicit=nothing (for BarotropicModel)
+# model.time_stepping.implicit=nothing (for BarotropicModel)
 initialize!(::Nothing, ::Variables, ::AbstractModel) = nothing
 implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
 
@@ -31,6 +31,7 @@ end
 $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
 ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(; kwargs...)
+default_implicit(SG::SpectralGrid, ::Type{<:ShallowWater}) = ImplicitShallowWater(SG)
 initialize!(::ImplicitShallowWater, ::Variables, ::AbstractModel) = nothing
 
 """
@@ -107,10 +108,12 @@ function implicit_correction!(
         time_stepping::AbstractNCycleLorenz,
         model::ShallowWater
     )
-    # implicit timestep ξ = α*Δt, depending on centering (0.5 Crank Nicolson, 1 backward Euler)
+    # implicit timestep ξ = w*θ*Δt with weight w and centering θ of the current substep
     (; Δt) = time_stepping
-    w = weight_coefficient(time_stepping, vars.prognostic.clock)
-    ξ = w * implicit.centering * Δt / vars.prognostic.scale[]
+    (; clock) = vars.prognostic
+    w = weight_coefficient(time_stepping, clock)
+    θ = implicit_centering(time_stepping, implicit, clock)
+    ξ = w * θ * Δt / vars.prognostic.scale[]
 
     # use Hotta et al. 2016 notation for current tendency F and previous (averaged) tendency G
     F_div = get_step(vars.tendencies.divergence, 1)    # no tuple (get_steps) here: a tuple of step
@@ -158,5 +161,5 @@ end
     # Reobtain F_explicit + L_implicit by undoing the Lorenz tendency average
     # and store in F tendencies so it can be plugged into Lorenz time stepping as normal
     F_div[lm, k] = (δdiv - (1 - w) * G_div[lm, k]) / w
-    F_η[lm, k] = (δη - (1 - w) * G_η[lm]) / w
+    F_η[lm] = (δη - (1 - w) * G_η[lm]) / w
 end

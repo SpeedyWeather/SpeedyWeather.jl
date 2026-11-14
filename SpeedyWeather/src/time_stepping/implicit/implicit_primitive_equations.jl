@@ -34,12 +34,19 @@ $(TYPEDFIELDS)"""
     margin::NF = 30
 end
 
-# reference temperature profile (broadcastable) from the current global-mean temperature profile
-# `temp_average` or the grid temperature `temp_grid` (full temperature, not the anomaly)
-reference_temperature(ref::IsothermalReferenceTemperature, temp_average, temp_grid) = ref.temperature
-reference_temperature(ref::GlobalMeanReferenceTemperature, temp_average, temp_grid) =
-    Base.Broadcast.broadcasted(+, temp_average, ref.offset)
-reference_temperature(ref::MaximumReferenceTemperature, temp_average, temp_grid) =
+"""$(TYPEDSIGNATURES)
+Global-mean temperature profile (broadcastable, one value per layer) from the l=m=0 harmonic
+of the spectral temperature `temp` (full temperature, not the anomaly), using `norm_sphere` of
+the spectral transform."""
+global_mean_temperature(temp::LowerTriangularArray, norm_sphere) =
+    Base.Broadcast.broadcasted(t -> real(t) / norm_sphere, view(temp.data, 1, :))
+
+# reference temperature profile (broadcastable) from the spectral temperature `temp` (for its
+# global-mean profile) or the grid temperature `temp_grid` (full temperature, not the anomaly)
+reference_temperature(ref::IsothermalReferenceTemperature, temp, temp_grid, norm_sphere) = ref.temperature
+reference_temperature(ref::GlobalMeanReferenceTemperature, temp, temp_grid, norm_sphere) =
+    Base.Broadcast.broadcasted(+, global_mean_temperature(temp, norm_sphere), ref.offset)
+reference_temperature(ref::MaximumReferenceTemperature, temp, temp_grid, norm_sphere) =
     maximum(temp_grid) + ref.margin
 
 # whether the reference temperature profile has to be recomputed on the schedule
@@ -140,11 +147,7 @@ function ImplicitPrimitiveEquation(
     )
 end
 
-function variables(implicit::ImplicitPrimitiveEquation)
-    return (
-        DynamicsVariable(:average_temperature_profile, VectorDim(implicit.nlayers), desc = "Average vertical temperature profile", units = "K"),
-    )
-end
+default_implicit(SG::SpectralGrid, ::Type{<:PrimitiveEquation}) = ImplicitPrimitiveEquation(SG)
 
 """$(TYPEDSIGNATURES)
 Initialize the `schedule` of `implicit` with the time step of `model`.
@@ -202,8 +205,10 @@ function reinitialize!(
     scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
     # reference temperature profile, isothermal or from the current global-mean temperature profile
     Tₖ = implicit.temp_profile
+    temp = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, implicit)
     temp_grid = get_prognostic_step(vars.grid.temperature, model.time_stepping, implicit)
-    Tₖ .= reference_temperature(implicit.reference_temperature, vars.dynamics.average_temperature_profile, temp_grid)
+    (; norm_sphere) = model.spectral_transform
+    Tₖ .= reference_temperature(implicit.reference_temperature, temp, temp_grid, norm_sphere)
     initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end

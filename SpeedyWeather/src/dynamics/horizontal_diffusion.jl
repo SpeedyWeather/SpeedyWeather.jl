@@ -261,7 +261,7 @@ function horizontal_diffusion!(
         model::Barotropic,
     )
     (; expl) = diffusion
-    impl = implicit_diffusion(diffusion, model.implicit, model.time_stepping) ? diffusion.impl : nothing
+    impl = implicit_diffusion(diffusion, model.time_stepping.implicit, model.time_stepping) ? diffusion.impl : nothing
 
     # Barotropic model diffuses vorticity (only variable)
     vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, diffusion)
@@ -286,7 +286,7 @@ function horizontal_diffusion!(
     (; expl, expl_div) = diffusion
 
     # apply diffusion explicitly by passing on nothing for the precomputed implicit array
-    do_implicitly = implicit_diffusion(diffusion, model.implicit, model.time_stepping)
+    do_implicitly = implicit_diffusion(diffusion, model.time_stepping.implicit, model.time_stepping)
     impl = do_implicitly ? diffusion.impl : nothing
     impl_div = do_implicitly ? diffusion.impl_div : nothing
 
@@ -324,7 +324,7 @@ function horizontal_diffusion!(
     (; expl, expl_div) = diffusion
 
     # apply diffusion explicitly by passing on nothing for the precomputed implicit array
-    do_implicitly = implicit_diffusion(diffusion, model.implicit, model.time_stepping)
+    do_implicitly = implicit_diffusion(diffusion, model.time_stepping.implicit, model.time_stepping)
     impl = do_implicitly ? diffusion.impl : nothing
     impl_div = do_implicitly ? diffusion.impl_div : nothing
 

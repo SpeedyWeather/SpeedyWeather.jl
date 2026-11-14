@@ -119,7 +119,7 @@ end
 
     _adjoint_check(
         SpeedyWeather.implicit_correction!, vars0,
-        Const(model.implicit), Const(model.time_stepping), Const(model);
+        Const(model.time_stepping.implicit), Const(model.time_stepping), Const(model);
         ingroup = :prognostic, outgroup = :tendencies, rtol_ad = 1.0e-5, rtol_fd = 1.0e-2,
     )
 end
