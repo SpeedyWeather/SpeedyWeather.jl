@@ -64,9 +64,24 @@ _make_zero_view!(x::SpeedyWeather.SpeedyTransforms.ColumnScratchMemory) =
     (_make_zero_view!(x.north); _make_zero_view!(x.south); nothing)
 _make_zero_view!(x::Base.RefValue) = (x[] isa Number && (x[] = zero(x[])); nothing)
 # Anything else (e.g. a coupled component's own state, such as Terrarium's `StateVariables`) is not
-# view-backed, so let Enzyme zero it in place; silently skipping it would leave the shadow as a copy
-# of the primal.
-_make_zero_view!(x) = (Enzyme.make_zero!(x); nothing)
+# view-backed, but silently skipping it would leave the shadow as a copy of the primal. It cannot be
+# handed to `Enzyme.make_zero!` either: its Oceananigans `Field`s are immutable and hold their grid,
+# whose nonzero floats Enzyme refuses to zero in place. Recurse into its fields instead, so that
+# arrays (including `Field`s) are zeroed by the methods above. Bits values (e.g. the `Float32`s of a
+# `Clock`) can only be zeroed where they are mutable, i.e. as fields of a mutable struct.
+function _make_zero_view!(x::T) where {T}
+    isbitstype(T) && return nothing
+    for i in 1:fieldcount(T)
+        isdefined(x, i) || continue
+        xᵢ = getfield(x, i)
+        if ismutable(x) && !isconst(T, i) && isbitstype(typeof(xᵢ))
+            setfield!(x, i, Enzyme.make_zero(xᵢ))
+        else
+            _make_zero_view!(xᵢ)
+        end
+    end
+    return nothing
+end
 
 ###
 # `reinitialize!` (called by every `time_step!`) recomputes the implicit solver whenever the
