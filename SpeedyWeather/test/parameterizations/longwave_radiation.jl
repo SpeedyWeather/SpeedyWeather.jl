@@ -74,3 +74,34 @@ end
     Δp = [SpeedyWeather.pressure_thickness(k, 1.0e5, coordinates) for k in 1:spectral_grid.nlayers]
     @test sum((dTdt0 .- dTdt1) .* Δp) * cₚ / g ≈ olr1 - olr0 rtol = 1.0e-3
 end
+
+@testset "Surface longwave emission over sea ice" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    @testset for LW in (JeevanjeeRadiation, OneBandLongwave)
+        longwave = LW(spectral_grid)
+        model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+        simulation = initialize!(model)
+        vars = simulation.variables
+        @test haskey(vars.prognostic.ocean, :sea_ice_concentration)
+
+        ϵ = model.radiation.longwave isa JeevanjeeRadiation ? model.radiation.longwave.emissivity_ocean :
+            model.radiation.longwave.radiative_transfer.emissivity_ocean
+        σ = model.atmosphere.stefan_boltzmann
+        ij = 1
+        function surface_longwave_up(sea_ice_concentration, surface_air_temperature; sea_surface_temperature = 271)
+            vars.parameterizations.surface_pressure .= 1.0e5
+            vars.grid.temperature .= 250
+            vars.prognostic.ocean.sea_surface_temperature .= sea_surface_temperature
+            vars.prognostic.ocean.sea_ice_concentration .= sea_ice_concentration
+            vars.parameterizations.surface_air_temperature .= surface_air_temperature
+            SpeedyWeather.parameterization!(ij, vars, model.radiation.longwave, model)
+            return vars.parameterizations.ocean.surface_longwave_up[ij]
+        end
+
+        @test surface_longwave_up(0, 243) ≈ ϵ * σ * 271^4       # open water emits at the sea surface temperature
+        @test surface_longwave_up(1, 243) ≈ ϵ * σ * 243^4       # sea ice at the (colder) surface air temperature
+        @test surface_longwave_up(1, 280) ≈ ϵ * σ * 271^4       # but never warmer than the water underneath
+        @test surface_longwave_up(0.5, 243) ≈ ϵ * σ * (271 / 2 + 243 / 2)^4
+        @test surface_longwave_up(1, 0) ≈ ϵ * σ * 271^4         # surface air temperature not yet computed
+    end
+end

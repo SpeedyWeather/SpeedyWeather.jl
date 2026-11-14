@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Surface longwave emission over sea ice uses the surface air temperature (at most the sea surface temperature) instead of the water temperature underneath, in `OneBandLongwave` and `JeevanjeeRadiation` [#NNNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNNN)
 - Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)
 - Fix the differentiability of `TwoBandShortwave` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
 - `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90 implementation, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)

@@ -89,6 +89,26 @@ Adapt.@adapt_structure JeevanjeeRadiation
 JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF}(; kwargs...)
 initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 
+"""$(TYPEDSIGNATURES)
+Temperature [K] at which the ocean part of grid point `ij` emits longwave radiation. Over open water that is the
+sea surface temperature `sst`. Sea ice (concentration ℵ) is assumed to have the surface air temperature but not to be
+warmer than the water underneath, i.e. `(1 - ℵ) * sst + ℵ * min(sst, surface_air_temperature)`. Without sea ice
+(or without a surface air temperature) this is the sea surface temperature."""
+@propagate_inbounds function ocean_skin_temperature(ij, vars, sst, longwave, model)
+    progn_ocean = vars.prognostic.ocean
+    ts = time_stepper(model.time_stepping, :ocean)
+    sea_surface_temperature = sst[ij]
+    sea_ice_concentration = haskey(progn_ocean, :sea_ice_concentration) ?
+        get_prognostic_step(progn_ocean.sea_ice_concentration, ts, longwave)[ij] : zero(sea_surface_temperature)
+    surface_air_temperature = haskey(vars.parameterizations, :surface_air_temperature) ?
+        vars.parameterizations.surface_air_temperature[ij] : sea_surface_temperature
+    # not (yet) computed, e.g. radiation called before the boundary layer: use the sea surface temperature
+    surface_air_temperature = ifelse(surface_air_temperature > 0, surface_air_temperature, sea_surface_temperature)
+    # sea ice emits at the surface air temperature, but never warmer than the water underneath
+    return (1 - sea_ice_concentration) * sea_surface_temperature +
+        sea_ice_concentration * min(sea_surface_temperature, surface_air_temperature)
+end
+
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, longwave::JeevanjeeRadiation, model)
 
@@ -113,7 +133,7 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
-    Fₖ_ocean = ϵ_ocean * σ * sst[ij]^4                                  # [W/m²]
+    Fₖ_ocean = ϵ_ocean * σ * ocean_skin_temperature(ij, vars, sst, longwave, model)^4  # [W/m²], sea ice aware
     vars.parameterizations.ocean.surface_longwave_up[ij] = Fₖ_ocean     # for ocean model forcing
 
     Fₖ_land = ϵ_land * σ * lst[ij, 1]^4                                 # [W/m²]
@@ -252,7 +272,7 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     # TODO use skin temperature?
     lst = get_prognostic_step(vars.prognostic.land.soil_temperature, time_stepper(model.time_stepping, :land), longwave)            
 
-    U_ocean = ϵ_ocean * σ * sst[ij]^4                                   # [W/m²]
+    U_ocean = ϵ_ocean * σ * ocean_skin_temperature(ij, vars, sst, longwave, model)^4  # [W/m²], sea ice aware
     vars.parameterizations.ocean.surface_longwave_up[ij] = U_ocean      # for ocean model forcing
 
     U_land = ϵ_land * σ * lst[ij, 1]^4                                  # [W/m²], 1 for top layer

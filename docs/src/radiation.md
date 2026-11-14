@@ -152,7 +152,9 @@ using optical depth ``\tau`` as vertical coordinate. Longwave emittance is
 ``\sigma T^4`` following Stefan-Boltzmann with emittance of 1. Boundary conditions
 are ``U = \sigma T_s^4`` at the surface, i.e. the surface emitting with its surface
 temperature ``T_s`` (sea surface temperature, skin or soil temperature); and
-``D = 0`` at the top (no longwave radiation from space). Instead of optical depth
+``D = 0`` at the top (no longwave radiation from space). Over sea ice with concentration ``ℵ`` the ocean
+emits with ``(1 - ℵ) T_{sst} + ℵ \min(T_{sst}, T_a)``, i.e. sea ice is assumed to have the surface
+air temperature ``T_a`` but not to be warmer than the water underneath. Instead of optical depth
 we solve these equations using the transmissivity ``t = \exp(-\tau)``.
 
 ```math
