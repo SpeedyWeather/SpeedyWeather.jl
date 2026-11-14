@@ -12,7 +12,7 @@ import SpeedyWeather.OutputVariables: path_or_nothing, hastime, is3D
 const SOIL_DEPTH_DIM_NAME = "soil_depth"
 
 """Output variable for a variable of the Terrarium land state in
-`simulation.variables.prognostic.land.terrarium`, used with the constructors
+`simulation.variables.prognostic.land.terrarium.state`, used with the constructors
 [`SpeedyWeather.OutputVariables.Terrarium`](@ref). 3D (subsurface) variables are written on their own
 vertical dimension `soil_depth` with the depths of the Terrarium soil layer
 centres as coordinates; ocean points are filled with `missing_value`. Supported
@@ -163,7 +163,7 @@ SpeedyWeather.OutputVariables.Terrarium(land::AbstractTerrariumLandModel, args..
 # follow the property path into the Terrarium state (prognostic, auxiliary and
 # input variables are all reachable via getproperty on StateVariables)
 SpeedyWeather.OutputVariables.path(variable::TerrariumOutputVariable, simulation) =
-    foldl(getproperty, variable.path; init = simulation.variables.prognostic.land.terrarium)
+    foldl(getproperty, variable.path; init = simulation.variables.prognostic.land.terrarium.state)
 
 """$(TYPEDSIGNATURES)
 Gather the Terrarium land columns of `variable` onto a full ring-grid scratch

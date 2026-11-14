@@ -23,7 +23,9 @@ const RingLandGrid = Union{
 Variable dimension for the full Terrarium land state. `allocate` for an
 `AbstractVariable{TerrariumVars}` calls `Terrarium.initialize` on `model.land`
 so that the entire Terrarium state lives inside SpeedyWeather's `Variables`
-container at `vars.prognostic.land.terrarium`. The `model.land` must therefore
+container at `vars.prognostic.land.terrarium.state`. Next to it,
+`vars.prognostic.land.terrarium.coupling` holds the coupler-defined `Field`s
+built from that state by [`coupling_fields`](@ref). The `model.land` must therefore
 be an [`AbstractTerrariumLandModel`](@ref)."""
 struct TerrariumVars <: SpeedyWeather.AbstractVariableDim end
 
@@ -40,7 +42,27 @@ function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars},
         boundary_conditions = land.boundary_conditions,
         fields = land.fields,
     )
-    return integrator.state
+    state = integrator.state
+    return (; state, coupling = coupling_fields(land, land.model.soil, state))
+end
+
+"""$(TYPEDSIGNATURES)
+
+Coupler-defined Terrarium `Field`s derived from the Terrarium `state`, stored at
+`vars.prognostic.land.terrarium.coupling`. They are built once in `allocate`, where the
+state is available, because constructing a computed `Field` from an operation is not
+type-stable. `compute!` on them is not type-stable either and fails under Enzyme, so it is
+only called in `initialize!`: they must only hold quantities that are constant in time and
+must not be recomputed in `timestep!`.
+
+For a soil, this is the porosity of the topmost soil layer, `soil_porosity`, which
+[`soil_moisture_capacity!`](@ref) copies into `soil_moisture_capacity`."""
+function coupling_fields(land::AbstractTerrariumLandModel, soil::Terrarium.AbstractSoil, state)
+    porosity = Terrarium.kernel_operation2D(
+        Terrarium.porosity_top, state, land.model.grid,
+        Terrarium.get_stratigraphy(soil), Terrarium.get_biogeochemistry(soil),
+    )
+    return (; soil_porosity = Terrarium.Field(porosity))
 end
 
 """$(TYPEDEF)
@@ -52,7 +74,8 @@ Terrarium model + integrator configuration and a SpeedyWeather
 on this abstract type:
 
 * [`variables`](@ref) declares `vars.prognostic.land.terrarium` (the full
-  Terrarium state) plus thin grid-side mirrors `:soil_temperature` and
+  Terrarium state at `.state` and the coupler-defined `Field`s at `.coupling`,
+  see [`coupling_fields`](@ref)) plus thin grid-side mirrors `:soil_temperature` and
   `:soil_moisture` that the rest of SpeedyWeather (radiation, surface
   fluxes, output) reads from.
 * [`initialize!`](@ref) initializes the Terrarium timestepper against the
@@ -121,22 +144,18 @@ function fill_fallback!(vars::Variables, land::AbstractTerrariumLandModel)
 end
 
 """$(TYPEDSIGNATURES)
-Copy the porosity of the topmost Terrarium soil layer into `soil_moisture_capacity`.
-Terrarium's soil moisture is a saturation (volumetric water content / porosity), so
-`soil_moisture * soil_moisture_capacity` is the volumetric soil water [m³/m³]."""
+Compute the porosity of the topmost Terrarium soil layer (`soil_porosity`, see
+[`coupling_fields`](@ref)) and copy it into `soil_moisture_capacity`. Terrarium's soil
+moisture is a saturation (volumetric water content / porosity), so
+`soil_moisture * soil_moisture_capacity` is the volumetric soil water [m³/m³].
+The porosity is constant in time, so this is only called from `initialize!`."""
 function soil_moisture_capacity!(vars::Variables, land::AbstractTerrariumLandModel)
     haskey(vars.parameterizations.land, :soil_moisture_capacity) || return nothing
-    state = vars.prognostic.land.terrarium
-    soil = land.model.soil
-    porosity = Terrarium.kernel_operation2D(
-        Terrarium.porosity_top, state, land.model.grid,
-        Terrarium.get_stratigraphy(soil), Terrarium.get_biogeochemistry(soil),
-    )
-    porosity_field = Terrarium.Field(porosity)
-    Terrarium.compute!(porosity_field)
+    porosity = vars.prognostic.land.terrarium.coupling.soil_porosity
+    Terrarium.compute!(porosity)
     RingGrids.copy_unmasked!(
         vars.parameterizations.land.soil_moisture_capacity,
-        @view(interior(porosity_field)[:, 1, 1]), land.mask_indices,
+        @view(interior(porosity)[:, 1, 1]), land.mask_indices,
     )
     return nothing
 end
@@ -343,7 +362,7 @@ function SpeedyWeather.initialize!(
         land::AbstractTerrariumLandModel,
         model::PrimitiveWetModel,
     )
-    state = vars.prognostic.land.terrarium
+    state = vars.prognostic.land.terrarium.state
     NF = eltype(vars.prognostic.land.soil_temperature)
     mask = land_mask(land)
     indices = land.mask_indices
@@ -394,7 +413,7 @@ function SpeedyWeather.timestep!(
         land::AbstractTerrariumLandModel,
         model::PrimitiveWetModel,
     )
-    state = vars.prognostic.land.terrarium
+    state = vars.prognostic.land.terrarium.state
     tmodel = land.model
     consts = tmodel.constants
     NF = eltype(state)
@@ -448,7 +467,6 @@ function SpeedyWeather.timestep!(
     end
     if haskey(vars.prognostic.land, :soil_moisture)
         RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, @view(interior(state.saturation_water_ice)[:, 1, end]), indices)
-        soil_moisture_capacity!(vars, land)
     end
     if haskey(vars.prognostic.land, :sensible_heat_flux)
         RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, @view(interior(state.sensible_heat_flux)[:, 1, 1]), indices)
@@ -473,7 +491,7 @@ function SpeedyWeather.initialize!(
         land::TerrariumLand,
         model::PrimitiveDryModel,
     )
-    state = vars.prognostic.land.terrarium
+    state = vars.prognostic.land.terrarium.state
     NF = eltype(vars.prognostic.land.soil_temperature)
     indices = land.mask_indices
 
@@ -495,7 +513,7 @@ function SpeedyWeather.timestep!(
         land::TerrariumLand,
         model::PrimitiveDryModel,
     )
-    state = vars.prognostic.land.terrarium
+    state = vars.prognostic.land.terrarium.state
     land_model = land.model
     NF = eltype(state)
     mask = land_mask(land)
