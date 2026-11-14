@@ -78,8 +78,10 @@ function ozone_absorption!(vars, ozone::SeasonalOzone, model)
     # 0 for the northern summer half-year, 1 at the northern winter solstice
     δ = solar_declination(NF, model.solar_zenith, vars.prognostic.clock.orbit_time)
     δₘₐₓ = abs(deg2rad(convert(NF, model.planet.axial_tilt)))
-    tilted = δₘₐₓ > 0               # guard against division by zero, also in the branch not taken
-    northern_winter = ifelse(tilted, clamp(-δ / ifelse(tilted, δₘₐₓ, one(NF)), 0, 1), zero(NF))
+    # guard against division by zero for an untilted planet, with guarded numerator and denominator
+    # (a nested ifelse(c, x / ifelse(c, y, 1), 0) is simplified by LLVM to an unguarded x / y)
+    tilted = δₘₐₓ > 0
+    northern_winter = clamp(ifelse(tilted, -δ, zero(NF)) / ifelse(tilted, δₘₐₓ, one(NF)), 0, 1)
     seasonal_term = ozone.seasonal_amplitude * northern_winter
     lower = ozone.absorption * ozone.lower_fraction
 
