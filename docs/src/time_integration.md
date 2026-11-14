@@ -84,10 +84,12 @@ For time steppers that need no such initialisation `spin_up_steps` is `0`, e.g. 
 
 Like `Leapfrog`, the Lorenz N-cycle is controlled by creating a custom `NCycleLorenz`
 component and passing it on to the model constructor. The cycle length `steps` (3 or 4
-recommended) and the weight `variant` ([`NCycleLorenzA`](@ref) (default), [`NCycleLorenzB`](@ref),
+recommended, 4 is the default) and the weight `variant` ([`NCycleLorenzA`](@ref) (default), [`NCycleLorenzB`](@ref),
 [`NCycleLorenzAB`](@ref) or [`NCycleLorenzABBA`](@ref), see [Lorenz N-cycle](@ref ncycle) for what
 distinguishes them) are the two options you are most likely to change, the time step options
-(`Δt_at_T32`, `adjust_with_output`) behave the same as for `Leapfrog` above.
+(`Δt_at_T32`, `adjust_with_output`) behave the same as for `Leapfrog` above. The implicit
+centering per substep, `implicit_centering`, has defaults for the 4-cycle with variant A and the
+3-cycle with variants A and B, see [Implicit centering of the Lorenz N-cycle](@ref ncycle_centering).
 
 ```@example ncycle
 using SpeedyWeather

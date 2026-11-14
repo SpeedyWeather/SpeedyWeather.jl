@@ -1,6 +1,6 @@
 # NCycleLorenz for the shallow water model: bug fixes and implicit centering
 
-> Status: **in progress**. Bugs fixed, robust per-substep implicit centering for the 3-cycle variants A and B, implicit solver moved into the time stepper; N=4, AB, ABBA left for review.
+> Status: **in progress**. Bugs fixed, implicit solver moved into the time stepper, per-substep implicit centering with an order condition (α_eff), 4-cycle variant A as new default; AB, ABBA left for future work.
 
 Date of initial draft: 2026-11-12
 
@@ -71,6 +71,20 @@ Base revision: 069fb09f3d4fa539fbeb27ea4c352010d6737961
   step in `transform!`). `GlobalMeanReferenceTemperature` computes the global-mean profile from the
   l=m=0 harmonic of the spectral temperature when the reference profile is recomputed
   (`global_mean_temperature`), `GlobalSurfaceTemperatureCallback` likewise for the lowest layer.
+
+> Merge main in yes and try to find centerings for N=4 I am keen to know whether it's generally
+> more/less stable or more/less diffusive. Can you also think whether there is a way to formalise
+> the centerings mathematically. Like do you want them to be like Crank Nicolson on average or what
+> do negative centerings actually mean. Intuitively only 0-1 makes sense to me. Is there something
+> better than just trial and error for these? / Yes can you run a few example across resolutions
+> with N=4 new A centering and check that it's always stable? / Yes please!! / And also can you
+> write up some details about the mathematics of the centerings we discussed into the docs?
+
+- Merged main. Derived the order condition / effective centering α_eff (see "Order condition
+  and effective centering"), chose centerings by fixing α_eff and maximising stability.
+- New defaults: `steps = 4` (was 3), 4-cycle A θ = (2.06, 0.93, 1.02, 0.09), 3-cycle B
+  θ = (1.63, 0.55, -0.55); 3-cycle A unchanged (-1.03, 0.70, 1.05). `effective_centering`
+  function. Mathematics in `docs/src/time_stepping.md` ("Implicit centering of the Lorenz N-cycle").
 
 ## Problem description
 
@@ -240,7 +254,83 @@ Afterwards round and re-check (two decimals are not enough, three are).
 - Galewsky jet: `ShallowWaterModel` with `ZonalJet` initial conditions and default orography, T85,
   20 days; stable = no NaNs detected.
 
-### Robust centerings (current defaults)
+### Order condition and effective centering
+
+Method: symbolic expansion (sympy) of one cycle of the oscillation equation
+``x' = (λ_E + λ_I)x`` with ``a = λ_EΔt``, ``b = λ_IΔt``, per substep
+``G ← (w(a+b)x + (1-w)G)/(1 - wθ_k b)``, ``x ← x + G``, starting from ``G = 0`` (``w_0 = 1``), in powers
+of ``a, b`` up to total order 3, compared with ``exp(N(a+b))``. Result: all first-order terms and the
+``a²`` term vanish (explicit Lorenz cycle is exact to order N), the ``ab`` and ``b²`` terms are equal
+and linear in θ, ``κ c⋅θ``:
+
+| N | Variant | c⋅θ | κ |
+|---|---|---|---|
+| 3 | A | θ₀ - θ₁ + 2θ₂ | 3/2 |
+| 3 | B | θ₁ + θ₂ | 3/2 |
+| 4 | A | θ₁ - θ₂ + θ₃ | 4 |
+| 4 | B | θ₁ + θ₂ + θ₃ | 4/3 |
+
+Comparing with a θ-method over the cycle (``R = (1+(1-α)Nb)/(1-αNb)``, error ``N²(α-1/2)b²``) gives
+``α_eff = 1/2 + κ c⋅θ/N²`` (`effective_centering`). α_eff of earlier centerings: θ = 1/2 on every
+substep 2/3 (N=3), 5/8 (N=4); A (0.069, 1.028, 0.48) and (0.116, 1.039, 0.462) 0.500;
+A (-1.03, 0.70, 1.05) 0.562; B (1.386, 0.468, -0.464) 0.501; B (1.222, 1.142, -0.905) 0.539.
+α_eff predicts the damping in the model: second order (α_eff = 1/2) keeps most gravity wave
+energy, α_eff = 0.52 already damps considerably more over 2 days.
+
+Design procedure: fix α_eff (one linear constraint, solved for the last θ with nonzero c), maximise
+over the remaining N-1 centerings the explicit stability limit ω_E,max (largest value on a ladder
+0.200, 0.225, ... up to the explicit limit of the cycle, 0.575 for N=3 and 0.705 for N=4, found by
+bisection) for which all test cases of "Robust centerings" below are stable, tie-break by the
+minimum gravity wave amplification for ω_LΔt ∈ [1, 4]. Bounded |θ| ≤ 3 or θ ∈ [0, 1] ("box").
+Random search, 24 starts (some seeded with known centerings), 400 iterations, step 0.3 halved every
+100. Results (amplification per step, minimum over ωΔt ≤ 1 and ωΔt ∈ [1, 4]):
+
+| N | Variant | α_eff | box | θ | ω_E,max | amp ≤ 1 | amp 1-4 |
+|---|---|---|---|---|---|---|---|
+| 3 | A | 0.50 | no | (0.155, 2.131, 0.988) | 0.575 | 0.83 | 0.72 |
+| 3 | A | 0.52 | yes | (0.912, 0.99, 0.099) | 0.575 | 0.977 | 0.86 |
+| 3 | A | 0.55 | yes | (0.08, 0.999, 0.61) | 0.575 | 0.956 | 0.93 |
+| 3 | B | 0.50 | no | (1.631, 0.55, -0.55) | 0.575 | 0.989 | 0.97 |
+| 3 | B | ≤ 0.55 | yes | - | 0 | | |
+| 4 | A | 0.50 | no | (2.056, 0.931, 1.02, 0.089) | 0.70 | 0.994 | 0.88 |
+| 4 | A | 0.52 | no | (2.276, 0.899, 0.905, 0.087) | 0.70 | 0.996 | 0.90 |
+| 4 | A | 0.50 | yes | (0.992, 0.65, 0.707, 0.057) | 0.325 | 0.96 | 0.74 |
+| 4 | A | 0.60 | yes | (0.985, 0.979, 0.641, 0.062) | 0.625 | 0.84 | 0.77 |
+| 4 | B | 0.60 | no | (2.977, -0.884, 1.713, 0.372) | 0.70 | 0.96 | 0.97 |
+
+The N=4 A optimum is reproducible (independent starts: θ ≈ (2, 0.9, 0.9-1.0, 0.09)), robust to
+θ₀ ∈ [2.0, 2.1] and rounding to (2.06, 0.93, 1.02, 0.09), but not to (2.06, 0.90, 1.00, 0.10)
+(unstable in the linear tests).
+
+Model sweep (method as in "Methods", η variance relative to initial, Δt_T32 = 20/30/40/50/60 min):
+
+| Scheme | Random waves T128 | Blob T128 | Jet T85 |
+|---|---|---|---|
+| Leapfrog | 0.38/0.35/0.29/0.23/0.18 | 0.46/0.46/0.45/0.44/0.36 | stable to 50 |
+| **4A (2.06, 0.93, 1.02, 0.09)** | 0.39/0.32/0.22/0.05/0.09 | 0.47/0.50/0.49/0.24/0.39 | stable to 40 |
+| 4A (2.276, 0.899, 0.905, 0.087), α_eff 0.52 | 0.02/0.03/0.06/0.02/0.06 | 0.17/0.14/0.14/0.09/0.11 | stable to 40 |
+| 4A box (0.985, 0.979, 0.641, 0.062) | 0.01 everywhere | 0.05/0.03/0.03/0.02/0.02 | stable to 40 |
+| 4B (2.977, -0.884, 1.713, 0.372) | 0.01 everywhere | 0.04-0.01 | stable to 40 |
+| **3B (1.631, 0.55, -0.55)** | 0.26/0.10/0.06/0.05/0.03 | 0.45/0.36/0.29/0.32/0.25 | stable to 40 |
+| 3A box (0.912, 0.99, 0.099) | 0.02-0.01 | 0.20/0.15/0.13/0.11/0.10 | stable to 20 |
+| 3A box (0.08, 0.999, 0.61) | 0.01 everywhere | 0.10-0.04 | stable to 40 |
+
+Resolutions, 4A (2.06, 0.93, 1.02, 0.09) vs leapfrog (gravity wave cases 2 days, jet 20 days):
+
+| Case | T32 | T64 | T128 | T256 |
+|---|---|---|---|---|
+| Random waves, 4A | 0.08/0.02/0.02/0.01/0.01 | 0.22/0.10/0.08/0.05/0.02 | 0.39/0.32/0.22/0.05/0.09 | 0.46/0.42/0.42/0.27/0.34 |
+| Random waves, LF | 0.07/0.08/0.06/0.05/0.05 | 0.25/0.17/0.15/0.11/0.11 | 0.38/0.35/0.29/0.23/0.18 | 0.42/0.41/0.37/0.31/0.35 |
+| Blob, 4A | 0.28/0.16/0.14/0.04/0.09 | 0.49/0.39/0.28/0.26/0.16 | 0.48/0.50/0.49/0.24/0.39 | 0.48/0.48/0.48/0.43/0.50 |
+| Blob, LF | 0.34/0.27/0.26/0.24/0.25 | 0.45/0.36/0.37/0.37/0.29 | 0.46/0.46/0.45/0.44/0.36 | 0.48/0.47/0.46/0.46/0.46 |
+| Jet, 4A stable up to | ≥ 60 | 40 | 30 | 30 |
+| Jet, LF stable up to | ≥ 60 | ≥ 60 | 40 | 40 |
+
+All 40 gravity wave runs with 4A were stable; the jet has a clean stability threshold at every
+resolution (stable below, unstable above), ≈ 0.75x leapfrog's time step, matching the ratio of
+the explicit limits (0.70 vs 1).
+
+### Robust centerings (previous defaults)
 
 The previous defaults, optimised for gravity wave energy, turned out unpredictably unstable in
 the model: A with (0.116, 1.039, 0.462) blew up in the Gaussian blob example at Δt_T32 = 30 and
@@ -303,31 +393,41 @@ Lorenz N-cycle), so it moves from `model.implicit` to `model.time_stepping.impli
 
 - Fix η tendency allocation for the shallow water model (`ts` steps).
 - Read fused spectral intermediates with `get_tendency_step` (shallow water and primitive models).
-- `NCycleLorenz` option `implicit_centering`: per-substep centering, default
-  `(-1.03, 0.70, 1.05)` for `steps=3` with `NCycleLorenzA`, `(1.222, 1.142, -0.905)` with
-  `NCycleLorenzB` (robust centerings), `nothing` (= `implicit.centering`
-  on every substep) otherwise. Used by the shallow water implicit solver.
+- `NCycleLorenz` option `implicit_centering`: per-substep centering, defaults
+  `(2.06, 0.93, 1.02, 0.09)` for `steps=4` with `NCycleLorenzA`, `(-1.03, 0.70, 1.05)` and
+  `(1.63, 0.55, -0.55)` for `steps=3` with `NCycleLorenzA`, `NCycleLorenzB`, `nothing`
+  (= `implicit.centering` on every substep) otherwise. Used by the shallow water implicit solver.
+- `NCycleLorenz` default `steps = 4` (was 3).
+- `effective_centering(variant, θ)`: α_eff of the cycle from the order condition.
 - Docs: Lorenz N-cycle algorithm as implemented, section on implicit centering, implicit solver
   section in `time_integration.md`, gravity wave example from a Gaussian blob.
 - Breaking: implicit solver as part of the time stepper, `model.time_stepping.implicit`.
 
 ## Testing and verification
 
-- Unit tests: default/explicit `implicit_centering` per substep; shallow water gravity waves with
-  `NCycleLorenz` (variants A and B) run without NaNs and keep at least half the η variance of
-  leapfrog after 1 day.
+- Unit tests: default/explicit `implicit_centering` per substep; `effective_centering` (θ = 1/2 gives
+  2/3 for N=3 and 5/8 for N=4, the second-order defaults 1/2, and the expansion of a cycle of the
+  oscillation equation agrees to second order with a θ-method with centering α_eff); shallow water
+  gravity waves with the 4-cycle A and 3-cycle A and B at Δt_T32 = 30 and 60 min run without NaNs
+  and do not increase the η variance.
 - Model experiments as described in "Methods" below.
 
 ## Documentation changes
 
-`docs/src/time_stepping.md`, Lorenz N-cycle section.
+`docs/src/time_stepping.md`, Lorenz N-cycle section incl. "Implicit centering of the Lorenz N-cycle"
+(order condition, α_eff, signs of the centerings, design procedure, defaults);
+`docs/src/shallowwater.md` semi-implicit Lorenz N-cycle; `docs/src/time_integration.md`.
 
 ## Known limitations
 
-- With the robust centerings both variants are stable up to Δt_T32 = 40 min for the Galewsky jet
-  at T85 (leapfrog 50 min) and at all tested time steps (up to 60 min) for gravity waves, but they
-  damp gravity waves considerably more than leapfrog (η variance kept 0.02-0.23 vs 0.18-0.46).
-  The default variant is unchanged (A).
+- The 4-cycle A default needs ≈ 0.75x leapfrog's time step where advection limits (Galewsky jet),
+  the explicit limit of the cycle. It preserves gravity wave energy like leapfrog at T128/T256 for
+  Δt_T32 ≲ 40 min but damps more at T32/T64 and longer time steps; the η variance is not monotonic
+  in Δt (dips at 50 min) although stable.
+- The 4-cycle A centering is sensitive in some directions (stable for θ₀ ∈ [2.0, 2.1], not for
+  (2.06, 0.90, 1.00, 0.10)), so it is pinned to two decimals.
+- No robust second-order centering for the 3-cycle variant A (default slightly off-centred,
+  α_eff = 0.56).
 - AB and ABBA: the centering tuple has length N and is indexed by `step_counter mod N`, so A and B
   cycles cannot get different centerings; they use `implicit.centering` on every substep.
 - The implicit primitive equation solver does not use the per-substep centering.
@@ -337,4 +437,4 @@ Lorenz N-cycle), so it moves from `model.implicit` to `model.time_stepping.impli
 
 - Consider `NCycleLorenzB` as default variant; understand why it is more stable than A in the model.
 - Centering indexed over the full AB/ABBA sequence.
-- N=4 centering (higher explicit limit ≈0.71), weighted implicit diffusion, primitive equations.
+- Third-order conditions for the centerings (the a²b, ab², b³ terms are quadratic in θ), weighted implicit diffusion, primitive equations.

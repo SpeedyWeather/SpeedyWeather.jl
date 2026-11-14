@@ -35,7 +35,7 @@ centering of substep k (see `implicit_centering`).
 $(TYPEDFIELDS)
 """
 mutable struct NCycleLorenz{NF, V, IntType, C, S, MS, B, I, O, L} <: AbstractNCycleLorenz
-    "[OPTION] Number of steps N in a cycle (3 or 4 recommended, 4 is more stable)"
+    "[OPTION] Number of steps N in a cycle (3 or 4 recommended, 4 (default) is more stable and less diffusive)"
     steps::IntType
 
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
@@ -103,7 +103,7 @@ Adapt.@adapt_structure NCycleLorenzCore
 Generator function for NCycleLorenz struct using `spectral_grid` for resolution."""
 function NCycleLorenz(
         spectral_grid::SpectralGrid;
-        steps = 3,
+        steps = 4,
         variant = NCycleLorenzA(),
         implicit_centering = default_implicit_centering(steps, variant),
         Δt_at_T32 = Minute(30),
@@ -123,17 +123,34 @@ function NCycleLorenz(
 end
 
 """$(TYPEDSIGNATURES)
-Default implicit centering per substep of the cycle. For the 3-cycle with variant A or B these
-are centerings optimized in a linear stability analysis for stability rather than for preserving
-gravity wave energy: the semi-implicit scheme (with the linear terms inside the Lorenz average)
-remains stable with Doppler-shifted gravity waves, Coriolis coupling and a reference layer
-thickness larger than the actual one (e.g. over orography), also combined, up to the explicit
-stability limit of the 3-cycle, while damping gravity waves by at most 2% (A) or 5% (B) per
-step for ωΔt ≤ 1 and fast gravity waves more strongly. `nothing` otherwise, meaning
-`implicit.centering` is used on every substep."""
+Default implicit centering θₖ per substep k of the cycle, `nothing` (= `implicit.centering` on
+every substep) if none is defined for the cycle length `steps` and `variant`. The centerings
+satisfy the second-order condition (effective centering over the cycle α_eff = 1/2, see
+`effective_centering`) and were chosen in a linear stability analysis to be stable with
+Doppler-shifted gravity waves, Coriolis coupling and a reference layer thickness larger than the
+actual one (e.g. over orography) up to the explicit stability limit of the cycle, except for the
+3-cycle variant A which is slightly off-centred (α_eff ≈ 0.56) for robustness."""
 default_implicit_centering(steps, variant) = nothing
-default_implicit_centering(steps, ::NCycleLorenzA) = steps == 3 ? (-1.03, 0.7, 1.05) : nothing
-default_implicit_centering(steps, ::NCycleLorenzB) = steps == 3 ? (1.222, 1.142, -0.905) : nothing
+default_implicit_centering(steps, ::NCycleLorenzA) =
+    steps == 4 ? (2.06, 0.93, 1.02, 0.09) : steps == 3 ? (-1.03, 0.7, 1.05) : nothing
+default_implicit_centering(steps, ::NCycleLorenzB) = steps == 3 ? (1.63, 0.55, -0.55) : nothing
+
+"""$(TYPEDSIGNATURES)
+Effective implicit centering α_eff of the Lorenz N-cycle with weights of `variant` and per-substep
+centerings `θ` (a tuple of length N, N = 3 or 4) for the linear terms: the cycle's amplification
+factor of the linear terms agrees to second order with a θ-method over the whole cycle (time step
+NΔt) with centering α_eff. α_eff = 1/2 is second-order accurate (as Crank-Nicolson), α_eff > 1/2
+damps gravity waves at second order like an off-centred Crank-Nicolson. From the expansion of the
+cycle in Δt: α_eff = 1/2 + κ c⋅θ / N² with c, κ given per N and variant."""
+function effective_centering(variant::NCycleLorenzVariant, θ::NTuple{N}) where {N}
+    c, κ = effective_centering_coefficients(variant, Val(N))
+    return 1 / 2 + κ * sum(c .* θ) / N^2
+end
+
+effective_centering_coefficients(::NCycleLorenzA, ::Val{3}) = (1, -1, 2), 3 / 2
+effective_centering_coefficients(::NCycleLorenzB, ::Val{3}) = (0, 1, 1), 3 / 2
+effective_centering_coefficients(::NCycleLorenzA, ::Val{4}) = (0, 1, -1, 1), 4
+effective_centering_coefficients(::NCycleLorenzB, ::Val{4}) = (0, 1, 1, 1), 4 / 3
 
 """$(TYPEDSIGNATURES)
 Implicit centering for the current substep of the cycle, `implicit.centering` if
