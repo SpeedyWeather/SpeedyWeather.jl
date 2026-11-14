@@ -40,3 +40,6 @@ using SpeedyWeather, Enzyme, FiniteDifferences, Test
 
     @test sum(to_vec(dvars)[1]) != 0
 end
+
+# coupled SpeedyWeather-Terrarium land (SpeedyWeatherTerrariumExt), a single reverse-mode time step
+include("terrarium_coupling.jl")
