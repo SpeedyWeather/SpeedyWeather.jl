@@ -405,8 +405,12 @@ Then the model can be run as any other [`Simulation`](@ref).
 Terarrium's state variales are owned by SpeedyWeather's [`Variables`](@ref "Variables") and can be accessed via 
 
 ```@example terrarium
-simulation.variables.prognostic.land.terrarium
+simulation.variables.prognostic.land.terrarium.state
 ```
+
+Next to the state, `simulation.variables.prognostic.land.terrarium.coupling` holds `Field`s that the
+coupling derives from the Terrarium state once at initialization, such as the porosity of the topmost
+soil layer, `soil_porosity`.
 
 ### Output of Terrarium variables
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix the differentiability of the Terrarium land coupling: coupler-defined Terrarium `Field`s (e.g. the top-layer soil porosity) are built once at allocation instead of in `timestep!`, plus Enzyme tests for the coupled model [#1405](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1405)
 - Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)
 - Fix the differentiability of `TwoBandShortwave` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
 - `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90 implementation, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
