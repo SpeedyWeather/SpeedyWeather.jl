@@ -46,25 +46,6 @@ function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars},
     return (; state, coupling = coupling_fields(land, land.model.soil, state))
 end
 
-"""$(TYPEDSIGNATURES)
-
-Coupler-defined Terrarium `Field`s derived from the Terrarium `state`, stored at
-`vars.prognostic.land.terrarium.coupling`. They are built once in `allocate`, where the
-state is available, because constructing a computed `Field` from an operation is not
-type-stable. `compute!` on them is not type-stable either and fails under Enzyme, so it is
-only called in `initialize!`: they must only hold quantities that are constant in time and
-must not be recomputed in `timestep!`.
-
-For a soil, this is the porosity of the topmost soil layer, `soil_porosity`, which
-[`soil_moisture_capacity!`](@ref) copies into `soil_moisture_capacity`."""
-function coupling_fields(land::AbstractTerrariumLandModel, soil::Terrarium.AbstractSoil, state)
-    porosity = Terrarium.kernel_operation2D(
-        Terrarium.porosity_top, state, land.model.grid,
-        Terrarium.get_stratigraphy(soil), Terrarium.get_biogeochemistry(soil),
-    )
-    return (; soil_porosity = Terrarium.Field(porosity))
-end
-
 """$(TYPEDEF)
 
 Abstract base type for SpeedyWeather land components that delegate land
@@ -96,6 +77,25 @@ Boolean land mask of the underlying Terrarium [`ColumnRingGrid`](@ref). Terrariu
 only allocates columns where this mask is `true`, so every Terrarium state field
 has length `sum(mask)` (the number of land columns)."""
 @inline land_mask(land::AbstractTerrariumLandModel) = land.model.grid.mask.data
+
+"""$(TYPEDSIGNATURES)
+
+Coupler-defined Terrarium `Field`s derived from the Terrarium `state`, stored at
+`vars.prognostic.land.terrarium.coupling`. They are built once in `allocate`, where the
+state is available, because constructing a computed `Field` from an operation is not
+type-stable. `compute!` on them is not type-stable either and fails under Enzyme, so it is
+only called in `initialize!`: they must only hold quantities that are constant in time and
+must not be recomputed in `timestep!`.
+
+For a soil, this is the porosity of the topmost soil layer, `soil_porosity`, which
+[`soil_moisture_capacity!`](@ref) copies into `soil_moisture_capacity`."""
+function coupling_fields(land::AbstractTerrariumLandModel, soil::Terrarium.AbstractSoil, state)
+    porosity = Terrarium.kernel_operation2D(
+        Terrarium.porosity_top, state, land.model.grid,
+        Terrarium.get_stratigraphy(soil), Terrarium.get_biogeochemistry(soil),
+    )
+    return (; soil_porosity = Terrarium.Field(porosity))
+end
 
 """$(TYPEDSIGNATURES)
 
