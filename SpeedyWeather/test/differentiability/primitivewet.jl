@@ -100,7 +100,7 @@ _spinup(model) = initialize_with_spinup!(model, Day(1), Hour(6))
 #
 @testset "Differentiability: PrimitiveWet dynamics_tendencies!" begin
     spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
-    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
+    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel), dynamics_only = true)
     simulation = _spinup(model)
     vars0 = deepcopy(simulation.variables)
     @test all(isfinite, to_vec(vars0)[1])   # the spin-up must not have blown up
@@ -113,13 +113,13 @@ end
 
 @testset "Differentiability: PrimitiveWet implicit_correction!" begin
     spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
-    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
+    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel), dynamics_only = true)
     simulation = _spinup(model)
     vars0 = deepcopy(simulation.variables)
 
     _adjoint_check(
         SpeedyWeather.implicit_correction!, vars0,
-        Const(model.implicit), Const(model.time_stepping), Const(model);
+        Const(model.time_stepping.implicit), Const(model.time_stepping), Const(model);
         ingroup = :prognostic, outgroup = :tendencies, rtol_ad = 1.0e-5, rtol_fd = 1.0e-2,
     )
 end
@@ -156,7 +156,7 @@ end
 
 @testset "Differentiability: PrimitiveWet transform!(::Variables)" begin
     spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
-    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
+    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel), dynamics_only = true)
     simulation = _spinup(model)
     vars0 = deepcopy(simulation.variables)
 

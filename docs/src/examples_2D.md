@@ -310,67 +310,80 @@ nothing # hide
 
 Setup script to copy and paste:
 ```@example gravity_wave_setup
-using Random # hide
-Random.seed!(1234) # hide
 using SpeedyWeather
 spectral_grid = SpectralGrid(truncation=128, nlayers=1)
 
 # model components
 implicit = ImplicitShallowWater(spectral_grid, centering=0.5)
+time_stepping = Leapfrog(spectral_grid; implicit)
 orography = EarthOrography(spectral_grid, smoothing=false)
-initial_conditions = RandomWaves(spectral_grid, lmin=10, lmax=30)      # between wavenumber 10 and 30
-time_stepping = Leapfrog(spectral_grid)
+initial_conditions = nothing                    # start from rest, set η below
 
-# construct, initialize, run
-model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit, time_stepping)
+# construct, initialize
+model = ShallowWaterModel(spectral_grid; orography, initial_conditions, time_stepping)
 simulation = initialize!(model)
-run!(simulation, period=Day(2))
+
+# 5km high Gaussian blob of interface displacement η in the central Pacific
+λ₀, φ₀, σ = 200, 10, 5      # longitude, latitude, width [˚]
+A = 5000                    # amplitude [m]
+set!(simulation, η = (λ, φ) -> A*exp(-spherical_distance((λ, φ), (λ₀, φ₀), radius=360/2π)^2/2σ^2))
+
+run!(simulation, period=Hour(10))
 nothing # hide
 ```
 
 How are gravity waves propagating around the globe? We want to use the shallow water model
-to start with some random perturbations of the interface displacement (the "sea surface height")
-but zero velocity and let them propagate around the globe. We set the `centering` parameter
-of the [semi-implicit time integration](@ref implicit_swm) to ``0.5`` to have a centred
+to start from rest but with a Gaussian blob of the interface displacement ``\eta``
+(the "sea surface height") of 5000m in the central Pacific and let the gravity waves propagate
+around the globe. We set the `centering` parameter of the
+[semi-implicit time integration](@ref implicit_swm) to ``0.5`` to have a centred
 implicit scheme (Crank-Nicolson) which dampens the gravity waves less than a
-backward implicit scheme (`centering = 1`) would do.
+backward implicit scheme (`centering = 1`) would do. The implicit solver is part of the
+time stepper and therefore passed on to `Leapfrog`.
 But we also want to keep orography, and particularly no smoothing on it, to have the orography
-as rough as possible. The initial conditions are set to `RandomWaves` which set the spherical
-harmonic coefficients of ``\eta`` to between given wavenumbers to some random values
-```@example gravity_wave_setup
-RandomWaves(spectral_grid)
-```
-so that the amplitude `A` is as desired, here 2000m. Our layer thickness in meters is by default
+as rough as possible. The interface displacement is set with a function of longitude ``\lambda``
+and latitude ``\phi`` in degrees, using `spherical_distance` (with `radius=360/2π` to return
+degrees) to the blob's centre at 160˚W, 10˚N. Our layer thickness in meters is by default
 ```@example gravity_wave_setup
 model.atmosphere.layer_thickness
 ```
-so those waves are with an amplitude of 2000m quite strong.
-But the semi-implicit time integration can handle that even with fairly large time steps of
+so a 5000m blob is a very strong perturbation, more than half the layer thickness. But the semi-implicit time integration can handle that
+even with fairly large time steps of
 ```@example gravity_wave_setup
 model.time_stepping.Δt
 ```
-seconds. Note that the gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s,
-given the speed of gravity waves we don't have to integrate for long.
-Visualise the dynamic layer thickness ``h = \eta + H + H_b``
-(interface displacement ``\eta``, layer thickness at rest ``H`` and orography ``H_b``)
-with
+seconds. The gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s, after 10 hours
+the waves have travelled about 10,000km, a quarter around the globe, forming a ring
+around the planet 90˚ away from where the blob started. Visualise the interface displacement
+``\eta`` with
 
 ```@example gravity_wave_setup
 using CairoMakie
-
-H = model.atmosphere.layer_thickness
-Hb = model.orography.orography
 η = get_step(simulation.variables.grid.η)
-h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
-
-heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)
+heatmap(η, title="Interface displacement η [m]", colormap=:balance)
 save("gravity_waves.png", ans) # hide
 nothing # hide
 ```
 ![Gravity waves plot](gravity_waves.png)
 
+The ring of the leading wave front has an amplitude of about 500m and is distorted where
+it travelled over mountains: the layer is thinner there, so the gravity waves are slower.
+Behind the leading front there are more rings from the waves dispersing on the sphere
+and being reflected from mountains. The dynamic layer thickness ``h = \eta + H - H_b``
+(interface displacement ``\eta``, layer thickness at rest ``H`` and orography ``H_b``)
+is dominated by the orography, but the ring of the wave front is visible too
+
+```@example gravity_wave_setup
+H = model.atmosphere.layer_thickness
+Hb = model.orography.orography
+h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
+heatmap(h, title="Dynamic layer thickness h [m]", colormap=:oslo)
+save("gravity_waves_h.png", ans) # hide
+nothing # hide
+```
+![Layer thickness plot](gravity_waves_h.png)
+
 Mountains like the Himalayas or the Andes are quite obvious because the atmospheric layer
 is much thinner there. The pressure gradient is relative to ``z=0`` so in a fluid
 at rest the mountains would just "reach into" the fluid, thinning the layer the higher
-the mountain. As the atmosphere here is not at rest the layer thickness is not perfectly
-(anti-)correlated with orography but almost so.
+the mountain.

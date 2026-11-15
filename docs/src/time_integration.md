@@ -21,8 +21,11 @@ component and passing it on to the model constructor
 ```@example leapfrog
 using SpeedyWeather
 spectral_grid = SpectralGrid()
-time_stepping = Leapfrog(spectral_grid)
+time_stepping = Leapfrog(spectral_grid, PrimitiveDryModel)
 ```
+
+The model type as second argument chooses the default [implicit solver](@ref implicit_solver)
+for that model, here for a `PrimitiveDryModel`.
 
 and with `?Leapfrog` you see a summary of the fields, only manually change those marked `[OPTION]`.
 We will discuss some options in the following.
@@ -84,10 +87,12 @@ For time steppers that need no such initialisation `spin_up_steps` is `0`, e.g. 
 
 Like `Leapfrog`, the Lorenz N-cycle is controlled by creating a custom `NCycleLorenz`
 component and passing it on to the model constructor. The cycle length `steps` (3 or 4
-recommended) and the weight `variant` ([`NCycleLorenzA`](@ref) (default), [`NCycleLorenzB`](@ref),
+recommended, 4 is the default) and the weight `variant` ([`NCycleLorenzA`](@ref) (default), [`NCycleLorenzB`](@ref),
 [`NCycleLorenzAB`](@ref) or [`NCycleLorenzABBA`](@ref), see [Lorenz N-cycle](@ref ncycle) for what
 distinguishes them) are the two options you are most likely to change, the time step options
-(`Δt_at_T32`, `adjust_with_output`) behave the same as for `Leapfrog` above.
+(`Δt_at_T32`, `adjust_with_output`) behave the same as for `Leapfrog` above. The implicit
+centering per substep, `implicit_centering`, has defaults for the 4-cycle with variant A and the
+3-cycle with variants A and B, see [Implicit centering of the Lorenz N-cycle](@ref ncycle_centering).
 
 ```@example ncycle
 using SpeedyWeather
@@ -109,7 +114,30 @@ model = PrimitiveDryModel(spectral_grid; time_stepping)
 nothing # hide
 ```
 
-where `;` matches the `time_stepping` keyword argument by name. If you name `leapfrog = Leapfrog(spectral_grid)` then you
+where `;` matches the `time_stepping` keyword argument by name. If you name `leapfrog = Leapfrog(spectral_grid, PrimitiveDryModel)` then you
 would need to change this to `time_stepping=leapfrog` in the function call arguments. The same
-keyword takes any time stepper, e.g. `time_stepping = NCycleLorenz(spectral_grid)` for the
+keyword takes any time stepper, e.g. `time_stepping = NCycleLorenz(spectral_grid, PrimitiveDryModel)` for the
 [Lorenz N-cycle](@ref ncycle).
+
+## [Implicit solver](@id implicit_solver)
+
+The semi-implicit solver for the gravity waves depends on the time stepper and is therefore
+part of it, as its `implicit` field, i.e. `model.time_stepping.implicit`. Creating a time stepper
+with the model type as second argument, e.g. `Leapfrog(spectral_grid, ShallowWaterModel)` or
+`NCycleLorenz(spectral_grid, PrimitiveWetModel)`, uses the default implicit solver of that model:
+`nothing` (no implicit solver) for the `BarotropicModel`, [`ImplicitShallowWater`](@ref) for the
+`ShallowWaterModel` and [`ImplicitPrimitiveEquation`](@ref) for the primitive equation models.
+Without the model type, `Leapfrog(spectral_grid)`, there is no implicit solver (`implicit = nothing`)
+and a model with gravity waves warns on `initialize!` as they then need a very short time step to
+be stable. A solver that does not match the model warns too. The default `time_stepping` of every
+model is created with its model type. To change the implicit solver, pass it on to the time stepper, e.g.
+
+```@example leapfrog
+implicit = ImplicitPrimitiveEquation(spectral_grid, centering = 1)    # backward Euler
+time_stepping = Leapfrog(spectral_grid; implicit)
+model = PrimitiveDryModel(spectral_grid; time_stepping)
+model.time_stepping.implicit
+```
+
+see [Semi-implicit time integration](@ref implicit_swm) (shallow water) and
+[Semi-implicit time stepping](@ref implicit_primitive) (primitive equations).

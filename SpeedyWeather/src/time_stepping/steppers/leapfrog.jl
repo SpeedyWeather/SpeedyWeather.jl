@@ -4,7 +4,7 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
+mutable struct Leapfrog{NF, S, B, MS, I, O, L} <: AbstractLeapfrog
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
@@ -22,6 +22,9 @@ mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
 
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
+
+    "[OPTION] Implicit solver for the gravity waves, `nothing` for none (default unless the model type is passed on to the constructor)"
+    implicit::I
 
     "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for leapfrog as the atmosphere"
     ocean::O
@@ -222,6 +225,7 @@ function Leapfrog(
         adjust_with_output = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
+        implicit = nothing,
         ocean = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
         land = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
     )
@@ -233,8 +237,17 @@ function Leapfrog(
 
     return Leapfrog(
         Second(Δt_at_T32), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
-        ocean, land,
+        implicit, ocean, land,
     )
+end
+
+"""$(TYPEDSIGNATURES)
+Generator function for a Leapfrog struct with the default implicit solver for models of type
+`Model`, e.g. `Leapfrog(spectral_grid, ShallowWaterModel)` uses `ImplicitShallowWater`,
+see `default_implicit`. An `implicit` keyword argument takes precedence."""
+function Leapfrog(spectral_grid::SpectralGrid, Model::Type{<:AbstractModel}; kwargs...)
+    haskey(kwargs, :implicit) && return Leapfrog(spectral_grid; kwargs...)
+    return Leapfrog(spectral_grid; implicit = default_implicit(spectral_grid, Model), kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
