@@ -150,7 +150,9 @@ centerings `θ` (a tuple of length N, N = 3 or 4) for the linear terms: the cycl
 factor of the linear terms agrees to second order with a θ-method over the whole cycle (time step
 NΔt) with centering α_eff. α_eff = 1/2 is second-order accurate (as Crank-Nicolson), α_eff > 1/2
 damps gravity waves at second order like an off-centred Crank-Nicolson. From the expansion of the
-cycle in Δt: α_eff = 1/2 + κ c⋅θ / N² with c, κ given per N and variant."""
+cycle in Δt: α_eff = 1/2 + κ c⋅θ / N² with c, κ given per N and variant.
+Not used during time stepping, only to analyse (and test) centerings, see the documentation
+section "Implicit centering of the Lorenz N-cycle"."""
 function effective_centering(variant::NCycleLorenzVariant, θ::NTuple{N}) where {N}
     c, κ = effective_centering_coefficients(variant, Val(N))
     return 1 / 2 + κ * sum(c .* θ) / N^2

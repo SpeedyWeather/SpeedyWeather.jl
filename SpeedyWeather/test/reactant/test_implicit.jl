@@ -47,7 +47,9 @@ end
     @testset "time step $time_step_counter" for (time_step_counter, scheduled) in cases
         reference_cpu = reference_temperature_after_reinitialize!(simulation_cpu, time_step_counter)
         reference_reactant = reference_temperature_after_reinitialize!(simulation_reactant, time_step_counter)
-        @test all(==(scheduled ? 300 : 250), reference_cpu)
-        @test reference_reactant == reference_cpu
+        # the global-mean temperature is set via the l=m=0 harmonic (× and ÷ norm_sphere),
+        # which can differ by rounding between CPU and Reactant, hence ≈
+        @test all(≈(scheduled ? 300 : 250), reference_cpu)
+        @test reference_reactant ≈ reference_cpu
     end
 end

@@ -150,7 +150,7 @@ Global mean temperature of the lowermost layer from the l=m=0 harmonic of the sp
 function global_surface_temperature(callback::GlobalSurfaceTemperatureCallback, vars::Variables, model::PrimitiveEquation)
     temp = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, callback)
     nlayers = model.geometry.nlayers
-    temp_lm0 = Array(view(temp.data, 1:1, nlayers))[1]                              # l=m=0 coefficient, works on GPU
+    temp_lm0 = @allowscalar temp[1, nlayers]                                        # l=m=0 coefficient
     return real(temp_lm0) / model.spectral_transform.norm_sphere
 end
 
