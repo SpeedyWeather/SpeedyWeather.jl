@@ -391,14 +391,14 @@ end
         SpeedyWeather.reinitialize!(implicit, model, simulation.variables)
         if reference_temperature isa GlobalMeanReferenceTemperature
             (; offset) = reference_temperature
-            @test Array(implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT .+ offset atol = 0.01
+            @test Array(simulation.variables.dynamics.implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT .+ offset atol = 0.01
         elseif reference_temperature isa MaximumReferenceTemperature
             # isothermal at max(T) + margin
             temp_grid = Array(SpeedyWeather.get_prognostic_step(simulation.variables.grid.temperature, model.time_stepping, implicit))
             expected = maximum(temp_grid) + reference_temperature.margin
-            @test all(==(expected), Array(implicit.temp_profile))
+            @test all(==(expected), Array(simulation.variables.dynamics.implicit.temp_profile))
         else
-            @test all(==(reference_temperature.temperature), Array(implicit.temp_profile))
+            @test all(==(reference_temperature.temperature), Array(simulation.variables.dynamics.implicit.temp_profile))
         end
     end
 

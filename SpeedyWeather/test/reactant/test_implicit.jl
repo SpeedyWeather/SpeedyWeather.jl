@@ -11,8 +11,8 @@ function implicit_test_simulation(arch, schedule)
     return initialize!(create_model(PrimitiveWetModel, arch; time_stepping))
 end
 
-function set_temperature_profiles!(implicit, vars, reference, average, norm_sphere)
-    implicit.temp_profile .= reference
+function set_temperature_profiles!(vars, reference, average, norm_sphere)
+    vars.dynamics.implicit.temp_profile .= reference
     # global-mean temperature profile from the l=m=0 harmonic, all layers and steps
     view(vars.prognostic.temperature.data, 1:1, :, :) .= average * norm_sphere
     return nothing
@@ -27,13 +27,14 @@ function reference_temperature_after_reinitialize!(simulation, time_step_counter
     (; time_stepping, architecture) = model
     (; implicit) = time_stepping
     (; norm_sphere) = model.spectral_transform
-    NF = eltype(implicit.temp_profile)
+    operators = vars.dynamics.implicit
+    NF = eltype(operators.temp_profile)
 
     copy!(vars.prognostic.clock, Clock(step_counter = 2, time_step_counter = time_step_counter, Δt = time_stepping.Δt_millisec))
-    implicit.Δt[] = SpeedyWeather.scalar_ref(architecture, 2 * time_stepping.Δt)[]
-    @maybe_jit architecture set_temperature_profiles!(implicit, vars, NF(250), NF(300), norm_sphere)
+    operators.Δt[] = SpeedyWeather.scalar_ref(architecture, 2 * time_stepping.Δt)[]
+    @maybe_jit architecture set_temperature_profiles!(vars, NF(250), NF(300), norm_sphere)
     @maybe_jit architecture SpeedyWeather.reinitialize!(implicit, model, vars)
-    return Array(on_architecture(SpeedyWeather.CPU(), implicit.temp_profile))
+    return Array(on_architecture(SpeedyWeather.CPU(), operators.temp_profile))
 end
 
 @testset "Implicit reference temperature on schedule: $(nameof(typeof(schedule)))" for (schedule, cases) in (

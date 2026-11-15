@@ -160,7 +160,8 @@ function SpeedyWeather.reinitialize!(
         vars::SpeedyWeather.Variables,
     )
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    (; temp_profile) = implicit
+    operators = vars.dynamics.implicit
+    (; temp_profile) = operators
     # reference temperature profile, isothermal or from the current global-mean temperature profile
     temp = SpeedyWeather.get_prognostic_step(vars.prognostic.temperature, model.time_stepping, implicit)
     temp_grid = SpeedyWeather.get_prognostic_step(vars.grid.temperature, model.time_stepping, implicit)
@@ -169,7 +170,7 @@ function SpeedyWeather.reinitialize!(
     temp_profile .= ifelse.(update, Tₖ, temp_profile)
 
     scale = vars.prognostic.scale[]         # implicit solver needs to be initialized with scaled time step
-    initialize!(implicit, Δt / scale, temp_profile, geometry, geopotential, atmosphere, adiabatic_conversion)
+    initialize!(operators, implicit, Δt / scale, temp_profile, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end
 

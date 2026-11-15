@@ -145,7 +145,7 @@ function dynamics_tendencies!(
     # temperature relative to profile
     # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (temp profile and temp_grid are different dimensions and array types)
     T = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
-    T.data .-= implicit.temp_profile'
+    T.data .-= vars.dynamics.implicit.temp_profile'
 
 
     # compute tendencies in grid space: u, v, temperature, pressure, u·T'·coslat⁻¹, v·T'·coslat⁻¹, kinetic energy, (wet model: humidity, u·q·coslat⁻¹, v·q·coslat⁻¹)
@@ -166,7 +166,7 @@ function dynamics_tendencies!(
     tracer_advection!(vars, model)
 
     # back to absolute temperature
-    T.data .+= implicit.temp_profile'
+    T.data .+= vars.dynamics.implicit.temp_profile'
 
     return nothing
 end
@@ -483,7 +483,7 @@ function linear_pressure_gradient!(
         time_stepping::AbstractTimeStepper,
     )
     (; R_dry) = atmosphere                      # dry gas constant
-    Tₖ = implicit.temp_profile                  # reference profile at layer k
+    Tₖ = vars.dynamics.implicit.temp_profile                  # reference profile at layer k
 
     # for Leapfrog this term is evaluated at the previous time step and the
     # implicit corrections will move it to the current as done for all linear gravity-wave related terms
@@ -538,7 +538,7 @@ function vordiv_grid_tendencies!(
         time_stepping::AbstractTimeStepper,
     )
     (; f) = coriolis
-    Tₖ = implicit.temp_profile
+    Tₖ = vars.dynamics.implicit.temp_profile
     scale = vars.prognostic.scale[]             # scale Coriolis on the fly as is vorticity
     (; coslat⁻¹) = geometry
 
@@ -687,7 +687,7 @@ function temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation)
         fill!(vars.scratch.grid.a, 0)
 
     (; pres_flux, pres_flux_sum_above, div_sum_above) = vars.dynamics
-    (; temp_profile) = implicit
+    (; temp_profile) = vars.dynamics.implicit
 
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
