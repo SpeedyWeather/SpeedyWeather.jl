@@ -402,7 +402,9 @@ gravity wave cases and preserved gravity wave energy about as well as leapfrog a
 for ``\Delta t \lesssim 40``min at T32, damping more at lower resolution or longer time steps. For the
 Galewsky jet, limited by advection, it required about 0.75x the time step of leapfrog
 (e.g. 30min vs 40min at T32 at T128 and T256), consistent with the ratio of the explicit
-stability limits. The default time step of `NCycleLorenz` is 30min at T32.
+stability limits. The default time step of `NCycleLorenz` is 40min at T32 (as leapfrog), the
+`NCycleLorenz` (4-cycle, variant A) is the default time stepper of the `BarotropicModel` and the
+`ShallowWaterModel`.
 
 Four weight variants are available, following the naming in [Hotta2016](@citet), selected via the
 `variant` option:

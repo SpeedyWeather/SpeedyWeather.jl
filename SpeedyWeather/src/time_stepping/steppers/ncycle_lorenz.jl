@@ -106,7 +106,7 @@ function NCycleLorenz(
         steps = 4,
         variant = NCycleLorenzA(),
         implicit_centering = default_implicit_centering(steps, variant),
-        Δt_at_T32 = Minute(30),
+        Δt_at_T32 = Minute(40),
         adjust_with_output = true,
         implicit = nothing,
         ocean = nothing,    # default can't be NCycleLorenz, creates an infinite loop
