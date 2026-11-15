@@ -32,6 +32,7 @@ Base revision: caed82d6 (main), to be implemented on top of
 - Added the merge of `ImplicitShallowWater` and `ImplicitPrimitiveEquation` into a single
   options-only `SemiImplicit` (items 11-15), which makes the model-type constructors of the time
   steppers from #1402 unnecessary. Item 8 superseded by it.
+- Item 15: per-substep centerings of the N-cycle move into the solver's `centering` (review on #1402).
 
 ## Problem description
 
@@ -162,8 +163,14 @@ With the arrays in `vars` (items 1-7) both implicit solvers are options only:
     deprecation warning; docs and tests use `SemiImplicit`.
 14. **Unused options**: `initialize!` for ShallowWater warns if `reference_temperature` or `schedule`
     are not the defaults, as they are ignored.
-15. **NCycleLorenz centerings** (`implicit_centering` from #1402) are unaffected; `centering` of the
-    solver remains the fallback when the time stepper has no per-substep centering.
+15. **NCycleLorenz centerings move into the solver** (review comment on #1402: `NCycleLorenz` should
+    not have two implicit-related fields, `implicit` and `implicit_centering`). `SemiImplicit`'s
+    `centering` becomes a number (one centering for every (sub)step, e.g. Leapfrog) or a tuple
+    (one per substep of the N-cycle). Its default depends on the time stepper (cycle length N and
+    variant, `default_implicit_centering` from #1402), so the time stepper constructors set it:
+    `NCycleLorenz(spectral_grid; steps = 4)` creates `SemiImplicit(centering = (2.06, 0.93, 1.02, 0.09))`,
+    `Leapfrog` uses 0.5. A tuple whose length does not match the cycle, or a tuple with Leapfrog,
+    throws an error on initialization. `implicit_centering` of `NCycleLorenz` is removed.
 
 ## Testing and verification
 
