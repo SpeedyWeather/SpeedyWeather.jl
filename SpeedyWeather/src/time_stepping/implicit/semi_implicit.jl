@@ -110,7 +110,11 @@ implicit_correction!(::Variables, ::SemiImplicit, ::AbstractTimeStepper, ::Barot
 Centering of the semi-implicit solver for (sub)step `k` (0-based) of a cycle, the same on every
 step if `centering` is a number, otherwise `centering[k+1]` (a centering per substep)."""
 substep_centering(centering::Number, k) = centering
-substep_centering(centering::Tuple, k) = centering[k + 1]
+substep_centering(centering::Tuple, k) = select_substep(centering, k)
+
+# branch-free indexing `t[k + 1]` of a tuple with a (possibly traced, e.g. Reactant) 0-based index k
+@inline select_substep(t::Tuple, k) = sum(ntuple(i -> ifelse(k == i - 1, t[i], zero(t[i])), Val(length(t))))
+
 
 """$(TYPEDSIGNATURES)
 Check the semi-implicit solver for `model`: a tuple of centerings (one per substep) requires the
