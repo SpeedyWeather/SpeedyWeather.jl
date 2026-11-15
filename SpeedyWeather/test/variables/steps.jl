@@ -173,7 +173,7 @@ end
 
     # Leapfrog: 2 spectral steps for prognostic variables, 1 for tendencies
     for Model in (ShallowWaterModel, PrimitiveDryModel, PrimitiveWetModel)
-        model = Model(spectral_grid, time_stepping = Leapfrog(spectral_grid, Model))
+        model = Model(spectral_grid, time_stepping = Leapfrog(spectral_grid))
         leapfrog = model.time_stepping
         @test leapfrog isa SW.AbstractLeapfrog
 
