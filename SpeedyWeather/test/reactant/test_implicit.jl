@@ -6,7 +6,7 @@
 function implicit_test_simulation(arch, schedule)
     spectral_grid = SpectralGrid(; architecture = arch, nlayers = nlayers_for_model(PrimitiveWetModel), truncation = TRUNCATION)
     reference_temperature = GlobalMeanReferenceTemperature{spectral_grid.NF}()     # recomputed on the schedule
-    implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = deepcopy(schedule), reference_temperature)
+    implicit = SemiImplicit(spectral_grid; schedule = deepcopy(schedule), reference_temperature)
     time_stepping = Leapfrog(spectral_grid; implicit)
     return initialize!(create_model(PrimitiveWetModel, arch; time_stepping))
 end

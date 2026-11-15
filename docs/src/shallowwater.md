@@ -272,10 +272,10 @@ for all variables, `implicit_correction!` writes back
 as for every other variable. Horizontal diffusion is applied (implicitly with ``\Delta t``) to ``N``
 before this correction.
 
-The centering ``\theta_k`` can vary within the cycle, chosen with the `implicit_centering` option of
-[`NCycleLorenz`](@ref). The defaults are ``\theta = (2.06, 0.93, 1.02, 0.09)`` for the 4-cycle
+The centering ``\theta_k`` can vary within the cycle, a tuple as `centering` of the
+[`SemiImplicit`](@ref) solver of [`NCycleLorenz`](@ref). The defaults are ``\theta = (2.06, 0.93, 1.02, 0.09)`` for the 4-cycle
 (default) with variant A, ``\theta = (-1.03, 0.70, 1.05)`` and ``\theta = (1.63, 0.55, -0.55)`` for the
-3-cycle with variants A and B, otherwise ``\theta_k = \alpha`` (`implicit.centering`) on every
+3-cycle with variants A and B, otherwise ``\theta_k = 1/2`` on every
 substep, see [Implicit centering of the Lorenz N-cycle](@ref ncycle_centering) for how they are chosen.
 
 "Daisuke's version", the formulation of [Hotta2016](@citet), instead keeps the linear terms

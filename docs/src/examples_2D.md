@@ -314,7 +314,7 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(truncation=128, nlayers=1)
 
 # model components
-implicit = ImplicitShallowWater(spectral_grid, centering=0.5)
+implicit = SemiImplicit(spectral_grid, centering=0.5)
 time_stepping = Leapfrog(spectral_grid; implicit)
 orography = EarthOrography(spectral_grid, smoothing=false)
 initial_conditions = nothing                    # start from rest, set η below

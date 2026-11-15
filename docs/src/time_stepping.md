@@ -240,8 +240,8 @@ but [`Leapfrog`](@ref) has `ocean` and `land` fields which default to
 [`EulerForward`](@ref), which steps the variables with **Euler forward over ``\Delta t``**:
 
 ```julia
-time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel)                  # Euler forward for ocean and land
-time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel, land = nothing)  # leapfrog land as the atmosphere
+time_stepping = Leapfrog(spectral_grid)                  # Euler forward for ocean and land
+time_stepping = Leapfrog(spectral_grid, land = nothing)  # leapfrog land as the atmosphere
 model = PrimitiveWetModel(spectral_grid; time_stepping)
 ```
 
@@ -392,9 +392,10 @@ are stable in all these test cases up to (almost) the explicit limit of the cycl
 variant A is second-order accurate, A-stable (all ``\theta_k \geq 0``) and has the largest explicit stability
 limit, so it is the default. No robust second-order centering was found for the 3-cycle with
 variant A. The centerings are specific to the order of the weights, so A and B need different ones,
-and for other cycle lengths and variants `implicit.centering` is used on every substep. The
-centering can be chosen with the `implicit_centering` option, e.g.
-`NCycleLorenz(spectral_grid, steps=3, implicit_centering=(0.5, 0.5, 0.5))`.
+and for other cycle lengths and variants the centering is 1/2 on every substep. The centerings are
+the `centering` of the [`SemiImplicit`](@ref) solver of `NCycleLorenz`, a tuple with one centering per
+substep (or a number for all substeps), and can be chosen with e.g.
+`NCycleLorenz(spectral_grid, steps=3, implicit=SemiImplicit(spectral_grid, centering=(0.5, 0.5, 0.5)))`.
 
 In the shallow water model (Gaussian blob and random gravity waves at T32-T256 with
 ``\Delta t`` at T32 of 20-60min, and the Galewsky jet) the 4-cycle with variant A was stable for all
@@ -505,7 +506,7 @@ to always recompute its reference temperature profile
 
 ```julia
 reference_temperature = GlobalMeanReferenceTemperature()
-implicit = ImplicitPrimitiveEquation(spectral_grid; schedule = StepSchedule(1), reference_temperature)
+implicit = SemiImplicit(spectral_grid; schedule = StepSchedule(1), reference_temperature)
 time_stepping = Leapfrog(spectral_grid; implicit)
 model = PrimitiveWetModel(spectral_grid; time_stepping)
 ```

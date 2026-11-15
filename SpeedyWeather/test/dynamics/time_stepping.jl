@@ -373,7 +373,7 @@ end
         MaximumReferenceTemperature(margin = 30.0f0),
     )
     spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
-    implicit = ImplicitPrimitiveEquation(spectral_grid; reference_temperature)
+    implicit = SemiImplicit(spectral_grid; reference_temperature)
     time_stepping = Leapfrog(spectral_grid; implicit)
     model = PrimitiveWetModel(spectral_grid; time_stepping)
     simulation = initialize!(model)
@@ -410,7 +410,7 @@ end
     # during the Leapfrog start (Euler step, first leapfrog step) the previous spectral step
     # is not advanced, so the previous grid step must not be either
     spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
-    model = PrimitiveDryModel(spectral_grid; time_stepping = Leapfrog(spectral_grid, PrimitiveDryModel, robert_filter = 0))
+    model = PrimitiveDryModel(spectral_grid; time_stepping = Leapfrog(spectral_grid, robert_filter = 0))
     simulation = initialize!(model)
     initialize!(simulation; steps = 4)
     (; variables) = simulation
@@ -424,34 +424,59 @@ end
 
 @testset "NCycleLorenz implicit centering per substep" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
-    implicit = ImplicitShallowWater(spectral_grid, centering = 0.5)
     clock = Clock()
 
-    # 4-cycle variant A is the default
-    @test NCycleLorenz(spectral_grid).steps == 4
+    # 4-cycle variant A is the default, with its semi-implicit solver
+    L = NCycleLorenz(spectral_grid)
+    @test L.steps == 4
+    @test L.implicit isa SemiImplicit
 
-    # default centerings for the 4-cycle variant A and the 3-cycle variants A and B
+    # default centerings for the 4-cycle variant A and the 3-cycle variants A and B, in the solver
     for (steps, variant, centering) in (
             (4, NCycleLorenzA(), (2.06, 0.93, 1.02, 0.09)),
             (3, NCycleLorenzA(), (-1.03, 0.7, 1.05)),
             (3, NCycleLorenzB(), (1.63, 0.55, -0.55)),
         )
         L = NCycleLorenz(spectral_grid; steps, variant)
-        @test L.implicit_centering == Float32.(centering)
-        for (i, θ) in enumerate(L.implicit_centering)
+        @test L.implicit.centering == Float32.(centering)
+        for (i, θ) in enumerate(L.implicit.centering)
             clock.step_counter = i - 1
-            @test SpeedyWeather.implicit_centering(L, implicit, clock) == θ
+            @test SpeedyWeather.implicit_centering(L, L.implicit, clock) == θ
         end
     end
 
-    # implicit.centering on every substep otherwise
+    # centering 0.5 on every substep otherwise
     for L in (NCycleLorenz(spectral_grid, steps = 4, variant = NCycleLorenzB()), NCycleLorenz(spectral_grid, variant = NCycleLorenzAB()))
-        @test isnothing(L.implicit_centering)
-        @test SpeedyWeather.implicit_centering(L, implicit, clock) == implicit.centering
+        @test L.implicit.centering == 0.5f0
+        @test SpeedyWeather.implicit_centering(L, L.implicit, clock) == 0.5f0
     end
 
-    L = NCycleLorenz(spectral_grid, steps = 3, implicit_centering = (0.5, 0.5, 0.5))
-    @test SpeedyWeather.implicit_centering(L, implicit, clock) == 0.5f0
+    # a number or a tuple chosen by the user
+    L = NCycleLorenz(spectral_grid, steps = 3, implicit = SemiImplicit(spectral_grid, centering = 0.6))
+    @test SpeedyWeather.implicit_centering(L, L.implicit, clock) == 0.6f0
+    L = NCycleLorenz(spectral_grid, steps = 3, implicit = SemiImplicit(spectral_grid, centering = (0.5, 0.6, 0.7)))
+    clock.step_counter = 2
+    @test SpeedyWeather.implicit_centering(L, L.implicit, clock) == 0.7f0
+
+    # a tuple needs as many centerings as steps per cycle, and the N-cycle
+    @test_throws ArgumentError SpeedyWeather.check_centering((0.5, 0.5), NCycleLorenz(spectral_grid, steps = 3))
+    @test_throws ArgumentError SpeedyWeather.check_centering((0.5, 0.5), Leapfrog(spectral_grid))
+    @test isnothing(SpeedyWeather.check_centering(0.5, Leapfrog(spectral_grid)))
+end
+
+@testset "SemiImplicit for all models" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+    # previous names are aliases
+    @test ImplicitShallowWater === SemiImplicit
+    @test ImplicitPrimitiveEquation === SemiImplicit
+    @test Leapfrog(spectral_grid).implicit isa SemiImplicit
+
+    # the same solver for every model, no implicit variables for barotropic and shallow water
+    for Model in (BarotropicModel, ShallowWaterModel)
+        model = Model(spectral_grid)
+        @test model.time_stepping.implicit isa SemiImplicit
+        @test SpeedyWeather.variables(model.time_stepping.implicit, model) == ()
+    end
 end
 
 @testset "NCycleLorenz effective centering" begin
@@ -494,7 +519,7 @@ end
     @testset for (steps, variant) in ((4, NCycleLorenzA()), (3, NCycleLorenzA()), (3, NCycleLorenzB())), Δt_at_T32 in (Minute(30), Minute(60))
         spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
         initial_conditions = RandomWaves(spectral_grid, lmin = 5, lmax = 15)
-        time_stepping = NCycleLorenz(spectral_grid, ShallowWaterModel; steps, variant, Δt_at_T32, adjust_with_output = false)
+        time_stepping = NCycleLorenz(spectral_grid; steps, variant, Δt_at_T32, adjust_with_output = false)
         model = ShallowWaterModel(spectral_grid; initial_conditions, time_stepping)
         simulation = initialize!(model)
         variance0 = η_variance(get_step(simulation.variables.prognostic.η, 1))

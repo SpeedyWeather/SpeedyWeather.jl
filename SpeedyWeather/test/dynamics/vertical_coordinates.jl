@@ -372,7 +372,7 @@ end
                         # Crank-Nicolson is unstable with uniform σ spacing over orography, use backward Euler there
                         time_stepping = Leapfrog(
                             spectral_grid; Δt_at_T32, adjust_with_output=false,
-                            implicit = ImplicitPrimitiveEquation(spectral_grid; centering = label == "default" ? 1 : 0.5),
+                            implicit = SemiImplicit(spectral_grid; centering = label == "default" ? 1 : 0.5),
                         ),
                     )
                     simulation = initialize!(model)

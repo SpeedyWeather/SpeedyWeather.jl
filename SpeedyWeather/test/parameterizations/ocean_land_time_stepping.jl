@@ -64,7 +64,7 @@ end
 
 @testset "NCycleLorenz for ocean and land with leapfrog" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
-    time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel, ocean = NCycleLorenz(spectral_grid), land = NCycleLorenz(spectral_grid))
+    time_stepping = Leapfrog(spectral_grid, ocean = NCycleLorenz(spectral_grid), land = NCycleLorenz(spectral_grid))
     model = PrimitiveWetModel(spectral_grid; time_stepping)
     simulation = initialize!(model)
     (; variables) = simulation
@@ -79,7 +79,7 @@ end
 
 @testset "EulerForward for ocean and land with NCycleLorenz" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
-    time_stepping = NCycleLorenz(spectral_grid, PrimitiveWetModel, ocean = EulerForward(spectral_grid), land = EulerForward(spectral_grid))
+    time_stepping = NCycleLorenz(spectral_grid, ocean = EulerForward(spectral_grid), land = EulerForward(spectral_grid))
     model = PrimitiveWetModel(spectral_grid; time_stepping)
     simulation = initialize!(model)
     @test SpeedyWeather.time_stepper(model.time_stepping, :land) === time_stepping.land
@@ -90,7 +90,7 @@ end
 
 @testset "Leapfrogged ocean and land" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
-    time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel, ocean = nothing, land = nothing)
+    time_stepping = Leapfrog(spectral_grid, ocean = nothing, land = nothing)
     model = PrimitiveWetModel(spectral_grid; time_stepping)
     simulation = initialize!(model)
     @test SpeedyWeather.time_stepper(model.time_stepping, :land) === time_stepping
@@ -103,7 +103,7 @@ end
 @testset "Snow time stepped by the land time stepper" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
     for land_time_stepper in (EulerForward(spectral_grid), nothing)    # nothing = leapfrogged
-        time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel, land = land_time_stepper)
+        time_stepping = Leapfrog(spectral_grid, land = land_time_stepper)
         model = PrimitiveWetModel(spectral_grid; time_stepping)
         @test model.land.snow isa SnowModel
         simulation = initialize!(model)
@@ -222,7 +222,7 @@ end
 @testset "Sea ice freezing and snow melt cap independent of the time stepper" begin
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
     for time_stepper in (EulerForward(spectral_grid), NCycleLorenz(spectral_grid))
-        time_stepping = Leapfrog(spectral_grid, PrimitiveWetModel, ocean = time_stepper, land = time_stepper)
+        time_stepping = Leapfrog(spectral_grid, ocean = time_stepper, land = time_stepper)
         model = PrimitiveWetModel(spectral_grid; time_stepping)
         log = SeaIceLog(Int[], Float64[])
         add!(model, log)

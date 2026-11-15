@@ -1,6 +1,6 @@
 # Implicit solver arrays as variables, single `SemiImplicit` solver reduced to options
 
-> Status: **planned**. Plan only, implementation to follow (depends on #1402 being merged): implicit arrays into the variables, then merge both implicit solvers into one options-only `SemiImplicit`.
+> Status: **in progress**. Implemented on top of #1402: implicit arrays in the variables, one options-only `SemiImplicit` for all models with the per-substep centering of the N-cycle; results bit-identical to #1402.
 
 Date of initial draft: 2026-11-14
 
@@ -24,6 +24,9 @@ Base revision: caed82d6 (main), to be implemented on top of
 
 > Yes this is great, note this in the plan please
 
+> Can you start implementing 1404 based on 1402? So they could go in one after another or 1404 into
+> 1402 first then into main
+
 ## Revision log
 
 - Initial draft.
@@ -33,6 +36,23 @@ Base revision: caed82d6 (main), to be implemented on top of
   options-only `SemiImplicit` (items 11-15), which makes the model-type constructors of the time
   steppers from #1402 unnecessary. Item 8 superseded by it.
 - Item 15: per-substep centerings of the N-cycle move into the solver's `centering` (review on #1402).
+- Implementation (branch rebased onto #1402):
+  - Item 1: a generic `TensorDim(m, n, o)` instead of a dedicated per-degree dimension.
+  - Item 6: `Val(size(S⁻¹, 2))` at the call site made the kernel launch a runtime dispatch (JET
+    `dispatch.jl` test failed). Instead `nlayers` is a variable of its own, `ValDim(n)` allocating a
+    `StaticValue{n}()` singleton (`Val(::StaticValue{N}) = Val(N)`), so `nlayers` is part of the type
+    of `Variables` and the kernel's vertical loops are compile-time again. `StaticValue` is defined in
+    SpeedyWeather with its own `on_architecture` method (a method for `Val` would have to go into
+    SpeedyWeatherInternals and require a version and compat bump).
+  - Item 9: the implicit time step `Δt` is a `ScalarDim(traceable = true)` variable, which allocates
+    `scalar_ref` (a `ConcreteRNumber` with Reactant) instead of a plain `Ref`, because it is compared
+    with the traced clock and overwritten in the traced time step.
+  - Items 11-15 as planned, `ImplicitShallowWater` and `ImplicitPrimitiveEquation` are aliases of
+    `SemiImplicit` (no deprecation warning, existing code including `isa` checks keeps working), the
+    reference temperature types moved with `SemiImplicit` into `time_stepping/implicit/semi_implicit.jl`.
+    Item 7 (geometry-only operators once) not done.
+  - Verified bit-identical to #1402 for all four models with their defaults and with leapfrog, and for
+    the primitive models with the isothermal and the global-mean reference temperature.
 
 ## Problem description
 

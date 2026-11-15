@@ -116,7 +116,7 @@ Meaning that if you want to have a shorter or longer time step you can create a 
 depends on a `SpectralGrid` as first argument.
 ```@example howto
 spectral_grid = SpectralGrid(truncation=64, nlayers=1)
-time_stepping = Leapfrog(spectral_grid, ShallowWaterModel, Δt_at_T32=Minute(15))
+time_stepping = Leapfrog(spectral_grid, Δt_at_T32=Minute(15))
 ```
 The actual time step at the given resolution (here T64) is then `Δt`.
 With this new `Leapfrog` time stepper constructed we can create a model by passing
