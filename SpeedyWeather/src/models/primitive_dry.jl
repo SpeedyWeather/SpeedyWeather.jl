@@ -93,7 +93,7 @@ $(TYPEDFIELDS)"""
     @component custom_parameterization::CP = nothing
 
     # NUMERICS
-    time_stepping::TS = Leapfrog(spectral_grid, PrimitiveDry)
+    time_stepping::TS = Leapfrog(spectral_grid)
     spectral_transform::ST = WhichTransform(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)

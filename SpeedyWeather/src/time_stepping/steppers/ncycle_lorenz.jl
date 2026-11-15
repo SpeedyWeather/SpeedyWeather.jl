@@ -31,18 +31,16 @@ A semi-implicit Lorenz N-cycle time integration scheme following Hotta et al. (2
 2. x = x + Δt*G                                  (state update)
 
 with F the full tendency, L the linear gravity-wave terms, w the weight and θₖ the implicit
-centering of substep k (see `implicit_centering`).
+centering of substep k, `implicit.centering` of the semi-implicit solver, a tuple with a centering
+per substep (see `default_implicit_centering`) or a number for all substeps.
 $(TYPEDFIELDS)
 """
-mutable struct NCycleLorenz{NF, V, IntType, C, S, MS, B, I, O, L} <: AbstractNCycleLorenz
+mutable struct NCycleLorenz{NF, V, IntType, S, MS, B, I, O, L} <: AbstractNCycleLorenz
     "[OPTION] Number of steps N in a cycle (3 or 4 recommended, 4 (default) is more stable and less diffusive)"
     steps::IntType
 
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
     variant::V
-
-    "[OPTION] Implicit centering per substep of the cycle (length `steps`), `nothing` uses `implicit.centering` on every substep"
-    implicit_centering::C
 
     "[OPTION] Time step for T32 resolution, scale linearly with resolution"
     Δt_at_T32::S
@@ -56,7 +54,7 @@ mutable struct NCycleLorenz{NF, V, IntType, C, S, MS, B, I, O, L} <: AbstractNCy
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
 
-    "[OPTION] Implicit solver for the gravity waves, `nothing` for none (default unless the model type is passed on to the constructor)"
+    "[OPTION] Semi-implicit solver for the gravity waves, `nothing` for none (explicit)"
     implicit::I
 
     "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for the same N-cycle as the atmosphere"
@@ -105,10 +103,9 @@ function NCycleLorenz(
         spectral_grid::SpectralGrid;
         steps = 4,
         variant = NCycleLorenzA(),
-        implicit_centering = default_implicit_centering(steps, variant),
         Δt_at_T32 = Minute(40),
         adjust_with_output = true,
-        implicit = nothing,
+        implicit = SemiImplicit(spectral_grid; centering = something(default_implicit_centering(steps, variant), 0.5)),
         ocean = nothing,    # default can't be NCycleLorenz, creates an infinite loop
         land = nothing,
     )
@@ -118,22 +115,19 @@ function NCycleLorenz(
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T32), truncation, DEFAULT_RADIUS, adjust_with_output)
     Δt::NF = Δt_millisec.value / 1000
 
-    implicit_centering = isnothing(implicit_centering) ? nothing : NTuple{steps, NF}(implicit_centering)
-    return NCycleLorenz(steps, variant, implicit_centering, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt, implicit, ocean, land)
+    return NCycleLorenz(steps, variant, Second(Δt_at_T32), adjust_with_output, Δt_millisec, Δt, implicit, ocean, land)
 end
 
-"""$(TYPEDSIGNATURES)
-Generator function for an NCycleLorenz struct with the default implicit solver for models of type
-`Model`, e.g. `NCycleLorenz(spectral_grid, ShallowWaterModel)` uses `ImplicitShallowWater`,
-see `default_implicit`. An `implicit` keyword argument takes precedence."""
+# TODO remove after v0.25 is released: the model type is not needed anymore, one implicit solver for all models
 function NCycleLorenz(spectral_grid::SpectralGrid, Model::Type{<:AbstractModel}; kwargs...)
-    haskey(kwargs, :implicit) && return NCycleLorenz(spectral_grid; kwargs...)
-    return NCycleLorenz(spectral_grid; implicit = default_implicit(spectral_grid, Model), kwargs...)
+    Base.depwarn("`NCycleLorenz(spectral_grid, $(nameof(Model)))` is deprecated, use `NCycleLorenz(spectral_grid)`.", :NCycleLorenz)
+    return NCycleLorenz(spectral_grid; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
-Default implicit centering θₖ per substep k of the cycle, `nothing` (= `implicit.centering` on
-every substep) if none is defined for the cycle length `steps` and `variant`. The centerings
+Default implicit centering θₖ per substep k of the cycle, used as `centering` of the default
+semi-implicit solver of `NCycleLorenz`, `nothing` (centering 0.5 on every substep) if none is
+defined for the cycle length `steps` and `variant`. The centerings
 satisfy the second-order condition (effective centering over the cycle α_eff = 1/2, see
 `effective_centering`) and were chosen in a linear stability analysis to be stable with
 Doppler-shifted gravity waves, Coriolis coupling and a reference layer thickness larger than the
@@ -164,14 +158,19 @@ effective_centering_coefficients(::NCycleLorenzA, ::Val{4}) = (0, 1, -1, 1), 4
 effective_centering_coefficients(::NCycleLorenzB, ::Val{4}) = (0, 1, 1, 1), 4 / 3
 
 """$(TYPEDSIGNATURES)
-Implicit centering for the current substep of the cycle, `implicit.centering` if
-`time_stepping.implicit_centering` is `nothing`."""
-implicit_centering(::AbstractNCycleLorenz, implicit, clock) = implicit.centering
-# branch-free indexing `t[k + 1]` of a tuple with a (possibly traced, e.g. Reactant) 0-based index k
-@inline select_substep(t::Tuple, k) = sum(ntuple(i -> ifelse(k == i - 1, t[i], zero(t[i])), Val(length(t))))
-function implicit_centering(L::NCycleLorenz, implicit, clock)
-    isnothing(L.implicit_centering) && return implicit.centering
-    return select_substep(L.implicit_centering, current_substep(L, clock))
+Implicit centering of `implicit` for the current substep of the cycle, see `substep_centering`."""
+implicit_centering(L::NCycleLorenz, implicit, clock) = substep_centering(implicit.centering, current_substep(L, clock))
+implicit_centering(::AbstractNCycleLorenz, implicit, clock) = substep_centering(implicit.centering, 0)
+
+# a centering per substep needs as many centerings as steps per cycle
+function check_centering(centering::Tuple, L::NCycleLorenz)
+    length(centering) == L.steps || throw(
+        ArgumentError(
+            "SemiImplicit: $(length(centering)) centerings for NCycleLorenz with $(L.steps) steps per cycle, " *
+                "provide one centering per substep or a number for all."
+        )
+    )
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

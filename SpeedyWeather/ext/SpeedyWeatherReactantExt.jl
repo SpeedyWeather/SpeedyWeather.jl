@@ -153,7 +153,7 @@ end
 # the time step changed or b) just handle the first few steps sepereatly for Reactant (a bit similar
 # to what we used to do in general for the time stepping)
 function SpeedyWeather.reinitialize!(
-        implicit::ImplicitPrimitiveEquation,
+        implicit::SemiImplicit,
         update::Reactant.TracedRNumber{Bool},
         Δt,
         model::SpeedyWeather.PrimitiveEquation,

@@ -1,97 +1,8 @@
-export ImplicitPrimitiveEquation
-export IsothermalReferenceTemperature, GlobalMeanReferenceTemperature, MaximumReferenceTemperature
-
-abstract type AbstractReferenceTemperature end
-
-"""$(TYPEDSIGNATURES)
-Isothermal reference temperature profile for the semi-implicit time stepping, the
-implicit operators are therefore only reinitialized when the time step changes.
-$(TYPEDFIELDS)"""
-@kwdef struct IsothermalReferenceTemperature{NF} <: AbstractReferenceTemperature
-    "[OPTION] Temperature of the isothermal reference profile [K]"
-    temperature::NF = 300
-end
-
-"""$(TYPEDSIGNATURES)
-Global-mean temperature profile plus `offset` as reference temperature profile for the
-semi-implicit time stepping, recomputed on the `schedule` of the implicit solver.
-$(TYPEDFIELDS)"""
-@kwdef struct GlobalMeanReferenceTemperature{NF} <: AbstractReferenceTemperature
-    "[OPTION] Offset [K] added to the global-mean temperature profile"
-    offset::NF = 0
-end
-
-"""$(TYPEDSIGNATURES)
-Isothermal reference temperature for the semi-implicit time stepping from the current
-maximum temperature of the model plus `margin`, recomputed on the `schedule` of the implicit
-solver. The semi-implicit scheme is stable for a warm isothermal reference temperature, warmer
-than the atmosphere (Simmons, Hoskins and Burridge, 1978), but the warmer the reference the more
-the gravity waves treated implicitly are slowed down. In contrast to `IsothermalReferenceTemperature`
-this follows the model's climate, e.g. for a snowball Earth or a hot climate.
-$(TYPEDFIELDS)"""
-@kwdef struct MaximumReferenceTemperature{NF} <: AbstractReferenceTemperature
-    "[OPTION] Margin [K] added to the maximum temperature"
-    margin::NF = 30
-end
-
-"""$(TYPEDSIGNATURES)
-Global-mean temperature profile (broadcastable, one value per layer) from the l=m=0 harmonic
-of the spectral temperature `temp` (full temperature, not the anomaly), using `norm_sphere` of
-the spectral transform."""
-global_mean_temperature(temp::LowerTriangularArray, norm_sphere) =
-    Base.Broadcast.broadcasted(t -> real(t) / norm_sphere, view(temp.data, 1, :))
-
-# reference temperature profile (broadcastable) from the spectral temperature `temp` (for its
-# global-mean profile) or the grid temperature `temp_grid` (full temperature, not the anomaly)
-reference_temperature(ref::IsothermalReferenceTemperature, temp, temp_grid, norm_sphere) = ref.temperature
-reference_temperature(ref::GlobalMeanReferenceTemperature, temp, temp_grid, norm_sphere) =
-    Base.Broadcast.broadcasted(+, global_mean_temperature(temp, norm_sphere), ref.offset)
-reference_temperature(ref::MaximumReferenceTemperature, temp, temp_grid, norm_sphere) =
-    maximum(temp_grid) + ref.margin
-
-# whether the reference temperature profile has to be recomputed on the schedule
-rescheduled(::IsothermalReferenceTemperature) = false
-rescheduled(::GlobalMeanReferenceTemperature) = true
-rescheduled(::MaximumReferenceTemperature) = true
-
-"""
-Semi-implicit solver for the gravity waves in the primitive equation models, holding only its
-options. The precomputed operators (reference temperature profile, `R, U, L, W` and the inverted
-`S⁻¹` per degree) are variables of the model in `vars.dynamics.implicit`, allocated for the model's
-resolution and (re)computed in `reinitialize!`.
-$(TYPEDFIELDS)"""
-struct ImplicitPrimitiveEquation{NF, ScheduleType, ReferenceTemperatureType} <: AbstractImplicit
-    "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
-    centering::NF
-
-    "[OPTION] Reference temperature profile to linearise about, isothermal or the global mean (plus offset)"
-    reference_temperature::ReferenceTemperatureType
-
-    "[OPTION] Schedule to recompute the reference temperature profile (and the implicit operators) from the current global-mean temperature"
-    schedule::ScheduleType
-end
-
-"""$(TYPEDSIGNATURES)
-Generator with number format `NF`."""
-function ImplicitPrimitiveEquation{NF}(;
-        centering = 0.5,
-        reference_temperature::AbstractReferenceTemperature = IsothermalReferenceTemperature{NF}(),
-        schedule::AbstractSchedule = PeriodicSchedule(every = Day(1)),
-    ) where {NF}
-    return ImplicitPrimitiveEquation{NF, typeof(schedule), typeof(reference_temperature)}(NF(centering), reference_temperature, schedule)
-end
-
-ImplicitPrimitiveEquation(; kwargs...) = ImplicitPrimitiveEquation{DEFAULT_NF}(; kwargs...)
-
-"""$(TYPEDSIGNATURES)
-Generator using the number format from SpectralGrid."""
-ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...) = ImplicitPrimitiveEquation{spectral_grid.NF}(; kwargs...)
-
 """$(TYPEDSIGNATURES)
 Variables of the semi-implicit solver for the primitive equations in `vars.dynamics.implicit`:
 the time step and reference temperature profile the operators were built with, the operators
 `R, U, L, W` (and the components `L0`-`L4` of `L`), scratch `S` and the inverted `S⁻¹` per degree."""
-function variables(::ImplicitPrimitiveEquation, model::PrimitiveEquation)
+function variables(::SemiImplicit, model::PrimitiveEquation)
     n = model.spectral_grid.nlayers
     truncation = model.spectral_grid.truncation
     vector(name, desc) = DynamicsVariable(name, VectorDim(n); namespace = :implicit, desc)
@@ -114,15 +25,13 @@ function variables(::ImplicitPrimitiveEquation, model::PrimitiveEquation)
     )
 end
 
-default_implicit(SG::SpectralGrid, ::Type{<:PrimitiveEquation}) = ImplicitPrimitiveEquation(SG)
-check_implicit(::ImplicitPrimitiveEquation, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES)
 Initialize the `schedule` of `implicit` with the time step of `model`.
 The implicit operators themselves are only built in the first time steps by `reinitialize!`,
 as they need the temperature profile of the initial conditions and the time step of the
 leapfrog start."""
-function initialize!(implicit::ImplicitPrimitiveEquation, model::PrimitiveEquation)
+function initialize!(implicit::SemiImplicit, model::PrimitiveEquation)
     initialize!(implicit.schedule, model.time_stepping)
     warn_uniform_spacing(implicit, model.geometry)
     return nothing
@@ -132,8 +41,8 @@ end
 # σ levels the explicit vertical advection of temperature over steep orography can then grow
 # (e.g. Held-Suarez, T32, 16-24 levels, Earth orography), backward Euler (centering = 1) or
 # the default FriersonSigmaCoordinates are stable, see docs/dev/2026-10/2026-10-31-implicit-reference-temperature.md
-function warn_uniform_spacing(implicit::ImplicitPrimitiveEquation, geometry::AbstractGeometry)
-    implicit.centering < 1 || return nothing
+function warn_uniform_spacing(implicit::SemiImplicit, geometry::AbstractGeometry)
+    minimum(implicit.centering) < 1 || return nothing
     Δσ = on_architecture(CPU(), geometry.σ_levels_thick)
     length(Δσ) > 1 || return nothing
     uniform = maximum(Δσ) / minimum(Δσ) < 1.1
@@ -146,7 +55,7 @@ end
 # start with Δt/2, Δt, then 2Δt, or a new time step) or when the reference temperature profile
 # is scheduled to be recomputed from the current global-mean temperature
 function reinitialize!(
-        implicit::ImplicitPrimitiveEquation,
+        implicit::SemiImplicit,
         model::PrimitiveEquation,
         vars::Variables,
     )
@@ -163,7 +72,7 @@ end
 # (re)initialize the implicit operators with time step Δt and the current global-mean temperature
 # as reference profile only if `update`, see SpeedyWeatherReactantExt for a traced `update`
 function reinitialize!(
-        implicit::ImplicitPrimitiveEquation,
+        implicit::SemiImplicit,
         update::Bool,
         Δt,
         model::PrimitiveEquation,
@@ -190,7 +99,7 @@ indexing, or data-dependent control flow so that Reactant can trace this inside 
 S⁻¹ is then computed per degree l with `invert_S!`."""
 function initialize!(
         operators::NamedTuple,                              # the implicit operators, vars.dynamics.implicit
-        implicit::ImplicitPrimitiveEquation,
+        implicit::SemiImplicit,
         Δt::Number,                                         # the time step [s], scaled
         temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
         geometry::AbstractGeometry,
@@ -383,7 +292,7 @@ end
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
 function implicit_correction!(
         vars::Variables,
-        implicit::ImplicitPrimitiveEquation,
+        implicit::SemiImplicit,
         time_stepping::AbstractLeapfrog,
         model::PrimitiveEquation,
     )

@@ -320,8 +320,7 @@ function (M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...)
     # TODO remove this error for the old `implicit` keyword after v0.25 is released
     haskey(kwargs, :implicit) && throw(
         ArgumentError(
-            "The implicit solver is part of the time stepper, create it with the model type, e.g. " *
-                "`time_stepping = Leapfrog(spectral_grid, $(nameof(M)))`, or pass on the solver as " *
+            "The implicit solver is part of the time stepper, pass it on as " *
                 "`time_stepping = Leapfrog(spectral_grid; implicit)` instead of `$(nameof(M))(spectral_grid; implicit)`"
         )
     )

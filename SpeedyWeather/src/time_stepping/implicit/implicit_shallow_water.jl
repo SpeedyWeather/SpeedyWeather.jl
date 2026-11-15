@@ -6,34 +6,9 @@ implicit_correction!(vars::Variables, model::AbstractModel) =
 initialize!(::Nothing, ::Variables, ::AbstractModel) = nothing
 implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
 
-# SHALLOW WATER MODEL
-export ImplicitShallowWater
-
-"""Struct that holds various precomputed arrays for the semi-implicit correction to
-prevent gravity waves from amplifying in the shallow water model. The implicit time step
-between i-1 and i+1 is controlled by the centering parameter `α` in the range [0, 1]
-
-    α = 0   means the gravity wave terms are evaluated at i-1 (forward)
-    α = 0.5 evaluates at i+1 and i-1 (centered implicit)
-    α = 1   evaluates at i+1 (backward implicit)
-    α ∈ [0.5, 1] are also possible which controls the strength of the gravity wave dampening.
-    α = 0.5 slows gravity waves and prevents them from amplifying
-    α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
-
-Fields are
-$(TYPEDFIELDS)"""
-@kwdef struct ImplicitShallowWater{NF} <: AbstractImplicit
-    "[OPTION] Centering coefficient for semi-implicit, 0.5 = Crank-Nicolson, 1 = Backwards Euler"
-    centering::NF = 0.5
-end
-
-"""
-$(TYPEDSIGNATURES)
-Generator using the resolution from `spectral_grid`."""
-ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(; kwargs...)
-default_implicit(SG::SpectralGrid, ::Type{<:ShallowWater}) = ImplicitShallowWater(SG)
-check_implicit(::ImplicitShallowWater, ::ShallowWater) = nothing
-initialize!(::ImplicitShallowWater, ::Variables, ::AbstractModel) = nothing
+# SHALLOW WATER MODEL, the semi-implicit time integration of the gravity wave terms
+# ∂D/∂t = -g∇²η, ∂η/∂t = -HD with centering α (0 forward, 0.5 centred, 1 backward implicit),
+# see `SemiImplicit` and the documentation section "Semi-implicit time integration"
 
 """
 $(TYPEDSIGNATURES)
@@ -42,7 +17,7 @@ The correction is implicitly evaluated using the parameter `implicit.α` to swit
 forward, centered implicit or backward evaluation of the gravity wave terms."""
 function implicit_correction!(
         vars::Variables,
-        implicit::ImplicitShallowWater,
+        implicit::SemiImplicit,
         time_stepping::AbstractLeapfrog,
         model::ShallowWater,
     )
@@ -105,7 +80,7 @@ The correction is implicitly evaluated using the parameter `implicit.α` to swit
 forward, centered implicit or backward evaluation of the gravity wave terms."""
 function implicit_correction!(
         vars::Variables,
-        implicit::ImplicitShallowWater,
+        implicit::SemiImplicit,
         time_stepping::AbstractNCycleLorenz,
         model::ShallowWater
     )

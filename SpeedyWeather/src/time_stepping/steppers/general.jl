@@ -4,25 +4,15 @@ one more step in the main time loop."""
 spin_up_steps(::AbstractTimeStepper) = 0
 
 """$(TYPEDSIGNATURES)
-Default implicit solver for a model of type `M`, used by the time stepper constructors that take
-the model type, e.g. `Leapfrog(spectral_grid, ShallowWaterModel)`. `nothing` (no implicit solver)
-unless extended for a model type: `ImplicitShallowWater` for `ShallowWater` and
-`ImplicitPrimitiveEquation` for `PrimitiveEquation` models."""
-default_implicit(::SpectralGrid, ::Type{<:AbstractModel}) = nothing
-
-"""$(TYPEDSIGNATURES)
-Warn if the implicit solver `implicit` (of the time stepper) does not match `model`, e.g. no
-implicit solver (`nothing`) for a model with gravity waves, which then have to be resolved
-explicitly with a short time step. Methods for matching solvers are defined with the solvers."""
-check_implicit(implicit, model::AbstractModel) =
-    @warn "Implicit solver $(nameof(typeof(implicit))) is not meant for $(nameof(typeof(model))), " *
-    "create the time stepper with the model type, e.g. `Leapfrog(spectral_grid, $(nameof(typeof(model))))`, " *
-    "or pass on a matching `implicit` solver."
+Check the implicit solver `implicit` (of the time stepper) for `model` on initialization, warns
+if there is no implicit solver (`nothing`) for a model with gravity waves, which then have to be
+resolved explicitly with a short time step. Extended for `SemiImplicit`."""
+check_implicit(implicit, model::AbstractModel) = nothing
 check_implicit(::Nothing, ::Barotropic) = nothing     # no gravity waves, no implicit solver needed
 check_implicit(::Nothing, model::AbstractModel) =
     @warn "No implicit solver for $(nameof(typeof(model))), gravity waves are integrated explicitly " *
-    "which requires a short time step. Create the time stepper with the model type, e.g. " *
-    "`Leapfrog(spectral_grid, $(nameof(typeof(model))))`, to use the default implicit solver."
+    "which requires a short time step. Use e.g. `Leapfrog(spectral_grid)` with its default " *
+    "`implicit = SemiImplicit(spectral_grid)`."
 
 # the implicit solver is part of the time stepper, collect its variables (e.g. reference temperature profile)
 variables(time_stepping::AbstractTimeStepper, model::AbstractModel) = variables(implicit_solver(time_stepping), model)

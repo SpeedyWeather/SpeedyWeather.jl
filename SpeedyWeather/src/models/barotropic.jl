@@ -47,7 +47,7 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS
-    time_stepping::TS = NCycleLorenz(spectral_grid, Barotropic)
+    time_stepping::TS = NCycleLorenz(spectral_grid)
     spectral_transform::ST = WhichTransform(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
