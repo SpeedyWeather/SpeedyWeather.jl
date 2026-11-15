@@ -1,6 +1,6 @@
-# Implicit solver arrays as variables, implicit solvers reduced to options
+# Implicit solver arrays as variables, single `SemiImplicit` solver reduced to options
 
-> Status: **planned**. Plan only, implementation to follow (depends on #1402 being merged).
+> Status: **planned**. Plan only, implementation to follow (depends on #1402 being merged): implicit arrays into the variables, then merge both implicit solvers into one options-only `SemiImplicit`.
 
 Date of initial draft: 2026-11-14
 
@@ -16,11 +16,22 @@ Base revision: caed82d6 (main), to be implemented on top of
 > Yes please write a follow-up PR plan and push this in a separate draft PR with just the plan in
 > it and a summary description. That way another session can easily pick that up
 
+> How would this interface need to change with PR1404?
+
+> Would it be possible to merge ImplicitShallowWater and ImplicitPrimitiveEquation? The latter has
+> some options that are irrelevant for the former but so does a shallow water model have an
+> atmosphere with information about temperature
+
+> Yes this is great, note this in the plan please
+
 ## Revision log
 
 - Initial draft.
 - Updated to #1402 replacing the `DefaultImplicit()` placeholder by time stepper constructors with
   the model type.
+- Added the merge of `ImplicitShallowWater` and `ImplicitPrimitiveEquation` into a single
+  options-only `SemiImplicit` (items 11-15), which makes the model-type constructors of the time
+  steppers from #1402 unnecessary. Item 8 superseded by it.
 
 ## Problem description
 
@@ -109,14 +120,50 @@ Relevant code (on the #1402 branch):
 7. **Geometry-only operators**: `R` and `L0`-`L4` depend only on geometry/atmosphere, not on Δt or
    the reference temperature. Optionally compute them once in `initialize!` (still variables), not
    on every `reinitialize!`. Not required for this PR.
-8. **ShallowWater**: `ImplicitShallowWater` already holds options only; no variables needed. Check
-   whether `default_implicit` (from #1402) still needs the `SpectralGrid` for any implicit solver
-   (only for the number format then) and simplify if so.
+8. **ShallowWater**: `ImplicitShallowWater` already holds options only; no variables needed.
+   Superseded by the merge (items 11-15).
 9. **Reactant**: `implicit.Δt` becomes the scalar variable (no `scalar_ref`), the Reactant method
    of `reinitialize!` writes into variables; remove what becomes unnecessary in the extension.
 10. **Breaking**: `model.time_stepping.implicit.temp_profile` (etc.) → `vars.dynamics.implicit.temp_profile`.
     CHANGELOG line, docs (`docs/src/primitiveequation.md` implicit section, `time_integration.md`
     implicit solver section from #1402), SpeedyWeather version: already a `-DEV` minor bump.
+
+### Merge into a single `SemiImplicit` solver
+
+With the arrays in `vars` (items 1-7) both implicit solvers are options only:
+
+| Option | ShallowWater | PrimitiveEquation |
+|---|---|---|
+| `centering` | used | used |
+| `reference_temperature` | unused | used |
+| `schedule` (recompute the reference) | unused | used |
+
+11. **One type** `SemiImplicit{NF, R, S}(; centering, reference_temperature, schedule)` (name to be
+    decided, e.g. `SemiImplicit` or `Implicit`), with a generator `SemiImplicit(spectral_grid; kwargs...)`
+    for the number format. Behaviour by dispatch on the model instead of the solver type:
+    `implicit_correction!(vars, ::SemiImplicit, time_stepping, ::ShallowWater)` (current
+    `ImplicitShallowWater` kernels for leapfrog and the N-cycle) and `::PrimitiveEquation` (current
+    `ImplicitPrimitiveEquation` kernels); `variables(::SemiImplicit, ::PrimitiveEquation)` declares
+    the operator arrays of item 2, `variables(::SemiImplicit, ::ShallowWater)` none;
+    `initialize!`/`reinitialize!` are no-ops for ShallowWater; for `Barotropic` (no gravity waves)
+    the correction is a no-op as well. Precedent for unused options: the ShallowWater model already
+    carries an atmosphere with temperature information it does not use.
+12. **Default for all time steppers**: `Leapfrog`, `NCycleLorenz` default to `implicit = SemiImplicit()`
+    (number format from the time stepper's `spectral_grid`), `EulerForward` (ocean/land) keeps
+    `nothing`. `Leapfrog(spectral_grid)` then works for every model. This removes from #1402:
+    the time stepper constructors with the model type (`Leapfrog(spectral_grid, Model)`,
+    `NCycleLorenz(spectral_grid, Model)`; deprecate, forwarding to the constructor without the model
+    type), `default_implicit`, and the solver/model mismatch case of `check_implicit` (a mismatch is
+    no longer possible). `check_implicit` remains for `implicit = nothing` with a model with
+    gravity waves (explicitly chosen then, so possibly an info rather than a warning).
+    The models' default `time_stepping` becomes `Leapfrog(spectral_grid)` / `NCycleLorenz(spectral_grid)`.
+13. **Deprecations**: `ImplicitShallowWater(spectral_grid; centering)` and
+    `ImplicitPrimitiveEquation(spectral_grid; kwargs...)` forward to `SemiImplicit` with a
+    deprecation warning; docs and tests use `SemiImplicit`.
+14. **Unused options**: `initialize!` for ShallowWater warns if `reference_temperature` or `schedule`
+    are not the defaults, as they are ignored.
+15. **NCycleLorenz centerings** (`implicit_centering` from #1402) are unaffected; `centering` of the
+    solver remains the fallback when the time stepper has no per-substep centering.
 
 ## Testing and verification
 
@@ -131,6 +178,11 @@ Relevant code (on the #1402 branch):
   with `GlobalMeanReferenceTemperature` is non-zero (it was implicitly zero before).
 - GPU (CUDA) and Reactant test suites, as the arrays move between model and variables.
 - Benchmark `manual_benchmarking.jl --debug` vs main (kernel type stability via `nlayers_val`).
+- Merge: all models run with `Leapfrog(spectral_grid)` and `NCycleLorenz(spectral_grid)` (shallow
+  water also with NCycleLorenz) and give bit-identical results to #1402 with the corresponding
+  solver; `SemiImplicit` allocates no implicit variables for ShallowWater and Barotropic; the
+  deprecated constructors forward correctly; warning for non-default `reference_temperature` with
+  ShallowWater; JET `dispatch.jl` (dispatch on the model type stays type stable).
 
 ## Documentation changes
 
@@ -139,13 +191,25 @@ Relevant code (on the #1402 branch):
 - `time_integration.md` "Implicit solver" section: implicit solvers are options, their state is
   in the variables.
 - Variables docs: new dimension.
+- Shallow water and primitive equation semi-implicit sections and `time_integration.md`: one
+  `SemiImplicit` solver, which options apply to which model, `Leapfrog(spectral_grid)` without
+  model type; all examples using `ImplicitShallowWater`/`ImplicitPrimitiveEquation` or the model-type
+  constructors (e.g. the gravity wave example in `examples_2D.md`, `output.md`, `land.md`,
+  `initial_conditions.md`, `how_to_run_speedy.md`, `time_stepping.md`).
 
 ## Known limitations
 
 - Memory of `S⁻¹` ((truncation+1) × nlayers²) moves into `Variables` and is therefore duplicated
   in shadow variables for Enzyme (`dvars`), as it should be for correct gradients.
+- `SemiImplicit` has options that only apply to some models (`reference_temperature`, `schedule`
+  only for the primitive equations), warned about if set for ShallowWater.
 
 ## Future work
 
 - Implicit solver for `NCycleLorenz` with the primitive equations (not implemented, see #917).
 - Compute geometry-only operators once (item 7) if not done here.
+- Reference state generalised across models: the shallow water analogue of the reference temperature
+  is the reference layer thickness H (currently `atmosphere.layer_thickness`). Linearising about an
+  H larger than the actual layer depth (H - H_b over orography) is stable (see the "orography" test
+  case in `docs/dev/2026-11/ncycle-lorenz-shallow-water.md`), so `SemiImplicit` could take a
+  `reference` option meaning a temperature profile (primitive) or a layer thickness (shallow water).
