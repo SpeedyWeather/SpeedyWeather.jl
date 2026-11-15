@@ -167,9 +167,11 @@ effective_centering_coefficients(::NCycleLorenzB, ::Val{4}) = (0, 1, 1, 1), 4 / 
 Implicit centering for the current substep of the cycle, `implicit.centering` if
 `time_stepping.implicit_centering` is `nothing`."""
 implicit_centering(::AbstractNCycleLorenz, implicit, clock) = implicit.centering
+# branch-free indexing `t[k + 1]` of a tuple with a (possibly traced, e.g. Reactant) 0-based index k
+@inline select_substep(t::Tuple, k) = sum(ntuple(i -> ifelse(k == i - 1, t[i], zero(t[i])), Val(length(t))))
 function implicit_centering(L::NCycleLorenz, implicit, clock)
     isnothing(L.implicit_centering) && return implicit.centering
-    return L.implicit_centering[current_substep(L, clock) + 1]
+    return select_substep(L.implicit_centering, current_substep(L, clock))
 end
 
 """$(TYPEDSIGNATURES)
