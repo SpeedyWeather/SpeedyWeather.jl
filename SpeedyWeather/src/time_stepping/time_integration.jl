@@ -124,22 +124,15 @@ function update_prognostic!(
         time_stepping::AbstractTimeStepper,
         model::AbstractModel,
     )
-    (; prognostic, tendencies) = vars
+    (; prognostic) = vars
     (; clock) = prognostic
     scale = prognostic.scale[]
 
     # atmospheric variables (unrolled per name so it's compile-time)
     update_prognostic_atmosphere!(vars, clock, time_stepping, model.implicit, model, scale)
 
-    # and time stepping for tracers if active.
-    # TODO: might need to revise this to be a compile-time / generated loop
-    for (name, tracer) in model.tracers
-        if tracer.active
-            var = prognostic.tracers[name]
-            tendency = tendencies.tracers[name]
-            update_prognostic!(var, tendency, clock, time_stepping, model.implicit, model, scale)
-        end
-    end
+    # and time stepping for the active tracers (unrolled per name)
+    foreach_active_tracer(update_prognostic_tracer!, vars, model, clock, time_stepping, model.implicit, scale)
 
     # ocean and land variables with their own time steppers (unrolled per name)
     update_prognostic_namespaces!(vars, clock, time_stepping, model.implicit, model)
@@ -153,6 +146,13 @@ function update_prognostic!(
     hasproperty(model, :land) && filter!(vars, model.land, model)
 
     return nothing
+end
+
+# time step tracer `name`, called for every active tracer by `foreach_active_tracer`
+function update_prognostic_tracer!(::Val{name}, vars, model, clock, time_stepping, implicit, scale) where {name}
+    var = getfield(vars.prognostic.tracers, name)
+    tendency = getfield(vars.tendencies.tracers, name)
+    return update_prognostic!(var, tendency, clock, time_stepping, implicit, model, scale)
 end
 
 # Unrolled per-name drivers. The names ARE compile-time constants (they come from

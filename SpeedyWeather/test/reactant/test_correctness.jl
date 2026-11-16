@@ -43,6 +43,20 @@ function compare_arrays(nt_cpu::NamedTuple, nt_reactant::NamedTuple; tolerances:
     return results
 end
 
+"""Like `compare_arrays` for the tracers in the namespace `namespace` (`:tracers`, or `:grid_tracers` for
+the grid tendencies) of `nt_cpu` and `nt_reactant`, empty if there is none. Tolerances are looked up by
+tracer name, results are keyed by `namespace.name`."""
+function compare_tracers(nt_cpu::NamedTuple, nt_reactant::NamedTuple, namespace::Symbol = :tracers; tolerances::NamedTuple = TOLERANCES)
+    haskey(nt_cpu, namespace) || return Dict{Symbol, NamedTuple}()
+    results = compare_arrays(getfield(nt_cpu, namespace), getfield(nt_reactant, namespace); tolerances)
+    return Dict{Symbol, NamedTuple}(Symbol(namespace, :., name) => r for (name, r) in results)
+end
+
+"""Initial condition for the tracers: a Gaussian blob centred at 180˚E, 45˚N in the midlatitude jet of
+the default initial conditions (the equatorial flow of the PrimitiveDry model is weak), increasing linearly
+with σ so that vertical advection acts on it from the first time step."""
+tracer_initial_condition(λ, φ, σ) = σ * exp(-((λ - 180)^2 + (φ - 45)^2) / 30^2)
+
 """Compare that the clock is running in the same way."""
 function compare_clock(sim_cpu, sim_reactant)
     clock_cpu = sim_cpu.variables.prognostic.clock
@@ -100,6 +114,8 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothi
     vars_cpu, _ = SpeedyWeather.unpack(sim_cpu)
     vars_reactant, _ = SpeedyWeather.unpack(sim_reactant)
     tend_results = compare_arrays(vars_cpu.tendencies, vars_reactant.tendencies; tolerances)
+    merge!(tend_results, compare_tracers(vars_cpu.tendencies, vars_reactant.tendencies, :tracers; tolerances))
+    merge!(tend_results, compare_tracers(vars_cpu.tendencies, vars_reactant.tendencies, :grid_tracers; tolerances))
 
     println("\nTendency comparison:")
     for (name, r) in tend_results
@@ -135,6 +151,12 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
     # Sync after @compile to undo any side effects on sim_reactant
     sync_variables!(sim_cpu, sim_reactant)
 
+    # tracers before the time stepping, to check they are advected (not just equal because frozen)
+    prognostic_cpu = sim_cpu.variables.prognostic
+    tracers_before = haskey(prognostic_cpu, :tracers) ?
+        Dict(name => copy(getfield(prognostic_cpu.tracers, name).data) for name in keys(prognostic_cpu.tracers)) :
+        Dict{Symbol, Any}()
+
     # Run time stepping
     println("  Running CPU model...")
     SpeedyWeather.run!(sim_cpu; steps = nsteps)
@@ -150,6 +172,8 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
     vars_reactant, _ = SpeedyWeather.unpack(sim_reactant)
     progn_results = compare_arrays(vars_cpu.prognostic, vars_reactant.prognostic; tolerances)
     grid_results = compare_arrays(vars_cpu.grid, vars_reactant.grid; tolerances)
+    merge!(progn_results, compare_tracers(vars_cpu.prognostic, vars_reactant.prognostic; tolerances))
+    merge!(grid_results, compare_tracers(vars_cpu.grid, vars_reactant.grid; tolerances))
 
     println("\nPrognostic variable comparison after $nsteps steps:")
     for (name, r) in progn_results
@@ -187,17 +211,26 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
                 @test r.matches
             end
         end
+
+        # diffusion alone changes the tracers by less than 1% over the compared time steps, advection by far more
+        @testset "Tracers advected" begin
+            for (name, before) in tracers_before
+                after = getfield(vars_cpu.prognostic.tracers, name).data
+                @test norm(after .- before) / norm(before) > 0.05
+            end
+        end
     end
 
     return (progn_results, grid_results)
 end
 
-"""Run all correctness tests for a given model type, both models with a spectral transform of type `Transform`."""
+"""Run all correctness tests for a given model type, both models with a spectral transform of type `Transform`
+and the tracers named in `tracers` (none by default)."""
 function test_model(
         ModelType::Type; Transform = MatrixSpectralTransform, truncation = TRUNCATION, nsteps = NSTEPS,
-        tolerances::NamedTuple = TOLERANCES, precompile = false
+        tolerances::NamedTuple = TOLERANCES, precompile = false, tracers::Tuple = ()
     )
-    model_name = "$ModelType with $(nameof(Transform))"
+    model_name = "$ModelType with $(nameof(Transform))" * (isempty(tracers) ? "" : " and tracers $tracers")
 
     println("="^60)
     println("$model_name: CPU vs Reactant Correctness Tests")
@@ -206,13 +239,17 @@ function test_model(
     # Setup CPU model
     println("\n[1/3] Setting up CPU model...")
     model_cpu = create_cpu_model(ModelType; truncation, Transform)
+    add!(model_cpu, Tracer.(tracers)...)
     simulation_cpu = initialize!(model_cpu)
     println("  ✓ CPU model initialized (T$(truncation - 1))")
 
     # Setup Reactant model
     println("\n[2/3] Setting up Reactant model...")
     model_reactant = create_reactant_model(ModelType; truncation, Transform)
+    add!(model_reactant, Tracer.(tracers)...)
     simulation_reactant = initialize!(model_reactant)
+    # set the tracers on Reactant only, they are copied to the CPU after the spin up
+    isempty(tracers) || set!(simulation_reactant; namespace = :tracers, (name => tracer_initial_condition for name in tracers)...)
     println("  ✓ Reactant model initialized")
 
     # spin up models a bit
@@ -255,3 +292,7 @@ test_model(PrimitiveWetModel)
 # single-layer variables (Barotropic) and the batched multi-layer transforms with all physics (PrimitiveWet)
 test_model(BarotropicModel; Transform = SpectralTransform)
 test_model(PrimitiveWetModel; Transform = SpectralTransform)
+
+# tracers: transformed, diffused, advected and time stepped per tracer name, compared in their own namespaces.
+# PrimitiveDry also covers the vertical advection of tracers and the primitive equation transform/diffusion
+test_model(PrimitiveDryModel; tracers = (:tracer,))

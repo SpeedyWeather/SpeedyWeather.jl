@@ -77,7 +77,9 @@ the same tracer -- and no two tracers with the same key can exist inside `model`
 
 What you should not do is add a tracer to the `model` _after_ it has been initialized,
 as this would leave it without its required variables that are allocated at
-`initialize!(model)`.
+`initialize!(model)`; `run!` throws an error naming such a tracer.
+Deleting a tracer after initialization keeps its variables in the simulation
+and the tracer is then frozen, as if deactivated (see below).
 You can check that the tracers exists in the variables with
 
 ```@example tracers
