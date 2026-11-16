@@ -1,6 +1,6 @@
 # Eccentric orbits: Kepler orbit, Sun–planet distance and precession
 
-> Status: **in progress**. Design agreed in #1407 (`planet.orbit`, dispatch in the zenith's global parameterization); implementing.
+> Status: **completed**. Implemented as agreed in #1407; unit tests pass and daily insolation matches climlab to 0.4 W/m² RMS.
 
 Date of initial draft: 2026-11-15
 
@@ -37,6 +37,16 @@ cycle.)
   model)`, outside any kernel, and the distance factor is stored in a `ScalarDim` parameterization
   variable that the shortwave schemes read. The equation of time from the orbit is left as future
   work.
+- 2026-11-15 (implementation):
+  - `cos_zenith!` takes the declination as an optional last argument, defaulting to today's
+    `S.solar_declination`.
+  - `solar_declination(T, zenith, orbit_time, planet)` follows the orbit; seasonal ozone uses it.
+  - The NumericalRadiation ecCKD shortwave boundary also gets the distance factor.
+  - With e = 0, `KeplerOrbit` uses the exact sin δ = sin(tilt)·sin λ, while `SinSolarDeclination`
+    uses δ = tilt·sin λ. They differ by up to ~0.004 rad, so `CircularOrbit` keeps the existing
+    path rather than routing through Kepler.
+  - The equinox phase uses the mean year (365.25 days), like `SinSolarDeclination`, so the same
+    leap-year offset of up to about half a day applies.
 
 ## Problem description
 
@@ -104,19 +114,36 @@ So none of these can be run:
 
 ## Testing and verification
 
-- **Unit tests** (`test/parameterizations/orbit.jl`):
-  - the Kepler residual |E − e sin E − M| is below 1e-10 for e ∈ [0, 0.9] (Float64);
-  - `KeplerOrbit` with e = 0 gives the same declination as `SinSolarDeclination` and a distance
-    factor of 1;
+- **Unit tests** (`test/parameterizations/orbit.jl`, 908 pass):
+  - the Kepler residual |E − e sin E − M| is below 1e-10 for e ∈ [0, 0.8] (Float64). Five
+    iterations reach round-off up to e = 0.8; e = 0.9 needs six;
+  - `CircularOrbit` returns `S.solar_declination` and a distance factor of exactly 1;
+  - `KeplerOrbit` with e = 0 gives δ = asin(sin(tilt) sin(g − g_equinox)) and a distance factor
+    of 1;
   - the annual mean of the distance factor is 1/√(1 − e²);
   - the solstices and equinoxes fall at λ = 0, 90°, 180°, 270°;
   - perihelion falls where ϖ puts it;
   - a short `PrimitiveWetModel` run with `KeplerOrbit` stays finite, and the stored distance
     factor varies between 1/(1 + e)² and 1/(1 − e)²;
   - the default model is unchanged (`CircularOrbit`, distance factor 1).
+- **Existing tests still pass:** zenith (72), shortwave (3267), radiation (82), variables
+  (13), all parameterizations (63), greenhouse gases (12), longwave (10).
 - **Insolation against climlab** (offline, reported in the PR rather than as a unit test):
-  daily-mean TOA insolation by latitude × day of year for present day, 6 ka, 116 ka and
-  126 ka.
+  - setup: daily-mean TOA insolation, 5° latitudes × 365 days, for the Berger & Loutre (1991)
+    orbits in climlab's table at 0, 6, 116 and 127 ka, with S₀ = 1365.2 and the equinox on
+    21 March;
+  - agreement: 0.36–0.38 W/m² RMS and 1.6–1.9 W/m² at most. The remainder is the 365- vs
+    365.2422-day calendar; the best calendar offset is 0;
+  - June 21 at 65°N:
+
+    | Orbit | This PR | climlab |
+    |---|---|---|
+    | 0 ka | 478.9 | 478.9 |
+    | 6 ka | 506.5 | 506.5 |
+    | 116 ka | 439.9 | 439.9 |
+    | 127 ka | 547.5 | 547.6 |
+
+  - global annual means agree to 0.02 W/m².
 
 ## Documentation changes
 

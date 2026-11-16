@@ -316,6 +316,46 @@ the seasonal cycle, and `equinox`, the time of the spring equinox, which sets it
 phase (only the month and day matter, not the year). `solar_constant` [W/m²]
 scales the total incoming radiation.
 
+### Eccentric orbits
+
+By default the orbit is circular, `planet.orbit = CircularOrbit()`: the solar
+declination follows the zenith's `solar_declination` and the Sun–planet distance
+is constant. An elliptical orbit is set with a `KeplerOrbit`
+
+```@example radiation
+orbit = KeplerOrbit(eccentricity=0.0167, longitude_of_perihelion=282.9)
+planet = Earth(spectral_grid; orbit)
+```
+
+`eccentricity` is the orbit's eccentricity e and `longitude_of_perihelion` [˚]
+the true solar longitude at perihelion, measured from the vernal equinox, which
+sets where perihelion falls in the year (precession). The values above are
+present-day Earth, with perihelion in early January. Following the PMIP protocol,
+the vernal equinox stays fixed at `planet.equinox`, so precession moves perihelion
+through the calendar.
+
+Once per time step the orbit position is computed from `orbit_time`: Kepler's
+equation for the eccentric anomaly E, the true anomaly and solar longitude λ, the
+solar declination sin(δ) = sin(tilt)·sin(λ) and the distance factor (a/r)² = 1/(1 - e cos E)².
+The shortwave schemes multiply `solar_constant` by this distance factor, stored
+as the scalar `solar_distance_factor` in `vars.parameterizations`, so the incoming
+radiation varies by a factor ((1+e)/(1-e))² between aphelion and perihelion,
+about 7% for Earth. Averaged over an orbit, the factor is 1/√(1 - e²), so an
+eccentric orbit also receives slightly more energy in the annual mean.
+
+The Last Interglacial orbit about 127,000 years ago (PMIP4's `lig127k`), with a
+larger eccentricity and perihelion just after the northern summer solstice, is
+
+```@example radiation
+orbit = KeplerOrbit(eccentricity=0.0394, longitude_of_perihelion=95.4)
+planet = Earth(spectral_grid; axial_tilt=24.04, orbit)
+```
+
+!!! note "Calendar effect"
+    With a fixed vernal equinox, eccentric orbits change the length of the seasons
+    (Kepler's second law), so calendar-month means sample slightly different parts of
+    the orbit than for a circular orbit. This "calendar effect" is not corrected for.
+
 ## Shortwave radiation
 
 The surface albedo used by the shortwave radiation schemes is a separate model component,

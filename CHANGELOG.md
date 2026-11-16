@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Eccentric orbits: `planet.orbit` is `CircularOrbit()` (default) or `KeplerOrbit(eccentricity, longitude_of_perihelion)`, with the solar declination and the Sun–planet distance factor (a/r)² computed once per time step in the solar zenith and applied in all shortwave schemes [#1407](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1407)
 - Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)
 - Fix the differentiability of `TwoBandShortwave` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
 - `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90 implementation, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
