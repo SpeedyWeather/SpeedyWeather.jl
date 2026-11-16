@@ -19,6 +19,9 @@ Base revision: `caed82d647c38b6fd793ff49ff674e62d437b8cc` (`main`, branch `mg/tu
 - **2026-11-16, initial draft** (prompt: "make a markdown plan that we can continue to update while we wait").
   Written while the first 30-year diagnostic runs are in progress. Records the setup, first-year energy budgets
   and the planned experiments.
+- **2026-11-16, scope decided** (prompt: "the observed one, yes cloud albedo, optimal depth can be tuned as well").
+  The tuning targets the observed global energy budget (Wild et al. 2013). Cloud albedo and the Frierson longwave
+  optical depths are in scope as well as the shortwave absorptivities.
 
 ## Problem description
 
@@ -106,7 +109,68 @@ January–May so far, so not comparable with the 12-month `main_default` row), a
    shortwave down is high (196 vs ≈185).
 5. **Sensible heat flux is about twice the observed value** (43 vs ≈20 W/m²). This is outside the scope of this
    tuning but is recorded here.
-6. **Caveat on the direction of the tuning.** With a grey longwave at fixed optical depth, moving shortwave
+6. **The top layer warms and moistens year after year since #1262.** On `main`, the top-layer (σ = 0.0625,
+   0–125 hPa) mean temperature rises 232 → 241 K and its maximum 264 → 283 K over 4 years. Its specific humidity
+   rises 80-fold, 0.0018 → 0.15 g/kg (observed stratospheric water vapour is ≈0.003 g/kg). `pre_albedo` behaves the
+   same. Before #1262 (`pre_radiation`) the top layer stays dry (0.001–0.004 g/kg), with maxima of 250–268 K. At
+   0.15 g/kg, the near-IR absorptivity of 15000 per kg/kg gives the top layer a near-IR optical depth of ≈0.3–0.4.
+   In polar summer that is ≈8 W/m², or ≈0.6 K/day, on top of ≈1.2 K/day of ozone heating, in a layer whose
+   longwave cooling is weak (Frierson τ ≈ 0.02–0.08 plus the stratospheric emissivity of 0.05). This is a positive
+   feedback: a warmer top layer has a much higher saturation humidity (≈3.8 g/kg at 240 K and 60 hPa), so moisture
+   arriving from below is never condensed out, and it absorbs more near-IR. This is the leading candidate for the
+   long-run instability (the "water vapour absorption" of the originating prompt).
+7. **speedy.f90 has no water vapour absorption in its top layer.** Its layer 1 (0–50 hPa) only has dry-air
+   absorption in the visible band (`tau2(:,:,1,1) = exp(-psaz*dhs(1)*absdry)`, and the near-IR loop is
+   `do k = 2, kx`). Our 8 equally spaced σ-layers put 0–125 hPa into the top layer, which absorbs in both bands with
+   its own humidity.
+8. **The near-IR band is saturated in the troposphere.** With q ≈ 5 g/kg and Δp = 125 hPa, a lower-tropospheric
+   layer has a near-IR optical depth of ≈9. Lowering `absorptivity_water_vapor_near_infrared` by a factor of ~10
+   would therefore barely change the tropospheric absorption of that band, but would cut the stratospheric heating
+   by the same factor.
+9. **`ThermodynamicSeaIce` is an energy source, so net TOA can't reach zero.** On `main` in years 3–5, net TOA
+   stays at −4.6 to −5.8 W/m² and the surface budget at ≈−6 W/m², while SST is flat (287.3 → 287.0 K). The
+   atmosphere is in balance (+1 W/m²). In `filter!(vars, ::ThermodynamicSeaIce, model)`, SST below the freezing
+   point is reset to 271.35 K after every time step, and the ice concentration is clamped at 1. An ice-covered
+   ocean keeps losing heat to the atmosphere (in polar night ≈300 W/m² of longwave emission plus sensible heat into
+   230–240 K air) but never cools. It isn't insulated by the ice. With ≈8% of the globe ice covered, this supplies
+   the missing ≈5–6 W/m², and probably most of the doubled sensible heat flux (44 vs ≈20 W/m²). It also prevents a
+   snowball. This is a structural issue of the sea ice model, not a tuning parameter, and it's out of scope here
+   (see future work). For the tuning it means that the steady-state net TOA is about −(sea-ice heat source), not
+   zero. The tuning therefore targets the individual budget terms (OSR, OLR, atmospheric and surface shortwave) and
+   a steady SST, not net TOA = 0.
+10. **Raising the absorptivities strengthens the stratospheric feedback** (session d3's wv × dry grid, 20 y runs).
+   Visible water vapour absorptivity raises atmospheric shortwave absorption about linearly: 53.7 / 65.3 / 78.2 /
+   92.6 W/m² for `wv` = 22 / 44 / 66 / 88 in year 1. `dry` = 0.066 adds about 12 W/m². However, OLR rises almost
+   as much as OSR falls (`wv` = 66: OSR −11, OLR +9), so net TOA improves by only 1–3 W/m². Every increase of `wv`
+   or `dry` heats the top layers faster. With `wv` = 88 and `dry` = 0.066, q₁ reaches 0.64 g/kg, q₂ 0.70 g/kg, and
+   the top-layer maximum 307 K by May of year 3. The observed atmospheric absorption is therefore only reachable once
+   the stratospheric water vapour feedback is cut (finding 6).
+11. **A lower near-IR water vapour absorptivity removes the stratospheric feedback** (`s1_*`, year-2 annual means).
+   The near-IR band heats layers 1 and 2 enough to let moisture in, and the moisture then absorbs more.
+
+   | run | atm SW | T₁ / T₂ [K] | max T₁ | q₁ / q₂ [g/kg] | SST | net TOA | OSR | LW sfc down |
+   |---|---|---|---|---|---|---|---|---|
+   | default (`wv_nir` = 15000) | 50.7 | 237 / 239 | 269 | 0.090 / 0.300 | 288.0 | −10.6 | 120.9 | 307.9 |
+   | `wv_nir` = 5000 | 51.6 | 230 / 220 | 265 | 0.0017 / 0.019 | 288.8 | −6.6 | 116.0 | 315.3 |
+   | `wv_nir` = 1500 | 50.1 | 231 / 219 | 264 | 0.0008 / 0.011 | 289.2 | −6.1 | 114.8 | 318.9 |
+   | `wv_nir` = 0 | 35.0 | 230 / 218 | 266 | 0.0009 / 0.014 | 289.5 | −5.6 | 117.4 | 317.4 |
+   | `strat_emis` = 0.1 | 50.9 | 215 / 209 | 266 | 0.0059 / 0.009 | 288.1 | −9.6 | 118.3 | 308.8 |
+   | `wv` = 60 | 66.2 | 243 / 246 | 283 | 0.166 / 0.446 | 288.1 | −12.0 | 115.9 | 311.1 |
+   | `wv` = 100 | 84.8 | 255 / 254 | 322 | 0.337 / 0.652 | 288.0 | −13.6 | 109.5 | 314.7 |
+   | `dry` = 0.066 | 62.3 | 243 / 247 | 279 | 0.111 / 0.384 | 288.0 | −11.9 | 116.1 | 309.3 |
+   | `aer` = 0.066 | 54.0 | 236 / 240 | 264 | 0.084 / 0.306 | 288.1 | −10.9 | 119.6 | 309.1 |
+   | `cloud_albedo` = 0.35 | 55.4 | 240 / 243 | 271 | 0.121 / 0.376 | 289.9 | −6.3 | 103.1 | 320.9 |
+   | `cloud_albedo` = 0.30 | 58.9 | 241 / 245 | 276 | 0.118 / 0.413 | 291.1 | −3.1 | 91.8 | 328.8 |
+   | `τ₀` = 7 / 1.75 | 52.1 | 235 / 234 | 271 | 0.097 / 0.236 | 289.2 | −5.0 | 117.4 | 323.2 |
+   | `τ₀` = 8 / 2 | 53.9 | 232 / 230 | 264 | 0.075 / 0.195 | 290.3 | −1.4 | 114.4 | 336.8 |
+
+   With `wv_nir` ≤ 5000 the top two layers stay dry, and layer 2 at 219 K is close to the observed ≈218 K at
+   200 hPa. A value of 1500 leaves the tropospheric absorption unchanged, because the band stays saturated there;
+   0 removes ≈16 W/m². Increasing the stratospheric emissivity also keeps the top dry, but cools layers 1–2 well
+   below observed values. Increases of `wv` or `dry` with the default near-IR absorptivity strengthen the feedback.
+   For the budget: `cloud_albedo` ≈ 0.34 gives OSR ≈ 100, `τ₀` ≈ 8 / 2 gives LW surface down ≈ 337 (obs ≈ 342),
+   and `wv` ≈ 75 should give atmospheric absorption ≈ 79 W/m².
+12. **Caveat on the direction of the tuning.** With a grey longwave at fixed optical depth, moving shortwave
    absorption from the surface into the atmosphere cools the surface for a given TOA balance (anti-greenhouse
    effect). The only TOA effect of more absorption is a lower OSR, from absorption above the cloud tops and in the
    reflected beam. More absorption alone may therefore not stop a cold drift. The experiments below test this
@@ -134,6 +198,19 @@ Short runs (2–5 years), many in parallel as Slurm jobs, varying one parameter 
 Diagnostics per run: annual net TOA, planetary albedo, atmospheric and surface shortwave, SST and sea-ice trend.
 The target is atmospheric shortwave absorption of ≈70–80 W/m², a TOA imbalance that approaches zero without a
 runaway, and global-mean SST and sea-ice extent in a plausible range.
+
+### Phase 2b: cut the stratospheric water vapour feedback
+
+Two alternatives, run in parallel:
+
+- **Tuning only:** lower `absorptivity_water_vapor_near_infrared` (`s1_nir*`). The near-IR band stays saturated in the
+  troposphere, so the cost is small.
+- **Structural (session ed):** a new `TwoBandShortwaveTransmissivity` option `water_vapor_pressure_top` [Pa], with
+  default 0 for the current behaviour. Water vapour (visible and near-IR) only absorbs in the part of each layer
+  below it, using the same pressure overlap as `SeasonalOzone`. It is tested at 50 / 100 / 140 hPa with the default
+  absorptivities and with `wv` = 66 / `dry` = 0.066 and `wv` = 88 / `dry` = 0.033. This follows speedy.f90, whose
+  0–50 hPa layer has no water vapour absorption. It is developed in its own worktree (`tree_ed_strat`), not in the
+  repository.
 
 ### Phase 3: validate candidates
 
@@ -176,21 +253,31 @@ Planned, pending the experiments:
 
 ## Future work
 
-- If tuning the absorptivities alone can't remove the cold drift, the next candidates are cloud albedo (0.43), the
-  Frierson optical depths, and the sensible heat flux (twice the observed value). These need a decision on scope
-  (see open questions).
+- The sensible heat flux is about twice the observed value. It is out of scope here and needs its own look at
+  the surface fluxes and boundary layer.
+- A longwave scheme with a water vapour dependence would replace the prescribed Frierson optical depth.
+- Energy-conserving sea ice: an ice surface temperature that can drop below freezing (insulating ice with
+  conductive flux), and ice growth that removes the latent heat of fusion from the ocean instead of resetting SST.
+  Required for a closed TOA budget (finding 9).
 
-## Open questions
+## Decisions
 
-1. **Tuning target:** observed global budgets (atmospheric absorption ≈79 W/m²) or speedy.f90's budget (≈62 W/m²)?
-2. **Scope if the absorptivities aren't enough:** may other parameters (cloud albedo, Frierson τ₀, surface fluxes)
-   be tuned in the same PR, or should that be a follow-up?
+1. **Tuning target:** the observed global-mean energy budget (Wild et al. 2013), not speedy.f90's.
+2. **Scope:** the shortwave absorptivities, `cloud_albedo` of `DiagnosticClouds` (0.43) and the optical depths
+   `τ₀_equator`, `τ₀_pole` of `FriersonLongwaveTransmissivity` may all be tuned in this PR. The surface fluxes
+   stay out of scope.
 
 ## Experiment log
 
 | Label | Revision / config | Length | Status | Notes |
 |---|---|---|---|---|
 | `smoke` | `main` | 60 days | completed | script check, net TOA −14 to −19 W/m² |
-| `main_default` | `main` defaults | 30 years | running | |
-| `pre_albedo` | `3245c69f` | 30 years | running | |
-| `pre_radiation` | `b43dc87c` | 30 years | running | |
+| `main_default` | `main` defaults | 30 years | running | year 4: net TOA −4.5, SST 287.2 K, ice 0.115, top layer 240 K / max 283 K, q₁ 0.15 g/kg |
+| `pre_albedo` | `3245c69f` | 30 years | running | same as `main` within noise |
+| `pre_radiation` | `b43dc87c` | 30 years | running | colder (SST 283 K), top layer dry (q₁ ≈ 0.002 g/kg) |
+| `s1_*` (Slurm 3279280, 7f) | one-at-a-time: `wv_nir` 0/1500/5000, `wv` 60/100, `dry` 0.066, `aer` 0.066, `cloud_albedo` 0.35/0.30, `τ₀` ×7/6 and ×4/3, `strat_emis` 0.1, plus default | 6 years each | running | year-2 results in finding 11: `wv_nir` ≤ 5000 keeps the stratosphere dry |
+| `s1b_*` (Slurm 3279354, 7f) | `wv_nir` 500/1500/3000 × `wv` 60/80/100, `dry` 0.05/0.066 combinations, and `wv_nir` = 1500 alone for 30 y | 10 years (one 30) | submitted | does the stratosphere stay dry with more visible absorption? |
+| `wv{44,66,88}_dry{0.033,0.066}` (login02, d3) | 2D grid with default `wv_nir` | 20 years | running | finding 10 |
+| sweep2 `cl*`, `tau*`, `fl*`, `c1`–`c6` (Slurm 3279283, d3) | cloud albedo, `τ₀`, `fₗ`, and combinations with default `wv_nir` | 15 years | running | session d3 ended. 7f reads the results |
+| `c7`–`c13` (Slurm 3279366, 7f) | all `wv_nir` = 1500: `wv` 65/75/85, `cloud_albedo` 0.37/0.40/0.43, `τ₀` 7.5/1.875 and 8/2, one with `dry` = 0.045 | 15 years | submitted | first combined candidates |
+| `ed_*` (Slurm 3279344, ed) | `water_vapor_pressure_top` 50/100/140 hPa, alone and with `wv` 66/88 | | running | structural variant, own worktree `tree_ed_strat` |
