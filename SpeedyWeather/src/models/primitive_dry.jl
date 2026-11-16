@@ -89,7 +89,7 @@ $(TYPEDFIELDS)"""
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
     @component radiation::RA = DryRadiation(spectral_grid)
-    @component greenhouse_gases::GHG = (;)
+    @component greenhouse_gases::GHG = (; co2 = CO2(spectral_grid))
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
