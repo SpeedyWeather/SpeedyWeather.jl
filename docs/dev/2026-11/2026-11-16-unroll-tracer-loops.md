@@ -1,6 +1,6 @@
 # Unroll the tracer loops over compile-time tracer names
 
-> Status: **in progress**. Plan signed off with the recommended answers to the open questions; implementation started on branch `mg/unroll-tracer-loops`.
+> Status: **in progress**. Implemented on branch `mg/unroll-tracer-loops` and verified locally (see "Results" below); no PR yet.
 
 Date of initial draft: 2026-11-16
 
@@ -29,6 +29,20 @@ Base revision: b06af911
   `get_prognostic_step`. The primitive-equation site passed no model before, but the only model-specific
   `which_prognostic_step` methods are for `TwoDModels`, so for primitive equation models the 4-argument call falls back
   to the 3-argument one and nothing changes.
+- 2026-11-16: Reactant correctness test with tracers. `compare_arrays` only compares top-level arrays, so tracers (in
+  their own namespace) would not have been compared. Added `compare_tracers` for the `tracers`/`grid_tracers`
+  namespaces, a `tracers` keyword to `test_model`, and a check that the tracers are advected, not merely frozen.
+  Cases: BarotropicModel and PrimitiveDryModel with one tracer each; the latter covers vertical advection and the
+  primitive-equation transform and diffusion.
+- 2026-11-16: the same Reactant tracer test also passes on main. Reactant traces the time step once, so on main the
+  `Dict` loop (which no longer exists on this branch) runs in plain Julia at compile time and the compiled program
+  already contains one block of operations per active tracer. On this branch the `@generated` `foreach_active_tracer`
+  does that unrolling in Julia, and only the `tracer_active` lookup is evaluated during tracing. Both compile to the
+  same Reactant program, so under Reactant the change adds test coverage rather than fixing anything.
+- 2026-11-16: differentiating `time_step!` in forward and reverse mode on Julia 1.12 with Enzyme 0.13.220 prints many
+  "Cannot deduce type of store `store i64 -1`" warnings in `_transform!` and `dynamics_tendencies!` (and, with a
+  tracer, in `horizontal_advection_tracer!`, which calls the same transforms). They appear without tracers too, so
+  they are unrelated to this change. CI runs these tests on Julia 1.10 and 1.11 and doesn't show them.
 
 ## Problem description
 
@@ -219,6 +233,25 @@ Checks done once during development (results go in the PR):
 No benchmark run is planned. The removed per-step work is one iteration over a (usually empty) `Dict` per site,
 negligible compared with the transforms.
 
+### Results (2026-11-16, Julia 1.12.7, aarch64 macOS)
+
+- **Bitwise regression:** identical. All 42 arrays (prognostic, grid and tendency tracers, vorticity, `u`) of
+  BarotropicModel, ShallowWaterModel and PrimitiveWetModel with three tracers are bitwise equal to main after 20 steps.
+  One tracer was deactivated after 10 steps and one deleted after initialization. Two runs on main were identical too,
+  so the comparison is deterministic.
+- **Unit tests** (`--check-bounds=yes`):
+  - `test/dynamics/tracer_advection.jl`: 6377 passed, including the 8 new ones.
+  - `test/dynamics/dispatch.jl`: all 3 JET tests passed, including the new tracer case.
+- **Differentiability** (Enzyme 0.13.220):
+  - `parameters.jl` (including "tracer_active is inactive") and `nested_ad.jl` pass.
+  - The new tracer case of `forward_mode.jl` passes. Forward mode with a populated tracer registry works now, and the
+    tracer block satisfies the forward/reverse dot-product identity. 49 of 49 passed.
+- **Warnings:** the CPU reference gradient of `test/reactant/differentation.jl` compiles without any
+  "Cannot deduce type of load" warning; main with the same Enzyme gave 2.
+- **Reactant** (0.2.308, versions as in CI): the new correctness cases pass. BarotropicModel with a tracer: 13 of 13.
+  PrimitiveDryModel with a tracer: 22 of 22. In both, the tracer differences between CPU and Reactant are comparable to
+  those of vorticity, within the default tolerances.
+
 ## Documentation changes
 
 - `docs/src/tracers.md`, "Add/delete tracers": say that `run!` now raises an error for tracers added after
@@ -231,8 +264,11 @@ negligible compared with the transforms.
 - The `move_prognostic_grid_variables_back!` warning in the Enzyme CI remains. It has a different cause, not inspected.
 - Tracers still cannot be added after `initialize!(model)`; the change only turns a confusing late error into a clear
   early one.
-- With Reactant, `active` is read at trace time, as it is today. Toggling a tracer after compilation is only honoured
-  if the program is recompiled.
+- With Reactant, `active` is read when the program is compiled, as on main. Every `run!` compiles the time stepping
+  again (`@compile` in the extension's `time_stepping!`), so (de)activating a tracer between `run!` calls works. A
+  switch during a run, e.g. from a callback, does not reach the compiled program.
+- Forward/reverse differentiation of `time_step!` on Julia 1.12 prints "Cannot deduce type of store" warnings from the
+  spectral transforms (see revision log), unrelated to the tracers.
 - `tracer_active` asserts a `Bool`. A user-constructed `Tracer{B}` with a non-`Bool` `B` (the parameter introduced in
   #970) would fail there; nothing in the package creates one.
 - Compile time grows by one specialization per tracer name and site. This is negligible for a handful of tracers.
@@ -241,10 +277,12 @@ negligible compared with the transforms.
 
 - Give the registry a concrete value type (`Dict{Symbol, Tracer{Bool}}`) or replace it with an immutable collection
   fixed at initialization. That would also make `tracer.active` a plain field load.
-- Investigate the remaining `move_prognostic_grid_variables_back!` warning.
-- Add tracers to the Reactant test suite if the check above shows it is not yet possible.
+- Investigate the remaining `move_prognostic_grid_variables_back!` warning and the Julia 1.12 store warnings in the
+  spectral transforms.
 
 ## Open questions
+
+Resolved at sign-off (see revision log): all three recommendations taken.
 
 1. **Remove the custom `iterate(::TRACER_DICT)` rules?** Recommended. After this change nothing in the package iterates
    the registry in differentiated code, and the rules are marked temporary. The cost: user code that iterates

@@ -288,3 +288,7 @@ test_model(PrimitiveWetModel)
 # single-layer variables (Barotropic) and the batched multi-layer transforms with all physics (PrimitiveWet)
 test_model(BarotropicModel; Transform = SpectralTransform)
 test_model(PrimitiveWetModel; Transform = SpectralTransform)
+
+# tracers: transformed, diffused, advected and time stepped per tracer name, compared in their own namespaces.
+# PrimitiveDry also covers the vertical advection of tracers and the primitive equation transform/diffusion
+test_model(PrimitiveDryModel; tracers = (:tracer,))
