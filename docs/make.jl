@@ -65,6 +65,7 @@ makedocs(
             "Large-scale condensation" => "large_scale_condensation.md",
             "Convection" => "convection.md",
             "Radiation" => "radiation.md",
+            "Albedo" => "albedo.md",
             "Vertical diffusion" => "vertical_diffusion.md",
             "Surface fluxes" => "surface_fluxes.md",
         ],

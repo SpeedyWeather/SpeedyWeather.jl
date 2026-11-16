@@ -4,8 +4,13 @@ function init_shortwave_state!(vars, model)
     vars.grid.pressure .= 1.0e5
     vars.parameterizations.cloud_top .= model.spectral_grid.nlayers + 1
     vars.parameterizations.rain_rate .= 0
-    vars.parameterizations.ocean.albedo .= 0.5
-    vars.parameterizations.land.albedo .= 0.3
+    # surfaces with direct (black-sky) and diffuse (white-sky) albedo, e.g. JinOceanAlbedo or LearnedLandAlbedo,
+    # are blended into the albedo by the shortwave scheme, so set those too
+    for (surface, albedo) in ((vars.parameterizations.ocean, 0.5), (vars.parameterizations.land, 0.3))
+        surface.albedo .= albedo
+        haskey(surface, :black_sky_albedo) && (surface.black_sky_albedo .= albedo)
+        haskey(surface, :white_sky_albedo) && (surface.white_sky_albedo .= albedo)
+    end
     vars.parameterizations.surface_pressure .= 1.0e5
     return nothing
 end

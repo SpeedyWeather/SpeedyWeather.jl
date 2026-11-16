@@ -319,7 +319,7 @@ The snow budget links into other surface schemes:
 
 - `snow_melt_rate` provides a latent heat sink to the land temperature budget.
 - The same flux (converted to ``m/s`` by dividing by ``ρ_w``) feeds the soil moisture tendency alongside rain.
-- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see [Albedo](@ref) below).
+- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see [Albedo](@ref)).
 
 Snow cover over land is diagnosed from snow depth using either a linear ramp
 ``σₛ = \min(S / \text{snow\_depth\_scale}, 1)`` or the default saturating form
@@ -328,7 +328,8 @@ Snow cover over land is diagnosed from snow depth using either a linear ramp
 σₛ = \frac{S}{S + \text{snow\_depth\_scale}},
 ```
 
-set via the `snow_cover` keyword of `LandSnowAlbedo`. Snow then adds an albedo to the land albedo
+set via the `snow_cover` keyword of `LandSnowAlbedo` or `LearnedLandAlbedo` (the default),
+see [Albedo](@ref). With `LandSnowAlbedo` snow then adds an albedo to the land albedo
 (diagnosed from vegetation cover)
 
 ```math
@@ -339,96 +340,6 @@ so snow depth from the snow bucket immediately brightens land grid cells.
 The total albedo is higher over already brighter areas (low vegetation cover)
 and lower over darker areas. This somewhat reflects that in forests the
 snow cover is broken up and snow lies in between trees.
-
-## Albedo
-
-Albedo is the surface reflectivity to downward solar shortwave radiation.
-A value of 1 indicates that all of the radiative flux is reflected at
-the Earth's surface and sent back up through the atmospheric column.
-In contrast, a value of 0 means no reflection and all of that radiative
-flux is absorbed, typically heating ocean or land surface.
-The following albedo's are currently implemented
-
-```@example land
-subtypes(SpeedyWeather.AbstractAlbedo)
-```
-Albedo is generally a 2D global diagnostic variable for ocean and land separately.
-You can keep it constant or diagnose it from other fields on every time step:
-`OceanSeaIceAlbedo` mixes in sea ice concentration and `LandSnowAlbedo` uses the
-snow depth bucket described above. Conceptually albedo is not a static boundary
-condition but recomputed each step so transient surface changes (e.g. snowfall)
-brighten the surface without losing the underlying bare albedo. If you want to set
-albedo manually with `set!` then use `ManualAlbedo` which has its own albedo 2D field
-that is copied into the diagnostic variables on every time step.
-See example below.
-`AlbedoClimatology` does the same but `ManualAlbedo` does not need
-to read an albedo from file at initialization.
-
-`Albedo` itself is a container for separate albedo's for ocean and land as
-averaging those in grid cells which are partially land, partially ocean will
-yield inaccurate results. Think 10% land having a lower heat capacity than
-land but being treated with an albedo that comes from 90% ocean.
-Not very realistic. The default albedo can be created with
-
-```@example land
-albedo = OceanLandAlbedo(spectral_grid)
-```
-
-and inspected with
-
-```@example land
-albedo.ocean
-```
-
-and `albedo.land`. You can mix those albedos too, they are internally
-two independent albedos that are applied to fluxes separately, e.g.
-
-```@example land
-albedo = OceanLandAlbedo(GlobalConstantAlbedo(spectral_grid), AlbedoClimatology(spectral_grid))
-```
-
-constructs an albedo that is a global constant (default 0.3) for the ocean
-but the `AlbedoClimatology` read from file used for the land.
-The first argument for `Albedo` is used for ocean the second for land
-but you can use keywords too.
-
-Alternatively you can also drop the separation into ocean/land albedo
-(e.g. idealised simulations or aqua planet, rocky planet). And just
-use
-
-```@example land
-albedo = GlobalConstantAlbedo(spectral_grid)
-```
-
-and this definition of the albedo will be used for both ocean and land fluxes.
-In all cases you can then pass on the albedo to the model constructor, e.g.
-
-```@example land
-albedo = OceanLandAlbedo(GlobalConstantAlbedo(spectral_grid, albedo=0.1), ManualAlbedo(spectral_grid))
-set!(albedo.land, (λ, φ) -> 0.2 + 0.3*abs(φ)/90)
-
-model = PrimitiveWetModel(spectral_grid; albedo)
-model.albedo
-```
-
-The albedo in the `model` is now the one defined just in the lines above,
-using a globally constant albedo of 0.1 for the ocean but a higher albedo
-over land which also increases to 0.5 towards the poles.
-
-You can always output the land-sea mask weighted albedo with
-`add!(model, OutputVariables.Albedo())` or inspect it as follows
-
-```@example land
-simulation = initialize!(model)
-run!(simulation, steps=1)   # run for a step to "diagnose" albedo = ocean/land weighted
-
-using CairoMakie
-(; albedo) = simulation.variables.parameterizations
-heatmap(albedo, title="Custom albedo, separately defined for ocean/land")
-save("ocean_land_albedo.png", ans) # hide
-nothing # hide
-```
-![Ocean-land albedo](ocean_land_albedo.png)
 
 ## Terrarium coupling
 
