@@ -241,6 +241,7 @@ function output!(
     field, host = scratch_fields(output, variable)
 
     # everything but the I/O (write_output!), compiled with Reactant in case it's used
+    # the `@maybe_jit` here is just a fallback in case this is called output of the regular output 
     @maybe_jit architecture(field) interpolate_output!(field, output, variable, simulation)
     write_output!(output, variable, field, host)    # to host, round and write
     return nothing
