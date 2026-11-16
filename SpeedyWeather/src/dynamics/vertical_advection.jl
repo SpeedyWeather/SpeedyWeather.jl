@@ -33,16 +33,18 @@ function vertical_advection!(vars::Variables, model)
     vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model)
     vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model)
 
-    for (name, tracer) in model.tracers
-        if tracer.active
-            ξ_tend = vars.tendencies.grid_tracers[name]
-            ξ = vars.grid.tracers[name]
-            s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
-            s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme, model)
-            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
-        end
-    end
+    # and the active tracers, likewise unrolled per name
+    foreach_active_tracer(vertical_advection_tracer!, vars, model, w, Δσ, advection_scheme)
     return nothing
+end
+
+# vertical advection of tracer `name`, called for every active tracer by `foreach_active_tracer`
+function vertical_advection_tracer!(::Val{name}, vars, model, w, Δσ, advection_scheme) where {name}
+    tracer_tend = getfield(vars.tendencies.grid_tracers, name)
+    tracer = getfield(vars.grid.tracers, name)
+    tendency_step = which_tendency_step(tracer_tend, model.time_stepping, advection_scheme)
+    prognostic_step = which_prognostic_step(tracer, model.time_stepping, advection_scheme, model)
+    return _vertical_advection!(tracer_tend, tendency_step, w, tracer, prognostic_step, Δσ, advection_scheme)
 end
 
 # var is a compile-time constant so that haskey and getproperty constant-fold to

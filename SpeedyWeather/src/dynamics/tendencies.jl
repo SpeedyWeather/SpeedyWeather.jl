@@ -799,17 +799,20 @@ function tracer_advection!(
         vars::Variables,
         model::AbstractModel,
     )
-    TS = model.time_stepping
-
-    for (name, tracer) in model.tracers
-        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], TS, DynamicalCore())
-        tracer_tend_grid = get_tendency_step(vars.tendencies.grid_tracers[name], TS, DynamicalCore())
-        tracer_grid = get_prognostic_step(vars.grid.tracers[name], TS, DynamicalCore(), model)
-
-        # add horizontal advection to parameterization + vertical advection + forcing/drag tendencies
-        tracer.active && horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, vars, model, add = true)
-    end
+    # horizontal advection of the active tracers (unrolled per name)
+    foreach_active_tracer(horizontal_advection_tracer!, vars, model)
     return nothing
+end
+
+# horizontal advection of tracer `name`, called for every active tracer by `foreach_active_tracer`
+function horizontal_advection_tracer!(::Val{name}, vars, model) where {name}
+    time_stepping = model.time_stepping
+    tracer_tend = get_tendency_step(getfield(vars.tendencies.tracers, name), time_stepping, DynamicalCore())
+    tracer_tend_grid = get_tendency_step(getfield(vars.tendencies.grid_tracers, name), time_stepping, DynamicalCore())
+    tracer_grid = get_prognostic_step(getfield(vars.grid.tracers, name), time_stepping, DynamicalCore(), model)
+
+    # add horizontal advection to parameterization + vertical advection + forcing/drag tendencies
+    return horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, vars, model, add = true)
 end
 
 """$(TYPEDSIGNATURES)

@@ -73,3 +73,41 @@ end
 function variables(D::TRACER_DICT, model::AbstractModel)
     return (variables(tracer, model) for tracer in values(D)) |> Iterators.flatten |> Tuple
 end
+
+"""$(TYPEDSIGNATURES)
+Whether the tracer `name` is in the tracer dictionary `model.tracers` and active. A tracer deleted
+after initialization is not, so its variables remain unchanged (frozen). A lookup in the dictionary,
+which is not differentiated (inactive for Enzyme)."""
+tracer_active(model::AbstractModel, name::Symbol) = tracer_active(model.tracers, name)
+tracer_active(tracers::TRACER_DICT, name::Symbol) = (haskey(tracers, name) && tracers[name].active)::Bool
+
+"""$(TYPEDSIGNATURES)
+Call `f(Val(name), vars, model, args...)` for every tracer `name` that has variables in `vars` and
+is active in `model.tracers` (see `tracer_active`). Unrolled at compile time over the tracer names
+in the type of `vars`, so that no dictionary is iterated at runtime and `getfield(vars.….tracers, name)`
+inside `f` is type-stable, as needed for Enzyme and Reactant. Does nothing for models without tracers."""
+@generated function foreach_active_tracer(
+        f::F, vars::Variables{Po, G, T}, model::AbstractModel, args...
+    ) where {F, Po, G, T}
+    calls = [
+        :(tracer_active(model, $(QuoteNode(name))) && f(Val($(QuoteNode(name))), vars, model, args...))
+            for name in _namespace_names(T, :tracers)
+    ]
+    return Expr(:block, calls..., :(return nothing))
+end
+
+"""$(TYPEDSIGNATURES)
+Throw an `ArgumentError` if `model.tracers` contains tracers without variables in `vars`, i.e.
+tracers added after the model was initialized, which the time stepping would otherwise skip."""
+function check_tracers(vars::Variables, model::AbstractModel)
+    names_with_variables = tracer_tendency_names(vars)
+    names_without_variables = sort!([name for name in keys(model.tracers) if !(name in names_with_variables)])
+    isempty(names_without_variables) || throw(
+        ArgumentError(
+            "Tracers $(Tuple(names_without_variables)) have no variables as they were added after the model " *
+                "was initialized. Add all tracers before `initialize!(model)` or delete them with " *
+                "`delete!(model, Tracer(name))`."
+        )
+    )
+    return nothing
+end

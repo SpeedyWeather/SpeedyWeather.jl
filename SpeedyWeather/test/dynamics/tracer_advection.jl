@@ -84,6 +84,44 @@ end
     end
 end
 
+@testset "Tracers: deactivated or deleted after initialization stay frozen, added after initialization error" begin
+    spectral_grid = SpectralGrid(nlayers = 1)
+    model = BarotropicModel(spectral_grid)
+    model.feedback.verbose = false
+
+    tracer_names = (:active_tracer, :deactivated_tracer, :deleted_tracer)
+    add!(model, Tracer.(tracer_names)...)
+    simulation = initialize!(model)
+
+    f = (λ, φ, σ) -> exp(-(λ - 180)^2 / 10^2)
+    set!(simulation, active_tracer = f, deactivated_tracer = f, deleted_tracer = f, namespace = :tracers)
+    run!(simulation, period = Day(0))       # all tracers active: transformed to the grid
+
+    # deactivate one, delete one (its variables remain in the simulation)
+    deactivate!(simulation, Tracer(:deactivated_tracer))
+    delete!(model, Tracer(:deleted_tracer))
+
+    (; prognostic, grid) = simulation.variables
+    prognostic0 = Dict(name => copy(getfield(prognostic.tracers, name).data) for name in tracer_names)
+    grid0 = Dict(name => copy(getfield(grid.tracers, name).data) for name in tracer_names)
+    @test all(name -> any(!iszero, grid0[name]), tracer_names)
+
+    run!(simulation, period = Day(1))
+
+    @test getfield(prognostic.tracers, :active_tracer).data != prognostic0[:active_tracer]
+    @test getfield(grid.tracers, :active_tracer).data != grid0[:active_tracer]
+    for name in (:deactivated_tracer, :deleted_tracer)     # frozen
+        @test getfield(prognostic.tracers, name).data == prognostic0[name]
+        @test getfield(grid.tracers, name).data == grid0[name]
+    end
+
+    # a tracer added after initialization has no variables
+    add!(model, Tracer(:late_tracer))
+    @test_throws ArgumentError run!(simulation, period = Day(0))
+    delete!(model, Tracer(:late_tracer))
+    run!(simulation, period = Day(0))       # runs again without it
+end
+
 @testset "Tracers primitive equation models" begin
     @testset for Model in (PrimitiveDryModel, PrimitiveWetModel)
         spectral_grid = SpectralGrid(nlayers = 8)

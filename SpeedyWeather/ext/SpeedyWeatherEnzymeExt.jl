@@ -77,49 +77,12 @@ _make_zero_view!(x) = (Enzyme.make_zero!(x); nothing)
 EnzymeRules.inactive(::typeof(SpeedyWeather.reinitialize!), args...) = nothing
 
 ###
-# TODO
-# Enzyme FORWARD-mode rule for iterating the tracer registry
-#
-# The time stepping iterates `model.tracers::TRACER_DICT` in 9 places (time_integration.jl,
-# time_stepping/transform.jl, horizontal_diffusion.jl, vertical_advection.jl, tendencies.jl).
-# Enzyme's forward mode fails with an internal error compiling `iterate(::Dict)` there, which
-# blocks `autodiff(Forward, time_step!, ...)` for every model.
-#
-# This is a temporary workaround that works for differnetiating the model in forward mode without tracers
-function EnzymeRules.forward(
-        config::EnzymeRules.FwdConfig, func::Const{typeof(Base.iterate)}, ::Type{RT},
-        dict::Annotation{<:SpeedyWeather.TRACER_DICT}, args::Annotation...,
-    ) where {RT <: Annotation}
-    primal = func.val(dict.val, map(a -> a.val, args)...)
-    # the return holds only Symbol/Tracer, so no shadow is ever requested
-    return EnzymeRules.needs_primal(config) ? primal : nothing
-end
-
-# ...and the matching REVERSE rule. Reverse mode over the tracer loop works without any rule, but
-# once a function carries a custom rule Enzyme looks one up for whichever mode is running, so the
-# forward rule above has to be matched by a reverse one for NESTED AD to compile. The iteration
-# still carries no derivative, so the pullback is empty. This is just a temporary workaround.
-function EnzymeRules.augmented_primal(
-        config::EnzymeRules.RevConfig, func::Const{typeof(Base.iterate)}, ::Type{RT},
-        dict::Annotation{<:SpeedyWeather.TRACER_DICT}, args::Annotation...,
-    ) where {RT <: Annotation}
-    primal = func.val(dict.val, map(a -> a.val, args)...)
-    # `iterate` returns `Union{Nothing, Tuple{Pair{Symbol, Tracer}, Int}}`, so the type parameters
-    # have to be pinned explicitly: letting the constructor infer them from the value splits the
-    # return into a Union of two `AugmentedReturn` types, which `primal_type` cannot resolve.
-    return if EnzymeRules.needs_primal(config)
-        EnzymeRules.AugmentedReturn{eltype(RT), Nothing, Nothing}(primal, nothing, nothing)
-    else
-        EnzymeRules.AugmentedReturn{Nothing, Nothing, Nothing}(nothing, nothing, nothing)
-    end
-end
-
-function EnzymeRules.reverse(
-        ::EnzymeRules.RevConfig, ::Const{typeof(Base.iterate)}, ::Type{RT}, tape,
-        dict::Annotation{<:SpeedyWeather.TRACER_DICT}, args::Annotation...,
-    ) where {RT <: Annotation}
-    return ntuple(_ -> nothing, 1 + length(args))    # one entry per argument, no gradients
-end
+# The tracer registry `model.tracers` (a `Dict` of names and `active` flags) carries no derivative.
+# The time stepping is unrolled over the tracer names in the type of the variables and reads the
+# registry only through `tracer_active` (and `check_tracers` before a run), so Enzyme never has to
+# differentiate the `Dict` lookups (in forward mode `iterate(::Dict)` hits an internal Enzyme error).
+EnzymeRules.inactive(::typeof(SpeedyWeather.tracer_active), args...) = nothing
+EnzymeRules.inactive(::typeof(SpeedyWeather.check_tracers), args...) = nothing
 
 ###
 # Enzyme FORWARD-mode rule for `reconstruct` on a model

@@ -69,6 +69,9 @@ function initialize!(
     (; variables, model) = simulation
     progn = variables.prognostic
 
+    # tracers added to the model after it was initialized have no variables, error early
+    check_tracers(variables, model)
+
     # SET THE CLOCK
     (; clock) = progn
     (; time_stepping) = model

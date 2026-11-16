@@ -268,12 +268,16 @@ function horizontal_diffusion!(
     vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, diffusion)
     horizontal_diffusion!(vor_tend, vor, expl, impl)
 
-    for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
-        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
-        tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
-    end
+    # diffuse the active tracers like vorticity (unrolled per name)
+    foreach_active_tracer(horizontal_diffusion_tracer!, vars, model, diffusion, expl, impl)
     return nothing
+end
+
+# horizontal diffusion of tracer `name`, called for every active tracer by `foreach_active_tracer`
+function horizontal_diffusion_tracer!(::Val{name}, vars, model, diffusion, expl, impl) where {name}
+    tracer = get_prognostic_step(getfield(vars.prognostic.tracers, name), model.time_stepping, diffusion)
+    tracer_tend = get_tendency_step(getfield(vars.tendencies.tracers, name), model.time_stepping, diffusion)
+    return horizontal_diffusion!(tracer_tend, tracer, expl, impl)
 end
 
 """$(TYPEDSIGNATURES)
@@ -305,11 +309,8 @@ function horizontal_diffusion!(
     η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, diffusion)
     zero_last_degree!(η_tend)
 
-    for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
-        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
-        tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
-    end
+    # diffuse the active tracers like vorticity (unrolled per name)
+    foreach_active_tracer(horizontal_diffusion_tracer!, vars, model, diffusion, expl, impl)
     return nothing
 end
 
@@ -354,11 +355,8 @@ function horizontal_diffusion!(
         horizontal_diffusion!(humid_tend, humid, expl, impl)
     end
 
-    for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
-        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
-        tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
-    end
+    # diffuse the active tracers like vorticity (unrolled per name)
+    foreach_active_tracer(horizontal_diffusion_tracer!, vars, model, diffusion, expl, impl)
 
     return nothing
 end

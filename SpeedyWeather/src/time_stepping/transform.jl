@@ -39,16 +39,22 @@ function SpeedyTransforms.transform!(
     transform!(u_grid, U, scratch_memory, S, unscale_coslat = true)
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
-    for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S, model)
-        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S, model)
-        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
-    end
+    # transform the active tracers (unrolled per name)
+    foreach_active_tracer(transform_tracer!, vars, model, time_stepping, scratch_memory, S)
 
     # transform random pattern for random process unless random_process=nothing
     transform!(vars, model.random_process, S)
 
     return nothing
+end
+
+# transform tracer `name` from spectral to grid, called for every active tracer by `foreach_active_tracer`.
+# `model` is passed on to `get_prognostic_step` to choose the 1st step on the grid for 2D models,
+# primitive equation models fall back to the method without `model`
+function transform_tracer!(::Val{name}, vars, model, time_stepping, scratch_memory, S) where {name}
+    tracer_spectral = get_prognostic_step(getfield(vars.prognostic.tracers, name), time_stepping, S, model)
+    tracer_grid = get_prognostic_step(getfield(vars.grid.tracers, name), time_stepping, S, model)
+    return transform!(tracer_grid, tracer_spectral, scratch_memory, S)
 end
 
 """
@@ -97,11 +103,8 @@ function SpeedyTransforms.transform!(
     transform!(u_grid, U, scratch_memory, S, unscale_coslat = true)
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
-    for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S, model)
-        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S, model)
-        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
-    end
+    # transform the active tracers (unrolled per name)
+    foreach_active_tracer(transform_tracer!, vars, model, time_stepping, scratch_memory, S)
 
     # transform random pattern for random process unless random_process=nothing
     transform!(vars, model.random_process, S)
@@ -171,11 +174,8 @@ function SpeedyTransforms.transform!(
         unscale_coslat = true
     )
 
-    for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
-        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
-        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
-    end
+    # transform the active tracers (unrolled per name)
+    foreach_active_tracer(transform_tracer!, vars, model, time_stepping, scratch_memory, S)
 
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
     # only do after transforms to avoid copying uninitialized zeros

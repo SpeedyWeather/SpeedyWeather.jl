@@ -28,11 +28,24 @@ function _seed_prognostic!(shadow, vars0, seed) # seed only prognostic atmospher
     return n
 end
 
-@testset "Differentiability: forward vs reverse time_step! ($(nameof(MT)))" for (MT, nlayers) in
-    ((BarotropicModel, 1), (ShallowWaterModel, 1), (PrimitiveWetModel, 2))
+# seed the spectral prognostic tracer `name` with unit-scale random values (tracers are O(1) here)
+function _seed_tracer!(shadow, name, seed)
+    rng = Random.MersenneTwister(seed)
+    d = getfield(shadow.prognostic.tracers, name).data
+    R = real(eltype(d))
+    d .= complex.(randn(rng, R, size(d)), randn(rng, R, size(d)))
+    return length(d)
+end
+
+@testset "Differentiability: forward vs reverse time_step! ($(nameof(MT))$(with_tracer ? " with a tracer" : ""))" for
+    (MT, nlayers, with_tracer) in
+    ((BarotropicModel, 1, false), (ShallowWaterModel, 1, false), (PrimitiveWetModel, 2, false), (BarotropicModel, 1, true))
 
     spectral_grid = SpectralGrid(; truncation = 6, nlayers, NF = Float64)
-    simulation = initialize!(MT(; spectral_grid))
+    model = MT(; spectral_grid)
+    with_tracer && add!(model, Tracer(:abc))
+    simulation = initialize!(model)
+    with_tracer && set!(simulation, abc = (λ, φ, σ) -> exp(-(λ - 180)^2 / 30^2), namespace = :tracers)
     initialize!(simulation)
     run!(simulation, period = Hour(6))
     vars0 = deepcopy(simulation.variables)
@@ -42,6 +55,12 @@ end
     w = make_zero(vars0)
     @test _seed_prognostic!(v, vars0, 1) > 0
     _seed_prognostic!(w, vars0, 2)
+
+    # with a tracer also seed it, so that the tracer block of the Jacobian is tested
+    if with_tracer
+        _seed_tracer!(v, :abc, 4)
+        _seed_tracer!(w, :abc, 5)
+    end
 
     # `make_zero` must produce a genuinely zero shadow: in forward mode the shadow IS the tangent,
     # so a leftover value anywhere (scratch, a scalar Ref) is a bogus seed that corrupts the JVP.
@@ -67,6 +86,7 @@ end
     jv = to_vec(jvp)[1]
     @test all(isfinite, jv)
     @test any(!iszero, jv)
+    with_tracer && @test any(!iszero, jvp.prognostic.tracers.abc.data)     # tracer tangent propagated
 
     lhs = sum(jv .* to_vec(w)[1])                   # <J v, w>
     rhs = sum(to_vec(v)[1] .* to_vec(vjp)[1])       # <v, Jᵀ w>
