@@ -1,7 +1,8 @@
 # Tuning shortwave water vapour and dry-air absorption for stable long T32L8 runs
 
-> Status: **in progress**. Reproducing the long-run instability with 30-year diagnostic runs on `main` and
-> before the two radiation PRs. No source code changed yet.
+> Status: **in progress**. The stratospheric water vapour feedback is identified and two fixes keep the
+> stratosphere dry for 10 years. Combined candidates (15 years) and 1000-year GPU runs are running. No source code
+> changed in the repository yet.
 
 Date of initial draft: 2026-11-16
 
@@ -22,6 +23,12 @@ Base revision: `caed82d647c38b6fd793ff49ff674e62d437b8cc` (`main`, branch `mg/tu
 - **2026-11-16, scope decided** (prompt: "the observed one, yes cloud albedo, optimal depth can be tuned as well").
   The tuning targets the observed global energy budget (Wild et al. 2013). Cloud albedo and the Frierson longwave
   optical depths are in scope as well as the shortwave absorptivities.
+- **2026-11-16, three sessions.** Sessions 7f, d3 and ed (forks of the same conversation) worked in parallel in the
+  same workspace and split the work: 7f the baselines, `s1`/`s1b` and the combined candidates `c7`–`c13`; d3 the
+  wv × dry grid and sweep2; ed the structural `water_vapor_pressure_top` variant and the long-run infrastructure.
+  d3 and later 7f ended; ed continues with everything. No commits to the branch unless the user asks.
+- **2026-11-16, long runs on GPU** (prompt: "submit a gpu job if you want it faster, not multithreaded"). Restartable
+  `run_long.jl` with `ARCH=gpu` and `long_gpu.sh`, see Phase 3. First 1000-year runs submitted.
 
 ## Problem description
 
@@ -170,7 +177,55 @@ January–May so far, so not comparable with the 12-month `main_default` row), a
    below observed values. Increases of `wv` or `dry` with the default near-IR absorptivity strengthen the feedback.
    For the budget: `cloud_albedo` ≈ 0.34 gives OSR ≈ 100, `τ₀` ≈ 8 / 2 gives LW surface down ≈ 337 (obs ≈ 342),
    and `wv` ≈ 75 should give atmospheric absorption ≈ 79 W/m².
-12. **Caveat on the direction of the tuning.** With a grey longwave at fixed optical depth, moving shortwave
+12. **Cutting water vapour absorption above a pressure level works too, but needs 250 hPa at L8** (`ed_pt*`,
+   10-year runs with `water_vapor_pressure_top`, final-year means).
+
+   | run | T₁ / T₂ [K] | max T₁ | q₁ / q₂ [g/kg] | atm SW | OSR | OLR | sfc SW down | SST |
+   |---|---|---|---|---|---|---|---|---|
+   | `main` (year 5) | 239 / 230, rising | 283 | 0.135 / 0.152 | 49.8 | 121.7 | 225.3 | 198.4 | 287.0 |
+   | `p_top` = 50 hPa | 229 / 234 | ≈265 | 0.25 / 0.25 | 49.5 | 121 | 224 | 199 | 286.8 |
+   | `p_top` = 100 hPa | 229 / 223 | ≈265 | 0.043 / 0.17 | 50.5 | 118 | 227.5 | 200 | 287.2 |
+   | `p_top` = 140 hPa | 229 / 220 | ≈263 | 0.025 / 0.12 | 50.3 | 119 | 226.5 | 200.5 | 287.4 |
+   | `p_top` = 250 hPa | 229 / 218 | ≈268 | 0.0022 / 0.013 | 51.5 | 117 | 228 | 200.6 | 287.9 |
+   | 140 hPa, `wv` = 66, `dry` = 0.066 | 235 / 228 | 270–286 | 0.082 / 0.29 | 82.4 | 103 | 242.5 | 182 | 287.6 |
+   | 140 hPa, `wv` = 88 | 230 / 223 | 268–278 | 0.0094 / 0.128 | 80.7 | 105 | 240.5 | 182 | 287.7 |
+   | 250 hPa, `wv` = 66, `dry` = 0.066 | 235 / 225 | ≈275 | 0.0017 / 0.013 | 80 | 108 | 238 | 179 | 287.8 |
+
+   50 hPa (speedy.f90's top-layer boundary) is too shallow for 8 equally spaced σ-layers: layer 2 (125–250 hPa)
+   still heats and moistens. 100–140 hPa stops the warming but leaves layer 2 moist. Only 250 hPa, which excludes
+   layer 2 as well, keeps the stratosphere as dry as before #1262, also with `wv` = 66 and `dry` = 0.066. This
+   confirms that the moistening is driven by layer 2 absorbing with its own water vapour, which `wv_nir` = 1500
+   (finding 11) prevents equally well (q₂ 0.011 g/kg). The tuning-only route needs no code change and keeps water
+   vapour absorption in the tropical upper troposphere, so it is preferred if it stays dry with `wv` = 75–100
+   (`s1b_*`). With the feedback cut, the observed shortwave budget is reachable: `wv` ≈ 66–88 gives atmospheric
+   absorption ≈ 80 W/m², OSR ≈ 103–108 and surface shortwave down ≈ 180, with layers 1–2 flat over 10 years.
+   The remaining gap is the surface longwave (LW down 315 vs ≈342 observed), which τ₀ addresses.
+13. **`wv_nir` = 1500 keeps the stratosphere dry for any visible absorptivity tested** (`s1b_*`, 9 years, means
+   over the last 3). With `wv` = 60 / 80 / 100, q₁ stays at 0.0010–0.0015 g/kg and q₂ at 0.007–0.020 g/kg, and
+   T₁ / T₂ at 231–232 / 219–221 K, while atmospheric SW absorption rises 67 / 77 / 89 W/m². `wv_nir` 500 / 3000
+   behave the same. This tuning-only route is preferred over `water_vapor_pressure_top`, which isn't needed.
+   Sweep2 (`c1`–`c6`, default `wv_nir`) confirms the feedback: all six reach top-layer maxima of 297–321 K with
+   q₁ = 0.2–0.36 g/kg. `τ₀` = 7.2 / 1.8 alone stayed dry for 15 years while neighbouring configurations didn't,
+   so the default sits near a threshold and could flip at any time in a long run. That is a further reason to cut
+   the feedback through `wv_nir` rather than rely on the climate staying below the threshold.
+14. **First combined candidates are close to the observed budget** (`c7`–`c13`, all `wv_nir` = 1500, 11 years,
+   means over the last 3).
+
+   | run | OSR | OLR | atm SW | sfc SW down | LW down | LW up | SH | LH | SST | ice | net TOA |
+   |---|---|---|---|---|---|---|---|---|---|---|---|
+   | observed | 100 | 239 | 79 | 185 | 342 | 397 | 20 | 84 | | | |
+   | `c7`: `wv` 75, `τ₀` 7.5 / 1.875 | 99.5 | 242.4 | 85.8 | 178.2 | 349.1 | 398.5 | 34.5 | 74.3 | 291.0 | 0.056 | −0.6 |
+   | `c10`: `wv` 75, `τ₀` 8 / 2 | 98.7 | 242.5 | 88.2 | 175.5 | 355.4 | 402.3 | 33.7 | 75.3 | 291.6 | 0.046 | 0.0 |
+   | `c13`: `wv` 85, `τ₀` 7.5 / 1.875 | 97.6 | 244.3 | 92.1 | 173.2 | 350.5 | 398.5 | 33.0 | 72.8 | 291.0 | 0.054 | −0.6 |
+   | `c8`: `c7` + `cloud_albedo` 0.40 | 94.3 | 247.2 | 90.4 | 178.3 | 353.8 | 402.8 | 33.8 | 75.7 | 291.7 | 0.049 | −0.3 |
+
+   Raising `τ₀` warms the climate and moistens the troposphere, so the shortwave absorption overshoots (85.8 instead
+   of ≈79 W/m² for `wv` = 75). From `s1b`, absorption changes by ≈0.5 W/m² per unit of `wv`, so `wv` ≈ 60–65
+   should give ≈79. The default `cloud_albedo` = 0.43 already gives OSR ≈ 100 once the atmosphere absorbs more.
+   Net TOA approaches zero because the sea-ice heat source (finding 9) shrinks with the ice cover (0.12 → 0.05).
+   Sensible heat (≈34 vs 20) and latent heat (≈74 vs 84) remain off, as expected from the out-of-scope surface
+   fluxes. Round 2 (`r2_*`) refines `wv` 55–65 and `τ₀` 7.0–7.5.
+15. **Caveat on the direction of the tuning.** With a grey longwave at fixed optical depth, moving shortwave
    absorption from the surface into the atmosphere cools the surface for a given TOA balance (anti-greenhouse
    effect). The only TOA effect of more absorption is a lower OSR, from absorption above the cloud tops and in the
    reflected beam. More absorption alone may therefore not stop a cold drift. The experiments below test this
@@ -214,9 +269,19 @@ Two alternatives, run in parallel:
 
 ### Phase 3: validate candidates
 
-- 100-year runs of the 2–3 best candidates (Slurm, `standard` partition).
-- One 1000-year run of the chosen configuration. At ≈600 SYPD, a millennium takes ≈40 h, which exceeds the 1-day
-  `priority`/`short` QOS, so it runs on the `medium` QOS (7 days) or is chained with restart files.
+- Long runs go on the GPU (prompt: "submit a gpu job if you want it faster, not multithreaded"). On the CPU,
+  4 Julia threads were slightly slower than 1 (≈13 vs ≈12 s per simulated month). The CUDA run of T32L8 does
+  ≈3600 SYPD on login02's A40 including the diagnostics, so a millennium takes a few hours on an H100.
+- `run_long.jl` (workspace) runs T32L8 with the same monthly diagnostics as `run_diag.jl`, frozen as a copy, on
+  CPU or GPU (`ARCH=gpu`). It runs in chunks and writes `runs/LABEL_restart/restart.jld2` after each one, using
+  `WriteVariablesRestartFile`, written to a temporary file and then moved into place. If that file exists it
+  resumes from it (`StartFromFile`, which also restores the clock, ocean, land and sea ice). Tested on CPU and on
+  the A40: the resumed run continues the same climate (SST 291.1 vs 291.2 K, sea ice 0.049 vs 0.048 one month
+  after the restart point).
+- `long_gpu.sh` runs all lines of a config file concurrently on one GPU (`gpushort` QOS, 1 day), one process each.
+  Resubmitting the same config resumes every run. The GPU environment (`tree/SpeedyWeather/test/GPU/CUDA`) must be
+  precompiled on login02, never on a GPU-less node, because the depot is shared.
+- 100-year runs of the 2–3 best candidates, then one 1000-year run of the chosen configuration.
 - Acceptance: no NaN in 1000 years, global-mean SST and sea ice without a long-term trend after spin-up, top-layer
   temperature and maximum wind speed bounded.
 
@@ -280,4 +345,6 @@ Planned, pending the experiments:
 | `wv{44,66,88}_dry{0.033,0.066}` (login02, d3) | 2D grid with default `wv_nir` | 20 years | running | finding 10 |
 | sweep2 `cl*`, `tau*`, `fl*`, `c1`–`c6` (Slurm 3279283, d3) | cloud albedo, `τ₀`, `fₗ`, and combinations with default `wv_nir` | 15 years | running | session d3 ended. 7f reads the results |
 | `c7`–`c13` (Slurm 3279366, 7f) | all `wv_nir` = 1500: `wv` 65/75/85, `cloud_albedo` 0.37/0.40/0.43, `τ₀` 7.5/1.875 and 8/2, one with `dry` = 0.045 | 15 years | submitted | first combined candidates |
-| `ed_*` (Slurm 3279344, ed) | `water_vapor_pressure_top` 50/100/140 hPa, alone and with `wv` 66/88 | | running | structural variant, own worktree `tree_ed_strat` |
+| `ed_*` (Slurm 3279344, ed) | `water_vapor_pressure_top` 50/100/140/250 hPa, alone and with `wv` 66/88, `dry` 0.066 | 10 years | completed, all stable | finding 12, worktree `tree_ed_strat` |
+| `r2_*` (Slurm 3279654, ed) | all `wv_nir` = 1500: `wv` 55/60/65 × `τ₀` 7.0/7.2/7.5, polar `τ₀` 2.0, `cloud_albedo` 0.45 | 20 years | running | round 2 around `c7` |
+| `L_main`, `L_nir1500`, `L_pt250` (GPU Slurm 3279622, ed) | `main` defaults; `wv_nir` = 1500; `water_vapor_pressure_top` = 250 hPa | 1000 years, 25-year restart chunks | running (H100) | does `main` blow up, and when? Do both stratosphere fixes hold for a millennium? |
