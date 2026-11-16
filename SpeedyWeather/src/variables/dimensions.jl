@@ -3,11 +3,20 @@ struct ClockDim <: AbstractVariableDim end
 allocate(::AbstractVariable{ClockDim}, model::AbstractModel) = Clock(model.architecture)
 
 """Dimension for scalar variables holding single numerical values as RefValue.
-Default value is 0, but can be set via ScalarDim, e.g. ScalarDim(1) for a default value of 1."""
+Default value is 0, but can be set via ScalarDim, e.g. ScalarDim(1) for a default value of 1.
+`traceable = true` for scalars that change during the time step depending on other (traced)
+variables, e.g. the time step the implicit solver was initialized with, which with Reactant then
+holds a traceable number (see `scalar_ref`)."""
 @kwdef struct ScalarDim{T} <: AbstractVariableDim
     value::T = zero(DEFAULT_NF)                                 # default value via ScalarDim(1)
+    traceable::Bool = false
 end
-allocate(v::AbstractVariable{<:ScalarDim}, model::AbstractModel) = Ref(convert(model.spectral_grid.NF, v.dims.value))
+ScalarDim(value::Number) = ScalarDim(value, false)
+
+function allocate(v::AbstractVariable{<:ScalarDim}, model::AbstractModel)
+    value = convert(model.spectral_grid.NF, v.dims.value)
+    return v.dims.traceable ? scalar_ref(model.spectral_grid.architecture, value) : Ref(value)
+end
 
 """Dimension for 2D grid variables on the horizontal grid."""
 struct Grid2D <: AbstractVariableDim2D end
@@ -149,6 +158,27 @@ allocate(v::AbstractVariable{ParticleVectorDim}, model::AbstractModel) = zeros(m
     n::Int = 1
 end
 allocate(v::AbstractVariable{MatrixDim}, model::AbstractModel) = on_architecture(model.spectral_grid.architecture, zeros(model.spectral_grid.NF, v.dims.m, v.dims.n))
+
+"""Compile-time constant `N` as a variable, e.g. the number of layers, so that loops over it in
+kernels are type stable: `N` becomes part of the type of `Variables`. `Val(::StaticValue{N})`
+returns `Val(N)`."""
+struct StaticValue{N} end
+Base.Val(::StaticValue{N}) where {N} = Val(N)
+Architectures.on_architecture(::AbstractArchitecture, x::StaticValue) = x
+
+"""Dimension for a compile-time constant stored as `StaticValue{value}`, e.g. the number of layers."""
+@kwdef struct ValDim <: AbstractVariableDim
+    value::Int = 1
+end
+allocate(v::AbstractVariable{ValDim}, model::AbstractModel) = StaticValue{v.dims.value}()
+
+"""Dimension for 3D tensor data of arbitrary dimensions, e.g. a matrix per spherical harmonic degree."""
+@kwdef struct TensorDim <: AbstractVariableDim
+    m::Int = 1
+    n::Int = 1
+    o::Int = 1
+end
+allocate(v::AbstractVariable{TensorDim}, model::AbstractModel) = on_architecture(model.spectral_grid.architecture, zeros(model.spectral_grid.NF, v.dims.m, v.dims.n, v.dims.o))
 
 """Dimension for spectral transform scratch memory."""
 struct TransformScratchMemory <: AbstractVariableDim end

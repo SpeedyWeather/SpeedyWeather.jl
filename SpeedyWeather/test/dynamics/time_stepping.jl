@@ -90,7 +90,7 @@ end
     dX = rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
     dX .= real.(dX)             # make them real only to better tell them apart
     dX1 = get_step(dX, 1)
-    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.time_stepping.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Euler step does not count as time step but as step
@@ -106,7 +106,7 @@ end
     # new time step, new random tendencies
     dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
     dX .= im * imag.(dX)          # make them imaginary only to better tell them apart
-    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.time_stepping.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Leapfrog step does count!
@@ -121,7 +121,7 @@ end
 
     # new time step, new random tendencies
     dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
-    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.time_stepping.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Leapfrog step does count!
@@ -137,7 +137,7 @@ end
 
     # new time step, new random tendencies
     dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
-    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.time_stepping.implicit, model)
     SpeedyWeather.time_step!(clock, time_stepping)
 
     # this Leapfrog step does count!
@@ -373,10 +373,11 @@ end
         MaximumReferenceTemperature(margin = 30.0f0),
     )
     spectral_grid = SpectralGrid(truncation = 22, nlayers = 4)
-    implicit = ImplicitPrimitiveEquation(spectral_grid; reference_temperature)
-    model = PrimitiveWetModel(spectral_grid; implicit)
+    implicit = SemiImplicit(spectral_grid; reference_temperature)
+    time_stepping = Leapfrog(spectral_grid; implicit)
+    model = PrimitiveWetModel(spectral_grid; time_stepping)
     simulation = initialize!(model)
-    (; implicit) = model
+    (; implicit) = model.time_stepping
     (; clock) = simulation.variables.prognostic
     σ_levels = Array(model.geometry.σ_levels_full)
     n = implicit.schedule.every_n_steps
@@ -390,14 +391,14 @@ end
         SpeedyWeather.reinitialize!(implicit, model, simulation.variables)
         if reference_temperature isa GlobalMeanReferenceTemperature
             (; offset) = reference_temperature
-            @test Array(implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT .+ offset atol = 0.01
+            @test Array(simulation.variables.dynamics.implicit.temp_profile) ≈ 200 .+ 100σ_levels .+ ΔT .+ offset atol = 0.01
         elseif reference_temperature isa MaximumReferenceTemperature
             # isothermal at max(T) + margin
             temp_grid = Array(SpeedyWeather.get_prognostic_step(simulation.variables.grid.temperature, model.time_stepping, implicit))
             expected = maximum(temp_grid) + reference_temperature.margin
-            @test all(==(expected), Array(implicit.temp_profile))
+            @test all(==(expected), Array(simulation.variables.dynamics.implicit.temp_profile))
         else
-            @test all(==(reference_temperature.temperature), Array(implicit.temp_profile))
+            @test all(==(reference_temperature.temperature), Array(simulation.variables.dynamics.implicit.temp_profile))
         end
     end
 
@@ -418,5 +419,113 @@ end
         SpeedyWeather.time_step!(variables.prognostic.clock, model.time_stepping)
         temperature_grid = transform(get_step(variables.prognostic.temperature, 1), model.spectral_transform)
         @test get_step(variables.grid.temperature, 1) ≈ temperature_grid rtol = 1.0e-5
+    end
+end
+
+@testset "NCycleLorenz implicit centering per substep" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+    clock = Clock()
+
+    # 4-cycle variant A is the default, with its semi-implicit solver
+    L = NCycleLorenz(spectral_grid)
+    @test L.steps == 4
+    @test L.implicit isa SemiImplicit
+
+    # default centerings for the 4-cycle variant A and the 3-cycle variants A and B, in the solver
+    for (steps, variant, centering) in (
+            (4, NCycleLorenzA(), (2.06, 0.93, 1.02, 0.09)),
+            (3, NCycleLorenzA(), (-1.03, 0.7, 1.05)),
+            (3, NCycleLorenzB(), (1.63, 0.55, -0.55)),
+        )
+        L = NCycleLorenz(spectral_grid; steps, variant)
+        @test L.implicit.centering == Float32.(centering)
+        for (i, θ) in enumerate(L.implicit.centering)
+            clock.step_counter = i - 1
+            @test SpeedyWeather.implicit_centering(L, L.implicit, clock) == θ
+        end
+    end
+
+    # centering 0.5 on every substep otherwise
+    for L in (NCycleLorenz(spectral_grid, steps = 4, variant = NCycleLorenzB()), NCycleLorenz(spectral_grid, variant = NCycleLorenzAB()))
+        @test L.implicit.centering == 0.5f0
+        @test SpeedyWeather.implicit_centering(L, L.implicit, clock) == 0.5f0
+    end
+
+    # a number or a tuple chosen by the user
+    L = NCycleLorenz(spectral_grid, steps = 3, implicit = SemiImplicit(spectral_grid, centering = 0.6))
+    @test SpeedyWeather.implicit_centering(L, L.implicit, clock) == 0.6f0
+    L = NCycleLorenz(spectral_grid, steps = 3, implicit = SemiImplicit(spectral_grid, centering = (0.5, 0.6, 0.7)))
+    clock.step_counter = 2
+    @test SpeedyWeather.implicit_centering(L, L.implicit, clock) == 0.7f0
+
+    # a tuple needs as many centerings as steps per cycle, and the N-cycle
+    @test_throws ArgumentError SpeedyWeather.check_centering((0.5, 0.5), NCycleLorenz(spectral_grid, steps = 3))
+    @test_throws ArgumentError SpeedyWeather.check_centering((0.5, 0.5), Leapfrog(spectral_grid))
+    @test isnothing(SpeedyWeather.check_centering(0.5, Leapfrog(spectral_grid)))
+end
+
+@testset "SemiImplicit for all models" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+    # previous names are aliases
+    @test ImplicitShallowWater === SemiImplicit
+    @test ImplicitPrimitiveEquation === SemiImplicit
+    @test Leapfrog(spectral_grid).implicit isa SemiImplicit
+
+    # the same solver for every model, no implicit variables for barotropic and shallow water
+    for Model in (BarotropicModel, ShallowWaterModel)
+        model = Model(spectral_grid)
+        @test model.time_stepping.implicit isa SemiImplicit
+        @test SpeedyWeather.variables(model.time_stepping.implicit, model) == ()
+    end
+end
+
+@testset "NCycleLorenz effective centering" begin
+    # the same centering on every substep is off-centred over the cycle (α_eff = 2/3 for N=3, 5/8 for N=4, for θ = 1/2)
+    for variant in (NCycleLorenzA(), NCycleLorenzB()), (N, α) in ((3, 2 / 3), (4, 5 / 8))
+        @test SpeedyWeather.effective_centering(variant, ntuple(_ -> 0.5, N)) ≈ α
+        @test SpeedyWeather.effective_centering(variant, ntuple(_ -> 0.0, N)) ≈ 1 / 2   # fully explicit
+    end
+
+    # the second-order defaults (4-cycle A, 3-cycle B), 3-cycle A is slightly off-centred
+    @test SpeedyWeather.effective_centering(NCycleLorenzA(), (2.06, 0.93, 1.02, 0.09)) ≈ 1 / 2
+    @test SpeedyWeather.effective_centering(NCycleLorenzB(), (1.63, 0.55, -0.55)) ≈ 1 / 2
+    @test 0.5 < SpeedyWeather.effective_centering(NCycleLorenzA(), (-1.03, 0.7, 1.05)) < 0.6
+
+    # the expansion of a cycle of the linear oscillation equation x' = iωx with these centerings
+    # agrees to 2nd order with a θ-method over the cycle (time step NΔt) with centering α_eff
+    for (variant, θ) in ((NCycleLorenzA(), (2.06, 0.93, 1.02, 0.09)), (NCycleLorenzA(), (0.3, 0.7, 0.2, 0.4)), (NCycleLorenzB(), (0.2, 0.6, 0.1)))
+        N = length(θ)
+        weights = [SpeedyWeather.weight_coefficient(Float64, variant, k, N) for k in 0:(N - 1)]
+        cycle(z) = foldl(zip(weights, θ); init = (1.0 + 0im, 0.0 + 0im)) do (x, G), (w, t)
+            Gnew = (w * z * x + (1 - w) * G) / (1 - w * t * z)    # G = w L(x + θ(x'-x)) + (1-w)G
+            (x + Gnew, Gnew)
+        end[1]
+        α = SpeedyWeather.effective_centering(variant, θ)
+        θ_method(z) = (1 + (1 - α) * N * z) / (1 - α * N * z)
+        z = 1.0e-3im
+        @test abs(cycle(z) - θ_method(z)) < 10 * abs(z)^3 * N^3     # agree to 2nd order
+    end
+end
+
+@testset "ShallowWater gravity waves with NCycleLorenz" begin
+    # variance of η (excluding the mean) relative to the initial conditions
+    function η_variance(η)
+        (; l_indices, m_indices) = η.spectrum
+        return sum((m == 1 ? 1 : 2) * abs2(η[lm]) for (lm, (l, m)) in enumerate(zip(l_indices, m_indices)) if l > 1)
+    end
+
+    # the default implicit centerings are chosen to be stable:
+    # stable and damping, not amplifying, also at long time steps
+    @testset for (steps, variant) in ((4, NCycleLorenzA()), (3, NCycleLorenzA()), (3, NCycleLorenzB())), Δt_at_T32 in (Minute(30), Minute(60))
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+        initial_conditions = RandomWaves(spectral_grid, lmin = 5, lmax = 15)
+        time_stepping = NCycleLorenz(spectral_grid; steps, variant, Δt_at_T32, adjust_with_output = false)
+        model = ShallowWaterModel(spectral_grid; initial_conditions, time_stepping)
+        simulation = initialize!(model)
+        variance0 = η_variance(get_step(simulation.variables.prognostic.η, 1))
+        run!(simulation, period = Day(2))
+        @test !simulation.model.feedback.nans_detected
+        variance_ratio = η_variance(get_step(simulation.variables.prognostic.η, 1)) / variance0
+        @test 0 < variance_ratio < 1
     end
 end

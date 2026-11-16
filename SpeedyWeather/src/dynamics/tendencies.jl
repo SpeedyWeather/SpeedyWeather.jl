@@ -125,7 +125,8 @@ function dynamics_tendencies!(
     drag!(vars, model)
     scale_tendencies!(vars, model)
 
-    (; geometry, spectral_transform, implicit, time_stepping) = model
+    (; geometry, spectral_transform, time_stepping) = model
+    (; implicit) = time_stepping
 
     # calculate (u_k, v_k)⋅∇ln(p_s), ∇ln(pₛ) is computed in transform! together with u, v
     pressure_gradient_flux!(vars, time_stepping)
@@ -144,7 +145,7 @@ function dynamics_tendencies!(
     # temperature relative to profile
     # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (temp profile and temp_grid are different dimensions and array types)
     T = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
-    T.data .-= implicit.temp_profile'
+    T.data .-= vars.dynamics.implicit.temp_profile'
 
 
     # compute tendencies in grid space: u, v, temperature, pressure, u·T'·coslat⁻¹, v·T'·coslat⁻¹, kinetic energy, (wet model: humidity, u·q·coslat⁻¹, v·q·coslat⁻¹)
@@ -165,7 +166,7 @@ function dynamics_tendencies!(
     tracer_advection!(vars, model)
 
     # back to absolute temperature
-    T.data .+= implicit.temp_profile'
+    T.data .+= vars.dynamics.implicit.temp_profile'
 
     return nothing
 end
@@ -470,7 +471,8 @@ So that the second term inside the Laplace operator can be added to the Bernoull
 Rd is the gas constant, Tᵥ the virtual temperature, Tᵥ' its anomaly wrt to the
 average or reference temperature Tₖ, and ln(pₛ) is the logarithm of surface pressure."""
 function linear_pressure_gradient!(vars::Variables, model::PrimitiveEquation)
-    (; atmosphere, implicit, time_stepping) = model
+    (; atmosphere, time_stepping) = model
+    (; implicit) = time_stepping
     return linear_pressure_gradient!(vars, atmosphere, implicit, time_stepping)
 end
 
@@ -481,12 +483,12 @@ function linear_pressure_gradient!(
         time_stepping::AbstractTimeStepper,
     )
     (; R_dry) = atmosphere                      # dry gas constant
-    Tₖ = implicit.temp_profile                  # reference profile at layer k
+    Tₖ = vars.dynamics.implicit.temp_profile                  # reference profile at layer k
 
     # for Leapfrog this term is evaluated at the previous time step and the
     # implicit corrections will move it to the current as done for all linear gravity-wave related terms
     lnpₛ = get_prognostic_step(vars.prognostic.pressure, time_stepping, LinearDynamicalCore())
-    bernoulli = get_step(vars.dynamics.kinetic_energy)
+    bernoulli = get_tendency_step(vars.dynamics.kinetic_energy, time_stepping, DynamicalCore())
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
@@ -505,7 +507,8 @@ function vordiv_tendencies!(
         vars::Variables,
         model::PrimitiveEquation,
     )
-    (; coriolis, atmosphere, geometry, implicit, spectral_transform, time_stepping) = model
+    (; coriolis, atmosphere, geometry, spectral_transform, time_stepping) = model
+    (; implicit) = time_stepping
     return vordiv_tendencies!(vars, coriolis, atmosphere, geometry, implicit, spectral_transform, time_stepping)
 end
 
@@ -535,7 +538,7 @@ function vordiv_grid_tendencies!(
         time_stepping::AbstractTimeStepper,
     )
     (; f) = coriolis
-    Tₖ = implicit.temp_profile
+    Tₖ = vars.dynamics.implicit.temp_profile
     scale = vars.prognostic.scale[]             # scale Coriolis on the fly as is vorticity
     (; coslat⁻¹) = geometry
 
@@ -567,7 +570,7 @@ function vordiv_grid_tendencies!(
 end
 
 vordiv_grid_tendencies!(vars::Variables, model::PrimitiveEquation) =
-    vordiv_grid_tendencies!(vars, model.coriolis, model.atmosphere, model.geometry, model.implicit, model.time_stepping)
+    vordiv_grid_tendencies!(vars, model.coriolis, model.atmosphere, model.geometry, model.time_stepping.implicit, model.time_stepping)
 
 """$(TYPEDSIGNATURES)
 
@@ -672,7 +675,8 @@ Compute the gridded contribution to the temperature tendency:
 * adds the adiabatic + T'D terms to `temp_tend_grid` via `_temperature_tendency_kernel!`
 * writes `(uT_anomaly_grid, vT_anomaly_grid) = (u·T', v·T')` for the flux divergence."""
 function temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation)
-    (; adiabatic_conversion, atmosphere, implicit, time_stepping) = model
+    (; adiabatic_conversion, atmosphere, time_stepping) = model
+    (; implicit) = time_stepping
     temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, DynamicalCore())
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
@@ -683,7 +687,7 @@ function temperature_grid_tendency!(vars::Variables, model::PrimitiveEquation)
         fill!(vars.scratch.grid.a, 0)
 
     (; pres_flux, pres_flux_sum_above, div_sum_above) = vars.dynamics
-    (; temp_profile) = implicit
+    (; temp_profile) = vars.dynamics.implicit
 
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
@@ -716,8 +720,8 @@ Here, the previosuly computed gridded tendency contribution are accumulated and 
 tendency computed with divergence is computed via the `flux_spectral_divergence!` function."""
 function temperature_spectral_tendency!(vars::Variables, S::AbstractSpectralTransform, time_stepping::AbstractTimeStepper)
     temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, DynamicalCore())
-    uT_spec = get_step(vars.dynamics.uT_anomaly)
-    vT_spec = get_step(vars.dynamics.vT_anomaly)
+    uT_spec = get_tendency_step(vars.dynamics.uT_anomaly, time_stepping, DynamicalCore())
+    vT_spec = get_tendency_step(vars.dynamics.vT_anomaly, time_stepping, DynamicalCore())
     flux_spectral_divergence!(temp_tend, uT_spec, vT_spec, S; add = true, flipsign = true)
     return nothing
 end
@@ -788,8 +792,8 @@ Adds `-∇⋅(uq, vq)` to the previously computed gridded and transformed tenden
 function humidity_spectral_tendency!(vars::Variables, model::PrimitiveWet)
     S = model.spectral_transform
     humid_tend = get_tendency_step(vars.tendencies.humidity, model.time_stepping, DynamicalCore())
-    uq_spec = get_step(vars.dynamics.uq)
-    vq_spec = get_step(vars.dynamics.vq)
+    uq_spec = get_tendency_step(vars.dynamics.uq, model.time_stepping, DynamicalCore())
+    vq_spec = get_tendency_step(vars.dynamics.vq, model.time_stepping, DynamicalCore())
     horizontal_spectral_advection!(humid_tend, uq_spec, vq_spec, S)
     return nothing
 end
@@ -1120,7 +1124,7 @@ function bernoulli_potential!(
     )
     bernoulli_grid_potential!(vars, S, TS)
 
-    bernoulli = get_step(vars.dynamics.kinetic_energy)
+    bernoulli = get_tendency_step(vars.dynamics.kinetic_energy, TS, DynamicalCore())
     bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
     scratch_memory = vars.scratch.transform_memory
 
@@ -1133,7 +1137,7 @@ function bernoulli_potential!(
     # Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
     # average or reference temperature Tₖ, pₛ is the surface pressure.
     # broadcast 1D Tₖ (1 value per layer) over 2D pₛ (one value per grid point) to 3D
-    # Tₖ = model.implicit.temp_profile                # average layer temperature (1D)
+    # Tₖ = model.time_stepping.implicit.temp_profile                # average layer temperature (1D)
     # pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
     # RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
 
@@ -1189,7 +1193,7 @@ function bernoulli_spectral_potential!(vars::Variables, S::AbstractSpectralTrans
 end
 
 function _bernoulli_spectral_potential!(vars::Variables, S::AbstractSpectralTransform, time_stepper::AbstractTimeStepper)
-    bernoulli = get_step(vars.dynamics.kinetic_energy)
+    bernoulli = get_tendency_step(vars.dynamics.kinetic_energy, time_stepper, DynamicalCore())
     div_tend = get_tendency_step(vars.tendencies.divergence, time_stepper, DynamicalCore())
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)
     return nothing
@@ -1229,25 +1233,12 @@ function volume_flux_divergence_spectral!(
         model::ShallowWater,
     )
     η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, ContinuityEquation())
-    uh = get_step(vars.dynamics.uh)
-    vh = get_step(vars.dynamics.vh)
+    uh = get_tendency_step(vars.dynamics.uh, model.time_stepping, DynamicalCore())
+    vh = get_tendency_step(vars.dynamics.vh, model.time_stepping, DynamicalCore())
     flux_spectral_divergence!(η_tend, uh, vh, model.spectral_transform; add = true, flipsign = true)
     return nothing
 end
 
-
-"""$(TYPEDSIGNATURES)
-Calculates the average temperature of a layer from the l=m=0 harmonic
-and stores the result in `diagn.temp_average`"""
-function temperature_average!(
-        vars::Variables,
-        temp::LowerTriangularArray,
-        S::AbstractSpectralTransform,
-    )
-    # average from l=m=0 harmonic divided by norm of the sphere
-    @. vars.dynamics.average_temperature_profile = real(temp[1, :]) / S.norm_sphere
-    return nothing
-end
 
 function reset_tendencies!(vars::Variables, time_stepping::AbstractTimeStepper; value = 0)
     _reset_tendencies!(vars.tendencies, time_stepping, value)

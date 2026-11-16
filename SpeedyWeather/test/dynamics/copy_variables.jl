@@ -103,10 +103,16 @@
     end
 end
 
-# The groups `copy!` copies (not the scratch) on the CPU, to compare with `==`. Without the fused parents
-# (compared through their views) and the clock and scale, which `==` compares by identity (mutable)
+# `==` compares a `Ref` (mutable) by identity, so compare scalar variables (`ScalarDim`, e.g. `scale`
+# or `dynamics.implicit.Δt`) by their value instead
+unwrap_refs(x::NamedTuple) = map(unwrap_refs, x)
+unwrap_refs(x::Base.RefValue) = x[]
+unwrap_refs(x) = x
+
+# The groups `copy!` copies (not the scratch) on the CPU, to compare with `==`. Without the clock,
+# which `==` compares by identity (mutable)
 variables_on_cpu(vars) = map((:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles)) do group
-    on_architecture(SpeedyWeather.CPU(), Base.structdiff(getfield(vars, group), NamedTuple{(:clock, :scale)}))
+    unwrap_refs(on_architecture(SpeedyWeather.CPU(), Base.structdiff(getfield(vars, group), NamedTuple{(:clock,)})))
 end
 
 # On JLArrays (as on CUDA) a contiguous view of a fused parent is not a `SubArray` but another JLArray sharing

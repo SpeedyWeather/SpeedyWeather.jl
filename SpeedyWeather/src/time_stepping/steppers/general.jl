@@ -2,6 +2,24 @@
 e.g. Leapfrog starts with 1 Euler step that isn't counted for the clock but requires
 one more step in the main time loop."""
 spin_up_steps(::AbstractTimeStepper) = 0
+
+"""$(TYPEDSIGNATURES)
+Check the implicit solver `implicit` (of the time stepper) for `model` on initialization, warns
+if there is no implicit solver (`nothing`) for a model with gravity waves, which then have to be
+resolved explicitly with a short time step. Extended for `SemiImplicit`."""
+check_implicit(implicit, model::AbstractModel) = nothing
+check_implicit(::Nothing, ::Barotropic) = nothing     # no gravity waves, no implicit solver needed
+check_implicit(::Nothing, model::AbstractModel) =
+    @warn "No implicit solver for $(nameof(typeof(model))), gravity waves are integrated explicitly " *
+    "which requires a short time step. Use e.g. `Leapfrog(spectral_grid)` with its default " *
+    "`implicit = SemiImplicit(spectral_grid)`."
+
+# the implicit solver is part of the time stepper, collect its variables (e.g. reference temperature profile)
+variables(time_stepping::AbstractTimeStepper, model::AbstractModel) = variables(implicit_solver(time_stepping), model)
+
+"""$(TYPEDSIGNATURES)
+The implicit solver of `time_stepping`, `nothing` for time steppers without an `implicit` field."""
+implicit_solver(time_stepping::AbstractTimeStepper) = hasfield(typeof(time_stepping), :implicit) ? getfield(time_stepping, :implicit) : nothing
 default_time_step(L::AbstractTimeStepper) = L.Δt
 
 """$(TYPEDSIGNATURES) Time step [s] of `time_stepping` at the current `clock`,

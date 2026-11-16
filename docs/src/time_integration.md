@@ -84,10 +84,12 @@ For time steppers that need no such initialisation `spin_up_steps` is `0`, e.g. 
 
 Like `Leapfrog`, the Lorenz N-cycle is controlled by creating a custom `NCycleLorenz`
 component and passing it on to the model constructor. The cycle length `steps` (3 or 4
-recommended) and the weight `variant` ([`NCycleLorenzA`](@ref) (default), [`NCycleLorenzB`](@ref),
+recommended, 4 is the default) and the weight `variant` ([`NCycleLorenzA`](@ref) (default), [`NCycleLorenzB`](@ref),
 [`NCycleLorenzAB`](@ref) or [`NCycleLorenzABBA`](@ref), see [Lorenz N-cycle](@ref ncycle) for what
 distinguishes them) are the two options you are most likely to change, the time step options
-(`Δt_at_T32`, `adjust_with_output`) behave the same as for `Leapfrog` above.
+(`Δt_at_T32`, `adjust_with_output`) behave the same as for `Leapfrog` above. The centering
+of its [implicit solver](@ref implicit_solver) is chosen per substep, with defaults for the 4-cycle with
+variant A and the 3-cycle with variants A and B, see [Implicit centering of the Lorenz N-cycle](@ref ncycle_centering).
 
 ```@example ncycle
 using SpeedyWeather
@@ -113,3 +115,29 @@ where `;` matches the `time_stepping` keyword argument by name. If you name `lea
 would need to change this to `time_stepping=leapfrog` in the function call arguments. The same
 keyword takes any time stepper, e.g. `time_stepping = NCycleLorenz(spectral_grid)` for the
 [Lorenz N-cycle](@ref ncycle).
+
+## [Implicit solver](@id implicit_solver)
+
+The semi-implicit solver for the gravity waves depends on the time stepper and is therefore
+part of it, as its `implicit` field, i.e. `model.time_stepping.implicit`. There is one solver for
+all models, [`SemiImplicit`](@ref), the default of `Leapfrog` and `NCycleLorenz`. It holds only
+options, its behaviour is defined by the model: no correction for the `BarotropicModel` (no gravity
+waves), the gravity wave terms of the shallow water equations for the `ShallowWaterModel` and the
+linearised gravity wave terms about a reference temperature profile for the primitive equation
+models (`reference_temperature` and `schedule` are only used there). Precomputed operators of the
+primitive equations are variables of the model in `vars.dynamics.implicit`, allocated for the
+model's resolution. The `centering` is a number (0.5 Crank-Nicolson, 1 backward Euler) or, for the
+Lorenz N-cycle, a tuple with a centering per substep (default for `NCycleLorenz`, see
+[Implicit centering of the Lorenz N-cycle](@ref ncycle_centering)). Without an implicit solver,
+`implicit = nothing`, a model with gravity waves warns on `initialize!` as they then need a very
+short time step to be stable. To change the implicit solver, pass it on to the time stepper, e.g.
+
+```@example leapfrog
+implicit = SemiImplicit(spectral_grid, centering = 1)    # backward Euler
+time_stepping = Leapfrog(spectral_grid; implicit)
+model = PrimitiveDryModel(spectral_grid; time_stepping)
+model.time_stepping.implicit
+```
+
+see [Semi-implicit time integration](@ref implicit_swm) (shallow water) and
+[Semi-implicit time stepping](@ref implicit_primitive) (primitive equations).

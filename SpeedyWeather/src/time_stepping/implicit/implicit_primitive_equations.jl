@@ -1,157 +1,37 @@
-export ImplicitPrimitiveEquation
-export IsothermalReferenceTemperature, GlobalMeanReferenceTemperature, MaximumReferenceTemperature
-
-abstract type AbstractReferenceTemperature end
-
 """$(TYPEDSIGNATURES)
-Isothermal reference temperature profile for the semi-implicit time stepping, the
-implicit operators are therefore only reinitialized when the time step changes.
-$(TYPEDFIELDS)"""
-@kwdef struct IsothermalReferenceTemperature{NF} <: AbstractReferenceTemperature
-    "[OPTION] Temperature of the isothermal reference profile [K]"
-    temperature::NF = 300
-end
-
-"""$(TYPEDSIGNATURES)
-Global-mean temperature profile plus `offset` as reference temperature profile for the
-semi-implicit time stepping, recomputed on the `schedule` of the implicit solver.
-$(TYPEDFIELDS)"""
-@kwdef struct GlobalMeanReferenceTemperature{NF} <: AbstractReferenceTemperature
-    "[OPTION] Offset [K] added to the global-mean temperature profile"
-    offset::NF = 0
-end
-
-"""$(TYPEDSIGNATURES)
-Isothermal reference temperature for the semi-implicit time stepping from the current
-maximum temperature of the model plus `margin`, recomputed on the `schedule` of the implicit
-solver. The semi-implicit scheme is stable for a warm isothermal reference temperature, warmer
-than the atmosphere (Simmons, Hoskins and Burridge, 1978), but the warmer the reference the more
-the gravity waves treated implicitly are slowed down. In contrast to `IsothermalReferenceTemperature`
-this follows the model's climate, e.g. for a snowball Earth or a hot climate.
-$(TYPEDFIELDS)"""
-@kwdef struct MaximumReferenceTemperature{NF} <: AbstractReferenceTemperature
-    "[OPTION] Margin [K] added to the maximum temperature"
-    margin::NF = 30
-end
-
-# reference temperature profile (broadcastable) from the current global-mean temperature profile
-# `temp_average` or the grid temperature `temp_grid` (full temperature, not the anomaly)
-reference_temperature(ref::IsothermalReferenceTemperature, temp_average, temp_grid) = ref.temperature
-reference_temperature(ref::GlobalMeanReferenceTemperature, temp_average, temp_grid) =
-    Base.Broadcast.broadcasted(+, temp_average, ref.offset)
-reference_temperature(ref::MaximumReferenceTemperature, temp_average, temp_grid) =
-    maximum(temp_grid) + ref.margin
-
-# whether the reference temperature profile has to be recomputed on the schedule
-rescheduled(::IsothermalReferenceTemperature) = false
-rescheduled(::GlobalMeanReferenceTemperature) = true
-rescheduled(::MaximumReferenceTemperature) = true
-
-"""
-Struct that holds various precomputed arrays for the semi-implicit correction to
-prevent gravity waves from amplifying in the primitive equation model.
-$(TYPEDFIELDS)"""
-@kwdef struct ImplicitPrimitiveEquation{
-        NF,             # number format
-        VectorType,
-        MatrixType,
-        TensorType,
-        IntType,
-        NLAYERS,        # nlayers as a type parameter, see `nlayers_val` below
-        ScheduleType,
-        ReferenceTemperatureType,
-        RefNF,          # <: Base.RefValue{NF} or Base.RefValue{<:Number} for Reactant, see `scalar_ref`
-    } <: AbstractImplicit
-
-    # DIMENSIONS
-    "[DERIVED] Spectral resolution"
-    truncation::IntType
-
-    "[DERIVED] Number of vertical layers"
-    nlayers::IntType
-
-    "[DERIVED] `nlayers` as a `Val` so that the vertical loops are more type stable"
-    nlayers_val::Val{NLAYERS} = Val(nlayers)
-
-    # PARAMETERS
-    "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
-    centering::NF = 0.5
-
-    "[OPTION] Reference temperature profile to linearise about, isothermal or the global mean (plus offset)"
-    reference_temperature::ReferenceTemperatureType = IsothermalReferenceTemperature{NF}()
-
-    "[OPTION] Schedule to recompute the reference temperature profile (and the implicit operators) from the current global-mean temperature"
-    schedule::ScheduleType = PeriodicSchedule(every = Day(1))
-
-    "[DERIVED] Time step [s] used to initialize. Used to check whether time step has changed and reinitialization is needed."
-    Δt::RefNF = Ref(zero(NF))
-
-    # PRECOMPUTED ARRAYS, to be initialized with initialize!
-    "[DERIVED] Reference temperature profile, the global-mean temperature when last (re)initialized"
-    temp_profile::VectorType = zeros(NF, nlayers)
-
-    "[DERIVED] divergence: operator for the geopotential calculation"
-    R::MatrixType = zeros(NF, nlayers, nlayers)
-
-    "[DERIVED] divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
-    U::VectorType = zeros(NF, nlayers)
-
-    "[DERIVED] temperature: operator for the TₖD + κTₖD(ln pₛ)/Dt term"
-    L::MatrixType = zeros(NF, nlayers, nlayers)
-
-    "[DERIVED] pressure: vertical averaging of the -D̄ term in the log surface pressure equation"
-    W::VectorType = zeros(NF, nlayers)
-
-    "[DERIVED] components to construct L, 1/ 2Δσ"
-    L0::VectorType = zeros(NF, nlayers)
-
-    "[DERIVED] vert advection term in the temperature equation (below+above)"
-    L1::MatrixType = zeros(NF, nlayers, nlayers)
-
-    "[DERIVED] factor in front of the `div_sum_above` term"
-    L2::VectorType = zeros(NF, nlayers)
-
-    "[DERIVED] `_sum_above` operator itself"
-    L3::MatrixType = zeros(NF, nlayers, nlayers)
-
-    "[DERIVED] factor in front of div term in Dlnpₛ/Dt"
-    L4::VectorType = zeros(NF, nlayers)
-
-    "[DERIVED] for every l the matrix to be inverted"
-    S::MatrixType = zeros(NF, nlayers, nlayers)
-
-    "[DERIVED] combined inverted operator: S = 1 - ξ²(RL + UW)"
-    S⁻¹::TensorType = zeros(NF, truncation + 1, nlayers, nlayers)
-end
-
-"""$(TYPEDSIGNATURES)
-Generator using the resolution from SpectralGrid."""
-function ImplicitPrimitiveEquation(
-        spectral_grid::SpectralGrid;
-        schedule::AbstractSchedule = PeriodicSchedule(every = Day(1)),
-        reference_temperature::AbstractReferenceTemperature = IsothermalReferenceTemperature{spectral_grid.NF}(),
-        kwargs...
-    )
-    (; NF, VectorType, MatrixType, TensorType, truncation, nlayers, architecture) = spectral_grid
-    IntType = typeof(truncation)
-    Δt = scalar_ref(architecture, zero(NF))
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, IntType, nlayers, typeof(schedule), typeof(reference_temperature), typeof(Δt)}(;
-        truncation, nlayers, schedule, reference_temperature, Δt, kwargs...
-    )
-end
-
-function variables(implicit::ImplicitPrimitiveEquation)
+Variables of the semi-implicit solver for the primitive equations in `vars.dynamics.implicit`:
+the time step and reference temperature profile the operators were built with, the operators
+`R, U, L, W` (and the components `L0`-`L4` of `L`), scratch `S` and the inverted `S⁻¹` per degree."""
+function variables(::SemiImplicit, model::PrimitiveEquation)
+    n = model.spectral_grid.nlayers
+    truncation = model.spectral_grid.truncation
+    vector(name, desc) = DynamicsVariable(name, VectorDim(n); namespace = :implicit, desc)
+    matrix(name, desc) = DynamicsVariable(name, MatrixDim(n, n); namespace = :implicit, desc)
     return (
-        DynamicsVariable(:average_temperature_profile, VectorDim(implicit.nlayers), desc = "Average vertical temperature profile", units = "K"),
+        DynamicsVariable(:nlayers, ValDim(n); namespace = :implicit, desc = "Number of layers as Val for type-stable vertical loops in kernels"),
+        DynamicsVariable(:Δt, ScalarDim(traceable = true); namespace = :implicit, desc = "Time step the implicit operators were built with", units = "s"),
+        vector(:temp_profile, "Reference temperature profile the implicit operators linearise about"),
+        matrix(:R, "divergence: operator for the geopotential calculation"),
+        vector(:U, "divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"),
+        matrix(:L, "temperature: operator for the TₖD + κTₖD(ln pₛ)/Dt term"),
+        vector(:W, "pressure: vertical averaging of the -D̄ term in the log surface pressure equation"),
+        vector(:L0, "components to construct L, 1/ 2Δσ"),
+        matrix(:L1, "vert advection term in the temperature equation (below+above)"),
+        vector(:L2, "factor in front of the `div_sum_above` term"),
+        matrix(:L3, "`_sum_above` operator itself"),
+        vector(:L4, "factor in front of div term in Dlnpₛ/Dt"),
+        matrix(:S, "for every l the matrix to be inverted (scratch)"),
+        DynamicsVariable(:S⁻¹, TensorDim(truncation + 1, n, n); namespace = :implicit, desc = "combined inverted operator: S = 1 - ξ²(RL + UW) per degree"),
     )
 end
+
 
 """$(TYPEDSIGNATURES)
 Initialize the `schedule` of `implicit` with the time step of `model`.
 The implicit operators themselves are only built in the first time steps by `reinitialize!`,
 as they need the temperature profile of the initial conditions and the time step of the
 leapfrog start."""
-function initialize!(implicit::ImplicitPrimitiveEquation, model::PrimitiveEquation)
+function initialize!(implicit::SemiImplicit, model::PrimitiveEquation)
     initialize!(implicit.schedule, model.time_stepping)
     warn_uniform_spacing(implicit, model.geometry)
     return nothing
@@ -161,8 +41,8 @@ end
 # σ levels the explicit vertical advection of temperature over steep orography can then grow
 # (e.g. Held-Suarez, T32, 16-24 levels, Earth orography), backward Euler (centering = 1) or
 # the default FriersonSigmaCoordinates are stable, see docs/dev/2026-10/2026-10-31-implicit-reference-temperature.md
-function warn_uniform_spacing(implicit::ImplicitPrimitiveEquation, geometry::AbstractGeometry)
-    implicit.centering < 1 || return nothing
+function warn_uniform_spacing(implicit::SemiImplicit, geometry::AbstractGeometry)
+    minimum(implicit.centering) < 1 || return nothing
     Δσ = on_architecture(CPU(), geometry.σ_levels_thick)
     length(Δσ) > 1 || return nothing
     uniform = maximum(Δσ) / minimum(Δσ) < 1.1
@@ -175,7 +55,7 @@ end
 # start with Δt/2, Δt, then 2Δt, or a new time step) or when the reference temperature profile
 # is scheduled to be recomputed from the current global-mean temperature
 function reinitialize!(
-        implicit::ImplicitPrimitiveEquation,
+        implicit::SemiImplicit,
         model::PrimitiveEquation,
         vars::Variables,
     )
@@ -183,15 +63,16 @@ function reinitialize!(
     Δt = time_step(model.time_stepping, clock)
     # an isothermal reference profile does not change, reinitialize only on a new time step
     scheduled = isscheduled(implicit.schedule, clock) & rescheduled(implicit.reference_temperature)
-    update = (implicit.Δt[] != Δt) | scheduled
-    implicit.Δt[] = Δt
+    Δt_implicit = vars.dynamics.implicit.Δt   # time step the operators were last built with
+    update = (Δt_implicit[] != Δt) | scheduled
+    Δt_implicit[] = Δt
     return reinitialize!(implicit, update, Δt, model, vars)
 end
 
 # (re)initialize the implicit operators with time step Δt and the current global-mean temperature
 # as reference profile only if `update`, see SpeedyWeatherReactantExt for a traced `update`
 function reinitialize!(
-        implicit::ImplicitPrimitiveEquation,
+        implicit::SemiImplicit,
         update::Bool,
         Δt,
         model::PrimitiveEquation,
@@ -201,20 +82,24 @@ function reinitialize!(
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
     scale = vars.prognostic.scale[]                         # implicit solver needs to be initialized with scaled time step
     # reference temperature profile, isothermal or from the current global-mean temperature profile
-    Tₖ = implicit.temp_profile
+    operators = vars.dynamics.implicit
+    Tₖ = operators.temp_profile
+    temp = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, implicit)
     temp_grid = get_prognostic_step(vars.grid.temperature, model.time_stepping, implicit)
-    Tₖ .= reference_temperature(implicit.reference_temperature, vars.dynamics.average_temperature_profile, temp_grid)
-    initialize!(implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
+    (; norm_sphere) = model.spectral_transform
+    Tₖ .= reference_temperature(implicit.reference_temperature, temp, temp_grid, norm_sphere)
+    initialize!(operators, implicit, Δt / scale, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
-Initialize the implicit terms for the PrimitiveEquation models. The operators are constructed
-via broadcasting on the device, without transfers to the CPU, scalar indexing, or data-dependent
-control flow so that Reactant can trace this inside the time step. S⁻¹ is then computed per
-degree l with `invert_S!`."""
+Initialize the implicit `operators` (`vars.dynamics.implicit`) for the PrimitiveEquation models.
+The operators are constructed via broadcasting on the device, without transfers to the CPU, scalar
+indexing, or data-dependent control flow so that Reactant can trace this inside the time step.
+S⁻¹ is then computed per degree l with `invert_S!`."""
 function initialize!(
-        implicit::ImplicitPrimitiveEquation,
+        operators::NamedTuple,                              # the implicit operators, vars.dynamics.implicit
+        implicit::SemiImplicit,
         Δt::Number,                                         # the time step [s], scaled
         temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
         geometry::AbstractGeometry,
@@ -222,12 +107,12 @@ function initialize!(
         atmosphere::AbstractAtmosphere,
         adiabatic_conversion::AbstractAdiabaticConversion,
     )
-    (; nlayers) = implicit
+    nlayers = length(operators.temp_profile)
     (; σ_levels_half, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
     (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
-    (; temp_profile, L, R, U, W, L0, L1, L2, L3, L4) = implicit
+    (; temp_profile, L, R, U, W, L0, L1, L2, L3, L4) = operators
 
     # use current vertical temperature profile
     temp_profile .= temp_average
@@ -290,24 +175,25 @@ function initialize!(
     # solving the equations above for δD yields
     # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
-    invert_S!(implicit, ξ, architecture(implicit.S⁻¹))
+    invert_S!(operators, ξ, architecture(operators.S⁻¹))
     return nothing
 end
 
 # S⁻¹ via LU decomposition on the CPU, but Reactant traces `initialize!` inside the time step
 # so no transfer to the CPU is possible, use Gauss-Jordan elimination in a kernel instead
-invert_S!(implicit::ImplicitPrimitiveEquation, ξ, ::AbstractArchitecture) = invert_S_lu!(implicit, ξ)
-invert_S!(implicit::ImplicitPrimitiveEquation, ξ, ::ReactantDevice) = invert_S_gauss_jordan!(implicit, ξ)
+invert_S!(operators::NamedTuple, ξ, ::AbstractArchitecture) = invert_S_lu!(operators, ξ)
+invert_S!(operators::NamedTuple, ξ, ::ReactantDevice) = invert_S_gauss_jordan!(operators, ξ)
 
 """$(TYPEDSIGNATURES)
 Compute S⁻¹ = (1 - ξ²λₗ(RL + UWᵀ))⁻¹ for every degree l, with λₗ the eigenvalues of ∇², via
 LU decomposition on the CPU, then transfer S⁻¹ back to the device. These are small
 (nlayers × nlayers) matrices, so CPU computation is more efficient."""
-function invert_S_lu!(implicit::ImplicitPrimitiveEquation, ξ)
-    (; truncation, nlayers) = implicit
-    arch = architecture(implicit.S⁻¹)
+function invert_S_lu!(operators::NamedTuple, ξ)
+    truncation = size(operators.S⁻¹, 1) - 1
+    nlayers = size(operators.S⁻¹, 2)
+    arch = architecture(operators.S⁻¹)
     temp_profile, S, S⁻¹, R, L, U, W = on_architecture(
-        CPU(), (implicit.temp_profile, implicit.S, implicit.S⁻¹, implicit.R, implicit.L, implicit.U, implicit.W)
+        CPU(), (operators.temp_profile, operators.S, operators.S⁻¹, operators.R, operators.L, operators.U, operators.W)
     )
 
     # return immediately if temp_profile contains NaRs, model blew up in that case
@@ -327,15 +213,17 @@ function invert_S_lu!(implicit::ImplicitPrimitiveEquation, ξ)
         S⁻¹[l, :, :] .= S⁻¹_l           # store in array, S⁻¹[truncation + 1, :, :] remains unused
     end
 
-    implicit.S⁻¹ .= on_architecture(arch, S⁻¹)
+    operators.S⁻¹ .= on_architecture(arch, S⁻¹)
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Compute S⁻¹ as in `invert_S_lu!` but on the device via Gauss-Jordan elimination (without pivoting)
 in a kernel, one thread per degree l, so that Reactant can trace it."""
-function invert_S_gauss_jordan!(implicit::ImplicitPrimitiveEquation, ξ)
-    (; truncation, nlayers, S⁻¹, R, L, U, W) = implicit
+function invert_S_gauss_jordan!(operators::NamedTuple, ξ)
+    (; S⁻¹, R, L, U, W) = operators
+    truncation = size(S⁻¹, 1) - 1
+    nlayers = size(S⁻¹, 2)
 
     # S⁻¹[truncation + 1, :, :] remains unused as in `invert_S_lu!`
     S_scratch = similar(S⁻¹)
@@ -404,7 +292,7 @@ end
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
 function implicit_correction!(
         vars::Variables,
-        implicit::ImplicitPrimitiveEquation,
+        implicit::SemiImplicit,
         time_stepping::AbstractLeapfrog,
         model::PrimitiveEquation,
     )
@@ -412,7 +300,8 @@ function implicit_correction!(
     # escape immediately if explicit
     implicit.centering == 0 && return nothing
 
-    (; S⁻¹, R, U, L, W, nlayers_val) = implicit
+    (; S⁻¹, R, U, L, W) = vars.dynamics.implicit
+    nlayers_val = Val(vars.dynamics.implicit.nlayers)   # Val(nlayers) for type-stable vertical loops in the kernel
 
     # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
     # dynamical core uses scaled time step, scale on the fly

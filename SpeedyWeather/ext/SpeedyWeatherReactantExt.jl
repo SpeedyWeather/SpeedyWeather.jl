@@ -153,21 +153,24 @@ end
 # the time step changed or b) just handle the first few steps sepereatly for Reactant (a bit similar
 # to what we used to do in general for the time stepping)
 function SpeedyWeather.reinitialize!(
-        implicit::ImplicitPrimitiveEquation,
+        implicit::SemiImplicit,
         update::Reactant.TracedRNumber{Bool},
         Δt,
         model::SpeedyWeather.PrimitiveEquation,
         vars::SpeedyWeather.Variables,
     )
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    (; temp_profile) = implicit
+    operators = vars.dynamics.implicit
+    (; temp_profile) = operators
     # reference temperature profile, isothermal or from the current global-mean temperature profile
+    temp = SpeedyWeather.get_prognostic_step(vars.prognostic.temperature, model.time_stepping, implicit)
     temp_grid = SpeedyWeather.get_prognostic_step(vars.grid.temperature, model.time_stepping, implicit)
-    Tₖ = SpeedyWeather.reference_temperature(implicit.reference_temperature, vars.dynamics.average_temperature_profile, temp_grid)
+    (; norm_sphere) = model.spectral_transform
+    Tₖ = SpeedyWeather.reference_temperature(implicit.reference_temperature, temp, temp_grid, norm_sphere)
     temp_profile .= ifelse.(update, Tₖ, temp_profile)
 
     scale = vars.prognostic.scale[]         # implicit solver needs to be initialized with scaled time step
-    initialize!(implicit, Δt / scale, temp_profile, geometry, geopotential, atmosphere, adiabatic_conversion)
+    initialize!(operators, implicit, Δt / scale, temp_profile, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end
 

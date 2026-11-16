@@ -6,24 +6,27 @@
         run!(simulation, steps = 3)     # to have a non-trivial average temperature profile
 
         (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-        Tₖ = simulation.variables.dynamics.average_temperature_profile
+        temp = get_step(simulation.variables.prognostic.temperature, 1)
+        Tₖ = collect(SpeedyWeather.global_mean_temperature(temp, model.spectral_transform.norm_sphere))
         Δt = NF(2 * 1800 / model.planet.radius)    # some (scaled) time step
 
-        implicit = deepcopy(model.implicit)
-        SpeedyWeather.initialize!(implicit, Δt, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
-        implicit_gauss_jordan = deepcopy(implicit)
+        (; implicit) = model.time_stepping
+        operators = deepcopy(simulation.variables.dynamics.implicit)
+        SpeedyWeather.initialize!(operators, implicit, Δt, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
+        operators_gauss_jordan = deepcopy(operators)
         ξ = implicit.centering * Δt
-        SpeedyWeather.invert_S_gauss_jordan!(implicit_gauss_jordan, ξ)
+        SpeedyWeather.invert_S_gauss_jordan!(operators_gauss_jordan, ξ)
 
         # S⁻¹ inverts S = 1 - ξ²λₗ(RL + UWᵀ) for every degree l, λₗ = -l(l-1) for 1-based l
-        (; truncation, R, L, U, W) = implicit
+        (; R, L, U, W, S⁻¹) = operators
+        truncation = size(S⁻¹, 1) - 1
         for l in 1:truncation
             S = one(R) - ξ^2 * (-l * (l - 1)) * (R * L + U * W')
-            @test implicit.S⁻¹[l, :, :] * S ≈ one(S) rtol = 10 * sqrt(eps(NF))
+            @test S⁻¹[l, :, :] * S ≈ one(S) rtol = 10 * sqrt(eps(NF))
         end
 
         # Gauss-Jordan elimination without pivoting vs LU decomposition
-        @test implicit_gauss_jordan.S⁻¹[1:truncation, :, :] ≈ implicit.S⁻¹[1:truncation, :, :] rtol = 10 * sqrt(eps(NF))
+        @test operators_gauss_jordan.S⁻¹[1:truncation, :, :] ≈ S⁻¹[1:truncation, :, :] rtol = 10 * sqrt(eps(NF))
     end
 end
 
@@ -41,9 +44,10 @@ end
         nlayers = spectral_grid.nlayers
 
         Tₖ = collect(range(NF(T_top), NF(290), nlayers))
-        model.implicit.temp_profile .= Tₖ
+        operators = vars.dynamics.implicit
+        operators.temp_profile .= Tₖ
         (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-        SpeedyWeather.initialize!(model.implicit, one(NF), Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
+        SpeedyWeather.initialize!(operators, model.time_stepping.implicit, one(NF), Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
 
         # zonal (m=0, real) divergence modes l=1:9, uniform T = Tₖ and pₛ = 1000 hPa, in both steps
         D = zeros(Complex{NF}, spectral_grid.spectrum, nlayers)
@@ -67,7 +71,7 @@ end
 
         temp_tend = SpeedyWeather.get_tendency_step(vars.tendencies.temperature, model.time_stepping, SpeedyWeather.DynamicalCore())
         div = SpeedyWeather.get_step(vars.prognostic.divergence, 2)     # radius-scaled
-        LD = transpose(model.implicit.L * transpose(div[2:10, :]))
+        LD = transpose(operators.L * transpose(div[2:10, :]))
         @test temp_tend[2:10, :] ≈ LD rtol = 1.0e-10
     end
 end
@@ -76,8 +80,8 @@ end
     spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
     uniform = Geometry(spectral_grid; vertical_coordinates = SigmaCoordinates(spectral_grid))
     frierson = Geometry(spectral_grid; vertical_coordinates = FriersonSigmaCoordinates(spectral_grid))
-    crank_nicolson = ImplicitPrimitiveEquation(spectral_grid; centering = 0.5)
-    backward_euler = ImplicitPrimitiveEquation(spectral_grid; centering = 1)
+    crank_nicolson = SemiImplicit(spectral_grid; centering = 0.5)
+    backward_euler = SemiImplicit(spectral_grid; centering = 1)
     @test_logs (:warn,) SpeedyWeather.warn_uniform_spacing(crank_nicolson, uniform)
     @test_logs SpeedyWeather.warn_uniform_spacing(crank_nicolson, frierson)
     @test_logs SpeedyWeather.warn_uniform_spacing(backward_euler, uniform)

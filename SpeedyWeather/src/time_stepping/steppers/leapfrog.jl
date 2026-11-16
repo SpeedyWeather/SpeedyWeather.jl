@@ -4,7 +4,7 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
+mutable struct Leapfrog{NF, S, B, MS, I, O, L} <: AbstractLeapfrog
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
@@ -22,6 +22,9 @@ mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
 
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt::NF
+
+    "[OPTION] Semi-implicit solver for the gravity waves, `nothing` for none (explicit)"
+    implicit::I
 
     "[OPTION] Time stepper for the ocean (incl sea ice) variables, `nothing` for leapfrog as the atmosphere"
     ocean::O
@@ -222,6 +225,7 @@ function Leapfrog(
         adjust_with_output = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
+        implicit = SemiImplicit(spectral_grid),
         ocean = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
         land = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
     )
@@ -233,8 +237,14 @@ function Leapfrog(
 
     return Leapfrog(
         Second(Δt_at_T32), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
-        ocean, land,
+        implicit, ocean, land,
     )
+end
+
+# TODO remove after v0.25 is released: the model type is not needed anymore, one implicit solver for all models
+function Leapfrog(spectral_grid::SpectralGrid, Model::Type{<:AbstractModel}; kwargs...)
+    Base.depwarn("`Leapfrog(spectral_grid, $(nameof(Model)))` is deprecated, use `Leapfrog(spectral_grid)`.", :Leapfrog)
+    return Leapfrog(spectral_grid; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)

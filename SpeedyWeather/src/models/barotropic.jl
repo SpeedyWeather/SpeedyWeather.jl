@@ -24,7 +24,6 @@ $(TYPEDFIELDS)"""
         RP,     # <:AbstractRandomProcess,
         TS,     # <:AbstractTimeStepper,
         ST,     # <:SpectralTransform{NF},
-        IM,     # <:AbstractImplicit,
         HD,     # <:AbstractHorizontalDiffusion,
         OU,     # <:AbstractOutput,
         FB,     # <:AbstractFeedback,
@@ -50,7 +49,6 @@ $(TYPEDFIELDS)"""
     # NUMERICS
     time_stepping::TS = NCycleLorenz(spectral_grid)
     spectral_transform::ST = WhichTransform(spectral_grid)
-    implicit::IM = nothing
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
@@ -104,6 +102,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     arch = model.architecture
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
+    check_implicit(model.time_stepping.implicit, model)
     initialize!(model.coriolis, model)
     initialize!(model.forcing, model)
     initialize!(model.drag, model)
