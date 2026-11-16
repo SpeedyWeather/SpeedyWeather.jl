@@ -167,7 +167,7 @@ function wiener_tendencies!(
         L::AbstractTimeStepper,
         model::AbstractModel,
     )
-    isdt = 1 / sqrt(L.Δt)               # Δt in [s], the Wiener increment scaling
+    isdt = 1 / sqrt(time_step(L, clock))# Δt in [s], the Wiener increment scaling
     R = vars.prognostic.scale[]         # radius scaling
     wiener_atmosphere!(vars, noise, L, isdt, R)
     wiener_surface!(vars, noise, L, isdt)

@@ -36,6 +36,14 @@ Base revision: `24fdb6847a3bdd49f7e23e94a5b64de06dd89d48` (branch point). HEAD w
 >   AR1's draw in step k equalled slot k of the Wiener noise's first draw. `model.random_process`
 >   stays unsalted, so SPPT runs are unchanged. The Wiener realisations change, so the origin
 >   project's gate no longer matches the noise patterns bitwise.
+> - 2026-11-16, user request: "just make random patterns SpectralAR1Process always 3D, but with a
+>   singleton dimension in case it's just a single layer. This should simplify the code". All three
+>   processes (`SpectralAR1Process`, `SpectralWhiteNoiseProcess`, `GridWhiteNoiseProcess`) now
+>   define `random_pattern` as `Spectral3D(; n)`/`Grid3D(; n)` for every `n_patterns`, and the AR1
+>   `random_numbers` buffer is always 3D. The single-pattern consumers take slot 1 explicitly: SPPT
+>   (`random_pattern[ij, 1]`), `StochasticStirring` and the `RandomPattern` output
+>   (`field_view(…, :, 1)`). Bitwise identical to before (SPPT with and without
+>   `StochasticLeapfrog`, stirring, white noise; 20 steps).
 
 ## Problem description
 
@@ -75,8 +83,9 @@ All changes are in `SpeedyWeather/` plus the docs. The other submodules are unto
 - `complex_normals!(r, rng)` draws in place and scales by `2/√2`, written that way to keep the
   random numbers of earlier versions bit for bit.
 - `SpectralAR1Process` gains `n_patterns` and a `random_numbers` buffer, so a draw no longer
-  allocates. `random_pattern_variables(n)` gives 2D variables for `n ≤ 1` and `Spectral3D/Grid3D(; n)`
-  otherwise.
+  allocates. `random_pattern_variables(n)` gives `Spectral3D/Grid3D(; n)` for every `n`, with a
+  trailing singleton dimension for a single pattern (until 2026-11-16 it gave 2D variables for `n ≤ 1`).
+  Consumers of a single pattern (SPPT, `StochasticStirring`, `RandomPattern` output) use slot 1.
 - New `SpectralWhiteNoiseProcess`: memoryless and spectrally flat by default (`wavenumber = 0`).
   No noise on l = 0 or l = lmax. The m = 0 coefficients are real and scaled by √2, so the pattern
   is homogeneous and band-limited. No clamp by default.
