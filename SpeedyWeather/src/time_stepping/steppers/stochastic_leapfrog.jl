@@ -246,14 +246,9 @@ function StochasticLeapfrog(
         williams_filter = 0.53,
         ocean = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
         land = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
-        noise = nothing,
+        noise = AdditiveWienerNoise(spectral_grid),
         kwargs...,
     )
-    if isnothing(noise)
-        noise = AdditiveWienerNoise(spectral_grid; kwargs...)
-    elseif !isempty(kwargs)
-        throw(ArgumentError("Provide either `noise` or its keyword arguments $(keys(kwargs)), not both."))
-    end
     return Leapfrog(spectral_grid; Δt_at_T32, adjust_with_output, robert_filter, williams_filter, ocean, land, noise)
 end
 
