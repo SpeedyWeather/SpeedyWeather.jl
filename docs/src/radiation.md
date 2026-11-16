@@ -323,31 +323,41 @@ declination follows the zenith's `solar_declination` and the Sun–planet distan
 is constant. An elliptical orbit is set with a `KeplerOrbit`
 
 ```@example radiation
-orbit = KeplerOrbit(eccentricity=0.0167, longitude_of_perihelion=282.9)
+orbit = KeplerOrbit(spectral_grid, eccentricity=0.0167, longitude_of_perihelion=282.9)
 planet = Earth(spectral_grid; orbit)
 ```
 
-`eccentricity` is the orbit's eccentricity e and `longitude_of_perihelion` [˚]
+`eccentricity` is the orbit's eccentricity e (0 ≤ e < 1) and `longitude_of_perihelion` [˚]
 the true solar longitude at perihelion, measured from the vernal equinox, which
-sets where perihelion falls in the year (precession). The values above are
-present-day Earth, with perihelion in early January. Following the PMIP protocol,
+sets where perihelion falls in the year (precession). `KeplerOrbit` can represent any
+elliptical orbit, but its defaults are present-day Earth (as above), with perihelion in
+early January. Note that `KeplerOrbit()` is almost identical to `CircularOrbit()` in the
+solar declination but not in insolation, see below. Following the PMIP protocol,
 the vernal equinox stays fixed at `planet.equinox`, so precession moves perihelion
 through the calendar.
 
-Once per time step the orbit position is computed from `orbit_time`: Kepler's
-equation for the eccentric anomaly E, the true anomaly and solar longitude λ, the
-solar declination sin(δ) = sin(tilt)·sin(λ) and the distance factor (a/r)² = 1/(1 - e cos E)².
-The shortwave schemes multiply `solar_constant` by this distance factor, stored
-as the scalar `solar_distance_factor` in `vars.parameterizations`, so the incoming
+Once per time step, before the zenith angle, the solar zenith computes the orbit position
+from `orbit_time`: Kepler's equation for the eccentric anomaly E, the true anomaly and solar
+longitude λ, the solar declination sin(δ) = sin(tilt)·sin(λ) and the distance factor
+(a/r)² = 1/(1 - e cos E)². The orbit defines the variables it needs: a `KeplerOrbit` stores
+the distance factor as the scalar `solar_distance_factor` in `vars.parameterizations`, a
+`CircularOrbit` stores nothing. The shortwave schemes multiply `solar_constant` by
+`solar_distance_factor(vars)`, which is 1 when no such variable exists, so the incoming
 radiation varies by a factor ((1+e)/(1-e))² between aphelion and perihelion,
-about 7% for Earth. Averaged over an orbit, the factor is 1/√(1 - e²), so an
+about 7% (±46 W/m²) for Earth. Averaged over an orbit, the factor is 1/√(1 - e²), so an
 eccentric orbit also receives slightly more energy in the annual mean.
+
+A `KeplerOrbit` computes the solar declination itself, so the solar zenith's
+`solar_declination` is not used (a warning is shown at initialization if it isn't the
+default `SinSolarDeclination`). The equation of time (`SolarTimeCorrection`) is still that
+of present-day Earth, not derived from the orbit, so for strongly eccentric orbits the
+daily cycle (sunrise and sunset times) is slightly off.
 
 The Last Interglacial orbit about 127,000 years ago (PMIP4's `lig127k`), with a
 larger eccentricity and perihelion just after the northern summer solstice, is
 
 ```@example radiation
-orbit = KeplerOrbit(eccentricity=0.0394, longitude_of_perihelion=95.4)
+orbit = KeplerOrbit(spectral_grid, eccentricity=0.0394, longitude_of_perihelion=95.4)
 planet = Earth(spectral_grid; axial_tilt=24.04, orbit)
 ```
 

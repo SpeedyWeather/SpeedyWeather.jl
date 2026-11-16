@@ -43,7 +43,7 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
     albedo_land = vars.parameterizations.land.albedo[ij]
 
     # solar constant at the current Sun–planet distance, factor (a/r)² from the orbit
-    S₀ = planet.solar_constant * vars.parameterizations.solar_distance_factor[]
+    S₀ = planet.solar_constant * solar_distance_factor(vars)
     D = S₀ * cos_zenith             # top of atmosphere downward radiation
     vars.parameterizations.surface_shortwave_down[ij] = D  # transparent atmosphere so same at surface (before albedo)
 
@@ -193,7 +193,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
 
     # Full TOA downward flux; ozone absorption is handled inside the layer loop below.
     # Solar constant at the current Sun–planet distance, factor (a/r)² from the orbit
-    D_toa = model.planet.solar_constant * vars.parameterizations.solar_distance_factor[] * cos_zenith
+    D_toa = model.planet.solar_constant * solar_distance_factor(vars) * cos_zenith
     D = D_toa
 
     # DOWNWARD BEAM
@@ -360,7 +360,7 @@ no reflection by clouds or the surface."""
 
     # top of atmosphere downward flux split into visible and near-infrared band,
     # solar constant at the current Sun–planet distance, factor (a/r)² from the orbit
-    D_toa = model.planet.solar_constant * vars.parameterizations.solar_distance_factor[] * cos_zenith
+    D_toa = model.planet.solar_constant * solar_distance_factor(vars) * cos_zenith
     D_nir = radiation.near_infrared_fraction * D_toa
     D = D_toa - D_nir
 

@@ -47,6 +47,39 @@ cycle.)
     path rather than routing through Kepler.
   - The equinox phase uses the mean year (365.25 days), like `SinSolarDeclination`, so the same
     leap-year offset of up to about half a day applies.
+- 2026-11-16 (review in #1407, Milan and milankl-claude):
+  > - planet.orbit is responsible to define the orbit and needed variables for its computation
+  > - model.solar_zenith is responsible to execute that computation before the zenith angle is computed
+  > - model.radiation uses zenith + distance and falls back to what we currently have for CircularOrbit
+
+  The structure changed accordingly:
+  - **Variables:** `variables(planet::Earth)` forwards to `variables(planet.orbit)`. Only
+    `KeplerOrbit` declares `solar_distance_factor`; `CircularOrbit` declares nothing.
+  - **Zenith:** `orbit_position!(vars, T, orbit, zenith, planet, orbit_time)` returns the
+    declination and writes the factor for `KeplerOrbit` only.
+  - **Radiation:** `solar_distance_factor(vars)` returns the stored factor, or 1 when the variable
+    doesn't exist. That's decided at compile time through `haskey` on the NamedTuple, so nothing
+    is read inside the kernels for a circular orbit. It is used at all four sites.
+  - **`KeplerOrbit`:**
+    - it is `@parameterized`, with `[OPTION]` fields and `@param eccentricity (bounds = 0 .. 1,)`;
+    - its defaults are the constants `EARTH_ECCENTRICITY` and `EARTH_LONGITUDE_OF_PERIHELION`;
+    - its docstring notes that `KeplerOrbit()` differs from `CircularOrbit()` in insolation
+      (±3.4%) and that the equation of time stays present-day Earth's;
+    - it has a `[DERIVED]` `mean_anomaly_equinox`, computed by `mean_anomaly_at_equinox`, which
+      also throws a `DomainError` unless 0 ≤ e < 1;
+    - `KeplerOrbit(spectral_grid; ...)` is a constructor.
+  - **Equinox phase:** `equinox_angle` is shared by `SinSolarDeclination` and `KeplerOrbit`.
+  - **Warning:** a warning at initialization when a `KeplerOrbit` meets a non-default
+    `solar_declination`, which it ignores.
+  - **Tests:**
+    - the ozone test compares `ozone_absorption!` for `CircularOrbit` and an eccentric orbit
+      with perihelion at the December solstice. There the solstice falls on 23 January
+      instead of 22 December, so on 1 February ozone is higher in the north and lower in the
+      south;
+    - variable allocation is tested per orbit;
+    - the simulation tests use T21 L4 for 1 day.
+  - The Newton iteration count stays a runtime keyword (5 iterations once per step, no
+    measurable gain from compile time).
 
 ## Problem description
 
