@@ -93,6 +93,11 @@ Base revision: 069fb09f3d4fa539fbeb27ea4c352010d6737961
   θ = (1.63, 0.55, -0.55); 3-cycle A unchanged (-1.03, 0.70, 1.05). `effective_centering`
   function. Mathematics in `docs/src/time_stepping.md` ("Implicit centering of the Lorenz N-cycle").
 
+> Can you do 4B now and add to the matrix? / yes update the plan with a quick summary
+
+- Searched a 4-cycle B centering (see "4-cycle variant B"): none keeps gravity waves and is
+  robustly stable, so 4B keeps no default centering.
+
 ## Problem description
 
 `NCycleLorenz` (#1031, #1035) is not the default for the shallow water model as it was found to
@@ -337,6 +342,26 @@ All 40 gravity wave runs with 4A were stable; the jet has a clean stability thre
 resolution (stable below, unstable above), ≈ 0.75x leapfrog's time step, matching the ratio of
 the explicit limits (0.70 vs 1).
 
+### 4-cycle variant B
+
+Method as in "Order condition and effective centering" (B weights w = (1, 4, 2, 4/3), c⋅θ =
+θ₁ + θ₂ + θ₃ fixed by α_eff, |θ| ≤ 3, test set of "Robust centerings", ladder 0, 0.025, ..., 0.70,
+optionally a minimum gravity wave amplification d_min for ω_LΔt ∈ [0.05, 1], 12 starts, 240
+iterations). Validated by reproducing ω_E,max = 0.70 for the 4A default.
+
+| α_eff | d_min | θ | ω_E,max | amp ωΔt = 0.5 / 1 |
+|---|---|---|---|---|
+| 0.50-0.60 | 0.98 | various | ≤ 0.1 | ≥ 0.98 |
+| 0.50 | - | (-0.90, 1.60, -2.97, 1.37) | 0.60 | 0.93 / 0.85 |
+| 0.55 | - | (2.90, -1.44, 1.72, 0.32) | 0.65 | 0.93 / 0.92 |
+| 0.60 | - | (2.98, -0.88, 1.71, 0.37) | 0.70 | 0.96 / 0.96 |
+| 4A default, 0.50 | | (2.06, 0.93, 1.02, 0.09) | 0.70 | 0.9997 / 0.994 |
+
+For 4B wave preservation and robust stability exclude each other. In the model (Gaussian blob,
+T128, Δt_T32 = 40 min, 10 h) both robust 4B centerings remove the outer wave front that leapfrog
+θ = 0.5, 3B and 4A keep (max |η| 425 m and 200 m vs 618 m leapfrog, 469 m 4A); constant θ = 0.5
+or 1 damp all variants (A, B, AB, N = 3, 4) to about 170-240 m. No default centering for 4B.
+
 ### Robust centerings (previous defaults)
 
 The previous defaults, optimised for gravity wave energy, turned out unpredictably unstable in
@@ -448,5 +473,5 @@ Lorenz N-cycle), so it moves from `model.implicit` to `model.time_stepping.impli
 ## Future work
 
 - Consider `NCycleLorenzB` as default variant; understand why it is more stable than A in the model.
-- Centering indexed over the full AB/ABBA sequence.
+- Centering indexed over the full AB/ABBA sequence (4B alone has no robust wave-preserving centering).
 - Third-order conditions for the centerings (the a²b, ab², b³ terms are quadratic in θ), weighted implicit diffusion, primitive equations.
