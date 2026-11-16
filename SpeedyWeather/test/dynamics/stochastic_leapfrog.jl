@@ -181,5 +181,5 @@ end
     simulation = seeded_initialize!(BarotropicModel(spectral_grid; random_process, time_stepping))
     run!(simulation, steps = 3)
     vars = simulation.variables
-    @test vars.prognostic.wiener_pattern.data[:, 1] != vars.prognostic.random_pattern.data
+    @test vars.prognostic.wiener_pattern.data[:, 1] != vars.prognostic.random_pattern.data[:, 1]
 end

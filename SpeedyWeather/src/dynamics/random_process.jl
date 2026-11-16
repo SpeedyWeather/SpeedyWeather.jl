@@ -2,7 +2,8 @@
 Implementation of random processes for stochastic forcings and parameterizations in SpeedyWeather.
 Any random process <: AbstractRandomProcess has to implement the following interface:
  - `variables(process)` defines the variables of `model.random_process`, by convention the
-   spectral `vars.prognostic.random_pattern` and its grid counterpart `vars.grid.random_pattern`
+   spectral `vars.prognostic.random_pattern` and its grid counterpart `vars.grid.random_pattern`,
+   always 3D with `n_patterns` independent patterns (a trailing singleton dimension for one)
  - `initialize!(process, model)` precomputes and (re)seeds the random number generator
  - `update_random!(pattern, process)` advances the process with `pattern` as its state, i.e.
    draws the next pattern into the array `pattern` (for processes with memory like the AR1
@@ -103,8 +104,8 @@ evolving `wavenumbers` with respectice `time_scales` and `standard_deviations`
 independently. Transformed after every time step to grid space with a
 `clamp` applied to limit extrema. For reproducability `seed` can be
 provided and an independent `random_number_generator` is used
-that is reseeded on every `initialize!`. `n_patterns > 1` evolves that many
-independent patterns (`Spectral3D`/`Grid3D` with `n_patterns` slots).
+that is reseeded on every `initialize!`. The pattern is always 3D (`Spectral3D`/`Grid3D`)
+with `n_patterns` independent patterns, `n_patterns = 1` (default) is a trailing singleton dimension.
 
 Every time step the coefficients `ξ` of degree l of the pattern are updated as
 
@@ -176,8 +177,7 @@ function SpectralAR1Process(
     )
     RNG = typeof(random_number_generator)
     (; truncation, spectrum) = SG
-    random_numbers = n_patterns <= 1 ? zeros(SG.SpectralVariable2D, spectrum) :
-        zeros(SG.SpectralVariable3D, spectrum, n_patterns)
+    random_numbers = zeros(SG.SpectralVariable3D, spectrum, n_patterns)
     return SpectralAR1Process{SG.NF, SG.VectorType, typeof(seed), RNG, typeof(truncation), typeof(random_numbers)}(;
         truncation, n_patterns, seed, random_number_generator, random_numbers, kwargs...,
     )
@@ -185,16 +185,13 @@ end
 
 """$(TYPEDSIGNATURES)
 Variables of a spectral random process: the spectral `random_pattern` and its grid counterpart,
-2D for a single pattern, 3D with `n` slots for `n > 1` independent patterns."""
+always 3D with `n` slots for `n` independent patterns, a trailing singleton dimension for `n = 1`."""
 function random_pattern_variables(n::Integer)
     desc = "Random pattern for the random process"
-    return n <= 1 ? (
-            PrognosticVariable(:random_pattern, Spectral2D(); desc, units = "1"),
-            GridVariable(:random_pattern, Grid2D(); desc, units = "1"),
-        ) : (
-            PrognosticVariable(:random_pattern, Spectral3D(; n); desc, units = "1"),
-            GridVariable(:random_pattern, Grid3D(; n); desc, units = "1"),
-        )
+    return (
+        PrognosticVariable(:random_pattern, Spectral3D(; n); desc, units = "1"),
+        GridVariable(:random_pattern, Grid3D(; n); desc, units = "1"),
+    )
 end
 
 variables(process::SpectralAR1Process) = random_pattern_variables(process.n_patterns)
@@ -430,11 +427,12 @@ function GridWhiteNoiseProcess(
     return GridWhiteNoiseProcess{SG.NF, typeof(seed), RNG, typeof(SG.truncation)}(; seed, random_number_generator, kwargs...)
 end
 
-function variables(process::GridWhiteNoiseProcess)
-    n = process.n_patterns
-    dims = n <= 1 ? Grid2D() : Grid3D(; n)
-    return (GridVariable(:random_pattern, dims, desc = "Random pattern for the random process", units = "1"),)
-end
+variables(process::GridWhiteNoiseProcess) = (
+    GridVariable(
+        :random_pattern, Grid3D(; n = process.n_patterns),
+        desc = "Random pattern for the random process", units = "1",
+    ),
+)
 
 function initialize!(process::GridWhiteNoiseProcess, model::AbstractModel)
     seed = process.seed == 0 ? rand(UInt) : process.seed

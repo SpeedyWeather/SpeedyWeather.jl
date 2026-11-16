@@ -22,6 +22,7 @@ using Statistics
                 # transform to grid space (don't clamp)
                 grid = simulation.variables.grid.random_pattern
                 spec = simulation.variables.prognostic.random_pattern
+                @test size(spec, 2) == size(grid, 2) == 1   # single pattern: trailing singleton dimension
                 transform!(grid, spec, model.spectral_transform)
 
                 @test mean(grid) ≈ 0 atol = 1.0e-2

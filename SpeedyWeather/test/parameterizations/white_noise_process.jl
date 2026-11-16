@@ -17,6 +17,7 @@ using Statistics, Random
 
                 spec = simulation.variables.prognostic.random_pattern
                 grid = simulation.variables.grid.random_pattern
+                @test size(spec, 2) == size(grid, 2) == 1   # single pattern: trailing singleton dimension
                 stds = zeros(20)
                 for i in eachindex(stds)
                     SpeedyWeather.update_random!(simulation.variables, random_process)
@@ -28,7 +29,7 @@ using Statistics, Random
 
                 # m = 0 coefficients are real
                 m0 = spec.spectrum.m_indices .== 1
-                @test all(imag.(spec.data[m0]) .== 0)
+                @test all(imag.(spec.data[m0, 1]) .== 0)
             end
         end
     end
@@ -97,6 +98,15 @@ end
     simulation = initialize!(model)
     SpeedyWeather.update_random!(simulation.variables, random_process)
     @test pattern == simulation.variables.grid.random_pattern
+end
+
+@testset "Grid white noise process: single pattern" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 1)
+    random_process = GridWhiteNoiseProcess(spectral_grid; seed = 123)
+    simulation = initialize!(BarotropicModel(spectral_grid; random_process))
+    SpeedyWeather.update_random!(simulation.variables, random_process)
+    @test size(simulation.variables.grid.random_pattern, 2) == 1
+    @test any(!iszero, simulation.variables.grid.random_pattern)
 end
 
 @testset "Random number generator per architecture" begin
