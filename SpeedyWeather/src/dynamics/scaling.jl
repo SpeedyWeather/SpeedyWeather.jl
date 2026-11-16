@@ -114,7 +114,7 @@ end
 Scale the variable `var` with scalar `scale`."""
 @inline function scale!(
         variable::Union{LowerTriangularArray, AbstractField},
-        scale::Real
+        scale::Number
     )
     variable.data .*= scale
     return variable
@@ -124,7 +124,7 @@ end
 Undo the scaling of the variable `var` with scalar `scale`."""
 @inline function unscale!(
         variable::Union{LowerTriangularArray, AbstractField},
-        scale::Real
+        scale::Number
     )
     return scale!(variable, inv(scale))
 end
