@@ -1,7 +1,7 @@
 const USAGE = """
 Check SpeedyWeather.jl for performance regression with the debug mode of the benchmark suite
-(`manual_benchmarking.jl --debug`: PrimitiveWet with the default transform, T32–T128 with 8 layers,
-T32 and T128 with 16 layers).
+(`manual_benchmarking.jl --debug --length 2`: PrimitiveWet with the default transform, T32–T128 with
+8 layers, T32 and T128 with 16 layers, timed runs twice as long as by default to reduce noise).
 
 Usage: julia SpeedyWeather/benchmark/regression/regression.jl <command> [options]
 
@@ -47,6 +47,7 @@ is_ancestor(a, b) = success(`git -C $REPO merge-base --is-ancestor $a $b`)
 const REPO = git(@__DIR__, "rev-parse", "--show-toplevel")
 const BENCHMARK_DIR = dirname(@__DIR__)     # the harness used for every revision
 const HARNESS_FILES = ("manual_benchmarking.jl", "benchmark_suite.jl", "define_benchmarks.jl")
+const RUN_LENGTH = 2        # `--length` of manual_benchmarking.jl: timed runs twice as long as by default, less noise
 const RESULTS_JSON = "SpeedyWeather/benchmark/assets/benchmark_results.json"
 const AMDGPU_UUID = "21141c5a-9bdb-4563-92ae-f87d6854732e"     # not a dependency of the benchmark project
 const GROUPS = ("all", "default", "matrix")
@@ -164,7 +165,7 @@ function benchmark(target, output; arch = "cpu", workdir = default_workdir())
     julia = `$(Base.julia_cmd()) --startup-file=no --project=$env`
     commands = (
         `$julia -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"`,
-        `$julia $(joinpath(env, "manual_benchmarking.jl")) $arch --debug --output=$output`,
+        `$julia $(joinpath(env, "manual_benchmarking.jl")) $arch --debug --length=$RUN_LENGTH --output=$output`,
     )
     succeeded = open(output * ".log", "w") do log
         all(command -> success(pipeline(command, stdout = log, stderr = log)), commands)
