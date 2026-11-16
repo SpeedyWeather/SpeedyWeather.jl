@@ -1,10 +1,10 @@
 # Eccentric orbits: Kepler orbit, Sun–planet distance and precession
 
-> Status: **plan**. Nothing implemented yet; posted for discussion before any code.
+> Status: **in progress**. Design agreed in #1407 (`planet.orbit`, dispatch in the zenith's global parameterization); implementing.
 
 Date of initial draft: 2026-11-15
 
-Base revision: `main` as of 2026-11-15
+Base revision: caed82d647c38b6fd793ff49ff674e62d437b8cc
 
 ## Originating prompt
 
@@ -15,6 +15,28 @@ Base revision: `main` as of 2026-11-15
 planets. Prompted by teaching uses like Build Your Own Earth, Schultz et al. 2017, BAMS,
 whose orbital experiments vary tilt, eccentricity and the orbit through the last glacial
 cycle.)
+
+## Revision log
+
+- 2026-11-15: initial plan with flat `planet.eccentricity` / `planet.longitude_of_perihelion`
+  parameters and a `KeplerOrbit` component.
+- 2026-11-15 (review in #1407):
+  > What about making planet.orbit by default CircularOrbit or alternatively KeplerOrbit with
+  > eccentricity and perihelion? Then we can dispatch over the orbit in the zenith calculation
+  > to compute the distance factor?
+
+  and
+
+  > I wouldn't put it into the radiation code as every grid cell would redo that ij-independent
+  > orbit calculation. Maybe make it part of the zenith's global parameterization! call? And then
+  > dispatch over planet.orbit? [...] Require the distance variable as ref you can then write
+  > into and read from inside kernels.
+
+  The design changed to `planet.orbit::AbstractOrbit` (`CircularOrbit` default, `KeplerOrbit`).
+  The orbit position is computed once per time step in `parameterization!(vars, ::AbstractZenith,
+  model)`, outside any kernel, and the distance factor is stored in a `ScalarDim` parameterization
+  variable that the shortwave schemes read. The equation of time from the orbit is left as future
+  work.
 
 ## Problem description
 
@@ -42,78 +64,69 @@ So none of these can be run:
 - The PMIP protocol (Otto-Bliesner et al. 2017, *GMD*): the vernal equinox is fixed at
   21 March and the orbit is set by (e, obliquity, longitude of perihelion ϖ measured from the
   vernal equinox). Present day: e ≈ 0.0167, with perihelion in early January (ϖ − 180° ≈ 102°
-  in Berger's convention). The exact values come from the PMIP tables when implementing.
+  in Berger's convention).
 - climlab (`climlab.solar.orbital`, `daily_insolation`; MIT licence): a reference
   implementation to test against.
 
-## Proposed changes
+## Summary of changes
 
-1. **Planet parameters** (`planet.jl`):
-   - `eccentricity::NF = 0` (bounds 0 ≤ e < 1);
-   - `longitude_of_perihelion::NF` [°, from the vernal equinox]. The default is irrelevant at
-     e = 0; Earth's present value would be a natural choice.
-
-   The existing `equinox` field fixes the calendar (PMIP convention), and `length_of_year`
-   is the orbital period.
-2. **An orbit component** used by `SolarZenith`/`SolarZenithSeason` in place of the
-   declination functor. Something like:
+1. **Orbit types** (`dynamics/planet.jl`):
 
    ```julia
-   abstract type AbstractOrbit <: AbstractModelComponent end
-   struct KeplerOrbit <: AbstractOrbit end   # reads e, ϖ, tilt, equinox from planet
-   # returns (δ, distance_factor = (a/r)^2) for a given orbit_time
+   abstract type AbstractOrbit end
+   struct CircularOrbit <: AbstractOrbit end
+   @kwdef struct KeplerOrbit{NF} <: AbstractOrbit
+       eccentricity::NF = 0.0167
+       longitude_of_perihelion::NF = 282.9    # [˚] from the vernal equinox
+   end
    ```
 
-   Steps:
-   - the mean anomaly comes from orbit_time, anchored so that the true solar longitude
-     λ = 0 at `planet.equinox`;
-   - Kepler's equation E − e·sin E = M is solved by Newton's method (a fixed 5 iterations, so
-     there is no data-dependent control flow for Reactant/Enzyme);
-   - then ν from E, λ = ν + ϖ, sin δ = sin(tilt)·sin λ, and (a/r)² = ((1 + e·cos ν)/(1 − e²))².
+   `Earth` gains `orbit::O = CircularOrbit()`. The vernal equinox (`planet.equinox`) fixes the
+   calendar, as in PMIP, and the year angle of `orbit_time` is the mean anomaly clock.
+2. **Orbit position** (`radiation/zenith.jl`):
+   `orbit_position(T, orbit, zenith, planet, orbit_time) -> (δ, distance_factor)`.
+   - `CircularOrbit`: δ from the zenith's `solar_declination` component as now, with a distance
+     factor of 1.
+   - `KeplerOrbit`:
+     - the mean anomaly is M = M₀ + (g − g_equinox), where M₀ is the mean anomaly at the vernal
+       equinox (true anomaly ν₀ = −ϖ);
+     - Kepler's equation E − e·sin E = M is solved with 5 fixed Newton iterations;
+     - then ν = 2 atan(√(1+e) sin(E/2), √(1−e) cos(E/2)) and λ = ν + ϖ;
+     - sin δ = sin(tilt) sin λ and (a/r)² = 1/(1 − e cos E)².
 
-   At e = 0 this reduces exactly to `SinSolarDeclination` with a distance factor of 1, so
-   existing simulations are unchanged. That case would be tested bitwise.
-3. **Distance factor in the shortwave.** The zenith step stores the scalar (a/r)² for the
-   current time step: a new 0-dimensional parameterization variable, or a field on the zenith
-   component, whichever fits your design. The three `solar_constant * cos_zenith` sites
-   multiply by it. `cos_zenith` stays the geometric cosine, so path lengths and
-   zenith-dependent albedos are unaffected.
-4. **Equation of time** (optional, second step): for a general orbit
-   EoT = (M − ν) − (λ_apparent − α) can replace the Earth-only Spencer series in
-   `SolarTimeCorrection`. It is small, so it could be left as future work.
+   `solar_declination(T, zenith, orbit_time)` gains a `planet` method so that seasonal
+   ozone follows the same orbit.
+3. **Distance factor:** `ParameterizationVariable(:solar_distance_factor, ScalarDim(1))` is
+   declared by the zenith. It is written in the zenith's global `parameterization!` and read by
+   the three `solar_constant * cos_zenith` sites. `cos_zenith` stays the geometric cosine.
 
-## What it does not do
-
-- No secular change of the orbit during a run: the elements are constants, as in PMIP time
-  slices. An `orbital_time` option evaluating Berger (1978) at a given date could follow later.
-- No change to the calendar/month definitions. PMIP's "calendar effect" on monthly means at
-  high e gets a docs note instead.
+`CircularOrbit` keeps exactly today's path, so default simulations are unchanged.
 
 ## Testing and verification
 
-- **Unit tests:**
-  - e = 0 is bitwise equal to `SinSolarDeclination` and gives a distance factor of 1;
-  - Kepler residual below 1e-6 across e ∈ [0, 0.5];
-  - the distance factor integrates over a year to 1/√(1 − e²);
-  - the solstices and equinoxes fall where λ says they should.
-- **Insolation against climlab** (or Berger & Loutre tables): daily-mean TOA insolation by
-  latitude × day of year for present day, 6 ka, 116 ka and 126 ka, within 1 W/m². That
-  includes the classic 65°N June value.
-- **Model runs** (T31 L8, slab ocean):
-  - present-day orbit vs circular, where we expect small, Southern-Hemisphere-summer-weighted
-    differences;
-  - 6 ka vs present, where we expect more North African summer rain;
-  - a Mars-like e = 0.09 at zero tilt, where both hemispheres should warm together near
-    perihelion.
+- **Unit tests** (`test/parameterizations/orbit.jl`):
+  - the Kepler residual |E − e sin E − M| is below 1e-10 for e ∈ [0, 0.9] (Float64);
+  - `KeplerOrbit` with e = 0 gives the same declination as `SinSolarDeclination` and a distance
+    factor of 1;
+  - the annual mean of the distance factor is 1/√(1 − e²);
+  - the solstices and equinoxes fall at λ = 0, 90°, 180°, 270°;
+  - perihelion falls where ϖ puts it;
+  - a short `PrimitiveWetModel` run with `KeplerOrbit` stays finite, and the stored distance
+    factor varies between 1/(1 + e)² and 1/(1 − e)²;
+  - the default model is unchanged (`CircularOrbit`, distance factor 1).
+- **Insolation against climlab** (offline, reported in the PR rather than as a unit test):
+  daily-mean TOA insolation by latitude × day of year for present day, 6 ka, 116 ka and
+  126 ka.
 
 ## Documentation changes
 
-A short "Orbit" section in `radiation.md`: the parameters, the PMIP equinox convention, the
-calendar-effect caveat, and an example setting a 126 ka orbit.
+An "Orbit" section in `radiation.md`: `CircularOrbit` / `KeplerOrbit`, the PMIP equinox
+convention, the calendar-effect caveat, and an example setting a 126 ka-like orbit.
 
 ## Known limitations
 
 - The orbit is fixed within a run (time-slice experiments only).
+- The equation of time (`SolarTimeCorrection`) stays Earth's; it isn't derived from the orbit yet.
 - For very eccentric orbits (e ≳ 0.3) the perihelion peak can be far brighter than the mean.
   That's a stability question for the physics at those fluxes, not for the orbit code.
 
@@ -121,4 +134,4 @@ calendar-effect caveat, and an example setting a 126 ka orbit.
 
 - `BergerOrbit(date)`: e, tilt and ϖ from Berger (1978) for any date in the last few Myr.
 - Secular (transient) orbits.
-- The equation of time from the orbit (item 4) if it isn't done here.
+- The equation of time from the orbit.
