@@ -43,6 +43,11 @@ Base revision: b06af911
   "Cannot deduce type of store `store i64 -1`" warnings in `_transform!` and `dynamics_tendencies!` (and, with a
   tracer, in `horizontal_advection_tracer!`, which calls the same transforms). They appear without tracers too, so
   they are unrelated to this change. CI runs these tests on Julia 1.10 and 1.11 and doesn't show them.
+- 2026-11-16: only the PrimitiveDryModel tracer case was kept in CI (the BarotropicModel one was dropped in commit
+  f5b9047e). Its tracer was a σ-independent blob on the equator, where the default (Jablonowski–Williamson) wind is
+  zero, and "advected" was only checked as `!=`, which diffusion alone would satisfy. Changed to a blob at 45˚N in
+  the midlatitude jet that increases linearly with σ, so vertical advection acts from the first step, and to require
+  a relative change of more than 0.05 over the compared steps. See Results for the measurements behind this.
 
 ## Problem description
 
@@ -251,6 +256,24 @@ negligible compared with the transforms.
 - **Reactant** (0.2.308, versions as in CI): the new correctness cases pass. BarotropicModel with a tracer: 13 of 13.
   PrimitiveDryModel with a tracer: 22 of 22. In both, the tracer differences between CPU and Reactant are comparable to
   those of vorticity, within the default tolerances.
+- **Choice of the Reactant test tracer** (PrimitiveDryModel, CPU, test setup: 10-day spin-up, then the 100 compared
+  steps; variants with advection switched off by tracer name). The relative change of the spectral tracer over the
+  100 compared steps:
+
+  | Tracer | Advected | Diffusion only | Vertical advection's share |
+  |---|---|---|---|
+  | Equator, σ-independent (before) | 0.38 | < 0.0001 | 0.10 |
+  | 45˚N, ∝ σ (now) | 0.74 | 0.0016 | 0.59 |
+
+  The threshold of 0.05 therefore separates advection from diffusion by more than an order of magnitude either way.
+  With the new tracer the Reactant case still passes 22 of 22; the tracer differs between CPU and Reactant by at
+  most about 1e-5 (mean about 2e-7), far within the norm-relative tolerance of 1e-3.
+- **Over- and undershoots.** The tracer has no positivity limiter, so spectral advection over- and undershoots at
+  T32. With the new tracer, the minimum reaches −0.61 at day 10 in the lowest layer at 69˚N, where the baroclinic wave
+  breaks; with horizontal advection only it is −0.14. This comes from the dispersive default
+  `CenteredVerticalAdvection`. With `UpwindVerticalAdvection` the minimum is −0.18. A constant tracer stays exactly 1
+  and c = σ stays within 0.00–1.16, so the vertical advection of tracers is consistent. Temperature uses the same
+  scheme. For a CPU-vs-Reactant comparison the undershoots don't matter.
 
 ## Documentation changes
 

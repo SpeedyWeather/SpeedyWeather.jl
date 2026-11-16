@@ -52,8 +52,10 @@ function compare_tracers(nt_cpu::NamedTuple, nt_reactant::NamedTuple, namespace:
     return Dict{Symbol, NamedTuple}(Symbol(namespace, :., name) => r for (name, r) in results)
 end
 
-"""Initial condition for the tracers: a Gaussian blob centred at 180˚E on the equator."""
-tracer_initial_condition(λ, φ, σ) = exp(-((λ - 180)^2 + φ^2) / 30^2)
+"""Initial condition for the tracers: a Gaussian blob centred at 180˚E, 45˚N in the midlatitude jet of
+the default initial conditions (the equatorial flow of the PrimitiveDry model is weak), increasing linearly
+with σ so that vertical advection acts on it from the first time step."""
+tracer_initial_condition(λ, φ, σ) = σ * exp(-((λ - 180)^2 + (φ - 45)^2) / 30^2)
 
 """Compare that the clock is running in the same way."""
 function compare_clock(sim_cpu, sim_reactant)
@@ -210,9 +212,11 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
             end
         end
 
+        # diffusion alone changes the tracers by less than 1% over the compared time steps, advection by far more
         @testset "Tracers advected" begin
             for (name, before) in tracers_before
-                @test getfield(vars_cpu.prognostic.tracers, name).data != before
+                after = getfield(vars_cpu.prognostic.tracers, name).data
+                @test norm(after .- before) / norm(before) > 0.05
             end
         end
     end
