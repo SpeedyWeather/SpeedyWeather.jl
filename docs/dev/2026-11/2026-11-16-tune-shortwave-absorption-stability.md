@@ -1,9 +1,9 @@
 # Tuning shortwave water vapour and dry-air absorption for stable long T32L8 runs
 
-> Status: **in progress**. On `origin/main` (`b06af911a`) the default Byrne–O'Gorman longwave runs away; `b` =
-> `water_vapor_absorption` ≈ 500 with `a` = `dry_absorption` ≈ 1.6–1.9 is stable (findings 17–20). Refining the
-> shortwave around it (`V_*`) and 1000-year brackets (`L3_*`) are running. No source code changed in the
-> repository yet.
+> Status: **in progress**. On `origin/main` the default Byrne–O'Gorman longwave runs away. The new defaults
+> (decision 4: `b` = 750, `a` = 1.45 at the new default CO₂ of 360 ppm, shortwave `dry` 0.066, `wv_nir` 1500) are
+> set in the worktree `tree_defaults` (branch `mg/tune-water-vapour-defaults`, uncommitted), and their 1000-year
+> GPU validation `D_*` is running.
 
 Date of initial draft: 2026-11-16
 
@@ -47,6 +47,13 @@ Base revision: `b06af911abf015a6cb2bcba991959908dbb87a03` (`origin/main` with #1
     longwave, and `lw_dry` / `lw_wv` / `lw_co2` set the Byrne–O'Gorman parameters.
   - Not transferable: the Frierson-based candidates (`c*`, `r2_*`, `L2_*`, `τ₀` 7.2 / 1.8 with `wv` 65).
   - New worktree `tree_1279` at `b06af911a`. Reproduction and sensitivity runs `M_*` were submitted.
+- **2026-11-17, default CO₂ 360 ppm** (prompts in decision 3). `DEFAULT_CO2` = 360 and reused by
+  `ByrneOGormanLongwaveTransmissivity.reference_co2`, so `dry_absorption` is the dry optical depth at the default
+  CO₂. The change lives in the new worktree `tree_defaults`, which also gets the tuned defaults later; the tuning
+  continues there (`W_*`), and earlier `a` values translate by −0.0508.
+- **2026-11-17, new defaults chosen** (prompt: "and then continue the tuining of the water-vapour longwave
+  absorption and dry_absorption"). After `W_*` (finding 22), decision 4 sets the defaults in `tree_defaults`. The
+  1000-year validation `D_*` runs the code defaults, not a parameter list.
 - **2026-11-16, long runs on GPU** (prompt: "submit a gpu job if you want it faster, not multithreaded"). Restartable
   `run_long.jl` with `ARCH=gpu` and `long_gpu.sh`, see Phase 3. First 1000-year runs submitted.
 
@@ -383,6 +390,76 @@ January–May so far, so not comparable with the 12-month `main_default` row), a
    - Next: `V_*` (CPU, 40 years with +2% twins) adds `dry` = 0.066 / 0.1 and `cloud_albedo` = 0.38 to
      `b` / `a` = 500 / 1.6–1.8 and 750 / 1.4–1.5. `L3_*` (CPU, 1000 years) brackets the `b` = 500 family at
      `a` = 1.75 and 1.9, each with a +4% solar twin (≈+9.6 W/m²) as stress test.
+21. **More dry-air shortwave absorption or a lower cloud albedo brings the budget close, but the climate jumps
+   between ≈291 and ≈294 K** (`V_*`, CPU, 40 years, all 20 runs and twins stable; `a` given at 280 ppm and, in
+   brackets, at the new default of 360 ppm, see decision 3).
+
+   | `b` / `a` (360 ppm), `dry`, `cloud_albedo` | SST | OSR | OLR | atm SW | sfc SW down | LW down | LW up | LH | P | cloud | ice | K per W/m² |
+   |---|---|---|---|---|---|---|---|---|---|---|---|---|
+   | observed (all-sky) | ≈291 | 100 | 239 | 79 | 185 | 342 | 397 | 84 | 2.9 | | | ≈0.8 |
+   | 500 / 1.7 (1.65), 0.066, 0.43 | 290.7 | 112 | 235 | 70 | 185 | 294 | 391 | 49 | 1.69 | 0.67 | 0.110 | 0.91 |
+   | 500 / 1.8 (1.75), 0.066, 0.43 | 294.5¹ | 98 | 246 | 82 | 184 | 342 | 419 | 66 | 2.29 | 0.59 | 0.069 | 0.46 |
+   | 500 / 1.6 (1.55), 0.033, 0.38 | 293.1 | 99 | 247 | 68 | 201 | 319 | 409 | 66 | 2.28 | 0.61 | 0.086 | 0.49 |
+   | 500 / 1.7 (1.65), 0.033, 0.38 | 294.9 | 95 | 249 | 73 | 197 | 340 | 421 | 72 | 2.46 | 0.59 | 0.065 | 0.41 |
+   | 500 / 1.6 (1.55), 0.066, 0.38 | 294.6 | 91 | 254 | 84 | 190 | 338 | 419 | 68 | 2.35 | 0.59 | 0.072 | 0.48 |
+   | 500 / 1.7 (1.65), 0.1, 0.38 | 297.5 | 81 | 261 | 104 | 177 | 372 | 439 | 72 | 2.45 | 0.56 | 0.043 | 0.39 |
+   | 750 / 1.4 (1.35), 0.066, 0.38 | 295.6 | 91 | 253 | 86 | 188 | 357 | 426 | 75 | 2.59 | 0.59 | 0.065 | 0.37 |
+
+   ¹ still warming by 0.19 K per decade (decadal means 292.5, 293.2, 294.1, 294.5 K).
+
+   - `dry` 0.033 → 0.066 adds 12–16 W/m² of atmospheric absorption and takes 10–15 W/m² from the surface, but
+     also lowers OSR by ≈8 W/m² (absorption above the cloud tops), so the same `a` gives a warmer climate.
+   - From `a` = 1.7 to 1.8 (`dry` 0.066, `cloud_albedo` 0.43) SST jumps by 3.8 K and OSR falls by 14 W/m², as
+     cloud cover drops from 0.67 to 0.59 and sea ice from 0.11 to 0.07. The observed state (LW up 397, OSR 100)
+     falls right into this jump. The diagnostic cloud cover, which falls by ≈2% per K, is the main shortwave
+     feedback.
+   - In the warm branch the budget is close to the observed one, except for the surface temperature. With 500 /
+     1.8 / `dry` 0.066, OSR, atmospheric absorption, surface shortwave down and LW down are all within
+     3 W/m² of the observations, but LW up is 22 W/m² (≈3 K) too high and the latent heat flux 18 W/m² too low.
+   - All sensitivities are 0.37–0.59 K per W/m², except 0.91 in the cool branch.
+   - Next: `W_*` (GPU, 360 ppm): `cloud_albedo` 0.40 with `dry` 0.066 and `a` = 1.40–1.70, the jump at
+     `cloud_albedo` 0.43 (`a` = 1.68 / 1.72), `dry` 0.08, and `b` = 750.
+22. **`b` = 750 with `a` = 1.45 (360 ppm), `dry` 0.066 and the default `cloud_albedo` 0.43 matches the observed
+   budget best** (`W_*`, GPU, 40 years, all 25 runs and twins stable; means over years 35–39, K per W/m² from the
+   +2% solar twin over years 20–39; all `wv_nir` = 1500). The check run with `a` = 1.6492 at 360 ppm reproduces
+   `V_b500_a1.7_d066` (290.74 vs 290.7 K), so the 280 → 360 ppm translation of decision 3 is exact.
+
+   | `b` / `a` (360 ppm), `dry`, `cloud_albedo` | SST | OSR | OLR | atm SW | sfc SW down | LW down | LW up | LH | P | cloud | ice | K per W/m² |
+   |---|---|---|---|---|---|---|---|---|---|---|---|---|
+   | observed | ≈291 | 100 | 239 | 79 | 185 | 314 clear / 342 all-sky | 397 | 84 | 2.9 | | | ≈0.8 |
+   | 500 / 1.40, 0.066, 0.40 | 289.1 | 108.6 | 241.0 | 68.2 | 193.0 | 272.6 | 380.7 | 45.0 | 1.56 | 0.66 | 0.151 | 0.36 |
+   | 500 / 1.47, 0.066, 0.40 | 290.1 | 107.3 | 240.8 | 69.9 | 190.8 | 284.2 | 387.1 | 48.0 | 1.66 | 0.66 | 0.127 | 0.54 |
+   | 500 / 1.55, 0.066, 0.40 | 291.7 | 103.5 | 242.8 | 74.1 | 189.0 | 304.2 | 398.1 | 54.5 | 1.88 | 0.65 | 0.103 | 0.78 |
+   | 500 / 1.62, 0.066, 0.40 | 294.3 | 93.7 | 250.4 | 82.9 | 188.0 | 337.5 | 417.7 | 66.9 | 2.31 | 0.59 | 0.072 | 0.49 |
+   | 500 / 1.70, 0.066, 0.40 | 295.7 | 91.4 | 251.8 | 86.6 | 185.7 | 352.5 | 427.2 | 70.2 | 2.42 | 0.58 | 0.058 | 0.41 |
+   | 500 / 1.68, 0.066, 0.43 | 291.3 | 110.2 | 235.9 | 71.3 | 184.4 | 301.5 | 395.6 | 50.7 | 1.75 | 0.66 | 0.100 | 0.89 |
+   | 500 / 1.72, 0.066, 0.43 | 292.6 | 105.7 | 239.3 | 75.4 | 183.6 | 317.9 | 404.6 | 57.3 | 1.98 | 0.64 | 0.083 | 0.77 |
+   | 500 / 1.60, 0.08, 0.43 | 290.4 | 110.0 | 237.1 | 73.7 | 182.5 | 291.0 | 389.1 | 46.3 | 1.60 | 0.67 | 0.114 | 0.69¹ |
+   | 500 / 1.70, 0.08, 0.43 | 292.6 | 104.1 | 241.0 | 79.9 | 180.4 | 318.3 | 404.6 | 55.5 | 1.92 | 0.64 | 0.086 | 0.84 |
+   | **750 / 1.45, 0.066, 0.43** | **291.5** | 108.6 | 237.9 | 71.8 | 185.8 | 313.7 | 397.3 | 59.8 | 2.07 | 0.65 | 0.105 | 0.92 |
+   | 750 / 1.55, 0.066, 0.43 | 295.3 | 98.2 | 245.3 | 83.2 | 182.2 | 357.6 | 424.7 | 72.7 | 2.50 | 0.59 | 0.064 | 0.41 |
+   | 750 / 1.35, 0.066, 0.40 | 293.1² | 98.0 | 247.4 | 78.1 | 190.0 | 331.1 | 409.1 | 68.1 | 2.35 | 0.61 | 0.092 | 0.71 |
+
+   ¹ the twin is still warming (decadal means 292.4, 293.2, 293.4, 294.1 K). ² still warming by ≈0.2 K per decade.
+
+   - **Two branches, nothing in between.** The cool branch (cloud cover 0.64–0.67, sea ice 0.08–0.15) reaches up
+     to ≈292.6 K, the warm branch (cloud cover 0.58–0.59, sea ice ≤ 0.07) starts at ≈294 K. The jump lies at
+     `a` ≈ 1.55–1.62 for `b` = 500 with `cloud_albedo` 0.40, at ≈1.72–1.75 with 0.43, and at ≈1.45–1.55 for
+     `b` = 750. The observed surface temperature (LW up 397) is on the cool branch, about 1 K below its upper end.
+   - **Every +2% solar twin of a cool-branch run ends on the warm branch** (295.5–296.2 K). That gives the cool
+     branch its 0.7–0.9 K per W/m², while warm-branch runs warm by ≈2 K (≈0.4 K per W/m²). The observed climate
+     sensitivity, ≈3 K for 3.7 W/m², is ≈0.8 K per W/m², so the cool branch is realistic in this respect too.
+   - **750 / 1.45 / `dry` 0.066 / `cloud_albedo` 0.43** has LW up, LW down (clear sky), OLR and surface SW
+     down all within 1–2 W/m² of the observations, steady over the 40 years (decadal SST 291.5, 291.5, 291.6,
+     291.5 K). It is off in OSR (+9 W/m²), atmospheric SW (−7 W/m²) and the hydrological cycle (LH 60 vs 84 W/m²,
+     P 2.07 vs 2.9 mm/day), like every run. Part of the OSR excess is surface reflection (SW up ≈30 vs 24 W/m²),
+     and the net TOA of −5.3 W/m² is the sea-ice energy source (finding 9).
+   - **500 / 1.55 / `cloud_albedo` 0.40** is the alternative. Its OSR is closer (103.5 W/m²), but LW down is
+     10 W/m² too low and OLR 4 W/m² too high, P is lower (1.88 mm/day), and it changes one more default.
+   - At the same SST a larger `b` gives more LW down and a stronger hydrological cycle (750 / 1.45 vs 500 / 1.68
+     at 291.5 / 291.3 K: LW down 313.7 vs 301.5 W/m², P 2.07 vs 1.75 mm/day).
+   - `L3_*` after 86 years (CPU, 280 ppm, `b` = 500): `a` = 1.75 (1.70 at 360 ppm) stays at 291.1 K with decadal
+     means within 0.1 K, its +4% twin at 296.5 K; `a` = 1.9 stays at 294.8 K, its twin at 298.7 K. All stable.
 
 ## Plan
 
@@ -444,11 +521,24 @@ Only once the parameters are settled.
 
 ## Summary of changes
 
-Planned, pending the experiments:
+Done (uncommitted, worktree `tree_defaults` on branch `mg/tune-water-vapour-defaults` from `origin/main`
+`f6c4d99f9`, because `mg/tune-water-vapour` is still based on `caed82d6`):
 
-- New default values in `TwoBandShortwaveTransmissivity` (`shortwave_transmissivity.jl`), with a comment giving the
-  tuning target and this document.
-- `CHANGELOG.md` entry under `## Unreleased`.
+- `DEFAULT_CO2` = 360 ppm in `greenhouse_gases.jl` (was 280), `TwoTimesCO2` / `FourTimesCO2` docstrings refer to
+  the default instead of preindustrial CO₂. `ExponentialCO2` keeps its preindustrial base of 280 ppm in 1850,
+  part of its fit to the Keeling curve (≈368 ppm in 2000).
+- `ByrneOGormanLongwaveTransmissivity.reference_co2 = DEFAULT_CO2` (was the literal 360).
+- NumericalRadiation extension: the `AnalyticBandLongwave` fallback without a CO₂ component is `DEFAULT_CO2`
+  (was its own 280). `ClearSkyEcCKDRadiation` keeps its own `mole_fractions.CO₂` default (NumericalRadiation's).
+- Tests: `numericalradiation.jl` uses `DEFAULT_CO2` instead of 280. `longwave_radiation.jl` checks that the dry
+  optical depth equals `dry_absorption` at the default CO₂. `greenhouse_gases.jl`, `longwave_radiation.jl`
+  and `numericalradiation.jl` pass with `--check-bounds=yes`.
+- `docs/src/radiation.md` and `CHANGELOG.md` (PR number still to be filled in).
+- Decision 4: `dry_absorption` = 1.45 and `water_vapor_absorption` = 750 in `longwave_transmissivity.jl`, with a
+  comment on why Byrne and O'Gorman's values are not used. `absorptivity_dry_air` = 0.066 and
+  `absorptivity_water_vapor_near_infrared` = 1500 in `TwoBandShortwaveTransmissivity`
+  (`shortwave_transmissivity.jl`), with comments. The `ByrneOGorman` paragraph of `docs/src/radiation.md` now
+  gives the tuning target and the resulting budget. Second `CHANGELOG.md` entry.
 - `SpeedyWeather` is already at `0.25.0-DEV`, so no version bump is needed for a change of default values.
 
 ## Testing and verification
@@ -485,6 +575,19 @@ Planned, pending the experiments:
 2. **Scope:** the shortwave absorptivities, `cloud_albedo` of `DiagnosticClouds` (0.43) and the optical depths
    `τ₀_equator`, `τ₀_pole` of `FriersonLongwaveTransmissivity` may all be tuned in this PR. The surface fluxes
    stay out of scope.
+3. **Default CO₂ of 360 ppm** (2026-11-17, prompts: "we might also change the co2 ppm default throughout the
+   model. By default we start in year 2000, so picking 360ppm seems right. Can you apply that througout the model
+   and then incorporate that into the tuning", "we should reuse the DEFAULT_CO2 throughout the model and set this
+   one to 360ppm"). `DEFAULT_CO2` = 360 (was preindustrial 280). `ByrneOGormanLongwaveTransmissivity.reference_co2`
+   and the NumericalRadiation extension's fallback reuse it. `dry_absorption` is therefore the dry optical depth at
+   the default CO₂. CO₂ enters only `ByrneOGormanLongwaveTransmissivity` (and NumericalRadiation's schemes), so
+   all earlier runs translate exactly: `a`(360 ppm) = `a`(280 ppm) − 0.2023 ln(360/280) = `a`(280 ppm) − 0.0508.
+   From `W_*` on, `a` is given at 360 ppm.
+4. **New defaults** (2026-11-17, finding 22): `ByrneOGormanLongwaveTransmissivity` `dry_absorption` 1.3 → 1.45
+   and `water_vapor_absorption` 1997.9 → 750; `TwoBandShortwaveTransmissivity` `absorptivity_dry_air`
+   0.033 → 0.066 and `absorptivity_water_vapor_near_infrared` 15000 → 1500. `cloud_albedo` stays 0.43. Reasons:
+   the closest match to the observed surface budget on the cool branch, steady over 40 years, the strongest
+   hydrological cycle of the candidates, and no change to the clouds. Pending the 1000-year validation `D_*`.
 
 ## Experiment log
 
@@ -504,8 +607,10 @@ Planned, pending the experiments:
 | `G_*` (GPU Slurm 3283750) and `M_b*`, `M_*_S` (CPU Slurm 3283751), `tree_1279` | `b` / `a` = 1000 / 2.5, 1000 / 3.0, 500 / 4.0, 500 / 4.5, 0 / 5.4, each with a +2% solar twin (`_S`); `_S` twins for the default, `a` = 1.1 and `b` = 1500 | 30 years | running | feedback strength, warming per W/m² |
 | `Y_*` (GPU Slurm 3284305 + 3284306, `tree_1279`) | all `wv_nir` = 1500: `b` = 0 with `a` 2.0 / 2.5 / 3.0 / 3.5, `b` = 250 with `a` 2.0 / 2.5 / 3.0, `b` = 500 with `a` 1.5 / 2.0 / 2.5, `b` = 1997.9 with `a` 0.7 / 0.87; each with a +2% solar twin | 40 years | completed, all stable | finding 19 |
 | `Z_*` (GPU Slurm 3289286 + 3289287, `tree_1279`) | all `wv_nir` = 1500: `b` = 500 with `a` 1.6 / 1.75 / 1.9; `b` = 1000 with `a` 1.0 / 1.2 / 1.4; with visible `wv` = 45: `b` / `a` 500 / 1.6, 500 / 1.75, 1000 / 1.0, 1000 / 1.2, 1997.9 / 0.75, 1997.9 / 0.87; `cloud_albedo` 0.40 with 500 / 1.75 / `wv` 45 and 1000 / 1.2 / `wv` 45; each with a +2% solar twin | 40 years | completed; the twin of 1997.9 / 0.87 / `wv` 45 NaN in year 15 | finding 20 |
-| `V_*` (CPU Slurm 3289952, `tree_1279`, `long_cpu.sh`) | all `wv_nir` = 1500: `b` = 500 with `a` 1.6 / 1.7 / 1.8 and `dry` 0.066 + `cloud_albedo` 0.38; `a` 1.7 / 1.8 with `dry` 0.066; `a` 1.6 / 1.7 with `cloud_albedo` 0.38; `a` 1.7 with `dry` 0.1 + `cloud_albedo` 0.38; `b` = 750 with `a` 1.4 / 1.5, `dry` 0.066 + `cloud_albedo` 0.38; each with a +2% solar twin | 40 years | running, ready ≈14:00 | more atmospheric absorption without q dependence, lower OSR |
-| `L3_*` (CPU Slurm 3289953, `tree_1279`) | `b` / `a` = 500 / 1.75 and 500 / 1.9 (`wv_nir` = 1500), each with a +4% solar twin (1419.6 W/m²) | 1000 years, 25-year restart chunks | running, ≈700 years per day | does the `b` = 500 family stay stable for centuries, also under strong forcing? |
+| `V_*` (CPU Slurm 3289952, `tree_1279`, `long_cpu.sh`) | all `wv_nir` = 1500: `b` = 500 with `a` 1.6 / 1.7 / 1.8 and `dry` 0.066 + `cloud_albedo` 0.38; `a` 1.7 / 1.8 with `dry` 0.066; `a` 1.6 / 1.7 with `cloud_albedo` 0.38; `a` 1.7 with `dry` 0.1 + `cloud_albedo` 0.38; `b` = 750 with `a` 1.4 / 1.5, `dry` 0.066 + `cloud_albedo` 0.38; each with a +2% solar twin | 40 years | completed, all stable | finding 21 |
+| `W_*` (GPU Slurm 3297308 + 3297309, `tree_defaults` = `f6c4d99f9` + `DEFAULT_CO2` = 360 ppm, `a` at 360 ppm) | all `wv_nir` = 1500: `b` = 500, `dry` 0.066, `cloud_albedo` 0.40 with `a` 1.40 / 1.47 / 1.55 / 1.62 / 1.70; `cloud_albedo` 0.43 with `a` 1.68 / 1.72 (`dry` 0.066) and 1.60 / 1.70 (`dry` 0.08); `b` = 750, `dry` 0.066 with `a` 1.45 / 1.55 (0.43) and 1.35 (0.40); each with a +2% solar twin; plus `a` = 1.6492 as a check of the 280 → 360 ppm translation (≡ `V_b500_a1.7_d066`) | 40 years | completed, all stable | finding 22 |
+| `L3_*` (CPU Slurm 3289953, `tree_1279`) | `b` / `a` = 500 / 1.75 and 500 / 1.9 (`wv_nir` = 1500), each with a +4% solar twin (1419.6 W/m²) | 1000 years, 25-year restart chunks | running, ≈700 years per day; year 86 at 15:15, all stable | does the `b` = 500 family stay stable for centuries, also under strong forcing? Resubmit `configs/l3.txt` after the 1-day limit (≈12:15 on 2026-11-18) |
+| `D_*` (GPU Slurm 3298103; `D_default_2xCO2` alone on GPU Slurm 3298179, `configs/d1_co2.txt`; `tree_defaults` with the decision-4 defaults) | code defaults; +4% solar (1419.6 W/m²); −4% solar (1310.4 W/m²); 2×CO₂ (`greenhouse_gases = (; co2 = CO2(spectral_grid, 720))`) | 1000 years, 25-year restart chunks | running since 15:21 (H100, ≈9 h); 2×CO₂ since 15:31 (H100, ≈5 h) | validation of the new defaults |
 | `X_*` (CPU Slurm 3283769, `tree_1279`) | all `wv_nir` = 1500: `b` / `a` = 1000 / 2.0, 750 / 3.0, 750 / 3.5, 250 / 4.5, 250 / 5.0, 0 / 4.8, 0 / 6.0, and 500 / 4.0 with `cloud_albedo` 0.40, each with a +2% solar twin | 30 years | running, ready ≈09:00 | fills in `b` ≤ 1000. At year 7 the `M_*` runs show `b` ≥ 1500 still warming: default SST 298.9 K at +4.5 W/m²; `a` = 1.1 and `b` = 1500 at 294.0 / 293.6 K, still rising ≈0.3 K per year. With Byrne–O'Gorman the stratosphere stays cool (T₁ ≈ 221 K, max 252 K); `wv_nir` = 1500 halves q₂ |
 | `r2_*` (Slurm 3279654, ed) | all `wv_nir` = 1500: `wv` 55/60/65 × `τ₀` 7.0/7.2/7.5, polar `τ₀` 2.0, `cloud_albedo` 0.45 | 20 years | running | round 2 around `c7` |
 | `L_main`, `L_nir1500`, `L_pt250` (GPU Slurm 3279622, ed) | `main` defaults; `wv_nir` = 1500; `water_vapor_pressure_top` = 250 hPa | 1000 years, 25-year restart chunks | running (H100) | does `main` blow up, and when? Do both stratosphere fixes hold for a millennium? ≈2.1 s per simulated month per run, done ≈03:00 on 2026-11-17 |
