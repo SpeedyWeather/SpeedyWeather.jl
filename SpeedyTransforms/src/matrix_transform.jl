@@ -85,9 +85,9 @@ function MatrixSpectralTransform(
     field2D = zeros(NF, grid_cpu)
     coeffs2D = zeros(Complex{NF}, spectrum_cpu)
 
-    progress_fwd = ProgressMeter.Progress(length(field2D); dt = 2, desc = "Precalculate forward matrix:")
+    progress_fwd = ProgressMeters.Progress(length(field2D); dt = 2, description = "Precalculate forward matrix:")
     forward_matrix!(forward, S, field2D, coeffs2D, progress_fwd)
-    progress_bwd = ProgressMeter.Progress(2 * nharmonics; dt = 2, desc = "Precalculate backward matrix:")
+    progress_bwd = ProgressMeters.Progress(nharmonics; dt = 2, description = "Precalculate backward matrix:")
     backward_matrix!(backward, S, field2D, coeffs2D, progress_bwd)
 
     # stack real and imaginary parts into real matrices, see struct definition
@@ -133,7 +133,7 @@ function forward_matrix!(F, S::AbstractSpectralTransform, field::AbstractField2D
         GPUArrays.@allowscalar field[ij] = 1
         transform!(coeffs, field, S)            # forward transforms of unit vectors
         F[:, ij] .= coeffs.data                 # are the columns of the transformation matrix F
-        isnothing(progress) || ProgressMeter.next!(progress)
+        isnothing(progress) || ProgressMeters.next!(progress)
     end
     return nothing
 end
@@ -160,7 +160,7 @@ function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2
 
         B[:, lm] .= real_response .+ im .* (.-field.data)
 
-        isnothing(progress) || ProgressMeter.next!(progress)
+        isnothing(progress) || ProgressMeters.next!(progress)
     end
     return nothing
 end

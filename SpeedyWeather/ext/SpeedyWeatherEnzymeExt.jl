@@ -5,7 +5,7 @@ using Enzyme
 using Enzyme.EnzymeCore                 # Annotation, Const, ...
 using Enzyme.EnzymeCore: Annotation
 import Enzyme.EnzymeCore.EnzymeRules    # `EnzymeRules.forward` is extended below (qualified)
-using SpeedyWeather.ProgressMeter
+using SpeedyWeather.ProgressMeters
 
 # currently not needed anymore:
 #=
@@ -23,15 +23,13 @@ end
 ###
 # implement make_zero where the default one fails
 
-# this lock is part of the ProgressMeter that's part of the Feedback of all models
-# dispatch on T <: ProgressCore as ProgressMeter v1.12 made it parametric (ProgressCore{O<:IO})
-# and Type{} is invariant, so Type{ProgressCore} would not match Type{ProgressCore{IO}}
+# the progress meter of the Feedback holds the output stream (with a lock) and is not differentiated
 @inline function Enzyme.make_zero(
-        ::Type{T},
+        ::Type{ProgressMeters.Progress},
         seen::IdDict,
-        prev::T,
+        prev::ProgressMeters.Progress,
         ::Val{copy_if_inactive} = Val(false),
-    )::T where {T <: ProgressMeter.ProgressCore, copy_if_inactive}
+    )::ProgressMeters.Progress where {copy_if_inactive}
     return prev
 end
 

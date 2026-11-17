@@ -26,6 +26,15 @@ Base revision: eb3a7080472dc558e82af58a39eb83f3523373f4 (head of `mc/progress-el
   its length and glyphs (`Bar(; length, fill, empty)`, no `BarGlyphs`, no partial glyphs); `Description`,
   `Colored`, `Speed` and `start` dropped; `Feedback.progress_bar_length` removed (no bar by default,
   as before).
+- 2026-11-17, merging `main` (70 commits): `SpeedyWeatherInternals` is now `1.0.3` (so `1.0.3+DEV`,
+  compat of SpeedyWeather/SpeedyTransforms to `1.0.4` at release) and SpeedyTransforms `1.0.2`
+  (`1.0.2+DEV`, its source is touched). Main added Reactant support to `Feedback`: maximum wind speed
+  and temperature range are opt-in there (`show_umax = nothing`), and
+  `progress!(feedback, vars, model, nsteps)` advances by several steps. Carried over as
+  `Feedback.elements = nothing` → `ProgressElements.default_elements(model.architecture)` in
+  `initialize!` (without the two diagnostics for `ReactantDevice`, listing them explicitly opts in),
+  and `next!(p; step)`. While at it: the backward-matrix meter in SpeedyTransforms counted to
+  `2 * nharmonics` but is advanced once per harmonic, so it never finished; now `nharmonics`.
 
 ## Problem description
 

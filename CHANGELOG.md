@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Progress line built from elements in the new module `ProgressElements` (ProgressMeter.jl's generic ones plus `SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`, new optional `VerticalCourantNumber`) via `Feedback(elements = ..., separator = ", ")`, replacing the `Feedback` options `showspeed`, `show_time`, `show_umax`, `show_temperature_range`; removes the `ProgressMeter.speedstring` type piracy and `FEEDBACK_*` globals. Depends on [ProgressMeter.jl#369](https://github.com/timholy/ProgressMeter.jl/pull/369) [#1298](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1298)
+- Lightweight progress meter `SpeedyWeatherInternals.ProgressMeters` replaces the ProgressMeter.jl dependency; progress line built from elements in the new module `ProgressElements` (`Percentage`, `Bar`, `ETA`, `ElapsedTime`, `Counter`, `SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`, new optional `VerticalCourantNumber`) via `Feedback(elements = ..., separator = ", ")`, replacing the `Feedback` options `showspeed`, `show_time`, `show_umax`, `show_temperature_range`, `progress_bar_length`; removes the `ProgressMeter.speedstring` type piracy and `FEEDBACK_*` globals [#1298](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1298)
 - Workaround LLVM bug for Enzyme differentiability by `noinline` parameterizations on CPU [#1413](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1413)
 - Reactant: compute `free_troposphere_layers` of `DiagnosticClouds` on a CPU copy of the vertical coordinates to avoid scalar indexing at `initialize!` [#1412](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1412)
 - Updated `JLArrays` dependency [#1411](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1411)

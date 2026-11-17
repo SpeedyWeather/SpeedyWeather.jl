@@ -26,21 +26,40 @@
 end
 
 @testset "Feedback progress elements" begin
-    spectral_grid = SpectralGrid(truncation = 15, nlayers = 4)
+    spectral_grid = SpectralGrid(truncation = 16, nlayers = 4)
+    render_line = SpeedyWeather.ProgressMeters.render_line
 
-    @testset "no speedstring piracy" begin
-        @test !any(m -> m.module === SpeedyWeather, methods(SpeedyWeather.ProgressMeter.speedstring))
+    @testset "no ProgressMeter.jl, no globals" begin
+        @test !isdefined(SpeedyWeather, :ProgressMeter)
         @test !isdefined(SpeedyWeather, :FEEDBACK_UMAX)
     end
 
     @testset "default elements" begin
         feedback = Feedback(verbose = false)
-        @test feedback.elements == ProgressElements.default_elements()
-        @test any(e -> e isa ProgressElements.SimulationSpeed, feedback.elements)
-        @test !any(e -> e isa ProgressElements.VerticalCourantNumber, feedback.elements)
-        # ProgressMeter's generic elements are available under ProgressElements too
-        @test ProgressElements.Bar === SpeedyWeather.ProgressMeter.Elements.Bar
-        @test !hasfield(Feedback, :showspeed) && !hasfield(Feedback, :show_umax)
+        @test isnothing(feedback.elements)      # default_elements(architecture) in initialize!
+        elements = ProgressElements.default_elements()
+        @test elements == ProgressElements.default_elements(SpeedyWeather.CPU())
+        @test any(e -> e isa ProgressElements.SimulationSpeed, elements)
+        @test any(e -> e isa ProgressElements.MaximumWindSpeed, elements)
+        @test !any(e -> e isa ProgressElements.VerticalCourantNumber, elements)
+        @test !any(e -> e isa ProgressElements.Bar, elements)
+        # the diagnostics are opt-in for Reactant
+        reactant = SpeedyWeather.ReactantDevice(nothing)   # for dispatch only, no Reactant needed
+        elements = ProgressElements.default_elements(reactant)
+        @test !any(e -> e isa Union{ProgressElements.MaximumWindSpeed, ProgressElements.TemperatureRange}, elements)
+        @test any(e -> e isa ProgressElements.SimulationTime, elements)
+        # the generic elements are available under ProgressElements too
+        @test ProgressElements.Bar === SpeedyWeather.ProgressMeters.Bar
+        @test !hasfield(Feedback, :showspeed) && !hasfield(Feedback, :show_umax) && !hasfield(Feedback, :progress_bar_length)
+    end
+
+    @testset "default line" begin
+        model = PrimitiveDryModel(spectral_grid; feedback = Feedback(verbose = false))
+        simulation = initialize!(model)
+        run!(simulation, period = Day(1))
+        p = model.feedback.progress_meter
+        @test p.counter == p.n
+        @test occursin(r"^ *\d+%, ETA: [\d:]+, \d{4}-\d\d-\d\d, .*/day, +\d+ m/s, \[ *-?\d+, +-?\d+\] ˚C$", render_line(p))
     end
 
     @testset "elements on redraw, VerticalCourantNumber" begin
@@ -49,10 +68,8 @@ end
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
         p = model.feedback.progress_meter
-        line = join(map(e -> ProgressElements.print_element(e, p), p.elements))
-        # the simulation elements are separated by ", ", also the appended one
-        @test occursin(r"ETA: .*, \d{4}-\d\d-\d\d, .*/day, +\d+ m/s, \[ *-?\d+, +-?\d+\] ˚C, Cᵥ = \d", line)
-        @test !occursin("(", line)
+        # the appended element is separated like the others
+        @test occursin(r"˚C, Cᵥ = \d+\.\d\d$", render_line(p))
         # the vertical scratch vector is allocated for the element, the redraw doesn't allocate
         element = p.elements[end]
         @test element.w_max isa AbstractMatrix && size(element.w_max) == (1, spectral_grid.nlayers)
@@ -81,30 +98,40 @@ end
         @test repr(p.elements[end]) == "VerticalCourantNumber()"
     end
 
-    @testset "barotropic leaves out temperature/Courant, separators" begin
-        (; Description, Percentage, SimulationTime, MaximumWindSpeed, TemperatureRange, VerticalCourantNumber) = ProgressElements
-        elements = (Description(), Percentage(), VerticalCourantNumber(), SimulationTime(), TemperatureRange(), MaximumWindSpeed())
-        model = BarotropicModel(SpectralGrid(truncation = 15, nlayers = 1); feedback = Feedback(; verbose = false, elements, separator = " | "))
+    @testset "barotropic leaves out temperature/Courant, separator, bar" begin
+        (; Percentage, Bar, SimulationTime, MaximumWindSpeed, TemperatureRange, VerticalCourantNumber) = ProgressElements
+        elements = (Percentage(), Bar(length = 4), VerticalCourantNumber(), SimulationTime(), TemperatureRange(), MaximumWindSpeed())
+        feedback = Feedback(; verbose = false, elements, separator = " | ", description = "Test")
+        model = BarotropicModel(SpectralGrid(truncation = 16, nlayers = 1); feedback)
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
-        bound = model.feedback.progress_meter.elements
-        @test bound[1] isa Description && bound[2] isa Percentage
-        @test bound[3] == " | " && bound[4] isa SimulationTime && bound[5] == " | " && bound[6] isa MaximumWindSpeed
-        @test length(bound) == 6
-
-        # no separator after only the description or strings
-        bound = ProgressElements.bind_elements((Description(), "[", SimulationTime(), MaximumWindSpeed()), simulation.variables, model)
-        @test bound[2] == "[" && bound[3] isa SimulationTime && bound[4] == ", " && bound[5] isa MaximumWindSpeed
+        p = model.feedback.progress_meter
+        @test p.elements[1] isa Percentage && p.elements[2] isa Bar
+        @test p.elements[3] isa SimulationTime && p.elements[4] isa MaximumWindSpeed
+        @test length(p.elements) == 4
+        # single spaces around the bar, the separator between other elements
+        @test occursin(r"^Test +\d+% [━ ]{4} \d{4}-\d\d-\d\d \| +\d+ m/s$", render_line(p))
     end
 end
 
 # a user-defined element extends `ProgressElements.print_element`
 struct CustomElement <: ProgressElements.AbstractProgressElement end
-ProgressElements.print_element(::CustomElement, p) = " custom"
+ProgressElements.print_element(::CustomElement, p) = "custom"
 
 @testset "custom progress element" begin
-    model = BarotropicModel(SpectralGrid(truncation = 15, nlayers = 1); feedback = Feedback(verbose = false, elements = (ProgressElements.Counter(), CustomElement())))
+    elements = (ProgressElements.Counter(), CustomElement())
+    model = BarotropicModel(SpectralGrid(truncation = 16, nlayers = 1); feedback = Feedback(; verbose = false, elements))
     simulation = initialize!(model)
     run!(simulation, steps = 2)
-    @test ProgressElements.print_element(model.feedback.progress_meter.elements[2], model.feedback.progress_meter) == " custom"
+    @test SpeedyWeather.ProgressMeters.render_line(model.feedback.progress_meter) == "2, custom"
+end
+
+@testset "progress! with several steps" begin
+    model = BarotropicModel(SpectralGrid(truncation = 16, nlayers = 1); feedback = Feedback(verbose = false))
+    simulation = initialize!(model)
+    run!(simulation, steps = 2)
+    p = model.feedback.progress_meter
+    p.counter = 0
+    SpeedyWeather.progress!(model.feedback, simulation.variables, model, 2)
+    @test p.counter == 2
 end

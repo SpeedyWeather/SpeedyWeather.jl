@@ -16,33 +16,30 @@ $(TYPEDFIELDS)"""
     "[OPTION] Progress description"
     description::String = ""
 
-    "[OPTION] Progress bar length in characters, `nothing` fits it to the terminal width, `0` shows no bar"
-    progress_bar_length::Union{Int, Nothing} = 0
-
     "[OPTION] Minimum wallclock time between feedback updates"
     feedback_dt::Float32 = 0.1
 
     "[OPTION] Interval in time steps between NaN checks"
     interval::Int = 50
 
-    """[OPTION] Elements of the progress line, see `ProgressElements`. Elements specific to
-    SpeedyWeather are bound to the simulation in `initialize!`, e.g. to add the vertical Courant number
-    `Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))`"""
-    elements::Tuple = ProgressElements.default_elements()
+    """[OPTION] Elements of the progress line, see `ProgressElements`, `nothing` for
+    `ProgressElements.default_elements(architecture)`. Elements specific to SpeedyWeather are bound to
+    the simulation in `initialize!`, e.g. to add a bar and the vertical Courant number
+    `Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.Bar(length = 20), ProgressElements.VerticalCourantNumber()))`"""
+    elements::Union{Tuple, Nothing} = nothing
 
-    "[OPTION] Separator in front of the elements showing a diagnostic of the simulation"
+    "[OPTION] Separator between the elements of the progress line"
     separator::String = ", "
 
-    "[DERIVED] struct containing everything progress related"
-    progress_meter::ProgressMeter.Progress =
-        ProgressMeter.Progress(1, enabled = verbose)
+    "[DERIVED] progress meter, created in `initialize!`"
+    progress_meter::ProgressMeters.Progress = ProgressMeters.Progress(1, enabled = false)
 
     "[DERIVED] did NaNs occur in the simulation?"
     nans_detected::Bool = false
 end
 
 # variables needed by the elements of the progress line, e.g. the scratch vector of `VerticalCourantNumber`
-variables(feedback::Feedback) = Tuple(Iterators.flatten(map(variables, feedback.elements)))
+variables(feedback::Feedback) = Tuple(Iterators.flatten(map(variables, something(feedback.elements, ()))))
 
 """
 $(TYPEDSIGNATURES)
@@ -55,24 +52,24 @@ function initialize!(feedback::Feedback, variables::Variables, model::AbstractMo
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
     # only do now for benchmark accuracy
-    (; description, verbose, feedback_dt) = feedback
-    elements = ProgressElements.bind_elements(feedback.elements, variables, model; feedback.separator)
-    desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
-    feedback.progress_meter = ProgressMeter.Progress(
-        clock.n_steps;          # use time stepper steps (regardless Δt) not time steps of size Δt
+    (; description, verbose, feedback_dt, separator) = feedback
+    elements = something(feedback.elements, ProgressElements.default_elements(model.architecture))
+    elements = ProgressElements.bind_elements(elements, variables, model)
+    model.output.active && (description = strip(description * " " * model.output.run_folder))
+    feedback.progress_meter = ProgressMeters.Progress(
+        Int(clock.n_steps);     # use time stepper steps (regardless Δt) not time steps of size Δt, Int for Reactant's numbers
         enabled = verbose,
+        description,
         elements,
-        desc,
+        separator,
         color = :blue,
-        barlen = feedback.progress_bar_length,
-        barglyphs = ProgressMeter.BarGlyphs(" ━━  "),
         dt = feedback_dt,
     )
 
     return nothing
 end
 
-progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
+progress!(feedback::Feedback) = ProgressMeters.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
     (; counter, n) = feedback.progress_meter
@@ -89,10 +86,21 @@ end
 # fallback for feedback = nothing
 progress!(::Nothing, vars::Variables, model::AbstractModel) = nothing
 
+"""$(TYPEDSIGNATURES)
+Feedback after `nsteps` time steps at once, e.g. after a compiled program of several time steps
+with Reactant: advance the progress meter by `nsteps` and check for NaNs (if `feedback.debug`)."""
+function progress!(feedback::Feedback, vars::Variables, model::AbstractModel, nsteps::Integer)
+    ProgressMeters.next!(feedback.progress_meter; step = nsteps)
+    feedback.debug && nan_detection!(feedback, vars, model)
+    return nothing
+end
+
+progress!(::Nothing, vars::Variables, model::AbstractModel, nsteps::Integer) = nothing
+
 """
 $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""
-finalize!(F::Feedback) = ProgressMeter.finish!(F.progress_meter)
+finalize!(F::Feedback) = ProgressMeters.finish!(F.progress_meter)
 
 # fallback if feedback is set to nothing
 finalize!(::Nothing) = nothing
@@ -222,11 +230,12 @@ function callback!(progress_txt::ProgressTxt, vars, model)
         percent = round(Int, (counter + 1) / n * 100)       # % of time steps completed
         if (percent % every_n_percent == 0)                 # write every p% step in txt
             write(file, @sprintf("\n%3d%%", percent))
-            r = remaining_time(progress_meter)
+            t = time()
+            r = ProgressMeters.durationstring(ProgressMeters.eta(progress_meter, t))
             write(file, ", ETA: $r")
 
-            time_elapsed = progress_meter.tlast - progress_meter.tinit
-            s = ProgressElements.speedstring(time_elapsed / counter, model.time_stepping.Δt)
+            time_elapsed = t - progress_meter.tinit
+            s = ProgressElements.speedstring(time_elapsed / max(1, counter), model.time_stepping.Δt)
             write(file, ", $s")
 
             nans_detected && write(file, ", NaN/Inf detected.")
@@ -246,24 +255,10 @@ function finalize!(progress_txt::ProgressTxt, vars, model)
     (; file) = progress_txt
     (; progress_meter) = model.feedback
 
-    time_elapsed = progress_meter.tlast - progress_meter.tinit
+    time_elapsed = time() - progress_meter.tinit
     s = "\nIntegration done in $(readable_secs(time_elapsed))."
     write(file, "\n$s\n")
     flush(file)
     close(file)
     return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Estimates the remaining time from a `ProgresssMeter.Progress`. Adapted from ProgressMeter.jl"""
-function remaining_time(p::ProgressMeter.Progress)
-    elapsed_time = time() - p.tinit
-    est_total_time = elapsed_time * (p.n - p.start) / (p.counter - p.start)
-    if 0 <= est_total_time <= typemax(Int)
-        eta_sec = round(Int, est_total_time - elapsed_time)
-        eta = ProgressMeter.durationstring(eta_sec)
-    else
-        eta = "N/A"
-    end
-    return eta
 end

@@ -2,8 +2,8 @@
     SpeedyWeather.ProgressElements
 
 Elements of the progress line printed by [`Feedback`](@ref SpeedyWeather.Feedback) while a simulation is running. Contains
-the generic elements of ProgressMeter.jl (`Description`, `Percentage`, `Bar`, `ETA`, `Speed`,
-`ElapsedTime`, `Counter`, `Colored`) and the ones specific to SpeedyWeather (`SimulationTime`,
+the generic elements of `SpeedyWeatherInternals.ProgressMeters` (`Percentage`, `Bar`, `ETA`,
+`ElapsedTime`, `Counter`) and the ones specific to SpeedyWeather (`SimulationTime`,
 `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`, `VerticalCourantNumber`). Pass a tuple of
 them as `Feedback(elements = ...)`, [`default_elements`](@ref)
 returns the default ones, e.g.
@@ -16,47 +16,34 @@ module ProgressElements
 using DocStringExtensions: TYPEDSIGNATURES
 import Dates
 import Printf: @sprintf
-import ProgressMeter
-import ..SpeedyWeather: variables, ScratchVariable, Vertical1D
-import ProgressMeter.Elements: AbstractProgressElement, print_element, Colored, Description,
-    Percentage, Bar, ETA, Speed, ElapsedTime, Counter
+import SpeedyWeatherInternals.ProgressMeters: ProgressMeters, Progress, AbstractProgressElement,
+    print_element, Percentage, Bar, ETA, ElapsedTime, Counter
+import ..SpeedyWeather: SpeedyWeather, variables, ScratchVariable, Vertical1D, AbstractArchitecture, ReactantDevice
 
-export AbstractProgressElement, print_element, Colored, Description, Percentage, Bar, ETA, Speed,
-    ElapsedTime, Counter, AbstractSimulationElement, SimulationTime, SimulationSpeed, MaximumWindSpeed, TemperatureRange,
+export AbstractProgressElement, print_element, Percentage, Bar, ETA, ElapsedTime, Counter,
+    AbstractSimulationElement, SimulationTime, SimulationSpeed, MaximumWindSpeed, TemperatureRange,
     VerticalCourantNumber, default_elements
 
 # Elements of the progress line. They are created unbound, e.g. `VerticalCourantNumber()`, and
 # `bind_element` returns a copy that holds what it needs from the simulation (`Variables`, time
 # step, ...) in `initialize!(::Feedback, ...)`, or `nothing` if the element does not apply to the
 # model, it is then left out of the line. `print_element` is only called when the progress meter
-# is redrawn, so diagnostics are only computed when they are displayed. Simulation elements print
-# only their value, the separators between them are added by `bind_elements`.
+# is redrawn, so diagnostics are only computed when they are displayed. Elements print only their
+# value, the progress meter puts its separator between them.
 
-"""Supertype of the elements that show a diagnostic of the simulation. They are separated from
-the elements before them by the `separator` of `Feedback`, see [`bind_elements`](@ref)."""
+"""Supertype of the elements that show a diagnostic of the simulation, they are bound to the
+simulation in `initialize!(::Feedback, ...)`, see `bind_elements`."""
 abstract type AbstractSimulationElement <: AbstractProgressElement end
 
 # elements that do not need anything from the simulation are their own bound version
 bind_element(element, vars, model) = element
 
 """$(TYPEDSIGNATURES)
-Bind `elements` to the simulation (`vars`, `model`), leave out those that do not apply to the
-model (`bind_element` returns `nothing`, e.g. `TemperatureRange` without temperature) and put
-`separator` in front of every simulation element (`AbstractSimulationElement`) that follows an
-element showing something. ProgressMeter's elements and strings are kept as they are, the
-description and strings alone do not cause a separator. Returns a tuple of the bound elements."""
-function bind_elements(elements::Tuple, vars, model; separator::AbstractString = ", ")
-    line = Any[]
-    shows_value = false     # has an element other than the description or strings been added yet?
-    for element in elements
-        bound = bind_element(element, vars, model)
-        isnothing(bound) && continue
-        bound isa AbstractSimulationElement && shows_value && push!(line, separator)
-        push!(line, bound)
-        shows_value |= !(bound isa Union{AbstractString, Description})
-    end
-    return Tuple(line)
-end
+Bind `elements` to the simulation (`vars`, `model`) and leave out those that do not apply to the
+model (`bind_element` returns `nothing`, e.g. `TemperatureRange` without temperature). Returns a
+tuple of the bound elements."""
+bind_elements(elements::Tuple, vars, model) =
+    Tuple(filter(!isnothing, Any[bind_element(element, vars, model) for element in elements]))
 
 # bound elements hold the `Variables`, don't print them
 Base.show(io::IO, element::AbstractSimulationElement) = print(io, nameof(typeof(element)), "()")
@@ -81,7 +68,7 @@ SimulationSpeed() = SimulationSpeed(0.0)
 bind_element(::SimulationSpeed, vars, model) = SimulationSpeed(Float64(model.time_stepping.Δt))
 
 function print_element(element::SimulationSpeed, p)
-    sec_per_iter = (p.tcurrent - p.tinit) / max(1, p.counter - p.start)
+    sec_per_iter = (p.tcurrent - p.tinit) / max(1, p.counter)
     return speedstring(sec_per_iter, element.Δt)
 end
 
@@ -201,11 +188,13 @@ function vertical_courant_number!(w_max, w_max_cpu, w, Δσ, Δt)
 end
 
 """$(TYPEDSIGNATURES)
-Default elements of the progress line of a `Feedback`: description, percentage, bar, ETA,
-simulation date, simulation speed, maximum wind speed and temperature range."""
-default_elements() = (
-    Description(), Percentage(), Bar(), ETA(),
-    SimulationTime(), SimulationSpeed(), MaximumWindSpeed(), TemperatureRange(),
+Default elements of the progress line of a `Feedback`: percentage, ETA, simulation date, simulation
+speed, maximum wind speed and temperature range. For Reactant without the latter two (computing them
+falls back to scalar indexing), add them explicitly to `Feedback(elements = ...)` to show them there too."""
+default_elements(architecture::AbstractArchitecture) = (
+    Percentage(), ETA(), SimulationTime(), SimulationSpeed(), MaximumWindSpeed(), TemperatureRange(),
 )
+default_elements(architecture::ReactantDevice) = (Percentage(), ETA(), SimulationTime(), SimulationSpeed())
+default_elements() = default_elements(SpeedyWeather.CPU())
 
 end # module ProgressElements
