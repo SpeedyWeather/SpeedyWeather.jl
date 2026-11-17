@@ -9,6 +9,15 @@ Default value is 0, but can be set via ScalarDim, e.g. ScalarDim(1) for a defaul
 end
 allocate(v::AbstractVariable{<:ScalarDim}, model::AbstractModel) = Ref(convert(model.spectral_grid.NF, v.dims.value))
 
+"""Dimension for scalar variables as `ScalarDim` but allocated on the model's architecture
+via `scalar_ref`, a `Ref(ConcreteRNumber(x))` with Reactant, so that a value computed inside
+a compiled (traced) time step can be written into it, e.g. `var[] = x` with `x` traced."""
+@kwdef struct ArchitectureScalarDim{T} <: AbstractVariableDim
+    value::T = zero(DEFAULT_NF)                                 # default value via ArchitectureScalarDim(1)
+end
+allocate(v::AbstractVariable{<:ArchitectureScalarDim}, model::AbstractModel) =
+    scalar_ref(model.architecture, convert(model.spectral_grid.NF, v.dims.value))
+
 """Dimension for 2D grid variables on the horizontal grid."""
 struct Grid2D <: AbstractVariableDim2D end
 allocate(::AbstractVariable{Grid2D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable2D, model.spectral_grid.grid)
