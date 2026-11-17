@@ -316,6 +316,34 @@ January–May so far, so not comparable with the 12-month `main_default` row), a
    `a` = 0.87 or 0.7 with the default `b`, all with `wv_nir` = 1500. A water vapour shortwave absorption that
    saturates with q would be a structural fix of the shortwave feedback, if tuning can't make the normal state
    robust.
+19. **With small `a`, all 24 `Y_*` runs are stable and equilibrated after 40 years** (GPU, `wv_nir` = 1500; means
+   over years 35–39; drift = change since years 25–29, ≤ 0.06 K per decade in all runs; K per W/m² from the +2%
+   solar twin, which is also stable in all cases).
+
+   | `b` / `a` | SST | net TOA | OSR | OLR | atm SW | sfc SW down | LW down | LW up | SH | LH | P | cloud | ice | max T₁ | K per W/m² |
+   |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+   | observed | ≈291 | 0 | 100 | 239 | 79 | 185 | 342 | 397 | 20 | 84 | 2.9 | | | | ≈0.8 |
+   | 0 / 2.0 | 285.9 | −7.1 | 118 | 230 | 54 | 198 | 227 | 363 | 13 | 27 | 0.93 | 0.65 | 0.146 | 241 | 0.21 |
+   | 0 / 2.5 | 291.8 | −2.2 | 107 | 236 | 66 | 191 | 279 | 399 | 13 | 39 | 1.32 | 0.62 | 0.058 | 242 | 0.22 |
+   | 0 / 3.0 | 297.8 | +0.3 | 89 | 252 | 86 | 186 | 336 | 439 | 12 | 52 | 1.77 | 0.52 | 0.015 | 246 | 0.24 |
+   | 0 / 3.5 | 302.3 | +0.9 | 82 | 259 | 101 | 176 | 377 | 469 | 11 | 56 | 1.90 | 0.49 | 0.001 | 245 | 0.23 |
+   | 250 / 2.0 | 290.3 | −4.7 | 116 | 231 | 59 | 192 | 278 | 388 | 18 | 43 | 1.50 | 0.66 | 0.100 | 242 | 0.29 |
+   | 250 / 2.5 | 298.4 | +0.2 | 93 | 248 | 84 | 185 | 368 | 445 | 18 | 70 | 2.38 | 0.56 | 0.021 | 251 | 0.34 |
+   | 250 / 3.0 | 304.0 | +1.0 | 84 | 256 | 104 | 171 | 424 | 484 | 16 | 77 | 2.60 | 0.52 | 0.002 | 247 | 0.39 |
+   | 500 / 1.5 | 287.5 | −9.8 | 120 | 231 | 53 | 199 | 254 | 370 | 21 | 41 | 1.42 | 0.66 | 0.172 | 245 | 0.24 |
+   | 500 / 2.0 | 296.3 | −1.1 | 100 | 243 | 75 | 188 | 358 | 431 | 22 | 73 | 2.51 | 0.59 | 0.045 | 252 | 0.38 |
+   | 500 / 2.5 | 303.5 | +1.1 | 87 | 253 | 101 | 171 | 432 | 483 | 19 | 84 | 2.84 | 0.53 | 0.003 | 249 | 0.81 |
+   | 1997.9 / 0.7 | 285.1 | −17.5 | 126 | 233 | 46 | 208 | 254 | 353 | 34 | 54 | 1.87 | 0.65 | 0.255 | 258 | 0.60 |
+   | 1997.9 / 0.87 (paper) | 289.6 | −7.8 | 116 | 233 | 55 | 200 | 310 | 385 | 34 | 70 | 2.42 | 0.65 | 0.142 | 252 | 0.70 |
+
+   With little water vapour longwave absorption (`b` ≤ 250) the climate is very insensitive (0.2–0.4 K per W/m²,
+   even at 300 K), but surface LW down and precipitation are far too low at Earth-like temperatures. The water vapour
+   longwave emission near the surface is what drives them. The default `b` with the paper's `a` = 0.87 has an
+   Earth-like sensitivity (0.70 K per W/m²), but it is only ≈3 K below the regime where `a` = 1.1–1.3 runs away
+   (findings 17–18), and its shortwave budget is off (atm SW 55, OSR 116). `b` = 500 with `a` ≈ 1.75 interpolates
+   to ≈292 K with a moderate sensitivity, and is refined next (`Z_*`), also with visible `wv` = 45 for more
+   atmospheric absorption and `cloud_albedo` = 0.40 for OSR. With much sea ice, the steady net TOA becomes strongly
+   negative (−17.5 W/m² at ice 0.255): the sea-ice energy source of finding 9 scales with the ice cover.
 
 ## Plan
 
@@ -434,7 +462,8 @@ Planned, pending the experiments:
 | `ed_*` (Slurm 3279344, ed) | `water_vapor_pressure_top` 50/100/140/250 hPa, alone and with `wv` 66/88, `dry` 0.066 | 10 years | completed, all stable | finding 12, worktree `tree_ed_strat` |
 | `M_*` (Slurm 3283731, CPU, `tree_1279` = `b06af911a`) | Byrne–O'Gorman default; `a` 1.1 / 1.5; `b` 1500 / 2500; `wv_nir` 1500; `a` 1.1 + `wv_nir` 1500; `strat_emis` 0.1 | 30 years | running | default runs away (finding 17) |
 | `G_*` (GPU Slurm 3283750) and `M_b*`, `M_*_S` (CPU Slurm 3283751), `tree_1279` | `b` / `a` = 1000 / 2.5, 1000 / 3.0, 500 / 4.0, 500 / 4.5, 0 / 5.4, each with a +2% solar twin (`_S`); `_S` twins for the default, `a` = 1.1 and `b` = 1500 | 30 years | running | feedback strength, warming per W/m² |
-| `Y_*` (GPU Slurm 3284305 + 3284306, `tree_1279`) | all `wv_nir` = 1500: `b` = 0 with `a` 2.0 / 2.5 / 3.0 / 3.5, `b` = 250 with `a` 2.0 / 2.5 / 3.0, `b` = 500 with `a` 1.5 / 2.0 / 2.5, `b` = 1997.9 with `a` 0.7 / 0.87; each with a +2% solar twin | 40 years | running | finding 18 |
+| `Y_*` (GPU Slurm 3284305 + 3284306, `tree_1279`) | all `wv_nir` = 1500: `b` = 0 with `a` 2.0 / 2.5 / 3.0 / 3.5, `b` = 250 with `a` 2.0 / 2.5 / 3.0, `b` = 500 with `a` 1.5 / 2.0 / 2.5, `b` = 1997.9 with `a` 0.7 / 0.87; each with a +2% solar twin | 40 years | completed, all stable | finding 19 |
+| `Z_*` (GPU Slurm 3289286 + 3289287, `tree_1279`) | all `wv_nir` = 1500: `b` = 500 with `a` 1.6 / 1.75 / 1.9; `b` = 1000 with `a` 1.0 / 1.2 / 1.4; with visible `wv` = 45: `b` / `a` 500 / 1.6, 500 / 1.75, 1000 / 1.0, 1000 / 1.2, 1997.9 / 0.75, 1997.9 / 0.87; `cloud_albedo` 0.40 with 500 / 1.75 / `wv` 45 and 1000 / 1.2 / `wv` 45; each with a +2% solar twin | 40 years | running, ready ≈12:00 | refinement around `b` = 500, `a` ≈ 1.75 |
 | `X_*` (CPU Slurm 3283769, `tree_1279`) | all `wv_nir` = 1500: `b` / `a` = 1000 / 2.0, 750 / 3.0, 750 / 3.5, 250 / 4.5, 250 / 5.0, 0 / 4.8, 0 / 6.0, and 500 / 4.0 with `cloud_albedo` 0.40, each with a +2% solar twin | 30 years | running, ready ≈09:00 | fills in `b` ≤ 1000. At year 7 the `M_*` runs show `b` ≥ 1500 still warming: default SST 298.9 K at +4.5 W/m²; `a` = 1.1 and `b` = 1500 at 294.0 / 293.6 K, still rising ≈0.3 K per year. With Byrne–O'Gorman the stratosphere stays cool (T₁ ≈ 221 K, max 252 K); `wv_nir` = 1500 halves q₂ |
 | `r2_*` (Slurm 3279654, ed) | all `wv_nir` = 1500: `wv` 55/60/65 × `τ₀` 7.0/7.2/7.5, polar `τ₀` 2.0, `cloud_albedo` 0.45 | 20 years | running | round 2 around `c7` |
 | `L_main`, `L_nir1500`, `L_pt250` (GPU Slurm 3279622, ed) | `main` defaults; `wv_nir` = 1500; `water_vapor_pressure_top` = 250 hPa | 1000 years, 25-year restart chunks | running (H100) | does `main` blow up, and when? Do both stratosphere fixes hold for a millennium? ≈2.1 s per simulated month per run, done ≈03:00 on 2026-11-17 |
