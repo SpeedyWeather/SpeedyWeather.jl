@@ -1,12 +1,14 @@
 # Tuning shortwave water vapour and dry-air absorption for stable long T32L8 runs
 
-> Status: **in progress**. The stratospheric water vapour feedback is identified and two fixes keep the
-> stratosphere dry for 10 years. Combined candidates (15 years) and 1000-year GPU runs are running. No source code
-> changed in the repository yet.
+> Status: **in progress, restarted on the correct base**. All experiments up to 2026-11-17 07:30 ran on `caed82d6`,
+> which predates #1279 and its default `ByrneOGormanLongwaveTransmissivity`. The tuning target is that scheme's
+> `dry_absorption` and `water_vapor_absorption`. Reproduction on `origin/main` (`b06af911a`) is running. No source
+> code changed in the repository yet.
 
 Date of initial draft: 2026-11-16
 
-Base revision: `caed82d647c38b6fd793ff49ff674e62d437b8cc` (`main`, branch `mg/tune-water-vapour`)
+Base revision: `b06af911abf015a6cb2bcba991959908dbb87a03` (`origin/main` with #1279) since 2026-11-17. Before that,
+`caed82d647c38b6fd793ff49ff674e62d437b8cc` (stale local `main`, see revision log).
 
 ## Originating prompt
 
@@ -27,6 +29,24 @@ Base revision: `caed82d647c38b6fd793ff49ff674e62d437b8cc` (`main`, branch `mg/tu
   same workspace and split the work: 7f the baselines, `s1`/`s1b` and the combined candidates `c7`–`c13`; d3 the
   wv × dry grid and sweep2; ed the structural `water_vapor_pressure_top` variant and the long-run infrastructure.
   d3 and later 7f ended; ed continues with everything. No commits to the branch unless the user asks.
+- **2026-11-17, wrong base revision** (prompt: "yes, this is about using ByrneOGormanLongwaveTransmissivity. What were
+  you doing before, why didn't you use the default?"). The branch was created from a local `main` at `caed82d6`
+  and `origin/main` was never fetched. #1279 (`ByrneOGormanLongwaveTransmissivity` as the default, `dry_absorption`
+  1.3, `water_vapor_absorption` 1997.9, Frierson defaults 8.4 / 2.1 / 0.25, default CO₂) had been merged at
+  2026-11-16 15:48 CET, three hours before the originating prompt. All runs up to here therefore used the old
+  default `FriersonLongwaveTransmissivity`, and "water vapour and dry absorption" was read as the shortwave
+  `absorptivity_water_vapor` / `absorptivity_dry_air`. The prompt means the longwave `water_vapor_absorption` and
+  `dry_absorption`. Consequences:
+  - On `caed82d6`, `main` itself ran 1000 years on the GPU without a NaN, with a steady climate after ≈5 years
+    (`L_main`, finding 16). The instability is therefore not in that code. The prime suspect is the longwave water
+    vapour feedback of #1279, whose constants were calibrated with 2-year spin-ups.
+  - Still valid: the shortwave stratospheric near-IR feedback (findings 6–8, 11–13), because the shortwave is
+    unchanged in #1279. Its importance with Byrne–O'Gorman has to be re-tested: the dry longwave optical depth of
+    the top layer is ≈0.16 instead of Frierson's ≈0.05, so the top layer emits more. Also still valid: the
+    sea-ice energy source (finding 9) and the run infrastructure. The scripts now keep each tree's default
+    longwave, and `lw_dry` / `lw_wv` / `lw_co2` set the Byrne–O'Gorman parameters.
+  - Not transferable: the Frierson-based candidates (`c*`, `r2_*`, `L2_*`, `τ₀` 7.2 / 1.8 with `wv` 65).
+  - New worktree `tree_1279` at `b06af911a`. Reproduction and sensitivity runs `M_*` were submitted.
 - **2026-11-16, long runs on GPU** (prompt: "submit a gpu job if you want it faster, not multithreaded"). Restartable
   `run_long.jl` with `ARCH=gpu` and `long_gpu.sh`, see Phase 3. First 1000-year runs submitted.
 
@@ -230,6 +250,72 @@ January–May so far, so not comparable with the 12-month `main_default` row), a
    effect). The only TOA effect of more absorption is a lower OSR, from absorption above the cloud tops and in the
    reflected beam. More absorption alone may therefore not stop a cold drift. The experiments below test this
    directly.
+16. **On `caed82d6` (Frierson longwave), every configuration is stable for 1000 years** (GPU, H100, `run_long.jl`,
+   century means; `L2_*` at year ≈835 when read).
+
+   | run | net TOA | OSR | OLR | atm SW | sfc SW down | LW down | SST | ice | T₁ / T₂ | max T₁ | q₁ [g/kg] |
+   |---|---|---|---|---|---|---|---|---|---|---|---|
+   | `L_main` | −4.3 | 121.3 | 224.2 | 49.6 | 199.5 | 302.0 | 286.87 | 0.121 | 239 / 230 | 293–308 | 0.13 |
+   | `L_nir1500` | −2.8 | 115.9 | 228.1 | 49.0 | 204.0 | 314.3 | 288.38 | 0.096 | 230 / 218 | 271–291 | 0.036 |
+   | `L_pt250` | −4.0 | 117.9 | 227.3 | 51.2 | 201.3 | 309.3 | 287.85 | 0.118 | 229 / 218 | 272–281 | 0.002 |
+   | `L2_wv65_t72` | −0.9 | 102.6 | 239.6 | 77.5 | 184.5 | 342.8 | 290.59 | 0.062 | 229 / 220 | 269–281 | 0.003 |
+
+   After ≈5 years of spin-up all century means agree to within 0.05 K. The stratospheric feedback on `caed82d6`
+   saturates at a warm, moist equilibrium (top layer up to 308 K) instead of running away. `L2_wv65_t72` (5d) matched
+   the observed budget term by term on that base, but it is Frierson-based and so superseded by the
+   Byrne–O'Gorman tuning.
+17. **On `origin/main` (`b06af911a`, Byrne–O'Gorman longwave) the default runs into a runaway greenhouse**
+   (`M_*`, CPU, annual means; τ from the logged humidity profile with equal Δσ, PW from the mass-weighted q).
+
+   | run | year | SST | net TOA | OLR | OSR | PW [kg/m²] | τ_dry | τ_wv |
+   |---|---|---|---|---|---|---|---|---|
+   | default (`a` = 1.3, `b` = 1997.9) | 1 / 2 / 3 / 4 | 292.4 / 293.7 / 295.1 / 296.1 | +6.7 / +5.7 / +6.9 / +6.5 | 223.5 → 229.1 | 111.1 → 107.0 | 29 → 42 | 1.27 | 5.7 → 8.3 |
+   | `a` = 1.5 | 1 / 2 / 3 | 292.9 / 295.2 / 297.3 | +13.1 / +12.3 / +11.8 | 219.0 → 228.2 | 109.1 → 101.5 | 32 → 50 | 1.46 | 6.2 → 9.8 |
+   | `b` = 2500 | 1 / 2 / 3 | 292.8 / 295.1 / 297.3 | +12.6 / +12.5 / +11.5 | 219.5 → 227.5 | 109.2 → 102.2 | | | |
+   | `a` = 1.1 | 1 / 2 / 3 / 4 | 291.9 / 292.3 / 292.7 / 293.0 | −0.1 / −1.5 / −1.5 / −1.6 | ≈229 | ≈113 | 27 → 30 | 1.07 | 5.3 → 5.9 |
+   | `b` = 1500 | 1 / 2 / 3 / 4 | 291.8 / 292.2 / 292.6 / 293.0 | −0.2 / −1.5 / −1.8 / −2.0 | ≈230 | ≈112 | 27 → 30 | 1.27 | 4.0 → 4.4 |
+
+   With the default the imbalance doesn't decrease as the planet warms: water vapour supplies ≈80% of the column
+   optical depth, and precipitable water grows ≈12% per K, so OLR rises only ≈1.5 W/m² per K. Reflected
+   shortwave meanwhile falls ≈1.8 W/m² per K as sea ice, snow and cloud cover retreat. The net feedback is ≈0 or
+   positive, which is the long-run instability. Weaker water vapour absorption or a weaker greenhouse (`a` = 1.1)
+   is close to balance, but still warms by ≈0.4 K per year, the steady net TOA of −1.5 to −2 W/m² being the
+   sea-ice energy source. The tuning therefore needs a clearly negative feedback, not only a balanced mean
+   state: shift optical depth from the water vapour term `b·q` to the dry term `a`. The total τ stays ≈5.3 (the
+   balanced value), and dτ/dT shrinks. Each configuration is paired with a +2% solar constant run
+   (1392.3 W/m², ≈+5 W/m² forcing) to measure the warming per W/m² directly.
+18. **The default blows up after 24 years, and the climate has a hot second state** (`M_*`, `G_*`, `X_*`, 30 years,
+   `_S` = +2% solar twin; sensitivity = ΔSST over the last 5 years per 4.8 W/m²).
+   - **Blow-ups (NaN):** the default in year 24, `wv_nir` = 1500 in year 26, `a` = 1.5 in year 11, `b` = 2500 in
+     year 9, `b` / `a` = 1000 / 2.5, 1000 / 3.0, 750 / 3.0, 750 / 3.5, 500 / 4.0, 500 / 4.5 and 500 / 4.0 with
+     `cloud_albedo` 0.40 in years 7–16, and the +2% solar twins of the default and of `a` = 1.1 (years 11 and 21).
+     All follow the same path. SST rises to 318–324 K, OSR collapses to 22–44 W/m² (planetary albedo 0.07–0.13) as
+     cloud cover disappears and water vapour absorbs most of the shortwave, and net TOA reaches +25 to +54 W/m².
+     The lower troposphere becomes almost isothermal (325–327 K) and precipitation drops below 1 mm/day before
+     the NaN.
+   - **Hot-house survivors:** with little water vapour longwave absorption, the climate settles at a hot second
+     equilibrium instead of blowing up.
+
+     | run | SST years 26–30 | trend [K/decade] | OSR | OLR | atm SW | ice | cloud | twin ΔSST | K per W/m² |
+     |---|---|---|---|---|---|---|---|---|---|
+     | `b` = 0, `a` = 4.8 | 310.1 | 0.0 | 68 | 272 | 136 | 0 | 0.43 | +0.8 | 0.17 |
+     | `b` = 0, `a` = 6.0 | 314.0 | 0.0 | 64 | 277 | 158 | 0 | 0.42 | +0.7 | 0.15 |
+     | `b` = 250, `a` = 5.0 | 315.6 | 0.0 | 68 | 273 | 164 | 0 | 0.45 | +1.8 | 0.37 |
+     | `b` = 1000, `a` = 2.0 | 309.0 | +3.1 | 81 | 258 | 126 | 0 | 0.50 | +11.7 | 2.44 |
+     | `b` = 1500, `a` = 1.3 | 297.7 | +1.8 | 102 | 240 | 78 | 0.037 | 0.60 | +3.6 | 0.74 |
+     | `b` = 1998, `a` = 1.1 | 296.0 | −0.9 | 106 | 237 | 72 | 0.049 | 0.62 | +10.6, NaN in year 21 | 2.2 |
+
+   Two corrections to finding 17. First, the assumption of equal column τ was wrong: a dry absorber uniform in
+   pressure puts much more opacity into the upper troposphere than water vapour does, so it is a far stronger
+   greenhouse for the same τ, and `a` = 4.5–6 makes a hot house. Second, the dominant positive feedback is in the
+   shortwave. The water vapour shortwave absorptivity is linear in q without saturation (visible 22 per kg/kg),
+   and the diagnostic cloud cover falls with warming. Atmospheric shortwave absorption therefore rises from ≈75 to
+   130–165 W/m², and OSR from the normal ≈105 falls to 65–70 W/m² (hot house) or 22–44 W/m² (runaway). Near the
+   observed climate (SST ≈ 291–297 K), every configuration so far is still drifting or extremely sensitive. Next
+   (`Y_*`, 2 GPU jobs, 40 years with twins): much smaller `a` with weak `b` (0 / 250 / 500), and the paper value
+   `a` = 0.87 or 0.7 with the default `b`, all with `wv_nir` = 1500. A water vapour shortwave absorption that
+   saturates with q would be a structural fix of the shortwave feedback, if tuning can't make the normal state
+   robust.
 
 ## Plan
 
@@ -346,6 +432,10 @@ Planned, pending the experiments:
 | sweep2 `cl*`, `tau*`, `fl*`, `c1`–`c6` (Slurm 3279283, d3) | cloud albedo, `τ₀`, `fₗ`, and combinations with default `wv_nir` | 15 years | running | session d3 ended. 7f reads the results |
 | `c7`–`c13` (Slurm 3279366, 7f) | all `wv_nir` = 1500: `wv` 65/75/85, `cloud_albedo` 0.37/0.40/0.43, `τ₀` 7.5/1.875 and 8/2, one with `dry` = 0.045 | 15 years | submitted | first combined candidates |
 | `ed_*` (Slurm 3279344, ed) | `water_vapor_pressure_top` 50/100/140/250 hPa, alone and with `wv` 66/88, `dry` 0.066 | 10 years | completed, all stable | finding 12, worktree `tree_ed_strat` |
+| `M_*` (Slurm 3283731, CPU, `tree_1279` = `b06af911a`) | Byrne–O'Gorman default; `a` 1.1 / 1.5; `b` 1500 / 2500; `wv_nir` 1500; `a` 1.1 + `wv_nir` 1500; `strat_emis` 0.1 | 30 years | running | default runs away (finding 17) |
+| `G_*` (GPU Slurm 3283750) and `M_b*`, `M_*_S` (CPU Slurm 3283751), `tree_1279` | `b` / `a` = 1000 / 2.5, 1000 / 3.0, 500 / 4.0, 500 / 4.5, 0 / 5.4, each with a +2% solar twin (`_S`); `_S` twins for the default, `a` = 1.1 and `b` = 1500 | 30 years | running | feedback strength, warming per W/m² |
+| `Y_*` (GPU Slurm 3284305 + 3284306, `tree_1279`) | all `wv_nir` = 1500: `b` = 0 with `a` 2.0 / 2.5 / 3.0 / 3.5, `b` = 250 with `a` 2.0 / 2.5 / 3.0, `b` = 500 with `a` 1.5 / 2.0 / 2.5, `b` = 1997.9 with `a` 0.7 / 0.87; each with a +2% solar twin | 40 years | running | finding 18 |
+| `X_*` (CPU Slurm 3283769, `tree_1279`) | all `wv_nir` = 1500: `b` / `a` = 1000 / 2.0, 750 / 3.0, 750 / 3.5, 250 / 4.5, 250 / 5.0, 0 / 4.8, 0 / 6.0, and 500 / 4.0 with `cloud_albedo` 0.40, each with a +2% solar twin | 30 years | running, ready ≈09:00 | fills in `b` ≤ 1000. At year 7 the `M_*` runs show `b` ≥ 1500 still warming: default SST 298.9 K at +4.5 W/m²; `a` = 1.1 and `b` = 1500 at 294.0 / 293.6 K, still rising ≈0.3 K per year. With Byrne–O'Gorman the stratosphere stays cool (T₁ ≈ 221 K, max 252 K); `wv_nir` = 1500 halves q₂ |
 | `r2_*` (Slurm 3279654, ed) | all `wv_nir` = 1500: `wv` 55/60/65 × `τ₀` 7.0/7.2/7.5, polar `τ₀` 2.0, `cloud_albedo` 0.45 | 20 years | running | round 2 around `c7` |
 | `L_main`, `L_nir1500`, `L_pt250` (GPU Slurm 3279622, ed) | `main` defaults; `wv_nir` = 1500; `water_vapor_pressure_top` = 250 hPa | 1000 years, 25-year restart chunks | running (H100) | does `main` blow up, and when? Do both stratosphere fixes hold for a millennium? ≈2.1 s per simulated month per run, done ≈03:00 on 2026-11-17 |
 | `L2_wv60_t75`, `L2_wv60_t72`, `L2_wv60_t70`, `L2_wv65_t72` (GPU Slurm 3279736, 5d) | all `wv_nir` = 1500: `wv` 60 with `τ₀` 7.5/1.875, 7.2/1.8, 7.0/1.75, and `wv` 65 with `τ₀` 7.2/1.8 (the `r2` grid's centre, see its year 1) | 1000 years, 25-year restart chunks | running (H100), expected ≈05:00–07:00 on 2026-11-17 | validation of the final candidates. `r2_*` (same parameters, 20 y on CPU) picks the best budget match |
