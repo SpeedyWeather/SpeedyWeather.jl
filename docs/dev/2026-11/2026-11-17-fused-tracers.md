@@ -1,7 +1,8 @@
 # Fuse the tracers: one batched transform and one kernel per operation for all tracers
 
-> Status: **in progress**. Phase 0 (measurements) is implemented and tested on CPU; it awaits the runs on an NVIDIA
-> GPU (see "Handover"), which decide whether phase 1 (the implementation) is done at all.
+> Status: **in progress**. Phase 0 ran on an NVIDIA H100 and says go; phase 1 is implemented (all tracers processed
+> together by default on GPU) and tested on CPU, GPU and with Enzyme, but the Reactant correctness test fails and
+> the benchmarks of the implementation are still running (see "State at the end of the session").
 
 Date of initial draft: 2026-11-17
 
@@ -30,6 +31,27 @@ Base revision: 174afe29 (`mg/unroll-tracer-loops`) plus the uncommitted part 2 o
   `SpeedyWeather/benchmark/fused_tracers_prototype.jl`. Both are meant to run in the same session on the GPU machine
   (one handover instead of two), the gate of 0a is then applied to the results of both. The prototype merges the
   `+A*div` and flux kernels into one kernel over all tracers.
+- 2026-11-17: phase 0 run on an NVIDIA H100 80GB (the cluster's GPU nodes, as the stored `gpu-nvidia` results; Julia
+  1.12.2, CUDA.jl 6.4.1), the full benchmark with the flags of the stored run (`--repeats 10 --length 2 --hi-res`) plus
+  `--tracers`, and the prototype; results below. **Go**: 8 tracers add far more than 20% at T ≤ 128, the prototype
+  saves 24–72% of the time step with 4 to 8 tracers at T ≤ 128 and 55–68% at T256. The CPU part of the gate failed
+  on the Apple M3 (up to 7% slower), so as planned the fused path is the default on GPU only. Reactant: the tracer suite
+  only ran for the ShallowWaterModel (also in a partial run in a separate worktree, to keep the stored results); every
+  PrimitiveWetModel construction on Reactant fails with scalar indexing in `free_troposphere_layers`
+  (`parameterizations/radiation/clouds.jl`), with or without tracers, a bug unrelated to this plan.
+- 2026-11-17: phase 1 implemented. Deviations from the plan: (1) the switch is a model option `fuse_tracers`
+  (default `default_fuse_tracers(architecture)`: `true` on GPU, `false` on CPU and Reactant), not only the
+  architecture, so that both paths can be tested against each other on any architecture, and the fused path is taken
+  if `fuse_tracers` and all tracers are active (`fused_tracers(vars, model)`); (2) the fluxes are `DynamicsVariable`s
+  (as the dycore's `uq`, `vq`) named `<tracer>_u_flux`, `<tracer>_v_flux` in the namespaces `:tracers` (spectral) and
+  `:grid_tracers` (grid), ordered `[tendencies; u fluxes; v fluxes]` by a `variables` method for the NamedTuple of
+  tracers; the per-tracer path uses them too, so the tracers don't declare the scratch `a`, `b` any more; (3) the
+  forward transform is one batch of 3N·L layers (in chunks), the prototype showed it best for few tracers and about
+  equal to three batches for more; (4) the spectral flux divergence (`divergence!`) has the same layer limit as the
+  transforms, it is chunked likewise (`stacked_chunks`); (5) vertical advection uses a stacked kernel (`k =
+  mod1(kn, L)` and the stencil shifted to the tracer's layers) instead of reshaping, reusing the
+  `reconstructed_at_face` methods; (6) moving the grid step back and (un)scaling the grid tendencies always act on
+  the tracer parents (one broadcast each, Reactant-safe as for the dycore), the per-tracer loops there are removed.
 
 ## Problem description
 
@@ -211,7 +233,55 @@ Tested on CPU (Apple M3, 4 threads, Julia 1.12.7):
 
 </details>
 
-The NVIDIA runs are pending (see "Handover").
+Run on an NVIDIA H100 80GB HBM3 (AMD EPYC 9554, Julia 1.12.2, CUDA.jl 6.4.1, default transform):
+
+- **0a, the tracer suite** (table below, from the full `gpu-nvidia` benchmark run): still running at the end of the
+  session, see the handover. <!-- 0A-SUMMARY -->
+- **0b, the prototype** (table below): the fused transforms and horizontal advection are 1.4× to 7.6× faster than
+  per tracer and save 24–72% of the whole time step with 4 to 8 tracers at T ≤ 128 and 55–68% at T256, matching the
+  model to ≤ 2e-6 (relative). A single tracer is already 1.4–2.8× faster (one forward transform instead of three).
+  At T128 and T256 the transforms are so latency-bound that a transform of 64 layers takes about as long as one of 8.
+- **Decision: go** for phase 1, on GPU (the CPU part of the gate failed on the M3, see above).
+- Reactant on the H100 (ShallowWaterModel only, see the revision log): 1, 2, 4, 8 and 16 tracers take 1.4×, 1.9×,
+  2.8×, 4.8× and 7.7× the time without tracers at T32 (3.3× with 8 tracers at T128), i.e. XLA does not merge the
+  per-tracer work by itself.
+
+<!-- 0A-TABLE -->
+
+<details><summary>Prototype on NVIDIA H100</summary>
+
+| Model | T | L | Tracers | per tracer [ms] | fused, 3 batches [ms] | fused, 1 batch [ms] | speedup | time step [ms] | saved of time step | max. rel. difference |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ShallowWaterModel | 32 | 1 | 1 | 0.110 | 0.110 | 0.067 | 1.64× | 0.569 | 7% | 0.0e+00 |
+| ShallowWaterModel | 32 | 1 | 2 | 0.221 | 0.124 | 0.069 | 3.21× | 0.700 | 22% | 7.5e-07 |
+| ShallowWaterModel | 32 | 1 | 4 | 0.441 | 0.126 | 0.098 | 4.49× | 0.966 | 35% | 7.5e-07 |
+| ShallowWaterModel | 32 | 1 | 8 | 0.905 | 0.135 | 0.130 | 6.94× | 1.505 | 51% | 7.6e-07 |
+| ShallowWaterModel | 64 | 1 | 1 | 0.351 | 0.348 | 0.257 | 1.36× | 1.058 | 9% | 0.0e+00 |
+| ShallowWaterModel | 64 | 1 | 2 | 0.701 | 0.534 | 0.285 | 2.46× | 1.421 | 29% | 1.7e-06 |
+| ShallowWaterModel | 64 | 1 | 4 | 1.403 | 0.629 | 0.394 | 3.56× | 2.147 | 47% | 1.7e-06 |
+| ShallowWaterModel | 64 | 1 | 8 | 2.803 | 0.596 | 0.569 | 4.93× | 3.594 | 62% | 1.7e-06 |
+| ShallowWaterModel | 128 | 1 | 1 | 2.887 | 2.886 | 1.623 | 1.78× | 8.484 | 15% | 0.0e+00 |
+| ShallowWaterModel | 128 | 1 | 2 | 5.779 | 2.909 | 1.655 | 3.49× | 11.394 | 36% | 0.0e+00 |
+| ShallowWaterModel | 128 | 1 | 4 | 11.545 | 2.970 | 2.363 | 4.88× | 17.209 | 53% | 0.0e+00 |
+| ShallowWaterModel | 128 | 1 | 8 | 23.093 | 3.078 | 3.151 | 7.50× | 28.843 | 69% | 0.0e+00 |
+| PrimitiveWetModel | 32 | 8 | 1 | 0.137 | 0.135 | 0.077 | 1.79× | 1.093 | 6% | 0.0e+00 |
+| PrimitiveWetModel | 32 | 8 | 2 | 0.274 | 0.130 | 0.074 | 3.68× | 1.298 | 15% | 2.2e-07 |
+| PrimitiveWetModel | 32 | 8 | 4 | 0.549 | 0.131 | 0.127 | 4.31× | 1.738 | 24% | 6.6e-07 |
+| PrimitiveWetModel | 32 | 8 | 8 | 1.095 | 0.158 | 0.185 | 6.91× | 2.242 | 42% | 8.4e-07 |
+| PrimitiveWetModel | 64 | 8 | 1 | 0.598 | 0.596 | 0.216 | 2.77× | 1.627 | 23% | 0.0e+00 |
+| PrimitiveWetModel | 64 | 8 | 2 | 1.196 | 0.510 | 0.285 | 4.20× | 2.193 | 42% | 1.4e-06 |
+| PrimitiveWetModel | 64 | 8 | 4 | 2.394 | 0.452 | 0.523 | 5.30× | 3.428 | 57% | 1.9e-06 |
+| PrimitiveWetModel | 64 | 8 | 8 | 4.795 | 0.631 | 0.852 | 7.60× | 5.907 | 70% | 1.3e-06 |
+| PrimitiveWetModel | 128 | 8 | 1 | 3.101 | 3.110 | 1.855 | 1.67× | 7.005 | 18% | 0.0e+00 |
+| PrimitiveWetModel | 128 | 8 | 2 | 6.245 | 3.274 | 1.977 | 3.16× | 10.136 | 42% | 0.0e+00 |
+| PrimitiveWetModel | 128 | 8 | 4 | 12.441 | 3.518 | 2.902 | 4.29× | 16.393 | 58% | 0.0e+00 |
+| PrimitiveWetModel | 128 | 8 | 8 | 24.794 | 4.013 | 4.020 | 6.18× | 28.913 | 72% | 0.0e+00 |
+| PrimitiveWetModel | 256 | 8 | 1 | 8.084 | 8.075 | 4.777 | 1.69× | 18.421 | 18% | 0.0e+00 |
+| PrimitiveWetModel | 256 | 8 | 2 | 16.124 | 8.946 | 5.482 | 2.94× | 26.540 | 40% | 0.0e+00 |
+| PrimitiveWetModel | 256 | 8 | 4 | 32.147 | 10.368 | 8.607 | 3.73× | 42.688 | 55% | 0.0e+00 |
+| PrimitiveWetModel | 256 | 8 | 8 | 64.490 | 12.920 | 12.957 | 4.99× | 75.365 | 68% | 0.0e+00 |
+
+</details>
 
 ### Handover to the NVIDIA GPU machine
 
@@ -233,7 +303,68 @@ On the machine of the stored `gpu-nvidia` results, from the repository root, on 
    shows that 8 tracers add at least 20% at T ≤ 128, and the prototype's "saved of time step" is at least 20% with 4 to
    8 tracers at T ≤ 128, with no slowdown at T256. Record the decision in the revision log, then commit and push.
 
-## Phase 1: implementation (only if phase 0 says go)
+## Phase 1: implementation (phase 0 said go)
+
+As planned below, with the deviations in the revision log. The code: `dynamics/tracers.jl` (variables, `fused_tracers`,
+`transform_stacked!`), the fused drivers next to their per-tracer counterparts (`transform_tracers!`,
+`horizontal_advection_tracers!`, `vertical_advection_tracers!`, `horizontal_diffusion_tracers!`,
+`update_prognostic_tracers!`), `move_grid_tracers_back!` and the scaling on the parents.
+
+### State at the end of the session of 2026-11-17 (handover)
+
+Tests of the implementation:
+
+- CPU, `test/dynamics/fused_tracers.jl`: fused and per-tracer paths **bitwise identical** for all four models
+  (incl. chunked transforms with 4 and 11 tracers), deactivation switches to per-tracer and back, stacked kernels
+  equal the per-tracer kernels: 94/94 passed, in 12 min (mostly compilation, 4 model types with 3 to 11 tracers).
+- GPU (A40), `test/GPU/tracers.jl`: fused (default on GPU) vs per-tracer to `rtol = 1e-4`, 58/58 passed (then the
+  redundant 3-tracer ShallowWater case was dropped).
+- Existing tracer tests (`tracer_advection.jl`) pass.
+- JET (`dispatch.jl`): all `@test_opt` in this file, **also at the base revision** `ac3c5befb`, fail in the freshly
+  instantiated test environment because of runtime dispatch inside KernelAbstractions (`__thread_run`) and
+  ModelParameters. With `ignored_modules = (Base, KernelAbstractions, ModelParameters)` all pass, including the new
+  fused-tracer testset (ShallowWater, PrimitiveWet). Environment issue, not this change.
+- Enzyme forward vs reverse (`forward_mode.jl`, Julia 1.10.12, Enzyme 0.13.220): Barotropic with a tracer and the new
+  PrimitiveWet with 2 fused tracers pass (11/11, 12/12).
+- **Reactant correctness: FAILS** in the existing single-tracer case (per-tracer path, `test_model(PrimitiveDryModel;
+  tracers = (:tracer,))`): the grid tracer tendency matches (1.6e-5) but the spectral tracer tendency differs (max rel.
+  0.39), and with it the time stepping. Suspected cause: the per-tracer path now writes the tendency and both fluxes of
+  a tracer as views of the same fused buffer, one in-place update after another (`transform!` into each, then
+  `divergence!` adding into the tendency) — the pattern that Reactant mis-handles within one trace (see the comment in
+  `scale_tendencies!`); before, the fluxes were the separate scratch arrays `a`, `b`. To do: confirm (e.g. the base
+  revision passes with the same Reactant 0.2.308), then fix, e.g. separate flux buffers on Reactant or one batched
+  update; the new fused case (`tracers = (:tracer1, :tracer2), fuse_tracers = true`) hasn't run yet as the script
+  stopped at the first failure. Run with the benchmark environment (Reactant 0.2.308) and a script that includes only
+  the tracer cases of `test_correctness.jl`.
+
+Benchmarks of the implementation, SLURM jobs still running (logs in `/p/tmp/maxgelbr/fused-tracers-phase1/`), each in
+its own throwaway worktree at `df8f45ecd` (partial `--suites benchmark510 --tracers` runs, results in that worktree's
+`SpeedyWeather/benchmark/README.md`, not to be committed):
+
+| Job | Worktree `/p/tmp/maxgelbr/code/…` | What |
+| --- | --- | --- |
+| `p1-gpu-fused` | `SpeedyWeather-phase1` | H100, fused (default), `--repeats 10` |
+| `p1-rea-pertracer` | `SpeedyWeather-phase1-rea` | Reactant H100, per tracer (default) |
+| `p1-rea-fused` | `SpeedyWeather-phase1-fuseall` | Reactant H100, fused (`default_fuse_tracers` patched to `true`) |
+| `p1-cpu-pertracer` | `SpeedyWeather-phase1-cpu` | x86 CPU node, per tracer (default) |
+| `p1-cpu-fused` | `SpeedyWeather-phase1-fuseall-cpu` | x86 CPU node, fused (patched) |
+
+Phase 0 jobs still running (logs in `/p/tmp/maxgelbr/fused-tracers-phase0/`): `ft-bench-gpu`, the full H100 benchmark
+with the tracer suite, in the worktree `SpeedyWeather-phase0-gpu` at `ac3c5befb`: when done, copy its
+`SpeedyWeather/benchmark/README.md` and `assets/benchmark_results.json` (only the `gpu-nvidia` section/record changes)
+into the branch and the tracer table into "Results of phase 0" (`<!-- 0A-… -->` above); `ft-proto-cpu`, the prototype
+on an x86 CPU node (`fused_tracers_cpu-x86.md`), a second CPU data point for the CPU default.
+
+To decide then: the CPU default (`p1-cpu-*` and the x86 prototype against the 5% of the gate) and the Reactant
+default (`p1-rea-*`, ShallowWater only, after the Reactant failure above is fixed). The worktrees `SpeedyWeather-phase0-*`
+and `SpeedyWeather-phase1*` can be removed afterwards (`git worktree remove`).
+
+Other findings: (1) every PrimitiveWetModel construction on Reactant fails (scalar indexing in
+`free_troposphere_layers`, `clouds.jl:238`), independent of tracers; (2) with Leapfrog, the first `run!` after
+deactivating a tracer still copies its 1st leapfrog step to the 2nd (as without fused tracers), frozen from then on;
+(3) compute nodes have no internet: a new worktree needs `RingGrids/Artifacts.toml` (gitignored) copied for the assets;
+(4) the benchmark manifest was updated (`Pkg.update`, CUDA stayed at 6.4.1), the old one is in
+`/p/tmp/maxgelbr/benchmark-Manifest.toml.bak-20261117`.
 
 ### 1. Fused tracer variables
 

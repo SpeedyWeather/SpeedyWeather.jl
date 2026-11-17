@@ -1,10 +1,9 @@
 @testset "GPU tracers: fused (default) as one by one" begin
     arch = SpeedyWeather.GPU()
 
-    # 3 tracers fit into one transform, 4 and 11 not (into the largest transform batch of 10 and 19 layers)
-    for (Model, nlayers, ntracers) in (
-            (ShallowWaterModel, 1, 3), (ShallowWaterModel, 1, 4), (PrimitiveWetModel, 8, 3), (PrimitiveDryModel, 2, 11),
-        )
+    # 3 tracers fit into one transform, the tendencies and fluxes of 4 tracers (12 layers) and all transforms of
+    # 11 tracers (22, 66 layers) not, they are split into chunks of whole tracers (largest batch 10 and 19 layers)
+    for (Model, nlayers, ntracers) in ((ShallowWaterModel, 1, 4), (PrimitiveWetModel, 8, 3), (PrimitiveDryModel, 2, 11))
         spectral_grid = SpectralGrid(truncation = 32; nlayers, architecture = arch)
         names = ntuple(i -> Symbol(:tracer, i), ntracers)
 
