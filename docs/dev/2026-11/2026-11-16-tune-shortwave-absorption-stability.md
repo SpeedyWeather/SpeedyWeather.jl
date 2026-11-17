@@ -1,9 +1,9 @@
 # Tuning shortwave water vapour and dry-air absorption for stable long T32L8 runs
 
-> Status: **in progress, restarted on the correct base**. All experiments up to 2026-11-17 07:30 ran on `caed82d6`,
-> which predates #1279 and its default `ByrneOGormanLongwaveTransmissivity`. The tuning target is that scheme's
-> `dry_absorption` and `water_vapor_absorption`. Reproduction on `origin/main` (`b06af911a`) is running. No source
-> code changed in the repository yet.
+> Status: **in progress**. On `origin/main` (`b06af911a`) the default Byrne–O'Gorman longwave runs away; `b` =
+> `water_vapor_absorption` ≈ 500 with `a` = `dry_absorption` ≈ 1.6–1.9 is stable (findings 17–20). Refining the
+> shortwave around it (`V_*`) and 1000-year brackets (`L3_*`) are running. No source code changed in the
+> repository yet.
 
 Date of initial draft: 2026-11-16
 
@@ -344,6 +344,45 @@ January–May so far, so not comparable with the 12-month `main_default` row), a
    to ≈292 K with a moderate sensitivity, and is refined next (`Z_*`), also with visible `wv` = 45 for more
    atmospheric absorption and `cloud_albedo` = 0.40 for OSR. With much sea ice, the steady net TOA becomes strongly
    negative (−17.5 W/m² at ice 0.255): the sea-ice energy source of finding 9 scales with the ice cover.
+20. **`b` = 500–1000 is stable, the default `b` with more shortwave absorption tips over** (`Z_*`, GPU, 40 years,
+   `wv_nir` = 1500; means over years 35–39; K per W/m² from the twin over years 20–39). 27 of 28 runs are stable.
+   The exception is the +2% solar twin of `b` / `a` = 1997.9 / 0.87 with `wv` = 45, which runs away from 295.2 K
+   to a NaN in year 15. Its neighbour, 1997.9 / 0.75 with `wv` = 45, warms by 10.5 K in its twin.
+
+   | `b` / `a`, other | SST | net TOA | OSR | OLR | atm SW | sfc SW down | LW down | LW up | LH | P | cloud | ice | K per W/m² |
+   |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+   | observed (all-sky) | ≈291 | 0 | 100 | 239 | 79 | 185 | 342 | 397 | 84 | 2.9 | | | ≈0.8 |
+   | 500 / 1.6 | 288.5 | −7.9 | 120 | 230 | 54 | 196 | 267 | 377 | 44 | 1.53 | 0.67 | 0.149 | 0.32 |
+   | 500 / 1.75 | 291.1 | −5.2 | 114 | 232 | 60 | 193 | 298 | 394 | 54 | 1.87 | 0.66 | 0.105 | 0.70 |
+   | 500 / 1.9 | 294.8 | −2.0 | 102 | 241 | 71 | 191 | 343 | 421 | 70 | 2.40 | 0.60 | 0.061 | 0.40 |
+   | 500 / 1.6, `wv` 45 | 289.8 | −6.8 | 112 | 236 | 73 | 183 | 287 | 386 | 46 | 1.60 | 0.65 | 0.130 | 1.02 |
+   | 500 / 1.75, `wv` 45 | 294.9 | −2.3 | 91 | 252 | 103 | 169 | 353 | 423 | 63 | 2.15 | 0.55 | 0.065 | 0.43 |
+   | 500 / 1.75, `wv` 45, `cloud_albedo` 0.40 | 296.6 | −1.1 | 84 | 258 | 112 | 166 | 369 | 434 | 66 | 2.24 | 0.54 | 0.046 | 0.65 |
+   | 1000 / 1.2 | 287.8 | −10.6 | 121 | 231 | 52 | 200 | 272 | 372 | 53 | 1.83 | 0.66 | 0.180 | 0.40 |
+   | 1000 / 1.4 | 292.1 | −4.4 | 111 | 235 | 62 | 194 | 325 | 402 | 69 | 2.38 | 0.64 | 0.100 | 0.67 |
+   | 1000 / 1.2, `wv` 45 | 289.3 | −8.3 | 111 | 239 | 71 | 189 | 299 | 384 | 59 | 2.03 | 0.62 | 0.153 | 1.08 |
+   | 1000 / 1.2, `wv` 45, `cloud_albedo` 0.40 | 294.2 | −3.0 | 93 | 252 | 95 | 176 | 355 | 418 | 71 | 2.44 | 0.58 | 0.075 | 0.95 |
+   | 1997.9 / 0.75, `wv` 45 | 288.7 | −10.0 | 114 | 238 | 66 | 192 | 303 | 379 | 65 | 2.25 | 0.63 | 0.166 | 2.18 |
+   | 1997.9 / 0.87, `wv` 45 | 295.2 | −1.6 | 98 | 245 | 94 | 170 | 379 | 425 | 79 | 2.71 | 0.59 | 0.058 | twin NaN |
+
+   - **The sensitivity depends on the state, not on noise.** The interannual standard deviation of the annual SST
+     is 0.02–0.12 K. Along `b` = 500 the sensitivity is 0.3 K per W/m² at 288 K, 0.7 at 291 K and 0.4 at 295 K.
+     It peaks where sea ice (0.10–0.15) and cloud cover (0.66 → 0.60) retreat with warming: from `a` = 1.75 to
+     1.9, OSR falls by 12 W/m² for 3.7 K. Earth-like temperatures lie in this sensitive range.
+   - **Visible water vapour absorption is the riskier lever.** `wv` = 45 adds 13–19 W/m² of atmospheric
+     absorption, but triples the sensitivity in the cooler states (500 / 1.6: 0.32 → 1.02; 1000 / 1.2: 0.40 → 1.08)
+     and tips the default `b` over. This is the shortwave absorption that is linear in q (finding 18). More
+     atmospheric absorption should come from the dry-air absorptivity, which has no q dependence.
+   - **The longwave has no cloud effect.** `ByrneOGormanLongwaveTransmissivity` is clear-sky, but the observed LW
+     down of 342 W/m² and OLR of 239 W/m² are all-sky values. Clear-sky values are ≈314 and ≈266 W/m² (Wild et
+     al. 2013). At an Earth-like surface temperature (LW up ≈ 395, `b` / `a` = 500 / 1.75) the greenhouse effect
+     LW up − OLR is 162 W/m² against the observed 158. LW down (298) is 16 W/m² below the clear-sky value. The clear-sky longwave therefore
+     emulates the cloud longwave effect at the TOA, but can't reach the all-sky LW down at the surface. The
+     remaining biases at Earth-like temperatures are in the shortwave: OSR 114 instead of 100, atmospheric
+     absorption 60 instead of 79.
+   - Next: `V_*` (CPU, 40 years with +2% twins) adds `dry` = 0.066 / 0.1 and `cloud_albedo` = 0.38 to
+     `b` / `a` = 500 / 1.6–1.8 and 750 / 1.4–1.5. `L3_*` (CPU, 1000 years) brackets the `b` = 500 family at
+     `a` = 1.75 and 1.9, each with a +4% solar twin (≈+9.6 W/m²) as stress test.
 
 ## Plan
 
@@ -428,7 +467,8 @@ Planned, pending the experiments:
 
 - Global means are from instantaneous samples every 6 hours, not time-step averages. The diurnal cycle is sampled
   at 4 fixed UTC times, which is adequate for global means.
-- The longwave has no water vapour dependence, so this tuning cannot introduce a water vapour longwave feedback.
+- The Byrne–O'Gorman longwave is clear-sky. It can match the all-sky OLR only by being more opaque than the clear
+  sky, and it can't match the all-sky surface LW down at an Earth-like surface temperature (finding 20).
 
 ## Future work
 
@@ -463,7 +503,9 @@ Planned, pending the experiments:
 | `M_*` (Slurm 3283731, CPU, `tree_1279` = `b06af911a`) | Byrne–O'Gorman default; `a` 1.1 / 1.5; `b` 1500 / 2500; `wv_nir` 1500; `a` 1.1 + `wv_nir` 1500; `strat_emis` 0.1 | 30 years | running | default runs away (finding 17) |
 | `G_*` (GPU Slurm 3283750) and `M_b*`, `M_*_S` (CPU Slurm 3283751), `tree_1279` | `b` / `a` = 1000 / 2.5, 1000 / 3.0, 500 / 4.0, 500 / 4.5, 0 / 5.4, each with a +2% solar twin (`_S`); `_S` twins for the default, `a` = 1.1 and `b` = 1500 | 30 years | running | feedback strength, warming per W/m² |
 | `Y_*` (GPU Slurm 3284305 + 3284306, `tree_1279`) | all `wv_nir` = 1500: `b` = 0 with `a` 2.0 / 2.5 / 3.0 / 3.5, `b` = 250 with `a` 2.0 / 2.5 / 3.0, `b` = 500 with `a` 1.5 / 2.0 / 2.5, `b` = 1997.9 with `a` 0.7 / 0.87; each with a +2% solar twin | 40 years | completed, all stable | finding 19 |
-| `Z_*` (GPU Slurm 3289286 + 3289287, `tree_1279`) | all `wv_nir` = 1500: `b` = 500 with `a` 1.6 / 1.75 / 1.9; `b` = 1000 with `a` 1.0 / 1.2 / 1.4; with visible `wv` = 45: `b` / `a` 500 / 1.6, 500 / 1.75, 1000 / 1.0, 1000 / 1.2, 1997.9 / 0.75, 1997.9 / 0.87; `cloud_albedo` 0.40 with 500 / 1.75 / `wv` 45 and 1000 / 1.2 / `wv` 45; each with a +2% solar twin | 40 years | running, ready ≈12:00 | refinement around `b` = 500, `a` ≈ 1.75 |
+| `Z_*` (GPU Slurm 3289286 + 3289287, `tree_1279`) | all `wv_nir` = 1500: `b` = 500 with `a` 1.6 / 1.75 / 1.9; `b` = 1000 with `a` 1.0 / 1.2 / 1.4; with visible `wv` = 45: `b` / `a` 500 / 1.6, 500 / 1.75, 1000 / 1.0, 1000 / 1.2, 1997.9 / 0.75, 1997.9 / 0.87; `cloud_albedo` 0.40 with 500 / 1.75 / `wv` 45 and 1000 / 1.2 / `wv` 45; each with a +2% solar twin | 40 years | completed; the twin of 1997.9 / 0.87 / `wv` 45 NaN in year 15 | finding 20 |
+| `V_*` (CPU Slurm 3289952, `tree_1279`, `long_cpu.sh`) | all `wv_nir` = 1500: `b` = 500 with `a` 1.6 / 1.7 / 1.8 and `dry` 0.066 + `cloud_albedo` 0.38; `a` 1.7 / 1.8 with `dry` 0.066; `a` 1.6 / 1.7 with `cloud_albedo` 0.38; `a` 1.7 with `dry` 0.1 + `cloud_albedo` 0.38; `b` = 750 with `a` 1.4 / 1.5, `dry` 0.066 + `cloud_albedo` 0.38; each with a +2% solar twin | 40 years | running, ready ≈14:00 | more atmospheric absorption without q dependence, lower OSR |
+| `L3_*` (CPU Slurm 3289953, `tree_1279`) | `b` / `a` = 500 / 1.75 and 500 / 1.9 (`wv_nir` = 1500), each with a +4% solar twin (1419.6 W/m²) | 1000 years, 25-year restart chunks | running, ≈700 years per day | does the `b` = 500 family stay stable for centuries, also under strong forcing? |
 | `X_*` (CPU Slurm 3283769, `tree_1279`) | all `wv_nir` = 1500: `b` / `a` = 1000 / 2.0, 750 / 3.0, 750 / 3.5, 250 / 4.5, 250 / 5.0, 0 / 4.8, 0 / 6.0, and 500 / 4.0 with `cloud_albedo` 0.40, each with a +2% solar twin | 30 years | running, ready ≈09:00 | fills in `b` ≤ 1000. At year 7 the `M_*` runs show `b` ≥ 1500 still warming: default SST 298.9 K at +4.5 W/m²; `a` = 1.1 and `b` = 1500 at 294.0 / 293.6 K, still rising ≈0.3 K per year. With Byrne–O'Gorman the stratosphere stays cool (T₁ ≈ 221 K, max 252 K); `wv_nir` = 1500 halves q₂ |
 | `r2_*` (Slurm 3279654, ed) | all `wv_nir` = 1500: `wv` 55/60/65 × `τ₀` 7.0/7.2/7.5, polar `τ₀` 2.0, `cloud_albedo` 0.45 | 20 years | running | round 2 around `c7` |
 | `L_main`, `L_nir1500`, `L_pt250` (GPU Slurm 3279622, ed) | `main` defaults; `wv_nir` = 1500; `water_vapor_pressure_top` = 250 hPa | 1000 years, 25-year restart chunks | running (H100) | does `main` blow up, and when? Do both stratosphere fixes hold for a millennium? ≈2.1 s per simulated month per run, done ≈03:00 on 2026-11-17 |
