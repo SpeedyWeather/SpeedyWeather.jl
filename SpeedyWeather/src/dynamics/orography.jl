@@ -114,7 +114,8 @@ function initialize!(
     (; radius, gravity, rotation) = P
     φ = G.latds                         # latitude for each grid point [˚N]
 
-    (; orography, surface_geopotential, η₀, u₀) = orog
+    (; orography, surface_geopotential, η₀) = orog
+    u₀ = jet_speed(orog.u₀, rotation)       # easterly jet on a retrograde planet
     NF = eltype(orography)
 
     ηᵥ = (1 - η₀) * π / 2                     # ηᵥ-coordinate of the surface [1]
