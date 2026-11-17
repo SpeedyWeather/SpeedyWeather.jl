@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reactant: compute `free_troposphere_layers` of `DiagnosticClouds` on a CPU copy of the vertical coordinates to avoid scalar indexing at `initialize!` [#1412](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1412)
 - Updated `JLArrays` dependency [#1411](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1411)
 - `ByrneOGormanLongwaveTransmissivity` with humidity- and CO₂-dependent optical depth as new longwave default, default CO₂ of 280 ppm, longwave optical depths calibrated for ~288 K with `TwoBandShortwave` [#1279](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1279)
 - Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)
