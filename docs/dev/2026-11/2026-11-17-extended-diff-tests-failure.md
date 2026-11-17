@@ -487,4 +487,4 @@ switch with both code paths kept (see Summary of changes, item 1). Validation (J
 | `test/parameterizations/column_loops.jl` + `all_parametrizations.jl`, `--check-bounds=yes` | 14/14 (paths bit-identical, Wet and Dry), 61/61 |
 | reproducer `repro_param_ad.jl`, `SPLIT_COLUMN_LOOPS = true` (repo) | pass (65.9 s) |
 | same, `SPLIT_COLUMN_LOOPS = false` (temporary worktree, otherwise identical) | **abort, "Broken module found"**: the switch restores the original behaviour, so the revert check works |
-| full `differentiability/runtests.jl` with the final code (job `sw_full`) | running |
+| full `differentiability/runtests.jl` with the final code (job `sw_full`) | **pass, all 23 testsets**, 0 "Cannot deduce type" warnings (40 min) |
