@@ -128,12 +128,13 @@ end
 # GROUP 2 — PHYSICS, PARAMETER AD
 #
 @testset "Differentiability: PrimitiveWet parameterization_tendencies! (parameter AD)" begin
-    # Regression guard: with Duplicated(model), the CPU column-parameterization loop
-    # must not materialize the get_parameterizations NamedTuple inside a non-inlined
-    # function — that broke Enzyme's reverse-mode primal on Julia 1.12
-    # ("Vararg length is negative"); fixed by the direct model-field access in
-    # _column_parameterizations_cpu!(vars, model).
-    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    # Regression guard for reverse mode with Duplicated(model) through the CPU column loops:
+    # - the get_parameterizations NamedTuple (or its elements) must not be materialized as arguments
+    #   of a non-inlined function (Julia 1.12: "Vararg length is negative"; EnzymeNoTypeError)
+    # - llvm/llvm-project#219885: this testset aborted with "Broken module found" in Enzyme's post-AD
+    #   GVN, worked around by SPLIT_COLUMN_LOOPS in parameterizations/tendencies.jl. Whether the
+    #   workaround is still needed: set SPLIT_COLUMN_LOOPS = false and run this testset.
+    spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
     model = PrimitiveWetModel(; spectral_grid)
     simulation = initialize!(model)
     initialize!(simulation)
