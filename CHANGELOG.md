@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Radiation retuned for stable millennial integrations: `ByrneOGormanLongwaveTransmissivity` with `dry_absorption = 1.45`, `water_vapor_absorption = 750`, `TwoBandShortwaveTransmissivity` with `absorptivity_dry_air = 0.066`, `absorptivity_water_vapor_near_infrared = 1500` [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+- Default CO₂ of 360 ppm (≈ year 2000, the default start date) instead of preindustrial 280 ppm [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - Updated `JLArrays` dependency [#1411](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1411)
 - `ByrneOGormanLongwaveTransmissivity` with humidity- and CO₂-dependent optical depth as new longwave default, default CO₂ of 280 ppm, longwave optical depths calibrated for ~288 K with `TwoBandShortwave` [#1279](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1279)
 - Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)
