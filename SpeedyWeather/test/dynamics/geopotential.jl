@@ -42,7 +42,7 @@
     end
 end
 
-@testset "Spectral geopotential: no errors" begin
+@testset "Grid geopotential enters the Bernoulli potential" begin
     for NF in (Float32, Float64)
         spectral_grid = SpectralGrid(; NF, nlayers = 5)
         model = PrimitiveWetModel(spectral_grid)
@@ -54,16 +54,21 @@ end
         temp[1, :] .= 280 * model.spectral_transform.norm_sphere
         humid .= 0
 
-        SpeedyWeather.transform!(vars, model)
-        SpeedyWeather.linear_virtual_temperature!(vars, model)
-        SpeedyWeather.geopotential!(vars, model.geopotential, model.orography)
-        SpeedyWeather.bernoulli_potential!(vars, model.spectral_transform, model.time_stepping)
+        # initialize = true copies step 1 to 2 for Leapfrog before transforming to the grid
+        SpeedyWeather.transform!(vars, model, initialize = true)
+        Φ = vars.dynamics.geopotential
 
-        Φ = transform(vars.dynamics.spectral_geopotential, model.spectral_transform)
         # geopotential decreases from top to surface (layer 1 is highest, last is lowest)
         for k in 1:(spectral_grid.nlayers - 1)
             @test all(Φ[:, k] .> Φ[:, k + 1])
         end
+
+        # Bernoulli potential on the grid is ½(u²+v²) + Φ
+        SpeedyWeather.bernoulli_grid_potential!(vars, model, model.time_stepping)
+        u = get_step(vars.grid.u, 2)
+        v = get_step(vars.grid.v, 2)
+        bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
+        @test bernoulli_grid ≈ @. (u^2 + v^2) / 2 + Φ
     end
 end
 

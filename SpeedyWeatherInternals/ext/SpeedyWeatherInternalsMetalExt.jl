@@ -41,4 +41,8 @@ Architectures.on_architecture(::MtlGPU, a::Array{Float64}) = MtlArray(Float32.(a
 
 @inline Architectures.convert_to_device(::MtlGPU, args) = Metal.mtlconvert(args)
 @inline Architectures.convert_to_device(::MtlGPU, args::Tuple) = map(Metal.mtlconvert, args)
+
+# count device memory in `memorysize`, `Base.summarysize` only counts the wrapper
+Architectures.device_bytes(a::MtlArray) = sizeof(a)
+
 end

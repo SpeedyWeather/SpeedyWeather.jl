@@ -121,22 +121,56 @@ end
     return Expr(:block, calls..., :(return nothing))
 end
 
-# copy grid prognostics from 2nd to 1st step to retain these fields for the previous time step
+"""$(TYPEDSIGNATURES)
+Retain the previous time step of the grid prognostic variables before the new spectral state is
+transformed to the grid: copy the 2nd (current) grid step to the 1st (previous) step whenever
+the leapfrog update has also moved the previous spectral step forward, such that the 1st grid
+step is always the grid-point equivalent of the 1st spectral step. The previous step is read by
+the parameterizations, vertical advection and the geopotential (which enters the semi-implicit
+dynamics). During the leapfrog start (Euler step and first leapfrog step, `lf == 1`) the previous
+spectral step is not advanced and so the previous grid step is left unchanged. Branch-free (`ifelse`)
+as the clock is traced with Reactant."""
+function move_prognostic_grid_variables_back!(
+        vars::Variables,
+        time_stepping::Leapfrog,
+        model::AbstractModel,
+        clock::Clock,
+    )
+    lf = prognostic_step(time_stepping, clock)
+    return move_prognostic_grid_variables_back!(vars, time_stepping, model; move = lf == 2)
+end
+
+# other leapfrog-like time steppers: always move the grid variables back, ignoring the clock
 function move_prognostic_grid_variables_back!(
         vars::Variables,
         time_stepping::AbstractLeapfrog,
         model::AbstractModel,
+        ::Clock,
+    )
+    return move_prognostic_grid_variables_back!(vars, time_stepping, model)
+end
+
+"""$(TYPEDSIGNATURES)
+Copy the grid prognostic variables from the 2nd (current) to the 1st (previous) step to retain
+them as the previous time step. With `move = false` the 1st step is left unchanged."""
+function move_prognostic_grid_variables_back!(
+        vars::Variables,
+        time_stepping::AbstractLeapfrog,
+        model::AbstractModel;
+        move = true,
     )
     # The atmospheric grid prognostics (vorticity, divergence, temperature, [humidity], pressure/η)
-    # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_grid` fuse parent.
-    # Together these cover exactly `tendency_and_uv_names`, so a single contiguous copy from the
-    # current step (2nd) to the previous step (1st) per fuse parent replaces the per-variable loop.
-    for fused in (vars.fused.grid, vars.fused.uv_grid)
-        copy_step_back!(parent(fused))
+    # live in the `:grid` fuse parent and the velocities (u, v) in the `:uv_dpres_grad_grid` fuse
+    # parent. Together these cover exactly `tendency_and_uv_names`, so a single contiguous copy from
+    # the current step (2nd) to the previous step (1st) per fuse parent replaces the per-variable loop.
+    # For primitive equation models `:uv_dpres_grad_grid` also holds ∇ln(pₛ) (`dpres_dx`, `dpres_dy`),
+    # which is copied along but not used from the previous step.
+    for fused in (vars.fused.grid, vars.fused.uv_dpres_grad_grid)
+        copy_step_back!(parent(fused), move)
     end
     # tracers, ocean and land grid variables are not part of the atmospheric fuse — copy
     # per-variable, unrolled per name (literal-Symbol getfield; steps bound individually)
-    move_grid_tracers_back!(vars)
+    move_grid_tracers_back!(vars, move)
     # does not have to be done for ocean/land as they don't have spectral variables
     # the grid variables are already in prognostic and the time stepper takes care
     # of moving them back during the update
@@ -144,16 +178,17 @@ function move_prognostic_grid_variables_back!(
 end
 
 # copy step 2 -> step 1 for one variable (retain current step as the previous one);
-@inline function copy_step_back!(var)
+# with `move = false` leave the 1st step unchanged (branch-free for Reactant)
+@inline function copy_step_back!(var, move = true)
     var_old = get_step(var, 1)
     var_new = get_step(var, 2)
-    var_old .= var_new
+    var_old .= ifelse.(move, var_new, var_old)
     return nothing
 end
 
-@generated function move_grid_tracers_back!(vars::Variables{Po, G, T}) where {Po, G, T}
+@generated function move_grid_tracers_back!(vars::Variables{Po, G, T}, move = true) where {Po, G, T}
     calls = [
-        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name)))))
+        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name))), move))
             for name in _namespace_names(T, :tracers)
     ]
     return Expr(:block, calls..., :(return nothing))
@@ -166,7 +201,7 @@ function diffusion_and_implicit!(vars, ::AbstractLeapfrog, ::AbstractImplicit, m
     return nothing
 end
 
-"""($TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Immutable core struct used to adapt only the time step fields for use in kernels"""
 struct LeapfrogCore{NF, MS} <: AbstractLeapfrog
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
@@ -227,12 +262,12 @@ spin_up_steps(::AbstractLeapfrog) = 1
 function time_step!(clock::Clock, time_stepping::Leapfrog)
     Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based
     i = clock.step_counter          # 0-based as the clock is only stepped below
-    first_step = i == 0            
-    second_step = i == 1            
+    first_step = i == 0
+    second_step = i == 1
 
     step_scale = ifelse(first_step, 0.5, 1.0)       # first Euler step at Δt/2
     rewind_scale = ifelse(second_step, 0.5, 0.0)    # second step: Leapfrog at Δt, later steps: Leapfrog at 2Δt but clock by Δt
-    increase_counter = ifelse(first_step, 0, 1)     
+    increase_counter = ifelse(first_step, 0, 1)
 
     # rotation and orbit time are dilated, so rewind them by their dilated Δt/2
     Δt_rewind = dilate(Δt, rewind_scale)
@@ -243,7 +278,8 @@ function time_step!(clock::Clock, time_stepping::Leapfrog)
     return nothing
 end
 
-default_time_step(L::Leapfrog) = 2 * L.Δt
+# for any AbstractLeapfrog: inside kernels the Leapfrog is adapted to a LeapfrogCore
+default_time_step(L::AbstractLeapfrog) = 2 * L.Δt
 function time_step(L::Leapfrog, clock::Clock)
     (; Δt) = L
     return ifelse(
@@ -265,17 +301,17 @@ function update_prognostic!(
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
-        scale::Real = 1,
+        scale::Number = 1,
     )
     Δt = time_step(time_stepping, clock)
-    Δt /= oftype(Δt, scale)                         # scale time step on the fly *1/radius for atmospheric variables
-    lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index
+    Δt /= scale                                     # scale time step on the fly *1/radius for atmospheric variables
+    lf = prognostic_step(time_stepping, clock)      # leapfrog prognostic step index, 1 or 2
     var_old = get_step(var, 1)                      # no tuple (get_steps) here: a tuple of step views
     var_new = get_step(var, 2)                      # breaks Enzyme's type analysis on Julia >= 1.11
-    var_lf = get_step(var, lf)                      # view on either t or t+dt to dis/enable Williams filter
     var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
 
-    @boundscheck lf == 1 || lf == 2 || throw(BoundsError())
+    # lf selects var_old (t) or var_new (t+dt) inside the kernel to dis/enable the Williams filter
+    # (not as a view here as lf depends on the clock, which is traced with Reactant)
     @boundscheck size(var_old) == size(var_new) == size(var_tend) || throw(BoundsError())
 
     (; robert_filter, williams_filter) = time_stepping          # coefficients for filters
@@ -290,16 +326,17 @@ function update_prognostic!(
 
     launch!(
         architecture(var_tend), SpectralWorkOrder, size(var_tend), leapfrog_kernel!,
-        var_old, var_new, var_lf, var_tend, Δt, w1, w2
+        var_old, var_new, lf, var_tend, Δt, w1, w2
     )
     return nothing
 end
 
-@kernel inbounds = true function leapfrog_kernel!(var_old, var_new, var_lf, tendency, Δt, w1, w2)
+@kernel inbounds = true function leapfrog_kernel!(var_old, var_new, lf, tendency, Δt, w1, w2)
     lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
     old = var_old[lmk]
+    var_lf = ifelse(lf == 1, old, var_new[lmk])     # on either t or t+dt, read before writing
     new = old + Δt * tendency[lmk]
-    update = old - 2var_lf[lmk] + new
-    var_old[lmk] = var_lf[lmk] + w1 * update
+    update = old - 2var_lf + new
+    var_old[lmk] = var_lf + w1 * update
     var_new[lmk] = new - w2 * update
 end

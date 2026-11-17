@@ -66,9 +66,43 @@ end
 # outer loop over parameterizations, inner loop over horizontal grid points
 # this yields a more contiguous memory access pattern on CPU
 function column_parameterizations_cpu!(vars, model)
-    _column_parameterizations_cpu!(vars, get_parameterizations(model), model)
+    if SPLIT_COLUMN_LOOPS       # workaround for llvm/llvm-project#219885, see below
+        _column_parameterizations_cpu_by_name!(vars, model, Val(keys(get_parameterizations(model))))
+    else
+        _column_parameterizations_cpu!(vars, get_parameterizations(model), model)
+    end
     return nothing
 end
+
+# >>> WORKAROUND llvm/llvm-project#219885 (LLVM GVN bug with `!invariant.group` loads) >>>>>>>>>>>>>>>>>>>>>>
+# Inlined, all column loops end up in one reverse function of Enzyme large enough to trigger an LLVM bug
+# in Enzyme's post-AD GVN (stale MemDep cache for the `!invariant.group` loads that Enzyme emits): a broken
+# module ("Broken module found") or a segfault while compiling the reverse pass, see #1290 and
+# docs/dev/2026-11/2026-11-17-extended-diff-tests-failure.md. With SPLIT_COLUMN_LOOPS every parameterization
+# runs in its own non-inlined function, also in Enzyme's reverse pass. No measurable cost (the call is per
+# parameterization and time step, not per grid point). Fixed upstream by llvm/llvm-project#219929, which
+# is not in the LLVM of Julia 1.10, 1.11 or 1.12 (2026-11).
+# TO REVERT once the Julia versions used for Enzyme CI ship an LLVM with that fix: a quick check is
+# `opt -passes=gvn` on docs/dev/2026-11/2026-11-17-gvn-invariant-group{,-upstream}.ll with the `opt` of the
+# LLVM_full_jll matching Julia's LLVM (see the headers of these files, valid output = fixed). Decisive: set
+# SPLIT_COLUMN_LOOPS = false and run test/differentiability/primitivewet.jl (the "parameter AD" testset aborted).
+# Then delete this block, the branch above and test/parameterizations/column_loops.jl.
+# xref Enzyme.jl issue: EnzymeAD/Enzyme.jl#4074
+const SPLIT_COLUMN_LOOPS = true
+
+# Unrolled at compile time over the names of the model's parameterizations, one call per parameterization
+@generated function _column_parameterizations_cpu_by_name!(vars, model, ::Val{names}) where {names}
+    calls = [:(_column_parameterization_cpu_by_name!(vars, Val($(QuoteNode(name))), model)) for name in names]
+    return Expr(:block, calls..., :(return nothing))
+end
+
+# The parameterization is selected by name inside: passing the struct to a non-inlined function makes
+# Enzyme copy it untyped (EnzymeNoTypeError with a Duplicated model)
+@noinline function _column_parameterization_cpu_by_name!(vars, ::Val{name}, model) where {name}
+    column_parameterization_cpu!(vars, getfield(model, name), model)
+    return nothing
+end
+# <<< END WORKAROUND llvm/llvm-project#219885 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 # Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
 @generated function _column_parameterizations_cpu!(vars, parameterizations::NamedTuple{names}, model) where {names}
@@ -98,6 +132,59 @@ converted to tendency [?/s]."""
 @propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
     flux_to_tendency(flux, pₛ, model.geometry.nlayers, model)
 
+"""Abstract supertype for the time integration of surface fluxes that relax the
+lowermost layer towards a surface value, `flux = -conductance * (x - x_surface)`.
+Subtypes define `flux_damping(scheme, z)` with `z = Δt/τ` the ratio of time step to
+relaxation time scale, a factor that multiplies the explicit flux."""
+abstract type AbstractFluxIntegration end
+Base.broadcastable(scheme::AbstractFluxIntegration) = Ref(scheme)
+
+export ExplicitFluxes, ImplicitFluxes, ExponentialFluxes, RationalFluxes
+
+"""Explicit (forward) time integration of surface fluxes, unstable for `Δt/τ > 2`."""
+struct ExplicitFluxes <: AbstractFluxIntegration end
+
+"""Implicit (backward Euler) time integration of surface fluxes, damping the explicit
+flux by `1/(1 + Δt/τ)`. Unconditionally stable."""
+struct ImplicitFluxes <: AbstractFluxIntegration end
+
+"""Exponential time differencing of surface fluxes, damping the explicit flux by
+`(1 - exp(-Δt/τ))/(Δt/τ)`. Exact for a fixed surface value, unconditionally stable."""
+struct ExponentialFluxes <: AbstractFluxIntegration end
+
+"""Rational approximation of `ExponentialFluxes`, damping the explicit flux by
+`(6 + z)/(6 + 4z + z²)` with `z = Δt/τ`. Matches `(1 - exp(-z))/z` to second order
+in `z` and as `1/z` for large `z`, at the cost of `ImplicitFluxes`. Unconditionally
+stable but overshoots the surface value slightly (≤ 10%) for `z > 3`."""
+struct RationalFluxes <: AbstractFluxIntegration end
+
+const DEFAULT_FLUX_INTEGRATION = RationalFluxes
+
+"""$(TYPEDSIGNATURES)
+Factor φ(z) multiplying an explicit relaxation flux for `z = Δt/τ` given time integration `scheme`."""
+@inline flux_damping(::ExplicitFluxes, z) = one(z)
+@inline flux_damping(::ImplicitFluxes, z) = 1 / (1 + z)
+@inline flux_damping(::ExponentialFluxes, z) = ifelse(z < sqrt(eps(z)), one(z), -expm1(-z) / z)
+@inline flux_damping(::RationalFluxes, z) = (6 + z) / (6 + 4z + z^2)
+
+"""$(TYPEDSIGNATURES)
+Damping factor for a surface flux into the lowermost layer with mass `conductance` [kg/m²/s],
+i.e. `-∂flux/∂x` with respect to the lowermost-layer variable x for the flux in units of
+x⋅kg/m²/s (so without cₚ for heat fluxes), surface pressure `pₛ` [Pa] and
+time integration `scheme`. Uses the time step of the time stepper, e.g. 2Δt for Leapfrog."""
+@propagate_inbounds function surface_flux_damping(scheme::AbstractFluxIntegration, conductance::Real, pₛ::Real, model)
+    Δp = pressure_thickness(model.geometry.nlayers, pₛ, model.geometry.vertical_coordinates)
+    Δt = default_time_step(model.time_stepping)
+    z = Δt * model.planet.gravity * conductance / Δp        # = Δt/τ, relaxation time scale τ
+    return flux_damping(scheme, z)
+end
+
+"""$(TYPEDSIGNATURES)
+Flux `flux` (upward positive) into the lowermost layer with mass `conductance` [kg/m²/s]
+converted to tendency [?/s], time-integrated following `scheme`, see `surface_flux_damping`."""
+@propagate_inbounds surface_flux_to_tendency(scheme::AbstractFluxIntegration, flux::Real, conductance::Real, pₛ::Real, model) =
+    surface_flux_damping(scheme, conductance, pₛ, model) * surface_flux_to_tendency(flux, pₛ, model)
+
 """$(TYPEDSIGNATURES)
 Flux `flux` into layer `k` of thickness `Δσ`  converted to tendency [?/s].
 Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
@@ -114,6 +201,8 @@ function reset_variables!(vars::Variables)
     reset_variable!(vars.parameterizations, :cloud_top, nlayers + 1)   # reset to below top layer
     reset_variable!(vars.parameterizations, :rain_rate, 0)
     reset_variable!(vars.parameterizations, :snow_rate, 0)
+    reset_variable!(vars.parameterizations, :rain_rate_convection, 0)
+    reset_variable!(vars.parameterizations, :snow_rate_convection, 0)
     reset_variable!(vars.parameterizations, :surface_humidity_flux, 0)
     reset_variable!(vars.parameterizations, :sensible_heat_flux, 0)
     return nothing

@@ -7,8 +7,13 @@ Albedo structs should be defined as MyAlbedo <: AbstractAlbedo and implement the
 `initialize!` is as for every model component but in contrast to other parameterizations albedos
 should not implement `parameterization!` but rather `albedo!`, which is called from within `parameterization!`.
 This is because every albedo needs to be used either as part of OceanLandAlbedo or the same albedo
-is called over both land and ocean surfaces."""
-abstract type AbstractAlbedo <: AbstractModelComponent end
+is called over both land and ocean surfaces. If a surface namespace (`vars.parameterizations.land` or `.ocean`) 
+contains both `black_sky_albedo` and `white_sky_albedo`, a shortwave scheme that knows the direct-beam fraction 
+blends them into that namespace's albedo. Otherwise it leaves albedo alone."""
+abstract type AbstractAlbedo <: AbstractParameterization end
+
+"""Some albedos rely on scattering computations, they will then have subcomponents of these types."""
+abstract type AbstractScattering <: AbstractModelComponent end
 
 # all albedos need to define albedo fields for ocean and land separately and total
 function variables(::AbstractAlbedo)
@@ -17,6 +22,29 @@ function variables(::AbstractAlbedo)
         ParameterizationVariable(:albedo, Grid2D(), desc = "Albedo over the ocean", units = "1", namespace = :ocean),
         ParameterizationVariable(:albedo, Grid2D(), desc = "Albedo over the land", units = "1", namespace = :land),
     )
+end
+
+# Every radiation scheme should call combine_albedos! to blend white and black sky
+# depending on the fraction of direct/diffusive radiation (depends on clouds)
+"""$(TYPEDSIGNATURES) Blend black/white-sky albedos over ocean and land wherever defined."""
+@propagate_inbounds function combine_albedos!(ij, vars, fraction_direct)
+    combine_surface_albedo!(ij, vars.parameterizations.ocean, fraction_direct)
+    combine_surface_albedo!(ij, vars.parameterizations.land, fraction_direct)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Blend direct (black-sky) and diffuse (white-sky) albedo into the broadband `albedo` of
+`surface` (a namespace of `vars.parameterizations`, e.g. `.land`) given the fraction of
+direct shortwave radiation `fraction_direct`. Does nothing if `surface` does not define
+both, decided at compile time."""
+@propagate_inbounds function combine_surface_albedo!(ij, surface::NamedTuple, fraction_direct)
+    if haskey(surface, :black_sky_albedo) && haskey(surface, :white_sky_albedo)
+        black_sky = surface.black_sky_albedo[ij]
+        white_sky = surface.white_sky_albedo[ij]
+        surface.albedo[ij] = fraction_direct * black_sky + (1 - fraction_direct) * white_sky
+    end
+    return nothing
 end
 
 export OceanLandAlbedo
@@ -34,8 +62,8 @@ end
 Adapt.@adapt_structure OceanLandAlbedo
 function OceanLandAlbedo(
         SG::SpectralGrid;
-        ocean = OceanSeaIceAlbedo(SG),      # default ocean albedo
-        land = LandSnowAlbedo(SG),          # default land albedo
+        ocean = JinOceanAlbedo(SG),      # default ocean albedo
+        land = LearnedLandAlbedo(SG),       # default land albedo
     )
     return OceanLandAlbedo(ocean, land)
 end
@@ -167,114 +195,8 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
         version = albedo.version
     )
 
+    a = on_architecture(model.architecture, a)
     return interpolate!(albedo.albedo, a)
 end
 
 @propagate_inbounds albedo!(ij, albedo, vars, scheme::AlbedoClimatology, model) = (albedo[ij] = scheme.albedo[ij])
-
-# OceanSeaIceAlbedo
-export OceanSeaIceAlbedo
-
-"""Albedo that scales linearly between ocean and ice albedo depending on sea ice concentration.
-Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct OceanSeaIceAlbedo{NF} <: AbstractAlbedo
-    "[OPTION] Albedo over open ocean [1]"
-    @param albedo_ocean::NF = 0.06 (bounds = 0 .. 1,)
-
-    "[OPTION] Albedo over sea ice at concentration=1 [1]"
-    @param albedo_ice::NF = 0.6 (bounds = 0 .. 1,)
-end
-
-Adapt.@adapt_structure OceanSeaIceAlbedo
-OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(; kwargs...)
-initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
-
-@propagate_inbounds function albedo!(ij, albedo, vars, scheme::OceanSeaIceAlbedo, model)
-    (; albedo_ocean, albedo_ice) = scheme
-    NF = eltype(albedo)
-    ℵ = haskey(vars.prognostic.ocean, :sea_ice_concentration) ? vars.prognostic.ocean.sea_ice_concentration[ij] : zero(NF)
-
-    # set ocean albedo linearly between ocean and ice depending on sea ice concentration
-    return albedo[ij] = albedo_ocean + ℵ * (albedo_ice - albedo_ocean)
-end
-
-abstract type AbstractSnowCover end
-
-export LinearSnowCover, SaturatingSnowCover
-"""Linear ramp: snow cover grows with snow depth from 0 to 1 at `snow_depth_scale`."""
-struct LinearSnowCover <: AbstractSnowCover end
-Adapt.@adapt_structure LinearSnowCover
-
-"""Saturating ramp: snow cover grows with snow depth S as `S/(S+scale)`."""
-struct SaturatingSnowCover <: AbstractSnowCover end
-Adapt.@adapt_structure SaturatingSnowCover
-
-"""$(TYPEDSIGNATURES) Snow cover fraction for the linear scheme, clamped to 1."""
-@inline (::LinearSnowCover)(snow_depth, scale) = min(snow_depth / scale, 1)
-
-"""$(TYPEDSIGNATURES) Snow cover fraction for the saturating scheme."""
-@inline (::SaturatingSnowCover)(snow_depth, scale) = snow_depth / (snow_depth + scale)
-
-# LandSnowAlbedo
-export LandSnowAlbedo
-
-"""Albedo over land based on bare soil, vegetation (high and low cover) and snow cover.
-Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct LandSnowAlbedo{NF, Scheme <: AbstractSnowCover} <: AbstractAlbedo
-    "Albedo of bare land (excluding vegetation) [1]"
-    @param albedo_land::NF = 0.4 (bounds = 0 .. 1,)
-
-    "Albedo of high vegetation [1]"
-    @param albedo_high_vegetation::NF = 0.15 (bounds = 0 .. 1,)
-
-    "Albedo of low vegetation [1]"
-    @param albedo_low_vegetation::NF = 0.2 (bounds = 0 .. 1,)
-
-    "Albedo of snow [1], additive to land"
-    @param albedo_snow::NF = 0.4 (bounds = 0 .. 1,)
-
-    "Conversion from snow depth to snow cover [m]"
-    @param snow_depth_scale::NF = 0.05 (bounds = Positive,)
-
-    "Snow cover-albedo scheme"
-    @param snow_cover::Scheme = SaturatingSnowCover() (group = :snow_cover,)
-end
-
-Adapt.@adapt_structure LandSnowAlbedo
-LandSnowAlbedo(SG::SpectralGrid; snow_cover = SaturatingSnowCover(), kwargs...) =
-    LandSnowAlbedo{SG.NF, typeof(snow_cover)}(; snow_cover, kwargs...)
-
-initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
-
-@propagate_inbounds function albedo!(ij, albedo, vars, scheme::LandSnowAlbedo, model)
-
-    # 1. Albedo of vegetation + bare soil (no snow)
-    (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = scheme
-
-    if haskey(vars.parameterizations.land, :vegetation_high) && haskey(vars.parameterizations.land, :vegetation_low)
-        (; vegetation_high, vegetation_low) = vars.parameterizations.land
-
-        # linear combination of high and low vegetation and bare soil
-        albedo[ij] = vegetation_high[ij] * albedo_high_vegetation +
-            vegetation_low[ij] * albedo_low_vegetation +
-            albedo_land * (1 - vegetation_high[ij] - vegetation_low[ij])
-    else
-        albedo[ij] = albedo_land
-    end
-
-    # 2. Add snow cover
-    if haskey(vars.prognostic, :land) && haskey(vars.prognostic.land, :snow_depth)
-        snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, time_stepper(model.time_stepping, :land), DummyParameterization())
-        (; albedo_snow, snow_depth_scale) = scheme
-
-        # how to compute snow cover from snow depth
-        snow_cover_scheme = scheme.snow_cover
-
-        # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
-        snow_cover = snow_cover_scheme(snow_depth[ij], snow_depth_scale)
-
-        # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
-        albedo[ij] += snow_cover * albedo_snow
-    end
-    return nothing
-end

@@ -14,6 +14,11 @@
         simulation = initialize!(model)
         @test !haskey(simulation.variables.prognostic, :greenhouse_gases)
     end
+
+    @testset "Default CO2" begin
+        simulation = initialize!(PrimitiveWetModel(spectral_grid))
+        @test simulation.variables.prognostic.greenhouse_gases.co2[] == SpeedyWeather.DEFAULT_CO2
+    end
 end
 
 @testset "Greenhouse gases: time stepping" begin

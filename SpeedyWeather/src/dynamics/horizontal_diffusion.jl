@@ -133,7 +133,7 @@ end
         ∇²ⁿ_implicit,
         ∇²ⁿ_div,
         ∇²ⁿ_div_implicit,
-        @Const(σ_levels_full),
+        σ_levels_full,
         truncation,
         power,
         power_stratosphere,
@@ -166,9 +166,9 @@ end
 
         # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue.
         # `@fastmath` for the `^`: `eigenvalue_norm^power` with a real exponent otherwise routes
-        # through Base's `Float64` `pow_body`, which does not compile on GPUs without Float64 (Metal)
-        ∇²ⁿ[l_plus_1, k] = @fastmath -eigenvalue_norm^power / time_scale
-        ∇²ⁿ_div[l_plus_1, k] = @fastmath -eigenvalue_norm^p / time_scale_div
+        # through Base's `Float64` `pow_body`, which does not compile on GPUs without Float64 (Metal).
+        ∇²ⁿ[l_plus_1, k] = -(@fastmath eigenvalue_norm^power) / time_scale
+        ∇²ⁿ_div[l_plus_1, k] = -(@fastmath eigenvalue_norm^p) / time_scale_div
 
         # and implicit part of the diffusion (= 1/(1-Δtν∇²ⁿ))
         ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - Δt * ∇²ⁿ[l_plus_1, k])
@@ -346,7 +346,7 @@ function horizontal_diffusion!(
     pres_tend = get_tendency_step(vars.tendencies.pressure, model.time_stepping, diffusion)
     zero_last_degree!(pres_tend)
 
-    pres_tend.data[1:1] .= 0    # mass conservation
+    set_scalar!(pres_tend.data, 1, 0)    # mass conservation
 
     if haskey(vars.tendencies, :humidity)
         humid = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, diffusion)

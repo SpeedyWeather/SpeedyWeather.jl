@@ -48,6 +48,11 @@ end
 # default constructor (extended e.g. by ReactantExt)
 Clock(architecture::AbstractArchitecture) = Clock()
 
+"""$(TYPEDSIGNATURES)
+Reference to a scalar `x` that can change during the simulation, e.g. the time step the
+implicit solver was initialized with. Extended by ReactantExt to hold a traceable number."""
+scalar_ref(::AbstractArchitecture, x::Number) = Ref(x)
+
 # we don't want to adapt the clock, it has to stay mutable,
 # we just explicitly transfer nothing to the kernels
 Adapt.adapt_structure(to, ::Clock) = nothing
@@ -227,8 +232,9 @@ Base.promote_rule(::Type{<:Millenium}, ::Type{Second}) = Second
 Dates.coarserperiod(::Type{Year}) = (Century, 100)
 Dates.coarserperiod(::Type{Century}) = (Millenium, 10)
 
-# secondofday: seconds since midnight for a DateTime
-secondofday(dt::DateTime) = div(Dates.value(Dates.Time(dt).instant), 1_000_000_000)
+# secondofday: seconds since midnight for a DateTime, via its value in milliseconds as in Dates.Time(dt)
+# which also works for other AbstractDateTimes, e.g. traced dates in Reactant
+secondofday(dt::Dates.AbstractDateTime) = div(Dates.value(dt) % 86_400_000, 1000)
 
 # conversion rules for floating point -> time types
 Dates.Second(x::AbstractFloat) = convert(Second, x)

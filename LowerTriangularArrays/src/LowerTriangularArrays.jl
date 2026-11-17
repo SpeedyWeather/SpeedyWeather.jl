@@ -1,7 +1,8 @@
 module LowerTriangularArrays
 
 # DOCUMENTATION
-using DocStringExtensions
+using DocStringExtensions: TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 using StyledStrings
 
 # NUMERICS

@@ -9,8 +9,9 @@
     jl_arch = SpeedyWeather.GPU(JLArrays.JLBackend())
     vars_gpu = on_architecture(jl_arch, vars_cpu)
 
-    # vorticity should now live on JLArray
-    @test parent(vars_gpu.prognostic.vorticity) isa JLArray
+    # vorticity should now live on JLArray, as a view of its fused parent
+    @test parent(vars_gpu.fused.prognostic).data isa JLArray
+    @test parent(vars_gpu.prognostic.vorticity.data) === parent(vars_gpu.fused.prognostic).data
 
     # round-trip back to CPU should reproduce original values
     vars_back = on_architecture(SpeedyWeather.CPU(), vars_gpu)

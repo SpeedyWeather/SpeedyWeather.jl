@@ -100,8 +100,8 @@ end
 @testset "HEALPixOutput flat write indices" begin
     # the x/y dims of a variable collapse into one flat `cell` dimension, so the flat
     # indices are the rectangular ones with one leading colon removed
-    vor = SpeedyWeather.VorticityOutput()                       # 3D + time
-    mslp = SpeedyWeather.MeanSeaLevelPressureOutput()           # 2D + time
+    vor = OutputVariables.Vorticity()                       # 3D + time
+    mslp = OutputVariables.MeanSeaLevelPressure()           # 2D + time
     @test SpeedyWeather.get_flat_indices(3, vor) == (:, :, 3)
     @test SpeedyWeather.get_flat_indices(3, mslp) == (:, 3)
     @test SpeedyWeather.get_flat_indices(2:4, vor) == (:, :, 2:4)

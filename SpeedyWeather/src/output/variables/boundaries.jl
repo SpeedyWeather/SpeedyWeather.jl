@@ -1,6 +1,6 @@
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct OrographyOutput <: AbstractOutputVariable
+@kwdef mutable struct Orography <: AbstractOutputVariable
     name::String = "orography"
     unit::String = "m"
     long_name::String = "orography"
@@ -11,8 +11,8 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 15
 end
 
-path(::OrographyOutput, simulation) = simulation.model.orography.orography
+path(::Orography, simulation) = simulation.model.orography.orography
 
-BoundaryOutput() = (
-    OrographyOutput(),
+Boundary() = (
+    Orography(),
 )

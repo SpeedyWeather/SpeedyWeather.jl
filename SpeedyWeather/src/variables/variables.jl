@@ -97,31 +97,28 @@ const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parame
 Adapt.@adapt_structure Variables
 
 """$(TYPEDSIGNATURES)
-Transfer all arrays in `vars` to `arch` using `on_architecture` for each group."""
-function Architectures.on_architecture(arch::AbstractArchitecture, vars::Variables)
-    return Variables(;
-        (k => on_architecture(arch, getfield(vars, k)) for k in fieldnames(Variables))...
-    )
-end
+Transfer all arrays in `vars` to `arch` using `on_architecture`. Every fused variable is
+created anew as the same view of its transferred fused parent, see [`map_variables`](@ref)."""
+Architectures.on_architecture(arch::AbstractArchitecture, vars::Variables) =
+    map_variables(variable -> on_architecture(arch, variable), vars)
 
 """$(TYPEDSIGNATURES)
 Copy all entries from `src` to `dest` by recursing over the variable groups
 and namespaces. Uses `copyto!` for arrays, `copy!` for `Clock`,
 and direct assignment for `Ref` values.
 
-View leaves (Fields/LTAs whose `.data` is a `SubArray`, or bare `SubArray`s) are
-skipped: their underlying storage lives in a fuse parent that is itself reachable
-through `vars.fused.*`, and that parent is copied directly. After the parent is
-updated, every view that aliases it sees the new data automatically.
-Copying through both view and parent is unnecessary work, and on cross-architecture
-copies (CPU ↔ Reactant) the broadcast-aliasing check inside `copyto!` fails.
-Skipping view leaves avoids both problems."""
+Fused variables of `dest` (see [`is_fused_view`](@ref)) are skipped: they are views of a
+fused parent `dest.fused.<fuse symbol>`, which is copied directly, after which every view
+of it holds the new data. Copying through both view and parent is unnecessary work, and on
+cross-architecture copies it fails: `copyto!` between a `SubArray` on one side and a GPU
+array on the other falls back to scalar indexing (CPU ↔ CUDA, a contiguous view of a `CuArray`
+is not a `SubArray`), and the broadcast-aliasing check inside `copyto!` fails (CPU ↔ Reactant)."""
 function Base.copy!(dest::Variables, src::Variables)
     for group in propertynames(dest)
         # skip scratch: it is write-before-read (never needs to survive a sync) and its size
         # is architecture-dependent
         group === :scratch && continue
-        copy_variables!(getfield(dest, group), getfield(src, group))
+        copy_variables!(getfield(dest, group), getfield(src, group), dest.fused)
     end
     return dest
 end
@@ -136,16 +133,71 @@ is_view_entry(a::LowerTriangularArray) = a.data isa SubArray
 is_view_entry(a::SubArray) = true
 is_view_entry(::AbstractArray) = false
 
+# FUSED VARIABLES, shared by `copy!`, `deepcopy` and `on_architecture` of `Variables`. A fused variable is a
+# view of a fused parent (`vars.fused.<fuse symbol>`). On CPU and Reactant it is a `SubArray`, but on CUDA a
+# contiguous view of a fused parent, e.g. the members `(:, k)` or `(:, slot)` of a parent without step
+# dimension, is another `CuArray` sharing the parent's memory, so it cannot be recognised by its type alone.
+
+"""$(TYPEDSIGNATURES)
+Where the variable `name` sits in the fused parents `fused`: `(fuse_name, indices)` such that `variable.data` is
+`view(parent(fused[fuse_name]).data, indices...)`, or `nothing` if it is not a fused variable (also for a variable
+of the same name in another group). Works for `SubArray`s and for GPU arrays sharing the parent's memory."""
+fused_view_location(name, variable, fused) = nothing
+function fused_view_location(name::Symbol, variable::Union{AbstractField, LowerTriangularArray}, fused::NamedTuple)
+    for (fuse_name, fused_parent) in pairs(fused)
+        haskey(fused_parent.slot_map, name) || continue
+        parent_data = parent(fused_parent).data
+        indices = fused_view_indices(variable.data, parent_data, fused_parent.slot_map[name])
+        isnothing(indices) && continue
+        is_same_view(variable.data, view(parent_data, indices...)) && return (fuse_name, indices)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Whether the variable `name` is a view of one of the fused parents `fused`. Decided by type for `SubArray`s (always
+fused variables, see [`is_view_entry`](@ref)) and `Array`s (never views), so that it is constant-folded on CPU
+(e.g. for Enzyme), and by [`fused_view_location`](@ref) for other array types (GPU, Reactant)."""
+is_fused_view(name, variable, fused) = is_view_entry(variable) || _is_fused_view(name, variable, fused)
+_is_fused_view(name, variable::AbstractField{T, N, <:Array}, fused) where {T, N} = false
+_is_fused_view(name, variable::LowerTriangularArray{T, N, <:Array}, fused) where {T, N} = false
+_is_fused_view(name, variable, fused) = !isnothing(fused_view_location(name, variable, fused))
+
+# Indices of a fused variable in its parent's data, as created by `_split_views`: the layer axis is the 2nd,
+# a variable that keeps it takes its whole `slot`, one that drops it (2D in a 3D parent, 3D in a 4D parent)
+# the slot's single index; the trailing (step) axis of a 4D parent in full. `nothing` if the number of
+# dimensions doesn't fit.
+function fused_view_indices(data::AbstractArray, parent_data::AbstractArray, slot::UnitRange{Int})
+    trailing = ntuple(_ -> Colon(), ndims(parent_data) - 2)
+    ndims(data) == ndims(parent_data) && return (Colon(), slot, trailing...)
+    ndims(data) == ndims(parent_data) - 1 && length(slot) == 1 && return (Colon(), first(slot), trailing...)
+    return nothing
+end
+
+# Whether `data` is the same view of the same parent as `expected` (= view(parent, indices...)). A contiguous
+# view of a GPU array is again a GPU array sharing the parent's memory: compare the memory addresses.
+is_same_view(data::SubArray, expected::SubArray) =
+    parent(data) === parent(expected) && parentindices(data) == parentindices(expected)
+is_same_view(data::SubArray, expected) = false
+is_same_view(data, expected::SubArray) = false
+is_same_view(data, expected) =
+    typeof(data) == typeof(expected) && size(data) == size(expected) && pointer(data) == pointer(expected)
+
 """$(TYPEDSIGNATURES)
 Copy variables in `NamedTuples` from `src` into `dest`, only copying keys present in both.
-Recurses into nested NamedTuples (namespaces like ocean, land, tracers).
+Recurses into nested NamedTuples (namespaces like ocean, land, tracers). With the fused
+parents `fused` of `dest` (as for `copy!(::Variables, ::Variables)`), the fused variables
+of `dest` are skipped, as their parents are copied directly; without (`nothing`), variables
+that are views on both sides are skipped.
 Uses `@generated` to unroll the key iteration at compile time so that Enzyme
 can differentiate through this function without runtime reflection more easily."""
-@generated function copy_variables!(dest::NamedTuple{K1}, src::NamedTuple{K2}) where {K1, K2}
+copy_variables!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src, nothing)
+
+@generated function copy_variables!(dest::NamedTuple{K1}, src::NamedTuple{K2}, fused::Union{Nothing, NamedTuple}) where {K1, K2}
     exprs = Expr[]
     for key in K1
         key in K2 || continue
-        push!(exprs, :(_copy_entry!(getfield(dest, $(QuoteNode(key))), getfield(src, $(QuoteNode(key))))))
+        push!(exprs, :(_copy_entry!(getfield(dest, $(QuoteNode(key))), getfield(src, $(QuoteNode(key))), $(QuoteNode(key)), fused)))
     end
     return quote
         $(exprs...)
@@ -153,8 +205,15 @@ can differentiate through this function without runtime reflection more easily."
     end
 end
 
-# Skip view-backed leaves when both dest and src are views; their data lives in a fuse parent
-# that is itself copied via vars.fused.<name>. See `is_view_entry` and the `copy!` docstring.
+# Skip the fused variables of `dest`, their parents are copied via `vars.fused.<fuse symbol>`
+_copy_entry!(dest::AbstractArray, src::AbstractArray, name::Symbol, fused::NamedTuple) =
+    is_fused_view(name, dest, fused) ? dest : copyto!(dest, src)
+_copy_entry!(dest::AbstractArray, src::AbstractArray, name::Symbol, ::Nothing) = _copy_entry!(dest, src)
+_copy_entry!(dest::NamedTuple, src::NamedTuple, name::Symbol, fused) = copy_variables!(dest, src, fused)
+_copy_entry!(dest, src, name::Symbol, fused) = _copy_entry!(dest, src)
+
+# Without the fused parents: skip view-backed leaves when both dest and src are views; their data lives in
+# a fuse parent. See `is_view_entry` and the `copy!` docstring.
 _copy_entry!(dest::AbstractArray, src::AbstractArray) =
     is_view_entry(dest) && is_view_entry(src) ? dest : copyto!(dest, src)
 _copy_entry!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src)
@@ -174,8 +233,11 @@ _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
             push!(exprs, :(copy_variables!(getfield(dest, $(QuoteNode(fname))), getfield(src, $(QuoteNode(fname))))))
         elseif ismutabletype(T)
             push!(exprs, :(setfield!(dest, $(QuoteNode(fname)), getfield(src, $(QuoteNode(fname))))))
+        elseif !isbitstype(ft)
+            # immutable struct with heap-allocated fields (e.g. ColumnScratchMemory inside ScratchMemory):
+            # recurse so its array fields get copied too
+            push!(exprs, :(_copy_entry!(getfield(dest, $(QuoteNode(fname))), getfield(src, $(QuoteNode(fname))))))
         end
-        # for immutable structs: skip non-array, non-NamedTuple fields (not copyable in place)
     end
     return quote
         $(exprs...)
@@ -183,14 +245,55 @@ _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
     end
 end
 
+"""$(TYPEDSIGNATURES)
+`deepcopy` of `vars` in which every fused variable is again a view of its (copied) fused parent
+`vars.fused.<fuse symbol>`, on every architecture. The default `deepcopy` keeps a fused variable attached
+to its parent only if the variable is a `SubArray` and the parent's array type registers its copy in
+deepcopy's `IdDict`. On CUDA a contiguous view of a fused parent is not a `SubArray` but another `CuArray`
+sharing the parent's memory, which the default `deepcopy` copies into independent memory (and GPUArrays'
+generic `deepcopy` of a GPU array, e.g. for JLArrays, does not use the `IdDict` at all). The batched
+transforms would then read the copied parent while the time stepping writes into the detached copy of
+the variable. Here every fused variable is created anew as the same view of its copied
+parent, see [`map_variables`](@ref)."""
+Base.deepcopy_internal(vars::Variables, stackdict::IdDict) =
+    map_variables(variable -> Base.deepcopy_internal(variable, stackdict), vars)
+
+"""$(TYPEDSIGNATURES)
+New `Variables` from `f` applied to the fused parents `vars.fused` and to all other variables
+that are not fused variables. Every fused variable (see [`fused_view_location`](@ref)) is
+created anew as the same view of its mapped parent instead, so that it remains a view of it.
+Applying `f` to each variable on its own would detach it from its parent whenever `f` copies
+(e.g. `deepcopy`, `on_architecture` to another architecture)."""
+function map_variables(f, vars::Variables)
+    mapped_fused = map(f, vars.fused)
+    groups = map(fieldnames(Variables)) do group
+        group === :fused && return group => mapped_fused
+        return group => map_group(f, getfield(vars, group), vars.fused, mapped_fused)
+    end
+    return Variables(; groups...)
+end
+
+# `map_variables` for a (possibly nested) NamedTuple of variables
+function map_group(f, variables::NamedTuple{names}, fused::NamedTuple, mapped_fused::NamedTuple) where {names}
+    return NamedTuple{names}(
+        map(names, values(variables)) do name, variable
+            variable isa NamedTuple && return map_group(f, variable, fused, mapped_fused)
+            location = fused_view_location(name, variable, fused)
+            isnothing(location) && return f(variable)
+            fuse_name, indices = location           # a fused variable: the same view of the mapped parent
+            return wrapped_view(parent(mapped_fused[fuse_name]), indices...)
+        end
+    )
+end
+
 # Exclude SubArray-backed memory from the pretty-print size: a fused parent's bytes are
 # already counted on `vars.fused.<sym>`, so charging them again on every view that aliases
 # it (e.g. `vars.tendencies.grid.u.data::SubArray`) would inflate the reported size.
-_pretty_size(x) = Base.summarysize(x)                # generic leaves (Clock, Ref, plain arrays, ...)
-_pretty_size(x::AbstractField) = is_view_entry(x) ? 0 : Base.summarysize(x.data)
-_pretty_size(x::LowerTriangularArray) = is_view_entry(x) ? 0 : Base.summarysize(x.data)
+_pretty_size(x) = memorysize(x)                     # generic leaves (Clock, Ref, plain arrays, ...)
+_pretty_size(x::AbstractField) = is_view_entry(x) ? 0 : memorysize(x.data)
+_pretty_size(x::LowerTriangularArray) = is_view_entry(x) ? 0 : memorysize(x.data)
 _pretty_size(x::SubArray) = 0
-_pretty_size(nt::NamedTuple) = isempty(nt) ? Base.summarysize(nt) : sum(_pretty_size, values(nt))
+_pretty_size(nt::NamedTuple) = isempty(nt) ? memorysize(nt) : sum(_pretty_size, values(nt))
 _pretty_size(v::Variables) = sum(_pretty_size, (getfield(v, k) for k in propertynames(v)))
 
 # pretty printing

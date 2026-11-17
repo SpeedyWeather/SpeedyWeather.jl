@@ -1,6 +1,7 @@
 module SpeedyTransforms
 
-using DocStringExtensions
+using DocStringExtensions: TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 using StyledStrings
 using Printf
 import ProgressMeter

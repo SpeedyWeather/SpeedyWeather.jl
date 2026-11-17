@@ -3,7 +3,7 @@ module SpeedyTransformsMetalExt
 import Metal: Metal, MtlArray
 import AbstractFFTs
 import LinearAlgebra
-using DocStringExtensions
+using SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids

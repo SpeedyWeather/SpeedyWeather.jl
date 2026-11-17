@@ -1,13 +1,52 @@
 using BenchmarkTools
-using SpeedyWeather: synchronize, _jit, ReactantDevice, MatrixSpectralTransform
+using Statistics: median
+using SpeedyWeather: synchronize, ReactantDevice, MatrixSpectralTransform, SpectralTransform
 
-# Build the model with the right spectral transform for `arch`.
-# Reactant requires MatrixSpectralTransform; otherwise honour `transform_kind`
+# The dense MatrixSpectralTransform is too large (memory and speed) above this truncation
+const MAX_MATRIX_TRUNCATION = 150
+
+const SPEEDY_CONFIGURATION = "The PrimitiveWet model in a configuration closer to SPEEDY.f90, at the resolutions " *
+    "of the PrimitiveWet resolution sweep with the default transform: seasonal " *
+    "prescribed climatologies of sea surface temperature (`SeasonalOceanClimatology`), land surface temperature " *
+    "(`SeasonalLandTemperature`) and soil moisture (`SeasonalSoilMoisture`) instead of the slab ocean " *
+    "and the land bucket model, constant surface roughness lengths over land and ocean (`ConstantSurfaceRoughness`) " *
+    "instead of the learned ones, and SPEEDY.f90's near-surface wind of 0.95 times the lowermost-layer wind " *
+    "(`ConstantWindSlowdown`) with 5 m/s gusts (`ConstantWindGust`) instead of the learned wind slowdown and " *
+    "Beljaars gusts; sea ice stays thermodynamic, driven by the prescribed sea surface temperature."
+
+# Model components of the SPEEDY.f90-like configuration (`--SPEEDY` suite), see `SPEEDY_CONFIGURATION`,
+# as `model_kwargs` of a `BenchmarkSuite`: functions of the spectral grid
+speedy_components(::Type{<:PrimitiveWet}) = (;
+    ocean = SeasonalOceanClimatology,
+    land = spectral_grid -> LandModel(
+        spectral_grid; temperature = SeasonalLandTemperature(spectral_grid), soil_moisture = SeasonalSoilMoisture(spectral_grid)
+    ),
+    boundary_layer = speedy_boundary_layer,
+)
+
+# the default boundary layer but with SPEEDY.f90's constant wind slowdown (0.95) and gusts (5 m/s),
+# Kucharski et al. 2006, and constant instead of learned surface roughness lengths
+speedy_boundary_layer(spectral_grid) = BoundaryLayer(
+    spectral_grid;
+    surface_condition = SurfaceCondition(
+        spectral_grid;
+        wind_slowdown = ConstantWindSlowdown(spectral_grid, wind_slowdown = 0.95),
+        wind_gust = ConstantWindGust(spectral_grid, wind_gust = 5),
+    ),
+    surface_roughness = ConstantSurfaceRoughness(spectral_grid),
+)
+
+# Build the model with the spectral transform of `transform_kind` for `arch`
 # (`:default` for FFT+Legendre, `:matrix` for MatrixSpectralTransform).
 function build_model(Model, spectral_grid, arch; transform_kind::Symbol = :default, kwargs...)
     if arch isa ReactantDevice
-        M = MatrixSpectralTransform(spectral_grid)
-        return Model(spectral_grid; spectral_transform = M, feedback = nothing, output = nothing, kwargs...)
+        transform_kind in (:default, :matrix) || error("Unknown transform_kind = $transform_kind. Use :default or :matrix.")
+        # `:default` explicitly the FFT-based SpectralTransform: the models' default on Reactant
+        # (`WhichTransform`) is the MatrixSpectralTransform at every resolution
+        S = transform_kind == :matrix ? MatrixSpectralTransform(spectral_grid) : SpectralTransform(spectral_grid)
+        # no progress meter or output: they would read the clock from the device every time step,
+        # synchronizing it. Passed last as repeated keyword arguments silently take the last value
+        return Model(spectral_grid; kwargs..., spectral_transform = S, feedback = nothing, output = nothing)
     elseif transform_kind == :matrix
         M = MatrixSpectralTransform(spectral_grid)
         return Model(spectral_grid; spectral_transform = M, kwargs...)
@@ -25,6 +64,16 @@ function format_sypd(s)
     return s < 10 ? string(round(s; digits = 1)) : string(round(Int, s))
 end
 
+# Format a duration in seconds, "—" if not available (e.g. compile time without Reactant)
+format_seconds(t) = isfinite(t) ? @sprintf("%.1f s", t) : "—"
+
+# Spread of the timed runs, (slowest - fastest) / median wallclock time, from their SYPD
+# (∝ 1/time). "—" for a single run.
+function format_spread(SYPD, SYPD_min, SYPD_max, nrepeats)
+    nrepeats > 1 || return "—"
+    return @sprintf("%.0f%%", 100 * (SYPD / SYPD_min - SYPD / SYPD_max))
+end
+
 # Resolve a NamedTuple of per-run model kwargs against `spectral_grid`.
 # Convention: a `Type` value is instantiated with `spectral_grid` (every
 # component has a `T(spectral_grid)` constructor); a
@@ -40,6 +89,8 @@ end
 abstract type AbstractBenchmarkSuite end
 @kwdef mutable struct BenchmarkSuite <: AbstractBenchmarkSuite
     title::String
+    # written below the title in the README, e.g. the configuration of the models
+    description::String = ""
     nruns::Int = 1
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
@@ -55,13 +106,26 @@ abstract type AbstractBenchmarkSuite end
     # Use this to vary arbitrary model components, e.g.
     # `model_kwargs = [(convection = NoConvection,), (convection = BettsMillerConvection,)]`.
     model_kwargs::Vector = fill(NamedTuple(), nruns)
+    # median SYPD of the timed runs, and of the slowest and the fastest run
     SYPD::Vector{Float64} = fill(0.0, nruns)
+    SYPD_min::Vector{Float64} = fill(0.0, nruns)
+    SYPD_max::Vector{Float64} = fill(0.0, nruns)
+    # number of timed runs, see `repeats` and `max_repeat_time`
+    nrepeats::Vector{Int} = fill(0, nruns)
     Δt::Vector{Float64} = fill(0.0, nruns)
     memory::Vector{Int} = fill(0, nruns)
+    # one-off compilation of the time step (Reactant only, NaN otherwise), excluded from SYPD
+    compile_time::Vector{Float64} = fill(NaN, nruns)
+    # "ok" or "failed: <error type>"
+    status::Vector{String} = fill("", nruns)
     architecture::Any = SpeedyWeather.CPU()
     # Scale factor on `n_timesteps` for the timed run; >1 lengthens every run for
-    # more robust (e.g. publication-ready) timings. Set globally by the driver.
+    # more robust (e.g. publication-ready) timings. Set by the driver for :benchmark201 only.
     timestep_multiplier::Real = 1
+    # Time every configuration up to `repeats` times from the same initial state, but no further
+    # run once all timed runs together would take longer than `max_repeat_time` [s]
+    repeats::Int = 5
+    max_repeat_time::Float64 = 30
 end
 
 default_nlayers(::Type{<:Barotropic}) = 1
@@ -77,14 +141,56 @@ default_nlayers(models) = [default_nlayers(model) for model in models]
 n_timesteps(truncation, nlayers, multiplier = 1) =
     round(Int, multiplier * clamp(round(Int, 4.0e9 / truncation^3 / nlayers^2), 50, 1200))
 
+# Architecture-specific hooks. The methods here are for CPU and GPU, `reactant_runner.jl`
+# adds the ones for `ReactantDevice` (it needs Reactant's `@compile` macro so it is only
+# included by the driver once Reactant is loaded).
+
+"""Return `(; time_stepping, compile_time)` where `time_stepping(simulation)` runs the main
+time loop of an initialized `simulation` for the timed `period`. `compile_time` is the time it took
+to compile the time loop (Reactant only, NaN otherwise), which is not included in the timed run."""
+build_runner(arch, simulation, period) = (time_stepping = SpeedyWeather.time_stepping!, compile_time = NaN)
+
+"""Wait for the device to have finished all work on `simulation`."""
+synchronize_device(arch, simulation) = synchronize(arch)
+
+"""Memory footprint of `simulation` in bytes."""
+memory_footprint(arch, simulation) = Base.summarysize(simulation)
+
+"""Return a function without arguments that calls `f(args...)` and waits for its result."""
+compiled_call(arch, f, args...) = () -> (f(args...); synchronize(arch))
+
+"""Adapt `suite` to what `arch` supports, by default unchanged."""
+adapt_to_architecture!(suite, arch) = suite
+
+"""Reset `simulation` to the initial state `initial_variables` for a timed run and return the
+simulation to run. By default copied into the variables of `simulation`, so that every timed run
+steps the same buffers as the warm-up and replays the GPU graphs captured there (they are per
+buffer, see `graph_key` in SpeedyTransforms) instead of capturing new ones in the timed region."""
+function reset_simulation!(arch, simulation, initial_variables, model)
+    copy!(simulation.variables, initial_variables)
+    return simulation
+end
+
 # Run every configuration of a suite. Each run lives in its own `run_benchmark!`
 # call so that its model and simulation go out of scope on return; `free_memory!`
 # (defined by the driver script) then collects them and hands device memory back
 # before the next run. This happens outside the timed region, so it does not
 # affect the measured SYPD but prevents memory piling up across many runs.
+# A configuration that errors is recorded as failed without losing the rest of the suite.
+# One with a `status` already, set by the driver for what the architecture doesn't support
+# (e.g. Float64 on Metal), is skipped and keeps that status.
 function run_benchmark_suite!(suite::AbstractBenchmarkSuite)
     for i in 1:suite.nruns
-        run_benchmark!(suite, i)
+        if hasproperty(suite, :status) && !isempty(suite.status[i])
+            @info "Skipping benchmark $i of $(suite.title): $(suite.status[i])"
+            continue
+        end
+        try
+            run_benchmark!(suite, i)
+        catch err
+            @warn "Benchmark $i of $(suite.title) failed on $(typeof(suite.architecture)); recording as failed" exception = (err, catch_backtrace())
+            hasproperty(suite, :status) && (suite.status[i] = "failed: $(nameof(typeof(err)))")
+        end
         free_memory!()
     end
     return suite
@@ -116,7 +222,7 @@ function run_benchmark!(suite::BenchmarkSuite, i::Integer)
     end
 
     simulation = initialize!(model)
-    suite.memory[i] = Base.summarysize(simulation)
+    suite.memory[i] = memory_footprint(architecture, simulation)
 
     nsteps = n_timesteps(truncation, nlayers, suite.timestep_multiplier)
     period = Second(round(Int, model.time_stepping.Δt * (nsteps + 1)))
@@ -129,30 +235,61 @@ function run_benchmark!(suite::BenchmarkSuite, i::Integer)
     # (e.g. the model compiled first appears slower than a later one that
     # reuses the compiled code). A handful of steps covers the Euler spin-up
     # plus regular steps. We then re-initialize so the timed run starts from
-    # the same initial state as before.
+    # the same initial state as before. With Reactant the whole time loop of the
+    # timed run is compiled once here (timed separately), warmed up and reused.
+    # (`initialize!`, `time_stepping!`, `finalize!` is what `run!` does)
     warmup_period = Second(round(Int, model.time_stepping.Δt * 3))
-    run!(simulation; period = warmup_period)
-    synchronize(architecture)
+    initialize!(simulation; period = warmup_period)
+    runner = build_runner(architecture, simulation, period)
+    runner.time_stepping(simulation)
+    finalize!(simulation)
+    synchronize_device(architecture, simulation)
 
-    # Time the run with a real wallclock timer rather than the progress
-    # meter's `tlast - tinit`. The latter measures only up to the *last*
-    # progress-bar render (every `feedback_dt = 0.1 s`)
-    simulation = initialize!(model)
-    t0 = time()
-    run!(simulation; period)
-    synchronize(architecture)
-    time_elapsed = time() - t0
+    # Time only the main time loop with a real wallclock timer rather than the
+    # progress meter's `tlast - tinit`. The latter measures only up to the *last*
+    # progress-bar render (every `feedback_dt = 0.1 s`). Repeat from the same initial
+    # state, see `repeats` and `max_repeat_time`: initialize once (with Reactant every
+    # `initialize!` compiles again, `@maybe_jit`) and reset the warm-up's simulation to it
+    # before each run, see `reset_simulation!`. Every timed run thereby steps the warm-up's
+    # buffers and replays the GPU graphs of the Fourier transform captured in the warm-up;
+    # none are captured in the timed region. (Graphs are per buffer: new variables would
+    # capture new ones. Hence also no `free_memory!` here, it would clear the graphs.)
+    # After the reset the GC frees what is left over, e.g. Reactant's previous copy, outside
+    # the timed region.
+    initial_simulation = initialize!(model)
+    initialize!(initial_simulation; period)
+    initial_variables = initial_simulation.variables    # initial state of every timed run, never run itself
+    initial_simulation = nothing
+    times = Float64[]
+    while length(times) < suite.repeats && (isempty(times) || sum(times) + times[end] <= suite.max_repeat_time)
+        simulation = reset_simulation!(architecture, simulation, initial_variables, model)
+        GC.gc()
+        initialize!(model.feedback, simulation.variables, model)    # a new progress meter
+        synchronize_device(architecture, simulation)
+        t0 = time()
+        runner.time_stepping(simulation)
+        synchronize_device(architecture, simulation)
+        push!(times, time() - t0)
+        finalize!(simulation)   # but keep `simulation`, the next run resets it
+    end
+    @info @sprintf("     %d timed run(s): median %.3g s, fastest %.3g s, slowest %.3g s", length(times), median(times), minimum(times), maximum(times))
 
-    sypd = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
+    sypd(time_elapsed) = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
 
     suite.Δt[i] = model.time_stepping.Δt
-    suite.SYPD[i] = sypd
+    suite.SYPD[i] = sypd(median(times))
+    suite.SYPD_min[i] = sypd(maximum(times))
+    suite.SYPD_max[i] = sypd(minimum(times))
+    suite.nrepeats[i] = length(times)
+    suite.compile_time[i] = runner.compile_time
+    suite.status[i] = "ok"
     return
 end
 
 function write_results(md, suite::BenchmarkSuite)
 
     write(md, "\n### $(suite.title)\n\n")
+    isempty(suite.description) || write(md, "$(suite.description)\n\n")
 
     print_NF = any(suite.NF .!= suite.NF[1])
     print_Grid = any(suite.Grid .!= suite.Grid[1])
@@ -160,6 +297,7 @@ function write_results(md, suite::BenchmarkSuite)
     print_dynamics = any(suite.dynamics .!= suite.dynamics[1])
     print_physics = any(suite.physics .!= suite.physics[1])
     print_transform = any(suite.spectral_transform .!= suite.spectral_transform[1])
+    print_compile = any(isfinite, suite.compile_time)
 
     column_header = "| Model "
     column_header *= print_NF ? "| NF " : ""
@@ -170,7 +308,8 @@ function write_results(md, suite::BenchmarkSuite)
     column_header *= print_dynamics ? "| Dynamics " : ""
     column_header *= print_physics ? "| Physics " : ""
     column_header *= print_transform ? "| Transform " : ""
-    column_header *= "| Δt | SYPD | Memory|"
+    column_header *= "| Δt | SYPD | Runs | Spread | Memory"
+    column_header *= print_compile ? "| Compile |" : "|"
 
     ncolumns = length(findall('|', column_header)) - 1
     second_row = repeat("| --- ", ncolumns) * "|"
@@ -191,9 +330,13 @@ function write_results(md, suite::BenchmarkSuite)
         row *= print_transform ? "| $(suite.spectral_transform[i]) " : ""
 
         Δt = round(Int, suite.Δt[i])
-        SYPD = format_sypd(suite.SYPD[i])
+        ok = suite.status[i] == "ok"
+        SYPD = ok ? format_sypd(suite.SYPD[i]) : suite.status[i]
+        runs = ok ? suite.nrepeats[i] : "—"
+        spread = ok ? format_spread(suite.SYPD[i], suite.SYPD_min[i], suite.SYPD_max[i], suite.nrepeats[i]) : "—"
         memory = prettymemory(suite.memory[i])
-        row *= "| $Δt | $SYPD | $memory |"
+        row *= "| $Δt | $SYPD | $runs | $spread | $memory "
+        row *= print_compile ? "| $(format_seconds(suite.compile_time[i])) |" : "|"
 
         write(md, "$row\n")
     end
@@ -290,42 +433,30 @@ function run_benchmark!(suite::BenchmarkSuiteDynamics, i::Integer)
     vars, model = SpeedyWeather.unpack(simulation)
     (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit, time_stepping) = model
 
-    # Each benchmark sample also calls `synchronize(arch)` to wait for the device.
-    safe_benchmark!(suite, i, 1) do
-        @benchmark (_jit($arch, SpeedyWeather.pressure_gradient_flux!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 2) do
-        @benchmark (_jit($arch, SpeedyWeather.linear_virtual_temperature!, $vars, $model); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 3) do
-        @benchmark (_jit($arch, SpeedyWeather.geopotential!, $vars, $geopotential, $orography); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 4) do
-        @benchmark (_jit($arch, SpeedyWeather.vertical_integration!, $vars, $geometry, $time_stepping); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 5) do
-        @benchmark (_jit($arch, SpeedyWeather.surface_pressure_tendency!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 6) do
-        @benchmark (_jit($arch, SpeedyWeather.vertical_velocity!, $vars, $geometry, $time_stepping); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 7) do
-        @benchmark (_jit($arch, SpeedyWeather.linear_pressure_gradient!, $vars, $atmosphere, $implicit, $time_stepping); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 8) do
-        @benchmark (_jit($arch, SpeedyWeather.vertical_advection!, $vars, $model); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 9) do
-        @benchmark (_jit($arch, SpeedyWeather.vordiv_tendencies!, $vars, $model); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 10) do
-        @benchmark (_jit($arch, SpeedyWeather.temperature_tendency!, $vars, $model); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 11) do
-        @benchmark (_jit($arch, SpeedyWeather.humidity_tendency!, $vars, $model); synchronize($arch))
-    end
-    safe_benchmark!(suite, i, 12) do
-        @benchmark (_jit($arch, SpeedyWeather.bernoulli_potential!, $vars, $spectral_transform, $time_stepping); synchronize($arch))
+    # Each function is called through `compiled_call` (compiled once with Reactant), each
+    # benchmark sample also waits for the device. Building the call inside `safe_benchmark!`
+    # records a function that fails to compile as N/A too.
+    functions_and_arguments = (
+        (SpeedyWeather.pressure_gradient_flux!, (vars, time_stepping)),
+        (SpeedyWeather.linear_virtual_temperature!, (vars, model)),
+        (SpeedyWeather.geopotential!, (vars, geopotential, orography)),
+        (SpeedyWeather.vertical_integration!, (vars, geometry, time_stepping)),
+        (SpeedyWeather.surface_pressure_tendency!, (vars, spectral_transform, time_stepping)),
+        (SpeedyWeather.vertical_velocity!, (vars, geometry, time_stepping)),
+        (SpeedyWeather.linear_pressure_gradient!, (vars, atmosphere, implicit, time_stepping)),
+        (SpeedyWeather.vertical_advection!, (vars, model)),
+        (SpeedyWeather.vordiv_tendencies!, (vars, model)),
+        (SpeedyWeather.temperature_tendency!, (vars, model)),
+        (SpeedyWeather.humidity_tendency!, (vars, model)),
+        (SpeedyWeather.bernoulli_potential!, (vars, spectral_transform, time_stepping)),
+    )
+    @assert [string(nameof(f)) for (f, _) in functions_and_arguments] == suite.function_names
+
+    for (i_func, (f, args)) in enumerate(functions_and_arguments)
+        safe_benchmark!(suite, i, i_func) do
+            call = compiled_call(arch, f, args...)
+            @benchmark $call()
+        end
     end
 
     return suite
@@ -339,7 +470,7 @@ function write_results(md, suite::AbstractBenchmarkSuiteTimed)
 
         title_row = "$(suite.model[i_run]) "
         title_row *= "| $(suite.NF[i_run]) "
-        title_row *= "| T$(suite.truncation[i_run] - 1) "
+        title_row *= "| T$(suite.truncation[i_run]) "
         title_row *= "L$(suite.nlayers[i_run]) "
         title_row *= "| $(suite.Grid[i_run]) "
         title_row *= "| $(suite.nlat[i_run]) Rings"

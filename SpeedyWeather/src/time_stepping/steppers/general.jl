@@ -1,4 +1,4 @@
-"""($TYPEDSIGNATURES) Extend in case a time stepper requires spin up steps,
+"""$(TYPEDSIGNATURES) Extend in case a time stepper requires spin up steps,
 e.g. Leapfrog starts with 1 Euler step that isn't counted for the clock but requires
 one more step in the main time loop."""
 spin_up_steps(::AbstractTimeStepper) = 0
@@ -28,7 +28,8 @@ within the `time_stepping` setup at the current `clock`."""
 function time_step(time_stepping::AbstractTimeStepper, component::Symbol, clock)
     stepper = time_stepper(time_stepping, component)
     Δt = time_step(stepper, clock)
-    return Δt / oftype(Δt, time_step_scale(time_stepping, stepper, clock))
+    # integer scale, so Δt keeps its type, no `oftype` as the scale can be traced (Reactant)
+    return Δt / time_step_scale(time_stepping, stepper, clock)
 end
 
 """$(TYPEDSIGNATURES)

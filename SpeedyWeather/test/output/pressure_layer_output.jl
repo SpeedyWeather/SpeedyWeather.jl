@@ -33,29 +33,35 @@ using NCDatasets, Dates
     @testset "Extrapolation defaults" begin
         # temperature descends dry-adiabatically below the lowest model layer,
         # everything else is constant
-        @test SpeedyWeather.output_extrapolation(SpeedyWeather.TemperatureOutput()) isa
+        @test OutputVariables.output_extrapolation(OutputVariables.Temperature()) isa
             SpeedyWeather.DryAdiabaticExtrapolation
-        for var in (SpeedyWeather.VorticityOutput(), SpeedyWeather.ZonalVelocityOutput(), SpeedyWeather.HumidityOutput())
-            @test SpeedyWeather.output_extrapolation(var) isa SpeedyWeather.ConstantExtrapolation
+        for var in (OutputVariables.Vorticity(), OutputVariables.ZonalVelocity(), OutputVariables.Humidity())
+            @test OutputVariables.output_extrapolation(var) isa SpeedyWeather.ConstantExtrapolation
         end
 
-        # κ is taken from the model's atmosphere at initialize!
+        # κ is taken from the model's atmosphere at initialize! and the Float64 defaults
+        # are converted to the model's number format (Metal doesn't support Float64 in kernels)
         spectral_grid = SpectralGrid(truncation = 15, nlayers = 8)
+        NF = spectral_grid.NF
         output = NetCDFOutput(spectral_grid, PrimitiveWet, layers = SpeedyWeather.PressureLayers(spectral_grid))
         model = PrimitiveWetModel(spectral_grid; output)
         SpeedyWeather.sync_extrapolations!(output, model)
+        @test output.variables[:temp].extrapolation isa SpeedyWeather.DryAdiabaticExtrapolation{NF}
         @test output.variables[:temp].extrapolation.κ == model.atmosphere.κ
 
         # a mask keeps its inner extrapolation synced too
         add!(
-            output, SpeedyWeather.TemperatureOutput(
+            output, OutputVariables.Temperature(
                 extrapolation = SpeedyWeather.SubsurfaceMask(
                     above_surface = SpeedyWeather.DryAdiabaticExtrapolation(),
                 ),
             ),
         )
         SpeedyWeather.sync_extrapolations!(output, model)
+        @test output.variables[:temp].extrapolation isa
+            SpeedyWeather.SubsurfaceMask{SpeedyWeather.DryAdiabaticExtrapolation{NF}, NF}
         @test output.variables[:temp].extrapolation.above_surface.κ == model.atmosphere.κ
+        @test isnan(output.variables[:temp].extrapolation.missing_value)
     end
 
     @testset "NetCDFOutput on pressure layers" begin
@@ -71,7 +77,7 @@ using NCDatasets, Dates
             layers = SpeedyWeather.PressureLayers(spectral_grid, p),
         )
         # no bitrounding and soil output so that the comparison below is exact
-        add!(output, SpeedyWeather.TemperatureOutput(keepbits = 23), SpeedyWeather.SoilTemperatureOutput())
+        add!(output, OutputVariables.Temperature(keepbits = 23), OutputVariables.SoilTemperature())
 
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)

@@ -124,3 +124,35 @@ end
     @test vec(ps) == ComponentVector(component = (x = 1.0, y = 2.0, z = 3.0))
     @test all(map(==(:group1), ps[:group]))
 end
+
+@testset "Tuples" begin
+    ParameterEditing.@parameterized @kwdef struct TupleLeaf{T}
+        @param a::T = 1.0
+        b::T = 2.0
+    end
+    ParameterEditing.@parameterized @kwdef struct TupleHolder{C}
+        @param components::C = (TupleLeaf(), "no parameters", TupleLeaf(a = 3.0))
+    end
+    obj = TupleHolder()
+
+    # elements are keyed by index, elements without parameters are dropped
+    ps = parameters(obj)
+    @test length(ps) == 2
+    @test vec(ps) == ComponentVector(components = (var"1" = (a = 1.0,), var"3" = (a = 3.0,)))
+
+    # round trip: reconstruct with new values, untouched elements are kept as is
+    θ = vec(ps)
+    θ.components.var"3".a = 5.0
+    new_obj = reconstruct(obj, θ)
+    @test new_obj.components[1] == TupleLeaf()
+    @test new_obj.components[2] == "no parameters"
+    @test new_obj.components[3] == TupleLeaf(a = 5.0)
+    @test typeof(new_obj) == typeof(obj)
+
+    # same through a NamedTuple of values and an empty patch
+    @test reconstruct(obj.components, (var"1" = (a = 7.0,),))[1].a == 7.0
+    @test reconstruct(obj.components, (;)) === obj.components
+
+    # a tuple without any parameters yields an empty table
+    @test isempty(parameters(("x", :y)))
+end

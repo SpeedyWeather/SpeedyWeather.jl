@@ -11,17 +11,24 @@ struct Simulation{V, M <: AbstractModel} <: AbstractSimulation{M}
     model::M
 end
 
-"""($TYPEDSIGNATURES) Same as `initialize!(model)` which returns a `Simulation`."""
+"""$(TYPEDSIGNATURES) Same as `initialize!(model)` which returns a `Simulation`."""
 Simulation(model::AbstractModel; kwargs...) = initialize!(model; kwargs...)
 
 function Base.show(io::IO, S::AbstractSimulation)
     vsize = prettymemory(_pretty_size(S.variables))
-    Msize = prettymemory(Base.summarysize(S.model))
-    Ssize = prettymemory(Base.summarysize(S))
+    Msize = prettymemory(memorysize(S.model))
+    Ssize = prettymemory(memorysize(S))
     println(io, styled"{warning:Simulation}", "{...} ", styled"{note:($Ssize)}")
     println(io, "├ ", styled"{info:variables}" * "::Variables{...} " * styled"{note:($vsize)}")
     print(io, "└ ", styled"{info:model}" * "::$(model_type(S.model)){...} " * styled"{note:($Msize)}")
     return nothing
+end
+
+function Base.show(io::IO, S::Type{<:Simulation})
+    isconcretetype(S) || return invoke(show, Tuple{IO, Type}, io, S)
+    M = S.parameters[2]
+    model_name = M isa Union{DataType, UnionAll} ? nameof(M) : M
+    return print(io, "Simulation{Variables{…}, $(model_name){…}}")
 end
 
 unpack(sim::AbstractSimulation) = (sim.variables, sim.model)
@@ -79,7 +86,7 @@ function initialize!(
     scale_prognostic!(variables, model.planet.radius)
 
     # TRANSFORM variables from spectral to grid (= set the diagnostic variables in the correct initial state)
-    transform!(variables, model, initialize = true)
+    @maybe_jit model.architecture transform!(variables, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays
 
     # OUTPUT, CALLBACKS, FEEDBACK only initialize output and callbacks now, just before the simulation starts

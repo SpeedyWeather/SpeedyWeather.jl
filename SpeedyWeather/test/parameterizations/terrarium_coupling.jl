@@ -81,6 +81,13 @@ end
     @test all(isfinite, Terrarium.interior(state.temperature))
     @test all(isfinite, Terrarium.interior(state.saturation_water_ice))
     @test all(isfinite, Terrarium.interior(state.skin_temperature))
+
+    # Check soil moisture capacity works correctly
+    land_vars = sim.variables.parameterizations.land
+    @test haskey(land_vars, :soil_moisture_capacity)
+    mask = SWTerrarium.land_mask(model.land)
+    @test all(0 .< land_vars.soil_moisture_capacity[mask] .<= 1)   # porosity is a volume fraction
+    @test all(isfinite, land_vars.albedo)                           # LearnedLandAlbedo now sees real soil moisture
 end
 
 @testset "Terrarium coupling (dry): initialize + run + NaN check" begin

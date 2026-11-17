@@ -51,11 +51,13 @@
     set!(simulation, pressure = L[:, 1]; step)
     @test get_step(prog_new.pressure, step) == L[:, 1]
 
+    # set! transforms in-place into the variable (a view), A_spec into a new array: the `muladd`s in
+    # the Legendre transform may be fused differently for these, ≈ instead of == (differs on x86)
     set!(simulation, vorticity = A; step)
-    @test get_step(prog_new.vorticity, step) == A_spec
+    @test get_step(prog_new.vorticity, step) ≈ A_spec
 
     set!(simulation, vorticity = A; step, add = true)
-    @test get_step(prog_new.vorticity, step) == (2 .* A_spec)
+    @test get_step(prog_new.vorticity, step) ≈ (2 .* A_spec)
 
     # grids
     set!(simulation, sea_surface_temperature = A[:, 1]; namespace = :ocean)

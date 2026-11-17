@@ -338,6 +338,14 @@ Kernels are spread across ~36 files in `SpeedyWeather/src/dynamics/`,
 `parameterizations/`, `SpeedyTransforms/src/`, `RingGrids/src/`, and
 `LowerTriangularArrays/src/`.
 
+### Branch-free code for Reactant
+
+Write functions that are broadcast or passed to `set!` branch-free, so that Reactant can trace them:
+use `ifelse(cond, a, b)`, `min`, `max` or `clamp` instead of `if`, `? :`, `&&`, `||` or an early
+`return` on a value. Branches inside `@kernel`s are fine.
+
+To ensure differentiability avoid potential division by zero even within branches that aren't taken in an `ifelse`. These cases might cause `NaN`s in the gradients / differentiated models. Guard numerator and denominator separately, `ifelse(c, x, 0) / ifelse(c, y, 1)`, never with a nested `ifelse(c, x / ifelse(c, y, 1), 0)`: LLVM removes the inner `ifelse` because `c` is known to be true in the taken branch, leaving an unguarded `x / y`.
+
 ## Benchmarks
 
 Benchmarks live in `SpeedyWeather/benchmark/`. Run the full suite with:
@@ -351,6 +359,30 @@ in that file serve as the baseline. When running benchmarks, compare new results
 the existing README.md values: deviations of +/- 20% are normal and acceptable, but
 larger regressions should be reported to the user.
 
+Each configuration of the main suites is timed up to 5 times, as long as all its timed runs together
+take at most 30 s, and the median SYPD is reported with the spread of the runs. `--repeats N` times
+every configuration exactly N times instead, and `--length X` makes the timed runs of the PrimitiveWet
+resolution sweep X times longer (e.g. `manual_benchmarking.jl gpu --repeats 5 --length 10`).
+`--suites benchmark201,benchmark900` runs only those suites; a partial run replaces the architecture's
+stored results with just these suites.
+
+The reverse-mode (AD) benchmarks with Reactant are opt-in,: add the flag
+`--reverse` (e.g. `manual_benchmarking.jl reactant-nvidia-gpu --reverse`). A run without it drops the
+stored reverse-mode results of that architecture. The flag `--hi-res` adds T342 and T512 to the
+PrimitiveWet resolution sweep, on GPU and TPU only. `--SPEEDY` adds a suite of the PrimitiveWet
+model over the same resolutions in a SPEEDY.f90-like configuration (prescribed seasonal climatologies,
+constant surface roughness, wind slowdown and gusts), on every architecture including Reactant. Truncations in the benchmarks are 1-based (T32, …, T256), as in
+the model code.
+
+For a quick check whether performance regressed, `manual_benchmarking.jl --debug` runs only a
+short PrimitiveWet resolution sweep with the default transform (T32–T128 with 8 layers, T32 and
+T128 with 16 layers) and does not touch the stored results.
+`julia SpeedyWeather/benchmark/regression/regression.jl check` runs it (with `--length 2`, i.e. timed
+runs twice as long, to reduce noise) on main, the latest release and the latest benchmarked revision and compares them (also run weekly by
+`.github/workflows/benchmark_regression.yml`; the `benchmark-regression` skill builds on it).
+Labelling a PR `benchmark-performance` runs it on the PR merged into main vs main on every push
+(`.github/workflows/benchmark_pr.yml`), and `benchmark_pr_comment.yml` posts the report on the PR.
+
 ## Code Style
 
 * The project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for formatting.
@@ -358,6 +390,9 @@ larger regressions should be reported to the user.
   them, e.g. `temperature` not `temp`, `surface_pressure` not `surf_pres`,
   `layer_thickness` not `lyr_thk`, `spectral_grid` not `sg`. Established physics/maths
   shorthand that is itself the conventional name (e.g. `coslat`, `vor`, `div`) is fine.
+* Spectral truncations are 1-based: always use the new 1-based truncations `T32`, `T64`, `T128`, …
+  (e.g. `SpectralGrid(truncation = 32)`) in code, tests and docs, never the old 0-based
+  `T31`, `T63`, `T127`, ….
 
 
 ## Pull Request Convention
@@ -388,7 +423,10 @@ that submodule must be bumped according to its size:
 
 Bump the version of every submodule whose source you actually touched in the PR.
 A change confined to `SpeedyWeather/` does not require bumping
-`LowerTriangularArrays`, etc.
+`LowerTriangularArrays`, etc. 
+
+When `SpeedyWeather` depends on a new functionality of one of its submodule, also
+bump the compatibility entry accordingly. 
 
 ## Implementation plans
 

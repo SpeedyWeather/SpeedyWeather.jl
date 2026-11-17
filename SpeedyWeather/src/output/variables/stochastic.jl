@@ -1,6 +1,6 @@
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomPatternOutput <: AbstractOutputVariable
+@kwdef mutable struct RandomPattern <: AbstractOutputVariable
     name::String = "random_pattern"
     unit::String = "1"
     long_name::String = "random pattern"
@@ -11,5 +11,5 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::RandomPatternOutput, simulation) =
+path(::RandomPattern, simulation) =
     simulation.variables.grid.random_pattern

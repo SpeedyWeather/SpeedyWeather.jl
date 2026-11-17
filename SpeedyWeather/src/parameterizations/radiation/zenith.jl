@@ -176,18 +176,31 @@ Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as a 
 This is because `Dates` functions assume an Earth calendar.
 Length of the seasonal cycle is instead controlled via a faster orbit time,
 see `Earth`."""
-function year_angle(::Type{T}, time::DateTime) where {T}
+function year_angle(::Type{T}, time::Dates.AbstractDateTime) where {T}
     seconds_of_year = (Dates.dayofyear(time) - 1) * LENGTH_OF_DAY + secondofday(time)
     seconds_in_year = Dates.daysinyear(time) * LENGTH_OF_DAY
     return T(2π) * T(seconds_of_year / seconds_in_year)
 end
 
 """$(TYPEDSIGNATURES)
+Angle of year [radians] of `orbit_time` for the solar zenith `S`, or of its initial time
+if the seasonal cycle is disabled, see `year_angle`."""
+year_angle(::Type{T}, S::AbstractZenith, orbit_time::Dates.AbstractDateTime) where {T} =
+    year_angle(T, ifelse(S.seasonal_cycle, orbit_time, S.initial_time[]))
+
+"""$(TYPEDSIGNATURES)
+Solar declination angle δ [radians] at `orbit_time` for the solar zenith `S`, following its
+`solar_declination` and seasonal cycle settings. Can be used to synchronize other seasonal
+cycles with the solar zenith angle."""
+solar_declination(::Type{T}, S::AbstractZenith, orbit_time::Dates.AbstractDateTime) where {T} =
+    S.solar_declination(year_angle(T, S, orbit_time))
+
+"""$(TYPEDSIGNATURES)
 Fraction of day in `time` as angle in radians [-π...π], noon to noon, at longitude `λ`.
 Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as constant.
 This is because `Dates` functions assume an Earth date. Length of the daily cycle is instead
 controlled via a faster rotation time, see `Earth`."""
-function solar_hour_angle(::Type{T}, time::DateTime, λ = 0) where {T}
+function solar_hour_angle(::Type{T}, time::Dates.AbstractDateTime, λ = 0) where {T}
     day2rad = T(2π) / LENGTH_OF_DAY
     noon_in_sec = LENGTH_OF_DAY ÷ 2
     return (secondofday(time) - noon_in_sec) * day2rad + convert(T, λ)
@@ -202,8 +215,8 @@ depending on parameters in SolarZenith."""
 function cos_zenith!(
         cos_zenith::AbstractField{NF},
         S::SolarZenith,
-        rotation_time::DateTime,
-        orbit_time::DateTime,
+        rotation_time::Dates.AbstractDateTime,
+        orbit_time::Dates.AbstractDateTime,
         geometry::AbstractGeometry,
     ) where {NF}
 
@@ -212,8 +225,7 @@ function cos_zenith!(
         throw(DimensionMismatch(geometry.spectral_grid.grid, cos_zenith.grid))
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
-    time_of_year = S.seasonal_cycle ? orbit_time : S.initial_time[]
-    g = year_angle(NF, time_of_year)
+    g = year_angle(NF, S, orbit_time)
 
     # time correction [radians] due to the equation of time (sunrise/set oscillation)
     tc = S.time_correction(g)
@@ -280,8 +292,8 @@ depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
         cos_zenith::AbstractField{NF},
         S::SolarZenithSeason,
-        rotation_time::DateTime,        # not used, but to keep the same function barrier as SolarZenith
-        orbit_time::DateTime,
+        rotation_time::Dates.AbstractDateTime,        # not used, but to keep the same function barrier as SolarZenith
+        orbit_time::Dates.AbstractDateTime,
         geometry::AbstractGeometry,
     ) where {NF}
 
@@ -290,8 +302,7 @@ function cos_zenith!(
         throw(DimensionMismatch(geometry.spectral_grid.grid, cos_zenith.grid))
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
-    time_of_year = S.seasonal_cycle ? orbit_time : S.initial_time[]
-    g = year_angle(NF, time_of_year)
+    g = year_angle(NF, S, orbit_time)
 
     # solar declination angle [radians] changing from tropic of cancer to capricorn
     # throughout the year measured by g [radians]
