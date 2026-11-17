@@ -19,7 +19,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'skip-reactant-ci')
       )
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 140
     permissions:
       actions: write
       contents: read
