@@ -135,3 +135,34 @@ end
     SpeedyWeather.progress!(model.feedback, simulation.variables, model, 2)
     @test p.counter == 2
 end
+
+@testset "NaN detection reports the time step of the blow up" begin
+    feedback = Feedback(verbose = false, interval = 10)
+    model = BarotropicModel(SpectralGrid(truncation = 16, nlayers = 1); feedback)
+    simulation = initialize!(model)
+    (; variables) = simulation
+    run!(simulation, steps = 2)
+    initialize!(feedback, variables, model)     # reset the progress meter and the NaN records
+    feedback.progress_meter.n = 100
+    vor = SpeedyWeather.get_prognostic_step(variables.prognostic.vorticity, model.time_stepping, feedback)
+
+    # recording a time step does not allocate (measured inside a function, see above)
+    allocations(feedback, variables, model) = @allocated SpeedyWeather.record_nans!(feedback, variables, model)
+    allocations(feedback, variables, model)
+    @test allocations(feedback, variables, model) == 0
+    feedback.nan_record_count = 0
+
+    # blow up at time step 4, only checked (and reported) at step 10, the interval
+    for step in 1:10
+        step == 4 && (vor.data .= NaN)
+        if step < 10
+            SpeedyWeather.progress!(feedback, variables, model)
+            @test !feedback.nans_detected
+        else
+            @test_logs (:warn, r"time step 4 ") SpeedyWeather.progress!(feedback, variables, model)
+        end
+    end
+    @test feedback.nans_detected
+    @test feedback.nans_detected_step == 4
+    @test feedback.nans_detected_time == variables.prognostic.clock.time
+end

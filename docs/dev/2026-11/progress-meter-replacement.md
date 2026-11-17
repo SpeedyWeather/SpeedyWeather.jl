@@ -1,6 +1,6 @@
 # Replace ProgressMeter.jl by a lightweight progress meter in SpeedyWeatherInternals
 
-> Status: **in progress**. Plan signed off, implementing. Drop the ProgressMeter.jl dependency (and its
+> Status: **in progress**. Implemented and tested locally, incl. NaN detection on every time step; awaiting review. Drop the ProgressMeter.jl dependency (and its
 > `[sources]` entries pointing at the unreleased ProgressMeter.jl#369 branch) by implementing the subset
 > SpeedyWeather uses in a new submodule `SpeedyWeatherInternals.ProgressMeters`. Continues
 > [progress-elements.md](../2026-10/progress-elements.md) in the same PR (#1298).
@@ -35,6 +35,25 @@ Base revision: eb3a7080472dc558e82af58a39eb83f3523373f4 (head of `mc/progress-el
   `initialize!` (without the two diagnostics for `ReactantDevice`, listing them explicitly opts in),
   and `next!(p; step)`. While at it: the backward-matrix meter in SpeedyTransforms counted to
   `2 * nharmonics` but is advanced once per harmonic, so it never finished; now `nharmonics`.
+- 2026-11-17: "We had some issues in the past with the feedback being called too frequently, slowing
+  down model simulations [...] it would be fantastic if we can still get accurate measurements of when
+  the blow up happened. I'm thinking to check for NaN's on every time step, record time step and time
+  when it happened, but then only print every so often, so the print may come after the blow up but
+  with the correct step." `Feedback` declares `vars.dynamics.feedback.nan_record`
+  (`VectorDim(interval)`); `record_nans!` writes `!isfinite` of the 1-0 mode of the surface vorticity
+  into it on every time step (a broadcast on the device, no GPU synchronization, no allocation) and
+  stores step and simulation time on the CPU. `nan_detection!` copies the record to the CPU every
+  `interval` steps (and on the last) and warns with the step/time of the first NaN, also stored in
+  `Feedback.nans_detected_step`/`nans_detected_time`. The Reactant path
+  (`progress!(..., nsteps)`) checks the last step directly as before.
+- 2026-11-17: "do acknowledge the ProgressMeter.jl project, while this is somewhat like stealing code,
+  the license is MIT so legally fine, but do explain why their code has been reimplemented."
+  MIT notice of ProgressMeter.jl at the top of `ProgressMeters.jl` (the redraw, ETA and
+  `durationstring` are adapted from it), acknowledgement and reasons in the module docstring and in a
+  section "Acknowledgement" of `docs/src/feedback.md`.
+- 2026-11-17: "I think with the ProgressMeters module we should bump to v1.1 in SpeedyWeatherInternals,
+  it's a new feature". `SpeedyWeatherInternals` `1.1.0-DEV`, its compat in SpeedyWeather and
+  SpeedyTransforms `"1.1"` (resolves with the `-DEV` pre-release via the `[sources]` paths).
 
 ## Problem description
 
@@ -158,9 +177,8 @@ Remove the `ProgressMeter` entries (`[deps]` and `[sources]`) from `SpeedyWeathe
 
 ### 5. Versions, CHANGELOG, PR
 
-- `SpeedyWeatherInternals`: `0.2.3` → `0.2.3+DEV` (additive, non-breaking). On release it becomes
-  `0.2.4` and the `SpeedyWeatherInternals` compat of `SpeedyWeather` and `SpeedyTransforms` must be
-  raised to `0.2.4`, otherwise `0.2.3` (without `ProgressMeters`) is allowed.
+- `SpeedyWeatherInternals`: `1.0.3` → `1.1.0-DEV` (new feature), compat in `SpeedyWeather` and
+  `SpeedyTransforms` raised to `"1.1"`. `SpeedyTransforms` `1.0.2+DEV`, `SpeedyWeather` already `0.25.0-DEV`.
 - `SpeedyTransforms` already `0.2.1+DEV`, `SpeedyWeather` already `0.23.0-DEV`: no bump.
 - CHANGELOG: rewrite the existing #1298 line ("... removes the ProgressMeter.jl dependency, progress
   meter now in `SpeedyWeatherInternals.ProgressMeters`" instead of "Depends on ProgressMeter.jl#369").

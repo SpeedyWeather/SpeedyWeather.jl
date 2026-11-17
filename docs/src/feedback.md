@@ -53,3 +53,27 @@ feedback = Feedback(elements = (ProgressElements.default_elements()..., StepsLef
 ```
 An element returning an empty string is left out of the line. To show something of the simulation,
 hold a reference to it in the element (e.g. a `Ref` that a callback updates).
+
+## NaN detection
+
+With `Feedback(debug = true)` (default) the simulation is checked for NaNs (or Infs), which stops it.
+NaNs propagate through the spectral transform to all coefficients, so whether the 1-0 mode of the
+surface vorticity is finite is recorded on every time step. As copying it to the CPU would synchronize
+a GPU, the record is only checked every `interval` time steps (default 50) and at the end, so the
+simulation may run for up to `interval` time steps after the blow-up, but the warning reports the
+time step and simulation time at which it happened, e.g.
+```
+┌ Warning: NaN or Inf detected at time step 1234 (2000-02-01T12:00:00)
+```
+which are also stored in `simulation.model.feedback.nans_detected_step` and `nans_detected_time`.
+
+## Acknowledgement
+
+The progress meter of SpeedyWeather (`SpeedyWeatherInternals.ProgressMeters`) is based on
+[ProgressMeter.jl](https://github.com/timholy/ProgressMeter.jl) by Tim Holy and contributors (MIT
+License), which SpeedyWeather used until v0.24. As SpeedyWeather needs a progress line built from its
+own elements, which ProgressMeter.jl only allowed through type piracy, and the corresponding proposal
+for ProgressMeter.jl ([#369](https://github.com/timholy/ProgressMeter.jl/pull/369)) has not been
+merged, the small part of ProgressMeter.jl that SpeedyWeather uses was reimplemented with a simpler
+element interface. Thanks to the ProgressMeter.jl authors.
+

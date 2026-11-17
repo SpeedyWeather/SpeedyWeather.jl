@@ -19,7 +19,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] Minimum wallclock time between feedback updates"
     feedback_dt::Float32 = 0.1
 
-    "[OPTION] Interval in time steps between NaN checks"
+    """[OPTION] Interval in time steps between NaN checks. NaNs are recorded on every time step (without
+    synchronizing a GPU) but only checked every `interval` steps, the warning then reports the time step
+    at which they occurred"""
     interval::Int = 50
 
     """[OPTION] Elements of the progress line, see `ProgressElements`, `nothing` for
@@ -36,10 +38,32 @@ $(TYPEDFIELDS)"""
 
     "[DERIVED] did NaNs occur in the simulation?"
     nans_detected::Bool = false
+
+    "[DERIVED] time step at which NaNs were first detected, 0 if none"
+    nans_detected_step::Int = 0
+
+    "[DERIVED] simulation time at which NaNs were first detected"
+    nans_detected_time::DateTime = DateTime(2000)
+
+    "[DERIVED] time steps recorded in `vars.dynamics.feedback.nan_record` (on the CPU)"
+    nan_record_steps::Vector{Int} = zeros(Int, 1)
+
+    "[DERIVED] simulation times of the time steps recorded in `nan_record`"
+    nan_record_times::Vector{DateTime} = fill(DateTime(2000), 1)
+
+    "[DERIVED] number of time steps recorded since the last check"
+    nan_record_count::Int = 0
 end
 
-# variables needed by the elements of the progress line, e.g. the scratch vector of `VerticalCourantNumber`
-variables(feedback::Feedback) = Tuple(Iterators.flatten(map(variables, something(feedback.elements, ()))))
+# variables needed by the elements of the progress line, e.g. the scratch vector of `VerticalCourantNumber`,
+# and the record of the last `interval` time steps for the NaN checks
+variables(feedback::Feedback) = (
+    DynamicsVariable(
+        :nan_record, VectorDim(max(1, feedback.interval)), namespace = :feedback,
+        desc = "1 if the 1-0 mode of the surface vorticity was NaN/Inf in the recorded time step, 0 otherwise", units = "1"
+    ),
+    Iterators.flatten(map(variables, something(feedback.elements, ())))...,
+)
 
 """
 $(TYPEDSIGNATURES)
@@ -47,8 +71,13 @@ Initializes the a `Feedback` struct."""
 function initialize!(feedback::Feedback, variables::Variables, model::AbstractModel)
     (; clock) = variables.prognostic
 
-    # set to false to recheck for NaNs
+    # set to false to recheck for NaNs, records of the last `interval` time steps for the NaN checks
     feedback.nans_detected = false
+    feedback.nans_detected_step = 0
+    interval = length(variables.dynamics.feedback.nan_record)
+    feedback.nan_record_steps = zeros(Int, interval)
+    feedback.nan_record_times = fill(clock.time, interval)
+    feedback.nan_record_count = 0
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
     # only do now for benchmark accuracy
@@ -72,14 +101,15 @@ end
 progress!(feedback::Feedback) = ProgressMeters.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
-    (; counter, n) = feedback.progress_meter
-    interval = max(1, feedback.interval)
-
     progress!(feedback)
+    feedback.debug || return nothing
 
-    last_step = counter == n - 1
-    feedback.debug && (mod(counter, interval) == 0 || last_step) &&
-        nan_detection!(feedback, vars, model)
+    # record the 1-0 mode on every time step, but check it for NaNs only every `interval` steps
+    # (and on the last) as that requires copying it to the CPU, synchronizing a GPU
+    record_nans!(feedback, vars, model)
+    (; counter, n) = feedback.progress_meter
+    (feedback.nan_record_count == length(feedback.nan_record_steps) || counter >= n) &&
+        nan_detection!(feedback, vars)
     return nothing
 end
 
@@ -91,7 +121,12 @@ Feedback after `nsteps` time steps at once, e.g. after a compiled program of sev
 with Reactant: advance the progress meter by `nsteps` and check for NaNs (if `feedback.debug`)."""
 function progress!(feedback::Feedback, vars::Variables, model::AbstractModel, nsteps::Integer)
     ProgressMeters.next!(feedback.progress_meter; step = nsteps)
-    feedback.debug && nan_detection!(feedback, vars, model)
+    (feedback.debug && !feedback.nans_detected) || return nothing
+
+    # only the last of the `nsteps` time steps can be checked, directly (no record, as it's not traced)
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, feedback)
+    GPUArrays.@allowscalar vor_10 = vor[2, end]     # 1-0 mode of the surface vorticity
+    isfinite(vor_10) || nans_detected!(feedback, feedback.progress_meter.counter, vars.prognostic.clock.time)
     return nothing
 end
 
@@ -106,18 +141,48 @@ finalize!(F::Feedback) = ProgressMeters.finish!(F.progress_meter)
 finalize!(::Nothing) = nothing
 
 """$(TYPEDSIGNATURES)
-Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
-function nan_detection!(feedback::Feedback, vars::Variables, model::AbstractModel)
-    feedback.nans_detected && return nothing        # escape immediately if nans already detected
-    i = feedback.progress_meter.counter             # time step
+Record the 1-0 mode of the surface vorticity (on the device, without synchronizing a GPU) together
+with the time step and simulation time, for [`nan_detection!`](@ref)."""
+function record_nans!(feedback::Feedback, vars::Variables, model::AbstractModel)
+    feedback.nans_detected && return nothing        # stop recording once NaNs were detected
+    k = feedback.nan_record_count += 1
     vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, feedback)
-    GPUArrays.@allowscalar vor0 = vor[2, end]       # only check 1-0 mode of surface vorticity
+    # record whether the 1-0 mode of the surface (last layer) vorticity is finite, the spectral
+    # transform propagates NaNs globally, so checking one coefficient is enough
+    record_nans!(vars.dynamics.feedback.nan_record, k, vor.data, size(vor.data, 2))
+    feedback.nan_record_steps[k] = feedback.progress_meter.counter
+    feedback.nan_record_times[k] = vars.prognostic.clock.time
+    return nothing
+end
 
-    # just check first harmonic, spectral transform propagates NaNs globally anyway
-    (; time) = vars.prognostic.clock                                # current time for feedback
-    nans_detected_here = ~isfinite(vor0)
-    nans_detected_here && @warn "NaN or Inf detected at time step $i ($time)"
-    return feedback.nans_detected = nans_detected_here
+# nan_record[k] = !isfinite(vor[2, layer]) on the device, without synchronizing a GPU
+function record_nans!(nan_record::AbstractVector, k::Integer, vor::AbstractArray, layer::Integer)
+    view(nan_record, k:k) .= .!isfinite.(view(vor, 2, layer:layer))
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Detect NaN (Not-a-Number, or Inf) in the time steps recorded since the last check (see
+[`record_nans!`](@ref)) and warn with the time step and simulation time at which they first occurred."""
+function nan_detection!(feedback::Feedback, vars::Variables)
+    k = feedback.nan_record_count
+    feedback.nan_record_count = 0
+    (feedback.nans_detected || k == 0) && return nothing    # escape immediately if NaNs already detected
+    record = Array(view(vars.dynamics.feedback.nan_record, 1:k))    # copy to the CPU (synchronizes a GPU)
+    first_nan = findfirst(!iszero, record)
+    isnothing(first_nan) && return nothing
+
+    nans_detected!(feedback, feedback.nan_record_steps[first_nan], feedback.nan_record_times[first_nan])
+    return nothing
+end
+
+# store and report time `step` and simulation `time` at which NaNs were detected
+function nans_detected!(feedback::Feedback, step::Integer, time::DateTime)
+    feedback.nans_detected = true
+    feedback.nans_detected_step = step
+    feedback.nans_detected_time = time
+    @warn "NaN or Inf detected at time step $step ($time)"
+    return nothing
 end
 
 export ParametersTxt

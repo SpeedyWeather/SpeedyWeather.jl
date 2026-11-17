@@ -1,3 +1,25 @@
+# This module is a reduced reimplementation of parts of ProgressMeter.jl
+# (https://github.com/timholy/ProgressMeter.jl), in particular the redrawing of the line, the
+# estimated remaining time and `durationstring`, which are adapted from it. ProgressMeter.jl is
+# released under the MIT License:
+#
+# Copyright (c) 2013 Timothy E. Holy
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+# associated documentation files (the "Software"), to deal in the Software without restriction,
+# including without limitation the rights to use, copy, modify, merge, publish, distribute,
+# sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all copies or
+# substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+# NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+# OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 """
     ProgressMeters
 
@@ -15,6 +37,14 @@ end
 
 prints `Computing:  42% ━━━━━━━━━━━━              ETA: 0:00:07, 42`. Define a custom element by
 subtyping [`AbstractProgressElement`](@ref) and extending [`print_element`](@ref).
+
+This module is based on [ProgressMeter.jl](https://github.com/timholy/ProgressMeter.jl) by Tim Holy
+and contributors (MIT License), which SpeedyWeather used until v0.24. It was reimplemented here
+because SpeedyWeather needed a progress line made of custom elements (simulation date, speed,
+diagnostics), which ProgressMeter.jl only allows through type piracy. The element interface proposed
+for it ([ProgressMeter.jl#369](https://github.com/timholy/ProgressMeter.jl/pull/369)) is not merged,
+and SpeedyWeather only needs a small subset of ProgressMeter.jl, so this module implements just that,
+with a simpler element interface that doesn't need to stay compatible with ProgressMeter.jl's layouts.
 """
 module ProgressMeters
 
