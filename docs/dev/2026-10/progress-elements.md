@@ -76,6 +76,10 @@ Base revision: e82b41763d831f2356ad4e661650f426ab9762ff
   element showing something. The default layout has no parentheses, so appended elements such as
   `VerticalCourantNumber` are separated the same way.
 
+- 2026-11-17: no progress upstream on ProgressMeter.jl#369, so the ProgressMeter.jl dependency is
+  to be replaced by a lightweight progress meter in `SpeedyWeatherInternals`, planned in
+  [progress-meter-replacement.md](../2026-11/progress-meter-replacement.md) (same PR).
+
 ## Problem description
 
 `src/output/feedback.jl` customizes the progress line by redefining
