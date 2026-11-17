@@ -106,6 +106,8 @@ abstract type AbstractBenchmarkSuite end
     # Use this to vary arbitrary model components, e.g.
     # `model_kwargs = [(convection = NoConvection,), (convection = BettsMillerConvection,)]`.
     model_kwargs::Vector = fill(NamedTuple(), nruns)
+    # number of (active) tracers, see `benchmark_tracers`; 0 for none
+    ntracers::Vector{Int} = fill(0, nruns)
     # median SYPD of the timed runs, and of the slowest and the fastest run
     SYPD::Vector{Float64} = fill(0.0, nruns)
     SYPD_min::Vector{Float64} = fill(0.0, nruns)
@@ -132,6 +134,11 @@ default_nlayers(::Type{<:Barotropic}) = 1
 default_nlayers(::Type{<:ShallowWater}) = 1
 default_nlayers(::Type{<:PrimitiveEquation}) = 8
 default_nlayers(models) = [default_nlayers(model) for model in models]
+
+# `ntracers` (active) tracers named tracer1, tracer2, … as the `tracers` keyword of the model constructor, zero
+# initial conditions: the cost of a tracer does not depend on its values
+benchmark_tracers(ntracers::Integer) =
+    NamedTuple{ntuple(i -> Symbol(:tracer, i), ntracers)}(ntuple(_ -> Tracer(), ntracers))
 
 # Number of timesteps for a timed run, chosen so every simulation takes a few
 # seconds. The step count is clamped between a floor and a ceiling:
@@ -212,7 +219,8 @@ function run_benchmark!(suite::BenchmarkSuite, i::Integer)
     suite.nlat[i] = spectral_grid.nlat
 
     extra_components = resolve_model_kwargs(suite.model_kwargs[i], spectral_grid)
-    model = build_model(Model, spectral_grid, architecture; transform_kind, extra_components..., feedback = Feedback(verbose = true))
+    tracers = suite.ntracers[i] > 0 ? (; tracers = benchmark_tracers(suite.ntracers[i])) : (;)
+    model = build_model(Model, spectral_grid, architecture; transform_kind, extra_components..., tracers..., feedback = Feedback(verbose = true))
     if Model <: PrimitiveEquation
         model.dynamics = dynamics
         model.dynamics_only = !physics
@@ -298,17 +306,21 @@ function write_results(md, suite::BenchmarkSuite)
     print_physics = any(suite.physics .!= suite.physics[1])
     print_transform = any(suite.spectral_transform .!= suite.spectral_transform[1])
     print_compile = any(isfinite, suite.compile_time)
+    print_tracers = any(suite.ntracers .!= suite.ntracers[1])
 
     column_header = "| Model "
     column_header *= print_NF ? "| NF " : ""
     column_header *= "| truncation "
     column_header *= "| L "
+    column_header *= print_tracers ? "| Tracers " : ""
     column_header *= print_Grid ? "| Grid " : ""
     column_header *= print_nlat ? "| Rings " : ""
     column_header *= print_dynamics ? "| Dynamics " : ""
     column_header *= print_physics ? "| Physics " : ""
     column_header *= print_transform ? "| Transform " : ""
-    column_header *= "| Δt | SYPD | Runs | Spread | Memory"
+    column_header *= "| Δt | SYPD "
+    column_header *= print_tracers ? "| vs no tracers " : ""
+    column_header *= "| Runs | Spread | Memory"
     column_header *= print_compile ? "| Compile |" : "|"
 
     ncolumns = length(findall('|', column_header)) - 1
@@ -323,6 +335,7 @@ function write_results(md, suite::BenchmarkSuite)
         row *= print_NF ? "| $(suite.NF[i]) " : ""
         row *= "| $(suite.truncation[i]) "
         row *= "| $(suite.nlayers[i]) "
+        row *= print_tracers ? "| $(suite.ntracers[i]) " : ""
         row *= print_Grid ? "| $(suite.Grid[i]) " : ""
         row *= print_nlat ? "| $(suite.nlat[i]) " : ""
         row *= print_dynamics ? "| $(suite.dynamics[i]) " : ""
@@ -335,12 +348,27 @@ function write_results(md, suite::BenchmarkSuite)
         runs = ok ? suite.nrepeats[i] : "—"
         spread = ok ? format_spread(suite.SYPD[i], suite.SYPD_min[i], suite.SYPD_max[i], suite.nrepeats[i]) : "—"
         memory = prettymemory(suite.memory[i])
-        row *= "| $Δt | $SYPD | $runs | $spread | $memory "
+        row *= "| $Δt | $SYPD "
+        row *= print_tracers ? "| $(format_tracer_slowdown(suite, i)) " : ""
+        row *= "| $runs | $spread | $memory "
         row *= print_compile ? "| $(format_seconds(suite.compile_time[i])) |" : "|"
 
         write(md, "$row\n")
     end
     return
+end
+
+# Wallclock time of run `i` relative to the same configuration without tracers (= SYPD without / SYPD with
+# tracers), e.g. "1.25×" if the tracers add 25% to the time step; "—" without such a run or if either failed
+function format_tracer_slowdown(suite::BenchmarkSuite, i::Integer)
+    same_configuration(j) = all(
+        getfield(suite, field)[j] == getfield(suite, field)[i] for field in
+            (:model, :NF, :truncation, :nlayers, :Grid, :dynamics, :physics, :spectral_transform, :model_kwargs)
+    )
+    reference = findfirst(j -> suite.ntracers[j] == 0 && same_configuration(j), 1:suite.nruns)
+    isnothing(reference) && return "—"
+    (suite.status[i] == "ok" && suite.status[reference] == "ok") || return "—"
+    return @sprintf("%.2f×", suite.SYPD[reference] / suite.SYPD[i])
 end
 
 abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end

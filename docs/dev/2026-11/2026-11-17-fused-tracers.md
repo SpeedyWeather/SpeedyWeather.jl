@@ -1,7 +1,7 @@
 # Fuse the tracers: one batched transform and one kernel per operation for all tracers
 
-> Status: **planned**. Measurement-gated: phase 0 decides with GPU benchmarks whether phase 1 (the implementation)
-> is done at all.
+> Status: **in progress**. Phase 0 (measurements) is implemented and tested on CPU; it awaits the runs on an NVIDIA
+> GPU (see "Handover"), which decide whether phase 1 (the implementation) is done at all.
 
 Date of initial draft: 2026-11-17
 
@@ -14,9 +14,22 @@ Base revision: 174afe29 (`mg/unroll-tracer-loops`) plus the uncommitted part 2 o
 > they are defined with our fuse system for variables and advect them together? This should only be done if it's
 > really faster on GPU
 
+> decisions: 1) all tracers 2) yes fall back to one-by-one in this case 3) go with your proposal 4) for now just
+> split in chunks when it's more than the largest allocated transform (set by `transform_batch`) 5) make the edits
+> now, then we hand over to a gpu machine with nvidia gpu
+
 ## Revision log
 
 - 2026-11-17: initial draft.
+- 2026-11-17: open questions decided: fuse all tracers automatically; fall back to the per-tracer path when any tracer
+  is deactivated; the proposed go/no-go thresholds; split transforms into chunks of whole tracers when they exceed the
+  transform's largest batch (`S.nlayers`, from `transform_batch`), no tracer-dependent transform construction for now;
+  the phase 0 edits are made here, the NVIDIA runs on a GPU machine.
+- 2026-11-17: phase 0 implemented. 0a as an opt-in suite (`--tracers`, `:benchmark510`) of the benchmark, so that a
+  regular benchmark run doesn't take about 40 runs longer; 0b as the script
+  `SpeedyWeather/benchmark/fused_tracers_prototype.jl`. Both are meant to run in the same session on the GPU machine
+  (one handover instead of two), the gate of 0a is then applied to the results of both. The prototype merges the
+  `+A*div` and flux kernels into one kernel over all tracers.
 
 ## Problem description
 
@@ -134,6 +147,92 @@ only). The thresholds are a proposal (see open questions).
 
 The results of phase 0 go into this document whatever the outcome.
 
+### Implementation of phase 0
+
+- **0a**, `SpeedyWeather/benchmark/`: `BenchmarkSuite` has a field `ntracers` (tracers `tracer1`, `tracer2`, … from
+  `benchmark_tracers`, zero initial conditions). Its table gets the columns "Tracers" and "vs no tracers" (the wallclock
+  time relative to the same configuration without tracers) when the number of tracers varies. The suite
+  `:benchmark510` is opt-in with `--tracers`, as `--SPEEDY`, and its numbers are also stored in the `tracers` field of
+  the architecture's record in `assets/benchmark_results.json`.
+- **0b**, `SpeedyWeather/benchmark/fused_tracers_prototype.jl`: for each configuration and N = 1, 2, 4, 8 it builds the
+  model with N tracers, runs 4 steps for a realistic state and times (median of 7 samples of at least 0.2 s each):
+  the transform and horizontal advection of the tracers as the model does it now; the prototype with the forward
+  transforms as three N·L batches and as one 3N·L batch (both split into chunks of whole tracers that fit `S.nlayers`);
+  and one full time step. It also checks that the prototype gives the model's grid tracers and advection tendencies.
+  `--quick` runs only T32 with 1 and 2 tracers.
+
+### Results of phase 0
+
+Tested on CPU (Apple M3, 4 threads, Julia 1.12.7):
+
+- A mini version of the suite (ShallowWaterModel T32 with 0, 2, 4 tracers): 1.84× and 2.76× the time without
+  tracers. Tracers are expensive for a model as cheap as the 1-layer ShallowWaterModel.
+- The prototype gives results bitwise identical to the model's in all 28 cases (and no compared array is zero).
+- On CPU the prototype is about neutral for the ShallowWaterModel (1.00× to 1.05×) and up to 15% slower for the
+  PrimitiveWetModel (0.85× to 0.99×); the worst case, T64 with 8 tracers, is 7% of the time step slower. That's beyond
+  the 5% of the gate, so phase 1 would use the fused path on GPU only. Presumably the per-tracer arrays of L layers
+  stay in cache, the stacked ones of N·L layers don't; not investigated.
+- Tracers are expensive on CPU too: 8 tracers' transforms and horizontal advection alone take 40% of a PrimitiveWetModel
+  T64 time step (16.6 of 42.0 ms), and the ShallowWaterModel T32 time step with 8 tracers takes about 4× as long as
+  without (0.73 vs. about 0.18 ms).
+
+<details><summary>Prototype on CPU (Apple M3, 4 threads)</summary>
+
+| Model | T | L | Tracers | per tracer [ms] | fused, 3 batches [ms] | fused, 1 batch [ms] | speedup | time step [ms] | saved of time step | max. rel. difference |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ShallowWaterModel | 32 | 1 | 1 | 0.070 | 0.071 | 0.097 | 0.98× | 0.245 | -0% | 0.0e+00 |
+| ShallowWaterModel | 32 | 1 | 2 | 0.135 | 0.133 | 0.133 | 1.02× | 0.315 | 1% | 0.0e+00 |
+| ShallowWaterModel | 32 | 1 | 4 | 0.264 | 0.262 | 0.260 | 1.02× | 0.454 | 1% | 0.0e+00 |
+| ShallowWaterModel | 32 | 1 | 8 | 0.533 | 0.508 | 0.535 | 1.05× | 0.727 | 4% | 0.0e+00 |
+| ShallowWaterModel | 64 | 1 | 1 | 0.298 | 0.292 | 0.322 | 1.02× | 1.122 | 0% | 0.0e+00 |
+| ShallowWaterModel | 64 | 1 | 2 | 0.599 | 0.586 | 0.611 | 1.02× | 1.368 | 1% | 0.0e+00 |
+| ShallowWaterModel | 64 | 1 | 4 | 1.159 | 1.135 | 1.136 | 1.02× | 1.959 | 1% | 0.0e+00 |
+| ShallowWaterModel | 64 | 1 | 8 | 2.341 | 2.274 | 2.250 | 1.04× | 3.144 | 3% | 0.0e+00 |
+| ShallowWaterModel | 128 | 1 | 1 | 1.596 | 1.604 | 1.604 | 1.00× | 5.763 | -0% | 0.0e+00 |
+| ShallowWaterModel | 128 | 1 | 2 | 3.242 | 3.174 | 3.173 | 1.02× | 7.416 | 1% | 0.0e+00 |
+| ShallowWaterModel | 128 | 1 | 4 | 6.393 | 6.339 | 6.319 | 1.01× | 10.720 | 1% | 0.0e+00 |
+| ShallowWaterModel | 128 | 1 | 8 | 12.884 | 12.785 | 12.647 | 1.02× | 17.290 | 1% | 0.0e+00 |
+| PrimitiveWetModel | 32 | 8 | 1 | 0.391 | 0.447 | 0.431 | 0.91× | 5.658 | -1% | 0.0e+00 |
+| PrimitiveWetModel | 32 | 8 | 2 | 0.785 | 0.886 | 0.885 | 0.89× | 6.213 | -2% | 0.0e+00 |
+| PrimitiveWetModel | 32 | 8 | 4 | 1.563 | 1.711 | 1.740 | 0.91× | 7.162 | -2% | 0.0e+00 |
+| PrimitiveWetModel | 32 | 8 | 8 | 3.343 | 3.474 | 3.462 | 0.97× | 9.124 | -1% | 0.0e+00 |
+| PrimitiveWetModel | 64 | 8 | 1 | 2.029 | 2.147 | 2.154 | 0.95× | 25.038 | -0% | 0.0e+00 |
+| PrimitiveWetModel | 64 | 8 | 2 | 4.160 | 4.359 | 4.349 | 0.96× | 27.528 | -1% | 0.0e+00 |
+| PrimitiveWetModel | 64 | 8 | 4 | 8.256 | 9.152 | 9.082 | 0.91× | 32.236 | -3% | 0.0e+00 |
+| PrimitiveWetModel | 64 | 8 | 8 | 16.554 | 19.457 | 19.588 | 0.85× | 42.030 | -7% | 0.0e+00 |
+| PrimitiveWetModel | 128 | 8 | 1 | 12.355 | 12.587 | 12.746 | 0.98× | 116.176 | -0% | 0.0e+00 |
+| PrimitiveWetModel | 128 | 8 | 2 | 25.258 | 26.307 | 26.023 | 0.97× | 129.822 | -1% | 0.0e+00 |
+| PrimitiveWetModel | 128 | 8 | 4 | 49.631 | 53.067 | 52.709 | 0.94× | 155.195 | -2% | 0.0e+00 |
+| PrimitiveWetModel | 128 | 8 | 8 | 99.123 | 105.525 | 105.364 | 0.94× | 208.535 | -3% | 0.0e+00 |
+| PrimitiveWetModel | 256 | 8 | 1 | 82.535 | 83.316 | 83.617 | 0.99× | 619.271 | -0% | 0.0e+00 |
+| PrimitiveWetModel | 256 | 8 | 2 | 164.205 | 166.340 | 166.505 | 0.99× | 722.753 | -0% | 0.0e+00 |
+| PrimitiveWetModel | 256 | 8 | 4 | 328.678 | 333.626 | 333.745 | 0.99× | 882.095 | -1% | 0.0e+00 |
+| PrimitiveWetModel | 256 | 8 | 8 | 666.807 | 740.590 | 689.685 | 0.97× | 1326.712 | -2% | 0.0e+00 |
+
+</details>
+
+The NVIDIA runs are pending (see "Handover").
+
+### Handover to the NVIDIA GPU machine
+
+On the machine of the stored `gpu-nvidia` results, from the repository root, on the branch with these changes:
+
+1. Instantiate the benchmark environment: `julia --project=SpeedyWeather/benchmark -e 'using Pkg; Pkg.instantiate()'`.
+2. Check the prototype works (a few minutes):
+   `julia --project=SpeedyWeather/benchmark SpeedyWeather/benchmark/fused_tracers_prototype.jl gpu --quick`.
+   The last column ("max. rel. difference") must be small (≲ 1e-5 in Float32); "Inf" means a compared array was zero.
+3. **0b**, the prototype:
+   `julia --project=SpeedyWeather/benchmark SpeedyWeather/benchmark/fused_tracers_prototype.jl gpu --output fused_tracers_gpu-nvidia.md`.
+4. **0a**, the benchmark with the tracer suite: `cd SpeedyWeather/benchmark && julia --project=. manual_benchmarking.jl gpu --tracers`.
+   This is a full benchmark run: it replaces the `gpu-nvidia` section of `README.md` and its record in
+   `assets/benchmark_results.json`, now with the tracer suite. Don't use `--suites benchmark510` for this, a partial run
+   replaces the stored results of all other suites of that architecture with nothing. If there is time, also
+   `reactant-nvidia-gpu --tracers`.
+5. Copy both tables (the tracer suite from the `gpu-nvidia` section of the README, the prototype's from
+   `fused_tracers_gpu-nvidia.md`) into "Results of phase 0" above and apply the gate: phase 1 only if the tracer suite
+   shows that 8 tracers add at least 20% at T ≤ 128, and the prototype's "saved of time step" is at least 20% with 4 to
+   8 tracers at T ≤ 128, with no slowdown at T256. Record the decision in the revision log, then commit and push.
+
 ## Phase 1: implementation (only if phase 0 says go)
 
 ### 1. Fused tracer variables
@@ -179,9 +278,10 @@ layers. Two ways, picked per kernel:
 ### 4. Batch sizes
 
 A helper `transform_tracers!` splits the fused transform into chunks of whole tracers that fit the transform's
-largest batch, i.e. one call for up to 9 tracers by default (two or three for the 3N·L batch). Optionally the model's
-default `spectral_transform` plans the tracer batch sizes: the `tracers` field comes before `spectral_transform` in
-the model structs, so its default can depend on the number of tracers (see open questions).
+largest batch `S.nlayers` (set by `transform_batch`), i.e. one call for up to 9 tracers by default (more for the
+3N·L batch), as `transform_slabs!` in the prototype. The transform's construction doesn't depend on the tracers for
+now. (Possible later: the `tracers` field comes before `spectral_transform` in the model structs, so the default
+transform could plan the tracer batch sizes.)
 
 ### 5. Versioning, changelog
 
@@ -221,18 +321,12 @@ suite, that goes into the same PR or a separate one.
 
 ## Open questions
 
-Recommendations in **bold**:
+Decided 2026-11-17 (see revision log):
 
-1. **Fuse all tracers automatically**, or only those declared with a `fuse` option per tracer
-   (`Tracer(fuse = :group)`)? Automatic needs no new user-facing option and costs no memory. Per-tracer groups would
-   allow several groups but add an API without a known use.
-2. **Deactivated tracers: switch to the per-tracer path when any tracer is deactivated**, or process all tracers fused
-   and mask the time step? The switch keeps the current behaviour exactly, and the per-tracer code already exists.
-   Masking keeps one path, but recomputes the frozen tracer's grid once (from the frozen spectral state) and wastes work
-   on frozen tracers.
-3. **Go/no-go thresholds:** 0a stops below a 20% cost of 8 tracers at T ≤ 128 on NVIDIA; 0b goes at a ≥ 20% shorter
-   time step with 4 to 8 tracers at T ≤ 128, not slower at T256, at most 5% slower on CPU. Adjust as you see fit.
-4. **More than 9 tracers: split the transforms into chunks first**, and only make the model's default transform plan
-   the tracer batch sizes if phase 0b shows that one wide batch is clearly faster than chunks.
-5. **Phase 0 runs:** I can run `cpu-arm` and `metal` on this machine. The NVIDIA and Reactant GPU runs need the GPU
-   machine of the stored results. Who runs them?
+1. All tracers are fused automatically, no per-tracer `fuse` option.
+2. With any tracer deactivated, all tracers are processed one by one (the existing per-tracer path).
+3. The go/no-go thresholds as proposed: 0a stops below a 20% cost of 8 tracers at T ≤ 128 on NVIDIA; 0b goes at a
+   ≥ 20% shorter time step with 4 to 8 tracers at T ≤ 128, not slower at T256, at most 5% slower on CPU.
+4. Transforms wider than the transform's largest batch (`S.nlayers`, from `transform_batch`) are split into chunks of
+   whole tracers; no tracer-dependent transform construction for now.
+5. The phase 0 edits are made on this machine; the NVIDIA runs are done on a GPU machine (see "Handover").

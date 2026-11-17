@@ -56,6 +56,13 @@ Beljaars gusts (`speedy_components` in `benchmark_suite.jl`). Its section and it
 numbers (the `speedy` field of the record) are part of the architecture's results,
 like those of `--reverse`. On every architecture, including Reactant.
 
+The flag `--tracers` additionally runs a suite (`:benchmark510`) of the ShallowWater
+model (T32, T64, T128) and the PrimitiveWet model (T32 to T256) with 0, 1, 2, 4, 8
+and 16 active tracers, default transform. Its column "vs no tracers" is the
+wallclock time relative to the same configuration without tracers, see
+`docs/dev/2026-11/2026-11-17-fused-tracers.md`. Its numbers are stored in the
+`tracers` field of the record.
+
 A run replaces all results stored for its label, including those of suites that a
 flag added in an earlier run. Flags and options can be combined in any order, e.g.
 `reactant-nvidia-gpu --length 10 --reverse --hi-res`; `--SPEEDY` can also be written `--speedy`. Truncations are 1-based throughout
@@ -69,7 +76,7 @@ layers (`DEBUG_TRUNCATIONS`, `DEBUG_NLAYERS`), under the key of the resolution s
 `assets/benchmark_results.json` untouched. With `--output FILE` the results are
 additionally written to FILE as JSON, e.g. to compare revisions (as
 `regression/regression.jl` does). `--repeats` and `--length` apply as usual, the
-flags adding or selecting suites (`--reverse`, `--SPEEDY`, `--hi-res`, `--suites`) can't
+flags adding or selecting suites (`--reverse`, `--SPEEDY`, `--tracers`, `--hi-res`, `--suites`) can't
 be combined with it, e.g.
 
     julia --project=SpeedyWeather/benchmark manual_benchmarking.jl --debug
@@ -143,8 +150,8 @@ const ARGUMENT_SETTINGS = ArgParseSettings(
     metavar = "N"
     range_tester = repeats -> repeats >= 1
     "--suites"
-    help = "comma-separated suite keys to run, e.g. `benchmark201,benchmark900` (benchmark800 needs --reverse, " *
-        "benchmark900 --SPEEDY). Default: all suites. A partial run replaces this architecture's stored results " *
+    help = "comma-separated suite keys to run, e.g. `benchmark201,benchmark900` (benchmark510 needs --tracers, " *
+        "benchmark800 --reverse, benchmark900 --SPEEDY). Default: all suites. A partial run replaces this architecture's stored results " *
         "with just these suites."
     arg_type = String
     default = ""
@@ -159,6 +166,9 @@ const ARGUMENT_SETTINGS = ArgParseSettings(
     help = "also run the PrimitiveWet resolution sweep in a SPEEDY.f90-like configuration (prescribed seasonal climatologies, constant surface roughness, wind slowdown and gusts)"
     action = :store_true
     dest_name = "speedy"
+    "--tracers"
+    help = "also run the ShallowWater and PrimitiveWet models with 0, 1, 2, 4, 8 and 16 tracers"
+    action = :store_true
     "--debug"
     help = "quick check whether the performance regressed: only a short PrimitiveWet resolution sweep with the default " *
         "transform (T32-T128 with 8 layers, T32 and T128 with 16 layers), the results are printed, README.md and " *
@@ -174,6 +184,7 @@ const ARGUMENTS = parse_args(ARGUMENT_SETTINGS)
 const RUN_REVERSE = ARGUMENTS["reverse"]
 const RUN_HI_RES = ARGUMENTS["hi_res"]
 const RUN_SPEEDY = ARGUMENTS["speedy"]
+const RUN_TRACERS = ARGUMENTS["tracers"]
 
 # Debug mode (`--debug`): only the PrimitiveWet model with the default transform at these
 # (truncation, nlayers): the resolution sweep up to T128 with 8 layers, and two configurations with 16 layers
@@ -186,8 +197,8 @@ const DEBUG_SUMMARY = "PrimitiveWet LT+FFT at " * join(
 )
 const OUTPUT_PATH = isnothing(ARGUMENTS["output"]) ? nothing : abspath(CALLER_DIRECTORY, ARGUMENTS["output"])
 isnothing(OUTPUT_PATH) || DEBUG_MODE || error("--output FILE is only supported together with --debug.")
-DEBUG_MODE && (RUN_REVERSE || RUN_HI_RES || RUN_SPEEDY || !isempty(strip(ARGUMENTS["suites"]))) &&
-    error("--debug only runs its own short PrimitiveWet sweep, it can't be combined with --reverse, --hi-res, --SPEEDY or --suites.")
+DEBUG_MODE && (RUN_REVERSE || RUN_HI_RES || RUN_SPEEDY || RUN_TRACERS || !isempty(strip(ARGUMENTS["suites"]))) &&
+    error("--debug only runs its own short PrimitiveWet sweep, it can't be combined with --reverse, --hi-res, --SPEEDY, --tracers or --suites.")
 
 const ARCH_ARG = lowercase(ARGUMENTS["architecture"])
 # Reactant's backend per architecture argument, the GPU vendor is that of the installed Reactant_jll build
@@ -271,6 +282,7 @@ RUN_HI_RES && !ON_ACCELERATOR && @warn "--hi-res only adds GPU and TPU configura
 @info "Reverse-mode benchmarks: $(RUN_REVERSE ? "on" : "off, enable with --reverse")"
 @info "High resolutions T342, T512 in benchmark201 (GPU, TPU only): $(RUN_HI_RES && ON_ACCELERATOR ? "on" : "off")"
 @info "SPEEDY.f90-like configuration suite: $(RUN_SPEEDY ? "on" : "off, enable with --SPEEDY")"
+@info "Tracer suite: $(RUN_TRACERS ? "on" : "off, enable with --tracers")"
 @info "Debug mode: $(DEBUG_MODE ? "on, results not stored" * (isnothing(OUTPUT_PATH) ? "" : " but written to $OUTPUT_PATH") : "off, enable with --debug")"
 
 # Free (device) memory between benchmark runs, called outside the timed region
@@ -297,6 +309,8 @@ DEBUG_MODE || load_results()     # the debug mode doesn't touch the store
 const REVERSE_SUITE_KEY = :benchmark800
 # The SPEEDY.f90-like configuration suite (`--SPEEDY`), its numbers also in the `speedy` field
 const SPEEDY_SUITE_KEY = :benchmark900
+# The tracer suite (`--tracers`), its numbers also in the `tracers` field
+const TRACER_SUITE_KEY = :benchmark510
 
 include("benchmark_suite.jl")
 # The Reactant methods of the benchmark hooks need the `@compile` macro, only parse them once Reactant is loaded
@@ -442,6 +456,7 @@ function suite_data(suite::BenchmarkSuite)
         "dt" => map(json_safe, suite.Δt),
         "compile_time" => map(json_safe, suite.compile_time),
         "spectral_transform" => string.(suite.spectral_transform),
+        "ntracers" => collect(suite.ntracers),
     )
 end
 
@@ -460,6 +475,7 @@ arch_record = Dict(
 :benchmark201 in SUITE_KEYS && (arch_record["overview"] = suite_data(benchmarks[:benchmark201]))
 REVERSE_SUITE_KEY in SUITE_KEYS && (arch_record["reverse"] = reverse_data(benchmarks[REVERSE_SUITE_KEY]))
 SPEEDY_SUITE_KEY in SUITE_KEYS && (arch_record["speedy"] = suite_data(benchmarks[SPEEDY_SUITE_KEY]))
+TRACER_SUITE_KEY in SUITE_KEYS && (arch_record["tracers"] = suite_data(benchmarks[TRACER_SUITE_KEY]))
 
 # Debug mode: print the results and write them to `--output` (if given) to compare
 # revisions, but leave benchmark_results.json and README.md untouched
@@ -559,7 +575,8 @@ function write_preamble(md)
     write(md, "`--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-nvidia-gpu --reverse`) additionally runs the ")
     write(md, "reverse-mode benchmarks, which take hours. `--hi-res` (GPU and TPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. ")
     write(md, "`--SPEEDY` additionally runs the PrimitiveWet model over the resolutions of the resolution sweep in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of ")
-    write(md, "sea surface temperature, land surface temperature and soil moisture, constant surface roughness, wind slowdown and gusts).\n\n")
+    write(md, "sea surface temperature, land surface temperature and soil moisture, constant surface roughness, wind slowdown and gusts). ")
+    write(md, "`--tracers` additionally runs the ShallowWater and PrimitiveWet models with 0, 1, 2, 4, 8 and 16 tracers.\n\n")
     write(md, "Each run replaces its own architecture's section in this `README.md` (including suites added by flags in an earlier run); ")
     write(md, "results for other architectures are preserved via `benchmark_results.json`.\n\n")
     write(md, "A pull request labelled `benchmark-performance` is benchmarked against main with the same debug mode on every push, and the comparison is posted as a comment.\n\n")

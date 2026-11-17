@@ -104,6 +104,32 @@ benchmarks[:benchmark700] = BenchmarkSuiteDynamics(
     nruns = 1,
 )
 
+## TRACERS, opt-in with `--tracers`
+# The ShallowWaterModel (L1) and the PrimitiveWetModel (L8) with 0, 1, 2, 4, 8 and 16 active tracers at low to
+# high resolution, default transform. The slowdown against no tracers is what the tracers cost, an upper bound of
+# what processing them together could save (docs/dev/2026-11/2026-11-17-fused-tracers.md, phase 0a).
+if RUN_TRACERS
+    let
+        configurations = [
+            (ShallowWaterModel, 32, 1), (ShallowWaterModel, 64, 1), (ShallowWaterModel, 128, 1),
+            (PrimitiveWetModel, 32, 8), (PrimitiveWetModel, 64, 8), (PrimitiveWetModel, 128, 8), (PrimitiveWetModel, 256, 8),
+        ]
+        runs = [(configuration..., ntracers) for configuration in configurations for ntracers in (0, 1, 2, 4, 8, 16)]
+        nruns = length(runs)
+        benchmarks[TRACER_SUITE_KEY] = BenchmarkSuite(
+            title = "Tracers",
+            description = "Active tracers (zero initial conditions) defined with the `tracers` keyword of the model " *
+                "constructor, default transform. \"vs no tracers\" is the wallclock time relative to the same " *
+                "configuration without tracers.",
+            nruns = nruns,
+            model = [run[1] for run in runs],
+            truncation = [run[2] for run in runs],
+            nlayers = [run[3] for run in runs],
+            ntracers = [run[4] for run in runs],
+        )
+    end
+end
+
 ## SPEEDY.F90-LIKE CONFIGURATION, opt-in with `--SPEEDY`
 # The PrimitiveWet model with prescribed seasonal climatologies and constant surface roughness, wind
 # slowdown and gusts (`speedy_components` in benchmark_suite.jl), over the same resolutions as the
