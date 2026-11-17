@@ -11,16 +11,18 @@ const AXIAL_TILT = 23.4
 const EARTH_ECCENTRICITY = 0.0167
 const EARTH_LONGITUDE_OF_PERIHELION = 282.9     # [˚] from the vernal equinox, perihelion early January
 
-export AbstractOrbit, CircularOrbit, KeplerOrbit
+export AbstractOrbit
 
 """Abstract supertype for the orbit of a planet around its star. The orbit defines the
 variables needed for its computation (`variables`), the solar zenith executes that
 computation once per time step before the zenith angle (`orbit_position!`), and the
-shortwave radiation reads the Sun–planet distance factor (`solar_distance_factor`)."""
-abstract type AbstractOrbit end
+shortwave radiation reads the Sun-planet distance factor (`solar_distance_factor`)."""
+abstract type AbstractOrbit <: AbstractModelComponent end
+
+export CircularOrbit
 
 """Circular orbit: the solar declination follows the solar zenith's `solar_declination`
-component and the Sun–planet distance is constant, so the distance factor (a/r)² is 1
+component and the Sun-planet distance is constant, so the distance factor (a/r)² is 1
 and no variable is needed for it."""
 struct CircularOrbit <: AbstractOrbit end
 
@@ -34,6 +36,8 @@ function mean_anomaly_at_equinox(e, longitude_of_perihelion)
     E = 2 * atan(sqrt(1 - e) * sin(-ϖ / 2), sqrt(1 + e) * cos(-ϖ / 2))    # eccentric anomaly
     return E - e * sin(E)
 end
+
+export KeplerOrbit
 
 """$(TYPEDSIGNATURES)
 Elliptical (Kepler) orbit. `KeplerOrbit` can represent any elliptical orbit but its defaults
@@ -63,7 +67,7 @@ KeplerOrbit(SG::SpectralGrid; kwargs...) = KeplerOrbit{SG.NF}(; kwargs...)
 # the orbit defines the variables needed for its computation
 variables(::AbstractOrbit) = ()
 variables(::KeplerOrbit) = (
-    ParameterizationVariable(:solar_distance_factor, ScalarDim(1), desc = "Sun–planet distance factor (a/r)²", units = "1"),
+    ParameterizationVariable(:solar_distance_factor, ScalarDim(1), desc = "Sun-planet distance factor (a/r)²", units = "1"),
 )
 
 export Earth
