@@ -87,6 +87,7 @@ end
 # LLVM_full_jll matching Julia's LLVM (see the headers of these files, valid output = fixed). Decisive: set
 # SPLIT_COLUMN_LOOPS = false and run test/differentiability/primitivewet.jl (the "parameter AD" testset aborted).
 # Then delete this block, the branch above and test/parameterizations/column_loops.jl.
+# xref Enzyme.jl issue: EnzymeAD/Enzyme.jl#4074
 const SPLIT_COLUMN_LOOPS = true
 
 # Unrolled at compile time over the names of the model's parameterizations, one call per parameterization
