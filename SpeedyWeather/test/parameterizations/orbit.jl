@@ -14,8 +14,12 @@ end
     # one year of uniformly spaced times (2001 is not a leap year)
     times = DateTime(2001, 1, 1) .+ Minute.(round.(Int, range(0, 365 * 24 * 60, length = 3651)[1:(end - 1)]))
 
+    @testset "KeplerOrbit is the default" begin
+        @test Earth(spectral_grid).orbit isa KeplerOrbit
+    end
+
     @testset "CircularOrbit" begin
-        planet = Earth(spectral_grid)
+        planet = Earth(spectral_grid; orbit = CircularOrbit())
         @test planet.orbit isa CircularOrbit
         for time in times[1:100:end]
             declination, distance_factor = SpeedyWeather.orbit_position(T, planet.orbit, zenith, planet, time)
@@ -80,7 +84,7 @@ end
     spectral_grid = SpectralGrid(truncation = 21, nlayers = 4)
 
     # a circular orbit needs no distance factor: nothing allocated, factor is 1
-    model = PrimitiveWetModel(spectral_grid)
+    model = PrimitiveWetModel(spectral_grid; planet = Earth(spectral_grid; orbit = CircularOrbit()))
     vars = SpeedyWeather.Variables(model)
     @test !haskey(vars.parameterizations, :solar_distance_factor)
     @test SpeedyWeather.solar_distance_factor(vars) == 1

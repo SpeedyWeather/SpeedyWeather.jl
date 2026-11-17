@@ -350,9 +350,10 @@ scales the total incoming radiation.
 
 ### Eccentric orbits
 
-By default the orbit is circular, `planet.orbit = CircularOrbit()`: the solar
-declination follows the zenith's `solar_declination` and the Sun–planet distance
-is constant. An elliptical orbit is set with a `KeplerOrbit`
+By default the orbit is elliptical, `planet.orbit = KeplerOrbit()`, with present-day
+Earth's eccentricity and longitude of perihelion. A circular orbit, `CircularOrbit()`,
+keeps the Sun–planet distance constant and takes the solar declination from the zenith's
+`solar_declination`, as before this option existed. An elliptical orbit is set with a `KeplerOrbit`
 
 ```@example radiation
 orbit = KeplerOrbit(spectral_grid, eccentricity=0.0167, longitude_of_perihelion=282.9)
