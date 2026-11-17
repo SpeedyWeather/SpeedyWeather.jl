@@ -66,9 +66,42 @@ end
 # outer loop over parameterizations, inner loop over horizontal grid points
 # this yields a more contiguous memory access pattern on CPU
 function column_parameterizations_cpu!(vars, model)
-    _column_parameterizations_cpu!(vars, get_parameterizations(model), model)
+    if SPLIT_COLUMN_LOOPS       # workaround for llvm/llvm-project#219885, see below
+        _column_parameterizations_cpu_by_name!(vars, model, Val(keys(get_parameterizations(model))))
+    else
+        _column_parameterizations_cpu!(vars, get_parameterizations(model), model)
+    end
     return nothing
 end
+
+# >>> WORKAROUND llvm/llvm-project#219885 (LLVM GVN bug with `!invariant.group` loads) >>>>>>>>>>>>>>>>>>>>>>
+# Inlined, all column loops end up in one reverse function of Enzyme large enough to trigger an LLVM bug
+# in Enzyme's post-AD GVN (stale MemDep cache for the `!invariant.group` loads that Enzyme emits): a broken
+# module ("Broken module found") or a segfault while compiling the reverse pass, see #1290 and
+# docs/dev/2026-11/2026-11-17-extended-diff-tests-failure.md. With SPLIT_COLUMN_LOOPS every parameterization
+# runs in its own non-inlined function, also in Enzyme's reverse pass. No measurable cost (the call is per
+# parameterization and time step, not per grid point). Fixed upstream by llvm/llvm-project#219929, which
+# is not in the LLVM of Julia 1.10, 1.11 or 1.12 (2026-11).
+# TO REVERT once the Julia versions used for Enzyme CI ship an LLVM with that fix: a quick check is
+# `opt -passes=gvn` on docs/dev/2026-11/2026-11-17-gvn-invariant-group{,-upstream}.ll with the `opt` of the
+# LLVM_full_jll matching Julia's LLVM (see the headers of these files, valid output = fixed). Decisive: set
+# SPLIT_COLUMN_LOOPS = false and run test/differentiability/primitivewet.jl (the "parameter AD" testset aborted).
+# Then delete this block, the branch above and test/parameterizations/column_loops.jl.
+const SPLIT_COLUMN_LOOPS = true
+
+# Unrolled at compile time over the names of the model's parameterizations, one call per parameterization
+@generated function _column_parameterizations_cpu_by_name!(vars, model, ::Val{names}) where {names}
+    calls = [:(_column_parameterization_cpu_by_name!(vars, Val($(QuoteNode(name))), model)) for name in names]
+    return Expr(:block, calls..., :(return nothing))
+end
+
+# The parameterization is selected by name inside: passing the struct to a non-inlined function makes
+# Enzyme copy it untyped (EnzymeNoTypeError with a Duplicated model)
+@noinline function _column_parameterization_cpu_by_name!(vars, ::Val{name}, model) where {name}
+    column_parameterization_cpu!(vars, getfield(model, name), model)
+    return nothing
+end
+# <<< END WORKAROUND llvm/llvm-project#219885 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 # Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
 @generated function _column_parameterizations_cpu!(vars, parameterizations::NamedTuple{names}, model) where {names}
