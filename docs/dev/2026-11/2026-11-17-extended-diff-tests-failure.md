@@ -360,12 +360,23 @@ It is now `truncation = 6`, the same resolution. The "Time step changed … to m
 Uncommitted on branch `mg/enzyme-failure` (base b06af911a). `SpeedyWeather` is already `0.25.0-DEV`, so no version
 bump is needed. A CHANGELOG line is still to be added once there is a PR number.
 
-1. `SpeedyWeather/src/parameterizations/tendencies.jl`: `column_parameterizations_cpu!(vars, model)` now unrolls over
-   the *names* of the model's parameterizations (`_column_parameterizations_cpu_by_name!`). Each parameterization runs
-   in its own `@noinline` function `_column_parameterization_cpu_by_name!(vars, ::Val{name}, model)`, which does
-   `getfield(model, name)` inside. Workaround for llvm/llvm-project#219885: smaller Enzyme reverse functions, no struct
-   copied into a non-inlined call. `_column_parameterizations_cpu!(vars, ::NamedTuple, model)` is unchanged (tests).
-   Only the plain-CPU path is affected; GPU and Reactant use `column_parameterizations_kernel!`.
+1. `SpeedyWeather/src/parameterizations/tendencies.jl`, workaround for llvm/llvm-project#219885, **reversible by one
+   constant**: `column_parameterizations_cpu!(vars, model)` branches on `const SPLIT_COLUMN_LOOPS = true` (constant-folded,
+   no runtime cost). `true` unrolls over the *names* of the model's parameterizations
+   (`_column_parameterizations_cpu_by_name!`), and each parameterization runs in its own `@noinline` function
+   `_column_parameterization_cpu_by_name!(vars, ::Val{name}, model)` with `getfield(model, name)` inside: smaller Enzyme
+   reverse functions, no struct copied into a non-inlined call. `false` is the original fused path
+   `_column_parameterizations_cpu!(vars, get_parameterizations(model), model)`, which is unchanged. The constant and both
+   new functions sit in one block delimited by `>>> WORKAROUND llvm/llvm-project#219885` / `<<< END WORKAROUND`, whose
+   comment says how to check whether it is still needed and what to delete. Only the plain-CPU path is affected; GPU
+   and Reactant use `column_parameterizations_kernel!`.
+   - Revert check: `docs/dev/2026-11/2026-11-17-gvn-invariant-group.ll` (our 65-line reproducer, breaks LLVM 15/16/18)
+     and `…-upstream.ll` (the #219885 reproducer, crashes LLVM 23.1.4jl). `opt -passes=gvn` on both with the `opt` of
+     the matching `LLVM_full_jll` must give valid output. Decisive: `SPLIT_COLUMN_LOOPS = false` +
+     `test/differentiability/primitivewet.jl`.
+   - New unit test `SpeedyWeather/test/parameterizations/column_loops.jl`: both paths (and the default) give identical
+     parameterization variables, tendencies and scratch for PrimitiveWet and PrimitiveDry, so the switch can be
+     flipped without changing the model. To be deleted together with the workaround.
 2. `SpeedyWeather/ext/SpeedyWeatherEnzymeExt.jl`: the custom forward/augmented-primal/reverse rules for
    `iterate(::TRACER_DICT, …)` are replaced by `EnzymeRules.inactive(::typeof(Base.iterate), ::TRACER_DICT, args...)`.
    This removes the "Cannot deduce type of load" warnings and makes forward mode over a populated registry work.
@@ -465,3 +476,15 @@ trees with the same `HEAD` need separate `--workdir`s, as the env directory is k
   `post_optimize!` (`mwe_post_optimize_ir.jl`).
 - Draft for an Enzyme.jl issue (not filed): `mwe/ENZYME_ISSUE_DRAFT.md`, with the SpeedyWeather reproducer, the
   65-line LLVM reproducer, the diagnosis and the stripping workaround.
+
+### Reversible workaround (`SPLIT_COLUMN_LOOPS`)
+
+User request: make the workaround easy to reverse once the LLVM fix reaches Julia. Implemented as a constant-folded
+switch with both code paths kept (see Summary of changes, item 1). Validation (Julia 1.10.13, Enzyme 0.13.220):
+
+| Test | Result |
+|---|---|
+| `test/parameterizations/column_loops.jl` + `all_parametrizations.jl`, `--check-bounds=yes` | 14/14 (paths bit-identical, Wet and Dry), 61/61 |
+| reproducer `repro_param_ad.jl`, `SPLIT_COLUMN_LOOPS = true` (repo) | pass (65.9 s) |
+| same, `SPLIT_COLUMN_LOOPS = false` (temporary worktree, otherwise identical) | **abort, "Broken module found"**: the switch restores the original behaviour, so the revert check works |
+| full `differentiability/runtests.jl` with the final code (job `sw_full`) | running |
