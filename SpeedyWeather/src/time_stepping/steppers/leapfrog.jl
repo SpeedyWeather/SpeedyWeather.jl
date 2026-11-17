@@ -186,12 +186,11 @@ end
     return nothing
 end
 
-@generated function move_grid_tracers_back!(vars::Variables{Po, G, T}, move = true) where {Po, G, T}
-    calls = [
-        :(copy_step_back!(getfield(vars.grid.tracers, $(QuoteNode(name))), move))
-            for name in _namespace_names(T, :tracers)
-    ]
-    return Expr(:block, calls..., :(return nothing))
+# all tracers (active or not) live in one fused parent, copy it contiguously (one broadcast, also Reactant-safe,
+# see `scale_tendencies!`)
+function move_grid_tracers_back!(vars::Variables, move = true)
+    haskey(vars.fused, :tracers_grid) && copy_step_back!(parent(vars.fused.tracers_grid), move)
+    return nothing
 end
 
 # for leapfrog do first semi-implicit corrections then horizontal diffusion

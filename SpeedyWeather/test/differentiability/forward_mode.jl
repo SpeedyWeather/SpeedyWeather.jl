@@ -37,14 +37,20 @@ function _seed_tracer!(shadow, name, seed)
     return length(d)
 end
 
-@testset "Differentiability: forward vs reverse time_step! ($(nameof(MT))$(with_tracer ? " with a tracer" : ""))" for
-    (MT, nlayers, with_tracer) in
-    ((BarotropicModel, 1, false), (ShallowWaterModel, 1, false), (PrimitiveWetModel, 2, false), (BarotropicModel, 1, true))
+# with `fuse_tracers` the tracers `abc` and `def` are processed together (fused), otherwise the tracer `abc` alone
+@testset "Differentiability: forward vs reverse time_step! ($(nameof(MT))$(with_tracer ? " with a tracer" : "")$(fuse_tracers ? ", fused" : ""))" for
+    (MT, nlayers, with_tracer, fuse_tracers) in (
+        (BarotropicModel, 1, false, false), (ShallowWaterModel, 1, false, false), (PrimitiveWetModel, 2, false, false),
+        (BarotropicModel, 1, true, false), (PrimitiveWetModel, 2, true, true),
+    )
 
     spectral_grid = SpectralGrid(; truncation = 6, nlayers, NF = Float64)
-    model = MT(; spectral_grid, tracers = with_tracer ? (; abc = Tracer()) : (;))
+    tracers = with_tracer ? (fuse_tracers ? (; abc = Tracer(), def = Tracer()) : (; abc = Tracer())) : (;)
+    model = MT(; spectral_grid, tracers, fuse_tracers)
     simulation = initialize!(model)
+    @test SpeedyWeather.fused_tracers(simulation.variables, simulation.model) == fuse_tracers
     with_tracer && set!(simulation, abc = (λ, φ, σ) -> exp(-(λ - 180)^2 / 30^2), namespace = :tracers)
+    with_tracer && fuse_tracers && set!(simulation, def = (λ, φ, σ) -> σ * cosd(φ), namespace = :tracers)
     initialize!(simulation)
     run!(simulation, period = Hour(6))
     vars0 = deepcopy(simulation.variables)
@@ -59,6 +65,8 @@ end
     if with_tracer
         _seed_tracer!(v, :abc, 4)
         _seed_tracer!(w, :abc, 5)
+        fuse_tracers && _seed_tracer!(v, :def, 6)
+        fuse_tracers && _seed_tracer!(w, :def, 7)
     end
 
     # `make_zero` must produce a genuinely zero shadow: in forward mode the shadow IS the tangent,
@@ -86,6 +94,7 @@ end
     @test all(isfinite, jv)
     @test any(!iszero, jv)
     with_tracer && @test any(!iszero, jvp.prognostic.tracers.abc.data)     # tracer tangent propagated
+    with_tracer && fuse_tracers && @test any(!iszero, jvp.prognostic.tracers.def.data)
 
     lhs = sum(jv .* to_vec(w)[1])                   # <J v, w>
     rhs = sum(to_vec(v)[1] .* to_vec(vjp)[1])       # <v, Jᵀ w>

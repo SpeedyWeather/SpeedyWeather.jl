@@ -47,6 +47,7 @@ Fields, representing model components, are $(TYPEDFIELDS)"""
     # VARIABLES
     random_process::RP = nothing
     tracers::TR = (;)
+    fuse_tracers::Bool = default_fuse_tracers(architecture)     # process all tracers together (if all active)
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)

@@ -75,6 +75,7 @@ $(TYPEDFIELDS)"""
     # VARIABLES
     random_process::RP = nothing
     tracers::TR = (;)
+    fuse_tracers::Bool = default_fuse_tracers(architecture)     # process all tracers together (if all active)
 
     # BOUNDARY CONDITIONS
     dynamics_only::Bool = false

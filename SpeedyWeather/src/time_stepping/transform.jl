@@ -39,12 +39,27 @@ function SpeedyTransforms.transform!(
     transform!(u_grid, U, scratch_memory, S, unscale_coslat = true)
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
-    # transform the active tracers (unrolled per name)
-    foreach_active_tracer(transform_tracer!, vars, model, time_stepping, scratch_memory, S)
+    # transform the active tracers (all together or one by one)
+    transform_tracers!(vars, model, time_stepping, scratch_memory, S)
 
     # transform random pattern for random process unless random_process=nothing
     transform!(vars, model.random_process, S)
 
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Transform the active tracers from spectral to grid space: all together in one batched transform (in chunks of whole
+tracers that fit into the transform's largest batch) if `fused_tracers`, otherwise one by one."""
+function transform_tracers!(vars::Variables, model::AbstractModel, time_stepping, scratch_memory, S)
+    if fused_tracers(vars, model)
+        # model is passed on as for the variables of a single tracer, see `transform_tracer!`
+        tracers_spectral = get_prognostic_step(parent(vars.fused.tracers_spectral), time_stepping, S, model)
+        tracers_grid = get_prognostic_step(parent(vars.fused.tracers_grid), time_stepping, S, model)
+        transform_stacked!(tracers_grid, tracers_spectral, get_nlayers(model), scratch_memory, S)
+    else
+        foreach_active_tracer(transform_tracer!, vars, model, time_stepping, scratch_memory, S)
+    end
     return nothing
 end
 
@@ -103,8 +118,8 @@ function SpeedyTransforms.transform!(
     transform!(u_grid, U, scratch_memory, S, unscale_coslat = true)
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
-    # transform the active tracers (unrolled per name)
-    foreach_active_tracer(transform_tracer!, vars, model, time_stepping, scratch_memory, S)
+    # transform the active tracers (all together or one by one)
+    transform_tracers!(vars, model, time_stepping, scratch_memory, S)
 
     # transform random pattern for random process unless random_process=nothing
     transform!(vars, model.random_process, S)
@@ -174,8 +189,8 @@ function SpeedyTransforms.transform!(
         unscale_coslat = true
     )
 
-    # transform the active tracers (unrolled per name)
-    foreach_active_tracer(transform_tracer!, vars, model, time_stepping, scratch_memory, S)
+    # transform the active tracers (all together or one by one)
+    transform_tracers!(vars, model, time_stepping, scratch_memory, S)
 
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
     # only do after transforms to avoid copying uninitialized zeros

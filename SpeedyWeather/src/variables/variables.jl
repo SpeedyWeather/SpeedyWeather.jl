@@ -372,6 +372,13 @@ function Variables(model::AbstractModel)
                                name_a = :spectral_tendencies, name_b = :grid_tendencies)
     end
 
+    # Same for the tracers, which are transformed all together (see `fused_tracers`)
+    for (spectral, grid) in ((:tracers_spectral, :tracers_grid), (:tracer_tendencies_spectral, :tracer_tendencies_grid))
+        if haskey(fused, spectral) && haskey(fused, grid)
+            _assert_fuse_alignment(fused[spectral], fused[grid]; name_a = spectral, name_b = grid)
+        end
+    end
+
     return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch, fused)
 end
 # runic: on

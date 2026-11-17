@@ -228,9 +228,11 @@ end
 and the tracers named in `tracers` (none by default)."""
 function test_model(
         ModelType::Type; Transform = MatrixSpectralTransform, truncation = TRUNCATION, nsteps = NSTEPS,
-        tolerances::NamedTuple = TOLERANCES, precompile = false, tracers::Tuple = ()
+        tolerances::NamedTuple = TOLERANCES, precompile = false, tracers::Tuple = (),
+        fuse_tracers::Bool = SpeedyWeather.default_fuse_tracers(ReactantDevice()),
     )
-    model_name = "$ModelType with $(nameof(Transform))" * (isempty(tracers) ? "" : " and tracers $tracers")
+    model_name = "$ModelType with $(nameof(Transform))" * (isempty(tracers) ? "" : " and tracers $tracers") *
+        (isempty(tracers) || !fuse_tracers ? "" : " (fused)")
 
     println("="^60)
     println("$model_name: CPU vs Reactant Correctness Tests")
@@ -244,7 +246,10 @@ function test_model(
 
     # Setup Reactant model
     println("\n[2/3] Setting up Reactant model...")
-    model_reactant = create_reactant_model(ModelType; truncation, Transform, tracers = NamedTuple{tracers}(map(_ -> Tracer(), tracers)))
+    # with tracers on Reactant processed together (fused) or one by one, always one by one on the CPU
+    model_reactant = create_reactant_model(
+        ModelType; truncation, Transform, tracers = NamedTuple{tracers}(map(_ -> Tracer(), tracers)), fuse_tracers
+    )
     simulation_reactant = initialize!(model_reactant)
     # set the tracers on Reactant only, they are copied to the CPU after the spin up
     isempty(tracers) || set!(simulation_reactant; namespace = :tracers, (name => tracer_initial_condition for name in tracers)...)
@@ -294,3 +299,6 @@ test_model(PrimitiveWetModel; Transform = SpectralTransform)
 # tracers: transformed, diffused, advected and time stepped per tracer name, compared in their own namespaces.
 # PrimitiveDry also covers the vertical advection of tracers and the primitive equation transform/diffusion
 test_model(PrimitiveDryModel; tracers = (:tracer,))
+
+# several tracers processed together (fused) on Reactant, one by one on the CPU
+test_model(PrimitiveDryModel; tracers = (:tracer1, :tracer2), fuse_tracers = true)

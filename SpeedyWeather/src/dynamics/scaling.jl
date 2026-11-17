@@ -31,6 +31,9 @@ function scale_tendencies!(vars::Variables, model::AbstractModel)
         scale!(get_tendency_step(parent(vars.fused.spectral_tendencies), TS, DummyParameterization()), scale)
     haskey(vars.fused, :grid_tendencies) &&
         scale!(get_tendency_step(parent(vars.fused.grid_tendencies), TS, DummyParameterization()), scale)
+    # likewise the grid tendencies of all tracers, always fused (and their fluxes, overwritten before read)
+    haskey(vars.fused, :tracer_tendencies_grid) &&
+        scale!(get_tendency_step(parent(vars.fused.tracer_tendencies_grid), TS, DummyParameterization()), scale)
 
     # Scale the standalone (non-fused) tendencies individually — unrolled per name
     _scale_tendencies_unrolled!(vars, TS, scale)
@@ -52,9 +55,6 @@ end
     for name in _tendency_and_uv_names(T)           # grid (+ u, v)
         push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies.grid, $(QuoteNode(name))), TS, scale)))
     end
-    for name in _namespace_names(T, :tracers)       # grid tracers
-        push!(calls, :(_scale_one_tendency!(getfield(vars.tendencies.grid_tracers, $(QuoteNode(name))), TS, scale)))
-    end
     return Expr(:block, calls..., :(return nothing))
 end
 
@@ -69,6 +69,7 @@ function unscale_tendencies!(vars::Variables)
     inv_scale = inv(scale)
     haskey(vars.fused, :spectral_tendencies) && (parent(vars.fused.spectral_tendencies).data .*= inv_scale)
     haskey(vars.fused, :grid_tendencies) && (parent(vars.fused.grid_tendencies).data .*= inv_scale)
+    haskey(vars.fused, :tracer_tendencies_grid) && (parent(vars.fused.tracer_tendencies_grid).data .*= inv_scale)
 
     # spectral
     for varname in tendency_names(vars)
@@ -82,11 +83,6 @@ function unscale_tendencies!(vars::Variables)
         is_view_entry(var) || unscale!(var, scale)
     end
 
-    # tracers
-    for varname in tracer_tendency_names(vars)
-        var = getfield(tendencies.grid_tracers, varname)
-        is_view_entry(var) || unscale!(var, scale)
-    end
     return nothing
 end
 

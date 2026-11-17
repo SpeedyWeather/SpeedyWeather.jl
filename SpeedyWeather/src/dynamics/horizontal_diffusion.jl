@@ -268,9 +268,66 @@ function horizontal_diffusion!(
     vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, diffusion)
     horizontal_diffusion!(vor_tend, vor, expl, impl)
 
-    # diffuse the active tracers like vorticity (unrolled per name)
-    foreach_active_tracer(horizontal_diffusion_tracer!, vars, model, diffusion, expl, impl)
+    # diffuse the active tracers like vorticity (all together or one by one)
+    horizontal_diffusion_tracers!(vars, model, diffusion, expl, impl)
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Horizontal diffusion of the active tracers with the explicit and implicit (or `nothing`) damping `expl`, `impl` of
+vorticity: all together in one kernel if `fused_tracers`, otherwise one by one."""
+function horizontal_diffusion_tracers!(vars::Variables, model::AbstractModel, diffusion, expl, impl)
+    if fused_tracers(vars, model)
+        tracers = get_prognostic_step(parent(vars.fused.tracers_spectral), model.time_stepping, diffusion)
+        tendencies = get_tendency_step(parent(vars.fused.tracer_tendencies_spectral), model.time_stepping, diffusion)
+        # the tendencies' parent also holds the fluxes in the layers after the tendencies
+        tracer_tendencies = wrapped_view(tendencies, :, 1:size(tracers, 2))
+        horizontal_diffusion_stacked!(tracer_tendencies, tracers, expl, impl, get_nlayers(model))
+    else
+        foreach_active_tracer(horizontal_diffusion_tracer!, vars, model, diffusion, expl, impl)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+`horizontal_diffusion!` of `var` stacked from several variables with `nlayers` layers each along the layer axis
+(e.g. tracers), all with the same damping `expl`, `impl` (or `nothing` for explicit diffusion) of `nlayers` layers."""
+function horizontal_diffusion_stacked!(
+        tendency::LowerTriangularArray,
+        var::LowerTriangularArray,
+        expl::AbstractMatrix,
+        impl::Union{Nothing, AbstractMatrix},
+        nlayers::Integer,
+    )
+    lmax, mmax = size(tendency, OneBased, Matrix)    # positional size, see `horizontal_diffusion!`
+
+    @boundscheck size(tendency) == size(var) || throw(BoundsError(tendency))
+    @boundscheck lmax <= size(expl, 1) || throw(BoundsError(expl, lmax))
+    @boundscheck nlayers <= size(expl, 2) || throw(BoundsError(expl, nlayers))
+    @boundscheck size(var, 2) % nlayers == 0 || throw(DimensionMismatch("$(size(var, 2)) layers are not a multiple of $nlayers"))
+
+    launch!(
+        architecture(tendency), SpectralWorkOrder, size(tendency), _stacked_horizontal_diffusion_kernel!,
+        tendency, var, expl, impl, var.spectrum.l_indices, nlayers
+    )
+    return nothing
+end
+
+# `_implicit_horizontal_diffusion_kernel!` (or `_explicit_horizontal_diffusion_kernel!` for `impl = nothing`)
+# for variables stacked along the layer axis, `nlayers` layers each
+@kernel inbounds = true function _stacked_horizontal_diffusion_kernel!(
+        tendency, var, expl, impl, l_indices, nlayers
+    )
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = mod1(I[2], nlayers)     # layer of expl, impl
+    l = l_indices[lm]           # degree l for this coefficient
+
+    if isnothing(impl)
+        tendency[I] += expl[l, k] * var[I]
+    else
+        tendency[I] = (tendency[I] + expl[l, k] * var[I]) * impl[l, k]
+    end
 end
 
 # horizontal diffusion of tracer `name`, called for every active tracer by `foreach_active_tracer`
@@ -309,8 +366,8 @@ function horizontal_diffusion!(
     η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, diffusion)
     zero_last_degree!(η_tend)
 
-    # diffuse the active tracers like vorticity (unrolled per name)
-    foreach_active_tracer(horizontal_diffusion_tracer!, vars, model, diffusion, expl, impl)
+    # diffuse the active tracers like vorticity (all together or one by one)
+    horizontal_diffusion_tracers!(vars, model, diffusion, expl, impl)
     return nothing
 end
 
@@ -355,8 +412,8 @@ function horizontal_diffusion!(
         horizontal_diffusion!(humid_tend, humid, expl, impl)
     end
 
-    # diffuse the active tracers like vorticity (unrolled per name)
-    foreach_active_tracer(horizontal_diffusion_tracer!, vars, model, diffusion, expl, impl)
+    # diffuse the active tracers like vorticity (all together or one by one)
+    horizontal_diffusion_tracers!(vars, model, diffusion, expl, impl)
 
     return nothing
 end

@@ -795,12 +795,18 @@ function humidity_spectral_tendency!(vars::Variables, model::PrimitiveWet)
 end
 humidity_spectral_tendency!(::Variables, ::PrimitiveDry) = nothing
 
+"""$(TYPEDSIGNATURES)
+Horizontal advection of the active tracers, added to their tendencies: all together if `fused_tracers`
+(see `horizontal_advection_tracers!`), otherwise one by one."""
 function tracer_advection!(
         vars::Variables,
         model::AbstractModel,
     )
-    # horizontal advection of the active tracers (unrolled per name)
-    foreach_active_tracer(horizontal_advection_tracer!, vars, model)
+    if fused_tracers(vars, model)
+        horizontal_advection_tracers!(vars, model)
+    else    # horizontal advection of the active tracers (unrolled per name)
+        foreach_active_tracer(horizontal_advection_tracer!, vars, model)
+    end
     return nothing
 end
 
@@ -811,8 +817,88 @@ function horizontal_advection_tracer!(::Val{name}, vars, model) where {name}
     tracer_tend_grid = get_tendency_step(getfield(vars.tendencies.grid_tracers, name), time_stepping, DynamicalCore())
     tracer_grid = get_prognostic_step(getfield(vars.grid.tracers, name), time_stepping, DynamicalCore(), model)
 
+    # the fluxes u*A, v*A of this tracer, in its own slots of the tracer tendencies' fused parents
+    u_flux, v_flux = tracer_flux_name(name, :u), tracer_flux_name(name, :v)
+    uA = get_tendency_step(getfield(vars.dynamics.tracers, u_flux), time_stepping, DynamicalCore())
+    vA = get_tendency_step(getfield(vars.dynamics.tracers, v_flux), time_stepping, DynamicalCore())
+    uA_grid = get_tendency_step(getfield(vars.dynamics.grid_tracers, u_flux), time_stepping, DynamicalCore())
+    vA_grid = get_tendency_step(getfield(vars.dynamics.grid_tracers, v_flux), time_stepping, DynamicalCore())
+
     # add horizontal advection to parameterization + vertical advection + forcing/drag tendencies
-    return horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, vars, model, add = true)
+    return horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, vars, model; add = true, uA, vA, uA_grid, vA_grid)
+end
+
+"""$(TYPEDSIGNATURES)
+Horizontal advection of all tracers together, which are stacked along the layer axis of the fused parents
+(see `variables(::NamedTuple{names, <:Tuple{Vararg{Tracer}}}, ::AbstractModel)`): one kernel for `+A*div` and the
+fluxes `u*A`, `v*A` of all tracers, one batched transform of their tendencies and fluxes (in chunks of whole tracers
+that fit into the transform's largest batch) and one flux divergence. Same as `horizontal_advection_tracer!` for
+every tracer."""
+function horizontal_advection_tracers!(vars::Variables, model::AbstractModel)
+    (; time_stepping, spectral_transform) = model
+    nlayers = get_nlayers(model)
+
+    # [tendencies; u*A; v*A] of all tracers, each of N*nlayers layers
+    tendencies = get_tendency_step(parent(vars.fused.tracer_tendencies_spectral), time_stepping, DynamicalCore())
+    tendencies_grid = get_tendency_step(parent(vars.fused.tracer_tendencies_grid), time_stepping, DynamicalCore())
+    tracers_grid = get_prognostic_step(parent(vars.fused.tracers_grid), time_stepping, DynamicalCore(), model)
+    nlayers_tracers = size(tracers_grid, 2)     # = N*nlayers
+
+    # the barotropic model doesn't have divergence, the +A*div term is then zero (u is only a placeholder)
+    with_divergence = haskey(vars.grid, :divergence)
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore(), model)
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore(), model)
+    div = with_divergence ? get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore(), model) : u
+    (; coslat⁻¹) = model.geometry
+    (; whichring) = tracers_grid.grid
+
+    launch!(
+        architecture(tendencies_grid), RingGridWorkOrder, (size(tracers_grid, 1), nlayers_tracers),
+        _horizontal_advection_tracers_kernel!, tendencies_grid, tracers_grid, div, u, v, coslat⁻¹, whichring,
+        nlayers, nlayers_tracers, with_divergence
+    )
+
+    # tendencies (incl +A*div) and fluxes to spectral space, all tracers together
+    transform_stacked!(tendencies, tendencies_grid, nlayers, vars.scratch.transform_memory, spectral_transform)
+
+    # tendencies += -∇⋅(u*A, v*A), all tracers together (in chunks as the transform, the gradients have the same limit)
+    layers_per_call = stacked_layers_per_call(nlayers, spectral_transform)
+    for layers in stacked_chunks(nlayers_tracers, layers_per_call)
+        tracer_tendencies = wrapped_view(tendencies, :, layers)
+        uA = wrapped_view(tendencies, :, nlayers_tracers .+ layers)
+        vA = wrapped_view(tendencies, :, 2nlayers_tracers .+ layers)
+        horizontal_spectral_advection!(tracer_tendencies, uA, vA, spectral_transform)
+    end
+    return nothing
+end
+
+# `_horizontal_advection_kernel!` (with muladd) and `_flux_divergence_kernel!` in one, for all tracers stacked along the
+# layer axis of `A_grid` (N*nlayers layers), the fluxes go into the layers after the tendencies in `A_tend_grid`
+@kernel inbounds = true function _horizontal_advection_tracers_kernel!(
+        A_tend_grid,        # Input/Output: [tendencies; u*A; v*A] on the grid, 3*N*nlayers layers
+        A_grid,             # Input: tracers to be advected, N*nlayers layers
+        div_grid,           # Input: divergence, nlayers
+        u_grid,             # Input: zonal velocity, nlayers
+        v_grid,             # Input: meridional velocity, nlayers
+        coslat⁻¹,           # Input: 1/cos(latitude) for scaling
+        whichring,          # Input: mapping from grid point to latitude ring
+        nlayers,            # Input: number of layers of a tracer
+        nlayers_tracers,    # Input: N*nlayers, layers of all tracers
+        with_divergence,    # Input: add the +A*div term?
+    )
+    ij, kn = @index(Global, NTuple)     # grid point ij, layer kn of the stacked tracers
+    k = mod1(kn, nlayers)               # layer of the shared fields u, v, div
+    A = A_grid[ij, kn]
+
+    # +A*div term of the advection operator, add as tend already contains parameterizations + vertical advection
+    if with_divergence
+        A_tend_grid[ij, kn] = muladd(A, div_grid[ij, k], A_tend_grid[ij, kn])
+    end
+
+    # fluxes u*A, v*A scaled by coslat⁻¹
+    Acoslat⁻¹j = A * coslat⁻¹[whichring[ij]]
+    A_tend_grid[ij, nlayers_tracers + kn] = u_grid[ij, k] * Acoslat⁻¹j
+    A_tend_grid[ij, 2nlayers_tracers + kn] = v_grid[ij, k] * Acoslat⁻¹j
 end
 
 """$(TYPEDSIGNATURES)

@@ -65,6 +65,20 @@ set_tracers_active!(::Nothing, value::Bool, names::Symbol...) = set_tracers_acti
 variables(name_tracer::Pair{Symbol, Tracer}, model::AbstractModel) =
     variables(name_tracer.second, name_tracer.first, model)
 
+# All tracers are allocated in fused parents, stacked along the layer axis in the order of `model.tracers`:
+# their spectral and grid variables in `vars.fused.tracers_spectral`, `vars.fused.tracers_grid`, and their spectral
+# and grid tendencies followed by the fluxes u*A, v*A of their horizontal advection in
+# `vars.fused.tracer_tendencies_spectral`, `vars.fused.tracer_tendencies_grid`, i.e. [tendencies; u fluxes; v fluxes]
+# of N tracers with L layers each in layers 1:NL, NL+1:2NL, 2NL+1:3NL. So that all tracers can be processed
+# together, see `fused_tracers`, with one transform of the tendencies and both fluxes of all tracers.
+# The per-tracer variables (views of the parents) are used when they are processed one by one.
+function variables(tracers::NamedTuple{names, <:Tuple{Vararg{Tracer}}}, model::AbstractModel) where {names}
+    per_tracer = Tuple(Iterators.flatten(variables(tracer, name, model) for (name, tracer) in pairs(tracers)))
+    u_fluxes = Tuple(Iterators.flatten(tracer_flux_variables(name, :u, model) for name in names))
+    v_fluxes = Tuple(Iterators.flatten(tracer_flux_variables(name, :v, model) for name in names))
+    return (per_tracer..., u_fluxes..., v_fluxes...)
+end
+
 function variables(::Tracer, name::Symbol, model::AbstractModel)
     nsteps = get_nsteps(model.time_stepping, model)
     pg = nsteps.prognostic_grid
@@ -72,12 +86,25 @@ function variables(::Tracer, name::Symbol, model::AbstractModel)
     tg = nsteps.tendency_grid
     ts = nsteps.tendency_spectral
     return (
-        PrognosticVariable(name, SpectralXYZT(ps), desc = "$name", namespace = :tracers),
-        GridVariable(name, GridXYZT(pg), desc = "$name", namespace = :tracers),
-        TendencyVariable(name, SpectralXYZT(ts), desc = "Tendency of $name", namespace = :tracers),
-        TendencyVariable(name, GridXYZT(tg), desc = "Tendency of $name", namespace = :grid_tracers),
-        ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
-        ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
+        PrognosticVariable(name, SpectralXYZT(ps), desc = "$name", namespace = :tracers, fuse = :tracers_spectral),
+        GridVariable(name, GridXYZT(pg), desc = "$name", namespace = :tracers, fuse = :tracers_grid),
+        TendencyVariable(name, SpectralXYZT(ts), desc = "Tendency of $name", namespace = :tracers, fuse = :tracer_tendencies_spectral),
+        TendencyVariable(name, GridXYZT(tg), desc = "Tendency of $name", namespace = :grid_tracers, fuse = :tracer_tendencies_grid),
+    )
+end
+
+# name of the flux `component` (:u or :v) of the horizontal advection of tracer `name`, e.g. `:abc_u_flux`
+tracer_flux_name(name::Symbol, component::Symbol) = Symbol(name, :_, component, :_flux)
+
+# the flux `component` (:u or :v, as u*A/coslat, v*A/coslat) of the horizontal advection of tracer `name` (=A),
+# on the grid and in spectral space, members of the tracer tendencies' fused parents (with the same step dimension)
+function tracer_flux_variables(name::Symbol, component::Symbol, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, model)
+    flux_name = tracer_flux_name(name, component)
+    desc = "$component*$name/coslat flux of the horizontal advection of $name"
+    return (
+        DynamicsVariable(flux_name, SpectralXYZT(nsteps.tendency_spectral); desc, namespace = :tracers, fuse = :tracer_tendencies_spectral),
+        DynamicsVariable(flux_name, GridXYZT(nsteps.tendency_grid); desc, namespace = :grid_tracers, fuse = :tracer_tendencies_grid),
     )
 end
 
@@ -88,6 +115,49 @@ Not differentiated (inactive for Enzyme)."""
 tracer_active(model::AbstractModel, name::Symbol) = tracer_active(model.tracers, name)
 tracer_active(tracers::NamedTuple, name::Symbol) = haskey(tracers, name) && getfield(tracers, name).active
 tracer_active(::Nothing, name::Symbol) = false
+
+"""$(TYPEDSIGNATURES)
+Whether all tracers in `tracers` are active, `false` without tracers."""
+all_tracers_active(tracers::NamedTuple) = !isempty(tracers) && all(tracer -> tracer.active, values(tracers))
+all_tracers_active(::Nothing) = false
+
+"""$(TYPEDSIGNATURES)
+Default of the model option `fuse_tracers`: process all tracers together (fused) on GPU, where that is faster as
+the transforms and kernels of a single tracer are too small to use the GPU, but one by one on CPU, where processing
+them together is not faster (see `docs/dev/2026-11/2026-11-17-fused-tracers.md`)."""
+default_fuse_tracers(architecture::AbstractArchitecture) = false
+default_fuse_tracers(::GPU) = true
+
+"""$(TYPEDSIGNATURES)
+Whether all tracers are processed together (fused): one batched transform and one kernel per operation for all
+tracers, stacked along the layer axis of the fused parents in `vars.fused` (see `variables(::NamedTuple{names,
+<:Tuple{Vararg{Tracer}}}, ::AbstractModel)`). Requires `model.fuse_tracers` and all tracers to be active (a deactivated
+tracer has to stay frozen); otherwise the tracers are processed one by one, see `foreach_active_tracer`.
+Not differentiated (inactive for Enzyme)."""
+fused_tracers(vars::Variables, model::AbstractModel) =
+    haskey(vars.fused, :tracers_spectral) && model.fuse_tracers && all_tracers_active(model.tracers)
+
+# Layers per call of a transform (or a spectral gradient) of slabs with `nlayers` layers each stacked along the layer
+# axis (e.g. one slab per tracer): as many whole slabs as fit into the transform's largest batch `S.nlayers` (see
+# `transform_batch` of the `SpectralGrid`), at least one
+stacked_layers_per_call(nlayers::Integer, S::AbstractSpectralTransform) = max(1, S.nlayers ÷ nlayers) * nlayers
+
+# Layer ranges of the chunks of `nlayers_total` stacked layers with `layers_per_call` layers each (the last one shorter)
+stacked_chunks(nlayers_total::Integer, layers_per_call::Integer) =
+    (layer:min(layer + layers_per_call - 1, nlayers_total) for layer in 1:layers_per_call:nlayers_total)
+
+"""$(TYPEDSIGNATURES)
+`transform!` of `input` to `output`, both holding slabs of `nlayers` layers stacked along the layer axis (e.g. one
+slab per tracer), in chunks of whole slabs that fit into the transform's largest batch `S.nlayers` (see
+`transform_batch` of the `SpectralGrid`), with one call if all slabs fit."""
+function transform_stacked!(output, input, nlayers::Integer, scratch_memory, S::AbstractSpectralTransform)
+    layers_per_call = stacked_layers_per_call(nlayers, S)
+    size(input, 2) <= layers_per_call && return transform!(output, input, scratch_memory, S)
+    for layers in stacked_chunks(size(input, 2), layers_per_call)
+        transform!(wrapped_view(output, :, layers), wrapped_view(input, :, layers), scratch_memory, S)
+    end
+    return output
+end
 
 """$(TYPEDSIGNATURES)
 Call `f(Val(name), vars, model, args...)` for every tracer `name` that has variables in `vars` and

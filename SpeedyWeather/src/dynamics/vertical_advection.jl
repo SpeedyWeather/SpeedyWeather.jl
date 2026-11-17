@@ -33,8 +33,35 @@ function vertical_advection!(vars::Variables, model)
     vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model)
     vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model)
 
-    # and the active tracers, likewise unrolled per name
-    foreach_active_tracer(vertical_advection_tracer!, vars, model, w, Δσ, advection_scheme)
+    # and the active tracers, all together or one by one (unrolled per name)
+    if fused_tracers(vars, model)
+        vertical_advection_tracers!(vars, model, w, Δσ, advection_scheme)
+    else
+        foreach_active_tracer(vertical_advection_tracer!, vars, model, w, Δσ, advection_scheme)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Vertical advection of all tracers together, stacked along the layer axis of the fused parents, in one kernel.
+Same as `vertical_advection_tracer!` for every tracer, the vertical stencil does not cross from one tracer
+into the next."""
+function vertical_advection_tracers!(vars::Variables, model, w, Δσ, advection_scheme)
+    # full step-dimensioned parents and the step index as in `vertical_advection!`,
+    # the tendencies' parent also holds the fluxes in the layers after the tendencies
+    tracers_tend = parent(vars.fused.tracer_tendencies_grid)
+    tracers = parent(vars.fused.tracers_grid)
+    tendency_step = which_tendency_step(tracers_tend, model.time_stepping, advection_scheme)
+    prognostic_step = which_prognostic_step(tracers, model.time_stepping, advection_scheme, model)
+
+    grids_match(tracers_tend, w, tracers) || throw(DimensionMismatch(tracers_tend, w, tracers))
+    nlayers = get_nlayers(model)
+
+    launch!(
+        architecture(tracers_tend), RingGridWorkOrder, (size(tracers, 1), size(tracers, 2)),
+        vertical_advection_stacked_kernel!,
+        tracers_tend, tendency_step, w, tracers, prognostic_step, Δσ, nlayers, advection_scheme
+    )
     return nothing
 end
 
@@ -110,6 +137,34 @@ end
 
     # -= as the tendencies already contain the parameterizations
     ξ_tend[ij, k, s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k, s_prog] * (w⁺ - w⁻))
+end
+
+# `vertical_advection_kernel!` for several variables stacked along the layer axis of ξ and ξ_tend (e.g. tracers,
+# `nlayers` layers each) that share `w` and `Δσ`. The stencil is that of layer k of the variable in layer kn,
+# shifted to its layers
+@kernel inbounds = true function vertical_advection_stacked_kernel!(
+        ξ_tend, s_tend, w, ξ, s_prog, Δσ, nlayers, adv
+    )
+    ij, kn = @index(Global, NTuple)
+    k = mod1(kn, nlayers)       # layer of the shared w, Δσ
+    offset = kn - k             # first layer - 1 of this variable in ξ, ξ_tend
+
+    Δσₖ⁻¹ = inv(Δσ[k])
+
+    # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
+    k⁻ = max(1, k - 1)
+    k⁺ = k
+
+    k_stencil = map(kₛ -> kₛ + offset, retrieve_stencil(k, nlayers, adv))
+
+    w⁻ = w[ij, k⁻]
+    w⁺ = w[ij, k⁺]
+
+    ξᶠ⁺ = reconstructed_at_face(ξ, ij, s_prog, Base.tail(k_stencil), w⁺, adv)
+    ξᶠ⁻ = reconstructed_at_face(ξ, ij, s_prog, Base.front(k_stencil), w⁻, adv)
+
+    # -= as the tendencies already contain the parameterizations
+    ξ_tend[ij, kn, s_tend] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, kn, s_prog] * (w⁺ - w⁻))
 end
 
 # reconstructed_at_face indexes ξ[ij, k[i], s]: `k` is the vertical stencil (tuple of

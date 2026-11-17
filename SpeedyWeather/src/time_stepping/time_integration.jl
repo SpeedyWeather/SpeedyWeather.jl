@@ -131,8 +131,12 @@ function update_prognostic!(
     # atmospheric variables (unrolled per name so it's compile-time)
     update_prognostic_atmosphere!(vars, clock, time_stepping, model.implicit, model, scale)
 
-    # and time stepping for the active tracers (unrolled per name)
-    foreach_active_tracer(update_prognostic_tracer!, vars, model, clock, time_stepping, model.implicit, scale)
+    # and time stepping for the active tracers (all together or one by one, unrolled per name)
+    if fused_tracers(vars, model)
+        update_prognostic_tracers!(vars, model, clock, time_stepping, model.implicit, scale)
+    else
+        foreach_active_tracer(update_prognostic_tracer!, vars, model, clock, time_stepping, model.implicit, scale)
+    end
 
     # ocean and land variables with their own time steppers (unrolled per name)
     update_prognostic_namespaces!(vars, clock, time_stepping, model.implicit, model)
@@ -146,6 +150,14 @@ function update_prognostic!(
     hasproperty(model, :land) && filter!(vars, model.land, model)
 
     return nothing
+end
+
+# time step all tracers together, as `update_prognostic_tracer!` for every tracer: the time steppers are elementwise
+function update_prognostic_tracers!(vars, model, clock, time_stepping, implicit, scale)
+    tracers = parent(vars.fused.tracers_spectral)
+    # all steps of the tendencies, but not the fluxes in the layers after them
+    tendencies = wrapped_view(parent(vars.fused.tracer_tendencies_spectral), :, 1:size(tracers, 2), :)
+    return update_prognostic!(tracers, tendencies, clock, time_stepping, implicit, model, scale)
 end
 
 # time step tracer `name`, called for every active tracer by `foreach_active_tracer`

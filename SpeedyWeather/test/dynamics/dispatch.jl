@@ -27,6 +27,22 @@ end
     @test_opt ignored_modules = (Base,) SpeedyWeather.time_step!(variables, model.time_stepping, model)
 end
 
+@testset "time_step! with fused tracers free of runtime dispatch (JET)" begin
+    for (Model, nlayers) in ((ShallowWaterModel, 1), (PrimitiveWetModel, 8))
+        spectral_grid = SpectralGrid(truncation = 6; nlayers)
+        tracers = (; a = Tracer(), b = Tracer(), c = Tracer())
+        model = Model(; spectral_grid, tracers, fuse_tracers = true)
+        model.feedback.verbose = false
+        simulation = initialize!(model)
+        (; variables, model) = simulation
+        initialize!(simulation)
+        @test SpeedyWeather.fused_tracers(variables, model)
+
+        # all tracers processed together, through their fused parents
+        @test_opt ignored_modules = (Base,) SpeedyWeather.time_step!(variables, model.time_stepping, model)
+    end
+end
+
 @testset "PrimitiveWet time_step! free of runtime dispatch (JET)" begin
     spectral_grid = SpectralGrid(truncation = 6, nlayers = 8)
     model = PrimitiveWetModel(; spectral_grid)

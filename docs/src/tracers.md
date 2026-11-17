@@ -107,6 +107,24 @@ which is equivalent to `model.tracers.abc.active = true` (default, or `false`)
 and also equivalent to (de)activating them in the `simulation` instead,
 i.e. `activate!(simulation, :abc)`.
 
+## Tracers processed together
+
+The variables of all tracers are stored together, stacked along the vertical,
+e.g. `simulation.variables.fused.tracers_grid` holds all tracers on the grid, while
+`simulation.variables.grid.tracers.abc` is a view on the layers of tracer `abc`.
+This allows all tracers to be processed together: one spectral transform
+and one kernel per operation (advection, diffusion, time step) for all tracers
+instead of one for each tracer. On GPU, where the transforms and kernels of a single tracer
+are too small to make use of the hardware, this is considerably faster with several
+tracers. It is the default on GPU, set by the model option `fuse_tracers`
+```@example tracers
+model.fuse_tracers
+```
+which is `false` on CPU by default, where processing the tracers one by one is not slower.
+Tracers can only be processed together when all are active: as long as any tracer is
+deactivated, all tracers are processed one by one (as with `fuse_tracers = false`),
+such that the deactivated tracers stay frozen.
+
 ## Set tracers
 
 Tracers can be set to values by using the `set!` function, which
