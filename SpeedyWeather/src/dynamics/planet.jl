@@ -110,13 +110,13 @@ $(TYPEDFIELDS)"""
     @param solar_constant::NF = 1365.0 (bounds = Nonnegative,)
 
     "orbit around the star, `CircularOrbit()` or `KeplerOrbit(; eccentricity, longitude_of_perihelion)`"
-    orbit::O = CircularOrbit()
+    orbit::O = KeplerOrbit()
 end
 
 Adapt.@adapt_structure Earth
 
 Earth(SG::SpectralGrid; kwargs...) = Earth(SG.NF; kwargs...)
-Earth(::Type{NF}; orbit = CircularOrbit(), kwargs...) where {NF} =
+Earth(::Type{NF}; orbit = KeplerOrbit{NF}(), kwargs...) where {NF} =
     Earth{NF, Dates.Second, Dates.DateTime, Bool, typeof(orbit)}(; orbit, kwargs...)
 
 # the planet's variables are those its orbit requires

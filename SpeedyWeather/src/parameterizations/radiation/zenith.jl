@@ -149,7 +149,7 @@ function orbit_position!(vars::Variables, ::Type{T}, orbit::KeplerOrbit, S::Abst
 end
 
 """$(TYPEDSIGNATURES)
-Sun–planet distance factor (a/r)² by which the solar constant is multiplied in the shortwave
+Sun-planet distance factor (a/r)² by which the solar constant is multiplied in the shortwave
 radiation: read from `vars.parameterizations.solar_distance_factor` if the orbit (`KeplerOrbit`)
 requires it, 1 otherwise. Decided at compile time, as `haskey` on a NamedTuple is resolved by the
 compiler, so for a `CircularOrbit` nothing is read and the multiplication drops out."""
