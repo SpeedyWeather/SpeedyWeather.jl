@@ -24,6 +24,7 @@ $(TYPEDFIELDS)"""
         FR,     # <:AbstractForcing,
         DR,     # <:AbstractDrag,
         RP,     # <:AbstractRandomProcess,
+        TR,     # NamedTuple of Tracers,
         OR,     # <:AbstractOrography,
         LS,     # <:AbstractLandSeaMask,
         OC,     # <:AbstractOcean,
@@ -73,7 +74,7 @@ $(TYPEDFIELDS)"""
 
     # VARIABLES
     random_process::RP = nothing
-    tracers::TRACER_DICT = TRACER_DICT()
+    tracers::TR = (;)
 
     # BOUNDARY CONDITIONS
     dynamics_only::Bool = false

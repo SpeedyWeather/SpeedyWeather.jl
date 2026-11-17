@@ -42,8 +42,7 @@ end
     ((BarotropicModel, 1, false), (ShallowWaterModel, 1, false), (PrimitiveWetModel, 2, false), (BarotropicModel, 1, true))
 
     spectral_grid = SpectralGrid(; truncation = 6, nlayers, NF = Float64)
-    model = MT(; spectral_grid)
-    with_tracer && add!(model, Tracer(:abc))
+    model = MT(; spectral_grid, tracers = with_tracer ? (; abc = Tracer()) : (;))
     simulation = initialize!(model)
     with_tracer && set!(simulation, abc = (λ, φ, σ) -> exp(-(λ - 180)^2 / 30^2), namespace = :tracers)
     initialize!(simulation)

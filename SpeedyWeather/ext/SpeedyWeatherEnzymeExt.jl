@@ -77,10 +77,10 @@ _make_zero_view!(x) = (Enzyme.make_zero!(x); nothing)
 EnzymeRules.inactive(::typeof(SpeedyWeather.reinitialize!), args...) = nothing
 
 ###
-# The tracer registry `model.tracers` (a `Dict` of names and `active` flags) carries no derivative.
-# The time stepping is unrolled over the tracer names in the type of the variables and reads the
-# registry only through `tracer_active` (and `check_tracers` before a run), so Enzyme never has to
-# differentiate the `Dict` lookups (in forward mode `iterate(::Dict)` hits an internal Enzyme error).
+# The tracers `model.tracers` (a NamedTuple of `active` flags) carry no derivative. The time stepping
+# is unrolled over the tracer names in the type of the variables and reads `model.tracers` only through
+# `tracer_active` (and `check_tracers` before a run). A `Bool` load is inactive anyway, the rules only
+# state that intent and keep Enzyme from analysing these functions.
 EnzymeRules.inactive(::typeof(SpeedyWeather.tracer_active), args...) = nothing
 EnzymeRules.inactive(::typeof(SpeedyWeather.check_tracers), args...) = nothing
 

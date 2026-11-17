@@ -22,6 +22,7 @@ $(TYPEDFIELDS)"""
         PA,     # <:AbstractParticleAdvection,
         IC,     # <:AbstractInitialConditions,
         RP,     # <:AbstractRandomProcess,
+        TR,     # NamedTuple of Tracers,
         TS,     # <:AbstractTimeStepper,
         ST,     # <:SpectralTransform{NF},
         IM,     # <:AbstractImplicit,
@@ -45,7 +46,7 @@ $(TYPEDFIELDS)"""
 
     # VARIABLES
     random_process::RP = nothing
-    tracers::TRACER_DICT = TRACER_DICT()
+    tracers::TR = (;)
 
     # NUMERICS
     time_stepping::TS = NCycleLorenz(spectral_grid)

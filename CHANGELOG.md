@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Tracer loops in the time stepping unrolled over the compile-time tracer names instead of iterating the `model.tracers` dictionary, removing the custom Enzyme `iterate` rules; `run!` errors for tracers added after initialization; Reactant correctness tests with tracers [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+- [BREAKING] Tracers are a NamedTuple defined with the `tracers` keyword of the model constructor, e.g. `tracers = (; abc = Tracer())`, instead of a dictionary filled with `add!(model, Tracer(:abc))` (breaking: `Tracer` has no name, `add!`/`delete!` for tracers removed, `activate!(model, :abc)` by name); tracer loops in the time stepping unrolled over the compile-time tracer names [#1409](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1409)
 - `ByrneOGormanLongwaveTransmissivity` with humidity- and CO₂-dependent optical depth as new longwave default, default CO₂ of 280 ppm, longwave optical depths calibrated for ~288 K with `TwoBandShortwave` [#1279](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1279)
 - Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)
 - Fix the differentiability of `TwoBandShortwave` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)

@@ -40,47 +40,35 @@ operator (zero for 2D models). The products ``\mathbf{u}q, q\mathcal{D}`` are co
 transformed to spectral space, where the divergence is taken for the former and added to the latter.
 The [time stepping](@ref time_stepping) is then performed in spectral space.
 
-## Add/delete tracers
+## Define tracers
 
 For every tracer in SpeedyWeather the tracer advection equation as outlined above is solved.
-One can add a new tracer to the `model` _before_ it is initialized to a `simulation`
+Tracers are defined when the `model` is constructed, through the `tracers` keyword,
+as a `NamedTuple` of `Tracer`s
 
 ```@example tracers
 using SpeedyWeather
 spectral_grid = SpectralGrid(truncation=64, nlayers=1)
-model = ShallowWaterModel(spectral_grid)
 
-# add a tracer called :abc
-add!(model, Tracer(:abc))
+# define three tracers called abc, co2 and ch4
+tracers = (; abc = Tracer(), co2 = Tracer(), ch4 = Tracer())
+model = ShallowWaterModel(spectral_grid; tracers)
+model.tracers
 ```
 
-This returns `model.tracers`, a dictionary, which will always give you an overview of which tracers
-are defined. Tracers are defined through a `key::Symbol` for which we use `Symbol`
-(not strings, because Symbols are immutable). We just wrap the `key` here in
-`Tracer` to define a tracer. You can add more tracers
+The key is the name of the tracer, e.g. `abc`, and there are no two tracers with the same
+name (just like the keys of any `NamedTuple`). `model.tracers` will always give you an overview
+of which tracers are defined. Without the `tracers` keyword a model has no tracers,
+which is the same as `tracers = (;)` (an empty `NamedTuple`) or `tracers = nothing`.
+
+The tracers of a model are fixed once it is constructed, because its type depends on them.
+To use other tracers, construct another `model`, e.g. with only the tracer `abc`
 
 ```@example tracers
-add!(model, Tracer(:co2), Tracer(:ch4))
+model = ShallowWaterModel(spectral_grid; tracers = (; abc = Tracer()))
 ```
 
-or delete them again
-
-```@example tracers
-delete!(model, Tracer(:co2))
-delete!(model, Tracer(:ch4))
-```
-
-Tracers are just defined through their `key`, e.g. `:co2`, so while you can do
-`tracer1 = Tracer(:co2)` and `tracer2 = Tracer(:co2)`, they will be considered
-the same tracer -- and no two tracers with the same key can exist inside `model`
-(and `simulation`).
-
-What you should not do is add a tracer to the `model` _after_ it has been initialized,
-as this would leave it without its required variables that are allocated at
-`initialize!(model)`; `run!` throws an error naming such a tracer.
-Deleting a tracer after initialization keeps its variables in the simulation
-and the tracer is then frozen, as if deactivated (see below).
-You can check that the tracers exists in the variables with
+The tracers then appear in the variables, which are allocated by `initialize!(model)`
 
 ```@example tracers
 simulation = initialize!(model)
@@ -88,22 +76,18 @@ simulation.variables
 ```
 
 Note that the tracer appear in several arrays, in the prognostic variables,
-a tendency and so on.
-
-All tracers have to be added to the `model` before it is initialized to
-return the `simulation`. This is because that initialization determines
-all required variables and allocates them, after that `simulation.variables`
+a tendency and so on. After initialization `simulation.variables`
 is an immutable collection of (mutable) arrays (see [Variables](@ref)). If you do want to start or
 pause a tracer advection at any time you have to activate or deactivate them,
 see below.
 
 ## (De)activate tracers
 
-While a tracer is defined through its key, e.g.
+A tracer has a field `active`
 ```@example tracers
-Tracer(:dust)
+Tracer()
 ```
-it also has a field `active` which can be changed any time.
+which can be changed any time.
 Do not confuse this with the discussion of active vs passive,
 categorising whether a tracer impacts the flow or not.
 Active versus deactivated here is solely used to describe
@@ -111,16 +95,17 @@ whether its time evolution is (temporarily) _deactivated_.
 An activated tracer (the default) is advected,
 a deactivated tracer does not change in time
 (=frozen) but continues to exist and all its variables remain in place.
-You can (de)activate a tracer with
+`Tracer(active = false)` defines a tracer that is deactivated from the start.
+You can (de)activate a tracer by its name with
 
 ```@example tracers
-activate!(model, Tracer(:abc))
-deactivate!(model, Tracer(:abc))
+activate!(model, :abc)
+deactivate!(model, :abc)
 ```
 
-which is equivalent to `model.tracers[:abc].active = true` (default, or `false`)
+which is equivalent to `model.tracers.abc.active = true` (default, or `false`)
 and also equivalent to (de)activating them in the `simulation` instead,
-i.e. `activate!(simulation, Tracer(:abc))`.
+i.e. `activate!(simulation, :abc)`.
 
 ## Set tracers
 
@@ -158,8 +143,7 @@ Let us illustrate some tracer advection in practice
 ```@example tracers
 using SpeedyWeather
 spectral_grid = SpectralGrid(truncation=86, nlayers = 1)
-model = ShallowWaterModel(spectral_grid)
-add!(model, Tracer(:abc))
+model = ShallowWaterModel(spectral_grid; tracers = (; abc = Tracer()))
 simulation = initialize!(model)
 
 # add and set tracer and run a 0-day simulation
@@ -196,7 +180,8 @@ nothing # hide
 ## Output tracers
 
 This follows equivalent to other [Output variables](@ref) but the
-tracer name as `Symbol` has to be provided
+tracer name as `Symbol` has to be provided (unlike the `Tracer()` of the model,
+the output variable `OutputVariables.Tracer` takes a name)
 
 ```@example tracers
 add!(model, OutputVariables.Tracer(:abc))

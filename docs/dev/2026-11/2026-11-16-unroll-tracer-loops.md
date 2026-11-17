@@ -1,6 +1,7 @@
-# Unroll the tracer loops over compile-time tracer names
+# Unroll the tracer loops over compile-time tracer names, tracers in a NamedTuple
 
-> Status: **in progress**. Implemented on branch `mg/unroll-tracer-loops` and verified locally (see "Results" below); no PR yet.
+> Status: **in progress**. Part 1 (unrolled loops) and part 2 (tracers in a NamedTuple, breaking) are implemented and
+> verified locally on the branch of draft PR #1409; part 2 is not committed yet.
 
 Date of initial draft: 2026-11-16
 
@@ -18,6 +19,11 @@ Base revision: b06af911
 > yes, draft the plan for unrolling the tracer loops
 
 > go with your recommendations, implement it
+
+> we are now back in the tracer work. I want to change the tracer dictionary to a tracer NamedTuple
+
+> [answers to three design questions: tracers are set with a constructor keyword, like `greenhouse_gases`; the
+> NamedTuple key is the name, so `Tracer` drops its `name` field; the change goes into the same PR #1409]
 
 ## Revision log
 
@@ -48,6 +54,17 @@ Base revision: b06af911
   zero, and "advected" was only checked as `!=`, which diffusion alone would satisfy. Changed to a blob at 45˚N in
   the midlatitude jet that increases linearly with σ, so vertical advection acts from the first step, and to require
   a relative change of more than 0.05 over the compared steps. See Results for the measurements behind this.
+- 2026-11-17: part 2 drafted: replace the `Dict` registry with a NamedTuple fixed at model construction (the first item
+  of Future work), in the same PR. See "Part 2" at the end.
+- 2026-11-17: part 2 open questions resolved. Remove the type parameter `B` of `Tracer{B}` (`active::Bool`). It came in
+  #970 without a stated reason, presumably for Reactant tracing the model. But a minimal `@compile` of a mutable model
+  holding a NamedTuple of tracers gives the right result with a plain `Bool` field as well (Reactant 0.2.294, active
+  and deactivated tracer). `tracers = nothing` is accepted and treated as `(;)`. Keep the Enzyme inactive rules.
+  `tracer_active` keeps its `haskey` (it constant-folds for a NamedTuple) so that it is `false` for names that are not
+  tracers, as the "tracer_active is inactive" test relies on.
+- 2026-11-17: part 2 implemented as planned. Additionally: `tracer_names` (keys of the tracers, `()` for `nothing`)
+  used by `check_tracers`; the frozen-tracer test also checks that a simulation assembled from the variables of a model
+  with other tracers errors. See Results of part 2.
 
 ## Problem description
 
@@ -299,7 +316,7 @@ negligible compared with the transforms.
 ## Future work
 
 - Give the registry a concrete value type (`Dict{Symbol, Tracer{Bool}}`) or replace it with an immutable collection
-  fixed at initialization. That would also make `tracer.active` a plain field load.
+  fixed at initialization. That would also make `tracer.active` a plain field load. Taken up as part 2 below.
 - Investigate the remaining `move_prognostic_grid_variables_back!` warning and the Julia 1.12 store warnings in the
   spectral transforms.
 
@@ -316,3 +333,238 @@ Resolved at sign-off (see revision log): all three recommendations taken.
    more explicit but repeat the name handling nine times.
 3. **Add a Reactant correctness case with a tracer to CI?** Recommended if it passes on main; it costs roughly a minute
    of compile time in a ~1 h workflow.
+
+---
+
+# Part 2: tracers in a NamedTuple
+
+Date of initial draft: 2026-11-17
+
+Base revision: 174afe29 (`mg/unroll-tracer-loops`, part 1 complete)
+
+## Problem description
+
+After part 1, the time stepping no longer iterates `model.tracers::Dict{Symbol, Tracer}`, but it still looks up every
+tracer in it, once per tracer and site per time step: `tracer_active` does `haskey` and `getindex` on a `Dict` whose
+value type `Tracer` is abstract. That leaves three loose ends:
+
+- `tracer_active` must be marked inactive for Enzyme to keep the `Dict` lookups out of the differentiated code, and
+  `tracer.active` is still a builtin `getfield` on an abstract type.
+- The set of tracers is mutable after initialization although the variables are not. Part 1 covers this with
+  `check_tracers` (tracers added later raise an error) and the rule that deleted tracers are frozen.
+- It is inconsistent with the greenhouse gases, the other named collection of components in the model, which are a
+  NamedTuple set when the model is constructed: `PrimitiveWetModel(spectral_grid; greenhouse_gases = (; co2 = CO2(...)))`.
+
+The aim is to store the tracers as a NamedTuple in a type parameter of the model, fixed when the model is
+constructed. Then the tracer names are in the types of both the model and the variables, `tracer_active` reduces to
+a field load that constant-folds, and tracers can no longer be added or deleted once the variables exist.
+
+## Background
+
+- All four models are `@parameterized @kwdef mutable struct`s with a concretely typed `tracers::TRACER_DICT` field.
+  With a type parameter `tracers::TR`, assigning a NamedTuple with other names to `model.tracers` fails, so
+  `add!`/`delete!` cannot work in place any more. Hence the constructor keyword (design decision 1).
+- Greenhouse gases use the NamedTuple key as the name: `variables(::Pair{Symbol, <:AbstractGreenhouseGas}, model)`
+  passes the key on, and `variables(nt::NamedTuple, model)` in `variables/variables.jl` already iterates the pairs of
+  any NamedTuple component. Tracers can use the same mechanism (design decision 2).
+- `reconstruct(model, parameters)` (used by `initialize!(model, ps)`) rebuilds the model with
+  `ConstructionBase.setproperties`, which keeps unpatched fields and their types, so the new type parameter needs
+  no special handling there. `tracers` is not a `@component`, as `Tracer` has no parameters.
+- A NamedTuple supports indexing by `Symbol`, so `model.tracers[:abc].active` keeps working, as does
+  `model.tracers.abc.active`.
+- `SpeedyWeather` is at `0.25.0-DEV`, an unreleased breaking version, so no version bump is needed.
+
+## Summary of changes
+
+All in `SpeedyWeather/` plus docs, tests and changelog.
+
+### 1. `Tracer` without a name (`dynamics/tracers.jl`)
+
+```julia
+@kwdef mutable struct Tracer <: AbstractTracer
+    active::Bool = true
+end
+
+# `Tracer(:abc)` was the old way to define a tracer, give a migration hint
+Tracer(name::Symbol; kwargs...) = throw(ArgumentError(
+    "Tracers are not named any more, define them through the `tracers` keyword when constructing the model, " *
+    "e.g. `ShallowWaterModel(spectral_grid; tracers = (; $name = Tracer()))`. (De)activate them with " *
+    "`activate!(model, :$name)` or `deactivate!(model, :$name)`."))
+```
+
+All old code calls `Tracer(:name)` (in `add!`, `delete!`, `activate!` and `deactivate!` alike), so this one error
+covers every migration case. `Tracer(active = false)` defines a tracer that starts deactivated.
+
+The type parameter `B` (the type of `active`, from #970) is removed: `active` is always a `Bool`. A minimal Reactant
+check traced a model with a NamedTuple of such tracers correctly (see revision log); the full check is the Reactant
+tracer test below.
+
+### 2. Models (`models/barotropic.jl`, `shallow_water.jl`, `primitive_dry.jl`, `primitive_wet.jl`)
+
+A new type parameter `TR, # NamedTuple of Tracers` and `tracers::TR = (;)` in place of
+`tracers::TRACER_DICT = TRACER_DICT()`, at the same position, under `# VARIABLES`.
+
+`tracers = nothing` is accepted and means the same as `(;)`. It cannot be converted to `(;)` on construction:
+`@kwdef` passes the keyword straight to the default constructor, which infers `TR` from it, and the keyword form
+`Model(; spectral_grid, tracers)` bypasses `Model(spectral_grid; kwargs...)`. So `nothing` is stored, and the
+functions that read `model.tracers` treat it as empty: `variables(nothing, model)` already returns `()`, and
+`tracer_active`, `set_tracers_active!` and `check_tracers` get a `Nothing` method each (below). This is how
+`greenhouse_gases = nothing` works too.
+
+### 3. Registry functions (`dynamics/tracers.jl`)
+
+Removed: `TRACER_DICT`, both `add!` methods for tracers, `delete!(model, ::Tracer)`,
+`variables(::TRACER_DICT, model)`, `_activate!`.
+
+New or changed:
+
+```julia
+# (de)activate by name, on the model or the simulation
+activate!(simulation::AbstractSimulation, names::Symbol...) = activate!(simulation.model, names...)
+activate!(model::AbstractModel, names::Symbol...) = set_tracers_active!(model.tracers, true, names...)
+deactivate!(simulation::AbstractSimulation, names::Symbol...) = deactivate!(simulation.model, names...)
+deactivate!(model::AbstractModel, names::Symbol...) = set_tracers_active!(model.tracers, false, names...)
+
+function set_tracers_active!(tracers::NamedTuple, value::Bool, names::Symbol...)
+    for name in names
+        haskey(tracers, name) || throw(ArgumentError("No tracer :$name in model.tracers, tracers are $(keys(tracers))"))
+        tracers[name].active = value
+    end
+    return tracers
+end
+set_tracers_active!(::Nothing, value::Bool, names::Symbol...) = set_tracers_active!((;), value, names...)
+
+# the NamedTuple key is the name of the tracer, as for greenhouse gases
+variables(name_tracer::Pair{Symbol, <:Tracer}, model::AbstractModel) =
+    variables(name_tracer.second, name_tracer.first, model)
+variables(::Tracer, name::Symbol, model::AbstractModel) = (...)  # the current body, `T.name` replaced by `name`
+
+# a field load: `name` is a compile-time constant in `foreach_active_tracer`, so `haskey` and
+# `getfield` constant-fold; `false` for names that are not tracers
+tracer_active(model::AbstractModel, name::Symbol) = tracer_active(model.tracers, name)
+tracer_active(tracers::NamedTuple, name::Symbol) = haskey(tracers, name) && getfield(tracers, name).active
+tracer_active(::Nothing, name::Symbol) = false
+```
+
+`foreach_active_tracer` stays as it is (unrolled over the tracer names in the type of the variables).
+
+`check_tracers(vars, model)` stays in `initialize!(simulation)` but checks something else: that `model.tracers` is a
+NamedTuple of `Tracer`s (or `nothing`, as `(;)`) whose names equal the tracer names in `vars`. With the constructor keyword, these can only
+differ if a simulation is assembled by hand from the variables of one model and another model. The more likely
+mistake it catches is `tracers = (Tracer(), Tracer())`, a `Tuple`: its elements have no names, so `Variables`
+silently allocates nothing for them (`variables(::Any) = ()`), and without the check the tracers would be ignored
+without any error.
+
+### 4. Enzyme extension
+
+Keep `EnzymeRules.inactive` for `tracer_active` and `check_tracers`. A `Bool` field load is inactive anyway, so the
+rule is not needed for correctness, but it costs nothing and states the intent. Update the comment above them: the
+registry is a NamedTuple of `active` flags that carries no derivative.
+
+### 5. Changelog
+
+Rewrite the line of this PR (and replace its `#NNN` placeholder with `#1409`) to mention the breaking change: tracers
+are defined with the `tracers` keyword of the model constructor as a NamedTuple, `Tracer` has no name, and
+`add!`/`delete!` for tracers are removed.
+
+## Behaviour changes
+
+| Situation | Before (part 1) | After |
+|-----------|-----------------|-------|
+| Define tracers | `add!(model, Tracer(:abc), Tracer(:co2))` | `ShallowWaterModel(spectral_grid; tracers = (; abc = Tracer(), co2 = Tracer()))` |
+| Start deactivated | `Tracer(:abc, active = false)` | `(; abc = Tracer(active = false))` |
+| Delete a tracer | `delete!(model, Tracer(:abc))` | construct a new model without it, or deactivate it |
+| (De)activate | `activate!(model, Tracer(:abc))` | `activate!(model, :abc)` (also on `simulation`) |
+| Look up | `model.tracers[:abc]` | `model.tracers[:abc]` or `model.tracers.abc` |
+| `Tracer(:abc)` | defines a tracer | `ArgumentError` with a migration hint |
+| Tracer added after `initialize!(model)` | `ArgumentError` from `run!` | not possible |
+| Tracer deleted after `initialize!(model)` | frozen | not possible |
+| `tracers = (Tracer(), Tracer())` (a `Tuple`) | — | `ArgumentError` from `run!`/`initialize!(simulation)` |
+| `tracers = nothing` | — | no tracers, as `(;)` |
+| `Tracer{B}` with a non-`Bool` `active` | possible, fails in `tracer_active` | not possible, `active::Bool` |
+| Results of active and deactivated tracers | | unchanged, bitwise |
+
+## Testing and verification
+
+Unit tests:
+
+- `test/dynamics/tracer_advection.jl`:
+  - "add/delete" testset becomes "tracers keyword": models with no, one and three tracers have the right
+    `keys(model.tracers)` and tracer variables; `Tracer(:abc)` throws an `ArgumentError`; a `Tuple` of tracers makes
+    `run!` throw an `ArgumentError`; a model with `tracers = nothing` runs, has no tracer variables, and
+    `activate!(model, :abc)` throws an `ArgumentError`; `reconstruct(model, parameters(model))` keeps `model.tracers`.
+  - (de)activate testset: by `Symbol` on the model and on the simulation; `model.tracers[:abc].active` reflects it;
+    an unknown name throws an `ArgumentError`.
+  - "deactivated or deleted ... added after initialization" testset: keep the active and the deactivated tracer,
+    drop the deleted and the late tracer (both no longer possible).
+  - primitive equation testset: construct with the keyword.
+- `test/dynamics/dispatch.jl`: construct the tracer case with the keyword. Its JET test now also covers
+  `tracer_active` as a field load.
+
+Other tests that only need the new construction: `test/differentiability/parameters.jl` ("tracer_active is
+inactive", the populated case becomes a model constructed with two tracers), `test/differentiability/forward_mode.jl`
+(tracer case), `test/reactant/test_correctness.jl` (`test_model` passes the tracers to the model constructors via
+`create_cpu_model`/`create_reactant_model`).
+
+Checks during development (results go in the PR):
+
+- **Bitwise regression against main:** BarotropicModel, ShallowWaterModel and PrimitiveWetModel with two tracers,
+  one deactivated after 10 of 20 steps; main defines them with `add!`, the branch with the keyword. All prognostic,
+  grid and tendency arrays must be identical.
+- **Differentiability:** `parameters.jl` and `forward_mode.jl` pass (Enzyme 0.13.220, Julia 1.12).
+- **Reactant:** the PrimitiveDryModel tracer case of `test_correctness.jl` passes. This is also the check on the full
+  model that `Tracer` needs no type parameter.
+- **Docs:** the code blocks of `docs/src/tracers.md` run as a script (the full docs build is not needed for this).
+
+### Results (2026-11-17, Julia 1.12, aarch64 macOS)
+
+- **Unit tests** (`--check-bounds=yes`): `test/dynamics/tracer_advection.jl` 6383 passed; `test/dynamics/dispatch.jl`
+  all 3 JET tests passed; `test/parameters.jl` 21 and `test/dynamics/simulation_constructor.jl` 10 passed.
+- **Bitwise regression:** all 30 arrays (prognostic, grid and tendency tracers, vorticity, `u`) of BarotropicModel,
+  ShallowWaterModel and PrimitiveWetModel with two tracers, one deactivated after 10 of 20 steps, are bitwise equal
+  to b06af911 (main before part 1, tracers defined with `add!`). Two runs of the branch are bitwise equal too. The
+  default `RandomVelocity` initial conditions of the BarotropicModel are randomly seeded (`seed = 0`), so the
+  comparison fixes `seed = 1`; without that, BarotropicModel runs differ between any two runs.
+- **Reactant** (0.2.308, Enzyme 0.13.220, the CI setup): BarotropicModel without tracers 8 of 8, PrimitiveDryModel with
+  a tracer 22 of 22 (as in part 1); the tracer differs between CPU and Reactant by at most about 1e-5 (relative). So
+  the tracer needs no type parameter `B`. The Reactant Correctness CI of part 1 (174afe29) failed at its first
+  case: `test_model` called `add!(model)` without tracers for models without tracers, which has no method. Passing
+  the tracers to the model constructor fixes that.
+- **Differentiability** (Enzyme 0.13.220, Enzyme_jll 0.0.310): `parameters.jl` passes, including "tracer_active is
+  inactive". In `forward_mode.jl` the BarotropicModel case passes (9 of 9), and so does the BarotropicModel case
+  with a tracer (10 of 10), the forward/reverse check of the tracers. The ShallowWaterModel and PrimitiveWetModel cases
+  error with an `IllegalTypeAnalysisException` in `bernoulli_grid_potential!` (the ShallowWater and the primitive
+  equation method), code the tracers don't touch. With the same environment at part 1's HEAD (174afe29) both cases
+  give the same error at the same line, so it is not caused by this change; part 1's 49 of 49 were with an
+  environment that is gone, presumably with other versions of indirect dependencies.
+- **Docs:** all 9 code blocks of `docs/src/tracers.md` run (with the plotting lines removed).
+- **Formatting:** Runic reports no changes.
+
+## Documentation changes
+
+- `docs/src/tracers.md`: rewrite "Add/delete tracers" as "Define tracers" with the constructor keyword (several
+  tracers, the key as name, a new model to change the set of tracers), "(De)activate tracers" with `Symbol`s and
+  `Tracer(active = false)`, and the visualisation example. Note that `OutputVariables.Tracer(:abc)` (output) still
+  takes a name, unlike the model's `Tracer()`.
+- Docstrings of `Tracer`, `activate!`, `deactivate!`, `tracer_active` and `check_tracers`.
+
+## Known limitations
+
+- Breaking for all user code that defines or (de)activates tracers. Old code fails at `Tracer(:name)` with an
+  error that shows the new way, so nothing changes silently.
+- Changing the set of tracers needs a new model and simulation. Before, adding needed a new simulation anyway, but
+  deleting during a simulation was possible (the tracer was frozen); deactivating has the same effect.
+- Each set of tracer names gives a distinct model type. The variables type already contains the tracer names, so this
+  does not add compilation in practice.
+- Two different `Tracer`s: the model's (no name) and `OutputVariables.Tracer(:abc)` (with a name). The docs say so.
+- `tracers = nothing` is stored as `nothing`, not converted to `(;)` (see section 2), so `model.tracers` is `nothing`
+  for such a model. Everything that uses the tracers treats both the same.
+- Part 1's limitation that `tracer_active` asserts a `Bool` no longer applies: `active` is always a `Bool`.
+- Unrelated to this change, but found while verifying it: with Enzyme 0.13.220 and the current indirect dependencies,
+  the ShallowWaterModel and PrimitiveWetModel cases of `test/differentiability/forward_mode.jl` fail locally with an
+  `IllegalTypeAnalysisException` in `bernoulli_grid_potential!`, at part 1's HEAD as well (see Results).
+
+## Open questions
+
+Resolved 2026-11-17 (see revision log): remove `B`, keep the Enzyme inactive rules, accept `tracers = nothing` as
+`(;)`.

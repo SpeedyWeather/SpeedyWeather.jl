@@ -69,7 +69,7 @@ function initialize!(
     (; variables, model) = simulation
     progn = variables.prognostic
 
-    # tracers added to the model after it was initialized have no variables, error early
+    # model.tracers has to be a NamedTuple of tracers that have variables, error early
     check_tracers(variables, model)
 
     # SET THE CLOCK

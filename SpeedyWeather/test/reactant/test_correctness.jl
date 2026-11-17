@@ -238,15 +238,13 @@ function test_model(
 
     # Setup CPU model
     println("\n[1/3] Setting up CPU model...")
-    model_cpu = create_cpu_model(ModelType; truncation, Transform)
-    add!(model_cpu, Tracer.(tracers)...)
+    model_cpu = create_cpu_model(ModelType; truncation, Transform, tracers = NamedTuple{tracers}(map(_ -> Tracer(), tracers)))
     simulation_cpu = initialize!(model_cpu)
     println("  ✓ CPU model initialized (T$(truncation - 1))")
 
     # Setup Reactant model
     println("\n[2/3] Setting up Reactant model...")
-    model_reactant = create_reactant_model(ModelType; truncation, Transform)
-    add!(model_reactant, Tracer.(tracers)...)
+    model_reactant = create_reactant_model(ModelType; truncation, Transform, tracers = NamedTuple{tracers}(map(_ -> Tracer(), tracers)))
     simulation_reactant = initialize!(model_reactant)
     # set the tracers on Reactant only, they are copied to the CPU after the spin up
     isempty(tracers) || set!(simulation_reactant; namespace = :tracers, (name => tracer_initial_condition for name in tracers)...)

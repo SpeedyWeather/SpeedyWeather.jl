@@ -17,9 +17,8 @@ end
 
 @testset "barotropic time_step! with a tracer free of runtime dispatch (JET)" begin
     spectral_grid = SpectralGrid(truncation = 6, nlayers = 1)
-    model = BarotropicModel(; spectral_grid)
+    model = BarotropicModel(; spectral_grid, tracers = (; abc = Tracer()))
     model.feedback.verbose = false
-    add!(model, Tracer(:abc))
     simulation = initialize!(model)
     (; variables, model) = simulation
     initialize!(simulation)

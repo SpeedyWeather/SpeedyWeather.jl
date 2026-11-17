@@ -129,20 +129,20 @@ end
     end
 end
 
-# The time stepping reads the tracer registry (a `Dict`) only through `tracer_active`, which is marked
-# inactive for Enzyme (SpeedyWeatherEnzymeExt): the registry holds only names and `active` flags, so
-# it must never contribute a derivative, in forward or reverse mode, empty or populated. The
+# The time stepping reads the tracers `model.tracers` (a NamedTuple) only through `tracer_active`, which
+# is marked inactive for Enzyme (SpeedyWeatherEnzymeExt): the tracers hold only `active` flags, so
+# they must never contribute a derivative, in forward or reverse mode, empty or populated. The
 # differentiable tracer data is reached separately via `vars.*.tracers.<name>`.
 @testset "tracer_active is inactive" begin
     spectral_grid = SpectralGrid(truncation = 9, nlayers = 1, NF = Float64)
-    model = BarotropicModel(; spectral_grid, drag = LinearVorticityDrag(spectral_grid))
 
     # number of active tracers, scaled by an active parameter: d/dx is just that number
     count_active_tracers(m, x) =
         (SpeedyWeather.tracer_active(m, :tracer_a) + SpeedyWeather.tracer_active(m, :tracer_b)) * x[1]
 
     for populated in (false, true)
-        populated && add!(model, Tracer(:tracer_a), Tracer(:tracer_b))
+        tracers = populated ? (; tracer_a = Tracer(), tracer_b = Tracer()) : (;)
+        model = BarotropicModel(; spectral_grid, drag = LinearVorticityDrag(spectral_grid), tracers)
         n = populated ? 2 : 0
         @test count_active_tracers(model, [1.0]) == n
 
