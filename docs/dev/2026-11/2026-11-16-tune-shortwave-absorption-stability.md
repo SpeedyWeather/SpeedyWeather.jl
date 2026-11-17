@@ -543,10 +543,12 @@ Done (uncommitted, worktree `tree_defaults` on branch `mg/tune-water-vapour-defa
 
 ## Testing and verification
 
-- Existing unit tests in `test/parameterizations/shortwave_radiation.jl` and `radiation.jl` must still pass with
-  the new defaults (for example, transmissivities in (0, 1] and near-IR absorbed more strongly than visible).
-- `test/long_integrations/default_primitive_wet.jl` (1 year) must pass.
-- The 1000-year T32L8 run (Phase 3) is the main verification. Its log and annual means will be summarised here.
+- Unit tests with the new defaults and `--check-bounds=yes` (2026-11-17, `tree_defaults`, identical to commit
+  `17f3f7987` on `mg/tune-water-vapour`): `longwave_radiation` 21, `shortwave_radiation` 3267, `radiation` 82,
+  `greenhouse_gases` 13, `albedo` 259, `numericalradiation` 26, `all_parametrizations` 61, all pass.
+- `test/long_integrations/default_primitive_wet.jl` (1 year, `--check-bounds=yes`): passes.
+- The 1000-year T32L8 runs `D_*` (experiment log) are the main verification. Their annual means will be
+  summarised here.
 
 ## Documentation changes
 
