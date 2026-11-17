@@ -81,7 +81,8 @@ const StochasticLeapfrog{NF, S, B, MS, O, L, N <: AbstractWienerNoise} = Leapfro
 
 """$(TYPEDSIGNATURES)
 Leapfrog with additive Wiener noise. Keyword arguments of `Leapfrog` are passed on to it, all
-others to `AdditiveWienerNoise` unless `noise` is provided."""
+others to `AdditiveWienerNoise`. Alternatively provide the `noise` directly (then without
+keyword arguments for it), `noise = nothing` gives a `Leapfrog` without noise."""
 function StochasticLeapfrog(
         spectral_grid::SpectralGrid;
         Δt_at_T32 = Minute(40),
@@ -90,9 +91,16 @@ function StochasticLeapfrog(
         williams_filter = 0.53,
         ocean = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
         land = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
-        noise = AdditiveWienerNoise(spectral_grid),
         kwargs...,
     )
+    noise = if haskey(kwargs, :noise)
+        noise_kwargs = filter(!=(:noise), keys(kwargs))
+        isempty(noise_kwargs) ||
+            throw(ArgumentError("Provide either `noise` or its keyword arguments $noise_kwargs, not both."))
+        kwargs[:noise]
+    else
+        AdditiveWienerNoise(spectral_grid; kwargs...)
+    end
     return Leapfrog(spectral_grid; Δt_at_T32, adjust_with_output, robert_filter, williams_filter, ocean, land, noise)
 end
 

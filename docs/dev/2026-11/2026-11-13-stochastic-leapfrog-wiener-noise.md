@@ -44,6 +44,15 @@ Base revision: `24fdb6847a3bdd49f7e23e94a5b64de06dd89d48` (branch point). HEAD w
 >   (`random_pattern[ij, 1]`), `StochasticStirring` and the `RandomPattern` output
 >   (`field_view(…, :, 1)`). Bitwise identical to before (SPPT with and without
 >   `StochasticLeapfrog`, stirring, white noise; 20 steps).
+> - 2026-11-16/17: Wiener code moved to `time_stepping/random_process.jl` (user, `0119d201`,
+>   `c457b112`). `StochasticLeapfrog(…; noise = nothing)` gives a `Leapfrog` without noise (user,
+>   `d8f3d433`); the keyword arguments for `AdditiveWienerNoise` are passed on again, with the
+>   `ArgumentError` when `noise` is given as well. User: "I don't want an additional check in the
+>   running model code. Can't we infer the correct scaling from the `time_step(...)`": the scaling
+>   is now `wiener_scale(stepper, time_step(…))`, `1/√Δt` with the stepper's current time step,
+>   `1/√(Δt/2)` for a leapfrog step (dispatch on `AbstractLeapfrog`, no runtime branch). From the
+>   3rd step on this is bitwise the old `1/√L.Δt`; the first two steps get the noise of their
+>   shorter steps, ocean/land with their own time step (also for `ocean/land = nothing`).
 
 ## Problem description
 
@@ -122,7 +131,10 @@ design record. It is summarised in this document; the full text is in the histor
   (`Grid3D`) has slots **only for ocean/land variables with a nonzero amplitude**.
 - `random_process!(vars, L::StochasticLeapfrog, model)` calls `wiener_tendencies!` (adds the stored
   pattern) and then `wiener_draw!` (draws the pattern for the next step).
-- Scaling: the tendency receives `a/√Δt · taper · ξ`, with `Δt = L.Δt` in seconds. Atmospheric
+- Scaling: the tendency receives `a/√Δt · taper · ξ`, with `1/√Δt = wiener_scale(stepper, time_step(…))`
+  in seconds: the time step of the stepper at the current step, half of it for a leapfrog step,
+  i.e. `L.Δt` from the 3rd step on (Δt/4 on the Euler start, Δt/2 on the first leapfrog step);
+  ocean/land with `time_step(L, :ocean/:land, clock)` (Δt/2 on the first two steps). Atmospheric
   tendencies are radius-scaled at that point, so the amplitude is multiplied by `R`, and by `R²`
   for vorticity and divergence. Ocean/land amplitudes are not scaled.
 - `wiener_tendencies!` dispatches to two `@generated` drivers, `wiener_atmosphere!` and
@@ -168,7 +180,9 @@ design record. It is summarised in this document; the full text is in the histor
 2. **One increment `2a√Δt ξⁿ` per leapfrog step.** It gives the nominal diffusion `a²σ²/2` for
    leapfrog+RAW (1.00 in the scalar test; `a/√(2Δt)` would give 0.50). The computational mode is
    excited and the RAW filter damps it. Ewald's `ΔWⁿ⁻¹ + ΔWⁿ` would avoid exciting it; that is a
-   possible option.
+   possible option. Equivalently: the noise is scaled with the time the clock (and the physical
+   mode, the mean of the two leapfrog sequences) advances per step, half the leapfrog step, which
+   `wiener_scale(::AbstractLeapfrog, Δt)` infers from `time_step` also for the first two steps.
 3. **The pattern is drawn at the end of a step and applied in the next**, and stored in the
    prognostic variables. As a result the first step of a new simulation is deterministic, and
    `run!` continues with the stored pattern. This was needed only for the bitwise reproduction.

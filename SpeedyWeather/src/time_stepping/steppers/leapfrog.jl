@@ -299,6 +299,15 @@ function time_step(L::Leapfrog, clock::Clock)
     )
 end
 
+"""$(TYPEDSIGNATURES)
+Wiener scaling `1/√Δt` (see `AdditiveWienerNoise`) for a leapfrog step, `Δt` is half its time
+step: a leapfrog step of 2Δt advances each of its two interleaved sequences by 2Δt, but the clock
+and the physical mode (the mean of the two) by Δt, which then receives the variance `a²Δt` per
+step. On the first leapfrog step (of Δt from the initial state) this is Δt/2, consistent with the
+clock. The Euler start (Δt/2) gets Δt/4, more noise than for an Euler step, but its midpoint state
+is only used for the tendencies of the first leapfrog step and discarded afterwards."""
+wiener_scale(::AbstractLeapfrog, Δt) = 1 / sqrt(Δt / 2)
+
 # on 1st Euler step + 2nd Leapfrog step disable filters; with RAW filters afterwards
 prognostic_step(::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, 1, 2)
 

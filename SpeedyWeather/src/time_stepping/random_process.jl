@@ -9,7 +9,8 @@ pattern `ξ` (independent in time, between variables and between layers) with a 
 amplitude `a`, so the noise is additive: its covariance depends neither on the state nor on
 any parameter of the model. With time step `Δt` the tendency receives `a/√Δt ⋅ taper ⋅ ξ`,
 so the state receives an increment ∝ `a√Δt ⋅ ξ` per step, a Wiener increment whose variance
-is independent of the time step.
+is independent of the time step. `Δt` is the time step of the respective time stepper at the
+current step, half of it for a leapfrog step, see `wiener_scale`.
 
 The amplitudes are given per variable by the name of its tendency, e.g.
 `AdditiveWienerNoise(spectral_grid; vorticity = 3e-8, η = 1e-3, soil_temperature = 1e-4)`,
@@ -160,19 +161,26 @@ end
 """$(TYPEDSIGNATURES)
 Add the stored noise patterns times `amplitude/√Δt` to the tendencies: of the atmospheric
 variables in spectral space, radius-scaled as the dynamical core leaves them, of the ocean and
-land variables in grid space, see `AdditiveWienerNoise`."""
+land variables in grid space, see `AdditiveWienerNoise` and `wiener_scale` for `Δt`."""
 function wiener_tendencies!(
         vars::Variables,
         noise::AdditiveWienerNoise,
         L::AbstractTimeStepper,
         model::AbstractModel,
     )
-    isdt = 1 / sqrt(time_step(L, clock))# Δt in [s], the Wiener increment scaling
-    R = vars.prognostic.scale[]         # radius scaling
-    wiener_atmosphere!(vars, noise, L, isdt, R)
-    wiener_surface!(vars, noise, L, isdt)
+    clock = vars.prognostic.clock
+    wiener_scaling = wiener_scale(L, time_step(L, clock))   # 1/√Δt [1/√s]
+    R = vars.prognostic.scale[]                             # radius scaling
+    wiener_atmosphere!(vars, noise, L, wiener_scaling, R)
+    wiener_surface!(vars, noise, L, clock)
     return nothing
 end
+
+"""$(TYPEDSIGNATURES)
+Scaling `1/√Δt` [1/√s] of the Wiener increment `a/√Δt ⋅ ξ` added to the tendencies of the
+variables that `stepper` steps with the time step `Δt` [s] (from `time_step`), so that the
+increment of the state `Δt ⋅ a/√Δt ⋅ ξ` has the variance `a²Δt` (Euler-Maruyama)."""
+wiener_scale(::AbstractTimeStepper, Δt) = 1 / sqrt(Δt)
 
 # The drivers below are unrolled over the variable names, which are compile-time constants (they
 # come from the type of the `Variables`), so that every `getfield` infers concretely; a loop over
@@ -185,12 +193,12 @@ Add the noise to the atmospheric tendencies. Slots of the spectral pattern: vari
 first, then single-layer variables, each in the order of `tendency_names`. After the dynamical core
 the tendencies are scaled with the radius R (`scale_tendencies!`, the time step is Δt/R), vorticity
 and divergence are stored scaled by R in addition (`scale_prognostic!`), so need R once more."""
-@generated function wiener_atmosphere!(vars::Variables{Po, G, T}, noise, L, isdt, R) where {Po, G, T}
+@generated function wiener_atmosphere!(vars::Variables{Po, G, T}, noise, L, wiener_scaling, R) where {Po, G, T}
     calls = Expr[]
     for layers in (true, false), name in _tendency_names(T)
         # R: tendencies are radius-scaled (time step Δt/R); R²: vorticity, divergence are also stored × R
-        a = name in (:vorticity, :divergence) ? :(amplitude(noise, $(QuoteNode(name))) * isdt * R * R) :
-            :(amplitude(noise, $(QuoteNode(name))) * isdt * R)
+        a = name in (:vorticity, :divergence) ? :(amplitude(noise, $(QuoteNode(name))) * wiener_scaling * R * R) :
+            :(amplitude(noise, $(QuoteNode(name))) * wiener_scaling * R)
         push!(
             calls, :(
                 offset = wiener_slots!(
@@ -216,7 +224,7 @@ end
 Add the noise to the ocean and land tendencies. Slots of the grid-point pattern only for variables
 with a nonzero amplitude, not radius-scaled: ocean and land variables are stepped with the unscaled
 time step. Without any such variable there is no `wiener_pattern_surface` and nothing to do."""
-@generated function wiener_surface!(vars::Variables{Po, G, T}, noise, L, isdt) where {Po, G, T}
+@generated function wiener_surface!(vars::Variables{Po, G, T}, noise, L, clock) where {Po, G, T}
     :wiener_pattern_surface in fieldnames(Po) || return :(return nothing)
     calls = Expr[]
     for namespace in (:ocean, :land), name in _namespace_names(T, namespace)
@@ -225,7 +233,7 @@ time step. Without any such variable there is no `wiener_pattern_surface` and no
                 offset = wiener_surface_slots!(
                     getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),
                     vars.prognostic.wiener_pattern_surface, amplitude(noise, $(QuoteNode(name))),
-                    isdt, offset, time_stepper(L, Val($(QuoteNode(namespace)))), noise,
+                    offset, L, Val($(QuoteNode(namespace))), clock, noise,
                 )
             )
         )
@@ -233,11 +241,14 @@ time step. Without any such variable there is no `wiener_pattern_surface` and no
     return Expr(:block, :(offset = 0), calls..., :(return nothing))
 end
 
-# `time_stepping` is the ocean or land time stepper, e.g. EulerForward, which decides the tendency step
-@inline function wiener_surface_slots!(var, pattern, a, isdt, offset, time_stepping, noise)
+# the ocean or land time stepper (e.g. EulerForward) decides the tendency step and the Wiener scaling,
+# with the time step of the ocean or land variables within `L`, e.g. Δt/2 on the first two Leapfrog steps
+@inline function wiener_surface_slots!(var, pattern, a, offset, L, component::Val{C}, clock, noise) where {C}
     iszero(a) && return offset
-    tendency = get_tendency_step(var, time_stepping, noise)
-    wiener!(tendency, pattern, a * isdt, nothing, offset)
+    stepper = time_stepper(L, component)
+    tendency = get_tendency_step(var, stepper, noise)
+    wiener_scaling = wiener_scale(stepper, time_step(L, C, clock))
+    wiener!(tendency, pattern, a * wiener_scaling, nothing, offset)
     return offset + nslots(tendency)
 end
 

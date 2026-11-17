@@ -27,6 +27,12 @@ const STOCHASTIC_TEST_MODELS = (BarotropicModel, ShallowWaterModel, PrimitiveWet
     @test !(Leapfrog(spectral_grid) isa StochasticLeapfrog)
     @test Leapfrog(spectral_grid; noise = AdditiveWienerNoise(spectral_grid)) isa StochasticLeapfrog
     @test_throws ArgumentError StochasticLeapfrog(spectral_grid; noise = AdditiveWienerNoise(spectral_grid), seed = 1)
+
+    # keyword arguments are passed on to the noise, noise = nothing is a Leapfrog without noise
+    @test StochasticLeapfrog(spectral_grid; seed = 7, temperature = 0).noise.amplitudes.temperature == 0
+    @test StochasticLeapfrog(spectral_grid; seed = 7).noise.spectral.seed == 7
+    @test StochasticLeapfrog(spectral_grid; noise = nothing).noise === nothing
+    @test !(StochasticLeapfrog(spectral_grid; noise = nothing) isa StochasticLeapfrog)
 end
 
 @testset "StochasticLeapfrog with zero amplitudes is Leapfrog" begin
@@ -124,13 +130,19 @@ end
     @test size(vars.prognostic.wiener_pattern_surface, 2) == 1 + nsoil
     @test noise.taper ≈ model.geometry.σ_levels_full
 
-    for Δt in (Minute(20), Minute(40))
+    # Wiener time step per step of the Leapfrog: Euler start (Δt/2), first leapfrog (Δt), later (2Δt)
+    # atmosphere: half the leapfrog time step; ocean and land, EulerForward: Δt/2 on the first two steps
+    for Δt in (Minute(20), Minute(40)), (step_counter, atmosphere_divisor, surface_divisor) in
+        ((0, 4, 2), (1, 2, 2), (2, 1, 1), (5, 1, 1))
         set!(L, Δt)
+        vars.prognostic.clock.step_counter = step_counter
         SpeedyWeather.wiener_draw!(vars, noise)         # a pattern to apply
         SpeedyWeather.reset_tendencies!(vars, L)
         SpeedyWeather.wiener_tendencies!(vars, noise, L, model)
 
-        isdt = 1 / sqrt(L.Δt)
+        wiener_scaling = 1 / sqrt(L.Δt / atmosphere_divisor)
+        wiener_scaling_ocean = 1 / sqrt(L.ocean.Δt / surface_divisor)
+        wiener_scaling_land = 1 / sqrt(L.land.Δt / surface_divisor)
         R = vars.prognostic.scale[]
         a = noise.amplitudes
         spec = vars.prognostic.wiener_pattern.data
@@ -139,21 +151,27 @@ end
         for k in 1:nlayers
             t = noise.taper[k]
             # spectral tendencies, radius-scaled as after the dynamical core (vorticity, divergence twice)
-            @test tend(vars.tendencies.vorticity)[:, k] == (a.vorticity * isdt * R * R * t) .* spec[:, k]
-            @test tend(vars.tendencies.divergence)[:, k] == (a.divergence * isdt * R * R * t) .* spec[:, nlayers + k]
-            @test tend(vars.tendencies.temperature)[:, k] == (a.temperature * isdt * R * t) .* spec[:, 2nlayers + k]
-            @test tend(vars.tendencies.humidity)[:, k] == (a.humidity * isdt * R * t) .* spec[:, 3nlayers + k]
+            @test tend(vars.tendencies.vorticity)[:, k] == (a.vorticity * wiener_scaling * R * R * t) .* spec[:, k]
+            @test tend(vars.tendencies.divergence)[:, k] == (a.divergence * wiener_scaling * R * R * t) .* spec[:, nlayers + k]
+            @test tend(vars.tendencies.temperature)[:, k] == (a.temperature * wiener_scaling * R * t) .* spec[:, 2nlayers + k]
+            @test tend(vars.tendencies.humidity)[:, k] == (a.humidity * wiener_scaling * R * t) .* spec[:, 3nlayers + k]
         end
-        @test tend(vars.tendencies.pressure) == (a.pressure * isdt * R) .* spec[:, 4nlayers + 1]
+        @test tend(vars.tendencies.pressure) == (a.pressure * wiener_scaling * R) .* spec[:, 4nlayers + 1]
         @test all(iszero, tend(vars.tendencies.grid.temperature))   # nothing in grid space
         sst = tend(vars.tendencies.ocean.sea_surface_temperature)
-        @test sst == (a.sea_surface_temperature * isdt) .* surface[:, 1]
+        @test sst == (a.sea_surface_temperature * wiener_scaling_ocean) .* surface[:, 1]
         @test any(!iszero, sst)
         for k in 1:nsoil
-            @test tend(vars.tendencies.land.soil_temperature)[:, k] == (a.soil_temperature * isdt) .* surface[:, 1 + k]
+            @test tend(vars.tendencies.land.soil_temperature)[:, k] == (a.soil_temperature * wiener_scaling_land) .* surface[:, 1 + k]
         end
         @test all(iszero, tend(vars.tendencies.ocean.sea_ice_concentration))
     end
+end
+
+@testset "StochasticLeapfrog: Wiener scale 1/√Δt, Δt half the time step for leapfrog steps" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 1)
+    @test SpeedyWeather.wiener_scale(SpeedyWeather.EulerForward(spectral_grid), 4.0f0) === 0.5f0
+    @test SpeedyWeather.wiener_scale(Leapfrog(spectral_grid), 8.0f0) === 0.5f0  # also for ocean/land = nothing
 end
 
 @testset "StochasticLeapfrog: noise conserves the global means" begin
