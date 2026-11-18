@@ -67,8 +67,8 @@ end
         set_points!(vars.prognostic.ocean.sea_ice_concentration, ice)
         if sea_ice isa ThermodynamicSeaIce      # its prognostic variable is the volume, ice surface balance needs albedo, shortwave
             set_points!(vars.prognostic.ocean.sea_ice_volume, SpeedyWeather.sea_ice_volume.(ice, Ref(sea_ice)))
-            vars.parameterizations.ocean.sea_ice_albedo .= 0.6
-            vars.parameterizations.surface_shortwave_down .= 100
+            vars.parameterizations.ocean.sea_ice_albedo .= 0.6f0
+            vars.parameterizations.surface_shortwave_down .= 100.0f0
         end
 
         SpeedyWeather.column_parameterizations!(vars, model)
