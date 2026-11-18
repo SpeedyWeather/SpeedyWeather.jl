@@ -39,7 +39,7 @@ prints `Computing:  42% ━━━━━━━━━━━━              ETA: 0
 subtyping [`AbstractProgressElement`](@ref) and extending [`print_element`](@ref).
 
 This module is based on [ProgressMeter.jl](https://github.com/timholy/ProgressMeter.jl) by Tim Holy
-and contributors (MIT License), which SpeedyWeather used until v0.24. It was reimplemented here
+and contributors (MIT License), which SpeedyWeather used until v0.25. It was reimplemented here
 because SpeedyWeather needed a progress line made of custom elements (simulation date, speed,
 diagnostics), which ProgressMeter.jl only allows through type piracy. The element interface proposed
 for it ([ProgressMeter.jl#369](https://github.com/timholy/ProgressMeter.jl/pull/369)) is not merged,

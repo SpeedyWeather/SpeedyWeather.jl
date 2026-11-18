@@ -93,7 +93,7 @@ which are also stored in `simulation.model.feedback.nan_detection.step` and `.ti
 
 The progress meter of SpeedyWeather (`SpeedyWeatherInternals.ProgressMeters`) is based on
 [ProgressMeter.jl](https://github.com/timholy/ProgressMeter.jl) by Tim Holy and contributors (MIT
-License), which SpeedyWeather used until v0.24. As SpeedyWeather needs a progress line built from its
+License), which SpeedyWeather used until v0.25. As SpeedyWeather needs a progress line built from its
 own elements, which ProgressMeter.jl only allowed through type piracy, and the corresponding proposal
 for ProgressMeter.jl ([#369](https://github.com/timholy/ProgressMeter.jl/pull/369)) has not been
 merged, the small part of ProgressMeter.jl that SpeedyWeather uses was reimplemented with a simpler
