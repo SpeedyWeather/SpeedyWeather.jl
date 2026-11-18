@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Eccentric orbits: `planet.orbit` is `KeplerOrbit()` (new default, with eccentricity and longitude of perihelion) or `CircularOrbit()` (previous), which defines its variables (the distance factor (a/r)²), is computed once per time step by the solar zenith, and scales the solar constant in all shortwave schemes via `solar_distance_factor(vars)` [#1407](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1407)
+- Eccentric orbits: `planet.orbit` is `KeplerOrbit()` (new default, with eccentricity and longitude of perihelion) or `CircularOrbit()` (previous), which defines its variables (the distance factor (a/r)²), is computed once per time step by the solar zenith, and scales the solar constant in all shortwave schemes via `solar_distance_factor(vars)`; scalar variables written every time step (the distance factor, CO₂) use the new `ArchitectureScalarDim` allocated with `scalar_ref`, which moved to SpeedyWeatherInternals (v1.1.0), so a compiled Reactant step can write them [#1407](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1407)
 - Workaround LLVM bug for Enzyme differentiability by `noinline` parameterizations on CPU [#1413](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1413)
 - Reactant: compute `free_troposphere_layers` of `DiagnosticClouds` on a CPU copy of the vertical coordinates to avoid scalar indexing at `initialize!` [#1412](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1412)
 - Updated `JLArrays` dependency [#1411](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1411)

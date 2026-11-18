@@ -45,7 +45,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 
 # UTILITIES
 export Utils
-import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs, set_scalar!
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs, set_scalar!, scalar_ref
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets

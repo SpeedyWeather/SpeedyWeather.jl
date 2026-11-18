@@ -2,16 +2,19 @@
 struct ClockDim <: AbstractVariableDim end
 allocate(::AbstractVariable{ClockDim}, model::AbstractModel) = Clock(model.architecture)
 
-"""Dimension for scalar variables holding single numerical values as RefValue.
+"""Dimension for scalar variables holding single numerical values as RefValue, for values set at
+`initialize!` rather than written by the time step, e.g. `prognostic.scale`. A scalar the time
+step writes, e.g. from the (traced) clock, needs `ArchitectureScalarDim` instead.
 Default value is 0, but can be set via ScalarDim, e.g. ScalarDim(1) for a default value of 1."""
 @kwdef struct ScalarDim{T} <: AbstractVariableDim
     value::T = zero(DEFAULT_NF)                                 # default value via ScalarDim(1)
 end
 allocate(v::AbstractVariable{<:ScalarDim}, model::AbstractModel) = Ref(convert(model.spectral_grid.NF, v.dims.value))
 
-"""Dimension for scalar variables as `ScalarDim` but allocated on the model's architecture
-via `scalar_ref`, a `Ref(ConcreteRNumber(x))` with Reactant, so that a value computed inside
-a compiled (traced) time step can be written into it, e.g. `var[] = x` with `x` traced."""
+"""Dimension for scalar variables written every time step, e.g. CO₂ or the Sun-planet distance
+factor, as `ScalarDim` but allocated on the model's architecture via `scalar_ref`, a
+`Ref(ConcreteRNumber(x))` with Reactant, so that a value computed inside a compiled (traced)
+time step can be written into it, e.g. `var[] = x` with `x` traced."""
 @kwdef struct ArchitectureScalarDim{T} <: AbstractVariableDim
     value::T = zero(DEFAULT_NF)                                 # default value via ArchitectureScalarDim(1)
 end
