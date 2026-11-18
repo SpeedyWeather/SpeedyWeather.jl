@@ -49,6 +49,7 @@ end
     co2 = vars.prognostic.greenhouse_gases.co2[]
     @test co2 == SpeedyWeather.DEFAULT_CO2
     τ_dry = dry_absorption + co2_sensitivity * log(co2 / reference_co2)
+    @test τ_dry == dry_absorption      # the reference is the default CO₂
     vars.grid.humidity .= 0
     t_dry = copy(SpeedyWeather.transmissivity!(1, vars, transmissivity, model)[1, :])
     @test prod(t_dry) ≈ exp(-τ_dry) rtol = 1.0e-5

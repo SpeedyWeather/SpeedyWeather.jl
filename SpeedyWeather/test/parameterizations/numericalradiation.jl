@@ -46,14 +46,14 @@ end
     @test any(!=(zero(NF)), variables.tendencies.grid.temperature)
     @test all(>(zero(NF)), variables.parameterizations.outgoing_longwave)
 
-    # without a CO₂ component the scheme uses 280 ppm: same result as prescribing it
+    # without a CO₂ component the scheme uses the default CO₂: same result as prescribing it
     olr = copy(variables.parameterizations.outgoing_longwave)
     model_co2 = PrimitiveWetModel(spectral_grid; radiation, parameterizations = (:radiation,),
-                                  greenhouse_gases = (; co2 = CO2(spectral_grid, 280)))
+                                  greenhouse_gases = (; co2 = CO2(spectral_grid)))
     initialize!(model_co2.radiation, model_co2)
     variables_co2 = Variables(model_co2)
     set_test_state!(variables_co2, model_co2)
-    variables_co2.prognostic.greenhouse_gases.co2[] = 280
+    variables_co2.prognostic.greenhouse_gases.co2[] = SpeedyWeather.DEFAULT_CO2
     SpeedyWeather.column_parameterizations!(variables_co2, model_co2)
     @test variables_co2.parameterizations.outgoing_longwave == olr
 end

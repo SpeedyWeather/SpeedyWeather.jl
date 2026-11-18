@@ -129,11 +129,10 @@ end
     end
 end
 
-# The tracer-registry `iterate` rules (SpeedyWeatherEnzymeExt). The forward rule unblocks forward
-# mode (Enzyme fails with an internal error compiling `iterate(::Dict)`); the reverse rule exists
-# because a function carrying any custom rule must have one for whichever mode is running, which
-# NESTED AD (reverse over forward) needs. Iterating the registry yields only a `Symbol` name and a
-# `Tracer` config, so neither rule may contribute a derivative — the differentiable tracer data is
+# The tracer-registry `iterate` rule (SpeedyWeatherEnzymeExt): iterating the registry is inactive, which
+# unblocks forward mode (Enzyme fails with an internal error compiling `iterate(::Dict)`) and avoids
+# "Cannot deduce type of load" warnings. Iterating the registry yields only a `Symbol` name and a
+# `Tracer` config, so it may not contribute a derivative — the differentiable tracer data is
 # reached separately via `vars.*.tracers[name]`.
 @testset "Tracer registry iterate rules" begin
     spectral_grid = SpectralGrid(truncation = 9, nlayers = 1, NF = Float64)
@@ -167,9 +166,8 @@ end
         @test dx[1] ≈ 2                              # d/dx of 2x
     end
 
-    # FORWARD mode over a POPULATED tracer registry is a known gap: it throws `EnzymeNoShadowError`.
-    # this is just a temporary workaround
-    @test_broken autodiff(
+    # FORWARD mode over a POPULATED tracer registry (threw `EnzymeNoShadowError` with custom rules)
+    @test autodiff(
         set_runtime_activity(Forward), count_tracers, Duplicated,
         Const(model), Duplicated([2.0], [1.0]),
     )[1] ≈ 2
