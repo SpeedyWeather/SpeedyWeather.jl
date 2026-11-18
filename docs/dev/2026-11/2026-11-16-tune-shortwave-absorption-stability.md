@@ -1,9 +1,8 @@
 # Tuning shortwave water vapour and dry-air absorption for stable long T32L8 runs
 
-> Status: **in progress**. On `origin/main` the default Byrne–O'Gorman longwave runs away. The new defaults
-> (decision 4: `b` = 750, `a` = 1.45 at the new default CO₂ of 360 ppm, shortwave `dry` 0.066, `wv_nir` 1500) are
-> set in the worktree `tree_defaults` (branch `mg/tune-water-vapour-defaults`, uncommitted), and their 1000-year
-> GPU validation `D_*` is running.
+> Status: **completed**, in PR #1414. The new defaults (decision 4: `b` = 750, `a` = 1.45 at the new default CO₂
+> of 360 ppm, shortwave `dry` 0.066, `wv_nir` 1500) run 1000 years at T32L8 without drift, also with ±4% solar
+> and with 2×CO₂ (finding 23).
 
 Date of initial draft: 2026-11-16
 
@@ -54,6 +53,11 @@ Base revision: `b06af911abf015a6cb2bcba991959908dbb87a03` (`origin/main` with #1
 - **2026-11-17, new defaults chosen** (prompt: "and then continue the tuining of the water-vapour longwave
   absorption and dry_absorption"). After `W_*` (finding 22), decision 4 sets the defaults in `tree_defaults`. The
   1000-year validation `D_*` runs the code defaults, not a parameter list.
+- **2026-11-17, moved to the PR branch** (prompt: "make the changes here in this branch, so I can also open a draft
+  PR (let me do that)"). `origin/main` merged into `mg/tune-water-vapour` and the `tree_defaults` changes
+  committed there (`17f3f7987`), now PR #1414. The 2×CO₂ run went to its own GPU job (prompt: "don't do the 1000y
+  on CPU, do it on GPU").
+- **2026-11-18, validation passed** (prompt: "continue, what did the 1000-year runs do"). Finding 23.
 - **2026-11-16, long runs on GPU** (prompt: "submit a gpu job if you want it faster, not multithreaded"). Restartable
   `run_long.jl` with `ARCH=gpu` and `long_gpu.sh`, see Phase 3. First 1000-year runs submitted.
 
@@ -460,6 +464,30 @@ January–May so far, so not comparable with the 12-month `main_default` row), a
      at 291.5 / 291.3 K: LW down 313.7 vs 301.5 W/m², P 2.07 vs 1.75 mm/day).
    - `L3_*` after 86 years (CPU, 280 ppm, `b` = 500): `a` = 1.75 (1.70 at 360 ppm) stays at 291.1 K with decadal
      means within 0.1 K, its +4% twin at 296.5 K; `a` = 1.9 stays at 294.8 K, its twin at 298.7 K. All stable.
+     After ≈615 years (2026-11-18) still the same, all stable.
+23. **The new defaults are stable for 1000 years, also under ±4% solar and 2×CO₂** (`D_*`, GPU, H100, code
+   defaults of commit `17f3f7987`; century means, first and last century; no NaN in any run).
+
+   | run | years | SST | sea ice | net TOA | OSR | OLR | atm SW | LW down | P | max T₁ | max wind |
+   |---|---|---|---|---|---|---|---|---|---|---|---|
+   | default (360 ppm) | 0–100 | 291.57 | 0.105 | −5.2 | 108.5 | 237.9 | 71.9 | 314.3 | 2.07 | 254 | 133 |
+   | | 900–1000 | 291.58 | 0.105 | −5.2 | 108.5 | 238.0 | 72.0 | 314.5 | 2.08 | 254 | 130 |
+   | +4% solar (1419.6 W/m²) | 0–100 | 297.55 | 0.045 | −0.7 | 99.0 | 256.6 | 93.3 | 379.0 | 2.74 | 277 | 130 |
+   | | 900–1000 | 297.27 | 0.047 | −1.2 | 99.5 | 256.6 | 92.2 | 376.2 | 2.73 | 261 | 130 |
+   | −4% solar (1310.4 W/m²) | 0–100 | 287.95 | 0.159 | −9.1 | 110.6 | 226.1 | 61.0 | 273.3 | 1.50 | 250 | 126 |
+   | | 900–1000 | 287.87 | 0.161 | −9.0 | 110.8 | 225.8 | 60.9 | 272.6 | 1.49 | 252 | 125 |
+   | 2×CO₂ (720 ppm) | 0–100 | 295.72 | 0.058 | −1.6 | 97.4 | 245.4 | 84.3 | 362.3 | 2.53 | 258 | 130 |
+   | | 900–1000 | 295.87 | 0.057 | −1.8 | 97.2 | 245.8 | 84.7 | 363.9 | 2.55 | 260 | 134 |
+
+   - **Default:** all ten century means of SST lie within 291.56–291.58 K, sea ice within 0.105–0.106, net TOA
+     within −5.17 to −5.21 W/m². The 40-year `W_b750_a1.45_d066` budget holds for the millennium.
+   - **2×CO₂:** +4.3 K, equilibrated within ≈100–200 years. That is within the very likely range of Earth's
+     equilibrium climate sensitivity (2–5 K, IPCC AR6), on the high side, because the run moves to the warm
+     branch of finding 22 (sea ice 0.105 → 0.057).
+   - **+4% solar** (≈+9.3 W/m² absorbed): +5.7 K (≈0.6 K per W/m², warm branch). SST falls by 0.3 K over the
+     first 600 years while the second layer dries out (q₂ 0.17 → 0.02 g/kg), then stays at 297.27 K. The top
+     layer reaches 277 K in the first century, 261–263 K afterwards.
+   - **−4% solar:** −3.7 K (≈0.4 K per W/m²), sea ice 0.161, steady. No runaway towards a snowball.
 
 ## Plan
 
@@ -521,8 +549,8 @@ Only once the parameters are settled.
 
 ## Summary of changes
 
-Done (uncommitted, worktree `tree_defaults` on branch `mg/tune-water-vapour-defaults` from `origin/main`
-`f6c4d99f9`, because `mg/tune-water-vapour` is still based on `caed82d6`):
+Done, PR #1414 (commit `17f3f7987` on `mg/tune-water-vapour` after merging `origin/main` `f6c4d99f9`; first made
+in the worktree `tree_defaults`, used by the `W_*` and `D_*` runs):
 
 - `DEFAULT_CO2` = 360 ppm in `greenhouse_gases.jl` (was 280), `TwoTimesCO2` / `FourTimesCO2` docstrings refer to
   the default instead of preindustrial CO₂. `ExponentialCO2` keeps its preindustrial base of 280 ppm in 1850,
@@ -533,7 +561,7 @@ Done (uncommitted, worktree `tree_defaults` on branch `mg/tune-water-vapour-defa
 - Tests: `numericalradiation.jl` uses `DEFAULT_CO2` instead of 280. `longwave_radiation.jl` checks that the dry
   optical depth equals `dry_absorption` at the default CO₂. `greenhouse_gases.jl`, `longwave_radiation.jl`
   and `numericalradiation.jl` pass with `--check-bounds=yes`.
-- `docs/src/radiation.md` and `CHANGELOG.md` (PR number still to be filled in).
+- `docs/src/radiation.md` and `CHANGELOG.md`.
 - Decision 4: `dry_absorption` = 1.45 and `water_vapor_absorption` = 750 in `longwave_transmissivity.jl`, with a
   comment on why Byrne and O'Gorman's values are not used. `absorptivity_dry_air` = 0.066 and
   `absorptivity_water_vapor_near_infrared` = 1500 in `TwoBandShortwaveTransmissivity`
@@ -547,8 +575,8 @@ Done (uncommitted, worktree `tree_defaults` on branch `mg/tune-water-vapour-defa
   `17f3f7987` on `mg/tune-water-vapour`): `longwave_radiation` 21, `shortwave_radiation` 3267, `radiation` 82,
   `greenhouse_gases` 13, `albedo` 259, `numericalradiation` 26, `all_parametrizations` 61, all pass.
 - `test/long_integrations/default_primitive_wet.jl` (1 year, `--check-bounds=yes`): passes.
-- The 1000-year T32L8 runs `D_*` (experiment log) are the main verification. Their annual means will be
-  summarised here.
+- The 1000-year T32L8 runs `D_*` are the main verification: the default and the ±4% solar and 2×CO₂ runs are
+  stable and steady for 1000 years (finding 23).
 
 ## Documentation changes
 
@@ -561,6 +589,11 @@ Done (uncommitted, worktree `tree_defaults` on branch `mg/tune-water-vapour-defa
   at 4 fixed UTC times, which is adequate for global means.
 - The Byrne–O'Gorman longwave is clear-sky. It can match the all-sky OLR only by being more opaque than the clear
   sky, and it can't match the all-sky surface LW down at an Earth-like surface temperature (finding 20).
+- The default climate sits ≈1 K below a jump to a warmer state (≈294–296 K, less cloud and sea ice, finding 22).
+  Forcings of a few W/m² (+2% solar, 2×CO₂) move it there, so its sensitivity to small forcings is ≈0.9 K per
+  W/m² and to 2×CO₂ 4.3 K.
+- Still off the observations with the new defaults: OSR +9 W/m², atmospheric SW −7 W/m², latent heat flux
+  60 vs 84 W/m² and precipitation 2.1 vs 2.9 mm/day.
 
 ## Future work
 
@@ -589,7 +622,8 @@ Done (uncommitted, worktree `tree_defaults` on branch `mg/tune-water-vapour-defa
    and `water_vapor_absorption` 1997.9 → 750; `TwoBandShortwaveTransmissivity` `absorptivity_dry_air`
    0.033 → 0.066 and `absorptivity_water_vapor_near_infrared` 15000 → 1500. `cloud_albedo` stays 0.43. Reasons:
    the closest match to the observed surface budget on the cool branch, steady over 40 years, the strongest
-   hydrological cycle of the candidates, and no change to the clouds. Pending the 1000-year validation `D_*`.
+   hydrological cycle of the candidates, and no change to the clouds. Validated by the 1000-year runs `D_*`
+   (finding 23).
 
 ## Experiment log
 
@@ -611,8 +645,8 @@ Done (uncommitted, worktree `tree_defaults` on branch `mg/tune-water-vapour-defa
 | `Z_*` (GPU Slurm 3289286 + 3289287, `tree_1279`) | all `wv_nir` = 1500: `b` = 500 with `a` 1.6 / 1.75 / 1.9; `b` = 1000 with `a` 1.0 / 1.2 / 1.4; with visible `wv` = 45: `b` / `a` 500 / 1.6, 500 / 1.75, 1000 / 1.0, 1000 / 1.2, 1997.9 / 0.75, 1997.9 / 0.87; `cloud_albedo` 0.40 with 500 / 1.75 / `wv` 45 and 1000 / 1.2 / `wv` 45; each with a +2% solar twin | 40 years | completed; the twin of 1997.9 / 0.87 / `wv` 45 NaN in year 15 | finding 20 |
 | `V_*` (CPU Slurm 3289952, `tree_1279`, `long_cpu.sh`) | all `wv_nir` = 1500: `b` = 500 with `a` 1.6 / 1.7 / 1.8 and `dry` 0.066 + `cloud_albedo` 0.38; `a` 1.7 / 1.8 with `dry` 0.066; `a` 1.6 / 1.7 with `cloud_albedo` 0.38; `a` 1.7 with `dry` 0.1 + `cloud_albedo` 0.38; `b` = 750 with `a` 1.4 / 1.5, `dry` 0.066 + `cloud_albedo` 0.38; each with a +2% solar twin | 40 years | completed, all stable | finding 21 |
 | `W_*` (GPU Slurm 3297308 + 3297309, `tree_defaults` = `f6c4d99f9` + `DEFAULT_CO2` = 360 ppm, `a` at 360 ppm) | all `wv_nir` = 1500: `b` = 500, `dry` 0.066, `cloud_albedo` 0.40 with `a` 1.40 / 1.47 / 1.55 / 1.62 / 1.70; `cloud_albedo` 0.43 with `a` 1.68 / 1.72 (`dry` 0.066) and 1.60 / 1.70 (`dry` 0.08); `b` = 750, `dry` 0.066 with `a` 1.45 / 1.55 (0.43) and 1.35 (0.40); each with a +2% solar twin; plus `a` = 1.6492 as a check of the 280 → 360 ppm translation (≡ `V_b500_a1.7_d066`) | 40 years | completed, all stable | finding 22 |
-| `L3_*` (CPU Slurm 3289953, `tree_1279`) | `b` / `a` = 500 / 1.75 and 500 / 1.9 (`wv_nir` = 1500), each with a +4% solar twin (1419.6 W/m²) | 1000 years, 25-year restart chunks | running, ≈700 years per day; year 86 at 15:15, all stable | does the `b` = 500 family stay stable for centuries, also under strong forcing? Resubmit `configs/l3.txt` after the 1-day limit (≈12:15 on 2026-11-18) |
-| `D_*` (GPU Slurm 3298103; `D_default_2xCO2` alone on GPU Slurm 3298179, `configs/d1_co2.txt`; `tree_defaults` with the decision-4 defaults) | code defaults; +4% solar (1419.6 W/m²); −4% solar (1310.4 W/m²); 2×CO₂ (`greenhouse_gases = (; co2 = CO2(spectral_grid, 720))`) | 1000 years, 25-year restart chunks | running since 15:21 (H100, ≈9 h); 2×CO₂ since 15:31 (H100, ≈5 h) | validation of the new defaults |
+| `L3_*` (CPU Slurm 3289953, `tree_1279`) | `b` / `a` = 500 / 1.75 and 500 / 1.9 (`wv_nir` = 1500), each with a +4% solar twin (1419.6 W/m²) | 1000 years, 25-year restart chunks | year ≈615 at the 1-day limit (2026-11-18), all stable; not resubmitted, superseded by `D_*` | does the `b` = 500 family stay stable for centuries, also under strong forcing? |
+| `D_*` (GPU Slurm 3298103; `D_default_2xCO2` alone on GPU Slurm 3298179, `configs/d1_co2.txt`; `tree_defaults` with the decision-4 defaults) | code defaults; +4% solar (1419.6 W/m²); −4% solar (1310.4 W/m²); 2×CO₂ (`greenhouse_gases = (; co2 = CO2(spectral_grid, 720))`) | 1000 years, 25-year restart chunks | completed 22:14 (2×CO₂ 19:33), all stable | finding 23 |
 | `X_*` (CPU Slurm 3283769, `tree_1279`) | all `wv_nir` = 1500: `b` / `a` = 1000 / 2.0, 750 / 3.0, 750 / 3.5, 250 / 4.5, 250 / 5.0, 0 / 4.8, 0 / 6.0, and 500 / 4.0 with `cloud_albedo` 0.40, each with a +2% solar twin | 30 years | running, ready ≈09:00 | fills in `b` ≤ 1000. At year 7 the `M_*` runs show `b` ≥ 1500 still warming: default SST 298.9 K at +4.5 W/m²; `a` = 1.1 and `b` = 1500 at 294.0 / 293.6 K, still rising ≈0.3 K per year. With Byrne–O'Gorman the stratosphere stays cool (T₁ ≈ 221 K, max 252 K); `wv_nir` = 1500 halves q₂ |
 | `r2_*` (Slurm 3279654, ed) | all `wv_nir` = 1500: `wv` 55/60/65 × `τ₀` 7.0/7.2/7.5, polar `τ₀` 2.0, `cloud_albedo` 0.45 | 20 years | running | round 2 around `c7` |
 | `L_main`, `L_nir1500`, `L_pt250` (GPU Slurm 3279622, ed) | `main` defaults; `wv_nir` = 1500; `water_vapor_pressure_top` = 250 hPa | 1000 years, 25-year restart chunks | running (H100) | does `main` blow up, and when? Do both stratosphere fixes hold for a millennium? ≈2.1 s per simulated month per run, done ≈03:00 on 2026-11-17 |
