@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Surface longwave emission over sea ice uses the surface air temperature (at most the sea surface temperature) instead of the water temperature underneath, in `OneBandLongwave`, `JeevanjeeRadiation`, `AnalyticBandLongwave` and `ClearSkyEcCKDRadiation` [#1406](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1406)
+- Runs some of the extended differentiability tests in F64 for finite difference comparisions to be more reliable [#1417](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1417)
 - Radiation retuned for stable millennial integrations: `ByrneOGormanLongwaveTransmissivity` with `dry_absorption = 1.45`, `water_vapor_absorption = 750`, `TwoBandShortwaveTransmissivity` with `absorptivity_dry_air = 0.066`, `absorptivity_water_vapor_near_infrared = 1500` [#1414](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1414)
 - Default CO₂ of 360 ppm (≈ year 2000, the default start date) instead of preindustrial 280 ppm [#1414](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1414)
 - Workaround LLVM bug for Enzyme differentiability by `noinline` parameterizations on CPU [#1413](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1413)
