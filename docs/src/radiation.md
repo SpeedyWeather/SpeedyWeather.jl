@@ -66,7 +66,8 @@ model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; lo
 ```
 
 Both schemes take CO₂ from the model's `co2` component when present (see
-[Greenhouse gases](@ref)) and use 280 ppm otherwise.
+[Greenhouse gases](@ref)). Without it, `AnalyticBandLongwave` uses the default 360 ppm and
+`ClearSkyEcCKDRadiation` its own `mole_fractions.CO₂` (280 ppm by default).
 
 The first `ClearSkyEcCKDRadiation` downloads the ecCKD coefficient tables (a lazy artifact of
 NumericalRadiation). Its work arrays, optical depths per g point, interface fluxes and the
@@ -171,6 +172,8 @@ Note that the sign change in the differential formulation with optical
 depth only occurs because the optical depth as vertical coordinate
 strictly increases towards the surface.
 
+To be used like (currently the default anyway, with the Byrne and O'Gorman transmissivity below)
+
 **Stratospheric emission.** A grey scheme with an optical depth that increases like ``\sigma^4``
 has an almost transparent stratosphere, which can hardly emit and therefore cannot balance
 stratospheric ozone heating (see [`TwoBandShortwave`](@ref "TwoBandShortwave: Two-band shortwave radiation with diagnostic clouds and ozone")).
@@ -217,7 +220,41 @@ as
 \tau = \tau_0 \left[ f_l \left( \frac{p}{p_s} \right) + (1 - f_l) \left( \frac{p}{p_s} \right)^4 \right]
 ```
 
-For details see [Frierson2006](@citet).
+For details see [Frierson2006](@citet). The default constants differ from Frierson's
+(``\tau_{0e} = 6``, ``\tau_{0p} = 1.5``, ``f_l = 0.1``): ``\tau_0`` is 1.4x larger and ``f_l = 0.25``
+to avoid a too cold planet with the `TwoBandShortwave` radiation.
+
+Use the Frierson transmissivity, which prescribes the optical depth independent of humidity and CO₂, with
+
+```@example radiation
+longwave = OneBandLongwave(spectral_grid, transmissivity = FriersonLongwaveTransmissivity(spectral_grid))
+```
+
+### Humidity- and CO₂-dependent transmissivity
+
+The default `ByrneOGormanLongwaveTransmissivity` follows [Byrne and O'Gorman, 2013](https://doi.org/10.1175/JCLI-D-12-00262.1)
+(as also used in Isca). The optical depth of layer ``k`` is
+
+```math
+d\tau_k = \left( a + c \ln \frac{\mathrm{CO_2}}{\mathrm{CO_2}_r} + b q_k \right) \frac{\Delta p_k}{p_0}
+```
+
+with dry absorption ``a``, CO₂ sensitivity ``c`` relative to the reference concentration
+``\mathrm{CO_2}_r = 360`` ppm (the default CO₂, `SpeedyWeather.DEFAULT_CO2`), water vapor absorption ``b``, specific humidity ``q_k``, the pressure
+thickness ``\Delta p_k`` of layer ``k`` and reference pressure ``p_0`` (from `model.atmosphere`).
+CO₂ is taken from `model.greenhouse_gases.co2` (see [Greenhouse gases](@ref)) so that the optical depth
+responds to both the model's humidity (a water vapor feedback) and CO₂. The parameters are
+
+```@example radiation
+ByrneOGormanLongwaveTransmissivity(spectral_grid)
+```
+
+With Byrne and O'Gorman's values ``a = 0.8678`` and ``b = 1997.9`` the water vapor feedback runs away
+together with the `TwoBandShortwave` radiation. The defaults ``a = 1.45`` and ``b = 750`` are tuned for stable
+long integrations and a global energy budget close to observations ([Wild et al., 2013](https://doi.org/10.1007/s00382-012-1569-8)) at T32L8:
+a global mean sea surface temperature of about 291.5 K, 397 W/m² of surface longwave emission
+and 314 W/m² of downward longwave radiation at the surface. Because the longwave radiation does not include
+clouds, the latter matches the observed clear-sky rather than the all-sky value (342 W/m²).
 
 ## [Solar zenith angle, length of day and year](@id zenith)
 
@@ -615,13 +652,16 @@ co2 = ExponentialCO2(spectral_grid)
 ```
 
 Step-change scenarios are also available: `TwoTimesCO2` and `FourTimesCO2` double or
-quadruple the preindustrial CO2 at a given date (default: year 2000). Any callable
+quadruple the default CO2 of 360 ppm at a given date (default: year 2000). Any callable
 `f(t::DateTime) -> concentration_in_ppm` can be wrapped in `CO2(f)` for a fully
 custom trajectory.
 
-!!! warning "Radiation schemes not yet CO2-aware"
-    The greenhouse gas concentrations are tracked as prognostic variables and evolve
-    correctly in time, but the radiation schemes (`OneBandLongwave`
-    etc.) have not yet been updated to use them. Changing CO2 therefore has no effect
-    on the radiative fluxes or temperature tendencies at this stage. This is work in
-    progress.
+By default, the primitive equation models have a constant `co2 = CO2(spectral_grid)` at
+360 ppm, about the concentration in the year 2000, the default start date of the model clock.
+This is also the `reference_co2` of `ByrneOGormanLongwaveTransmissivity`, so its dry optical
+depth is `dry_absorption` by default. Use `greenhouse_gases = (;)` or `nothing` to remove it.
+
+!!! warning "Only some radiation schemes are CO2-aware"
+    The default `ByrneOGormanLongwaveTransmissivity` uses `greenhouse_gases.co2`: its dry optical
+    depth grows logarithmically with CO2. `FriersonLongwaveTransmissivity` and the shortwave schemes
+    do not use it, so with them, changing CO2 has no effect on the radiative fluxes.

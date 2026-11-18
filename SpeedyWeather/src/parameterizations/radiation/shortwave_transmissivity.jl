@@ -156,8 +156,10 @@ $(TYPEDFIELDS)"""
     "[OPTION] Zenith correction exponent [1]"
     @param zenith_exponent::NF = 2 (bounds = Nonnegative,)
 
+    # Twice SPEEDY's 0.033: absorption by dry air instead of the humidity-proportional absorption
+    # (a strong positive feedback) brings the atmospheric absorption closer to the observed ≈79 W/m²
     "[OPTION] Absorptivity of dry air, visible band [per 10^5 Pa]"
-    @param absorptivity_dry_air::NF = 0.033 (bounds = Nonnegative,)
+    @param absorptivity_dry_air::NF = 0.066 (bounds = Nonnegative,)
 
     "[OPTION] Constant aerosol concentration?"
     aerosols::Bool = true
@@ -168,8 +170,10 @@ $(TYPEDFIELDS)"""
     "[OPTION] Absorptivity of water vapor, visible band [per kg/kg per 10^5 Pa]"
     @param absorptivity_water_vapor::NF = 22 (bounds = Nonnegative,)
 
+    # SPEEDY's 15000 (15 per g/kg) heats the top layers enough to moisten them, which then absorb more,
+    # a positive feedback that destabilises long integrations. At 1500 the band is still saturated in the troposphere
     "[OPTION] Absorptivity of water vapor, near-infrared band [per kg/kg per 10^5 Pa]"
-    @param absorptivity_water_vapor_near_infrared::NF = 15000 (bounds = Nonnegative,)
+    @param absorptivity_water_vapor_near_infrared::NF = 1500 (bounds = Nonnegative,)
 
     "[OPTION] Cloud absorptivity per cloud-base humidity, visible band [per kg/kg per 10^5 Pa]"
     @param absorptivity_cloud_base::NF = 15 (bounds = Nonnegative,)
