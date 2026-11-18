@@ -134,6 +134,10 @@ SpeedyWeather.scalar_ref(::ReactantDevice, x::Number) = Ref(Reactant.ConcreteRNu
 # Dates.year(days) for which Dates' method branches on the traced month, use yearmonthday instead
 Dates.year(days::Reactant.TracedRNumber) = first(Dates.yearmonthday(days))
 
+# TODO: move upstream to Reactant, ReactantDatesExt defines datetime2julian but not datetime2unix,
+# used by `ExponentialCO2`; same as Dates' method and as ReactantDatesExt's datetime2julian
+Dates.datetime2unix(dt::ReactantDatesExt.ReactantDateTime) = (Dates.value(dt) - Dates.UNIXEPOCH) / 1000.0
+
 # TODO: move upstream to Reactant, Dates' method indexes a table with the (traced) month and branches
 # with `&&`, used by the seasonal climatologies (`monthly_interpolation`)
 function Dates.daysinmonth(year::Reactant.TracedRNumber, month::Reactant.TracedRNumber)
