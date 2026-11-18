@@ -18,7 +18,7 @@ using NCDatasets
 
     simulation = initialize!(model)
     run!(simulation, period = Day(1), output = true)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
     for key in ("sr_h", "sr_m", "bld_h", "bld_m", "bld_q")

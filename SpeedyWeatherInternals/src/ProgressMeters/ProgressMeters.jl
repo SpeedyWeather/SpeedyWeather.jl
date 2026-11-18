@@ -134,38 +134,46 @@ function Base.show(io::IO, p::Progress)
     return print(io, "Progress($(p.counter)/$(p.n), elements = $(p.elements))")
 end
 
-"""$(TYPEDSIGNATURES)
+"""
+    next!(p::Progress, args...; step = 1)
+
 Advance the progress meter `p` by `step` iterations and redraw its line if more than `p.dt` seconds
-have passed since the last redraw, or draw the final line once `p.n` is reached. Does not allocate
-unless the line is drawn."""
-function next!(p::Progress; step::Integer = 1)
+have passed since the last redraw, or draw the final line once `p.n` is reached. `args` are passed on
+to [`print_element`](@ref)`(element, p, args...)` of every element on a redraw, e.g. the data an element
+shows. Does not allocate unless the line is drawn."""
+function next!(p::Progress, args...; step::Integer = 1)
     p.counter += step
     p.enabled || return nothing
     p.finished && return nothing
     if p.counter >= p.n
-        p.printed ? draw!(p, true) : (p.finished = true)
+        p.printed ? draw!(p, true, args...) : (p.finished = true)
     elseif time() > p.tlast + p.dt
-        draw!(p, false)
+        draw!(p, false, args...)
     end
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
-Set the progress meter `p` to its last iteration and draw the final line if the line has been drawn before."""
-function finish!(p::Progress)
+"""
+    finish!(p::Progress, args...)
+
+Set the progress meter `p` to its last iteration and draw the final line if the line has been drawn
+before. `args` are passed on to [`print_element`](@ref) as in [`next!`](@ref)."""
+function finish!(p::Progress, args...)
     p.counter = max(p.counter, p.n)
     p.enabled || return nothing
     p.finished && return nothing
-    p.printed ? draw!(p, true) : (p.finished = true)
+    p.printed ? draw!(p, true, args...) : (p.finished = true)
     return nothing
 end
 
 # draw the lines over the ones of the last redraw (or the final lines, followed by a newline),
 # written at once, the cursor stays at the end of the last line
-function draw!(p::Progress, finished::Bool)
+function draw!(p::Progress, finished::Bool, args...)
     p.tcurrent = time()
     p.finished = finished
-    lines = render_lines(p)
+    lines = render_lines(p, args...)
+    # with fewer lines than in the last redraw clear the others (keep the block's size)
+    length(lines) < p.nlines && append!(lines, fill("", p.nlines - length(lines)))
     buffer = IOBuffer()
     print(buffer, '\r')
     p.nlines > 1 && print(buffer, "\e[A"^(p.nlines - 1))     # back up to the first line of the last redraw
@@ -186,15 +194,16 @@ function draw!(p::Progress, finished::Bool)
 end
 
 """
-    print_element(element, p::Progress) -> String
+    print_element(element, p::Progress, args...) -> String
 
 Text of `element` in the line of the progress meter `p`, only its value, the separators are added
 by the meter. Called for every element on each redraw, so this is where an element computes what it
-shows. Useful fields of `p` are `counter`, `n`, `tinit` (`time()` of creation), `tcurrent` (`time()`
-of this redraw) and `finished` (whether this is the final line). Strings print themselves, an empty
-string leaves the element out of the line."""
+shows. `args` are those passed to [`next!`](@ref)/[`finish!`](@ref), e.g. the data to show. Useful
+fields of `p` are `counter`, `n`, `tinit` (`time()` of creation), `tcurrent` (`time()` of this redraw)
+and `finished` (whether this is the final line). Strings print themselves, an empty string leaves the
+element out of the line."""
 function print_element end
-print_element(s::AbstractString, p::Progress) = s
+print_element(s::AbstractString, p::Progress, args...) = s
 
 """
     NewLine(; indent = 0)
@@ -205,18 +214,19 @@ struct NewLine <: AbstractProgressElement
     indent::Int
 end
 NewLine(; indent::Integer = 0) = NewLine(indent)
-print_element(::NewLine, p::Progress) = ""
+print_element(::NewLine, p::Progress, args...) = ""
 
 """$(TYPEDSIGNATURES)
 The lines of the progress meter `p` joined by newlines, see [`render_lines`](@ref)."""
-render_line(p::Progress) = join(render_lines(p), '\n')
+render_line(p::Progress, args...) = join(render_lines(p, args...), '\n')
 
 """$(TYPEDSIGNATURES)
 The lines of the progress meter `p` for its `elements`, split at every `NewLine`: the description (first
 line, an indent of its width on the others), then the non-empty texts of the elements joined by
-`p.separator`, with a single space next to a bar instead. Every line is cut to the width of the terminal
-minus one column, so that it doesn't wrap."""
-function render_lines(p::Progress)
+`p.separator`, with a single space next to a bar instead. `args` are passed on to `print_element`.
+Lines after the first whose elements all print nothing are left out. Every line is cut to the width of
+the terminal minus one column, so that it doesn't wrap."""
+function render_lines(p::Progress, args...)
     (; elements, description) = p
     terminal_width = displaysize(p.output)[2]
     lines = String[]
@@ -225,10 +235,10 @@ function render_lines(p::Progress)
     for i in eachindex(elements)
         if i == lastindex(elements) || elements[i + 1] isa NewLine
             line_elements = elements[first_element:i]
-            if !isempty(line_elements)          # leave out lines without elements
+            if !isempty(line_elements)
                 prefix = isempty(lines) ? description : " "^(textwidth(description) + !isempty(description) + indent)
-                line = render_line(p, line_elements, prefix, terminal_width)
-                push!(lines, truncate_line(line, terminal_width - 1))
+                line, visible = render_line(p, line_elements, prefix, terminal_width, args...)
+                (isempty(lines) || visible) && push!(lines, truncate_line(line, terminal_width - 1))
             end
             if i < lastindex(elements)
                 indent = elements[i + 1].indent
@@ -240,10 +250,11 @@ function render_lines(p::Progress)
     return lines
 end
 
-# render one line of `elements` after `prefix` (the description or an indent)
-function render_line(p::Progress, elements::Tuple, prefix::AbstractString, terminal_width::Integer)
+# render one line of `elements` after `prefix` (the description or an indent), returns the line and
+# whether any element printed something
+function render_line(p::Progress, elements::Tuple, prefix::AbstractString, terminal_width::Integer, args...)
     (; separator) = p
-    texts = String[isbar(element) ? "" : print_element(element, p) for element in elements]
+    texts = String[isbar(element) ? "" : print_element(element, p, args...) for element in elements]
 
     # bars without a length share the terminal width the rest of the line leaves
     flexible = [isbar(element) && isnothing(element.length) for element in elements]
@@ -275,7 +286,7 @@ function render_line(p::Progress, elements::Tuple, prefix::AbstractString, termi
         print(line, text)
         previous = element
     end
-    return String(take!(line))
+    return String(take!(line)), !isnothing(previous)
 end
 
 # cut `line` to at most `width` columns
@@ -309,7 +320,7 @@ default_elements() = (Percentage(), Bar(), ETA())
 
 """Percentage of completed iterations, e.g. ` 42%`, padded to 3 digits, 100% only once finished."""
 struct Percentage <: AbstractProgressElement end
-function print_element(::Percentage, p::Progress)
+function print_element(::Percentage, p::Progress, args...)
     percentage = p.finished ? 100 : min(99, floor(Int, 100 * p.counter / max(1, p.n)))
     return @sprintf "%3d%%" percentage
 end
@@ -331,7 +342,7 @@ isbar(element) = false
 isbar(::Bar) = true
 
 # a bar printed on its own (outside of `render_line`) has 20 characters if not given a length
-print_element(bar::Bar, p::Progress) = bar_string(bar, p, something(bar.length, 20))
+print_element(bar::Bar, p::Progress, args...) = bar_string(bar, p, something(bar.length, 20))
 
 function bar_string(bar::Bar, p::Progress, width::Integer)
     width <= 0 && return ""
@@ -341,7 +352,7 @@ end
 
 """Estimated remaining time, e.g. `ETA: 0:01:23`, the total time `Time: 0:02:00` once finished."""
 struct ETA <: AbstractProgressElement end
-function print_element(::ETA, p::Progress)
+function print_element(::ETA, p::Progress, args...)
     p.finished && return "Time: " * durationstring(p.tcurrent - p.tinit)
     return "ETA: " * durationstring(eta(p, p.tcurrent))
 end
@@ -357,11 +368,11 @@ end
 
 """Time elapsed since the progress meter was created, e.g. `0:00:42`."""
 struct ElapsedTime <: AbstractProgressElement end
-print_element(::ElapsedTime, p::Progress) = durationstring(p.tcurrent - p.tinit)
+print_element(::ElapsedTime, p::Progress, args...) = durationstring(p.tcurrent - p.tinit)
 
 """Number of iterations so far."""
 struct Counter <: AbstractProgressElement end
-print_element(::Counter, p::Progress) = string(p.counter)
+print_element(::Counter, p::Progress, args...) = string(p.counter)
 
 """$(TYPEDSIGNATURES)
 Duration of `seconds` as `h:mm:ss`, with days for 1 to 9 days (`2 days, 3:04:05`) and in days

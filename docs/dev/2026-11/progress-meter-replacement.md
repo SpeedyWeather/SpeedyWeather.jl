@@ -1,6 +1,6 @@
 # Replace ProgressMeter.jl by a lightweight progress meter in SpeedyWeatherInternals
 
-> Status: **in progress**. Implemented and tested locally, incl. NaN detection on every time step; awaiting review. Drop the ProgressMeter.jl dependency (and its
+> Status: **in progress**. Implemented and tested locally, incl. the two-line display and the `Feedback` overhaul (`NaNDetector`, elements without binding); awaiting review. Drop the ProgressMeter.jl dependency (and its
 > `[sources]` entries pointing at the unreleased ProgressMeter.jl#369 branch) by implementing the subset
 > SpeedyWeather uses in a new submodule `SpeedyWeatherInternals.ProgressMeters`. Continues
 > [progress-elements.md](../2026-10/progress-elements.md) in the same PR (#1298).
@@ -61,6 +61,17 @@ Base revision: eb3a7080472dc558e82af58a39eb83f3523373f4 (head of `mc/progress-el
   line" below.
 - 2026-11-18: "Can the incoming not be simplified to solar constant / 4 ?" Yes, measured to differ by
   ≤ 0.02 W/m² from the grid mean of `solar_constant * cos_zenith`; `EnergyImbalance` uses `S₀/4`.
+- 2026-11-18: "Can you overhaul the Feedback please. Can everything that's related to the nan detection
+  be in a NaNDetector type used as a .nan_detection field in Feedback with the possibility of setting
+  this to nothing. The interval field of feedback should probably also live in the NaNDetector and
+  debug removed [...] The whole nan detection looks super convoluted to me. Then the actual detection
+  also seems to happen in several places actually? Then can we also allow in the ProgressMeters.next!
+  function to pass on additional arguments? [...] the `print_element` could dispatch over element as
+  first argument, the progress itself as 2nd but then allow for additional variables like the
+  simulation object. That way we probably don't need the "bind" logic and allocate the progress
+  elements at the construction of feedback." and "feel free to add area weights to model.geometry,
+  that's sensible. Also the computation of those weights only depends on grid so that should move to
+  RingGrids". See "Feedback overhaul" below.
 
 ## Problem description
 
@@ -199,6 +210,41 @@ export Progress, next!, finish!,
   MaximumWindSpeed(), TemperatureRange(), VerticalCourantNumber(), Precipitation(), EnergyImbalance())`.
   `VerticalCourantNumber` thereby becomes part of the default (it is only computed on redraw).
   `variables(::Feedback)` collects the variables of `default_elements()` if `elements = nothing`.
+
+### 2c. Feedback overhaul (added 2026-11-18)
+
+- **`NaNDetector`** (`output/nan_detection.jl`), the field `Feedback.nan_detection` (`nothing` disables
+  it, replacing `Feedback.debug`). Holds `interval` (moved from `Feedback`) and all NaN state: `detected`,
+  `step`, `time` and the steps/times recorded since the last check. It declares
+  `vars.dynamics.nan_detection.nan_record`. One entry point
+  `detect_nans!(detector, vars, model, step; check)`: record whether the 1-0 mode of the surface vorticity
+  is finite at time step `step` (a broadcast on the device; with Reactant, outside a compiled program,
+  scalar indexing), and check the record on the CPU every `interval` recorded steps or if `check`
+  (last step, or after several steps at once with Reactant). `nans_detected(detector)`,
+  `nans_detected(feedback)`, `nans_detected(nothing) = false` are used by the time stepping, the
+  Reactant extension and `ProgressTxt` (replacing `feedback.nans_detected`).
+- **`progress!(feedback, vars, model, nsteps = 1)`** is a single method: `next!(progress_meter, vars, model;
+  step = nsteps)` then `detect_nans!(...)`.
+- **`ProgressMeters.next!(p, args...; step)`, `finish!(p, args...)`** pass `args` on to
+  `print_element(element, p, args...)` on a redraw. Feedback passes `vars, model`, so SpeedyWeather's
+  elements read what they show at redraw, no binding: `bind_element(s)`, `AbstractSimulationElement` and
+  the compact `show` go. Elements are created once in `Feedback(elements = default_elements())` (no
+  `nothing` default any more). Elements that don't apply (e.g. no temperature) print `""` and are left
+  out; a line after the first whose elements all print `""` is left out (the number of lines drawn is
+  tracked, so the cursor movement stays right). `finalize!(feedback, vars, model)` draws the final lines
+  (before `unscale!`).
+- Elements that need storage get it from `Variables` (declared via `variables(element)`, as
+  `VerticalCourantNumber`'s scratch vector) or `model.geometry`; `VerticalCourantNumber` keeps its two
+  small CPU buffers (`nlayers`) in the element and resizes them on use.
+- Reactant: the diagnostics (`MaximumWindSpeed`, `TemperatureRange`, `VerticalCourantNumber`,
+  `Precipitation`, `EnergyImbalance`, subtypes of `AbstractDiagnosticElement`) print `""` on a
+  `ReactantDevice` (scalar indexing), `ProgressElements.OnReactant(element)` shows one there anyway
+  (replacing the architecture-dependent `default_elements(architecture)`).
+- **Area weights**: `RingGrids.get_area_weights(Grid, nlat_half)` / `get_area_weights(grid)`, the solid
+  angle of every grid point over 4π (sum 1, `dot(weights, field)` is the global mean), stored as
+  `model.geometry.area_weights` (number format and device of the model) and used by `Precipitation` and
+  `EnergyImbalance`. RingGrids `1.0.2` → `1.1.0-DEV` (new exported function), SpeedyWeather's compat on
+  RingGrids `"1.1"`.
 
 ### 3. SpeedyTransforms
 

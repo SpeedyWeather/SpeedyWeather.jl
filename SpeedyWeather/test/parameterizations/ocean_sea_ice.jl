@@ -37,7 +37,7 @@ using Dates
 
             run!(simulation, period = Day(1))
 
-            @test simulation.model.feedback.nans_detected == false
+            @test !SpeedyWeather.nans_detected(simulation.model.feedback)
             @test haskey(simulation.variables.prognostic.ocean, :sea_surface_temperature)
 
             @test ArrayDimensions.hastime(simulation.variables.prognostic.ocean.sea_surface_temperature) == (ocean isa SpeedyWeather.AbstractDynamicOcean)

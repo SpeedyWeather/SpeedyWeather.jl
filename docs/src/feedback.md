@@ -28,7 +28,7 @@ ones (`Percentage`, `Bar`, `ETA`, `ElapsedTime`, `Counter`, `NewLine`) and the o
     MaximumWindSpeed(), TemperatureRange(), VerticalCourantNumber(), Precipitation(), EnergyImbalance())
 ```
 which are used if `elements` is not set (with Reactant only the first line, as computing the
-diagnostics is slow there, list them explicitly to show them). Pass your own tuple with `elements` to
+diagnostics is slow there, see `ProgressElements.OnReactant`). Pass your own tuple with `elements` to
 change the lines, e.g. for a single line without the bar
 ```julia
 using SpeedyWeather
@@ -46,37 +46,48 @@ width of the description). `Bar(length = nothing)` fills the remaining width of 
 feedback = Feedback(elements = (Percentage(), Bar(length = 10), SimulationTime(), MaximumWindSpeed()), separator = " | ")
 ```
 prints ` 23% ━━         2000-01-03 | 44 m/s`. Lines are cut to the width of the terminal so that they
-don't wrap. SpeedyWeather's elements are created without arguments and bound to the simulation when it
-starts. Diagnostics are only computed when the lines are redrawn (every `feedback_dt` seconds).
+don't wrap. `Feedback` passes the variables and the model of the simulation on to the elements on every
+redraw. Diagnostics are only computed when the lines are redrawn (every `feedback_dt` seconds).
 
 ## Custom elements
 
-A custom element is a subtype of `ProgressElements.AbstractProgressElement` that extends
-`ProgressElements.print_element(element, progress)` to return the text it shows. It is called on every
-redraw with the progress meter `progress` (a `SpeedyWeatherInternals.ProgressMeters.Progress`), whose
-fields `counter`, `n`, `tinit` (`time()` when the simulation started), `tcurrent` (`time()` of this redraw)
-and `finished` (`true` for the last line) can be used, e.g.
+A custom element is a subtype of `ProgressElements.AbstractSimulationElement` that extends
+`ProgressElements.print_element(element, progress, vars, model)` to return the text it shows. It is
+called on every redraw with the progress meter `progress` (a `SpeedyWeatherInternals.ProgressMeters.Progress`),
+the variables `vars` and the `model` of the simulation. The fields `counter`, `n`, `tinit` (`time()`
+when the simulation started), `tcurrent` (`time()` of this redraw) and `finished` (`true` for the last
+lines) of `progress` can be used too, e.g.
 ```julia
-struct StepsLeft <: ProgressElements.AbstractProgressElement end
-ProgressElements.print_element(::StepsLeft, p) = "$(p.n - p.counter) steps left"
+struct StepsLeft <: ProgressElements.AbstractSimulationElement end
+ProgressElements.print_element(::StepsLeft, p, vars, model) = "$(p.n - p.counter) steps left"
 
-feedback = Feedback(elements = (ProgressElements.default_elements()..., StepsLeft()))   # appended to the 2nd line
+struct MaximumHumidity <: ProgressElements.AbstractSimulationElement end
+function ProgressElements.print_element(::MaximumHumidity, p, vars, model)
+    hasproperty(vars.grid, :humidity) || return ""      # leaves it out for models without humidity
+    return "q ≤ $(round(1000 * maximum(vars.grid.humidity), digits = 1)) g/kg"
+end
+
+feedback = Feedback(elements = (ProgressElements.default_elements()..., StepsLeft(), MaximumHumidity()))   # appended to the 2nd line
 ```
-An element returning an empty string is left out of the line. To show something of the simulation,
-hold a reference to it in the element (e.g. a `Ref` that a callback updates).
+An element returning an empty string is left out of the line, and a line after the first whose
+elements all return empty strings is left out. Diagnostics like `MaximumWindSpeed` subtype
+`ProgressElements.AbstractDiagnosticElement` and are not shown with Reactant (computing them falls back
+to scalar indexing there), `ProgressElements.OnReactant(MaximumWindSpeed())` shows one anyway.
 
 ## NaN detection
 
-With `Feedback(debug = true)` (default) the simulation is checked for NaNs (or Infs), which stops it.
-NaNs propagate through the spectral transform to all coefficients, so whether the 1-0 mode of the
-surface vorticity is finite is recorded on every time step. As copying it to the CPU would synchronize
-a GPU, the record is only checked every `interval` time steps (default 50) and at the end, so the
-simulation may run for up to `interval` time steps after the blow-up, but the warning reports the
-time step and simulation time at which it happened, e.g.
+With `Feedback(nan_detection = NaNDetector())` (default) the simulation is checked for NaNs (or Infs),
+which stops it, `nan_detection = nothing` disables that. NaNs propagate through the spectral transform
+to all coefficients, so whether the 1-0 mode of the surface vorticity is finite is recorded on every
+time step. As copying it to the CPU would synchronize a GPU, the record is only checked every
+`interval` time steps (`NaNDetector(interval = 50)`, default) and at the end, so the simulation may run
+for up to `interval` time steps after the blow-up, but the warning reports the time step and simulation
+time at which it happened, e.g.
 ```
 ┌ Warning: NaN or Inf detected at time step 1234 (2000-02-01T12:00:00)
 ```
-which are also stored in `simulation.model.feedback.nans_detected_step` and `nans_detected_time`.
+which are also stored in `simulation.model.feedback.nan_detection.step` and `.time`.
+`SpeedyWeather.nans_detected(simulation.model.feedback)` returns whether NaNs were detected.
 
 ## Acknowledgement
 

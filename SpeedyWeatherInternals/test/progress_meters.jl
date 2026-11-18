@@ -95,6 +95,12 @@ output_string(io::IOContext) = String(take!(io.io))
         lines = ProgressMeters.render_lines(p)
         @test textwidth(lines[1]) == 19 && lines[2] == "0"
 
+        # a line whose elements all print nothing is left out, the first line is always drawn
+        p = Progress(100; elements = ("", NewLine(), ""), output = progress_buffer(100))
+        @test ProgressMeters.render_lines(p) == [""]
+        p = Progress(100; elements = (Counter(), NewLine(), ""), output = progress_buffer(100))
+        @test ProgressMeters.render_lines(p) == ["0"]
+
         # redraws move the cursor up to the first line and overwrite both lines
         io = progress_buffer(3)
         p = Progress(3; dt = 0, elements = (Counter(), NewLine(), "second"), output = io)
@@ -104,6 +110,37 @@ output_string(io::IOContext) = String(take!(io.io))
         @test output_string(io) == "\r\e[A2\e[K\nsecond\e[K"
         next!(p)
         @test output_string(io) == "\r\e[A3\e[K\nsecond\e[K\n"     # final lines end with a newline
+    end
+
+    @testset "arguments passed on to the elements" begin
+        struct Shows <: AbstractProgressElement end
+        ProgressMeters.print_element(::Shows, p::Progress, data, factor) = "data $(factor * data[])"
+        ProgressMeters.print_element(::Shows, p::Progress) = "no data"
+        data = Ref(1)
+        io = progress_buffer(3)
+        p = Progress(3; dt = 0, elements = (Counter(), Shows()), output = io)
+        next!(p, data, 2)
+        @test output_string(io) == "\r1, data 2\e[K"
+        data[] = 5
+        next!(p, data, 2; step = 1)
+        @test output_string(io) == "\r2, data 10\e[K"
+        finish!(p, data, 3)
+        @test output_string(io) == "\r3, data 15\e[K\n"
+        @test render_line(p) == "3, no data"
+        # a line that disappears is cleared, the block keeps its number of lines
+        io = progress_buffer(3)
+        visible = Ref(true)
+        struct Maybe <: AbstractProgressElement end
+        ProgressMeters.print_element(::Maybe, p::Progress, visible) = visible[] ? "shown" : ""
+        p = Progress(3; dt = 0, elements = (Counter(), NewLine(), Maybe()), output = io)
+        next!(p, visible)
+        @test output_string(io) == "\r1\e[K\nshown\e[K"
+        visible[] = false
+        next!(p, visible)
+        @test output_string(io) == "\r\e[A2\e[K\n\e[K"      # the second line is cleared
+        visible[] = true
+        next!(p, visible)
+        @test output_string(io) == "\r\e[A3\e[K\nshown\e[K\n"
     end
 
     @testset "drawing" begin

@@ -49,3 +49,18 @@ get_solid_angles(Grid::Type{<:AbstractGrid}, nlat_half::Integer) =
     get_quadrature_weights(Grid, nlat_half) .* (2π ./ get_nlons(Grid, nlat_half))
 get_solid_angles(Grid::Type{<:Union{HEALPixGrid, OctaHEALPixGrid}}, nlat_half::Integer) =
     4π / get_npoints(Grid, nlat_half) * ones(get_nlat(Grid, nlat_half))
+
+"""$(TYPEDSIGNATURES)
+Area weights of every grid point of `Grid` at resolution `nlat_half` in ring order: the solid angle of
+its grid cell divided by 4π. They sum to 1, so `dot(weights, field.data)` is the area-weighted global
+mean of a 2D `field` on that grid."""
+function get_area_weights(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
+    solid_angles = get_solid_angles(Grid, nlat_half)
+    weights = zeros(get_npoints(Grid, nlat_half))
+    for (j, ring) in enumerate(eachring(Grid, nlat_half))
+        weights[ring] .= solid_angles[j] / 4π
+    end
+    return weights
+end
+
+get_area_weights(grid::AbstractGrid) = get_area_weights(typeof(grid), grid.nlat_half)

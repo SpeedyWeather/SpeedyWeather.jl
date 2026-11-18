@@ -91,6 +91,6 @@ end
         model = Model(spectral_grid)
         simulation = initialize!(model)
         run!(simulation, period = Day(5))
-        @test model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(model.feedback)
     end
 end

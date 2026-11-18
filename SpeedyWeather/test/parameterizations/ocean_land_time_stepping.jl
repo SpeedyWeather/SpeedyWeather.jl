@@ -54,7 +54,7 @@ end
         @test SpeedyWeather.nsteps(var) == 1
     end
     run!(simulation, steps = 4)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
     # NCycleLorenz uses itself for ocean and land by default
     ncycle = NCycleLorenz(spectral_grid)
@@ -74,7 +74,7 @@ end
     @test SpeedyWeather.nsteps(variables.tendencies.land.soil_temperature) == 2
     @test SpeedyWeather.nsteps(variables.tendencies.ocean.sea_surface_temperature) == 2
     run!(simulation, steps = 4)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 end
 
 @testset "EulerForward for ocean and land with NCycleLorenz" begin
@@ -97,7 +97,7 @@ end
     @test SpeedyWeather.nsteps(simulation.variables.prognostic.land.soil_temperature) == 2
     @test SpeedyWeather.nsteps(simulation.variables.prognostic.ocean.sea_surface_temperature) == 2
     run!(simulation, steps = 4)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 end
 
 @testset "Snow time stepped by the land time stepper" begin
@@ -122,7 +122,7 @@ end
 
         snow_depth .= 0
         run!(simulation, steps = 4)
-        @test simulation.model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(simulation.model.feedback)
         @test all(0 .<= snow_depth .<= model.land.snow.snow_depth_cap)
     end
 end
@@ -195,7 +195,7 @@ SpeedyWeather.timestep!(::Variables, ::TestCustomOcean, ::PrimitiveEquation) = n
     simulation = initialize!(model)
     @test !ArrayDimensions.hastime(simulation.variables.prognostic.land.soil_temperature)
     run!(simulation, steps = 4)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 end
 
 @testset "Latent heat of fusion for snow melt" begin
@@ -228,7 +228,7 @@ end
         add!(model, log)
         simulation = initialize!(model)
         run!(simulation, steps = 8)
-        @test simulation.model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(simulation.model.feedback)
         @test all(log.ncold .== 0)          # SST restored to freezing after every step
         @test issorted(log.ice)             # sea ice grows monotonically in the first steps (no N-cycle flip)
         @test all(0 .<= simulation.variables.prognostic.land.snow_depth .<= model.land.snow.snow_depth_cap)

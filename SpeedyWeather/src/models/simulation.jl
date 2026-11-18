@@ -102,7 +102,7 @@ Finalize a `simulation`. Finishes the progress meter, unscales variables,
 finalizes the output, writes a restart file and finalizes callbacks."""
 function finalize!(simulation::AbstractSimulation)
     (; variables, model) = simulation
-    finalize!(model.feedback)                       # finish the progress meter, do first for benchmark accuracy
+    finalize!(model.feedback, variables, model)     # finish the progress meter, do first for benchmark accuracy
     unscale!(variables)                             # undo radius-scaling for vor, div in the dynamical core
     finalize!(model.output, simulation)             # possibly post-process output, then close netCDF file
     finalize!(model.callbacks, variables, model)    # any callbacks to finalize?
