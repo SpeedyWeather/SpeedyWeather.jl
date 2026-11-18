@@ -171,7 +171,7 @@ function forcing!(
     )
     # get random values from random process
     S_grid = vars.scratch.grid.a_2D
-    S_grid .= vars.grid.random_pattern  # copy to leave the random pattern unchanged
+    S_grid .= field_view(vars.grid.random_pattern, :, 1)  # copy first pattern to leave it unchanged
 
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
