@@ -1,5 +1,7 @@
 # Changelog
 
+- Fixes a bug that the `custom_parameterization` was incorrectly not initialized [#1419](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1419)
+
 ## v0.25
 
 - Runs some of the extended differentiability tests in F64 for finite difference comparisions to be more reliable [#1417](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1417)
