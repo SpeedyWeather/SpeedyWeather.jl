@@ -127,25 +127,26 @@ end
 """$(TYPEDSIGNATURES)
 Ice surface temperature `T_i` [K] from the zero-layer (Semtner, 1976) surface energy balance of sea ice
 
-    ϵσT_i⁴ = A + G (T_f - T_i)
+    ϵσT_i⁴ = absorbed_radiation + conductance (T_f - T_i)
 
-with `A` [W/m²] the absorbed shortwave and downward longwave radiation, `G = k/h` [W/m²/K] the conductance of the ice
+with `absorbed_radiation` [W/m²] the absorbed shortwave and downward longwave radiation, `conductance = k/h` [W/m²/K]
+that of the ice
 and `T_f` the freezing temperature at the ice base, solved with a fixed number (branch-free) of Newton steps
-from `T_start`, then capped at the melting temperature `T_m`. Returns `T_i`, the conductive flux `F_c = G (T_f - T_i)`
-[W/m²] (positive upward, cooling the ocean) and the surplus `max(A + F_c - ϵσT_i⁴, 0)` [W/m²] that melts ice at the
-top when `T_i` is capped. Four Newton steps converge also for the thinnest ice (largest `G`)."""
-@inline function sea_ice_surface_balance(A, G, ϵσ, T_freeze, T_melt, T_start)
+from `T_start`, then capped at the melting temperature `T_m`. Returns `T_i`, the conductive flux `F_c = conductance (T_f - T_i)`
+[W/m²] (positive upward, cooling the ocean) and the surplus `max(absorbed_radiation + F_c - ϵσT_i⁴, 0)` [W/m²] that
+melts ice at the top when `T_i` is capped. Four Newton steps converge also for the thinnest ice (largest conductance)."""
+@inline function sea_ice_surface_balance(absorbed_radiation, conductance, ϵσ, T_freeze, T_melt, T_start)
     # f(T) = ϵσT⁴ + G(T - T_f) - A is convex and increasing for T > 0, Newton converges from any T > 0
     T = T_start
     for _ in 1:4
-        f = ϵσ * T^4 + G * (T - T_freeze) - A
-        dfdT = 4ϵσ * T^3 + G                # > 0, as G > 0
+        f = ϵσ * T^4 + conductance * (T - T_freeze) - absorbed_radiation
+        dfdT = 4ϵσ * T^3 + conductance      # > 0, as the conductance > 0
         T -= f / dfdT
     end
     T = min(T, T_melt)                      # the ice surface cannot be warmer than melting
-    F_c = G * (T_freeze - T)                # conducted from the ice base (ocean) to the ice surface
+    F_c = conductance * (T_freeze - T)                # conducted from the ice base (ocean) to the ice surface
     # energy left at the surface to melt ice at T = T_melt, not negative (the Newton residual stays with the ocean)
-    surplus = max(A + F_c - ϵσ * T^4, zero(T))
+    surplus = max(absorbed_radiation + F_c - ϵσ * T^4, zero(T))
     return T, F_c, surplus
 end
 
@@ -197,29 +198,29 @@ function Base.filter!(vars::Variables, sea_ice::ThermodynamicSeaIce, model::Prim
 
         # only an interactive ocean (with an SST tendency) pays and receives the latent heat
         interactive = haskey(vars.tendencies.ocean, :sea_surface_temperature)
-        C = convert(NF, interactive ? ocean_heat_capacity(model.ocean, sea_ice) : sea_ice.prescribed_ocean_heat_capacity)
-        s = NF(interactive)                                 # 1 to change the SST, 0 to keep it
+        heat_capacity = convert(NF, interactive ? ocean_heat_capacity(model.ocean, sea_ice) : sea_ice.prescribed_ocean_heat_capacity)
+        sst_change = NF(interactive)                        # 1 to change the SST, 0 to keep it
 
         # 1. top melt beyond the ice present (V < 0): that heat warms the ocean instead
-        sst .+= ifelse.(ocean, s .* ρL .* max.(.-V, zero(NF)) ./ C, zero(NF))
+        sst .+= ifelse.(ocean, sst_change .* ρL .* max.(.-V, zero(NF)) ./ heat_capacity, zero(NF))
         V .= max.(V, zero(NF))
 
         # 2. freezing: the ocean's heat deficit below freezing becomes ice
-        E = ifelse.(ocean, C .* max.(T_f .- sst, zero(NF)), zero(NF))     # [J/m²]
+        heat_deficit = ifelse.(ocean, heat_capacity .* max.(T_f .- sst, zero(NF)), zero(NF))     # [J/m²]
         if interactive
             # the ocean pays for the ice and returns to freezing, no upper bound (the ice thickens)
-            V .+= E ./ ρL
-            sst .+= E ./ C
+            V .+= heat_deficit ./ ρL
+            sst .+= heat_deficit ./ heat_capacity
         else
             # a prescribed SST stays below freezing, so the same deficit would freeze again every step:
             # grow ice towards full cover (as main's concentration clamp) but never thicken it beyond
-            V .= max.(V, min.(V .+ E ./ ρL, sea_ice.pack_ice_thickness))
+            V .= max.(V, min.(V .+ heat_deficit ./ ρL, sea_ice.pack_ice_thickness))
         end
 
         # 3. bottom melt: a basal flux above freezing melts ice, limited to the ice present, the ocean pays for it
         ΔV = ifelse.(ocean, min.(γ .* max.(sst .- T_f, zero(NF)) .* Δt ./ ρL, V), zero(NF))
         V .-= ΔV
-        sst .-= s .* ρL .* ΔV ./ C
+        sst .-= sst_change .* ρL .* ΔV ./ heat_capacity
     end
 
     (; thin_ice_thickness, pack_ice_thickness) = sea_ice
@@ -261,12 +262,14 @@ also writes these sea ice diagnostics, which the slab ocean and the sea ice time
     surface_air_temperature = haskey(vars.parameterizations, :surface_air_temperature) ?
         vars.parameterizations.surface_air_temperature[ij] : sea_surface_temperature
 
-    # ice surface energy balance: absorbed radiation A, conductance G = k/h, emission ϵσT⁴
-    A = (1 - params_ocean.sea_ice_albedo[ij]) * surface_shortwave_down + surface_longwave_down
-    G = sea_ice.conductivity / sea_ice_thickness_from_volume(V, sea_ice)
+    # ice surface energy balance: absorbed radiation, conductance k/h of the ice, emission ϵσT⁴
+    absorbed_radiation = (1 - params_ocean.sea_ice_albedo[ij]) * surface_shortwave_down + surface_longwave_down
+    conductance = sea_ice.conductivity / sea_ice_thickness_from_volume(V, sea_ice)
     ϵσ = emissivity * model.atmosphere.stefan_boltzmann
     T_start = min(sea_surface_temperature, surface_air_temperature)
-    T_i, F_c, surplus = sea_ice_surface_balance(A, G, ϵσ, sea_ice.freezing_temperature, sea_ice.melting_temperature, T_start)
+    T_i, F_c, surplus = sea_ice_surface_balance(
+        absorbed_radiation, conductance, ϵσ, sea_ice.freezing_temperature, sea_ice.melting_temperature, T_start
+    )
 
     params_ocean.sea_ice_surface_temperature[ij] = T_i
     # [W/m²] per ocean area, zero (not 0·NaN) without ice, e.g. over land with a NaN sea surface temperature

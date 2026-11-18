@@ -181,3 +181,44 @@ end
     dV = vars.tendencies.ocean.sea_ice_volume.data
     @test dV[ocean, 1] ≈ fill(-10 / (model.sea_ice.density * model.sea_ice.latent_heat_fusion), count(ocean)) rtol = 1.0e-5
 end
+
+@testset "Downward longwave needed in advance" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 5)
+    # only ThermodynamicSeaIce solves an ice surface balance that needs the surface downward longwave first
+    @test SpeedyWeather.needs_surface_longwave_down(ThermodynamicSeaIce(spectral_grid))
+    @test !SpeedyWeather.needs_surface_longwave_down(PrescribedSeaIce())
+    @test !SpeedyWeather.needs_surface_longwave_down(nothing)
+
+    # the pre-pass gives bitwise the surface downward longwave of OneBandLongwave's own downward beam
+    model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave = OneBandLongwave(spectral_grid)))
+    vars = initialize!(model).variables
+    longwave = model.radiation.longwave
+    vars.parameterizations.surface_pressure .= 1.0e5
+    for k in 1:spectral_grid.nlayers
+        vars.grid.temperature[:, k, :] .= 210 + 15 * (k - 1)
+    end
+    vars.grid.humidity .= 0.004
+    ij = 1
+    SpeedyWeather.parameterization!(ij, vars, longwave, model)
+    T = SpeedyWeather.get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave.radiative_transfer)
+    t = SpeedyWeather.transmissivity!(ij, vars, longwave.transmissivity, model)     # same column, same values
+    σ = model.atmosphere.stefan_boltzmann
+    D = SpeedyWeather.surface_longwave_down(ij, T, t, σ, spectral_grid.nlayers)
+    @test D == vars.parameterizations.surface_longwave_down[ij]
+end
+
+@testset "Sea ice output variables" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 5)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    vars = simulation.variables
+    vars.prognostic.ocean.sea_ice_volume .= 1.5
+    vars.parameterizations.ocean.sea_ice_surface_temperature .= 250
+    volume = OutputVariables.SeaIceVolume()
+    surface_temperature = OutputVariables.SeaIceSurfaceTemperature()
+    @test volume isa SpeedyWeather.AbstractOutputVariable
+    @test OutputVariables.path(volume, simulation) === vars.prognostic.ocean.sea_ice_volume
+    @test OutputVariables.path(surface_temperature, simulation) === vars.parameterizations.ocean.sea_ice_surface_temperature
+    @test surface_temperature.transform(250.0f0) ≈ 250 - 273.15     # written in ˚C
+    @test volume.unit == "m"
+end
