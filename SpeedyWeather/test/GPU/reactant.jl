@@ -32,7 +32,7 @@ end
     @test fused_members(vars, 1000) == members      # the original still holds 1000 + i: no shared memory
 end
 
-# to expensive to run
+# TODO: too expensive to run in CI at the moment
 #=
 @testset "Reactant GPU: PrimitiveWetModel with $Transform steps without NaNs" for Transform in (SpectralTransform, ) # SpectralTransform
     spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice())
