@@ -199,6 +199,12 @@ end
         end
     end
 
+    # the sea ice model of a model, or nothing for models without one
+    @test SpeedyWeather.get_sea_ice(PrimitiveWetModel(spectral_grid)) isa ThermodynamicSeaIce
+    @test SpeedyWeather.get_sea_ice(PrimitiveWetModel(spectral_grid; sea_ice = PrescribedSeaIce())) isa PrescribedSeaIce
+    @test SpeedyWeather.get_sea_ice(PrimitiveWetModel(spectral_grid; sea_ice = nothing)) === nothing
+    @test SpeedyWeather.get_sea_ice(ShallowWaterModel(spectral_grid)) === nothing      # no sea ice field at all
+
     # the emission temperature dispatches on the sea ice model
     model = PrimitiveWetModel(spectral_grid)
     simulation = initialize!(model)
