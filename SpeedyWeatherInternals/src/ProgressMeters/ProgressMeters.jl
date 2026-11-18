@@ -52,7 +52,7 @@ using DocStringExtensions: TYPEDSIGNATURES, TYPEDFIELDS
 import Printf: @sprintf
 
 export Progress, next!, finish!,
-    AbstractProgressElement, print_element, Percentage, Bar, ETA, ElapsedTime, Counter
+    AbstractProgressElement, print_element, Percentage, Bar, ETA, ElapsedTime, Counter, NewLine
 
 """Supertype of the elements of a progress line, see [`print_element`](@ref)."""
 abstract type AbstractProgressElement end
@@ -102,6 +102,9 @@ mutable struct Progress
     "Has the line been drawn at least once?"
     printed::Bool
 
+    "Number of lines drawn in the last redraw"
+    nlines::Int
+
     "Has the final line been drawn (or the meter finished without drawing)?"
     finished::Bool
 end
@@ -123,7 +126,7 @@ function Progress(
     t = time()
     return Progress(
         n, 0, description, Tuple(elements), separator, color, enabled, dt, output,
-        t, t, t, false, false
+        t, t, t, false, 0, false
     )
 end
 
@@ -157,20 +160,26 @@ function finish!(p::Progress)
     return nothing
 end
 
-# draw the line over the current one (or the final line, followed by a newline), written at once
+# draw the lines over the ones of the last redraw (or the final lines, followed by a newline),
+# written at once, the cursor stays at the end of the last line
 function draw!(p::Progress, finished::Bool)
     p.tcurrent = time()
     p.finished = finished
+    lines = render_lines(p)
     buffer = IOBuffer()
     print(buffer, '\r')
+    p.nlines > 1 && print(buffer, "\e[A"^(p.nlines - 1))     # back up to the first line of the last redraw
     colored = get(p.output, :color, false)::Bool
     colored && print(buffer, get(Base.text_colors, p.color, ""))
-    print(buffer, render_line(p))
+    for (i, line) in enumerate(lines)
+        i > 1 && print(buffer, '\n')
+        print(buffer, line, "\e[K")    # clear the rest of a previous, longer line
+    end
     colored && print(buffer, Base.text_colors[:normal])
-    print(buffer, "\e[K")       # clear the rest of a previous, longer line
     finished && print(buffer, '\n')
     write(p.output, take!(buffer))
     flush(p.output)
+    p.nlines = length(lines)
     p.tlast = time()
     p.printed = true
     return nothing
@@ -187,11 +196,53 @@ string leaves the element out of the line."""
 function print_element end
 print_element(s::AbstractString, p::Progress) = s
 
+"""
+    NewLine(; indent = 0)
+
+Starts a new line of the progress meter. Lines after the first are indented by the width of the
+description (plus a space) and `indent` spaces. A line without elements is left out."""
+struct NewLine <: AbstractProgressElement
+    indent::Int
+end
+NewLine(; indent::Integer = 0) = NewLine(indent)
+print_element(::NewLine, p::Progress) = ""
+
 """$(TYPEDSIGNATURES)
-The line of the progress meter `p` for its `elements`: the description, then the non-empty texts of the
-elements joined by `p.separator`, with a single space next to a bar instead."""
-function render_line(p::Progress)
-    (; elements, separator, description) = p
+The lines of the progress meter `p` joined by newlines, see [`render_lines`](@ref)."""
+render_line(p::Progress) = join(render_lines(p), '\n')
+
+"""$(TYPEDSIGNATURES)
+The lines of the progress meter `p` for its `elements`, split at every `NewLine`: the description (first
+line, an indent of its width on the others), then the non-empty texts of the elements joined by
+`p.separator`, with a single space next to a bar instead. Every line is cut to the width of the terminal
+minus one column, so that it doesn't wrap."""
+function render_lines(p::Progress)
+    (; elements, description) = p
+    terminal_width = displaysize(p.output)[2]
+    lines = String[]
+    first_element = 1
+    indent = 0
+    for i in eachindex(elements)
+        if i == lastindex(elements) || elements[i + 1] isa NewLine
+            line_elements = elements[first_element:i]
+            if !isempty(line_elements)          # leave out lines without elements
+                prefix = isempty(lines) ? description : " "^(textwidth(description) + !isempty(description) + indent)
+                line = render_line(p, line_elements, prefix, terminal_width)
+                push!(lines, truncate_line(line, terminal_width - 1))
+            end
+            if i < lastindex(elements)
+                indent = elements[i + 1].indent
+                first_element = i + 2
+            end
+        end
+    end
+    isempty(lines) && push!(lines, truncate_line(description, terminal_width - 1))
+    return lines
+end
+
+# render one line of `elements` after `prefix` (the description or an indent)
+function render_line(p::Progress, elements::Tuple, prefix::AbstractString, terminal_width::Integer)
+    (; separator) = p
     texts = String[isbar(element) ? "" : print_element(element, p) for element in elements]
 
     # bars without a length share the terminal width the rest of the line leaves
@@ -199,10 +250,10 @@ function render_line(p::Progress)
     bar_width = 0
     if any(flexible)
         visible = [!isempty(text) || isbar(element) for (element, text) in zip(elements, texts)]
-        width = textwidth(description) + !isempty(description) +
+        width = textwidth(prefix) + (!isempty(prefix) && !all(isspace, prefix)) +
             sum(textwidth, texts; init = 0) + separators_width(elements, visible, separator) +
             sum(element -> isbar(element) ? something(element.length, 0) : 0, elements; init = 0)
-        bar_width = max(0, (displaysize(p.output)[2] - width - 1) ÷ count(flexible))
+        bar_width = max(0, (terminal_width - width - 1) ÷ count(flexible))
     end
 
     for (i, element) in enumerate(elements)
@@ -212,19 +263,30 @@ function render_line(p::Progress)
     end
 
     line = IOBuffer()
-    print(line, description)
+    print(line, prefix)
     previous = nothing      # previous element that was printed
     for (element, text) in zip(elements, texts)
         isempty(text) && continue
         if !isnothing(previous)
             print(line, isbar(previous) || isbar(element) ? " " : separator)
-        elseif !isempty(description)
-            print(line, " ")
+        elseif !isempty(prefix) && !all(isspace, prefix)
+            print(line, " ")    # after the description, not after an indent
         end
         print(line, text)
         previous = element
     end
     return String(take!(line))
+end
+
+# cut `line` to at most `width` columns
+function truncate_line(line::AbstractString, width::Integer)
+    textwidth(line) <= width && return line
+    columns = 0
+    for (i, char) in pairs(line)
+        columns += textwidth(char)
+        columns > width && return line[begin:prevind(line, i)]
+    end
+    return line
 end
 
 # width of all separators if only the elements with `visible` are printed

@@ -41,37 +41,36 @@ end
         @test elements == ProgressElements.default_elements(SpeedyWeather.CPU())
         @test any(e -> e isa ProgressElements.SimulationSpeed, elements)
         @test any(e -> e isa ProgressElements.MaximumWindSpeed, elements)
-        @test !any(e -> e isa ProgressElements.VerticalCourantNumber, elements)
-        @test !any(e -> e isa ProgressElements.Bar, elements)
+        @test any(e -> e isa ProgressElements.VerticalCourantNumber, elements)
+        @test any(e -> e isa ProgressElements.EnergyImbalance, elements)
+        @test count(e -> e isa ProgressElements.NewLine, elements) == 1      # two lines
+        @test any(e -> e isa ProgressElements.Bar, elements)
         # the diagnostics are opt-in for Reactant
         reactant = SpeedyWeather.ReactantDevice(nothing)   # for dispatch only, no Reactant needed
         elements = ProgressElements.default_elements(reactant)
-        @test !any(e -> e isa Union{ProgressElements.MaximumWindSpeed, ProgressElements.TemperatureRange}, elements)
+        @test !any(e -> e isa ProgressElements.AbstractSimulationElement && !(e isa Union{ProgressElements.SimulationTime, ProgressElements.SimulationSpeed}), elements)
+        @test !any(e -> e isa ProgressElements.NewLine, elements)
         @test any(e -> e isa ProgressElements.SimulationTime, elements)
         # the generic elements are available under ProgressElements too
         @test ProgressElements.Bar === SpeedyWeather.ProgressMeters.Bar
         @test !hasfield(Feedback, :showspeed) && !hasfield(Feedback, :show_umax) && !hasfield(Feedback, :progress_bar_length)
     end
 
-    @testset "default line" begin
-        model = PrimitiveDryModel(spectral_grid; feedback = Feedback(verbose = false))
+    @testset "default lines" begin
+        model = PrimitiveWetModel(spectral_grid; feedback = Feedback(verbose = false))
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
         p = model.feedback.progress_meter
         @test p.counter == p.n
-        @test occursin(r"^ *\d+%, ETA: [\d:]+, \d{4}-\d\d-\d\d, .*/day, +\d+ m/s, \[ *-?\d+, +-?\d+\] ˚C$", render_line(p))
-    end
+        lines = SpeedyWeather.ProgressMeters.render_lines(p)
+        @test length(lines) == 2
+        @test occursin(r"^ *\d+% [━ ]+ ETA: [\d:]+, \d{4}-\d\d-\d\d, .*/day$", lines[1])
+        # (Cᵥ is wrong after the run, as `w` is still radius-scaled, but `scale` isn't anymore)
+        @test occursin(r"^ {5}\d+ m/s, \[-?\d+, -?\d+\] ˚C, Cᵥ = [\d.]+, precip \d+\.\d\d mm/day, TOA [+-]\d+\.\d W/m²$", lines[2])
 
-    @testset "elements on redraw, VerticalCourantNumber" begin
-        feedback = Feedback(verbose = false, elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))
-        model = PrimitiveDryModel(spectral_grid; feedback)
-        simulation = initialize!(model)
-        run!(simulation, period = Day(1))
-        p = model.feedback.progress_meter
-        # the appended element is separated like the others
-        @test occursin(r"˚C, Cᵥ = \d+\.\d\d$", render_line(p))
+        # the vertical Courant number
+        element = p.elements[findfirst(e -> e isa ProgressElements.VerticalCourantNumber, p.elements)]
         # the vertical scratch vector is allocated for the element, the redraw doesn't allocate
-        element = p.elements[end]
         @test element.w_max isa AbstractMatrix && size(element.w_max) == (1, spectral_grid.nlayers)
         (; w) = simulation.variables.dynamics
         Δt = Float64(model.time_stepping.Δt)
@@ -95,7 +94,19 @@ end
         @test ProgressElements.vertical_courant_number!(w_max, w_max_cpu, w, Float32[0.5, 0.1, 0.2, 0.2], 10) ≈ 20
 
         # bound elements hold the Variables but print compactly
-        @test repr(p.elements[end]) == "VerticalCourantNumber()"
+        @test repr(element) == "VerticalCourantNumber()"
+
+        # precipitation and energy imbalance, hand-computed
+        @test sum(ProgressElements.global_mean_weights(model)) ≈ 1
+        (; parameterizations) = simulation.variables
+        parameterizations.rain_rate .= 3 / 1000 / 86400     # 3 mm/day in m/s
+        parameterizations.snow_rate .= 1 / 1000 / 86400
+        precipitation = p.elements[findfirst(e -> e isa ProgressElements.Precipitation, p.elements)]
+        @test ProgressElements.print_element(precipitation, p) == "precip 4.00 mm/day"
+        parameterizations.outgoing_shortwave .= 101.25     # incoming 1365 / 4 = 341.25 W/m²
+        parameterizations.outgoing_longwave .= 200
+        energy = p.elements[findfirst(e -> e isa ProgressElements.EnergyImbalance, p.elements)]
+        @test ProgressElements.print_element(energy, p) == "TOA +40.0 W/m²"
     end
 
     @testset "barotropic leaves out temperature/Courant, separator, bar" begin

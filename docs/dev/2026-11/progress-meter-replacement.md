@@ -54,6 +54,13 @@ Base revision: eb3a7080472dc558e82af58a39eb83f3523373f4 (head of `mc/progress-el
 - 2026-11-17: "I think with the ProgressMeters module we should bump to v1.1 in SpeedyWeatherInternals,
   it's a new feature". `SpeedyWeatherInternals` `1.1.0-DEV`, its compat in SpeedyWeather and
   SpeedyTransforms `"1.1"` (resolves with the `-DEV` pre-release via the `[sources]` paths).
+- 2026-11-18: "Can you add the two line "bar" to this PR please, all time and performance information
+  in the top row, and then max speed, temperature range, vertical courant, precipitation and can you
+  define a new element for energy imbalance so incoming minus outgoing shortwave minus outgoing
+  longwave? And then post that new design as example to the PR please". See "Two-line progress
+  line" below.
+- 2026-11-18: "Can the incoming not be simplified to solar constant / 4 ?" Yes, measured to differ by
+  ≤ 0.02 W/m² from the grid mean of `solar_constant * cos_zenith`; `EnergyImbalance` uses `S₀/4`.
 
 ## Problem description
 
@@ -164,6 +171,35 @@ export Progress, next!, finish!,
   `ProgressMeters.Progress` (the `IO` field must not be zeroed or copied); drop it if the
   differentiability tests pass without it.
 
+### 2b. Two-line progress line (added 2026-11-18)
+
+- `ProgressMeters.NewLine(; indent = 0)` splits `elements` into lines. Each line is rendered like
+  before (separators, bars filling the width of their line); lines after the first are indented by the
+  description width (+1) plus `indent`. Every line is truncated to the terminal width minus one column so
+  it never wraps (wrapping would break moving the cursor back up). A redraw moves the cursor up by the
+  number of lines drawn before (`\e[A`) and overwrites them, the cursor stays at the end of the last
+  line; the final redraw ends with a newline. `render_line(p)` returns the lines joined by `\n`.
+- New SpeedyWeather elements:
+  - `Precipitation()`: global mean of `rain_rate + snow_rate` [m/s] in mm/day, `precip 2.91 mm/day`.
+    Left out without `rain_rate`.
+  - `EnergyImbalance()`: global mean net top-of-atmosphere radiation, incoming shortwave
+    `solar_constant / 4` minus `outgoing_shortwave` minus `outgoing_longwave`, as `TOA +1.2 W/m²`.
+    Left out without these variables. "Can the incoming not be simplified to solar constant / 4 ?"
+    Yes: the area-weighted mean of `solar_constant * cos_zenith` differs from it by ≤ 0.02 W/m²
+    (T32 and T64, four times of day), so the reduction over `cos_zenith` was dropped.
+  - Labels and padding kept short so the second line fits into 80 columns (`%d m/s`, `[%d, %d] ˚C`).
+  - Global means use per-grid-point area weights (solid angle per ring / 4π, precomputed on the
+    device in `bind_element`) and `LinearAlgebra.dot`, no allocation on the CPU, a reduction on GPUs.
+- New default layout (Reactant: only the first line, without the diagnostics, as before):
+  ```
+   47% ━━━━━━━━━━━━━━━━━━━━━━  ETA: 0:01:12, 2000-01-15, 97.03 years/day
+       42 m/s, [-64, 32] ˚C, Cᵥ = 0.05, precip 2.91 mm/day, TOA +1.2 W/m²
+  ```
+  i.e. `(Percentage(), Bar(), ETA(), SimulationTime(), SimulationSpeed(), NewLine(indent = 5),
+  MaximumWindSpeed(), TemperatureRange(), VerticalCourantNumber(), Precipitation(), EnergyImbalance())`.
+  `VerticalCourantNumber` thereby becomes part of the default (it is only computed on redraw).
+  `variables(::Feedback)` collects the variables of `default_elements()` if `elements = nothing`.
+
 ### 3. SpeedyTransforms
 
 `matrix_transform.jl` uses `SpeedyWeatherInternals.ProgressMeters.Progress(n; dt = 2, desc = ...)`;
@@ -220,6 +256,9 @@ Remove the `ProgressMeter` entries (`[deps]` and `[sources]`) from `SpeedyWeathe
   in Jupyter the line is still overwritten via `\r`, but very long runs may hit IJulia's output throttling.
 - Non-terminal outputs (log files, CI) get the `\r`-separated lines like with ProgressMeter.
 - Bars have no sub-character resolution and no end glyphs.
+- Multi-line: output printed by others during a run (e.g. `@info` from a callback) lands after the
+  block and the next redraw overwrites part of it; outputs that don't interpret ANSI cursor movement
+  (log files, CI, Jupyter) show every redraw.
 - One color for the whole line.
 - Loses upstream fixes in ProgressMeter.jl; the module is small enough to maintain.
 

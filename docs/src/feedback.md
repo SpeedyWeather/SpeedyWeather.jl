@@ -6,37 +6,48 @@ REPL and checks the prognostic variables for NaNs. Its options are described in 
 
 ## Progress line
 
-While running, `Feedback` prints a progress line like
+While running, `Feedback` prints two progress lines like
 ```
- 23%, ETA: 0:00:07, 2000-01-03, 153.56 years/day,  44 m/s, [ -84,   35] ˚C
+ 23% ━━━━━━━━━━━━━━━━━━━━━━━                                   ETA: 0:00:07, 2000-01-03, 153.56 years/day
+     44 m/s, [-84, 35] ˚C, Cᵥ = 0.05, precip 2.91 mm/day, TOA +1.2 W/m²
 ```
-with the percentage of time steps done, the estimated remaining time, the simulation date, speed,
-maximum zonal wind and temperature range. The line is built from *elements*, which are collected in
-the module `ProgressElements`: the generic ones (`Percentage`, `Bar`, `ETA`, `ElapsedTime`, `Counter`)
-and the ones specific to SpeedyWeather (`SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`,
-`TemperatureRange`, `VerticalCourantNumber`). `ProgressElements.default_elements()` returns the
-default ones, which are used if `elements` is not set (with Reactant the maximum wind speed and the
-temperature range are left out by default as computing them is slow there, list them explicitly
-to show them). Pass your own tuple with `elements` to change the line, e.g. to also show the maximum
-vertical Courant number
+with the time and performance information on the first line: percentage of time steps done, a bar, the
+estimated remaining time, the simulation date and speed. The second line shows diagnostics of the
+simulation: the maximum zonal wind, the temperature range, the maximum vertical Courant number
+(`|σ̇|Δt/Δσ`, a stability indicator), the global mean precipitation and the global mean energy
+imbalance at the top of the atmosphere (incoming shortwave `S₀/4` minus outgoing shortwave minus
+outgoing longwave radiation). Elements that do not apply to a model are left out, e.g. the temperature
+range, Courant number, precipitation and energy imbalance in a `BarotropicModel`.
+
+The lines are built from *elements*, which are collected in the module `ProgressElements`: the generic
+ones (`Percentage`, `Bar`, `ETA`, `ElapsedTime`, `Counter`, `NewLine`) and the ones specific to SpeedyWeather
+(`SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`, `VerticalCourantNumber`,
+`Precipitation`, `EnergyImbalance`). `ProgressElements.default_elements()` returns the default ones,
+```julia
+(Percentage(), Bar(), ETA(), SimulationTime(), SimulationSpeed(), NewLine(indent = 5),
+    MaximumWindSpeed(), TemperatureRange(), VerticalCourantNumber(), Precipitation(), EnergyImbalance())
+```
+which are used if `elements` is not set (with Reactant only the first line, as computing the
+diagnostics is slow there, list them explicitly to show them). Pass your own tuple with `elements` to
+change the lines, e.g. for a single line without the bar
 ```julia
 using SpeedyWeather
 spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
-feedback = Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))
+(; Percentage, ETA, SimulationTime, MaximumWindSpeed, EnergyImbalance) = ProgressElements
+feedback = Feedback(elements = (Percentage(), ETA(), SimulationTime(), MaximumWindSpeed(), EnergyImbalance()))
 model = PrimitiveWetModel(spectral_grid; feedback)
 ```
-which appends `, Cᵥ = 0.04` to the line.
 Elements print only their value, `Feedback` puts its `separator` (default `", "`) between them, and a
-single space next to a bar. `Bar(length = nothing)` fills the remaining width of the terminal,
+single space next to a bar. `NewLine(indent = 5)` starts a new line, indented by 5 spaces (plus the
+width of the description). `Bar(length = nothing)` fills the remaining width of the terminal,
 `Bar(length = 20, fill = '#', empty = '.')` changes its length and characters. So
 ```julia
 (; Percentage, Bar, SimulationTime, MaximumWindSpeed) = ProgressElements
 feedback = Feedback(elements = (Percentage(), Bar(length = 10), SimulationTime(), MaximumWindSpeed()), separator = " | ")
 ```
-prints ` 23% ━━         2000-01-03 |  44 m/s`. Elements that do not apply to a model are left out, e.g.
-`TemperatureRange` and `VerticalCourantNumber` in a `BarotropicModel`. SpeedyWeather's elements are
-created without arguments and bound to the simulation when it starts. Diagnostics are only computed
-when the line is redrawn (every `feedback_dt` seconds).
+prints ` 23% ━━         2000-01-03 | 44 m/s`. Lines are cut to the width of the terminal so that they
+don't wrap. SpeedyWeather's elements are created without arguments and bound to the simulation when it
+starts. Diagnostics are only computed when the lines are redrawn (every `feedback_dt` seconds).
 
 ## Custom elements
 
@@ -49,7 +60,7 @@ and `finished` (`true` for the last line) can be used, e.g.
 struct StepsLeft <: ProgressElements.AbstractProgressElement end
 ProgressElements.print_element(::StepsLeft, p) = "$(p.n - p.counter) steps left"
 
-feedback = Feedback(elements = (ProgressElements.default_elements()..., StepsLeft()))
+feedback = Feedback(elements = (ProgressElements.default_elements()..., StepsLeft()))   # appended to the 2nd line
 ```
 An element returning an empty string is left out of the line. To show something of the simulation,
 hold a reference to it in the element (e.g. a `Ref` that a callback updates).

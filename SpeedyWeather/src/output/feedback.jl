@@ -26,8 +26,8 @@ $(TYPEDFIELDS)"""
 
     """[OPTION] Elements of the progress line, see `ProgressElements`, `nothing` for
     `ProgressElements.default_elements(architecture)`. Elements specific to SpeedyWeather are bound to
-    the simulation in `initialize!`, e.g. to add a bar and the vertical Courant number
-    `Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.Bar(length = 20), ProgressElements.VerticalCourantNumber()))`"""
+    the simulation in `initialize!`, e.g. for a single line with a bar of fixed length
+    `Feedback(elements = (ProgressElements.Percentage(), ProgressElements.Bar(length = 20), ProgressElements.ETA()))`"""
     elements::Union{Tuple, Nothing} = nothing
 
     "[OPTION] Separator between the elements of the progress line"
@@ -62,7 +62,7 @@ variables(feedback::Feedback) = (
         :nan_record, VectorDim(max(1, feedback.interval)), namespace = :feedback,
         desc = "1 if the 1-0 mode of the surface vorticity was NaN/Inf in the recorded time step, 0 otherwise", units = "1"
     ),
-    Iterators.flatten(map(variables, something(feedback.elements, ())))...,
+    Iterators.flatten(map(variables, something(feedback.elements, ProgressElements.default_elements())))...,
 )
 
 """

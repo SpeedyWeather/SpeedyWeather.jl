@@ -3,26 +3,29 @@
 
 Elements of the progress line printed by [`Feedback`](@ref SpeedyWeather.Feedback) while a simulation is running. Contains
 the generic elements of `SpeedyWeatherInternals.ProgressMeters` (`Percentage`, `Bar`, `ETA`,
-`ElapsedTime`, `Counter`) and the ones specific to SpeedyWeather (`SimulationTime`,
-`SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`, `VerticalCourantNumber`). Pass a tuple of
-them as `Feedback(elements = ...)`, [`default_elements`](@ref)
-returns the default ones, e.g.
+`ElapsedTime`, `Counter`, `NewLine`) and the ones specific to SpeedyWeather (`SimulationTime`,
+`SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`, `VerticalCourantNumber`, `Precipitation`,
+`EnergyImbalance`). Pass a tuple of them as `Feedback(elements = ...)`, [`default_elements`](@ref)
+returns the default ones, e.g. for a single line without the bar
 
 ```julia
-feedback = Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))
+(; Percentage, ETA, SimulationTime, SimulationSpeed, MaximumWindSpeed) = ProgressElements
+feedback = Feedback(elements = (Percentage(), ETA(), SimulationTime(), SimulationSpeed(), MaximumWindSpeed()))
 ```"""
 module ProgressElements
 
 using DocStringExtensions: TYPEDSIGNATURES
 import Dates
 import Printf: @sprintf
+import LinearAlgebra: dot
 import SpeedyWeatherInternals.ProgressMeters: ProgressMeters, Progress, AbstractProgressElement,
-    print_element, Percentage, Bar, ETA, ElapsedTime, Counter
-import ..SpeedyWeather: SpeedyWeather, variables, ScratchVariable, Vertical1D, AbstractArchitecture, ReactantDevice
+    print_element, Percentage, Bar, ETA, ElapsedTime, Counter, NewLine
+import ..SpeedyWeather: SpeedyWeather, variables, ScratchVariable, Vertical1D, AbstractArchitecture,
+    ReactantDevice, on_architecture, RingGrids
 
-export AbstractProgressElement, print_element, Percentage, Bar, ETA, ElapsedTime, Counter,
+export AbstractProgressElement, print_element, Percentage, Bar, ETA, ElapsedTime, Counter, NewLine,
     AbstractSimulationElement, SimulationTime, SimulationSpeed, MaximumWindSpeed, TemperatureRange,
-    VerticalCourantNumber, default_elements
+    VerticalCourantNumber, Precipitation, EnergyImbalance, default_elements
 
 # Elements of the progress line. They are created unbound, e.g. `VerticalCourantNumber()`, and
 # `bind_element` returns a copy that holds what it needs from the simulation (`Variables`, time
@@ -105,7 +108,7 @@ print_element(::MaximumWindSpeed{Nothing}, p) = ""
 
 function print_element(element::MaximumWindSpeed, p)
     umin, umax = extrema(element.vars.grid.u)
-    return @sprintf "%3d m/s" max(abs(umin), abs(umax))
+    return @sprintf "%d m/s" max(abs(umin), abs(umax))
 end
 
 """$(TYPEDSIGNATURES)
@@ -120,7 +123,7 @@ print_element(::TemperatureRange{Nothing}, p) = ""
 
 function print_element(element::TemperatureRange, p)
     tmin, tmax = extrema(element.vars.grid.temperature)
-    return @sprintf "[%4d, %4d] ˚C" tmin - 273.15f0 tmax - 273.15f0
+    return @sprintf "[%d, %d] ˚C" tmin - 273.15f0 tmax - 273.15f0
 end
 
 """$(TYPEDSIGNATURES)
@@ -129,11 +132,7 @@ Progress line element that shows an estimate of the maximum vertical Courant num
 at the layer interfaces, Δσ the layer thickness and Δt the time step. It is meant to indicate how
 close the simulation is to the vertical stability limit, not to be exact, see
 [`vertical_courant_number!`](@ref). Left out for models without vertical velocity
-`vars.dynamics.w`. Not part of the default layout, add it with
-
-```julia
-Feedback(elements = (ProgressElements.default_elements()..., ProgressElements.VerticalCourantNumber()))
-```"""
+`vars.dynamics.w`."""
 struct VerticalCourantNumber{V, W, C, S} <: AbstractSimulationElement
     vars::V
     w_max::W            # 1×nlayers view on the vertical scratch vector, maximum |σ̇| per interface
@@ -188,13 +187,80 @@ function vertical_courant_number!(w_max, w_max_cpu, w, Δσ, Δt)
 end
 
 """$(TYPEDSIGNATURES)
-Default elements of the progress line of a `Feedback`: percentage, ETA, simulation date, simulation
-speed, maximum wind speed and temperature range. For Reactant without the latter two (computing them
-falls back to scalar indexing), add them explicitly to `Feedback(elements = ...)` to show them there too."""
+Weights of the grid points of `model` for a global mean (`dot(weights, field.data)`), the solid angle
+of every grid point divided by 4π, so they sum to 1. On the architecture of the model."""
+function global_mean_weights(model)
+    grid = model.spectral_grid.grid
+    solid_angles = RingGrids.get_solid_angles(grid)
+    weights = zeros(model.spectral_grid.NF, RingGrids.get_npoints(grid))
+    for (j, ring) in enumerate(RingGrids.eachring(typeof(grid), grid.nlat_half))
+        weights[ring] .= solid_angles[j] / 4π
+    end
+    return on_architecture(model.architecture, weights)
+end
+
+"""$(TYPEDSIGNATURES)
+Progress line element that shows the global mean precipitation rate (rain and snow, large-scale and
+convective) in mm/day. Left out if the model has no precipitation (`vars.parameterizations.rain_rate`)."""
+struct Precipitation{V, W} <: AbstractSimulationElement
+    vars::V
+    weights::W      # area weights of the grid points for the global mean
+end
+Precipitation() = Precipitation(nothing, nothing)
+print_element(::Precipitation{Nothing}, p) = ""
+
+function bind_element(::Precipitation, vars, model)
+    hasproperty(vars.parameterizations, :rain_rate) || return nothing
+    return Precipitation(vars, global_mean_weights(model))
+end
+
+function print_element(element::Precipitation, p)
+    (; vars, weights) = element
+    (; parameterizations) = vars
+    rate = dot(weights, parameterizations.rain_rate.data)       # m/s
+    hasproperty(parameterizations, :snow_rate) && (rate += dot(weights, parameterizations.snow_rate.data))
+    return @sprintf "precip %.2f mm/day" rate * 1000 * 86400
+end
+
+"""$(TYPEDSIGNATURES)
+Progress line element that shows the global mean energy imbalance at the top of the atmosphere in W/m²:
+incoming shortwave radiation minus outgoing shortwave minus outgoing longwave radiation, positive if the
+planet gains energy. The global mean incoming shortwave radiation is `solar_constant / 4` (the planet
+intercepts `πr² S₀` and has a surface of `4πr²`), the area-weighted mean of `solar_constant * cos_zenith`
+on the grid differs from that by less than 0.1 W/m². Left out if the model has no radiation."""
+struct EnergyImbalance{V, W, S} <: AbstractSimulationElement
+    vars::V
+    weights::W              # area weights of the grid points for the global mean
+    incoming::S             # global mean incoming shortwave radiation, solar_constant / 4
+end
+EnergyImbalance() = EnergyImbalance(nothing, nothing, nothing)
+print_element(::EnergyImbalance{Nothing}, p) = ""
+
+function bind_element(::EnergyImbalance, vars, model)
+    (; parameterizations) = vars
+    has_radiation = hasproperty(parameterizations, :outgoing_shortwave) &&
+        hasproperty(parameterizations, :outgoing_longwave) && hasproperty(model, :planet)
+    has_radiation || return nothing
+    return EnergyImbalance(vars, global_mean_weights(model), model.planet.solar_constant / 4)
+end
+
+function print_element(element::EnergyImbalance, p)
+    (; vars, weights, incoming) = element
+    (; outgoing_shortwave, outgoing_longwave) = vars.parameterizations
+    imbalance = incoming - dot(weights, outgoing_shortwave.data) - dot(weights, outgoing_longwave.data)
+    return @sprintf "TOA %+.1f W/m²" imbalance
+end
+
+"""$(TYPEDSIGNATURES)
+Default elements of the progress line of a `Feedback`, two lines: percentage, bar, ETA, simulation date
+and speed, then maximum wind speed, temperature range, vertical Courant number, precipitation and energy
+imbalance (those that apply to the model). For Reactant only the first line (computing the diagnostics
+falls back to scalar indexing there), add them explicitly to `Feedback(elements = ...)` to show them."""
 default_elements(architecture::AbstractArchitecture) = (
-    Percentage(), ETA(), SimulationTime(), SimulationSpeed(), MaximumWindSpeed(), TemperatureRange(),
+    Percentage(), Bar(), ETA(), SimulationTime(), SimulationSpeed(), NewLine(indent = 5),
+    MaximumWindSpeed(), TemperatureRange(), VerticalCourantNumber(), Precipitation(), EnergyImbalance(),
 )
-default_elements(architecture::ReactantDevice) = (Percentage(), ETA(), SimulationTime(), SimulationSpeed())
+default_elements(architecture::ReactantDevice) = (Percentage(), Bar(), ETA(), SimulationTime(), SimulationSpeed())
 default_elements() = default_elements(SpeedyWeather.CPU())
 
 end # module ProgressElements

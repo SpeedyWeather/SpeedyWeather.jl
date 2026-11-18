@@ -65,14 +65,45 @@ output_string(io::IOContext) = String(take!(io.io))
             @test textwidth(render_line(p)) == width - 1
         end
         # and is left out if there's no space
-        p = Progress(100; elements = (Percentage(), Bar(), Counter()), output = progress_buffer(100; width = 5))
+        p = Progress(100; elements = (Percentage(), Bar(), Counter()), output = progress_buffer(100; width = 8))
         @test render_line(p) == "  0%, 0"
+        # lines are cut to the terminal width minus one column so they don't wrap
+        p = Progress(100; elements = (Percentage(), Counter(), "αβγ"), output = progress_buffer(100; width = 11))
+        @test render_line(p) == "  0%, 0, α"
+        p.output = progress_buffer(100; width = 5)
+        @test render_line(p) == "  0%"
 
         # custom elements
         struct Custom <: AbstractProgressElement end
         ProgressMeters.print_element(::Custom, p::Progress) = "custom $(p.counter)"
         p = Progress(10; elements = (Counter(), Custom()), output = progress_buffer(10))
         @test render_line(p) == "0, custom 0"
+    end
+
+    @testset "several lines" begin
+        elements = (Percentage(), ETA(), NewLine(indent = 2), Counter(), "abc", NewLine(), NewLine(), "last")
+        p = Progress(100; elements, output = progress_buffer(100))
+        p.counter = 50
+        p.tcurrent = p.tinit + 5
+        # indented by the description and `indent`, lines without elements left out
+        @test ProgressMeters.render_lines(p) == [" 50%, ETA: 0:00:05", "  50, abc", "last"]
+        p.description = "Run:"
+        @test ProgressMeters.render_lines(p) == ["Run:  50%, ETA: 0:00:05", "       50, abc", "     last"]
+        @test render_line(p) == join(ProgressMeters.render_lines(p), '\n')
+        # a bar fills the width of its line only
+        p = Progress(100; elements = (Percentage(), Bar(), NewLine(), Counter()), output = progress_buffer(100; width = 20))
+        lines = ProgressMeters.render_lines(p)
+        @test textwidth(lines[1]) == 19 && lines[2] == "0"
+
+        # redraws move the cursor up to the first line and overwrite both lines
+        io = progress_buffer(3)
+        p = Progress(3; dt = 0, elements = (Counter(), NewLine(), "second"), output = io)
+        next!(p)
+        @test output_string(io) == "\r1\e[K\nsecond\e[K"
+        next!(p)
+        @test output_string(io) == "\r\e[A2\e[K\nsecond\e[K"
+        next!(p)
+        @test output_string(io) == "\r\e[A3\e[K\nsecond\e[K\n"     # final lines end with a newline
     end
 
     @testset "drawing" begin
