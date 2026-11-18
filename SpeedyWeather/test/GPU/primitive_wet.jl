@@ -56,10 +56,10 @@ end
             temperature[:, k, :] .= 210 + 10 * (k - 1)
         end
         copyto!(vars.grid.temperature.data, temperature)
-        vars.grid.humidity .= 0.003
-        vars.parameterizations.surface_pressure .= 1.0e5
-        vars.tendencies.grid.temperature .= 0
-        vars.prognostic.land.soil_temperature .= 280
+        vars.grid.humidity .= 0.003f0             # Float32 literals: no Float64 on Metal
+        vars.parameterizations.surface_pressure .= 1.0f5
+        vars.tendencies.grid.temperature .= 0.0f0
+        vars.prognostic.land.soil_temperature .= 280.0f0
         set_points!(vars.prognostic.ocean.sea_surface_temperature, Float32.(265 .+ 30 .* x))
         set_points!(vars.parameterizations.surface_air_temperature, Float32.(230 .+ 50 .* reverse(x)))
         ice = Float32.(ifelse.(isodd.(1:npoints), x, 0))        # sea ice on every other point
