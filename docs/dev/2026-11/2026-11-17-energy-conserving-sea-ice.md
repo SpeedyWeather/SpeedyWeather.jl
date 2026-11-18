@@ -91,9 +91,10 @@ Base revision: 0de00d4365636eaf6367bbee3aeef1891a61d8c8 (#1406 after the review 
   - with the cap (v0.23-based, 1 year A/B against the SST-emission behaviour): more summer ice than the old
     handling in the north (minimum 20.8 against 19.6 × 10⁶ km²), about the same in the south, energy closed to
     0.07 W/m², but water under full cover supercooled to −6 °C (hence the lifted cap);
-  - cap lifted (10-year T213 run, 7 years so far): no supercooling, energy residual −0.09 W/m² over the run,
-    ice cover steady at 3.8–4.2 % of the ocean, and the ice volume levelling off as predicted (yearly growth
-    0.038, 0.023, 0.018, 0.013, 0.012, 0.012, 0.007 m of sea-mean volume).
+  - cap lifted (10-year T213 run, `europa_coupled024_t213_10y`, SpeedyWeather v0.24.1 with the design ported to the
+    external coupler, finished 2026-11-16): no NaNs, no supercooling, energy residual of the ice −0.07 W/m² over the
+    10 years. The ice volume grows more slowly each year (0.038, 0.023, 0.018, 0.013, 0.012, 0.012, 0.007 m of
+    sea-mean volume in years 1–7; 0.151 → 0.196 m over years 4–9), but it had not fully settled after 10 years.
 - 2026-11-16: plan signed off. The two open questions are decided:
   - `PrescribedSeaIce` keeps #1406's emission temperature, `(1 − ℵ)·SST + ℵ·min(SST, T_sa)`. It has no thickness
     or ice budget, so no T_i is solved for it;
@@ -402,6 +403,12 @@ Run on the rebuilt branch (commit 7d7fdbf): `radiation.jl`, `longwave_radiation.
 
 ### 4. GPU
 
+`test/GPU/primitive_wet.jl`, "GPU surface longwave over sea ice matches CPU" (from #1406, extended here; run by
+Buildkite): with `ThermodynamicSeaIce` also the ice surface temperature on GPU equals the CPU's within
+`rtol = 1e-5`. Passes locally (RTX 4050, 10/10).
+
+Check by hand beforehand:
+
 NVIDIA RTX 4050, CUDA, `ThermodynamicSeaIce` on half the points (random SST, surface air temperature and
 concentration, volume from the concentration, ice albedo 0.6, 100 W/m² shortwave):
 
@@ -455,6 +462,12 @@ Should-fix items applied:
   longwave, the ice albedo without an albedo scheme, and how to set the volume after restarting from an old file;
 - the docstring of `ocean_surface_emission_temperature` for `ThermodynamicSeaIce` says it writes the diagnostics;
 - an always-true guard removed; this plan corrected (full Rld, four Newton steps, `conductivity`).
+
+Afterwards, checking the PR against the repository's conventions (2026-11-17): tests added for
+`needs_surface_longwave_down`, for the `OneBandLongwave` downward-beam pre-pass (bitwise equal to the scheme's own
+surface downward longwave) and for the `SeaIceVolume` and `SeaIceSurfaceTemperature` output variables; short names in
+the sea ice code spelled out (`absorbed_radiation`, `conductance`, `heat_capacity`, `heat_deficit`, `sst_change`);
+the GPU testset above.
 
 Not applied:
 - reordering `OneBandLongwave` so the downward beam runs first (avoids the duplicate pre-pass): kept, so that the
