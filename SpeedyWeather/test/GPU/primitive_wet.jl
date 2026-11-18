@@ -34,7 +34,8 @@ end
 
 @testset "GPU surface longwave over sea ice matches CPU" begin
     # the ocean surface emission over sea ice dispatches on the sea ice model, which therefore is a core
-    # component available inside the GPU kernels: GPU and CPU give the same emission (Float32 round-off)
+    # component available inside the GPU kernels: GPU and CPU give the same emission (Float32 round-off),
+    # with ThermodynamicSeaIce also the same ice surface temperature
     function set_points!(field, values)     # values per grid point, the same on every layer and step
         data = Array(field.data)
         data .= reshape(values, :, ntuple(_ -> 1, ndims(data) - 1)...)
@@ -64,15 +65,25 @@ end
         set_points!(vars.parameterizations.surface_air_temperature, Float32.(230 .+ 50 .* reverse(x)))
         ice = Float32.(ifelse.(isodd.(1:npoints), x, 0))        # sea ice on every other point
         set_points!(vars.prognostic.ocean.sea_ice_concentration, ice)
+        if sea_ice isa ThermodynamicSeaIce      # its prognostic variable is the volume, ice surface balance needs albedo, shortwave
+            set_points!(vars.prognostic.ocean.sea_ice_volume, SpeedyWeather.sea_ice_volume.(ice, Ref(sea_ice)))
+            vars.parameterizations.ocean.sea_ice_albedo .= 0.6
+            vars.parameterizations.surface_shortwave_down .= 100
+        end
 
         SpeedyWeather.column_parameterizations!(vars, model)
-        return Array(vars.parameterizations.ocean.surface_longwave_up), ice
+        ice_surface_temperature = haskey(vars.parameterizations.ocean, :sea_ice_surface_temperature) ?
+            Array(vars.parameterizations.ocean.sea_ice_surface_temperature) : nothing
+        return Array(vars.parameterizations.ocean.surface_longwave_up), ice, ice_surface_temperature
     end
 
     @testset for Longwave in (OneBandLongwave, JeevanjeeRadiation), SeaIce in (PrescribedSeaIce, ThermodynamicSeaIce)
-        cpu, ice = ocean_longwave(SpeedyWeather.CPU(), Longwave, SeaIce)
-        gpu, _ = ocean_longwave(SpeedyWeather.GPU(), Longwave, SeaIce)
+        cpu, ice, T_i_cpu = ocean_longwave(SpeedyWeather.CPU(), Longwave, SeaIce)
+        gpu, _, T_i_gpu = ocean_longwave(SpeedyWeather.GPU(), Longwave, SeaIce)
         @test all(isfinite, gpu)
         @test gpu ≈ cpu rtol = 1.0e-5
+        if SeaIce === ThermodynamicSeaIce       # ice surface temperature from the ice surface energy balance (Newton)
+            @test T_i_gpu[ice .> 0] ≈ T_i_cpu[ice .> 0] rtol = 1.0e-5
+        end
     end
 end
