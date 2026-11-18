@@ -154,7 +154,11 @@ are ``U = \sigma T_s^4`` at the surface, i.e. the surface emitting with its surf
 temperature ``T_s`` (sea surface temperature, skin or soil temperature); and
 ``D = 0`` at the top (no longwave radiation from space). Over sea ice with concentration ``ℵ`` the ocean
 emits with ``(1 - ℵ) T_{sst} + ℵ \min(T_{sst}, T_a)``, i.e. sea ice is assumed to have the surface
-air temperature ``T_a`` but not to be warmer than the water underneath. Instead of optical depth
+air temperature ``T_a`` but not to be warmer than the water underneath. All schemes that emit from the
+ocean surface get this temperature from `ocean_surface_emission_temperature`, which dispatches on the
+sea ice model, so a future sea ice model with an ice surface temperature of its own only needs a new
+method there. ``T_a`` is computed in the boundary layer, so a custom `parameterizations` tuple with
+sea ice has to keep `:boundary_layer` before `:radiation`. Instead of optical depth
 we solve these equations using the transmissivity ``t = \exp(-\tau)``.
 
 ```math

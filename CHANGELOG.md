@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Surface longwave emission over sea ice uses the surface air temperature (at most the sea surface temperature) instead of the water temperature underneath, in `OneBandLongwave` and `JeevanjeeRadiation` [#1406](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1406)
+- Surface longwave emission over sea ice uses the surface air temperature (at most the sea surface temperature) instead of the water temperature underneath, in `OneBandLongwave`, `JeevanjeeRadiation`, `AnalyticBandLongwave` and `ClearSkyEcCKDRadiation` [#1406](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1406)
 - `ByrneOGormanLongwaveTransmissivity` with humidity- and CO₂-dependent optical depth as new longwave default, default CO₂ of 280 ppm, longwave optical depths calibrated for ~288 K with `TwoBandShortwave` [#1279](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1279)
 - Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)
 - Fix the differentiability of `TwoBandShortwave` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)

@@ -98,7 +98,7 @@ end
 end
 
 @testset "Surface longwave emission over sea ice" begin
-    # sea ice emits at the surface air temperature (here colder than the sea surface), see ocean_skin_temperature
+    # sea ice emits at the surface air temperature (here colder than the sea surface), see ocean_surface_emission_temperature
     @testset for radiation in (
             Radiation(spectral_grid; shortwave = nothing, longwave = AnalyticBandLongwave(spectral_grid)),
             ClearSkyEcCKDRadiation(spectral_grid),
@@ -109,7 +109,7 @@ end
         @test haskey(variables.prognostic.ocean, :sea_ice_concentration)
 
         function surface_longwave_up(sea_ice_concentration)
-            set_test_state!(variables, model)
+            set_test_state!(variables, model)       # sea surface temperature 295 K everywhere, above the air
             variables.prognostic.ocean.sea_ice_concentration .= sea_ice_concentration
             variables.parameterizations.surface_air_temperature .= 250
             SpeedyWeather.column_parameterizations!(variables, model)

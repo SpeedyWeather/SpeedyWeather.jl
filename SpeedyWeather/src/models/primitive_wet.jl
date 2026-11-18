@@ -117,7 +117,7 @@ $(TYPEDFIELDS)"""
     # also determine order in which parameterizations are called
     core_components::TS1 = (
         :architecture, :time_stepping, :orography, :geopotential, :atmosphere,
-        :planet, :geometry, :land_sea_mask,
+        :planet, :geometry, :land_sea_mask, :sea_ice,
     )
     parameterizations::TS2 = (
         :solar_zenith,              # external forcing
