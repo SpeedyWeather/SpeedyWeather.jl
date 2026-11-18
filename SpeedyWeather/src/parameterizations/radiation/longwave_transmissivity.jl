@@ -89,19 +89,20 @@ CO₂ [ppm] is read from `model.greenhouse_gases.co2` if present, otherwise `CO�
 In contrast to the `FriersonLongwaveTransmissivity` there is no prescribed latitude-vertical profile,
 the optical depth follows the model's humidity, introducing a water vapor feedback. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct ByrneOGormanLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
-    # Byrne and O'Gorman use 0.8678, which yields a too cold planet (~280K lowest layer at T31L8)
-    # with TwoBandShortwave, 1.3 yields ~286K (~288K at the surface)
+    # Byrne and O'Gorman use a = 0.8678 and b = 1997.9. With TwoBandShortwave that water vapor feedback runs away
+    # (SST rising ≈1 K/yr). A weaker b = 750 with a larger a = 1.45 is stable and gives a global mean SST of
+    # ≈291.5 K, surface LW up ≈397 W/m² and clear-sky-like LW down ≈314 W/m² at T32L8 (Wild et al. 2013)
     "[OPTION] Optical depth of the dry atmosphere (well-mixed greenhouse gases) per p₀ at `reference_co2` [1]"
-    @param dry_absorption::NF = 1.3 (bounds = Nonnegative,)
+    @param dry_absorption::NF = 1.45 (bounds = Nonnegative,)
 
     "[OPTION] Optical depth from water vapor per p₀ and per specific humidity [1/(kg/kg)]"
-    @param water_vapor_absorption::NF = 1997.9 (bounds = Nonnegative,)
+    @param water_vapor_absorption::NF = 750 (bounds = Nonnegative,)
 
     "[OPTION] Optical depth per p₀ per e-fold of CO₂ relative to `reference_co2` [1]"
     @param co2_sensitivity::NF = 0.2023 (bounds = Nonnegative,)
 
-    "[OPTION] CO₂ concentration at which the dry optical depth is `dry_absorption` [ppm]"
-    reference_co2::NF = 360
+    "[OPTION] CO₂ concentration at which the dry optical depth is `dry_absorption` [ppm], the default CO₂"
+    reference_co2::NF = DEFAULT_CO2
 end
 
 Adapt.@adapt_structure ByrneOGormanLongwaveTransmissivity
