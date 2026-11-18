@@ -53,6 +53,16 @@ Base revision: `24fdb6847a3bdd49f7e23e94a5b64de06dd89d48` (branch point). HEAD w
 >   `1/√(Δt/2)` for a leapfrog step (dispatch on `AbstractLeapfrog`, no runtime branch). From the
 >   3rd step on this is bitwise the old `1/√L.Δt`; the first two steps get the noise of their
 >   shorter steps, ocean/land with their own time step (also for `ocean/land = nothing`).
+> - 2026-11-18, user: "implement the merge and fix AR1s shortcoming. The behaviour of
+>   SpectralWhiteNoiseProcess should be identical to before". `SpectralWhiteNoiseProcess` is now a
+>   constructor for `SpectralAR1Process(…; time_scale = Second(0), wavenumber = 0, clamp = (-Inf, Inf))`
+>   (white noise is the limit τ → 0, a = 0; τ → ∞ would freeze the pattern). The AR1 process gets
+>   the white noise's spectral structure: flat for `wavenumber = 0` (was NaN), no noise on l = lmax,
+>   real m = 0 coefficients × √2. This changes the AR1 patterns (SPPT, stirring). Without memory
+>   there is no `random_numbers` buffer, the draw goes directly into the pattern. White noise draws
+>   and a 10-step `StochasticLeapfrog` PrimitiveWet run are bitwise identical to before (`isequal`).
+>   CHANGELOG entry moved from `## v0.25` (merge artifact, v0.25.0 is released without this PR) to
+>   `## Unreleased`, version `0.26.0-DEV`.
 
 ## Problem description
 
@@ -97,7 +107,11 @@ All changes are in `SpeedyWeather/` plus the docs. The other submodules are unto
   Consumers of a single pattern (SPPT, `StochasticStirring`, `RandomPattern` output) use slot 1.
 - New `SpectralWhiteNoiseProcess`: memoryless and spectrally flat by default (`wavenumber = 0`).
   No noise on l = 0 or l = lmax. The m = 0 coefficients are real and scaled by √2, so the pattern
-  is homogeneous and band-limited. No clamp by default.
+  is homogeneous and band-limited. No clamp by default. Since 2026-11-18 it is not a type of its
+  own but a constructor for `SpectralAR1Process(…; time_scale = Second(0), wavenumber = 0,
+  clamp = (-Inf, Inf))`, and the AR1 process got the spectral structure above (l = lmax, m = 0,
+  flat for `wavenumber = 0`). Without memory the AR1 process draws directly into the pattern
+  (`random_numbers = nothing`, no buffer).
 - New `GridWhiteNoiseProcess`: independent normals at every grid point, drawn directly in grid space.
 
 ### `src/time_stepping/steppers/leapfrog.jl`
@@ -118,7 +132,7 @@ design record. It is summarised in this document; the full text is in the histor
 - `AdditiveWienerNoise`: `amplitudes` is a NamedTuple keyed by tendency name, merged over
   `DEFAULT_WIENER_AMPLITUDES` (vor/div 3e-8, temperature 3e-3, humidity 3e-8, SST 1e-3). The
   defaults are tuned for T32 L8 PrimitiveWet from a 1500-year control run in the origin project.
-  Other fields: `tapering(σ)` → `taper` per layer, `spectral::SpectralWhiteNoiseProcess`,
+  Other fields: `tapering(σ)` → `taper` per layer, `spectral` (a `SpectralWhiteNoiseProcess`, i.e. a memoryless `SpectralAR1Process`),
   `grid::GridWhiteNoiseProcess`. When both processes get the same nonzero seed, the grid one is
   reseeded with a derived hash.
 - `tendency_variables(model)` collects the `TendencyVariable`s of the model and all its components
@@ -255,9 +269,8 @@ JULIA_LOAD_PATH="@:$PWD/SpeedyWeather/test:@stdlib" julia +1.12 --project=Speedy
 - [ ] Your TODO in `stochastic_leapfrog.jl`: maybe rewrite `wiener_atmosphere!` on the fused
       variable system.
 - [x] Decided: `random_process!` keeps its name.
-- [ ] `SpectralAR1Process(…; wavenumber = 0)` silently gives NaN noise factors (`k(k+1) = 0`), so
-      an `ArgumentError` check would help. Its docstring's first sentence is stale (fields
-      `wavenumbers`, `time_scales` do not exist, typos).
+- [x] `SpectralAR1Process(…; wavenumber = 0)` gave NaN noise factors (`k(k+1) = 0`); since
+      2026-11-18 it is spectrally flat, and the stale first sentence of its docstring is rewritten.
 - [ ] Update the origin project's gate (`speedy/checks/upstream_wiener_equivalence.jl`): the seed
       salting changed the Wiener realisations.
 - [ ] Maybe extend the CHANGELOG entry: `update_random!(vars, model)` once per time step, seed salting.
