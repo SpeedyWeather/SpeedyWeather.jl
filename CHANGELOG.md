@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Energy-conserving `ThermodynamicSeaIce`: the sea ice volume is the prognostic variable (concentration and thickness follow from it), freezing, bottom and top melt exchange latent heat with the ocean, no ice is lost at full cover, and heat is conducted through the ice from a diagnostic ice surface temperature that the longwave emits at; `melt_rate` and `freeze_rate` are replaced by `conductivity`, `thin_ice_thickness`, `pack_ice_thickness`, `basal_melt_coefficient` and others [#PRNUMBER](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/PRNUMBER)
 - Surface longwave emission over sea ice uses the surface air temperature (at most the sea surface temperature) instead of the water temperature underneath, in `OneBandLongwave`, `JeevanjeeRadiation`, `AnalyticBandLongwave` and `ClearSkyEcCKDRadiation` [#1406](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1406)
 - `ByrneOGormanLongwaveTransmissivity` with humidity- and CO₂-dependent optical depth as new longwave default, default CO₂ of 280 ppm, longwave optical depths calibrated for ~288 K with `TwoBandShortwave` [#1279](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1279)
 - Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)

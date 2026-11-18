@@ -217,3 +217,6 @@ end
 
     return nothing
 end
+# albedo of the sea ice part of the ocean, for the ice surface energy balance (see `sea_ice_albedo!`)
+@propagate_inbounds sea_ice_albedo(ij, vars::Variables, albedo::OceanSeaIceAlbedo) = albedo.albedo_ice
+@propagate_inbounds sea_ice_albedo(ij, vars::Variables, albedo::JinOceanAlbedo) = albedo.albedo_ice

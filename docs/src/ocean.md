@@ -110,7 +110,7 @@ temporal evolution of sea surface temperature ``SST`` is given by
 
 
 ```math
-C_0 \frac{\mathrm{d} SST}{\mathrm{d}t} = \left( R_{sd} - R_{su} - R_{lu} + R_{ld} - L_v H - S \right)
+C_0 \frac{\mathrm{d} SST}{\mathrm{d}t} = \left( R_{sd} - R_{su} - R_{lu} + R_{ld} - L_v H - S - M \right)
 ```
 
 The surface fluxes are ``R_{sd}`` for shortwave (``s``) radiative
@@ -123,6 +123,9 @@ converted to ``W/m^2`` through multiplication with the latent heat of condensati
 ``L_v`` (negative sign as evaporation cools the ocean); and ``S`` the sensible heat flux
 through turbulent transport of heat in the atmospheric boundary layer. All surface flux
 terms have units of ``W/m^2``.
+``M`` is the part of the surface energy budget that melts sea ice at its top instead of warming
+the ocean, computed with `ThermodynamicSeaIce` (zero otherwise). Under sea ice the ocean then loses the heat
+conducted through the ice, see [Thermodynamic sea ice model](@ref).
 
 Depending on the presence of sea ice, the sensible and latent heat fluxes are subject to
 insulation, see [Thermodynamic sea ice model](@ref). The insulation is applied as a flux reduction

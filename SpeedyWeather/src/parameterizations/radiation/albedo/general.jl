@@ -92,14 +92,30 @@ end
 """$(TYPEDSIGNATURES) Composite OceanLandAlbedo: Call albedo.ocean over ocean and albedo.land over land."""
 @propagate_inbounds function parameterization!(ij, vars::Variables, albedo::OceanLandAlbedo, model)
     albedo!(ij, vars.parameterizations.ocean.albedo, vars, albedo.ocean, model)
+    sea_ice_albedo!(ij, vars, albedo.ocean)
     return albedo!(ij, vars.parameterizations.land.albedo, vars, albedo.land, model)
 end
 
 """$(TYPEDSIGNATURES) Single Albedo: Call same albedo over ocean and land."""
 @propagate_inbounds function parameterization!(ij, vars::Variables, albedo::AbstractAlbedo, model)
     albedo!(ij, vars.parameterizations.ocean.albedo, vars, albedo, model)
+    sea_ice_albedo!(ij, vars, albedo)
     return albedo!(ij, vars.parameterizations.land.albedo, vars, albedo, model)
 end
+
+"""$(TYPEDSIGNATURES)
+Store the albedo of the sea ice part of the ocean in `vars.parameterizations.ocean.sea_ice_albedo` for the ice
+surface energy balance of a sea ice model that allocates it (e.g. `ThermodynamicSeaIce`). Call after the ocean albedo."""
+@propagate_inbounds function sea_ice_albedo!(ij, vars::Variables, albedo::AbstractAlbedo)
+    if haskey(vars.parameterizations.ocean, :sea_ice_albedo)    # compile-time, only with a sea ice model that needs it
+        vars.parameterizations.ocean.sea_ice_albedo[ij] = sea_ice_albedo(ij, vars, albedo)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Albedo of sea ice for an ocean `albedo` without one of its own: the albedo of the ocean part of the grid point."""
+@propagate_inbounds sea_ice_albedo(ij, vars::Variables, ::AbstractAlbedo) = vars.parameterizations.ocean.albedo[ij]
 
 export GlobalConstantAlbedo
 

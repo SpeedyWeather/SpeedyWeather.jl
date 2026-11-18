@@ -182,7 +182,10 @@ Base.@propagate_inbounds function ecckd_surface_state(ij, vars, rad::ClearSkyEcC
     sst_all = SpeedyWeather.get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature,
                                                 model.time_stepping, rad)
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    sea_surface_temperature = SpeedyWeather.ocean_surface_emission_temperature(ij, vars, sst_all, rad, model)    # sea ice aware
+    # sea ice aware, with the previous step's surface downward longwave (the upward emission is computed first)
+    sea_surface_temperature = SpeedyWeather.ocean_surface_emission_temperature(
+        ij, vars, sst_all, vars.parameterizations.surface_longwave_down[ij], rad.surface_emissivity, rad, model
+    )
     land_surface_temperature = vars.prognostic.land.soil_temperature[ij, 1]
     albedo_ocean = vars.parameterizations.ocean.albedo[ij]
     albedo_land = vars.parameterizations.land.albedo[ij]

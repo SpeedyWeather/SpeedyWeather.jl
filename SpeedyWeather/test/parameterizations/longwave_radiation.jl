@@ -120,7 +120,8 @@ end
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     @testset for LW in (JeevanjeeRadiation, OneBandLongwave)
         longwave = LW(spectral_grid)
-        model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+        # PrescribedSeaIce: the ice emits at the surface air temperature (ThermodynamicSeaIce: see below)
+        model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave), sea_ice = PrescribedSeaIce())
         simulation = initialize!(model)
         vars = simulation.variables
         @test haskey(vars.prognostic.ocean, :sea_ice_concentration)
@@ -154,7 +155,7 @@ end
         T_eff(ℵ, Ta, S) = (
             sst .= S; vars.prognostic.ocean.sea_ice_concentration .= ℵ;
             vars.parameterizations.surface_air_temperature .= Ta;
-            SpeedyWeather.ocean_surface_emission_temperature(ij, vars, sst, model.radiation.longwave, model)
+            SpeedyWeather.ocean_surface_emission_temperature(ij, vars, sst, 0, ϵ, model.radiation.longwave, model)
         )
         @test T_eff(0.5, 243, 271) isa NF
         for ℵ in (0, 0.25, 0.5, 1), Ta in (230, 260, 271, 290), S in (271, 280)
@@ -213,11 +214,11 @@ end
     sst .= 271
     vars.prognostic.ocean.sea_ice_concentration .= 1
     vars.parameterizations.surface_air_temperature .= 243
+    lw = model.radiation.longwave
     @test model.sea_ice isa ThermodynamicSeaIce
-    @test SpeedyWeather.ocean_surface_emission_temperature(1, vars, sst, model.radiation.longwave, model) ≈ 243
-    @test SpeedyWeather.ocean_surface_emission_temperature(1, vars, sst, PrescribedSeaIce(), model.radiation.longwave, model) ≈ 243
+    @test SpeedyWeather.ocean_surface_emission_temperature(1, vars, sst, 0, 1, PrescribedSeaIce(), lw, model) ≈ 243
     # sea_ice = nothing with a manually set concentration also blends
-    @test SpeedyWeather.ocean_surface_emission_temperature(1, vars, sst, nothing, model.radiation.longwave, model) ≈ 243
+    @test SpeedyWeather.ocean_surface_emission_temperature(1, vars, sst, 0, 1, nothing, lw, model) ≈ 243
 
     # PrescribedSeaIce: the concentration has no time step dimension
     model = PrimitiveWetModel(spectral_grid; sea_ice = PrescribedSeaIce())
@@ -227,10 +228,61 @@ end
     sst .= 271
     vars.prognostic.ocean.sea_ice_concentration .= 1
     vars.parameterizations.surface_air_temperature .= 243
-    @test SpeedyWeather.ocean_surface_emission_temperature(1, vars, sst, model.radiation.longwave, model) ≈ 243
+    @test SpeedyWeather.ocean_surface_emission_temperature(1, vars, sst, 0, 1, model.radiation.longwave, model) ≈ 243
 
     # the surface air temperature is computed (boundary layer) before the radiation uses it
     @test findfirst(==(:boundary_layer), model.parameterizations) < findfirst(==(:radiation), model.parameterizations)
     dry_model = PrimitiveDryModel(spectral_grid)
     @test findfirst(==(:boundary_layer), dry_model.parameterizations) < findfirst(==(:radiation), dry_model.parameterizations)
+end
+
+@testset "Surface longwave emission over ThermodynamicSeaIce" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    @testset for LW in (JeevanjeeRadiation, OneBandLongwave)
+        longwave = LW(spectral_grid)
+        model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+        @test model.sea_ice isa ThermodynamicSeaIce
+        vars = initialize!(model).variables
+        ϵ = model.radiation.longwave isa JeevanjeeRadiation ? model.radiation.longwave.emissivity_ocean :
+            model.radiation.longwave.radiative_transfer.emissivity_ocean
+        σ = model.atmosphere.stefan_boltzmann
+        sea_ice = model.sea_ice
+        po, pp = vars.prognostic.ocean, vars.parameterizations.ocean
+        ij = 1
+        # ice surface temperature from the ice surface energy balance
+        function emission(ℵ; temperature = 250, shortwave = 0)
+            vars.parameterizations.surface_pressure .= 1.0e5
+            vars.grid.temperature .= temperature
+            vars.prognostic.ocean.sea_surface_temperature .= 271.35
+            po.sea_ice_volume .= SpeedyWeather.sea_ice_volume(ℵ, sea_ice)
+            po.sea_ice_concentration .= ℵ
+            vars.parameterizations.surface_shortwave_down .= shortwave  # zero: polar night
+            pp.sea_ice_albedo .= 0.6
+            vars.parameterizations.surface_air_temperature .= temperature
+            SpeedyWeather.parameterization!(ij, vars, model.radiation.longwave, model)
+            return pp.surface_longwave_up[ij], pp.sea_ice_surface_temperature[ij], vars.parameterizations.surface_longwave_down[ij]
+        end
+        ϵσ = ϵ * σ
+        T_f = sea_ice.freezing_temperature
+
+        U, T_i, D = emission(0)
+        @test U == ϵσ * 271.35f0^4                                      # no ice: exactly the open water emission
+
+        U, T_i, D = emission(1)
+        @test T_i < T_f                                                 # cold ice surface
+        G = sea_ice.conductivity / sea_ice.pack_ice_thickness
+        @test ϵσ * T_i^4 ≈ D + G * (T_f - T_i) rtol = 1.0e-5           # ice surface balance with this step's downward longwave
+        @test U ≈ ϵσ * T_i^4 rtol = 1.0e-5                              # full cover emits at the ice surface temperature
+        @test pp.sea_ice_conductive_flux[ij] ≈ G * (T_f - T_i) rtol = 1.0e-5
+        @test abs(pp.sea_ice_top_melt[ij]) < 1.0e-2                     # no melt below freezing (Newton residual only)
+
+        U, T_i, D = emission(0.5)
+        @test U ≈ ϵσ * (271.35f0^4 / 2 + T_i^4 / 2) rtol = 1.0e-5      # flux-equivalent, no Jensen gap
+
+        U, T_i, D = emission(1, temperature = 300, shortwave = 1000)    # summer: ice surface capped at melting
+        @test T_i == sea_ice.melting_temperature
+        @test pp.sea_ice_top_melt[ij] > 0
+        absorbed = (1 - 0.6f0) * 1000 + D
+        @test pp.sea_ice_top_melt[ij] ≈ absorbed + pp.sea_ice_conductive_flux[ij] - ϵσ * T_i^4 rtol = 1.0e-5
+    end
 end

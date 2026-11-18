@@ -269,15 +269,23 @@ conserves energy.
 
 All schemes that emit from the ocean surface (`OneBandLongwave`, `JeevanjeeRadiation`, and
 `AnalyticBandLongwave` and `ClearSkyEcCKDRadiation` from NumericalRadiation.jl) get this temperature from
-`ocean_surface_emission_temperature`, which dispatches on the sea ice model `model.sea_ice`. `PrescribedSeaIce`,
-`ThermodynamicSeaIce` and `sea_ice = nothing` (with a manually set concentration, see [Sea ice models](@ref)) use
-the formula above, so a future sea ice model with an ice surface temperature of its own only needs a new method.
+`ocean_surface_emission_temperature`, which dispatches on the sea ice model `model.sea_ice`. `PrescribedSeaIce`
+and `sea_ice = nothing` (with a manually set concentration, see [Sea ice models](@ref)) use the formula above.
 ``T_a`` is computed in the boundary layer, which runs before the radiation, so a custom `parameterizations`
-tuple with sea ice has to keep `:boundary_layer` before `:radiation`.
+tuple with sea ice has to keep `:boundary_layer` before `:radiation`. Blending temperatures linearly
+underestimates the area-weighted emission ``εσ[(1 - ℵ) T_{sst}^4 + ℵ T_a^4]`` because ``T^4`` is convex, by
+about ``6 ε σ \bar{T}^2 ℵ (1 - ℵ) (T_{sst} - T_a)^2``, e.g. about ``5ε`` W/m² for ``ℵ = 0.5`` and a 30 K difference.
 
-Blending temperatures linearly underestimates the area-weighted emission ``εσ[(1 - ℵ) T_{sst}^4 + ℵ T_a^4]``
-because ``T^4`` is convex, by about ``6 ε σ \bar{T}^2 ℵ (1 - ℵ) (T_{sst} - T_a)^2``, e.g. about ``5ε`` W/m² for
-``ℵ = 0.5`` and a 30 K difference.
+`ThermodynamicSeaIce` has an ice surface temperature ``T_i`` of its own, from the ice surface energy balance
+(see [Sea ice models](@ref)), which needs the downward longwave at the surface: `OneBandLongwave` and
+`JeevanjeeRadiation` use that of the same time step, `AnalyticBandLongwave` and `ClearSkyEcCKDRadiation` that of
+the previous one. The ocean then emits at the flux-equivalent temperature
+
+```math
+T_{ocean} = \left((1 - ℵ) T_{sst}^4 + ℵ T_i^4\right)^{1/4}
+```
+
+so that ``εσT_{ocean}^4`` is exactly the emission of the open water and the ice together, with no blending error.
 
 ## [Solar zenith angle, length of day and year](@id zenith)
 

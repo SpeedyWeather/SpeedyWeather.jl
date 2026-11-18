@@ -30,91 +30,250 @@ timestep!(vars::Variables, ::PrescribedSeaIce, model) = nothing
 
 export ThermodynamicSeaIce
 
-"""Thermodynamic sea ice model using sea ice concentration as
-prognostic variable, also modifies sea surface temperature as
-cooling below freezing grows sea ice. Fields are $(TYPEDFIELDS)"""
+"""Thermodynamic sea ice model with the sea ice volume per unit ocean area `V` [m] as prognostic variable.
+The sea ice concentration ℵ and the ice thickness `h` follow from `V`: the thickness is tied to the concentration,
+`h(ℵ) = h_thin + (h_pack - h_thin)ℵ`, so that low concentrations represent thin, new ice and full cover thick pack
+ice, with `V = ℵ h(ℵ)`, see `sea_ice_concentration`. Beyond full cover (`V > h_pack`) the ice thickens. Heat is
+conducted through the ice (zero-layer Semtner, 1976), `F_c = k (T_f - T_i) / h`, with an ice surface temperature
+`T_i` diagnosed from the ice surface energy balance in the longwave radiation, see
+`ocean_surface_emission_temperature`. Freezing, bottom melt and top melt all change `V` by the energy they use,
+so that the ocean heat content minus the latent heat stored in sea ice is conserved. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct ThermodynamicSeaIce{NF} <: AbstractDynamicSeaIce
     "[OPTION] Freezing temperature of sea water [K]"
     @param freezing_temperature::NF = 273.15 - 1.8 (bounds = Positive,)
 
-    "[OPTION] Melting rate of sea ice [m²/m²/s/K]"
-    @param melt_rate::NF = 1.0e-7 (bounds = Nonnegative,)
+    "[OPTION] Melting temperature of the sea ice surface, upper bound of the ice surface temperature [K]"
+    @param melting_temperature::NF = 273.15 (bounds = Positive,)
 
-    "[OPTION] Freezing rate of sea ice [m²/m²/K]"
-    @param freeze_rate::NF = 0.5 (bounds = Nonnegative,)
+    "[OPTION] Thermal conductivity of sea ice [W/m/K]"
+    @param conductivity::NF = 2 (bounds = Positive,)
+
+    "[OPTION] Ice thickness at vanishing concentration, i.e. of new, thin ice [m]"
+    @param thin_ice_thickness::NF = 0.2 (bounds = Positive,)
+
+    "[OPTION] Ice thickness at full cover, i.e. of pack ice [m], at least `thin_ice_thickness`"
+    @param pack_ice_thickness::NF = 2.5 (bounds = Positive,)
+
+    "[OPTION] Density of sea ice [kg/m³]"
+    @param density::NF = 917 (bounds = Positive,)
+
+    "[OPTION] Latent heat of fusion of sea ice [J/kg]"
+    @param latent_heat_fusion::NF = 3.34e5 (bounds = Positive,)
+
+    "[OPTION] Basal melt coefficient, ice-ocean heat flux per Kelvin above freezing [W/m²/K]"
+    @param basal_melt_coefficient::NF = 6.1 (bounds = Nonnegative,)
+
+    "[OPTION] Heat capacity per area [J/m²/K] with which ice freezes over a prescribed (not interactive) ocean, 50 m of water"
+    @param prescribed_ocean_heat_capacity::NF = 4184 * 1000 * 50 (bounds = Positive,)
 end
-
-ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(; kwargs...)
 
 # immutable and adapted: a core component of the model, so the radiation can dispatch on it inside (GPU) kernels
 Adapt.@adapt_structure ThermodynamicSeaIce
-
+ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(; kwargs...)
 initialize!(::ThermodynamicSeaIce, ::AbstractModel) = nothing
-initialize!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation) = nothing
 
-function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation)
-    # escape immediately if there is no sea surface temperature
-    haskey(vars.prognostic.ocean, :sea_surface_temperature) || return nothing
+function variables(::ThermodynamicSeaIce, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, :ocean)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
+    return (
+        # the ice volume is the prognostic variable, time stepped with the top melt as tendency
+        PrognosticVariable(:sea_ice_volume, OceanXYT(pg), namespace = :ocean, desc = "Sea ice volume per unit ocean area", units = "m"),
+        TendencyVariable(:sea_ice_volume, OceanXYT(tg), namespace = :ocean, desc = "Tendency of sea ice volume", units = "m/s"),
+        # the concentration follows from the volume (no tendency, so not time stepped), read by albedo, fluxes, radiation
+        PrognosticVariable(:sea_ice_concentration, OceanXYT(pg), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
+        # diagnosed in the longwave radiation from the ice surface energy balance
+        ParameterizationVariable(:sea_ice_surface_temperature, Grid2D(), namespace = :ocean, desc = "Sea ice surface temperature", units = "K"),
+        ParameterizationVariable(:sea_ice_conductive_flux, Grid2D(), namespace = :ocean, desc = "Heat conducted from the ocean through the sea ice, per ocean area", units = "W/m^2"),
+        ParameterizationVariable(:sea_ice_top_melt, Grid2D(), namespace = :ocean, desc = "Heat flux melting sea ice at its surface, per ocean area", units = "W/m^2"),
+        # written by the albedo, for the ice surface energy balance
+        ParameterizationVariable(:sea_ice_albedo, Grid2D(), namespace = :ocean, desc = "Albedo of the sea ice part of the ocean", units = "1"),
+    )
+end
 
-    # if ocean does not have an SST tendency use scratch array to write into the void
-    dsst = haskey(vars.tendencies.ocean, :sea_surface_temperature) ?
-        get_tendency_step(vars.tendencies.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), model.ocean) :
-        vars.scratch.grid.a_2D
+"""$(TYPEDSIGNATURES)
+Sea ice thickness [m] at concentration `ℵ`, linear between `thin_ice_thickness` at ℵ = 0 and
+`pack_ice_thickness` at ℵ = 1."""
+@inline sea_ice_thickness(ℵ, sea_ice::ThermodynamicSeaIce) =
+    sea_ice_thickness(ℵ, sea_ice.thin_ice_thickness, sea_ice.pack_ice_thickness)
+@inline sea_ice_thickness(ℵ, h_thin, h_pack) = h_thin + (max(h_pack, h_thin) - h_thin) * ℵ   # pack at least thin
 
-    # sea ice concentration written as \aleph yay!
-    dℵ = get_tendency_step(vars.tendencies.ocean.sea_ice_concentration, time_stepper(model.time_stepping, :ocean), sea_ice_model)
-    sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), model.ocean)
-    
-    @boundscheck size(dsst) == size(dℵ) == size(sst) || throw(BoundsError())
+"""$(TYPEDSIGNATURES)
+Sea ice thickness [m] of the ice volume per unit ocean area `V` [m]: `h(ℵ(V))` up to full cover, beyond which
+(`V > pack_ice_thickness`) the ice thickens, i.e. `h = V` at full cover."""
+@inline sea_ice_thickness_from_volume(V, sea_ice::ThermodynamicSeaIce) =
+    sea_ice_thickness_from_volume(V, sea_ice.thin_ice_thickness, sea_ice.pack_ice_thickness)
+@inline sea_ice_thickness_from_volume(V, h_thin, h_pack) =
+    sea_ice_thickness(sea_ice_concentration(V, h_thin, h_pack), h_thin, h_pack) + max(V - max(h_pack, h_thin), zero(V))
 
-    Δt = time_step(model.time_stepping, :ocean, vars.prognostic.clock)
+"""$(TYPEDSIGNATURES)
+Sea ice volume per unit ocean area [m] at concentration `ℵ ∈ [0, 1]`, `V = ℵ h(ℵ)`."""
+@inline sea_ice_volume(ℵ, sea_ice::ThermodynamicSeaIce) = sea_ice_volume(ℵ, sea_ice.thin_ice_thickness, sea_ice.pack_ice_thickness)
+@inline sea_ice_volume(ℵ, h_thin, h_pack) = ℵ * sea_ice_thickness(ℵ, h_thin, h_pack)
+
+"""$(TYPEDSIGNATURES)
+Sea ice concentration [1] of the ice volume per unit ocean area `V` [m], the exact inverse of `V = ℵ h(ℵ)`,
+written such that it never divides by `pack_ice_thickness - thin_ice_thickness` (which may be zero) and its
+denominator is at least `2thin_ice_thickness`. One for `V ≥ pack_ice_thickness`, zero for `V ≤ 0`. Branch-free."""
+@inline sea_ice_concentration(V, sea_ice::ThermodynamicSeaIce) =
+    sea_ice_concentration(V, sea_ice.thin_ice_thickness, sea_ice.pack_ice_thickness)
+@inline function sea_ice_concentration(V, h_thin, h_pack)
+    h_pack = max(h_pack, h_thin)    # pack ice at least as thick as thin ice, else the sqrt could be of a negative
+    V = clamp(V, zero(V), h_pack)
+    ℵ = 2V / (h_thin + sqrt(h_thin^2 + 4 * (h_pack - h_thin) * V))
+    return min(ℵ, one(ℵ))
+end
+
+"""$(TYPEDSIGNATURES)
+Ice surface temperature `T_i` [K] from the zero-layer (Semtner, 1976) surface energy balance of sea ice
+
+    ϵσT_i⁴ = A + G (T_f - T_i)
+
+with `A` [W/m²] the absorbed shortwave and downward longwave radiation, `G = k/h` [W/m²/K] the conductance of the ice
+and `T_f` the freezing temperature at the ice base, solved with a fixed number (branch-free) of Newton steps
+from `T_start`, then capped at the melting temperature `T_m`. Returns `T_i`, the conductive flux `F_c = G (T_f - T_i)`
+[W/m²] (positive upward, cooling the ocean) and the surplus `max(A + F_c - ϵσT_i⁴, 0)` [W/m²] that melts ice at the
+top when `T_i` is capped. Four Newton steps converge also for the thinnest ice (largest `G`)."""
+@inline function sea_ice_surface_balance(A, G, ϵσ, T_freeze, T_melt, T_start)
+    # f(T) = ϵσT⁴ + G(T - T_f) - A is convex and increasing for T > 0, Newton converges from any T > 0
+    T = T_start
+    for _ in 1:4
+        f = ϵσ * T^4 + G * (T - T_freeze) - A
+        dfdT = 4ϵσ * T^3 + G                # > 0, as G > 0
+        T -= f / dfdT
+    end
+    T = min(T, T_melt)                      # the ice surface cannot be warmer than melting
+    F_c = G * (T_freeze - T)                # conducted from the ice base (ocean) to the ice surface
+    # energy left at the surface to melt ice at T = T_melt, not negative (the Newton residual stays with the ocean)
+    surplus = max(A + F_c - ϵσ * T^4, zero(T))
+    return T, F_c, surplus
+end
+
+# initialize the ice volume from the concentration (zero unless set before) after the ocean initial conditions
+function initialize!(vars::Variables, sea_ice::ThermodynamicSeaIce, model::PrimitiveEquation)
+    V = vars.prognostic.ocean.sea_ice_volume.data
+    ℵ = vars.prognostic.ocean.sea_ice_concentration.data
+    NF = eltype(V)
+    (; thin_ice_thickness, pack_ice_thickness) = sea_ice
+    ocean = model.land_sea_mask.land_fraction.data .< 1     # at least partially ocean
+    V .= ifelse.(ocean, sea_ice_volume.(clamp.(ℵ, zero(NF), one(NF)), thin_ice_thickness, pack_ice_thickness), zero(NF))
+    ℵ .= sea_ice_concentration.(V, thin_ice_thickness, pack_ice_thickness)
+    return nothing
+end
+
+function timestep!(vars::Variables, sea_ice::ThermodynamicSeaIce, model::PrimitiveEquation)
+    # the top melt [W/m²] was computed by the longwave radiation (zero without radiation)
+    dV = get_tendency_step(vars.tendencies.ocean.sea_ice_volume, time_stepper(model.time_stepping, :ocean), sea_ice)
+    top_melt = vars.parameterizations.ocean.sea_ice_top_melt
     (; land_fraction) = model.land_sea_mask
 
-    m = sea_ice_model.melt_rate             # melt rate [m²/m²/s/K]
-    f = sea_ice_model.freeze_rate           # freeze rate [m²/m²/K]
-    T_freeze = sea_ice_model.freezing_temperature
-    parameters = (; m, f, T_freeze, Δt)
+    @boundscheck size(dV) == size(top_melt) || throw(BoundsError())
+    ρL⁻¹ = inv(sea_ice.density * sea_ice.latent_heat_fusion)       # [m³/J] ice volume per energy
 
-    launch!(
-        architecture(dℵ), LinearWorkOrder, size(dℵ), sea_ice_kernel!,
-        dℵ, dsst, sst, land_fraction, parameters
-    )
+    launch!(architecture(dV), LinearWorkOrder, size(dV), sea_ice_kernel!, dV, top_melt, land_fraction, ρL⁻¹)
     return nothing
 end
 
-@kernel inbounds = true function sea_ice_kernel!(dℵ, dsst, sst, land_fraction, parameters)
+@kernel inbounds = true function sea_ice_kernel!(dV, top_melt, land_fraction, ρL⁻¹)
     ij = @index(Global, Linear)     # every grid point ij
-
     if land_fraction[ij] < 1        # at least partially ocean
-        (; m, f, T_freeze, Δt) = parameters
-
-        # melt as a relaxation term wrt to freezing, freezing below is an adjustment in filter!
-        dT = sst[ij] - T_freeze                     # difference to freezing temperature
-        dℵ[ij] = -m * max(dT, 0)                    # sea ice tendency, melt if above freezing
+        dV[ij] = -top_melt[ij] * ρL⁻¹               # melt at the top [m/s]
     end
 end
 
-# applied after the time stepping for any kind of "hacky" correction
-function Base.filter!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation)
-    ℵ = vars.prognostic.ocean.sea_ice_concentration
+# applied after the time step: the ocean freezes ice or melts it from below as exact energy adjustments
+function Base.filter!(vars::Variables, sea_ice::ThermodynamicSeaIce, model::PrimitiveEquation)
+    V = vars.prognostic.ocean.sea_ice_volume.data
+    ℵ = vars.prognostic.ocean.sea_ice_concentration.data
+    NF = eltype(V)
+    ocean = model.land_sea_mask.land_fraction.data .< 1     # at least partially ocean
 
-    # freezing is an adjustment after the time step (not a tendency) so that it is independent
-    # of the ocean time stepper: freeze sea ice below freezing and restore SST to freezing
     if haskey(vars.prognostic.ocean, :sea_surface_temperature)
-        sst = vars.prognostic.ocean.sea_surface_temperature
-        (; freeze_rate, freezing_temperature) = sea_ice_model
-        ocean = model.land_sea_mask.land_fraction.data .< 1     # at least partially ocean
+        sst = vars.prognostic.ocean.sea_surface_temperature.data
+        Δt = time_step(model.time_stepping, :ocean, vars.prognostic.clock)
+        ρL = sea_ice.density * sea_ice.latent_heat_fusion   # [J/m³] latent heat stored per ice volume
+        T_f = sea_ice.freezing_temperature
+        γ = sea_ice.basal_melt_coefficient
 
-        ℵ.data .+= ocean .* freeze_rate .* max.(freezing_temperature .- sst.data, zero(freezing_temperature))
+        # only an interactive ocean (with an SST tendency) pays and receives the latent heat
+        interactive = haskey(vars.tendencies.ocean, :sea_surface_temperature)
+        C = convert(NF, interactive ? ocean_heat_capacity(model.ocean, sea_ice) : sea_ice.prescribed_ocean_heat_capacity)
+        s = NF(interactive)                                 # 1 to change the SST, 0 to keep it
 
-        # only change SST if not prescribed (i.e. the ocean has an SST tendency)
-        if haskey(vars.tendencies.ocean, :sea_surface_temperature)
-            sst.data .= ifelse.(ocean, max.(sst.data, freezing_temperature), sst.data)
+        # 1. top melt beyond the ice present (V < 0): that heat warms the ocean instead
+        sst .+= ifelse.(ocean, s .* ρL .* max.(.-V, zero(NF)) ./ C, zero(NF))
+        V .= max.(V, zero(NF))
+
+        # 2. freezing: the ocean's heat deficit below freezing becomes ice
+        E = ifelse.(ocean, C .* max.(T_f .- sst, zero(NF)), zero(NF))     # [J/m²]
+        if interactive
+            # the ocean pays for the ice and returns to freezing, no upper bound (the ice thickens)
+            V .+= E ./ ρL
+            sst .+= E ./ C
+        else
+            # a prescribed SST stays below freezing, so the same deficit would freeze again every step:
+            # grow ice towards full cover (as main's concentration clamp) but never thicken it beyond
+            V .= max.(V, min.(V .+ E ./ ρL, sea_ice.pack_ice_thickness))
         end
+
+        # 3. bottom melt: a basal flux above freezing melts ice, limited to the ice present, the ocean pays for it
+        ΔV = ifelse.(ocean, min.(γ .* max.(sst .- T_f, zero(NF)) .* Δt ./ ρL, V), zero(NF))
+        V .-= ΔV
+        sst .-= s .* ρL .* ΔV ./ C
     end
 
-    # clamp sea ice concentration in [0, 1], bounds of the same type as Reactant warns for mixed types
-    NF = eltype(ℵ)
-    ℵ .= max.(min.(ℵ, one(NF)), zero(NF))
+    (; thin_ice_thickness, pack_ice_thickness) = sea_ice
+    V .= max.(V, zero(NF))
+    ℵ .= sea_ice_concentration.(V, thin_ice_thickness, pack_ice_thickness)
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Heat capacity per area [J/m²/K] of the ocean with which `sea_ice` freezes and melts. That of the mixed layer for a
+`SlabOcean`, otherwise `prescribed_ocean_heat_capacity` of the sea ice model."""
+ocean_heat_capacity(ocean, sea_ice::ThermodynamicSeaIce) =
+    hasproperty(ocean, :heat_capacity_mixed_layer) ? ocean.heat_capacity_mixed_layer : sea_ice.prescribed_ocean_heat_capacity
+
+# SEA ICE IN THE LONGWAVE RADIATION, see `ocean_surface_emission_temperature` in longwave_radiation.jl
+needs_surface_longwave_down(::ThermodynamicSeaIce) = true
+
+"""$(TYPEDSIGNATURES)
+`ThermodynamicSeaIce`: the ocean part of grid point `ij` is split into sea ice (concentration ℵ) and open water.
+The ice surface temperature `T_i` is solved from the ice surface energy balance (see `sea_ice_surface_balance`)
+with the absorbed shortwave (ice albedo), the downward longwave and the heat conducted through the ice of thickness
+`h(V)`. Stores `T_i`, the conductive flux and the top melt (both per ocean area) and returns the flux-equivalent
+temperature `T* = ((1 - ℵ) sst⁴ + ℵ T_i⁴)^(1/4)`, so that `emissivity * σ * T*⁴` is exactly the emission of the
+open water and the ice together. Without ice (ℵ = 0) this is exactly `sst`. Note: unlike the other methods, this one
+also writes these sea ice diagnostics, which the slab ocean and the sea ice time step use."""
+@propagate_inbounds function ocean_surface_emission_temperature(
+        ij, vars, sst, surface_longwave_down, emissivity, sea_ice::ThermodynamicSeaIce, scheme, model
+    )
+    progn_ocean = vars.prognostic.ocean
+    params_ocean = vars.parameterizations.ocean
+    ts = time_stepper(model.time_stepping, :ocean)
+    sea_surface_temperature = sst[ij]
+    NF = typeof(sea_surface_temperature)
+
+    ℵ = get_prognostic_step(progn_ocean.sea_ice_concentration, ts, scheme)[ij]
+    V = get_prognostic_step(progn_ocean.sea_ice_volume, ts, scheme)[ij]
+    surface_shortwave_down = haskey(vars.parameterizations, :surface_shortwave_down) ?
+        vars.parameterizations.surface_shortwave_down[ij] : zero(NF)
+    surface_air_temperature = haskey(vars.parameterizations, :surface_air_temperature) ?
+        vars.parameterizations.surface_air_temperature[ij] : sea_surface_temperature
+
+    # ice surface energy balance: absorbed radiation A, conductance G = k/h, emission ϵσT⁴
+    A = (1 - params_ocean.sea_ice_albedo[ij]) * surface_shortwave_down + surface_longwave_down
+    G = sea_ice.conductivity / sea_ice_thickness_from_volume(V, sea_ice)
+    ϵσ = emissivity * model.atmosphere.stefan_boltzmann
+    T_start = min(sea_surface_temperature, surface_air_temperature)
+    T_i, F_c, surplus = sea_ice_surface_balance(A, G, ϵσ, sea_ice.freezing_temperature, sea_ice.melting_temperature, T_start)
+
+    params_ocean.sea_ice_surface_temperature[ij] = T_i
+    # [W/m²] per ocean area, zero (not 0·NaN) without ice, e.g. over land with a NaN sea surface temperature
+    params_ocean.sea_ice_conductive_flux[ij] = ifelse(ℵ > 0, ℵ * F_c, zero(NF))     # cools the ocean
+    params_ocean.sea_ice_top_melt[ij] = ifelse(ℵ > 0, ℵ * surplus, zero(NF))        # melts ice at the top
+
+    # flux-equivalent emission temperature of open water and ice, exactly the SST without ice
+    T⁴ = (1 - ℵ) * sea_surface_temperature^4 + ℵ * T_i^4
+    return ifelse(ℵ > 0, sqrt(sqrt(T⁴)), sea_surface_temperature)
 end
