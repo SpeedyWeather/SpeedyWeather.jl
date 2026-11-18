@@ -59,7 +59,7 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation)
         r_time_steps!(simulation, m)
         SpeedyWeather.progress!(feedback, variables, model, m)
         SpeedyWeather.output!(output, simulation)
-        nans_detected(feedback) && return simulation    # don't continue with NaNs
+        SpeedyWeather.nans_detected(feedback) && return simulation    # don't continue with NaNs
     end
     single_steps!(r_time_step!, simulation, remainder)
     return simulation
@@ -123,9 +123,6 @@ end
 # output interval in time steps, 0 without (active) output
 output_every_n_steps(::Nothing) = 0
 output_every_n_steps(output::SpeedyWeather.AbstractOutput) = output.active ? output.output_every_n_steps : 0
-
-nans_detected(::Nothing) = false
-nans_detected(feedback::SpeedyWeather.Feedback) = feedback.nans_detected
 
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 SpeedyWeather.scalar_ref(::ReactantDevice, x::Number) = Ref(Reactant.ConcreteRNumber(x))

@@ -50,7 +50,7 @@ end
     (; clock) = simulation.variables.prognostic
     @test Int(clock.step_counter) == 6
     @test model.feedback.progress_meter.counter == 6
-    @test !model.feedback.nans_detected
+    @test !SpeedyWeather.nans_detected(model.feedback)
     @test all(isfinite, Array(parent(simulation.variables.prognostic.vorticity)))
 end
 

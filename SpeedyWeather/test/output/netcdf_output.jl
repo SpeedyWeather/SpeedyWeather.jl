@@ -11,7 +11,7 @@ using NCDatasets, Dates
         model.feedback.verbose = false
         simulation = initialize!(model)
         run!(simulation, output = true; period)
-        @test simulation.model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -38,7 +38,7 @@ end
         model.feedback.verbose = false
         simulation = initialize!(model)
         run!(simulation, output = true; period)
-        @test simulation.model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -87,7 +87,7 @@ end
         model.feedback.verbose = false
         simulation = initialize!(model)
         run!(simulation, output = true; period)
-        @test simulation.model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -113,7 +113,7 @@ end
         model.feedback.verbose = false
         simulation = initialize!(model)
         run!(simulation, output = true; period)
-        @test simulation.model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -151,7 +151,7 @@ end
     simulation = initialize!(model)
     run!(simulation, output = true; period)
 
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
 
     # test

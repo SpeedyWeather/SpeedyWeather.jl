@@ -375,7 +375,7 @@ end
                     )
                     simulation = initialize!(model)
                     run!(simulation; period = Day(5))               # don't test longer on CI but otherwise could be Day(20) too
-                    @test model.feedback.nans_detected == false
+                    @test !SpeedyWeather.nans_detected(model.feedback)
                 end
             end
         end

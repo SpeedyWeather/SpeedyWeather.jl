@@ -173,7 +173,7 @@ end
     model = ShallowWaterModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
     g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
     npix = 12nside^2
@@ -228,7 +228,7 @@ end
     model = ShallowWaterModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
     g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
 
@@ -264,7 +264,7 @@ end
     model = ShallowWaterModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
     g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
     grid = spectral_grid.grid
@@ -386,7 +386,7 @@ end
     model = PrimitiveWetModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
     g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
     npix = 12nside^2

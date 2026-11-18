@@ -238,3 +238,6 @@ run!(simulation, period=Day(5), output=true)
 ```
 You would continue this simulation (the previous `run!` call already integrated
 10 days!) for another 5 days and storing default [NetCDF output](@ref).
+
+While running, `Feedback` prints a progress line to the REPL, see [Feedback](@ref feedback)
+for how to change what it shows.

@@ -20,7 +20,7 @@ end
     model = ShallowWaterModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
     g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
 
@@ -61,7 +61,7 @@ end
     model = PrimitiveWetModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
     g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
     @test haskey(g.arrays, "temp")
@@ -103,7 +103,7 @@ end
     model = PrimitiveWetModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
     g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
     nx, ny = RingGrids.matrix_size(output.field2D)
@@ -322,7 +322,7 @@ end
         model = ShallowWaterModel(spectral_grid; output, initial_conditions)
         simulation = initialize!(model)
         run!(simulation, output = true; period)
-        @test simulation.model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(simulation.model.feedback)
         # all members must resolve to the same shared run folder / store
         member == 1 && (store_path = joinpath(model.output.run_path, model.output.filename))
         @test joinpath(model.output.run_path, model.output.filename) == store_path

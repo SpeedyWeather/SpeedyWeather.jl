@@ -38,7 +38,7 @@ import NCDatasets: NCDatasets, NCDataset, defDim, defVar
 import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
-import ProgressMeter
+import SpeedyWeatherInternals.ProgressMeters
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
@@ -222,6 +222,8 @@ include("parameterizations/land/rivers.jl")
 
 # OUTPUT
 include("output/callbacks.jl")
+include("output/progress_elements.jl")
+include("output/nan_detection.jl")
 include("output/feedback.jl")
 include("output/vertical_interpolation.jl")
 include("output/writers/general.jl")

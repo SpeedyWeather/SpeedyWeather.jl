@@ -13,7 +13,7 @@
     simulation = initialize!(model)
     run!(simulation, steps = 3, output = true)
 
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
     @test isfile(joinpath(output.run_path, output.filename))
 end
 
@@ -29,5 +29,5 @@ end
     simulation = Simulation(model)
     run!(simulation, steps = 3)
 
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 end

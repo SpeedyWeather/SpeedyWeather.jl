@@ -6,7 +6,7 @@
         simulation = initialize!(model)
         model.feedback.verbose = false
         run!(simulation, period = Day(5))
-        @test simulation.model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(simulation.model.feedback)
     end
 end
 

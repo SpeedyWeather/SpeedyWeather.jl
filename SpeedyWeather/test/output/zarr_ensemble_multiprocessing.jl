@@ -34,7 +34,7 @@ using Zarr, Dates
         model = ShallowWaterModel(spectral_grid; output, initial_conditions)
         simulation = initialize!(model)
         run!(simulation, output = true, period = Day(1))
-        exit(simulation.model.feedback.nans_detected ? 1 : 0)
+        exit(SpeedyWeather.nans_detected(simulation.model.feedback) ? 1 : 0)
         """
     )
 

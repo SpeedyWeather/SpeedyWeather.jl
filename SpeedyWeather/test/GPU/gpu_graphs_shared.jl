@@ -61,7 +61,7 @@ function test_gpu_graphs(ext, prefix)
             run!(simulation, steps = 5)     # 5 more steps must add no new graphs (buffers reused)
             s2 = cache_stats()
 
-            @test simulation.model.feedback.nans_detected == false
+            @test !SpeedyWeather.nans_detected(simulation.model.feedback)
             @test s2.failed == 0                # nothing fell back to the un-captured direct loop
             @test s2.total == s1.total          # extra steps add no graphs → cache is bounded
             @test s1.total > 0                  # graphs were actually captured

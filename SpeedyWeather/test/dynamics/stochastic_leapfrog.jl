@@ -80,7 +80,7 @@ end
     model = PrimitiveWetModel(spectral_grid; time_stepping = StochasticLeapfrog(spectral_grid; seed = 123))
     simulation = initialize!(model)
     run!(simulation, period = Day(5))
-    @test !simulation.model.feedback.nans_detected
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 end
 
 @testset "StochasticLeapfrog: noise variables from the tendencies of the model" begin
@@ -183,7 +183,7 @@ end
     p0 = mean_pressure()
     run!(simulation, steps = 10)
     @test mean_pressure() == p0
-    @test !simulation.model.feedback.nans_detected
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 end
 
 @testset "StochasticLeapfrog: noise independent of model.random_process with the same seed" begin

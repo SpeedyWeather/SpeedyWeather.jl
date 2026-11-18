@@ -4,7 +4,7 @@ using DocStringExtensions: TYPEDFIELDS
 using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 using StyledStrings
 using Printf
-import ProgressMeter
+import SpeedyWeatherInternals.ProgressMeters
 
 # NUMERICS
 import AssociatedLegendrePolynomials as Legendre

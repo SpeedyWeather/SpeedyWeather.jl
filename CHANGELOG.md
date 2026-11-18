@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Lightweight progress meter `SpeedyWeatherInternals.ProgressMeters` replaces the ProgressMeter.jl dependency; two-line progress display built from elements in the new module `ProgressElements` (`Percentage`, `Bar`, `ETA`, `ElapsedTime`, `Counter`, `NewLine`, `SimulationTime`, `SimulationSpeed`, `MaximumWindSpeed`, `TemperatureRange`, new `VerticalCourantNumber`, `Precipitation`, `EnergyImbalance`) via `Feedback(elements = ..., separator = ", ")`, replacing the `Feedback` options `showspeed`, `show_time`, `show_umax`, `show_temperature_range`, `progress_bar_length`, `debug`, `interval`; removes the `ProgressMeter.speedstring` type piracy and `FEEDBACK_*` globals; `Feedback(nan_detection = NaNDetector(interval = 50))` records NaNs on every time step and reports the time step of the blow-up; `RingGrids.get_area_weights` and `model.geometry.area_weights` for global means [#1298](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1298)
 - Introduces a `StochasticLeapfrog` integrator that uses a Wiener process for a stochastic integration of the model, revised `AbstractRandomProcess` to accomodate for that (`random_process!(vars, process)` is now `update_random!`); `SpectralWhiteNoiseProcess` is a `SpectralAR1Process` with `time_scale = 0`, `SpectralAR1Process` now has real m = 0 coefficients, no noise on the last degree and is spectrally flat for `wavenumber = 0` (changes its random patterns) [#1397](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1397)
 
 ## v0.25

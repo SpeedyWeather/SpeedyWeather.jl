@@ -82,7 +82,7 @@ using NCDatasets, Dates
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, period = Hour(6), output = true)
-        @test model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(model.feedback)
 
         NCDataset(SpeedyWeather.get_output_path(model.output)) do ds
             # the pressure dimension replaces the sigma layer dimension

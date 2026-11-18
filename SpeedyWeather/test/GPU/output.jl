@@ -89,7 +89,7 @@ end
         # write every time step so that the last snapshot is the final state
         set!(output, model, interval = model.time_stepping.Δt_millisec)
         run!(simulation, steps = 3, output = true)
-        @test simulation.model.feedback.nans_detected == false
+        @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 
         # the last written temperature agrees with the final state interpolated on the CPU
         temperature = SpeedyWeather.get_prognostic_step(simulation.variables.grid.temperature, model.time_stepping, output)

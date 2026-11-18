@@ -5,5 +5,5 @@
     simulation = initialize!(model)
     run!(simulation, steps = 4)
 
-    @test simulation.model.feedback.nans_detected == false
+    @test !SpeedyWeather.nans_detected(simulation.model.feedback)
 end

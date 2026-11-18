@@ -69,6 +69,9 @@ $(TYPEDFIELDS)
     "Latitude (-π/2...π/2) for each grid point in ring order"
     lats::VTGrid = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[2]
 
+    "Area weight for each grid point in ring order, solid angle / 4π, `dot(area_weights, field.data)` is the global mean"
+    area_weights::VTGrid = RingGrids.get_area_weights(spectral_grid.Grid, nlat_half)
+
     "sin of latitudes"
     sinlat::VTLat = sind.(latd)
 

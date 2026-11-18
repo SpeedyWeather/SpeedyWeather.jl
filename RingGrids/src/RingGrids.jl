@@ -101,7 +101,8 @@ export get_londlatds,
 
 # INTEGRATION
 export get_quadrature_weights,
-    get_solid_angles
+    get_solid_angles,
+    get_area_weights
 
 # ITERATORS
 export eachlayer,

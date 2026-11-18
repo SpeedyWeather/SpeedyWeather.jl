@@ -44,7 +44,7 @@ function time_step!(
         model::Union{Barotropic, ShallowWater}, # everything that's constant at runtime
     )
     # exit immediately if NaNs/Infs already present
-    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
+    nans_detected(model.feedback) && return nothing
 
     # re-initialize model components if needed, e.g. implicit with changing time step
     reinitialize!(model, vars)
@@ -107,7 +107,7 @@ function time_step!(
         model::PrimitiveEquation,           # everything that's constant at runtime
     )
     # exit immediately if NaNs/Infs already present
-    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
+    nans_detected(model.feedback) && return nothing
 
     # re-initialize model components if needed, e.g. the implicit solver for the time step
     # of this step (Δt/2, Δt, then 2Δt in the leapfrog start)

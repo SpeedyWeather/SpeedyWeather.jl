@@ -57,6 +57,7 @@ makedocs(
             "Ocean" => "custom_ocean.md",
             "NetCDF output variables" => "custom_netcdf_output.md",
             "Callbacks" => "callbacks.md",
+            "Feedback" => "feedback.md",
         ],
         "Physics" => [
             "Barotropic model" => "barotropic.md",

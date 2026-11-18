@@ -1,225 +1,94 @@
 abstract type AbstractFeedback <: AbstractModelComponent end
 
-export Feedback
+export Feedback, ProgressElements
 
 """
-Feedback struct that contains options and object for command-line feedback
-like the progress meter.
+Feedback of a running simulation: the progress lines printed to the REPL (built from `elements`, see
+`ProgressElements`) and the detection of NaNs (`nan_detection`, see `NaNDetector`). Options are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Feedback <: AbstractFeedback
-    "[OPTION] print feedback to REPL?, default is isinteractive(), true in interactive REPL mode"
+@kwdef mutable struct Feedback{E <: Tuple, N <: Union{AbstractNaNDetector, Nothing}} <: AbstractFeedback
+    "[OPTION] print the progress lines to the REPL?, default is isinteractive(), true in interactive REPL mode"
     verbose::Bool = isinteractive()
 
-    "[OPTION] check for NaNs in the prognostic variables"
-    debug::Bool = true
-
-    "[OPTION] Progress description"
+    "[OPTION] Description in front of the progress lines"
     description::String = ""
 
-    "[OPTION] Progress bar length in characters, `nothing` fits it to the terminal width, `0` shows no bar"
-    progress_bar_length::Union{Int, Nothing} = 0
-
-    "[OPTION] show speed (e.g. in simulated years per day) in progress meter?"
-    showspeed::Bool = true
-
-    "[OPTION] Minimum wallclock time between feedback updates"
+    "[OPTION] Minimum wallclock time [s] between redraws of the progress lines"
     feedback_dt::Float32 = 0.1
 
-    "[OPTION] Show simulation time?"
-    show_time::Bool = true
+    """[OPTION] Elements of the progress lines, see `ProgressElements`, they are shown with
+    `print_element(element, progress, vars, model)` on every redraw. E.g. a single line with a bar of
+    fixed length `Feedback(elements = (ProgressElements.Percentage(), ProgressElements.Bar(length = 20), ProgressElements.ETA()))`"""
+    elements::E = ProgressElements.default_elements()
 
-    "[OPTION] Show maximum speed of the simulated flow [m/s], `nothing` = yes except for Reactant (opt-in there)"
-    show_umax::Union{Bool, Nothing} = nothing
+    "[OPTION] Separator between the elements of the progress lines"
+    separator::String = ", "
 
-    "[OPTION] Show temperature range of simulation [˚C], `nothing` = yes except for Reactant (opt-in there)"
-    show_temperature_range::Union{Bool, Nothing} = nothing
+    "[OPTION] Detection of NaNs in the simulation, which stops it, `nothing` to disable"
+    nan_detection::N = NaNDetector()
 
-    "[OPTION] Interval in time steps between NaN checks, and between the progress meter diagnostics (maximum speed, temperature range)"
-    interval::Int = 50
-
-    "[DERIVED] struct containing everything progress related"
-    progress_meter::ProgressMeter.Progress =
-        ProgressMeter.Progress(1, enabled = verbose)
-
-    "[DERIVED] did NaNs occur in the simulation?"
-    nans_detected::Bool = false
+    "[DERIVED] progress meter, created in `initialize!`"
+    progress_meter::ProgressMeters.Progress = ProgressMeters.Progress(1, enabled = false)
 end
 
-function Base.show(io::IO, P::ProgressMeter.Progress)
-    println(io, "$(typeof(P)) <: ProgressMeter.AbstractProgress")
-    keys = propertynames(P)
-    return print_fields(io, P, keys)
-end
+# the default outer constructor of a parametric struct doesn't convert its arguments (e.g. feedback_dt = 0.1)
+Feedback(verbose, description, feedback_dt, elements::E, separator, nan_detection::N, progress_meter) where {E, N} =
+    Feedback{E, N}(verbose, description, feedback_dt, elements, separator, nan_detection, progress_meter)
+
+# variables of the NaN detection and the elements, e.g. the scratch vector of `VerticalCourantNumber`
+variables(feedback::Feedback) = (
+    variables(feedback.nan_detection)...,
+    Iterators.flatten(map(variables, feedback.elements))...,
+)
 
 """
 $(TYPEDSIGNATURES)
-Initializes the a `Feedback` struct."""
-function initialize!(feedback::Feedback, variables::Variables, model::AbstractModel)
-    (; clock) = variables.prognostic
-
-    # set to false to recheck for NaNs
-    feedback.nans_detected = false
-
-    # hack: redefine element in global constant dt_in_sec
-    # used to pass on the time step to ProgressMeter.speedstring
-    FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt
-    FEEDBACK_TIME[] = clock.time
-
-    # reset those to default (-1 not shown)
-    FEEDBACK_UMAX[] = -1
-    FEEDBACK_TMIN[] = -1
-    FEEDBACK_TMAX[] = -300  # in °C
-
-    # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
-    # only do now for benchmark accuracy
-    (; showspeed, description, verbose, feedback_dt) = feedback
-    desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
-    feedback.progress_meter = ProgressMeter.Progress(
+Initializes the `Feedback`: a new progress meter for the time steps of this run and the NaN detection."""
+function initialize!(feedback::Feedback, vars::Variables, model::AbstractModel)
+    (; clock) = vars.prognostic
+    (; description, verbose, feedback_dt, elements, separator) = feedback
+    model.output.active && (description = strip(description * " " * model.output.run_folder))
+    feedback.progress_meter = ProgressMeters.Progress(
         Int(clock.n_steps);     # use time stepper steps (regardless Δt) not time steps of size Δt, Int for Reactant's numbers
         enabled = verbose,
-        showspeed,
-        desc,
+        description,
+        elements,
+        separator,
         color = :blue,
-        barlen = feedback.progress_bar_length,
-        barglyphs = ProgressMeter.BarGlyphs(" ━━  "),
         dt = feedback_dt,
     )
-
+    isnothing(feedback.nan_detection) || initialize!(feedback.nan_detection, vars, model)
     return nothing
 end
 
-progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
-
-# Show a diagnostic (maximum speed, temperature range) in the progress meter? `nothing` = the
-# architecture's default: not for Reactant (opt-in), `extrema` of Reactant arrays falls back to
-# scalar indexing, which is disallowed on GPU (and slow on CPU)
-show_diagnostic(option::Bool, architecture::AbstractArchitecture) = option
-show_diagnostic(::Nothing, architecture::AbstractArchitecture) = true
-show_diagnostic(::Nothing, architecture::ReactantDevice) = false
-
-function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
-    (; counter, n, check_iterations, enabled) = feedback.progress_meter
-    interval = max(1, feedback.interval)
-    FEEDBACK_TIME[] = vars.prognostic.clock.time
-
-    every_nsteps = enabled ? check_iterations : interval
-    if mod(counter, every_nsteps) == 0
-        show_diagnostic(feedback.show_umax, model.architecture) && max_speed(vars)
-        show_diagnostic(feedback.show_temperature_range, model.architecture) && temperature_range(vars)
-    end
-
-    progress!(feedback)
-
-    last_step = counter == n - 1
-    feedback.debug && (mod(counter, interval) == 0 || last_step) &&
-        nan_detection!(feedback, vars, model)
+"""$(TYPEDSIGNATURES)
+Feedback after `nsteps` time steps (1 normally, several after a compiled program of several time steps
+with Reactant): advance the progress meter, which redraws the progress lines every `feedback_dt` seconds
+with `print_element(element, progress, vars, model)`, and detect NaNs. After several time steps only the
+last one can be checked for NaNs, so that's done immediately, as on the last time step."""
+function progress!(feedback::Feedback, vars::Variables, model::AbstractModel, nsteps::Integer = 1)
+    progress_meter = feedback.progress_meter
+    ProgressMeters.next!(progress_meter, vars, model; step = nsteps)
+    check = progress_meter.counter >= progress_meter.n || nsteps > 1
+    detect_nans!(feedback.nan_detection, vars, model, progress_meter.counter; check)
     return nothing
 end
 
 # fallback for feedback = nothing
-progress!(::Nothing, vars::Variables, model::AbstractModel) = nothing
+progress!(::Nothing, vars::Variables, model::AbstractModel, nsteps::Integer = 1) = nothing
 
 """$(TYPEDSIGNATURES)
-Feedback after `nsteps` time steps at once, e.g. after a compiled program of several time steps
-with Reactant: advance the progress meter by `nsteps` and check for NaNs (if `feedback.debug`)."""
-function progress!(feedback::Feedback, vars::Variables, model::AbstractModel, nsteps::Integer)
-    FEEDBACK_TIME[] = vars.prognostic.clock.time
-    show_diagnostic(feedback.show_umax, model.architecture) && max_speed(vars)
-    show_diagnostic(feedback.show_temperature_range, model.architecture) && temperature_range(vars)
-    ProgressMeter.next!(feedback.progress_meter; step = nsteps)
-    feedback.debug && nan_detection!(feedback, vars, model)
-    return nothing
-end
-
-progress!(::Nothing, vars::Variables, model::AbstractModel, nsteps::Integer) = nothing
+Were NaNs detected in the simulation? `false` without feedback or NaN detection."""
+nans_detected(feedback::Feedback) = nans_detected(feedback.nan_detection)
 
 """
 $(TYPEDSIGNATURES)
-Finalises the progress meter and the progress txt file."""
-finalize!(F::Feedback) = ProgressMeter.finish!(F.progress_meter)
+Finishes the progress meter, drawing the final progress lines."""
+finalize!(feedback::Feedback, vars::Variables, model::AbstractModel) =
+    ProgressMeters.finish!(feedback.progress_meter, vars, model)
 
 # fallback if feedback is set to nothing
-finalize!(::Nothing) = nothing
-
-"""$(TYPEDSIGNATURES)
-Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
-function nan_detection!(feedback::Feedback, vars::Variables, model::AbstractModel)
-    feedback.nans_detected && return nothing        # escape immediately if nans already detected
-    i = feedback.progress_meter.counter             # time step
-    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, feedback)
-    GPUArrays.@allowscalar vor0 = vor[2, end]       # only check 1-0 mode of surface vorticity
-
-    # just check first harmonic, spectral transform propagates NaNs globally anyway
-    (; time) = vars.prognostic.clock                                # current time for feedback
-    nans_detected_here = ~isfinite(vor0)
-    nans_detected_here && @warn "NaN or Inf detected at time step $i ($time)"
-    return feedback.nans_detected = nans_detected_here
-end
-
-"""
-$(TYPEDSIGNATURES)
-Define a ProgressMeter.speedstring method that also takes a time step
-`dt_in_sec` to translate sec/iteration to days/days-like speeds."""
-function speedstring(sec_per_iter, dt_in_sec)
-    if sec_per_iter == Inf
-        return ", N/A  days/day"
-    end
-
-    sim_time_per_time = dt_in_sec / sec_per_iter
-
-    for (divideby, unit) in (
-            (365 * 1_000, "millenia"),
-            (365, "years"),
-            (1, "days"),
-            (1 / 24, "hours"),
-        )
-        if (sim_time_per_time / divideby) > 2
-            return @sprintf ", %5.2f %2s/day" (sim_time_per_time / divideby) unit
-        end
-    end
-    return ", <2 hours/days"
-end
-
-# hack: define global constant whose element will be changed in initialize_feedback
-# used to pass on the time step to ProgressMeter.speedstring via calling this
-# constant from the ProgressMeter module
-const FEEDBACK_DT_IN_SEC = Ref(1.0)
-const FEEDBACK_TIME = Ref(DEFAULT_DATE)
-const FEEDBACK_UMAX = Ref(-1.0f0)     # default negative = skip show
-const FEEDBACK_TMIN = Ref(-1.0f0)
-const FEEDBACK_TMAX = Ref(-300.0f0)
-
-# "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
-# not just ::Any to effectively overwrite it
-function ProgressMeter.speedstring(sec_per_iter::AbstractFloat)
-    t = SpeedyWeather.FEEDBACK_TIME[]
-    dt_in_sec = SpeedyWeather.FEEDBACK_DT_IN_SEC[]   # pull global "constant"
-    U = SpeedyWeather.FEEDBACK_UMAX[]
-    Tmin = SpeedyWeather.FEEDBACK_TMIN[]
-    Tmax = SpeedyWeather.FEEDBACK_TMAX[]
-    return progress_string(t, sec_per_iter, dt_in_sec, U, Tmin, Tmax)
-end
-
-function progress_string(t, sec_per_iter, dt_in_sec, U, Tmin, Tmax)
-    time = string(Dates.Date(t))
-    speed = speedstring(sec_per_iter, dt_in_sec)
-    umax = U < 0 ? "" : @sprintf ", %3d m/s" U
-    Trange = Tmax <= -300 ? "" : @sprintf ", [%4d, %4d] ˚C" Tmin Tmax
-    return time * speed * umax * Trange
-end
-
-function max_speed(vars::Variables)
-    hasproperty(vars.grid, :u) || return nothing
-    umin, umax = extrema(vars.grid.u)
-    return FEEDBACK_UMAX[] = max(abs(umin), abs(umax))
-end
-
-function temperature_range(vars::Variables)
-    hasproperty(vars.grid, :temperature) || return nothing
-    tmin, tmax = extrema(vars.grid.temperature)
-    FEEDBACK_TMIN[] = tmin - 273.15f0
-    return FEEDBACK_TMAX[] = tmax - 273.15f0
-end
+finalize!(::Nothing, vars::Variables, model::AbstractModel) = nothing
 
 export ParametersTxt
 
@@ -322,7 +191,7 @@ function callback!(progress_txt::ProgressTxt, vars, model)
     progress_txt.write_only_with_output && (model.output.active || return nothing)
     isnothing(model.feedback) && return nothing
 
-    (; progress_meter, nans_detected) = model.feedback
+    (; progress_meter) = model.feedback
     (; counter, n) = progress_meter
     (; file, every_n_percent) = progress_txt
 
@@ -331,14 +200,15 @@ function callback!(progress_txt::ProgressTxt, vars, model)
         percent = round(Int, (counter + 1) / n * 100)       # % of time steps completed
         if (percent % every_n_percent == 0)                 # write every p% step in txt
             write(file, @sprintf("\n%3d%%", percent))
-            r = remaining_time(progress_meter)
+            t = time()
+            r = ProgressMeters.durationstring(ProgressMeters.eta(progress_meter, t))
             write(file, ", ETA: $r")
 
-            time_elapsed = progress_meter.tlast - progress_meter.tinit
-            s = speedstring(time_elapsed / counter, FEEDBACK_DT_IN_SEC[])
+            time_elapsed = t - progress_meter.tinit
+            s = ProgressElements.speedstring(time_elapsed / max(1, counter), model.time_stepping.Δt)
             write(file, ", $s")
 
-            nans_detected && write(file, ", NaN/Inf detected.")
+            nans_detected(model.feedback) && write(file, ", NaN/Inf detected.")
             flush(file)
         end
     end
@@ -355,24 +225,10 @@ function finalize!(progress_txt::ProgressTxt, vars, model)
     (; file) = progress_txt
     (; progress_meter) = model.feedback
 
-    time_elapsed = progress_meter.tlast - progress_meter.tinit
+    time_elapsed = time() - progress_meter.tinit
     s = "\nIntegration done in $(readable_secs(time_elapsed))."
     write(file, "\n$s\n")
     flush(file)
     close(file)
     return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Estimates the remaining time from a `ProgresssMeter.Progress`. Adapted from ProgressMeter.jl"""
-function remaining_time(p::ProgressMeter.Progress)
-    elapsed_time = time() - p.tinit
-    est_total_time = elapsed_time * (p.n - p.start) / (p.counter - p.start)
-    if 0 <= est_total_time <= typemax(Int)
-        eta_sec = round(Int, est_total_time - elapsed_time)
-        eta = ProgressMeter.durationstring(eta_sec)
-    else
-        eta = "N/A"
-    end
-    return eta
 end
