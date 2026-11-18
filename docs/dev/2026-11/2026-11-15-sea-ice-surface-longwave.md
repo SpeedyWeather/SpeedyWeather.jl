@@ -160,6 +160,13 @@ is outside the repository.
 
 ### 3. GPU
 
+`test/GPU/primitive_wet.jl`, "GPU surface longwave over sea ice matches CPU" (run by Buildkite): with
+`OneBandLongwave` and `JeevanjeeRadiation`, each with `PrescribedSeaIce` and `ThermodynamicSeaIce`, sea ice on every
+other point, the ocean surface longwave on GPU equals the CPU's within `rtol = 1e-5`. Passes locally (RTX 4050, 8/8).
+`get_sea_ice` is tested directly in `longwave_radiation.jl`.
+
+Check by hand beforehand:
+
 NVIDIA RTX 4050, CUDA, with random SST, surface air temperature and sea ice on half the points:
 
 - The ocean surface longwave differs between GPU and CPU by at most 1.8 × 10⁻⁴ W/m² over ice and 3.1 × 10⁻⁵ W/m²
@@ -196,7 +203,7 @@ A sub-agent without the development context reviewed the diff and found no corre
 - a shorter CHANGELOG entry;
 - a cross-link from `sea_ice.md`.
 
-Not applied: a GPU testset in `test/GPU`.
+A GPU testset was added afterwards too (see section 3).
 
 ### Not done
 
