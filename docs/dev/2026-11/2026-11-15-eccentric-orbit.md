@@ -89,6 +89,9 @@ cycle.)
   `ArchitectureScalarDim` is merged back into `ScalarDim`, which now allocates with `scalar_ref`.
   With Reactant, `prognostic.scale` is then traced in the compiled step too, so `scale_prognostic!`,
   `scale!`, `unscale!` and the `NCycleLorenz` update take `scale::Number` instead of `Real`.
+- 2026-11-19 (JET test in CI): with the `KeplerOrbit` default the `solar_distance_factor` Ref is one
+  more variable type in `vars.parameterizations`, enough for `reset_variable!(vars, var::Symbol, ...)`
+  to infer `getfield` as a widened union and dispatch at runtime. It now takes the name as `Val(var)`.
 
 ## Problem description
 
