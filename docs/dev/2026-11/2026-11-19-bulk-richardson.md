@@ -1,11 +1,58 @@
-# Handoff: overhaul of `BulkRichardsonDiffusion` (vertical diffusion)
+# Overhaul of `BulkRichardsonDiffusion` (vertical diffusion)
 
-> Status: **plan, nothing implemented**. Written 2026-11-19 from the T512L24 stability investigation
-> (`STABILITY_NOTES.md` in this folder). Intended to become `docs/dev/2026-11/…-vertical-diffusion-overhaul.md`
-> in the SpeedyWeather repository once someone picks it up.
+> Status: **in progress**. Implementation started 2026-11-19 on `mg/bulk-richardson-reimplemented`, steps 1–6
+> of section 5 being implemented; step 7 (GPU performance, on a GPU node), step 8 (default on) and the model
+> validation of section 6 are open.
 
-Base revision: SpeedyWeather `mg/t512l24-stability` at `81ad7df44` (= `mg/reactant-output` `6ec9ce35c` + advection option).
+Date of initial draft: 2026-11-19
+
+Base revision: `d8ceb78f` (`mg/bulk-richardson-reimplemented`, = main `2c729bee` + this plan). The plan itself was
+written from the T512L24 stability investigation on `mg/t512l24-stability` at `81ad7df44`
+(= `mg/reactant-output` `6ec9ce35c` + advection option, `STABILITY_NOTES.md` there).
 Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#1336, #1346, #1363.
+
+## Originating prompt
+
+> Start the implementation
+
+## Revision log
+
+- 2026-11-19: sign convention of 4.1 fixed. With F = ρK ∂X/∂z (positive for X increasing upwards, i.e. a
+  downward turbulent flux) the tendency is −g ∂F/∂p = g (F_{k−½} − F_{k+½})/Δp_k, not g (F_{k+½} − F_{k−½})/Δp_k.
+  The implicit equation of 4.2 already had the diffusive sign and is unchanged.
+- 2026-11-19: new step 7 in section 5, GPU performance optimisation, to be done later in a session on a GPU node
+  (user request). Initial GPU correctness checks on the local Metal GPU. The former step 7 (default on) is now step 8.
+- 2026-11-19, decisions while implementing steps 1–6 (one rewrite of `vertical_diffusion.jl` rather than one commit
+  per step, as the explicit operator of step 1 is the Δt = 0 limit of the implicit solve of step 2):
+  - Formulas checked against the literature: Holtslag & Boville (1993) read from the paper (K = l²S F(Ri),
+    1/l = 1/κz + 1/λ, λ = 300 m below 1 km and λ = 30 + 270 exp(1 − z/1000) above, unstable F = √(1 − 18 Ri),
+    bulk Ri with |V|² ≥ 1 m²/s², Ri_cr = 0.5 for h; stable F = 1/(1 + 10Ri(1 + 8Ri)), a short tail). Sandu et al.
+    (2013) read from ECMWF Tech. Memo 684: IFS uses λ = 150 m with long tails near the surface, UKMO 40 m, NCEP 30 m
+    plus a background diffusivity (heat 1 m²/s decaying with height, momentum 3 m²/s). The Louis, Tiedtke & Geleyn
+    (1982) long-tail functions could not be checked against the original (workshop proceedings); the forms of
+    section 3 are used as quoted in secondary sources.
+  - Separate diffusivities for momentum (f_m) and heat/humidity (f_h); profile and background are shared.
+  - Asymptotic mixing length: 150 m (`mixing_length`, IFS/plan) below 1 km, decaying with the HB93 eq. 3.6 shape to
+    30 m (`free_mixing_length`) above, instead of a single λ.
+  - Background diffusivity K₀ exp(−z/H), K₀ = 0.1 m²/s, H = 1 km instead of a step at 1 km.
+  - Surface Ri: land and ocean values of `bulk_richardson_surface` weighted with the land fraction. The function
+    was already standalone in `drag.jl` and is called from there, not moved. ln(z/z₀) of the stability correction
+    uses the grid-box `momentum_roughness` of the surface roughness scheme (fallback: option `roughness_length`).
+  - Friction velocity u⋆ = √C_M Vₛ with the surface wind speed (incl. gustiness) of the boundary layer.
+  - `boundary_layer_height` output is now in metres (was a layer index).
+  - Source coupling (step 5) is the option `couple_surface_fluxes = true`: the solve is (1 − ΔtL) y = L X⁻ + S
+    for the tendency y, replacing the accumulated tendency S.
+  - Memory: two `ParameterizationVariable`s (K_m, K_h, `GridXYZ`) and three `ScratchVariable`s (ρ/Δz and the two
+    Thomas vectors).
+  - Unstable diffusivity: with HB93's λ = 30 m in the free atmosphere, a −30 K superadiabatic layer at 5–6 km
+    (T32L8, steps of 2Δt = 4800 s) was mixed halfway to neutral only after ~20 steps (≈ 1 day; 75 m: ~3 steps,
+    150 m: 1 step). The unstable K is therefore split into a shear part l²S with the HB93 mixing length and a
+    buoyancy part l_c²(√(S² − 18N²) − S) with λ_c = max(λ(z), `convective_mixing_length` = 150 m). Continuous at
+    N² = 0; `convective_mixing_length = 0` recovers HB93 eq. 3.7. Superadiabatic layers are now mixed halfway
+    within 1–2 steps (test T8) without raising the stable free-atmosphere (jet) mixing. This answers the first
+    open question of section 7 in favour of the hybrid K for now; the SPEEDY-style relaxation is not implemented.
+- 2026-11-19: long GPU runs for stability added to the model validation of section 6 as the final validation
+  (user request), required before step 8 (default on).
 
 ## 1. Why this matters
 
@@ -92,13 +139,13 @@ quoted from memory of the papers; check the formulas against the originals befor
 
 Diffusion of X ∈ {u, v, s = cₚT + Φ, q} as a flux divergence:
 
-    ∂X/∂t = (1/ρ) ∂/∂z (ρ K ∂X/∂z) = g ∂F/∂p,     F = ρ K ∂X/∂z   [X · kg m⁻² s⁻¹]
+    ∂X/∂t = (1/ρ) ∂/∂z (ρ K ∂X/∂z) = −g ∂F/∂p,     F = ρ K ∂X/∂z   [X · kg m⁻² s⁻¹]
 
 Discretised with layers k = 1 (top) … N (surface) and interfaces k+½ between k and k+1:
 
     F_{k+½} = ρ_{k+½} K_{k+½} (X_k − X_{k+1}) / (z_k − z_{k+1}),   z_k − z_{k+1} = (Φ_k − Φ_{k+1})/g
     ρ_{k+½} = p_{k+½} / (R_d T_v,k+½)
-    (∂X_k/∂t) = g (F_{k+½} − F_{k−½}) / Δp_k,      F_{½} = 0,   F_{N+½} = 0 (surface flux handled separately, see 4.4)
+    (∂X_k/∂t) = g (F_{k−½} − F_{k+½}) / Δp_k,      F_{½} = 0,   F_{N+½} = 0 (surface flux handled separately, see 4.4)
 
 Reasons: correct units by construction (fixes D2); conserves the mass-weighted column integral Σ X_k Δp_k
 exactly; uses `pressure_thickness(k, pₛ, vertical_coordinates)` and `pressure_half`, so it works for
@@ -180,7 +227,18 @@ Each step is a separately testable commit; 1–3 are the minimum for a working s
 5. **Source coupling** with surface-flux tendencies (4.4). Test T9.
 6. **Docs** (`docs/src/vertical_diffusion.md`: operator, implicit solve, hybrid K, Ri_c), CHANGELOG, references
    (`Louis1979`, `HoltslagBoville1993`, `Viterbo1999`, `KalnayKanamitsu1988`).
-7. **Default on?** Only after the validation runs in section 6; changes the climate of every multi-layer run.
+7. **GPU performance** (to be done in a session on a GPU node, after steps 1–6 work on CPU and Metal): the
+   scheme runs per column inside the fused `column_parameterizations_kernel!`. The first implementation is
+   written for correctness and keeps three per-column scratch arrays in global memory (ρ/Δz and the two
+   Thomas-algorithm vectors) plus the two diffusivities, re-reads u, v, T, q, Φ in several loops, and calls
+   `exp`/`log`/`sqrt` per interface. To check and optimise there: cost of `parameterization_tendencies!` with
+   and without the scheme at T256/T512 L24 on an H100 (benchmark suite, `--suites` for the PrimitiveWet sweep),
+   register pressure and occupancy of the fused kernel, whether the Thomas algorithm should run for all
+   variables in one sweep (shared pivots of the momentum and heat systems), and the memory of the five
+   additional `GridXYZ` arrays at T512L24 (≈ 130 MB each in Float32). CUDA and Reactant correctness (section 6)
+   are tested in the same session.
+8. **Default on?** Only after the validation runs in section 6, including the long GPU stability runs; changes
+   the climate of every multi-layer run.
 
 ## 6. Tests and validation
 
@@ -210,6 +268,12 @@ Model validation:
 - T256L8 Antarctic winter (drivers in `/p/tmp/maxgelbr/code/claude_t256_instability_2026-10-19/`): number of
   superadiabatic columns and cold points < 170 K.
 - Over Tibet at L24 (the #1283 failure): check soil temperature and lowest-layer temperature for 2Δt oscillations.
+- **Long GPU runs for stability (final validation, user request)**: multi-year integrations of the default wet
+  model with `BulkRichardsonDiffusion` on GPU, at several resolutions and layer numbers (L8 to L24; resolutions
+  and lengths to be decided, as long as the budget allows). Pass criteria: no blow-up or NaNs, no drift of the
+  global means (temperature, precipitation, surface pressure) beyond that of `vertical_diffusion = nothing`, and
+  no growing extremes in the lowest layers (cold pools, polar inversions). Run after the GPU performance work
+  (step 7) so that the runs use the final kernel.
 
 ## 7. Open questions for whoever picks this up
 
