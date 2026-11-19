@@ -223,6 +223,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
+    initialize!(model.custom_parameterization, model)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
 
