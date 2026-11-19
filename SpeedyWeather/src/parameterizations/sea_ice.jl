@@ -33,7 +33,7 @@ export ThermodynamicSeaIce
 """Thermodynamic sea ice model using sea ice concentration as
 prognostic variable, also modifies sea surface temperature as
 cooling below freezing grows sea ice. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractDynamicSeaIce
+@parameterized @kwdef struct ThermodynamicSeaIce{NF} <: AbstractDynamicSeaIce
     "[OPTION] Freezing temperature of sea water [K]"
     @param freezing_temperature::NF = 273.15 - 1.8 (bounds = Positive,)
 
@@ -45,6 +45,10 @@ cooling below freezing grows sea ice. Fields are $(TYPEDFIELDS)"""
 end
 
 ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(; kwargs...)
+
+# immutable and adapted: a core component of the model, so the radiation can dispatch on it inside (GPU) kernels
+Adapt.@adapt_structure ThermodynamicSeaIce
+
 initialize!(::ThermodynamicSeaIce, ::AbstractModel) = nothing
 initialize!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation) = nothing
 

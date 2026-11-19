@@ -95,7 +95,9 @@ get_step(var::AbstractArray) = get_step(var, size(var, ndims(var)))
 # (otherwise the device-side MethodError aborts kernel compilation). Without the dimension
 # information of a Field/LowerTriangularArray, `step` here always indexes the last dimension;
 # for arrays without an explicit step dimension `step` must be 1 (trailing singleton dimension).
-@inline get_step(var::AbstractArray{T, 1}, step::Integer) where {T} = view(var, :, step)
+# a vector has no step dimension (step must be 1): return it as it is; a 2-index view of a vector
+# (`view(var, :, 1)`) also fails to compile on Metal
+@inline get_step(var::AbstractArray{T, 1}, step::Integer) where {T} = var
 @inline get_step(var::AbstractArray{T, 2}, step::Integer) where {T} = view(var, :, step)
 @inline get_step(var::AbstractArray{T, 3}, step::Integer) where {T} = view(var, :, :, step)
 

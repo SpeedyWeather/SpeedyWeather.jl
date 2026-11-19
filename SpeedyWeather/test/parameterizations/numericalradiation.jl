@@ -96,3 +96,28 @@ end
     @test all(isfinite, simulation.variables.parameterizations.outgoing_longwave)
     @test all(isfinite, simulation.variables.prognostic.temperature)
 end
+
+@testset "Surface longwave emission over sea ice" begin
+    # sea ice emits at the surface air temperature (here colder than the sea surface), see ocean_surface_emission_temperature
+    @testset for radiation in (
+            Radiation(spectral_grid; shortwave = nothing, longwave = AnalyticBandLongwave(spectral_grid)),
+            ClearSkyEcCKDRadiation(spectral_grid),
+        )
+        model = PrimitiveWetModel(spectral_grid; radiation, parameterizations = (:radiation,))
+        initialize!(model.radiation, model)
+        variables = Variables(model)
+        @test haskey(variables.prognostic.ocean, :sea_ice_concentration)
+
+        function surface_longwave_up(sea_ice_concentration)
+            set_test_state!(variables, model)       # sea surface temperature 295 K everywhere, above the air
+            variables.prognostic.ocean.sea_ice_concentration .= sea_ice_concentration
+            variables.parameterizations.surface_air_temperature .= 250
+            SpeedyWeather.column_parameterizations!(variables, model)
+            return Array(variables.parameterizations.ocean.surface_longwave_up), Array(variables.parameterizations.land.surface_longwave_up)
+        end
+        ocean_open, land_open = surface_longwave_up(0)
+        ocean_ice, land_ice = surface_longwave_up(1)
+        @test all(ocean_ice .< ocean_open)          # ice at 250 K emits less than open water at 295 K
+        @test land_ice == land_open                 # land unaffected
+    end
+end

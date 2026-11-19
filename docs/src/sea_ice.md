@@ -27,7 +27,9 @@ model.sea_ice
 Note that in SpeedyWeather the sea ice model and its [albedo](@ref "Albedo") are defined
 independently, means you can have a sea ice model without affecting the albedo
 and `sea_ice=nothing` but set the sea ice concentration manually and use its albedo
-effect, this will be discussed in `ThermodynamicSeaIce` below.
+effect, this will be discussed in `ThermodynamicSeaIce` below. The sea ice concentration also
+lowers the surface longwave emission of the ocean, with any sea ice model and also with
+`sea_ice=nothing`, see [Radiation](@ref).
 
 ## Thermodynamic sea ice model
 

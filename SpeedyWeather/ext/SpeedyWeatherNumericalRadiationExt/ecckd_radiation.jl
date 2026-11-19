@@ -175,14 +175,14 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(ij, vars,
 end
 
 """$(TYPEDSIGNATURES)
-Lower-boundary state of column `ij`: land fraction, sea-surface and land-surface
-temperature and their blend, ocean and land albedo and their blend, cosine of the
-solar zenith angle."""
+Lower-boundary state of column `ij`: land fraction, sea-surface (emitting temperature, sea ice aware via
+`SpeedyWeather.ocean_surface_emission_temperature`) and land-surface temperature and their blend, ocean and
+land albedo and their blend, cosine of the solar zenith angle."""
 Base.@propagate_inbounds function ecckd_surface_state(ij, vars, rad::ClearSkyEcCKDRadiation, model)
     sst_all = SpeedyWeather.get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature,
                                                 model.time_stepping, rad)
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    sea_surface_temperature = sst_all[ij]
+    sea_surface_temperature = SpeedyWeather.ocean_surface_emission_temperature(ij, vars, sst_all, rad, model)    # sea ice aware
     land_surface_temperature = vars.prognostic.land.soil_temperature[ij, 1]
     albedo_ocean = vars.parameterizations.ocean.albedo[ij]
     albedo_land = vars.parameterizations.land.albedo[ij]

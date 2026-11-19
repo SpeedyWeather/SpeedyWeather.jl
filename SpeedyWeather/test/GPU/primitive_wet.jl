@@ -31,3 +31,48 @@ end
 
     @test simulation.model.feedback.nans_detected == false
 end
+
+@testset "GPU surface longwave over sea ice matches CPU" begin
+    # the ocean surface emission over sea ice dispatches on the sea ice model, which therefore is a core
+    # component available inside the GPU kernels: GPU and CPU give the same emission (Float32 round-off)
+    function set_points!(field, values)     # values per grid point, the same on every layer and step
+        data = Array(field.data)
+        data .= reshape(values, :, ntuple(_ -> 1, ndims(data) - 1)...)
+        return copyto!(field.data, data)
+    end
+
+    function ocean_longwave(arch, Longwave, SeaIce)
+        spectral_grid = SpectralGrid(truncation = 32, nlayers = 8, architecture = arch)
+        radiation = Radiation(spectral_grid; longwave = Longwave(spectral_grid))
+        sea_ice = SeaIce === ThermodynamicSeaIce ? ThermodynamicSeaIce(spectral_grid) : SeaIce()
+        model = PrimitiveWetModel(spectral_grid; radiation, sea_ice, parameterizations = (:radiation,))
+        initialize!(model.radiation, model)
+        vars = Variables(model)
+
+        npoints = spectral_grid.npoints
+        x = (0:(npoints - 1)) ./ npoints
+        temperature = Array(vars.grid.temperature.data)
+        for k in 1:spectral_grid.nlayers
+            temperature[:, k, :] .= 210 + 10 * (k - 1)
+        end
+        copyto!(vars.grid.temperature.data, temperature)
+        vars.grid.humidity .= 0.003f0             # Float32 literals: no Float64 on Metal
+        vars.parameterizations.surface_pressure .= 1.0f5
+        vars.tendencies.grid.temperature .= 0.0f0
+        vars.prognostic.land.soil_temperature .= 280.0f0
+        set_points!(vars.prognostic.ocean.sea_surface_temperature, Float32.(265 .+ 30 .* x))
+        set_points!(vars.parameterizations.surface_air_temperature, Float32.(230 .+ 50 .* reverse(x)))
+        ice = Float32.(ifelse.(isodd.(1:npoints), x, 0))        # sea ice on every other point
+        set_points!(vars.prognostic.ocean.sea_ice_concentration, ice)
+
+        SpeedyWeather.column_parameterizations!(vars, model)
+        return Array(vars.parameterizations.ocean.surface_longwave_up), ice
+    end
+
+    @testset for Longwave in (OneBandLongwave, JeevanjeeRadiation), SeaIce in (PrescribedSeaIce, ThermodynamicSeaIce)
+        cpu, ice = ocean_longwave(SpeedyWeather.CPU(), Longwave, SeaIce)
+        gpu, _ = ocean_longwave(SpeedyWeather.GPU(), Longwave, SeaIce)
+        @test all(isfinite, gpu)
+        @test gpu ≈ cpu rtol = 1.0e-5
+    end
+end
