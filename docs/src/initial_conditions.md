@@ -298,6 +298,12 @@ kept westerly the Coriolis term ``B(\phi)R\Omega`` would change sign alone and t
 start tens of Kelvin warmer than the tropics. The same applies to `ZonalWind`,
 `JablonowskiTemperature` and the `ZonalRidge` orography.
 
+The sign of `rotation` only sets the Coriolis force, and with it the direction of the jet here.
+The direction the sun moves across the sky is set independently by `length_of_day`, and a
+negative `length_of_day` makes the sun rise in the west (see [Orbit and rotation time](@ref)).
+A planet that rotates backwards in both senses therefore needs both negative, e.g.
+`Earth(spectral_grid, rotation=-7.29e-5, length_of_day=Hour(-24))`.
+
 ### Derivation
 
 The temperature follows from the same balance that Jablonowski and Williamson use, only
