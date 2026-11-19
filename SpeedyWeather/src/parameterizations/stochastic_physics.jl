@@ -65,7 +65,7 @@ Apply stochastically perturbed parameterization tendencies (SPPT) to
 u, v, temperature and humidity in column ij."""
 @propagate_inbounds function sppt!(ij, vars, sppt, time_stepping)
 
-    r = vars.grid.random_pattern[ij]
+    r = vars.grid.random_pattern[ij, 1]     # first pattern
     (; taper) = sppt
     u_tend = get_tendency_step(vars.tendencies.grid.u, time_stepping, sppt)
     v_tend = get_tendency_step(vars.tendencies.grid.v, time_stepping, sppt)
