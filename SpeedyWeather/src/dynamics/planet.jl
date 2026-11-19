@@ -67,7 +67,7 @@ KeplerOrbit(SG::SpectralGrid; kwargs...) = KeplerOrbit{SG.NF}(; kwargs...)
 # the orbit defines the variables needed for its computation
 variables(::AbstractOrbit) = ()
 variables(::KeplerOrbit) = (
-    ParameterizationVariable(:solar_distance_factor, ArchitectureScalarDim(1), desc = "Sun-planet distance factor (a/r)²", units = "1"),
+    ParameterizationVariable(:solar_distance_factor, ScalarDim(1), desc = "Sun-planet distance factor (a/r)²", units = "1"),
 )
 
 export Earth

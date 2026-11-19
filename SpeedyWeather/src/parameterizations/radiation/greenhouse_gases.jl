@@ -7,7 +7,7 @@ variables(name_ghg::Pair{<:Symbol, <:AbstractGreenhouseGas}, model::AbstractMode
     variables(name_ghg.second, name_ghg.first, model)
 
 variables(::AbstractCO2, name::Symbol, args...) = (
-    PrognosticVariable(name, ArchitectureScalarDim(), units = "ppm", desc = "Carbon dioxide", namespace = :greenhouse_gases),
+    PrognosticVariable(name, ScalarDim(), units = "ppm", desc = "Carbon dioxide", namespace = :greenhouse_gases),
 )
 
 """$(TYPEDSIGNATURES)

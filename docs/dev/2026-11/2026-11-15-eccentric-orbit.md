@@ -80,6 +80,15 @@ cycle.)
     - the simulation tests use T21 L4 for 1 day.
   - The Newton iteration count stays a runtime keyword (5 iterations once per step, no
     measurable gain from compile time).
+- 2026-11-17/18 (Reactant GPU failure in #1407): a traced value can't be written into the plain
+  `Ref{NF}` of a `ScalarDim`, so the distance factor and CO₂ moved to a new `ArchitectureScalarDim`
+  allocated with `scalar_ref` (moved to SpeedyWeatherInternals).
+- 2026-11-19 (review in #1407):
+  > We want to consolidate both of them just in `ScalarDim`
+
+  `ArchitectureScalarDim` is merged back into `ScalarDim`, which now allocates with `scalar_ref`.
+  With Reactant, `prognostic.scale` is then traced in the compiled step too, so `scale_prognostic!`,
+  `scale!`, `unscale!` and the `NCycleLorenz` update take `scale::Number` instead of `Real`.
 
 ## Problem description
 
