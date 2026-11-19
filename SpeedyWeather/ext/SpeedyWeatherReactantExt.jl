@@ -181,6 +181,19 @@ SpeedyWeather.dilate(Δt::Millisecond, dilation::Reactant.TracedRNumber) =
 SpeedyWeather.dilate(Δt::ReactantDatesExt.ReactantMillisecond, dilation) =
     ReactantDatesExt.ReactantMillisecond(round(Int, Δt.value * dilation))
 
+# TODO: remove once Reactant reduces over views of concrete arrays, which might be resolved by
+# EnzymeAD/Reactant.jl#3660 (`mapreduce` over wrapped concrete arrays, e.g. a `SubArray`, as one compiled
+# reduction) together with EnzymeAD/Reactant.jl#3531 (`count` over traced arrays, Base's `_bool` predicate
+# wrapper throws for a `TracedRNumber{Bool}`). Until then `count` over a view of the σ levels in
+# `free_troposphere_layers` (once at initialize!) falls back to scalar indexing, so count on a CPU copy
+const ConcreteVerticalCoordinates = Union{
+    SpeedyWeather.SigmaCoordinates{<:Any, <:Any, <:Reactant.AbstractConcreteArray},
+    SpeedyWeather.SigmaPressureCoordinates{<:Any, <:Any, <:Reactant.AbstractConcreteArray},
+}
+
+SpeedyWeather.free_troposphere_layers(clouds::SpeedyWeather.DiagnosticClouds, vertical_coordinates::ConcreteVerticalCoordinates) =
+    SpeedyWeather.free_troposphere_layers(clouds, SpeedyWeather.Adapt.adapt(Array, vertical_coordinates))
+
 # OUTPUT HANDLING FOR REACTANT
 #
 # Reactant cannot trace through the output! pipeline: `output!` interpolates onto

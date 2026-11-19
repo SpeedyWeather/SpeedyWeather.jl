@@ -4,6 +4,19 @@
 
 - New variable group `variables.output` declared via `OutputVariable` for output-only variables, accumulated precipitation and river runoff moved there from `variables.parameterizations`. New `model.diagnostics` with `Accumulate` (parameterizations only write rates), `Maximum` and `Mean`, reset by the output writer so precipitation output is since the last output (rate output variables removed), output variables are written to restart files [#1362](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1362)
 - Fix the differentiability of `TwoBandShort` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
+- Introduces a `StochasticLeapfrog` integrator that uses a Wiener process for a stochastic integration of the model, revised `AbstractRandomProcess` to accomodate for that (`random_process!(vars, process)` is now `update_random!`); `SpectralWhiteNoiseProcess` is a `SpectralAR1Process` with `time_scale = 0`, `SpectralAR1Process` now has real m = 0 coefficients, no noise on the last degree and is spectrally flat for `wavenumber = 0` (changes its random patterns) [#1397](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1397)
+
+## v0.25
+
+- Runs some of the extended differentiability tests in F64 for finite difference comparisions to be more reliable [#1417](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1417)
+- Radiation retuned for stable millennial integrations: `ByrneOGormanLongwaveTransmissivity` with `dry_absorption = 1.45`, `water_vapor_absorption = 750`, `TwoBandShortwaveTransmissivity` with `absorptivity_dry_air = 0.066`, `absorptivity_water_vapor_near_infrared = 1500` [#1414](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1414)
+- Default CO₂ of 360 ppm (≈ year 2000, the default start date) instead of preindustrial 280 ppm [#1414](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1414)
+- Workaround LLVM bug for Enzyme differentiability by `noinline` parameterizations on CPU [#1413](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1413)
+- Reactant: compute `free_troposphere_layers` of `DiagnosticClouds` on a CPU copy of the vertical coordinates to avoid scalar indexing at `initialize!` [#1412](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1412)
+- Updated `JLArrays` dependency [#1411](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1411)
+- `ByrneOGormanLongwaveTransmissivity` with humidity- and CO₂-dependent optical depth as new longwave default, default CO₂ of 280 ppm, longwave optical depths calibrated for ~288 K with `TwoBandShortwave` [#1279](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1279)
+- Jin et al. dynamic ocean albedo parameterization, albedo documentation moved to its own page [#1371](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1371)
+- Fix the differentiability of `TwoBandShortwave` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
 - `TwoBandShortwave` (new default for `PrimitiveWetModel`) with visible and near-infrared band and `SeasonalOzone` following speedy.f90 implementation, fix precipitation units, static stability and max-RH cloud top in `DiagnosticClouds`, stratospheric emission in `OneBandLongwave` [#1262](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1262)
 
 ## 0.24.1

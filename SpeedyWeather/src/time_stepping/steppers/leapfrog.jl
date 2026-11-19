@@ -4,7 +4,7 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
+mutable struct Leapfrog{NF, S, B, MS, O, L, N} <: AbstractLeapfrog
     "[OPTION] Time step for T32, scale linearly to spectral resolution `truncation`"
     Δt_at_T32::S
 
@@ -28,6 +28,9 @@ mutable struct Leapfrog{NF, S, B, MS, O, L} <: AbstractLeapfrog
 
     "[OPTION] Time stepper for the land variables, `nothing` for leapfrog as the atmosphere"
     land::L
+
+    "[OPTION] Additive Wiener noise added to the tendencies every time step, `nothing` for none, see `StochasticLeapfrog`"
+    noise::N
 end
 
 Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt))
@@ -224,6 +227,7 @@ function Leapfrog(
         williams_filter = 0.53,
         ocean = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
         land = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
+        noise = nothing,
     )
     (; NF, truncation) = spectral_grid
 
@@ -233,7 +237,7 @@ function Leapfrog(
 
     return Leapfrog(
         Second(Δt_at_T32), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt,
-        ocean, land,
+        ocean, land, noise,
     )
 end
 
@@ -244,8 +248,12 @@ be a divisor such that an integer number of time steps matches exactly with the 
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
     calculate_Δt!(L, model)         # common among several time steppers, also sets ocean/land Δt
+    initialize!(L.noise, model)     # Wiener noise, if any: seeds its random processes
     return nothing
 end
+
+# the noise (if any) defines the variables for its random patterns, see `StochasticLeapfrog`
+variables(L::Leapfrog, model::AbstractModel) = variables(L.noise, model)
 
 # ocean and land use the time steppers in the respective fields, `nothing` means leapfrog like the atmosphere
 time_stepper(L::Leapfrog, ::Val{:ocean}) = something(L.ocean, L)
@@ -294,6 +302,15 @@ end
 # the clock passes Δt/2 on the 1st Euler step and on the 2nd leapfrog step (Δt but rewinds Δt/2),
 # then Δt on every later step, see `time_step!(::Clock, ::Leapfrog)`
 clock_increment(L::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, L.Δt / 2, L.Δt)
+      
+"""$(TYPEDSIGNATURES)
+Wiener scaling `1/√Δt` (see `AdditiveWienerNoise`) for a leapfrog step, `Δt` is half its time
+step: a leapfrog step of 2Δt advances each of its two interleaved sequences by 2Δt, but the clock
+and the physical mode (the mean of the two) by Δt, which then receives the variance `a²Δt` per
+step. On the first leapfrog step (of Δt from the initial state) this is Δt/2, consistent with the
+clock. The Euler start (Δt/2) gets Δt/4, more noise than for an Euler step, but its midpoint state
+is only used for the tendencies of the first leapfrog step and discarded afterwards."""
+wiener_scale(::AbstractLeapfrog, Δt) = 1 / sqrt(Δt / 2)
 
 # on 1st Euler step + 2nd Leapfrog step disable filters; with RAW filters afterwards
 prognostic_step(::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, 1, 2)

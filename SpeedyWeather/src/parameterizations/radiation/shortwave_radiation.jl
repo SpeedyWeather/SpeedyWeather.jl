@@ -345,6 +345,11 @@ no reflection by clouds or the surface."""
     pₛ = vars.parameterizations.surface_pressure[ij]
     nlayers = size(dTdt, 2)
 
+    # Here we take fractional cloud cover as a proxy for direct/diffuse
+    # radiation fraction, and use it to combine black/white sky surface albedos
+    fraction_direct = 1 - cloud_cover
+    combine_albedos!(ij, vars, fraction_direct)
+
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     albedo_ocean = vars.parameterizations.ocean.albedo[ij]
     albedo_land = vars.parameterizations.land.albedo[ij]

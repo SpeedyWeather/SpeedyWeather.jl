@@ -5,9 +5,13 @@
 # between CPU and GPU would `copyto!` between a `SubArray` and a GPU array (scalar indexing).
 
 # The groups `copy!` copies (not the scratch) on the CPU, to compare with `==`. Without the fused parents
-# (compared through their views) and the clock and scale, which `==` compares by identity (mutable)
+# (compared through their views) and the clock and scale, which `==` compares by identity (mutable).
+# Scalar variables (e.g. greenhouse gases) are `Ref`s, also compared by identity, so unwrap them to their value
+unwrap_refs(x) = x
+unwrap_refs(x::Base.RefValue) = x[]
+unwrap_refs(x::NamedTuple) = map(unwrap_refs, x)
 variables_on_cpu(vars) = map((:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles)) do group
-    on_architecture(SpeedyWeather.CPU(), Base.structdiff(getfield(vars, group), NamedTuple{(:clock, :scale)}))
+    unwrap_refs(on_architecture(SpeedyWeather.CPU(), Base.structdiff(getfield(vars, group), NamedTuple{(:clock, :scale)})))
 end
 
 # UTILITIES to check copying and deepcopy of Variables, even with array types where SubArray don't exists (CuArray, JLArray, ..)

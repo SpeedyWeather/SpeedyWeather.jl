@@ -32,8 +32,8 @@ end
     @test fused_members(vars, 1000) == members      # the original still holds 1000 + i: no shared memory
 end
 
-#= # TODO: Reactative test, the compiled_call just takes too long in the CI with consumer GPUs :(
-# with both spectral transforms (the FFT-based one uses cuFFT through XLA on the GPU)
+# TODO: too expensive to run in CI at the moment
+#=
 @testset "Reactant GPU: PrimitiveWetModel with $Transform steps without NaNs" for Transform in (SpectralTransform, ) # SpectralTransform
     spectral_grid = SpectralGrid(architecture = SpeedyWeather.ReactantDevice())
     spectral_transform = Transform(spectral_grid)

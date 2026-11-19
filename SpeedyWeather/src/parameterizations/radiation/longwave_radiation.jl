@@ -167,7 +167,7 @@ Adapt.@adapt_structure OneBandLongwave
 # primitive wet model version
 function OneBandLongwave(
         SG::SpectralGrid;
-        transmissivity = FriersonLongwaveTransmissivity(SG),
+        transmissivity = ByrneOGormanLongwaveTransmissivity(SG),
         radiative_transfer = OneBandLongwaveRadiativeTransfer(SG, stratospheric_emissivity = 0.05),
     )
     return OneBandLongwave(transmissivity, radiative_transfer)
