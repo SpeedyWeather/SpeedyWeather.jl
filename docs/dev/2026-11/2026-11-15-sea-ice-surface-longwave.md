@@ -63,6 +63,13 @@ first draft on dd988ccb9c3e6c87d6a0a8c0dde3e783484b5cf7)
   in a separate PR. Agreed. The option 2 work moves to that PR with its own plan. #1406 keeps the review changes.
   Making `sea_ice` a core component (below) stays in #1406, as the dispatch needs it on the GPU.
 
+- 2026-11-18: the maintainers merged main (radiation recalibrated in #1414) into this PR; v0.25.0 was released
+  without it. The new GPU testset failed on Metal: (1) Float64 literals in the test (Metal has no Float64), fixed;
+  (2) with `PrescribedSeaIce` the concentration has no step dimension, and `get_step` took a 2-index view of that
+  vector (`view(var, :, 1)`), which Metal cannot compile (the same path in `surface_roughness.jl`). `get_step` now
+  returns a vector as it is (step 1), with a unit test (`test/dynamics/get_step.jl`). The joint recalibration of
+  #1406 + #1415 is left to the maintainers (their offer).
+
 ## Problem description
 
 `OneBandLongwave` and the other ocean-emitting schemes compute the upward longwave over the ocean part of a
