@@ -68,7 +68,11 @@ Base.@propagate_inbounds function SpeedyWeather.parameterization!(ij, variables,
     geometry = column_geometry(model)
     # SpeedyWeather has no surface emissivity of its own: the scheme's values are used
     surface  = SurfaceState{NF}(
-        sea_surface_temperature  = sst_all[ij],
+        # sea ice aware, with the previous step's surface downward longwave (this scheme computes the upward beam first)
+        sea_surface_temperature  = SpeedyWeather.ocean_surface_emission_temperature(
+            ij, variables, sst_all, variables.parameterizations.surface_longwave_down[ij],
+            scheme.ocean_emissivity, scheme, model
+        ),
         land_surface_temperature = variables.prognostic.land.soil_temperature[ij, 1],
         land_fraction            = model.land_sea_mask.land_fraction[ij],
         ocean_emissivity         = scheme.ocean_emissivity,

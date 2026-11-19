@@ -164,7 +164,7 @@ end
         for k in 1:nsoil
             @test tend(vars.tendencies.land.soil_temperature)[:, k] == (a.soil_temperature * wiener_scaling_land) .* surface[:, 1 + k]
         end
-        @test all(iszero, tend(vars.tendencies.ocean.sea_ice_concentration))
+        @test all(iszero, tend(vars.tendencies.ocean.sea_ice_volume))   # no noise on sea ice (its prognostic volume)
     end
 end
 

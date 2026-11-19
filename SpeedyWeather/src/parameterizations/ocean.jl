@@ -365,20 +365,27 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
     S = vars.parameterizations.ocean.sensible_heat_flux
     H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
 
+    # the part of the surface energy budget that melts sea ice at its top instead (ThermodynamicSeaIce)
+    M = haskey(vars.parameterizations.ocean, :sea_ice_top_melt) ? vars.parameterizations.ocean.sea_ice_top_melt : nothing
+
     @boundscheck size(dsst) == size(Rsd) == size(Rsu) == size(Rld) == size(Rlu) || throw(BoundsError())
     @boundscheck size(dsst) == size(S) == size(H) || throw(BoundsError())
 
     launch!(
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,
-        dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params
+        dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, M, params
     )
     return nothing
 end
 
-@kernel inbounds = true function slab_ocean_kernel!(dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params)
+@kernel inbounds = true function slab_ocean_kernel!(dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, M, params)
     ij = @index(Global, Linear)         # every grid point ij
     if land_fraction[ij] < 1            # at least partially ocean
         (; C₀⁻¹, Lᵥ) = params
-        dsst[ij] = C₀⁻¹ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij])
+        dsst[ij] = C₀⁻¹ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij] - sea_ice_top_melt(M, ij))
     end
 end
+
+# heat flux [W/m²] that melts sea ice at its top, zero without a sea ice model that computes it
+@inline sea_ice_top_melt(M, ij) = M[ij]
+@inline sea_ice_top_melt(::Nothing, ij) = false     # strong zero: x - false == x bitwise

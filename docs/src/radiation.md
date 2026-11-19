@@ -153,7 +153,8 @@ using optical depth ``\tau`` as vertical coordinate. Longwave emittance is
 ``\sigma T^4`` following Stefan-Boltzmann with emittance of 1. Boundary conditions
 are ``U = \sigma T_s^4`` at the surface, i.e. the surface emitting with its surface
 temperature ``T_s`` (sea surface temperature, skin or soil temperature); and
-``D = 0`` at the top (no longwave radiation from space). Instead of optical depth
+``D = 0`` at the top (no longwave radiation from space). Over sea ice the surface temperature of the
+ocean is modified, see [Surface longwave emission over sea ice](@ref). Instead of optical depth
 we solve these equations using the transmissivity ``t = \exp(-\tau)``.
 
 ```math
@@ -255,6 +256,41 @@ long integrations and a global energy budget close to observations ([Wild et al.
 a global mean sea surface temperature of about 291.5 K, 397 W/m² of surface longwave emission
 and 314 W/m² of downward longwave radiation at the surface. Because the longwave radiation does not include
 clouds, the latter matches the observed clear-sky rather than the all-sky value (342 W/m²).
+
+## Surface longwave emission over sea ice
+
+The ocean part of a grid point emits longwave radiation at the sea surface temperature ``T_{sst}`` over open
+water. Under sea ice that is the water below the ice, near freezing, however cold the air above it. So over
+sea ice with concentration ``ℵ`` the ocean emits at
+
+```math
+T_{ocean} = (1 - ℵ) T_{sst} + ℵ \min(T_{sst}, T_a)
+```
+
+i.e. sea ice is assumed to have the surface air temperature ``T_a`` (the lowermost layer temperature lowered
+dry-adiabatically to the surface) but not to be warmer than the water underneath. Without sea ice,
+``T_{ocean} = T_{sst}`` exactly. The slab ocean loses the same upward longwave, so the surface exchange
+conserves energy.
+
+All schemes that emit from the ocean surface (`OneBandLongwave`, `JeevanjeeRadiation`, and
+`AnalyticBandLongwave` and `ClearSkyEcCKDRadiation` from NumericalRadiation.jl) get this temperature from
+`ocean_surface_emission_temperature`, which dispatches on the sea ice model `model.sea_ice`. `PrescribedSeaIce`
+and `sea_ice = nothing` (with a manually set concentration, see [Sea ice models](@ref)) use the formula above.
+``T_a`` is computed in the boundary layer, which runs before the radiation, so a custom `parameterizations`
+tuple with sea ice has to keep `:boundary_layer` before `:radiation`. Blending temperatures linearly
+underestimates the area-weighted emission ``εσ[(1 - ℵ) T_{sst}^4 + ℵ T_a^4]`` because ``T^4`` is convex, by
+about ``6 ε σ \bar{T}^2 ℵ (1 - ℵ) (T_{sst} - T_a)^2``, e.g. about ``5ε`` W/m² for ``ℵ = 0.5`` and a 30 K difference.
+
+`ThermodynamicSeaIce` has an ice surface temperature ``T_i`` of its own, from the ice surface energy balance
+(see [Sea ice models](@ref)), which needs the downward longwave at the surface: `OneBandLongwave` and
+`JeevanjeeRadiation` use that of the same time step, `AnalyticBandLongwave` and `ClearSkyEcCKDRadiation` that of
+the previous one. The ocean then emits at the flux-equivalent temperature
+
+```math
+T_{ocean} = \left((1 - ℵ) T_{sst}^4 + ℵ T_i^4\right)^{1/4}
+```
+
+so that ``εσT_{ocean}^4`` is exactly the emission of the open water and the ice together, with no blending error.
 
 ## [Solar zenith angle, length of day and year](@id zenith)
 

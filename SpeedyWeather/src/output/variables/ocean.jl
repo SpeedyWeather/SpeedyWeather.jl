@@ -32,6 +32,39 @@ end
 path(::SeaIceConcentration, simulation) =
     simulation.variables.prognostic.ocean.sea_ice_concentration
 
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Sea ice volume per unit ocean area of `ThermodynamicSeaIce` (its prognostic variable). Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct SeaIceVolume <: AbstractOutputVariable
+    name::String = "siv"
+    unit::String = "m"
+    long_name::String = "sea ice volume per unit ocean area"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 10
+end
+
+path(::SeaIceVolume, simulation) =
+    simulation.variables.prognostic.ocean.sea_ice_volume
+
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
+Sea ice surface temperature of `ThermodynamicSeaIce`, diagnosed in the longwave radiation. Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct SeaIceSurfaceTemperature{F} <: AbstractOutputVariable
+    name::String = "sist"
+    unit::String = "degC"
+    long_name::String = "sea ice surface temperature"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 10
+    transform::F = (x) -> x - oftype(x, 273.15)
+end
+
+path(::SeaIceSurfaceTemperature, simulation) =
+    simulation.variables.parameterizations.ocean.sea_ice_surface_temperature
+
 Ocean() = (
     SeaSurfaceTemperature(),
     SeaIceConcentration(),
