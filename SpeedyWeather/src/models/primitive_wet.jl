@@ -204,6 +204,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.surface_humidity_flux, model)
+    initialize!(model.custom_parameterization, model)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
 

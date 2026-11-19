@@ -4,6 +4,7 @@
 
 - New variable group `variables.output` declared via `OutputVariable` for output-only variables, accumulated precipitation and river runoff moved there from `variables.parameterizations`. New `model.diagnostics` with `Accumulate` (parameterizations only write rates), `Maximum` and `Mean`, reset by the output writer so precipitation output is since the last output (rate output variables removed), output variables are written to restart files [#1362](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1362)
 - Fix the differentiability of `TwoBandShort` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
+- Fixes a bug that the `custom_parameterization` was incorrectly not initialized [#1419](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1419)
 - Introduces a `StochasticLeapfrog` integrator that uses a Wiener process for a stochastic integration of the model, revised `AbstractRandomProcess` to accomodate for that (`random_process!(vars, process)` is now `update_random!`); `SpectralWhiteNoiseProcess` is a `SpectralAR1Process` with `time_scale = 0`, `SpectralAR1Process` now has real m = 0 coefficients, no noise on the last degree and is spectrally flat for `wavenumber = 0` (changes its random patterns) [#1397](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1397)
 
 ## v0.25
