@@ -8,7 +8,8 @@
 > a stronger speed-limit drag against the top-layer jet failure (which it also has without the scheme), and in the
 > multi-year runs a rare cold event at one Antarctic coastal point remains, which a shorter hyperdiffusion time
 > scale removes in restart tests. The final verification, T512L24 over three years, is running in four setups
-> (8.8, 8.10). Details in section 8.
+> (8.8, 8.10). Since `1cdc3b1a` the boundary layer height uses Ri_c = 10, which improves the tropics but has not
+> been through these stability checks (8.16). Details in section 8.
 
 Date of initial draft: 2026-11-19
 
@@ -99,6 +100,17 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
   profile, while `critical_Richardson = 1` keeps defining the boundary layer height. Before the split the
   diffusion used Ri_c = 1 for both. The validation runs of section 8 used that, so the profile is now somewhat
   stronger in stable surface conditions than in those runs.
+- 2026-11-20, user decision: `critical_Richardson = 10` also for the boundary layer height (committed in
+  `1cdc3b1a`, together with the new output `OutputVariables.BoundaryLayerHeight()`, `blh` in m). In the user's
+  simulations this clearly improves the tropics: tropical cyclones at T86, patchier convective rain instead of
+  large areas of weak rain, and much more small-scale dynamics. The tropical boundary layer is 1–2 km deep with
+  Ri_c = 10 against below 1 km with 1, closer to observations (section 8.16). The cost is in the mid-latitudes,
+  where h reaches the tropopause (> 10 km) under the jet, so the profile diffusivity extends through the
+  troposphere there. Ri_c = 10 is therefore an empirical choice for this model, not a critical Richardson number
+  in the sense of the literature (0.25–1), against the recommendation of 4.3.
+- 2026-11-20, tried and reverted: surface excess terms in the bulk Richardson number of the boundary layer height
+  (Troen and Mahrt 1986, Holtslag and Boville 1993, Vogelezang and Holtslag 1996), meant to deepen the tropical
+  boundary layer without the mid-latitude overshoot so that Ri_c could return to 0.25–1. See section 8.16.
 - 2026-11-19 (GPU session, A40 on login02 and H100 via Slurm), step 7, see section 8 for the numbers:
   - No GPU optimisation is kept. The scheme doubles the cost of the fused column kernel, but that kernel is only
     about 4 % of a time step, so the scheme costs 2–5 % of a time step at T256/T512.
@@ -944,6 +956,36 @@ workaround of 8.3 is sensitive to how the loops read their arrays:
   `$D/reactant_conductance_check.jl`, `$D/reactant_correctness_conductance.jl`, `$D/tests/*scratch_ab*`,
   `$D/tests/*conductance*`.
 
+### 8.16 Boundary layer height: Ri_c = 10 and the surface excess terms (2026-11-20)
+
+Typical observed boundary layer heights (radiosonde climatologies, e.g. Seidel et al. 2010, 2012): stable
+nocturnal over land 50–300 m, polar winter 10–200 m, convective daytime over mid-latitude land 1–2 km in summer,
+subtropical deserts 3–5 km, stratocumulus regions 0.5–1 km, trade-wind cumulus 1–2 km, mid-latitude oceans
+0.5–1.5 km. With Ri_c = 1 the T32 runs of 8.6 had global means of 0.9–1.2 km.
+
+With Ri_c = 10 (user's runs, not in this protocol) the tropical boundary layer is 1–2 km deep and the tropics
+improve markedly (revision log); under the mid-latitude jet h exceeds 10 km. Explanation: the bulk Richardson
+number of the height uses the full wind speed |V(z)|² in the denominator, without any buoyancy excess of the
+parcel. In the tropics winds are weak and Ri reaches 1 just above the lowest layers; under the jet |V|² is large
+throughout the troposphere and Ri stays below 10 up to the tropopause.
+
+Tried (not committed, reverted by the user): the standard remedy of the literature, with options for each term,
+- b u⋆² (b = 100) added to the squared wind,
+- a thermal excess θ_T = b′(w′θᵥ′)₀/w_m (b′ = 8.5, at most 3 K) of the rising parcel for an upward surface
+  buoyancy flux from the current sensible heat and humidity fluxes, w_m = (u⋆³ + 0.6w⋆³)^⅓ with w⋆ from the
+  boundary layer height of the previous time step (to avoid the circularity h ↔ θ_T),
+- the wind difference to the lowermost layer |V(z) − V_N|² instead of |V(z)|² (`relative_wind = true`).
+
+Result (user's run): the tropics fell back to the state of Ri_c = 1, "a sluggish soup": little dynamics, low
+winds, no cyclones, large areas of weak convective rain. Not investigated further. A likely cause, not tested:
+the relative wind raises Ri where the lowermost layer itself is windy (the trades) and the shear above is weak,
+so the tropical h became shallower, not deeper. The improvements of Ri_c = 10 thus seem to come from the
+full-wind formulation with a large Ri_c, not from the physics that the excess terms represent. Whether the thermal
+excess alone (with the full wind) would help was not tried.
+
+Open: the effect of the deep mid-latitude h (profile diffusivity through the troposphere, momentum mixing across
+the jet) on the jet strength and the T512L24 stability (8.8, 8.10), which was validated with Ri_c = 1.
+
 ### 8.12 Next
 
 0. Fill the item marked PENDING in `PR_bulk_richardson_diffusion.md` (multi-year runs) and set the PR number in
@@ -957,6 +999,9 @@ workaround of 8.3 is sensitive to how the loops read their arrays:
    without (`drag1e-5`) over the full three years (events, drift, highest winds), and look at what the stronger
    hyperdiffusion costs in resolved small scales (e.g. kinetic energy spectrum), which has not been looked at.
 4. Tibet at L24: done at T32 (8.14).
+5. With `critical_Richardson = 10` (8.16): repeat the stability checks that were made with Ri_c = 1, at least the
+   T32L24 ensemble (8.13.2) and a T512L24 run, and look at the maximum winds and the jet with the deep
+   mid-latitude boundary layer. Compare the `blh` output with the ERA5 boundary layer height climatology.
 
 Slurm: `gpushort` allows two running jobs per user and 24 hours; the multi-year runs other than the first use
 `gpupreempt`, which has no such limit but can be preempted.

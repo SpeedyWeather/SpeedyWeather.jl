@@ -121,8 +121,11 @@ Ri(z) = \frac{gz \left[ s_v(z) - s_v(z_N) \right]}{c_p T_v(z_N) |v(z)|^2}
 between the lowermost layer ``N`` at height ``z_N`` and the layer at height ``z`` above the surface,
 using the virtual dry static energy ``s_v = c_p T_v + \Phi`` and the wind speed ``|v|``, at least
 1 m/s [HoltslagBoville1993](@citep). ``h`` is the height where ``Ri(z)`` first reaches the critical Richardson
-number ``Ri_c = 1`` (option `critical_Richardson`) going upwards from the lowermost layer with
-``Ri(z_N) = 0``, interpolated linearly between the layers. Within the boundary layer
+number ``Ri_c = 10`` (option `critical_Richardson`) going upwards from the lowermost layer with
+``Ri(z_N) = 0``, interpolated linearly between the layers. ``Ri_c = 10`` is far above the literature
+values of 0.25–1 [HoltslagBoville1993, Frierson2006](@citep) and an empirical choice: it gives tropical boundary layers of 1–2 km,
+which markedly improves tropical convection and variability in SpeedyWeather, at the cost of very deep
+boundary layers under the mid-latitude jets. Within the boundary layer
 
 ```math
 K_{profile}(z) = \begin{cases}
