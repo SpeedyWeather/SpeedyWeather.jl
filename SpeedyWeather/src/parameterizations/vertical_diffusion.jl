@@ -63,12 +63,13 @@ Adapt.@adapt_structure BulkRichardsonDiffusion
 # generator function
 BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...) = BulkRichardsonDiffusion{SG.NF}(; kwargs...)
 
-# diffusivities are defined on the interface k+½ below layer k, the surface interface (k = nlayers) is zero
+# The conductance a = ρK/Δz [kg/m²/s] of the interface k+½ below layer k is stored, not the diffusivity K [m²/s]:
+# the implicit solver only needs the product, which saves the array for ρ/Δz. No flux through the surface
+# interface (k = nlayers), where the conductance is zero. K = a Δz/ρ can be recovered from the state
 variables(::BulkRichardsonDiffusion) = (
     ParameterizationVariable(:boundary_layer_height, Grid2D(), desc = "Boundary layer height above the surface", units = "m"),
-    ParameterizationVariable(:vertical_diffusivity_momentum, GridXYZ(), desc = "Vertical diffusivity of momentum at the interface below each layer", units = "m^2/s"),
-    ParameterizationVariable(:vertical_diffusivity_heat, GridXYZ(), desc = "Vertical diffusivity of heat and humidity at the interface below each layer", units = "m^2/s"),
-    ScratchVariable(:density_over_distance, GridXYZ(), desc = "Air density over the distance between layers at the interface below each layer", units = "kg/m^4", namespace = :grid),
+    ParameterizationVariable(:vertical_conductance_momentum, GridXYZ(), desc = "Conductance (density times diffusivity over layer distance) of the vertical diffusion of momentum at the interface below each layer", units = "kg/m^2/s"),
+    ParameterizationVariable(:vertical_conductance_heat, GridXYZ(), desc = "Conductance (density times diffusivity over layer distance) of the vertical diffusion of heat and humidity at the interface below each layer", units = "kg/m^2/s"),
 
     #TODO: reusing the scratch memory for a parameterization has caused problems with Reactant before
     # so far this seems fine but it might need be revisited
@@ -84,34 +85,33 @@ initialize!(::BulkRichardsonDiffusion, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES)
 Vertical diffusion tendencies of u, v, temperature (via dry static energy) and humidity at grid point
-`ij`, solved implicitly with the diffusivities from `vertical_diffusivity!`."""
+`ij`, solved implicitly with the conductances from `vertical_conductance!`."""
 @propagate_inbounds function vertical_diffusion!(ij, vars, diffusion::BulkRichardsonDiffusion, model)
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity, couple_surface_fluxes) = diffusion
 
     # escape immediately if all diffusions disabled
     any((diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
 
-    vertical_diffusivity!(ij, vars, diffusion, model)
+    vertical_conductance!(ij, vars, diffusion, model)
 
     (; time_stepping) = model
     Δt = default_time_step(time_stepping)       # 2Δt for leapfrog
     g = model.planet.gravity
     (; vertical_coordinates) = model.geometry
     pₛ = vars.parameterizations.surface_pressure[ij]
-    K_momentum = vars.parameterizations.vertical_diffusivity_momentum
-    K_heat = vars.parameterizations.vertical_diffusivity_heat
-    (; density_over_distance) = vars.scratch.grid
+    conductance_momentum = vars.parameterizations.vertical_conductance_momentum
+    conductance_heat = vars.parameterizations.vertical_conductance_heat
     tridiagonal_rhs = vars.scratch.grid.a       # general scratch arrays, the virtual temperature in `a` is
-    tridiagonal_upper = vars.scratch.grid.b     # not needed any more after vertical_diffusivity!
-    solver_arguments = (density_over_distance, tridiagonal_upper, tridiagonal_rhs, pₛ, Δt, g, vertical_coordinates, couple_surface_fluxes)
+    tridiagonal_upper = vars.scratch.grid.b     # not needed any more after vertical_conductance!
+    solver_arguments = (tridiagonal_upper, tridiagonal_rhs, pₛ, Δt, g, vertical_coordinates, couple_surface_fluxes)
 
     if diffuse_momentum
         u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
         v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
         u_tend = get_tendency_step(vars.tendencies.grid.u, time_stepping, diffusion)
         v_tend = get_tendency_step(vars.tendencies.grid.v, time_stepping, diffusion)
-        implicit_vertical_diffusion!(ij, u_tend, u, nothing, K_momentum, solver_arguments...)
-        implicit_vertical_diffusion!(ij, v_tend, v, nothing, K_momentum, solver_arguments...)
+        implicit_vertical_diffusion!(ij, u_tend, u, nothing, conductance_momentum, solver_arguments...)
+        implicit_vertical_diffusion!(ij, v_tend, v, nothing, conductance_momentum, solver_arguments...)
     end
 
     if diffuse_static_energy
@@ -120,13 +120,13 @@ Vertical diffusion tendencies of u, v, temperature (via dry static energy) and h
         T = get_prognostic_step(vars.grid.temperature, time_stepping, diffusion)
         T_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, diffusion)
         geopotential_term = (vars.dynamics.geopotential, inv(model.atmosphere.heat_capacity))
-        implicit_vertical_diffusion!(ij, T_tend, T, geopotential_term, K_heat, solver_arguments...)
+        implicit_vertical_diffusion!(ij, T_tend, T, geopotential_term, conductance_heat, solver_arguments...)
     end
 
     if diffuse_humidity && haskey(vars.grid, :humidity)
         q = get_prognostic_step(vars.grid.humidity, time_stepping, diffusion)
         q_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, diffusion)
-        implicit_vertical_diffusion!(ij, q_tend, q, nothing, K_heat, solver_arguments...)
+        implicit_vertical_diffusion!(ij, q_tend, q, nothing, conductance_heat, solver_arguments...)
     end
     return nothing
 end
@@ -136,11 +136,11 @@ end
 @inline column_humidity(::Nothing, ij, k) = false     # strong zero
 
 """$(TYPEDSIGNATURES)
-Vertical diffusivities [m²/s] of momentum and heat at the interfaces k+½ below every layer k of column
-`ij`, written into `vars.parameterizations.vertical_diffusivity_momentum` and `_heat`, the boundary layer
-height into `vars.parameterizations.boundary_layer_height` and the air density over the distance between
-the layers at the interfaces into `vars.scratch.grid.density_over_distance`. The diffusivity is
-K = min(max(K_profile, K_local, K_background), K_max) with
+Conductances a = ρK/Δz [kg/m²/s] of the vertical diffusion of momentum and heat at the interfaces k+½
+below every layer k of column `ij`, with the diffusivity K [m²/s], the air density ρ at the interface and
+the distance Δz between the two layers, written into `vars.parameterizations.vertical_conductance_momentum`
+and `_heat`, and the boundary layer height into `vars.parameterizations.boundary_layer_height`. The
+diffusivity is K = min(max(K_profile, K_local, K_background), K_max) with
 
 - K_profile the boundary-layer profile of Frierson et al. 2006, eqs. 16–20, from the friction velocity
   of the surface drag, a stability correction from the bulk Richardson number between surface and
@@ -151,7 +151,7 @@ K = min(max(K_profile, K_local, K_background), K_max) with
   f = √(1 - 18Ri) for Ri < 0 (Holtslag and Boville, 1993) with the buoyancy-driven part using a mixing
   length of at least `convective_mixing_length`;
 - K_background = `background_diffusivity` ⋅ exp(-z/`background_height`)."""
-@propagate_inbounds function vertical_diffusivity!(ij, vars, diffusion::BulkRichardsonDiffusion, model)
+@propagate_inbounds function vertical_conductance!(ij, vars, diffusion::BulkRichardsonDiffusion, model)
     (; time_stepping, atmosphere, geometry) = model
     (; nlayers, vertical_coordinates) = geometry
     g = model.planet.gravity
@@ -171,10 +171,9 @@ K = min(max(K_profile, K_local, K_background), K_max) with
     pₛ = vars.parameterizations.surface_pressure[ij]
     Φₛ = g * model.orography.orography[ij]     # surface geopotential
 
-    K_momentum = vars.parameterizations.vertical_diffusivity_momentum
-    K_heat = vars.parameterizations.vertical_diffusivity_heat
-    (; density_over_distance) = vars.scratch.grid
-    NF = eltype(K_momentum)
+    conductance_momentum = vars.parameterizations.vertical_conductance_momentum
+    conductance_heat = vars.parameterizations.vertical_conductance_heat
+    NF = eltype(conductance_momentum)
 
     # Virtual temperature of every layer, in a general scratch array that the implicit solver reuses for its
     # right-hand side afterwards. The two loops below (boundary layer height, diffusivities) read it
@@ -218,7 +217,7 @@ K = min(max(K_profile, K_local, K_background), K_max) with
 
         # air density at the interface over the distance between layers [kg/m⁴]
         p = pressure_half(k + 1, pₛ, vertical_coordinates)
-        density_over_distance[ij, k] = p / (R_dry * Tᵥ * Δz)
+        density_over_distance = p / (R_dry * Tᵥ * Δz)
 
         # 1. BOUNDARY LAYER PROFILE, Frierson 2006, eqs. 16-20, Kb(z) = κ u⋆ z in the surface layer
         # z < fb*h, cubic decay to zero at z = h above, zero above the boundary layer
@@ -257,14 +256,17 @@ K = min(max(K_profile, K_local, K_background), K_max) with
         # 3. BACKGROUND DIFFUSIVITY
         K_background = background_diffusivity * exp(-z / background_height)
 
-        K_momentum[ij, k] = min(max(K_profile, K_local_momentum, K_background), max_diffusivity)
-        K_heat[ij, k] = min(max(K_profile, K_local_heat, K_background), max_diffusivity)
+        K_momentum = min(max(K_profile, K_local_momentum, K_background), max_diffusivity)
+        K_heat = min(max(K_profile, K_local_heat, K_background), max_diffusivity)
+
+        # store the conductances ρK/Δz [kg/m²/s], all the implicit solver needs
+        conductance_momentum[ij, k] = density_over_distance * K_momentum
+        conductance_heat[ij, k] = density_over_distance * K_heat
     end
 
     # no diffusive flux through the surface, which is handled by the surface fluxes
-    K_momentum[ij, nlayers] = 0
-    K_heat[ij, nlayers] = 0
-    density_over_distance[ij, nlayers] = 0
+    conductance_momentum[ij, nlayers] = 0
+    conductance_heat[ij, nlayers] = 0
     return nothing
 end
 
@@ -277,7 +279,7 @@ drag or the surface wind of a boundary layer, which switches the boundary-layer 
 diffusivity off."""
 @propagate_inbounds function surface_layer(ij, ΔΦ₀, vars, diffusion::BulkRichardsonDiffusion, model)
     (; parameterizations) = vars
-    NF = eltype(parameterizations.vertical_diffusivity_momentum)
+    NF = eltype(parameterizations.vertical_conductance_momentum)
     has_boundary_layer = haskey(parameterizations, :boundary_layer_drag_momentum) &&
         haskey(parameterizations, :surface_wind_speed)
     has_boundary_layer || return zero(NF), zero(NF)
@@ -352,7 +354,8 @@ end
 
 """$(TYPEDSIGNATURES)
 Implicit (backward Euler) vertical diffusion of `variable` (plus `scale * Φ` with `geopotential_term =
-(Φ, scale)`, or `nothing`) in column `ij` with diffusivity `K` [m²/s] on the interfaces below every layer.
+(Φ, scale)`, or `nothing`) in column `ij` with the `conductance` a = ρK/Δz [kg/m²/s] (density times
+diffusivity over the distance between layers) on the interfaces below every layer.
 With the diffusion operator L as a flux divergence on the pressure thickness Δp of the layers,
 
     (L x)ₖ = g/Δpₖ [aₖ₊½ (xₖ₊₁ - xₖ) - aₖ₋½ (xₖ - xₖ₋₁)],     aₖ₊½ = ρₖ₊½ Kₖ₊½ / Δzₖ₊½,
@@ -367,8 +370,7 @@ y is added to `tendency`. Conserves the mass-weighted column integral Σ xₖ Δ
         tendency,                   # tendency of variable, accumulate into or replace
         variable,                   # variable to diffuse
         geopotential_term,          # (Φ, scale) to diffuse variable + scale*Φ, or nothing
-        K,                          # diffusivity [m²/s] at the interface below every layer
-        density_over_distance,      # ρ/Δz [kg/m⁴] at the interface below every layer
+        conductance,                # ρK/Δz [kg/m²/s] at the interface below every layer
         tridiagonal_upper,          # scratch, upper diagonal after forward elimination
         tridiagonal_rhs,            # scratch, right-hand side after forward elimination
         pₛ,                         # surface pressure [Pa]
@@ -389,7 +391,7 @@ y is added to `tendency`. Conserves the mass-weighted column integral Σ xₖ Δ
     for k in 1:nlayers
         x = diffused_value(variable, geopotential_term, ij, k)
         x_below = diffused_value(variable, geopotential_term, ij, min(k + 1, nlayers))
-        a_below = ifelse(k < nlayers, density_over_distance[ij, k] * K[ij, k], zero(NF))
+        a_below = ifelse(k < nlayers, conductance[ij, k], zero(NF))
 
         g_Δp = g / pressure_thickness(k, pₛ, vertical_coordinates)
         explicit_tendency = g_Δp * (a_below * (x_below - x) - a_above * (x - x_above))

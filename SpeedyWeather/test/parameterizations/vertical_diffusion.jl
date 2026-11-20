@@ -1,6 +1,7 @@
 using Random
 
-# Implicit vertical diffusion of a single column on plain 1×nlayers arrays, returns the tendency
+# Implicit vertical diffusion of a single column on plain 1×nlayers arrays, returns the tendency. The solver
+# takes the conductance ρK/Δz of the interfaces, here from the diffusivity K and ρ/Δz
 function diffuse_column(
         x, K, density_over_distance, coordinates;
         surface_pressure = 1.0e5, Δt = 1800.0, gravity = 9.81, tendency = zero(x),
@@ -10,7 +11,7 @@ function diffuse_column(
     tend = row(tendency)
     upper, rhs = zero(tend), zero(tend)
     SpeedyWeather.implicit_vertical_diffusion!(
-        1, tend, row(x), geopotential_term, row(K), row(density_over_distance),
+        1, tend, row(x), geopotential_term, row(collect(K) .* collect(density_over_distance)),
         upper, rhs, surface_pressure, Δt, gravity, coordinates, couple,
     )
     return vec(tend)
@@ -134,14 +135,47 @@ function vertical_diffusion_simulation(Model = PrimitiveWetModel; nlayers = 8, k
     return simulation
 end
 
-# recompute the diffusivities on all grid points
+# air density over the distance between layers ρ/Δz [kg/m⁴] at the interfaces k+½ below every layer, from
+# the state of the simulation as in vertical_conductance!, zero for the surface interface
+function density_over_distance(simulation)
+    (; model, variables) = simulation
+    (; atmosphere, time_stepping) = model
+    (; nlayers, vertical_coordinates) = model.geometry
+    diffusion = model.vertical_diffusion
+    T = SpeedyWeather.get_prognostic_step(variables.grid.temperature, time_stepping, diffusion).data
+    q = haskey(variables.grid, :humidity) ?
+        SpeedyWeather.get_prognostic_step(variables.grid.humidity, time_stepping, diffusion).data : zero(T)
+    virtual_temperature = SpeedyWeather.virtual_temperature.(T, q, Ref(atmosphere))
+    Φ = variables.dynamics.geopotential.data
+    pₛ = variables.parameterizations.surface_pressure.data
+
+    ρ_Δz = zeros(eltype(T), size(T))
+    for k in 1:(nlayers - 1), ij in axes(T, 1)
+        p = SpeedyWeather.pressure_half(k + 1, pₛ[ij], vertical_coordinates)
+        Δz = (Φ[ij, k] - Φ[ij, k + 1]) / model.planet.gravity
+        Tᵥ = (virtual_temperature[ij, k] + virtual_temperature[ij, k + 1]) / 2
+        ρ_Δz[ij, k] = p / (atmosphere.R_dry * Tᵥ * Δz)
+    end
+    return ρ_Δz
+end
+
+# recompute the conductances ρK/Δz on all grid points and return the diffusivities K [m²/s] of momentum
+# and heat they correspond to, the boundary layer height and ρ/Δz
 function vertical_diffusivity!(simulation)
     (; model, variables) = simulation
     for ij in 1:model.geometry.npoints
-        SpeedyWeather.vertical_diffusivity!(ij, variables, model.vertical_diffusion, model)
+        SpeedyWeather.vertical_conductance!(ij, variables, model.vertical_diffusion, model)
     end
     p = variables.parameterizations
-    return copy(p.vertical_diffusivity_momentum.data), copy(p.vertical_diffusivity_heat.data), copy(p.boundary_layer_height.data)
+    ρ_Δz = density_over_distance(simulation)
+    nlayers = size(ρ_Δz, 2)
+
+    # the conductance of the surface interface is zero, as is the diffusivity returned for it
+    diffusivity(conductance) =
+        [k < nlayers ? conductance[ij, k] / ρ_Δz[ij, k] : conductance[ij, k] for ij in axes(ρ_Δz, 1), k in 1:nlayers]
+    K_momentum = diffusivity(p.vertical_conductance_momentum.data)
+    K_heat = diffusivity(p.vertical_conductance_heat.data)
+    return K_momentum, K_heat, copy(p.boundary_layer_height.data), ρ_Δz
 end
 
 # height [m] of the interfaces k+½ above the surface
@@ -168,7 +202,7 @@ end
             @test all(isfinite, K)
             @test all(K[:, end] .== 0)                                      # no flux through the surface
             @test all(K[:, 1:(end - 1)] .>= K_background[:, 1:(end - 1)] * (1 - 1.0e-5))
-            @test all(K .<= max_diffusivity)
+            @test all(K .<= max_diffusivity * (1 + 1.0e-5))
         end
         @test all(K_momentum .>= K_heat)       # longer tail for momentum
 
@@ -239,8 +273,7 @@ end
 
     # temperature tendency of the vertical diffusion of dry static energy for all columns
     function temperature_tendency(; source = zeros(npoints, nlayers), couple = true)
-        _, K_heat, _ = vertical_diffusivity!(simulation)
-        ρ_Δz = variables.scratch.grid.density_over_distance.data
+        _, K_heat, _, ρ_Δz = vertical_diffusivity!(simulation)
         return reduce(
             vcat, map(1:npoints) do ij
                 diffuse_column(
@@ -297,9 +330,10 @@ end
         simulation = initialize!(model)
         run!(simulation, period = Day(2))
         @test !simulation.model.feedback.nans_detected
-        (; vertical_diffusivity_momentum, vertical_diffusivity_heat, boundary_layer_height) = simulation.variables.parameterizations
-        @test all(isfinite, vertical_diffusivity_momentum)
-        @test all(isfinite, vertical_diffusivity_heat)
+        (; vertical_conductance_momentum, vertical_conductance_heat, boundary_layer_height) = simulation.variables.parameterizations
+        @test all(isfinite, vertical_conductance_momentum)
+        @test all(isfinite, vertical_conductance_heat)
+        @test maximum(vertical_conductance_heat) > 0
         @test all(boundary_layer_height .> 0)
     end
 
@@ -309,7 +343,7 @@ end
     model = PrimitiveWetModel(spectral_grid; vertical_diffusion = diffusion)
     simulation = initialize!(model)
     run!(simulation, steps = 3)
-    @test all(simulation.variables.parameterizations.vertical_diffusivity_heat .== 0)   # never computed
+    @test all(simulation.variables.parameterizations.vertical_conductance_heat .== 0)   # never computed
 
     # friction velocity and surface Richardson number from the boundary layer, both zero without its
     # drag and surface wind, which switches the boundary-layer profile of the diffusivity off
@@ -318,6 +352,6 @@ end
     friction_velocity, Ri_surface = SpeedyWeather.surface_layer(1, ΔΦ₀, variables, diffusion, model)
     @test friction_velocity > 0
     @test isfinite(Ri_surface)
-    no_boundary_layer = (; parameterizations = (; variables.parameterizations.vertical_diffusivity_momentum))
+    no_boundary_layer = (; parameterizations = (; variables.parameterizations.vertical_conductance_momentum))
     @test SpeedyWeather.surface_layer(1, ΔΦ₀, no_boundary_layer, diffusion, model) === (0.0f0, 0.0f0)
 end
