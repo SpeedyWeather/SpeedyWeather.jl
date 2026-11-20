@@ -325,7 +325,7 @@ Model validation:
 
 ## 8. Progress protocol
 
-State on 2026-11-20, 09:20 CET. Everything below was run on the committed code `1179b149` unless stated otherwise.
+State on 2026-11-20, 11:25 CET (sections 8.10–8.14 carry their own times). Everything below was run on the committed code `1179b149` unless stated otherwise.
 Scripts and logs are in `/p/tmp/maxgelbr/code/Speedy2/claude_bulk_richardson_2026-11-19/` (called `$D` below),
 not in the repository.
 
@@ -613,8 +613,9 @@ H100, job 3343105, output in `$D/validation/output/run_t512l24_vdiff_0001`.
 
 - Without the scheme the run ends with NaN between day 60 and 70 (2000-03-10). Until then it has 5800–8800 layer
   pairs that are more than 1 K superadiabatic and inversions up to 37 K in the lowest layers.
-- With the scheme the run completes the 300 days, through the Antarctic winter: 6–24 superadiabatic layer pairs,
-  inversions of 9–21 K, no point below 170 K in any layer (coldest 172 K in layers 1–2 in August). Maximum wind
+- With the scheme the run completes the 300 days, through the Antarctic winter: 6–36 superadiabatic layer pairs,
+  inversions of 9–21 K. Coldest point 169.0 K, 12 points below 170 K, in the top layer on day 240. (Corrected: an
+  earlier version of this line said no point below 170 K, from reading only every third output row.) Maximum wind
   speeds are 80–95 m/s, as in the run without the scheme before it failed (84–96 m/s).
 - 17 minutes on the H100 for 300 days with the scheme.
 
@@ -635,7 +636,9 @@ folders). No run has a NaN.
 - Lowest-layer temperatures of −60 to −74 °C with several hundred points below −60 °C occur in the Antarctic
   winter in all runs, on the plateau. I take these to be the model's Antarctic winter, not cold pools; this has
   not been compared with observations.
-- **Two cold events remain**, both at the same grid point on the Antarctic coast (79°S, 81°W, land fraction
+- A third event of the same kind occurred later in the `dt112` run, on 2001-08-12 at the same grid point: lowest
+  layer −264 °C, inversion 159 K, again recovering.
+- **Two cold events remain** (state at 08:15), both at the same grid point on the Antarctic coast (79°S, 81°W, land fraction
   0.12–0.25, next to steep orography): −155 °C with an inversion of 133 K in the `dt112` run, −93 °C in the
   `limit60_drag1e-5` run. Both recover within two days and neither ends the run. The `drag1e-5` run has had none
   in 1.6 years. The monitor's budget term shows the vertical advection warming the point by 20–40 K per hour, as
@@ -714,20 +717,48 @@ strong at T32:
 |---|---|---|---|
 | `drag = 3e-6` (main) | overshoots above 150 m/s | 3·10⁻⁶ | T32 fine; T512L24 blows up in the top layer on day 39 (8.8) |
 | `drag = 1e-5` at all resolutions (`89be0251`) | overshoots above 101 m/s, reverses above 133 m/s | 10⁻⁵, stable (8.8, 8.10) | **T32L24 with the scheme NaN on 2000-07-05** (stable for a year with 3e-6; job 3349009); `test/output/zarr_output.jl` fails |
-| `drag = 3e-6`, `resolution_scaling = 0.5` (working tree) | as main | 1.2·10⁻⁵ | T32 identical to main by construction; T512L24 run for 60 days submitted (job 3349380) |
+| `drag = 3e-6`, `resolution_scaling = 0.5` (`b3c43ac4`) | as main | 1.2·10⁻⁵ | T32 identical to main by construction; T512L24 run for 60 days submitted (job 3349380) |
 
 - The failing test runs T6 with four layers for a day, with a time step of 3 hours. That run blows up on main as
   well (winds of 3700 m/s after one day without the scheme and with `3e-6`); the test only checks that the output
   is finite, and with `1e-5` it no longer was.
-- Side result of job 3349009: T256L8 **without** the scheme completes 300 days with `drag = 1e-5`. With `3e-6` it
-  went NaN between day 60 and 70 (8.9). So the stronger drag also matters at T256, and that failure was not, or not
-  only, the missing vertical mixing. The run with the scheme and `1e-5` at T256L8 had not finished when this was
-  written.
+- Side result of job 3349009 (`$D/validation/means_drag1e-5_fixed`): T256L8 **without** the scheme completes 300
+  days with `drag = 1e-5`. With `3e-6` it went NaN between day 60 and 70 (8.9). So that NaN came from the weak drag,
+  not from the missing vertical mixing. What the missing mixing does at T256L8 is still there without the scheme:
+  5900–12100 superadiabatic layer pairs. With the scheme and `1e-5`: 5–46 pairs, 300 days completed.
+- "Points below 170 K" is not a measure of the scheme: in all T256L8 runs that reach late winter, with and without
+  the scheme and for every drag, the coldest points are in the top two layers on days 210–250 (163–170 K, 0–116
+  points in the 10-daily snapshots).
+- T256L8 with the committed scaled drag (8.5·10⁻⁶; job 3349399, `$D/validation/means`): both runs complete 300 days;
+  superadiabatic layer pairs 6000–11100 without and 4–26 with the scheme, highest wind 96 m/s in both.
+- Tests with the committed scaled drag (`b3c43ac4`): main suite 122074 of 122074 on Julia 1.12.2 and 1.10.13;
+  CPU vs Reactant for the dry and wet model 20 of 20 and 23 of 23; Enzyme `full_diff_CI.jl` on 1.10.13 and 1.11.7
+  and the extended Enzyme tests on 1.10.13 (23 test sets) pass; T32L24 with the scheme stable for the year again
+  (job 3349399). Not repeated after the drag change: the GPU suite and the full Reactant suite (the drag kernel
+  is unchanged, the coefficient is computed on the host).
 - The three-year T512L24 runs use `drag = 1e-5` set explicitly. The new default gives 1.2·10⁻⁵ there, 20 % more;
   the 60-day run checks that this makes no difference to stability.
 - With the scaling the coefficient is 8.5·10⁻⁶ at T256, 6·10⁻⁶ at T128 and 4.2·10⁻⁶ at T64. The overshoot threshold
   rises with resolution (excess of 69 m/s at T32, 139 m/s at T128, 278 m/s at T512), since the time step shrinks
   faster than the coefficient grows.
+
+### 8.14 Tibet at L24
+
+The draft of #1283 reported T31L24 NaN after about 12 hours over Tibet and attributed it to the explicit coupling
+of land and a thin lowest layer. Here T32L24 with the scheme is stable for a year (8.6, 8.13). Looked at directly
+with `$D/validation/tibet_oscillation.jl`: lowest-layer and soil temperature at every time step for 10 days after a
+20-day spin-up, at the 10 land points of 28–38°N, 78–100°E above 3000 m. A 2Δt oscillation would make the second
+difference in time about twice the first difference.
+
+| | Lowest-layer T: mean second / first difference | largest second difference [K] | Soil T: mean second / first difference |
+|---|---|---|---|
+| T32L8 without the scheme | 0.32 | 0.30 | 0.19 |
+| T32L8 with | 0.33 | 0.29 | 0.19 |
+| T32L24 without | 0.30 | 0.86 | 0.19 |
+| T32L24 with | 0.37 | 0.93 | 0.19 |
+
+No oscillation with or without the scheme, and no NaN. Ten points and ten days in January; not a proof for all
+seasons.
 
 ### 8.12 Next
 
@@ -741,7 +772,7 @@ strong at T32:
    and never ended a run. To decide: compare the multi-year run with it (`drag1e-5_hyper2`) against the one
    without (`drag1e-5`) over the full three years (events, drift, highest winds), and look at what the stronger
    hyperdiffusion costs in resolved small scales (e.g. kinetic energy spectrum), which has not been looked at.
-4. Tibet at L24.
+4. Tibet at L24: done at T32 (8.14).
 
 Slurm: `gpushort` allows two running jobs per user and 24 hours; the multi-year runs other than the first use
 `gpupreempt`, which has no such limit but can be preempted.
