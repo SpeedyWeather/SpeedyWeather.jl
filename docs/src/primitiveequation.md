@@ -561,6 +561,37 @@ to [Vertical advection](@ref) as ``W_q``. This equation is identical to a tracer
 with ``\mathcal{P}_q`` denoting sources and sinks. Note that [Horizontal diffusion](@ref horizontal_diffusion_primitive)
 should be applied to every advected variable.
 
+### Hole filling
+
+The spectral truncation, the advection and noise create negative humidity ``q < 0``,
+"holes", typically where the air is very dry. The `hole_filling` component of the
+`PrimitiveWetModel` removes them from the grid-point humidity after every transform to
+grid-point space. The default `ClipNegatives` sets negative values to zero,
+``[q]^+ = \max([q], 0)``, so that the dynamics and all parameterizations see a non-negative
+humidity. But the time stepping integrates the spectral humidity ``q_{lm}``,
+which still has the holes. Moisture added to a hole remains invisible to all tendencies,
+which see zero humidity there, so the holes in the spectral humidity can deepen and spread over time.
+With the additive noise of the `StochasticLeapfrog` the spectral humidity of the dry upper layers
+drifts to negative values this way. With `ClipNegatives(spectral_grid; fill_tendency = true)`
+the humidity that the clipping adds,
+``f = [q]^+ - [q] = \max(-[q], 0)``, is stored (`vars.dynamics.humidity_hole_fill`)
+and added in the next time step as a tendency ``f/\Delta t`` to the grid-point tendency of humidity.
+With the [Leapfrog](@ref leapfrog) time stepping, which steps forward from the previous time step ``i-1``
+with ``2\Delta t``, the fill of that previous step is used, such that
+```math
+q_{i+1} = q_{i-1} + 2\Delta t \left( \frac{f_{i-1}}{2\Delta t} + F(q^+_i, q^+_{i-1}) \right)
+= q^+_{i-1} + 2\Delta t F(q^+_i, q^+_{i-1})
+```
+in grid-point space, with the tendencies ``F`` of the dynamics evaluated at ``q^+_i``
+and those of the parameterizations at ``q^+_{i-1}``. The spectral humidity therefore
+integrates the clipped humidity that the tendencies see. By default (`fill_tendency = nothing`)
+the fill tendency is used with the `StochasticLeapfrog` only, `fill_tendency = true` or `false`
+turns it on or off with any time stepper. With the fill tendency, clipping is not water conserving:
+it adds the water to fill the holes, a few mm per year at T32.
+The [Robert-Asselin and Williams filter](@ref) sees the unfilled previous step, it moves
+a few percent of the fill back into the previous time step from where it is filled again
+two time steps later. `hole_filling = nothing` disables any hole filling.
+
 A very similar equation is solved for (absolute) temperature
 as described in the following.
 
@@ -840,7 +871,7 @@ Additionally we
 
 Now loop over
 
-1. Compute all tendencies of ``u, v, T, q`` due to physical parameterizations in grid-point space.
+1. Compute all tendencies of ``u, v, T, q`` due to physical parameterizations in grid-point space, add the [Hole filling](@ref) of humidity as a tendency if enabled.
 2. Compute the gradient of the logarithm of surface pressure ``\nabla (\ln p_s)_{lm}`` in spectral space and convert the two fields to grid-point space. Unscale the ``\cos(\theta)`` on the fly.
 3. For every layer ``k`` compute the pressure flux ``\mathbf{u}_k \cdot \nabla \ln p_s`` in grid-point space.
 4. For every layer ``k`` compute a linearized [Virtual temperature](@ref) in spectral space.
@@ -858,7 +889,7 @@ Now loop over
 16. Correct the tendencies following the [semi-implicit time integration](@ref implicit_swm) to prevent fast gravity waves from causing numerical instabilities.
 17. Compute the [horizontal diffusion](@ref diffusion) for the advected variables ``\zeta, \mathcal{D}, T, q``
 18. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
-19. Transform the new spectral state of ``\zeta_{lm}``, ``\mathcal{D}_{lm}``, ``T_{lm}``, ``q_{lm}`` and ``(\ln p_s)_{lm}`` to grid-point ``u, v, \zeta, \mathcal{D}, T, q, \ln p_s`` as described in 0.
+19. Transform the new spectral state of ``\zeta_{lm}``, ``\mathcal{D}_{lm}``, ``T_{lm}``, ``q_{lm}`` and ``(\ln p_s)_{lm}`` to grid-point ``u, v, \zeta, \mathcal{D}, T, q, \ln p_s`` as described in 0. Remove negative humidity with the [Hole filling](@ref).
 20. Possibly do some output
 21. Repeat from 1.
 

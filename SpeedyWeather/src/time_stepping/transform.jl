@@ -155,9 +155,8 @@ function SpeedyTransforms.transform!(
     grid_variables = get_prognostic_step(parent(vars.fused.grid), time_stepping, S)
     transform!(grid_variables, prognostic_variables, scratch_memory, S)
 
-    if model isa PrimitiveWet
-        humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
-        hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
+    if model isa PrimitiveWet   # remove negative humidity, the fill is added as tendency next step
+        hole_filling!(vars, model.hole_filling, model)
     end
 
     # Batched spec→grid for the velocities and ∇ln(pₛ), all unscaled by coslat: the

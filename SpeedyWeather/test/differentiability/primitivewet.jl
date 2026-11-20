@@ -183,3 +183,23 @@ end
         fd_only = (:vorticity, :divergence, :temperature, :pressure),
     )
 end
+
+@testset "Differentiability: PrimitiveWet hole_filling_tendency!" begin
+    # The hole filling adds the fill of the previous step divided by the time step to the grid
+    # humidity tendency (a Field broadcast there failed Enzyme's type analysis in reverse mode)
+    spectral_grid = _group1_spectral_grid()
+    hole_filling = ClipNegatives(spectral_grid; fill_tendency = true)       # opt-in with Leapfrog
+    model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true, hole_filling)
+    simulation = _spinup(model)
+    vars = simulation.variables
+    dvars = make_zero(vars)
+    dvars.tendencies.grid.humidity .= 1
+
+    autodiff(
+        set_runtime_activity(Reverse), SpeedyWeather.hole_filling_tendency!, Const,
+        Duplicated(vars, dvars), Const(model),
+    )
+    Δt = SpeedyWeather.time_step(model.time_stepping, vars.prognostic.clock)
+    @test all(SpeedyWeather.get_step(dvars.dynamics.humidity_hole_fill, 1) .≈ 1 / Δt)
+    @test all(SpeedyWeather.get_step(dvars.dynamics.humidity_hole_fill, 2) .== 0)
+end
