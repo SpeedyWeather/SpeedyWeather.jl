@@ -1,8 +1,8 @@
 # Hole filling of the PrimitiveWet humidity: integrate the clipped humidity
 
 > Status: **in progress**. Option 1 (the fill as a tendency, from the previous leapfrog step) is implemented and
-> passes the unit, JET, Enzyme, Reactant (CPU) and 10-year CPU checks; the 100-year run and the project's AD check
-> are pending.
+> passes the unit, JET, Enzyme, Reactant (CPU) and 10-year CPU checks, and the GPU checks on an H100 (GPU = CPU to
+> rounding, all drift variants, the 100-year run, timing, Reactant in strict Float32); the project's AD check is pending.
 
 Date of initial draft: 2026-11-20
 
@@ -30,6 +30,12 @@ constraints and acceptance tests below, committed in fa90cc81.
 * 2026-11-20: Enzyme reverse mode failed on the tendency written as a broadcast over `Field`s
   (`IllegalTypeAnalysisException`, not covered by the existing differentiability tests); both new broadcasts
   now act on `.data`, and a differentiability test was added.
+* 2026-11-20: GPU check on an NVIDIA H100 (see GPU below): GPU versions of the unit checks, CPU vs GPU from the
+  same state, the drift variants of the audit (fix against the old clip), the 100-year run (acceptance test 2) and
+  the timing. The GPU reproduces the CPU results; the implementation is unchanged. The `test/GPU/CUDA` environment
+  pins Reactant 0.2.291 (compat is ≥ 0.2.305), on which `transform!` does not compile on the GPU with the old clip
+  either, so Reactant was checked in a freshly resolved environment (0.2.308). There Reactant on the GPU matches the
+  CPU only in strict Float32 (with TF32 it fails for the old clip too).
 
 ## Problem description
 
@@ -255,8 +261,27 @@ humidity that differs from the field the model uses (10-yr deterministic T32 L8:
 against the fix). With the fix the hole volume is 25–260× smaller (up to 2000× with the additive noise),
 and every run adds 2.6–4.4 mm/yr of water.
 
-**2. 100 years from rest with noise.** Pending: about 2 h on this CPU, ~0.5 GPU-h on the cluster. 10 years from rest
-are too short to separate the spin-up from a trend.
+**2. 100 years from rest with noise** (GPU, T32 L8, `StochasticLeapfrog` with the default amplitudes, seed 1, H100,
+32 min). No drift of the filled layers. Linear fits over years 11–100 (the first decade is the spin-up from rest):
+
+| layer | mean [kg/kg] | slope [kg/kg/yr] | R², daily values | R², yearly means | temperature: slope [K/yr], R² (yearly) |
+|---|---|---|---|---|---|
+| 1 | 4.11e-5 | +4.0e-8 | 0.011 | 0.015 | +0.0003, 0.012 |
+| 2 | 1.22e-4 | +3.8e-8 | 0.006 | 0.008 | +0.0003, 0.008 |
+| 3 | 3.64e-4 | +5.3e-8 | 0.005 | 0.016 | +0.0007, 0.010 |
+| 4 | 1.61e-3 | +1.8e-7 | 0.008 | 0.022 | +0.0010, 0.023 |
+| 5 | 3.65e-3 | +2.6e-7 | 0.004 | 0.020 | +0.0008, 0.021 |
+| 6 | 5.69e-3 | +3.1e-7 | 0.002 | 0.023 | +0.0007, 0.021 |
+| 7 | 7.25e-3 | +3.6e-7 | 0.001 | 0.023 | +0.0004, 0.006 |
+| 8 | 9.57e-3 | +4.6e-7 | 0.001 | 0.023 | +0.0007, 0.023 |
+
+With daily values R² < 0.01 in layers 2–8 and 0.011 in layer 1 (the old model: 0.006, metric not recorded), with yearly
+means 0.008–0.023. The small residual trend is not the hole filling: temperature trends with the same R² (+0.03 to
++0.1 K per century), and the layers without holes (4–8) trend as much as layers 1–2, a slow warming and moistening of
+the whole model. Before the fix the layer-2 trend was −1.5e-4 kg/kg/yr (R² 1.00), now +3.8e-8 kg/kg/yr. Over the 100
+years the hole volume stays at 5.1e-4 → 6.5e-4 mm, 0.6/0.8 % (year 1) → 0.1/0.3 % (year 100) of the points of
+layers 1/2 are below zero (yearly means), the deepest unclipped value in any layer is −1.2e-3 kg/kg, and the filling adds 3.4–4.3 mm/yr (0.5 % of the evaporation, 780–860
+mm/yr). Year 10 equals that of the separate 10-year run exactly (same seed: the GPU runs are reproducible).
 
 **3. Climate impact.** 10-yr means (years 1–10, incl. spin-up), fix against old:
 
@@ -291,10 +316,91 @@ Upstream, in a scratch environment (Enzyme 0.13, Julia 1.12, CPU), all pass:
 (MatrixSpectralTransform, tendencies after one step and 100 steps of prognostic and grid variables) passes, 23/23,
 with Reactant on the CPU of this Mac. The Reactant state is also internally consistent: its stored fill equals
 `max(−transform(q), 0)` of its own spectral humidity to 4.9e-9 and its grid humidity equals `max(q, 0)` to 2.8e-8
-(Float32 rounding). Reactant on GPU not tested; the new code is broadcasts only, no scalar indexing.
+(Float32 rounding). Reactant on the GPU: see GPU below.
 
 **Performance.** CPU, T32 L8, per time step: +36 μs of 5.9 ms (+0.6 %): the fill broadcast (+8 μs), the tendency
-(3 μs) and moving the fill back (24 μs). GPU not measured; it adds three small kernels per step.
+(3 μs) and moving the fill back (24 μs). GPU: about +22 μs per step, see GPU below.
+
+**GPU.** One NVIDIA H100 80GB per SLURM job, Julia 1.12.2, CUDA.jl 6.2 (environment `SpeedyWeather/test/GPU/CUDA`),
+Float32, from rest, with the GPU's default transform (`MatrixSpectralTransform` up to T64). Script
+`docs/dev/2026-11/hole_filling_gpu_check.jl`, modes `consistency`, `drift`, `perf` and `summary`. The old behaviour
+is a hole filling `OldClip <: AbstractHoleFilling` that only defines the grid-field clip. It takes the fallback,
+without the fill variable or the tendency, so fix and old run in one process. Logs and daily TSVs are in
+`/p/tmp/maxgelbr/code/claude_holefilling_gpu_2026-11-20/`.
+
+*Consistency* (`--check-bounds=yes`, all pass). `clip_negatives!` on the GPU equals the CPU bitwise, and
+`hole_filling_tendency!` adds `fill(step 1) / Δt`. Without physics, the constant hole of −1e-5 is refilled to
++1.3e-7 after one day: as on the CPU, the filter leaves ≈ 1 % of the hole as extra water. After one day of the default
+model, the current step's grid humidity is exactly `max(transform(q), 0)` and its fill exactly
+`max(−transform(q), 0)`, with both `MatrixSpectralTransform` and `SpectralTransform`. This holds for the current
+step only. On the CPU too, the previous step differs by up to 3.5e-5, because the filter changes its spectral
+humidity after its grid humidity was computed (see Known limitations).
+
+*CPU vs GPU from the same state.* The GPU state after 10 days is copied to a CPU model, `SpectralTransform` on both;
+maximum relative differences:
+
+| hole filling | 1 step: spectral q, grid q, T | 36 steps: spectral q, grid q, T |
+|---|---|---|
+| fix | 8.5e-9, 3.6e-7, 5.0e-7 | 1.6e-4, 2.6e-2, 2.1e-3 |
+| old | 8.6e-9, 3.6e-7, 5.0e-7 | 1.5e-4, 1.7e-2, 5.3e-4 |
+
+After one step, the fills differ by at most 7e-10 (largest fill 2.5e-4) and are nonzero at the same 791 points. After a
+day the trajectories diverge chaotically, the grid humidity through condensation switches, with and without the fix
+alike.
+
+*Drift variants*, fix | old (compare the Audit table; T32 L8 unless stated):
+
+| run | points < 0, layers 1/2, yr 1 → last | deepest unclipped | hole volume [mm] | water added \| hidden [mm/yr] | evaporation [mm/yr] |
+|---|---|---|---|---|---|
+| StochasticLeapfrog, 10 yr | 0.6/0.8 → 0.1/0.3 % \| 50/26 → 67/56 % | −7.1e-4 \| −7.2e-2 | 5.1e-4 → 6.1e-4 \| 0.066 → 1.12 | 3.4 → 4.0 \| 430 → 7400 | 780–850 |
+| deterministic, 10 yr | 1.0/0.6 → 0.0/0.2 % \| 23/15 → 0.1/9.7 % | −6.4e-4 \| −5.7e-3 | 4.2e-4 → 4.6e-4 \| 0.027 → 0.032 | 2.8 → 3.0 \| 180 → 210 | 710–770 |
+| deterministic T32 L16, 3 yr | 1.0/1.7 → 0.0/0.1 % \| 20/28 → 3.0/4.7 % | −2.1e-3 \| −8.4e-3 | 4.1e-4 → 6.2e-4 \| 0.015 → 0.020 | 2.7 → 4.2 \| 97 → 134 | 670–840 |
+| SPPT (SpectralAR1Process), 3 yr | 0.9/0.6 → 0.1/0.1 % \| 25/13 → 8.9/4.8 % | −6.7e-4 \| −6.5e-3 | 3.7e-4 → 4.2e-4 \| 0.027 → 0.012 | 2.5 → 2.7 \| 174 → 77 | 710–740 |
+| deterministic T64 L8, 1 yr | 0.6/0.4 % \| 14.5/12.6 % | −8.1e-4 \| −2.1e-2 | 2.0e-4 \| 0.052 | 2.6 \| 685 | 740 |
+
+For the fix, "water added" is the fill accumulated every time step (column integral of the fill / 2 per leapfrog
+step). For the old clip, "hidden" is the hole volume × time steps per year / 2, as in the Audit. For the fix both
+measures agree (4.02 against 4.0 mm/yr). With noise, year 10, layers 1/2:
+
+* spectral means: fix +3.2e-5 / +1.2e-4, old −2.0e-4 / −1.5e-3 kg/kg (CPU: +2.9e-5 / +1.1e-4 and
+  −2.2e-4 / −1.7e-3);
+* trend over years 4–10: fix +2.8e-6 (R² 0.65) / +4.4e-6 (0.58), old −2.3e-5 (0.99) / −1.5e-4 (1.00) kg/kg/yr;
+* climate impact (10-yr means): +0.10 to +0.50 K, layer 1 9.3× and layer 2 3.7× moister (CPU 11× and 3.6×).
+
+In the old deterministic T64 run the layer-2 spectral mean is again negative after one year: −3.3e-5 against a
+clipped mean of +6.7e-5. The GPU reproduces the CPU results within the spread of chaotic trajectories, which here
+differ in hardware and transform.
+
+*Timing* (`perf`): default model with `Leapfrog`, median of 5 timings of 1000, 600 and 300 steps, alternating fix
+and old:
+
+| resolution, transform | ms per step, fix | old | difference |
+|---|---|---|---|
+| T32 L8, MatrixSpectralTransform | 1.111 | 1.084 | +0.027 (+2.5 %) |
+| T64 L8, MatrixSpectralTransform | 1.140 | 1.086 | +0.055 (+5.0 %) |
+| T128 L8, SpectralTransform | 3.802 | 3.791 | +0.011 (+0.3 %) |
+
+At every resolution the calls alone take 11–12 μs (`hole_filling!`, two broadcasts), 7 μs
+(`hole_filling_tendency!`) and 3 μs (moving the fill back), ≈ 22 μs per step. The T64 difference is inflated by the
+spread of the fix's timings (1.11–1.77 ms). Up to T64 the GPU time step is bound by kernel launches, so the fix costs
+≈ 2 % there and nothing measurable from T128 on.
+
+*Reactant on the GPU* (`docs/dev/2026-11/hole_filling_reactant_gpu.jl`: the PrimitiveWet correctness test of
+`test/reactant/test_correctness.jl` for both transforms, the fill of CPU and Reactant after its 100 steps, and the
+consistency of the Reactant state):
+* Reactant 0.2.291 (the stale `test/GPU/CUDA` manifest): `transform!` fails to compile, "cannot raise op to stablehlo"
+  on a complex zero constant (`llvm.mlir.constant` `array<2 x f32>`), with the old clip as well. Not the fix.
+* Reactant 0.2.308 (freshly resolved environment), Reactant on the CPU (`CUDA_VISIBLE_DEVICES=`): the correctness
+  test passes; after 100 steps CPU and Reactant hold the same fill (total 4.0363e-2 at 918 points); the current step
+  of the Reactant state is consistent to 1.1e-8 (grid) and 5.6e-9 (fill).
+* Reactant 0.2.308 on the GPU, default TF32 matrix products: the correctness test fails for the fix and the old clip
+  alike (maximum relative difference 1.2–2.0 in all prognostic variables after 100 steps), the TF32 deviations
+  described in `docs/src/architectures_gpu.md`.
+* Reactant 0.2.308 on the GPU, strict Float32 (`PrecisionConfig.HIGHEST`, `XLA_FLAGS=--xla_gpu_enable_triton_gemm=false`,
+  `NVIDIA_TF32_OVERRIDE=0`): all pass, 48/48 with the fix and 42/42 with the old clip, both transforms. After 100
+  steps CPU and Reactant hold the same fill (`MatrixSpectralTransform`: 4.0446e-2 at 924 points; `SpectralTransform`:
+  4.0681e-2 against 4.0680e-2 at 935 points), and the current step of the Reactant state is consistent to 2.8e-8 and
+  1.3e-8 (grid humidity) and 4.0e-9 and 1.9e-9 (fill).
 
 ## Documentation changes
 
@@ -311,6 +417,9 @@ with Reactant on the CPU of this Mac. The Reactant state is also internally cons
   damped by the filter. In the unit test (constant hole of −1e-5) about 1 % of the hole remains as extra water. An
   exact treatment needs the fill in spectral space inside the leapfrog kernel (see Future work).
 * **Not water conserving.** The filling adds ≈ 4 mm/yr (0.5 % of the evaporation) at T32 L8 with noise.
+* **GPU cost at low resolution.** Three small kernels and a copy per step, ≈ 22 μs on an H100: ≈ 2 % of a T32/T64
+  time step, which is bound by kernel launches there. Fusing the two broadcasts of the clip into one kernel would save
+  one launch.
 * **Truncation.** The fill reaches the spectral humidity through the spectral truncation of the tendency, so small
   negatives remain on the grid (0.1–0.7 % of the points in layers 1–2, minima of a few 1e-6 to 2e-5 kg/kg).
 * **`NCycleLorenz`.** Its weighted tendency memory spreads the fill over the cycle, so the spectral humidity is
@@ -349,8 +458,16 @@ Next steps:
 Handoff: SpeedyWeather `0.25.0-DEV`, branch `mg/gfdt-upstream` at `c19adc3d9` (git tree `55c4d100`; `fb912357a` was
 checked bitwise identical for this model); Julia 1.11.7; NVIDIA GPU via CUDA.jl's own artifacts (no system CUDA module).
 Fix: SpeedyWeather `0.26.0-DEV`, branch `mg/holefilling-revised` on fa90cc81; checks with Julia 1.12.7 on CPU.
+GPU checks at `4681db88f`: Julia 1.12.2, CUDA.jl 6.2.2, KernelAbstractions 0.9.44 (`SpeedyWeather/test/GPU/CUDA`),
+one H100 80GB per job (SLURM jobs 3369964–3372655); Reactant 0.2.308 with CUDA.jl 6.4.1 in a freshly resolved copy
+of that environment (`/p/tmp/maxgelbr/code/claude_holefilling_gpu_2026-11-20/env_fresh`).
 
 ## Files
 
-* `docs/dev/2026-11/hole_filling_mwe.jl` — standalone reproducer (SpeedyWeather only).
-* `docs/dev/2026-11/hole_filling_drift_check.jl` — the yearly diagnostics above, with and without the fix.
+* `docs/dev/2026-11/hole_filling_mwe.jl` — standalone reproducer (SpeedyWeather only; not in this checkout).
+* `docs/dev/2026-11/hole_filling_drift_check.jl` — the yearly diagnostics above, with and without the fix (not in
+  this checkout).
+* `docs/dev/2026-11/hole_filling_gpu_check.jl` — the GPU checks: consistency, the drift variants (fix against the old
+  grid-only clip), timing, and the tables from the daily TSVs.
+* `docs/dev/2026-11/hole_filling_reactant_gpu.jl` — Reactant against CPU with the fix (or `HF_VARIANT=old`), on the GPU
+  or the CPU, optionally strict Float32 (`HF_STRICT=1`).
