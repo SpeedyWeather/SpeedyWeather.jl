@@ -234,6 +234,24 @@ model the grid humidity is exactly `max(transform(spectral humidity), 0)` and th
 The JET dispatch tests (`test/dynamics/dispatch.jl`, PrimitiveWet and StochasticLeapfrog `time_step!` free of
 runtime dispatch) pass.
 
+**After the change to opt-in** (cluster, Julia 1.12.2, CPU unless stated, `--check-bounds=yes`):
+* **Unit tests** (`test/dynamics/hole_filling.jl`) pass, 5 + 10 + 5 + 3:
+  * The automatic choice: `ClipNegatives(spectral_grid)` adds the fill with `StochasticLeapfrog` but not with
+    `Leapfrog`, and `fill_tendency = true`/`false` overrides it with either. The fill variable exists only with the fill
+    tendency.
+  * The constant hole is refilled with `fill_tendency = true` and stays at −1e-5 with `false`.
+  * The consistency test now runs with `StochasticLeapfrog`, i.e. through the automatic path.
+* **JET dispatch tests**: all 4 pass. They cover `PrimitiveWet` with `Leapfrog` (fill off) and with
+  `StochasticLeapfrog` (fill on). In `SpeedyWeather/test`'s manifest the barotropic test fails with runtime dispatch
+  inside KernelAbstractions 0.9.41's CPU launch (`__thread_run`). That is unrelated to the hole filling and passes
+  with 0.9.48 in a freshly resolved environment (SpeedyWeather, JET 0.13.3, Test).
+* **Enzyme**: the hole-filling reverse-mode test (now with `fill_tendency = true`) passes, 2/2, with Enzyme 0.13.221
+  in a freshly resolved copy of the differentiability environment. Its pinned manifest no longer precompiles
+  LowerTriangularArrays.
+* **GPU, the automatic default end to end.** With the default `ClipNegatives`, one year on the H100 reproduces the
+  earlier runs bitwise (every daily value): with `StochasticLeapfrog` the fix run, with `Leapfrog` the old clip.
+  The GPU consistency checks with `fill_tendency = true` pass again, 23/23.
+
 **1. MWE with noise.** Layers 1 and 2 stay positive. The unclipped minimum does not deepen and holes cover
 0.1–0.7 % of the points (old: 33–67 %, old without noise 3–31 %).
 
