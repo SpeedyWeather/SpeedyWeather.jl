@@ -198,20 +198,26 @@ end
 # hacky, temporary placement, and also modularize this?
 function reset_variables!(vars::Variables)
     nlayers = size(vars.prognostic.temperature, 2)
-    reset_variable!(vars.parameterizations, :cloud_top, nlayers + 1)   # reset to below top layer
-    reset_variable!(vars.parameterizations, :rain_rate, 0)
-    reset_variable!(vars.parameterizations, :snow_rate, 0)
-    reset_variable!(vars.parameterizations, :rain_rate_convection, 0)
-    reset_variable!(vars.parameterizations, :snow_rate_convection, 0)
-    reset_variable!(vars.parameterizations, :surface_humidity_flux, 0)
-    reset_variable!(vars.parameterizations, :sensible_heat_flux, 0)
-    return nothing
+    resets = (
+        cloud_top = nlayers + 1,                # reset to below top layer
+        rain_rate = 0,
+        snow_rate = 0,
+        rain_rate_convection = 0,
+        snow_rate_convection = 0,
+        surface_humidity_flux = 0,
+        sensible_heat_flux = 0,
+    )
+    return reset_variables!(vars.parameterizations, resets)
 end
 
-function reset_variable!(vars, var::Symbol, reset_value)
-    if haskey(vars, var)
-        field = getfield(vars, var)
-        field .= reset_value
-    end
-    return nothing
+"""$(TYPEDSIGNATURES)
+Reset every variable in `vars` that is named in `resets` to its value there, `vars.name .= resets.name`,
+skipping names that `vars` doesn't have. Generated from the names of both NamedTuples, so the variables
+are picked at compile time, one concretely inferred broadcast each, however many variables `vars` holds."""
+@generated function reset_variables!(vars::NamedTuple{names}, resets::NamedTuple{reset_names}) where {names, reset_names}
+    exprs = [
+        :(getfield(vars, $(QuoteNode(name))) .= getfield(resets, $(QuoteNode(name))))
+            for name in reset_names if name in names
+    ]
+    return Expr(:block, exprs..., :(return nothing))
 end
