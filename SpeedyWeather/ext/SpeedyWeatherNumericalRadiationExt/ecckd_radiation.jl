@@ -322,7 +322,7 @@ Base.@propagate_inbounds function ecckd_shortwave!(ij, vars, fluxes, shortwave, 
                                          view(W.sw_stack_albedo, ij, 1:(nlayers + 1)),
                                          view(W.sw_source, ij, 1:(nlayers + 1)))
         boundary = ShortwaveBoundaryConditions(
-            toa_shortwave_down = model.planet.solar_constant * cos_zenith,
+            toa_shortwave_down = model.planet.solar_constant * SpeedyWeather.solar_distance_factor(vars) * cos_zenith,
             surface_albedo = albedo)
         radiative_fluxes!(fluxes, CloudlessShortwave(), shortwave, atmosphere, boundary, scratch)
     else
