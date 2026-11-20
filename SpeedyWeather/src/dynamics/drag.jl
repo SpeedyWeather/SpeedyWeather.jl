@@ -122,7 +122,7 @@ end
 export SpeedLimitDrag
 @parameterized @kwdef struct SpeedLimitDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/m]"
-    @param drag::NF = 3.0e-6 (bounds = Nonnegative,)
+    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)
 
     "[OPTION] Speed limit above which drag kicks in [m/s]"
     @param speed_limit::NF = 80 (bounds = Nonnegative,)
