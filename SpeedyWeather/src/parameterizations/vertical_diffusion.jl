@@ -69,8 +69,11 @@ variables(::BulkRichardsonDiffusion) = (
     ParameterizationVariable(:vertical_diffusivity_momentum, GridXYZ(), desc = "Vertical diffusivity of momentum at the interface below each layer", units = "m^2/s"),
     ParameterizationVariable(:vertical_diffusivity_heat, GridXYZ(), desc = "Vertical diffusivity of heat and humidity at the interface below each layer", units = "m^2/s"),
     ScratchVariable(:density_over_distance, GridXYZ(), desc = "Air density over the distance between layers at the interface below each layer", units = "kg/m^4", namespace = :grid),
-    ScratchVariable(:tridiagonal_upper, GridXYZ(), desc = "Upper diagonal of the forward-eliminated tridiagonal system", units = "1", namespace = :grid),
-    ScratchVariable(:tridiagonal_rhs, GridXYZ(), desc = "Right-hand side of the forward-eliminated tridiagonal system", units = "?", namespace = :grid),
+
+    #TODO: reusing the scratch memory for a parameterization has caused problems with Reactant before
+    # so far this seems fine but it might need be revisited
+    ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
+    ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
 )
 
 initialize!(::BulkRichardsonDiffusion, ::PrimitiveEquation) = nothing
@@ -97,7 +100,9 @@ Vertical diffusion tendencies of u, v, temperature (via dry static energy) and h
     pₛ = vars.parameterizations.surface_pressure[ij]
     K_momentum = vars.parameterizations.vertical_diffusivity_momentum
     K_heat = vars.parameterizations.vertical_diffusivity_heat
-    (; density_over_distance, tridiagonal_upper, tridiagonal_rhs) = vars.scratch.grid
+    (; density_over_distance) = vars.scratch.grid
+    tridiagonal_rhs = vars.scratch.grid.a       # general scratch arrays, the virtual temperature in `a` is
+    tridiagonal_upper = vars.scratch.grid.b     # not needed any more after vertical_diffusivity!
     solver_arguments = (density_over_distance, tridiagonal_upper, tridiagonal_rhs, pₛ, Δt, g, vertical_coordinates, couple_surface_fluxes)
 
     if diffuse_momentum
@@ -171,13 +176,13 @@ K = min(max(K_profile, K_local, K_background), K_max) with
     (; density_over_distance) = vars.scratch.grid
     NF = eltype(K_momentum)
 
-    # Virtual temperature of every layer, in the scratch array for the right-hand side of the implicit solver,
-    # which is free until the solves. The two loops below (boundary layer height, diffusivities) read it
+    # Virtual temperature of every layer, in a general scratch array that the implicit solver reuses for its
+    # right-hand side afterwards. The two loops below (boundary layer height, diffusivities) read it
     # instead of temperature and humidity. Do not merge this loop into them: with the virtual temperature
     # computed from humidity inside these loops (in both, or in the first and stored for the second),
     # Reactant raised the kernel of the wet model to one that writes nothing (Reactant 0.2.30x, see
     # docs/dev/2026-11/2026-11-19-bulk-richardson.md, section 8.3)
-    Tᵥ_layers = vars.scratch.grid.tridiagonal_rhs
+    Tᵥ_layers = vars.scratch.grid.a
     for k in 1:nlayers
         Tᵥ_layers[ij, k] = virtual_temperature(T[ij, k], column_humidity(q, ij, k), atmosphere)
     end
