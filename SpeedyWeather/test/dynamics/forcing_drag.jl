@@ -103,20 +103,20 @@ end
     time_stepping = model.time_stepping
     Δt = SpeedyWeather.default_time_step(time_stepping)     # 2Δt of the leapfrog
 
-    # with leapfrog the drag reads the previous step (a forward step over 2Δt), not the current one
-    @test SpeedyWeather.which_prognostic_step(variables.grid.u, time_stepping, default_drag) == 1
+    # with leapfrog the drag reads the current step as the other drags (the previous step made T32L24 blow up)
+    @test SpeedyWeather.which_prognostic_step(variables.grid.u, time_stepping, default_drag) == 2
     u_steps = SpeedyWeather.get_steps(variables.grid.u)
     Fu = SpeedyWeather.get_tendency_step(variables.tendencies.grid.u, time_stepping, default_drag)
     variables.grid.v .= 0
-    u_steps[1] .= 100   # previous step above the limit
-    u_steps[2] .= 0     # current step at rest
+    u_steps[1] .= 0     # previous step at rest
+    u_steps[2] .= 100   # current step above the limit
     Fu .= 0
     SpeedyWeather.drag!(variables, default_drag, model)
     @test all(<(0), Array(parent(Fu)))
 
     # one forward step of a zonal flow 20 m/s above the limit, from z = Δt*c*excess ≪ 1 to z ≫ 1
     excess = 20.0
-    u = u_steps[1]
+    u = u_steps[2]
     explicit, implicit, exponential, rational = ExplicitFluxes(), ImplicitFluxes(), ExponentialFluxes(), RationalFluxes()
     for c in (1.0e-7, 1.0e-5, 1.0e-3)
         z = Δt * c * excess

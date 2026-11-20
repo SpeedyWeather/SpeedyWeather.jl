@@ -54,10 +54,6 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractForcing) = 2
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDrag) = 2
 
-# but the speed limit drag on the previous step, a forward step over 2Δt damped by its `time_integration`,
-# as a damping term on the current step amplifies the computational mode (in 2D models the only grid step)
-@inline which_prognostic_step(var, ::AbstractLeapfrog, ::SpeedLimitDrag) = 1
-
 # in Leapfrog use the current (=2nd) in the dynamical core
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
 

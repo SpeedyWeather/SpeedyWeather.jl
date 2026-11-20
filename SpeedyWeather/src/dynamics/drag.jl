@@ -154,9 +154,9 @@ damping factor `φ(z)` of `scheme.time_integration` with `z = Δt/τ = Δt*c*e` 
 the time step (2Δt for leapfrog), so that the drag does not decelerate the wind beyond
 the speed limit for large `c`, `e` or `Δt`. With `ImplicitFluxes()`, `φ = 1/(1 + z)`, this
 is the exact solution `e(Δt) = e/(1 + c*e*Δt)` of the quadratic drag. With leapfrog the
-drag is evaluated at the previous time step (a forward step over 2Δt, as the
-parameterizations), as a damping term evaluated at the current time step amplifies
-the computational mode."""
+drag is evaluated at the current time step as the other drags. (At the previous time
+step, a forward step over 2Δt for which φ is derived, T32L24 blew up in the lowest layers
+at the Antarctic coast where the drag at the current step held the wind below 110 m/s.)"""
 function drag!(
         vars::Variables,
         scheme::SpeedLimitDrag,
