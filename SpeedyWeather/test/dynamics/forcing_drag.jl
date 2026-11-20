@@ -48,7 +48,7 @@ end
     # diagonal instead and was √2 too large for a 45° flow.
     spectral_grid = SpectralGrid(truncation = 16, nlayers = 2)
     c, speed_limit = 3.0e-6, 80.0
-    drag = SpeedLimitDrag(spectral_grid; drag = c, speed_limit)
+    drag = SpeedLimitDrag(spectral_grid; drag = c, speed_limit, resolution_scaling = 0)    # c at all resolutions
     model = PrimitiveDryModel(spectral_grid; drag)
     simulation = initialize!(model)
     (; variables) = simulation
@@ -81,6 +81,20 @@ end
             @test fv ≈ -expected * uv[2] / speed rtol = 1.0e-5
         end
     end
+
+    # by default the drag coefficient is that of T32 and stronger at higher resolution
+    default_drag = SpeedLimitDrag(spectral_grid)
+    coefficient = SpeedyWeather.speed_limit_drag_coefficient
+    @test coefficient(default_drag, 32) == default_drag.drag
+    @test coefficient(default_drag, 512) ≈ 4 * default_drag.drag
+    @test coefficient(default_drag, 16) < default_drag.drag
+    @test coefficient(drag, 512) == drag.drag       # resolution_scaling = 0
+    u .= 100
+    v .= 0
+    Fu .= 0
+    Fv .= 0
+    SpeedyWeather.drag!(variables, default_drag, model)     # T16
+    @test Array(parent(Fu))[1] ≈ -coefficient(default_drag, 16) * 20^2 rtol = 1.0e-5
 
     # no drag below the limit, and no NaN for zero wind (the 0/0 guard)
     u .= 0

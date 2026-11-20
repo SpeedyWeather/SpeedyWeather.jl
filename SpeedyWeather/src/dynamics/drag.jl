@@ -121,11 +121,18 @@ end
 
 export SpeedLimitDrag
 @parameterized @kwdef struct SpeedLimitDrag{NF} <: AbstractDrag
-    "[OPTION] drag coefficient [1/m]"
-    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)
+    "[OPTION] drag coefficient [1/m] at T32, see `resolution_scaling`"
+    @param drag::NF = 3.0e-6 (bounds = Nonnegative,)
 
     "[OPTION] Speed limit above which drag kicks in [m/s]"
     @param speed_limit::NF = 80 (bounds = Nonnegative,)
+
+    # 0.5 gives 1.2e-5 at T512, where 3e-6 let the wind in the uppermost layers blow up after 5 weeks (with
+    # 24 layers and the default time step) and 1e-5 did not. A coefficient of 1e-5 at all resolutions is too
+    # strong at T32 with its 16 times longer time step, as the drag is explicit in time (T32 with 24 layers
+    # blew up within a year)
+    "[OPTION] stronger drag with resolution? Drag coefficient is `drag * (truncation/32)^resolution_scaling`, 0: constant with truncation"
+    resolution_scaling::NF = 0.5
 end
 
 SpeedLimitDrag(SG::SpectralGrid; kwargs...) = SpeedLimitDrag{SG.NF}(; kwargs...)
@@ -137,7 +144,8 @@ Speed limit drag for the momentum equations.
 
     (Fu, Fv) = -c*max(0, |(u, v)| - speed_limit)^2 * (u, v)/|(u, v)|
 
-with `c` the drag coefficient [1/m] as defined in `drag::SpeedLimitDrag` and
+with `c` the drag coefficient [1/m], `drag * (truncation/32)^resolution_scaling` as defined in
+`drag::SpeedLimitDrag`, i.e. stronger at higher resolution, and
 kicking in only above a certain speed limit. The drag is quadratic in the excess
 speed above the limit and antiparallel to the flow, so it only decelerates and
 never rotates it."""
@@ -152,8 +160,8 @@ function drag!(
     Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
     Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 
-    # total drag coefficient
-    c = scheme.drag
+    # total drag coefficient, stronger at higher resolution
+    c = speed_limit_drag_coefficient(scheme, model.spectral_grid.truncation)
     (; speed_limit) = scheme
 
     launch!(
@@ -162,6 +170,12 @@ function drag!(
     )
     return nothing
 end
+
+"""$(TYPEDSIGNATURES)
+Drag coefficient [1/m] of `scheme` at spectral truncation `truncation`:
+`drag * (truncation/32)^resolution_scaling`, with `drag` the coefficient at T32."""
+speed_limit_drag_coefficient(scheme::SpeedLimitDrag, truncation::Integer) =
+    scheme.drag * (oftype(scheme.drag, truncation) / DEFAULT_TRUNCATION)^scheme.resolution_scaling
 
 @kernel inbounds = true function speed_limit_drag_kernel!(
         Fu, Fv, u, v, c, speed_limit
