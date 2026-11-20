@@ -7,6 +7,14 @@ abstract type AbstractZenith <: AbstractModelComponent end
 const LENGTH_OF_DAY = Second(EARTH_DAY).value
 const LENGTH_OF_YEAR = Second(EARTH_YEAR).value
 
+"""$(TYPEDSIGNATURES)
+Phase [radians] of the vernal `equinox` in the year angle, relative to the mean year (365.25 days)
+not the actual year length as in `year_angle`, so that the year of `equinox` is (up to the one
+day that a Feb-29 shifts `dayofyear` by in leap years) irrelevant, as documented for
+`planet.equinox`. Shared by `SinSolarDeclination` and `KeplerOrbit`."""
+equinox_angle(::Type{T}, equinox::Dates.AbstractDateTime) where {T} =
+    convert(T, 2π * (Dates.dayofyear(equinox) - 1) * LENGTH_OF_DAY / LENGTH_OF_YEAR)
+
 """Coefficients to calculate the solar declination angle δ [radians] based on a simple
 sine function, with Earth's axial tilt as amplitude, equinox as phase shift.
 $(TYPEDFIELDS)"""
@@ -28,11 +36,7 @@ is relative to the Earth calendar. The year angle `g` should reflect
 slower/faster seasons."""
 function (S::SinSolarDeclination)(g::NF) where {NF}
     axial_tilt = deg2rad(S.axial_tilt)
-    # phase of the equinox relative to the mean year (365.25 days), not the actual year length
-    # as in `year_angle`, so that the year of `S.equinox` is (up to the one day that a Feb-29
-    # shifts `dayofyear` by in leap years) irrelevant, as documented for `planet.equinox`
-    equinox = 2π * (Dates.dayofyear(S.equinox) - 1) * LENGTH_OF_DAY / LENGTH_OF_YEAR
-    return axial_tilt * sin(g - convert(NF, equinox))
+    return axial_tilt * sin(g - equinox_angle(NF, S.equinox))
 end
 
 """Coefficients to calculate the solar declination angle δ from
@@ -119,13 +123,85 @@ function WhichZenith(
     return Z(SG; planet.seasonal_cycle, solar_declination, time_correction)
 end
 
-# function barrier
+# function barrier, the orbit (`planet.orbit`, which defines the variables it needs) is computed
+# here once per time step outside any kernel: the solar declination is passed on to the zenith
+# kernels, a `KeplerOrbit` also writes the distance factor (a/r)² for the shortwave radiation
 function parameterization!(vars::Variables, zenith::AbstractZenith, model::PrimitiveEquation)
     (; rotation_time, orbit_time) = vars.prognostic.clock
-    (; geometry) = model
+    (; geometry, planet) = model
     (; cos_zenith) = vars.parameterizations
-    cos_zenith!(cos_zenith, zenith, rotation_time, orbit_time, geometry)
+    declination = orbit_position!(vars, eltype(cos_zenith), planet.orbit, zenith, planet, orbit_time)
+    cos_zenith!(cos_zenith, zenith, rotation_time, orbit_time, geometry, declination)
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Compute the orbit position at `orbit_time` and return the solar declination δ [radians]. A
+`KeplerOrbit` also writes the distance factor (a/r)² into `vars.parameterizations.solar_distance_factor`,
+a `CircularOrbit` writes nothing as the factor is 1 (see `solar_distance_factor`)."""
+orbit_position!(vars::Variables, ::Type{T}, orbit::CircularOrbit, S::AbstractZenith, planet::AbstractPlanet, orbit_time::Dates.AbstractDateTime) where {T} =
+    first(orbit_position(T, orbit, S, planet, orbit_time))
+
+function orbit_position!(vars::Variables, ::Type{T}, orbit::KeplerOrbit, S::AbstractZenith, planet::AbstractPlanet, orbit_time::Dates.AbstractDateTime) where {T}
+    declination, distance_factor = orbit_position(T, orbit, S, planet, orbit_time)
+    vars.parameterizations.solar_distance_factor[] = distance_factor
+    return declination
+end
+
+"""$(TYPEDSIGNATURES)
+Sun-planet distance factor (a/r)² by which the solar constant is multiplied in the shortwave
+radiation: read from `vars.parameterizations.solar_distance_factor` if the orbit (`KeplerOrbit`)
+requires it, 1 otherwise. Decided at compile time, as `haskey` on a NamedTuple is resolved by the
+compiler, so for a `CircularOrbit` nothing is read and the multiplication drops out."""
+@inline solar_distance_factor(vars::Variables) =
+    haskey(vars.parameterizations, :solar_distance_factor) ? vars.parameterizations.solar_distance_factor[] :
+    one(eltype(vars.parameterizations.cos_zenith))
+
+"""$(TYPEDSIGNATURES)
+Solar declination δ [radians] and distance factor (a/r)² for a `CircularOrbit`: the declination
+from the solar zenith's `solar_declination` component, the distance factor is 1."""
+orbit_position(::Type{T}, ::CircularOrbit, S::AbstractZenith, planet::AbstractPlanet, orbit_time::Dates.AbstractDateTime) where {T} =
+    (solar_declination(T, S, orbit_time), one(T))
+
+"""$(TYPEDSIGNATURES)
+Eccentric anomaly E [radians] solving Kepler's equation E - e sin(E) = M for the mean anomaly `M`
+and eccentricity `e` with a fixed number of Newton iterations (no data-dependent control flow).
+Converges quadratically from the starting guess E = M + e sin(M), to round-off for e ≲ 0.8."""
+function eccentric_anomaly(M, e; iterations::Int = 5)
+    E = M + e * sin(M)
+    for _ in 1:iterations
+        E -= (E - e * sin(E) - M) / (1 - e * cos(E))
+    end
+    return E
+end
+
+"""$(TYPEDSIGNATURES)
+Solar declination δ [radians] and distance factor (a/r)² for a `KeplerOrbit` at `orbit_time`.
+The year angle of `orbit_time` advances the mean anomaly, anchored so that the true solar
+longitude λ is 0 at the planet's vernal `equinox`. With the eccentric anomaly E from Kepler's
+equation, the true anomaly ν, λ = ν + ϖ (ϖ the longitude of perihelion),
+sin(δ) = sin(tilt)·sin(λ) and (a/r)² = 1/(1 - e cos(E))²."""
+function orbit_position(
+        ::Type{T},
+        orbit::KeplerOrbit,
+        S::AbstractZenith,
+        planet::AbstractPlanet,
+        orbit_time::Dates.AbstractDateTime,
+    ) where {T}
+    e = convert(T, orbit.eccentricity)
+    ϖ = deg2rad(convert(T, orbit.longitude_of_perihelion))
+    tilt = deg2rad(convert(T, planet.axial_tilt))
+
+    # mean anomaly advances uniformly with the year angle from its value at the vernal equinox
+    g = year_angle(T, S, orbit_time)
+    M = convert(T, orbit.mean_anomaly_equinox) + g - equinox_angle(T, planet.equinox)
+
+    E = eccentric_anomaly(M, e)
+    ν = 2 * atan(sqrt(1 + e) * sin(E / 2), sqrt(1 - e) * cos(E / 2))    # true anomaly
+    λ = ν + ϖ                                                           # true solar longitude
+    declination = asin(sin(tilt) * sin(λ))
+    distance_factor = 1 / (1 - e * cos(E))^2                            # (a/r)²
+    return declination, distance_factor
 end
 
 # as a global parameterization define the column parameterization as doing nothing
@@ -165,8 +241,17 @@ function initialize!(
         initial_time::DateTime,
         model::AbstractModel
     )
+    hasproperty(model, :planet) && warn_ignored_declination(model.planet.orbit, S.solar_declination)
     return S.initial_time[] = initial_time     # to fix the season if no seasonal cycle
 end
+
+# a KeplerOrbit computes the solar declination itself, so a solar_declination other than the
+# default (SinSolarDeclination, also used by CircularOrbit) would be silently ignored
+warn_ignored_declination(::AbstractOrbit, solar_declination) = nothing
+warn_ignored_declination(::KeplerOrbit, ::SinSolarDeclination) = nothing
+warn_ignored_declination(::KeplerOrbit, solar_declination) =
+    @warn "planet.orbit is a KeplerOrbit, which computes the solar declination itself: " *
+    "the solar zenith's $(nameof(typeof(solar_declination))) is ignored."
 
 """$(TYPEDSIGNATURES)
 Fraction of year as angle in radians, sawtooth from 0 at Jan-01T00:00 to 2π at the end
@@ -196,6 +281,12 @@ solar_declination(::Type{T}, S::AbstractZenith, orbit_time::Dates.AbstractDateTi
     S.solar_declination(year_angle(T, S, orbit_time))
 
 """$(TYPEDSIGNATURES)
+Solar declination angle δ [radians] at `orbit_time` following the `planet`'s orbit,
+from `S.solar_declination` for a `CircularOrbit`, from the orbit for a `KeplerOrbit`."""
+solar_declination(::Type{T}, S::AbstractZenith, orbit_time::Dates.AbstractDateTime, planet::AbstractPlanet) where {T} =
+    orbit_position(T, planet.orbit, S, planet, orbit_time)[1]
+
+"""$(TYPEDSIGNATURES)
 Fraction of day in `time` as angle in radians [-π...π], noon to noon, at longitude `λ`.
 Always calculated relative to the Earth calendar, so LENGTH_OF_DAY is used as constant.
 This is because `Dates` functions assume an Earth date. Length of the daily cycle is instead
@@ -211,13 +302,15 @@ $(TYPEDSIGNATURES)
 Calculate cos of solar zenith angle with a daily cycle
 at rotation_time `rotation_time` and orbit_time `orbit_time`.
 Seasonal cycle or time correction may be disabled,
-depending on parameters in SolarZenith."""
+depending on parameters in SolarZenith. The solar `declination` [radians]
+defaults to the one from `S.solar_declination` (a circular orbit), see `orbit_position`."""
 function cos_zenith!(
         cos_zenith::AbstractField{NF},
         S::SolarZenith,
         rotation_time::Dates.AbstractDateTime,
         orbit_time::Dates.AbstractDateTime,
         geometry::AbstractGeometry,
+        declination = solar_declination(NF, S, orbit_time),
     ) where {NF}
 
     (; sinlat, coslat, lons) = geometry
@@ -235,8 +328,8 @@ function cos_zenith!(
     solar_hour_angle_0E = solar_hour_angle(NF, rotation_time, λ) + tc
 
     # solar declination angle [radians] changing from tropic of cancer to capricorn
-    # throughout the year measured by g [radians]
-    δ = S.solar_declination(g)
+    # throughout the year, from the orbit
+    δ = convert(NF, declination)
     sinδ, cosδ = sincos(δ)
 
     # Launch kernel for solar zenith calculation
@@ -288,25 +381,24 @@ $(TYPEDSIGNATURES)
 Calculate cos of solar zenith angle as daily average
 at rotation_time `rotation_time` and orbit_time `orbit_time`.
 Seasonal cycle or time correction may be disabled,
-depending on parameters in SolarZenithSeason."""
+depending on parameters in SolarZenithSeason. The solar `declination` [radians]
+defaults to the one from `S.solar_declination` (a circular orbit), see `orbit_position`."""
 function cos_zenith!(
         cos_zenith::AbstractField{NF},
         S::SolarZenithSeason,
         rotation_time::Dates.AbstractDateTime,        # not used, but to keep the same function barrier as SolarZenith
         orbit_time::Dates.AbstractDateTime,
         geometry::AbstractGeometry,
+        declination = solar_declination(NF, S, orbit_time),
     ) where {NF}
 
     (; sinlat, coslat, lat) = geometry
     @boundscheck geometry.spectral_grid.grid == cos_zenith.grid ||
         throw(DimensionMismatch(geometry.spectral_grid.grid, cos_zenith.grid))
 
-    # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
-    g = year_angle(NF, S, orbit_time)
-
     # solar declination angle [radians] changing from tropic of cancer to capricorn
-    # throughout the year measured by g [radians]
-    δ = S.solar_declination(g)
+    # throughout the year, from the orbit
+    δ = convert(NF, declination)
     sinδ, cosδ = sincos(δ)
 
     # Launch kernel for seasonal solar zenith calculation

@@ -45,7 +45,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 
 # UTILITIES
 export Utils
-import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs, set_scalar!
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs, set_scalar!, scalar_ref
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets
@@ -222,6 +222,7 @@ include("parameterizations/land/rivers.jl")
 
 # OUTPUT
 include("output/callbacks.jl")
+include("output/diagnostics.jl")
 include("output/feedback.jl")
 include("output/vertical_interpolation.jl")
 include("output/writers/general.jl")

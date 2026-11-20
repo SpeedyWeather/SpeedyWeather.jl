@@ -2,12 +2,16 @@
 struct ClockDim <: AbstractVariableDim end
 allocate(::AbstractVariable{ClockDim}, model::AbstractModel) = Clock(model.architecture)
 
-"""Dimension for scalar variables holding single numerical values as RefValue.
+"""Dimension for scalar variables holding a single numerical value, e.g. `prognostic.scale`,
+CO₂ or the Sun-planet distance factor. Allocated on the model's architecture via `scalar_ref`:
+a `Ref(x)`, with Reactant a `Ref(ConcreteRNumber(x))` so that a compiled (traced) time step
+reads it as a traced number and can write a traced value into it, e.g. `var[] = x`.
 Default value is 0, but can be set via ScalarDim, e.g. ScalarDim(1) for a default value of 1."""
 @kwdef struct ScalarDim{T} <: AbstractVariableDim
     value::T = zero(DEFAULT_NF)                                 # default value via ScalarDim(1)
 end
-allocate(v::AbstractVariable{<:ScalarDim}, model::AbstractModel) = Ref(convert(model.spectral_grid.NF, v.dims.value))
+allocate(v::AbstractVariable{<:ScalarDim}, model::AbstractModel) =
+    scalar_ref(model.architecture, convert(model.spectral_grid.NF, v.dims.value))
 
 """Dimension for 2D grid variables on the horizontal grid."""
 struct Grid2D <: AbstractVariableDim2D end

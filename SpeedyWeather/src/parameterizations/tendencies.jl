@@ -199,13 +199,13 @@ end
 function reset_variables!(vars::Variables)
     nlayers = size(vars.prognostic.temperature, 2)
     resets = (
-            cloud_top = nlayers + 1,                # reset to below top layer
-            rain_rate = 0,
-            snow_rate = 0,
-            rain_rate_convection = 0,
-            snow_rate_convection = 0,
-            surface_humidity_flux = 0,
-            sensible_heat_flux = 0,
+        cloud_top = nlayers + 1,                # reset to below top layer
+        rain_rate = 0,
+        snow_rate = 0,
+        rain_rate_convection = 0,
+        snow_rate_convection = 0,
+        surface_humidity_flux = 0,
+        sensible_heat_flux = 0,
     )
     return reset_variables!(vars.parameterizations, resets)
 end
