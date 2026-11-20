@@ -186,7 +186,7 @@ function variables(::LandBucketMoisture, model::AbstractModel)
         TendencyVariable(:soil_moisture, LandXYZT(tg), desc = "Tendency of soil moisture", units = "1/s", namespace = :land),
 
         ParameterizationVariable(:soil_moisture_capacity, GridXY(), desc = "Volumetric soil water content of a full layer [m³/m³]: field capacity (bucket models) or porosity (Terrarium)", units = "m³/m³", namespace = :land),
-        ParameterizationVariable(:river_runoff, Grid2D(), desc = "Accumulated river runoff from soil moisture", units = "m", namespace = :land),
+        ParameterizationVariable(:river_runoff_rate, Grid2D(), desc = "River runoff rate from soil moisture", units = "m/s", namespace = :land),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
         ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
         ParameterizationVariable(:snow_melt_rate, Grid2D(), desc = "Snow melt rate + snow runoff", units = "m/s", namespace = :land),
@@ -309,13 +309,13 @@ end
 
 """$(TYPEDSIGNATURES)
 Applied after the time step: Excess water above field capacity in the top layer is split into
-infiltration (fraction `p`) into the lower layer and river runoff (fraction `1-p`, accumulated
-in `river_runoff` [m]). Excess water in the lower layer is removed (this disappears), and soil
-moisture is capped at 0 from below. This needs to be done after the time step as the excess
+infiltration (fraction `p`) into the lower layer and river runoff (fraction `1-p`, as a rate
+`river_runoff_rate` [m/s], accumulated by an `Accumulate` diagnostic). Excess water in the lower
+layer is removed (this disappears), and soil moisture is capped at 0 from below. This needs to be done after the time step as the excess
 water is only known for the new soil moisture."""
 function Base.filter!(vars::Variables, soil::LandBucketMoisture, model::PrimitiveEquation)
     soil_moisture = vars.prognostic.land.soil_moisture
-    R = vars.parameterizations.land.river_runoff            # accumulated [m]
+    R = vars.parameterizations.land.river_runoff_rate       # [m/s]
     (; land_fraction) = model.land_sea_mask
 
     @boundscheck fields_match(soil_moisture, R, horizontal_only = true) ||
@@ -327,7 +327,8 @@ function Base.filter!(vars::Variables, soil::LandBucketMoisture, model::Primitiv
     f₁ = γ * model.land.geometry.layer_thickness[1]
     f₂ = γ * model.land.geometry.layer_thickness[2]
     p = soil.infiltration_fraction      # fraction of top layer runoff put into lower layer
-    params = (; f₁, f₂, p)
+    Δt = clock_increment(model.time_stepping, vars.prognostic.clock)   # model time [s] of this step to convert runoff [m] into a rate [m/s]
+    params = (; f₁, f₂, p, Δt)
 
     launch!(
         architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
@@ -341,19 +342,20 @@ end
     )
     ij = @index(Global, Linear)             # every grid point ij
     nsteps = size(soil_moisture, 3)         # apply to all steps, runoff only diagnosed from the last
+    R[ij] = 0                               # no runoff unless diagnosed below
 
     for step in 1:nsteps
         if land_fraction[ij] > 0            # at least partially land
-            (; f₁, f₂, p) = params
+            (; f₁, f₂, p, Δt) = params
 
             W₁ = soil_moisture[ij, 1, step]     # wrt to field capacity so maximum is 1
             δW₁ = max(W₁ - 1, 0)                # excess moisture in top layer
             soil_moisture[ij, 1, step] = W₁ - δW₁
             soil_moisture[ij, 2, step] += p * δW₁ * f₁ / f₂     # add infiltration fraction to lower layer
 
-            # accumulate river runoff [m] = excess leftover of top layer
+            # river runoff rate [m/s] = excess leftover of top layer over time step
             if step == nsteps
-                R[ij] += (1 - p) * δW₁ * f₁
+                R[ij] = (1 - p) * δW₁ * f₁ / Δt
             end
         end
 
