@@ -117,3 +117,7 @@ end
 """$(TYPEDSIGNATURES)
 Draw the noise patterns for the next time step, called in `time_step!` via `update_random!(vars, model)`."""
 update_random!(vars::Variables, L::StochasticLeapfrog) = wiener_draw!(vars, L.noise)
+
+# the additive noise seeds holes in the dry upper layers, which the spectral humidity accumulates without
+# the fill tendency of the hole filling, so `ClipNegatives` adds it by default with `StochasticLeapfrog`
+adds_fill_tendency(::ClipNegatives{nothing}, ::StochasticLeapfrog) = true

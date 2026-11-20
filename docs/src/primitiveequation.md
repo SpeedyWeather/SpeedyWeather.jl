@@ -569,7 +569,11 @@ The spectral truncation, the advection and noise create negative humidity ``q < 
 grid-point space. The default `ClipNegatives` sets negative values to zero,
 ``[q]^+ = \max([q], 0)``, so that the dynamics and all parameterizations see a non-negative
 humidity. But the time stepping integrates the spectral humidity ``q_{lm}``,
-which still has the holes. Therefore the humidity that the clipping adds,
+which still has the holes. Moisture added to a hole remains invisible to all tendencies,
+which see zero humidity there, so the holes in the spectral humidity can deepen and spread over time.
+With the additive noise of the `StochasticLeapfrog` the spectral humidity of the dry upper layers
+drifts to negative values this way. With `ClipNegatives(spectral_grid; fill_tendency = true)`
+the humidity that the clipping adds,
 ``f = [q]^+ - [q] = \max(-[q], 0)``, is stored (`vars.dynamics.humidity_hole_fill`)
 and added in the next time step as a tendency ``f/\Delta t`` to the grid-point tendency of humidity.
 With the [Leapfrog](@ref leapfrog) time stepping, which steps forward from the previous time step ``i-1``
@@ -580,9 +584,10 @@ q_{i+1} = q_{i-1} + 2\Delta t \left( \frac{f_{i-1}}{2\Delta t} + F(q^+_i, q^+_{i
 ```
 in grid-point space, with the tendencies ``F`` of the dynamics evaluated at ``q^+_i``
 and those of the parameterizations at ``q^+_{i-1}``. The spectral humidity therefore
-integrates the clipped humidity that the tendencies see, without this the holes in the spectral
-humidity could deepen and spread over time as moisture added to a hole remains invisible to all
-tendencies. Clipping is not water conserving: it adds the water to fill the holes.
+integrates the clipped humidity that the tendencies see. By default (`fill_tendency = nothing`)
+the fill tendency is used with the `StochasticLeapfrog` only, `fill_tendency = true` or `false`
+turns it on or off with any time stepper. With the fill tendency, clipping is not water conserving:
+it adds the water to fill the holes, a few mm per year at T32.
 The [Robert-Asselin and Williams filter](@ref) sees the unfilled previous step, it moves
 a few percent of the fill back into the previous time step from where it is filled again
 two time steps later. `hole_filling = nothing` disables any hole filling.
@@ -866,7 +871,7 @@ Additionally we
 
 Now loop over
 
-1. Compute all tendencies of ``u, v, T, q`` due to physical parameterizations in grid-point space, add the [Hole filling](@ref) of humidity as a tendency.
+1. Compute all tendencies of ``u, v, T, q`` due to physical parameterizations in grid-point space, add the [Hole filling](@ref) of humidity as a tendency if enabled.
 2. Compute the gradient of the logarithm of surface pressure ``\nabla (\ln p_s)_{lm}`` in spectral space and convert the two fields to grid-point space. Unscale the ``\cos(\theta)`` on the fly.
 3. For every layer ``k`` compute the pressure flux ``\mathbf{u}_k \cdot \nabla \ln p_s`` in grid-point space.
 4. For every layer ``k`` compute a linearized [Virtual temperature](@ref) in spectral space.

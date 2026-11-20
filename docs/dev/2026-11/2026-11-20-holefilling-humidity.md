@@ -1,8 +1,9 @@
 # Hole filling of the PrimitiveWet humidity: integrate the clipped humidity
 
-> Status: **in progress**. Option 1 (the fill as a tendency, from the previous leapfrog step) is implemented and
-> passes the unit, JET, Enzyme, Reactant (CPU) and 10-year CPU checks, and the GPU checks on an H100 (GPU = CPU to
-> rounding, all drift variants, the 100-year run, timing, Reactant in strict Float32); the project's AD check is pending.
+> Status: **in progress**. Option 1 (the fill as a tendency, from the previous leapfrog step) is chosen, opt-in via
+> `ClipNegatives(spectral_grid; fill_tendency = true)` and on by default only with `StochasticLeapfrog`. It passes the
+> unit, JET, Enzyme, Reactant (CPU) and 10-year CPU checks, and the GPU checks on an H100 (GPU = CPU to rounding, all
+> drift variants, the 100-year run, timing, Reactant in strict Float32); the project's AD check is pending.
 
 Date of initial draft: 2026-11-20
 
@@ -38,6 +39,13 @@ constraints and acceptance tests below, committed in fa90cc81.
   pins Reactant 0.2.291 (compat is ≥ 0.2.305), on which `transform!` does not compile on the GPU with the old clip
   either, so Reactant was checked in a freshly resolved environment (0.2.308). There Reactant on the GPU matches the
   CPU only in strict Float32 (with TF32 it fails for the old clip too).
+* 2026-11-20: Option 1 chosen, without measuring the other options' GPU cost (option 1 costs ≈ 22 μs per step on an
+  H100). Decided: option 1 is **opt-in, not the default**, and is used automatically with `StochasticLeapfrog` only.
+  This overrides the earlier "the fix stays general": deterministic and SPPT runs keep the old grid-only clip unless
+  they opt in. `ClipNegatives{F}` has a type parameter `fill_tendency` (`true`, `false`, or `nothing` = automatic),
+  and `adds_fill_tendency(hole_filling, time_stepping)` resolves the automatic choice by dispatch on the
+  `StochasticLeapfrog` type alias at compile time (no runtime branch, Reactant-traceable). The fill variable is only
+  allocated with the fill tendency.
 
 ## Problem description
 
@@ -169,8 +177,15 @@ in the dry upper layers. Scaling it down there would slow the seeding; it does n
 
 ## Summary of changes
 
-Option 1, with the fill of the step the time stepper steps forward from.
+Option 1, with the fill of the step the time stepper steps forward from, opt-in and automatic with
+`StochasticLeapfrog` only.
 
+* **Opt-in.** `ClipNegatives(spectral_grid; fill_tendency = nothing)` returns a `ClipNegatives{fill_tendency}`.
+  `adds_fill_tendency(::ClipNegatives{F}, time_stepping)` is `F` for `true`/`false`. For `nothing`, the default and
+  also the `PrimitiveWetModel` default, it is `true` only for a `StochasticLeapfrog` (a `Leapfrog` whose `noise` is an
+  `AbstractWienerNoise`; method in `stochastic_leapfrog.jl`) and `false` otherwise. Without the fill tendency,
+  `ClipNegatives` behaves exactly as before the fix: it clips the grid humidity, defines no variable and adds no
+  tendency. The bullets below describe the behaviour with the fill tendency.
 * **`ClipNegatives` stores its fill** (`src/dynamics/hole_filling.jl`). It defines the variable
   `vars.dynamics.humidity_hole_fill` (grid, all layers, as many steps as the grid humidity: 2 for `Leapfrog`).
   `hole_filling!(vars, ::ClipNegatives, model)`, called in `transform!` instead of the grid-only clip, writes
@@ -199,7 +214,8 @@ Option 1, with the fill of the step the time stepper steps forward from.
   move-back is skipped by a `haskey` on `vars.dynamics` that is resolved at compile time.
 
 Files: `src/dynamics/hole_filling.jl`, `src/time_stepping/transform.jl`, `src/time_stepping/time_integration.jl`,
-`src/time_stepping/steppers/leapfrog.jl`, `test/dynamics/hole_filling.jl` (new),
+`src/time_stepping/steppers/leapfrog.jl`, `src/time_stepping/steppers/stochastic_leapfrog.jl`,
+`test/dynamics/hole_filling.jl` (new),
 `test/differentiability/primitivewet.jl`, `docs/src/primitiveequation.md`, `CHANGELOG.md`. SpeedyWeather is
 already `0.26.0-DEV`, no version bump.
 
@@ -328,7 +344,9 @@ Float32, from rest, with the GPU's default transform (`MatrixSpectralTransform` 
 `docs/dev/2026-11/hole_filling_gpu_check.jl`, modes `consistency`, `drift`, `perf` and `summary`. The old behaviour
 is a hole filling `OldClip <: AbstractHoleFilling` that only defines the grid-field clip. It takes the fallback,
 without the fill variable or the tendency, so fix and old run in one process. Logs and daily TSVs are in
-`/p/tmp/maxgelbr/code/claude_holefilling_gpu_2026-11-20/`.
+`/p/tmp/maxgelbr/code/claude_holefilling_gpu_2026-11-20/`. These runs predate the opt-in. At the time
+`ClipNegatives` always added the fill tendency, which is now `ClipNegatives(spectral_grid; fill_tendency = true)`,
+and the scripts now request it explicitly.
 
 *Consistency* (`--check-bounds=yes`, all pass). `clip_negatives!` on the GPU equals the CPU bitwise, and
 `hole_filling_tendency!` adds `fill(step 1) / Δt`. Without physics, the constant hole of −1e-5 is refilled to
@@ -410,9 +428,13 @@ consistency of the Reactant state):
   tendency from the previous step, not water conserving, the filter interplay), and the hole filling in steps 1 and
   19 of the algorithm.
 * `CHANGELOG.md`: entry under Unreleased (PR number to be filled in).
+* The `ClipNegatives` docstring and the docs subsection describe `fill_tendency` and its automatic default.
 
 ## Known limitations
 
+* **Off by default except with `StochasticLeapfrog`.** Deterministic and SPPT runs keep the old inconsistency
+  unless they opt in with `fill_tendency = true`. On the GPU at T32 L8 the old clip hides 77–210 mm/yr in holes
+  (hole volume 0.01–0.03 mm), and at T64 the layer-2 spectral mean is already negative after one year (Audit, GPU).
 * **Robert–Asselin–Williams filter.** The filter sees the unfilled previous step as part of the curvature
   `q⁽ⁿ⁻¹⁾ − 2q⁽ⁿ⁾ + q⁽ⁿ⁺¹⁾`. It moves ≈ ν α/2 ≈ 2.7 % of the fill back into the previous step as a hole and adds
   ≈ 2.3 % to the new step. The moved part is refilled two steps later; the computational mode this excites is
@@ -611,7 +633,7 @@ humidity, ln pₛ, uT′, vT′, kinetic energy, uq, vq), i.e. ≈ 124 layer-tra
 | option | T32 L8 | T64 L8 | T128 L8 | T128 L16 | conserves water | removes the drift | effort |
 |---|---|---|---|---|---|---|---|
 | 0 clip only | baseline | baseline | baseline | baseline | no (hides holes) | no | — |
-| 1 fill as tendency (prev. step) | | | | | no (+2.6–4.4 mm/yr) | yes (10 yr CPU) | done |
+| 1 fill as tendency (prev. step) | +0.027 ms (+2.5 %) | +0.055 ms (+5.0 %, noisy) | +0.011 ms (+0.3 %) | | no (+2.6–4.4 mm/yr) | yes (10 yr CPU, GPU; 100 yr GPU) | done, chosen |
 | 2 transform clipped back | | | | | no (truncation source) | expected | small |
 | 3 spectral fill into the base | | | | | no (as 1) | expected | medium |
 | 4 column borrowing + fixer | | | | | yes | expected | medium |
@@ -621,10 +643,15 @@ humidity, ln pₛ, uT′, vT′, kinetic energy, uq, vq), i.e. ≈ 124 layer-tra
 | 8 grid-point semi-Lagrangian | | | | | with fixer | expected | very large |
 
 Entries: added time per step in ms and in % of `time_step!` (building blocks or end to end, say which).
+Option 1: end to end on one H100, the `perf` mode of `docs/dev/2026-11/hole_filling_gpu_check.jl` (median ms per step of
+`run!` over 1000/600/300 steps, against the old clip in the same process, not the benchmark suite), see GPU. B1
+alone is ≈ 22 μs per step at every resolution (11–12 + 7 + 3 μs). Options 2–8 were not measured: option 1 was chosen
+on 2026-11-20.
 
 ## Future work
 
-* Pick an option from the GPU costs above. Water conservation would favour 4 or 5, applied through route 1 or 3.
+* Option 1 is chosen (opt-in). If water conservation or the filter limitation matters later, options 4 or 5
+  (applied through route 1 or 3) or option 3 remain.
 * Project side: taper the humidity noise with height, the noise seeds the holes in the dry upper layers.
 
 ## After the fix (project side)
