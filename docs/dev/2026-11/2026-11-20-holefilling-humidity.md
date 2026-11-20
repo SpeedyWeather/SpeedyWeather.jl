@@ -1,8 +1,8 @@
 # Hole filling of the PrimitiveWet humidity: integrate the clipped humidity
 
 > Status: **in progress**. Option 1 (the fill as a tendency, from the previous leapfrog step) is implemented and
-> passes the unit, JET, Enzyme, Reactant (CPU) and 10-year CPU checks; the 100-year run and the project's AD check
-> are pending.
+> passes the unit, JET, Enzyme, Reactant (CPU) and 10-year CPU checks. Next: the GPU cost of all nine options on a
+> GPU node (section "Options and their GPU cost"), the 100-year run and the project's AD check.
 
 Date of initial draft: 2026-11-20
 
@@ -27,6 +27,8 @@ constraints and acceptance tests below, committed in fa90cc81.
   accepted as a known limitation (≈ 2.5 % of the fill, refilled two steps later).
 * 2026-11-20: Asked whether the problem is specific to `StochasticLeapfrog` (and the fix should then be limited
   to it): audited deterministic and SPPT runs, it is general (see Audit below), so the fix stays general.
+* 2026-11-20: All options written up with implementation sketches and a GPU measurement protocol, for a GPU node
+  to estimate their cost before an option is chosen ("Options and their GPU cost").
 * 2026-11-20: Enzyme reverse mode failed on the tendency written as a broadcast over `Field`s
   (`IllegalTypeAnalysisException`, not covered by the existing differentiability tests); both new broadcasts
   now act on `.data`, and a differentiability test was added.
@@ -309,7 +311,7 @@ with Reactant on the CPU of this Mac. The Reactant state is also internally cons
   `q⁽ⁿ⁻¹⁾ − 2q⁽ⁿ⁾ + q⁽ⁿ⁺¹⁾`. It moves ≈ ν α/2 ≈ 2.7 % of the fill back into the previous step as a hole and adds
   ≈ 2.3 % to the new step. The moved part is refilled two steps later; the computational mode this excites is
   damped by the filter. In the unit test (constant hole of −1e-5) about 1 % of the hole remains as extra water. An
-  exact treatment needs the fill in spectral space inside the leapfrog kernel (see Future work).
+  exact treatment needs the fill in spectral space, added to the leapfrog base (option 3 below).
 * **Not water conserving.** The filling adds ≈ 4 mm/yr (0.5 % of the evaporation) at T32 L8 with noise.
 * **Truncation.** The fill reaches the spectral humidity through the spectral truncation of the tendency, so small
   negatives remain on the grid (0.1–0.7 % of the points in layers 1–2, minima of a few 1e-6 to 2e-5 kg/kg).
@@ -318,22 +320,202 @@ with Reactant on the CPU of this Mac. The Reactant state is also internally cons
 * **Variables layout.** `vars.dynamics.humidity_hole_fill` is a new variable: states saved as a whole `Variables`
   from the old model may not load into the new one. A continued `run!` recomputes the fill in the initial transform.
 
+## Options and their GPU cost (handover to a GPU node)
+
+Option 1 is implemented (Summary of changes). Before settling on it, the GPU cost of every option below is to
+be estimated on a GPU node. The options differ in cost, water conservation, accuracy and implementation effort.
+All but option 6 make the spectral humidity integrate the humidity that the tendencies see.
+Numbering here replaces the three fix options of the handoff (Background): handoff option 1 → 1,
+handoff 2 → 2, handoff 3 → 4.
+
+**Reference work per time step** of the PrimitiveWet model with L layers: three batched spectral transforms,
+spectral→grid of the prognostic state (4L+1 layers: vorticity, divergence, temperature, humidity, ln pₛ),
+spectral→grid of U, V and ∇ln pₛ (2L+2), and grid→spectral of the tendencies (9L+1: u, v, temperature,
+humidity, ln pₛ, uT′, vT′, kinetic energy, uq, vq), i.e. ≈ 124 layer-transforms at L8. Humidity accounts for
+4L of them (32 at L8). Then the column parameterizations, which are one fused kernel on GPU.
+
+### How to measure
+
+* **Code.** Option 1 is on branch `mg/holefilling-revised`. Option 0 (old behaviour, the baseline) is the base
+  revision `fa90cc81`. Prototypes of other options go on their own commits or checkouts.
+* **End to end** (options with an implementation: 0, 1 and every prototype). The debug sweep of the benchmark
+  suite (PrimitiveWet, T32–T128 at L8, T32 and T128 at L16, `--length 2`) per revision or checkout, then a
+  comparison table:
+
+  ```bash
+  julia SpeedyWeather/benchmark/regression/regression.jl benchmark fa90cc81 option0.json --arch gpu
+  julia SpeedyWeather/benchmark/regression/regression.jl benchmark mg/holefilling-revised option1.json --arch gpu
+  julia SpeedyWeather/benchmark/regression/regression.jl benchmark <checkout dir> option3.json --arch gpu
+  julia SpeedyWeather/benchmark/regression/regression.jl table --result option0=option0.json \
+      --result option1=option1.json --candidate option1
+  ```
+
+  ±20 % between processes is normal, so run the options to compare in the same session and repeat once.
+* **Building blocks** (estimates without a full implementation). Time each block on the GPU after a warm-up:
+  `CUDA.@elapsed` or `CUDA.@sync`, median of ≥ 20 calls. Do this at T32, T64 and T128 with L8, and T128 with L16
+  (launch overhead dominates at low resolution, the transforms at high resolution). Compare against one full
+  `SpeedyWeather.time_step!(simulation)`, after `initialize!(simulation; steps = n)` on a spun-up simulation.
+  * **B1** (option 1): `SpeedyWeather.hole_filling!(vars, model.hole_filling, model)`,
+    `SpeedyWeather.hole_filling_tendency!(vars, model)`,
+    `SpeedyWeather.copy_step_back!(vars.dynamics.humidity_hole_fill, true)`, and the old clip
+    `SpeedyWeather.hole_filling!(humid_grid, ClipNegatives())` for the difference.
+  * **B2** (option 2): one unbatched L-layer grid→spectral transform,
+    `transform!(spectral_L, grid_L, vars.scratch.transform_memory, model.spectral_transform)`.
+  * **B3** (options 3, 8): the batched grid→spectral transform with 9L+1 layers against 10L+1 (option 3) and 5L+1
+    (option 8, without q tendency, uq, vq); and the spectral→grid batch with 4L+1 against 3L+1 (option 8).
+    Use standalone arrays and a `SpectralTransform` whose scratch memory covers the largest layer count.
+  * **B4** (options 4, 5): a column kernel over the grid points with a loop over the L layers (the prototype of
+    option 4), and a global mass-weighted sum of an L-layer field (`sum`/`mapreduce` with the area weights from
+    `RingGrids.get_quadrature_weights` per ring), including the device synchronisation it implies.
+  * **B5** (option 8): departure points for all grid points from u, v (two iterations) and the interpolation of
+    an L-layer field to them with RingGrids' `AnvilInterpolator` (`update_locator!` + `interpolate!`).
+* **Report** per option and resolution: the added time per time step in ms and in % of `time_step!`, and the
+  SYPD of the debug sweep for the implemented options. Fill in the table at the end of this section.
+
+### Option 0: clip the grid humidity only (old behaviour, baseline)
+
+* **What.** `q = max(q, 0)` on the grid after the transform, the spectral humidity is left unchanged.
+* **Cost.** One element-wise kernel over L×npoints. Has the inconsistency and drift described above.
+
+### Option 1: the fill as tendency, from the previous step (implemented)
+
+* **What.** Store `f = max(−q, 0)` per leapfrog step, add the previous step's `f/Δt` to the grid humidity
+  tendency, which is transformed with the other tendencies (Summary of changes).
+* **Where.** `src/dynamics/hole_filling.jl`, called from `transform!` and `time_step!`, fill moved back in
+  `move_prognostic_grid_variables_back!` (`leapfrog.jl`).
+* **Extra work per step.** No transform. Three element-wise kernels over L×npoints: writing the fill next to the
+  clip, adding the tendency, moving the 2-step fill back. Memory: 2L×npoints. CPU T32 L8: +36 μs of 5.9 ms (+0.6 %).
+  On GPU mostly launch overhead.
+* **Measure.** B1 and end to end (option 1 against option 0).
+* **Variants if the GPU cost matters.** (a) Fuse fill and clip into one kernel. (b) Use the current step's fill:
+  one step of storage, no move-back, but it fills the other leapfrog sequence and skips a step in the leapfrog
+  start.
+* **Accuracy.** Water source 2.6–4.4 mm/yr. The time filter sees ≈ 2.5 % of the fill (Known limitations).
+
+### Option 2: transform the clipped field back to spectral
+
+* **What.** After the clip, overwrite the current spectral humidity with the transform of the clipped grid
+  humidity, so grid and spectral agree at once. No fill storage, no tendency.
+* **Where.** `transform!` (`src/time_stepping/transform.jl`): after the clip,
+  `transform!(get_step(vars.prognostic.humidity, 2), humid_grid, scratch_memory, S)`. In the initial transform
+  (`initialize = true`) also copy the result to the previous step (1), which the leapfrog start steps from.
+* **Extra work per step.** One unbatched L-layer grid→spectral transform (≈ L/124 more transform work at L8, plus
+  the launch overhead of a separate transform).
+* **Measure.** B2, then end to end with a prototype (≈ 5 lines).
+* **Accuracy.** The truncation of `max(q, 0)` makes new small negatives every step, so the clip–truncate cycle is a
+  systematic water source: measure it with `docs/dev/2026-11/hole_filling_drift_check.jl`. It edits a leapfrog
+  level outside the time stepper; the filter then sees the clipped level, which is consistent.
+
+### Option 3: like 1, but the spectral fill is added to the previous step (exact with the time filter)
+
+* **What.** Transform the previous step's fill to spectral together with the tendencies, and add it to the
+  spectral humidity of the previous step (the leapfrog base) before the implicit terms and the leapfrog. Then
+  the horizontal diffusion, the leapfrog and the Robert–Asselin–Williams filter all see the filled base. This
+  removes the filter limitation of option 1.
+* **Where.**
+  * Add a grid slot for the fill to the `:grid_tendencies` fuse and a matching spectral slot to the
+    `:spectral_tendencies` fuse (the fuse alignment check requires the same members in both).
+  * In `dynamics_tendencies!` (`src/dynamics/tendencies.jl`), copy the fill of step 1 into the grid slot after
+    `scale_tendencies!`, so that it is not scaled. The batched transform then produces the spectral fill. Add it
+    to `get_step(vars.prognostic.humidity, 1)` right after `spectral_tendencies!`.
+  * Zero the grid fill of step 1 once applied. In the leapfrog start the previous step is not advanced, and its
+  fill would otherwise be added twice. The `dynamics = false` path (`parameterization_tendencies_only!`) needs the
+  same.
+* **Extra work per step.** The batched grid→spectral transform grows from 9L+1 to 10L+1 layers (+11 % of that
+  batch), plus one spectral element-wise kernel. Option 1's storage and move-back stay, its tendency kernel goes.
+* **Measure.** B3 (9L+1 against 10L+1) plus B1, then end to end with a prototype.
+* **Accuracy.** Like option 1 without the filter effect. Water source unchanged.
+
+### Option 4: conservative filler (borrow from the column, then a global fixer)
+
+* **What.** Fill each hole from the same column, mass-weighted by Δσ: going down the column, a negative q_k takes
+  its deficit from the layer below, `q_{k+1} += q_k Δσ_k/Δσ_{k+1}`, `q_k = 0` (pₛ cancels within a column). A
+  deficit left in the lowest layer is clipped and paid back by a global multiplicative fixer (option 5), in the
+  spirit of Rasch and Williamson (1990). It conserves water. Bottom-up borrowing is the alternative to evaluate:
+  in the dry upper layers the layer below is often dry as well.
+* **Where.** A new `AbstractHoleFilling` type in `src/dynamics/hole_filling.jl`. Its `hole_filling!` is a column
+  kernel (`LinearWorkOrder` over npoints, loop over k, branches inside the kernel are fine). The change
+  `q_filled − q_unclipped` (positive in holes, negative where water was borrowed) is stored as the fill and
+  applied through option 1's tendency (or option 3's route). Guard the fixer's division for differentiability:
+  `ifelse(c, x, 0) / ifelse(c, y, 1)`.
+* **Extra work per step.** One column kernel (sequential in k), one or two global reductions with a device
+  synchronisation, plus option 1's kernels.
+* **Measure.** B4 plus B1, then end to end with a prototype.
+* **Accuracy.** Conserves water (no 2.6–4.4 mm/yr source); moves water vertically, mostly within the dry upper
+  layers.
+
+### Option 5: clip plus a global water fixer
+
+* **What.** Clip as in option 1, then rescale the clipped humidity so that its global mass-weighted water equals
+  that of the unclipped humidity: `q ← q·W(q_unclipped)/W(q_clipped)`, globally or per layer. Store
+  `q_new − q_unclipped` (zero global integral) as the fill and apply it through option 1's tendency.
+* **Where.** `src/dynamics/hole_filling.jl`, a new type or a type parameter of `ClipNegatives` (not a Bool field,
+  to avoid a runtime branch).
+* **Extra work per step.** One global reduction (two sums) with a synchronisation, one element-wise kernel, plus
+  option 1's kernels.
+* **Measure.** B4 (the reduction) plus B1.
+* **Accuracy.** Conserves water globally but not locally: dries moist regions in proportion to pay for the
+  holes in dry regions.
+
+### Option 6: no clipping
+
+* **What.** `hole_filling = nothing`: grid and spectral humidity agree, and the physics sees negative humidity.
+* **Where.** Model setting only. Every parameterization reading humidity needs an audit for q < 0: large-scale
+  condensation, convection, clouds (relative humidity), surface fluxes, both radiation schemes (the default
+  longwave already uses `max(q, 0)`), and virtual temperature.
+* **Extra work per step.** None, one kernel less than option 0.
+* **Measure.** No GPU cost to measure. The question is whether the holes stay bounded: run
+  `hole_filling_drift_check.jl` with `hole_filling = nothing` and the default noise. Nothing restores negative
+  values, so expect unbounded holes.
+
+### Option 7: a positive-definite prognostic variable
+
+* **What.** Prognose s = √q (or ln q) in spectral space, q = s² on the grid, positive by construction.
+  Tendencies convert as ∂s/∂t = (∂q/∂t)/(2s), which is singular for s → 0 and needs a floor. The advection
+  becomes the advective form u·∇s, so the flux form of q and the uq, vq slots go. Not water conserving.
+* **Where.** The humidity variable and its advection (`humidity_grid_tendency!`, `humidity_spectral_tendency!`,
+  vertical advection), the transform (q = s² instead of the clip), and the conversion of all parameterization
+  tendencies.
+* **Extra work per step.** About the same transform work: the advective form needs ∇s on the grid (2L
+  spectral→grid), which replaces uq and vq (2L grid→spectral). Plus two element-wise kernels.
+* **Measure.** Element-wise kernels only (B1 as a proxy). The cost is implementation effort and accuracy, not GPU
+  time: prototype only if options 1–5 fail.
+
+### Option 8: humidity as a grid-point variable with positive-definite advection
+
+* **What.** Remove humidity from the spectral state. Step it in grid space with a semi-Lagrangian (or
+  flux-limited finite-volume) horizontal advection with a monotone interpolation, as operational spectral models
+  such as ECMWF's IFS do. Negative values then do not arise from the advection. Semi-Lagrangian advection is not
+  conservative, so it needs a global fixer (option 5).
+* **Where.** A redesign: humidity becomes a grid prognostic like the ocean and land variables, with a
+  departure-point and interpolation step (`RingGrids.AnvilInterpolator`; `src/dynamics/particle_advection.jl`
+  moves points with u, v and is a starting point). The vertical advection stays.
+* **Extra work per step.** Saves 4L transform layers: q in the spectral→grid batch, and the q tendency, uq and vq
+  in the grid→spectral batch, about a quarter of the transform layers at L8. Adds departure points, an L-layer
+  interpolation and a reduction for the fixer. It may be cheaper than today on GPU.
+* **Measure.** B3 (batches without humidity) against B5 + B4.
+* **Accuracy.** Removes the holes at their source, but changes the humidity advection and its numerics
+  everywhere. Largest effort.
+
+### Results to fill in
+
+| option | T32 L8 | T64 L8 | T128 L8 | T128 L16 | conserves water | removes the drift | effort |
+|---|---|---|---|---|---|---|---|
+| 0 clip only | baseline | baseline | baseline | baseline | no (hides holes) | no | — |
+| 1 fill as tendency (prev. step) | | | | | no (+2.6–4.4 mm/yr) | yes (10 yr CPU) | done |
+| 2 transform clipped back | | | | | no (truncation source) | expected | small |
+| 3 spectral fill into the base | | | | | no (as 1) | expected | medium |
+| 4 column borrowing + fixer | | | | | yes | expected | medium |
+| 5 clip + global fixer | | | | | yes (globally) | expected | small |
+| 6 no clipping | none | none | none | none | yes | no (holes unbounded) | audit |
+| 7 √q or ln q | | | | | no | expected | large |
+| 8 grid-point semi-Lagrangian | | | | | with fixer | expected | very large |
+
+Entries: added time per step in ms and in % of `time_step!` (building blocks or end to end, say which).
+
 ## Future work
 
-Other approaches, beyond the three fix options above:
-* no clipping (`hole_filling = nothing`) and parameterizations robust to q < 0: consistent, but the holes are
-  unbounded and the physics sees negative humidity;
-* a global multiplicative water fixer after the clip (conserving, can be combined with option 1);
-* a positive-definite prognostic variable, e.g. ln q or √q in spectral space: positive by construction, but
-  changes the advection equation and loses conservation;
-* humidity as a grid-point variable with a monotone or positive-definite advection scheme (semi-Lagrangian or
-  flux-limited), as operational spectral models such as ECMWF's IFS do: removes the holes at their source, but
-  a redesign of the humidity advection.
-
-Next steps:
-* A conservative filler (option 3) through the same `hole_filling_tendency!` route.
-* An exact treatment of the filter: transform the fill alongside the tendencies into its own spectral slot and add
-  it to the previous step inside the leapfrog kernel (one more 8-layer slot in the batched transform).
+* Pick an option from the GPU costs above. Water conservation would favour 4 or 5, applied through route 1 or 3.
 * Project side: taper the humidity noise with height, the noise seeds the holes in the dry upper layers.
 
 ## After the fix (project side)
