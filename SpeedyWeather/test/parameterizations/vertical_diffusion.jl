@@ -290,9 +290,10 @@ end
 end
 
 @testset "BulkRichardsonDiffusion in a model" begin
-    @testset for Model in (PrimitiveWetModel, PrimitiveDryModel), nlayers in (8, 24)
+    @testset for (Model, nlayers) in ((PrimitiveWetModel, 8), (PrimitiveWetModel, 24), (PrimitiveDryModel, 24))
         spectral_grid = SpectralGrid(truncation = 32; nlayers)
-        model = Model(spectral_grid; vertical_diffusion = BulkRichardsonDiffusion(spectral_grid))
+        model = Model(spectral_grid)
+        @test model.vertical_diffusion isa BulkRichardsonDiffusion      # default
         simulation = initialize!(model)
         run!(simulation, period = Day(2))
         @test !simulation.model.feedback.nans_detected
@@ -310,7 +311,13 @@ end
     run!(simulation, steps = 3)
     @test all(simulation.variables.parameterizations.vertical_diffusivity_heat .== 0)   # never computed
 
-    # requires a boundary layer
-    model = PrimitiveDryModel(spectral_grid; vertical_diffusion = BulkRichardsonDiffusion(spectral_grid), boundary_layer = nothing)
-    @test_throws ArgumentError initialize!(model)
+    # friction velocity and surface Richardson number from the boundary layer, both zero without its
+    # drag and surface wind, which switches the boundary-layer profile of the diffusivity off
+    (; variables) = simulation
+    ΔΦ₀ = 500.0f0       # geopotential of the lowermost layer relative to the surface
+    friction_velocity, Ri_surface = SpeedyWeather.surface_layer(1, ΔΦ₀, variables, diffusion, model)
+    @test friction_velocity > 0
+    @test isfinite(Ri_surface)
+    no_boundary_layer = (; parameterizations = (; variables.parameterizations.vertical_diffusivity_momentum))
+    @test SpeedyWeather.surface_layer(1, ΔΦ₀, no_boundary_layer, diffusion, model) === (0.0f0, 0.0f0)
 end

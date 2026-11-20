@@ -8,8 +8,9 @@ with the boundary layer height from a bulk Richardson number, a local Richardson
 diffusivity following Louis et al. 1982 and Holtslag and Boville 1993, and a background diffusivity
 decaying with height. The diffusion is formulated as a flux divergence on the pressure thickness of
 the layers, conserving the mass-weighted column integral, and integrated implicitly (backward Euler)
-so that it is stable for any diffusivity and time step. Requires a boundary layer (`model.boundary_layer`)
-for the surface drag and wind. Fields are $(TYPEDFIELDS)"""
+so that it is stable for any diffusivity and time step. The boundary-layer profile uses the surface drag
+and wind of the boundary layer (`model.boundary_layer`), without one only the local and the background
+diffusivity act. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
     "[OPTION] von Kármán constant [1]"
     @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
@@ -72,15 +73,7 @@ variables(::BulkRichardsonDiffusion) = (
     ScratchVariable(:tridiagonal_rhs, GridXYZ(), desc = "Right-hand side of the forward-eliminated tridiagonal system", units = "?", namespace = :grid),
 )
 
-function initialize!(::BulkRichardsonDiffusion, model::PrimitiveEquation)
-    isnothing(model.boundary_layer) && throw(
-        ArgumentError(
-            "BulkRichardsonDiffusion uses the surface drag and wind of the boundary layer, " *
-                "model.boundary_layer must not be nothing."
-        )
-    )
-    return nothing
-end
+initialize!(::BulkRichardsonDiffusion, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, diffusion::BulkRichardsonDiffusion, model) =
@@ -178,14 +171,20 @@ K = min(max(K_profile, K_local, K_background), K_max) with
     (; density_over_distance) = vars.scratch.grid
     NF = eltype(K_momentum)
 
+    # Virtual temperature of every layer, in the scratch array for the right-hand side of the implicit solver,
+    # which is free until the solves. The two loops below (boundary layer height, diffusivities) read it
+    # instead of temperature and humidity. Do not merge this loop into them: with the virtual temperature
+    # computed from humidity inside these loops (in both, or in the first and stored for the second),
+    # Reactant raised the kernel of the wet model to one that writes nothing (Reactant 0.2.30x, see
+    # docs/dev/2026-11/2026-11-19-bulk-richardson.md, section 8.3)
+    Tᵥ_layers = vars.scratch.grid.tridiagonal_rhs
+    for k in 1:nlayers
+        Tᵥ_layers[ij, k] = virtual_temperature(T[ij, k], column_humidity(q, ij, k), atmosphere)
+    end
+
     # SURFACE LAYER: friction velocity from the drag of the boundary layer, surface Richardson number
     # from the surface temperatures (land and ocean, weighted by the land fraction)
-    Φ_N = Φ[ij, nlayers]
-    Ri_land, Ri_ocean = bulk_richardson_surface(ij, Φ_N - Φₛ, vars, atmosphere, diffusion, time_stepping)
-    land_fraction = model.land_sea_mask.land_fraction[ij]
-    Ri_surface = land_fraction * Ri_land + (1 - land_fraction) * Ri_ocean
-    drag = vars.parameterizations.boundary_layer_drag_momentum[ij]
-    friction_velocity = sqrt(drag) * vars.parameterizations.surface_wind_speed[ij]
+    friction_velocity, Ri_surface = surface_layer(ij, Φ[ij, nlayers] - Φₛ, vars, diffusion, model)
 
     # roughness length for the stability correction, from the surface roughness scheme if present
     z₀ = haskey(vars.parameterizations, :momentum_roughness) ?
@@ -193,8 +192,7 @@ K = min(max(K_profile, K_local, K_background), K_max) with
     z₀ = ifelse(z₀ > 0, z₀, diffusion.roughness_length)
 
     # BOUNDARY LAYER HEIGHT h [m] above the surface
-    Tᵥ_N = virtual_temperature(T[ij, nlayers], column_humidity(q, ij, nlayers), atmosphere)
-    h = boundary_layer_height(ij, u, v, T, q, Φ, Φₛ, Tᵥ_N, g, cₚ, Ri_c, atmosphere)
+    h = boundary_layer_height(ij, u, v, Tᵥ_layers, Φ, Φₛ, g, cₚ, Ri_c)
     vars.parameterizations.boundary_layer_height[ij] = h
 
     # Stable correction of Frierson 2006, eq. 20, [1 + Ri/Ri_c log(z/z₀)/(1 - Ri/Ri_c)]⁻¹ with the surface
@@ -204,10 +202,10 @@ K = min(max(K_profile, K_local, K_background), K_max) with
     surface_layer_height = fb * h
     stability_surface_layer = stable_correction(r, surface_layer_height, z₀)
 
-    Tᵥ_above = virtual_temperature(T[ij, 1], column_humidity(q, ij, 1), atmosphere)
     for k in 1:(nlayers - 1)
         # interface k+½ between layer k (above) and k+1 (below)
-        Tᵥ_below = virtual_temperature(T[ij, k + 1], column_humidity(q, ij, k + 1), atmosphere)
+        Tᵥ_above = Tᵥ_layers[ij, k]
+        Tᵥ_below = Tᵥ_layers[ij, k + 1]
         ΔΦ = Φ[ij, k] - Φ[ij, k + 1]                    # geopotential difference between layers
         Δz = ΔΦ / g                                     # distance between layers [m]
         z = ((Φ[ij, k] + Φ[ij, k + 1]) / 2 - Φₛ) / g    # height of the interface above the surface [m]
@@ -256,8 +254,6 @@ K = min(max(K_profile, K_local, K_background), K_max) with
 
         K_momentum[ij, k] = min(max(K_profile, K_local_momentum, K_background), max_diffusivity)
         K_heat[ij, k] = min(max(K_profile, K_local_heat, K_background), max_diffusivity)
-
-        Tᵥ_above = Tᵥ_below
     end
 
     # no diffusive flux through the surface, which is handled by the surface fluxes
@@ -265,6 +261,28 @@ K = min(max(K_profile, K_local, K_background), K_max) with
     K_heat[ij, nlayers] = 0
     density_over_distance[ij, nlayers] = 0
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Friction velocity u⋆ = √C_M Vₛ [m/s] from the momentum drag coefficient and the surface wind speed of the
+boundary layer, and the bulk Richardson number between the surface and the lowermost layer, the land and
+ocean values of `bulk_richardson_surface` weighted with the land fraction, for column `ij` with the
+geopotential `ΔΦ₀` of the lowermost layer relative to the surface. Both zero for a model without the
+drag or the surface wind of a boundary layer, which switches the boundary-layer profile of the
+diffusivity off."""
+@propagate_inbounds function surface_layer(ij, ΔΦ₀, vars, diffusion::BulkRichardsonDiffusion, model)
+    (; parameterizations) = vars
+    NF = eltype(parameterizations.vertical_diffusivity_momentum)
+    has_boundary_layer = haskey(parameterizations, :boundary_layer_drag_momentum) &&
+        haskey(parameterizations, :surface_wind_speed)
+    has_boundary_layer || return zero(NF), zero(NF)
+
+    Ri_land, Ri_ocean = bulk_richardson_surface(ij, ΔΦ₀, vars, model.atmosphere, diffusion, model.time_stepping)
+    land_fraction = model.land_sea_mask.land_fraction[ij]
+    Ri_surface = land_fraction * Ri_land + (1 - land_fraction) * Ri_ocean
+    drag = parameterizations.boundary_layer_drag_momentum[ij]
+    friction_velocity = sqrt(drag) * parameterizations.surface_wind_speed[ij]
+    return friction_velocity, Ri_surface
 end
 
 # minimum wind speed [m/s] squared for the bulk Richardson number (Holtslag and Boville, 1993)
@@ -292,11 +310,13 @@ for the gradient Richardson number `Ri` ≥ 0."""
 """$(TYPEDSIGNATURES)
 Boundary layer height h [m] above the surface of column `ij`: the height where the bulk Richardson
 number relative to the lowermost layer N, Ri(z) = gz (sᵥ(z) - sᵥ_N) / (cₚTᵥ_N |V(z)|²) with the virtual
-dry static energy sᵥ = cₚTᵥ + Φ (Frierson et al. 2006), first reaches `Ri_c` from below, interpolated
-linearly between the layers that bracket Ri_c with Ri = 0 at the lowermost layer. The height of the
-uppermost layer if Ri < Ri_c everywhere. Fixed trip count, no early exit."""
-@propagate_inbounds function boundary_layer_height(ij, u, v, T, q, Φ, Φₛ, Tᵥ_N, g, cₚ, Ri_c, atmosphere)
-    nlayers = size(T, 2)
+dry static energy sᵥ = cₚTᵥ + Φ (Frierson et al. 2006) from the virtual temperature `Tᵥ` of the layers,
+first reaches `Ri_c` from below, interpolated linearly between the layers that bracket Ri_c with Ri = 0
+at the lowermost layer. The height of the uppermost layer if Ri < Ri_c everywhere. Fixed trip count,
+no early exit."""
+@propagate_inbounds function boundary_layer_height(ij, u, v, Tᵥ, Φ, Φₛ, g, cₚ, Ri_c)
+    nlayers = size(Tᵥ, 2)
+    Tᵥ_N = Tᵥ[ij, nlayers]
     sᵥ_N = cₚ * Tᵥ_N + Φ[ij, nlayers]
     h = (Φ[ij, 1] - Φₛ) / g                 # top layer height if no crossing of Ri_c
     z_below = (Φ[ij, nlayers] - Φₛ) / g     # height of the layer below k, starting with N
@@ -305,7 +325,7 @@ uppermost layer if Ri < Ri_c everywhere. Fixed trip count, no early exit."""
 
     for k in (nlayers - 1):-1:1
         z = (Φ[ij, k] - Φₛ) / g
-        sᵥ = cₚ * virtual_temperature(T[ij, k], column_humidity(q, ij, k), atmosphere) + Φ[ij, k]
+        sᵥ = cₚ * Tᵥ[ij, k] + Φ[ij, k]
         V² = max(u[ij, k]^2 + v[ij, k]^2, MINIMUM_WIND_SPEED²)
         Ri = g * z * (sᵥ - sᵥ_N) / (cₚ * Tᵥ_N * V²)
 
