@@ -91,6 +91,14 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
   every restart variant (2 of 4 years in the ensemble); on the user's request it reads the current step again
   (`b7156e83`) and completes 4 of 4 years there (8.13.2). The same runs show that T32L24 with the scheme also
   blows up with main's drag (2 of 4 years).
+- 2026-11-20, user decision: the Richardson number at which the stable surface correction reaches zero is a
+  cutoff, not a critical Richardson number in the sense of a turbulence threshold (0.25–1). With a cutoff of 1
+  the drag vanishes where buoyancy and shear are still comparable; 10 means that buoyancy dominates by an order
+  of magnitude. Hence `BulkRichardsonDrag.critical_Richardson` is renamed to `Richardson_cutoff` (default 10),
+  and `BulkRichardsonDiffusion` gets a separate `Richardson_cutoff = 10` for the stability correction of the
+  profile, while `critical_Richardson = 1` keeps defining the boundary layer height. Before the split the
+  diffusion used Ri_c = 1 for both. The validation runs of section 8 used that, so the profile is now somewhat
+  stronger in stable surface conditions than in those runs.
 - 2026-11-19 (GPU session, A40 on login02 and H100 via Slurm), step 7, see section 8 for the numbers:
   - No GPU optimisation is kept. The scheme doubles the cost of the fused column kernel, but that kernel is only
     about 4 % of a time step, so the scheme costs 2–5 % of a time step at T256/T512.

@@ -16,7 +16,10 @@ diffusivity act. Fields are $(TYPEDFIELDS)"""
     @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
 
     "[OPTION] Critical bulk Richardson number defining the boundary layer height [1]"
-    @param critical_Richardson::NF = 1 (bounds = Positive,)
+    @param critical_Richardson::NF = 10 (bounds = Positive,)
+
+    "[OPTION] Surface bulk Richardson number at and above which the boundary-layer profile is zero [1]"
+    @param Richardson_cutoff::NF = 10 (bounds = Positive,)
 
     "[OPTION] Fraction of the boundary layer height that is the surface layer [1]"
     @param surface_layer_fraction::NF = 0.1 (bounds = 0 .. 1,)
@@ -144,7 +147,7 @@ diffusivity is K = min(max(K_profile, K_local, K_background), K_max) with
 
 - K_profile the boundary-layer profile of Frierson et al. 2006, eqs. 16–20, from the friction velocity
   of the surface drag, a stability correction from the bulk Richardson number between surface and
-  lowermost layer, and the boundary layer height h where the bulk Richardson number relative to the
+  lowermost layer that vanishes at `Richardson_cutoff`, and the boundary layer height h where the bulk Richardson number relative to the
   lowermost layer reaches `critical_Richardson`, interpolated linearly between layers;
 - K_local = l² |∂V/∂z| f(Ri) with the gradient Richardson number Ri between adjacent layers, the
   mixing length 1/l = 1/(κz) + 1/λ, long-tail stability functions of Louis et al. 1982 for Ri > 0 and
@@ -159,6 +162,7 @@ diffusivity is K = min(max(K_profile, K_local, K_background), K_max) with
     R_dry = atmosphere.R_dry
     κ = diffusion.von_Karman
     Ri_c = diffusion.critical_Richardson
+    Ri_cutoff = diffusion.Richardson_cutoff
     fb = diffusion.surface_layer_fraction
     (; mixing_length, free_mixing_length, mixing_length_height, convective_mixing_length) = diffusion
     (; background_diffusivity, background_height, max_diffusivity) = diffusion
@@ -199,10 +203,12 @@ diffusivity is K = min(max(K_profile, K_local, K_background), K_max) with
     h = boundary_layer_height(ij, u, v, Tᵥ_layers, Φ, Φₛ, g, cₚ, Ri_c)
     vars.parameterizations.boundary_layer_height[ij] = h
 
-    # Stable correction of Frierson 2006, eq. 20, [1 + Ri/Ri_c log(z/z₀)/(1 - Ri/Ri_c)]⁻¹ with the surface
-    # Richardson number, here written as (1 - r)/(1 - r + r log(z/z₀)), r = Ri/Ri_c ∈ [0, 1], to avoid a
-    # division by zero at Ri = Ri_c. It is 1 for unstable conditions (Ri ≤ 0) and 0 for Ri ≥ Ri_c
-    r = clamp(Ri_surface / Ri_c, 0, 1)
+    # Stable correction of Frierson 2006, eq. 20, [1 + Ri/Ri_cutoff log(z/z₀)/(1 - Ri/Ri_cutoff)]⁻¹ with the
+    # surface Richardson number, here written as (1 - r)/(1 - r + r log(z/z₀)), r = Ri/Ri_cutoff ∈ [0, 1], to
+    # avoid a division by zero at Ri = Ri_cutoff. It is 1 for unstable conditions (Ri ≤ 0) and 0 for
+    # Ri ≥ Ri_cutoff. Frierson uses the critical Richardson number here; a separate cutoff (as for the drag)
+    # keeps boundary-layer mixing in stable conditions until buoyancy dominates the shear
+    r = clamp(Ri_surface / Ri_cutoff, 0, 1)
     surface_layer_height = fb * h
     stability_surface_layer = stable_correction(r, surface_layer_height, z₀)
 
@@ -299,8 +305,8 @@ const MINIMUM_WIND_SPEED² = 1
 const MINIMUM_WIND_SHEAR² = 0.01
 
 """$(TYPEDSIGNATURES)
-Stability correction [1 + Ri/Ri_c log(z/z₀)/(1 - Ri/Ri_c)]⁻¹ of Frierson 2006, eq. 20, written with
-r = Ri/Ri_c ∈ [0, 1] as (1 - r)/(1 - r + r log(z/z₀)) to be finite at r = 1. z is capped one order of
+Stability correction [1 + Ri/Ri_cutoff log(z/z₀)/(1 - Ri/Ri_cutoff)]⁻¹ of Frierson 2006, eq. 20, written
+with r = Ri/Ri_cutoff ∈ [0, 1] as (1 - r)/(1 - r + r log(z/z₀)) to be finite at r = 1. z is capped one order of
 magnitude above the roughness length `z₀` as in `neutral_transfer_coefficient`."""
 @inline stable_correction(r, z, z₀) = (1 - r) / (1 - r + r * log(max(z, 10z₀) / z₀))
 

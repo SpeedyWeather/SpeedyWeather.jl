@@ -136,7 +136,7 @@ and zero above. ``f_b = 0.1`` is the surface layer fraction of the boundary laye
 ``K`` decreases to zero at ``z = h``. ``K_b(z)`` is
 
 ```math
-K_b(z) = \kappa u_\star z \left[ 1 + \frac{Ri_a}{Ri_c} \frac{\log(z/z_0)}{1 - Ri_a/Ri_c}\right]^{-1}
+K_b(z) = \kappa u_\star z \left[ 1 + \frac{Ri_a}{Ri_{cut}} \frac{\log(z/z_0)}{1 - Ri_a/Ri_{cut}}\right]^{-1}
 ```
 
 with the von Kármán constant ``\kappa = 0.4`` and the friction velocity ``u_\star = \sqrt{C} V_s``
@@ -144,8 +144,11 @@ from the drag coefficient for momentum ``C`` of the boundary layer and the surfa
 see [Bulk Richardson-based drag coefficient](@ref). The stability correction in brackets uses the
 bulk Richardson number ``Ri_a`` between the surface and the lowermost layer (computed as for the drag,
 from the soil and sea surface temperatures, weighted with the land fraction)
-clamped to ``0 \leq Ri_a \leq Ri_c``, so that it is 1 for unstable and neutral conditions and 0
-for ``Ri_a \geq Ri_c``. ``z_0`` is the roughness length for momentum.
+clamped to ``0 \leq Ri_a \leq Ri_{cut}``, so that it is 1 for unstable and neutral conditions and 0
+for ``Ri_a \geq Ri_{cut}``. Frierson et al. (2006) use ``Ri_c`` here. We use a separate cutoff
+``Ri_{cut} = 10`` (option `Richardson_cutoff`), as for the drag, so that the profile only vanishes
+where buoyancy dominates the shear by an order of magnitude. ``Ri_c`` keeps its conventional meaning as
+the threshold that defines the boundary layer height. ``z_0`` is the roughness length for momentum.
 
 ### Local diffusivity
 

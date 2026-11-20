@@ -178,7 +178,7 @@ boundary_layer = BoundaryLayer(
     spectral_grid;
     surface_condition,
     surface_roughness,
-    drag = BulkRichardsonDrag(spectral_grid, critical_Richardson = 5),
+    drag = BulkRichardsonDrag(spectral_grid, Richardson_cutoff = 5),
 )
 
 model = PrimitiveWetModel(spectral_grid; boundary_layer)
@@ -458,16 +458,19 @@ Then the drag coefficient ``C`` follows as
 ```math
 C = \begin{cases}
         C_{max} \quad &\text{for} \quad Ri_N  \leq 0\\
-        C_{max} \left(1 - \frac{Ri_N}{Ri_c}\right)^2 \quad &\text{for} \quad 0 < Ri_N < Ri_c \\
-        C_{min} \quad &\text{for} \quad Ri_N \geq Ri_c, \\
+        C_{max} \left(1 - \frac{Ri_N}{Ri_{cut}}\right)^2 \quad &\text{for} \quad 0 < Ri_N < Ri_{cut} \\
+        C_{min} \quad &\text{for} \quad Ri_N \geq Ri_{cut}, \\
     \end{cases}
 ```
 
 with the neutral drag coefficient ``C_{max}`` and the minimum drag ``C_{min}`` defined below, and 
 roughness lengths computed in the surface roughness scheme `boundary_layer.surface_roughness`, per 
 surface and per flux type. There is a maximum drag ``C`` for negative bulk Richardson numbers 
-``Ri_N`` but the drag drops to ``C_{min}`` for bulk Richardson numbers being larger than a critical
-``Ri_c = 10`` with a smooth transition in between. The height of the ``N``-th
+``Ri_N`` but the drag drops to ``C_{min}`` for bulk Richardson numbers larger than a cutoff
+``Ri_{cut} = 10`` (option `Richardson_cutoff`) with a smooth transition in between. Frierson et al. (2006)
+use a critical Richardson number of 1 here, but that lets the drag vanish where buoyancy and shear
+are still comparable. With ``Ri_{cut} = 10`` the drag only reaches its minimum where buoyancy
+dominates the shear by an order of magnitude. The height of the ``N``-th
 model layer is ``z_N = \tfrac{\Phi_N - \Phi_0}{g}`` with the geopotential
 ```math
 \Phi_N = \Phi_{0} + T_N R_d ( \log p_{N+h} - \log p_N)
@@ -486,10 +489,10 @@ the roughness length of momentum, heat or humidity, so the three coefficients sh
 but differ in their roughness lengths. This simplifies the drag coefficient calculation to
 
 ```math
-C = \max\left(C_{min}, C_{max} \left[1 - \frac{Ri_N^*}{Ri_c}\right]^2\right)
+C = \max\left(C_{min}, C_{max} \left[1 - \frac{Ri_N^*}{Ri_{cut}}\right]^2\right)
 ```
-with ``Ri_N^* = \max(0, \min(Ri_N, Ri_c))`` the clamped ``Ri_N`` which
-is at least ``0`` and at most ``Ri_c``, and ``C_{min} = 10^{-5}`` (`drag_min`) a minimum drag that avoids 
+with ``Ri_N^* = \max(0, \min(Ri_N, Ri_{cut}))`` the clamped ``Ri_N`` which
+is at least ``0`` and at most ``Ri_{cut}``, and ``C_{min} = 10^{-5}`` (`drag_min`) a minimum drag that avoids 
 vanishing surface fluxes in strongly stable conditions.
 
 ## Surface momentum fluxes

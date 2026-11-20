@@ -226,8 +226,8 @@ end
         end
 
         K_warm, _, h = diffusivity(20, 10)              # unstable surface layer, Ri < 0
-        K_cold, _, h_cold = diffusivity(-10, 10)        # stable surface layer, 0 < Ri < Ri_c
-        K_very_cold, _, _ = diffusivity(-20, 0.5)       # Ri ≥ Ri_c at the surface, no boundary layer profile
+        K_cold, _, h_cold = diffusivity(-10, 10)        # stable surface layer, 0 < Ri < Ri_cutoff
+        K_very_cold, _, _ = diffusivity(-20, 0.5)       # Ri ≥ Ri_cutoff at the surface, no boundary layer profile
 
         @test h == h_cold                               # h from the atmospheric column only
         @test all(K_warm .>= K_cold .>= K_very_cold)
