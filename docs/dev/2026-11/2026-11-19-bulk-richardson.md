@@ -2,7 +2,9 @@
 
 > Status: **in progress**. Steps 1–8 are implemented: the scheme works on CPU, CUDA and Reactant, costs 2–5 % of a
 > time step and is the default of both primitive models (committed in `b7bdfdd1` with the Reactant workaround).
-> Tests: see 8.11. Validation: T32, T256L8 and the T512L24 cold-pool restart tests pass. T512L24 needs
+> Tests: see 8.11. Validation: T32, T256L8 and the T512L24 cold-pool restart tests pass, but T32L24 with the scheme
+> blows up in the lowest layers at the Antarctic coast in 2 of 4 years with main's drag (0 of 4 with the new damped
+> drag, 8.13.2). T512L24 needs
 > a stronger speed-limit drag against the top-layer jet failure (which it also has without the scheme), and in the
 > multi-year runs a rare cold event at one Antarctic coastal point remains, which a shorter hyperdiffusion time
 > scale removes in restart tests. The final verification, T512L24 over three years, is running in four setups
@@ -67,8 +69,9 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
   Done in the working tree (8.11). Two things followed from it: the scheme no longer throws without a boundary
   layer (it then has no boundary-layer profile), and `reset_variable!` takes the variable name as a `Val`, because
   with the scheme's three additional variables the lookup by `Symbol` was no longer inferred (runtime dispatch).
-- 2026-11-20, user request: audit whether all variables of the scheme are necessary, then test on Reactant
-  whether two of the three scratch variables can be the model's general scratch arrays. They can (8.15).
+- 2026-11-20, user requests: audit whether all variables of the scheme are necessary; use the model's general
+  scratch arrays for the solver; store the conductances ρK/Δz instead of the diffusivities and ρ/Δz; keep two
+  diffusivities (one K for momentum and heat is not wanted). Done and checked on Reactant (8.15).
 - 2026-11-20, user request: a draft of the PR description, comparing the implementation with main and with the
   draft of #1283 (`milankl-claude:mc/richardson-surface-temperature`), with the GPU measurements already made (no
   new benchmarks). It is in `PR_bulk_richardson_diffusion.md` in the repository root, untracked.
@@ -81,9 +84,13 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
   replaced by a resolution-scaled coefficient, `drag * (truncation/32)^resolution_scaling` with `drag = 3e-6` and
   `resolution_scaling = 0.5`. The limiter is not in the code.
 - 2026-11-20, user request: replace the resolution scaling of `SpeedLimitDrag` by a damped time integration as for
-  the surface fluxes in #1336 (8.13.1). The drag now reads the previous leapfrog step and is multiplied by
-  `flux_damping(time_integration, 2Δt·c·excess)`, default `ImplicitFluxes()` (exact for the quadratic drag), with
-  `drag = 1e-5` at all resolutions.
+  the surface fluxes in #1336 (8.13.1). The drag is multiplied by `flux_damping(time_integration, 2Δt·c·excess)`,
+  default `ImplicitFluxes()` (exact for the quadratic drag), with `drag = 1e-5` at all resolutions (`41854301`).
+  I also moved it to the previous leapfrog step, the forward step over 2Δt that φ is derived for. With that,
+  T32L24 with the scheme blew up in the lowest layers at the Antarctic coast in the first validation runs and in
+  every restart variant (2 of 4 years in the ensemble); on the user's request it reads the current step again
+  (`b7156e83`) and completes 4 of 4 years there (8.13.2). The same runs show that T32L24 with the scheme also
+  blows up with main's drag (2 of 4 years).
 - 2026-11-19 (GPU session, A40 on login02 and H100 via Slurm), step 7, see section 8 for the numbers:
   - No GPU optimisation is kept. The scheme doubles the cost of the fused column kernel, but that kernel is only
     about 4 % of a time step, so the scheme costs 2–5 % of a time step at T256/T512.
@@ -782,8 +789,10 @@ time integrated as the surface fluxes of #1336, with a damping factor φ(z) of a
 - The drag read the *current* leapfrog step (`which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDrag) = 2`),
   so it was a centred leapfrog step, not the forward step over 2Δt the table above assumes. A damping term −a·u
   in a centred leapfrog step has a computational mode with |λ| = aΔt + √(1 + (aΔt)²) > 1, which only the Robert
-  filter (ν = 0.1) holds down, and only for small aΔt. `SpeedLimitDrag` now reads the previous step, like the
-  parameterizations, so it is a forward step over 2Δt (the other drags are unchanged).
+  filter (ν = 0.1) holds down, and only for small aΔt. `SpeedLimitDrag` therefore first read the previous step,
+  like the parameterizations, a forward step over 2Δt (`41854301`). That made T32L24 with the scheme blow up
+  (8.13.2), so it reads the **current** step again (`b7156e83`), as all drags. With φ the drag of one step is
+  still bounded to about the excess (rate per step aΔt·φ < 0.5), but φ = 1/(1 + z) is no longer the exact solution.
 - Without other tendencies the excess speed e decays as de/dt = −c·e², a relaxation of the speed towards the speed
   limit on the time scale τ = 1/(c·e). The explicit drag is multiplied by φ(z), z = 2Δt·c·e, of the new option
   `time_integration`. Its default `ImplicitFluxes()`, φ = 1/(1 + z), is the **exact** solution of the quadratic
@@ -793,19 +802,82 @@ time integrated as the surface fluxes of #1336, with a damping factor φ(z) of a
   each of them the wind is never decelerated beyond the speed limit, for any c, e or Δt.
 - Hence one coefficient for all resolutions, `drag = 1e-5` (what T512L24 needs, 8.8). `resolution_scaling` and
   `speed_limit_drag_coefficient` are removed. At T512 (2Δt = 300 s) and 20 m/s excess z = 0.06, so the drag is
-  6 % weaker than the undamped one of the three-year runs (which also still read the current step). At T32
-  (2Δt = 4800 s) z = 0.96 and φ = 0.51 for 20 m/s excess.
+  6 % weaker than the undamped one of the three-year runs. At T32 (2Δt = 4800 s) z = 0.96 and φ = 0.51 for
+  20 m/s excess.
 - `AbstractFluxIntegration`, its four subtypes and `flux_damping` moved from `parameterizations/tendencies.jl` to the
   new `time_stepping/flux_integration.jl`, which is included before the dynamics. `flux_damping(::ExponentialFluxes, z)`
   now guards numerator and denominator separately: the drag has z = 0 wherever it is inactive, where the former
   `ifelse(small, 1, -expm1(-z)/z)` evaluated 0/0 in the branch that is not taken (NaN derivatives).
-- Tests: `test/dynamics/forcing_drag.jl` (antiparallel with `ExplicitFluxes()`, previous step, one step of every
-  time integration against its closed form for z from 0.02 to 200) and `test/parameterizations/surface_flux_time_integration.jl` pass.
-- Validation, all with the new default and the scheme switched on unless stated: T32L24 and T32L8 for 360 days on
-  the CPU (login02, `$D/validation/means_drag_damped_cpu`, `run_means_cpu_dragdamped.sh`); job 3371652
-  (`submit_dragdamped.sh`): T32L24, T32L8 and T256L8 with and without the scheme on the GPU
-  (`$D/validation/means_drag_damped`), then T512L24 for 60 days (`output/run_t512l24_vdiff_dragdamped_0001`).
-  **Results pending.**
+- Tests: `test/dynamics/forcing_drag.jl` (antiparallel with `ExplicitFluxes()`, the step the drag reads, one step
+  of every time integration against its closed form for z from 0.02 to 200) and
+  `test/parameterizations/surface_flux_time_integration.jl` pass, with the previous and with the current step.
+- With the previous-step version (`41854301`): `test/output/zarr_output.jl` passes (116 of 116; it failed with the
+  undamped 1e-5), CPU vs Reactant 20 of 20 (dry) and 23 of 23 (wet) (`$D/tests/reactant_correctness_dragdamped.log`),
+  Enzyme `full_diff_CI.jl` on 1.11.7 passes (run from a copy of the environment, the tracked
+  `test/differentiability/Project.toml` untouched). Not repeated for the current step, which only changes the
+  step that is read.
+- Validation runs: 8.13.2.
+
+#### 8.13.2 T32L24 blow-ups and the leapfrog step of the drag
+
+First validation, with the damped drag on the **previous** step (`41854301`; T512L24 still running):
+
+| Run | Without the scheme | With the scheme |
+|---|---|---|
+| T32L8, 360 days (GPU; with the scheme also CPU) | completes | completes |
+| T32L24, 360 days, GPU (`$D/validation/means_drag_damped`, job 3371652) | NaN 2000-08-10 | NaN 2000-07-21 |
+| T32L24, 360 days, CPU (`$D/validation/means_drag_damped_cpu`) | completes | NaN 2000-07-23 |
+| T256L8, 300 days, GPU | completes, max wind 99 m/s, 6000–10800 superadiabatic layer pairs | completes, max wind 96 m/s, 2–30 pairs |
+| T512L24, 60 days, GPU (`output/run_t512l24_vdiff_dragdamped_0001`) | – | **PENDING** (started 15:37, loaded the previous-step code) |
+
+Where it blows up (`$D/validation/t32_blowup_probe.jl`, `logs/t32-probe-spinup140.log`): a single 200-day run of
+T32L24 with the scheme went NaN on 2000-05-23. Restarted from its state on 2000-05-20 (day 140) and continued in one
+`run!`, it goes NaN on 2000-05-22T15. Not in the jet aloft (top layers stay near 100 m/s) but in the **lowest
+layers** (20–24 of 24) at the Antarctic coast, 72–80°S, 150–170°E (Ross Sea, Victoria Land), in southern winter:
+a lowest-layer wind of about 115 m/s for a day, then 148 → 186 → 279 → 480 → 1285 → 8238 m/s in six steps (×1.6 per
+40-minute step). The sign does not alternate between steps, so it is not the computational mode.
+
+Restart test, 5 days from that state for every drag variant (`t32_blowup_probe.jl restart`,
+`logs/t32-probe-restart140.log`):
+
+| Drag | Step | Result | Peak wind in the lowest layers [m/s] |
+|---|---|---|---|
+| 3e-6, undamped (main) | current | completes | 109 |
+| 1e-5, undamped (`89be0251`) | current | completes | 106 |
+| 1e-5, damped (now default) | current | completes | 108 |
+| 1e-5, damped (`41854301`) | previous | NaN | 115, then grows |
+| 1e-5, `RationalFluxes()` | previous | NaN | 116, then grows |
+| 1e-5, undamped | previous | NaN | 174 within 6 h, then grows |
+| 3e-6, damped | previous | NaN | 113, then grows |
+| none (`drag = 0`) | – | NaN | – |
+| 1e-5, damped, without the scheme | previous | completes (the event does not occur) | – |
+
+The drag on the previous step does act (the top-layer winds of the run with it are 100–110 m/s, 115–123 m/s without
+drag), but every variant on the current step keeps the lowest-layer jet below 110 m/s and every variant on the
+previous step lets it grow past 113 m/s and blow up, like no drag at all. Why is not understood. A guess (not
+tested): the jet near the surface becomes unstable above roughly 110–115 m/s at this time step, and a drag on the
+previous step lags one step behind a jet that grows within hours.
+
+One-year ensemble with the scheme (CPU, `$D/validation/run_t32_ensemble.sh`, `logs/t32ens/`, code after
+`8f1520f0`): four realizations per drag that differ only in the length of the `run!` calls (every call starts the
+leapfrog again with an Euler step, which perturbs the trajectory):
+
+| Drag | One call | 10-day calls | 30-day calls | 90-day calls |
+|---|---|---|---|---|
+| 3e-6, undamped, current step (main) | NaN 2000-06-10 | NaN 2000-07-15 | completes | completes |
+| 1e-5, damped, current step (now default) | completes | completes | completes | completes |
+| 1e-5, damped, previous step (`41854301`) | NaN 2000-05-23 | NaN 2000-07-23 | completes | completes |
+
+- **T32L24 with the scheme is marginal with main's drag too**: 2 of 4 years blow up. The earlier stable year with
+  3e-6 (8.6, 8.13) was one lucky realization. The 2000-07-05 NaN with the undamped 1e-5 (8.13) can no longer be
+  taken as evidence against that coefficient.
+- With the damped 1e-5 on the previous step 2 of 4 years blow up, as with main's drag (maximum winds of 103–106 m/s
+  at the ends of the calls of the two that complete).
+- With the damped 1e-5 on the current step all four years complete, with maximum winds of 89–95 m/s at the ends of
+  the calls. Four realizations do not prove stability; the instability in the lowest layers at the Antarctic coast
+  is still there and only less likely (0 of 4 against 2 of 4 for the other two drags).
+- Open: the cause of that instability (scheme, thin lowest layers, orography at T32; without the scheme it did not
+  occur in the restart test and one of two years blew up in the first validation).
 
 ### 8.14 Tibet at L24
 
@@ -828,27 +900,41 @@ seasons.
 ### 8.15 Audit of the scheme's variables (2026-11-20, user request)
 
 Question: are all six variables necessary, or can some be computed on the fly? Each 3D array is 58 MB at T512L24
-in Float32.
+in Float32. Outcome: the scheme's dedicated 3D arrays went from five to two.
 
-| Variable | Finding |
-|---|---|
-| `boundary_layer_height` (2D) | diagnostic only, read nowhere; kept, it is 2D |
-| `vertical_diffusivity_momentum`, `_heat` | needed as storage between the diffusivity loop and the four solves, and they are the scheme's diagnostics; kept |
-| `density_over_distance` | needs storage, only ever read as a product with the diffusivity. Could go by storing ρK/Δz instead of K, at the price of diagnostics in kg/(m² s) instead of m²/s. **Not done**, open |
-| `tridiagonal_upper`, `tridiagonal_rhs` | inherent to the Thomas algorithm, but a dedicated variable is not needed: **replaced by the model's general scratch arrays** `vars.scratch.grid.a` and `.b` (write before read within the call, as convection and the radiation transmissivities use them) |
+| Variable (before) | Finding | Now |
+|---|---|---|
+| `boundary_layer_height` (2D) | diagnostic only, read nowhere | kept, it is 2D |
+| `vertical_diffusivity_momentum`, `_heat` | needed as storage between the loop that computes them and the four solves | replaced by `vertical_conductance_momentum`, `_heat`, the product ρK/Δz [kg/m²/s] |
+| `density_over_distance` | only ever read as a product with the diffusivity | **removed**, part of the conductances |
+| `tridiagonal_upper`, `tridiagonal_rhs` | inherent to the Thomas algorithm, but no dedicated variable needed | **removed**, the model's general scratch arrays `vars.scratch.grid.a` and `.b` are used (write before read within the call, as convection and the radiation transmissivities use them) |
 
-The replacement is in the working tree (`vertical_diffusion.jl`, uncommitted at 14:40). The virtual temperature is
-in `a`, which the solver then reuses for its right-hand side; the upper diagonal is in `b`. Checked, because the
-Reactant workaround of 8.3 is sensitive to how the loops read their arrays:
+Decisions of the user along the way:
 
-- `Variables` of the dry and wet model have one scratch 3D array more with the scheme than without
-  (`density_over_distance`), was three: 116 MB less at T512L24.
-- Unit tests of the scheme: 68 of 68, `--check-bounds=yes`.
-- Reactant, whole `vertical_diffusion!` as one kernel, raised against not raised (`$D/reactant_diffusion_check.jl`,
-  wet coupled, wet uncoupled, dry coupled): relative differences 10⁻⁷ to 7·10⁻⁵, and the means of diffusivities,
-  boundary layer height and all tendencies are the same digits as before the change.
-- Reactant, CPU vs Reactant over 100 steps: PrimitiveDryModel 20 of 20, PrimitiveWetModel 23 of 23.
-- Not repeated with the change: main suite, CUDA, Enzyme, GPU timing (the memory accesses are the same).
+- Computing the diffusivity on the fly inside the solves: not done. With four separate solves it would be
+  computed four times, and the virtual temperature would need an array of its own for the duration of the solves.
+- One diffusivity for momentum and heat: **not wanted** (it fixes the turbulent Prandtl number at 1). The two
+  stability functions stay.
+- Storing conductances instead of diffusivities: done (`8f1520f0`). The diffusivity in m²/s is no longer stored;
+  it is K = conductance · Δz/ρ. The unit tests recompute ρ/Δz from the state to check K. `vertical_diffusivity!` is
+  now `vertical_conductance!`, and `implicit_vertical_diffusion!` takes the conductance.
+
+Checks, for the scratch arrays (`6bc132e2`) and then for the conductances (`8f1520f0`), because the Reactant
+workaround of 8.3 is sensitive to how the loops read their arrays:
+
+| | General scratch arrays | Conductances |
+|---|---|---|
+| Unit tests of the scheme, `--check-bounds=yes` | 68 of 68 | 71 of 71 |
+| Reactant, whole `vertical_diffusion!` as one kernel, raised against not raised (wet coupled, wet uncoupled, dry coupled) | relative differences 10⁻⁷ to 7·10⁻⁵ | 10⁻⁷ to 6·10⁻⁵ |
+| Same check: boundary layer height and the four tendencies against the version before | same digits | same digits |
+| Reactant, CPU vs Reactant over 100 steps, PrimitiveDryModel / PrimitiveWetModel | 20 of 20 / 23 of 23 | 20 of 20 / 23 of 23 |
+
+- `Variables` of the dry and wet model: no scratch array of the scheme any more, two 3D parameterization
+  variables (the conductances) and the 2D boundary layer height.
+- Each solve reads one array per layer where it read two; the effect on the GPU timing is not measured.
+- Not repeated with these two changes: main suite, CUDA, Enzyme, GPU suite. Scripts and logs:
+  `$D/reactant_conductance_check.jl`, `$D/reactant_correctness_conductance.jl`, `$D/tests/*scratch_ab*`,
+  `$D/tests/*conductance*`.
 
 ### 8.12 Next
 
