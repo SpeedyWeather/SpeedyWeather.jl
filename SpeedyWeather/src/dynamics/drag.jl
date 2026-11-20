@@ -120,35 +120,43 @@ end
 end
 
 export SpeedLimitDrag
-@parameterized @kwdef struct SpeedLimitDrag{NF} <: AbstractDrag
-    "[OPTION] drag coefficient [1/m] at T32, see `resolution_scaling`"
-    @param drag::NF = 3.0e-6 (bounds = Nonnegative,)
+
+"""Drag on the horizontal wind above a speed limit, quadratic in the excess speed and
+antiparallel to the flow, see `drag!(::Variables, ::SpeedLimitDrag, ::AbstractModel)`.
+$(TYPEDFIELDS)"""
+@parameterized @kwdef struct SpeedLimitDrag{NF, FI <: AbstractFluxIntegration} <: AbstractDrag
+    "[OPTION] drag coefficient [1/m]"
+    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)
 
     "[OPTION] Speed limit above which drag kicks in [m/s]"
     @param speed_limit::NF = 80 (bounds = Nonnegative,)
 
-    # 0.5 gives 1.2e-5 at T512, where 3e-6 let the wind in the uppermost layers blow up after 5 weeks (with
-    # 24 layers and the default time step) and 1e-5 did not. A coefficient of 1e-5 at all resolutions is too
-    # strong at T32 with its 16 times longer time step, as the drag is explicit in time (T32 with 24 layers
-    # blew up within a year)
-    "[OPTION] stronger drag with resolution? Drag coefficient is `drag * (truncation/32)^resolution_scaling`, 0: constant with truncation"
-    resolution_scaling::NF = 0.5
+    "[OPTION] Time integration, damping the drag for large `Δt*drag*excess`. `ImplicitFluxes()` is exact for this drag"
+    time_integration::FI = ImplicitFluxes()
 end
 
-SpeedLimitDrag(SG::SpectralGrid; kwargs...) = SpeedLimitDrag{SG.NF}(; kwargs...)
+SpeedLimitDrag(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
+    SpeedLimitDrag{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SpeedLimitDrag, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
 Speed limit drag for the momentum equations.
 
-    (Fu, Fv) = -c*max(0, |(u, v)| - speed_limit)^2 * (u, v)/|(u, v)|
+    (Fu, Fv) = -c*max(0, |(u, v)| - speed_limit)^2 * (u, v)/|(u, v)| * φ(z)
 
-with `c` the drag coefficient [1/m], `drag * (truncation/32)^resolution_scaling` as defined in
-`drag::SpeedLimitDrag`, i.e. stronger at higher resolution, and
-kicking in only above a certain speed limit. The drag is quadratic in the excess
-speed above the limit and antiparallel to the flow, so it only decelerates and
-never rotates it."""
+with `c` the drag coefficient [1/m] (`drag`), kicking in only above a certain speed limit.
+The drag is quadratic in the excess speed above the limit and antiparallel to the flow,
+so it only decelerates and never rotates it. Without other tendencies the excess speed
+`e` decays as `de/dt = -c*e^2`, a relaxation of the speed towards the speed limit on the
+time scale `τ = 1/(c*e)`. As for the surface fluxes, the explicit drag is multiplied by a
+damping factor `φ(z)` of `scheme.time_integration` with `z = Δt/τ = Δt*c*e` and `Δt`
+the time step (2Δt for leapfrog), so that the drag does not decelerate the wind beyond
+the speed limit for large `c`, `e` or `Δt`. With `ImplicitFluxes()`, `φ = 1/(1 + z)`, this
+is the exact solution `e(Δt) = e/(1 + c*e*Δt)` of the quadratic drag. With leapfrog the
+drag is evaluated at the previous time step (a forward step over 2Δt, as the
+parameterizations), as a damping term evaluated at the current time step amplifies
+the computational mode."""
 function drag!(
         vars::Variables,
         scheme::SpeedLimitDrag,
@@ -160,25 +168,18 @@ function drag!(
     Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, scheme)
     Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, scheme)
 
-    # total drag coefficient, stronger at higher resolution
-    c = speed_limit_drag_coefficient(scheme, model.spectral_grid.truncation)
-    (; speed_limit) = scheme
+    (; drag, speed_limit, time_integration) = scheme
+    Δt = default_time_step(model.time_stepping)     # 2Δt for leapfrog
 
     launch!(
         architecture(Fu), RingGridWorkOrder, size(Fu), speed_limit_drag_kernel!,
-        Fu, Fv, u, v, c, speed_limit
+        Fu, Fv, u, v, drag, speed_limit, time_integration, Δt
     )
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
-Drag coefficient [1/m] of `scheme` at spectral truncation `truncation`:
-`drag * (truncation/32)^resolution_scaling`, with `drag` the coefficient at T32."""
-speed_limit_drag_coefficient(scheme::SpeedLimitDrag, truncation::Integer) =
-    scheme.drag * (oftype(scheme.drag, truncation) / DEFAULT_TRUNCATION)^scheme.resolution_scaling
-
 @kernel inbounds = true function speed_limit_drag_kernel!(
-        Fu, Fv, u, v, c, speed_limit
+        Fu, Fv, u, v, c, speed_limit, time_integration, Δt
     )
     ij, k = @index(Global, NTuple)
 
@@ -187,11 +188,14 @@ speed_limit_drag_coefficient(scheme::SpeedLimitDrag, truncation::Integer) =
     speed = sqrt(uij^2 + vij^2)
     excess = max(0, speed - speed_limit)    # zero below the limit
 
+    # damping factor for the relaxation of the excess speed towards zero on the time scale 1/(c*excess)
+    damping = flux_damping(time_integration, Δt * c * excess)
+
     # -c*excess^2 * (u, v)/speed, i.e. antiparallel to the flow. Scaling the unit vector
     # (u, v)/speed rather than (sign(u), sign(v)) keeps the drag opposite to the velocity;
     # the latter points along the quadrant diagonal and is √2 too large for a 45° flow.
-    # excess > 0 implies speed > speed_limit >= 0, so the division is guarded.
-    scale = ifelse(excess > 0, c * excess^2 / speed, zero(speed))  # excess > 0 ? c * excess^2 / speed : zero(speed)
+    # The numerator is zero for excess = 0, so only the denominator is guarded (against zero wind)
+    scale = c * excess^2 * damping / ifelse(excess > 0, speed, one(speed))
 
     # -= as the tendencies already contain forcing
     Fu[ij, k] -= scale * uij

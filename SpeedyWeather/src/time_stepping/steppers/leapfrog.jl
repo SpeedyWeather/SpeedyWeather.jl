@@ -54,6 +54,10 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractForcing) = 2
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDrag) = 2
 
+# but the speed limit drag on the previous step, a forward step over 2Δt damped by its `time_integration`,
+# as a damping term on the current step amplifies the computational mode (in 2D models the only grid step)
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::SpeedLimitDrag) = 1
+
 # in Leapfrog use the current (=2nd) in the dynamical core
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
 
@@ -302,7 +306,7 @@ end
 # the clock passes Δt/2 on the 1st Euler step and on the 2nd leapfrog step (Δt but rewinds Δt/2),
 # then Δt on every later step, see `time_step!(::Clock, ::Leapfrog)`
 clock_increment(L::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, L.Δt / 2, L.Δt)
-      
+
 """$(TYPEDSIGNATURES)
 Wiener scaling `1/√Δt` (see `AdditiveWienerNoise`) for a leapfrog step, `Δt` is half its time
 step: a leapfrog step of 2Δt advances each of its two interleaved sequences by 2Δt, but the clock
