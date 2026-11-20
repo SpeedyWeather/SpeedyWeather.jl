@@ -102,9 +102,13 @@ K = \min(\max(K_{profile}, K_{local}, K_{background}), K_{max})
 ```
 
 and is computed separately for momentum ``K_m`` and for heat and humidity ``K_h``, which
-differ only in ``K_{local}``. The diffusivities and the boundary layer height ``h``
-are stored in `vertical_diffusivity_momentum`, `vertical_diffusivity_heat` and
-`boundary_layer_height` in `simulation.variables.parameterizations`.
+differ only in ``K_{local}``. The implicit solver only needs the conductances
+``a = \rho K / \Delta z`` [kg/m²/s] from above, so these are stored, not the diffusivities, as
+`vertical_conductance_momentum` and `vertical_conductance_heat` in
+`simulation.variables.parameterizations`, next to the boundary layer height ``h`` as
+`boundary_layer_height`. The value belongs to the interface below each layer and is zero for
+the lowermost layer (no flux through the surface). The diffusivity is
+``K = a \Delta z / \rho`` with the density and layer distance as defined above.
 
 ### Boundary layer profile
 
