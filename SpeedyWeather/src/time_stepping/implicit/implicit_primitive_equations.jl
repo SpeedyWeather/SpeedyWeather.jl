@@ -57,7 +57,6 @@ $(TYPEDFIELDS)"""
         MatrixType,
         TensorType,
         IntType,
-        NLAYERS,        # nlayers as a type parameter, see `nlayers_val` below
         ScheduleType,
         ReferenceTemperatureType,
         RefNF,          # <: Base.RefValue{NF} or Base.RefValue{<:Number} for Reactant, see `scalar_ref`
@@ -69,9 +68,6 @@ $(TYPEDFIELDS)"""
 
     "[DERIVED] Number of vertical layers"
     nlayers::IntType
-
-    "[DERIVED] `nlayers` as a `Val` so that the vertical loops are more type stable"
-    nlayers_val::Val{NLAYERS} = Val(nlayers)
 
     # PARAMETERS
     "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
@@ -135,7 +131,7 @@ function ImplicitPrimitiveEquation(
     (; NF, VectorType, MatrixType, TensorType, truncation, nlayers, architecture) = spectral_grid
     IntType = typeof(truncation)
     Δt = scalar_ref(architecture, zero(NF))
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, IntType, nlayers, typeof(schedule), typeof(reference_temperature), typeof(Δt)}(;
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, IntType, typeof(schedule), typeof(reference_temperature), typeof(Δt)}(;
         truncation, nlayers, schedule, reference_temperature, Δt, kwargs...
     )
 end
@@ -412,7 +408,7 @@ function implicit_correction!(
     # escape immediately if explicit
     implicit.centering == 0 && return nothing
 
-    (; S⁻¹, R, U, L, W, nlayers_val) = implicit
+    (; S⁻¹, R, U, L, W, nlayers) = implicit
 
     # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
     # dynamical core uses scaled time step, scale on the fly
@@ -444,7 +440,7 @@ function implicit_correction!(
         implicit_primitive_leapfrog_kernel!,
         temperature_tendency, pressure_tendency, divergence_tendency,
         divergence, temp_step, pres_step, div_step,
-        S⁻¹, R, U, L, W, l_indices, ξ, nlayers_val
+        S⁻¹, R, U, L, W, l_indices, ξ, Val(nlayers)
     )
 
     return nothing

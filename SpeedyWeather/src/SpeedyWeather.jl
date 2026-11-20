@@ -49,6 +49,7 @@ import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, read
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets
+using PrecompileTools: @setup_workload, @compile_workload
 using SpeedyWeatherInternals.ParameterEditing
 import SpeedyWeatherInternals.ParameterEditing: parameters
 export ParameterTable, parameters, stripparams       # export user-facing parameter handling types and methods
@@ -242,4 +243,7 @@ include("models/shallow_water.jl")
 include("models/primitive_dry.jl")
 include("models/primitive_wet.jl")
 include("models/set.jl")
+
+# PRECOMPILATION
+include("precompile.jl")
 end

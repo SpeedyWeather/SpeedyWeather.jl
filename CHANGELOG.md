@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Precompile workload for the default model, `nlayers` no longer a type parameter of `ImplicitPrimitiveEquation` so that other `nlayers` reuse the precompiled model [#1421](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1421)
 - Initial conditions for retrograde planets: `ZonalWind`, `JablonowskiTemperature`, `BalancedZonalState` and `ZonalRidge` use a jet in the sense of rotation (easterly for `rotation < 0`), the mirror image of the prograde state, instead of poles that start tens of Kelvin warmer than the tropics [#1410](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1410)
 - Eccentric orbits: `planet.orbit` is `KeplerOrbit()` (new default, with eccentricity and longitude of perihelion) or `CircularOrbit()` (previous), which defines its variables (the distance factor (a/r)²), is computed once per time step by the solar zenith, and scales the solar constant in all shortwave schemes via `solar_distance_factor(vars)`; `ScalarDim` variables (the distance factor, CO₂, `prognostic.scale`) are allocated with `scalar_ref`, which moved to SpeedyWeatherInternals (v1.1.0), so a compiled Reactant step can write them; `ExponentialCO2` runs with Reactant (`datetime2unix(::ReactantDateTime)` in the Reactant extension, years since start kept in Float64) [#1407](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1407)
 - Fixes a bug that the `custom_parameterization` was incorrectly not initialized [#1419](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1419)
