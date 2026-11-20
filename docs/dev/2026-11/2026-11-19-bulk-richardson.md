@@ -1,8 +1,12 @@
 # Overhaul of `BulkRichardsonDiffusion` (vertical diffusion)
 
-> Status: **in progress**. Implementation started 2026-11-19 on `mg/bulk-richardson-reimplemented`, steps 1–6
-> of section 5 being implemented; step 7 (GPU performance, on a GPU node), step 8 (default on) and the model
-> validation of section 6 are open.
+> Status: **in progress**. Steps 1–8 are implemented: the scheme works on CPU, CUDA and Reactant, costs 2–5 % of a
+> time step and is the default of both primitive models (committed in `b7bdfdd1` with the Reactant workaround).
+> Tests: see 8.11. Validation: T32, T256L8 and the T512L24 cold-pool restart tests pass. T512L24 needs
+> a stronger speed-limit drag against the top-layer jet failure (which it also has without the scheme), and in the
+> multi-year runs a rare cold event at one Antarctic coastal point remains, which a shorter hyperdiffusion time
+> scale removes in restart tests. The final verification, T512L24 over three years, is running in four setups
+> (8.8, 8.10). Details in section 8.
 
 Date of initial draft: 2026-11-19
 
@@ -53,6 +57,29 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
     open question of section 7 in favour of the hybrid K for now; the SPEEDY-style relaxation is not implemented.
 - 2026-11-19: long GPU runs for stability added to the model validation of section 6 as the final validation
   (user request), required before step 8 (default on).
+
+- 2026-11-19, user requests during the GPU session: (1) the first goal is a fast, efficient and
+  Reactant-compatible implementation of the scheme; (2) the goal remains a stable T512L24, to be reached by
+  parameter choices of this and other parameterizations only (structural changes elsewhere are out of scope),
+  trying setups with a shorter time step and a stronger speed-limit drag against the top-layer jet failure;
+  (3) the last verification is a T512L24 run over several years. Section 6 is extended accordingly.
+- 2026-11-20, user request: the scheme becomes the default of both primitive models, and all tests have to pass.
+  Done in the working tree (8.11). Two things followed from it: the scheme no longer throws without a boundary
+  layer (it then has no boundary-layer profile), and `reset_variable!` takes the variable name as a `Val`, because
+  with the scheme's three additional variables the lookup by `Symbol` was no longer inferred (runtime dispatch).
+- 2026-11-20: the defaults of `SpeedLimitDrag` and `HyperDiffusion` are **not** changed, although T512L24 needs
+  other values (8.8, 8.10): that changes all resolutions and is a decision for a human.
+- 2026-11-19 (GPU session, A40 on login02 and H100 via Slurm), step 7, see section 8 for the numbers:
+  - No GPU optimisation is kept. The scheme doubles the cost of the fused column kernel, but that kernel is only
+    about 4 % of a time step, so the scheme costs 2–5 % of a time step at T256/T512.
+  - An in-place tridiagonal solve (right-hand side stored in the tendency, one scratch array fewer) was implemented
+    and measured: 14–17 % less added kernel cost. It was reverted because the Reactant compilation of the column
+    kernel failed with it. The patch is kept outside the repository (section 8.5).
+  - Solving u and v (and T and q) in one sweep with shared pivots was not implemented: estimated gain below 1 % of
+    a time step.
+  - The model validation runs use their own environment and copies of the T512L24 driver scripts in
+    `/p/tmp/maxgelbr/code/Speedy2/claude_bulk_richardson_2026-11-19/validation/`, so that nothing in
+    `/p/tmp/maxgelbr/t512l24-reactant-10y/` (another session's work) is modified. Its restart files are read only.
 
 ## 1. Why this matters
 
@@ -273,7 +300,9 @@ Model validation:
   and lengths to be decided, as long as the budget allows). Pass criteria: no blow-up or NaNs, no drift of the
   global means (temperature, precipitation, surface pressure) beyond that of `vertical_diffusion = nothing`, and
   no growing extremes in the lowest layers (cold pools, polar inversions). Run after the GPU performance work
-  (step 7) so that the runs use the final kernel.
+  (step 7) so that the runs use the final kernel. **The last verification is a T512L24 run over several years**
+  (user request 2026-11-19), with whatever time step and parameters of the other parameterizations make T512L24
+  stable (8.8); structural changes outside the scheme are out of scope.
 
 ## 7. Open questions for whoever picks this up
 
@@ -284,3 +313,396 @@ Model validation:
   the advective limit at Δt = 150 s is ≈ 83 m/s).
 - Vertical diffusion alone does not remove the aliasing on the octahedral grid (see `STABILITY_NOTES.md`,
   finding 4). The `dealiasing = 3` runs test that separately.
+
+## 8. Progress protocol
+
+State on 2026-11-20, 08:30 CET. Everything below was run on the committed code `1179b149` unless stated otherwise.
+Scripts and logs are in `/p/tmp/maxgelbr/code/Speedy2/claude_bulk_richardson_2026-11-19/` (called `$D` below),
+not in the repository.
+
+### 8.1 Where the plan stands
+
+| Step | State |
+|---|---|
+| 1–6 operator, implicit solve, K profile, local term, source coupling, docs | done, committed in `1179b149` |
+| 7 GPU correctness, CUDA | done (8.2) |
+| 7 GPU correctness, Reactant | dry and wet model pass with the workaround in the working tree; on the GPU backend the scheme works and changes nothing about the 3 comparisons that fail there without it (8.3) |
+| 7 GPU performance | measured, three optimisations tried, none kept (8.4, 8.5) |
+| 6 validation: T32L8 and T32L24, one year | done (8.6) |
+| 6 validation: T512L24 cold-pool restart tests | done (8.7) |
+| 6 validation: T512L24 45 days | no cold pools; NaN on 02-08 from the top-layer jet (8.8) |
+| 6 validation: T256L8, 300 days through the Antarctic winter | done (8.9) |
+| 6 validation: T512L24 with shorter time step / stronger speed-limit drag | all 4 runs completed 60 days (8.8) |
+| 6 final verification: T512L24 over several years | four runs of 3 years running, the first three at 1.2–1.6 years without NaN; rare cold event at one Antarctic point (8.10) |
+| 6 Enzyme differentiability tests | pass with the scheme as default (8.11) |
+| 8 default on | done in the working tree (8.11) |
+
+The source and test changes of these sessions are committed in `b7bdfdd1` ("make it default", 2026-11-20 08:06):
+the Reactant workaround of 8.3, no error without a boundary layer, the defaults of both primitive models,
+`reset_variable!` in `parameterizations/tendencies.jl`, the tests of the scheme and one GPU test (8.11). Not
+committed yet: `CHANGELOG.md`, `docs/src/vertical_diffusion.md` (both say that the scheme is the default) and
+this document.
+
+### 8.2 Unit tests and CUDA
+
+- CPU unit tests (`test/parameterizations/vertical_diffusion.jl`, `--check-bounds=yes`): 67 of 67 pass. The file
+  takes 7.5 minutes, almost all of it compilation of four model configurations.
+- CUDA on the A40 (`$D/cuda_correctness.jl`, log next to it; repeated with the workaround of 8.3 for 2 and 20
+  steps, same numbers): PrimitiveWet and PrimitiveDry at T32 with 8 and 24
+  layers, CPU and GPU from the same initial conditions, compared after 2, 20 and 72 steps. No NaN in any of the
+  12 runs. After 2 steps the diffusivities and the boundary layer height agree to 1–4·10⁻⁴ of their maximum and
+  temperature to 2–5·10⁻⁶. Later the pointwise differences grow (up to 0.9 of the maximum diffusivity after 72
+  steps) while the global means stay within 1 %, i.e. the two runs diverge chaotically, as they do without the
+  scheme. This is a check of the whole model run, not of the kernel in isolation.
+
+### 8.3 Reactant
+
+`$D/reactant_correctness.jl` runs the tendency and time-stepping comparison of `test/reactant/test_correctness.jl`
+(T32L8, CPU backend of Reactant, 100 steps) with `vertical_diffusion = BulkRichardsonDiffusion{Float32}()`.
+
+- **PrimitiveDryModel: 20 of 20 pass.** Mean diffusivities agree (momentum 4.4263 on CPU, 4.4267 on Reactant).
+- **PrimitiveWetModel: 10 of 23 fail** (tendencies and state outside the tolerances), and the Reactant model has
+  `vertical_diffusivity_momentum`, `vertical_diffusivity_heat` and `boundary_layer_height` exactly zero
+  everywhere, so the scheme writes nothing there. The cause is not known. What is established, from 5 time steps
+  at T32L8 (`$D/reactant_probe.jl`, `$D/reactant_variant.jl`, CPU reference `$D/reactant_probe_cpu.jl`):
+  - Without the scheme the wet model on Reactant agrees with the CPU (mean drag coefficient 5.3997·10⁻⁴ on both,
+    and switching the large-scale condensation off changes the cloud top on both). So the scheme is the cause.
+  - With the scheme, the Reactant result is the same to all printed digits whether the humidity diffusion, the
+    large-scale condensation or the default instead of the test physics is used (mean drag 7.13·10⁻⁴, CPU
+    5.39·10⁻⁴). Parameterizations other than the scheme therefore also seem to have no effect, i.e. the compiled
+    column kernel is wrong as a whole, not only the scheme's part of it.
+  - On the CPU the wet model has a mean diffusivity of momentum of 0.22 m²/s and a mean boundary layer height of
+    222 m after these 5 steps, so zero is not a valid result.
+  - Reproducer (`$D/reactant_clean.jl`): a kernel that only calls `vertical_diffusivity!` for every column of the
+    wet model, compiled twice on the same state. With Reactant's default options (kernels not raised to StableHLO)
+    it gives the expected diffusivities (mean of momentum 0.203 m²/s, boundary layer height 196 m). With
+    `reactant_compile_options()` (kernels raised, as in every model run) the kernel writes nothing: both
+    diffusivities, the boundary layer height and the scratch array stay zero. So the fault is in the raising of
+    this kernel or a pass after it, not in the tracing, and it needs only the scheme's own function to show.
+  - The whole `time_step!(vars, time_stepping, model)` compiled without raising also gives correct
+    diffusivities (logs in `$D/default_options/`).
+  - Variants of the function on a valid state (`$D/reactant_clean_[ab].log`): the raised kernel is correct if
+    humidity is not read at all, if the virtual temperature is computed from humidity only in the loop for the
+    boundary layer height, or only in the loop for the diffusivities. It writes nothing if both loops compute
+    it. It also writes nothing if the first loop computes and stores it and the second reads the stored values
+    (`$D/reactant_diffusion_check_folded.log`). Removing the surface Richardson number or the roughness length
+    changes nothing. Simple kernels that read humidity at layers k and k+1 are raised correctly
+    (`$D/reactant_minimal.jl`). What exactly breaks the raising is not known; it has not been reduced to a small
+    example for an upstream issue.
+  - An earlier round of variants (logs in `$D/bisect1/`, `reactant_bisect_[c-f].log`) is not usable: its state had
+    zero surface wind (no boundary layer step had run), for which the surface Richardson number is NaN on any
+    backend.
+- **Workaround, in the working tree, not committed**: `vertical_diffusivity!` first writes the virtual temperature
+  of all layers into the scratch array `tridiagonal_rhs` (free until the solves) in a loop of its own, and the
+  two other loops read that instead of temperature and humidity. With it:
+  - the reproducer and the whole `vertical_diffusion!` as one kernel (`$D/reactant_diffusion_check.jl`, wet and
+    dry) give the same result raised and not raised (relative differences below 10⁻⁴);
+  - the full comparison above passes for both models: PrimitiveDryModel 20 of 20, PrimitiveWetModel 23 of 23
+    (`$D/reactant_correctness_workaround_only.log`; mean diffusivity of momentum 2.698 m²/s on the CPU and
+    2.696 m²/s on Reactant after 100 steps), and again on the final text of the file
+    (`$D/reactant_correctness_final_cpu.log`, same counts);
+  - CPU unit tests: 67 of 67 pass.
+- Reactant on the GPU backend (A40, `reactant_correctness.jl gpu …`, `$D/reactant_correctness_gpu.log` and
+  `reactant_correctness_gpu_dry_vdiff.log`): the scheme runs and has non-zero diffusivities close to the CPU (wet
+  model after 100 steps: mean of momentum 3.03 against 2.96 m²/s, boundary layer height 804 against 798 m). In
+  every configuration 3 comparisons are outside the tolerances, with and without the scheme:
+
+  | Model | Without the scheme | With the scheme |
+  |---|---|---|
+  | PrimitiveDryModel | 14 pass, 3 fail | 17 pass, 3 fail |
+  | PrimitiveWetModel | 17 pass, 3 fail | 20 pass, 3 fail |
+
+  (The three additional passes are the checks that the diffusivities are finite.) The differences between CPU and
+  Reactant are of the same size with and without the scheme (wet model, largest difference of the divergence
+  tendency 5.1·10⁻³ and 5.4·10⁻³, of temperature after 100 steps 1.5 K and 2.8 K). So the scheme does not make
+  the agreement on the GPU backend worse. Why three comparisons fail there at all is a separate question that
+  was not looked into; the tolerances are those of the CPU backend, and matrix products on the GPU run in
+  reduced precision (TF32) by default.
+
+### 8.4 GPU performance
+
+H100, CUDA.jl, Float32, default `PrimitiveWetModel`, `$D/gpu_perf.jl` and `$D/gpu_step_profile.jl`
+(Slurm jobs 3342330 and 3342587). Column kernel: minimum of 30 calls of `column_parameterizations!`.
+
+| | Column kernel without [ms] | with scheme [ms] | added [ms] | Time step without [ms] | with [ms] |
+|---|---|---|---|---|---|
+| T256 L24 | 0.65 | 1.26 | 0.62 | 17.8 | 18.3 |
+| T512 L24 | 2.21 | 4.45 | 2.25 | 72.6 – 74.7 | 76.4 – 76.6 |
+| T512 L8 | 0.97 | 1.77 | 0.80 | 38.9 | 39.7 |
+
+- The scheme about doubles the column kernel. A time step is dominated by the dynamics and the transforms
+  (T256 L24: dynamics 7.6 ms, transform 8.9 ms, parameterizations 0.8 ms without and 1.8 ms with the scheme when
+  called inside a time step), so the scheme costs about 3 % of a time step at T256 L24, 2 % at T512 L8 and
+  2–5 % at T512 L24.
+- The time step numbers are noisier than the kernel numbers. The T512 L24 range is from two jobs; the first
+  model built in a Julia session ran up to 8 % faster than later ones (T256 L24: 16.5 ms as first, 17.8 ms when
+  alternating), so only runs in alternating order should be compared.
+- Parts of the added cost at T256 L24, from runs with only momentum or only dry static energy diffused: the
+  diffusivities about 0.16 ms and each tridiagonal solve about 0.15 ms. `couple_surface_fluxes` makes no
+  difference.
+- The added cost scales with the number of grid points times layers. My reading is that it is limited by memory
+  traffic (I count about 47 reads or writes of a 3D array per time step for the scheme), not by arithmetic. The
+  register use and occupancy of the kernel were not measured.
+- Memory of the five additional 3D arrays: not measured (the script's numbers accumulate over the models built in
+  one session). By size it is 5 × 58 MB at T512 L24 in Float32, about 3 % of the 9.7 GB the model uses there.
+
+### 8.5 Optimisations tried or considered
+
+Column kernel on the H100 at T256 L24 (0.65 ms without the scheme), same script as 8.4. The same code measured
+in two jobs differs by up to 0.03 ms (the workaround: 1.27 and 1.30 ms), so differences of that size are noise.
+
+| Variant | Kernel with scheme [ms] | Reactant |
+|---|---|---|
+| committed (`1179b149`) | 1.26 | dry model correct, wet model writes nothing (8.3) |
+| + workaround of 8.3 (virtual temperature in a loop of its own), **the code in the working tree** | 1.27, 1.30 | correct |
+| in-place solve, first version (right-hand side in the tendency for both couplings, layer values carried through the loop) | 1.16 | does not compile ("cannot raise op to stablehlo") |
+| workaround + right-hand side in the tendency for the coupled solve only, nothing carried | 1.26 | correct |
+| workaround + layer values carried through the loops of solver and diffusivities, each layer read once | 1.30 | does not compile |
+| virtual temperature computed and stored inside the boundary layer height loop | 1.30 | wet model writes nothing |
+
+- None of the variants that Reactant compiles correctly is faster than the committed code, so none is kept. The
+  only faster one (8 %, i.e. 0.5 % of a time step) is the first in-place solve, which Reactant cannot raise. Why
+  it is faster is not understood: neither of its two ingredients alone (in-place, carried values) gives the gain.
+- Carried values (`x = x_below` at the end of the forward sweep, and the same for temperature, geopotential and
+  wind in the diffusivity loop) are what Reactant cannot raise. The other carried values of these loops (pivots,
+  conductance, height and Richardson number of the layer below) are raised without problems.
+- The workaround of 8.3 costs little: within the noise at T256 L24, and 0.12–0.16 ms at T512 L24 (kernel 4.57 and
+  4.61 ms in two jobs against 4.45 ms), i.e. 0.2 % of a time step.
+- **Not tried: one sweep for u and v, and for T and q, with shared pivots.** It would save the second read of
+  diffusivity and density and the second upper diagonal, about a tenth of the scheme's memory accesses by my
+  count, for one more scratch array. Expected gain below 0.5 % of a time step.
+- Conclusion: the scheme stays at about 0.6 ms at T256 L24 and 2.4 ms at T512 L24 on the H100, 2–5 % of a time
+  step. Making it substantially cheaper would need a different structure (all four variables and the
+  diffusivities in one sweep), which is larger than what was tried here and would have to be checked against
+  Reactant's raising at every step. Patches of the first variant: `$D/inplace_solve.patch`.
+
+### 8.6 One-year runs at T32
+
+`$D/validation/run_means.jl`, H100, default `PrimitiveWetModel` from 2000-01-01 for 360 days, statistics every
+10 days (`$D/validation/means/*.csv`, job 3342771). All four runs finish without NaN. Means over days 190–360,
+extremes over the same period:
+
+| | L8 without | L8 with | L24 without | L24 with |
+|---|---|---|---|---|
+| Lowest-layer temperature, global mean [K] | 283.0 | 283.3 | 288.9 | 285.5 |
+| Lowest-layer temperature, maximum [K] | 308.9 | 303.4 | 325.9 | 309.5 |
+| Lowest-layer temperature, minimum [K] | 215.5 | 213.0 | 207.5 | 210.1 |
+| Column-mean temperature [K] | 252.4 | 252.0 | 252.1 | 252.3 |
+| Lowest-layer humidity [g/kg] | 7.9 | 6.9 | 11.9 | 7.8 |
+| Soil temperature over land, mean [K] | 279.6 | 277.8 | 286.1 | 279.0 |
+| Precipitation [mm/day] | 1.95 | 2.06 | 1.70 | 2.17 |
+| Surface pressure [hPa] | 974.39 | 974.38 | 974.38 | 974.31 |
+| Maximum wind speed [m/s] | 96 | 101 | 96 | 110 |
+| Layer pairs more than 1 K superadiabatic (of 3168 columns) | 289 | 0.1 | 3202 | 3.3 |
+| Strongest inversion in the lowest 6 layers [K] | 22.5 | 18.9 | 38.2 | 18.7 |
+| Boundary layer height, global mean [m] | – | 884 | – | 1158 |
+| Diffusivity of heat, mean / maximum [m²/s] | – | 7.3 / 350 | – | 8.5 / 542 |
+
+- The scheme removes the superadiabatic layers and limits the inversions, which is what it was written for.
+- With the scheme the 8- and 24-layer climates are much closer to each other near the surface (lowest-layer
+  temperature, humidity, soil temperature, precipitation). Without it the thin lowest layer at L24 is 6 K warmer
+  and 4 g/kg moister than at L8.
+- The maximum wind speed rises by 5 m/s (L8) and 14 m/s (L24). This is the interaction with the jet raised in
+  section 7 and has to be looked at at high resolution, where the advective limit is close.
+- One year from a cold start says nothing about drift. That is left to the long runs.
+- The L8 run with the scheme used the in-place variant of 8.5 (it started before the revert); the L24 runs used
+  the committed code. The two differ only by rounding.
+
+### 8.7 T512L24 cold-pool restart tests
+
+`$D/validation/run_t512l24_restart_test.jl` (copy of the driver of the stability investigation) with
+`CONFIG=vdiff`, H100, job 3342860: restart of the diagnostic run before the Lake Baikal blow-up (8 days) and
+before the Committee Bay event (4 days). Lowest layer is layer 24. The other rows are the earlier runs in
+`/p/tmp/maxgelbr/t512l24-reactant-10y/output/restart_tests`, made with the branch `mg/t512l24-stability`
+(SpeedyWeather 0.25.0-DEV); the new run uses this branch (0.26.0-DEV), so differences between the branches other
+than the scheme could play a role. They do not: the control repeated on this branch (job 3343104) reproduces
+the earlier control (Baikal: NaN at the same time, coldest point −334.0 °C against −333.9 °C).
+
+| Segment | Configuration | Ends | Coldest lowest-layer T [°C] | Strongest inversion [K] | Most points below −60 °C |
+|---|---|---|---|---|---|
+| Baikal | control (other branch) | NaN on 02-06 17:55 | −334 | 405 | 19 |
+| Baikal | advective form (other branch) | 02-13, completed | −79 | 61 | 66 |
+| Baikal | 4× hyperdiffusion (other branch) | 02-13, completed | −76 | 58 | 50 |
+| Baikal | control (this branch) | NaN on 02-06 17:55 | −334 | 405 | 19 |
+| Baikal | **new scheme** | 02-13, completed | **−53** | **27** | **0** |
+| Committee Bay | control (other branch) | 02-01, completed | −267 | 259 | 44 |
+| Committee Bay | advective form (other branch) | 02-01, completed | −65 | 51 | 2 |
+| Committee Bay | 4× hyperdiffusion (other branch) | 02-01, completed | −60 | 54 | 0 |
+| Committee Bay | control (this branch) | 02-01, completed | −267 | 259 | 44 |
+| Committee Bay | **new scheme** | 02-01, completed | **−51** | **28** | **0** |
+
+- With the scheme neither event happens: no NaN, no monitor event (lowest layer below −90 °C), and the coldest
+  point of each run is at its start, i.e. inherited from the restart file.
+- The largest superadiabatic difference between the lowest layers falls from 40–66 K in all earlier runs to 2 K.
+- The restart files of the other branch load on this branch (with a version warning).
+- 14 minutes for 8 days at T512L24 with 30-minute monitoring and 6-hourly output.
+
+### 8.8 T512L24, 45 days from 2000-01-01
+
+`$D/validation/run_t512l24_gpu_diag.jl` with `VDIFF=1` (copy of the diagnostic driver with the cold pool monitor),
+H100, job 3343105, output in `$D/validation/output/run_t512l24_vdiff_0001`.
+
+- No cold pools in 38.8 days: the coldest lowest-layer temperature of the run stays near −47 °C, the strongest
+  inversion below 15 K, no point below −60 °C. The run passes 02-06, when the run without the scheme blew up over
+  Lake Baikal.
+- **The run ends with NaN on 02-08 20:27**, from a different failure: the wind in the top layer (layer 1) at
+  49°N 270°E goes from 104 m/s to 2400 m/s within 30 minutes. The lowest layer is unremarkable until the last
+  monitor step.
+- The maximum wind speed grows through the run, from 37 m/s to about 100 m/s in layers 1–2 from late January on,
+  above the advective limit of about 83 m/s at Δt = 150 s. The original run without the scheme shows the same
+  growth (90 m/s on 01-21, 101 m/s on 01-26, 110 m/s on 01-31, all in layer 2), so the scheme does not cause
+  it. This is the "top-layer jet" failure of the stability investigation (`STABILITY_NOTES.md`, finding 10:
+  runs without the scheme and without cold pools die of it on 02-11), which is being worked on there with a
+  shorter time step and a stronger speed-limit drag.
+- Whether the scheme makes this failure more likely cannot be said from one run. It ended three days earlier than
+  the comparable runs without the scheme, and the T32 runs have higher maximum winds with the scheme (8.6).
+- Consequence: a 45-day or longer T512L24 validation of the scheme needs a remedy for the jet failure.
+- The stability investigation tried two remedies without the scheme (with `dealiasing = 3`): the time step
+  reduced from 150 s to 112.5 s (`Leapfrog(Δt_at_T32 = Minute(30))`) completed 60 days; `SpeedLimitDrag(speed_limit
+  = 70, drag = 1e-4)` failed earlier, on 02-05. A drag that strong is probably unstable by itself: it is applied
+  explicitly and its rate 2c(|V| − limit) exceeds 1/(2Δt) for an excess of 17 m/s (my estimate, not tested).
+- Runs with the scheme, default grid, 60 days each (`$D/validation/output/run_t512l24_vdiff_*`). None has a
+  NaN or a point below −60 °C in the lowest layer (coldest −53 to −55 °C, strongest inversion 20–21 K):
+
+  | Run | Time step | Speed-limit drag | Result | Highest wind [m/s] | Speed with 6-hourly output |
+  |---|---|---|---|---|---|
+  | (above) | 150 s | default (80 m/s, 3·10⁻⁶ /m) | NaN on day 39 | 104 before the blow-up | 2.55 SYPD |
+  | `drag1e-5` | 150 s | 80 m/s, 10⁻⁵ /m | completed 60 days | 109 | 2.28 SYPD |
+  | `limit60_drag1e-5` | 150 s | 60 m/s, 10⁻⁵ /m | completed 60 days | 95 | 2.27 SYPD |
+  | `dt112` | 112.5 s | default | completed 60 days | 122 | 1.91 SYPD |
+  | `dt131` | 131 s | default | completed 60 days | 107 | 1.99 SYPD |
+
+- The stronger drag at the standard time step costs no speed and keeps the run alive; the lower limit of 60 m/s
+  also lowers the highest wind by 14 m/s. The shorter time steps cost an eighth to a quarter of the speed and
+  let the wind go as high as or higher than in the run that failed. The global-mean temperatures of the runs with
+  150 s and 112.5 s agree within 0.5 K at day 60 (layers 1, 12 and 24).
+- 60 days is weak evidence for a failure that took 39 days to appear. That is what the multi-year runs are for.
+- **Final verification, running**: `$D/validation/run_t512l24_years.jl` (the same driver in segments of 183 days,
+  each with its own run folder and restart file, monthly output, monitor every 2 hours; `START_RUN_NUMBER=n`
+  continues after a job's time limit; segments and continuation tested at T32). Three runs of 6 segments
+  (3 years) with the scheme, output in `$D/validation/output/run_t512l24_years_<setup>_000n`:
+
+  | Setup | Time step | Speed-limit drag | Job | QOS |
+  |---|---|---|---|---|
+  | `drag1e-5` | 150 s | 80 m/s, 10⁻⁵ /m | 3345833 | gpushort (24 h limit) |
+  | `limit60_drag1e-5` | 150 s | 60 m/s, 10⁻⁵ /m | 3346081 | gpupreempt |
+  | `dt112` | 112.5 s | default | 3346082 | gpupreempt |
+
+  In their first half hour the runs with 150 s made about 1.2 simulated days per minute including compilation
+  (roughly 4.8 SYPD, 15 hours for the 3 years), the one with 112.5 s about 0.8 (22 hours).
+
+  A preempted or timed-out job is continued with `sbatch --export=ALL,RUN_ID=…,START_RUN_NUMBER=<last complete
+  folder>,SEGMENTS=<remaining>,… submit_years.sh` (same options as the original, see the first line of its log
+  in `$D/validation/logs/vdiff-years-<job>.log`). To evaluate: `monitor_global.csv` (extremes of all layers and
+  layer-mean temperatures every 2 hours) and `monitor_stats.csv` (lowest layer) in every run folder.
+- Disk: each 60-day run with 6-hourly output is 43 GB; about 250 GB are in `$D/validation/output`. The
+  multi-year runs write monthly, about 0.7 GB per output time.
+
+### 8.9 T256L8, 300 days from 2000-01-01
+
+`run_means.jl` as in 8.6, job 3343106, `means/means_T256L8_*.csv`.
+
+- Without the scheme the run ends with NaN between day 60 and 70 (2000-03-10). Until then it has 5800–8800 layer
+  pairs that are more than 1 K superadiabatic and inversions up to 37 K in the lowest layers.
+- With the scheme the run completes the 300 days, through the Antarctic winter: 6–24 superadiabatic layer pairs,
+  inversions of 9–21 K, no point below 170 K in any layer (coldest 172 K in layers 1–2 in August). Maximum wind
+  speeds are 80–95 m/s, as in the run without the scheme before it failed (84–96 m/s).
+- 17 minutes on the H100 for 300 days with the scheme.
+
+### 8.10 Multi-year T512L24 runs: state and the Antarctic cold event
+
+State at 08:15 on 2026-11-20 (`python3 $D/validation/evaluate_years.py` prints the table below for all run
+folders). No run has a NaN.
+
+| Setup | Simulated so far | Speed | Highest wind [m/s] | Coldest lowest-layer T [°C] |
+|---|---|---|---|---|
+| `drag1e-5` (150 s) | 1.6 years | 5.0 SYPD | 125 | −67 (Antarctic winter) |
+| `limit60_drag1e-5` (150 s) | 1.6 years | 5.0 SYPD | 110 | **−93** on 2001-05-15, otherwise −74 |
+| `dt112` (112.5 s) | 1.2 years | 3.8 SYPD | 132 | **−155** on 2000-06-26, otherwise −71 |
+| `drag1e-5_hyper2` (150 s, hyperdiffusion 2 h), job 3348592 | started 08:05 | – | – | – |
+
+- Layer-mean temperatures of the second year are within 1 K of the first in the same season (layers 1, 12, 24);
+  the first four months include the spin-up. Drift can only be judged at the end.
+- Lowest-layer temperatures of −60 to −74 °C with several hundred points below −60 °C occur in the Antarctic
+  winter in all runs, on the plateau. I take these to be the model's Antarctic winter, not cold pools; this has
+  not been compared with observations.
+- **Two cold events remain**, both at the same grid point on the Antarctic coast (79°S, 81°W, land fraction
+  0.12–0.25, next to steep orography): −155 °C with an inversion of 133 K in the `dt112` run, −93 °C in the
+  `limit60_drag1e-5` run. Both recover within two days and neither ends the run. The `drag1e-5` run has had none
+  in 1.6 years. The monitor's budget term shows the vertical advection warming the point by 20–40 K per hour, as
+  in the events of the stability investigation, which it traced to aliasing of the flux-form horizontal
+  advection on the octahedral grid (`STABILITY_NOTES.md`, finding 4). The scheme removes the decoupled polar-night
+  cold pools that used to trigger this, but not this point.
+- Restart tests from 2 days before each event (`run_t512l24_restart_test.jl` with the options of
+  `config_components`, output in `$D/validation/output/event_tests`), 4–5 days each:
+
+  | From the event of | Setup | Coldest lowest-layer T [°C] | Strongest inversion [K] |
+  |---|---|---|---|
+  | 2000-06-26 | 112.5 s (as the run) | −161 | 139 |
+  | 2000-06-26 | 150 s, drag 10⁻⁵ | −140 | 120 |
+  | 2000-06-26 | 112.5 s, background diffusivity 1 m²/s instead of 0.1 | −130 | 79 |
+  | 2000-06-26 | 150 s, drag 10⁻⁵, hyperdiffusion 3 h | −78 | 62 |
+  | 2000-06-26 | 112.5 s, hyperdiffusion 2 h | −60 (elsewhere) | 29 |
+  | 2000-06-26 | 112.5 s, hyperdiffusion 1 h | −60 (elsewhere) | 25 |
+  | 2000-06-26 | **150 s, drag 10⁻⁵, hyperdiffusion 2 h** | −60 (elsewhere) | 28 |
+  | 2001-05-15 | 150 s, limit 60 m/s, drag 10⁻⁵ (as the run) | −94 | 51 |
+  | 2001-05-15 | **150 s, drag 10⁻⁵, hyperdiffusion 2 h** | −63 (plateau) | 14 |
+
+  The event does not depend on the time step or the drag, more vertical background mixing reduces it only a
+  little, and `HyperDiffusion(time_scale = Hour(2))` instead of the default 4 hours removes it in both cases.
+- Hence the fourth multi-year run: scheme, Δt = 150 s, `SpeedLimitDrag(drag = 1e-5)`,
+  `HyperDiffusion(time_scale = Hour(2))`. It costs no speed. This is the setup I would propose for T512L24 if it
+  completes the three years without an event.
+
+### 8.11 Scheme as the default (step 8) and the state of the tests
+
+Changes (committed in `b7bdfdd1`, except docs page and changelog):
+
+- `vertical_diffusion = BulkRichardsonDiffusion(spectral_grid)` is the default of `PrimitiveDryModel` and
+  `PrimitiveWetModel`; docs page and changelog say so.
+- The scheme does not throw any more in a model without a boundary layer: `surface_layer` returns a zero friction
+  velocity if the drag or the surface wind are missing, so only the local and the background diffusivity act.
+  (A model with `boundary_layer = nothing` does not run on main for other reasons: surface fluxes, ocean albedo
+  and slab ocean read variables of the boundary layer and the surface fluxes. Not touched.)
+- `reset_variable!(vars, ::Val{name}, value)` instead of a `Symbol` argument. With 43 instead of 40
+  parameterization variables the compiler no longer inferred the lookup by `Symbol`, which gave a runtime
+  dispatch in every time step and failed `test/dynamics/dispatch.jl`.
+- `test/GPU/set.jl` used `SpeedyWeather.zfac`, which does not exist any more on main; replaced by a function
+  defined in the test file. Unrelated to the scheme, but the GPU suite stopped there.
+
+Tests with the scheme as default:
+
+| Suite | Julia | Result |
+|---|---|---|
+| Main suite (`Pkg.test`, `--check-bounds=yes`), before the `reset_variable!` fix | 1.12.2 | 122067 pass, 2 fail (both in `dynamics/dispatch`) |
+| `dynamics/dispatch` after the fix | 1.12.2 | 4 of 4 pass |
+| **Main suite on the final code** | 1.12.2 | **122069 of 122069 pass** |
+| **Main suite on the final code** (copy of the tree, set up as in CI) | 1.10.13 | **122069 of 122069 pass** |
+| Enzyme, `full_diff_CI.jl`, final code | 1.10.13 and 1.11.7 | pass |
+| Enzyme, extended (`test/differentiability/runtests.jl`) | 1.10.13 | all 23 test sets pass before the `reset_variable!` fix; repeat on the final code running |
+| Reactant suite, CPU backend | 1.12.2 | running |
+| GPU suite (A40, CUDA), before the `reset_variable!` fix | 1.12.2 | all pass up to `test/GPU/reactant.jl`, see below |
+| Docs build | 1.12.2 | completes, no warning about the vertical diffusion page |
+
+- `test/GPU/reactant.jl`: the BarotropicModel with `SpectralTransform` on Reactant's GPU backend does not
+  compile ("cannot raise op to stablehlo"). The same test set fails in the same way on a clean checkout of main
+  (`$D/tests/gpu_reactant_barotropic_main.log`), so it is not caused by this work. The suite stops there; the
+  test sets after it in that file did not run.
+- The Reactant suite has to run on the CPU backend as in CI (`CUDA_VISIBLE_DEVICES=` on login02); on the A40 it
+  fails in `test_transform.jl` with a relative difference of 2·10⁻³, the reduced precision of GPU matrix products.
+- Logs in `$D/tests/`. The Enzyme runs follow CI and `Pkg.develop` the packages into
+  `SpeedyWeather/test/differentiability/Project.toml`; that file has to be restored with `git checkout` after
+  the runs.
+
+### 8.12 Next
+
+1. Wait for the two test runs of 8.11 that are still going (Reactant suite, extended Enzyme tests on the final
+   code), restore `SpeedyWeather/test/differentiability/Project.toml` afterwards, commit docs page and changelog.
+2. Follow the four multi-year runs (8.10) to the end; continue preempted ones with `START_RUN_NUMBER`. Decide on
+   the T512L24 setup from them.
+3. Decision for a human: whether `SpeedLimitDrag(drag = 1e-5)` and `HyperDiffusion(time_scale = Hour(2))` become
+   defaults, or stay a recommendation for high resolution.
+4. Tibet at L24.
+
+Slurm: `gpushort` allows two running jobs per user and 24 hours; the multi-year runs other than the first use
+`gpupreempt`, which has no such limit but can be preempted.

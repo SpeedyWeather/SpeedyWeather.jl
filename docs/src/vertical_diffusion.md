@@ -17,19 +17,20 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractVerticalDiffusion)
 ```
 
-Vertical diffusion is currently disabled by default (`vertical_diffusion=nothing`) in both
-`PrimitiveDryModel` and `PrimitiveWetModel`. Enable it with
+`BulkRichardsonDiffusion` is the default in both `PrimitiveDryModel` and `PrimitiveWetModel`.
+Its options are passed on as keyword arguments, and `vertical_diffusion = nothing` disables it
 
 ```@example vertical_diffusion
 spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
-vertical_diffusion = BulkRichardsonDiffusion(spectral_grid)
+vertical_diffusion = BulkRichardsonDiffusion(spectral_grid, background_diffusivity = 0.5)
 model = PrimitiveWetModel(spectral_grid; vertical_diffusion)
+model_without = PrimitiveWetModel(spectral_grid; vertical_diffusion = nothing)
 nothing # hide
 ```
 
-`BulkRichardsonDiffusion` is explained in the following. It needs a boundary layer
-(`model.boundary_layer`, the default) for the surface drag and wind and is called
-after the surface fluxes. See [Parameterizations](@ref) for the
+`BulkRichardsonDiffusion` is explained in the following. It uses the surface drag and wind of the
+boundary layer (`model.boundary_layer`, the default) and is called after the surface fluxes.
+In a model without a boundary layer only its local and background diffusivity act. See [Parameterizations](@ref) for the
 general parameterization interface these implement.
 
 ## Diffusion as a flux divergence
