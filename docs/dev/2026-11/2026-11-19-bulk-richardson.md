@@ -67,8 +67,17 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
   Done in the working tree (8.11). Two things followed from it: the scheme no longer throws without a boundary
   layer (it then has no boundary-layer profile), and `reset_variable!` takes the variable name as a `Val`, because
   with the scheme's three additional variables the lookup by `Symbol` was no longer inferred (runtime dispatch).
-- 2026-11-20: the defaults of `SpeedLimitDrag` and `HyperDiffusion` are **not** changed, although T512L24 needs
-  other values (8.8, 8.10): that changes all resolutions and is a decision for a human.
+- 2026-11-20, user request: a draft of the PR description, comparing the implementation with main and with the
+  draft of #1283 (`milankl-claude:mc/richardson-surface-temperature`), with the GPU measurements already made (no
+  new benchmarks). It is in `PR_bulk_richardson_diffusion.md` in the repository root, untracked.
+- 2026-11-20, user decisions on the two parameters that T512L24 needs (8.8, 8.10): (1) the stronger drag becomes
+  the default; (2) the shorter hyperdiffusion time scale is **not** changed and stays a to-do: check whether it
+  is really needed (8.12).
+- 2026-11-20, how the stronger drag became the default (8.13): a fixed `drag = 1e-5` (committed in `89be0251`) made
+  T32L24 with the scheme blow up within a year and one test fail. I first added a limiter to the drag (at most
+  excess/Δt); on the user's question whether the drag could instead just be larger at high resolution, that was
+  replaced by a resolution-scaled coefficient, `drag * (truncation/32)^resolution_scaling` with `drag = 3e-6` and
+  `resolution_scaling = 0.5`. The limiter is not in the code.
 - 2026-11-19 (GPU session, A40 on login02 and H100 via Slurm), step 7, see section 8 for the numbers:
   - No GPU optimisation is kept. The scheme doubles the cost of the fused column kernel, but that kernel is only
     about 4 % of a time step, so the scheme costs 2–5 % of a time step at T256/T512.
@@ -316,7 +325,7 @@ Model validation:
 
 ## 8. Progress protocol
 
-State on 2026-11-20, 08:30 CET. Everything below was run on the committed code `1179b149` unless stated otherwise.
+State on 2026-11-20, 09:20 CET. Everything below was run on the committed code `1179b149` unless stated otherwise.
 Scripts and logs are in `/p/tmp/maxgelbr/code/Speedy2/claude_bulk_richardson_2026-11-19/` (called `$D` below),
 not in the repository.
 
@@ -333,7 +342,7 @@ not in the repository.
 | 6 validation: T512L24 45 days | no cold pools; NaN on 02-08 from the top-layer jet (8.8) |
 | 6 validation: T256L8, 300 days through the Antarctic winter | done (8.9) |
 | 6 validation: T512L24 with shorter time step / stronger speed-limit drag | all 4 runs completed 60 days (8.8) |
-| 6 final verification: T512L24 over several years | four runs of 3 years running, the first three at 1.2–1.6 years without NaN; rare cold event at one Antarctic point (8.10) |
+| 6 final verification: T512L24 over several years | four runs of 3 years running, the first three at 1.4–1.9 years without NaN at 09:20; rare cold event at one Antarctic point (8.10) |
 | 6 Enzyme differentiability tests | pass with the scheme as default (8.11) |
 | 8 default on | done in the working tree (8.11) |
 
@@ -679,8 +688,9 @@ Tests with the scheme as default:
 | **Main suite on the final code** | 1.12.2 | **122069 of 122069 pass** |
 | **Main suite on the final code** (copy of the tree, set up as in CI) | 1.10.13 | **122069 of 122069 pass** |
 | Enzyme, `full_diff_CI.jl`, final code | 1.10.13 and 1.11.7 | pass |
-| Enzyme, extended (`test/differentiability/runtests.jl`) | 1.10.13 | all 23 test sets pass before the `reset_variable!` fix; repeat on the final code running |
-| Reactant suite, CPU backend | 1.12.2 | running |
+| Enzyme, extended (`test/differentiability/runtests.jl`), final code | 1.10.13 | all 23 test sets pass |
+| Reactant suite (`test/reactant/runtests.jl`), CPU backend, before the `reset_variable!` fix | 1.12.2 | all 28 test sets pass |
+| Reactant, CPU vs Reactant for the dry and wet model, committed code | 1.12.2 | 20 of 20 and 23 of 23 pass |
 | GPU suite (A40, CUDA), before the `reset_variable!` fix | 1.12.2 | all pass up to `test/GPU/reactant.jl`, see below |
 | Docs build | 1.12.2 | completes, no warning about the vertical diffusion page |
 
@@ -691,17 +701,46 @@ Tests with the scheme as default:
 - The Reactant suite has to run on the CPU backend as in CI (`CUDA_VISIBLE_DEVICES=` on login02); on the A40 it
   fails in `test_transform.jl` with a relative difference of 2·10⁻³, the reduced precision of GPU matrix products.
 - Logs in `$D/tests/`. The Enzyme runs follow CI and `Pkg.develop` the packages into
-  `SpeedyWeather/test/differentiability/Project.toml`; that file has to be restored with `git checkout` after
-  the runs.
+  `SpeedyWeather/test/differentiability/Project.toml`; that file was restored with `git checkout` afterwards.
+
+### 8.13 Default of `SpeedLimitDrag`
+
+The drag is explicit in time: the wind is reduced by c·excess²·Δt per step, with Δt = 2Δt of the leapfrog. For
+c·excess·Δt > 1 that is more than the excess over the speed limit, and for c·excess²·Δt > |V| the wind is reversed.
+The time step at T32 (2Δt = 4800 s) is 16 times that of T512 (300 s), so a coefficient that T512 needs is too
+strong at T32:
+
+| Default | T32 | T512 | Result |
+|---|---|---|---|
+| `drag = 3e-6` (main) | overshoots above 150 m/s | 3·10⁻⁶ | T32 fine; T512L24 blows up in the top layer on day 39 (8.8) |
+| `drag = 1e-5` at all resolutions (`89be0251`) | overshoots above 101 m/s, reverses above 133 m/s | 10⁻⁵, stable (8.8, 8.10) | **T32L24 with the scheme NaN on 2000-07-05** (stable for a year with 3e-6; job 3349009); `test/output/zarr_output.jl` fails |
+| `drag = 3e-6`, `resolution_scaling = 0.5` (working tree) | as main | 1.2·10⁻⁵ | T32 identical to main by construction; T512L24 run for 60 days submitted (job 3349380) |
+
+- The failing test runs T6 with four layers for a day, with a time step of 3 hours. That run blows up on main as
+  well (winds of 3700 m/s after one day without the scheme and with `3e-6`); the test only checks that the output
+  is finite, and with `1e-5` it no longer was.
+- Side result of job 3349009: T256L8 **without** the scheme completes 300 days with `drag = 1e-5`. With `3e-6` it
+  went NaN between day 60 and 70 (8.9). So the stronger drag also matters at T256, and that failure was not, or not
+  only, the missing vertical mixing. The run with the scheme and `1e-5` at T256L8 had not finished when this was
+  written.
+- The three-year T512L24 runs use `drag = 1e-5` set explicitly. The new default gives 1.2·10⁻⁵ there, 20 % more;
+  the 60-day run checks that this makes no difference to stability.
+- With the scaling the coefficient is 8.5·10⁻⁶ at T256, 6·10⁻⁶ at T128 and 4.2·10⁻⁶ at T64. The overshoot threshold
+  rises with resolution (excess of 69 m/s at T32, 139 m/s at T128, 278 m/s at T512), since the time step shrinks
+  faster than the coefficient grows.
 
 ### 8.12 Next
 
-1. Wait for the two test runs of 8.11 that are still going (Reactant suite, extended Enzyme tests on the final
-   code), restore `SpeedyWeather/test/differentiability/Project.toml` afterwards, commit docs page and changelog.
+0. Fill the item marked PENDING in `PR_bulk_richardson_diffusion.md` (multi-year runs) and set the PR number in
+   `CHANGELOG.md`.
+1. Commit the changelog (PR number) and this document.
 2. Follow the four multi-year runs (8.10) to the end; continue preempted ones with `START_RUN_NUMBER`. Decide on
    the T512L24 setup from them.
-3. Decision for a human: whether `SpeedLimitDrag(drag = 1e-5)` and `HyperDiffusion(time_scale = Hour(2))` become
-   defaults, or stay a recommendation for high resolution.
+3. **To-do: is `HyperDiffusion(time_scale = Hour(2))` really needed?** Evidence so far: it removes the Antarctic
+   coastal cold event in two restart tests (8.10), the event occurred once each in two of three multi-year runs
+   and never ended a run. To decide: compare the multi-year run with it (`drag1e-5_hyper2`) against the one
+   without (`drag1e-5`) over the full three years (events, drift, highest winds), and look at what the stronger
+   hyperdiffusion costs in resolved small scales (e.g. kinetic energy spectrum), which has not been looked at.
 4. Tibet at L24.
 
 Slurm: `gpushort` allows two running jobs per user and 24 hours; the multi-year runs other than the first use
