@@ -375,7 +375,7 @@ end
     simulation = initialize!(model)
     run!(simulation, period = Day(1))
 
-    P = simulation.variables.parameterizations
+    P = simulation.variables.output         # no output so accumulated over the whole run
     rain = P.rain_convection .+ P.rain_large_scale .+ P.snow_large_scale     # accumulated [m]
     weights = RingGrids.get_quadrature_weights(spectral_grid.grid)
     global_mean_rain = sum(zonal_mean(rain) .* weights) / sum(weights) * 1000  # [mm] in 1 day

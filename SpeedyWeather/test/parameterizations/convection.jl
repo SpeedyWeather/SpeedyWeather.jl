@@ -187,7 +187,7 @@
 
         vars = simulation.variables
         @test model.convection.snow == true
-        @test haskey(vars.parameterizations, :snow_convection)
+        @test haskey(vars.output, :snow_convection)
         @test haskey(vars.parameterizations, :snow_rate_convection)
         @test haskey(vars.parameterizations, :snow_rate)
 
@@ -197,21 +197,21 @@
         convection_snow = model.convection
         convection_no_snow = BettsMillerConvection(spectral_grid; snow = false)
 
-        vars.parameterizations.rain_convection .= 0
-        vars.parameterizations.snow_convection .= 0
+        vars.parameterizations.rain_rate_convection .= 0
+        vars.parameterizations.snow_rate_convection .= 0
         SpeedyWeather._column_parameterizations_cpu!(vars, (convection = convection_snow,), model)
-        rain_on = copy(vars.parameterizations.rain_convection)
-        snow_on = copy(vars.parameterizations.snow_convection)
+        rain_on = copy(vars.parameterizations.rain_rate_convection)
+        snow_on = copy(vars.parameterizations.snow_rate_convection)
 
-        vars.parameterizations.rain_convection .= 0
-        vars.parameterizations.snow_convection .= 0
+        vars.parameterizations.rain_rate_convection .= 0
+        vars.parameterizations.snow_rate_convection .= 0
         SpeedyWeather._column_parameterizations_cpu!(vars, (convection = convection_no_snow,), model)
-        rain_off = copy(vars.parameterizations.rain_convection)
-        snow_off = copy(vars.parameterizations.snow_convection)
+        rain_off = copy(vars.parameterizations.rain_rate_convection)
+        snow_off = copy(vars.parameterizations.snow_rate_convection)
 
         @test all(snow_off .== 0)                    # snow = false: never snows
         @test any(snow_on .> 0)                       # some (polar) column does snow by default
-        # snow only swaps rain <-> snow after rain_convection is fully computed, so the total
+        # snow only swaps rain <-> snow after the convective rain is fully computed, so the total
         # is exactly conserved (not merely approximately) between the two configurations
         @test rain_on .+ snow_on == rain_off
     end
@@ -228,8 +228,8 @@
         vars = simulation.variables
         humid_tend = SpeedyWeather.get_tendency_step(vars.tendencies.grid.humidity, model.time_stepping, model.convection)
         humid_tend .= 0
-        vars.parameterizations.rain_convection .= 0
-        vars.parameterizations.snow_convection .= 0
+        vars.parameterizations.rain_rate_convection .= 0
+        vars.parameterizations.snow_rate_convection .= 0
         SpeedyWeather._column_parameterizations_cpu!(vars, (convection = model.convection,), model)
 
         Δσ = model.geometry.σ_levels_thick
@@ -237,7 +237,7 @@
         g = model.planet.gravity
         ρ = model.atmosphere.water_density
         pₛ = vars.parameterizations.surface_pressure
-        precip = vars.parameterizations.rain_convection .+ vars.parameterizations.snow_convection
+        precip = Δt * (vars.parameterizations.rain_rate_convection .+ vars.parameterizations.snow_rate_convection)
         @test any(precip .> 0)
 
         for ij in 1:spectral_grid.npoints
