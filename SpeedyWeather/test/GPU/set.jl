@@ -1,5 +1,6 @@
 # a function of three arguments that is compiled and not dynamically generated, for `static_func = true`
-static_test_function(λ, φ, η) = cosd(φ) * (1 - η) + sind(λ) / 10
+# use cos(deg2rad(x)) not cosd(x): Base's Float32 sind/cosd compute in Float64, unsupported on Metal
+static_test_function(λ, φ, η) = cos(deg2rad(φ)) * (1 - η) + sin(deg2rad(λ)) / 10
 
 @testset "set! functions on GPU" begin
 
