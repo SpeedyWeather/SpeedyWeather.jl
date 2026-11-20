@@ -72,6 +72,9 @@ tendency_steps(::AbstractLeapfrog) = 1
 # Parameterizations should always be evaluated on the previous time step for Euler forward
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractParameterization) = 1
 
+# the hole filling tendency adds the fill of the previous step, the step leapfrog steps forward from
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractHoleFilling) = 1
+
 # ocean, sea ice or land components read the 1st step: prescribed ones have no step dimension,
 # with the default `EulerForward` for ocean and land there is only 1 step, and with `ocean/land = nothing`
 # (leapfrogged) the 1st step is the previous one, consistent with the parameterizations
@@ -174,6 +177,8 @@ function move_prognostic_grid_variables_back!(
     # tracers, ocean and land grid variables are not part of the atmospheric fuse — copy
     # per-variable, unrolled per name (literal-Symbol getfield; steps bound individually)
     move_grid_tracers_back!(vars, move)
+    # the humidity added by the hole filling belongs to the grid humidity of the same step
+    haskey(vars.dynamics, :humidity_hole_fill) && copy_step_back!(vars.dynamics.humidity_hole_fill, move)
     # does not have to be done for ocean/land as they don't have spectral variables
     # the grid variables are already in prognostic and the time stepper takes care
     # of moving them back during the update
