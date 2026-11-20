@@ -401,6 +401,13 @@ end
     η_perturb_grid[ij] = exp(-(ϕ / α)^2) * ηθ
 end
 
+"""$(TYPEDSIGNATURES)
+Zonal jet speed `u₀` [m/s] in the sense of the planet's `rotation` [1/s]: westerly (`u₀`) for
+prograde rotation, easterly (`-u₀`) for retrograde (`rotation < 0`). (Ω, u) → (-Ω, -u) is a
+symmetry of the equations (the mirror image), so a retrograde planet starts from the mirror image
+of the prograde initial state, with the same temperature in thermal wind balance."""
+jet_speed(u₀, rotation) = copysign(u₀, rotation)
+
 export ZonalWind
 
 """
@@ -443,11 +450,12 @@ function initialize!(
     haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
     haskey(vars.prognostic, :divergence) || warn_undefvar(vars, :divergence) && return nothing
 
-    (; u₀, η₀) = initial_conditions
+    (; η₀) = initial_conditions
     (; perturb_uₚ, perturb_radius) = initial_conditions
     λc = initial_conditions.perturb_lon
     sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
-    (; radius) = model.planet
+    (; radius, rotation) = model.planet
+    u₀ = jet_speed(initial_conditions.u₀, rotation)
     R = radius * perturb_radius         # spatial extent of perturbation
     scratch_field = vars.scratch.grid.a
 
@@ -643,7 +651,7 @@ function initialize!(
     temp = vars.prognostic.temperature
     NF = real(eltype(temp))
 
-    (; u₀, η₀, ΔT, Tmin) = initial_conditions
+    (; η₀, ΔT, Tmin) = initial_conditions
     (; σ_tropopause) = initial_conditions
 
     # use the stably stratified lapse rate of Jablonowski and Williamson, not the (dry-adiabatic
@@ -653,6 +661,7 @@ function initialize!(
     T₀ = model.atmosphere.reference_temperature
     (; grid, nlayers) = model.spectral_grid
     (; radius, rotation, gravity) = model.planet
+    u₀ = jet_speed(initial_conditions.u₀, rotation)
 
     (; σ_levels_full) = model.geometry
     σ_levels_full_cpu = on_architecture(CPU(), σ_levels_full)
@@ -800,12 +809,13 @@ function initialize!(
     haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
     haskey(vars.prognostic, :temperature) || warn_undefvar(vars, :temperature) && return nothing
 
-    (; u₀, H, Tmin, σ_jet, jet_decay) = initial_conditions
+    (; H, Tmin, σ_jet, jet_decay) = initial_conditions
     z_jet = -log(σ_jet)                 # = Inf for σ_jet = 0, i.e. no decay
     T₀ = model.atmosphere.reference_temperature
     Γ = lapse_rate(model.atmosphere)
     (; perturb_uₚ, perturb_radius) = initial_conditions
     (; radius, rotation, gravity) = model.planet
+    u₀ = jet_speed(initial_conditions.u₀, rotation)
     (; R_dry) = model.atmosphere
     (; grid, nlayers) = model.spectral_grid
 
@@ -833,17 +843,17 @@ function initialize!(
     launch!(
         architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
         balanced_zonal_temperature_kernel!, temp_grid, lnp_grid, model.geometry.σ_levels_full,
-        model.geometry.latds, initial_conditions, z_jet, T₀, log(p₀), RΓg⁻¹, R_dry, aΩ,
+        model.geometry.latds, initial_conditions, u₀, z_jet, T₀, log(p₀), RΓg⁻¹, R_dry, aΩ,
     )
     set!(vars, model; temperature = temp_grid)
     return nothing
 end
 
 @kernel inbounds = true function balanced_zonal_temperature_kernel!(
-        temp_grid, lnp_grid, σ_levels_full, φ, initial_conditions, z_jet, T₀, lnp₀, RΓg⁻¹, R_dry, aΩ,
+        temp_grid, lnp_grid, σ_levels_full, φ, initial_conditions, u₀, z_jet, T₀, lnp₀, RΓg⁻¹, R_dry, aΩ,
     )
     ij, k = @index(Global, NTuple)
-    (; u₀, H, Tmin, jet_decay) = initial_conditions
+    (; H, Tmin, jet_decay) = initial_conditions
 
     # plain sin/cos avoid AMDGPU hostcalls (see JablonowskiVorticity)
     φij = deg2rad(φ[ij])
