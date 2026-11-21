@@ -998,8 +998,8 @@ the jet) on the jet strength and the T512L24 stability (8.8, 8.10), which was va
 
 ### 8.17 Performance audit (2026-11-21, user request)
 
-> State 2026-11-21 13:15: **in progress**. Measured so far: CPU baseline and CPU prototypes. Running: the H100
-> job with all prototypes (3387439) and the Reactant checks. Items without a result are marked PENDING.
+> State 2026-11-21 13:10: **in progress**. Measured so far: CPU baseline and prototypes, H100 at T256 L24, Reactant
+> (wet model). Running: H100 at T512, Reactant dry model, CPU time-step shares. Open items are marked PENDING.
 
 Request: audit the vertical diffusion for further optimisations, for both CPU and GPU. Nothing in the source is
 changed by the audit. All variants are prototypes outside the repository, in
@@ -1080,19 +1080,76 @@ model with the variant in place of the scheme.
   including the range form called per column, also with the layer-outer height search and the branch-free
   `exp`/`log`. No ranking at these sizes: a kernel that does nothing but takes the same arguments
   (`vars`, `diffusion`, `model`) already needs 0.15 ms per launch there, as much as every variant.
-- PENDING: H100 at T256 L24, T512 L24, T512 L8 (job 3387439).
+- H100, T256 L24 (job 3387439, `$A/gpu_variants-3387439.log`). Time step 18.52 ms with the scheme, 18.00 ms
+  without (0.52 ms, 2.8 %); fused column kernel 1.311 ms with, 0.787 ms without. Minimum of 30 calls; the
+  median is 0.12 ms higher for every kernel, the differences between variants are the same in both.
+
+  | Variant | Own kernel [ms], 0.114 ms launch included | In the model's fused column kernel [ms] |
+  |---|---|---|
+  | package | 0.552 | 1.314 |
+  | package, `@propagate_inbounds` accessors (8.17.5) | 0.541 | 1.286 |
+  | shared pivots (u with v, T with q) | 0.465 | 1.198 |
+  | one sweep for all four | 0.511 | 1.259 |
+  | reciprocals and division-free height loop, package solves | 0.467 | |
+  | **reciprocals + shared pivots** | **0.387** | **1.080** |
+  | reciprocals + one sweep | 0.434 | 1.136 |
+  | reciprocals, `log` branch, stored surface Ri + shared pivots | 0.379 | |
+  | range form per column: reciprocals, `log` branch | 0.397 | |
+  | range form per column: + stored surface Ri | 0.386 | |
+  | range form per column: + layer-outer height search | 0.431 | |
+  | range form per column: + branch-free `exp`/`log` | 0.443 | |
+  | solves only: package / shared pivots / one sweep | 0.346 / 0.165 / 0.239 | |
+  | conductances only: package / all four options | 0.173 / 0.128 | |
+
+  - Reciprocals with shared pivots take the scheme from 0.52 ms to 0.29 ms inside the fused kernel (−45 %),
+    which is 1.3 % of a time step. About half of that comes from the solves, half from the conductances: the
+    arithmetic matters on the GPU as well, the kernel is not limited by memory traffic alone as assumed in 8.4.
+  - One sweep for all four variables is slower than two sweeps with shared pivots in every pairing on the GPU
+    (on the CPU it is slightly faster, 8.17.2).
+  - **The range form called per column is as fast as the column variant with the same options** (0.386 against
+    0.379 ms), so reading the carried values back from the arrays costs nothing measurable on the H100. Its two
+    CPU-oriented options (height search with the layers outside, branch-free `exp`/`log`) cost 0.05 ms on the
+    GPU and belong on the CPU only.
+  - The `log` branch and the stored surface Richardson number make no measurable difference on the GPU.
+- PENDING: T512 L24 and T512 L8 (same job).
 
 #### 8.17.4 Reactant (session `speedyweather-jl-d6`)
 
 `$A/reactant_variants.jl`, as in 8.3: the variant as one kernel over all columns, compiled without and with
-raising on the same state, the outputs compared. Reactant 0.2.308, CPU backend, T32 L8, wet model. PENDING, three
-processes running (`$A/reactant_*.log`):
+raising on the same state, the outputs compared (conductances, boundary layer height, the four tendencies).
+Reactant 0.2.308, CPU backend, T32 L8, `PrimitiveWetModel`, coupled solve (`$A/reactant_*.log`, lines `RESULT`).
+Two variants are added to those of 8.17.2: "merged", the virtual temperature computed where it is read in both
+loops instead of the scratch loop (what made the raised kernel write nothing in 8.3), and "carried", the
+package's solver with `x = x_below` carried through the loop (what could not be raised in 8.5). Each is run with
+the package's `@inline` accessors `diffused_value` and `column_humidity` and with `@propagate_inbounds` ones
+(8.17.5).
 
-- the package, shared pivots, one sweep, the conductance options, the range form;
-- "merged": the virtual temperature computed in both loops instead of the scratch loop (what made the raised
-  kernel write nothing in 8.3), and "carried": the solver with `x = x_below` carried through the loop (what could
-  not be raised in 8.5), each with the package's `@inline` accessors and with `@propagate_inbounds` ones, to test
-  whether the bounds checks of 8.17.5 are what broke the raising.
+| Variant | Accessors `@inline` (package) | Accessors `@propagate_inbounds` |
+|---|---|---|
+| package | agrees, 1.1·10⁻⁴ | agrees, 1.1·10⁻⁴ |
+| merged (no scratch loop for the virtual temperature) | **raised kernel writes nothing** | agrees, 1.1·10⁻⁴ |
+| carried (`x = x_below`) | **does not compile** ("cannot raise op to stablehlo", `scf.while`) | agrees, 1.1·10⁻⁴ |
+| shared pivots | agrees, 1.1·10⁻⁴ | agrees, 1.1·10⁻⁴ |
+| one sweep | agrees, 1.1·10⁻⁴ | agrees, 1.1·10⁻⁴ |
+| reciprocals + shared pivots | | agrees, 1.6·10⁻⁴ |
+| + `log` branch (`if`) | | agrees, 1.6·10⁻⁴ |
+| + stored surface Ri | | agrees, 1.3·10⁻⁴ |
+| range form per column | | agrees, 1.6·10⁻⁴ |
+| range form + layer-outer height search | | agrees, 1.6·10⁻⁴ |
+| range form + branch-free `exp`/`log` | | agrees, 1.6·10⁻⁴ |
+
+("agrees": largest difference between raised and not raised, relative to the largest value of the field.)
+
+- **The two Reactant failures of 8.3 and 8.5 are caused by the bounds checks of the two accessors.** Both are
+  reproduced with the package's accessors and gone with `@propagate_inbounds`. The mechanism matches what is
+  known from the Reactant test suite, which cannot raise kernels under `--check-bounds=yes`. Consequences: the
+  separate virtual temperature loop (the workaround of 8.3, with its `TODO` on the scratch memory) and the rule
+  "no layer values carried through a loop" (8.5) are not needed once the accessors are fixed, and the committed
+  code only works because of the workaround, not because the cause was removed.
+- Every prototype is raised correctly, including the range form with its `@simd ivdep` loops, `Base.sqrt_llvm`
+  and the bit operations of the branch-free `exp`/`log`.
+- PENDING: `PrimitiveDryModel` for package, merged, carried (running). Not checked: the uncoupled solve of the
+  prototypes, Reactant on the GPU backend, CPU against Reactant over 100 steps (`test_correctness.jl`), Enzyme.
 
 #### 8.17.5 Bounds checks
 
@@ -1111,8 +1168,10 @@ Two independent gaps in the `@propagate_inbounds` chain, both also on main:
    temperature loop. In the device code of the scheme's CUDA kernel `boundserror` occurs 52 times with the
    package's accessors and 20 times with `@propagate_inbounds` ones (same result, `$A/gpu_variants_a40_test.log`).
    The remaining 20 are not located yet; `get_prognostic_step`/`get_step` are `@inline` as well and sit between
-   the kernel and `field_view`/`view`. On the CPU the fix alone gains nothing in scalar code but is what allows
-   the `@simd` loops of the range form (a8). PENDING: effect on the H100 and on the raising.
+   the kernel and `field_view`/`view`. Effect of `@propagate_inbounds` on the two accessors alone: on the CPU
+   nothing in scalar code, but it is what allows the `@simd` loops of the range form (a8); on the H100 at
+   T256 L24 the four solves 0.346 → 0.282 ms as a kernel of their own and the fused column kernel 1.314 →
+   1.286 ms; **on Reactant it removes the cause of the two raising failures** (8.17.4).
 
 #### 8.17.6 Candidates and recommendation
 
