@@ -22,6 +22,7 @@ function Adapt.adapt_structure(to, vars::Variables{<:NamedTuple})
         Adapt.adapt(to, vars.dynamics),
         Adapt.adapt(to, vars.parameterizations),
         Adapt.adapt(to, vars.particles),
+        Adapt.adapt(to, vars.output),
         Adapt.adapt(to, vars.scratch),
         Adapt.adapt(to, vars.fused),
     )
