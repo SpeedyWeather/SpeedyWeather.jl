@@ -15,6 +15,32 @@
     @test (6, 7, 8, 8, 8) == SpeedyWeather.retrieve_stencil(8, 8, SpeedyWeather.CenteredVerticalAdvection{Float32, 2}())
 end
 
+@testset "Vertical advection order of accuracy" begin
+    # reconstruct sin(2πx) at the faces from its cell averages on N uniform cells and
+    # check that the error converges at the nominal order of each scheme, for both signs of u
+    cell_averages(N) = reshape([(cos(2π * (j - 1) / N) - cos(2π * j / N)) / (2π / N) for j in 1:N], 1, N, 1)
+
+    function face_error(scheme, N, u)
+        ξ = cell_averages(N)
+        return maximum((N ÷ 4):(3N ÷ 4)) do k    # interior faces k+1/2, away from the clamped boundaries
+            stencil = Base.tail(SpeedyWeather.retrieve_stencil(k, N, scheme))
+            abs(SpeedyWeather.reconstructed_at_face(ξ, 1, 1, stencil, u, scheme) - sin(2π * k / N))
+        end
+    end
+
+    for (scheme, order) in (
+            (SpeedyWeather.UpwindVerticalAdvection{Float64, 1}(), 1),
+            (SpeedyWeather.UpwindVerticalAdvection{Float64, 2}(), 3),
+            (SpeedyWeather.UpwindVerticalAdvection{Float64, 3}(), 5),
+            (SpeedyWeather.CenteredVerticalAdvection{Float64, 1}(), 2),
+            (SpeedyWeather.CenteredVerticalAdvection{Float64, 2}(), 4),
+            (SpeedyWeather.WENOVerticalAdvection{Float64}(), 5),
+        ), u in (1.0, -1.0)
+        observed_order = log2(face_error(scheme, 32, u) / face_error(scheme, 64, u))
+        @test observed_order ≈ order atol = 0.2
+    end
+end
+
 @testset "Vertical advection runs" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
 
