@@ -23,7 +23,9 @@ const RingLandGrid = Union{
 Variable dimension for the full Terrarium land state. `allocate` for an
 `AbstractVariable{TerrariumVars}` calls `Terrarium.initialize` on `model.land`
 so that the entire Terrarium state lives inside SpeedyWeather's `Variables`
-container at `vars.prognostic.land.terrarium`. The `model.land` must therefore
+container at `vars.prognostic.land.terrarium.state`. Next to it,
+`vars.prognostic.land.terrarium.coupling` holds the coupler-defined `Field`s
+built from that state by [`coupling_fields`](@ref). The `model.land` must therefore
 be an [`AbstractTerrariumLandModel`](@ref)."""
 struct TerrariumVars <: SpeedyWeather.AbstractVariableDim end
 
@@ -40,7 +42,8 @@ function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars},
         boundary_conditions = land.boundary_conditions,
         fields = land.fields,
     )
-    return integrator.state
+    state = integrator.state
+    return (; state, coupling = coupling_fields(land, land.model.soil, state))
 end
 
 """$(TYPEDEF)
@@ -52,14 +55,16 @@ Terrarium model + integrator configuration and a SpeedyWeather
 on this abstract type:
 
 * [`variables`](@ref) declares `vars.prognostic.land.terrarium` (the full
-  Terrarium state) plus thin grid-side mirrors `:soil_temperature` and
+  Terrarium state at `.state` and the coupler-defined `Field`s at `.coupling`,
+  see [`coupling_fields`](@ref)) plus thin grid-side mirrors `:soil_temperature` and
   `:soil_moisture` that the rest of SpeedyWeather (radiation, surface
   fluxes, output) reads from.
 * [`initialize!`](@ref) initializes the Terrarium timestepper against the
   freshly-allocated state and seeds the soil mirrors.
 * [`timestep!`](@ref) pushes SpeedyWeather atmospheric forcings into the
   Terrarium inputs, runs the Terrarium integrator for the duration of the
-  SpeedyWeather step using `land.Δt` as the sub-step, and
+  SpeedyWeather step using `land.Δt` as the sub-step (by default `nothing`:
+  one Terrarium step per SpeedyWeather step, so that both clocks stay in sync), and
   copies soil temperatures, moisture and surface fluxes back into the
   SpeedyWeather variables.
 """
@@ -73,6 +78,25 @@ Boolean land mask of the underlying Terrarium [`ColumnRingGrid`](@ref). Terrariu
 only allocates columns where this mask is `true`, so every Terrarium state field
 has length `sum(mask)` (the number of land columns)."""
 @inline land_mask(land::AbstractTerrariumLandModel) = land.model.grid.mask.data
+
+"""$(TYPEDSIGNATURES)
+
+Coupler-defined Terrarium `Field`s derived from the Terrarium `state`, stored at
+`vars.prognostic.land.terrarium.coupling`. They are built once in `allocate`, where the
+state is available, because constructing a computed `Field` from an operation is not
+type-stable. `compute!` on them is not type-stable either and fails under Enzyme, so it is
+only called in `initialize!`: they must only hold quantities that are constant in time and
+must not be recomputed in `timestep!`.
+
+For a soil, this is the porosity of the topmost soil layer, `soil_porosity`, which
+[`soil_moisture_capacity!`](@ref) copies into `soil_moisture_capacity`."""
+function coupling_fields(land::AbstractTerrariumLandModel, soil::Terrarium.AbstractSoil, state)
+    porosity = Terrarium.kernel_operation2D(
+        Terrarium.porosity_top, state, land.model.grid,
+        Terrarium.get_stratigraphy(soil), Terrarium.get_biogeochemistry(soil),
+    )
+    return (; soil_porosity = Terrarium.Field(porosity))
+end
 
 """$(TYPEDSIGNATURES)
 
@@ -121,22 +145,18 @@ function fill_fallback!(vars::Variables, land::AbstractTerrariumLandModel)
 end
 
 """$(TYPEDSIGNATURES)
-Copy the porosity of the topmost Terrarium soil layer into `soil_moisture_capacity`.
-Terrarium's soil moisture is a saturation (volumetric water content / porosity), so
-`soil_moisture * soil_moisture_capacity` is the volumetric soil water [m³/m³]."""
+Compute the porosity of the topmost Terrarium soil layer (`soil_porosity`, see
+[`coupling_fields`](@ref)) and copy it into `soil_moisture_capacity`. Terrarium's soil
+moisture is a saturation (volumetric water content / porosity), so
+`soil_moisture * soil_moisture_capacity` is the volumetric soil water [m³/m³].
+The porosity is constant in time, so this is only called from `initialize!`."""
 function soil_moisture_capacity!(vars::Variables, land::AbstractTerrariumLandModel)
     haskey(vars.parameterizations.land, :soil_moisture_capacity) || return nothing
-    state = vars.prognostic.land.terrarium
-    soil = land.model.soil
-    porosity = Terrarium.kernel_operation2D(
-        Terrarium.porosity_top, state, land.model.grid,
-        Terrarium.get_stratigraphy(soil), Terrarium.get_biogeochemistry(soil),
-    )
-    porosity_field = Terrarium.Field(porosity)
-    Terrarium.compute!(porosity_field)
+    porosity = vars.prognostic.land.terrarium.coupling.soil_porosity
+    Terrarium.compute!(porosity)
     RingGrids.copy_unmasked!(
         vars.parameterizations.land.soil_moisture_capacity,
-        @view(interior(porosity_field)[:, 1, 1]), land.mask_indices,
+        @view(interior(porosity)[:, 1, 1]), land.mask_indices,
     )
     return nothing
 end
@@ -217,7 +237,7 @@ struct TerrariumLand{
     initializers::IT
     "Preconstructed Terrarium fields forwarded to `Terrarium.initialize`"
     fields::FL
-    "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
+    "Terrarium-internal sub-step (seconds or a `Period`) used to integrate within each SpeedyWeather step; `nothing` takes a single step of the SpeedyWeather step length. A sub-step should divide the SpeedyWeather step, since only whole sub-steps are taken"
     Δt::TT
     "Indices of the common land sea mask, used for allocation-free copying between SpeedyWeather and Terrarium"
     mask_indices::MI
@@ -228,7 +248,19 @@ struct TerrariumLand{
 end
 
 """$(TYPEDSIGNATURES)
+# Terrarium sub-step for a SpeedyWeather step of length `period`: the step itself (one Terrarium step per
+# SpeedyWeather step, keeping both clocks in sync) unless a sub-step `Δt` is given."""
+@inline terrarium_time_step(::Nothing, period) = period
+@inline terrarium_time_step(Δt::Period, period) = min(Millisecond(Δt), period)
+@inline terrarium_time_step(Δt::Real, period) = min(Δt, Dates.value(period) / 1000)
 
+# Length of the current SpeedyWeather step for the land: the land time step of `time_stepping`, which for
+# `Leapfrog` is Δt/2 on the first two steps, when the clock only advances by Δt/2, and Δt afterwards.
+# `clock.Δt` is always the full Δt, so integrating the land over it would run the land clock ahead.
+terrarium_period(time_stepping, clock) =
+    Millisecond(round(Int, 1000 * SpeedyWeather.time_step(time_stepping, :land, clock)))
+
+"""$(TYPEDSIGNATURES)
 Construct a [`TerrariumLand`](@ref) from a Terrarium land model and a
 SpeedyWeather spectral grid."""
 function TerrariumLand(
@@ -238,7 +270,7 @@ function TerrariumLand(
         boundary_conditions::NamedTuple = (;),
         initializers::NamedTuple = (;),
         fields::NamedTuple = (;),
-        Δt = Minute(5),
+        Δt = nothing,
         ocean_temperature::Real = 285,
         ocean_moisture::Real = 0,
     ) where {NF}
@@ -343,7 +375,7 @@ function SpeedyWeather.initialize!(
         land::AbstractTerrariumLandModel,
         model::PrimitiveWetModel,
     )
-    state = vars.prognostic.land.terrarium
+    state = vars.prognostic.land.terrarium.state
     NF = eltype(vars.prognostic.land.soil_temperature)
     mask = land_mask(land)
     indices = land.mask_indices
@@ -359,6 +391,8 @@ function SpeedyWeather.initialize!(
         state, land.initializers,
     )
     Terrarium.initialize!(integrator)
+    # Terrarium releases up to 0.1.10 reset the clock to its zero time in `initialize!`, so sync it again
+    state.clock.time = vars.prognostic.clock.time
 
     Tsoil = interior(state.temperature)[:, 1, end] .+ NF(273.15)
     sat = @view interior(state.saturation_water_ice)[:, 1, end]
@@ -394,7 +428,7 @@ function SpeedyWeather.timestep!(
         land::AbstractTerrariumLandModel,
         model::PrimitiveWetModel,
     )
-    state = vars.prognostic.land.terrarium
+    state = vars.prognostic.land.terrarium.state
     tmodel = land.model
     consts = tmodel.constants
     NF = eltype(state)
@@ -435,7 +469,8 @@ function SpeedyWeather.timestep!(
         state.clock, tmodel, land.inputs,
         state, land.initializers,
     )
-    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
+    period = terrarium_period(model.time_stepping, vars.prognostic.clock)
+    Terrarium.run!(integrator; period, Δt = terrarium_time_step(land.Δt, period))
 
     # Push Terrarium output back into SpeedyWeather coupling variables.
     # The Terrarium state itself is mutated in place above and remains in
@@ -448,7 +483,6 @@ function SpeedyWeather.timestep!(
     end
     if haskey(vars.prognostic.land, :soil_moisture)
         RingGrids.copy_unmasked!(vars.prognostic.land.soil_moisture, @view(interior(state.saturation_water_ice)[:, 1, end]), indices)
-        soil_moisture_capacity!(vars, land)
     end
     if haskey(vars.prognostic.land, :sensible_heat_flux)
         RingGrids.copy_unmasked!(vars.prognostic.land.sensible_heat_flux, @view(interior(state.sensible_heat_flux)[:, 1, 1]), indices)
@@ -473,7 +507,7 @@ function SpeedyWeather.initialize!(
         land::TerrariumLand,
         model::PrimitiveDryModel,
     )
-    state = vars.prognostic.land.terrarium
+    state = vars.prognostic.land.terrarium.state
     NF = eltype(vars.prognostic.land.soil_temperature)
     indices = land.mask_indices
 
@@ -495,7 +529,7 @@ function SpeedyWeather.timestep!(
         land::TerrariumLand,
         model::PrimitiveDryModel,
     )
-    state = vars.prognostic.land.terrarium
+    state = vars.prognostic.land.terrarium.state
     land_model = land.model
     NF = eltype(state)
     mask = land_mask(land)
@@ -515,7 +549,8 @@ function SpeedyWeather.timestep!(
         state.clock, land_model, InputSources(NF),
         state, land.initializers,
     )
-    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
+    period = terrarium_period(model.time_stepping, vars.prognostic.clock)
+    Terrarium.run!(integrator; period, Δt = terrarium_time_step(land.Δt, period))
 
     # Surface soil temperature from the bottom of the column (last z-index)
     vars.prognostic.land.soil_temperature[mask, 1] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
