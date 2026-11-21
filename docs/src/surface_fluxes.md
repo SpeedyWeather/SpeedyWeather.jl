@@ -371,9 +371,9 @@ For small ``z`` we have ``\varphi = 1 - z/2 + z^2/6 - \dots``, and ``\varphi \ap
 meaning ``x`` is relaxed fully to ``x_s`` within one time step.
 
 However, evaluating ``\varphi`` requires an exponential for every grid point, every surface flux
-and every time step. This is relatively expensive: at T32L8 using `ExponentialFluxes` for all
+and every time step. This is relatively expensive: at T32L8 using `ExponentialRelaxation` for all
 surface fluxes increases the time per time step by about 5%, compared to about 1% for
-`ImplicitFluxes`. We therefore look for cheaper approximations of ``\varphi`` that keep its
+`ImplicitRelaxation`. We therefore look for cheaper approximations of ``\varphi`` that keep its
 essential properties: ``\varphi \approx 1`` for small ``z`` (the flux is unchanged if
 the time step resolves the relaxation) and ``\varphi \approx 1/z`` for large ``z``
 (``x`` relaxes to ``x_s`` but does not overshoot it). The other time integration schemes
@@ -395,10 +395,10 @@ correspond to such approximations of the exact ``\varphi``:
 
 | Scheme | ``\varphi(z)`` | ``1 - z\varphi(z)`` | Single step ``x \to x_s`` | Cost |
 | ------ | -------------- | ------------------- | ------------------------- | ---- |
-| `ExplicitFluxes()` | ``1`` | ``1 - z`` | overshoots for ``z > 1``, unstable for ``z > 2`` | none |
-| `ImplicitFluxes()` | ``\frac{1}{1 + z}`` | ``\frac{1}{1 + z}`` | monotone, stable, first order | 1 division |
-| `ExponentialFluxes()` | ``\frac{1 - e^{-z}}{z}`` | ``e^{-z}`` | monotone, stable, exact for fixed ``a, x_s`` | `exp`, ~5% of a time step at T32L8 |
-| `RationalFluxes()` (default) | ``\frac{6 + z}{6 + 4z + z^2}`` | ``\frac{6 - 2z}{6 + 4z + z^2}`` | stable, ≤10% overshoot for ``z > 3`` | 1 division |
+| `ExplicitRelaxation()` | ``1`` | ``1 - z`` | overshoots for ``z > 1``, unstable for ``z > 2`` | none |
+| `ImplicitRelaxation()` | ``\frac{1}{1 + z}`` | ``\frac{1}{1 + z}`` | monotone, stable, first order | 1 division |
+| `ExponentialRelaxation()` | ``\frac{1 - e^{-z}}{z}`` | ``e^{-z}`` | monotone, stable, exact for fixed ``a, x_s`` | `exp`, ~5% of a time step at T32L8 |
+| `RationalRelaxation()` (default) | ``\frac{6 + z}{6 + 4z + z^2}`` | ``\frac{6 - 2z}{6 + 4z + z^2}`` | stable, ≤10% overshoot for ``z > 3`` | 1 division |
 
 Because ``\varphi`` is applied to the flux (not only to the tendency) before it is stored, the fluxes
 passed on to the ocean and land models and to the output are consistent with those the atmosphere
@@ -413,17 +413,20 @@ the surface value ``x_s`` are held fixed over the time step (linearisation), whi
 The scheme is chosen per flux, for example
 
 ```julia
-spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
-surface_momentum_flux = SurfaceMomentumFlux(spectral_grid, time_integration = ExponentialFluxes())
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+surface_momentum_flux = SurfaceMomentumFlux(spectral_grid, time_integration = ExponentialRelaxation())
 surface_heat_flux = SurfaceHeatFlux(
     spectral_grid,
-    ocean = SurfaceOceanHeatFlux(spectral_grid, time_integration = ImplicitFluxes()),
-    land = SurfaceLandHeatFlux(spectral_grid, time_integration = ExplicitFluxes()),
+    ocean = SurfaceOceanHeatFlux(spectral_grid, time_integration = ImplicitRelaxation()),
+    land = SurfaceLandHeatFlux(spectral_grid, time_integration = ExplicitRelaxation()),
 )
 model = PrimitiveWetModel(spectral_grid; surface_momentum_flux, surface_heat_flux)
 ```
 
 and similarly for `SurfaceOceanHumidityFlux` and `SurfaceLandHumidityFlux`.
+These schemes are subtypes of `AbstractRelaxationIntegration` and integrate any relaxation
+``dx/dt = -(x - x_0)/\tau`` towards a target value ``x_0``, so they are also used for the time integration
+of the `SpeedLimitDrag`, which relaxes the wind speed towards the speed limit.
 
 ## Bulk Richardson-based drag coefficient
 

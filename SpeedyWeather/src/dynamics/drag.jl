@@ -124,18 +124,18 @@ export SpeedLimitDrag
 """Drag on the horizontal wind above a speed limit, quadratic in the excess speed and
 antiparallel to the flow, see `drag!(::Variables, ::SpeedLimitDrag, ::AbstractModel)`.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SpeedLimitDrag{NF, FI <: AbstractFluxIntegration} <: AbstractDrag
+@parameterized @kwdef struct SpeedLimitDrag{NF, FI <: AbstractRelaxationIntegration} <: AbstractDrag
     "[OPTION] drag coefficient [1/m]"
     @param drag::NF = 1.0e-5 (bounds = Nonnegative,)
 
     "[OPTION] Speed limit above which drag kicks in [m/s]"
     @param speed_limit::NF = 80 (bounds = Nonnegative,)
 
-    "[OPTION] Time integration, damping the drag for large `Δt*drag*excess`. `ImplicitFluxes()` is exact for this drag"
-    time_integration::FI = ImplicitFluxes()
+    "[OPTION] Time integration, damping the drag for large `Δt*drag*excess`. `ImplicitRelaxation()` is exact for this drag"
+    time_integration::FI = ImplicitRelaxation()
 end
 
-SpeedLimitDrag(SG::SpectralGrid; time_integration = ImplicitFluxes(), kwargs...) =
+SpeedLimitDrag(SG::SpectralGrid; time_integration = ImplicitRelaxation(), kwargs...) =
     SpeedLimitDrag{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SpeedLimitDrag, ::AbstractModel) = nothing
 
@@ -152,7 +152,7 @@ so it only decelerates and never rotates it. Without other tendencies the excess
 time scale `τ = 1/(c*e)`. As for the surface fluxes, the explicit drag is multiplied by a
 damping factor `φ(z)` of `scheme.time_integration` with `z = Δt/τ = Δt*c*e` and `Δt`
 the time step (2Δt for leapfrog), so that the drag does not decelerate the wind beyond
-the speed limit for large `c`, `e` or `Δt`. With `ImplicitFluxes()`, `φ = 1/(1 + z)`, this
+the speed limit for large `c`, `e` or `Δt`. With `ImplicitRelaxation()`, `φ = 1/(1 + z)`, this
 is the exact solution `e(Δt) = e/(1 + c*e*Δt)` of the quadratic drag. With leapfrog the
 drag is evaluated at the current time step as the other drags. (At the previous time
 step, a forward step over 2Δt for which φ is derived, T32L24 blew up in the lowest layers
@@ -189,7 +189,7 @@ end
     excess = max(0, speed - speed_limit)    # zero below the limit
 
     # damping factor for the relaxation of the excess speed towards zero on the time scale 1/(c*excess)
-    damping = flux_damping(time_integration, Δt * c * excess)
+    damping = relaxation(time_integration, Δt * c * excess)
 
     # -c*excess^2 * (u, v)/speed, i.e. antiparallel to the flow. Scaling the unit vector
     # (u, v)/speed rather than (sign(u), sign(v)) keeps the drag opposite to the velocity;

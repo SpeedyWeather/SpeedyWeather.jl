@@ -111,6 +111,14 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
 - 2026-11-20, tried and reverted: surface excess terms in the bulk Richardson number of the boundary layer height
   (Troen and Mahrt 1986, Holtslag and Boville 1993, Vogelezang and Holtslag 1996), meant to deepen the tropical
   boundary layer without the mid-latitude overshoot so that Ri_c could return to 0.25–1. See section 8.16.
+- 2026-11-21, user decision: the time integration schemes are renamed from fluxes to relaxation, as they are
+  used for any relaxation dx/dt = −(x − x₀)/τ (now also the drag), not only for fluxes: `AbstractFluxIntegration`
+  → `AbstractRelaxationIntegration`, `ExplicitFluxes`, `ImplicitFluxes`, `ExponentialFluxes`, `RationalFluxes` →
+  `ExplicitRelaxation`, `ImplicitRelaxation`, `ExponentialRelaxation`, `RationalRelaxation` (old names removed,
+  no deprecations, although exported since v0.24), `flux_damping` → `relaxation`, and
+  `time_stepping/flux_integration.jl` → `time_stepping/relaxation_integration.jl`. `surface_flux_damping` and
+  `DEFAULT_FLUX_INTEGRATION` (the default of the surface fluxes) keep their names. Older names in this plan
+  refer to the code before the rename.
 - 2026-11-19 (GPU session, A40 on login02 and H100 via Slurm), step 7, see section 8 for the numbers:
   - No GPU optimisation is kept. The scheme doubles the cost of the fused column kernel, but that kernel is only
     about 4 % of a time step, so the scheme costs 2–5 % of a time step at T256/T512.
@@ -825,7 +833,7 @@ time integrated as the surface fluxes of #1336, with a damping factor φ(z) of a
   6 % weaker than the undamped one of the three-year runs. At T32 (2Δt = 4800 s) z = 0.96 and φ = 0.51 for
   20 m/s excess.
 - `AbstractFluxIntegration`, its four subtypes and `flux_damping` moved from `parameterizations/tendencies.jl` to the
-  new `time_stepping/flux_integration.jl`, which is included before the dynamics. `flux_damping(::ExponentialFluxes, z)`
+  new `time_stepping/flux_integration.jl` (since renamed, see the revision log of 2026-11-21), which is included before the dynamics. `flux_damping(::ExponentialFluxes, z)`
   now guards numerator and denominator separately: the drag has z = 0 wherever it is inactive, where the former
   `ifelse(small, 1, -expm1(-z)/z)` evaluated 0/0 in the branch that is not taken (NaN derivatives).
 - Tests: `test/dynamics/forcing_drag.jl` (antiparallel with `ExplicitFluxes()`, the step the drag reads, one step

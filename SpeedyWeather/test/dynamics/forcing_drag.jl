@@ -48,7 +48,7 @@ end
     # diagonal instead and was √2 too large for a 45° flow.
     spectral_grid = SpectralGrid(truncation = 16, nlayers = 2)
     c, speed_limit = 3.0e-6, 80.0
-    drag = SpeedLimitDrag(spectral_grid; drag = c, speed_limit, time_integration = ExplicitFluxes())  # undamped
+    drag = SpeedLimitDrag(spectral_grid; drag = c, speed_limit, time_integration = ExplicitRelaxation())  # undamped
     model = PrimitiveDryModel(spectral_grid; drag)
     simulation = initialize!(model)
     (; variables) = simulation
@@ -96,7 +96,7 @@ end
     spectral_grid = SpectralGrid(truncation = 16, nlayers = 2)
     speed_limit = 80.0
     default_drag = SpeedLimitDrag(spectral_grid)
-    @test default_drag.time_integration isa ImplicitFluxes
+    @test default_drag.time_integration isa ImplicitRelaxation
     model = PrimitiveDryModel(spectral_grid, drag = default_drag)
     simulation = initialize!(model)
     (; variables, model) = simulation
@@ -117,7 +117,7 @@ end
     # one forward step of a zonal flow 20 m/s above the limit, from z = Δt*c*excess ≪ 1 to z ≫ 1
     excess = 20.0
     u = u_steps[2]
-    explicit, implicit, exponential, rational = ExplicitFluxes(), ImplicitFluxes(), ExponentialFluxes(), RationalFluxes()
+    explicit, implicit, exponential, rational = ExplicitRelaxation(), ImplicitRelaxation(), ExponentialRelaxation(), RationalRelaxation()
     for c in (1.0e-7, 1.0e-5, 1.0e-3)
         z = Δt * c * excess
         excess_after = Dict()

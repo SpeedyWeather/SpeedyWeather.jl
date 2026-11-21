@@ -137,17 +137,17 @@ Damping factor for a surface flux into the lowermost layer with mass `conductanc
 i.e. `-∂flux/∂x` with respect to the lowermost-layer variable x for the flux in units of
 x⋅kg/m²/s (so without cₚ for heat fluxes), surface pressure `pₛ` [Pa] and
 time integration `scheme`. Uses the time step of the time stepper, e.g. 2Δt for Leapfrog."""
-@propagate_inbounds function surface_flux_damping(scheme::AbstractFluxIntegration, conductance::Real, pₛ::Real, model)
+@propagate_inbounds function surface_flux_damping(scheme::AbstractRelaxationIntegration, conductance::Real, pₛ::Real, model)
     Δp = pressure_thickness(model.geometry.nlayers, pₛ, model.geometry.vertical_coordinates)
     Δt = default_time_step(model.time_stepping)
     z = Δt * model.planet.gravity * conductance / Δp        # = Δt/τ, relaxation time scale τ
-    return flux_damping(scheme, z)
+    return relaxation(scheme, z)
 end
 
 """$(TYPEDSIGNATURES)
 Flux `flux` (upward positive) into the lowermost layer with mass `conductance` [kg/m²/s]
 converted to tendency [?/s], time-integrated following `scheme`, see `surface_flux_damping`."""
-@propagate_inbounds surface_flux_to_tendency(scheme::AbstractFluxIntegration, flux::Real, conductance::Real, pₛ::Real, model) =
+@propagate_inbounds surface_flux_to_tendency(scheme::AbstractRelaxationIntegration, flux::Real, conductance::Real, pₛ::Real, model) =
     surface_flux_damping(scheme, conductance, pₛ, model) * surface_flux_to_tendency(flux, pₛ, model)
 
 """$(TYPEDSIGNATURES)

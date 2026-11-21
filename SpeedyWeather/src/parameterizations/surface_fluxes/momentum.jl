@@ -7,7 +7,7 @@ turbulent exchange of momentum between the surface and atmosphere, representing
 surface drag that slows down near-surface winds. Uses bulk aerodynamic formulas
 with separate drag coefficients for ocean and land surfaces to account for
 different surface roughness characteristics. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceMomentumFlux{NF, FI <: AbstractFluxIntegration} <: AbstractSurfaceMomentumFlux
+@parameterized @kwdef struct SurfaceMomentumFlux{NF, FI <: AbstractRelaxationIntegration} <: AbstractSurfaceMomentumFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
