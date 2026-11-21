@@ -119,6 +119,8 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
   `time_stepping/flux_integration.jl` → `time_stepping/relaxation_integration.jl`. `surface_flux_damping` and
   `DEFAULT_FLUX_INTEGRATION` (the default of the surface fluxes) keep their names. Older names in this plan
   refer to the code before the rename.
+- 2026-11-21, user request: audit the performance of the scheme for further optimisations on CPU and GPU, and
+  protocol the progress here. No source change; prototypes and measurements outside the repository. See 8.17.
 - 2026-11-19 (GPU session, A40 on login02 and H100 via Slurm), step 7, see section 8 for the numbers:
   - No GPU optimisation is kept. The scheme doubles the cost of the fused column kernel, but that kernel is only
     about 4 % of a time step, so the scheme costs 2–5 % of a time step at T256/T512.
@@ -993,6 +995,130 @@ excess alone (with the full wind) would help was not tried.
 
 Open: the effect of the deep mid-latitude h (profile diffusivity through the troposphere, momentum mixing across
 the jet) on the jet strength and the T512L24 stability (8.8, 8.10), which was validated with Ri_c = 1.
+
+### 8.17 Performance audit (2026-11-21, user request)
+
+> State 2026-11-21 13:15: **in progress**. Measured so far: CPU baseline and CPU prototypes. Running: the H100
+> job with all prototypes (3387439) and the Reactant checks. Items without a result are marked PENDING.
+
+Request: audit the vertical diffusion for further optimisations, for both CPU and GPU. Nothing in the source is
+changed by the audit. All variants are prototypes outside the repository, in
+`$A = /p/tmp/maxgelbr/code/Speedy2/claude_vdiff_perf_2026-11-21/`, each a function of its own that is compared
+against the scheme of `007f04d9` (frozen copies `$A/tree` for CPU, `$A/tree_gpu` for GPU and Reactant). Two
+sessions work on it in parallel, because the user's "continue" forked the session: `speedyweather-jl-a8` does the
+CPU side (8.17.2), `speedyweather-jl-d6` GPU and Reactant (8.17.3, 8.17.4) and this protocol.
+
+#### 8.17.1 Where the time goes
+
+CPU: EPYC 9354 (login02), one thread, Float32, default `PrimitiveWetModel`, T32 L8 (3168 grid points), after 3
+days of spin-up, minimum of 30 calls (`$A/cpu_baseline.jl`, `cpu_inbounds.jl`, `cpu_profile.jl`).
+
+- A time step takes 13.8 ms with the scheme and 10.9 ms without: **the scheme is 21 % of a T32 L8 time step on
+  the CPU** (2.9 ms). On the H100 it is 2–5 % (8.4), because there the transforms and the dynamics dominate.
+- It is the most expensive column parameterization:
+
+  | Parameterization | Time [ms] | Share of the time step |
+  |---|---|---|
+  | `vertical_diffusion` | 3.07 | 22 % |
+  | `radiation` | 2.57 | 19 % |
+  | `boundary_layer` | 1.68 | 12 % |
+  | `convection` | 0.65 | 5 % |
+  | `large_scale_condensation` | 0.51 | 4 % |
+  | `albedo`, the three surface fluxes | 0.62 | 4 % |
+  | all column parameterizations | 9.1 | 66 % |
+
+- Inside the scheme (loops with `@inbounds`, 2.65 ms): the conductances 1.62 ms (61 %), the four solves 0.23 to
+  0.25 ms each (0.95 ms, 36 %). That is 121 ns per grid point and layer with the bounds checks of the package's
+  loop, 104 ns without.
+- Line profile of the conductances: per interface about 16 divisions, 4 square roots, 2 `exp` (mixing length decay,
+  background diffusivity) and 1 `log` (stability correction, evaluated for every interface although it is only
+  used in the surface layer, the lowest 10 % of the boundary layer). `exp` and `log` are about a fifth of the
+  scheme's samples. Per column, `bulk_richardson_surface` (two `saturation_humidity`) is computed a second time:
+  the drag of the boundary layer scheme has just computed the same surface Richardson number.
+- The solves are limited by the latency of the divisions in the pivot recurrence (3 divisions per layer and
+  variable), not by memory: four separate sweeps, and u and v (and T and q) recompute identical pivots.
+
+GPU (H100, from 8.4, before the conductance and scratch changes): the scheme adds 0.62 ms to the 0.65 ms column
+kernel at T256 L24 and 2.25 ms at T512 L24. PENDING: the same on `007f04d9` (job 3387439).
+
+#### 8.17.2 CPU prototypes (session `speedyweather-jl-a8`; provisional numbers from its messages, to be replaced by its final tables)
+
+`$A/variants.jl`, `cpu_variants.jl` (column variants) and `$A/range_variants.jl`, `cpu_range.jl` (layers in the
+outer loop). Whole scheme, `@inbounds` loop over the columns, ms:
+
+| | Package | All conductance options + shared pivots | Solves only: package / shared pivots / one sweep |
+|---|---|---|---|
+| T32 L8 | 2.65 | 1.92 (−28 %) | 0.92 / 0.57 / 0.50 |
+| T32 L24 | 7.55 | 5.37 (−29 %) | 2.63 / 1.54 / 1.40 |
+| T64 L8 | 9.20 | 6.58 (−28 %) | 3.22 / 1.98 / 1.80 |
+| T128 L8 | 34.8 | 25.0 (−28 %) | 12.6 / 7.5 / 6.9 |
+
+- Conductance options, each alone at T32 L8 (1.63 ms): reciprocals instead of divisions −1 %, boundary layer
+  height without a division per layer −3 %, `log` only in the surface layer (an `if` instead of `ifelse`) −8 %,
+  surface Richardson number and friction velocity read from 2D arrays instead of recomputed −11 %, all four −20 %.
+  Lower bound without the two `exp`: 0.90 ms, without `exp` and `log`: 0.875 ms (both change the result).
+- Shared pivots: u and v in one sweep and T and q in one sweep, one pivot and one upper diagonal per pair, the
+  right-hand side stored in the tendency (coupled solve), one division per layer for the pivot. One sweep: all
+  four variables and both matrices in one loop. Agreement with the package: tendencies ≤ 9·10⁻⁵ relative,
+  conductances ≤ 2·10⁻⁵ (the reciprocals change the rounding).
+- **Layers in the outer loop, columns in the inner `@simd` loop** ("range form", everything carried from layer to
+  layer read from the arrays at k−1, per-column scalars in three 2D scratch arrays): T32 L8 whole scheme 2.66 ms
+  → 1.27 ms with Base's `exp`/`log` (the conductance loop then stays scalar) → 0.29 ms with branch-free Float32
+  `exp`/`log` and a layer-outer height search (0.18 ms with the stored surface Richardson number as well). The
+  four solves alone go from 0.92 ms to 0.04 ms. The same function called for one column (`ij:ij`) is the per-column
+  scheme, so one code path could serve the CPU loop and the GPU kernel; column by column on the CPU it is as fast
+  as the package (2.4–2.6 ms). PENDING: larger resolutions, share of the time step.
+
+#### 8.17.3 GPU (session `speedyweather-jl-d6`)
+
+`$A/gpu_variants.jl`, `submit_gpu.sh`: every variant as a kernel of its own over all columns, compared with the
+package's result on the same state, minimum and median of 30 calls; additionally the fused column kernel of the
+model with the variant in place of the scheme.
+
+- A40 on login02, T64 L8 and T128 L8 (`$A/gpu_variants_a40_*.log`): all variants compile and agree with the
+  package (tendencies 2·10⁻⁶, conductances 6·10⁻⁶ to 4·10⁻⁵ relative, the shared-pivot solves alone 10⁻⁷),
+  including the range form called per column, also with the layer-outer height search and the branch-free
+  `exp`/`log`. No ranking at these sizes: a kernel that does nothing but takes the same arguments
+  (`vars`, `diffusion`, `model`) already needs 0.15 ms per launch there, as much as every variant.
+- PENDING: H100 at T256 L24, T512 L24, T512 L8 (job 3387439).
+
+#### 8.17.4 Reactant (session `speedyweather-jl-d6`)
+
+`$A/reactant_variants.jl`, as in 8.3: the variant as one kernel over all columns, compiled without and with
+raising on the same state, the outputs compared. Reactant 0.2.308, CPU backend, T32 L8, wet model. PENDING, three
+processes running (`$A/reactant_*.log`):
+
+- the package, shared pivots, one sweep, the conductance options, the range form;
+- "merged": the virtual temperature computed in both loops instead of the scratch loop (what made the raised
+  kernel write nothing in 8.3), and "carried": the solver with `x = x_below` carried through the loop (what could
+  not be raised in 8.5), each with the package's `@inline` accessors and with `@propagate_inbounds` ones, to test
+  whether the bounds checks of 8.17.5 are what broke the raising.
+
+#### 8.17.5 Bounds checks
+
+Two independent gaps in the `@propagate_inbounds` chain, both also on main:
+
+1. **CPU, all column parameterizations**: `column_parameterization_cpu!` is `@propagate_inbounds`, but nothing
+   above it has an `@inbounds`, so the loop over the grid points runs with bounds checks in every
+   parameterization (the GPU kernel has `inbounds = true`). With `@inbounds` on that loop at T32 L8: all column
+   parameterizations −11.6 % (9.22 → 8.15 ms), i.e. **7.7 % of the time step**; the scheme −14.6 %, radiation
+   −11.9 %, convection −12.0 %, the surface fluxes −28 to −53 %. Patch and tests on a copy
+   (`$A/inbounds_fix.patch`, `$A/tree_fix`) by session a8: PENDING. Not checked: Enzyme (the
+   `SPLIT_COLUMN_LOOPS` workaround in the same file is sensitive to what is inlined there).
+2. **The scheme, all backends**: `diffused_value` and `column_humidity` are `@inline`, not
+   `@propagate_inbounds`, so their `getindex` keeps its bounds check under any `@inbounds` (it only reaches one
+   level of inlining): three checked reads per layer and variable in the solver and one in the virtual
+   temperature loop. In the device code of the scheme's CUDA kernel `boundserror` occurs 52 times with the
+   package's accessors and 20 times with `@propagate_inbounds` ones (same result, `$A/gpu_variants_a40_test.log`).
+   The remaining 20 are not located yet; `get_prognostic_step`/`get_step` are `@inline` as well and sit between
+   the kernel and `field_view`/`view`. On the CPU the fix alone gains nothing in scalar code but is what allows
+   the `@simd` loops of the range form (a8). PENDING: effect on the H100 and on the raising.
+
+#### 8.17.6 Candidates and recommendation
+
+PENDING until the GPU and Reactant results are in. Candidates so far, in the order of what they gain on the CPU:
+`@inbounds` on the CPU column loop (all parameterizations); the range form for the CPU; shared pivots; the
+surface Richardson number stored by the boundary layer scheme; `log` only in the surface layer; reciprocals.
 
 ### 8.12 Next
 
