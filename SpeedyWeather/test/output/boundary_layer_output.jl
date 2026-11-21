@@ -12,8 +12,9 @@ using NCDatasets
     # the surface roughness and boundary layer drag output groups under test
     add!(
         model,
-        OutputVariables.SurfaceRoughness(),
-        OutputVariables.BoundaryLayerDrag(),
+        OutputVariables.SurfaceRoughness()...,
+        OutputVariables.BoundaryLayerDrag()...,
+        OutputVariables.BoundaryLayerHeight(),
     )
 
     simulation = initialize!(model)
@@ -21,7 +22,7 @@ using NCDatasets
     @test simulation.model.feedback.nans_detected == false
 
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
-    for key in ("sr_h", "sr_m", "bld_h", "bld_m", "bld_q")
+    for key in ("sr_h", "sr_m", "bld_h", "bld_m", "bld_q", "blh")
         @test haskey(ds, key)
 
         # 2D + time variable (no vertical dimension)

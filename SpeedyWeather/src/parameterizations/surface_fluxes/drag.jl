@@ -55,8 +55,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] von Kármán constant [1]"
     @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
 
-    "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    @param critical_Richardson::NF = 10 (bounds = Positive,)
+    "[OPTION] Bulk Richardson number at and above which the drag is minimal (stable mixing cutoff) [1]"
+    @param Richardson_cutoff::NF = 10 (bounds = Positive,)
 
     "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
     @param drag_min::NF = 1.0e-5 (bounds = Nonnegative,)
@@ -108,15 +108,15 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # they call it Ri_a = Ri_land/Ri_ocean here
     ΔΦ₀ = gravity * z     # geopotential height relative to surface
     Ri_land, Ri_ocean = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
-    Ri_c = drag.critical_Richardson
+    Ri_cutoff = drag.Richardson_cutoff
     (; drag_min) = drag
 
-    # clamp to get the cases, eq (12-14)
-    # if Ri > Ri_c then C = 0
-    # if Ri_c > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_c)^2
+    # clamp to get the cases, eq (12-14), with a cutoff instead of Frierson's critical Richardson number
+    # if Ri > Ri_cutoff then C = 0
+    # if Ri_cutoff > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_cutoff)^2
     # if Ri < 0 then κ^2/log(z/z₀)^2
-    stability_land = (1 - clamp(Ri_land, 0, Ri_c) / Ri_c)^2
-    stability_ocean = (1 - clamp(Ri_ocean, 0, Ri_c) / Ri_c)^2
+    stability_land = (1 - clamp(Ri_land, 0, Ri_cutoff) / Ri_cutoff)^2
+    stability_ocean = (1 - clamp(Ri_ocean, 0, Ri_cutoff) / Ri_cutoff)^2
 
     # unpack for readability
     (; land, ocean) = vars.parameterizations
