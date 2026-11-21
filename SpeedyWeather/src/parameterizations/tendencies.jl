@@ -118,9 +118,11 @@ end
 Loop over all horizontal grid points `ij` for a single column `parameterization` on CPU.
 Parameterizations that bundle several schemes (e.g. `Radiation`) extend this method to loop
 over the grid points for every scheme separately, keeping the memory access contiguous per
-scheme and the loop bodies small."""
-@propagate_inbounds function column_parameterization_cpu!(vars, parameterization, model)
-    for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
+scheme and the loop bodies small. The loop is `@inbounds` like the GPU kernel (`inbounds = true`),
+which reaches the array accesses of a `parameterization!` through `@propagate_inbounds` functions only."""
+function column_parameterization_cpu!(vars, parameterization, model)
+    # every ij is a valid grid point: no bounds checks in the columns, as in the GPU kernel
+    @inbounds for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
         parameterization!(ij, vars, parameterization, model)
     end
     return nothing

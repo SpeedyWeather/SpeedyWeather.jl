@@ -1,7 +1,8 @@
 # Overhaul of `BulkRichardsonDiffusion` (vertical diffusion)
 
-> Status: **in progress**. Steps 1–8 are implemented: the scheme works on CPU, CUDA and Reactant, costs 2–5 % of a
-> time step and is the default of both primitive models (committed in `b7bdfdd1` with the Reactant workaround).
+> Status: **in progress**. Steps 1–8 are implemented: the scheme works on CPU, CUDA and Reactant, costs 1.4–2.8 %
+> of a time step on the H100 and about 21 % on the CPU (8.17), and is the default of both primitive models
+> (committed in `b7bdfdd1` with the Reactant workaround).
 > Tests: see 8.11. Validation: T32, T256L8 and the T512L24 cold-pool restart tests pass, but T32L24 with the scheme
 > blows up in the lowest layers at the Antarctic coast in 2 of 4 years with main's drag (0 of 4 with the new damped
 > drag, 8.13.2). T512L24 needs
@@ -9,7 +10,10 @@
 > multi-year runs a rare cold event at one Antarctic coastal point remains, which a shorter hyperdiffusion time
 > scale removes in restart tests. The final verification, T512L24 over three years, is running in four setups
 > (8.8, 8.10). Since `1cdc3b1a` the boundary layer height uses Ri_c = 10, which improves the tropics but has not
-> been through these stability checks (8.16). Details in section 8.
+> been through these stability checks (8.16). A performance audit on 2026-11-21 (8.17) found bounds checks
+> left active on the CPU and in the scheme (they are also what made the Reactant workaround of 8.3 necessary) and
+> a form of the scheme with the layers in the outer loop that is 2 to 15 times faster on the CPU and 40–45 %
+> faster on the GPU; none of it is implemented yet. Details in section 8.
 
 Date of initial draft: 2026-11-19
 
@@ -998,15 +1002,19 @@ the jet) on the jet strength and the T512L24 stability (8.8, 8.10), which was va
 
 ### 8.17 Performance audit (2026-11-21, user request)
 
-> State 2026-11-21 13:10: **in progress**. Measured so far: CPU baseline and prototypes, H100 at T256 L24, Reactant
-> (wet model). Running: H100 at T512, Reactant dry model, CPU time-step shares. Open items are marked PENDING.
+> State 2026-11-21 18:00: **audit complete**, no run is left. All measurements are done and the unit tests pass
+> with the bounds-check patches, both with `@inbounds` active and with `--check-bounds=yes` (8.17.5). Nothing is
+> implemented; candidates and recommendation in 8.17.6. Not done: Enzyme, and the Reactant and GPU suites with
+> the patches.
 
 Request: audit the vertical diffusion for further optimisations, for both CPU and GPU. Nothing in the source is
 changed by the audit. All variants are prototypes outside the repository, in
 `$A = /p/tmp/maxgelbr/code/Speedy2/claude_vdiff_perf_2026-11-21/`, each a function of its own that is compared
 against the scheme of `007f04d9` (frozen copies `$A/tree` for CPU, `$A/tree_gpu` for GPU and Reactant). Two
 sessions work on it in parallel, because the user's "continue" forked the session: `speedyweather-jl-a8` does the
-CPU side (8.17.2), `speedyweather-jl-d6` GPU and Reactant (8.17.3, 8.17.4) and this protocol.
+CPU side (8.17.2), `speedyweather-jl-d6` GPU and Reactant (8.17.3, 8.17.4) and this protocol. After a second
+"continue" at 13:15 `speedyweather-jl-6a` took over from d6, which stopped. Session a8 ended at 13:18 with three
+of its runs unfinished; 6a restarted them (8.17.5).
 
 #### 8.17.1 Where the time goes
 
@@ -1014,7 +1022,8 @@ CPU: EPYC 9354 (login02), one thread, Float32, default `PrimitiveWetModel`, T32 
 days of spin-up, minimum of 30 calls (`$A/cpu_baseline.jl`, `cpu_inbounds.jl`, `cpu_profile.jl`).
 
 - A time step takes 13.8 ms with the scheme and 10.9 ms without: **the scheme is 21 % of a T32 L8 time step on
-  the CPU** (2.9 ms). On the H100 it is 2–5 % (8.4), because there the transforms and the dynamics dominate.
+  the CPU** (2.9 ms). On the H100 it is 1.4–2.8 % (8.17.3), because there the transforms and the dynamics
+  dominate.
 - It is the most expensive column parameterization:
 
   | Parameterization | Time [ms] | Share of the time step |
@@ -1038,38 +1047,104 @@ days of spin-up, minimum of 30 calls (`$A/cpu_baseline.jl`, `cpu_inbounds.jl`, `
 - The solves are limited by the latency of the divisions in the pivot recurrence (3 divisions per layer and
   variable), not by memory: four separate sweeps, and u and v (and T and q) recompute identical pivots.
 
-GPU (H100, from 8.4, before the conductance and scratch changes): the scheme adds 0.62 ms to the 0.65 ms column
-kernel at T256 L24 and 2.25 ms at T512 L24. PENDING: the same on `007f04d9` (job 3387439).
+GPU (H100, `007f04d9`, 8.17.3): the scheme adds 0.52 ms to the 0.79 ms fused column kernel at T256 L24 (2.8 % of
+the 18.5 ms time step) and 1.83 ms to 2.74 ms at T512 L24 (2.3 % of 78.9 ms). In 8.4, before the conductance
+and scratch changes, it was 0.62 ms and 2.25 ms.
 
-#### 8.17.2 CPU prototypes (session `speedyweather-jl-a8`; provisional numbers from its messages, to be replaced by its final tables)
+#### 8.17.2 CPU (written by session `speedyweather-jl-a8`, pending numbers completed by `speedyweather-jl-6a`)
 
-`$A/variants.jl`, `cpu_variants.jl` (column variants) and `$A/range_variants.jl`, `cpu_range.jl` (layers in the
-outer loop). Whole scheme, `@inbounds` loop over the columns, ms:
+login02 (AMD EPYC 9354, AVX-512), one thread, Julia 1.12.2, Float32, default `PrimitiveWetModel` after 3 days, frozen
+copy of `007f04d95` (`$A/tree`, `$A` as above). Times are the
+minimum of 30–40 calls. Scripts: `$A/cpu_baseline.jl` (cost in the model), `cpu_inbounds.jl`, `cpu_variants.jl`
+and `cpu_range.jl` (prototypes in `variants.jl` and `range_variants.jl`, which do not override the package).
 
-| | Package | All conductance options + shared pivots | Solves only: package / shared pivots / one sweep |
+**Cost in the model today** (`cpu_baseline.jl`; "scheme" is `column_parameterization_cpu!` of the scheme as the
+model calls it, i.e. with bounds checks, see 8.17.5):
+
+| | Time step [ms] | without the scheme [ms] | All column parameterizations [ms] | Scheme [ms] | Scheme, share of the step |
+|---|---|---|---|---|---|
+| T32 L8 | 13.87 | 10.90 | 9.13 | 3.14 | 22 % |
+| T32 L24 | 37.85 | 29.84 | 20.92 | 8.65 | 23 % |
+| T64 L8 | 52.63 | 42.68 | 31.45 | 10.74 | 20 % |
+| T128 L8 | 226.0 | 187.5 | 116.4 | 38.3 | 17 % |
+
+- On the CPU the scheme is the most expensive parameterization (T32 L8: 3.1 ms, radiation 2.7 ms, boundary layer
+  1.7 ms, convection 0.65 ms), and the column parameterizations together are two thirds of a time step. This is
+  the opposite of the GPU, where the scheme is 1.4–2.8 % of a step (8.17.3).
+- It costs 100–108 ns per grid point and layer at all four configurations (without bounds checks), so it is
+  limited by arithmetic, not by memory: T128 L8 is hardly slower per point than T32 L8.
+- Parts at T32 L8 without bounds checks (2.65 ms): conductances 1.63 ms (61 %), the four solves 0.92 ms (35 %).
+
+**Variants, whole scheme** (`cpu_variants.jl`, `cpu_range.jl`; all loops with `@inbounds`, so the first column is
+already faster than the model today). Largest relative difference to the package (relative to the largest value
+of the field) over all four configurations: tendencies 9·10⁻⁵, conductances 2·10⁻⁵, boundary layer height
+9·10⁻⁷; the solver changes alone give 6·10⁻⁷.
+
+| [ms] | Package | Column variant | Range form, Base `exp`/`log` | Range form, vectorised `exp`/`log` and height search | same, surface Ri recomputed |
+|---|---|---|---|---|---|
+| T32 L8 | 2.66 | 1.92 | 1.27 | 0.18 | 0.29 |
+| T32 L24 | 7.57 | 5.41 | 3.95 | 0.48 | 0.58 |
+| T64 L8 | 9.28 | 6.59 | 4.40 | 0.62 | 1.00 |
+| T128 L8 | 34.8 | 25.9 | 16.3 | 2.34 | 3.74 |
+| relative to the package | 1 | 0.71–0.74 | 0.47–0.52 | 0.06–0.07 | 0.08–0.11 |
+
+- **Column variant** (same structure as now, one column at a time): the four changes of the conductances below,
+  and the solves of u and v, and of dry static energy and humidity, in one sweep each with a shared pivot
+  (`implicit_vertical_diffusion_shared!`: one upper diagonal and one division for the pivot per layer for both
+  variables, right-hand side stored in the tendency for the coupled solve, so one scratch array is enough).
+- **Range form** (`range_variants.jl`): the scheme as a function of a range of columns, layers in the outer
+  loops and columns in the inner `@simd ivdep` loops. What is carried from layer to layer (pivot, right-hand
+  side, conductance of the interface above) is read from the arrays at k−1, the per-column scalars (friction
+  velocity, stability ratio, stability correction of the surface layer) are in three 2D scratch arrays. Called
+  with `1:npoints` the inner loops vectorise across columns; called with `ij:ij` it is the per-column scheme of
+  the GPU kernel (8.17.3). With Base's `exp` and `log` only the solves and the virtual temperature vectorise
+  (LLVM does not vectorise a loop with these calls); with branch-free Float32 versions (`exp_branchfree`,
+  `log_branchfree`, after Cephes) and the boundary layer height searched with the layers in the outer loop,
+  everything but the surface layer does.
+- The range form run column by column on the CPU (as the GPU kernel would run it) takes 2.40 / 6.76 / 8.21 /
+  31.6 ms: 10 % faster than the package, 20–25 % slower than the column variant, because the carried values go
+  through memory. Blocks of 64 to 1024 columns are not faster than all columns at once.
+
+**Parts at T32 L8** [ms]:
+
+| Conductances (column loop) | | Solves | |
 |---|---|---|---|
-| T32 L8 | 2.65 | 1.92 (−28 %) | 0.92 / 0.57 / 0.50 |
-| T32 L24 | 7.55 | 5.37 (−29 %) | 2.63 / 1.54 / 1.40 |
-| T64 L8 | 9.20 | 6.58 (−28 %) | 3.22 / 1.98 / 1.80 |
-| T128 L8 | 34.8 | 25.0 (−28 %) | 12.6 / 7.5 / 6.9 |
+| package | 1.63 | package, 4 solves | 0.92 |
+| same code as a variant (control) | 1.56 | shared pivots, 2 sweeps | 0.57 |
+| reciprocals instead of about half of the divisions per interface | 1.54 | one sweep for all four variables | 0.50 |
+| boundary layer height without a division per layer | 1.52 | range form over all columns (vectorised) | 0.04 |
+| `log` of the stability correction only in the surface layer (`if`, not `ifelse`) | 1.44 | | |
+| surface Richardson number and friction velocity read, not recomputed | 1.39 | | |
+| all four | 1.25 | | |
+| all four, without the two `exp` (wrong result, bound) | 0.93 | | |
+| range form over all columns, Base `exp`/`log` | 1.21 | | |
+| range form, vectorised `exp`/`log` and height search | 0.14 | | |
 
-- Conductance options, each alone at T32 L8 (1.63 ms): reciprocals instead of divisions −1 %, boundary layer
-  height without a division per layer −3 %, `log` only in the surface layer (an `if` instead of `ifelse`) −8 %,
-  surface Richardson number and friction velocity read from 2D arrays instead of recomputed −11 %, all four −20 %.
-  Lower bound without the two `exp`: 0.90 ms, without `exp` and `log`: 0.875 ms (both change the result).
-- Shared pivots: u and v in one sweep and T and q in one sweep, one pivot and one upper diagonal per pair, the
-  right-hand side stored in the tendency (coupled solve), one division per layer for the pivot. One sweep: all
-  four variables and both matrices in one loop. Agreement with the package: tendencies ≤ 9·10⁻⁵ relative,
-  conductances ≤ 2·10⁻⁵ (the reciprocals change the rounding).
-- **Layers in the outer loop, columns in the inner `@simd` loop** ("range form", everything carried from layer to
-  layer read from the arrays at k−1, per-column scalars in three 2D scratch arrays): T32 L8 whole scheme 2.66 ms
-  → 1.27 ms with Base's `exp`/`log` (the conductance loop then stays scalar) → 0.29 ms with branch-free Float32
-  `exp`/`log` and a layer-outer height search (0.18 ms with the stored surface Richardson number as well). The
-  four solves alone go from 0.92 ms to 0.04 ms. The same function called for one column (`ij:ij`) is the per-column
-  scheme, so one code path could serve the CPU loop and the GPU kernel; column by column on the CPU it is as fast
-  as the package (2.4–2.6 ms). PENDING: larger resolutions, share of the time step.
+- The solves are limited by the chain pivot → upper diagonal → next pivot with one division per layer. Two
+  variables per sweep share that chain (−38 to −41 % over the four configurations); all four in one sweep run
+  both chains at once (−44 to −47 %). Vectorised over the columns the chain no longer matters: 23 times faster
+  at T32 L8, 21 times at the other three configurations.
+- `bulk_richardson_surface` is evaluated twice per column and time step, in the drag of the boundary layer and
+  again in `surface_layer` of the scheme (two saturation humidities each). Storing the surface Richardson number
+  (and the friction velocity) in the boundary layer scheme saves 11 % of the conductances in the column loop at
+  L8 and 4 % at L24 (it is a cost per column), and 17 % (L24) to 38 % (L8) of the whole scheme once everything
+  else is vectorised.
+- The logarithm is only needed for interfaces below the surface layer height (0.1 h), at L8 almost none. With
+  `ifelse` it is evaluated for every interface (7–8 % of the conductances).
+- Fewer divisions gain 1–4 % only: the divider is not the bottleneck in the column loop.
+- The two exponentials (mixing length decay and background diffusivity) are 20 % of the conductances. Both are
+  functions of the height of the interface only; they could only be removed by changing the formulation
+  (profiles from reference heights, or one height scale for both), which was not tried.
+- `Base.sqrt` checks its argument and throws, which blocks vectorisation. The range form uses `Base.sqrt_llvm`;
+  `sqrt(abs(x))` has the same effect with public API.
+- A solver written with `map` and closures over tuples of fields was 3–4 times slower than the package's
+  (no allocations; why was not looked into). With recursion over the tuples instead (`forward_steps!`) it is
+  faster than hand-written code for two variables (0.57 against 0.74–0.77 ms).
 
-#### 8.17.3 GPU (session `speedyweather-jl-d6`)
+Not measured on the CPU: Float64 (the vectorised `exp`/`log` of the prototype are Float32 only and fall back to
+Base otherwise), Enzyme through the range form, more than one thread.
+
+#### 8.17.3 GPU (sessions `speedyweather-jl-d6`, `speedyweather-jl-6a`)
 
 `$A/gpu_variants.jl`, `submit_gpu.sh`: every variant as a kernel of its own over all columns, compared with the
 package's result on the same state, minimum and median of 30 calls; additionally the fused column kernel of the
@@ -1080,40 +1155,72 @@ model with the variant in place of the scheme.
   including the range form called per column, also with the layer-outer height search and the branch-free
   `exp`/`log`. No ranking at these sizes: a kernel that does nothing but takes the same arguments
   (`vars`, `diffusion`, `model`) already needs 0.15 ms per launch there, as much as every variant.
-- H100, T256 L24 (job 3387439, `$A/gpu_variants-3387439.log`). Time step 18.52 ms with the scheme, 18.00 ms
-  without (0.52 ms, 2.8 %); fused column kernel 1.311 ms with, 0.787 ms without. Minimum of 30 calls; the
-  median is 0.12 ms higher for every kernel, the differences between variants are the same in both.
+- H100, T256 L24, T512 L24 and T512 L8 (job 3387439, `$A/gpu_variants-3387439.log`), minimum of 30 calls. The
+  median is 0.12 ms higher for every kernel; the differences between variants are the same in both.
 
-  | Variant | Own kernel [ms], 0.114 ms launch included | In the model's fused column kernel [ms] |
-  |---|---|---|
-  | package | 0.552 | 1.314 |
-  | package, `@propagate_inbounds` accessors (8.17.5) | 0.541 | 1.286 |
-  | shared pivots (u with v, T with q) | 0.465 | 1.198 |
-  | one sweep for all four | 0.511 | 1.259 |
-  | reciprocals and division-free height loop, package solves | 0.467 | |
-  | **reciprocals + shared pivots** | **0.387** | **1.080** |
-  | reciprocals + one sweep | 0.434 | 1.136 |
-  | reciprocals, `log` branch, stored surface Ri + shared pivots | 0.379 | |
-  | range form per column: reciprocals, `log` branch | 0.397 | |
-  | range form per column: + stored surface Ri | 0.386 | |
-  | range form per column: + layer-outer height search | 0.431 | |
-  | range form per column: + branch-free `exp`/`log` | 0.443 | |
-  | solves only: package / shared pivots / one sweep | 0.346 / 0.165 / 0.239 | |
-  | conductances only: package / all four options | 0.173 / 0.128 | |
+  | | T256 L24 | T512 L24 | T512 L8 |
+  |---|---|---|---|
+  | Time step with / without the scheme [ms] | 18.52 / 18.00 (0.52, 2.8 %) | 78.91 / 77.09 (1.81, 2.3 %) | 40.71 / 40.12 (0.59, 1.4 %) |
+  | Fused column kernel with / without the scheme [ms] | 1.311 / 0.787 | 4.572 / 2.744 | 1.734 / 1.153 |
+  | Empty kernel with the same arguments (launch) [ms] | 0.114 | 0.106 | 0.117 |
 
-  - Reciprocals with shared pivots take the scheme from 0.52 ms to 0.29 ms inside the fused kernel (−45 %),
-    which is 1.3 % of a time step. About half of that comes from the solves, half from the conductances: the
-    arithmetic matters on the GPU as well, the kernel is not limited by memory traffic alone as assumed in 8.4.
-  - One sweep for all four variables is slower than two sweeps with shared pivots in every pairing on the GPU
-    (on the CPU it is slightly faster, 8.17.2).
+  "Own" is the variant as a kernel of its own (launch included), "fused" the model's fused column kernel of all
+  parameterizations with the variant in place of the scheme, both in ms:
+
+  | Variant | T256 L24 own | T256 L24 fused | T512 L24 own | T512 L24 fused | T512 L8 own | T512 L8 fused |
+  |---|---|---|---|---|---|---|
+  | package | 0.552 | 1.314 | 1.755 | 4.575 | 0.479 | 1.740 |
+  | package, `@propagate_inbounds` accessors (8.17.5) | 0.541 | 1.286 | 1.719 | 4.493 | 0.466 | 1.688 |
+  | shared pivots (u with v, T with q) | 0.465 | 1.198 | 1.507 | 4.189 | 0.416 | 1.606 |
+  | one sweep for all four | 0.511 | 1.259 | 1.707 | 4.402 | 0.427 | 1.612 |
+  | reciprocals and division-free height loop, package solves | 0.467 | | 1.482 | | 0.413 | |
+  | **reciprocals + shared pivots** | **0.387** | **1.080** | **1.257** | **3.749** | **0.350** | **1.508** |
+  | reciprocals + one sweep | 0.434 | 1.136 | 1.455 | 3.955 | 0.358 | 1.505 |
+  | reciprocals, `log` branch, stored surface Ri + shared pivots | 0.379 | | 1.231 | | 0.336 | |
+  | range form per column: reciprocals, `log` branch | 0.397 | | 1.266 | | 0.379 | |
+  | range form per column: + stored surface Ri | 0.386 | | 1.239 | | 0.356 | |
+  | range form per column: + layer-outer height search | 0.431 | | 1.381 | | 0.399 | |
+  | range form per column: + branch-free `exp`/`log` | 0.443 | | 1.411 | | 0.409 | |
+  | solves only: package / shared pivots / one sweep | 0.346 / 0.165 / 0.239 | | 1.085 / 0.622 / 0.727 | | 0.321 / 0.163 / 0.211 | |
+  | conductances only: package / all four options | 0.173 / 0.128 | | 0.560 / 0.383 | | 0.179 / 0.123 | |
+
+  - Reciprocals with shared pivots take the scheme inside the fused kernel from 0.52 ms to 0.29 ms at T256 L24,
+    from 1.83 ms to 1.00 ms at T512 L24 (−45 % at both) and from 0.58 ms to 0.35 ms at T512 L8 (−40 %), which
+    is 1.3 %, 1.0 % and 0.6 % of a time step. About half of that comes from the solves and half from the
+    conductances: the arithmetic matters on the GPU as well, the kernel is not limited by memory traffic alone
+    as assumed in 8.4.
+  - The single conductance options are not additive on the GPU: reciprocals alone are slower than the control as
+    a kernel of their own (0.663 against 0.559 ms at T512 L24), while reciprocals together with the division-free
+    height loop save 0.27 ms in the kernel of the whole scheme. Only the combinations in the table are reliable.
+  - One sweep for all four variables is slower than two sweeps with shared pivots at L24 in every pairing and
+    equal at L8 (on the CPU it is slightly faster, 8.17.2).
   - **The range form called per column is as fast as the column variant with the same options** (0.386 against
-    0.379 ms), so reading the carried values back from the arrays costs nothing measurable on the H100. Its two
-    CPU-oriented options (height search with the layers outside, branch-free `exp`/`log`) cost 0.05 ms on the
-    GPU and belong on the CPU only.
+    0.379 ms, 1.239 against 1.231 ms, at L8 0.356 against 0.336 ms), so reading the carried values back from the
+    arrays costs at most 0.02 ms on the H100. Its two CPU-oriented options (height search with the layers
+    outside, branch-free `exp`/`log`) cost 0.05 ms at T256 L24 and T512 L8 and 0.15 ms at T512 L24 and belong on
+    the CPU only.
   - The `log` branch and the stored surface Richardson number make no measurable difference on the GPU.
-- PENDING: T512 L24 and T512 L8 (same job).
+- Second job 3390072 (`$A/gpu_extra.jl`, `$A/gpu_extra-3390072.log`), cumulative stages of the package's scheme,
+  minimum of 30 calls in ms. The package measured twice in a row differs by 0.003 ms at most. Stages 1 to 3 give
+  results identical to the package.
 
-#### 8.17.4 Reactant (session `speedyweather-jl-d6`)
+  | Stage | T256 L24 scheme kernel | T256 L24 fused | T512 L24 scheme kernel | T512 L24 fused | Bounds checks, scheme / fused |
+  |---|---|---|---|---|---|
+  | 0 package | 0.558 | 1.313 | 1.758 | 4.595 | 26 / 32 |
+  | 1 + `@propagate_inbounds` on `diffused_value`, `column_humidity` | 0.545 | 1.289 | 1.725 | 4.510 | 10 / 16 |
+  | 2 + `@propagate_inbounds` on `get_step`, `get_prognostic_step`, `get_tendency_step` | 0.543 | 1.271 | 1.726 | 4.436 | 0 / 0 |
+  | 3 + virtual temperature computed where it is read, no scratch loop | 0.529 | 1.246 | 1.683 | 4.350 | 0 / 0 |
+  | 4 reciprocals + shared pivots in place of the scheme, with 1 and 2 | 0.392 | 1.070 | 1.255 | 3.708 | 8 / 8 (from the prototype) |
+
+  - The two bounds-check fixes take 3.2 % (T256 L24) and 3.5 % (T512 L24) off the fused column kernel of all
+    parameterizations, 0.04 and 0.16 ms, which is 0.2 % of a time step. Stage 2 does not change the scheme's own
+    kernel; its gain in the fused kernel is in the other parameterizations.
+  - Without the scratch loop for the virtual temperature (possible once stage 1 has removed the cause of the
+    Reactant failure, 8.17.4) the fused kernel is another 0.025 and 0.086 ms faster.
+  - Stage 4 does not include stage 3; together they would put the fused kernel at about 1.05 and 3.62 ms, i.e. the
+    scheme at half of its present cost (not measured as one variant).
+
+#### 8.17.4 Reactant (sessions `speedyweather-jl-d6`, `speedyweather-jl-6a`)
 
 `$A/reactant_variants.jl`, as in 8.3: the variant as one kernel over all columns, compiled without and with
 raising on the same state, the outputs compared (conductances, boundary layer height, the four tendencies).
@@ -1148,36 +1255,134 @@ the package's `@inline` accessors `diffused_value` and `column_humidity` and wit
   code only works because of the workaround, not because the cause was removed.
 - Every prototype is raised correctly, including the range form with its `@simd ivdep` loops, `Base.sqrt_llvm`
   and the bit operations of the branch-free `exp`/`log`.
-- PENDING: `PrimitiveDryModel` for package, merged, carried (running). Not checked: the uncoupled solve of the
-  prototypes, Reactant on the GPU backend, CPU against Reactant over 100 steps (`test_correctness.jl`), Enzyme.
+- `PrimitiveDryModel` with `@propagate_inbounds` accessors: package, merged and carried agree, 1.1·10⁻⁵
+  (`$A/reactant_propagate_dry.log`).
+- Not checked: the uncoupled solve of the prototypes, Reactant on the GPU backend, CPU against Reactant over 100
+  steps (`test_correctness.jl`), Enzyme.
 
 #### 8.17.5 Bounds checks
 
-Two independent gaps in the `@propagate_inbounds` chain, both also on main:
+Three independent gaps in the `@propagate_inbounds` chain, all of them also on main. None changes a result.
 
-1. **CPU, all column parameterizations**: `column_parameterization_cpu!` is `@propagate_inbounds`, but nothing
-   above it has an `@inbounds`, so the loop over the grid points runs with bounds checks in every
-   parameterization (the GPU kernel has `inbounds = true`). With `@inbounds` on that loop at T32 L8: all column
-   parameterizations −11.6 % (9.22 → 8.15 ms), i.e. **7.7 % of the time step**; the scheme −14.6 %, radiation
-   −11.9 %, convection −12.0 %, the surface fluxes −28 to −53 %. Patch and tests on a copy
-   (`$A/inbounds_fix.patch`, `$A/tree_fix`) by session a8: PENDING. Not checked: Enzyme (the
-   `SPLIT_COLUMN_LOOPS` workaround in the same file is sensitive to what is inlined there).
-2. **The scheme, all backends**: `diffused_value` and `column_humidity` are `@inline`, not
+1. **CPU, all column parameterizations.** `column_parameterization_cpu!` and everything it calls is
+   `@propagate_inbounds`, but nothing at the root of the chain says `@inbounds`
+   (`column_parameterizations_cpu!` and `_column_parameterization_cpu_by_name!` are plain functions), so on the
+   CPU every column parameterization runs with bounds checks, also before the `SPLIT_COLUMN_LOOPS` workaround.
+   The GPU kernel has `inbounds = true`. Effect of `@inbounds` on the loop over the grid points, T32 L8
+   (`$A/cpu_inbounds.jl`):
+
+   | Parameterization | as in the model [ms] | `@inbounds` loop [ms] | |
+   |---|---|---|---|
+   | boundary layer | 1.68 | 1.63 | −3 % |
+   | surface momentum / heat / humidity flux | 0.05 / 0.11 / 0.18 | 0.03 / 0.05 / 0.13 | −46 / −53 / −28 % |
+   | vertical diffusion | 3.10 | 2.65 | −15 % |
+   | large-scale condensation | 0.50 | 0.44 | −11 % |
+   | convection | 0.65 | 0.57 | −12 % |
+   | albedo | 0.29 | 0.29 | 0 % |
+   | radiation | 2.68 | 2.36 | −12 % |
+   | sum | 9.22 | 8.15 | −12 % |
+
+2. **The scheme, all backends.** `diffused_value` and `column_humidity` are `@inline`, not
    `@propagate_inbounds`, so their `getindex` keeps its bounds check under any `@inbounds` (it only reaches one
    level of inlining): three checked reads per layer and variable in the solver and one in the virtual
-   temperature loop. In the device code of the scheme's CUDA kernel `boundserror` occurs 52 times with the
-   package's accessors and 20 times with `@propagate_inbounds` ones (same result, `$A/gpu_variants_a40_test.log`).
-   The remaining 20 are not located yet; `get_prognostic_step`/`get_step` are `@inline` as well and sit between
-   the kernel and `field_view`/`view`. Effect of `@propagate_inbounds` on the two accessors alone: on the CPU
-   nothing in scalar code, but it is what allows the `@simd` loops of the range form (a8); on the H100 at
-   T256 L24 the four solves 0.346 → 0.282 ms as a kernel of their own and the fused column kernel 1.314 →
-   1.286 ms; **on Reactant it removes the cause of the two raising failures** (8.17.4).
+   temperature loop. They are the only helpers of the parameterizations that index an array without propagating.
+   Effect of `@propagate_inbounds` on the two alone: on the CPU nothing in the scalar column loop (four solves
+   at T32 L8 0.92 ms with either), but their checks are what kept the layer-outer loops of the range form from
+   vectorising; on the H100 the fused column kernel 1.314 → 1.286 ms at T256 L24, 4.575 → 4.493 ms at T512 L24
+   and 1.740 → 1.688 ms at T512 L8 (the four solves as a kernel of their own −18 to −33 %); **on Reactant it
+   removes the cause of the two raising failures** (8.17.4).
+3. **Every column parameterization, all backends.** `get_step`, `get_prognostic_step` and `get_tendency_step`
+   (`time_stepping/steps.jl`) are `@inline` as well, so the `view` they create keeps its `checkbounds`, once per
+   column and call. They are called 98 times in `src/parameterizations`. All bounds checks left in the scheme's
+   kernel after item 2 are these (`$A/gpu_boundschecks.jl`: 4 in `vertical_conductance!`, 4 in
+   `vertical_diffusion!`, 2 in `bulk_richardson_surface`). Calls of `throw_boundserror` in the CUDA device code
+   (A40, T64 L8, `$A/gpu_extra_a40_test.log`), with identical results in all three rows:
+
+   | | Kernel of the scheme | Fused column kernel of all parameterizations |
+   |---|---|---|
+   | package | 26 | 32 |
+   | + `@propagate_inbounds` on `diffused_value`, `column_humidity` | 10 | 16 |
+   | + `@propagate_inbounds` on `get_step`, `get_prognostic_step`, `get_tendency_step` | 0 | 0 |
+
+   The six checks of the fused kernel that are not in the scheme belong to other parameterizations and go away
+   with the step functions as well. On the H100 the step functions take another 1.4–1.6 % off the fused column
+   kernel (1.289 → 1.271 ms at T256 L24, 4.510 → 4.436 ms at T512 L24, 8.17.3).
+
+Patches, each applied to a copy of `007f04d9`: `$A/inbounds_fix.patch` (items 1 and 2, copy `$A/tree_fix`) and
+`$A/get_step_fix.patch` on top (item 3, 18 methods, copy `$A/tree_fix2`). End to end on the CPU
+(`cpu_baseline.jl`, the copies measured one after the other):
+
+| | `007f04d9` | items 1 and 2 | items 1 to 3 |
+|---|---|---|---|
+| T32 L8 time step [ms], four rounds (items 1 to 3: the last two) | 13.87 / 13.75 / 13.74 / 13.90 | 12.95 / 13.05 / 12.96 / 13.04 (−5.9 %) | 12.87 / 12.93 (−6.7 %) |
+| T32 L8 all column parameterizations [ms] | 9.13 / 9.00 / 9.01 / 9.12 | 8.18 / 8.18 / 8.19 / 8.18 (−9.7 %) | 8.08 / 8.08 (−10.9 %) |
+| T32 L8 scheme [ms] | 3.14 / 3.05 / 3.03 / 3.04 | 2.60 / 2.60 / 2.60 / 2.61 | 2.56 / 2.56 |
+| T32 L24 time step / all column parameterizations [ms] | 37.85 / 20.92 | | 35.18 / 18.63 (−7.1 / −10.9 %) |
+| T64 L8 time step / all column parameterizations [ms] | 52.63 / 31.45 | | 48.93 / 27.78 (−7.0 / −11.7 %) |
+| T128 L8 time step / all column parameterizations [ms] | 226.0 / 116.4 | | 212.7 / 102.7 (−5.9 / −11.8 %) |
+
+- The three fixes together make a CPU time step 6–7 % faster at all four configurations, all of it in the column
+  parameterizations (−11 to −12 %). Item 3 contributes 0.09 ms at T32 L8 (0.7 % of the time step).
+  Logs `$A/cpu_baseline_tree*`, `cpu_baseline_fix*` (chain `$A/run_chain_6a.sh` and a8's `run_chain.sh`).
+- Unit tests on `tree_fix2` (items 1 to 3) with the `@inbounds` active, i.e. without `--check-bounds=yes`
+  (`$A/run_tests.jl`, environment `SpeedyWeather/Project.toml`, `$A/tests_fix2_default.log`): **54066 passed,
+  0 failed, 1 error** in 19 files of `test/parameterizations` (12069 tests, among them the 71 of the scheme) and
+  13 files of `test/dynamics` (41997 tests). The error is `dynamics/copy_variables.jl` loading `JLArrays`, a
+  test-only dependency that this environment does not have (its 27 tests before that line pass); it has nothing
+  to do with the patch. Not included: the test files that need other test-only dependencies (`dispatch.jl`,
+  `numericalradiation.jl`, `terrarium_coupling.jl`) and the output tests.
+- With `--check-bounds=yes`, as in CI, the three fixes are without effect by construction. The same files give
+  the same result there: **54066 passed, 0 failed, 1 error** (again the `JLArrays` load), 142 min,
+  `$A/tests_fix2_checkbounds.log`. `parameterizations/surface_fluxes.jl` counts 0 tests in both runs: the file
+  has two test sets and no `@test`, so it only checks that the prescribed-flux models run.
+- A first run of session a8 on `tree_fix` was killed when that session ended.
+- Not run: the Enzyme tests. Item 1 changes the loop that the `SPLIT_COLUMN_LOOPS` workaround wraps for
+  llvm/llvm-project#219885, so the extended differentiability tests have to be run before it is merged. Also not
+  run: the Reactant and GPU suites with the patches.
 
 #### 8.17.6 Candidates and recommendation
 
-PENDING until the GPU and Reactant results are in. Candidates so far, in the order of what they gain on the CPU:
-`@inbounds` on the CPU column loop (all parameterizations); the range form for the CPU; shared pivots; the
-surface Richardson number stored by the boundary layer scheme; `log` only in the surface layer; reciprocals.
+"Scheme" percentages are relative to the scheme's own cost, which is 21 % of a T32 L8 time step on the CPU and
+1.4–2.8 % of a T256/T512 time step on the H100.
+
+| # | Candidate | CPU | H100 | Reactant | Result changes by | Size of the change |
+|---|---|---|---|---|---|---|
+| 1 | `@inbounds` on the grid point loop of `column_parameterization_cpu!` | with 2: all column parameterizations −10 to −12 %, time step −6 to −7 % (four configurations) | none (the kernel has it) | not affected | nothing | one line |
+| 2 | `@propagate_inbounds` instead of `@inline` on `diffused_value`, `column_humidity` | nothing by itself, but required for 9 | scheme −5 % (solves −20 %) | **removes the cause of the failures of 8.3 and 8.5** | nothing | three lines |
+| 3 | `@propagate_inbounds` on `get_step`, `get_prognostic_step`, `get_tendency_step` | time step −0.7 % at T32 L8 | fused column kernel of all parameterizations −1.5 %; with 2 no bounds check is left in it (32 before) | fewer checks to raise in every parameterization | nothing | 18 one-line methods in `steps.jl` |
+| 4 | With 2: remove the virtual temperature scratch loop (the workaround of 8.3) | not measured | scheme −5 % | raised correctly, wet and dry | nothing (identical on the H100) | a few lines, removes a `TODO` |
+| 5 | Solves with shared pivots: u with v, T with q, right-hand side in the tendency | solves −38 to −41 %, scheme −13 % | scheme −22 % | raised correctly | 10⁻⁷ | new solver for N variables; the uncoupled solve needs one more scratch array or the present path |
+| 6 | Reciprocals in the conductances, boundary layer height without a division per layer | conductances −1 to −4 % | with 5: scheme −40 to −45 % | raised correctly | 10⁻⁵ (rounding) | rewrite of two loops, same formulas |
+| 7 | `log` of the stability correction only in the surface layer (`if`) | conductances −8 % | none | raised correctly | nothing | a few lines |
+| 8 | Surface Richardson number and friction velocity stored by the boundary layer scheme instead of recomputed | conductances −11 % at L8, −4 % at L24 | none | raised correctly | nothing | one or two new 2D variables, couples the two schemes |
+| 9 | Range form: the scheme as a function of a range of columns, layers in the outer loops; all columns at once on the CPU (`@simd`), one column in the kernel. Includes 5–7 | scheme −50 % with Base `exp`/`log`; −89 to −94 % with branch-free `exp`/`log` and a layer-outer height search | same as 5 + 6 (−40 to −45 %); the two CPU options must stay off | raised correctly, also with the CPU options | 10⁻⁵ | rewrite of the scheme, three 2D scratch arrays, two compile-time switches for the CPU |
+| – | One sweep for all four variables | solves −44 to −47 % | slower than 5 | raised correctly | 10⁻⁷ | not recommended: 9 makes it irrelevant on the CPU |
+| – | The two `exp` per interface | bound: conductances −25 % | bound: small | | changes the physics | not tried: needs profiles from reference heights or one height scale |
+
+What it adds up to, if all of 1–9 were done: on the CPU at T32 L8 the time step goes from 13.9 ms to about
+10.6 ms (−23 %; −16 % with Base `exp`/`log`), of which the bounds checks of 1–3 are 0.9 ms for all
+parameterizations and the scheme 2.3 ms. On the H100 the time step gets 0.6–1.3 % faster.
+
+Recommendation (shared by both sessions; nothing of it is implemented, the decision is the user's):
+
+1. **Bounds checks first, as a change of their own** (1–3, optionally 4): small, no change of results, a gain for
+   every column parameterization on the CPU, and it removes the cause of the Reactant failures instead of working
+   around it. Before merging: the Enzyme tests including the extended ones, because 1 changes the loop that the
+   `SPLIT_COLUMN_LOOPS` workaround wraps; the Reactant and GPU suites.
+2. **Then the scheme in the range form (9)** as a separate step with its own plan section: it is the only
+   candidate that changes the CPU picture (the scheme from 21 % of a T32 L8 time step to 3 %, or 11 % with
+   Base's `exp`/`log`), it costs nothing on the GPU, and it is one code path for CPU, GPU and Reactant. To
+   decide there: whether the CPU gets the branch-free `exp`/`log` (a8's prototype is Float32 only and its
+   accuracy is not characterised), how the uncoupled solve and the options `diffuse_*` are handled, and Enzyme
+   through the `@simd` loops.
+3. If the range form is not wanted: 5 to 8 in the present per-column structure give −28 % on the CPU (about
+   −21 % without 8) and −40 to −45 % on the GPU.
+4. 8 is independent of the rest and only matters once the scheme is cheap (then it is 17–38 % of what is left on
+   the CPU).
+
+Outside the scheme, seen on the way and not followed up: `boundary_layer` costs 1.7 ms per T32 L8 step on the
+CPU for a 2D computation (12 % of the time step), and launching a kernel with `vars` and `model` as arguments
+costs 0.11 ms on the H100 node and 0.15 ms on login02 before any work is done.
 
 ### 8.12 Next
 
@@ -1195,6 +1400,10 @@ surface Richardson number stored by the boundary layer scheme; `log` only in the
 5. With `critical_Richardson = 10` (8.16): repeat the stability checks that were made with Ri_c = 1, at least the
    T32L24 ensemble (8.13.2) and a T512L24 run, and look at the maximum winds and the jet with the deep
    mid-latitude boundary layer. Compare the `blh` output with the ERA5 boundary layer height climatology.
+6. Performance (8.17.6), to be decided by the user: (a) the three bounds-check fixes as a change of their own
+   (patches `inbounds_fix.patch` and `get_step_fix.patch` in the audit directory; the Enzyme tests including the
+   extended ones and the Reactant and GPU suites have to be run with them first); (b) the scheme in the range
+   form, with a plan section of its own.
 
 Slurm: `gpushort` allows two running jobs per user and 24 hours; the multi-year runs other than the first use
 `gpupreempt`, which has no such limit but can be preempted.

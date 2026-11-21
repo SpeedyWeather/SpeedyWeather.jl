@@ -135,7 +135,7 @@ Vertical diffusion tendencies of u, v, temperature (via dry static energy) and h
 end
 
 # humidity of layer k, zero for models without humidity
-@inline column_humidity(q, ij, k) = q[ij, k]
+@propagate_inbounds column_humidity(q, ij, k) = q[ij, k]
 @inline column_humidity(::Nothing, ij, k) = false     # strong zero
 
 """$(TYPEDSIGNATURES)
@@ -355,8 +355,8 @@ no early exit."""
 end
 
 # value of the variable in layer k that is diffused, with or without a geopotential term
-@inline diffused_value(variable, ::Nothing, ij, k) = variable[ij, k]
-@inline diffused_value(variable, (Φ, scale)::Tuple, ij, k) = variable[ij, k] + scale * Φ[ij, k]
+@propagate_inbounds diffused_value(variable, ::Nothing, ij, k) = variable[ij, k]
+@propagate_inbounds diffused_value(variable, (Φ, scale)::Tuple, ij, k) = variable[ij, k] + scale * Φ[ij, k]
 
 """$(TYPEDSIGNATURES)
 Implicit (backward Euler) vertical diffusion of `variable` (plus `scale * Φ` with `geopotential_term =
