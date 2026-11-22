@@ -7,8 +7,11 @@ $(TYPEDFIELDS)"""
     "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
     @param relative_humidity_threshold::NF = 0.95 (bounds = 0 .. 1,)
 
-    "[OPTION] Reevaporation efficiency [1/(kg/kg)], 0 for no reevaporation"
+    "[OPTION] Reevaporation efficiency [1/(kg/kg)] per reference layer thickness, 0 for no reevaporation"
     @param reevaporation::NF = 30 (bounds = Nonnegative,)
+
+    "[OPTION] Reference layer thickness Δσ [1] for reevaporation, makes it independent of the number of layers"
+    @param reevaporation_layer_thickness::NF = 1 / 8 (bounds = Positive,)
 
     "[OPTION] Convert rain below freezing to snow?"
     snow::Bool = true
@@ -117,8 +120,11 @@ large-scale precipitation vertically for output."""
 
             # 2. Reevaporation and condensation
             dq = sat_humid_k - humid[ij, k]                 # reevaporation relative to 100% humidity
-            r = condensation.reevaporation * max(dq, 0)     # reevaporation efficiency [1], scale linearly with dryness
-            rain_evaporated = min(r, 1) * rain_flux_down    # [m/s], min(r, 1) to not evaporate more than available
+            # reevaporation rate per unit mass (Δp/pₛ = Δσ), scales linearly with dryness, exponential decay
+            # of rain flux so that reevaporation through a column is independent of the number of layers
+            Δσ = Δp / pₛ                                    # layer thickness in σ [1]
+            r = condensation.reevaporation * max(dq, 0) * Δσ / condensation.reevaporation_layer_thickness
+            rain_evaporated = (1 - exp(-r)) * rain_flux_down    # [m/s], fraction in [0, 1) never evaporates more than available
             rain_flux_down -= rain_evaporated               # remove reevaporated rain
             δq_evap = rain_evaporated * Δtgρ_Δp             # convert to humidity tendency over timestep [kg/kg]
             δq = min(0, δq_cond) + δq_evap                  # [kg/kg] sum with condensation (negative) and evaporation (positive)

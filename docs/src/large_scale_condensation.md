@@ -143,7 +143,7 @@ proportional to the difference of humidity ``q`` to saturation ``q^*``.
 
 ```math
 \begin{aligned}
-F_{e, k}   &= \min(c\max(q^* - q, 0), 1) F_{r, k} \\
+F_{e, k}   &= \left(1 - \exp\left(-c\max(q^* - q, 0)\frac{\Delta\sigma_k}{\Delta\sigma_{ref}}\right)\right) F_{r, k} \\
 F_{r, k+1} &= F_{r, k} - F_{e, k}
 \end{aligned}
 ```
@@ -154,8 +154,13 @@ constant that effectively parameterizes the effectiveness of reevaporation.
 For ``c=0`` reevaporation is disabled, for ``c = 1/q^*`` (though ``c`` is a global constant)
 and ``q=0`` evaporation would be immediate, i.e. when the humidity in the layer is zero
 but ``c`` is chosen to be on the order of  one over the saturation humidity then all
-rain water would evaporate. We add a ``\min(..., 1)`` to avoid evaporating more rain water
-than is available. We then convert ``F_e`` into a humidity tendency by division with
+rain water would evaporate. The exponential avoids evaporating more rain water
+than is available. The reevaporation is scaled with the layer's mass, i.e. its thickness
+``\Delta\sigma_k = \Delta p_k/p_s`` relative to a reference thickness ``\Delta\sigma_{ref}``
+(`reevaporation_layer_thickness = 1/8` by default), so that the fraction of rain
+evaporated through a column does not depend on the number of layers: for constant ``q^* - q``
+the product over layers ``\prod_k \exp(-c(q^* - q)\Delta\sigma_k/\Delta\sigma_{ref})`` only
+depends on the total ``\sum_k \Delta\sigma_k``, see [#1426](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1426). We then convert ``F_e`` into a humidity tendency by division with
 ``\Delta p/(\Delta t g \rho)``, layer pressure thickness ``\Delta p`` (see [Sigma coordinates](@ref sigma_coordinates_physics)), gravity ``g``,
 but this depends on the units you use for the rain water flux.
 Since reevaporation takes the same latent heat (though opposite sign) as condensation,
