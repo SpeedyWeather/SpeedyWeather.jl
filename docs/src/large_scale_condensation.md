@@ -163,10 +163,21 @@ the product over layers ``\prod_k \exp(-c(q^* - q)\Delta\sigma_k/\Delta\sigma_{r
 depends on the total ``\sum_k \Delta\sigma_k``, see [#1426](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1426). We then convert ``F_e`` into a humidity tendency by division with
 ``\Delta p/(\Delta t g \rho)``, layer pressure thickness ``\Delta p`` (see [Sigma coordinates](@ref sigma_coordinates_physics)), gravity ``g``,
 but this depends on the units you use for the rain water flux.
-Since reevaporation takes the same latent heat (though opposite sign) as condensation,
-this tendency has to be substracted from the large-scale condensation tendency but the
-implicit time stepping can be used as before if reevaporation is calculated before the
-latent heat release.
+Reevaporation is treated implicitly too, but separately from condensation, as it is not a
+relaxation towards saturation with time scale ``\Delta t_c`` but limited by the rain falling into
+a layer. Evaporating ``\delta q_e`` cools the layer by ``L_v/c_p \delta q_e`` which also lowers
+saturation, so the saturation deficit after evaporation is ``(q^* - q) - \gamma \delta q_e`` with
+``\gamma = 1 + L_v/c_p \, \partial q^*/\partial T``. With evaporation proportional to the deficit
+after evaporation (backward Euler) the explicit amount ``\delta q_e^*`` from ``F_{e,k}`` becomes
+
+```math
+\delta q_e = \frac{\delta q_e^* (q^* - q)}{(q^* - q) + \gamma \delta q_e^*}
+```
+
+which can never evaporate a layer beyond saturation. Exactly that amount ``\delta q_e`` is removed
+from the rain flux so that water is conserved, see [#1420](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1420).
+Condensation (negative) and reevaporation (positive) humidity tendencies are then added, and
+the latent heat release (or uptake) is computed from their sum.
 
 The reevaportation in `ImplicitCondensation` is controlled by `reevaporation` (dimensionless),
 the proportionality constant ``c \geq 0`` here.

@@ -93,6 +93,7 @@ end
 @testset "Reevaporation independent of number of layers" begin
     # rain forms in the top layer and falls through layers that are all dq below saturation,
     # the fraction reaching the surface is exp(-c*dq*(1-Δσ₁)/Δσ_ref) regardless of nlayers, see #1426
+    # (for little rain so that the implicit limiter of reevaporation is negligible)
     @testset for nlayers in (8, 64)
         spectral_grid = SpectralGrid(truncation = 15; nlayers, NF = Float64)
         large_scale_condensation = ImplicitCondensation(spectral_grid, snow = false, relative_humidity_threshold = 1)
@@ -117,7 +118,7 @@ end
             temp[ij, k] = 300
             pₖ = SpeedyWeather.pressure(k, surface_pressure, coord)
             sat_humid = SpeedyWeather.saturation_humidity(temp[ij, k], pₖ, atmosphere)
-            humid[ij, k] = k == 1 ? 1.2 * sat_humid : sat_humid - dq
+            humid[ij, k] = k == 1 ? 1.001 * sat_humid : sat_humid - dq
         end
 
         temp_tend[ij, :] .= 0
@@ -131,6 +132,28 @@ end
         rain_top = -humid_tend[ij, 1] * Δσ[1] * surface_pressure / gρ      # [m/s] rain formed in top layer
         (; reevaporation, reevaporation_layer_thickness) = condensation
         fraction = exp(-reevaporation * dq * sum(Δσ[2:end]) / reevaporation_layer_thickness)
-        @test vars.parameterizations.rain_rate_large_scale[ij] ≈ fraction * rain_top rtol = 1.0e-8
+        @test vars.parameterizations.rain_rate_large_scale[ij] ≈ fraction * rain_top rtol = 1.0e-3
+
+        # water conservation: column humidity change + precipitation = 0, see #1420
+        # strongly supersaturated top layer and dry layers below for lots of reevaporation
+        for k in 1:nlayers
+            pₖ = SpeedyWeather.pressure(k, surface_pressure, coord)
+            sat_humid = SpeedyWeather.saturation_humidity(temp[ij, k], pₖ, atmosphere)
+            humid[ij, k] = (k == 1 ? 1.5 : 0.5) * sat_humid
+        end
+        humid_tend[ij, :] .= 0
+        temp_tend[ij, :] .= 0
+        SpeedyWeather.large_scale_condensation!(ij, vars, condensation, geometry, planet, atmosphere, time_stepping)
+        vapour = sum(humid_tend[ij, k] * Δσ[k] for k in 1:nlayers) * surface_pressure / planet.gravity    # [kg/m²/s]
+        precip = vars.parameterizations.rain_rate_large_scale[ij] * atmosphere.water_density             # [kg/m²/s]
+        @test any(humid_tend[ij, 2:end] .> 0)               # reevaporation happened
+        @test abs(vapour + precip) <= 1.0e-10 * precip
+        # no layer evaporated into beyond saturation
+        for k in 2:nlayers
+            pₖ = SpeedyWeather.pressure(k, surface_pressure, coord)
+            q_new = humid[ij, k] + time_stepping.Δt * humid_tend[ij, k]
+            T_new = temp[ij, k] + time_stepping.Δt * temp_tend[ij, k]
+            @test q_new <= SpeedyWeather.saturation_humidity(T_new, pₖ, atmosphere)
+        end
     end
 end

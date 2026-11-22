@@ -118,24 +118,31 @@ large-scale precipitation vertically for output."""
             δT = -Lᵢ_cₚ * δq_melt / Δt                      # latent heat required for melting [K/s] (explicit in time)
             # don't use δq_melt as humidity tendency as it's only snow->rain
 
-            # 2. Reevaporation and condensation
-            dq = sat_humid_k - humid[ij, k]                 # reevaporation relative to 100% humidity
+            # Solve for condensation and reevaporation separately implicitly in time, then add
+            T = temp[ij, k] + Δt * δT                       # use temperature after melting [K] in gradient
+            dqsat_dT = sat_humid_k * Lᵥ / (Rᵥ * T^2)        # Clausius-Clapeyron [1/K] at 100% saturation
+            # δq change in humidity also changes temperature by -Lᵥ/cₚ*δq and therefore saturation by -dqsat_dT*Lᵥ/cₚ*δq
+            # so that the change in humidity relative to saturation is γ*δq
+            γ_cond = 1 + Lᵥ_cₚ * relative_humidity_threshold * dqsat_dT     # relative to threshold
+            γ_evap = 1 + Lᵥ_cₚ * dqsat_dT                                   # relative to 100%
+
+            # 2. Condensation, implicit relaxation to threshold, Frierson et al. 2006 eq. (21)
+            δq_cond = min(δq_cond, 0) / (γ_cond * time_scale * Δt)          # [kg/kg/s], ≤ 0
+
+            # 3. Reevaporation of rain from above relative to 100% humidity
+            dq = max(sat_humid_k - humid[ij, k], 0)         # saturation deficit [kg/kg]
             # reevaporation rate per unit mass (Δp/pₛ = Δσ), scales linearly with dryness, exponential decay
             # of rain flux so that reevaporation through a column is independent of the number of layers
             Δσ = Δp / pₛ                                    # layer thickness in σ [1]
-            r = condensation.reevaporation * max(dq, 0) * Δσ / condensation.reevaporation_layer_thickness
-            rain_evaporated = (1 - exp(-r)) * rain_flux_down    # [m/s], fraction in [0, 1) never evaporates more than available
-            rain_flux_down -= rain_evaporated               # remove reevaporated rain
-            δq_evap = rain_evaporated * Δtgρ_Δp             # convert to humidity tendency over timestep [kg/kg]
-            δq = min(0, δq_cond) + δq_evap                  # [kg/kg] sum with condensation (negative) and evaporation (positive)
-            # division by timestep for tendency below
+            r = condensation.reevaporation * dq * Δσ / condensation.reevaporation_layer_thickness
+            δq_evap = (1 - exp(-r)) * rain_flux_down * Δtgρ_Δp  # explicit humidity increase over Δt [kg/kg]
+            # implicit: evaporation is proportional to the deficit after evaporation dq - γ_evap*δq_evap
+            # so that a layer cannot be evaporated into beyond saturation, guard against 0/0 for dq = 0
+            δq_evap *= dq / max(dq + γ_evap * δq_evap, floatmin(dq))
+            δq_evap /= Δt                                   # [kg/kg/s], ≥ 0
+            rain_flux_down -= δq_evap * Δp_Δtgρ * Δt        # remove exactly the reevaporated rain [m/s]
 
-            # Solve for melting of snow, condensation, reevaporation (and possibly sublimation) implicitly in time
-            # implicit correction, Frierson et al. 2006 eq. (21)
-            # derivative of qsat wrt to temp
-            T = temp[ij, k] + Δt * δT                       # use temperature after melting [K] in gradient
-            dqsat_dT = sat_humid_k * relative_humidity_threshold * Lᵥ / (Rᵥ * T^2)    # Clausius-Clapeyron [1/K]
-            δq /= ((1 + Lᵥ_cₚ * dqsat_dT) * time_scale * Δt)
+            δq = δq_cond + δq_evap                          # [kg/kg/s] sum of condensation and reevaporation
             δT -= Lᵥ_cₚ * δq                                # add latent heat release to melting for enthalpy conservation
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
@@ -143,8 +150,8 @@ large-scale precipitation vertically for output."""
             # Fortran SPEEDY documentation Page 7 (last sentence)
             vars.parameterizations.cloud_top[ij] = min(vars.parameterizations.cloud_top[ij], k)
 
-            # 2. Precipitation (rain) due to large-scale condensation [kg/m²/s] /ρ for [m/s]
-            δq_rain = min(0, δq)                # precipitation only for negative humidity tendency
+            # 4. Precipitation (rain) due to large-scale condensation [kg/m²/s] /ρ for [m/s]
+            δq_rain = δq_cond                   # precipitation from condensation only, reevaporation removed above
             rain = Δp_gρ * -δq_rain             # precipitation rain [m/s] on this layer k, Formula 4
             snow = zero(rain)                   # start with zero snow but potentially swap below
 

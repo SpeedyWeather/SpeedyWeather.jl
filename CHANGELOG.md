@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Reevaporation of large-scale rain scaled per unit mass (layer thickness Δσ) so it is independent of the number of layers, new parameter `reevaporation_layer_thickness` [#1427](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1427)
+- Reevaporation of large-scale rain scaled per unit mass (layer thickness Δσ) so it is independent of the number of layers, new parameter `reevaporation_layer_thickness`; reevaporation is implicit separately from condensation and conserves water (fixes #1420) [#1427](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1427)
 
 - New variable group `variables.output` declared via `OutputVariable` for output-only variables, accumulated precipitation and river runoff moved there from `variables.parameterizations`. New `model.diagnostics` with `Accumulate` (parameterizations only write rates), `Maximum` and `Mean`, reset by the output writer so precipitation output is since the last output (rate output variables removed), output variables are written to restart files [#1362](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1362)
 - Fix the differentiability of `TwoBandShort` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
