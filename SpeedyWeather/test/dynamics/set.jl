@@ -150,6 +150,9 @@
     # non-stepped variables need step = nothing
     set!(simulation, geopotential = 1, group = :dynamics)
     @test all(simulation.variables.dynamics.geopotential .== 1)
+
+    # options are typed keyword arguments, not converted
+    @test_throws TypeError set!(simulation, vorticity = 1, add = 1)
 end
 
 @testset "Set! grids" begin

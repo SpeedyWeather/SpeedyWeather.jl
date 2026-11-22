@@ -29,7 +29,7 @@ For variables without a step dimension use `step = nothing` to skip the `get_ste
 function set!(
         vars::NamedTuple,
         geometry::Geometry;
-        step = 1,
+        step::Union{Nothing, Integer} = 1,
         add::Bool = false,
         spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing,
         coslat_scaling_included::Bool = false,
@@ -38,19 +38,65 @@ function set!(
         scratch_field::Union{Nothing, AbstractField} = nothing,
         kwargs...
     )
+    # Type-erase the variables to set into a runtime `Vector` of `name => value` pairs, and pass
+    # the options positionally as a concrete struct. The `Base.Pairs` type of `kwargs` encodes
+    # the keyword names and value types, so passing it on would make `set_variables!` and
+    # everything it calls (transforms, kernels, ...) re-specialize for every distinct combination
+    # of variables set at a call site, costing seconds of compilation each. `@nospecialize` is
+    # needed too, otherwise this method itself is inferred for every such combination.
+    # `set!` is called a handful of times per simulation, so the dynamic dispatch is irrelevant.
+    @nospecialize kwargs
+    vars_to_set = Pair{Symbol, Any}[name => value for (name, value) in kwargs]
+    options = SetOptions(step, add, spectral_transform, coslat_scaling_included, static_func, namespace, scratch_field)
+    return set_variables!(vars, geometry, vars_to_set, options)
+end
+
+"""$(TYPEDSIGNATURES) Options controlling how `set!` sets variables, see `set!`."""
+struct SetOptions
+    step::Union{Nothing, Int}
+    add::Bool
+    spectral_transform::Union{Nothing, AbstractSpectralTransform}
+    coslat_scaling_included::Bool
+    static_func::Bool
+    namespace::Union{Nothing, Symbol}
+    scratch_field::Union{Nothing, AbstractField}
+end
+
+"""$(TYPEDSIGNATURES)
+Core of `set!`: sets the variables given as `name => value` pairs in `vars_to_set`, with
+`options` controlling how. Deliberately free of keyword-dependent specialization so that all
+call sites share a single compiled method, see `set!(::NamedTuple, ::Geometry)`."""
+function set_variables!(
+        vars::NamedTuple,
+        geometry::Geometry,
+        vars_to_set::Vector{Pair{Symbol, Any}},
+        options::SetOptions,
+    )
+    (; step, add, spectral_transform, coslat_scaling_included, static_func, namespace, scratch_field) = options
+
+    # value for `name` among the variables to set, or `nothing` if not given
+    function value_or_nothing(name)
+        for (varname, value) in vars_to_set
+            varname === name && return value
+        end
+        return nothing
+    end
+
     # special case for u,v setting vor, div
-    if :u in keys(kwargs) && :v in keys(kwargs)
+    u = value_or_nothing(:u)
+    v = value_or_nothing(:v)
+    if !isnothing(u) && !isnothing(v)
         (; vorticity, divergence) = vars
         set_vordiv!(
-            get_step(vorticity, step), get_step(divergence, step), kwargs[:u], kwargs[:v],
+            get_step(vorticity, step), get_step(divergence, step), u, v,
             geometry, spectral_transform; add, coslat_scaling_included, static_func
         )
-    elseif :u in keys(kwargs) || :v in keys(kwargs)
+    elseif !isnothing(u) || !isnothing(v)
         @warn "Only one of `u` and `v` provided, but both are needed to set `vor` and `div`. Skipping."
     end
 
     # normal case, search for varname in prognostic variables
-    for varname in keys(kwargs)
+    for (varname, value) in vars_to_set
         if varname in (:u, :v)  # already handled in special case above
             nothing
         elseif varname in keys(vars)
@@ -74,8 +120,10 @@ function set!(
 end
 
 """$(TYPEDSIGNATURES) set the `variables`, default is in the group `prognostic`."""
-set!(variables::Variables, args...; group::Symbol = :prognostic, kwargs...) =
-    set!(getfield(variables, group), args...; kwargs...)
+function set!(variables::Variables, args...; group::Symbol = :prognostic, kwargs...)
+    @nospecialize kwargs
+    return set!(getfield(variables, group), args...; kwargs...)
+end
 
 # set LTA <- LTA
 function set!(
@@ -420,10 +468,12 @@ Sets properties of the simuluation `S`. Convenience wrapper to call the other co
 `set!` methods. All `kwargs` are forwarded to these methods, which are documented 
 seperately. See their documentation for possible `kwargs`. """
 function set!(S::AbstractSimulation; kwargs...)
+    @nospecialize kwargs
     return set!(S.variables, S.model.geometry; spectral_transform = S.model.spectral_transform, kwargs...)
 end
 
 function set!(vars::Variables, model::AbstractModel; kwargs...)
+    @nospecialize kwargs
     vars.prognostic.scale[] != 1 && @warn "Prognostic variables are scaled with $(vars.prognostic.scale[]), but `set!` assumes unscaled variables."
     return set!(vars, model.geometry; spectral_transform = model.spectral_transform, kwargs...)
 end

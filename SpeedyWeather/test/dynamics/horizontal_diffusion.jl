@@ -58,7 +58,7 @@ end
         # arrays are precomputed with the radius-scaled time step, see initialize!
         Δt = SpeedyWeather.default_time_step(model.time_stepping) / model.planet.radius
 
-        # last degree (trunc+2) is zeroed for both, exclude it here
+        # last degree (truncation+1) is zeroed for both, exclude it here
         @test impl[1:(end - 1), :] ≈ 1 ./ (1 .- Δt .* expl[1:(end - 1), :])
         @test impl_div[1:(end - 1), :] ≈ 1 ./ (1 .- Δt .* expl_div[1:(end - 1), :])
 
