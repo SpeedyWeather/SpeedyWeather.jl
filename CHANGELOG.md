@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Optional horizontal heat transport for the `SlabOcean` mixed layer: new `heat_transport` component, `NoOceanHeatTransport()` (default, unchanged results) or `OceanHeatDiffusion(spectral_grid)`, a conservative finite-volume diffusion of heat on ring grids with ocean-fraction weighted faces (no flux through coasts), longitude-interpolated faces between rings and Codron's diffusivity rule [#1420](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1420)
 - `set!` and the initial conditions remove the extra degree lmax+1 from spectral prognostic variables, opt out with `set!(...; truncate = false)`; `truncate_extra_degree!` (LowerTriangularArrays v1.1.0) replaces `zero_last_degree!` [#1440](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1440)
 - Fix re-evaporation bug in the large-scale precipitation scheme to close the water budget [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
 - Reevaporation dependent on layer-thickness [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)

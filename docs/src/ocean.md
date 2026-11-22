@@ -124,6 +124,25 @@ converted to ``W/m^2`` through multiplication with the latent heat of condensati
 through turbulent transport of heat in the atmospheric boundary layer. All surface flux
 terms have units of ``W/m^2``.
 
+### Ocean heat transport
+
+By default the slab ocean has no horizontal heat transport. Optionally the mixed layer
+temperature is diffused horizontally, a simple parameterization of the heat transport by
+eddies and currents that moves heat from the tropics towards the poles
+
+```julia
+ocean = SlabOcean(spectral_grid, heat_transport = OceanHeatDiffusion(spectral_grid))
+```
+
+`OceanHeatDiffusion` is a conservative finite-volume discretization on ring grids that is
+precomputed at `initialize!` (so set the land-sea mask before). Heat, not temperature, is conserved,
+and there is no flux through coastlines: every face between two cells is weighted by the smaller of their
+ocean fractions. The transport continues under sea ice. Between rings the temperature
+is interpolated in longitude to the segments of the shared face, which keeps the discretization of the Laplacian
+accurate for fields that vary with longitude. The default diffusivity is
+``25000 \cdot 50 / (H + 150)`` m²/s for mixed-layer depth ``H`` in meters (Codron, 2012), or set `diffusivity`.
+It is explicit in time and `initialize!` warns if the time step is too large for it.
+
 Depending on the presence of sea ice, the sensible and latent heat fluxes are subject to
 insulation, see [Thermodynamic sea ice model](@ref). The insulation is applied as a flux reduction
 within the surface flux calculation. The slab ocean is then passed on to the model constructor
