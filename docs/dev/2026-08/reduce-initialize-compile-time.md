@@ -1,6 +1,6 @@
 # Reducing compile time of `initialize!(model)` and `run!(simulation)`
 
-> Status: **in progress**. Changes 1 and 2 implemented and verified: total `initialize!` 34.0 s → 22.6 s. Change 3 (precompile workload) still outstanding and currently out of scope. `run!` profiled 2026-08-21: no structural fix found, see "Profiling `run!`".
+> Status: **in progress**. Changes 1 and 2 implemented and re-verified after merging main on 2026-11-22 (`initialize!` −30 %, new `set!` call patterns −35 %); Change 1 simplified to keep the typed keyword signature. Precompilation (Change 3) split out into #1421.
 
 Date of initial draft: 2026-08-20
 
@@ -28,6 +28,12 @@ Base revision: f89bce984b028f4aa9f62622accc32aba157d6a8
   convoluted. Removed `SET_OPTIONS`, its sync `@assert`, the duplicated second
   `_set_options` method and the `_set_step` helper (net −19 lines) with no compile-time
   cost. See "Simplification of the Change 1 machinery" below.
+- 2026-11-22: merged main (conflict in `set.jl`: main's new `scratch_field` keyword became a
+  `SetOptions` field). Change 3 (precompile workload) split out into its own PR, #1421, so that
+  the compile-time reductions here, which have no downside, can go in independently. Critically
+  re-assessed Changes 1 and 2 and simplified Change 1 further ("variant B"): the explicit, typed
+  keyword signature of `set!` is restored and the `is_option`/`_set_pairs`/`_set_options` helpers
+  are removed. Same compile time as before, see "Re-assessment after merging main (2026-11-22)".
 
 ## Problem description
 
@@ -247,6 +253,8 @@ warmup was 0.024 s for all of step 3; the dispatch overhead is far below that.
 
 #### Simplification of the Change 1 machinery
 
+> Superseded on 2026-11-22 by "variant B", see "Re-assessment after merging main (2026-11-22)".
+
 The first implementation was reviewed as convoluted. Three of its four moving parts turned
 out to be incidental rather than load-bearing, and were removed on 2026-08-21 with **no
 measurable compile-time cost** (net −19 lines):
@@ -385,6 +393,61 @@ longer `Pkg.precompile` and a larger image.
 contention — an intermediate measurement taken while the test suite was running showed
 every step roughly doubled, including steps not touched by the change. Always re-measure on
 an idle machine before concluding anything.
+
+## Re-assessment after merging main (2026-11-22)
+
+> Originating prompt: "Can you merge main into 1212? I think that PR is a win-win whereas the
+> precompile PR also has downsides. So the former should go in any case. Merge main then revisit
+> your changes and critically assess whether they are the right thing to do!!"
+
+Base revision: 32fbfa49 (main), merged into this branch.
+
+### Change 2 — kept unchanged
+
+Collecting the variable definitions into a `Vector{AbstractVariable}` is simple, has no runtime
+cost (it runs once, in `Variables(model)`), keeps the component-facing `variables(component, model)`
+tuple API, and works with main's new `output` group without changes. Its only other caller,
+`any(all_variables(model))` in `stochastic_physics.jl`, works on a vector as is.
+
+### Change 1 — idea kept, implementation simplified
+
+The type erasure is the right thing: `set!(vars, ...)` is only called from initial conditions and
+user code, never from the time loop, Enzyme or Reactant tracing, so the dynamic dispatch it
+introduces costs nothing that matters. But the 2026-08-21 implementation ("variant A") had three
+downsides:
+
+- The documented `set!(::NamedTuple, ::Geometry; kwargs...)` signature no longer showed the options
+  (`step`, `add`, `namespace`, ...), so `TYPEDSIGNATURES` in the docs lost them.
+- The option types were no longer enforced: `add = 1` was silently converted by `@kwdef`
+  instead of raising a `TypeError` as on main.
+- Options were separated from variables by name (`is_option`), merged with defaults via
+  `NamedTuple` `merge`s (`_set_options`), three helpers of indirection.
+
+"Variant B" restores main's explicit typed keyword arguments and only erases the remaining
+`kwargs` (the variables) into a `Vector{Pair{Symbol, Any}}`, with `@nospecialize` on them, and
+passes the options positionally as a plain `SetOptions` struct. The `set!(::Simulation)` and
+`set!(::Variables, ::AbstractModel)` wrappers go back to main's form (forwarding with
+`spectral_transform` from the model), with `@nospecialize kwargs` on them and on the
+`set!(::Variables, args...)` forwarder. The earlier finding that passing options back on as
+*keywords* defeats the erasure still holds; B passes them positionally.
+
+Measured in fresh sessions, interleaved, on a shared machine (load ~3): absolute numbers are
+inflated relative to an idle machine and only the comparison within this table is meaningful.
+"5 new `set!` signatures" is the sum over five user calls after `initialize!`: a function for
+`temperature`, two variables at once, a namespaced scalar, an LTA with `add = true`, and `u`/`v`.
+
+| | `initialize!` | 5 new `set!` signatures |
+|---|---|---|
+| main | 95.9 s, 102.4 s | 21.0 s, 20.8 s |
+| variant A | 65.4 s, 66.7 s, 71.3 s | 13.4 s, 14.4 s, 14.1 s |
+| variant B | 68.0 s, 78.9 s | 12.9 s, 12.9 s |
+
+A and B are indistinguishable within noise, so B is preferred for being simpler and closer to
+main. A test now checks that a wrongly typed option raises a `TypeError`.
+
+The `u`/`v` call is the most expensive new signature in all three (8–12 s): `set_vordiv!`
+specializes on the types of `u` and `v` (here a closure) and compiles the vorticity/divergence
+transforms. Not addressed here.
 
 ## Profiling `run!(simulation)`
 
@@ -539,10 +602,9 @@ the precompilation behaviour and the `NF=Float32` coverage in the docs.
 - After Changes 1 and 2, `run!` (28.8 s) costs more than `initialize!` (21.9 s) in a cold
   session, and no structural fix was found for it — the cost is spread across the
   dynamical core rather than concentrated in a re-specialization pattern.
-- `SetOptions` fixes the set of `set!` options at the struct definition: a keyword that is
-  not one of its fields is treated as a variable to set, so a typo'd option produces a
-  "not defined" warning rather than an error. Adding a new option is a one-line change to
-  the struct since the 2026-08-21 simplification.
+- A misspelt `set!` option is treated as a variable to set and produces a "not defined"
+  warning rather than an error, as on main. A new option has to be added both as a keyword of
+  `set!(::NamedTuple, ::Geometry)` and as a field of `SetOptions`.
 
 ## Future work
 
