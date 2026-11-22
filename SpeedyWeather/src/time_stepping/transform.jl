@@ -130,19 +130,24 @@ function SpeedyTransforms.transform!(
     vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
     div = get_prognostic_step(vars.prognostic.divergence, time_stepping, S)
     temp = get_prognostic_step(vars.prognostic.temperature, time_stepping, S)
+    pres = get_prognostic_step(vars.prognostic.pressure, time_stepping, S)
 
     scratch_memory = vars.scratch.transform_memory
     U = vars.scratch.a                              # reuse work arrays
     V = vars.scratch.b                              # U = u*coslat, V=v*coslat
+    (; dpres_dx_spec, dpres_dy_spec) = vars.dynamics    # ∇ln(pₛ)*coslat, fused with U, V
 
     # retain previous time step for vertical advection and parameterizations
     # if not initial step do before transforms i.e before that step is overwritten
-    initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
+    initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model, vars.prognostic.clock)
 
     # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
+
+    # gradient of the logarithm of surface pressure ∇ln(pₛ), also *coslat as U, V
+    ∇!(dpres_dx_spec, dpres_dy_spec, pres, S)
 
     # Batched spec→grid for the prognostic state: one call covers vorticity, divergence,
     # temperature, pressure (and humidity for PrimitiveWet).
@@ -155,15 +160,22 @@ function SpeedyTransforms.transform!(
         hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
     end
 
-    # Batched spec→grid for the velocities: the general-purpose `:spectral_scratch` fuse packs
-    # `(:a, :b)` (here holding U, V) into one Spectral3D parent, and `:uv_grid` packs `(:u, :v)`
-    # TODO: theoretically we could merge this with the other big transform and then unscale coslat
-    # seperately, but the dimensions don't quite align, shall we still do that in a hacky way?
+    # Batched spec→grid for the velocities and ∇ln(pₛ), all unscaled by coslat: the
+    # `:uv_dpres_grad_spectral` fuse packs `(:a, :b, :dpres_dx_spec, :dpres_dy_spec)` (a, b here
+    # holding U, V) into one Spectral3D parent, and `:uv_dpres_grad_grid` packs
+    # `(:u, :v, :dpres_dx, :dpres_dy)` in the same order. This is not merged with the prognostic
+    # batch above because that one is not unscaled by coslat and its spectral side carries the step dimension
     transform!(
-        get_prognostic_step(parent(vars.fused.uv_grid), time_stepping, S),
-        parent(vars.fused.spectral_scratch), scratch_memory, S;
+        get_prognostic_step(parent(vars.fused.uv_dpres_grad_grid), time_stepping, S),
+        parent(vars.fused.uv_dpres_grad_spectral), scratch_memory, S;
         unscale_coslat = true
     )
+
+    for (name, tracer) in model.tracers
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
+        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
+    end
 
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
     # only do after transforms to avoid copying uninitialized zeros
@@ -178,12 +190,6 @@ function SpeedyTransforms.transform!(
     temperature_average!(vars, temp, S)
     geopotential!(vars, model)                  # calculate geopotential
 
-    for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
-        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
-        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
-    end
-
     # transform random pattern for random process unless random_process=nothing
     transform!(vars, model.random_process, S)
 
@@ -192,4 +198,4 @@ end
 
 # only needed for Leapfrog to retain a copy of the current time step moved to the previous
 # fallback is nothing for other time steppers
-move_prognostic_grid_variables_back!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
+move_prognostic_grid_variables_back!(::Variables, ::AbstractTimeStepper, ::AbstractModel, args...; kwargs...) = nothing

@@ -7,6 +7,17 @@ function time_stepping!(simulation::AbstractSimulation)
     return simulation
 end
 
+"""$(TYPEDSIGNATURES)
+Perform `n` time steps of `simulation`. Extended in the Reactant extension to 
+implement a time stepping loop that can be differentiated with checkpointing
+schemes used."""
+function time_steps!(simulation::AbstractSimulation, n::Integer; kwargs...)
+    for _ in 1:n # This function is extended in the Reactant extension to implement the features described in the docstring
+        time_step!(simulation)
+    end
+    return nothing
+end
+
 # dispatch over time stepper
 time_step!(simulation::AbstractSimulation) = time_step!(simulation, simulation.model.time_stepping)
 
@@ -16,10 +27,8 @@ function time_step!(simulation::AbstractSimulation, time_stepping::AbstractTimeS
     (; feedback, output) = model
     (; clock) = variables.prognostic
 
-    # re-initialize model components if needed, e.g. implicit with changing time step
-    reinitialize!(model, variables)
-
     time_step!(variables, time_stepping, model)     # calculate tendencies and step forward
+    diagnostics!(variables, model)                  # accumulate or update diagnostics for output
     time_step!(clock, time_stepping)                # then step the clock forward
 
     progress!(feedback, variables, model)           # updates the progress meter bar
@@ -37,16 +46,44 @@ function time_step!(
     )
     # exit immediately if NaNs/Infs already present
     (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
+
+    # re-initialize model components if needed, e.g. implicit with changing time step
+    reinitialize!(model, vars)
     reset_tendencies!(vars, time_stepping)      # set the tendencies back to zero for accumulation
 
     dynamics_tendencies!(vars, model)
+    random_process!(vars, time_stepping, model) # stochastic time steppers only: noise before the implicit terms
     diffusion_and_implicit!(vars, model)        # dispatch over time stepper and implicit so that the order can be changed
     update_prognostic!(vars, model)             # step prognostic variables forward
+    update_random!(vars, model)                 # draw the random patterns for the next time step
     transform!(vars, model)                     # new spectral state to grid
     particle_advection!(vars, model)            # TODO move up?
 
     return nothing
 end
+
+"""$(TYPEDSIGNATURES)
+Add the noise (Wiener increment) of a stochastic time stepper to the tendencies. Called after
+the dynamical core, when the explicit tendencies are complete, and before the implicit terms
+(horizontal diffusion, semi-implicit correction), which therefore act on the noise like on
+every explicit tendency (drift-implicit, see `StochasticLeapfrog`). Deterministic time
+steppers do nothing."""
+random_process!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
+
+"""$(TYPEDSIGNATURES)
+Advance all random processes by one time step, i.e. draw the random patterns for the next time
+step: of `model.random_process` (e.g. for SPPT) and of the noise of a stochastic time stepper
+(e.g. `StochasticLeapfrog`). Called once per time step in `time_step!` after `update_prognostic!`
+and before `transform!`, which transforms the pattern of `model.random_process` to grid space for
+the parameterizations of the next time step."""
+function update_random!(vars::Variables, model::AbstractModel)
+    update_random!(vars, model.random_process)
+    update_random!(vars, model.time_stepping)
+    return nothing
+end
+
+# deterministic time steppers have no random process
+update_random!(::Variables, ::AbstractTimeStepper) = nothing
 
 # dispatch over time stepper here so that other time stepper can change the order
 diffusion_and_implicit!(vars, model) =
@@ -72,6 +109,10 @@ function time_step!(
     )
     # exit immediately if NaNs/Infs already present
     (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
+
+    # re-initialize model components if needed, e.g. the implicit solver for the time step
+    # of this step (Δt/2, Δt, then 2Δt in the leapfrog start)
+    reinitialize!(model, vars)
     reset_tendencies!(vars, time_stepping)  # set the tendencies back to zero for accumulation
 
     if ~model.dynamics_only                 # switch on/off all physics parameterizations
@@ -84,6 +125,7 @@ function time_step!(
 
     if model.dynamics                           # switch on/off all dynamics
         dynamics_tendencies!(vars, model)       # dynamical core
+        random_process!(vars, time_stepping, model) # stochastic time steppers only: noise before the implicit terms
         diffusion_and_implicit!(vars, model)    # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
         parameterization_tendencies_only!(vars, model)
@@ -91,6 +133,7 @@ function time_step!(
     end
 
     update_prognostic!(vars, model)             # the actual time step
+    update_random!(vars, model)                 # draw the random patterns for the next time step
     transform!(vars, model)                     # transform spectral back to grid
     particle_advection!(vars, model)
 
@@ -126,11 +169,8 @@ function update_prognostic!(
         end
     end
 
-    # ocean and land variables, use unscaled time step (unrolled per name)
+    # ocean and land variables with their own time steppers (unrolled per name)
     update_prognostic_namespaces!(vars, clock, time_stepping, model.implicit, model)
-
-    # evolve the random pattern in time
-    random_process!(vars, model.random_process)
 
     # allow ocean, sea ice and land to "filter" variables, e.g. cap sea ice concentration at [0, 1]
     hasproperty(model, :ocean) && filter!(vars, model.ocean, model)
@@ -167,13 +207,17 @@ end
     ) where {Po, G, T}
     calls = Expr[]
     for namespace in (:ocean, :land), name in _namespace_names(T, namespace)
+        # each namespace has its own time stepper, e.g. EulerForward for ocean and land with Leapfrog
+        # scale only to adjust the child's time step to the clock (not radius-scaled as the atmosphere)
         push!(
             calls, :(
-                update_prognostic!(
-                    getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name))),
-                    getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),
-                    clock, time_stepping, implicit, model,   # no scale: ocean/land use the unscaled time step
-                )
+                let child = time_stepper(time_stepping, Val($(QuoteNode(namespace))))
+                    update_prognostic!(
+                        getfield(getfield(vars.prognostic, $(QuoteNode(namespace))), $(QuoteNode(name))),
+                        getfield(getfield(vars.tendencies, $(QuoteNode(namespace))), $(QuoteNode(name))),
+                        clock, child, nothing, model, time_step_scale(time_stepping, child, clock),
+                    )
+                end
             )
         )
     end

@@ -1,5 +1,85 @@
 # Radiation
 
+## Radiation as one model component
+
+Shortwave and longwave radiation are bundled into a single model component `model.radiation`.
+The default is [`Radiation`](@ref), which holds a `shortwave` and a `longwave` scheme and calls
+them in that order for every grid column
+
+```@example radiation
+using SpeedyWeather
+spectral_grid = SpectralGrid()
+radiation = Radiation(spectral_grid; shortwave = TwoBandShortwave(spectral_grid), longwave = OneBandLongwave(spectral_grid))
+model = PrimitiveWetModel(spectral_grid; radiation)
+model.radiation
+```
+
+Either stream can be `nothing` to switch it off, e.g. `Radiation(spectral_grid; shortwave = nothing)`.
+The individual schemes are accessed as `model.radiation.shortwave` and `model.radiation.longwave`.
+A radiation scheme that computes both streams at once (for example a correlated-k scheme that
+shares its gas optics between shortwave and longwave) subtypes `SpeedyWeather.AbstractRadiation`
+directly, implements `parameterization!(ij, vars, scheme, model)` for both streams, declares its
+variables via `variables(::MyRadiation)` (the standard radiation diagnostics such as `outgoing_longwave`
+and `surface_shortwave_down` are those of `variables(::AbstractShortwave)` and `variables(::AbstractLongwave)`),
+and is passed as `radiation = MyRadiation(spectral_grid)`.
+
+## Radiation schemes from NumericalRadiation.jl
+
+SpeedyWeather itself includes simple radiation schemes, described in the rest of this page:
+a uniform cooling, the Jeevanjee temperature-flux longwave, and one-band longwave and
+shortwave schemes with diagnostic clouds. More comprehensive schemes are provided by
+[NumericalRadiation.jl](https://github.com/NumericalEarth/NumericalRadiation.jl) through a
+package extension that is active as soon as both packages are loaded:
+
+- `ClearSkyEcCKDRadiation`: clear-sky correlated-k gas optics (ecCKD, the gas-optics models of
+  ECMWF's ecRad) with 32 or 64 longwave and 32, 64 or 96 shortwave g points, interpolated
+  from tabulated coefficients for every column. Longwave and shortwave are solved from one
+  gas-optics evaluation, with Rayleigh scattering in the shortwave. CO₂ follows the model's
+  greenhouse gases; ozone comes from an analytic default profile until SpeedyWeather has an
+  ozone field, other gases are prescribed with the scheme (`mole_fractions`).
+- `AnalyticBandLongwave`: NumericalRadiation's analytic 41-band clear-sky longwave scheme of
+  [Williams2026](@citet) for water vapour and CO₂, usable as it is as the longwave part of a
+  [`Radiation`](@ref); see its
+  [documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the
+  scheme's parameters.
+
+Both are NumericalRadiation's own scheme types, used like any other SpeedyWeather scheme; the
+extension adds constructors from a `SpectralGrid`. Add NumericalRadiation (version 0.2 or
+later) with `Pkg.add("NumericalRadiation")`:
+
+```julia
+using SpeedyWeather, NumericalRadiation
+
+spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
+
+# ecCKD for both streams: the reference 32x32 model, or e.g. ClearSkyEcCKDRadiation(spectral_grid, "64x96")
+radiation = ClearSkyEcCKDRadiation(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; radiation)
+simulation = initialize!(model)
+run!(simulation, period = Day(10))
+simulation.variables.parameterizations.outgoing_longwave
+
+# or the analytic-band longwave next to the default one-band shortwave; keywords are the scheme's
+# parameters, e.g. the surface emissivities (SpeedyWeather has no field for them)
+longwave = AnalyticBandLongwave(spectral_grid; ocean_emissivity = 0.98, land_emissivity = 0.97)
+model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+```
+
+Both schemes take CO₂ from the model's `co2` component when present (see
+[Greenhouse gases](@ref)). Without it, `AnalyticBandLongwave` uses the default 360 ppm and
+`ClearSkyEcCKDRadiation` its own `mole_fractions.CO₂` (280 ppm by default).
+
+The first `ClearSkyEcCKDRadiation` downloads the ecCKD coefficient tables (a lazy artifact of
+NumericalRadiation). Its work arrays, optical depths per g point, interface fluxes and the
+surface emission, are parameterization variables in the `ecckd` namespace,
+`simulation.variables.parameterizations.ecckd`. The scheme is clear-sky, about 3x the cost
+of the one-band pair at T31 with 8 layers, and further gases of an ecCKD model are passed as
+`mole_fractions = (; CH₄ = 1.8e-6)`; see NumericalRadiation's
+[documentation](https://NumericalEarth.github.io/NumericalRadiation.jl/dev/) for the scheme.
+
+!!! warning "Work in progress"
+    NumericalRadiation is still in an early stage and not yet fully validated.
+
 ## Longwave radiation implementations
 
 Currently implemented is
@@ -10,9 +90,11 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractLongwave)
 ```
 
+See [Parameterizations](@ref) for the general parameterization interface these implement.
+
 ## Uniform cooling
 
-Following Paulius and Garner[^PG06], the uniform cooling of the atmosphere
+Following [PauluisGarner2006](@citet), the uniform cooling of the atmosphere
 is defined as
 
 ```math
@@ -27,8 +109,8 @@ is present.
 
 ## Jeevanjee radiation
 
-Jeevanjee and Zhou [^JZ22] (eq. 2) define a longwave radiative flux ``F`` for atmospheric cooling
-as (following Seeley and Wordsworth [^SW23], eq. 1)
+[JeevanjeeZhou2022](@citet) (Eq. 2) define a longwave radiative flux ``F`` for atmospheric cooling
+as (following [SeeleyWordsworth2023](@citet), Eq. 1)
 
 ```math
 \frac{dF}{dT} = α (T_t - T)
@@ -54,14 +136,14 @@ The flux ``F`` is converted to temperature tendencies at layer ``k`` via
 
 The term in parentheses is the absorbed flux in layer ``k`` of the upward
 flux from below at interface ``k+1/2`` (``k`` increases downwards, see
-[Vertical coordinates and resolution](@ref) and [Sigma coordinates](@ref)).
+[Vertical coordinates and resolution](@ref) and [Sigma coordinates](@ref sigma_coordinates_physics)).
 ``\Delta p = p_{k+1/2} - p_{k-1/2}`` is the pressure thickness of layer ``k``,
 gravity ``g`` and heat capacity ``c_p``.
 
 ## OneBandLongwave
 
 Solves the standard two-stream approximation to calculate longwave radiative fluxes
-up ``U`` and down ``D`` following Frierson et al. 2006 [^FH06].
+up ``U`` and down ``D`` following [Frierson2006](@citet).
 
 ```math
 \frac{dU}{d\tau} = (U - B), \qquad \frac{dD}{d\tau} = (B - D)
@@ -90,16 +172,33 @@ Note that the sign change in the differential formulation with optical
 depth only occurs because the optical depth as vertical coordinate
 strictly increases towards the surface.
 
+To be used like (currently the default anyway, with the Byrne and O'Gorman transmissivity below)
+
+**Stratospheric emission.** A grey scheme with an optical depth that increases like ``\sigma^4``
+has an almost transparent stratosphere, which can hardly emit and therefore cannot balance
+stratospheric ozone heating (see [`TwoBandShortwave`](@ref "TwoBandShortwave: Two-band shortwave radiation with diagnostic clouds and ozone")).
+Following the stratospheric correction in Fortran SPEEDY, the stratosphere ``p < p_s`` (`stratosphere_pressure`,
+default 140 hPa) additionally emits ``\epsilon_s \sigma T_k^4`` directly to space
+
+```math
+E_k = \epsilon_s \frac{\Delta p_k^s}{p_s} \sigma T_k^4
+```
+
+with ``\Delta p_k^s`` the pressure overlap of layer ``k`` with the stratosphere and
+``\epsilon_s`` = `stratospheric_emissivity` (0.05 for `OneBandLongwave`, 0 for `OneBandGreyLongwave`).
+This emission cools the stratospheric layers and is added to the outgoing longwave radiation.
+It represents emission in the centre of the CO₂ band, which a single grey band lacks.
+
 To be used like (currently the default anyway)
 
 ```@example radiation
 spectral_grid = SpectralGrid()
-longwave_radiation = OneBandLongwave(spectral_grid)
-model = PrimitiveWetModel(spectral_grid; longwave_radiation)
-model.longwave_radiation
+longwave = OneBandLongwave(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; longwave))
+model.radiation.longwave
 ```
 
-The transmissivity is defined as in Frierson et al. 2006 [^FH06]
+The transmissivity is defined as in [Frierson2006](@citet)
 using the following parameters
 
 ```@example radiation
@@ -121,7 +220,41 @@ as
 \tau = \tau_0 \left[ f_l \left( \frac{p}{p_s} \right) + (1 - f_l) \left( \frac{p}{p_s} \right)^4 \right]
 ```
 
-For details see Frierson et al. 2006 [^FH06].
+For details see [Frierson2006](@citet). The default constants differ from Frierson's
+(``\tau_{0e} = 6``, ``\tau_{0p} = 1.5``, ``f_l = 0.1``): ``\tau_0`` is 1.4x larger and ``f_l = 0.25``
+to avoid a too cold planet with the `TwoBandShortwave` radiation.
+
+Use the Frierson transmissivity, which prescribes the optical depth independent of humidity and CO₂, with
+
+```@example radiation
+longwave = OneBandLongwave(spectral_grid, transmissivity = FriersonLongwaveTransmissivity(spectral_grid))
+```
+
+### Humidity- and CO₂-dependent transmissivity
+
+The default `ByrneOGormanLongwaveTransmissivity` follows [Byrne and O'Gorman, 2013](https://doi.org/10.1175/JCLI-D-12-00262.1)
+(as also used in Isca). The optical depth of layer ``k`` is
+
+```math
+d\tau_k = \left( a + c \ln \frac{\mathrm{CO_2}}{\mathrm{CO_2}_r} + b q_k \right) \frac{\Delta p_k}{p_0}
+```
+
+with dry absorption ``a``, CO₂ sensitivity ``c`` relative to the reference concentration
+``\mathrm{CO_2}_r = 360`` ppm (the default CO₂, `SpeedyWeather.DEFAULT_CO2`), water vapor absorption ``b``, specific humidity ``q_k``, the pressure
+thickness ``\Delta p_k`` of layer ``k`` and reference pressure ``p_0`` (from `model.atmosphere`).
+CO₂ is taken from `model.greenhouse_gases.co2` (see [Greenhouse gases](@ref)) so that the optical depth
+responds to both the model's humidity (a water vapor feedback) and CO₂. The parameters are
+
+```@example radiation
+ByrneOGormanLongwaveTransmissivity(spectral_grid)
+```
+
+With Byrne and O'Gorman's values ``a = 0.8678`` and ``b = 1997.9`` the water vapor feedback runs away
+together with the `TwoBandShortwave` radiation. The defaults ``a = 1.45`` and ``b = 750`` are tuned for stable
+long integrations and a global energy budget close to observations ([Wild et al., 2013](https://doi.org/10.1007/s00382-012-1569-8)) at T32L8:
+a global mean sea surface temperature of about 291.5 K, 397 W/m² of surface longwave emission
+and 314 W/m² of downward longwave radiation at the surface. Because the longwave radiation does not include
+clouds, the latter matches the observed clear-sky rather than the all-sky value (342 W/m²).
 
 ## [Solar zenith angle, length of day and year](@id zenith)
 
@@ -131,7 +264,7 @@ around the sun. Both are controlled through the planet
 
 ```@example radiation
 using Dates
-spectral_grid = SpectralGrid(truncation=31, nlayers=8)
+spectral_grid = SpectralGrid(truncation=32, nlayers=8)
 planet = Earth(spectral_grid, length_of_day=Hour(24), length_of_year=Day(365)+Hour(6))
 ```
 
@@ -140,7 +273,7 @@ planet = Earth(spectral_grid, length_of_day=Hour(24), length_of_year=Day(365)+Ho
 the sun (controlling the seasonal cycle). Both are `Dates` periods, so
 `Hour(24)`, `Day(1)` or `Second(86400)` are equivalent, and both are completely
 independent of the model's time step and of the simulation time you pass to
-`run!`. A planet with a 10-day-long day and an Earth-length year is just
+[`run!`](@ref). A planet with a 10-day-long day and an Earth-length year is just
 
 ```@example radiation
 planet = Earth(spectral_grid, length_of_day=Day(10), length_of_year=Day(365))
@@ -220,19 +353,116 @@ the seasonal cycle, and `equinox`, the time of the spring equinox, which sets it
 phase (only the month and day matter, not the year). `solar_constant` [W/m²]
 scales the total incoming radiation.
 
+### Eccentric orbits
+
+By default the orbit is elliptical, `planet.orbit = KeplerOrbit()`, with present-day
+Earth's eccentricity and longitude of perihelion. A circular orbit, `CircularOrbit()`,
+keeps the Sun–planet distance constant and takes the solar declination from the zenith's
+`solar_declination`, as before this option existed. An elliptical orbit is set with a `KeplerOrbit`
+
+```@example radiation
+orbit = KeplerOrbit(spectral_grid, eccentricity=0.0167, longitude_of_perihelion=282.9)
+planet = Earth(spectral_grid; orbit)
+```
+
+`eccentricity` is the orbit's eccentricity e (0 ≤ e < 1) and `longitude_of_perihelion` [˚]
+the true solar longitude at perihelion, measured from the vernal equinox, which
+sets where perihelion falls in the year (precession). `KeplerOrbit` can represent any
+elliptical orbit, but its defaults are present-day Earth (as above), with perihelion in
+early January. Note that `KeplerOrbit()` is almost identical to `CircularOrbit()` in the
+solar declination but not in insolation, see below. Following the PMIP protocol,
+the vernal equinox stays fixed at `planet.equinox`, so precession moves perihelion
+through the calendar.
+
+Once per time step, before the zenith angle, the solar zenith computes the orbit position
+from `orbit_time`: Kepler's equation for the eccentric anomaly E, the true anomaly and solar
+longitude λ, the solar declination sin(δ) = sin(tilt)·sin(λ) and the distance factor
+(a/r)² = 1/(1 - e cos E)². The orbit defines the variables it needs: a `KeplerOrbit` stores
+the distance factor as the scalar `solar_distance_factor` in `vars.parameterizations`, a
+`CircularOrbit` stores nothing. The shortwave schemes multiply `solar_constant` by
+`solar_distance_factor(vars)`, which is 1 when no such variable exists, so the incoming
+radiation varies by a factor ((1+e)/(1-e))² between aphelion and perihelion,
+about 7% (±46 W/m²) for Earth. Averaged over an orbit, the factor is 1/√(1 - e²), so an
+eccentric orbit also receives slightly more energy in the annual mean.
+
+A `KeplerOrbit` computes the solar declination itself, so the solar zenith's
+`solar_declination` is not used (a warning is shown at initialization if it isn't the
+default `SinSolarDeclination`). The equation of time (`SolarTimeCorrection`) is still that
+of present-day Earth, not derived from the orbit, so for strongly eccentric orbits the
+daily cycle (sunrise and sunset times) is slightly off.
+
+The Last Interglacial orbit about 127,000 years ago (PMIP4's `lig127k`), with a
+larger eccentricity and perihelion just after the northern summer solstice, is
+
+```@example radiation
+orbit = KeplerOrbit(spectral_grid, eccentricity=0.0394, longitude_of_perihelion=95.4)
+planet = Earth(spectral_grid; axial_tilt=24.04, orbit)
+```
+
+!!! note "Calendar effect"
+    With a fixed vernal equinox, eccentric orbits change the length of the seasons
+    (Kepler's second law), so calendar-month means sample slightly different parts of
+    the orbit than for a circular orbit. This "calendar effect" is not corrected for.
+
 ## Shortwave radiation
 
-Currently implemented schemes:
+The surface albedo used by the shortwave radiation schemes is a separate model component,
+`model.albedo`, see [Albedo](@ref). Currently implemented shortwave schemes:
 
 ```@example radiation
 using SpeedyWeather
 subtypes(SpeedyWeather.AbstractShortwave)
 ```
 
+## TwoBandShortwave: Two-band shortwave radiation with diagnostic clouds and ozone
+
+`TwoBandShortwave` is the default shortwave radiation in `PrimitiveWetModel` and follows Fortran SPEEDY
+[Molteni2003](@citep) as in [speedy.f90](https://github.com/samhatfield/speedy.f90). It uses the same
+diagnostic clouds as `OneBandShortwave` (see below), but splits the incoming solar radiation into two bands
+
+- a visible band (95%, `1 - near_infrared_fraction`) that is absorbed by ozone in the stratosphere,
+  by dry air, aerosols, water vapor and clouds, reflected by clouds at the top of the cloud-top layer,
+  by stratocumulus clouds at the top of the boundary layer and by the surface albedo,
+- a near-infrared band (5%, `near_infrared_fraction`) that is only absorbed by water vapor
+  (strongly, `absorptivity_water_vapor_near_infrared`). It bypasses the cloud reflection and
+  is fully absorbed at the surface, i.e. not reflected by the surface albedo.
+
+The transmissivities of both bands are computed by `TwoBandShortwaveTransmissivity` with
+the same zenith angle correction factor ``\mu`` as `BackgroundShortwaveTransmissivity` below,
+but with separate absorptivities for the visible and the near-infrared band. Clouds absorb from
+the cloud top down to the cloud base, so never in the boundary layer.
+
+**Ozone:**
+The ozone absorption is a separate component, `SeasonalOzone` (default) or `NoOzone`.
+`SeasonalOzone` absorbs a fraction of the top-of-atmosphere shortwave flux ``F_0`` in the upper
+(``p < 50`` hPa) and lower (``50 < p < 140`` hPa) stratosphere
+
+```math
+\Delta F^{O_3}_\text{upper} = \frac{1}{2}\epsilon \, \mu F_0, \quad
+\Delta F^{O_3}_\text{lower} = 0.4\epsilon \left(1 + \max\left(0, -\frac{\delta}{|\delta_{\max}|}\right)\sin\phi + 1.8 P_2(\sin\phi)\right) \mu F_0
+```
+
+with ``\epsilon = 0.02``, latitude ``\phi`` and the second Legendre polynomial ``P_2(x) = (3x^2-1)/2``.
+The seasonal cycle uses the solar declination ``\delta`` of the [solar zenith angle](@ref zenith)
+normalized by the planet's `axial_tilt` ``\delta_{\max}``, so it is synchronized with the planet's
+orbit (`length_of_year`, `equinox`, `axial_tilt`, `seasonal_cycle`). For Earth,
+``-\delta/\delta_{\max} = \cos\alpha`` with ``\alpha`` the angle of the year from the northern
+winter solstice as in SPEEDY.
+There is more ozone absorption towards the poles and in the northern hemisphere during its winter.
+The absorption is distributed across model layers by their overlap with these pressure intervals,
+so that stratospheric heating rates don't increase over high orography where the upper σ-layers are thinner.
+
+```@example radiation
+spectral_grid = SpectralGrid(truncation=31, nlayers=8)
+shortwave = TwoBandShortwave(spectral_grid, ozone=NoOzone(spectral_grid))
+model = PrimitiveWetModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave))
+model.radiation.shortwave
+```
+
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
 The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization,
-including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use
+including diagnostic cloud effects following [KucharskiMolteniBracco2006](@citep). For dry models without water vapor, use
 `OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent
 transmissivity ``t=1``.
 
@@ -243,24 +473,31 @@ transmissivity ``t=1``.
 
 **Cloud diagnosis:**
 Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column.
-The cloud base is set at the interface between the lowest two model layers, and the cloud top is the
-highest layer where both
+Clouds only form in the free troposphere: layers between the tropopause (``\sigma \geq`` `σ_tropopause`,
+default 0.14) and the top of the boundary layer (``\sigma \leq`` `σ_boundary_layer`, default 0.9).
+These σ-boundaries are the half levels of Fortran SPEEDY's 8 layers, where the top two layers are the
+stratosphere and the lowest is the boundary layer, and they generalize this to any number of layers.
+Clouds never reach the surface layer. The cloud base is the lowest layer above the boundary layer.
+Among all free-tropospheric layers with $Q_k > Q_{cl}$ (this threshold does not apply to the
+cloud base layer, as in SPEEDY) the one with the largest relative humidity $\mathrm{RH}_{\max}$ is found.
+The cloud top is the higher (smaller ``k``) of this layer and the top of convection or large-scale
+condensation, restricted to the free troposphere.
+The cloud cover (CLC) is then given by
 
 ```math
-\mathrm{RH}_k > \mathrm{RH}_{cl} \quad \text{and} \quad Q_k > Q_{cl}
+\mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \frac{\mathrm{RH}_{\max} - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right]
 ```
 
-are satisfied. The cloud cover (CLC) in a layer is then given by
-
-```math
-\mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \left(\frac{\mathrm{RH}_k - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right)\right]
-```
-
-where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are large-scale and convective precipitation,
-and $\mathrm{RH}_{cl}$ is a threshold.
+where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are [large-scale](@ref "Large-scale precipitation")
+and [convective](@ref "Convective precipitation") precipitation (rain and snow),
+and $\mathrm{RH}_{cl}$ is a threshold. Precipitation is in mm/day.
 
 **Stratocumulus clouds:**
-Stratocumulus cloud cover over oceans is parameterized based on boundary layer static stability (GSEN):
+Stratocumulus cloud cover over oceans is parameterized based on boundary layer static stability
+``\mathrm{GSE}_N = (s_{b} - s_N)/(\Phi_{b} - \Phi_N)``, the vertical gradient of dry static energy
+``s = c_pT + \Phi`` between the cloud base layer ``b`` and the surface layer ``N`` (the lowest two layers
+with 8 layers) normalized by their geopotential difference
+(0 for a dry adiabatic, 1 for an isothermal lower atmosphere):
 
 ```math
 \mathrm{CLS} = F_{ST} \max(\mathrm{CLS}_{\max} - \mathrm{CLC}, 0)
@@ -272,10 +509,11 @@ with
 F_{ST} = \max\left(0, \min\left(1, \frac{\mathrm{GSE}_N - \mathrm{GSES}_0}{\mathrm{GSES}_1 - \mathrm{GSES}_0}\right)\right)
 ```
 
-Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be proportional to the surface relative humidity:
+Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be proportional to the surface relative humidity
+with a minimum cover $\mathrm{CLS}_{\min,L}$ (`stratocumulus_cover_min_land`):
 
 ```math
-\mathrm{CLS}_L = \mathrm{CLS} \cdot \mathrm{RH}_N
+\mathrm{CLS}_L = \max(\mathrm{CLS}, \mathrm{CLS}_{\min,L}) \cdot \mathrm{RH}_N
 ```
 where $\mathrm{RH}_N$ is the surface (lowest model layer) relative humidity.
 
@@ -337,7 +575,7 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 ```@example radiation
 using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(truncation=32, nlayers=8)
-model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
+model = PrimitiveWetModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave=OneBandShortwave(spectral_grid)))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
@@ -366,7 +604,7 @@ Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `Tra
 ```@example radiation
 using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(truncation=32, nlayers=8)
-model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
+model = PrimitiveDryModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave=OneBandGreyShortwave(spectral_grid), longwave=OneBandGreyLongwave(spectral_grid)))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
@@ -431,7 +669,7 @@ using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid()
 sw_no_sc = OneBandShortwave(spectral_grid, clouds = DiagnosticClouds(spectral_grid; use_stratocumulus=false))
 
-model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
+model = PrimitiveWetModel(spectral_grid; radiation=Radiation(spectral_grid; shortwave=sw_no_sc))
 sim = initialize!(model)
 run!(sim, period=Day(5))
 ssrd = sim.variables.parameterizations.surface_shortwave_down
@@ -445,7 +683,7 @@ nothing # hide
 ## Greenhouse gases
 
 Greenhouse gas concentrations can be prescribed as time-varying scalar quantities and are
-tracked as prognostic variables. For example, an `ExponentialCO2`
+tracked as [prognostic variables](@ref "Prognostic variables"). For example, an `ExponentialCO2`
 concentration is fitted to the Keeling curve. To customise or add greenhouse gases, pass a
 `NamedTuple` of gas objects to `greenhouse_gases`. The key of the named tuple will be used for the variable name, so `co2 = ..., carbon_dioxide = ...` can co-exist.
 
@@ -465,25 +703,16 @@ co2 = ExponentialCO2(spectral_grid)
 ```
 
 Step-change scenarios are also available: `TwoTimesCO2` and `FourTimesCO2` double or
-quadruple the preindustrial CO2 at a given date (default: year 2000). Any callable
+quadruple the default CO2 of 360 ppm at a given date (default: year 2000). Any callable
 `f(t::DateTime) -> concentration_in_ppm` can be wrapped in `CO2(f)` for a fully
 custom trajectory.
 
-!!! warning "Radiation schemes not yet CO2-aware"
-    The greenhouse gas concentrations are tracked as prognostic variables and evolve
-    correctly in time, but the radiation schemes (`OneBandLongwave`
-    etc.) have not yet been updated to use them. Changing CO2 therefore has no effect
-    on the radiative fluxes or temperature tendencies at this stage. This is work in
-    progress.
+By default, the primitive equation models have a constant `co2 = CO2(spectral_grid)` at
+360 ppm, about the concentration in the year 2000, the default start date of the model clock.
+This is also the `reference_co2` of `ByrneOGormanLongwaveTransmissivity`, so its dry optical
+depth is `dry_absorption` by default. Use `greenhouse_gases = (;)` or `nothing` to remove it.
 
-## References
-
-[^PG06]: Paulius and Garner, 2006. JAS. DOI:[10.1175/JAS3705.1](https://doi.org/10.1175/JAS3705.1)
-
-[^SW23]: Seeley, J. T. & Wordsworth, R. D. Moist Convection Is Most Vigorous at Intermediate Atmospheric Humidity. Planet. Sci. J. 4, 34 (2023). DOI:[10.3847/PSJ/acb0cb](https://doi.org/10.3847/PSJ/acb0cb)
-
-[^JZ22]: Jeevanjee, N. & Zhou, L. On the Resolution‐Dependence of Anvil Cloud Fraction and Precipitation Efficiency in Radiative‐Convective Equilibrium. J Adv Model Earth Syst 14, e2021MS002759 (2022). DOI:[10.1029/2021MS002759](https://doi.org/10.1029/2021MS002759)
-
-[^KMB06]: Kucharski, F., Molteni, F., & Bracco, A. SPEEDY: A simplified atmospheric general circulation model. ICTP, Trieste, Italy. Appendix A: Model Equations and Parameters (2006). [PDF](https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
-
-[^FH06]: Frierson DMW, IM Held, P Zurita-Gotor. A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale (2006). Journal of the Atmospheric Sciences 63:10. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1)
+!!! warning "Only some radiation schemes are CO2-aware"
+    The default `ByrneOGormanLongwaveTransmissivity` uses `greenhouse_gases.co2`: its dry optical
+    depth grows logarithmically with CO2. `FriersonLongwaveTransmissivity` and the shortwave schemes
+    do not use it, so with them, changing CO2 has no effect on the radiative fluxes.

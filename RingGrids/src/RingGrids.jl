@@ -2,13 +2,15 @@ module RingGrids
 
 # DOCUMENTATION
 using StyledStrings
-using DocStringExtensions
+using DocStringExtensions: TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 import Printf
 
 # NUMERICS
 import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
+import Random
 
 # ASSET DOWNLOADING
 import Downloads
@@ -83,7 +85,8 @@ export grids_match,
     get_nlat,
     get_nlat_half,
     get_npoints,
-    get_npoints2D
+    get_npoints2D,
+    average_resolution
 
 # COORDINATES
 export get_londlatds,
@@ -128,8 +131,14 @@ export AbstractInterpolator,
 
 export interpolate,
     interpolate!,
+    interpolate_3D!,
+    interpolate_2D!,
     update_locator,
     update_locator!
+
+export SigmaCenter,
+    SigmaFaceAbove,
+    SigmaFaceBelow
 
 # STATISTICS
 export zonal_mean
@@ -142,8 +151,9 @@ const DEFAULT_ARRAYTYPE = Array
 const DEFAULT_ARCHITECTURE = CPU
 
 # to be defined in GeoMakie extension
-export globe
+export globe, globe!
 function globe end
+function globe! end
 
 include("utility_functions.jl")
 
@@ -176,6 +186,7 @@ include("grids/octaminimal_gaussian.jl")
 # INTEGRATION AND INTERPOLATION
 include("quadrature_weights.jl")
 include("interpolation.jl")
+include("interpolation_3d.jl")
 include("vertices.jl")
 include("statistics.jl")
 include("copy_unmasked.jl")

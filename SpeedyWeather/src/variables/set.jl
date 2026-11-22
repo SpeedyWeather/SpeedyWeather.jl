@@ -29,58 +29,50 @@ For variables without a step dimension use `step = nothing` to skip the `get_ste
 function set!(
         vars::NamedTuple,
         geometry::Geometry;
+        step::Union{Nothing, Integer} = 1,
+        add::Bool = false,
+        spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing,
+        coslat_scaling_included::Bool = false,
+        static_func::Bool = true,
+        namespace::Union{Nothing, Symbol} = nothing,
+        scratch_field::Union{Nothing, AbstractField} = nothing,
         kwargs...
     )
+    # Type-erase the variables to set into a runtime `Vector` of `name => value` pairs, and pass
+    # the options positionally as a concrete struct. The `Base.Pairs` type of `kwargs` encodes
+    # the keyword names and value types, so passing it on would make `set_variables!` and
+    # everything it calls (transforms, kernels, ...) re-specialize for every distinct combination
+    # of variables set at a call site, costing seconds of compilation each. `@nospecialize` is
+    # needed too, otherwise this method itself is inferred for every such combination.
+    # `set!` is called a handful of times per simulation, so the dynamic dispatch is irrelevant.
     @nospecialize kwargs
-    return set_variables!(vars, geometry, _set_pairs(kwargs), _set_options(kwargs))
+    vars_to_set = Pair{Symbol, Any}[name => value for (name, value) in kwargs]
+    options = SetOptions(step, add, spectral_transform, coslat_scaling_included, static_func, namespace, scratch_field)
+    return set_variables!(vars, geometry, vars_to_set, options)
 end
 
-# Type-erase the keyword arguments of `set!` into a runtime `Vector` of `name => value` pairs
-# (the variables to set) plus a concrete `SetOptions` (how to set them). This is deliberate:
-# the `Base.Pairs` kwargs type encodes the keyword names AND the value types, so passing them
-# on makes `set_variables!` and everything it calls (`transform!`, the Legendre/FFT kernels,
-# ...) re-specialize for every distinct combination used at a call site. There are eight such
-# combinations among the initial conditions alone, each costing seconds of inference. The
-# options must be passed *positionally* as a concrete struct: splatting them back out as
-# keywords would reintroduce one specialization per distinct option NamedTuple and defeat the
-# erasure. `set!` is a setup-path function called a handful of times per simulation, so the
-# dynamic dispatch this introduces is irrelevant next to the compile time it saves.
-
-"""$(TYPEDSIGNATURES) Options controlling how `set!` sets a variable, see `set!`."""
-Base.@kwdef struct SetOptions
-    "Step index to set, `nothing` skips `get_step` for variables without a step dimension"
-    step::Union{Nothing, Int} = 1
-    add::Bool = false
-    spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing
-    coslat_scaling_included::Bool = false
-    static_func::Bool = true
-    namespace::Union{Nothing, Symbol} = nothing
-end
-
-# every keyword that is not an option is a variable to set
-is_option(name::Symbol) = name in fieldnames(SetOptions)
-
-_set_pairs(@nospecialize(kwargs)) =
-    Pair{Symbol, Any}[k => v for (k, v) in kwargs if !is_option(k)]
-
-# `defaults` lets callers that know the spectral transform (or any other option) supply it
-# without it having to be repeated at every call site
-function _set_options(@nospecialize(kwargs); defaults...)
-    options = merge(NamedTuple(defaults), NamedTuple(k => v for (k, v) in kwargs if is_option(k)))
-    return SetOptions(; options...)
+"""$(TYPEDSIGNATURES) Options controlling how `set!` sets variables, see `set!`."""
+struct SetOptions
+    step::Union{Nothing, Int}
+    add::Bool
+    spectral_transform::Union{Nothing, AbstractSpectralTransform}
+    coslat_scaling_included::Bool
+    static_func::Bool
+    namespace::Union{Nothing, Symbol}
+    scratch_field::Union{Nothing, AbstractField}
 end
 
 """$(TYPEDSIGNATURES)
 Core of `set!`: sets the variables given as `name => value` pairs in `vars_to_set`, with
 `options` controlling how. Deliberately free of keyword-dependent specialization so that all
-call sites share a single compiled method, see `_set_pairs`."""
+call sites share a single compiled method, see `set!(::NamedTuple, ::Geometry)`."""
 function set_variables!(
         vars::NamedTuple,
         geometry::Geometry,
         vars_to_set::Vector{Pair{Symbol, Any}},
         options::SetOptions,
     )
-    (; step, add, spectral_transform, coslat_scaling_included, static_func, namespace) = options
+    (; step, add, spectral_transform, coslat_scaling_included, static_func, namespace, scratch_field) = options
 
     # value for `name` among the variables to set, or `nothing` if not given
     function value_or_nothing(name)
@@ -109,12 +101,12 @@ function set_variables!(
             nothing
         elseif varname in keys(vars)
             var = ArrayDimensions.hastime(vars[varname]) ? get_step(vars[varname], step) : vars[varname]
-            set!(var, value, geometry, spectral_transform; add, static_func)
+            set!(var, value, geometry, spectral_transform; add, static_func, scratch_field)
         elseif namespace in keys(vars)
             if varname in keys(vars[namespace])
                 var = ArrayDimensions.hastime(vars[namespace][varname]) ?
                     get_step(vars[namespace][varname], step) : vars[namespace][varname]
-                set!(var, value, geometry, spectral_transform; add, static_func)
+                set!(var, value, geometry, spectral_transform; add, static_func, scratch_field)
             else
                 # throw error if varname can't be found and print existing variables
                 @warn "`$varname` not defined in NamedTuple with keys = $(keys(vars[namespace])). Skipping."
@@ -128,8 +120,10 @@ function set_variables!(
 end
 
 """$(TYPEDSIGNATURES) set the `variables`, default is in the group `prognostic`."""
-set!(variables::Variables, args...; group::Symbol = :prognostic, kwargs...) =
-    set!(getfield(variables, group), args...; kwargs...)
+function set!(variables::Variables, args...; group::Symbol = :prognostic, kwargs...)
+    @nospecialize kwargs
+    return set!(getfield(variables, group), args...; kwargs...)
+end
 
 # set LTA <- LTA
 function set!(
@@ -165,9 +159,17 @@ function set!(
     if isnothing(S)
         specs = transform(field)
     else
-        # convert to number format in S, needed for FFTW
-        field = convert.(eltype(S), field)
-        specs = transform(field, S)
+        # convert to number format in S, needed for FFTW, but skipped if that's already the case
+        # as broadcasting the conversion would allocate (and is not traceable by Reactant)
+        field = eltype(field) == eltype(S) ? field : convert.(eltype(S), field)
+
+        # only allocate temporary array if we need to transform to a different truncation
+        if var.spectrum == S.spectrum && !add
+            transform!(var, field, S)
+            return nothing
+        else
+            specs = transform(field, S)
+        end
     end
     return set!(var, specs; add, kwargs...)
 end
@@ -179,10 +181,11 @@ function set!(
         geometry::Geometry,
         S::Union{AbstractSpectralTransform, Nothing} = nothing;
         add::Bool = false,
+        scratch_field::Union{AbstractField, Nothing} = nothing,
         kwargs...,
     )
     (; grid, nlayers, NF) = geometry.spectral_grid
-    field = ndims(var) == 1 ? zeros(NF, grid) : zeros(NF, grid, nlayers)
+    field = isnothing(scratch_field) ? (ndims(var) == 1 ? zeros(NF, grid) : zeros(NF, grid, nlayers)) : scratch_field
     set!(field, f, geometry, S; add = false, kwargs...)
     return set!(var, field, geometry, S; add, kwargs...)
 end
@@ -257,11 +260,15 @@ function set!(
         S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         static_func = true,
+        kwargs...
     )
     (; londs, latds, σ_levels_full) = geometry
 
-    # on GPU no dynamically generated function are allowd in kernels, transfer them to CPU and back
-    if typeof(architecture(var)) <: GPU && static_func == false
+    # Reactant: use broadcasting (no KA kernel, no scalar indexing)
+    if typeof(architecture(var)) <: ReactantDevice
+        _set_function_3d_broadcast!(var, f, londs, latds, σ_levels_full; add)
+        # on GPU no dynamically generated function are allowd in kernels, transfer them to CPU and back
+    elseif typeof(architecture(var)) <: GPU && static_func == false
         arch_cpu = CPU()
 
         var_cpu = on_architecture(arch_cpu, var)
@@ -288,6 +295,25 @@ end
 @kernel function set_field_3d_kernel!(var, londs, latds, σ_levels_full, f, kernel_func)
     ij, k = @index(Global, NTuple)
     var[ij, k] = kernel_func(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
+end
+
+# Reactant-compatible broadcasting version: no KA kernel, no scalar indexing
+function _set_function_3d_broadcast!(
+        var::AbstractField, f::Function,
+        londs::AbstractVector, latds::AbstractVector, σ_levels_full::AbstractVector;
+        add::Bool = false,
+    )
+    # reshape σ for broadcasting: londs/latds are (npoints,), σ_row is (1, nlayers)
+    NF = eltype(var)
+    σ_row = reshape(σ_levels_full, 1, :)
+    val_raw = f.(londs, latds, σ_row)
+    val = eltype(val_raw) === NF ? val_raw : NF.(val_raw)
+    if add
+        var.data .= var.data .+ val
+    else
+        var.data .= val
+    end
+    return var
 end
 
 # if geometry available
@@ -441,15 +467,13 @@ end
 Sets properties of the simuluation `S`. Convenience wrapper to call the other concrete 
 `set!` methods. All `kwargs` are forwarded to these methods, which are documented 
 seperately. See their documentation for possible `kwargs`. """
-function set!(S::AbstractSimulation; group::Symbol = :prognostic, kwargs...)
+function set!(S::AbstractSimulation; kwargs...)
     @nospecialize kwargs
-    options = _set_options(kwargs; spectral_transform = S.model.spectral_transform)
-    return set_variables!(getfield(S.variables, group), S.model.geometry, _set_pairs(kwargs), options)
+    return set!(S.variables, S.model.geometry; spectral_transform = S.model.spectral_transform, kwargs...)
 end
 
-function set!(vars::Variables, model::AbstractModel; group::Symbol = :prognostic, kwargs...)
+function set!(vars::Variables, model::AbstractModel; kwargs...)
     @nospecialize kwargs
     vars.prognostic.scale[] != 1 && @warn "Prognostic variables are scaled with $(vars.prognostic.scale[]), but `set!` assumes unscaled variables."
-    options = _set_options(kwargs; spectral_transform = model.spectral_transform)
-    return set_variables!(getfield(vars, group), model.geometry, _set_pairs(kwargs), options)
+    return set!(vars, model.geometry; spectral_transform = model.spectral_transform, kwargs...)
 end

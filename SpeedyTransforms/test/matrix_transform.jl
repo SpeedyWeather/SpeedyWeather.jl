@@ -14,12 +14,12 @@
                 @test M isa MatrixSpectralTransform
                 @test eltype(M) == NF
                 @test M.nlayers > 0
-                @test size(M.forward, 1) == LowerTriangularArrays.nonzeros(spectrum)
-                @test size(M.forward, 2) == RingGrids.get_npoints(grid)
-                @test size(M.backward, 1) == RingGrids.get_npoints(grid)
-                @test size(M.backward, 2) == LowerTriangularArrays.nonzeros(spectrum)
-                @test size(M.backward_real) == size(M.backward)
-                @test size(M.backward_imag) == size(M.backward)
+                nharmonics = LowerTriangularArrays.nonzeros(spectrum)
+                npoints = RingGrids.get_npoints(grid)
+                @test eltype(M.forward_stacked) == NF            # real matrices, stacked Re/Im parts
+                @test size(M.forward_stacked) == (2nharmonics, npoints)
+                @test size(M.backward_stacked) == (npoints, 2nharmonics)
+                @test size(M.scratch_memory) == (2nharmonics, M.nlayers)
 
                 rtol = NF == Float32 ? 1.0e-3 : 1.0e-7
                 atol = NF == Float32 ? 1.0e-3 : 1.0e-7
@@ -107,4 +107,55 @@ end
             end
         end
     end
+end
+
+@testset "MatrixSpectralTransform: wide batches and views" begin
+    NF = Float32
+    spectrum = Spectrum(32)
+    grid = OctahedralGaussianGrid(SpeedyTransforms.get_nlat_half(32))
+    nlayers = 8
+    S = SpectralTransform(spectrum, grid; NF, nlayers)
+    M = MatrixSpectralTransform(spectrum, grid; NF, nlayers)
+
+    spec = randn(Complex{NF}, spectrum, nlayers)
+    field = transform(spec, S)
+
+    # a batch as wide as the model's tendency batch (9nlayers+1 columns) is a single multiply when
+    # the transform (its scratch) is constructed for it; a too narrow scratch throws
+    K = 9nlayers + 1
+    M_wide = MatrixSpectralTransform(spectrum, grid; NF, nlayers = K)
+    spec_wide = randn(Complex{NF}, spectrum, K)
+    field_wide = transform(spec_wide, S)
+    @test transform(field_wide, M_wide) ≈ transform(field_wide, S) rtol = 1.0e-3
+    @test transform(spec_wide, M_wide) ≈ field_wide rtol = 1.0e-3
+    nharmonics = LowerTriangularArrays.nonzeros(spectrum)
+    scratch_narrow = zeros(NF, 2nharmonics, 3)
+    @test_throws DimensionMismatch transform!(spec, field, scratch_narrow, M)
+    @test_throws DimensionMismatch transform!(field, spec, scratch_narrow, M)
+
+    # transforms into and out of views (2D view of a 3D parent, 1D slot) as in the model's fused
+    # variables agree with plain arrays and land in the parent
+    nsteps = 2
+    coeffs_parent = zeros(Complex{NF}, spectrum, nlayers, nsteps)
+    field_parent = zeros(NF, grid, nlayers, nsteps)
+    coeffs_view = LowerTriangularArray(view(coeffs_parent.data, :, :, 2), spectrum)
+    field_view = Field(view(field_parent.data, :, :, 2), grid)
+    coeffs_view .= spec
+    transform!(field_view, coeffs_view, M)
+    @test field_view ≈ field rtol = 1.0e-3
+    @test field_parent[:, :, 2] ≈ field.data rtol = 1.0e-3
+    @test all(iszero, field_parent[:, :, 1])
+
+    coeffs_view .= 0
+    transform!(coeffs_view, field_view, M)
+    @test coeffs_view ≈ transform(field, M) rtol = 1.0e-3
+    @test all(iszero, coeffs_parent[:, :, 1])
+
+    # single layer slot (1D view) in both directions
+    coeffs_slot = LowerTriangularArray(view(coeffs_parent.data, :, 3, 2), spectrum)
+    field_slot = Field(view(field_parent.data, :, 3, 2), grid)
+    transform!(field_slot, coeffs_slot, M)
+    @test field_slot ≈ field[:, 3] rtol = 1.0e-3
+    transform!(coeffs_slot, field_slot, M)
+    @test coeffs_slot ≈ transform(field, M)[:, 3] rtol = 1.0e-3
 end

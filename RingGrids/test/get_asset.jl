@@ -32,6 +32,20 @@ end
     data_branch = get_asset(LSM_PATH; name = "lsm", FileFormat = NCDataset, version = "main")
     @test data_branch isa Array
     @test size(data_branch) == size(data_v)
+
+    artifact_toml = joinpath(pkgdir(RingGrids), "Artifacts.toml")
+    version_binding = RingGrids.asset_binding_name(LSM_PATH; version = v"1")
+    branch_binding = RingGrids.asset_binding_name(LSM_PATH; version = "main")
+    version_hash = Pkg.Artifacts.artifact_hash(version_binding, artifact_toml)
+    branch_hash = Pkg.Artifacts.artifact_hash(branch_binding, artifact_toml)
+    @test version_hash !== nothing
+    @test branch_hash !== nothing
+
+    # Switching back preserves both bindings and returns the earlier data.
+    data_again = get_asset(LSM_PATH; name = "lsm", FileFormat = NCDataset, version = v"1")
+    @test data_again == data_v
+    @test Pkg.Artifacts.artifact_hash(version_binding, artifact_toml) == version_hash
+    @test Pkg.Artifacts.artifact_hash(branch_binding, artifact_toml) == branch_hash
 end
 
 @testset "get_asset: Local file loading with NCDatasets (from_assets=false)" begin
@@ -40,7 +54,8 @@ end
 
     # find the local artifact path by going through the artifact system
     artifact_toml = joinpath(pkgdir(RingGrids), "Artifacts.toml")
-    hash = Pkg.Artifacts.artifact_hash(basename(LSM_PATH), artifact_toml)
+    binding_name = RingGrids.asset_binding_name(LSM_PATH)
+    hash = Pkg.Artifacts.artifact_hash(binding_name, artifact_toml)
     local_path = joinpath(Pkg.Artifacts.artifact_path(hash), basename(LSM_PATH))
 
     # load the same file locally

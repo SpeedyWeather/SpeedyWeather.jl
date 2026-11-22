@@ -63,6 +63,17 @@ parameters(::Type{PT}, obj; kwargs...) where {PT <: AbstractParam} = (;)
 parameters(::Type{PT}, param::AbstractParam; kwargs...) where {PT <: AbstractParam} = PT(merge(parent(param), kwargs))
 parameters(::Type{PT}, x::Union{Number, AbstractArray}; kwargs...) where {PT <: AbstractParam} = PT(x; kwargs...)
 
+# Tuples (e.g. a field holding several sub-components) are collected element-wise and keyed by the
+# 1-based index of each element; elements without parameters are dropped. Without this method,
+# parameters nested inside a `Tuple` fall through to the `(;)` catch-all above and are silently lost.
+function parameters(::Type{PT}, components::Tuple; kwargs...) where {PT <: AbstractParam}
+    component_params = map(enumerate(components)) do (i, component)
+        Symbol(i) => parameters(PT, component; kwargs...)
+    end
+    nonempty_params = filter(p -> !isempty(p[2]), component_params)
+    return ParameterTable((; nonempty_params...))
+end
+
 """
     $SIGNATURES
 
@@ -97,6 +108,21 @@ the nested structure must match that of `obj`. This function is used to reconstr
         patch = NamedTuple{$(keysof(values))}(patchvals)
         return setproperties(obj, patch)
     end
+end
+
+# `setproperties` rejects a non-empty patch for a `Tuple`, so the generic `reconstruct` above cannot rebuild
+# one; reconstruct each element by its 1-based index instead (the keys produced by `parameters` for tuples),
+# leaving elements absent from `values` untouched. Generated so that the key lookup happens at compile time.
+@inline reconstruct(obj::Tuple, ::NamedTuple{()}) = obj
+@generated function reconstruct(obj::Tuple, values::Union{NamedTuple, ComponentArray})
+    keysof(::Type{<:NamedTuple{keys}}) where {keys} = keys
+    keysof(::Type{<:ComponentArray{T, N, A, Tuple{Axis{coords}}}}) where {T, N, A, coords} = keys(coords)
+    value_keys = keysof(values)
+    element_calls = map(1:fieldcount(obj)) do i
+        key = Symbol(i)
+        return key in value_keys ? :(reconstruct(obj[$i], values.$key)) : :(obj[$i])
+    end
+    return :(tuple($(element_calls...)))
 end
 
 # Internal helper functions

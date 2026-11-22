@@ -47,6 +47,7 @@ function spectral_tendencies!(vars::Variables, model::PrimitiveEquation)
     vordiv_spectral_tendencies!(vars, model)
     temperature_spectral_tendency!(vars, model)
     humidity_spectral_tendency!(vars, model)         # no-op for PrimitiveDry
+    linear_pressure_gradient!(vars, model)           # Bernoulli potential += R*Tₖ*lnpₛ
     bernoulli_spectral_potential!(vars, model)
     surface_pressure_spectral_tendency!(vars, model)
     return nothing
@@ -124,21 +125,10 @@ function dynamics_tendencies!(
     drag!(vars, model)
     scale_tendencies!(vars, model)
 
-    (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit, time_stepping) = model
+    (; geometry, spectral_transform, implicit, time_stepping) = model
 
-    # calculate ∇ln(pₛ), then (u_k, v_k)⋅∇ln(p_s)
-    pressure_gradient_flux!(vars, spectral_transform, time_stepping)
-
-    # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
-    linear_virtual_temperature!(vars, model)
-
-    # temperature relative to profile
-    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (temp profile and temp_grid are different dimensions and array types)
-    T = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
-    T.data .-= implicit.temp_profile'
-
-    # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
-    geopotential!(vars, geopotential, orography)
+    # calculate (u_k, v_k)⋅∇ln(p_s), ∇ln(pₛ) is computed in transform! together with u, v
+    pressure_gradient_flux!(vars, time_stepping)
 
     # get ū, v̄, D̄ on grid; D̄ in spectral
     vertical_integration!(vars, geometry, time_stepping)
@@ -146,11 +136,15 @@ function dynamics_tendencies!(
     # calculate vertical velocity σ̇ in sigma coordinates for the vertical mass flux M = pₛ * σ̇
     vertical_velocity!(vars, geometry, time_stepping)
 
-    # add the RTₖlnpₛ term to geopotential
-    linear_pressure_gradient!(vars, atmosphere, implicit, time_stepping)
-
     # use σ̇ for the vertical advection of u, v, T, q
+    # this advects the full temperature T = T' + Tₖ, i.e. it includes the vertical advection
+    # of the reference profile Tₖ, which implicit_correction! expects in the explicit tendency
     vertical_advection!(vars, model)
+
+    # temperature relative to profile
+    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (temp profile and temp_grid are different dimensions and array types)
+    T = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
+    T.data .-= implicit.temp_profile'
 
 
     # compute tendencies in grid space: u, v, temperature, pressure, u·T'·coslat⁻¹, v·T'·coslat⁻¹, kinetic energy, (wet model: humidity, u·q·coslat⁻¹, v·q·coslat⁻¹)
@@ -177,31 +171,15 @@ function dynamics_tendencies!(
 end
 
 """$(TYPEDSIGNATURES)
-Compute the gradient ∇ln(pₛ) of the logarithm of surface pressure,
-followed by its flux, (u,v) * ∇ln(pₛ)."""
+Compute the pressure gradient flux, (u,v) * ∇ln(pₛ). The gradient ∇ln(pₛ) of the
+logarithm of surface pressure is computed and transformed to grid space in `transform!`
+together with u, v."""
 function pressure_gradient_flux!(
         vars::Variables,
-        S::AbstractSpectralTransform,
         time_stepping::AbstractTimeStepper,
     )
-    progn = vars.prognostic
-    scratch_memory = vars.scratch.transform_memory
-
-    # PRESSURE GRADIENT
-    pres = get_prognostic_step(progn.pressure, time_stepping, DynamicalCore())
-    dpres_dx_spec = vars.dynamics.dpres_dx_spec     # view of slot 1 in :dpres_grad_spec parent
-    dpres_dy_spec = vars.dynamics.dpres_dy_spec     # view of slot 2 in :dpres_grad_spec parent
-    (; dpres_dx, dpres_dy) = vars.dynamics          # views of slot 1 / 2 in :dpres_grad parent
-
-    ∇!(dpres_dx_spec, dpres_dy_spec, pres, S)       # CALCULATE ∇ln(pₛ)
-
-    # One batched spectral→grid transform for both gradients
-    transform!(
-        parent(vars.fused.dpres_grad),
-        parent(vars.fused.dpres_grad_spec),
-        scratch_memory, S, unscale_coslat = true
-    )
-
+    dpres_dx = get_prognostic_step(vars.dynamics.dpres_dx, time_stepping, DynamicalCore())
+    dpres_dy = get_prognostic_step(vars.dynamics.dpres_dy, time_stepping, DynamicalCore())
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     uv∇lnp = vars.dynamics.pres_flux
@@ -229,7 +207,7 @@ u, v are averaged in grid-point space, divergence in spectral space.
 # For the vertical integration and vertical average, the kernel version is unreasonably slow
 # on CPU, that's why we have two seperate versions for this function
 function vertical_integration!(
-        ::CPU,
+        ::AbstractCPU,
         vars::Variables,
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
@@ -239,7 +217,9 @@ function vertical_integration!(
     # hybrid coordinates requires replacing Δσₖ with the actual pressure thickness divided
     # by surface pressure, which varies in space and time.
     (; σ_levels_thick, nlayers) = geometry
-    (; dpres_dx, dpres_dy) = vars.dynamics      # zonal, meridional grad of log surface pressure
+    # zonal, meridional grad of log surface pressure
+    dpres_dx = get_prognostic_step(vars.dynamics.dpres_dx, time_stepping, DynamicalCore())
+    dpres_dy = get_prognostic_step(vars.dynamics.dpres_dy, time_stepping, DynamicalCore())
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
@@ -281,7 +261,7 @@ function vertical_integration!(
 end
 
 function vertical_integration!(
-        ::GPU,
+        ::AbstractArchitecture,
         vars::Variables,
         geometry::Geometry,
         time_stepping::AbstractTimeStepper,
@@ -289,7 +269,9 @@ function vertical_integration!(
 
     # TODO: same as CPU version — Δσₖ weights baked into sigma-coordinate continuity equation.
     (; σ_levels_thick, nlayers) = geometry
-    (; dpres_dx, dpres_dy) = vars.dynamics    # zonal, meridional grad of log surface pressure
+    # zonal, meridional grad of log surface pressure
+    dpres_dx = get_prognostic_step(vars.dynamics.dpres_dx, time_stepping, DynamicalCore())
+    dpres_dy = get_prognostic_step(vars.dynamics.dpres_dy, time_stepping, DynamicalCore())
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
@@ -393,11 +375,13 @@ with ū, v̄ being the vertically averaged velocities; px, py the gradients
 of the logarithm of surface pressure ln(pₛ) and D̄ the vertically averaged divergence.
 
 Here, computes the grid tendency contribuation of the logarithm of surface pressure by:
-* ∇ln(pₛ)/px,py is previously computed in grid space in `pressure_gradient_flux!``, 
+* ∇ln(pₛ)/px,py is previously computed in grid space in `transform!`,
 * Multiply ū, v̄ with ∇ln(pₛ) in grid-point space."""
 function surface_pressure_grid_tendency!(vars::Variables, time_stepping::AbstractTimeStepper)
     pres_tend_grid = get_tendency_step(vars.tendencies.grid.pressure, time_stepping, DynamicalCore())
-    (; dpres_dx, dpres_dy, u_mean_grid, v_mean_grid) = vars.dynamics
+    dpres_dx = get_prognostic_step(vars.dynamics.dpres_dx, time_stepping, DynamicalCore())
+    dpres_dy = get_prognostic_step(vars.dynamics.dpres_dy, time_stepping, DynamicalCore())
+    (; u_mean_grid, v_mean_grid) = vars.dynamics
     @. pres_tend_grid += u_mean_grid * dpres_dx + v_mean_grid * dpres_dy
     return nothing
 end
@@ -421,7 +405,7 @@ function surface_pressure_spectral_tendency!(vars::Variables)
     pres_tend = vars.tendencies.pressure
     div_mean = vars.dynamics.div_mean
     @. pres_tend = -pres_tend - div_mean
-    pres_tend.data[1:1] .= 0
+    set_scalar!(pres_tend.data, 1, zero(eltype(pres_tend.data)))  # for mass conservation
     return nothing
 end
 
@@ -450,7 +434,9 @@ function vertical_velocity!(
     (; w) = vars.dynamics                       # = vertical mass flux M = pₛσ̇ at k+1/2
 
     # to calculate u_mean_grid*dpres_dx + v_mean_grid*dpres_dy again
-    (; dpres_dx, dpres_dy, u_mean_grid, v_mean_grid) = vars.dynamics
+    dpres_dx = get_prognostic_step(vars.dynamics.dpres_dx, time_stepping, DynamicalCore())
+    dpres_dy = get_prognostic_step(vars.dynamics.dpres_dy, time_stepping, DynamicalCore())
+    (; u_mean_grid, v_mean_grid) = vars.dynamics
     ūv̄∇lnp = vars.scratch.grid.a_2D             # use scratch memory
     @. ūv̄∇lnp = u_mean_grid * dpres_dx + v_mean_grid * dpres_dy
 
@@ -475,14 +461,19 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Add the linear contribution of the pressure gradient to the geopotential.
-The pressure gradient in the divergence equation takes the form
+Add the linear contribution of the pressure gradient to the (spectral) Bernoulli potential,
+which already holds the transformed kinetic energy and geopotential. The pressure gradient in the divergence equation takes the form
 
     -∇⋅(Rd * Tᵥ * ∇lnpₛ) = -∇⋅(Rd * Tᵥ' * ∇lnpₛ) - ∇²(Rd * Tₖ * lnpₛ)
 
-So that the second term inside the Laplace operator can be added to the geopotential.
+So that the second term inside the Laplace operator can be added to the Bernoulli potential.
 Rd is the gas constant, Tᵥ the virtual temperature, Tᵥ' its anomaly wrt to the
 average or reference temperature Tₖ, and ln(pₛ) is the logarithm of surface pressure."""
+function linear_pressure_gradient!(vars::Variables, model::PrimitiveEquation)
+    (; atmosphere, implicit, time_stepping) = model
+    return linear_pressure_gradient!(vars, atmosphere, implicit, time_stepping)
+end
+
 function linear_pressure_gradient!(
         vars::Variables,
         atmosphere::AbstractAtmosphere,
@@ -495,14 +486,14 @@ function linear_pressure_gradient!(
     # for Leapfrog this term is evaluated at the previous time step and the
     # implicit corrections will move it to the current as done for all linear gravity-wave related terms
     lnpₛ = get_prognostic_step(vars.prognostic.pressure, time_stepping, LinearDynamicalCore())
-    Φ = vars.dynamics.spectral_geopotential
+    bernoulli = get_step(vars.dynamics.kinetic_energy)
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
-    # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
-    # -∇² is applied in bernoulli_potential!
+    # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the Bernoulli potential on which the operator
+    # -∇² is applied in bernoulli_spectral_potential!
     # TODO: Broadcast issue with LTA, conflicting broadcast styles
-    Φ.data .+= R_dry .* Tₖ' .* lnpₛ.data
+    bernoulli.data .+= R_dry .* Tₖ' .* lnpₛ.data
 
     return nothing
 end
@@ -561,7 +552,9 @@ function vordiv_grid_tendencies!(
         get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) :
         fill!(vars.scratch.grid.a, 0)
 
-    (; dpres_dx, dpres_dy) = vars.dynamics              # zonal/meridional gradient of logarithm of surface pressure
+    # zonal/meridional gradient of logarithm of surface pressure
+    dpres_dx = get_prognostic_step(vars.dynamics.dpres_dx, time_stepping, DynamicalCore())
+    dpres_dy = get_prognostic_step(vars.dynamics.dpres_dy, time_stepping, DynamicalCore())
 
     (; whichring) = u_tend_grid.grid
     arch = architecture(u_tend_grid)
@@ -1164,21 +1157,22 @@ function bernoulli_grid_potential!(vars::Variables, model::ShallowWater, time_st
 end
 
 """$(TYPEDSIGNATURES)
-Gridded contribution of `bernoulli_potential!` for PrimitiveEquation: writes `kinetic_energy_grid = ½(u²+v²)`."""
+Gridded contribution of `bernoulli_potential!` for PrimitiveEquation: writes `kinetic_energy_grid = ½(u²+v²)+Φ`
+with the grid-point geopotential Φ calculated in `transform!`, shared with the parameterizations."""
 function bernoulli_grid_potential!(vars::Variables, ::Union{PrimitiveEquation, AbstractSpectralTransform}, time_stepping::AbstractTimeStepper)
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
+    Φ = vars.dynamics.geopotential
     bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
     half = convert(eltype(bernoulli_grid), 0.5)
-    @. bernoulli_grid = half * (u^2 + v^2)
+    @. bernoulli_grid = half * (u^2 + v^2) + Φ
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Spectral half of `bernoulli_potential!`. `kinetic_energy` is assumed to already hold the spec
 transform of `kinetic_energy_grid` (from the mega-batched transform). Adds `-∇²(KE)` into
-`div_tend`. For SW, geopotential is already absorbed into `kinetic_energy_grid` on the grid
-side; for PrimitiveEquation, the spectral geopotential is added here first."""
+`div_tend`. The geopotential is already absorbed into `kinetic_energy_grid` on the grid side."""
 function bernoulli_spectral_potential!(vars::Variables, model::ShallowWater)
     _bernoulli_spectral_potential!(vars, model.spectral_transform, model.time_stepping)
     return nothing
@@ -1190,10 +1184,6 @@ function bernoulli_spectral_potential!(vars::Variables, model::PrimitiveEquation
 end
 
 function bernoulli_spectral_potential!(vars::Variables, S::AbstractSpectralTransform, time_stepper::AbstractTimeStepper)
-    # PrimitiveEquation path: add spectral geopotential to KE before the Laplacian.
-    bernoulli = get_step(vars.dynamics.kinetic_energy)
-    geopot = vars.dynamics.spectral_geopotential
-    bernoulli .+= geopot
     _bernoulli_spectral_potential!(vars, S, time_stepper)
     return nothing
 end

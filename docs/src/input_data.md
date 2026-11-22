@@ -3,7 +3,8 @@
 Several components will allow you to specify your own input data. You
 can either do this with the [`set!`](@ref) method, passing on a
 `Field` to a variable, or many components allow for a `path` and `filename`.
-See for example [Load orography from file](@ref).
+See for example [Load orography from file](@ref) or the [Earth's land-sea mask](@ref) option
+described in [The land-sea mask](@ref).
 
 However, we also use SpeedyWeatherAssets.jl to handle different versions
 of input data with Julia's Artifacts system (`Artifacts.jl` and `Pkg.Artifacts`)
@@ -66,10 +67,22 @@ for `YourArrayType` and `YourFileFormat`.
 When calling `get_asset` a new asset will be downloaded and stored where
 other Julia Artifacts are stored, by default this would be `.julia/artifacts`
 and then folders of their respective hash. Using assets in SpeedyWeather one
-does not handle the Artifacts.toml file directly but this will be placed in the
-root folder (or inside `SpeedyWeather/src/input` when loading locally with `.SpeedyWeather`).
-Deleting this file will redownload all demanded assets but one can also
-delete individiual ones. 
+does not handle the Artifacts.toml file directly; it is placed in the RingGrids
+package root. Each asset is bound by its full source URL, including the repository,
+version tag or branch, and file path. Different versions coexist in `Artifacts.toml`:
+changing `DEFAULT_ASSETS_VERSION` downloads assets for the new version as needed,
+and switching back reuses the previous downloads if they are still installed.
+These bindings persist across Julia sessions. Old bindings keyed only by filename
+are ignored because their source version is unknown; assets are downloaded once
+to establish the new bindings.
+The downloaded files in Julia's artifact store are left for Julia to manage.
+Loading local files with `from_assets = false` does not change the cache.
+Reusing the same branch name does not detect upstream commits. To refresh an
+individual asset, remove its binding with
+`Pkg.Artifacts.unbind_artifact!(artifact_toml, binding_name)`, where `binding_name`
+is the full source URL shown in `Artifacts.toml`.
+Deleting `Artifacts.toml` will redownload all demanded assets, but one can also
+delete individual bindings.
 
 ## Managing new SpeedyWeatherAssets versions
 

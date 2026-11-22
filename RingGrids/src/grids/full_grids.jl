@@ -55,6 +55,17 @@ function get_londlatds(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
     nlat = get_nlat(Grid, nlat_half)        # number of latitudes
 
     npoints = get_npoints(Grid, nlat_half)  # total number of grid points
+    londs = zeros(npoints)                  # preallocate arrays
+    latds = zeros(npoints)
 
-    return reshape(ones(nlat)' .* lond, :), reshape(latd' .* ones(nlon), :)
+    # explicit loops instead of reshape(ones(nlat)' .* lond, :) etc. as the latter is
+    # miscompiled on Julia v1.13.2, corrupting memory, see #1347
+    ij = 0                                  # running index
+    for j in 1:nlat, i in 1:nlon            # populate arrays ring by ring
+        ij += 1
+        londs[ij] = lond[i]
+        latds[ij] = latd[j]
+    end
+
+    return londs, latds
 end

@@ -55,6 +55,8 @@ forcing but with altered parameters. Generally you should also include any
 kind of precomputed arrays (here a vector `v`). For example, you want to
 apply your forcing only in certain parts of the globe? Then you probably want
 to define a mask here that somehow includes the information of your region.
+Alternatively, SpeedyWeather also provides a dynamic [Variable system](@ref)
+to declare such arrays through the `variables` function instead of as struct fields directly.
 For a more concrete example see [Custom forcing and drag](@ref).
 But note that once you include `Vector`, `Matrix`, or generally `Array`,
 there are some changes needed for GPU compatibility, see [GPU and Architectures](@ref).

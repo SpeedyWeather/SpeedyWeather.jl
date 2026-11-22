@@ -1,5 +1,12 @@
 export ZarrOutput
 
+"""Supertype of all output writers that write into a Zarr store. Subtypes share the
+time-chunk buffering, the time axis and the coordinate helpers implemented in the
+`SpeedyWeatherZarrExt` extension and must have the fields `zarr_group`, `time_buffers`,
+`time_chunk`, `compressor` and `variables`. Concrete subtypes are [`ZarrOutput`](@ref)
+(rectangular `lon`/`lat` layout) and [`HEALPixOutput`](@ref) (flat HEALPix layout)."""
+abstract type AbstractZarrOutput <: AbstractOutput end
+
 """Output writer that writes a SpeedyWeather simulation to a Zarr store. Mirrors the
 behaviour of [`NetCDFOutput`](@ref) but writes a chunked, optionally compressed Zarr
 hierarchy on disk. The actual implementation lives in the `SpeedyWeatherZarrExt`
@@ -11,19 +18,24 @@ using SpeedyWeather
 output = ZarrOutput(spectral_grid)
 ```
 
-Type parameters: `Field2D`, `Field3D` are the scratch field types, `Interpolator`
+Type parameters: `Field2D`, `Field3D` are the scratch field types (on the model's
+architecture), `HostField2D`, `HostField3D` their host (CPU) equivalents to write from, `Interpolator`
 is the interpolator type, `DT` and `S` are the start-date and output-step types,
-`C` is the Zarr compressor type (or `Nothing` for the Zarr default), and `Z` is
-the Zarr group type once `initialize!` has been called (`Nothing` before)."""
+`C` is the Zarr compressor type (or `Nothing` for the Zarr default), `Z` is
+the Zarr group type once `initialize!` has been called (`Nothing` before) and
+`Layers` the type of the vertical output layers."""
 @kwdef mutable struct ZarrOutput{
         Field2D,
         Field3D,
+        HostField2D,
+        HostField3D,
         Interpolator,
         DT,
         S,
         C,
         Z,
-    } <: AbstractOutput
+        Layers,
+    } <: AbstractZarrOutput
 
     # FILE OPTIONS
     active::Bool = false
@@ -71,6 +83,10 @@ the Zarr group type once `initialize!` has been called (`Nothing` before)."""
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
 
+    "[OPTION] vertical layers to write 3D atmospheric variables on, `ModelLayers()` (default)
+    or `PressureLayers(spectral_grid)`, see [`AbstractOutputLayers`](@ref)"
+    layers::Layers = ModelLayers()
+
     "[OPTION] number of time steps per chunk along the time dimension"
     time_chunk::Int = 1
 
@@ -105,10 +121,15 @@ the Zarr group type once `initialize!` has been called (`Nothing` before)."""
     const interpolator::Interpolator
     const land_fraction::Field2D
 
-    # SCRATCH FIELDS TO INTERPOLATE ONTO
+    # SCRATCH FIELDS TO INTERPOLATE ONTO, on the model's architecture
     const field2D::Field2D
     const field3D::Field3D
     const field3Dland::Field3D
+
+    # HOST (CPU) COPIES OF THE SCRATCH FIELDS TO WRITE FROM, the same objects on CPU
+    const host2D::HostField2D
+    const host3D::HostField3D
+    const host3Dland::HostField3D
 end
 
 """$(TYPEDSIGNATURES)
@@ -137,9 +158,13 @@ function Base.show(io::IO, output::ZarrOutput{F}) where {F}
     println(io, styled"├ {info:write restart file} = $(output.write_restart) (if active)")
 
     interp_type_str = string(typeof(output.interpolator))
-    interp_type_str_short = length(interp_type_str) > 70 ? string(first(interp_type_str, 70), "...}") : interp_type_str
-
+    interp_type_str_short = length(interp_type_str) > 64 ? string(first(interp_type_str, 64), "...}") : interp_type_str
     println(io, styled"├ {info:interpolator}::$interp_type_str_short")
+
+    layers_type_str = string(typeof(output.layers))
+    layers_type_str_short = length(layers_type_str) > 70 ? string(first(layers_type_str, 70), "...}") : layers_type_str
+    println(io, styled"├ {info:layers}::$layers_type_str_short")
+
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, styled"├ {info:interval} = $(output.interval)")
     println(io, styled"├ {info:time chunk} = $(output.time_chunk)")

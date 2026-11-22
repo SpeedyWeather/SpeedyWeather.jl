@@ -50,7 +50,7 @@ end
 
 export SurfaceOceanHumidityFlux
 """Humidity flux parameterization over ocean surfaces. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceOceanHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceOceanHumidityFlux{NF, FI <: AbstractFluxIntegration} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
@@ -59,10 +59,14 @@ export SurfaceOceanHumidityFlux
 
     "[OPTION] Sea ice insulating surface humidity fluxes [1]"
     @param sea_ice_insulation::NF = 0.01 (bounds = 0 .. 1,)
+
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
-SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF}(; kwargs...)
+SurfaceOceanHumidityFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
+    SurfaceOceanHumidityFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 variables(::SurfaceOceanHumidityFlux) = (
@@ -74,7 +78,8 @@ variables(::SurfaceOceanHumidityFlux) = (
     )
 
     surface = model.geometry.nlayers
-    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, model.time_stepping, humidity_flux)
+    ts = time_stepper(model.time_stepping, :ocean)
+    SST = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, ts, humidity_flux)
 
     # SATURATION HUMIDITY OVER OCEAN
     pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
@@ -88,15 +93,21 @@ variables(::SurfaceOceanHumidityFlux) = (
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(SST[ij])
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
-    d = vars.parameterizations.boundary_layer_drag[ij]
+    d = vars.parameterizations.ocean.boundary_layer_drag_humidity[ij]
     drag_ocean = ifelse(humidity_flux.use_boundary_layer_drag, d, humidity_flux.drag)
 
-    # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
-    # but remove the max( ,0) to allow for surface condensation
-    flux_ocean = ρ * drag_ocean * V₀ * (sat_humid_ocean - surface_humid)
+    # SPEEDY documentation eq. 55/57, but remove the max( ,0) to allow for surface condensation
+    conductance = ρ * drag_ocean * V₀   # = -∂flux/∂q [kg/m²/s]
+    flux_ocean = conductance * (sat_humid_ocean - surface_humid)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
-    flux_ocean /= 1 + sea_ice_concentration / humidity_flux.sea_ice_insulation
+    insulation = 1 + sea_ice_concentration / humidity_flux.sea_ice_insulation
+    flux_ocean /= insulation
+
+    # damp explicit flux for stable time integration with thin lowermost layers, applied
+    # before storing so that coupled ocean/land receive the flux the atmosphere receives
+    conductance /= insulation
+    flux_ocean *= surface_flux_damping(humidity_flux.time_integration, (1 - land_fraction) * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling
     vars.parameterizations.ocean.surface_humidity_flux[ij] = flux_ocean
@@ -113,7 +124,7 @@ end
 
 export SurfaceLandHumidityFlux
 """Humidity flux parameterization over land surfaces. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceLandHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceLandHumidityFlux{NF, FI <: AbstractFluxIntegration} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
@@ -122,10 +133,14 @@ export SurfaceLandHumidityFlux
 
     "[OPTION] Snow insulation depth [m], e-folding depth controlling how snow insulates surface humidity fluxes"
     @param snow_insulation_depth::NF = 0.05 (bounds = 0 .. 1,)
+
+    "[OPTION] Time integration of the flux into the lowermost layer"
+    time_integration::FI = DEFAULT_FLUX_INTEGRATION()
 end
 
 Adapt.@adapt_structure SurfaceLandHumidityFlux
-SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF}(; kwargs...)
+SurfaceLandHumidityFlux(SG::SpectralGrid; time_integration = DEFAULT_FLUX_INTEGRATION(), kwargs...) =
+    SurfaceLandHumidityFlux{SG.NF, typeof(time_integration)}(; time_integration, kwargs...)
 initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
 variables(::SurfaceLandHumidityFlux) = (
@@ -135,8 +150,10 @@ variables(::SurfaceLandHumidityFlux) = (
 @propagate_inbounds function surface_humidity_flux!(ij, vars, humidity_flux::SurfaceLandHumidityFlux, model)
 
     # TODO use a skin temperature?
-    T = vars.prognostic.land.soil_temperature[ij, 1]  # uppermost land layer with index 1
-    snow_depth = vars.prognostic.land.snow_depth[ij]
+    ts = time_stepper(model.time_stepping, :land)
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, ts, humidity_flux)
+    T = soil_temperature[ij, 1]  # uppermost land layer with index 1
+    snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, ts, humidity_flux)[ij]
     α = vars.parameterizations.land.soil_moisture_availability[ij]
 
     # SATURATION HUMIDITY OVER LAND
@@ -150,15 +167,21 @@ variables(::SurfaceLandHumidityFlux) = (
     surface_humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, humidity_flux)[ij, surface]
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
-    d = vars.parameterizations.boundary_layer_drag[ij]
+    d = vars.parameterizations.land.boundary_layer_drag_humidity[ij]
     drag_land = humidity_flux.use_boundary_layer_drag ? d : humidity_flux.drag
 
-    # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
-    # but remove the max( ,0) to allow for surface condensation
-    flux_land = ifelse(isfinite(T) && isfinite(α), ρ * drag_land * V₀ * (α * sat_humid_land - surface_humid), zero(T))
+    # SPEEDY documentation eq. 55/57 but remove the max( ,0) to allow for surface condensation
+    conductance = ρ * drag_land * V₀    # = -∂flux/∂q [kg/m²/s]
+    flux_land = conductance * (α * sat_humid_land - surface_humid)
 
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
-    flux_land /= 1 + snow_depth / humidity_flux.snow_insulation_depth
+    insulation = 1 + snow_depth / humidity_flux.snow_insulation_depth
+    flux_land /= insulation
+
+    # damp explicit flux for stable time integration with thin lowermost layers, applied
+    # before storing so that coupled ocean/land receive the flux the atmosphere receives
+    conductance /= insulation
+    flux_land *= surface_flux_damping(humidity_flux.time_integration, land_fraction * conductance, pₛ, model)
 
     # store without weighting by land fraction for coupling
     vars.parameterizations.land.surface_humidity_flux[ij] = flux_land    # [kg/m²/s]

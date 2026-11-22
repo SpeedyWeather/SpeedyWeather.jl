@@ -3,20 +3,17 @@ module SpeedyTransformsCUDAExt
 import CUDA: CUDA, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
 using cuFFT
 import AbstractFFTs
-import LinearAlgebra
-import LinearAlgebra: mul!
-using KernelAbstractions
-using DocStringExtensions
+using SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-import SpeedyTransforms: SpectralTransform, _fourier_batched!
+import SpeedyTransforms: SpectralTransform, _fourier_batched!,
+    GraphBackend, get_cache, run_graph!, forward_loop!, inverse_loop!, graph_key
 import SpeedyTransforms.RingGrids: AbstractField
 
-import SpeedyWeatherInternals.KernelLaunching: launch!, ArrayWorkOrder
-import SpeedyWeatherInternals.Architectures: on_architecture, GPU
+import SpeedyWeatherInternals.Architectures: GPU
 
 # =====================================================================================
 # CUDA GRAPHS ACCELERATION OF THE BATCHED FOURIER TRANSFORM
@@ -36,22 +33,24 @@ import SpeedyWeatherInternals.Architectures: on_architecture, GPU
 #     between the strided grid/scratch layout and the packed buffer in one launch.
 #     This collapses the graph from ~6*nlat_half nodes to ~2*nlat_half + 4.
 #
-# The captured graph bakes in the device pointers of the input `field.data`,  and the
-# scratch buffers (`scratch_memory.north/.south`) and the packed work
-# buffer `GPUFourierGraphCache`. In the SpeedyWeather time loop the same variable buffers are reused every
-# timestep, so a graph captured for a given `field` is replayed on all subsequent steps.
+# The captured graph bakes in the device pointers of the input `field.data`, of the
+# scratch buffers (`scratch_memory.north/.south`) and of the packed work buffers in
+# `GPUFourierGraphCache`. In the SpeedyWeather time loop the same variable buffers are reused every
+# timestep, so a graph captured for a given field and scratch memory is replayed on all subsequent steps.
 # Caches are held per transform SIZE (keyed by the FFT plan, so an `S` that batches
 # several layer counts gets one cache each); within a cache, graphs are keyed by the device
-# pointer of `field.data` (see `graph_key`), keying on the wrapper object identity wouldn't
-# work as a view on a CuArray is again a CuArray and not a SubArray which causes problems here.
+# pointers of `field.data` and of both scratch arrays (see `graph_key`): the field and the
+# scratch memory are the caller's (in a simulation both are part of the `Variables`), so new
+# `Variables` for the same model must not replay graphs captured with the buffers of earlier ones.
+# Keying on the wrapper object identity wouldn't work as a view on a CuArray is again a CuArray
+# (a new wrapper every time step), not a SubArray.
 #
 # The backend-agnostic parts of this (kernels, cache struct, allocation-free loops,
-# capture/replay control flow) live in gpu_graphs_common.jl, included below and shared with
-# SpeedyTransformsAMDGPUExt.jl; only the capture/instantiate/launch primitives differ per
-# backend (see `GraphBackend`).
+# capture/replay control flow, the `GraphBackend` struct itself) live in
+# `SpeedyTransforms/src/gpu_graphs_common.jl` and are compiled unconditionally as part of the
+# main package (imported above); only the capture/instantiate/launch primitives below, and the
+# `CuArray`-dispatched methods, are backend-specific and have to live in this extension.
 # =====================================================================================
-
-include("gpu_graphs_common.jl")
 
 # The CUDA capture/instantiate/launch primitives `run_graph!` needs, plus the architecture
 # used to `synchronize` before capture; see `GraphBackend` in gpu_graphs_common.jl. `capture`
@@ -62,6 +61,9 @@ const CUDA_GRAPH_BACKEND = GraphBackend(
     launch,
     GPU(CUDA.CUDABackend(always_inline = true)),
 )
+
+# trim CUDA's memory pool, see `clear_fourier_graph_cache!`
+SpeedyTransforms.reclaim!(::GPU{<:CUDA.CUDABackend}) = (CUDA.reclaim(); nothing)
 
 # =====================================================================================
 # Method overrides: dispatch on CuArray scratch (more specific than the generic
@@ -86,9 +88,9 @@ function _fourier_batched!(
         )
     end
     # the cache is selected by (and sized for) this transform size (= its FFT plan set); within
-    # it the only thing that varies between calls is the field buffer, so that is the graph key
+    # it what varies between calls are the caller's buffers, field and scratch, so they are the graph key
     cache = get_cache(CuGraphExec, S, size(field, 2))
-    run_graph!(cache.forward_execs, graph_key(field.data), () -> forward_loop!(cache, f_north, f_south, field, S), CUDA_GRAPH_BACKEND)
+    run_graph!(cache.forward_execs, graph_key(field, f_north, f_south), () -> forward_loop!(cache, f_north, f_south, field, S), CUDA_GRAPH_BACKEND)
     return nothing
 end
 
@@ -112,7 +114,7 @@ function _fourier_batched!(
     cache = get_cache(CuGraphExec, S, size(field, 2))
     # `add` is part of the graph key: a captured graph bakes in overwrite-vs-accumulate, so replaying
     # the wrong one would silently produce incorrect results.
-    run_graph!(cache.inverse_execs, (graph_key(field.data), add), () -> inverse_loop!(cache, field, g_north, g_south, S, add), CUDA_GRAPH_BACKEND)
+    run_graph!(cache.inverse_execs, (graph_key(field, g_north, g_south), add), () -> inverse_loop!(cache, field, g_north, g_south, S, add), CUDA_GRAPH_BACKEND)
     return nothing
 end
 

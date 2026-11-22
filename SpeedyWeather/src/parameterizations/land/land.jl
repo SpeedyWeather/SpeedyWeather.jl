@@ -1,20 +1,3 @@
-"""Abstract supertype for all land models. Custom land models should subtype `AbstractWetLand`
-or `AbstractDryLand` and implement `initialize!`, `timestep!`, and optionally `variables` and `filter!`."""
-abstract type AbstractLand <: AbstractModelComponent end
-
-"""Abstract supertype for sub-components of a land model (soil temperature, soil moisture,
-snow, vegetation, rivers). Each component implements `initialize!`, `timestep!`, and optionally
-`variables` and `filter!`."""
-abstract type AbstractLandComponent <: AbstractModelComponent end
-
-"""Abstract land model type that includes hydrological processes (soil moisture, snow,
-vegetation, rivers). Intended for use with `PrimitiveWet`. The default concrete type is `LandModel`."""
-abstract type AbstractWetLand <: AbstractLand end
-
-"""Abstract land model type that omits hydrological processes and only includes soil temperature.
-Can be used with both `PrimitiveDry` and `PrimitiveWet`. The default concrete type is `DryLandModel`."""
-abstract type AbstractDryLand <: AbstractLand end
-
 const DEFAULT_NLAYERS_SOIL = 2
 
 # model class is the abstract supertype
@@ -65,11 +48,11 @@ function initialize!(land::LandModel, model::AbstractModel)
 end
 
 # allocate variables as defined by land components
-variables(land::LandModel) = (
-    variables(land.temperature)...,
-    variables(land.soil_moisture)...,
-    variables(land.snow)...,
-    variables(land.vegetation)...,
+variables(land::LandModel, model::AbstractModel) = (
+    variables(land.temperature, model)...,
+    variables(land.soil_moisture, model)...,
+    variables(land.snow, model)...,
+    variables(land.vegetation, model)...,
     variables(land.rivers)...,
 )
 
@@ -92,7 +75,7 @@ function initialize!(land::DryLandModel, model::AbstractModel)
 end
 
 # initializing the land model initializes its components
-variables(land::DryLandModel) = (variables(land.temperature)...,)
+variables(land::DryLandModel, model::AbstractModel) = (variables(land.temperature, model)...,)
 
 # unpack land model and call general timestep! function
 land_timestep!(vars::Variables, model::PrimitiveEquation) =
@@ -114,6 +97,9 @@ function timestep!(
 end
 
 function initialize!(vars::Variables, land_model::AbstractLand, model::PrimitiveEquation)
+    # soil temperature first, snow uses it for its initial conditions
+    initialize!(vars, land_model.temperature, model)
+
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
     if model isa PrimitiveWet && land_model isa AbstractWetLand
         initialize!(vars, land_model.snow, model)
@@ -121,7 +107,6 @@ function initialize!(vars::Variables, land_model::AbstractLand, model::Primitive
         initialize!(vars, land_model.vegetation, model)
         initialize!(vars, land_model.rivers, model)
     end
-    initialize!(vars, land_model.temperature, model)
     return nothing
 end
 

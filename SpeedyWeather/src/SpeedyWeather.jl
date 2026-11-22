@@ -1,7 +1,8 @@
 module SpeedyWeather
 
 # STRUCTURE
-using DocStringExtensions
+using DocStringExtensions: TYPEDEF, TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 using StyledStrings
 
 # NUMERICS
@@ -21,9 +22,10 @@ import Base: @propagate_inbounds
 using SpeedyWeatherInternals
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.KernelLaunching
-import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU,
+import SpeedyWeatherInternals.Utils: reactant_compile_options, REACTANT_EXCLUDED_PASSES
+import SpeedyWeatherInternals.Architectures: AbstractArchitecture, AbstractCPU, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
-export CPU, GPU, on_architecture, architecture                # export device functions
+export CPU, GPU, ReactantDevice, on_architecture, architecture        # export device functions
 export SpeedyWeatherInternals, Architectures, KernelLaunching, ArrayDimensions
 
 # INPUT OUTPUT
@@ -43,7 +45,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 
 # UTILITIES
 export Utils
-import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs, set_scalar!, scalar_ref
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets
@@ -109,11 +111,17 @@ export power_spectrum
 import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 
 # to be defined in GeoMakie extension
-export animate, globe
+export animate, globe, globe!
 function animate end
 
-# constructors to be defined in Terrarium extension
+# output variables, e.g. OutputVariables.Temperature()
+export OutputVariables
+
+# deprecated, use OutputVariables.Terrarium, to be defined in Terrarium extension
 export TerrariumOutput
+
+# constructor to be extended by packages that define parameterizations
+export Parameterization
 
 # abstract types
 include("variables/abstract_types.jl")
@@ -138,6 +146,7 @@ include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("time_stepping/clock.jl")
+include("time_stepping/schedules.jl")
 include("variables/set.jl")
 
 # MODEL COMPONENTS
@@ -158,8 +167,11 @@ include("dynamics/random_process.jl")
 # TIME STEPPING
 include("time_stepping/time_integration.jl")
 include("time_stepping/steps.jl")
+include("time_stepping/random_process.jl")
 include("time_stepping/steppers/general.jl")
+include("time_stepping/steppers/euler_forward.jl")
 include("time_stepping/steppers/leapfrog.jl")
+include("time_stepping/steppers/stochastic_leapfrog.jl")
 include("time_stepping/steppers/ncycle_lorenz.jl")
 include("time_stepping/transform.jl")
 include("time_stepping/implicit/implicit_shallow_water.jl")
@@ -167,23 +179,32 @@ include("time_stepping/implicit/implicit_primitive_equations.jl")
 
 # PARAMETERIZATIONS
 include("parameterizations/general.jl")
-include("parameterizations/albedo.jl")
 include("parameterizations/tendencies.jl")
 include("parameterizations/vertical_diffusion.jl")
 include("parameterizations/large_scale_condensation.jl")
 include("parameterizations/surface_fluxes/boundary_layer.jl")
 include("parameterizations/surface_fluxes/surface_roughness.jl")
 include("parameterizations/surface_fluxes/surface_condition.jl")
+include("parameterizations/surface_fluxes/neutral_wind.jl")
+include("parameterizations/surface_fluxes/drag.jl")
 include("parameterizations/surface_fluxes/momentum.jl")
 include("parameterizations/surface_fluxes/heat.jl")
 include("parameterizations/surface_fluxes/humidity.jl")
+include("parameterizations/entrainment.jl")
 include("parameterizations/convection.jl")
+include("parameterizations/radiation/albedo/general.jl")
+include("parameterizations/radiation/albedo/land_scattering.jl")
+include("parameterizations/radiation/albedo/ocean_scattering.jl")
+include("parameterizations/radiation/albedo/land_albedo.jl")
+include("parameterizations/radiation/albedo/ocean_albedo.jl")
 include("parameterizations/radiation/zenith.jl")
+include("parameterizations/radiation/ozone.jl")
 include("parameterizations/radiation/shortwave_radiation.jl")
 include("parameterizations/radiation/shortwave_transmissivity.jl")
 include("parameterizations/radiation/clouds.jl")
 include("parameterizations/radiation/longwave_radiation.jl")
 include("parameterizations/radiation/longwave_transmissivity.jl")
+include("parameterizations/radiation/radiation.jl")
 include("parameterizations/radiation/greenhouse_gases.jl")
 include("parameterizations/stochastic_physics.jl")
 
@@ -200,14 +221,17 @@ include("parameterizations/land/vegetation.jl")
 include("parameterizations/land/rivers.jl")
 
 # OUTPUT
-include("output/schedule.jl")
 include("output/callbacks.jl")
+include("output/diagnostics.jl")
 include("output/feedback.jl")
+include("output/vertical_interpolation.jl")
 include("output/writers/general.jl")
 include("output/writers/output_writer_core.jl")
+include("output/writers/output_layers.jl")
 include("output/writers/netcdf_output.jl")
 include("output/writers/variables_output.jl")
 include("output/writers/zarr_output.jl")
+include("output/writers/healpix_output.jl")
 include("output/variables/output_variables.jl")
 include("output/restart.jl")
 include("output/particle_tracker.jl")

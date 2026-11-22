@@ -34,3 +34,47 @@
     @test clock_cpu2.period == clock_cpu.period
     @test clock_cpu2.Δt == clock_cpu.Δt
 end
+
+@testset "monthly_interpolation with a traced time" begin
+    # the seasonal climatologies interpolate in time with the clock's time, traced in compiled code
+    # (with `Dates.daysinmonth` for traced numbers from SpeedyWeatherReactantExt)
+    traced_time(time) = Reactant.to_rarray(time; track_numbers = true)
+    interpolation = @compile SpeedyWeather.monthly_interpolation(traced_time(DateTime(2000, 1, 1)))
+
+    for time in (
+            DateTime(2000, 1, 1), DateTime(2000, 2, 29, 12), DateTime(2000, 4, 30, 23),
+            DateTime(2001, 2, 28), DateTime(2001, 12, 31, 18), DateTime(2100, 2, 15),
+        )
+        this_month, next_month, weight = interpolation(traced_time(time))
+        @test (Int(this_month), Int(next_month), Float64(weight)) == SpeedyWeather.monthly_interpolation(time)
+    end
+
+    # weight in the precision of the interpolated variable (promoted, `convert` doesn't apply to traced numbers)
+    interpolation = @compile SpeedyWeather.monthly_interpolation(traced_time(DateTime(2000, 1, 1)), Float32)
+    weight = interpolation(traced_time(DateTime(2000, 2, 29, 12)), Float32)[3]
+    @test Float32(weight) === SpeedyWeather.monthly_interpolation(DateTime(2000, 2, 29, 12), Float32)[3]
+end
+
+@testset "Views into concrete Reactant arrays" begin
+    x = Reactant.to_rarray(ones(Float32, 6))
+    v = view(x, 2:4)
+
+    # broadcasting into a view writes into the parent
+    v .*= 3
+    @test Array(x) == Float32[1, 3, 3, 3, 1, 1]
+
+    # deepcopy keeps the view aliased with the copied parent, as for Array
+    copied = deepcopy((; parent = x, view = v))
+    @test parent(copied.view) === copied.parent
+    fill!(copied.parent, 0)
+    @test all(iszero, Array(copied.view))
+    @test Array(x) == Float32[1, 3, 3, 3, 1, 1]     # original untouched
+
+    # to the CPU: the parent is transferred and the view copied out on the host (instead of compiling
+    # a program that materializes the view on the device on every call)
+    y = Reactant.to_rarray(reshape(Float32.(1:24), 4, 3, 2))
+    w = view(y, :, 2:3, :)
+    w_cpu = on_architecture(SpeedyWeather.CPU(), w)
+    @test w_cpu isa Array{Float32, 3}
+    @test w_cpu == Array(w)
+end

@@ -2,12 +2,16 @@
 struct ClockDim <: AbstractVariableDim end
 allocate(::AbstractVariable{ClockDim}, model::AbstractModel) = Clock(model.architecture)
 
-"""Dimension for scalar variables holding single numerical values as RefValue.
+"""Dimension for scalar variables holding a single numerical value, e.g. `prognostic.scale`,
+CO₂ or the Sun-planet distance factor. Allocated on the model's architecture via `scalar_ref`:
+a `Ref(x)`, with Reactant a `Ref(ConcreteRNumber(x))` so that a compiled (traced) time step
+reads it as a traced number and can write a traced value into it, e.g. `var[] = x`.
 Default value is 0, but can be set via ScalarDim, e.g. ScalarDim(1) for a default value of 1."""
 @kwdef struct ScalarDim{T} <: AbstractVariableDim
     value::T = zero(DEFAULT_NF)                                 # default value via ScalarDim(1)
 end
-allocate(v::AbstractVariable{<:ScalarDim}, model::AbstractModel) = Ref(convert(model.spectral_grid.NF, v.dims.value))
+allocate(v::AbstractVariable{<:ScalarDim}, model::AbstractModel) =
+    scalar_ref(model.architecture, convert(model.spectral_grid.NF, v.dims.value))
 
 """Dimension for 2D grid variables on the horizontal grid."""
 struct Grid2D <: AbstractVariableDim2D end
@@ -99,11 +103,11 @@ allocate(v::AbstractVariable{SpectralXYT}, model::AbstractModel) = zeros(model.s
 
 """Dimension for 1D variables as a function of latitude only."""
 struct Latitude1D <: AbstractVariableDim end
-allocate(::AbstractVariable{Latitude1D}, model::AbstractModel) = fill!(model.spectral_grid.VectorType(undef, model.spectral_grid.nlat), 0)
+allocate(::AbstractVariable{Latitude1D}, model::AbstractModel) = on_architecture(model.spectral_grid.architecture, zeros(model.spectral_grid.NF, model.spectral_grid.nlat))
 
 """Dimension for 1D vertical level variables."""
 struct Vertical1D <: AbstractVariableDim end
-allocate(::AbstractVariable{Vertical1D}, model::AbstractModel) = fill!(model.spectral_grid.VectorType(undef, get_nlayers(model)), 0)
+allocate(::AbstractVariable{Vertical1D}, model::AbstractModel) = on_architecture(model.spectral_grid.architecture, zeros(model.spectral_grid.NF, get_nlayers(model)))
 
 """Dimension for 4D grid variables with customizable extra dimension (neutral tag). Prefer
 `GridXYZT` when the trailing dimensions are specifically vertical + time."""
@@ -135,7 +139,7 @@ allocate(v::AbstractVariable{SpectralXYZT}, model::AbstractModel) = zeros(model.
 @kwdef struct VectorDim <: AbstractVariableDim
     n::Int = 1
 end
-allocate(v::AbstractVariable{VectorDim}, model::AbstractModel) = fill!(model.spectral_grid.VectorType(undef, v.dims.n), 0)
+allocate(v::AbstractVariable{VectorDim}, model::AbstractModel) = on_architecture(model.spectral_grid.architecture, zeros(model.spectral_grid.NF, v.dims.n))
 
 """Dimension for particle system vectors."""
 @kwdef struct ParticleVectorDim <: AbstractVariableDim
@@ -148,17 +152,32 @@ allocate(v::AbstractVariable{ParticleVectorDim}, model::AbstractModel) = zeros(m
     m::Int = 1
     n::Int = 1
 end
-allocate(v::AbstractVariable{MatrixDim}, model::AbstractModel) = fill!(model.spectral_grid.MatrixType(undef, v.dims.m, v.dims.n), 0)
+allocate(v::AbstractVariable{MatrixDim}, model::AbstractModel) = on_architecture(model.spectral_grid.architecture, zeros(model.spectral_grid.NF, v.dims.m, v.dims.n))
 
 """Dimension for spectral transform scratch memory."""
 struct TransformScratchMemory <: AbstractVariableDim end
 allocate(::AbstractVariable{TransformScratchMemory}, model::AbstractModel) = model.spectral_transform.scratch_memory
 
-"""Dimension for particle locator tracking in space."""
-@kwdef struct LocatorDim <: AbstractVariableDim
-    n::Int = 1                                                  # number of locations to track, e.g. for particle advection
+"""Dimension for 2D locator, locating `n` positions, e.g. particles."""
+@kwdef struct Locator2DDim <: AbstractVariableDim
+    n::Int = 1
 end
-allocate(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.AnvilLocator(model.spectral_grid.NF, model.particle_advection.nparticles; architecture = model.spectral_grid.architecture)
+
+function allocate(v::AbstractVariable{Locator2DDim}, model::AbstractModel)
+    (; NF, architecture) = model.spectral_grid
+    return RingGrids.AnvilLocator(NF, v.dims.n; architecture)
+end
+
+"""Dimension for 3D locator, locating `n` positions on model's `nlayers`, e.g. particles."""
+@kwdef struct Locator3DDim <: AbstractVariableDim
+    n::Int = 1
+end
+const LocatorDim = Locator3DDim
+
+function allocate(v::AbstractVariable{Locator3DDim}, model::AbstractModel)
+    (; NF, architecture, nlayers) = model.spectral_grid
+    return RingGrids.AnvilLocator(NF, v.dims.n, nlayers; architecture)
+end
 
 # Variable fusion support
 # We may want to fuse a group of variables into a single parent variable to

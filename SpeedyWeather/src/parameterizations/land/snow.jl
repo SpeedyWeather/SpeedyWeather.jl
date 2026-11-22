@@ -1,4 +1,6 @@
 abstract type AbstractSnow <: AbstractLandComponent end
+abstract type AbstractDynamicSnow <: AbstractSnow end
+abstract type AbstractPrescribedSnow <: AbstractSnow end
 
 export SnowModel    # maybe change for a more concise name later
 
@@ -7,14 +9,21 @@ $(TYPEDSIGNATURES)
 Single-column snow bucket model in equivalent liquid water depth. Snow accumulates
 from the diagnosed precipitation, melts once the top soil layer exceeds
 `melting_threshold`, and is capped at `snow_depth_cap` to limit infinite snow/ice accumulation
-over perennial ice caps and glaciers.
+over perennial ice caps and glaciers. The snow depth is time stepped by the land time stepper
+(`time_stepper(model.time_stepping, :land)`), the cap (and non-negativity) is applied in `filter!`.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SnowModel{NF} <: AbstractSnow
+@parameterized @kwdef struct SnowModel{NF} <: AbstractDynamicSnow
     "[OPTION] Temperature threshold for snow melting [K]"
     @param melting_threshold::NF = 275 (bounds = Positive,)
 
     "[OPTION] Permanent snow/ice depth cap in equivalent liquid water depth [m]"
     snow_depth_cap::NF = 10
+
+    "[OPTION] Initial snow depth per Kelvin the top soil layer is below `melting_threshold` [m/K]"
+    @param initial_snow_depth_rate::NF = 0.005 (bounds = Nonnegative,)
+
+    "[OPTION] Maximum initial snow depth [m]"
+    @param initial_snow_depth_max::NF = 0.2 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure SnowModel
@@ -22,10 +31,14 @@ Adapt.@adapt_structure SnowModel
 # generator function
 SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF}(; kwargs...)
 
-function variables(::SnowModel)
+# snow reads but doesn't define soil_temperature, whose dimensions are defined by the land temperature model
+function variables(::SnowModel, model::AbstractModel)
+    nsteps = get_nsteps(model.time_stepping, :land)
+    pg = nsteps.prognostic
+    tg = nsteps.tendency
     return (
-        PrognosticVariable(:snow_depth, Grid2D(), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
-        PrognosticVariable(:soil_temperature, LandXYZ(), namespace = :land, units = "K", desc = "Soil temperature"),
+        PrognosticVariable(:snow_depth, LandXYT(pg), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
+        TendencyVariable(:snow_depth, LandXYT(tg), namespace = :land, units = "m/s", desc = "Tendency of snow depth"),
         ParameterizationVariable(:snow_melt_rate, Grid2D(), namespace = :land, units = "kg/m²/s", desc = "Snow melt rate"),
     )
 end
@@ -33,9 +46,28 @@ end
 # initialize component
 initialize!(snow::SnowModel, model::PrimitiveEquation) = nothing
 
-# set initial conditions for snow depth in initial conditions
-initialize!(vars::Variables, snow::SnowModel, model::PrimitiveEquation) =
-    set!(vars.prognostic.land, model.geometry, snow_depth = 0)
+"""$(TYPEDSIGNATURES)
+Initial snow depth estimated from the top-layer soil temperature (which therefore has to be
+initialized first), growing linearly by `initial_snow_depth_rate` per Kelvin below
+`melting_threshold` up to `initial_snow_depth_max`, zero over ocean. Starting from cold but snow-free
+land puts the model on the wrong side of the snow-albedo feedback as snow accumulates only slowly."""
+function initialize!(vars::Variables, snow::SnowModel, model::PrimitiveEquation)
+    (; melting_threshold, initial_snow_depth_rate, initial_snow_depth_max) = snow
+    # top layer, all steps; a prescribed soil temperature has no steps (indexing it with 3 indices
+    # would reshape, which falls back to scalar indexing on Reactant GPU)
+    soil_temperature_data = vars.prognostic.land.soil_temperature.data
+    soil_temperature = ndims(soil_temperature_data) == 3 ? soil_temperature_data[:, 1, :] : soil_temperature_data[:, 1]
+    snow_depth = vars.prognostic.land.snow_depth
+    snow_depth.data .= initial_snow_depth.(soil_temperature, melting_threshold, initial_snow_depth_rate, initial_snow_depth_max)
+    mask!(snow_depth, model.land_sea_mask, :ocean, masked_value = 0)
+    return nothing
+end
+
+# finite soil temperature only, NaN (e.g. unmasked ocean) → no snow
+@inline function initial_snow_depth(soil_temperature, melting_threshold, rate, max_depth)
+    snow_depth = clamp(rate * (melting_threshold - soil_temperature), 0, max_depth)
+    return ifelse(isfinite(soil_temperature), snow_depth, zero(snow_depth))
+end
 
 function timestep!(
         vars::Variables,
@@ -43,9 +75,12 @@ function timestep!(
         model::PrimitiveEquation,
     )
 
-    (; Δt) = model.time_stepping                            # time step [s]
-    (; snow_depth) = vars.prognostic.land                   # in equivalent liquid water height [m]
-    (; soil_temperature) = vars.prognostic.land
+    land_time_stepper = time_stepper(model.time_stepping, :land)
+    soil_temperature = get_prognostic_step(vars.prognostic.land.soil_temperature, land_time_stepper, snow)
+    snow_depth = get_prognostic_step(vars.prognostic.land.snow_depth, land_time_stepper, snow)  # equivalent liquid water height [m]
+    snow_depth_tendency = get_tendency_step(vars.tendencies.land.snow_depth, land_time_stepper, snow)
+
+    Δt = time_step(model.time_stepping, :land, vars.prognostic.clock)    # time step [s] of the land time stepper
     (; land_fraction) = model.land_sea_mask
 
     # Some thermodynamics needed by snow
@@ -53,7 +88,7 @@ function timestep!(
     Lᵢ = model.atmosphere.latent_heat_fusion                # latent heat of fusion
     cₛ = model.land.thermodynamics.heat_capacity_dry_soil
     z₁ = model.land.geometry.layer_thickness[1]
-    (; melting_threshold, snow_depth_cap) = snow
+    (; melting_threshold) = snow
 
     # reset in any case
     vars.scratch.grid.a_2D .= 0
@@ -65,31 +100,28 @@ function timestep!(
 
     snow_melt_rate = vars.parameterizations.land.snow_melt_rate     # for soil moisture model
 
-    params = (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, snow_depth_cap)
+    params = (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ)
 
     launch!(
         architecture(snow_depth), LinearWorkOrder, size(snow_depth), land_snow_kernel!,
-        snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, land_fraction,
+        snow_depth_tendency, snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, land_fraction,
         params,
     )
     return nothing
 end
 
 @kernel inbounds = true function land_snow_kernel!(
-        snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, land_fraction,
+        snow_depth_tendency, snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, land_fraction,
         params,
     )
     ij = @index(Global, Linear)             # every grid point ij
 
     if land_fraction[ij] > 0               # at least partially land
 
-        (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, snow_depth_cap) = params
+        (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ) = params
 
         # check for melting of snow if temperature above melting threshold
-        # check for NaNs here to prevent land temperatures read from NetCDF data
-        # to cause an immediate blow up in case the land-sea mask doesn't align
-        δT_melt = isfinite(soil_temperature[ij, 1]) ?
-            max(soil_temperature[ij, 1] - melting_threshold, 0) : zero(soil_temperature[ij, 1])
+        δT_melt = max(soil_temperature[ij, 1] - melting_threshold, 0)
 
         # energy available from soil warming above melting threshold [J/m²/s]
         # heat capacity per volume, so not *density needed
@@ -106,7 +138,7 @@ end
         dsnow_max = snow_fall_rate_max - melt_rate_max
 
         # don't melt or runoff more than there is snow + snow that is falling down this time step
-        # limited amount of snow change by how much there is
+        # limited amount of snow change by how much there is (Δt is the land time step)
         dsnow = -min(snow_depth[ij] / Δt, -dsnow_max)
 
         # snow that we tried to melt/runoff that isn't available though
@@ -116,11 +148,20 @@ end
         # limited to what's available to melt/runoff
         snow_melt_rate[ij] = (melt_rate_max + dsnow_excess) * ρ_water
 
-        # Euler forward time step but cap at 0 depth to not melt more snow than available
-        snow_depth_forward = max(snow_depth[ij] + Δt * dsnow, 0)
-
-        # Conservation of mass is violated here by removing excess snow above the depth cap,
-        # but we do it at the end here to avoid that excess adding to the melt rate
-        snow_depth[ij] = min(snow_depth_forward, snow_depth_cap)
+        # the land time stepper steps snow depth forward with the uncapped tendency (the cap to the
+        # available snow is not a tendency but an adjustment, done in filter!), with Euler forward
+        # this is identical to the capped tendency as the melt rate above is capped
+        snow_depth_tendency[ij] = dsnow_max
     end
+end
+
+"""$(TYPEDSIGNATURES)
+Keep snow depth within [0, `snow_depth_cap`] after the time step. Conservation of mass is
+violated here by removing excess snow above the depth cap, done after the time step so that
+this excess does not add to the melt rate."""
+function Base.filter!(vars::Variables, snow::SnowModel, model::PrimitiveEquation)
+    snow_depth = vars.prognostic.land.snow_depth
+    (; snow_depth_cap) = snow
+    snow_depth .= clamp.(snow_depth, 0, snow_depth_cap)     # all steps
+    return nothing
 end

@@ -1,6 +1,6 @@
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct SeaSurfaceTemperatureOutput{F} <: AbstractOutputVariable
+@kwdef mutable struct SeaSurfaceTemperature{F} <: AbstractOutputVariable
     name::String = "sst"
     unit::String = "degC"
     long_name::String = "sea surface temperature"
@@ -9,15 +9,15 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 10
-    transform::F = (x) -> x - 273.15
+    transform::F = (x) -> x - oftype(x, 273.15)
 end
 
-path(::SeaSurfaceTemperatureOutput, simulation) =
+path(::SeaSurfaceTemperature, simulation) =
     simulation.variables.prognostic.ocean.sea_surface_temperature
 
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct SeaIceConcentrationOutput <: AbstractOutputVariable
+@kwdef mutable struct SeaIceConcentration <: AbstractOutputVariable
     name::String = "sic"
     unit::String = "m^2/m^2"
     long_name::String = "sea ice concentration"
@@ -29,10 +29,10 @@ Fields are: $(TYPEDFIELDS)"""
     ocean_fraction::Bool = true     # scale by ocean fraction of cell
 end
 
-path(::SeaIceConcentrationOutput, simulation) =
+path(::SeaIceConcentration, simulation) =
     simulation.variables.prognostic.ocean.sea_ice_concentration
 
-OceanOutput() = (
-    SeaSurfaceTemperatureOutput(),
-    SeaIceConcentrationOutput(),
+Ocean() = (
+    SeaSurfaceTemperature(),
+    SeaIceConcentration(),
 )

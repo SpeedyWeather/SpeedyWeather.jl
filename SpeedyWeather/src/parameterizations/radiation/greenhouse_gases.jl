@@ -31,7 +31,9 @@ greenhouse_gases_time_step!(vars::Variables, model::AbstractModel) = nothing
 """$(TYPEDSIGNATURES) The molar mass ratio CO2 / molar mass of dry air"""
 @inline molar_mass_ratio(::AbstractCO2) = 44.0f0 / 29.0f0
 
-const DEFAULT_CO2 = 280     # preindustrial CO2 [ppm]
+# CO2 [ppm] around the year 2000, the default start date of the model clock. Equal to the
+# `reference_co2` of `ByrneOGormanLongwaveTransmissivity`, so that its dry optical depth is `dry_absorption`
+const DEFAULT_CO2 = 360
 
 export CO2
 """$(TYPEDSIGNATURES) CO2 concentration [ppm] that can be a constant, e.g. `CO2(420)`
@@ -45,14 +47,15 @@ end
 CO2(SG::SpectralGrid, concentration::Real = DEFAULT_CO2) = CO2{SG.NF}(concentration)
 CO2(SG::SpectralGrid, concentration::Function) = CO2(concentration)
 
-@inline (C::CO2)(::DateTime) = C.concentration
-@inline (C::CO2{<:Function})(t::DateTime) = C.concentration(t)
+# untyped time argument to also support other time types, e.g. Reactant's
+@inline (C::CO2)(t) = C.concentration
+@inline (C::CO2{<:Function})(t) = C.concentration(t)
 
 export TwoTimesCO2, FourTimesCO2
-"$(TYPEDSIGNATURES) 2xCO2 scenario: Doubles preindustrial `DEFAULT_CO2` in the year 2000."
+"$(TYPEDSIGNATURES) 2xCO2 scenario: Doubles the default `DEFAULT_CO2` (360 ppm) at `t0`, default year 2000."
 TwoTimesCO2(t0 = DateTime(2000)) = CO2(t -> t > t0 ? 2DEFAULT_CO2 : DEFAULT_CO2)
 
-"$(TYPEDSIGNATURES) 4xCO2 scenario: Quadruples preindustrial `DEFAULT_CO2` in the year 2000."
+"$(TYPEDSIGNATURES) 4xCO2 scenario: Quadruples the default `DEFAULT_CO2` (360 ppm) at `t0`, default year 2000."
 FourTimesCO2(t0 = DateTime(2000)) = CO2(t -> t > t0 ? 4DEFAULT_CO2 : DEFAULT_CO2)
 
 export ExponentialCO2
@@ -76,8 +79,8 @@ end
 ExponentialCO2(SG::SpectralGrid; kwargs...) = ExponentialCO2{SG.NF, DateTime}(; kwargs...)
 function (C::ExponentialCO2{NF})(t) where {NF}
 
-    # time since start in seconds, convert from Float64 to NF
-    Δt = convert(NF, Dates.datetime2unix(t) - Dates.datetime2unix(C.start))
-    Δt *= convert(NF, 1 / (365.25f0 * 24 * 3600))    # time in years
+    # time since start in years, kept in Float64 (datetime2unix's type): with Reactant `t` is traced
+    # and a traced Float64 can't be converted to NF, the result is stored into a CO₂ variable of NF
+    Δt = (Dates.datetime2unix(t) - Dates.datetime2unix(C.start)) / (365.25 * 24 * 3600)
     return C.base_concentration + C.a * exp(C.b * Δt)
 end
