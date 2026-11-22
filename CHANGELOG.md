@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Entrainment in Betts-Miller convection as a rate per unit σ so parcel dilution is independent of the number of layers, new parameter `reference_layer_thickness` [#1429](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1429)
+
 - New variable group `variables.output` declared via `OutputVariable` for output-only variables, accumulated precipitation and river runoff moved there from `variables.parameterizations`. New `model.diagnostics` with `Accumulate` (parameterizations only write rates), `Maximum` and `Mean`, reset by the output writer so precipitation output is since the last output (rate output variables removed), output variables are written to restart files [#1362](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1362)
 - Fix the differentiability of `TwoBandShort` [#1401](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1401)
 - Initial conditions for retrograde planets: `ZonalWind`, `JablonowskiTemperature`, `BalancedZonalState` and `ZonalRidge` use a jet in the sense of rotation (easterly for `rotation < 0`), the mirror image of the prograde state, instead of poles that start tens of Kelvin warmer than the tropics [#1410](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1410)
