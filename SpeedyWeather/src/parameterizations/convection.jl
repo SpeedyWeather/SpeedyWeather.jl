@@ -270,7 +270,7 @@ column then need no branch to skip those levels, they contribute zero on their o
                     # entrainment: mix the rising parcel with environmental air, diluting its
                     # buoyancy and moisture; sat_humid is recomputed at the mixed temperature so
                     # the reference humidity below stays consistent with the (now mixed) T_ref
-                    ε = entrainment(σ[k])
+                    ε = entrainment(σ[k], σ[k + 1] - σ[k])    # fraction mixed over Δσ from k+1 to k
                     temp_parcel = (1 - ε) * temp_parcel + ε * temp_env
                     humid_parcel = (1 - ε) * humid_parcel + ε * humid_env
                     sat_humid = saturation_humidity(temp_parcel, σ[k] * pres, atmosphere)
@@ -433,7 +433,7 @@ exactly: downstream loops over the full column then need no branch to skip those
 
             if entraining(entrainment)      # compiled away entirely for NoEntrainment
                 # entrainment: mix the rising parcel with environmental air, diluting its buoyancy
-                ε = entrainment(σ[k])
+                ε = entrainment(σ[k], σ[k + 1] - σ[k])    # fraction mixed over Δσ from k+1 to k
                 temp_parcel = (1 - ε) * temp_parcel + ε * temp_env
             end
 
