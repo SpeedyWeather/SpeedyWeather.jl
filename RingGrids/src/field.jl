@@ -27,7 +27,8 @@ Field(grid::AbstractGrid, k...) = zeros(grid, k...)
 Field(::Type{T}, grid::AbstractGrid, k...) where {T} = zeros(T, grid, k...)
 Field(grid::AbstractGrid, dims::AbstractArrayDimensions, k...) = zeros(grid, dims, k...)
 Field(::Type{T}, grid::AbstractGrid, dims::AbstractArrayDimensions, k...) where {T} = zeros(T, grid, dims, k...)
-(::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid, args...) where {T} = Field(T.(data), grid, args...)
+(::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid, args...) where {T} =
+    Field(eltype(data) === T ? data : T.(data), grid, args...)
 
 # TYPES
 Architectures.nonparametric_type(::Type{<:Field}) = Field
@@ -123,7 +124,16 @@ matrix_size(field::AbstractField) = (matrix_size(field.grid)..., size(field)[2:e
 # simply propagate all indices forward
 Base.@propagate_inbounds Base.getindex(field::AbstractField, ijk...) = getindex(field.data, ijk...)
 Base.@propagate_inbounds Base.setindex!(field::AbstractField, x, ijk...) = setindex!(field.data, x, ijk...)
-Base.fill!(field::AbstractField, x) = fill!(field.data, x)
+function Base.fill!(field::AbstractField, x) 
+    fill!(field.data, x)
+    return field
+end 
+
+# defined explicitly as the generic AbstractArray fallback uses scalar indexing, which errors on GPU
+function Base.clamp!(field::AbstractField, lo, hi)
+    clamp!(field.data, lo, hi)
+    return field
+end
 
 # make [:, k...] not escape the Field
 @inline Base.getindex(field::AbstractField, col::Colon, k...) = Field(field.data[col, k...], field.grid, field.dims[col, k...])
@@ -232,140 +242,153 @@ Base.Vector(field::AbstractField2D) = Array(field, as = Vector)
 Base.Matrix(field::AbstractField2D) = Array(field, as = Matrix)
 
 for f in (:zeros, :ones, :rand, :randn)
-    @eval begin
-        # zeros(grid, nlayers...)
-        function Base.$f(grid::AbstractGrid, k::Integer...)
-            data = array_type(grid.architecture)($f(DEFAULT_NF, get_npoints(grid), k...))
-            return Field(data, grid)
-        end
+    # rand and randn additionally accept a random number generator as optional first argument
+    prefixes = f in (:rand, :randn) ? (Any[], Any[:(rng::Random.AbstractRNG)]) : (Any[],)
+    for sig_args in prefixes
+        call_args = isempty(sig_args) ? Any[] : Any[:rng]
+        @eval begin
+            # zeros(grid, nlayers...)
+            function Base.$f($(sig_args...), grid::AbstractGrid, k::Integer...)
+                data = array_type(grid.architecture)($f($(call_args...), DEFAULT_NF, get_npoints(grid), k...))
+                return Field(data, grid)
+            end
 
-        # zeros(grid, dims, nlayers...)
-        function Base.$f(grid::AbstractGrid, dims::AbstractArrayDimensions, k::Integer...)
-            data = array_type(grid.architecture)($f(DEFAULT_NF, get_npoints(grid), k...))
-            return Field(data, grid, dims)
-        end
+            # zeros(grid, dims, nlayers...)
+            function Base.$f($(sig_args...), grid::AbstractGrid, dims::AbstractArrayDimensions, k::Integer...)
+                data = array_type(grid.architecture)($f($(call_args...), DEFAULT_NF, get_npoints(grid), k...))
+                return Field(data, grid, dims)
+            end
 
-        # zeros(NF, grid, nlayers...)
-        function Base.$f(::Type{T}, grid::AbstractGrid, k::Integer...) where {T}
-            data = array_type(grid.architecture)($f(T, get_npoints(grid), k...))
-            return Field(data, grid)
-        end
+            # zeros(NF, grid, nlayers...)
+            function Base.$f($(sig_args...), ::Type{T}, grid::AbstractGrid, k::Integer...) where {T}
+                data = array_type(grid.architecture)($f($(call_args...), T, get_npoints(grid), k...))
+                return Field(data, grid)
+            end
 
-        # zeros(NF, grid, dims, nlayers...)
-        function Base.$f(::Type{T}, grid::AbstractGrid, dims::AbstractArrayDimensions, k::Integer...) where {T}
-            data = array_type(grid.architecture)($f(T, get_npoints(grid), k...))
-            return Field(data, grid, dims)
-        end
+            # zeros(NF, grid, dims, nlayers...)
+            function Base.$f($(sig_args...), ::Type{T}, grid::AbstractGrid, dims::AbstractArrayDimensions, k::Integer...) where {T}
+                data = array_type(grid.architecture)($f($(call_args...), T, get_npoints(grid), k...))
+                return Field(data, grid, dims)
+            end
 
-        # zeros(Grid, nlat_half, nlayers...)
-        # ::Integer added here to avoid ambiguity with array.jl in Base
-        function Base.$f(Grid::Type{<:AbstractGrid}, nlat_half::Integer, k::Integer...; architecture = DEFAULT_ARCHITECTURE())
-            grid = Grid(nlat_half, architecture)
-            data = array_type(architecture)($f(DEFAULT_NF, get_npoints(grid), k...))
-            return Field(data, grid)
-        end
+            # zeros(Grid, nlat_half, nlayers...)
+            # ::Integer added here to avoid ambiguity with array.jl in Base
+            function Base.$f($(sig_args...), Grid::Type{<:AbstractGrid}, nlat_half::Integer, k::Integer...; architecture = DEFAULT_ARCHITECTURE())
+                grid = Grid(nlat_half, architecture)
+                data = array_type(architecture)($f($(call_args...), DEFAULT_NF, get_npoints(grid), k...))
+                return Field(data, grid)
+            end
 
-        # zeros(Grid, nlat_half, dims, nlayers...)
-        function Base.$f(Grid::Type{<:AbstractGrid}, nlat_half::Integer, dims::AbstractArrayDimensions, k::Integer...; architecture = DEFAULT_ARCHITECTURE())
-            grid = Grid(nlat_half, architecture)
-            data = array_type(architecture)($f(DEFAULT_NF, get_npoints(grid), k...))
-            return Field(data, grid, dims)
-        end
+            # zeros(Grid, nlat_half, dims, nlayers...)
+            function Base.$f($(sig_args...), Grid::Type{<:AbstractGrid}, nlat_half::Integer, dims::AbstractArrayDimensions, k::Integer...; architecture = DEFAULT_ARCHITECTURE())
+                grid = Grid(nlat_half, architecture)
+                data = array_type(architecture)($f($(call_args...), DEFAULT_NF, get_npoints(grid), k...))
+                return Field(data, grid, dims)
+            end
 
-        # zeros(NF, Grid, nlat_half, nlayers...)
-        function Base.$f(
-                ::Type{T},
-                Grid::Type{<:AbstractGrid},
-                nlat_half::Integer,
-                k::Integer...;
-                architecture = DEFAULT_ARCHITECTURE(),
-            ) where {T}
-            grid = Grid(nlat_half, architecture)
-            data = array_type(architecture)($f(T, get_npoints(grid), k...))
-            return Field(data, grid)
-        end
+            # zeros(NF, Grid, nlat_half, nlayers...)
+            function Base.$f(
+                    $(sig_args...),
+                    ::Type{T},
+                    Grid::Type{<:AbstractGrid},
+                    nlat_half::Integer,
+                    k::Integer...;
+                    architecture = DEFAULT_ARCHITECTURE(),
+                ) where {T}
+                grid = Grid(nlat_half, architecture)
+                data = array_type(architecture)($f($(call_args...), T, get_npoints(grid), k...))
+                return Field(data, grid)
+            end
 
-        # zeros(NF, Grid, nlat_half, dims, nlayers...)
-        function Base.$f(
-                ::Type{T},
-                Grid::Type{<:AbstractGrid},
-                nlat_half::Integer,
-                dims::AbstractArrayDimensions,
-                k::Integer...;
-                architecture = DEFAULT_ARCHITECTURE(),
-            ) where {T}
-            grid = Grid(nlat_half, architecture)
-            data = array_type(architecture)($f(T, get_npoints(grid), k...))
-            return Field(data, grid, dims)
-        end
+            # zeros(NF, Grid, nlat_half, dims, nlayers...)
+            function Base.$f(
+                    $(sig_args...),
+                    ::Type{T},
+                    Grid::Type{<:AbstractGrid},
+                    nlat_half::Integer,
+                    dims::AbstractArrayDimensions,
+                    k::Integer...;
+                    architecture = DEFAULT_ARCHITECTURE(),
+                ) where {T}
+                grid = Grid(nlat_half, architecture)
+                data = array_type(architecture)($f($(call_args...), T, get_npoints(grid), k...))
+                return Field(data, grid, dims)
+            end
 
-        function Base.$f(
-                ::Type{F},
-                nlat_half::Integer,
-                k::Integer...;
-                architecture = DEFAULT_ARCHITECTURE(),
-            ) where {F <: AbstractField}
-            Grid = grid_type(F)
-            grid = nonparametric_type(Grid)(nlat_half, architecture)
-            data = array_type(architecture)($f(get_npoints(grid), k...))
-            return Field(data, grid)
-        end
+            function Base.$f(
+                    $(sig_args...),
+                    ::Type{F},
+                    nlat_half::Integer,
+                    k::Integer...;
+                    architecture = DEFAULT_ARCHITECTURE(),
+                ) where {F <: AbstractField}
+                Grid = grid_type(F)
+                grid = nonparametric_type(Grid)(nlat_half, architecture)
+                data = array_type(architecture)($f($(call_args...), get_npoints(grid), k...))
+                return Field(data, grid)
+            end
 
-        function Base.$f(
-                ::Type{F},
-                nlat_half::Integer,
-                dims::AbstractArrayDimensions,
-                k::Integer...;
-                architecture = DEFAULT_ARCHITECTURE(),
-            ) where {F <: AbstractField}
-            Grid = grid_type(F)
-            grid = nonparametric_type(Grid)(nlat_half, architecture)
-            data = array_type(architecture)($f(get_npoints(grid), k...))
-            return Field(data, grid, dims)
-        end
+            function Base.$f(
+                    $(sig_args...),
+                    ::Type{F},
+                    nlat_half::Integer,
+                    dims::AbstractArrayDimensions,
+                    k::Integer...;
+                    architecture = DEFAULT_ARCHITECTURE(),
+                ) where {F <: AbstractField}
+                Grid = grid_type(F)
+                grid = nonparametric_type(Grid)(nlat_half, architecture)
+                data = array_type(architecture)($f($(call_args...), get_npoints(grid), k...))
+                return Field(data, grid, dims)
+            end
 
-        function Base.$f(
-                ::Type{F},
-                nlat_half::Integer,
-                k::Integer...;
-                architecture = DEFAULT_ARCHITECTURE(),
-            ) where {F <: AbstractField{T}} where {T}
-            Grid = grid_type(F)
-            grid = nonparametric_type(Grid)(nlat_half, architecture)
-            data = array_type(architecture)($f(T, get_npoints(grid), k...))
-            return Field(data, grid)
-        end
+            function Base.$f(
+                    $(sig_args...),
+                    ::Type{F},
+                    nlat_half::Integer,
+                    k::Integer...;
+                    architecture = DEFAULT_ARCHITECTURE(),
+                ) where {F <: AbstractField{T}} where {T}
+                Grid = grid_type(F)
+                grid = nonparametric_type(Grid)(nlat_half, architecture)
+                data = array_type(architecture)($f($(call_args...), T, get_npoints(grid), k...))
+                return Field(data, grid)
+            end
 
-        function Base.$f(
-                ::Type{F},
-                nlat_half::Integer,
-                dims::AbstractArrayDimensions,
-                k::Integer...;
-                architecture = DEFAULT_ARCHITECTURE(),
-            ) where {F <: AbstractField{T}} where {T}
-            Grid = grid_type(F)
-            grid = nonparametric_type(Grid)(nlat_half, architecture)
-            data = array_type(architecture)($f(T, get_npoints(grid), k...))
-            return Field(data, grid, dims)
-        end
+            function Base.$f(
+                    $(sig_args...),
+                    ::Type{F},
+                    nlat_half::Integer,
+                    dims::AbstractArrayDimensions,
+                    k::Integer...;
+                    architecture = DEFAULT_ARCHITECTURE(),
+                ) where {F <: AbstractField{T}} where {T}
+                Grid = grid_type(F)
+                grid = nonparametric_type(Grid)(nlat_half, architecture)
+                data = array_type(architecture)($f($(call_args...), T, get_npoints(grid), k...))
+                return Field(data, grid, dims)
+            end
 
-        function Base.$f(
-                ::Type{F},
-                grid::AbstractGrid,
-                k::Integer...,
-            ) where {F <: AbstractField{T}} where {T}
-            data = array_type(F)($f(T, get_npoints(grid), k...))
-            return Field(data, grid, dims_type(F)())
-        end
+            function Base.$f(
+                    $(sig_args...),
+                    ::Type{F},
+                    grid::AbstractGrid,
+                    k::Integer...,
+                ) where {F <: AbstractField{T}} where {T}
+                data = array_type(F)($f($(call_args...), T, get_npoints(grid), k...))
+                return Field(data, grid, dims_type(F)())
+            end
 
-        function Base.$f(
-                ::Type{F},
-                grid::AbstractGrid,
-                dims::AbstractArrayDimensions,
-                k::Integer...,
-            ) where {F <: AbstractField{T}} where {T}
-            data = array_type(F)($f(T, get_npoints(grid), k...))
-            return Field(data, grid, dims)
+            function Base.$f(
+                    $(sig_args...),
+                    ::Type{F},
+                    grid::AbstractGrid,
+                    dims::AbstractArrayDimensions,
+                    k::Integer...,
+                ) where {F <: AbstractField{T}} where {T}
+                data = array_type(F)($f($(call_args...), T, get_npoints(grid), k...))
+                return Field(data, grid, dims)
+            end
         end
     end
 end
@@ -646,6 +669,7 @@ find_field(x) = x
 find_field(::Tuple{}) = nothing
 find_field(a::AbstractField, rest) = a
 find_field(::Any, rest) = find_field(rest)
+find_field(ex::Base.Broadcast.Extruded) = find_field(ex.x)
 
 # allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
 # e.g. field1 + field2 creates a new field that share the grid of field1
@@ -696,6 +720,16 @@ FieldGPUStyle{1, Grid}(::Val{2}) where {Grid} = FieldGPUStyle{2, Grid}()
 FieldGPUStyle{1, Grid}(::Val{0}) where {Grid} = FieldGPUStyle{1, Grid}()
 FieldGPUStyle{2, Grid}(::Val{3}) where {Grid} = FieldGPUStyle{3, Grid}()
 FieldGPUStyle{3, Grid}(::Val{4}) where {Grid} = FieldGPUStyle{4, Grid}()
+
+# combine with any other GPU array style (e.g. plain CuArray, Adjoint/Transpose of one) choosing
+# the larger dimensionality, mirroring Base's AbstractArrayStyle-DefaultArrayStyle rule; without
+# this, mixing a Field with a bare GPU array falls back to Broadcast.Unknown() since their type
+# names differ, which silently triggers scalar indexing on the GPU array
+Base.BroadcastStyle(::FieldGPUStyle{N, Grid}, ::GPUArrays.AbstractGPUArrayStyle{M}) where {N, Grid, M} = FieldGPUStyle{N, Grid}(Val(max(N, M)))
+Base.BroadcastStyle(::GPUArrays.AbstractGPUArrayStyle{M}, ::FieldGPUStyle{N, Grid}) where {N, Grid, M} = FieldGPUStyle{N, Grid}(Val(max(N, M)))
+
+# disambiguate the two general rules above for the Field-Field case (same Grid, different N)
+Base.BroadcastStyle(::FieldGPUStyle{M, Grid}, ::FieldGPUStyle{N, Grid}) where {M, N, Grid} = FieldGPUStyle{M, Grid}(Val(max(M, N)))
 
 function KernelAbstractions.get_backend(
         field::F

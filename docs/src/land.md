@@ -84,7 +84,7 @@ model.land
 
 is now the land defined above used when integrating a SpeedyWeather `model`.
 
-In case a non-default number of soil layers is used, the `LandGeometry` also needs to be passed to the `NetCDFOutput` constructor to allocate the correct dimensions of the output variables, when an output is desired:
+In case a non-default number of soil layers is used, the `LandGeometry` also needs to be passed to the [`NetCDFOutput`](@ref) constructor to allocate the correct dimensions of the output variables, when an output is desired:
 
 ```julia
 output = NetCDFOutput("output.nc", model, land_geometry)
@@ -181,7 +181,7 @@ C_2 &= C_w W_2 \gamma + C_s
 \end{aligned}
 ```
 
-with ``\gamma = 0.24`` being the field capacity per meter soil.
+with ``\gamma = 0.3`` being the field capacity per meter soil.
 
 ## Land soil moisture
 
@@ -199,6 +199,9 @@ model constructor
 soil_moisture = LandBucketMoisture(spectral_grid)
 land = LandModel(spectral_grid; soil_moisture)
 ```
+
+`SeasonalSoilMoisture` reads volumetric soil moisture from the climatology
+and converts it to a fraction of the field capacity, capped at 1.
 
 ### LandBucketMoisture
 
@@ -223,14 +226,14 @@ The equations are
 
 for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
 defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
-with ``\gamma = 0.24`` the field capacity per meter soil and
+with ``\gamma = 0.3`` the field capacity per meter soil and
 ``\Delta z_1 = 0.1~m`` the top layer thickness by default, and
 ``\Delta z_2 = 4.0~m`` the layer below. The top layer is forced by precipitation
 ``P`` minus evaporation ``E`` minus river runoff ``R``. The second term is a
 diffusion term of soil moisture between the two layers, acting on a time scale
 of ``\tau = 2~``days.
 
-At the moment (and generally if not coupled to an ocean model) the river runoff
+At the moment (and generally if not coupled to an [ocean model](@ref "Ocean models")) the river runoff
 lets water disappear. ``W_1, W_2`` are bounded by ``[0, 1]`` so that if
 more precipitation ``P`` (or in combination with negative evaporation ``E``,
 meaning condensation) occurs than the land can hold we compute the excess water
@@ -295,14 +298,28 @@ in ``kg/m²/s``, where the `excess` term (negative for melting trying to remove 
 only appears when the naive tendency would overdraw the bucket.
 `snow_melt_rate` is zero over ocean points. Negative snow depth is clamped to zero (technically redundant given the conserving excess term above) and stored 
 as equivalent liquid water height, not physical snow thickness. The accumulation is 
-capped at 10m equivalent liquid water height, following how permanent snow area is treated 
-in [IFS Cycle 49r1](https://www.ecmwf.int/en/elibrary/81626-ifs-documentation-cy49r1-part-iv-physical-processes). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
+capped at 10m equivalent liquid water height, following how permanent snow area is treated
+in [IFSCycle49r1](@citep). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
+
+Snow needs time to accumulate from precipitation, so starting from snow-free land would put
+the model on the wrong side of the snow-albedo feedback: dark, cold land warms and melts what
+little snow falls. The initial snow depth is therefore estimated from the initial top-layer soil
+temperature ``T_1``
+
+```math
+S_0 = \min\left(r \max(T_{melt} - T_1, 0), S_{max}\right)
+```
+
+with `initial_snow_depth_rate` ``r = 5~mm/K`` and `initial_snow_depth_max` ``S_{max} = 0.2~m``,
+and zero over ocean. So land 10 K below ``T_{melt}`` starts fully snow covered and ``250~K`` land
+with about ``0.12~m``, comparable to observed winter maxima at high latitudes.
+Use `SnowModel(spectral_grid, initial_snow_depth_rate = 0)` to start without snow.
 
 The snow budget links into other surface schemes:
 
 - `snow_melt_rate` provides a latent heat sink to the land temperature budget.
 - The same flux (converted to ``m/s`` by dividing by ``ρ_w``) feeds the soil moisture tendency alongside rain.
-- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see below).
+- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see [Albedo](@ref)).
 
 Snow cover over land is diagnosed from snow depth using either a linear ramp
 ``σₛ = \min(S / \text{snow\_depth\_scale}, 1)`` or the default saturating form
@@ -311,7 +328,8 @@ Snow cover over land is diagnosed from snow depth using either a linear ramp
 σₛ = \frac{S}{S + \text{snow\_depth\_scale}},
 ```
 
-set via the `snow_cover` keyword of `LandSnowAlbedo`. Snow then adds an albedo to the land albedo
+set via the `snow_cover` keyword of `LandSnowAlbedo` or `LearnedLandAlbedo` (the default),
+see [Albedo](@ref). With `LandSnowAlbedo` snow then adds an albedo to the land albedo
 (diagnosed from vegetation cover)
 
 ```math
@@ -322,96 +340,6 @@ so snow depth from the snow bucket immediately brightens land grid cells.
 The total albedo is higher over already brighter areas (low vegetation cover)
 and lower over darker areas. This somewhat reflects that in forests the
 snow cover is broken up and snow lies in between trees.
-
-## Albedo
-
-Albedo is the surface reflectivity to downward solar shortwave radiation.
-A value of 1 indicates that all of the radiative flux is reflected at
-the Earth's surface and sent back up through the atmospheric column.
-In contrast, a value of 0 means no reflection and all of that radiative
-flux is absorbed, typically heating ocean or land surface.
-The following albedo's are currently implemented
-
-```@example land
-subtypes(SpeedyWeather.AbstractAlbedo)
-```
-Albedo is generally a 2D global diagnostic variable for ocean and land separately.
-You can keep it constant or diagnose it from other fields on every time step:
-`OceanSeaIceAlbedo` mixes in sea ice concentration and `LandSnowAlbedo` uses the
-snow depth bucket described above. Conceptually albedo is not a static boundary
-condition but recomputed each step so transient surface changes (e.g. snowfall)
-brighten the surface without losing the underlying bare albedo. If you want to set
-albedo manually with `set!` then use `ManualAlbedo` which has its own albedo 2D field
-that is copied into the diagnostic variables on every time step.
-See example below.
-`AlbedoClimatology` does the same but `ManualAlbedo` does not need
-to read an albedo from file at initialization.
-
-`Albedo` itself is a container for separate albedo's for ocean and land as
-averaging those in grid cells which are partially land, partially ocean will
-yield inaccurate results. Think 10% land having a lower heat capacity than
-land but being treated with an albedo that comes from 90% ocean.
-Not very realistic. The default albedo can be created with
-
-```@example land
-albedo = OceanLandAlbedo(spectral_grid)
-```
-
-and inspected with
-
-```@example land
-albedo.ocean
-```
-
-and `albedo.land`. You can mix those albedos too, they are internally
-two independent albedos that are applied to fluxes separately, e.g.
-
-```@example land
-albedo = OceanLandAlbedo(GlobalConstantAlbedo(spectral_grid), AlbedoClimatology(spectral_grid))
-```
-
-constructs an albedo that is a global constant (default 0.3) for the ocean
-but the `AlbedoClimatology` read from file used for the land.
-The first argument for `Albedo` is used for ocean the second for land
-but you can use keywords too.
-
-Alternatively you can also drop the separation into ocean/land albedo
-(e.g. idealised simulations or aqua planet, rocky planet). And just
-use
-
-```@example land
-albedo = GlobalConstantAlbedo(spectral_grid)
-```
-
-and this definition of the albedo will be used for both ocean and land fluxes.
-In all cases you can then pass on the albedo to the model constructor, e.g.
-
-```@example land
-albedo = OceanLandAlbedo(GlobalConstantAlbedo(spectral_grid, albedo=0.1), ManualAlbedo(spectral_grid))
-set!(albedo.land, (λ, φ) -> 0.2 + 0.3*abs(φ)/90)
-
-model = PrimitiveWetModel(spectral_grid; albedo)
-model.albedo
-```
-
-The albedo in the `model` is now the one defined just in the lines above,
-using a globally constant albedo of 0.1 for the ocean but a higher albedo
-over land which also increases to 0.5 towards the poles.
-
-You can always output the land-sea mask weighted albedo with
-`add!(model, SpeedyWeather.AlbedoOutput())` or inspect it as follows
-
-```@example land
-simulation = initialize!(model)
-run!(simulation, steps=1)   # run for a step to "diagnose" albedo = ocean/land weighted
-
-using CairoMakie
-(; albedo) = simulation.variables.parameterizations
-heatmap(albedo, title="Custom albedo, separately defined for ocean/land")
-save("ocean_land_albedo.png", ans) # hide
-nothing # hide
-```
-![Ocean-land albedo](ocean_land_albedo.png)
 
 ## Terrarium coupling
 
@@ -473,8 +401,8 @@ model = PrimitiveWetModel(
 simulation = initialize!(model)
 ```
 
-Then the model can be run as any other `Simulation`.
-Terarrium's state variales are owned by SpeedyWeather's `Variables` and can be accessed via 
+Then the model can be run as any other [`Simulation`](@ref).
+Terarrium's state variales are owned by SpeedyWeather's [`Variables`](@ref "Variables") and can be accessed via 
 
 ```@example terrarium
 simulation.variables.prognostic.land.terrarium
@@ -483,19 +411,19 @@ simulation.variables.prognostic.land.terrarium
 ### Output of Terrarium variables
 
 Any variable of the Terrarium state (prognostic, auxiliary/diagnostic, or input)
-can be written to SpeedyWeather's output with `TerrariumOutput`. Its name,
+can be written to SpeedyWeather's output with `OutputVariables.Terrarium`. Its name,
 units, long name and dimensionality are derived automatically from Terrarium's
 variable metadata. Add all prognostic and auxiliary Terrarium variables with
 
 ```@example terrarium
-add!(model, TerrariumOutput(terrarium_model)...)
+add!(model, OutputVariables.Terrarium(terrarium_model)...)
 ```
 
 or add a single variable (here renamed in the output file via `name`, any Terrarium
 variable name works, e.g. also `:saturation_water_ice` or `:sensible_heat_flux`) with
 
 ```@example terrarium
-add!(model, TerrariumOutput(terrarium_model, :temperature, name = "soil_temperature"))
+add!(model, OutputVariables.Terrarium(terrarium_model, :temperature, name = "soil_temperature"))
 nothing # hide
 ```
 
@@ -504,13 +432,12 @@ Then run the simulation with `run!(simulation, output = true)` as usual.
 additional vertical dimension `soil_depth` with the depths of the
 Terrarium soil layer centres (in meters, positive down) as coordinates.
 Ocean grid points, where Terrarium does not simulate anything, are filled
-with NaN. Terrarium output variables are supported both with `NetCDFOutput`
-and, once Zarr.jl is loaded, with `ZarrOutput`:
+with NaN. Terrarium output variables are supported both with [`NetCDFOutput`](@ref)
+and, once Zarr.jl is loaded, with [`ZarrOutput`](@ref "Zarr Output"):
 
 ```julia
 using Zarr
 output = ZarrOutput(spectral_grid, PrimitiveWet)
 model = PrimitiveWetModel(spectral_grid; land, output, ...)
-add!(model, TerrariumOutput(terrarium_model)...)
+add!(model, OutputVariables.Terrarium(terrarium_model)...)
 ```
-

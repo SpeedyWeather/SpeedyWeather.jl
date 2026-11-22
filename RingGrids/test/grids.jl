@@ -1,4 +1,5 @@
 using JLArrays
+import Random
 
 @testset "Grid types" begin
     # TODO: These grid/field types should be pulled out into constants rather than copy-pasted
@@ -23,6 +24,27 @@ using JLArrays
             @test G <: RingGrids.AbstractReducedGrid
         end
     end
+end
+
+@testset "Average resolution" begin
+    for G in (
+            FullClenshawGrid,
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+            FullHEALPixGrid,
+            FullOctaHEALPixGrid,
+        )
+        grid = G(24)
+        degrees = average_resolution(grid)
+        @test degrees == average_resolution(G, 24)
+        @test get_npoints(grid) * deg2rad(degrees)^2 ≈ 4π     # npoints squares of that side cover the sphere
+        @test average_resolution(G(48)) < degrees             # more rings, finer
+    end
+    @test average_resolution(OctahedralGaussianGrid(24)) ≈ 3.61 atol = 0.01     # T32's grid, as SpectralGrid shows it
 end
 
 @testset "Field types" begin
@@ -161,6 +183,23 @@ end
     end
 end
 
+@testset "Field{T, N, A, G}(data, grid) skips no-op cast" begin
+    # Regression: under Reactant, `T.(data)` with `eltype(data) === T` traces as a
+    # self-recursive `copy(::Broadcasted)` that blows the Julia stack. The constructor
+    # must pass `data` through identity-ically when the eltype already matches.
+    grid = HEALPixGrid(4)
+    data = zeros(Float32, RingGrids.get_npoints(grid))
+    F = typeof(Field(data, grid))   # Field{Float32, 1, Vector{Float32}, HEALPixGrid{...}}
+
+    field_same = F(data, grid)
+    @test field_same.data === data   # identity, no broadcast/copy
+
+    data64 = zeros(Float64, RingGrids.get_npoints(grid))
+    field_cast = F(data64, grid)
+    @test eltype(field_cast) === Float32
+    @test field_cast.data !== data64   # broadcast/cast ran
+end
+
 @testset "Field generators: ones" begin
     for NF in (Float32, Float64)
         for F in (
@@ -213,6 +252,35 @@ end
 
             G1 = randn(NF, G, n)
             @test eltype(G1) == NF
+        end
+    end
+end
+
+@testset "Field generators: rand, randn with rng" begin
+    for f in (rand, randn)
+        n = 4      # resolution parameter nlat_half
+        grid = OctahedralGaussianGrid(n)
+
+        # same seed = same field, reproducibility
+        @test f(Random.Xoshiro(123), grid) == f(Random.Xoshiro(123), grid)
+        @test f(Random.Xoshiro(123), grid, 2) == f(Random.Xoshiro(123), grid, 2)
+
+        # rng doesn't change type or size compared to no rng
+        for NF in (Float32, Float64)
+            F1 = f(Random.Xoshiro(123), NF, grid, 2)
+            F2 = f(NF, grid, 2)
+            @test typeof(F1) == typeof(F2)
+            @test size(F1) == size(F2)
+
+            F1 = f(Random.Xoshiro(123), NF, OctahedralGaussianGrid, n)
+            F2 = f(NF, OctahedralGaussianGrid, n)
+            @test typeof(F1) == typeof(F2)
+            @test size(F1) == size(F2)
+
+            F1 = f(Random.Xoshiro(123), OctahedralGaussianField{NF}, n)
+            F2 = f(OctahedralGaussianField{NF}, n)
+            @test typeof(F1) == typeof(F2)
+            @test size(F1) == size(F2)
         end
     end
 end
@@ -548,9 +616,16 @@ end
         field[:, 1, 2] = v
         @test field[:, 1, 2].data ≈ v.data
 
-        # fill
-        fill!(field, 2.0)
+        # fill! (returns a Field, not the bare underlying array)
+        filled = fill!(field, 2.0)
         @test all(field .== 2)
+        @test filled isa Field{NF, ndims, JLArray{NF, ndims}}
+
+        # clamp! (uses `field.data`'s clamp! to avoid scalar indexing on GPU)
+        field3 = on_architecture(jl_arch, randn(F{NF}, s...))
+        clamped = clamp!(field3, NF(-0.5), NF(0.5))
+        @test clamped isa Field{NF, ndims, JLArray{NF, ndims}}
+        @test all(-0.5 .<= clamped .<= 0.5)
     end
 end
 
@@ -694,4 +769,22 @@ end
 
     # Check that concatenation along dimension 1 fails
     @test_throws AssertionError cat(F1, F2, dims = 1)
+end
+
+@testset "get_londlatds for full grids" begin
+    for G in (FullClenshawGrid, FullGaussianGrid, FullHEALPixGrid, FullOctaHEALPixGrid)
+        for nlat_half in (1, 2, 3, 8)
+            (G <: FullHEALPixGrid && isodd(nlat_half)) && continue
+            grid = G(nlat_half)
+            londs, latds = RingGrids.get_londlatds(grid)
+            lond = RingGrids.get_lond(grid)
+            latd = RingGrids.get_latd(grid)
+
+            @test length(londs) == length(latds) == RingGrids.get_npoints(grid)
+            for (j, ring) in enumerate(eachring(grid))
+                @test londs[ring] == lond
+                @test all(latds[ring] .== latd[j])
+            end
+        end
+    end
 end

@@ -1,22 +1,54 @@
-# Shared test logic for CUDA-graphs tests, called from cuda_graphs.jl.
-# HIP graphs are not implemented for AMDGPU (see SpeedyTransformsAMDGPUExt.jl and
-# hip_graphs.jl), so this is CUDA-only.
-# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live inside the CUDA extension
-# module (SpeedyTransformsCUDAExt), not in the main SpeedyTransforms package — hence
-# accessed via `ext.` below, not `SpeedyTransforms.`.
+# Shared test logic for GPU-graphs tests, called from cuda_graphs.jl and hip_graphs.jl.
+# GRAPH_CACHES, MAX_GRAPHS, and clear_fourier_graph_cache! live in the main SpeedyTransforms
+# package (they're backend-agnostic — see SpeedyTransforms/src/gpu_graphs_common.jl), hence
+# accessed via `SpeedyTransforms.` below. `ext` (the backend extension module, or `nothing` if
+# not loaded) is still used to gate these tests on the extension actually being loaded.
+#
+# These tests only actually exercise the graphs-accelerated path when
+# `SpeedyTransforms.default_gpu_graphs` says this backend's GPU-graphs are trusted (currently:
+# `false` for AMDGPU — HIP graphs aren't confirmed stable outside datacenter/CDNA hardware yet).
+# That single method is the switch: to enable these tests (e.g. once run on trusted hardware like
+# LUMI), edit `SpeedyTransforms/ext/SpeedyTransformsAMDGPUExt.jl` and change
+# `default_gpu_graphs(::AMDGPU.ROCBackend) = false` to `= true`. This also flips the runtime
+# default for `SpectralTransform`'s `gpu_graphs` keyword on AMDGPU — that's intentional, it's the
+# same trust decision, not a separate toggle.
 
 function test_gpu_graphs(ext, prefix)
-    @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
+    @testset "$prefix Graphs: clearing the cache reclaims device memory" begin
         if ext !== nothing
+            architecture = SpeedyWeather.GPU()
+            # the backend extension provides the method that trims the memory pool
+            @test parentmodule(which(SpeedyTransforms.reclaim!, (typeof(architecture),))) == ext
+            @test SpeedyTransforms.reclaim!(architecture) === nothing
+
+            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture)
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
+            transform(rand(Float32, spectral_grid.grid, spectral_grid.nlayers), S)
+
+            @test SpeedyTransforms.clear_fourier_graph_cache!(gc = false) === nothing
+            @test isempty(SpeedyTransforms.GRAPH_CACHES)
+
+            # with GC + reclaim (default), also with the architecture passed on explicitly
+            transform(rand(Float32, spectral_grid.grid, spectral_grid.nlayers), S)
+            @test SpeedyTransforms.clear_fourier_graph_cache!() === nothing
+            @test SpeedyTransforms.clear_fourier_graph_cache!(architecture) === nothing
+            @test isempty(SpeedyTransforms.GRAPH_CACHES)
+        end
+    end
+
+    @testset "$prefix Graphs: bounded graph cache over a GPU model run" begin
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(SpeedyWeather.GPU())
             spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
-            model = PrimitiveWetModel(spectral_grid; spectral_transform = SpectralTransform(spectral_grid))
+            # gpu_graphs explicit: default is backend-dependent (see `default_gpu_graphs`), this
+            # test specifically exercises the graphs-enabled path
+            model = PrimitiveWetModel(spectral_grid; spectral_transform = SpectralTransform(spectral_grid; gpu_graphs = true))
             simulation = initialize!(model)
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
 
             function cache_stats()
                 maxlen = total = failed = 0
-                for c in values(ext.GRAPH_CACHES), execs in (c.forward_execs, c.inverse_execs)
+                for c in values(SpeedyTransforms.GRAPH_CACHES), execs in (c.forward_execs, c.inverse_execs)
                     maxlen = max(maxlen, length(execs))
                     total += length(execs)
                     failed += count(e -> e === nothing, values(execs))
@@ -33,9 +65,9 @@ function test_gpu_graphs(ext, prefix)
             @test s2.failed == 0                # nothing fell back to the un-captured direct loop
             @test s2.total == s1.total          # extra steps add no graphs → cache is bounded
             @test s1.total > 0                  # graphs were actually captured
-            @test s1.maxlen < ext.MAX_GRAPHS    # cache stays under the cap
+            @test s1.maxlen < SpeedyTransforms.MAX_GRAPHS    # cache stays under the cap
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
         end
     end
 
@@ -45,55 +77,93 @@ function test_gpu_graphs(ext, prefix)
     # key on the stable device pointer — not the churning wrapper identity — or it captures a
     # new graph every step and grows without bound.
     @testset "$prefix Graphs: per-step views of one buffer reuse a single graph" begin
-        if ext !== nothing
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(SpeedyWeather.GPU())
             spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture = SpeedyWeather.GPU())
-            S = SpectralTransform(spectral_grid)
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
             nlayers = spectral_grid.nlayers
 
-            gridded = rand(Float32, spectral_grid.grid, nlayers, 2)
-            specs = rand(ComplexF32, spectral_grid.spectrum, nlayers)
+            gridded = rand(spectral_grid.GridVariableXYZT, spectral_grid.grid, nlayers, 2)
+            specs = rand(spectral_grid.SpectralVariableXYZ, spectral_grid.spectrum, nlayers)
 
             # the hazard: the per-step view wrapper identity is NOT stable across calls
             @test get_step(gridded, 2).data !== get_step(gridded, 2).data
 
             # inverse (spectral→grid) into a fresh step-2 view each call → only ONE graph captured
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
             for _ in 1:4
                 transform!(get_step(gridded, 2), specs, S)
             end
-            @test sum(length(c.inverse_execs) for c in values(ext.GRAPH_CACHES); init = 0) == 1
+            @test sum(length(c.inverse_execs) for c in values(SpeedyTransforms.GRAPH_CACHES); init = 0) == 1
 
             # forward (grid→spectral) from a fresh step-2 view each call → only ONE graph captured
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
             for _ in 1:4
                 transform!(specs, get_step(gridded, 2), S)
             end
-            @test sum(length(c.forward_execs) for c in values(ext.GRAPH_CACHES); init = 0) == 1
+            @test sum(length(c.forward_execs) for c in values(SpeedyTransforms.GRAPH_CACHES); init = 0) == 1
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
+        end
+    end
+
+    # A captured graph also bakes in the scratch memory the caller passes (in a model:
+    # `vars.scratch.transform_memory`, part of the Variables, not of the model, so new Variables for
+    # the same model bring a new one). The same field with another scratch memory must capture a new
+    # graph, not replay the one recorded with the first: that would write the Fourier output into
+    # (or read it from) the first scratch while the Legendre transform uses the second.
+    @testset "$prefix Graphs: another scratch memory doesn't replay a stale graph" begin
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(SpeedyWeather.GPU())
+            architecture = SpeedyWeather.GPU()
+            spectral_grid = SpectralGrid(; truncation = 32, nlayers = 8, architecture)
+            (; NF, grid, spectrum, nlayers) = spectral_grid
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
+            S_reference = SpectralTransform(spectral_grid; gpu_graphs = false)     # with its own scratch memory
+            scratches = [SpeedyTransforms.ScratchMemory(NF, architecture, grid, nlayers) for _ in 1:2]
+            n_graphs(execs) = sum(length(getfield(c, execs)) for c in values(SpeedyTransforms.GRAPH_CACHES); init = 0)
+
+            # the same field and coefficients (= buffer addresses) for every call, only the scratch
+            # memory changes. New data for every call, so that a graph replayed with the other scratch
+            # memory can't find matching data there. The first round captures a graph per direction
+            # and scratch memory (its result comes from the warm-up), the second one replays them.
+            field = zeros(NF, grid, nlayers)
+            coeffs = zeros(Complex{NF}, spectrum, nlayers)
+            SpeedyTransforms.clear_fourier_graph_cache!()
+            for round in 1:2, scratch in scratches
+                copyto!(field.data, rand(NF, grid, nlayers).data)
+                transform!(coeffs, field, scratch, S)                           # grid → spectral
+                @test Array(coeffs.data) ≈ Array(transform(field, S_reference).data)
+
+                copyto!(coeffs.data, rand(Complex{NF}, spectrum, nlayers).data)
+                transform!(field, coeffs, scratch, S)                           # spectral → grid
+                @test Array(field.data) ≈ Array(transform(coeffs, S_reference).data)
+            end
+            @test n_graphs(:forward_execs) == 2     # one graph per direction and scratch memory
+            @test n_graphs(:inverse_execs) == 2
+
+            SpeedyTransforms.clear_fourier_graph_cache!()
         end
     end
 
     # `add=true` (accumulate onto the field instead of overwriting; used by the Enzyme adjoint
     # rules). Two hazards, both regressions guarded here:
     #  1. A captured graph bakes in overwrite-vs-accumulate, so the two modes must NOT share a
-    #     graph — the cache is therefore keyed by (field buffer, add). Sharing would silently
+    #     graph — the cache is therefore keyed by (field and scratch buffers, add). Sharing would silently
     #     give wrong results.
     #  2. `run_graph!` warms up and then captures; capture only RECORDS (it does not execute), so
     #     the warmup alone produces the call's result. Launching the graph as well would apply the
     #     work twice — invisible for an overwriting loop, but a double-accumulate for `add=true`.
     return @testset "$prefix Graphs: add=true accumulates exactly once and uses its own graph" begin
-        if ext !== nothing
+        if ext !== nothing && SpeedyTransforms.default_gpu_graphs(SpeedyWeather.GPU())
             spectral_grid = SpectralGrid(; truncation = 16, nlayers = 4, architecture = SpeedyWeather.GPU())
-            S = SpectralTransform(spectral_grid)
+            S = SpectralTransform(spectral_grid; gpu_graphs = true)
             nlayers = spectral_grid.nlayers
             specs = rand(ComplexF32, spectral_grid.spectrum, nlayers)
             field = zeros(Float32, spectral_grid.grid, nlayers)
             scratch = S.scratch_memory
 
-            n_inverse() = sum(length(c.inverse_execs) for c in values(ext.GRAPH_CACHES); init = 0)
+            n_inverse() = sum(length(c.inverse_execs) for c in values(SpeedyTransforms.GRAPH_CACHES); init = 0)
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
             SpeedyTransforms._transform_grid!(field, specs, scratch, S, false)    # populate the fourier scratch
 
             SpeedyTransforms._fourier!(field, scratch.north, scratch.south, S)                # overwrite → reference
@@ -114,7 +184,7 @@ function test_gpu_graphs(ext, prefix)
             @test Array(field.data) ≈ 2 .* once
             @test n_inverse() == n_before
 
-            ext.clear_fourier_graph_cache!()
+            SpeedyTransforms.clear_fourier_graph_cache!()
         end
     end
 end

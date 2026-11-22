@@ -167,7 +167,8 @@ TE = total_energy(u, v, η, model)
 with units of ``m^3 s^{-2}`` (multiplying by surface area of the sphere
 and density of the fluid would turn it into joule = ``kg \, m^2 s^{-2}``).
 To know in general where to find the respective variables ``u, v, \eta`` inside our
-simulation object see [Variables](@ref). Now let us continue the simulation
+simulation object see [Variables](@ref) (in particular the [Step dimension](@ref)
+used by `get_step` above). Now let us continue the simulation
 
 ```@example analysis
 run!(simulation, period=Day(10))

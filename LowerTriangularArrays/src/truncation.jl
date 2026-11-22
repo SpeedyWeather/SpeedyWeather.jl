@@ -19,7 +19,7 @@ function truncate!(
     return alms
 end
 
-@kernel inbounds = true function _truncate_kernel!(data, @Const(l_indices), @Const(m_indices), lmax, mmax)
+@kernel inbounds = true function _truncate_kernel!(data, l_indices, m_indices, lmax, mmax)
     I = @index(Global, NTuple)
     lm = I[1]
 

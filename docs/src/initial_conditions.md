@@ -9,11 +9,13 @@ are three ways to do this
 3. Set the `initial_conditions` component of a model
 
 where 1 is a rather low-level and largely requires you to directly set the
-complex coefficients of the spherical harmonics (advanced!).
+complex coefficients of the [spherical harmonics](@ref "Spherical harmonics") (advanced!).
 So the `set!` function builds a convenient interface around 1 such that you
-don't have to know about details of grid or spectral space.
+don't have to know about details of grid or spectral space (see also
+[Setting variables](@ref) for more on `set!`).
 3 then collects method 1 or 2 (or a combination of both) into a single struct
-to "save" some initial conditions for one or several variables.
+to "save" some initial conditions for one or several variables, similar to the
+`initial_conditions` model component described in [Creating model components](@ref create_model_components).
 This lets you use predefined (inside SpeedyWeather or externally) initial conditions
 as easy as `initial_conditions = RossbyHaurwitzWave()`.
 Let us illustrate this with some examples where we will refer back those
@@ -38,9 +40,9 @@ the initial conditions will be set back to what is defined in `model.initial_con
 We will illustrate the `set!` function now that conveniently lets you (re)set the
 current state of the prognostic variables:
 
-The Rossby-Haurwitz wave[^Williamson92] is defined as an initial condition for
+The Rossby-Haurwitz wave [Williamson1992](@citep) is defined as an initial condition for
 vorticity ``\zeta`` (which is the sole prognostic variable in the
-barotropic vorticity model) as
+[barotropic vorticity model](@ref barotropic_vorticity_model)) as
 
 ```math
 ζ(λ, θ) = 2ω \sin(θ) - K \sin(θ) \cos(θ)^m (m^2 + 3m + 2) \cos(m λ)
@@ -61,12 +63,12 @@ set!(simulation, vorticity=ζ, step=1)
 with only two difference from the mathematical notation. (1) SpeedyWeather's
 coordinates are in degrees, so we replaced ``\sin, \cos`` with `sind` and `cosd`;
 and (2) To generalise to vertical coordinates, the function `ζ(λ, θ, σ)` takes
-*exactly* three arguments, with `σ` denoting the vertical [Sigma coordinates](@ref).
+*exactly* three arguments, with `σ` denoting the vertical [Sigma coordinates](@ref sigma_coordinates_physics).
 This is important so that we can use the same definition of initial conditions
 for the 2D barotropic vorticity model also for the 3D primitive equations.
 Furthermore we explicitly set here step 1, as, depending on the time stepper,
 prognostic variables may have more than 1 step, see [Step dimension](@ref)
-for more details. Leapfrog for example has 2 steps but it's important to set
+for more details. [Leapfrog](@ref leapfrog) for example has 2 steps but it's important to set
 the initial conditions for step 1 here, not step 2.
 
 One may filter out low values of spectral vorticity with some cut-off amplitude
@@ -127,7 +129,7 @@ details.
 
 ## Rossby-Haurwitz wave in a ShallowWater model
 
-For the shallow water model Williamson et al., 1992[^Williamson92] also give
+For the shallow water model [Williamson1992](@citet) also give
 initial conditions for the prognostic variable height ``h = h_0 + \eta`` (equivalent to geopotential).
 The layer thickness is ``h_0`` and ``\eta`` is the interface displacement
 of that layer. SpeedyWeather however, uses as prognostic variable ``\eta``
@@ -151,9 +153,9 @@ Rossby-Haurwitz wave, this value can be found in `model.planet.radius`
 and ``Ω`` and ``g`` are the rotation and the gravity constant of the planet,
 which are in `model.planet.rotation` and `model.planet.gravity`.
 
-The interface displacement ``\eta`` in SpeedyWeather's `ShallowWaterModel`
+The interface displacement ``\eta`` in SpeedyWeather's [`ShallowWaterModel`](@ref)
 is stored in the variable `pres` in analogy to the actual pressure in
-the `PrimitiveEquation` model. So we can set ``\eta`` using
+the [primitive equation](@ref primitive_equation_model) model. So we can set ``\eta`` using
 `set!(simulation, pres=η)` for an appropriate implementation of the above
 equations, similar to how `ζ(λ, θ, σ) =` is defined above.
 However, we also already defined `RossbyHaurwitzWave` to do
@@ -185,7 +187,7 @@ poles and the vorticity patches develop an internal structure.
 ## Rossby-Haurwitz wave in primitive equations
 
 You can use `set!` or the predefined `RossbyHaurwitzWave` also in other
-models. For the `BarotropicModel` or the `PrimitiveDryModel` (or `Wet`)
+models. For the [`BarotropicModel`](@ref) or the [`PrimitiveDryModel`](@ref) (or `Wet`)
 the definition for ``\eta`` is skipped. The barotropic model does not have
 a pressure variable, the primitive equation model uses the logarithm of surface
 pressure, which is incompatible with ``\eta`` being defined as an interface displacement.
@@ -217,7 +219,7 @@ run!(simulation, period=Day(5))
 nothing # hide
 ```
 
-Note that we chose a lower resolution here (T42) as we are simulating
+Note that we chose a lower resolution here (T43) as we are simulating
 8 vertical layers now too. Let us visualise the surface vorticity
 (`[:, 8]` is the lowermost layer)
 
@@ -234,6 +236,170 @@ As you can see the actual Rossby-Haurwitz wave is not as stable any more
 (because those initial conditions are not a stable solution of the primitive equations)
 and so the 3-day integration looks already different from the barotropic model!
 
-## References
+## Default initial conditions for the PrimitiveWetModel
 
-[^Williamson92]: DL Williamson, JB Drake, JJ Hack, R Jakob, PN Swarztrauber, 1992. *A standard test set for numerical approximations to the shallow water equations in spherical geometry*, **Journal of Computational Physics**, 102, 1, DOI: [10.1016/S0021-9991(05)80016-6](https://doi.org/10.1016/S0021-9991(05)80016-6)
+The [`PrimitiveWetModel`](@ref) starts by default from a state close to its own equilibrium
+climate, so that the model does not first have to adjust towards it. This matters mostly for humidity:
+a warm and moist tropical lower troposphere that is conditionally unstable would be rained out
+by the convection scheme within the first day.
+
+```@example wet_initial_conditions
+using SpeedyWeather
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+InitialConditions(spectral_grid, PrimitiveWet)
+```
+
+`BalancedZonalState` sets vorticity, divergence, surface pressure and temperature. It generalises the
+Jablonowski-Williamson initial conditions [Jablonowski2006](@citep) to a different vertical
+profile of the zonal wind ``u``. With the dimensionless log-pressure coordinate ``z = -\ln \sigma`` (zero at the surface, increasing upwards, but not a height in meters),
+
+```math
+u(\phi, \sigma) = U(\sigma) \sin^2(2\phi), \qquad U(\sigma) = u_0 \tanh(z/H) f(z)
+```
+
+which is zero at the surface and increases about linearly with ``z`` in the troposphere.
+Above ``z_{jet} = -\ln\sigma_{jet}`` the wind decays with
+
+```math
+f(z) = \exp\left(-\left(\frac{z - z_{jet}}{D}\right)^2\right) \quad \text{for } z > z_{jet},
+\qquad f(z) = 1 \quad \text{otherwise,}
+```
+
+so that the jet peaks in the upper troposphere (about ``\sigma = 0.2`` for the defaults
+`σ_jet = 0.3` and `jet_decay = D = 1.5`) and not at the model top. The decaying wind requires,
+through thermal wind balance, a reversed meridional temperature gradient above the jet, i.e. a
+polar lower stratosphere that is warmer than the tropical one, as observed and as in
+[Held1994](@citet). With the defaults the poles are up to about 40K warmer at
+``\sigma \approx 0.1``, which is more than in the real atmosphere. The initial
+conditions are still balanced, but whether the model's radiation maintains this
+stratosphere is a different question, so the jet may drift up or down over time.
+Use `σ_jet = 0` for ``f = 1``, i.e. a wind that increases monotonically up to the model top with
+the poles colder than the tropics at all heights. That is closer to the equilibrium climate of
+the `PrimitiveWetModel` at the moment, which lacks the stratospheric warming at the poles,
+e.g. from ozone.
+Thermal wind balance then determines the temperature
+
+```math
+T(\phi, \sigma) = \bar{T}(\sigma) + \frac{1}{R_d}\frac{dU}{dz}\left(2A(\phi)U + B(\phi)R\Omega\right)
+```
+
+with ``A(\phi) = -2\sin^6\phi(\cos^2\phi + \tfrac{1}{3}) + \tfrac{10}{63}``
+and ``B(\phi) = \tfrac{8}{5}\cos^3\phi(\sin^2\phi + \tfrac{2}{3}) - \tfrac{\pi}{4}``,
+radius ``R`` and rotation ``\Omega``. Jablonowski and Williamson's temperature is the special case
+``U = u_0\cos^{3/2}\eta_v``. ``A`` and ``B`` have a zero global mean, so
+``\bar{T}(\sigma) = \max(T_0 \sigma^{R_d\Gamma/g}, T_{min})`` is the global-mean temperature
+and can be chosen freely without breaking the balance.
+As in Jablonowski-Williamson a small perturbation of the zonal wind triggers baroclinic instability.
+
+On a retrograde planet (`rotation < 0`) the jet blows in the sense of rotation, i.e. ``u_0`` becomes
+``-u_0`` (easterlies). ``(\Omega, u) \to (-\Omega, -u)`` is the mirror image of the planet, so the
+temperature is the same as for prograde rotation and the vorticity changes sign. With ``u_0``
+kept westerly the Coriolis term ``B(\phi)R\Omega`` would change sign alone and the poles would
+start tens of Kelvin warmer than the tropics. The same applies to `ZonalWind`,
+`JablonowskiTemperature` and the `ZonalRidge` orography.
+
+The sign of `rotation` only sets the Coriolis force, and with it the direction of the jet here.
+The direction the sun moves across the sky is set independently by `length_of_day`, and a
+negative `length_of_day` makes the sun rise in the west (see [Orbit and rotation time](@ref)).
+A planet that rotates backwards in both senses therefore needs both negative, e.g.
+`Earth(spectral_grid, rotation=-7.29e-5, length_of_day=Hour(-24))`.
+
+### Derivation
+
+The temperature follows from the same balance that Jablonowski and Williamson use, only
+without fixing the vertical profile of the wind. With a uniform surface pressure the
+gradient-wind balance on the sphere is
+
+```math
+\left(f + \frac{2u\tan\phi}{R}\right) u = -\frac{1}{R}\frac{\partial \Phi}{\partial \phi}
+```
+
+with ``f = 2\Omega\sin\phi`` and geopotential ``\Phi``. Differentiating with respect to
+``z`` and using hydrostatic balance ``\partial\Phi/\partial z = R_d T`` gives the
+thermal wind equation in its gradient-wind form
+
+```math
+\frac{\partial T}{\partial \phi} = -\frac{1}{R_d}\left(2R\Omega\sin\phi + 2u\tan\phi\right)\frac{\partial u}{\partial z}.
+```
+
+Inserting ``u = U(\sigma)\sin^2(2\phi)`` the right-hand side separates into ``dU/dz`` times
+two functions of latitude, ``8\sin^3\phi\cos^2\phi`` (Coriolis term) and
+``16 U \sin^5\phi\cos^3\phi`` (curvature term). These are exactly ``-dB/d\phi``
+and ``-2U\,dA/d\phi``, so integrating in latitude yields the temperature above. The integration
+constants in ``A`` and ``B`` (``10/63`` and ``-\pi/4``) are chosen such that both have zero global
+mean, which leaves the global-mean temperature ``\bar{T}(\sigma)`` as a free function of height
+that does not affect the balance. The vorticity is the curl of ``u``, i.e. Jablonowski and
+Williamson's eq. (3) with ``U(\sigma)`` in place of ``u_0\cos^{3/2}\eta_v``, and the divergence is zero
+apart from the perturbation.
+
+This is not the moist baroclinic wave of the DCMIP-2016 intercomparison [Ullrich2016](@citep),
+which prescribes a different analytic temperature (and a specific humidity profile) chosen for a
+reproducible test case, not to be close to a given model's climate. The point here is that only
+``U(\sigma)`` and ``\bar{T}(\sigma)`` are free, and they can be shaped like the model's climate
+while the balance is guaranteed analytically.
+
+### Parameters
+
+The surface temperature ``T_0`` and the lapse rate ``\Gamma`` are taken from the atmosphere,
+`model.atmosphere.reference_temperature` and `SpeedyWeather.lapse_rate(model.atmosphere)`
+(the `moist_lapse_rate` for wet atmospheres, the `dry_lapse_rate` for dry ones), so that the
+initial conditions start from the climate the atmosphere is meant to have. Change them there,
+e.g. `EarthAtmosphere(spectral_grid, reference_temperature = 283)`, which also changes
+other components that use these reference values. The remaining parameters were chosen to be
+close to the equilibrium climate of the default `PrimitiveWetModel`, by comparing against zonal
+and time means over days 60-120 of a long run at T32L8, T64L8 and T32L16 (which agree within
+about 2K). No formal optimisation was done; the parameters were read off these means:
+
+| Parameter | Default | How it was chosen |
+| --------- | ------- | ----------------- |
+| ``T_0`` | 288 K | `atmosphere.reference_temperature` |
+| ``\Gamma`` | 5.7 K/km | `atmosphere.moist_lapse_rate`, slope of the global-mean ``\ln T`` against ``\ln\sigma`` in the troposphere, which is ``R_d\Gamma/g`` |
+| ``T_{min}`` | 226 K | Roughly isothermal global-mean stratosphere |
+| ``u_0`` | 56 m/s | Zonal-mean wind at 45°, about 40 m/s at ``\sigma = 0.2`` |
+| ``H`` | 2 | Wind growing about linearly in ``-\ln\sigma`` through the troposphere |
+| ``\sigma_{jet}`` | 0.3 | Jet at about ``\sigma = 0.2``, as in observations and [Held1994](@citet) |
+| ``D`` | 1.5 | Weak wind at the model top while keeping the reversed temperature gradient moderate |
+
+With ``u_0`` and ``H`` fixed by the wind, the meridional temperature contrast (about 45K equator to
+pole near the surface) is no longer free but follows from the balance, and it agrees with the
+equilibrium to a few Kelvin. These parameters therefore describe the climate of a specific
+version of SpeedyWeather with its default parameterizations. If you change the physics, resolution
+or the planet substantially, the model's climate will change and to start close to the new
+equilibrium the parameters need to be adapted the same way: run the model into equilibrium
+(a few months), compute the zonal and time-mean temperature and zonal wind, fit ``T_0, \Gamma`` (of the atmosphere) to
+the global-mean temperature profile, ``T_{min}`` to the stratosphere and ``u_0, H`` to the wind
+at mid-latitudes, then check that the resulting meridional temperature contrast is reasonable.
+The initial conditions remain balanced for any choice of parameters, only how close they
+are to the equilibrium climate depends on them.
+
+Over orography the surface pressure is set hydrostatically with the temperature ``T_0 - \Gamma h`` at orographic height ``h`` (in meters)
+and the temperature above is evaluated with ``p/p_0 = \sigma p_s/p_0`` in place of ``\sigma``.
+Air over a mountain is then as cold as the free atmosphere at the same pressure, otherwise the
+initial imbalance between surface pressure and temperature radiates gravity waves.
+`BalancedZonalState` therefore should not be combined with `PressureOnOrography`, which would
+overwrite its surface pressure.
+
+`ConstantRelativeHumidity` then sets the humidity to a relative humidity of `relhumid_ref`
+below `σ_moist`, decreasing linearly to zero at `σ_dry` for a dry stratosphere.
+Use `σ_moist = σ_dry = 0` for a vertically constant relative humidity instead.
+
+To change these, pass a new NamedTuple of initial conditions, e.g. a weaker jet, or the Jablonowski-Williamson initial conditions
+
+```@example wet_initial_conditions
+initial_conditions = (;
+    zonal = BalancedZonalState(spectral_grid, u₀ = 40),
+    humid = ConstantRelativeHumidity(spectral_grid, relhumid_ref = 0.6),
+)
+
+# or
+initial_conditions = (;
+    vordiv = ZonalWind(spectral_grid),
+    temp = JablonowskiTemperature(spectral_grid),
+    pres = PressureOnOrography(spectral_grid),
+    humid = ConstantRelativeHumidity(spectral_grid),
+)
+model = PrimitiveWetModel(spectral_grid; initial_conditions)
+nothing # hide
+```
+
+Humidity is computed from temperature and pressure, so it has to come last in the NamedTuple.

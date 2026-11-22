@@ -114,7 +114,8 @@ function initialize!(
     (; radius, gravity, rotation) = P
     φ = G.latds                         # latitude for each grid point [˚N]
 
-    (; orography, surface_geopotential, η₀, u₀) = orog
+    (; orography, surface_geopotential, η₀) = orog
+    u₀ = jet_speed(orog.u₀, rotation)       # easterly jet on a retrograde planet
     NF = eltype(orography)
 
     ηᵥ = (1 - η₀) * π / 2                     # ηᵥ-coordinate of the surface [1]
@@ -134,8 +135,9 @@ end
 
 @kernel inbounds = true function zonal_ridge_orography_kernel!(orography, latds, A, RΩ, g⁻¹)
     ij, _ = @index(Global, NTuple)
-    sinφ = sind(latds[ij])
-    cosφ = cosd(latds[ij])
+    φ = deg2rad(latds[ij])
+    sinφ = sin(φ)
+    cosφ = cos(φ)
 
     # Jablonowski & Williamson, 2006, eq. (7)
     orography[ij] = g⁻¹ * A * (A * (-2 * sinφ^6 * (cosφ^2 + 1 / 3) + 10 / 63) + (8 / 5 * cosφ^3 * (sinφ^2 + 2 / 3) - π / 4) * RΩ)
@@ -227,9 +229,11 @@ function initialize!(
     )
 
     orography_highres = on_architecture(S.architecture, field)
+    synchronize(S.architecture)
 
-    # Interpolate/coarsen to desired resolution
-    interpolate!(orography, orography_highres)
+    # Interpolate/coarsen to desired resolution, jitted as one compiled function on Reactant
+    interp = RingGrids.interpolator(orography, orography_highres)
+    @maybe_jit S.architecture interpolate!(orography, orography_highres, interp)
     orography .*= scale                     # scale orography (default 1)
     transform!(surface_geopotential, orography, S)   # no *gravity yet
 

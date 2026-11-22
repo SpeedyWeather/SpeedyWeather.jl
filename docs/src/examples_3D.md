@@ -26,16 +26,19 @@ run!(simulation, period = Day(9))
 nothing # hide
 ```
 
-The Jablonowski-Williamson baroclinic wave test case[^JW06] using the
-[Primitive equation model](@ref primitive_equation_model) particularly the dry model,
+The Jablonowski-Williamson baroclinic wave test case [Jablonowski2006](@citep) using the
+[Primitive equation model](@ref primitive_equation_model) particularly the [`PrimitiveDryModel`](@ref),
 as we switch off all parameterizations (and ocean, sea_ice and land) with `dynamics_only = true`.
-We want to use 8 vertical levels, and a lower resolution of T31 on a
+We want to use 8 vertical levels, and a lower resolution of T32 on a
 [full Gaussian grid](@ref FullGaussianGrid).
 The Jablonowski-Williamson initial conditions are `ZonalWind` for vorticity and divergence
 (curl and divergence of ``u, v``), `JablonowskiTemperature` for temperature and
-`ZeroInitially` for pressure. The orography is just a `ZonalRidge`.
+`ConstantPressure` for pressure. The orography is just a `ZonalRidge`.
 There is no forcing and the initial conditions are baroclinically unstable which kicks
-off a wave propagating eastward. This wave becomes obvious when visualised with
+off a wave propagating eastward. `JablonowskiTemperature` uses the stable tropospheric
+lapse rate of ``\Gamma = 5~\text{K/km}`` from Jablonowski and Williamson
+(option `lapse_rate`), independent of the lapse rate of the model's atmosphere.
+This wave becomes obvious when visualised with
 
 ```@example jablonowski
 using CairoMakie
@@ -73,11 +76,11 @@ run!(simulation, period = Day(20))
 nothing # hide
 ```
 
-The code above defines the Held-Suarez forcing [^HS94] in terms of temperature relaxation
+The code above defines the Held-Suarez forcing [Held1994](@citep) in terms of temperature relaxation
 and a linear drag term that is applied near the planetary boundary but switches off
-all other parameterizations in the primitive equation model without humidity.
+all other [parameterizations](@ref "Parameterizations") in the primitive equation model without humidity.
 One could also just switch off the boundary layer scheme which would also automatically turn off
-the surface fluxes (heat and momentum) as they aren't supposed to run with Held-Suarez forcing.
+the [surface fluxes](@ref "Surface fluxes") (heat and momentum) as they aren't supposed to run with Held-Suarez forcing.
 But to also avoid the calculation being run at all we use `dynamics_only = true`.
 The `forcing` and `drag` are considered to be terms of the dynamical core
 (regardless of which process they represent conceptually).
@@ -115,15 +118,15 @@ nothing # hide
 ```
 
 Here we have defined an aquaplanet simulation by
-- creating an `ocean::AquaPlanet`. This will use constant sea surface temperatures that only vary with latitude (and not with time).
-- creating a `land_sea_mask::AquaPlanetMask` this will use a land-sea mask with `false`=ocean everywhere.
-- creating an `orography::NoOrography` which will have no orography and zero surface geopotential.
+- creating an `ocean::AquaPlanet` (see [Aqua planet](@ref) in Ocean models). This will use constant sea surface temperatures that only vary with latitude (and not with time).
+- creating a `land_sea_mask::AquaPlanetMask` (see [`AquaPlanetMask`](@ref)) this will use a land-sea mask with `false`=ocean everywhere.
+- creating an `orography::NoOrography` which will have no [orography](@ref "Orography") and zero surface geopotential.
 
-All passed on to the model constructor for a `PrimitiveWetModel`, we have now a model with humidity
+All passed on to the model constructor for a [`PrimitiveWetModel`](@ref), we have now a model with humidity
 and physics parameterization as they are defined by default (typing `model` will give you an overview
 of its components). We could have change the `model.land` and `model.vegetation` components too,
 but given the land-sea masks masks those contributions to the surface fluxes anyway, this is not
-necessary. Note that neither sea surface temperature, land-sea mask
+necessary. Note that neither sea surface temperature, [land-sea mask](@ref "The land-sea mask")
 or orography have to agree. It is possible to have an ocean on top of a mountain.
 For an ocean grid-cell that is (partially) masked by the land-sea mask, its value will
 be (fractionally) ignored in the calculation of surface fluxes (potentially leading
@@ -132,7 +135,7 @@ to a zero flux depending on land surface temperatures).
 Now with the following we visualize the surface humidity after the 50 days of
 simulation. We use 50 days as without mountains it takes longer for the initial conditions to
 become unstable. The surface humidity shows small-scale patches in the tropics, which is a result
-of the convection scheme, causing updrafts and downdrafts in both humidity and temperature.
+of the [convection](@ref "Convection") scheme, causing updrafts and downdrafts in both humidity and temperature.
 
 ```@example aquaplanet
 using CairoMakie
@@ -228,7 +231,7 @@ We set `snow = false` in `ImplicitCondensation` and therefore deal with rain onl
 ```@example precipitation
 using CairoMakie
 
-(; rain_large_scale, rain_convection) = simulation.variables.parameterizations
+(; rain_large_scale, rain_convection) = simulation.variables.output
 m2mm = 1000     # convert from [m] to [mm]
 heatmap(m2mm*rain_large_scale, title="Large-scale precipiation (rain) [mm]: Accumulated over 10 days", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
@@ -236,17 +239,17 @@ nothing # hide
 ```
 ![Large-scale precipitation](large-scale_precipitation_acc.png)
 
-Precipitation (rain, both large-scale and convective) are written into the
-`simulation.variables.parameterizations` which, however, accumulate all precipitation
-during simulation. In the NetCDF output, precipitation rate (in mm/hr) is calculated
-from accumulated precipitation as a post-processing step.
+Precipitation (rain, both large-scale and convective) is accumulated by [Diagnostics](@ref)
+in `simulation.variables.output`. With output these are reset after every output so that the
+NetCDF output contains the precipitation since the last output, but without output they
+accumulate all precipitation during the simulation.
 More interactively, you can also reset these accumulators and integrate for another 6 hours
 to get the precipitation only in that period.
 
 ```@example precipitation
 # reset accumulators and simulate 6 hours
-simulation.variables.parameterizations.rain_large_scale .= 0
-simulation.variables.parameterizations.rain_convection .= 0
+simulation.variables.output.rain_large_scale .= 0
+simulation.variables.output.rain_convection .= 0
 run!(simulation, period=Hour(6))
 
 # visualise, rain_* arrays are flat copies, no need to read them out again!
@@ -263,9 +266,3 @@ nothing # hide
 As the precipitation fields are accumulated meters over the integration period
 we divide by 6 hours to get a precipitation rate ``[m/s]``
 but then multiply with 1 hour and 1000 to get the typical precipitation unit of ``[mm/hr]``.
-
-## References
-
-[^JW06]: Jablonowski, C. and Williamson, D.L. (2006), A baroclinic instability test case for atmospheric model dynamical cores. Q.J.R. Meteorol. Soc., 132: 2943-2975. DOI:[10.1256/qj.06.12](https://doi.org/10.1256/qj.06.12)
-
-[^HS94]: Held, I. M. & Suarez, M. J. A Proposal for the Intercomparison of the Dynamical Cores of Atmospheric General Circulation Models. Bulletin of the American Meteorological Society 75, 1825-1830 (1994). DOI:[10.1175/1520-0477(1994)075<1825:APFTIO>2.0.CO;2](https://doi.org/10.1175/1520-0477(1994)075<1825:APFTIO>2.0.CO;2)

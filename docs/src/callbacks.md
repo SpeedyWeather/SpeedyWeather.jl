@@ -8,7 +8,7 @@ we currently do not implement other callsites.
 
 Callbacks are mainly introduced for diagnostic purposes, meaning that they do not influence
 the simulation, and access the prognostic variables and the model components in a read-only
-fashion. However, a callback is not strictly prevented from changing prognostic or diagnostic
+fashion (see also [Online diagnostics](@ref) for a concrete callback-based example). However, a callback is not strictly prevented from changing prognostic or diagnostic
 variables or the model. For example, you may define a callback that changes the orography
 during the simulation. In general, one has to keep the general order of executions during a
 time step in mind (valid for all models)
@@ -296,6 +296,13 @@ callback execution steps there are and count them up. `times` is a
 actual schedule inside a `Schedule`, implemented as `BitVector`
 indicating whether to execute on a given time step (`true`) or not
 (`false`).
+
+A `Schedule` is initialized with the clock at the start of every `run!`
+as its `BitVector` depends on the start and length of the simulation.
+For model components there are also the purely periodic [`PeriodicSchedule`](@ref)
+and [`StepSchedule`](@ref) that only need the time step, see
+[Periodic schedules](@ref periodic_schedules) in the time stepping section,
+which also illustrates how schedules behave during a leapfrog spin-up.
 
 Let's show how to use a `Schedule` inside a callback
 
