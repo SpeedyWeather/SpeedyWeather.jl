@@ -101,12 +101,12 @@ function set_variables!(
             nothing
         elseif varname in keys(vars)
             var = ArrayDimensions.hastime(vars[varname]) ? get_step(vars[varname], step) : vars[varname]
-            set!(var, value, geometry, spectral_transform; add, static_func, scratch_field)
+            set!(var, kwargs[varname], geometry, spectral_transform; add, static_func, scratch_field)
         elseif namespace in keys(vars)
             if varname in keys(vars[namespace])
                 var = ArrayDimensions.hastime(vars[namespace][varname]) ?
                     get_step(vars[namespace][varname], step) : vars[namespace][varname]
-                set!(var, value, geometry, spectral_transform; add, static_func, scratch_field)
+                set!(var, kwargs[varname], geometry, spectral_transform; add, static_func, scratch_field)
             else
                 # throw error if varname can't be found and print existing variables
                 @warn "`$varname` not defined in NamedTuple with keys = $(keys(vars[namespace])). Skipping."
