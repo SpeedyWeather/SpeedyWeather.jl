@@ -139,9 +139,11 @@ precomputed at `initialize!` (so set the land-sea mask before). Heat, not temper
 and there is no flux through coastlines: every face between two cells is weighted by the smaller of their
 ocean fractions. The transport continues under sea ice. Between rings the temperature
 is interpolated in longitude to the segments of the shared face, which keeps the discretization of the Laplacian
-accurate for fields that vary with longitude. The default diffusivity is
-``25000 \cdot 50 / (H + 150)`` m²/s for mixed-layer depth ``H`` in meters (Codron, 2012), or set `diffusivity`.
-It is explicit in time and `initialize!` warns if the time step is too large for it.
+accurate for fields that vary with longitude. The flux is ``\rho c\, K \nabla T`` with the depth-integrated
+diffusivity `diffusivity_depth` ``K = D H`` [m³/s] (default 1.25e6, which is Codron's, 2012, 25000 m²/s for a 50 m layer)
+so that the transport does not depend on the mixed-layer depth ``H`` and the diffusivity is ``D = K/H``. Alternatively
+set `diffusivity` [m²/s] directly. The scheme is explicit in time, `initialize!` chooses the number of substeps per ocean time step
+such that the stability number is below 0.5 (`substeps`), which matters for shallow oceans where ``D`` is large.
 
 Depending on the presence of sea ice, the sensible and latent heat fluxes are subject to
 insulation, see [Thermodynamic sea ice model](@ref). The insulation is applied as a flux reduction

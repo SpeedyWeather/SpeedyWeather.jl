@@ -1,9 +1,9 @@
-using Random
+using Random, Statistics
 
 # a simulation with a slab ocean and diffusion, at truncation, grid and number format
-function heat_diffusion_simulation(; truncation = 32, Grid = FullGaussianGrid, NF = Float64, kwargs...)
+function heat_diffusion_simulation(; truncation = 32, Grid = FullGaussianGrid, NF = Float64, mixed_layer_depth = 50, kwargs...)
     spectral_grid = SpectralGrid(; truncation, Grid, NF, nlayers = 4)
-    ocean = SlabOcean(spectral_grid, heat_transport = OceanHeatDiffusion(spectral_grid; kwargs...))
+    ocean = SlabOcean(spectral_grid; mixed_layer_depth, heat_transport = OceanHeatDiffusion(spectral_grid; kwargs...))
     model = PrimitiveWetModel(spectral_grid; ocean)
     return initialize!(model)
 end
@@ -15,6 +15,7 @@ function heat_transport_tendency(simulation, T)
     dsst = SpeedyWeather.get_tendency_step(variables.tendencies.ocean.sea_surface_temperature, model.time_stepping.ocean, model.ocean)
     sst .= T
     dsst .= 0
+    variables.prognostic.clock.step_counter = 2         # full time step
     SpeedyWeather.heat_transport!(dsst, variables, model.ocean.heat_transport, model.ocean, model)
     return copy(dsst)
 end
@@ -47,7 +48,7 @@ end
             land = land_fraction.data .>= 1
             ocean_fraction = 1 .- land_fraction.data
             @test any(land) && any(.!land)          # real land-sea mask
-            @test ht.diffusivity_used ≈ 6250
+            @test ht.diffusivity_used ≈ 25000           # 1.25e6 m³/s / 50 m
 
             # rows sum to zero, heat-weighted columns sum to zero
             @test all(abs.(sum(ht.weights, dims = 2)) .< 1.0e-12 * ht.max_rate)
@@ -107,15 +108,38 @@ end
         end
     end
 
-    @testset "Stability number" begin
-        for truncation in (32, 42)
+    @testset "Stability number and substeps" begin
+        for truncation in (32, 43)
             simulation = heat_diffusion_simulation(; truncation)
             (; model) = simulation
-            number = SpeedyWeather.stability_number(model.ocean.heat_transport, model.time_stepping.Δt)
-            @info "Stability number" truncation number
-            @test 0 < number < 1
+            ht = model.ocean.heat_transport
+            number = SpeedyWeather.stability_number(ht, model.time_stepping.Δt)
+            @info "Stability number, substeps" truncation number ht.substeps
+            @test ht.substeps == max(1, ceil(Int, number / 0.5))
         end
-        @test_logs (:warn, r"unstable") match_mode = :any heat_diffusion_simulation(; diffusivity = 1.0e7)
+    end
+
+    @testset "Shallow ocean at T42 is stable with substeps" begin
+        simulation = heat_diffusion_simulation(; truncation = 43, mixed_layer_depth = 10)
+        (; model) = simulation
+        ht = model.ocean.heat_transport
+        (; land_fraction) = model.land_sea_mask
+        land = land_fraction.data .>= 1
+        @test ht.diffusivity_used ≈ 125000
+        @test SpeedyWeather.stability_number(ht, model.time_stepping.Δt) > 1       # unstable without substeps
+        @test ht.substeps > 1
+        Δt = model.time_stepping.Δt
+        weights = ht.area .* (1 .- land_fraction.data)
+        T = 280 .+ 10 .* rand(length(land_fraction.data))
+        heat0 = sum(weights[.!land] .* T[.!land])
+        std0 = std(T[.!land])
+        for _ in 1:300
+            T = T .+ Δt .* heat_transport_tendency(simulation, T).data
+        end
+        @test all(isfinite, T)
+        @test abs(sum(weights[.!land] .* T[.!land]) - heat0) < 1.0e-11 * abs(heat0)
+        @test std(T[.!land]) < std0         # smoothed, not blown up
+        @info "10 m ocean at T42" ht.substeps std0 std_after = std(T[.!land])
     end
 
     @testset "Runs with sea ice" begin

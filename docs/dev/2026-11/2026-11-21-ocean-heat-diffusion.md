@@ -13,6 +13,9 @@ Base revision: 32fbfa49d5c9e244340109cdb403e8642b3f90f2
 
 ## Revision log
 
+- Diffusivity parametrized by the depth-integrated D H instead of Codron's 2-layer rule D = 25000·50/(H+150), which applies
+  to both layers; automatic substepping instead of a warning.
+
 ## Problem description
 
 The `SlabOcean` has no horizontal heat transport, so tropics are too warm and poles too cold unless a
@@ -31,7 +34,10 @@ This is the diffusion part only, which is useful on its own (Donnadieu et al. 20
   zonal faces between neighbours, meridional faces between rings with both rings linearly interpolated in longitude
   to the midpoints of the face segments, every face weighted by the smaller ocean fraction of its two cells.
   The stencil is applied in a kernel that adds to the SST tendency.
-- Diffusivity `25000 * 50 / (H + 150)` m²/s by default, a stability number is checked at `initialize!`.
+- The transport is set by the depth-integrated diffusivity `diffusivity_depth` = D H = 1.25e6 m³/s (Codron's
+  25000 m²/s at 50 m), flux = ρ c D H ∇T, so it does not depend on the mixed-layer depth; `diffusivity` [m²/s] overrides.
+  A later 2-layer scheme can split D H between layers.
+- Explicit time stepping with a fixed number of substeps chosen at `initialize!` so that the stability number is below 0.5.
 
 ## Testing and verification
 
@@ -44,7 +50,7 @@ A section "Ocean heat transport" in `docs/src/ocean.md`.
 
 ## Known limitations
 
-- Explicit in time (stability number reported), mixed-layer depth is uniform.
+- Explicit in time (substeps fixed at `initialize!`, so changing the time step afterwards needs a new `initialize!`), mixed-layer depth is uniform.
 - The land-sea mask has to be set before `initialize!`.
 - Rings at the poles (e.g. a Clenshaw grid with poles) are not supported.
 

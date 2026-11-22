@@ -19,27 +19,29 @@ shared face. To be used like
 
     ocean = SlabOcean(spectral_grid, heat_transport = OceanHeatDiffusion(spectral_grid))
 
-The diffusivity defaults to `diffusivity_reference * reference_depth / (mixed_layer_depth + deep_layer_depth)`
-(Codron, 2012, Clim. Dyn., doi:10.1007/s00382-011-1031-3), about 6250 m²/s for a 50m mixed layer, and is
-independent of the planet's radius. The land-sea mask has to be set before `initialize!`.
-Any grid with iso-latitude rings and equidistant longitudes per ring is supported,
-rings at the poles are not. The scheme is explicit in time and `initialize!` warns if the time step is
-unstable. Fields and options are $(TYPEDFIELDS)"""
+The transport is set by the depth-integrated diffusivity `diffusivity_depth` [m³/s], the flux is
+`density * specific_heat_capacity * diffusivity_depth * ∇T`, so the transport does not depend on the mixed-layer
+depth `H` and the diffusivity is `D = diffusivity_depth / H`. The default 1.25e6 m³/s is Codron's (2012, Clim. Dyn.,
+doi:10.1007/s00382-011-1031-3) 25000 m²/s for a 50 m layer. Alternatively set `diffusivity` [m²/s] directly, independent
+of the depth. Both are independent of the planet's radius. The land-sea mask has to be set before `initialize!`.
+Any grid with iso-latitude rings and equidistant longitudes per ring is supported, rings at the poles are not.
+The scheme is explicit in time, so at `initialize!` the number of substeps per ocean time step is chosen such that
+the stability number is below 0.5. Fields and options are $(TYPEDFIELDS)"""
 @kwdef mutable struct OceanHeatDiffusion{NF, MatrixInt, MatrixNF, VectorNF} <: AbstractOceanHeatTransport
-    "[OPTION] Diffusivity [m²/s], `NaN` uses Codron's rule from the options below and the mixed-layer depth"
+    "[OPTION] Depth-integrated diffusivity, diffusivity times mixed-layer depth [m³/s]"
+    diffusivity_depth::NF = 1.25e6
+
+    "[OPTION] Diffusivity [m²/s], overrides `diffusivity_depth` if not `NaN`"
     diffusivity::NF = NaN
 
-    "[OPTION] Diffusivity of the reference mixed layer [m²/s]"
-    diffusivity_reference::NF = 25000
-
-    "[OPTION] Depth of the reference mixed layer [m]"
-    reference_depth::NF = 50
-
-    "[OPTION] Depth of the deep layer the diffusivity is shared with [m]"
-    deep_layer_depth::NF = 150
+    "[OPTION] Largest stability number (stable below 1) allowed per substep"
+    max_stability::NF = 0.5
 
     "[DERIVED] Diffusivity used [m²/s]"
     diffusivity_used::NF = NaN
+
+    "[DERIVED] Number of explicit substeps per ocean time step"
+    substeps::Int = 1
 
     "[DERIVED] Stencil: linear indices of the grid points each grid point's tendency depends on, padded with itself"
     columns::MatrixInt = zeros(Int, 0, 0)
@@ -52,6 +54,10 @@ unstable. Fields and options are $(TYPEDFIELDS)"""
 
     "[DERIVED] Largest sum of absolute stencil weights [1/s], bounds the largest eigenvalue"
     max_rate::NF = 0
+
+    "[DERIVED] Work arrays for the temperature increment of the substeps"
+    increment::VectorNF = zeros(NF, 0)
+    increment_next::VectorNF = zeros(NF, 0)
 end
 
 """$(TYPEDSIGNATURES) Generator using the number format, array type and architecture of `spectral_grid`."""
@@ -60,14 +66,13 @@ function OceanHeatDiffusion(SG::SpectralGrid; kwargs...)
     columns = on_architecture(architecture, zeros(Int, 0, 0))
     weights = on_architecture(architecture, zeros(NF, 0, 0))
     area = on_architecture(architecture, zeros(NF, 0))
-    return OceanHeatDiffusion{NF, typeof(columns), typeof(weights), typeof(area)}(; columns, weights, area, kwargs...)
+    return OceanHeatDiffusion{NF, typeof(columns), typeof(weights), typeof(area)}(;
+        columns, weights, area, increment = copy(area), increment_next = copy(area), kwargs...
+    )
 end
 
 function initialize!(heat_transport::OceanHeatDiffusion{NF}, ocean::AbstractOcean, model::AbstractModel) where {NF}
-    (; diffusivity_reference, reference_depth, deep_layer_depth) = heat_transport
-    D = isnan(heat_transport.diffusivity) ?
-        diffusivity_reference * reference_depth / (ocean.mixed_layer_depth + deep_layer_depth) :
-        heat_transport.diffusivity
+    D = isnan(heat_transport.diffusivity) ? heat_transport.diffusivity_depth / ocean.mixed_layer_depth : heat_transport.diffusivity
     heat_transport.diffusivity_used = D
 
     arch = architecture(model.land_sea_mask.land_fraction)
@@ -80,17 +85,18 @@ function initialize!(heat_transport::OceanHeatDiffusion{NF}, ocean::AbstractOcea
     heat_transport.columns = on_architecture(arch, columns)
     heat_transport.weights = on_architecture(arch, NF.(weights))
     heat_transport.area = on_architecture(arch, NF.(area))
+    heat_transport.increment = on_architecture(arch, zeros(NF, length(area)))
+    heat_transport.increment_next = on_architecture(arch, zeros(NF, length(area)))
 
-    # explicit Euler: stable if Δt * (largest eigenvalue magnitude) < 2, which max_rate (Gershgorin) bounds
-    Δt = model.time_stepping.Δt
-    if Δt * heat_transport.max_rate / 2 > 1
-        @warn "OceanHeatDiffusion is unstable with the time step $(Δt)s: stability number $(Δt * heat_transport.max_rate / 2) > 1, reduce the diffusivity or the time step."
-    end
+    # explicit Euler is stable if Δt * (largest eigenvalue magnitude) < 2, which max_rate (Gershgorin) bounds,
+    # substep such that the stability number is below max_stability, fixed here so that it is a constant later
+    number = stability_number(heat_transport, model.time_stepping.Δt)
+    heat_transport.substeps = max(1, ceil(Int, number / heat_transport.max_stability))
     return nothing
 end
 
 """$(TYPEDSIGNATURES) Stability number of the explicit time stepping of `heat_transport` with time step `Δt` [s],
-stable if below 1 (conservatively estimated, the actual limit is typically 1.5-2 times larger)."""
+stable if below 1 (conservatively estimated, the actual limit is typically 1.5-2 times larger), before substepping."""
 stability_number(heat_transport::OceanHeatDiffusion, Δt) = Δt * heat_transport.max_rate / 2
 
 """$(TYPEDSIGNATURES)
@@ -198,21 +204,41 @@ end
 function heat_transport!(dsst, vars, heat_transport::OceanHeatDiffusion, ocean, model)
     sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), ocean)
     (; land_fraction) = model.land_sea_mask
-    (; columns, weights) = heat_transport
-    launch!(
-        architecture(dsst), LinearWorkOrder, size(dsst), ocean_heat_diffusion_kernel!,
-        dsst, sst, land_fraction, columns, weights
-    )
+    (; columns, weights, substeps) = heat_transport
+    Δt = time_step(model.time_stepping, :ocean, vars.prognostic.clock)
+    Δt_substep = Δt / substeps
+    arch = architecture(dsst)
+
+    # explicit substeps of the temperature increment, kept as increment to avoid cancellation of
+    # the (small) increment against the temperature itself in low precision
+    increment, increment_next = heat_transport.increment, heat_transport.increment_next
+    increment .= 0
+    for _ in 1:substeps
+        launch!(
+            arch, LinearWorkOrder, size(dsst), ocean_heat_diffusion_kernel!,
+            increment_next, increment, sst, land_fraction, columns, weights, Δt_substep
+        )
+        increment, increment_next = increment_next, increment
+    end
+    launch!(arch, LinearWorkOrder, size(dsst), ocean_heat_tendency_kernel!, dsst, increment, land_fraction, inv(Δt))
     return nothing
 end
 
-@kernel inbounds = true function ocean_heat_diffusion_kernel!(dsst, sst, land_fraction, columns, weights)
+@kernel inbounds = true function ocean_heat_diffusion_kernel!(increment_next, increment, sst, land_fraction, columns, weights, Δt)
     ij = @index(Global, Linear)         # every grid point ij
     if land_fraction[ij] < 1            # at least partially ocean
-        tendency = zero(eltype(dsst))
+        tendency = zero(eltype(increment))
         for m in axes(weights, 2)
-            tendency += weights[ij, m] * sst[columns[ij, m]]
+            column = columns[ij, m]
+            tendency += weights[ij, m] * (sst[column] + increment[column])
         end
-        dsst[ij] += tendency
+        increment_next[ij] = increment[ij] + Δt * tendency
+    end
+end
+
+@kernel inbounds = true function ocean_heat_tendency_kernel!(dsst, increment, land_fraction, Δt⁻¹)
+    ij = @index(Global, Linear)
+    if land_fraction[ij] < 1
+        dsst[ij] += Δt⁻¹ * increment[ij]
     end
 end
