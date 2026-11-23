@@ -1,18 +1,19 @@
 using Random
 
 # Implicit vertical diffusion of a single column on plain 1×nlayers arrays, returns the tendency. The solver
-# takes the conductance ρK/Δz of the interfaces, here from the diffusivity K and ρ/Δz
+# takes the conductance ρK/Δz of the interfaces, here from the diffusivity K and ρ/Δz, and uses `tendency`
+# as the source of the implicit solve (zero: diffusion of x alone)
 function diffuse_column(
         x, K, density_over_distance, coordinates;
         surface_pressure = 1.0e5, Δt = 1800.0, gravity = 9.81, tendency = zero(x),
-        geopotential_term = nothing, couple = false,
+        geopotential_term = nothing,
     )
     row(v) = reshape(collect(v), 1, :)
     tend = row(tendency)
-    upper, rhs = fill(NaN, size(tend)), fill(NaN, size(tend))      # scratch, to be written before read
+    upper = fill(NaN, size(tend))       # scratch, to be written before read
     SpeedyWeather.implicit_vertical_diffusion!(
         1:1, ((tend, row(x), geopotential_term),), row(collect(K) .* collect(density_over_distance)),
-        upper, rhs, [surface_pressure], Δt, gravity, coordinates, couple,
+        upper, [surface_pressure], Δt, gravity, coordinates,
     )
     return vec(tend)
 end
@@ -50,12 +51,12 @@ end
     @testset "Conservation (T1) for $(nameof(typeof(coordinates)))" for coordinates in coordinate_systems
         Δp = [SpeedyWeather.pressure_thickness(k, pₛ, coordinates) for k in 1:nlayers]
         rng = Xoshiro(123)
-        for couple in (false, true), Δt in (0.0, 300.0, 1.0e5)
+        for with_source in (false, true), Δt in (0.0, 300.0, 1.0e5)
             x = 280 .+ 10 * randn(rng, nlayers)
             K = 100 * rand(rng, nlayers)
             ρ_Δz = 1.0e-2 * rand(rng, nlayers)
-            source = 1.0e-4 * randn(rng, nlayers)
-            tend = diffuse_column(x, K, ρ_Δz, coordinates; surface_pressure = pₛ, Δt, tendency = source, couple)
+            source = with_source ? 1.0e-4 * randn(rng, nlayers) : zeros(nlayers)
+            tend = diffuse_column(x, K, ρ_Δz, coordinates; surface_pressure = pₛ, Δt, tendency = source)
             @test sum(tend .* Δp) ≈ sum(source .* Δp) atol = 1.0e-12 * sum(abs.(x .* Δp))
         end
     end
@@ -141,44 +142,42 @@ end
         Δt, g = 1800.0, 9.81
 
         # both variables for the columns of a range with the solver for ranges
-        function diffuse_columns(columns, couple)
+        function diffuse_columns(columns)
             tendency_x, tendency_y = copy(source_x), copy(source_y)
-            upper, rhs = fill(NaN, size(x)), fill(NaN, size(x))     # scratch, to be written before read
+            upper = fill(NaN, size(x))      # scratch, to be written before read
             fields = ((tendency_x, x, (Φ, 1 / cₚ)), (tendency_y, y, nothing))
-            SpeedyWeather.implicit_vertical_diffusion!(columns, fields, K .* ρ_Δz, upper, rhs, surface_pressure, Δt, g, coordinates, couple)
+            SpeedyWeather.implicit_vertical_diffusion!(columns, fields, K .* ρ_Δz, upper, surface_pressure, Δt, g, coordinates)
             return tendency_x, tendency_y
         end
 
-        for couple in (true, false)
-            # reference: one variable and one column at a time
-            reference_x = reduce(
-                vcat, [
-                    diffuse_column(
-                        x[ij, :], K[ij, :], ρ_Δz[ij, :], coordinates; surface_pressure = surface_pressure[ij], Δt, gravity = g,
-                        tendency = source_x[ij, :], geopotential_term = (Φ[ij:ij, :], 1 / cₚ), couple
-                    )' for ij in 1:ncolumns
-                ]
-            )
-            reference_y = reduce(
-                vcat, [
-                    diffuse_column(
-                        y[ij, :], K[ij, :], ρ_Δz[ij, :], coordinates; surface_pressure = surface_pressure[ij], Δt, gravity = g,
-                        tendency = source_y[ij, :], couple
-                    )' for ij in 1:ncolumns
-                ]
-            )
-            tendency_x, tendency_y = diffuse_columns(1:ncolumns, couple)
-            @test all(isfinite, tendency_x) && all(isfinite, tendency_y)
-            @test tendency_x ≈ reference_x rtol = 1.0e-12
-            @test tendency_y ≈ reference_y rtol = 1.0e-12
+        # reference: one variable and one column at a time
+        reference_x = reduce(
+            vcat, [
+                diffuse_column(
+                    x[ij, :], K[ij, :], ρ_Δz[ij, :], coordinates; surface_pressure = surface_pressure[ij], Δt, gravity = g,
+                    tendency = source_x[ij, :], geopotential_term = (Φ[ij:ij, :], 1 / cₚ)
+                )' for ij in 1:ncolumns
+            ]
+        )
+        reference_y = reduce(
+            vcat, [
+                diffuse_column(
+                    y[ij, :], K[ij, :], ρ_Δz[ij, :], coordinates; surface_pressure = surface_pressure[ij], Δt, gravity = g,
+                    tendency = source_y[ij, :]
+                )' for ij in 1:ncolumns
+            ]
+        )
+        tendency_x, tendency_y = diffuse_columns(1:ncolumns)
+        @test all(isfinite, tendency_x) && all(isfinite, tendency_y)
+        @test tendency_x ≈ reference_x rtol = 1.0e-12
+        @test tendency_y ≈ reference_y rtol = 1.0e-12
 
-            # a subrange only changes its columns
-            tendency_x, tendency_y = diffuse_columns(3:5, couple)
-            @test tendency_x[3:5, :] ≈ reference_x[3:5, :] rtol = 1.0e-12
-            @test tendency_y[3:5, :] ≈ reference_y[3:5, :] rtol = 1.0e-12
-            @test tendency_x[[1, 2, 6, 7], :] == source_x[[1, 2, 6, 7], :]
-            @test tendency_y[[1, 2, 6, 7], :] == source_y[[1, 2, 6, 7], :]
-        end
+        # a subrange only changes its columns
+        tendency_x, tendency_y = diffuse_columns(3:5)
+        @test tendency_x[3:5, :] ≈ reference_x[3:5, :] rtol = 1.0e-12
+        @test tendency_y[3:5, :] ≈ reference_y[3:5, :] rtol = 1.0e-12
+        @test tendency_x[[1, 2, 6, 7], :] == source_x[[1, 2, 6, 7], :]
+        @test tendency_y[[1, 2, 6, 7], :] == source_y[[1, 2, 6, 7], :]
     end
 end
 
@@ -375,13 +374,13 @@ end
     pₛ = variables.parameterizations.surface_pressure.data
 
     # temperature tendency of the vertical diffusion of dry static energy for all columns
-    function temperature_tendency(; source = zeros(npoints, nlayers), couple = true)
+    function temperature_tendency(; source = zeros(npoints, nlayers))
         _, K_heat, _, ρ_Δz = vertical_diffusivity!(simulation)
         return reduce(
             vcat, map(1:npoints) do ij
                 diffuse_column(
                     T[ij, :], K_heat[ij, :], ρ_Δz[ij, :], vertical_coordinates;
-                    surface_pressure = pₛ[ij], Δt, gravity = g, tendency = source[ij, :], couple,
+                    surface_pressure = pₛ[ij], Δt, gravity = g, tendency = source[ij, :],
                     geopotential_term = (Φ[ij:ij, :], 1 / cₚ),
                 )'
             end
@@ -414,8 +413,8 @@ end
         # heating of the lowermost layer as by a surface sensible heat flux
         source = zeros(npoints, nlayers)
         source[:, end] .= 1.0e-4            # [K/s]
-        coupled = temperature_tendency(; source, couple = true)
-        uncoupled = temperature_tendency(; source, couple = false)
+        coupled = temperature_tendency(; source)       # the source as part of the implicit solve
+        uncoupled = temperature_tendency() + source     # diffusion without source, the source added afterwards
         spread = coupled - uncoupled
 
         Δp = [SpeedyWeather.pressure_thickness(k, pₛ[ij], vertical_coordinates) for ij in 1:npoints, k in 1:nlayers]
@@ -468,10 +467,10 @@ end
         end
     end
 
-    @testset "Options: coupled = $couple_surface_fluxes" for couple_surface_fluxes in (true, false)
-        reference = diffuse!(BulkRichardsonDiffusion(spectral_grid; couple_surface_fluxes))
+    @testset "Options" begin
+        reference = diffuse!(BulkRichardsonDiffusion(spectral_grid))
         for diffuse_momentum in (true, false), diffuse_static_energy in (true, false), diffuse_humidity in (true, false)
-            options = BulkRichardsonDiffusion(spectral_grid; couple_surface_fluxes, diffuse_momentum, diffuse_static_energy, diffuse_humidity)
+            options = BulkRichardsonDiffusion(spectral_grid; diffuse_momentum, diffuse_static_energy, diffuse_humidity)
             result = diffuse!(options)
             diffused = (diffuse_momentum, diffuse_momentum, diffuse_static_energy, diffuse_humidity)
             for (i, is_diffused) in enumerate(diffused)

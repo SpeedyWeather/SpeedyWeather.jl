@@ -56,9 +56,6 @@ diffusivity act. Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Diffuse humidity? Ignored for models without humidity"
     diffuse_humidity::Bool = true
-
-    "[OPTION] Spread the tendencies of the parameterizations called before (the surface fluxes) implicitly over the column?"
-    couple_surface_fluxes::Bool = true
 end
 
 Adapt.@adapt_structure BulkRichardsonDiffusion
@@ -107,7 +104,7 @@ Vertical diffusion tendencies of u, v, temperature (via dry static energy) and h
 `columns` of horizontal grid points, solved implicitly with the conductances from `vertical_conductance!`.
 The variables that share a conductance (u and v, dry static energy and humidity) are solved together."""
 @propagate_inbounds function vertical_diffusion!(columns::AbstractUnitRange, vars, diffusion::BulkRichardsonDiffusion, model)
-    (; diffuse_momentum, diffuse_static_energy, diffuse_humidity, couple_surface_fluxes) = diffusion
+    (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
 
     # escape immediately if all diffusions disabled
     any((diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
@@ -118,10 +115,9 @@ The variables that share a conductance (u and v, dry static energy and humidity)
     conductance_momentum = vars.parameterizations.vertical_conductance_momentum
     conductance_heat = vars.parameterizations.vertical_conductance_heat
     solver_arguments = (
-        vars.scratch.grid.b,                        # general scratch arrays, their use in
-        vars.scratch.grid.a,                        # vertical_conductance! has ended
+        vars.scratch.grid.b,                        # general scratch array for the upper diagonal
         vars.parameterizations.surface_pressure,
-        Δt, model.planet.gravity, model.geometry.vertical_coordinates, couple_surface_fluxes,
+        Δt, model.planet.gravity, model.geometry.vertical_coordinates,
     )
 
     if diffuse_momentum
@@ -464,6 +460,9 @@ end
 @propagate_inbounds diffused_value(variable, ::Nothing, ij, k) = variable[ij, k]
 @propagate_inbounds diffused_value(variable, (Φ, scale)::Tuple, ij, k) = variable[ij, k] + scale * Φ[ij, k]
 
+# TODO: we may also factor out the triadiagonal solve into one of the subpackages, as it could beused elsewhere
+# this is fairly generic code.
+
 """$(TYPEDSIGNATURES)
 Implicit (backward Euler) vertical diffusion for the range `columns` of horizontal grid points of every
 variable in `fields`, a tuple with one `(tendency, variable, geopotential_term)` per variable, with the
@@ -475,50 +474,24 @@ pressure thickness Δp of the layers,
     (L x)ₖ = g/Δpₖ [aₖ₊½ (xₖ₊₁ - xₖ) - aₖ₋½ (xₖ - xₖ₋₁)],     aₖ₊½ = ρₖ₊½ Kₖ₊½ / Δzₖ₊½,
 
 and no flux through the top and the surface, the tendency y = (x⁺ - x⁻)/Δt is the solution of the
-tridiagonal system (1 - ΔtL) y = L x⁻ + S, solved with the Thomas algorithm. With `couple = true` the
-source S is the `tendency` accumulated so far (e.g. the surface fluxes into the lowermost layer), which
-is then spread over the column within the time step and `tendency` is replaced by y. Otherwise S = 0 and
-y is added to `tendency`. Conserves the mass-weighted column integral Σ xₖ Δpₖ exactly.
+tridiagonal system (1 - ΔtL) y = L x⁻ + S, solved with the Thomas algorithm. The source S is the `tendency`
+accumulated so far (the surface fluxes into the lowermost layer, the parameterizations called before), so
+these tendencies are applied first and the result is diffused, which spreads the surface fluxes over the
+column within the time step. `tendency` is replaced by y. Conserves the mass-weighted column integral
+Σ xₖ Δpₖ exactly, with that of the source.
 
-The matrix is the same for all variables in `fields`. With `couple = true` they are solved together, with
-one elimination of the matrix and the right-hand side of every variable stored in its tendency. Otherwise
-the tendencies have to be kept, so the right-hand side is stored in `tridiagonal_rhs` and the variables
-are solved one after the other."""
+The matrix is the same for all variables in `fields`: it is eliminated once, and the right-hand side of every
+variable is stored in its tendency. Layers in the outer, columns in the inner loops: what the elimination of
+layer k needs of the layer above (upper diagonal, right-hand side) is read from the arrays."""
 @propagate_inbounds function implicit_vertical_diffusion!(
         columns::AbstractUnitRange,
         fields::Tuple,              # (tendency, variable, geopotential_term) of every variable to diffuse
         conductance,                # ρK/Δz [kg/m²/s] at the interface below every layer
         tridiagonal_upper,          # scratch, upper diagonal after forward elimination
-        tridiagonal_rhs,            # scratch, right-hand side after forward elimination if not coupled
         surface_pressure,           # [Pa] of every column
         Δt,                         # time step [s]
         g,                          # gravity [m/s²]
         vertical_coordinates,
-        couple::Bool,               # use the tendencies as source in the implicit solve?
-    )
-    if couple       # `nothing` for the right-hand side: stored in the tendencies
-        tridiagonal_solve!(columns, fields, nothing, conductance, tridiagonal_upper, surface_pressure, Δt, g, vertical_coordinates)
-    else
-        tridiagonal_solve_each!(columns, fields, tridiagonal_rhs, conductance, tridiagonal_upper, surface_pressure, Δt, g, vertical_coordinates)
-    end
-    return nothing
-end
-
-# one variable after the other, by recursion over the tuple
-@inline tridiagonal_solve_each!(columns, ::Tuple{}, arguments...) = nothing
-@propagate_inbounds function tridiagonal_solve_each!(columns, fields::Tuple, arguments...)
-    tridiagonal_solve!(columns, (first(fields),), arguments...)
-    tridiagonal_solve_each!(columns, Base.tail(fields), arguments...)
-    return nothing
-end
-
-# TODO: we may also factor out the triadiagonal solve into one of the subpackages, as it could beused elsewhere 
-# this is fairly generic code. 
-#
-# Thomas algorithm for all variables in `fields`, layers in the outer, columns in the inner loops. What the
-# elimination of layer k needs of the layer above (upper diagonal, right-hand side) is read from the arrays
-@propagate_inbounds function tridiagonal_solve!(
-        columns, fields::Tuple, rhs_scratch, conductance, tridiagonal_upper, surface_pressure, Δt, g, vertical_coordinates,
     )
     nlayers = size(conductance, 2)
     NF = eltype(conductance)
@@ -542,7 +515,7 @@ end
             upper_above = ifelse(k > 1, tridiagonal_upper[ij, k_above], zero(NF))
             inv_pivot = inv(diagonal - lower * upper_above)     # pivot ≥ 1
             tridiagonal_upper[ij, k] = upper * inv_pivot
-            forward_elimination_all!(ij, k, k_above, k_below, fields, rhs_scratch, a_above, a_below, g_Δp, lower, inv_pivot)
+            forward_elimination_all!(ij, k, k_above, k_below, fields, a_above, a_below, g_Δp, lower, inv_pivot)
         end
     end
 
@@ -550,49 +523,30 @@ end
     for k in nlayers:-1:1
         k_below = min(k + 1, nlayers)
         @simd ivdep for ij in columns
-            back_substitution_all!(ij, k, k_below, fields, rhs_scratch, tridiagonal_upper[ij, k])
+            back_substitution_all!(ij, k, k_below, fields, tridiagonal_upper[ij, k])
         end
     end
     return nothing
 end
 
-# the right-hand side of a variable is stored in its tendency (coupled, `nothing`) or in a scratch array
-@inline right_hand_side(tendency, ::Nothing) = tendency
-@inline right_hand_side(tendency, rhs_scratch) = rhs_scratch
-
-# source S of the implicit solve: the tendency accumulated so far (coupled, `nothing`) or zero
-@propagate_inbounds implicit_source(tendency, ::Nothing, ij, k) = tendency[ij, k]
-@inline implicit_source(tendency, rhs_scratch, ij, k) = zero(eltype(tendency))
-
-# forward elimination of the right-hand side of one variable in layer k
+# forward elimination of one variable in layer k: the right-hand side, with the tendency accumulated so far as
+# the source, replaces the tendency
 @propagate_inbounds function forward_elimination!(
-        ij, k, k_above, k_below, (tendency, variable, geopotential_term)::Tuple, rhs_scratch, a_above, a_below, g_Δp, lower, inv_pivot,
+        ij, k, k_above, k_below, (tendency, variable, geopotential_term)::Tuple, a_above, a_below, g_Δp, lower, inv_pivot,
     )
-    rhs = right_hand_side(tendency, rhs_scratch)
     x = diffused_value(variable, geopotential_term, ij, k)
     x_above = diffused_value(variable, geopotential_term, ij, k_above)
     x_below = diffused_value(variable, geopotential_term, ij, k_below)
     explicit_tendency = g_Δp * (a_below * (x_below - x) - a_above * (x - x_above))
-    source = implicit_source(tendency, rhs_scratch, ij, k)
-    rhs_above = ifelse(k > 1, rhs[ij, k_above], zero(x))
-    rhs[ij, k] = (explicit_tendency + source - lower * rhs_above) * inv_pivot
+    rhs_above = ifelse(k > 1, tendency[ij, k_above], zero(x))
+    tendency[ij, k] = (explicit_tendency + tendency[ij, k] - lower * rhs_above) * inv_pivot
     return nothing
 end
 
-# back substitution of one variable in layer k. Coupled (`nothing`): the solution replaces the right-hand
-# side in the tendency
-@propagate_inbounds function back_substitution!(ij, k, k_below, (tendency, variable, geopotential_term)::Tuple, ::Nothing, upper)
+# back substitution of one variable in layer k: the solution replaces the right-hand side in the tendency
+@propagate_inbounds function back_substitution!(ij, k, k_below, (tendency, variable, geopotential_term)::Tuple, upper)
     y_below = ifelse(k < k_below, tendency[ij, k_below], zero(upper))
     tendency[ij, k] -= upper * y_below
-    return nothing
-end
-
-# Not coupled: the solution replaces the right-hand side in the scratch array and is added to the tendency
-@propagate_inbounds function back_substitution!(ij, k, k_below, (tendency, variable, geopotential_term)::Tuple, rhs_scratch, upper)
-    y_below = ifelse(k < k_below, rhs_scratch[ij, k_below], zero(upper))
-    y = rhs_scratch[ij, k] - upper * y_below
-    rhs_scratch[ij, k] = y
-    tendency[ij, k] += y
     return nothing
 end
 
