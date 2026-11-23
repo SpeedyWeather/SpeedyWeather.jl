@@ -1,13 +1,9 @@
 abstract type AbstractHoleFilling <: AbstractModelComponent end
 
-# HOLE FILLING
-# `hole_filling!(vars, hole_filling, model)` is called in `transform!` after the spectral prognostic
-# humidity of the current step has been transformed to the grid and changes that grid humidity only.
-# Everything that reads humidity afterwards (dynamics, parameterizations) uses the filled grid field,
-# but the time stepping integrates the spectral humidity. A hole filling that changes the grid field
-# can therefore also add that change as a tendency in the next time step (`hole_filling_tendency!`), so
-# that the spectral humidity receives the moisture that the tendencies assume. `ClipNegatives` does so
-# with `fill_tendency = true`, or by default only with `StochasticLeapfrog`.
+# Hole filling for the specific humidity 
+# Note that this is a relatively hacky solution to the problem of negative humidity values in the spectral 
+# model. We might revist how humidity is handled in the model in the future, but for now this is a simple 
+# way to ensure that the model does not produce unphysical negative humidity values.
 
 # no hole filling
 hole_filling!(::Variables, ::Nothing, ::AbstractModel) = nothing
@@ -33,7 +29,7 @@ export ClipNegatives
 """Hole filling that sets negative grid-point humidity to zero, `q = max(q, 0)`, after every
 transform to grid-point space, so that dynamics and parameterizations see non-negative humidity.
 The spectral prognostic humidity keeps its negative values, where all tendencies see zero humidity.
-With the fill tendency, the humidity the clipping adds at every grid point, `max(-q, 0)`, is stored
+With `fill_tendency``, the humidity the clipping adds at every grid point, `max(-q, 0)`, is stored
 in `vars.dynamics.humidity_hole_fill` and added as a tendency in the next time step, so that the spectral
 humidity is stepped forward from the clipped humidity that the tendencies were computed from (with
 `Leapfrog` from the clipped previous step). Without it holes in the spectral humidity can deepen and
