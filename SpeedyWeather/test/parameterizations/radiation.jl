@@ -12,8 +12,13 @@ function init_radiation_state!(vars, model)
     vars.parameterizations.surface_pressure .= 1.0e5
     haskey(vars.parameterizations, :cloud_top) && (vars.parameterizations.cloud_top .= model.spectral_grid.nlayers + 1)
     haskey(vars.parameterizations, :rain_rate) && (vars.parameterizations.rain_rate .= 0)
-    vars.parameterizations.ocean.albedo .= 0.5
-    vars.parameterizations.land.albedo .= 0.3
+    # surfaces with direct (black-sky) and diffuse (white-sky) albedo, e.g. JinOceanAlbedo or LearnedLandAlbedo,
+    # are blended into the albedo by the shortwave scheme, so set those too
+    for (surface, albedo) in ((vars.parameterizations.ocean, 0.5), (vars.parameterizations.land, 0.3))
+        surface.albedo .= albedo
+        haskey(surface, :black_sky_albedo) && (surface.black_sky_albedo .= albedo)
+        haskey(surface, :white_sky_albedo) && (surface.white_sky_albedo .= albedo)
+    end
     vars.prognostic.ocean.sea_surface_temperature .= 290
     vars.prognostic.land.soil_temperature .= 285
     SpeedyWeather.parameterization!(vars, model.solar_zenith, model)
@@ -21,13 +26,13 @@ function init_radiation_state!(vars, model)
 end
 
 @testset "Radiation bundle" begin
-    shortwaves = (TransparentShortwave, OneBandShortwave, OneBandGreyShortwave, Nothing)
+    shortwaves = (TransparentShortwave, OneBandShortwave, TwoBandShortwave, OneBandGreyShortwave, Nothing)
     longwaves = (UniformCooling, JeevanjeeRadiation, OneBandLongwave, OneBandGreyLongwave, Nothing)
 
     @testset "Bit-identical to separate schemes" begin
         # full matrix in Float32 (the default), spot check of the default pair in Float64
         cases = [(Float32, SW, LW) for SW in shortwaves for LW in longwaves]
-        push!(cases, (Float64, OneBandShortwave, OneBandLongwave))
+        push!(cases, (Float64, TwoBandShortwave, OneBandLongwave))
 
         @testset for (NF, SW, LW) in cases
             spectral_grid = SpectralGrid(; NF, truncation = 32, nlayers = 8)
@@ -84,7 +89,7 @@ end
 
         # defaults
         model = PrimitiveWetModel(spectral_grid)
-        @test model.radiation isa Radiation{<:OneBandShortwave, <:OneBandLongwave}
+        @test model.radiation isa Radiation{<:TwoBandShortwave, <:OneBandLongwave}
         @test :radiation in model.parameterizations
         model = PrimitiveDryModel(spectral_grid)
         @test model.radiation.shortwave isa OneBandShortwave     # the grey variant is a OneBandShortwave

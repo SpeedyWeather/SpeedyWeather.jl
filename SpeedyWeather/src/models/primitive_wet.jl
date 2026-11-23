@@ -49,6 +49,7 @@ $(TYPEDFIELDS)"""
         VA,     # <:AbstractVerticalAdvection,
         HO,     # <:AbstractHoleFilling,
         OU,     # <:AbstractOutput,
+        DG,     # NamedTuple of <:AbstractDiagnostic,
         FB,     # <:AbstractFeedback,
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
@@ -94,7 +95,7 @@ $(TYPEDFIELDS)"""
     @component large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     @component convection::CV = BettsMillerConvection(spectral_grid)
     @component radiation::RA = Radiation(spectral_grid)
-    @component greenhouse_gases::GHG = (;)
+    @component greenhouse_gases::GHG = (; co2 = CO2(spectral_grid))
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
@@ -108,6 +109,7 @@ $(TYPEDFIELDS)"""
 
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, PrimitiveWet)
+    diagnostics::DG = PrecipitationDiagnostics()
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 
@@ -202,8 +204,11 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.surface_humidity_flux, model)
+    initialize!(model.custom_parameterization, model)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
+
+    initialize!(model.diagnostics, model)
 
     # allocate all variables
     variables = Variables(model)

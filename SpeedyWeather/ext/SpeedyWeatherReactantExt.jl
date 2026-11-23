@@ -134,6 +134,10 @@ SpeedyWeather.scalar_ref(::ReactantDevice, x::Number) = Ref(Reactant.ConcreteRNu
 # Dates.year(days) for which Dates' method branches on the traced month, use yearmonthday instead
 Dates.year(days::Reactant.TracedRNumber) = first(Dates.yearmonthday(days))
 
+# TODO: move upstream to Reactant, ReactantDatesExt defines datetime2julian but not datetime2unix,
+# used by `ExponentialCO2`; same as Dates' method and as ReactantDatesExt's datetime2julian
+Dates.datetime2unix(dt::ReactantDatesExt.ReactantDateTime) = (Dates.value(dt) - Dates.UNIXEPOCH) / 1000.0
+
 # TODO: move upstream to Reactant, Dates' method indexes a table with the (traced) month and branches
 # with `&&`, used by the seasonal climatologies (`monthly_interpolation`)
 function Dates.daysinmonth(year::Reactant.TracedRNumber, month::Reactant.TracedRNumber)
@@ -180,6 +184,19 @@ SpeedyWeather.dilate(Δt::Millisecond, dilation::Reactant.TracedRNumber) =
 
 SpeedyWeather.dilate(Δt::ReactantDatesExt.ReactantMillisecond, dilation) =
     ReactantDatesExt.ReactantMillisecond(round(Int, Δt.value * dilation))
+
+# TODO: remove once Reactant reduces over views of concrete arrays, which might be resolved by
+# EnzymeAD/Reactant.jl#3660 (`mapreduce` over wrapped concrete arrays, e.g. a `SubArray`, as one compiled
+# reduction) together with EnzymeAD/Reactant.jl#3531 (`count` over traced arrays, Base's `_bool` predicate
+# wrapper throws for a `TracedRNumber{Bool}`). Until then `count` over a view of the σ levels in
+# `free_troposphere_layers` (once at initialize!) falls back to scalar indexing, so count on a CPU copy
+const ConcreteVerticalCoordinates = Union{
+    SpeedyWeather.SigmaCoordinates{<:Any, <:Any, <:Reactant.AbstractConcreteArray},
+    SpeedyWeather.SigmaPressureCoordinates{<:Any, <:Any, <:Reactant.AbstractConcreteArray},
+}
+
+SpeedyWeather.free_troposphere_layers(clouds::SpeedyWeather.DiagnosticClouds, vertical_coordinates::ConcreteVerticalCoordinates) =
+    SpeedyWeather.free_troposphere_layers(clouds, SpeedyWeather.Adapt.adapt(Array, vertical_coordinates))
 
 # OUTPUT HANDLING FOR REACTANT
 #

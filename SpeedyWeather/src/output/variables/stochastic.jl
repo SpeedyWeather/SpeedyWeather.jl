@@ -12,4 +12,4 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::RandomPattern, simulation) =
-    simulation.variables.grid.random_pattern
+    field_view(simulation.variables.grid.random_pattern, :, 1)      # first pattern

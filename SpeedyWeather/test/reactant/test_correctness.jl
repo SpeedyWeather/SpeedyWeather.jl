@@ -235,6 +235,15 @@ function test_model(
     @testset "$model_name CPU vs Reactant" begin
         tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name, r_timestep!; tolerances)
         stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name, r_timestep!; nsteps, tolerances)
+
+        # the default precipitation diagnostics (see `PrecipitationDiagnostics`) run inside `time_step!`
+        if ModelType <: PrimitiveWetModel
+            for name in (:rain_large_scale, :snow_large_scale)
+                accumulated = on_architecture(SpeedyWeather.CPU(), getproperty(simulation_reactant.variables.output, name))
+                @test all(isfinite, accumulated)
+                @test all(>=(0), accumulated)
+            end
+        end
     end
 
     println("\n" * "="^60)

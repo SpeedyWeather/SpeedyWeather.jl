@@ -291,6 +291,19 @@ radius ``R`` and rotation ``\Omega``. Jablonowski and Williamson's temperature i
 and can be chosen freely without breaking the balance.
 As in Jablonowski-Williamson a small perturbation of the zonal wind triggers baroclinic instability.
 
+On a retrograde planet (`rotation < 0`) the jet blows in the sense of rotation, i.e. ``u_0`` becomes
+``-u_0`` (easterlies). ``(\Omega, u) \to (-\Omega, -u)`` is the mirror image of the planet, so the
+temperature is the same as for prograde rotation and the vorticity changes sign. With ``u_0``
+kept westerly the Coriolis term ``B(\phi)R\Omega`` would change sign alone and the poles would
+start tens of Kelvin warmer than the tropics. The same applies to `ZonalWind`,
+`JablonowskiTemperature` and the `ZonalRidge` orography.
+
+The sign of `rotation` only sets the Coriolis force, and with it the direction of the jet here.
+The direction the sun moves across the sky is set independently by `length_of_day`, and a
+negative `length_of_day` makes the sun rise in the west (see [Orbit and rotation time](@ref)).
+A planet that rotates backwards in both senses therefore needs both negative, e.g.
+`Earth(spectral_grid, rotation=-7.29e-5, length_of_day=Hour(-24))`.
+
 ### Derivation
 
 The temperature follows from the same balance that Jablonowski and Williamson use, only
