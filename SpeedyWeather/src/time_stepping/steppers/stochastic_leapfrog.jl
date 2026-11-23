@@ -62,7 +62,9 @@ alias, not a new time stepper): every method of `Leapfrog` applies, only the Wie
 added. Use as `time_stepping = StochasticLeapfrog(spectral_grid; seed = 123)`, keyword arguments
 other than those of `Leapfrog` are passed on to `AdditiveWienerNoise`, or equivalently
 `Leapfrog(spectral_grid; noise = AdditiveWienerNoise(spectral_grid; seed = 123))`.
-All amplitudes zero gives the same trajectory as `Leapfrog` without noise.
+All amplitudes zero gives the same trajectory as `Leapfrog` without noise, but note that the default
+hole filling of the `PrimitiveWetModel`, `ClipNegatives`, adds its fill tendency only with
+`StochasticLeapfrog`: choose `ClipNegatives(spectral_grid; fill_tendency)` explicitly to compare.
 
 References
 
@@ -117,3 +119,7 @@ end
 """$(TYPEDSIGNATURES)
 Draw the noise patterns for the next time step, called in `time_step!` via `update_random!(vars, model)`."""
 update_random!(vars::Variables, L::StochasticLeapfrog) = wiener_draw!(vars, L.noise)
+
+# the additive noise seeds holes in the dry upper layers, which the spectral humidity accumulates without
+# the fill tendency of the hole filling, so `ClipNegatives` adds it by default with `StochasticLeapfrog`
+adds_fill_tendency(::ClipNegatives{nothing}, ::StochasticLeapfrog) = true

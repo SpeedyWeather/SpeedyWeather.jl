@@ -123,6 +123,10 @@ function time_step!(
         land_timestep!(vars, model)         # soil moisture and temperature,...
     end
 
+    # PrimitiveWet and hole filling with tendencies (ClipNegatives{true}) only: 
+    # humidity added by the hole filling in transform! as tendency
+    hole_filling_tendency!(vars, model)
+
     if model.dynamics                           # switch on/off all dynamics
         dynamics_tendencies!(vars, model)       # dynamical core
         random_process!(vars, time_stepping, model) # stochastic time steppers only: noise before the implicit terms
