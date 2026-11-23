@@ -43,8 +43,12 @@ end
             spectral_grid; seed = 1, vorticity = 0, divergence = 0, temperature = 0,
             humidity = 0, sea_surface_temperature = 0,
         )
-        sim_lf = seeded_initialize!(Model(spectral_grid; time_stepping = Leapfrog(spectral_grid)))
-        sim_sl = seeded_initialize!(Model(spectral_grid; time_stepping = StochasticLeapfrog(spectral_grid; noise = zero_noise)))
+        # the same hole filling for both: by default ClipNegatives adds its fill tendency only with StochasticLeapfrog
+        hole_filling = Model <: PrimitiveWetModel ? (; hole_filling = ClipNegatives(spectral_grid; fill_tendency = true)) : (;)
+        sim_lf = seeded_initialize!(Model(spectral_grid; time_stepping = Leapfrog(spectral_grid), hole_filling...))
+        sim_sl = seeded_initialize!(
+            Model(spectral_grid; time_stepping = StochasticLeapfrog(spectral_grid; noise = zero_noise), hole_filling...)
+        )
         run!(sim_lf, steps = 10)
         run!(sim_sl, steps = 10)
         @test same_state(sim_lf, sim_sl)

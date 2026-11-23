@@ -62,7 +62,9 @@ alias, not a new time stepper): every method of `Leapfrog` applies, only the Wie
 added. Use as `time_stepping = StochasticLeapfrog(spectral_grid; seed = 123)`, keyword arguments
 other than those of `Leapfrog` are passed on to `AdditiveWienerNoise`, or equivalently
 `Leapfrog(spectral_grid; noise = AdditiveWienerNoise(spectral_grid; seed = 123))`.
-All amplitudes zero gives the same trajectory as `Leapfrog` without noise.
+All amplitudes zero gives the same trajectory as `Leapfrog` without noise, but note that the default
+hole filling of the `PrimitiveWetModel`, `ClipNegatives`, adds its fill tendency only with
+`StochasticLeapfrog`: choose `ClipNegatives(spectral_grid; fill_tendency)` explicitly to compare.
 
 References
 
