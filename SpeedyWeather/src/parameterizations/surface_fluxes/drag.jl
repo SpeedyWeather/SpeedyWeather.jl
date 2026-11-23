@@ -66,6 +66,13 @@ Adapt.@adapt_structure BulkRichardsonDrag
 BulkRichardsonDrag(SG::SpectralGrid; kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
 initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
+# additionally the bulk Richardson number that the drag is computed from, for parameterizations called
+# afterwards that need it too (`BulkRichardsonDiffusion`) and would otherwise compute it again
+variables(drag::BulkRichardsonDrag) = (
+    invoke(variables, Tuple{AbstractBoundaryLayerDrag}, drag)...,
+    ParameterizationVariable(:surface_bulk_richardson, GridXY(), desc = "Bulk Richardson number between the surface and the lowermost layer", units = "1"),
+)
+
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, boundary_layer, model) =
     boundary_layer_drag!(ij, vars, drag, model)
@@ -108,6 +115,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # they call it Ri_a = Ri_land/Ri_ocean here
     ΔΦ₀ = gravity * z     # geopotential height relative to surface
     Ri_land, Ri_ocean = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
+    vars.parameterizations.surface_bulk_richardson[ij] = land_fraction * Ri_land + (1 - land_fraction) * Ri_ocean
     Ri_cutoff = drag.Richardson_cutoff
     (; drag_min) = drag
 

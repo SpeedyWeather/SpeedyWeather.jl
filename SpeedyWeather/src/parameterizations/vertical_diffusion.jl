@@ -78,72 +78,125 @@ variables(::BulkRichardsonDiffusion) = (
     # so far this seems fine but it might need be revisited
     ScratchVariable(:a, GridXYZ(), desc = "Scratch array", namespace = :grid),
     ScratchVariable(:b, GridXYZ(), desc = "Scratch array", namespace = :grid),
+    ScratchVariable(:a_2D, Grid2D(), desc = "Scratch array", namespace = :grid),
+    ScratchVariable(:b_2D, Grid2D(), desc = "Scratch array", namespace = :grid),
 )
 
 initialize!(::BulkRichardsonDiffusion, ::PrimitiveEquation) = nothing
 
-# function barrier
+# The scheme is written for efficient performance on both CPU and GPU.
+# On CPU the outer loop is over the layers, the inner loop over the columns, so that the inner loop reads
+# contiguous memory and vectorises. On GPU the outer loop is over the columns (as are all GPU kernels in
+# SpeedyWeather), the inner loop over the layers, so that memory access is coalesced (hopefully).
+#
+# To enable both the parameterization is written for ranges of columns with the GPU just always passing a range
+# of one column.
+
+# One column of the fused kernel (GPU, Reactant) is the range ij:ij, for which the inner loops have one iteration
 @propagate_inbounds parameterization!(ij, vars, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, vars, diffusion, model)
+    vertical_diffusion!(ij:ij, vars, diffusion, model)
+
+# On CPU all columns at once
+@inline function column_parameterization_cpu!(vars, diffusion::BulkRichardsonDiffusion, model)
+    @inbounds vertical_diffusion!(1:model.geometry.npoints, vars, diffusion, model)
+    return nothing
+end
 
 """$(TYPEDSIGNATURES)
-Vertical diffusion tendencies of u, v, temperature (via dry static energy) and humidity at grid point
-`ij`, solved implicitly with the conductances from `vertical_conductance!`."""
-@propagate_inbounds function vertical_diffusion!(ij, vars, diffusion::BulkRichardsonDiffusion, model)
+Vertical diffusion tendencies of u, v, temperature (via dry static energy) and humidity for the range
+`columns` of horizontal grid points, solved implicitly with the conductances from `vertical_conductance!`.
+The variables that share a conductance (u and v, dry static energy and humidity) are solved together."""
+@propagate_inbounds function vertical_diffusion!(columns::AbstractUnitRange, vars, diffusion::BulkRichardsonDiffusion, model)
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity, couple_surface_fluxes) = diffusion
 
     # escape immediately if all diffusions disabled
     any((diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
 
-    vertical_conductance!(ij, vars, diffusion, model)
+    vertical_conductance!(columns, vars, diffusion, model)
 
-    (; time_stepping) = model
-    Δt = default_time_step(time_stepping)       # 2Δt for leapfrog
-    g = model.planet.gravity
-    (; vertical_coordinates) = model.geometry
-    pₛ = vars.parameterizations.surface_pressure[ij]
+    Δt = default_time_step(model.time_stepping)     # 2Δt for leapfrog
     conductance_momentum = vars.parameterizations.vertical_conductance_momentum
     conductance_heat = vars.parameterizations.vertical_conductance_heat
-    tridiagonal_rhs = vars.scratch.grid.a       # general scratch arrays, the virtual temperature in `a` is
-    tridiagonal_upper = vars.scratch.grid.b     # not needed any more after vertical_conductance!
-    solver_arguments = (tridiagonal_upper, tridiagonal_rhs, pₛ, Δt, g, vertical_coordinates, couple_surface_fluxes)
+    solver_arguments = (
+        vars.scratch.grid.b,                        # general scratch arrays, their use in
+        vars.scratch.grid.a,                        # vertical_conductance! has ended
+        vars.parameterizations.surface_pressure,
+        Δt, model.planet.gravity, model.geometry.vertical_coordinates, couple_surface_fluxes,
+    )
 
     if diffuse_momentum
-        u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
-        v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
-        u_tend = get_tendency_step(vars.tendencies.grid.u, time_stepping, diffusion)
-        v_tend = get_tendency_step(vars.tendencies.grid.v, time_stepping, diffusion)
-        implicit_vertical_diffusion!(ij, u_tend, u, nothing, conductance_momentum, solver_arguments...)
-        implicit_vertical_diffusion!(ij, v_tend, v, nothing, conductance_momentum, solver_arguments...)
+        u = diffused_wind(vars.grid.u, vars.tendencies.grid.u, diffusion, model)
+        v = diffused_wind(vars.grid.v, vars.tendencies.grid.v, diffusion, model)
+        implicit_vertical_diffusion!(columns, (u, v), conductance_momentum, solver_arguments...)
     end
 
-    if diffuse_static_energy
-        # diffuse the dry static energy s = cₚT + Φ (divided by cₚ) with Φ held fixed, so that the
-        # tendency of s/cₚ is the temperature tendency
-        T = get_prognostic_step(vars.grid.temperature, time_stepping, diffusion)
-        T_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, diffusion)
-        geopotential_term = (vars.dynamics.geopotential, inv(model.atmosphere.heat_capacity))
-        implicit_vertical_diffusion!(ij, T_tend, T, geopotential_term, conductance_heat, solver_arguments...)
-    end
-
-    if diffuse_humidity && haskey(vars.grid, :humidity)
-        q = get_prognostic_step(vars.grid.humidity, time_stepping, diffusion)
-        q_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, diffusion)
-        implicit_vertical_diffusion!(ij, q_tend, q, nothing, conductance_heat, solver_arguments...)
+    has_humidity = haskey(vars.grid, :humidity)
+    if has_humidity && diffuse_humidity && diffuse_static_energy
+        static_energy = diffused_static_energy(vars, diffusion, model)
+        humidity = diffused_humidity(vars, diffusion, model)
+        implicit_vertical_diffusion!(columns, (static_energy, humidity), conductance_heat, solver_arguments...)
+    elseif diffuse_static_energy
+        static_energy = diffused_static_energy(vars, diffusion, model)
+        implicit_vertical_diffusion!(columns, (static_energy,), conductance_heat, solver_arguments...)
+    elseif has_humidity && diffuse_humidity
+        humidity = diffused_humidity(vars, diffusion, model)
+        implicit_vertical_diffusion!(columns, (humidity,), conductance_heat, solver_arguments...)
     end
     return nothing
+end
+
+# A variable to diffuse is described by (tendency, variable, geopotential_term), see implicit_vertical_diffusion!
+@propagate_inbounds function diffused_wind(wind, wind_tendency, diffusion, model)
+    (; time_stepping) = model
+    return (get_tendency_step(wind_tendency, time_stepping, diffusion), get_prognostic_step(wind, time_stepping, diffusion), nothing)
+end
+
+# diffuse the dry static energy s = cₚT + Φ (divided by cₚ) with Φ held fixed, so that the
+# tendency of s/cₚ is the temperature tendency
+@propagate_inbounds function diffused_static_energy(vars, diffusion, model)
+    (; time_stepping) = model
+    T = get_prognostic_step(vars.grid.temperature, time_stepping, diffusion)
+    T_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, diffusion)
+    return (T_tend, T, (vars.dynamics.geopotential, inv(model.atmosphere.heat_capacity)))
+end
+
+@propagate_inbounds function diffused_humidity(vars, diffusion, model)
+    (; time_stepping) = model
+    q = get_prognostic_step(vars.grid.humidity, time_stepping, diffusion)
+    q_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, diffusion)
+    return (q_tend, q, nothing)
 end
 
 # humidity of layer k, zero for models without humidity
 @propagate_inbounds column_humidity(q, ij, k) = q[ij, k]
 @inline column_humidity(::Nothing, ij, k) = false     # strong zero
 
+# roughness length for the stability correction, from the surface roughness scheme if present
+@propagate_inbounds column_roughness_length(roughness, default, ij) = ifelse(roughness[ij] > 0, roughness[ij], default)
+@inline column_roughness_length(::Nothing, default, ij) = default
+
+"""$(TYPEDSIGNATURES)
+Friction velocity u⋆ = √C_M Vₛ [m/s] at grid point `ij` from the momentum drag coefficient `drag` and the
+`surface_wind_speed` of the boundary layer. Zero without them (`nothing`), which switches the
+boundary-layer profile of the diffusivity off."""
+@propagate_inbounds friction_velocity(drag, surface_wind_speed, ij) = sqrt(abs(drag[ij])) * surface_wind_speed[ij]
+@inline friction_velocity(::Nothing, ::Nothing, ij) = false     # strong zero
+
+# drag and surface wind speed of a boundary layer, or nothing for both if `parameterizations` lacks one
+@inline function boundary_layer_drag_and_wind(parameterizations)
+    has_boundary_layer = haskey(parameterizations, :boundary_layer_drag_momentum) &&
+        haskey(parameterizations, :surface_wind_speed)
+    has_boundary_layer || return nothing, nothing
+    return parameterizations.boundary_layer_drag_momentum, parameterizations.surface_wind_speed
+end
+
 """$(TYPEDSIGNATURES)
 Conductances a = ρK/Δz [kg/m²/s] of the vertical diffusion of momentum and heat at the interfaces k+½
-below every layer k of column `ij`, with the diffusivity K [m²/s], the air density ρ at the interface and
-the distance Δz between the two layers, written into `vars.parameterizations.vertical_conductance_momentum`
-and `_heat`, and the boundary layer height into `vars.parameterizations.boundary_layer_height`. The
-diffusivity is K = min(max(K_profile, K_local, K_background), K_max) with
+below every layer k for the range `columns` of horizontal grid points (typically a single column on GPU, or 
+all columns on CPU), with the diffusivity K [m²/s], the air density ρ at the interface and the distance Δz 
+between the two layers, written into `vars.parameterizations.vertical_conductance_momentum` and `_heat`, and 
+the boundary layer height into `vars.parameterizations.boundary_layer_height`. The diffusivity is
+K = min(max(K_profile, K_local, K_background), K_max) with
 
 - K_profile the boundary-layer profile of Frierson et al. 2006, eqs. 16–20, from the friction velocity
   of the surface drag, a stability correction from the bulk Richardson number between surface and
@@ -153,149 +206,187 @@ diffusivity is K = min(max(K_profile, K_local, K_background), K_max) with
   mixing length 1/l = 1/(κz) + 1/λ, long-tail stability functions of Louis et al. 1982 for Ri > 0 and
   f = √(1 - 18Ri) for Ri < 0 (Holtslag and Boville, 1993) with the buoyancy-driven part using a mixing
   length of at least `convective_mixing_length`;
-- K_background = `background_diffusivity` ⋅ exp(-z/`background_height`)."""
-@propagate_inbounds function vertical_conductance!(ij, vars, diffusion::BulkRichardsonDiffusion, model)
+- K_background = `background_diffusivity` ⋅ exp(-z/`background_height`).
+
+Computed in five loops over the layers with the columns inside: virtual temperature, boundary layer
+height, the stability of the surface layer (per column), the stability correction of every interface 
+and the conductances."""
+@propagate_inbounds function vertical_conductance!(columns::AbstractUnitRange, vars, diffusion::BulkRichardsonDiffusion, model)
     (; time_stepping, atmosphere, geometry) = model
     (; nlayers, vertical_coordinates) = geometry
     g = model.planet.gravity
+    inv_g = inv(g)
     cₚ = atmosphere.heat_capacity
-    R_dry = atmosphere.R_dry
+    inv_cₚ = inv(cₚ)
+    inv_R_dry = inv(atmosphere.R_dry)
     κ = diffusion.von_Karman
     Ri_c = diffusion.critical_Richardson
     Ri_cutoff = diffusion.Richardson_cutoff
     fb = diffusion.surface_layer_fraction
     (; mixing_length, free_mixing_length, mixing_length_height, convective_mixing_length) = diffusion
     (; background_diffusivity, background_height, max_diffusivity) = diffusion
+    inv_mixing_length_height = inv(mixing_length_height)
+    inv_background_height = inv(background_height)
 
     u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
     v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
     T = get_prognostic_step(vars.grid.temperature, time_stepping, diffusion)
     q = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, diffusion) : nothing
     Φ = vars.dynamics.geopotential      # includes the orography
-    pₛ = vars.parameterizations.surface_pressure[ij]
-    Φₛ = g * model.orography.orography[ij]     # surface geopotential
+    (; orography) = model.orography     # surface geopotential Φₛ = g * orography
+    (; surface_pressure, boundary_layer_height) = vars.parameterizations
+    drag, surface_wind_speed = boundary_layer_drag_and_wind(vars.parameterizations)
+
+    # roughness length for the stability correction, from the surface roughness scheme if present
+    roughness = haskey(vars.parameterizations, :momentum_roughness) ? vars.parameterizations.momentum_roughness : nothing
+    default_roughness = diffusion.roughness_length
 
     conductance_momentum = vars.parameterizations.vertical_conductance_momentum
     conductance_heat = vars.parameterizations.vertical_conductance_heat
     NF = eltype(conductance_momentum)
 
-    # Virtual temperature of every layer, in a general scratch array that the implicit solver reuses for its
-    # right-hand side afterwards. The two loops below (boundary layer height, diffusivities) read it
-    # instead of temperature and humidity. Do not merge this loop into them: with the virtual temperature
-    # computed from humidity inside these loops (in both, or in the first and stored for the second),
-    # Reactant raised the kernel of the wet model to one that writes nothing (Reactant 0.2.30x, see
-    # docs/dev/2026-11/2026-11-19-bulk-richardson.md, section 8.3)
-    Tᵥ_layers = vars.scratch.grid.a
+    # 1. VIRTUAL TEMPERATURE of every layer, in a general scratch array that the implicit solver reuses
+    # afterwards. The loops below read it instead of temperature and humidity
+    Tᵥ = vars.scratch.grid.a
     for k in 1:nlayers
-        Tᵥ_layers[ij, k] = virtual_temperature(T[ij, k], column_humidity(q, ij, k), atmosphere)
+        @simd ivdep for ij in columns
+            Tᵥ[ij, k] = virtual_temperature(T[ij, k], column_humidity(q, ij, k), atmosphere)
+        end
     end
 
-    # SURFACE LAYER: friction velocity from the drag of the boundary layer, surface Richardson number
-    # from the surface temperatures (land and ocean, weighted by the land fraction)
-    friction_velocity, Ri_surface = surface_layer(ij, Φ[ij, nlayers] - Φₛ, vars, diffusion, model)
+    # 2. BOUNDARY LAYER HEIGHT h [m] above the surface
+    boundary_layer_height!(columns, boundary_layer_height, u, v, Tᵥ, Φ, orography, g, cₚ, Ri_c)
 
-    # roughness length for the stability correction, from the surface roughness scheme if present
-    z₀ = haskey(vars.parameterizations, :momentum_roughness) ?
-        vars.parameterizations.momentum_roughness[ij] : diffusion.roughness_length
-    z₀ = ifelse(z₀ > 0, z₀, diffusion.roughness_length)
+    # 3. SURFACE LAYER, per column. Stable correction of Frierson 2006, eq. 20,
+    # [1 + Ri/Ri_cutoff log(z/z₀)/(1 - Ri/Ri_cutoff)]⁻¹ with the surface Richardson number, here written as
+    # (1 - r)/(1 - r + r log(z/z₀)), r = Ri/Ri_cutoff ∈ [0, 1], to avoid a division by zero at Ri = Ri_cutoff.
+    # It is 1 for unstable conditions (Ri ≤ 0) and 0 for Ri ≥ Ri_cutoff. Frierson uses the critical Richardson
+    # number here; a separate cutoff (as for the drag) keeps boundary-layer mixing in stable conditions until
+    # buoyancy dominates the shear. Stored are r and the correction at the surface layer height z = fb*h,
+    # which holds for all interfaces above the surface layer
+    stability_ratio = vars.scratch.grid.a_2D
+    stability_surface_layer = vars.scratch.grid.b_2D
+    for ij in columns
+        ΔΦ₀ = Φ[ij, nlayers] - g * orography[ij]       # geopotential of the lowermost layer relative to the surface
+        r = clamp(surface_richardson(ij, ΔΦ₀, vars, diffusion, model) / Ri_cutoff, 0, 1)
+        z₀ = column_roughness_length(roughness, default_roughness, ij)
+        stability_ratio[ij] = r
+        stability_surface_layer[ij] = stable_correction(r, fb * boundary_layer_height[ij], z₀)
+    end
 
-    # BOUNDARY LAYER HEIGHT h [m] above the surface
-    h = boundary_layer_height(ij, u, v, Tᵥ_layers, Φ, Φₛ, g, cₚ, Ri_c)
-    vars.parameterizations.boundary_layer_height[ij] = h
-
-    # Stable correction of Frierson 2006, eq. 20, [1 + Ri/Ri_cutoff log(z/z₀)/(1 - Ri/Ri_cutoff)]⁻¹ with the
-    # surface Richardson number, here written as (1 - r)/(1 - r + r log(z/z₀)), r = Ri/Ri_cutoff ∈ [0, 1], to
-    # avoid a division by zero at Ri = Ri_cutoff. It is 1 for unstable conditions (Ri ≤ 0) and 0 for
-    # Ri ≥ Ri_cutoff. Frierson uses the critical Richardson number here; a separate cutoff (as for the drag)
-    # keeps boundary-layer mixing in stable conditions until buoyancy dominates the shear
-    r = clamp(Ri_surface / Ri_cutoff, 0, 1)
-    surface_layer_height = fb * h
-    stability_surface_layer = stable_correction(r, surface_layer_height, z₀)
-
+    # 4. STABILITY CORRECTION of the boundary-layer profile at every interface k+½, with its `log` only for the
+    # interfaces inside the surface layer (few). That branch does not vectorise, so it is evaluated here and
+    # not in the loop of the conductances, which then does. The conductance of heat holds the correction
+    # until that loop has read it
+    profile_stability = conductance_heat
     for k in 1:(nlayers - 1)
-        # interface k+½ between layer k (above) and k+1 (below)
-        Tᵥ_above = Tᵥ_layers[ij, k]
-        Tᵥ_below = Tᵥ_layers[ij, k + 1]
-        ΔΦ = Φ[ij, k] - Φ[ij, k + 1]                    # geopotential difference between layers
-        Δz = ΔΦ / g                                     # distance between layers [m]
-        z = ((Φ[ij, k] + Φ[ij, k + 1]) / 2 - Φₛ) / g    # height of the interface above the surface [m]
-        Tᵥ = (Tᵥ_above + Tᵥ_below) / 2                  # virtual temperature at the interface
+        for ij in columns
+            z = ((Φ[ij, k] + Φ[ij, k + 1]) / 2 - g * orography[ij]) * inv_g     # height of the interface above the surface [m]
 
-        # air density at the interface over the distance between layers [kg/m⁴]
-        p = pressure_half(k + 1, pₛ, vertical_coordinates)
-        density_over_distance = p / (R_dry * Tᵥ * Δz)
+            stability = stability_surface_layer[ij]
+            if z < fb * boundary_layer_height[ij]       # inside the surface layer
+                stability = stable_correction(stability_ratio[ij], z, column_roughness_length(roughness, default_roughness, ij))
+            end
+            profile_stability[ij, k] = stability
+        end
+    end
 
-        # 1. BOUNDARY LAYER PROFILE, Frierson 2006, eqs. 16-20, Kb(z) = κ u⋆ z in the surface layer
-        # z < fb*h, cubic decay to zero at z = h above, zero above the boundary layer
-        in_surface_layer = z < surface_layer_height
-        stability = ifelse(in_surface_layer, stable_correction(r, z, z₀), stability_surface_layer)
-        above_surface_layer = (z > surface_layer_height) & (z < h)
-        ξ = ifelse(above_surface_layer, z - surface_layer_height, zero(z)) /
-            ifelse(above_surface_layer, (1 - fb) * h, one(z))
-        K_profile = κ * friction_velocity * z * stability * (1 - ξ)^2
-        K_profile = ifelse(z < h, K_profile, zero(K_profile))
+    # 5. CONDUCTANCES of the interfaces k+½ between layer k (above) and k+1 (below). Multiplications with
+    # reciprocals where the same divisor occurs several times, and sqrt(abs(x)) for the square roots: all
+    # their arguments are positive, but `sqrt` alone checks that and throws, which prevents vectorisation.
+    # `@inline exp`: Base declares `exp` `@noinline`, and a call of it prevents the vectorisation of the loop
+    # too, inlined at the call site it vectorises
+    for k in 1:(nlayers - 1)
+        @simd ivdep for ij in columns
+            Tᵥ_above = Tᵥ[ij, k]
+            Tᵥ_below = Tᵥ[ij, k + 1]
+            Φ_above = Φ[ij, k]
+            Φ_below = Φ[ij, k + 1]
+            ΔΦ = Φ_above - Φ_below                                      # geopotential difference between layers
+            inv_Δz = g / ΔΦ                                             # 1 / distance between layers [1/m]
+            z = ((Φ_above + Φ_below) / 2 - g * orography[ij]) * inv_g   # height of the interface above the surface [m]
+            inv_Tᵥ = 2 / (Tᵥ_above + Tᵥ_below)                          # 1 / virtual temperature at the interface
 
-        # 2. LOCAL DIFFUSIVITY, l² S f(Ri) with S = |∂V/∂z|, squared buoyancy frequency
-        # N² = g/(cₚTᵥ) ∂sᵥ/∂z from the virtual dry static energy sᵥ = cₚTᵥ + Φ
-        ΔV² = (u[ij, k] - u[ij, k + 1])^2 + (v[ij, k] - v[ij, k + 1])^2
-        S² = max(ΔV², NF(MINIMUM_WIND_SHEAR²)) / Δz^2
-        S = sqrt(S²)
-        N² = g * (cₚ * (Tᵥ_above - Tᵥ_below) + ΔΦ) / (cₚ * Tᵥ * Δz)
-        Ri = max(N² / S², 0)      # gradient Richardson number, stable part
+            # air density at the interface over the distance between layers [kg/m⁴]
+            p = pressure_half(k + 1, surface_pressure[ij], vertical_coordinates)
+            density_over_distance = p * inv_R_dry * inv_Tᵥ * inv_Δz
 
-        # asymptotic mixing length λ, constant below mixing_length_height, then decaying towards
-        # free_mixing_length (Holtslag and Boville, 1993, eq. 3.6), mixing length 1/l = 1/(κz) + 1/λ
-        λ = free_mixing_length + (mixing_length - free_mixing_length) * exp(min(1 - z / mixing_length_height, 0))
-        l = κ * z * λ / (κ * z + λ)
+            # 1. BOUNDARY LAYER PROFILE, Frierson 2006, eqs. 16-20, Kb(z) = κ u⋆ z in the surface layer
+            # z < fb*h, cubic decay to zero at z = h above, zero above the boundary layer
+            h = boundary_layer_height[ij]
+            surface_layer_height = fb * h
+            above_surface_layer = (z > surface_layer_height) & (z < h)
+            ξ = ifelse(above_surface_layer, z - surface_layer_height, zero(z)) /
+                ifelse(above_surface_layer, (1 - fb) * h, one(z))
+            K_profile = κ * friction_velocity(drag, surface_wind_speed, ij) * z * profile_stability[ij, k] * (1 - ξ)^2
+            K_profile = ifelse(z < h, K_profile, zero(K_profile))
 
-        # unstable: l²S√(1 - 18Ri) = l²√(S² - 18N²) (Holtslag and Boville, 1993, eq. 3.7), split into a shear
-        # part l²S and a buoyancy part l_c²(√(S² - 18N²) - S) whose mixing length l_c uses at least the
-        # convective_mixing_length, so that superadiabatic layers are mixed within a few time steps also in
-        # the free atmosphere where λ is small. Continuous at N² = 0, l_c = l reproduces eq. 3.7
-        λ_convective = max(λ, convective_mixing_length)
-        l_convective = κ * z * λ_convective / (κ * z + λ_convective)
-        unstable = N² < 0
-        K_unstable = l^2 * S + l_convective^2 * (sqrt(S² - 18 * min(N², 0)) - S)
-        K_local_momentum = ifelse(unstable, K_unstable, l^2 * S * stability_function_momentum(Ri))
-        K_local_heat = ifelse(unstable, K_unstable, l^2 * S * stability_function_heat(Ri))
+            # 2. LOCAL DIFFUSIVITY, l² S f(Ri) with S = |∂V/∂z|, squared buoyancy frequency
+            # N² = g/(cₚTᵥ) ∂sᵥ/∂z from the virtual dry static energy sᵥ = cₚTᵥ + Φ
+            ΔV² = max((u[ij, k] - u[ij, k + 1])^2 + (v[ij, k] - v[ij, k + 1])^2, NF(MINIMUM_WIND_SHEAR²))
+            S² = ΔV² * inv_Δz^2
+            S = sqrt(abs(S²))
+            N² = g * (Tᵥ_above - Tᵥ_below + ΔΦ * inv_cₚ) * inv_Tᵥ * inv_Δz
+            unstable = N² < 0
 
-        # 3. BACKGROUND DIFFUSIVITY
-        K_background = background_diffusivity * exp(-z / background_height)
+            # gradient Richardson number, stable part, and N² of the unstable part. With ifelse and not as
+            # max(N²/S², 0) and min(N², 0): from a `max` LLVM (Julia 1.12) knows the sign of the argument of the
+            # square roots in the stability functions, removes their `abs` and keeps the check of `sqrt`, which
+            # costs the vectorisation of this loop
+            Ri = ifelse(unstable, zero(N²), N² / S²)
+            N²_unstable = ifelse(unstable, N², zero(N²))
 
-        K_momentum = min(max(K_profile, K_local_momentum, K_background), max_diffusivity)
-        K_heat = min(max(K_profile, K_local_heat, K_background), max_diffusivity)
+            # asymptotic mixing length λ, constant below mixing_length_height, then decaying towards
+            # free_mixing_length (Holtslag and Boville, 1993, eq. 3.6), mixing length 1/l = 1/(κz) + 1/λ
+            λ = free_mixing_length + (mixing_length - free_mixing_length) * @inline(exp(min(1 - z * inv_mixing_length_height, 0)))
+            l = κ * z * λ / (κ * z + λ)
 
-        # store the conductances ρK/Δz [kg/m²/s], all the implicit solver needs
-        conductance_momentum[ij, k] = density_over_distance * K_momentum
-        conductance_heat[ij, k] = density_over_distance * K_heat
+            # unstable: l²S√(1 - 18Ri) = l²√(S² - 18N²) (Holtslag and Boville, 1993, eq. 3.7), split into a shear
+            # part l²S and a buoyancy part l_c²(√(S² - 18N²) - S) whose mixing length l_c uses at least the
+            # convective_mixing_length, so that superadiabatic layers are mixed within a few time steps also in
+            # the free atmosphere where λ is small. Continuous at N² = 0, l_c = l reproduces eq. 3.7
+            λ_convective = max(λ, convective_mixing_length)
+            l_convective = κ * z * λ_convective / (κ * z + λ_convective)
+            K_unstable = l^2 * S + l_convective^2 * (sqrt(abs(S² - 18 * N²_unstable)) - S)
+            K_local_momentum = ifelse(unstable, K_unstable, l^2 * S * stability_function_momentum(Ri))
+            K_local_heat = ifelse(unstable, K_unstable, l^2 * S * stability_function_heat(Ri))
+
+            # 3. BACKGROUND DIFFUSIVITY
+            K_background = background_diffusivity * @inline(exp(-z * inv_background_height))
+
+            K_momentum = min(max(K_profile, K_local_momentum, K_background), max_diffusivity)
+            K_heat = min(max(K_profile, K_local_heat, K_background), max_diffusivity)
+
+            # store the conductances ρK/Δz [kg/m²/s], all the implicit solver needs
+            conductance_momentum[ij, k] = density_over_distance * K_momentum
+            conductance_heat[ij, k] = density_over_distance * K_heat
+        end
     end
 
     # no diffusive flux through the surface, which is handled by the surface fluxes
-    conductance_momentum[ij, nlayers] = 0
-    conductance_heat[ij, nlayers] = 0
+    @simd ivdep for ij in columns
+        conductance_momentum[ij, nlayers] = 0
+        conductance_heat[ij, nlayers] = 0
+    end
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
-Friction velocity u⋆ = √C_M Vₛ [m/s] from the momentum drag coefficient and the surface wind speed of the
-boundary layer, and the bulk Richardson number between the surface and the lowermost layer, the land and
-ocean values of `bulk_richardson_surface` weighted with the land fraction, for column `ij` with the
-geopotential `ΔΦ₀` of the lowermost layer relative to the surface. Both zero for a model without the
-drag or the surface wind of a boundary layer, which switches the boundary-layer profile of the
-diffusivity off."""
-@propagate_inbounds function surface_layer(ij, ΔΦ₀, vars, diffusion::BulkRichardsonDiffusion, model)
+Bulk Richardson number between the surface and the lowermost layer at grid point `ij`, the land and ocean
+values of `bulk_richardson_surface` weighted with the land fraction, with the geopotential `ΔΦ₀` of the
+lowermost layer relative to the surface. Read from `vars.parameterizations.surface_bulk_richardson` if the
+drag of the boundary layer has stored it (`BulkRichardsonDrag`, which computes it for the same state),
+otherwise computed here. Zero for a model without the drag or the surface wind of a boundary layer."""
+@propagate_inbounds function surface_richardson(ij, ΔΦ₀, vars, diffusion::BulkRichardsonDiffusion, model)
     (; parameterizations) = vars
-    NF = eltype(parameterizations.vertical_conductance_momentum)
-    has_boundary_layer = haskey(parameterizations, :boundary_layer_drag_momentum) &&
-        haskey(parameterizations, :surface_wind_speed)
-    has_boundary_layer || return zero(NF), zero(NF)
+    haskey(parameterizations, :surface_bulk_richardson) && return parameterizations.surface_bulk_richardson[ij]
+
+    drag, _ = boundary_layer_drag_and_wind(parameterizations)
+    isnothing(drag) && return zero(eltype(parameterizations.vertical_conductance_momentum))
 
     Ri_land, Ri_ocean = bulk_richardson_surface(ij, ΔΦ₀, vars, model.atmosphere, diffusion, model.time_stepping)
     land_fraction = model.land_sea_mask.land_fraction[ij]
-    Ri_surface = land_fraction * Ri_land + (1 - land_fraction) * Ri_ocean
-    drag = parameterizations.boundary_layer_drag_momentum[ij]
-    friction_velocity = sqrt(drag) * parameterizations.surface_wind_speed[ij]
-    return friction_velocity, Ri_surface
+    return land_fraction * Ri_land + (1 - land_fraction) * Ri_ocean
 end
 
 # minimum wind speed [m/s] squared for the bulk Richardson number (Holtslag and Boville, 1993)
@@ -312,46 +403,61 @@ magnitude above the roughness length `z₀` as in `neutral_transfer_coefficient`
 
 """$(TYPEDSIGNATURES)
 Long-tail stability function for momentum of Louis et al. 1982, 1/(1 + 2bRi/√(1 + dRi)) with b = d = 5,
-for the gradient Richardson number `Ri` ≥ 0."""
-@inline stability_function_momentum(Ri) = 1 / (1 + 10Ri / sqrt(1 + 5Ri))
+for the gradient Richardson number `Ri` ≥ 0. `sqrt(abs(x))` as the argument is positive but `sqrt` alone
+checks that and throws, which prevents the vectorisation of the loop that calls it."""
+@inline stability_function_momentum(Ri) = 1 / (1 + 10Ri / sqrt(abs(1 + 5Ri)))
 
 """$(TYPEDSIGNATURES)
 Long-tail stability function for heat of Louis et al. 1982, 1/(1 + 3bRi√(1 + dRi)) with b = d = 5,
-for the gradient Richardson number `Ri` ≥ 0."""
-@inline stability_function_heat(Ri) = 1 / (1 + 15Ri * sqrt(1 + 5Ri))
+for the gradient Richardson number `Ri` ≥ 0, see `stability_function_momentum` for `sqrt(abs(x))`."""
+@inline stability_function_heat(Ri) = 1 / (1 + 15Ri * sqrt(abs(1 + 5Ri)))
 
 """$(TYPEDSIGNATURES)
-Boundary layer height h [m] above the surface of column `ij`: the height where the bulk Richardson
-number relative to the lowermost layer N, Ri(z) = gz (sᵥ(z) - sᵥ_N) / (cₚTᵥ_N |V(z)|²) with the virtual
-dry static energy sᵥ = cₚTᵥ + Φ (Frierson et al. 2006) from the virtual temperature `Tᵥ` of the layers,
-first reaches `Ri_c` from below, interpolated linearly between the layers that bracket Ri_c with Ri = 0
-at the lowermost layer. The height of the uppermost layer if Ri < Ri_c everywhere. Fixed trip count,
-no early exit."""
-@propagate_inbounds function boundary_layer_height(ij, u, v, Tᵥ, Φ, Φₛ, g, cₚ, Ri_c)
+Boundary layer height h [m] above the surface for the range `columns` of horizontal grid points, written
+into `height`: the height where the bulk Richardson number relative to the lowermost layer N,
+Ri(z) = gz (sᵥ(z) - sᵥ_N) / (cₚTᵥ_N |V(z)|²) with the virtual dry static energy sᵥ = cₚTᵥ + Φ (Frierson et
+al. 2006) from the virtual temperature `Tᵥ` of the layers, first reaches `Ri_c` from below, interpolated
+linearly between the layers that bracket Ri_c with Ri = 0 at the lowermost layer. The height of the
+uppermost layer if Ri < Ri_c everywhere. Layers from the surface upwards in the outer loop, with a fixed
+trip count and no early exit: a negative height marks the columns without a crossing so far."""
+@propagate_inbounds function boundary_layer_height!(columns::AbstractUnitRange, height, u, v, Tᵥ, Φ, orography, g, cₚ, Ri_c)
     nlayers = size(Tᵥ, 2)
-    Tᵥ_N = Tᵥ[ij, nlayers]
-    sᵥ_N = cₚ * Tᵥ_N + Φ[ij, nlayers]
-    h = (Φ[ij, 1] - Φₛ) / g                 # top layer height if no crossing of Ri_c
-    z_below = (Φ[ij, nlayers] - Φₛ) / g     # height of the layer below k, starting with N
-    Ri_below = zero(h)                      # Ri relative to the lowermost layer is zero there
-    found = false
+    inv_g = inv(g)
+
+    # top layer height if no crossing of Ri_c, negative until a crossing is found
+    @simd ivdep for ij in columns
+        height[ij] = -(Φ[ij, 1] - g * orography[ij]) * inv_g
+    end
 
     for k in (nlayers - 1):-1:1
-        z = (Φ[ij, k] - Φₛ) / g
-        sᵥ = cₚ * Tᵥ[ij, k] + Φ[ij, k]
-        V² = max(u[ij, k]^2 + v[ij, k]^2, MINIMUM_WIND_SPEED²)
-        Ri = g * z * (sᵥ - sᵥ_N) / (cₚ * Tᵥ_N * V²)
+        @simd ivdep for ij in columns
+            Φₛ = g * orography[ij]                              # surface geopotential
+            Tᵥ_N = Tᵥ[ij, nlayers]
+            sᵥ_N = cₚ * Tᵥ_N + Φ[ij, nlayers]                   # virtual dry static energy of the lowermost layer
 
-        # first crossing of Ri_c from below, Ri_below < Ri_c ≤ Ri, guard division for other layers
-        crossing = !found & (Ri >= Ri_c)
-        weight = ifelse(crossing, Ri_c - Ri_below, zero(Ri)) / ifelse(crossing, Ri - Ri_below, one(Ri))
-        h = ifelse(crossing, z_below + weight * (z - z_below), h)
-        found |= crossing
+            # Ri = numerator/denominator of layer k and of the layer below, where Ri = 0 for the lowermost
+            # layer. With gz = Φ - Φₛ
+            ΔΦ = Φ[ij, k] - Φₛ
+            ΔΦ_below = Φ[ij, k + 1] - Φₛ
+            numerator = ΔΦ * (cₚ * Tᵥ[ij, k] + Φ[ij, k] - sᵥ_N)
+            numerator_below = ΔΦ_below * (cₚ * Tᵥ[ij, k + 1] + Φ[ij, k + 1] - sᵥ_N)
+            denominator = cₚ * Tᵥ_N * max(u[ij, k]^2 + v[ij, k]^2, MINIMUM_WIND_SPEED²)
+            denominator_below = cₚ * Tᵥ_N * max(u[ij, k + 1]^2 + v[ij, k + 1]^2, MINIMUM_WIND_SPEED²)
 
-        z_below = z
-        Ri_below = Ri
+            # first crossing of Ri_c from below, Ri_below < Ri_c ≤ Ri, found without a division. The weight
+            # (Ri_c - Ri_below)/(Ri - Ri_below) of the interpolation with one, guarded for the other layers
+            h = height[ij]
+            crossing = (h < 0) & (numerator >= Ri_c * denominator)
+            weight = ifelse(crossing, (Ri_c * denominator_below - numerator_below) * denominator, zero(h)) /
+                ifelse(crossing, numerator * denominator_below - numerator_below * denominator, one(h))
+            height[ij] = ifelse(crossing, (ΔΦ_below + weight * (ΔΦ - ΔΦ_below)) * inv_g, h)
+        end
     end
-    return h
+
+    @simd ivdep for ij in columns
+        height[ij] = abs(height[ij])
+    end
+    return nothing
 end
 
 # value of the variable in layer k that is diffused, with or without a geopotential term
@@ -359,10 +465,12 @@ end
 @propagate_inbounds diffused_value(variable, (Φ, scale)::Tuple, ij, k) = variable[ij, k] + scale * Φ[ij, k]
 
 """$(TYPEDSIGNATURES)
-Implicit (backward Euler) vertical diffusion of `variable` (plus `scale * Φ` with `geopotential_term =
-(Φ, scale)`, or `nothing`) in column `ij` with the `conductance` a = ρK/Δz [kg/m²/s] (density times
-diffusivity over the distance between layers) on the interfaces below every layer.
-With the diffusion operator L as a flux divergence on the pressure thickness Δp of the layers,
+Implicit (backward Euler) vertical diffusion for the range `columns` of horizontal grid points of every
+variable in `fields`, a tuple with one `(tendency, variable, geopotential_term)` per variable, with the
+`conductance` a = ρK/Δz [kg/m²/s] (density times diffusivity over the distance between layers) on the
+interfaces below every layer that these variables share. Diffused is `variable` (plus `scale * Φ` with
+`geopotential_term = (Φ, scale)`, or `nothing`). With the diffusion operator L as a flux divergence on the
+pressure thickness Δp of the layers,
 
     (L x)ₖ = g/Δpₖ [aₖ₊½ (xₖ₊₁ - xₖ) - aₖ₋½ (xₖ - xₖ₋₁)],     aₖ₊½ = ρₖ₊½ Kₖ₊½ / Δzₖ₊½,
 
@@ -370,61 +478,132 @@ and no flux through the top and the surface, the tendency y = (x⁺ - x⁻)/Δt 
 tridiagonal system (1 - ΔtL) y = L x⁻ + S, solved with the Thomas algorithm. With `couple = true` the
 source S is the `tendency` accumulated so far (e.g. the surface fluxes into the lowermost layer), which
 is then spread over the column within the time step and `tendency` is replaced by y. Otherwise S = 0 and
-y is added to `tendency`. Conserves the mass-weighted column integral Σ xₖ Δpₖ exactly."""
+y is added to `tendency`. Conserves the mass-weighted column integral Σ xₖ Δpₖ exactly.
+
+The matrix is the same for all variables in `fields`. With `couple = true` they are solved together, with
+one elimination of the matrix and the right-hand side of every variable stored in its tendency. Otherwise
+the tendencies have to be kept, so the right-hand side is stored in `tridiagonal_rhs` and the variables
+are solved one after the other."""
 @propagate_inbounds function implicit_vertical_diffusion!(
-        ij,
-        tendency,                   # tendency of variable, accumulate into or replace
-        variable,                   # variable to diffuse
-        geopotential_term,          # (Φ, scale) to diffuse variable + scale*Φ, or nothing
+        columns::AbstractUnitRange,
+        fields::Tuple,              # (tendency, variable, geopotential_term) of every variable to diffuse
         conductance,                # ρK/Δz [kg/m²/s] at the interface below every layer
         tridiagonal_upper,          # scratch, upper diagonal after forward elimination
-        tridiagonal_rhs,            # scratch, right-hand side after forward elimination
-        pₛ,                         # surface pressure [Pa]
+        tridiagonal_rhs,            # scratch, right-hand side after forward elimination if not coupled
+        surface_pressure,           # [Pa] of every column
         Δt,                         # time step [s]
         g,                          # gravity [m/s²]
         vertical_coordinates,
-        couple::Bool,               # use tendency as source in the implicit solve?
+        couple::Bool,               # use the tendencies as source in the implicit solve?
     )
-    nlayers = size(variable, 2)
-    NF = eltype(tendency)
+    if couple       # `nothing` for the right-hand side: stored in the tendencies
+        tridiagonal_solve!(columns, fields, nothing, conductance, tridiagonal_upper, surface_pressure, Δt, g, vertical_coordinates)
+    else
+        tridiagonal_solve_each!(columns, fields, tridiagonal_rhs, conductance, tridiagonal_upper, surface_pressure, Δt, g, vertical_coordinates)
+    end
+    return nothing
+end
+
+# one variable after the other, by recursion over the tuple
+@inline tridiagonal_solve_each!(columns, ::Tuple{}, arguments...) = nothing
+@propagate_inbounds function tridiagonal_solve_each!(columns, fields::Tuple, arguments...)
+    tridiagonal_solve!(columns, (first(fields),), arguments...)
+    tridiagonal_solve_each!(columns, Base.tail(fields), arguments...)
+    return nothing
+end
+
+# Thomas algorithm for all variables in `fields`, layers in the outer, columns in the inner loops. What the
+# elimination of layer k needs of the layer above (upper diagonal, right-hand side) is read from the arrays
+@propagate_inbounds function tridiagonal_solve!(
+        columns, fields::Tuple, rhs_scratch, conductance, tridiagonal_upper, surface_pressure, Δt, g, vertical_coordinates,
+    )
+    nlayers = size(conductance, 2)
+    NF = eltype(conductance)
 
     # FORWARD ELIMINATION, from top to surface
-    a_above = zero(NF)              # conductance [kg/m²/s] at the interface above layer k, no flux through top
-    x_above = diffused_value(variable, geopotential_term, ij, 1)
-    upper_above = zero(NF)          # upper diagonal and rhs of the eliminated layer above
-    rhs_above = zero(NF)
-
     for k in 1:nlayers
-        x = diffused_value(variable, geopotential_term, ij, k)
-        x_below = diffused_value(variable, geopotential_term, ij, min(k + 1, nlayers))
-        a_below = ifelse(k < nlayers, conductance[ij, k], zero(NF))
+        k_above = max(k - 1, 1)             # clamped, the terms of a layer above the top or below the
+        k_below = min(k + 1, nlayers)       # surface are multiplied with a zero conductance
+        @simd ivdep for ij in columns
+            # conductances [kg/m²/s] at the interfaces above and below layer k, no flux through top and surface
+            a_above = ifelse(k > 1, conductance[ij, k_above], zero(NF))
+            a_below = ifelse(k < nlayers, conductance[ij, k], zero(NF))
+            g_Δp = g / pressure_thickness(k, surface_pressure[ij], vertical_coordinates)
 
-        g_Δp = g / pressure_thickness(k, pₛ, vertical_coordinates)
-        explicit_tendency = g_Δp * (a_below * (x_below - x) - a_above * (x - x_above))
-        source = ifelse(couple, tendency[ij, k], zero(NF))
+            # row k of (1 - ΔtL): lower, diagonal and upper entry, diagonally dominant
+            α = Δt * g_Δp
+            lower = -α * a_above
+            upper = -α * a_below
+            diagonal = 1 + α * (a_above + a_below)
 
-        # row k of (1 - ΔtL): lower, diagonal and upper entry, diagonally dominant
-        α = Δt * g_Δp
-        lower = -α * a_above
-        upper = -α * a_below
-        diagonal = 1 + α * (a_above + a_below)
-
-        pivot = diagonal - lower * upper_above          # ≥ 1
-        upper_above = upper / pivot
-        rhs_above = (explicit_tendency + source - lower * rhs_above) / pivot
-        tridiagonal_upper[ij, k] = upper_above
-        tridiagonal_rhs[ij, k] = rhs_above
-
-        a_above = a_below
-        x_above = x
+            upper_above = ifelse(k > 1, tridiagonal_upper[ij, k_above], zero(NF))
+            inv_pivot = inv(diagonal - lower * upper_above)     # pivot ≥ 1
+            tridiagonal_upper[ij, k] = upper * inv_pivot
+            forward_elimination_all!(ij, k, k_above, k_below, fields, rhs_scratch, a_above, a_below, g_Δp, lower, inv_pivot)
+        end
     end
 
     # BACK SUBSTITUTION, from surface to top
-    y_below = zero(NF)
     for k in nlayers:-1:1
-        y = tridiagonal_rhs[ij, k] - tridiagonal_upper[ij, k] * y_below
-        tendency[ij, k] = ifelse(couple, y, tendency[ij, k] + y)
-        y_below = y
+        k_below = min(k + 1, nlayers)
+        @simd ivdep for ij in columns
+            back_substitution_all!(ij, k, k_below, fields, rhs_scratch, tridiagonal_upper[ij, k])
+        end
     end
+    return nothing
+end
+
+# the right-hand side of a variable is stored in its tendency (coupled, `nothing`) or in a scratch array
+@inline right_hand_side(tendency, ::Nothing) = tendency
+@inline right_hand_side(tendency, rhs_scratch) = rhs_scratch
+
+# source S of the implicit solve: the tendency accumulated so far (coupled, `nothing`) or zero
+@propagate_inbounds implicit_source(tendency, ::Nothing, ij, k) = tendency[ij, k]
+@inline implicit_source(tendency, rhs_scratch, ij, k) = zero(eltype(tendency))
+
+# forward elimination of the right-hand side of one variable in layer k
+@propagate_inbounds function forward_elimination!(
+        ij, k, k_above, k_below, (tendency, variable, geopotential_term)::Tuple, rhs_scratch, a_above, a_below, g_Δp, lower, inv_pivot,
+    )
+    rhs = right_hand_side(tendency, rhs_scratch)
+    x = diffused_value(variable, geopotential_term, ij, k)
+    x_above = diffused_value(variable, geopotential_term, ij, k_above)
+    x_below = diffused_value(variable, geopotential_term, ij, k_below)
+    explicit_tendency = g_Δp * (a_below * (x_below - x) - a_above * (x - x_above))
+    source = implicit_source(tendency, rhs_scratch, ij, k)
+    rhs_above = ifelse(k > 1, rhs[ij, k_above], zero(x))
+    rhs[ij, k] = (explicit_tendency + source - lower * rhs_above) * inv_pivot
+    return nothing
+end
+
+# back substitution of one variable in layer k. Coupled (`nothing`): the solution replaces the right-hand
+# side in the tendency
+@propagate_inbounds function back_substitution!(ij, k, k_below, (tendency, variable, geopotential_term)::Tuple, ::Nothing, upper)
+    y_below = ifelse(k < k_below, tendency[ij, k_below], zero(upper))
+    tendency[ij, k] -= upper * y_below
+    return nothing
+end
+
+# Not coupled: the solution replaces the right-hand side in the scratch array and is added to the tendency
+@propagate_inbounds function back_substitution!(ij, k, k_below, (tendency, variable, geopotential_term)::Tuple, rhs_scratch, upper)
+    y_below = ifelse(k < k_below, rhs_scratch[ij, k_below], zero(upper))
+    y = rhs_scratch[ij, k] - upper * y_below
+    rhs_scratch[ij, k] = y
+    tendency[ij, k] += y
+    return nothing
+end
+
+# the same for every variable of a tuple, by recursion (no closures, so that it inlines and @inbounds propagates)
+@inline forward_elimination_all!(ij, k, k_above, k_below, ::Tuple{}, arguments...) = nothing
+@propagate_inbounds function forward_elimination_all!(ij, k, k_above, k_below, fields::Tuple, arguments...)
+    forward_elimination!(ij, k, k_above, k_below, first(fields), arguments...)
+    forward_elimination_all!(ij, k, k_above, k_below, Base.tail(fields), arguments...)
+    return nothing
+end
+
+@inline back_substitution_all!(ij, k, k_below, ::Tuple{}, arguments...) = nothing
+@propagate_inbounds function back_substitution_all!(ij, k, k_below, fields::Tuple, arguments...)
+    back_substitution!(ij, k, k_below, first(fields), arguments...)
+    back_substitution_all!(ij, k, k_below, Base.tail(fields), arguments...)
     return nothing
 end

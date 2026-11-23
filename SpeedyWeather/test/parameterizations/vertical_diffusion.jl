@@ -9,10 +9,10 @@ function diffuse_column(
     )
     row(v) = reshape(collect(v), 1, :)
     tend = row(tendency)
-    upper, rhs = zero(tend), zero(tend)
+    upper, rhs = fill(NaN, size(tend)), fill(NaN, size(tend))      # scratch, to be written before read
     SpeedyWeather.implicit_vertical_diffusion!(
-        1, tend, row(x), geopotential_term, row(collect(K) .* collect(density_over_distance)),
-        upper, rhs, surface_pressure, Δt, gravity, coordinates, couple,
+        1:1, ((tend, row(x), geopotential_term),), row(collect(K) .* collect(density_over_distance)),
+        upper, rhs, [surface_pressure], Δt, gravity, coordinates, couple,
     )
     return vec(tend)
 end
@@ -124,6 +124,111 @@ end
         @test error_1 < 1.0e-2 * maximum(abs, explicit)
         @test error_10 / error_1 ≈ 10 rtol = 0.1      # first order in Δt
     end
+
+    @testset "Several variables and columns at once" begin
+        coordinates = first(coordinate_systems)
+        ncolumns = 7
+        cₚ = 1004.0
+        rng = Xoshiro(3)
+        x = 280 .+ 10 * randn(rng, ncolumns, nlayers)       # with a geopotential term
+        y = 1.0e-2 * rand(rng, ncolumns, nlayers)           # without
+        Φ = repeat(reshape(collect(range(3.0e5, 400.0, length = nlayers)), 1, :), ncolumns) .* (1 .+ 0.1 * rand(rng, ncolumns))
+        K = 100 * rand(rng, ncolumns, nlayers)
+        ρ_Δz = 1.0e-2 * rand(rng, ncolumns, nlayers)
+        surface_pressure = 1.0e5 .+ 1.0e3 * randn(rng, ncolumns)
+        source_x = 1.0e-4 * randn(rng, ncolumns, nlayers)
+        source_y = 1.0e-8 * randn(rng, ncolumns, nlayers)
+        Δt, g = 1800.0, 9.81
+
+        # both variables for the columns of a range with the solver for ranges
+        function diffuse_columns(columns, couple)
+            tendency_x, tendency_y = copy(source_x), copy(source_y)
+            upper, rhs = fill(NaN, size(x)), fill(NaN, size(x))     # scratch, to be written before read
+            fields = ((tendency_x, x, (Φ, 1 / cₚ)), (tendency_y, y, nothing))
+            SpeedyWeather.implicit_vertical_diffusion!(columns, fields, K .* ρ_Δz, upper, rhs, surface_pressure, Δt, g, coordinates, couple)
+            return tendency_x, tendency_y
+        end
+
+        for couple in (true, false)
+            # reference: one variable and one column at a time
+            reference_x = reduce(
+                vcat, [
+                    diffuse_column(
+                        x[ij, :], K[ij, :], ρ_Δz[ij, :], coordinates; surface_pressure = surface_pressure[ij], Δt, gravity = g,
+                        tendency = source_x[ij, :], geopotential_term = (Φ[ij:ij, :], 1 / cₚ), couple
+                    )' for ij in 1:ncolumns
+                ]
+            )
+            reference_y = reduce(
+                vcat, [
+                    diffuse_column(
+                        y[ij, :], K[ij, :], ρ_Δz[ij, :], coordinates; surface_pressure = surface_pressure[ij], Δt, gravity = g,
+                        tendency = source_y[ij, :], couple
+                    )' for ij in 1:ncolumns
+                ]
+            )
+            tendency_x, tendency_y = diffuse_columns(1:ncolumns, couple)
+            @test all(isfinite, tendency_x) && all(isfinite, tendency_y)
+            @test tendency_x ≈ reference_x rtol = 1.0e-12
+            @test tendency_y ≈ reference_y rtol = 1.0e-12
+
+            # a subrange only changes its columns
+            tendency_x, tendency_y = diffuse_columns(3:5, couple)
+            @test tendency_x[3:5, :] ≈ reference_x[3:5, :] rtol = 1.0e-12
+            @test tendency_y[3:5, :] ≈ reference_y[3:5, :] rtol = 1.0e-12
+            @test tendency_x[[1, 2, 6, 7], :] == source_x[[1, 2, 6, 7], :]
+            @test tendency_y[[1, 2, 6, 7], :] == source_y[[1, 2, 6, 7], :]
+        end
+    end
+end
+
+# boundary layer height of a single column (vectors from top to surface) as defined: where the bulk Richardson
+# number relative to the lowermost layer first reaches Ri_c from below, linearly interpolated
+function reference_boundary_layer_height(u, v, Tᵥ, Φ, Φₛ, g, cₚ, Ri_c)
+    nlayers = length(Tᵥ)
+    z(k) = (Φ[k] - Φₛ) / g
+    Ri(k) = g * z(k) * (cₚ * Tᵥ[k] + Φ[k] - cₚ * Tᵥ[nlayers] - Φ[nlayers]) / (cₚ * Tᵥ[nlayers] * max(u[k]^2 + v[k]^2, 1))
+    for k in (nlayers - 1):-1:1
+        if Ri(k) >= Ri_c
+            weight = (Ri_c - Ri(k + 1)) / (Ri(k) - Ri(k + 1))
+            return z(k + 1) + weight * (z(k) - z(k + 1))
+        end
+    end
+    return z(1)
+end
+
+@testset "Boundary layer height" begin
+    ncolumns, nlayers = 200, 12
+    g, cₚ = 9.81, 1004.0
+    rng = Xoshiro(4)
+    orography = 2000 * rand(rng, ncolumns)
+    z = repeat(reshape(collect(range(15000.0, 100.0, length = nlayers)), 1, :), ncolumns) .* (1 .+ 0.2 * rand(rng, ncolumns))
+    Φ = g * (z .+ orography)
+    lapse_rate = 4.0e-3 .+ 8.0e-3 * rand(rng, ncolumns)       # [K/m] from stable to unstable (dry adiabatic 9.8e-3)
+    Tᵥ = 290 .- lapse_rate .* z .+ 0.3 * randn(rng, ncolumns, nlayers)
+    u = 15 * randn(rng, ncolumns, nlayers)
+    v = 15 * randn(rng, ncolumns, nlayers)
+
+    for Ri_c in (0.5, 10.0, 1.0e6)
+        reference = [reference_boundary_layer_height(u[ij, :], v[ij, :], Tᵥ[ij, :], Φ[ij, :], g * orography[ij], g, cₚ, Ri_c) for ij in 1:ncolumns]
+        height = fill(NaN, ncolumns)
+        SpeedyWeather.boundary_layer_height!(1:ncolumns, height, u, v, Tᵥ, Φ, orography, g, cₚ, Ri_c)
+        @test height ≈ reference rtol = 1.0e-8
+        @test all(z[:, end] * (1 - 1.0e-10) .<= height .<= z[:, 1] * (1 + 1.0e-10))     # between lowermost and uppermost layer
+
+        # columns of a subrange only
+        height = fill(-1.0, ncolumns)
+        SpeedyWeather.boundary_layer_height!(11:20, height, u, v, Tᵥ, Φ, orography, g, cₚ, Ri_c)
+        @test height[11:20] ≈ reference[11:20] rtol = 1.0e-8
+        @test all(height[[1:10; 21:ncolumns]] .== -1)
+    end
+
+    # both cases occur: a crossing inside the column, and none (height of the uppermost layer)
+    reference = [reference_boundary_layer_height(u[ij, :], v[ij, :], Tᵥ[ij, :], Φ[ij, :], g * orography[ij], g, cₚ, 10.0) for ij in 1:ncolumns]
+    @test 0 < count(reference .< z[:, 1]) < ncolumns || count(reference .< z[:, 1]) == ncolumns
+    height = fill(NaN, ncolumns)
+    SpeedyWeather.boundary_layer_height!(1:ncolumns, height, u, v, Tᵥ, Φ, orography, g, cₚ, 1.0e6)
+    @test height ≈ z[:, 1]
 end
 
 # model with vertical diffusion after a day, so that low-level winds and a boundary layer develop
@@ -163,9 +268,7 @@ end
 # and heat they correspond to, the boundary layer height and ρ/Δz
 function vertical_diffusivity!(simulation)
     (; model, variables) = simulation
-    for ij in 1:model.geometry.npoints
-        SpeedyWeather.vertical_conductance!(ij, variables, model.vertical_diffusion, model)
-    end
+    SpeedyWeather.vertical_conductance!(1:model.geometry.npoints, variables, model.vertical_diffusion, model)
     p = variables.parameterizations
     ρ_Δz = density_over_distance(simulation)
     nlayers = size(ρ_Δz, 2)
@@ -322,6 +425,104 @@ end
     end
 end
 
+@testset "BulkRichardsonDiffusion for ranges of columns" begin
+    simulation = vertical_diffusion_simulation()
+    (; model, variables) = simulation
+    (; spectral_grid) = model
+    diffusion = model.vertical_diffusion
+    npoints = model.geometry.npoints
+    p = variables.parameterizations
+    names = (:u, :v, :temperature, :humidity)
+    tendencies = map(name -> SpeedyWeather.get_tendency_step(getfield(variables.tendencies.grid, name), model.time_stepping, diffusion).data, names)
+    initial = map(copy, tendencies)     # of the parameterizations of the last time step, here the source of the diffusion
+
+    # tendencies, conductances and boundary layer height after `run!`, always from the same tendencies
+    function diffuse!(run!)
+        foreach((tendency, tendency_initial) -> tendency .= tendency_initial, tendencies, initial)
+        run!()
+        return (;
+            tendencies = map(copy, tendencies), conductance_momentum = copy(p.vertical_conductance_momentum.data),
+            conductance_heat = copy(p.vertical_conductance_heat.data), height = copy(p.boundary_layer_height.data),
+        )
+    end
+    diffuse!(diffusion::BulkRichardsonDiffusion, columns = 1:npoints) = diffuse!(() -> SpeedyWeather.vertical_diffusion!(columns, variables, diffusion, model))
+
+    @testset "All columns at once, column by column, a subrange" begin
+        all_columns = diffuse!(() -> SpeedyWeather.column_parameterization_cpu!(variables, diffusion, model))   # as on CPU
+        column_by_column = diffuse!(() -> foreach(ij -> SpeedyWeather.parameterization!(ij, variables, diffusion, model), 1:npoints))   # as in a kernel
+        for (a, b) in zip(all_columns.tendencies, column_by_column.tendencies)
+            @test all(isfinite, a)
+            @test a ≈ b rtol = 1.0e-6
+        end
+        @test all_columns.conductance_momentum ≈ column_by_column.conductance_momentum rtol = 1.0e-6
+        @test all_columns.conductance_heat ≈ column_by_column.conductance_heat rtol = 1.0e-6
+        @test all_columns.height ≈ column_by_column.height rtol = 1.0e-6
+        @test all(map((a, b) -> any(a .!= b), all_columns.tendencies, initial))     # every variable is diffused
+
+        columns = 101:200
+        others = setdiff(1:npoints, columns)
+        subrange = diffuse!(diffusion, columns)
+        for (a, b, c) in zip(subrange.tendencies, all_columns.tendencies, initial)
+            @test a[columns, :] ≈ b[columns, :] rtol = 1.0e-6
+            @test a[others, :] == c[others, :]
+        end
+    end
+
+    @testset "Options: coupled = $couple_surface_fluxes" for couple_surface_fluxes in (true, false)
+        reference = diffuse!(BulkRichardsonDiffusion(spectral_grid; couple_surface_fluxes))
+        for diffuse_momentum in (true, false), diffuse_static_energy in (true, false), diffuse_humidity in (true, false)
+            options = BulkRichardsonDiffusion(spectral_grid; couple_surface_fluxes, diffuse_momentum, diffuse_static_energy, diffuse_humidity)
+            result = diffuse!(options)
+            diffused = (diffuse_momentum, diffuse_momentum, diffuse_static_energy, diffuse_humidity)
+            for (i, is_diffused) in enumerate(diffused)
+                if is_diffused      # as with all variables diffused, also if solved alone
+                    @test result.tendencies[i] ≈ reference.tendencies[i] rtol = 1.0e-6
+                else                # untouched
+                    @test result.tendencies[i] == initial[i]
+                end
+            end
+        end
+    end
+
+    @testset "Surface Richardson number stored by the drag" begin
+        drag = model.boundary_layer.drag
+        @test drag isa BulkRichardsonDrag
+        g = model.planet.gravity
+        Φ = variables.dynamics.geopotential.data
+        orography = model.orography.orography.data
+        foreach(ij -> SpeedyWeather.boundary_layer_drag!(ij, variables, drag, model), 1:npoints)
+
+        # as the diffusion would compute it without the stored one
+        recomputed = map(1:npoints) do ij
+            ΔΦ₀ = Φ[ij, end] - g * orography[ij]
+            Ri_land, Ri_ocean = SpeedyWeather.bulk_richardson_surface(ij, ΔΦ₀, variables, model.atmosphere, diffusion, model.time_stepping)
+            land_fraction = model.land_sea_mask.land_fraction[ij]
+            land_fraction * Ri_land + (1 - land_fraction) * Ri_ocean
+        end
+        stored = p.surface_bulk_richardson.data
+        @test all(isfinite, stored)
+        @test all(isapprox.(stored, recomputed, rtol = 1.0e-3, atol = 1.0e-3))
+        @test SpeedyWeather.surface_richardson(17, 0.0f0, variables, diffusion, model) === stored[17]
+    end
+
+    @testset "Drag without a stored surface Richardson number" begin
+        boundary_layer = BoundaryLayer(spectral_grid; drag = ConstantDrag(spectral_grid))
+        model_constant_drag = PrimitiveWetModel(spectral_grid; boundary_layer)
+        simulation_constant_drag = initialize!(model_constant_drag)
+        run!(simulation_constant_drag, period = Day(1))
+        parameterizations = simulation_constant_drag.variables.parameterizations
+        @test !haskey(parameterizations, :surface_bulk_richardson)
+        @test !simulation_constant_drag.model.feedback.nans_detected
+        @test all(isfinite, parameterizations.vertical_conductance_momentum)
+        @test maximum(parameterizations.vertical_conductance_heat) > 0
+
+        # then computed by the diffusion itself
+        ΔΦ₀ = 500.0f0
+        Ri = SpeedyWeather.surface_richardson(1, ΔΦ₀, simulation_constant_drag.variables, model_constant_drag.vertical_diffusion, model_constant_drag)
+        @test isfinite(Ri)
+    end
+end
+
 @testset "BulkRichardsonDiffusion in a model" begin
     @testset for (Model, nlayers) in ((PrimitiveWetModel, 8), (PrimitiveWetModel, 24), (PrimitiveDryModel, 24))
         spectral_grid = SpectralGrid(truncation = 32; nlayers)
@@ -349,9 +550,11 @@ end
     # drag and surface wind, which switches the boundary-layer profile of the diffusivity off
     (; variables) = simulation
     ΔΦ₀ = 500.0f0       # geopotential of the lowermost layer relative to the surface
-    friction_velocity, Ri_surface = SpeedyWeather.surface_layer(1, ΔΦ₀, variables, diffusion, model)
-    @test friction_velocity > 0
-    @test isfinite(Ri_surface)
+    drag, surface_wind_speed = SpeedyWeather.boundary_layer_drag_and_wind(variables.parameterizations)
+    @test SpeedyWeather.friction_velocity(drag, surface_wind_speed, 1) > 0
+    @test isfinite(SpeedyWeather.surface_richardson(1, ΔΦ₀, variables, diffusion, model))
     no_boundary_layer = (; parameterizations = (; variables.parameterizations.vertical_conductance_momentum))
-    @test SpeedyWeather.surface_layer(1, ΔΦ₀, no_boundary_layer, diffusion, model) === (0.0f0, 0.0f0)
+    @test SpeedyWeather.boundary_layer_drag_and_wind(no_boundary_layer.parameterizations) === (nothing, nothing)
+    @test SpeedyWeather.friction_velocity(nothing, nothing, 1) == 0
+    @test SpeedyWeather.surface_richardson(1, ΔΦ₀, no_boundary_layer, diffusion, model) === 0.0f0
 end
