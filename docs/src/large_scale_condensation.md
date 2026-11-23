@@ -143,7 +143,7 @@ proportional to the difference of humidity ``q`` to saturation ``q^*``.
 
 ```math
 \begin{aligned}
-F_{e, k}   &= \min(c\max(q^* - q, 0), 1) F_{r, k} \\
+F_{e, k}   &= \left(1 - \exp\left(-c\max(q^* - q, 0)\frac{\Delta\sigma_k}{\Delta\sigma_{ref}}\right)\right) F_{r, k} \\
 F_{r, k+1} &= F_{r, k} - F_{e, k}
 \end{aligned}
 ```
@@ -154,17 +154,46 @@ constant that effectively parameterizes the effectiveness of reevaporation.
 For ``c=0`` reevaporation is disabled, for ``c = 1/q^*`` (though ``c`` is a global constant)
 and ``q=0`` evaporation would be immediate, i.e. when the humidity in the layer is zero
 but ``c`` is chosen to be on the order of  one over the saturation humidity then all
-rain water would evaporate. We add a ``\min(..., 1)`` to avoid evaporating more rain water
-than is available. We then convert ``F_e`` into a humidity tendency by division with
+rain water would evaporate. The exponential avoids evaporating more rain water
+than is available.
+
+The evaporated fraction is scaled with the layer's mass, i.e. its thickness
+``\Delta\sigma_k = \Delta p_k/p_s`` relative to a reference thickness ``\Delta\sigma_{ref}``
+(`reevaporation_layer_thickness = 1/8` by default, so that 8 layers behave roughly as
+without this scaling). The fraction of rain that reaches the ground is then the product
+over layers ``\prod_k \exp(-c(q^* - q)\Delta\sigma_k/\Delta\sigma_{ref})``, which
+for constant ``q^* - q`` only depends on the total ``\sum_k \Delta\sigma_k`` and not on
+the number of layers, see [#1426](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1426).
+
+We then convert ``F_e`` into a humidity tendency by division with
 ``\Delta p/(\Delta t g \rho)``, layer pressure thickness ``\Delta p`` (see [Sigma coordinates](@ref sigma_coordinates_physics)), gravity ``g``,
 but this depends on the units you use for the rain water flux.
-Since reevaporation takes the same latent heat (though opposite sign) as condensation,
-this tendency has to be substracted from the large-scale condensation tendency but the
-implicit time stepping can be used as before if reevaporation is calculated before the
-latent heat release.
+Reevaporation is not a relaxation towards saturation with time scale ``\Delta t_c``
+but is limited by the rain falling into a layer, so it is not included in the implicit
+correction of condensation above. Evaporating ``\delta q_e`` cools the layer by
+``\tfrac{L_v}{c_p}\delta q_e``, which also lowers its saturation humidity, so that the
+saturation deficit after evaporation is ``(q^* - q) - \gamma\,\delta q_e`` with
+``\gamma = 1 + \tfrac{L_v}{c_p}\tfrac{\partial q^*}{\partial T}``. We therefore cap
+the reevaporation at
+
+```math
+\delta q_e \leq \frac{\max(q^* - q, 0)}{\gamma}
+```
+
+so that a layer is never evaporated into beyond saturation. Exactly the evaporated
+amount is removed from the rain flux and added to humidity, so that water is conserved,
+see [#1420](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1420). The
+condensation (negative) and reevaporation (positive) humidity tendencies are then added,
+and the latent heat release (or uptake) is computed from their sum. Only the condensation
+tendency produces new rain in that layer.
+
+If snow from above melts in a layer, the latent heat for melting cools that layer
+first, and saturation humidity ``q^*`` for both condensation and reevaporation is
+computed at this cooled temperature.
 
 The reevaportation in `ImplicitCondensation` is controlled by `reevaporation` (dimensionless),
-the proportionality constant ``c \geq 0`` here.
+the proportionality constant ``c \geq 0`` here, and `reevaporation_layer_thickness`,
+the reference thickness ``\Delta\sigma_{ref}``.
 
 ```@example condensation
 spectral_grid = SpectralGrid()
