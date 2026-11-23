@@ -512,6 +512,9 @@ end
     return nothing
 end
 
+# TODO: we may also factor out the triadiagonal solve into one of the subpackages, as it could beused elsewhere 
+# this is fairly generic code. 
+#
 # Thomas algorithm for all variables in `fields`, layers in the outer, columns in the inner loops. What the
 # elimination of layer k needs of the layer above (upper diagonal, right-hand side) is read from the arrays
 @propagate_inbounds function tridiagonal_solve!(
