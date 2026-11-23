@@ -47,12 +47,14 @@ warning on CPU, too slow).
 
 The flag `--SPEEDY` additionally runs a suite (`:benchmark900`) of the PrimitiveWet
 model over the resolutions of the main benchmark (`:benchmark201`, default
-transform) in a configuration closer to the original SPEEDY.f90: seasonal
-prescribed climatologies of sea surface temperature, land surface temperature and
-soil moisture instead of the slab ocean and the land bucket model, constant
-instead of learned surface roughness lengths, and a constant wind slowdown (0.95)
-and gusts (5 m/s) as in SPEEDY.f90 instead of the learned wind slowdown and
-Beljaars gusts (`speedy_components` in `benchmark_suite.jl`). Its section and its
+transform) in a configuration closer to the original SPEEDY.f90, with every model
+component set explicitly so that changed model defaults do not change it
+(`speedy_components` in `benchmark_suite.jl`): seasonal prescribed climatologies of
+sea surface temperature, land surface temperature and soil moisture, daily-mean
+insolation, SPEEDY.f90's ocean, sea-ice and snow albedos, constant surface roughness
+lengths, a constant wind slowdown (0.95) and gusts (5 m/s), and SPEEDY.f90's
+hyperdiffusion and time step; schemes without a SPEEDY.f90 equivalent are listed in
+`SPEEDY_CONFIGURATION`. Its section and its
 numbers (the `speedy` field of the record) are part of the architecture's results,
 like those of `--reverse`. On every architecture, including Reactant.
 
@@ -156,7 +158,7 @@ const ARGUMENT_SETTINGS = ArgParseSettings(
     action = :store_true
     dest_name = "hi_res"
     "--SPEEDY", "--speedy"
-    help = "also run the PrimitiveWet resolution sweep in a SPEEDY.f90-like configuration (prescribed seasonal climatologies, constant surface roughness, wind slowdown and gusts)"
+    help = "also run the PrimitiveWet resolution sweep in a SPEEDY.f90-like configuration (prescribed seasonal climatologies, daily-mean insolation, SPEEDY.f90's albedos, constant surface roughness, wind slowdown and gusts)"
     action = :store_true
     dest_name = "speedy"
     "--debug"
@@ -559,7 +561,7 @@ function write_preamble(md)
     write(md, "`--reverse` (Reactant only, e.g. `manual_benchmarking.jl reactant-nvidia-gpu --reverse`) additionally runs the ")
     write(md, "reverse-mode benchmarks, which take hours. `--hi-res` (GPU and TPU only) adds T342 and T512 to the PrimitiveWet resolution sweep. ")
     write(md, "`--SPEEDY` additionally runs the PrimitiveWet model over the resolutions of the resolution sweep in a configuration closer to SPEEDY.f90 (seasonal prescribed climatologies of ")
-    write(md, "sea surface temperature, land surface temperature and soil moisture, constant surface roughness, wind slowdown and gusts).\n\n")
+    write(md, "sea surface temperature, land surface temperature and soil moisture, daily-mean insolation, SPEEDY.f90's albedos, constant surface roughness, wind slowdown and gusts).\n\n")
     write(md, "Each run replaces its own architecture's section in this `README.md` (including suites added by flags in an earlier run); ")
     write(md, "results for other architectures are preserved via `benchmark_results.json`.\n\n")
     write(md, "A pull request labelled `benchmark-performance` is benchmarked against main with the same debug mode on every push, and the comparison is posted as a comment.\n\n")
