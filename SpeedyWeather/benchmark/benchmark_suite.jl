@@ -15,12 +15,13 @@ const SPEEDY_CONFIGURATION = "The PrimitiveWet model in a configuration closer t
     "with a snow cover linear in snow depth up to 60 mm water equivalent (`LandSnowAlbedo`); a near-surface wind of " *
     "0.95 times the lowermost-layer wind (`ConstantWindSlowdown`) with 5 m/s gusts (`ConstantWindGust`) and constant " *
     "roughness lengths (`ConstantSurfaceRoughness`); ∇⁸ hyperdiffusion with a 2.4-hour time scale at T32; a " *
-    "40-minute time step at T32 with Robert–Williams filter; SPEEDY.f90's σ levels with 8 layers. Without an " *
-    "equivalent of SPEEDY.f90's scheme in SpeedyWeather: Betts–Miller convection (SPEEDY.f90: mass flux), " *
-    "one-band longwave radiation (SPEEDY.f90: four bands), Richardson-number-dependent drag coefficients " *
-    "(SPEEDY.f90: constant coefficients with a stability correction), `BulkRichardsonDiffusion` vertical diffusion, " *
-    "thermodynamic sea ice (SPEEDY.f90: sea-ice climatology), a snow model (SPEEDY.f90: snow climatology) and the " *
-    "speed-limit drag."
+    "40-minute time step at T32 with Robert–Williams filter. Without an equivalent of SPEEDY.f90's scheme in " *
+    "SpeedyWeather: Betts–Miller convection (SPEEDY.f90: mass flux), one-band longwave radiation (SPEEDY.f90: " *
+    "four bands), Richardson-number-dependent drag coefficients (SPEEDY.f90: constant coefficients with a " *
+    "stability correction), `BulkRichardsonDiffusion` vertical diffusion, thermodynamic sea ice (SPEEDY.f90: " *
+    "sea-ice climatology), a snow model (SPEEDY.f90: snow climatology) and the speed-limit drag. SpeedyWeather's " *
+    "σ levels (Frierson et al. 2006) instead of SPEEDY.f90's, with which SpeedyWeather's shortwave absorption " *
+    "moistens the stratosphere."
 
 # Model components of the SPEEDY.f90-like configuration (`--SPEEDY` suite), see `SPEEDY_CONFIGURATION`,
 # as `model_kwargs` of a `BenchmarkSuite`: types or functions of the spectral grid (`resolve_model_kwargs`).
@@ -99,13 +100,28 @@ speedy_components(::Type{<:PrimitiveWet}) = (;
     hole_filling = ClipNegatives,
 )
 
-# SPEEDY.f90's σ half levels with 8 layers (no equivalent for more layers: Frierson et al. 2006 spacing)
-const SPEEDY_SIGMA_HALF_8LAYERS = [0, 0.05, 0.14, 0.26, 0.42, 0.6, 0.77, 0.9, 1]
-speedy_geometry(spectral_grid) = Geometry(
-    spectral_grid;
-    vertical_coordinates = spectral_grid.nlayers == 8 ? SigmaCoordinates(spectral_grid, SPEEDY_SIGMA_HALF_8LAYERS) :
-        FriersonSigmaCoordinates(spectral_grid),
+# Fields of the model that `speedy_components` leaves to the benchmark, as for all other suites
+const SPEEDY_UNSET_FIELDS = (
+    :spectral_grid, :architecture, :dynamics, :dynamics_only, :tracers, :spectral_transform, :output,
+    :diagnostics, :callbacks, :feedback, :core_components, :parameterizations, :params,
 )
+
+# Error if `Model` has a field that `speedy_components` neither sets nor leaves to the benchmark, e.g.
+# a new component, which would otherwise silently take its default in the SPEEDY.f90-like configuration
+function check_speedy_components(Model)
+    unset = setdiff(fieldnames(Model), keys(speedy_components(Model)), SPEEDY_UNSET_FIELDS)
+    isempty(unset) || error(
+        "speedy_components($Model) does not set $(Tuple(unset)): set them explicitly (benchmark_suite.jl) " *
+            "so that the SPEEDY.f90-like configuration does not change with model defaults."
+    )
+    return nothing
+end
+
+# σ levels of Frierson et al. 2006, not SPEEDY.f90's (half levels 0, 0.05, 0.14, 0.26, 0.42, 0.6, 0.77,
+# 0.9, 1 with 8 layers): with those, the shortwave water vapour absorption of SpeedyWeather (calibrated on
+# these levels in #1414, SPEEDY.f90 has none in its top layer) moistens the top layer, 0.002 to 0.05 g/kg
+# in the first year at T32L8 and still rising, while it stays below 0.02 g/kg with these levels
+speedy_geometry(spectral_grid) = Geometry(spectral_grid; vertical_coordinates = FriersonSigmaCoordinates(spectral_grid))
 
 # Earth with daily-mean insolation (no daily cycle) as in SPEEDY.f90, seasonal cycle on an eccentric
 # orbit, also SPEEDY.f90 computes the Sun-Earth distance factor (via Spencer 1971's Fourier series)
@@ -306,6 +322,18 @@ default_nlayers(models) = [default_nlayers(model) for model in models]
 n_timesteps(truncation, nlayers, multiplier = 1) =
     round(Int, multiplier * clamp(round(Int, 4.0e9 / truncation^3 / nlayers^2), 50, 1200))
 
+# Number of steps the time loop actually takes for `period` (`clock.n_steps`, as set by
+# `initialize!(simulation; period)`), incl. the spin-up steps of the time stepper. With the timed
+# `period = Δt * (n_timesteps + 1)` usually `n_timesteps + 2` (1 Euler spin-up step of Leapfrog), one
+# more if Δt isn't whole seconds and rounding the period to seconds rounds up (on Reactant, without
+# output Δt isn't adjusted to the output interval, e.g. at T43, T342). All are timed, the SYPD is
+# computed from these.
+function n_steps_run(model, period)
+    clock = SpeedyWeather.Clock()
+    initialize!(clock, model.time_stepping, model.planet, period)
+    return Int(clock.n_steps)
+end
+
 # Architecture-specific hooks. The methods here are for CPU and GPU, `reactant_runner.jl`
 # adds the ones for `ReactantDevice` (it needs Reactant's `@compile` macro so it is only
 # included by the driver once Reactant is loaded).
@@ -391,6 +419,7 @@ function run_benchmark!(suite::BenchmarkSuite, i::Integer)
 
     nsteps = n_timesteps(truncation, nlayers, suite.timestep_multiplier)
     period = Second(round(Int, model.time_stepping.Δt * (nsteps + 1)))
+    nsteps_run = n_steps_run(model, period)     # steps of every timed run, incl. spin-up, for the SYPD
 
     # Warm up before timing: run a few steps so JIT compilation of the time
     # loop happens here rather than inside the timed run below. The timed run
@@ -437,9 +466,10 @@ function run_benchmark!(suite::BenchmarkSuite, i::Integer)
         push!(times, time() - t0)
         finalize!(simulation)   # but keep `simulation`, the next run resets it
     end
-    @info @sprintf("     %d timed run(s): median %.3g s, fastest %.3g s, slowest %.3g s", length(times), median(times), minimum(times), maximum(times))
+    @info @sprintf("     %d timed run(s) of %d steps: median %.3g s, fastest %.3g s, slowest %.3g s", length(times), nsteps_run, median(times), minimum(times), maximum(times))
 
-    sypd(time_elapsed) = model.time_stepping.Δt * nsteps / (time_elapsed * 365.25)
+    # all steps of a timed run take a full step's work, incl. the spin-up step
+    sypd(time_elapsed) = model.time_stepping.Δt * nsteps_run / (time_elapsed * 365.25)
 
     suite.Δt[i] = model.time_stepping.Δt
     suite.SYPD[i] = sypd(median(times))
