@@ -6,26 +6,153 @@ using SpeedyWeather: synchronize, ReactantDevice, MatrixSpectralTransform, Spect
 const MAX_MATRIX_TRUNCATION = 150
 
 const SPEEDY_CONFIGURATION = "The PrimitiveWet model in a configuration closer to SPEEDY.f90, at the resolutions " *
-    "of the PrimitiveWet resolution sweep with the default transform: seasonal " *
-    "prescribed climatologies of sea surface temperature (`SeasonalOceanClimatology`), land surface temperature " *
-    "(`SeasonalLandTemperature`) and soil moisture (`SeasonalSoilMoisture`) instead of the slab ocean " *
-    "and the land bucket model, constant surface roughness lengths over land and ocean (`ConstantSurfaceRoughness`) " *
-    "instead of the learned ones, and SPEEDY.f90's near-surface wind of 0.95 times the lowermost-layer wind " *
-    "(`ConstantWindSlowdown`) with 5 m/s gusts (`ConstantWindGust`) instead of the learned wind slowdown and " *
-    "Beljaars gusts; sea ice stays thermodynamic, driven by the prescribed sea surface temperature."
+    "of the PrimitiveWet resolution sweep with the default transform. " *
+    "As in SPEEDY.f90: prescribed seasonal climatologies of sea surface temperature (`SeasonalOceanClimatology`), " *
+    "land surface temperature (`SeasonalLandTemperature`) and soil moisture (`SeasonalSoilMoisture`); daily-mean " *
+    "insolation with a seasonal cycle on an eccentric orbit (`SolarZenithSeason`, `KeplerOrbit`); two-band shortwave " *
+    "radiation with diagnostic clouds and seasonal ozone (`TwoBandShortwave`); albedos of 0.07 for the ocean and 0.6 for " *
+    "sea ice, blended by sea-ice concentration (`OceanSeaIceAlbedo`), and a land albedo of bare soil and vegetation " *
+    "with a snow cover linear in snow depth up to 60 mm water equivalent (`LandSnowAlbedo`); a near-surface wind of " *
+    "0.95 times the lowermost-layer wind (`ConstantWindSlowdown`) with 5 m/s gusts (`ConstantWindGust`) and constant " *
+    "roughness lengths (`ConstantSurfaceRoughness`); ∇⁸ hyperdiffusion with a 2.4-hour time scale at T32; a " *
+    "40-minute time step at T32 with Robert–Williams filter; SPEEDY.f90's σ levels with 8 layers. Without an " *
+    "equivalent of SPEEDY.f90's scheme in SpeedyWeather: Betts–Miller convection (SPEEDY.f90: mass flux), " *
+    "one-band longwave radiation (SPEEDY.f90: four bands), Richardson-number-dependent drag coefficients " *
+    "(SPEEDY.f90: constant coefficients with a stability correction), `BulkRichardsonDiffusion` vertical diffusion, " *
+    "thermodynamic sea ice (SPEEDY.f90: sea-ice climatology), a snow model (SPEEDY.f90: snow climatology) and the " *
+    "speed-limit drag."
 
 # Model components of the SPEEDY.f90-like configuration (`--SPEEDY` suite), see `SPEEDY_CONFIGURATION`,
-# as `model_kwargs` of a `BenchmarkSuite`: functions of the spectral grid
+# as `model_kwargs` of a `BenchmarkSuite`: types or functions of the spectral grid (`resolve_model_kwargs`).
+# Every component of the PrimitiveWetModel and all their subcomponents are set explicitly, so that a
+# changed default of the model does not change this configuration. Left to the benchmark as for all
+# other suites: the spectral transform, output, feedback, diagnostics and callbacks. Parameters are the
+# components' defaults unless set here, mostly to the values of SPEEDY.f90 (github.com/samhatfield/speedy.f90).
 speedy_components(::Type{<:PrimitiveWet}) = (;
-    ocean = SeasonalOceanClimatology,
-    land = spectral_grid -> LandModel(
-        spectral_grid; temperature = SeasonalLandTemperature(spectral_grid), soil_moisture = SeasonalSoilMoisture(spectral_grid)
+    # DYNAMICS
+    geometry = speedy_geometry,
+    planet = speedy_planet,
+    atmosphere = EarthAtmosphere,
+    coriolis = Coriolis,
+    geopotential = Geopotential,
+    adiabatic_conversion = AdiabaticConversion,
+    particle_advection = nothing,
+    initial_conditions = spectral_grid -> (;
+        zonal = BalancedZonalState(spectral_grid),
+        humid = ConstantRelativeHumidity(spectral_grid),
     ),
+    forcing = nothing,
+    drag = SpeedLimitDrag,                  # SPEEDY.f90 instead: 30-day drag on the zonal-mean wind in the top layer
+    random_process = nothing,
+
+    # BOUNDARY CONDITIONS
+    orography = EarthOrography,
+    land_sea_mask = EarthLandSeaMask,
+    ocean = SeasonalOceanClimatology,       # SPEEDY.f90: SST climatology (+ observed anomalies)
+    sea_ice = ThermodynamicSeaIce,          # SPEEDY.f90: sea-ice climatology, not available in SpeedyWeather
+    land = speedy_land,
+
+    # PHYSICS
+    solar_zenith = speedy_solar_zenith,
+    albedo = speedy_albedo,
     boundary_layer = speedy_boundary_layer,
+    vertical_diffusion = BulkRichardsonDiffusion,
+    surface_momentum_flux = spectral_grid -> SurfaceMomentumFlux(spectral_grid; time_integration = RationalFluxes()),
+    surface_heat_flux = spectral_grid -> SurfaceHeatFlux(
+        spectral_grid;
+        ocean = SurfaceOceanHeatFlux(spectral_grid; time_integration = RationalFluxes()),
+        land = SurfaceLandHeatFlux(spectral_grid; time_integration = RationalFluxes()),
+    ),
+    surface_humidity_flux = spectral_grid -> SurfaceHumidityFlux(
+        spectral_grid;
+        ocean = SurfaceOceanHumidityFlux(spectral_grid; time_integration = RationalFluxes()),
+        land = SurfaceLandHumidityFlux(spectral_grid; time_integration = RationalFluxes()),
+    ),
+    large_scale_condensation = ImplicitCondensation,
+    convection = spectral_grid -> BettsMillerConvection(spectral_grid; entrainment = LinearEntrainment(spectral_grid)),
+    radiation = speedy_radiation,
+    greenhouse_gases = spectral_grid -> (; co2 = CO2(spectral_grid, 360)),     # [ppm], constant as in SPEEDY.f90
+    stochastic_physics = nothing,
+    custom_parameterization = nothing,
+
+    # NUMERICS
+    time_stepping = speedy_time_stepping,
+    implicit = spectral_grid -> ImplicitPrimitiveEquation(
+        spectral_grid;
+        centering = 0.5,                    # SPEEDY.f90's alph = 0.5
+        reference_temperature = IsothermalReferenceTemperature{spectral_grid.NF}(),
+        schedule = PeriodicSchedule(every = Day(1)),
+    ),
+    horizontal_diffusion = spectral_grid -> HyperDiffusion(
+        spectral_grid;
+        power = 4,                          # ∇⁸ as SPEEDY.f90's npowhd = 4
+        time_scale = Minute(144),           # SPEEDY.f90's thd = 2.4 hours, scaled with resolution from T32
+        resolution_scaling = 1,
+        # divergence: SpeedyWeather's stronger damping, scale-selective in the troposphere
+        # and ∇⁴ in the stratosphere as a sponge, SPEEDY.f90 instead: thdd = 2.4 hours
+        # and an additional ∇² diffusion (12 hours) of vorticity, divergence and temperature
+        time_scale_div = Hour(1),
+        power_stratosphere = 2,
+        tapering_σ = 0.2,
+    ),
+    vertical_advection = CenteredVerticalAdvection,
+    hole_filling = ClipNegatives,
 )
 
-# the default boundary layer but with SPEEDY.f90's constant wind slowdown (0.95) and gusts (5 m/s),
-# Kucharski et al. 2006, and constant instead of learned surface roughness lengths
+# SPEEDY.f90's σ half levels with 8 layers (no equivalent for more layers: Frierson et al. 2006 spacing)
+const SPEEDY_SIGMA_HALF_8LAYERS = [0, 0.05, 0.14, 0.26, 0.42, 0.6, 0.77, 0.9, 1]
+speedy_geometry(spectral_grid) = Geometry(
+    spectral_grid;
+    vertical_coordinates = spectral_grid.nlayers == 8 ? SigmaCoordinates(spectral_grid, SPEEDY_SIGMA_HALF_8LAYERS) :
+        FriersonSigmaCoordinates(spectral_grid),
+)
+
+# Earth with daily-mean insolation (no daily cycle) as in SPEEDY.f90, seasonal cycle on an eccentric
+# orbit, also SPEEDY.f90 computes the Sun-Earth distance factor (via Spencer 1971's Fourier series)
+speedy_planet(spectral_grid) = Earth(
+    spectral_grid; daily_cycle = false, seasonal_cycle = true, orbit = KeplerOrbit(spectral_grid)
+)
+
+# daily-mean cos of the zenith angle as in `WhichZenith` for `daily_cycle = false`
+# (`KeplerOrbit` computes the declination itself, the declination function is then not used)
+speedy_solar_zenith(spectral_grid) = SolarZenithSeason(
+    spectral_grid; seasonal_cycle = true,
+    solar_declination = SpeedyWeather.SinSolarDeclination(speedy_planet(spectral_grid))
+)
+
+# land with SPEEDY.f90's prescribed climatologies of land surface temperature and soil moisture
+# (SPEEDY.f90 adds anomalies of a slab land model relaxed to its climatology), the snow model as
+# SpeedyWeather has no snow climatology (SPEEDY.f90's snow is prescribed)
+function speedy_land(spectral_grid)
+    geometry = LandGeometry(spectral_grid, nlayers = 2)
+    return LandModel(;
+        spectral_grid,
+        geometry,
+        thermodynamics = LandThermodynamics(spectral_grid, geometry),
+        temperature = SeasonalLandTemperature(spectral_grid, geometry),
+        soil_moisture = SeasonalSoilMoisture(spectral_grid, geometry),
+        snow = SnowModel(spectral_grid, geometry),
+        vegetation = VegetationClimatology(spectral_grid, geometry),
+        rivers = nothing,
+    )
+end
+
+# SPEEDY.f90's albedos: ocean 0.07 and sea ice 0.6 blended by sea-ice concentration, and over land
+# snow cover = min(1, snow depth / 60 mm water equivalent). SPEEDY.f90 reads the snow-free land
+# albedo from a climatology and blends it with snow (0.6), here vegetation and bare soil with
+# additive snow albedo (0.4, so ≈0.6 under full snow cover over vegetation as in SPEEDY.f90)
+speedy_albedo(spectral_grid) = OceanLandAlbedo(
+    spectral_grid;
+    ocean = OceanSeaIceAlbedo(spectral_grid; albedo_ocean = 0.07, albedo_ice = 0.6),
+    land = LandSnowAlbedo(
+        spectral_grid; snow_cover = LinearSnowCover(), snow_depth_scale = 0.06, albedo_snow = 0.4
+    ),
+)
+
+# SPEEDY.f90's constant wind slowdown (0.95) and gusts (5 m/s), Kucharski et al. 2006, constant
+# surface roughness lengths (SPEEDY.f90 has constant drag coefficients instead, `ConstantDrag` has
+# no stability correction and one coefficient for momentum, heat and humidity), no neutral wind
+# speed (only used by the learned ocean roughness)
 speedy_boundary_layer(spectral_grid) = BoundaryLayer(
     spectral_grid;
     surface_condition = SurfaceCondition(
@@ -33,8 +160,46 @@ speedy_boundary_layer(spectral_grid) = BoundaryLayer(
         wind_slowdown = ConstantWindSlowdown(spectral_grid, wind_slowdown = 0.95),
         wind_gust = ConstantWindGust(spectral_grid, wind_gust = 5),
     ),
+    neutral_wind_speed = nothing,
     surface_roughness = ConstantSurfaceRoughness(spectral_grid),
+    drag = BulkRichardsonDrag(spectral_grid),
 )
+
+# SPEEDY.f90's two-band shortwave scheme with its diagnostic clouds and ozone (SpeedyWeather's
+# absorptivities, calibrated in #1414) and one-band longwave (SPEEDY.f90: four bands)
+speedy_radiation(spectral_grid) = Radiation(
+    spectral_grid;
+    shortwave = TwoBandShortwave(
+        spectral_grid;
+        clouds = DiagnosticClouds(spectral_grid),
+        transmissivity = TwoBandShortwaveTransmissivity(spectral_grid),
+        ozone = SeasonalOzone(spectral_grid),
+        radiative_transfer = TwoBandShortwaveRadiativeTransfer(spectral_grid),
+    ),
+    longwave = OneBandLongwave(
+        spectral_grid;
+        transmissivity = ByrneOGormanLongwaveTransmissivity(spectral_grid),
+        radiative_transfer = OneBandLongwaveRadiativeTransfer(spectral_grid, stratospheric_emissivity = 0.05),
+    ),
+)
+
+# SPEEDY.f90's leapfrog: 40 min time step at T32 (36 steps/day), Robert filter rob = 0.05 and
+# Williams filter wil = 0.53; SpeedyWeather's `robert_filter` is ν in Williams (2009) with the
+# displacement ν/2, so 0.1 here is SPEEDY.f90's rob = 0.05
+function speedy_time_stepping(spectral_grid)
+    Δt_at_T32 = Minute(40)
+    adjust_with_output = true
+    return Leapfrog(
+        spectral_grid;
+        Δt_at_T32,
+        adjust_with_output,
+        robert_filter = 0.1,
+        williams_filter = 0.53,
+        ocean = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
+        land = EulerForward(spectral_grid; Δt_at_T32, adjust_with_output),
+        noise = nothing,
+    )
+end
 
 # Build the model with the spectral transform of `transform_kind` for `arch`
 # (`:default` for FFT+Legendre, `:matrix` for MatrixSpectralTransform).
