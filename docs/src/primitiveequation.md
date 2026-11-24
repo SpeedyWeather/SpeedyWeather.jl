@@ -379,6 +379,13 @@ With the reconstruction at the faces, ``T_{k+\tfrac{1}{2}}`` and ``T_{k-\tfrac{1
 
 However, note that this scheme is dispersive and easily leads to instabilities at higher resolution, where a more advanced vertical advection scheme becomes necessary. For convenience, we may write ``W(T)`` to denote the vertical advection term ``\dot{\sigma}\partial_\sigma T``, without specifying which schemes is used.
 
+With many vertical layers the vertical Courant number ``|\dot{\sigma}| \Delta t / \Delta \sigma`` easily exceeds 1 in
+strong ascent, e.g. ``|w| \gtrsim 0.3`` m/s for 100 layers with ``\Delta t = 300`` s, and all of the schemes above
+become unstable. `SubcycledVerticalAdvection(spectral_grid; courant_target = 1, max_substeps = 16)` splits the time
+step per column into as many substeps as needed to keep the Courant number of each substep below `courant_target`,
+each a 3-stage strong-stability-preserving Runge-Kutta step of the WENO operator. Columns with weak vertical motion
+take a single substep, so the extra cost is mostly 3 instead of 1 evaluations of the column operator.
+
 ### Vertical velocity
 
 In the section [Surface pressure tendency](@ref) we used that the surface pressure changes

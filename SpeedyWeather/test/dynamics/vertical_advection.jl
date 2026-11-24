@@ -48,6 +48,7 @@ end
         SpeedyWeather.WENOVerticalAdvection,
         SpeedyWeather.CenteredVerticalAdvection,
         SpeedyWeather.UpwindVerticalAdvection,
+        SpeedyWeather.SubcycledVerticalAdvection,
     )
 
     for VerticalAdvection in advection_schemes
@@ -75,6 +76,7 @@ end
         SpeedyWeather.CenteredVerticalAdvection,
         SpeedyWeather.UpwindVerticalAdvection,
         SpeedyWeather.WENOVerticalAdvection,
+        SpeedyWeather.SubcycledVerticalAdvection,
     )
 
     for VerticalAdvection in advection_schemes
@@ -108,4 +110,50 @@ end
         ).data
         @test tendency_changed_profile ≈ tendency .- profile_change' .* divergence
     end
+end
+
+@testset "Subcycled vertical advection" begin
+    # a single column: compare with WENO for small Courant numbers, stay bounded for large ones
+    nlayers = 40
+    Δσ = fill(1 / nlayers, nlayers)
+    ξ = zeros(1, nlayers, 2)
+    ξ[1, :, 1] .= [exp(-((k - 15) / 4)^2) for k in 1:nlayers]     # Gaussian bump, step 1 is advected
+    function tendency(adv, w, interval)
+        ξ_tend = zeros(1, nlayers, 2)
+        if adv isa SpeedyWeather.SubcycledVerticalAdvection
+            adv.interval[] = interval
+            S, A, B = adv.S, adv.A, adv.B
+            SpeedyWeather.launch!(
+                SpeedyWeather.CPU(), SpeedyWeather.LinearWorkOrder, (1,), SpeedyWeather.subcycled_vertical_advection_kernel!,
+                ξ_tend, 1, w, ξ, 1, Δσ, nlayers, S, A, B, interval, adv.courant_target, adv.max_substeps,
+                SpeedyWeather.WENOVerticalAdvection{Float64}(),
+            )
+        else
+            SpeedyWeather.launch!(
+                SpeedyWeather.CPU(), SpeedyWeather.RingGridWorkOrder, (1, nlayers), SpeedyWeather.vertical_advection_kernel!,
+                ξ_tend, 1, w, ξ, 1, Δσ, nlayers, adv,
+            )
+        end
+        return ξ_tend[1, :, 1]
+    end
+
+    spectral_grid = SpectralGrid(truncation = 5; nlayers, NF = Float64)
+    @test SubcycledVerticalAdvection(spectral_grid) isa SpeedyWeather.SubcycledVerticalAdvection{Float64}
+    sub = SpeedyWeather.SubcycledVerticalAdvection{Float64, Matrix{Float64}, Base.RefValue{Float64}}(
+        1.0, 64, zeros(1, nlayers), zeros(1, nlayers), zeros(1, nlayers), Ref(0.0))
+    weno = SpeedyWeather.WENOVerticalAdvection{Float64}()
+
+    w = zeros(1, nlayers)
+    w[1, 1:(nlayers - 1)] .= 1.0e-4                     # uniform descent (σ increasing), w = 0 at the surface
+    # tiny interval: one substep, SSP-RK3 converges to the instantaneous WENO tendency
+    @test tendency(sub, w, 1.0e-3) ≈ tendency(weno, w, 1.0e-3) rtol = 1.0e-3
+
+    # Courant number 10 over the interval (bump moves ~10 layers, away from the boundaries):
+    # subcycled stays finite and bounded to within 1 % (WENO is not strictly monotone)
+    interval = 10 * Δσ[1] / 1.0e-4
+    ξ_end = ξ[1, :, 1] .+ interval .* tendency(sub, w, interval)
+    @test all(isfinite, ξ_end)
+    @test maximum(ξ_end) <= maximum(ξ[1, :, 1]) + 1.0e-2
+    @test minimum(ξ_end) >= -1.0e-2
+    @test argmax(ξ_end) - argmax(ξ[1, :, 1]) in 9:11   # the bump moved down ~10 layers (towards larger σ)
 end
