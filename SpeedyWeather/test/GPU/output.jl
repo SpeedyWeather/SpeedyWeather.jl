@@ -83,6 +83,16 @@ end
 
     for output in writers
         add!(output, OutputVariables.All()...)
+
+        # on pressure layers mask temperature below the surface, NaNs that have to stay NaN in the output
+        if output.layers isa PressureLayers
+            add!(
+                output, OutputVariables.Temperature(
+                    extrapolation = SpeedyWeather.SubsurfaceMask(above_surface = SpeedyWeather.DryAdiabaticExtrapolation()),
+                )
+            )
+        end
+
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)
 
@@ -94,7 +104,16 @@ end
         # the last written temperature agrees with the final state interpolated on the CPU
         temperature = SpeedyWeather.get_prognostic_step(simulation.variables.grid.temperature, model.time_stepping, output)
         temperature = on_architecture(SpeedyWeather.CPU(), temperature)     # the step written out
-        output.layers isa PressureLayers && continue    # vertical interpolation on top, not compared
+        if output.layers isa PressureLayers             # vertical interpolation on top, not compared
+            # but the masked values (1000 hPa below the surface over orography) have to be NaN:
+            # GPU arithmetic produces the NaN 0x7fffffff, which the mantissa rounding wrote as -0
+            written = NCDataset(joinpath(output.run_path, output.filename)) do ds
+                ds["temp"].var[:, :, :, end]
+            end
+            @test 0 < count(isnan, written) < length(written)
+            @test !any(x -> x === -0.0f0, written)
+            continue
+        end
         output isa HEALPixOutput && continue            # different output grid, covered above
         expected = RingGrids.interpolate(on_architecture(SpeedyWeather.CPU(), output.field3D.grid), temperature)
         grid = output.host3D.grid
@@ -109,29 +128,4 @@ end
         # in ˚C and rounded to keepbits=10, i.e. a relative error of ~1e-3 in K
         @test written .+ 273.15f0 ≈ expected rtol = 2.0e-3
     end
-end
-
-@testset "GPU output: NaNs stay NaN" begin
-    # GPU arithmetic produces the NaN 0x7fffffff, which the mantissa rounding of the output
-    # turned into -0, so that e.g. masked values below the surface were written as -0
-    arch = SpeedyWeather.GPU()
-    path = mktempdir(pwd(), prefix = "tmp_gpu_output_")
-    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8, architecture = arch)
-    output = NetCDFOutput(spectral_grid, PrimitiveWet; path, layers = PressureLayers(spectral_grid))
-    temperature = OutputVariables.Temperature(
-        extrapolation = SpeedyWeather.SubsurfaceMask(above_surface = SpeedyWeather.DryAdiabaticExtrapolation()),
-    )
-    add!(output, temperature)
-    model = PrimitiveWetModel(spectral_grid; output)
-    model.feedback.verbose = false
-    simulation = initialize!(model)
-    run!(simulation, steps = 1, output = true)
-
-    written = NCDataset(joinpath(output.run_path, output.filename)) do ds
-        ds["temp"].var[:, :, :, end]
-    end
-
-    # 1000 hPa is below the surface over orography and low surface pressure
-    @test 0 < count(isnan, written) < length(written)
-    @test !any(x -> x === -0.0f0, written)
 end
