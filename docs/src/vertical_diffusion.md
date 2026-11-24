@@ -87,9 +87,9 @@ and a back substitution over the layers. The system is diagonally dominant so th
 the solution is unconditionally stable, does not create new extrema and conserves
 the column integral.
 
-With `couple_surface_fluxes = true` (default) the source ``S`` contains the tendencies
-of the surface fluxes into the lowermost layer, which is called before the vertical diffusion.
-The surface fluxes are therefore spread over the boundary layer within the time step instead of
+The source ``S`` are the tendencies of the parameterizations called before the vertical diffusion,
+by default the surface fluxes into the lowermost layer. They are applied first and the result is
+diffused, so that the surface fluxes are spread over the boundary layer within the time step instead of
 heating, moistening or decelerating only the lowermost layer. This is a split version of the
 coupled implicit solve of surface fluxes and vertical diffusion in [Frierson2006](@citet).
 
@@ -109,6 +109,9 @@ differ only in ``K_{local}``. The implicit solver only needs the conductances
 `boundary_layer_height`. The value belongs to the interface below each layer and is zero for
 the lowermost layer (no flux through the surface). The diffusivity is
 ``K = a \Delta z / \rho`` with the density and layer distance as defined above.
+The boundary layer height is written to the output with
+`add!(model, OutputVariables.BoundaryLayerHeight())` (`blh` in m), which is also part of the
+output group `OutputVariables.BoundaryLayer()`.
 
 ### Boundary layer profile
 

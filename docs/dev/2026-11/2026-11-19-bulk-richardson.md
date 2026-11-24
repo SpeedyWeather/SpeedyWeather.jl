@@ -13,7 +13,8 @@
 > been through these stability checks (8.16). A performance audit on 2026-11-21 (8.17) found bounds checks
 > left active on the CPU and in the scheme (they are also what made the Reactant workaround of 8.3 necessary) and
 > a form of the scheme with the layers in the outer loop that is 2 to 15 times faster on the CPU and 40–45 %
-> faster on the GPU; none of it is implemented yet. Details in section 8.
+> faster on the GPU. The bounds-check fixes are implemented (`161719fed`, `a7d67a165`, 8.17.7); the range form is
+> planned in `2026-11-21-vertical-diffusion-range-form.md` and not implemented. Details in section 8.
 
 Date of initial draft: 2026-11-19
 
@@ -125,6 +126,10 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
   refer to the code before the rename.
 - 2026-11-21, user request: audit the performance of the scheme for further optimisations on CPU and GPU, and
   protocol the progress here. No source change; prototypes and measurements outside the repository. See 8.17.
+- 2026-11-21, user request: first the bounds-check fixes of the audit, then a detailed plan for the range form.
+  The fixes are `161719fed`; they broke the extended Enzyme tests (lost inlining of `column_parameterization_cpu!`),
+  corrected in `a7d67a165`. See 8.17.7. The range form is planned in a document of its own,
+  `2026-11-21-vertical-diffusion-range-form.md`.
 - 2026-11-19 (GPU session, A40 on login02 and H100 via Slurm), step 7, see section 8 for the numbers:
   - No GPU optimisation is kept. The scheme doubles the cost of the fused column kernel, but that kernel is only
     about 4 % of a time step, so the scheme costs 2–5 % of a time step at T256/T512.
@@ -737,6 +742,172 @@ folders). No run has a NaN.
   (`submit_years_frozen.sh`). The working tree has since changed `SpeedLimitDrag` (scaling, then damping), and
   `SPEED_DRAG=1e-5` would mean something else there.
 
+**Update 2026-11-22: the 10-year run failed on day 170 (top-layer jet), three replacement runs started.**
+
+- The run: `output/run_t512l24_10y_0001`, started 2026-11-20 16:41 as a chain of jobs (3373695–3373698) on the
+  frozen worktree `$D/validation/tree_final` at `16de36b9`, all defaults of that revision: scheme on with
+  `critical_Richardson = 1`, Δt = 150 s, damped `SpeedLimitDrag(drag = 1e-5, speed_limit = 80)`, hyperdiffusion
+  4 h. It went **NaN on 2000-06-18** (step 97851, after 2.2 h of wall time; the monitor has infinite winds from
+  the record of 19:57). The three follow-up jobs restarted from the NaN restart file and stopped at step 1
+  (`run_t512l24_10y_0002`–`0004`); `submit_years_chain2.sh` now leaves a marker `output/run_<RUN_ID>_FAILED` on
+  NaN, and later jobs of a chain exit when they find it.
+- **Cause: the top-layer jet, not a cold pool.** A restart 21 hours before
+  (`restarts/event01_restart3_20000617T2357.jld2`) with a monitor record every 5 minutes reproduces it at the
+  same time: the highest wind is in layer 1 at 68°S, 102°E, 97–99 m/s for the whole day, then 100.6 → 102 → 104 →
+  108 → 116 → 133 → 190 → 583 → 45505 m/s between 18:00 and 18:45. The lowest layer is unremarkable (coldest
+  point −59 °C and strongest inversion 12 K at the time; −63 °C and 27 K over the whole 170 days, so no cold
+  event).
+- Restart tests from that file, 2 days each, code `tree_final`
+  (`submit_restart_final.sh`, output in `output/blowup_10y/run_b10_<name>_0001`):
+
+  | Setup | Result | Highest wind after 12:00 on 06-18 [m/s] |
+  |---|---|---|
+  | defaults (reproduction) | blow-up 06-18 18:40 | 98 → ∞ |
+  | no speed-limit drag (`drag = 0`) | blow-up 06-18 03:20, same place, 15 h earlier | – |
+  | hyperdiffusion 3 h | survives | 97–99 |
+  | hyperdiffusion 2 h | survives | 97–99 |
+  | Δt = 131 s | survives | 97–99 |
+  | Δt = 112.5 s | survives | 97–99 |
+  | `speed_limit = 70` | survives | 87–91 |
+  | `speed_limit = 60` | survives | 76–81 |
+  | `drag = 1e-4` | survives | 89–91 |
+  | `drag = 1e-3` | survives | 84–90 |
+
+- What the tests show: the drag does work against this (without it the run fails 15 hours earlier), and every
+  modest change avoids this one event. What they do not show: that any of them is stable for years; each is one
+  event over two days. The stronger hyperdiffusion and the shorter time steps leave the wind at 97–99 m/s, only
+  the drag variants bring it down. Since the drag is now damped (8.13.1), coefficients of 1e-4 and 1e-3 are
+  stable at this time step.
+- Interpretation (mine, not tested further): the linear stability limit of the explicit leapfrog advection for
+  the smallest resolved scale is a wind of a/(N·Δt) ≈ 83 m/s at T512 with 150 s, and about the same at every
+  resolution because Δt ∝ 1/N. The default speed limit of 80 m/s sits just below it, but a drag of 1e-5 does not
+  hold the wind there: from February on the strongest wind of the globe was in layer 1 or 2 at 92 % or more of
+  the monitor times of each month, with a monthly median of 90–96 m/s. So the top two layers are above that limit most of the
+  time and are held by the hyperdiffusion and the drag. The highest wind alone does not predict the failure: the
+  same run had 127.5 m/s in layer 2 at 71°S on 2000-05-27 and survived, and failed three weeks later at 99 m/s.
+- Why the three-year run above completed and this one did not is not known. They differ in the drag (undamped
+  there; the damping weakens it by about 6 % at 20 m/s above the limit, and the damped drag reads the current
+  leapfrog step) and in code changes of 2026-11-20 (conductances, scratch arrays), and each is a single
+  realisation of a marginal state; the three-year run had 128 m/s too.
+- **The failed run was not on the current code.** `16de36b9` still has `critical_Richardson = 1`; the commits
+  since (`1cdc3b1a7` with Ri_c = 10 and the boundary layer height output, the rename to `ImplicitRelaxation`,
+  the bounds-check fixes `161719fed`, `a7d67a165`) are not in it. So there is no long T512L24 run of the code as
+  it is committed now.
+- Hence three 10-year runs on a frozen worktree of the branch head, `$D/validation/tree_head` at `a7d67a165`
+  with `env_head` (`CODE=head` in `submit_years_chain2.sh`), started 2026-11-22 20:14, 20 segments of 183 days,
+  monitor every 2 hours, output every 183 days:
+
+  | Run folder `output/run_<...>_00nn` | Setup | Jobs |
+  |---|---|---|
+  | `t512l24_10y_head` | defaults (control) | 3416528–3416535, gpupreempt |
+  | `t512l24_10y_head_drag1e-4` | `SpeedLimitDrag(drag = 1e-4)` | 3416524–3416527, gpushort |
+  | `t512l24_10y_head_hyper2` | `HyperDiffusion(time_scale = Hour(2))` | 3416536–3416543, gpupreempt |
+
+  At 5.4 SYPD each needs about 45 hours, so Tuesday evening (2026-11-24) without preemptions. Evaluate with
+  `python3 $D/validation/evaluate_years.py --block 366 10y_head`. Results in the next update: all three failed.
+
+**Update 2026-11-23: all three runs on `a7d67a165` failed within 140 days; the cause is `critical_Richardson = 10`
+together with `Richardson_cutoff = 10`.**
+
+- The three 10-year runs went NaN in their first segment:
+
+  | Run | NaN on | 5-minute reproduction from the last restart file (`output/blowup_head/run_bh_repro_*`) |
+  |---|---|---|
+  | `t512l24_10y_head` (defaults) | 2000-03-01 16:15 (day 60) | reproduced: layers 20–21 at 62°N, 46°W (southern tip of Greenland), temperature 70 °C in layer 20, wind 109 → 160 → 294 → 1612 m/s within 15 minutes |
+  | `t512l24_10y_head_drag1e-4` | 2000-01-29 00:55 (day 28) | reproduced: layers 21–22 at 52.5°N, 169.5°W (Aleutians), temperature 44 °C in layer 21 first, wind 104 → 154 → 233 → 850 → 13876 m/s within 20 minutes |
+  | `t512l24_10y_head_hyper2` | 2000-05-20 15:00 (day 140) | not reproduced: the restart from 3 hours before survives the day |
+
+  The two reproduced events are not the top-layer jet: they start in the lower troposphere at steep orography,
+  and the highest wind of the globe shows nothing before. The column at these points has not been looked at.
+- The climate of these runs differs from the run of 2026-11-20 (Ri_c = 1) from the second week on. Attribution
+  runs, 183 days each on `a7d67a165` with only the two parameters changed (`RI_C`, `RI_CUTOFF` in
+  `run_t512l24_years.jl`, folders `output/run_t512l24_attr_*`), February means:
+
+  | `critical_Richardson` / `Richardson_cutoff` | Layer-mean T, layers 24 / 12 [°C] | Coldest point, median [°C] (layers) | Highest wind, median [m/s] | Lowest layer: strongest inversion, median [K] | End |
+  |---|---|---|---|---|---|
+  | 1 / 1 (physics of `16de36b9`) | 12.9 / −19.5 | −83 (1–4) | 96 | 8.5 | NaN at step 97851, 2000-06-18 21:05 |
+  | 1 / 10 | 13.0 / −19.4 | −82 (1–4) | 94 | 5.5 | completed 183 days; one Antarctic coastal cold event (−94 °C, inversion 40 K, 2000-05-27) |
+  | 10 / 1 | 17.2 / −22.1 | −93 (6–8) | 102 | 9.6 | completed 183 days; coldest point −116 °C in layer 6 by the end of June; one Antarctic coastal event (inversion 51 K, 2000-04-25) |
+  | 10 / 10 (default) | 18.7 / −22.5 | −99 (6–9) | 103 | 3.7 | NaN on days 28, 60, 140 (the three runs above) |
+
+  - The 1 / 1 run fails at the same step as the run of 2026-11-20 and has the same statistics throughout: the
+    other changes between `16de36b9` and `a7d67a165` (bounds-check fixes, renames) do not change the results on
+    the GPU.
+  - The shift (lowest layer +4 to +6 K, mid-troposphere −3 K, tropopause-level minimum 10–16 K colder, stronger
+    jets) comes from `critical_Richardson = 10`; the cutoff alone changes the means by 0.1 K, on top of Ri_c = 10
+    it adds 1.5 K in the lowest layer and removes the surface inversions.
+  - Only the combination failed early; each single change completed the half year. These are single runs.
+- Reading: with Ri_c = 10 the boundary layer height is √10 ≈ 3.2 times that of Ri_c = 1 for the same wind and
+  stratification (h ≈ √Ri_c |V|/N), 8–11 km under the jets (8.16). The profile diffusivity peaks at about
+  0.07 u⋆ h at h/3, so 200–400 m²/s in the mid-troposphere there, and the diffusion of dry static energy then
+  carries heat from the upper to the lower troposphere on a time scale of days.
+- Screening runs for a counterweight, 183 days each with Ri_c = 10 and cutoff 10, started 11:50 (jobs
+  3446153–3446155, folders `output/run_t512l24_bal_*`): `max_diffusivity = 100`; `critical_Richardson = 3`; boundary
+  layer height capped at 3 km (one-line patch in the scratch worktree `$D/validation/tree_hcap`, not in the
+  repository). They show stability and the temperature fingerprint, not the quality of the tropics. Results
+  (final states 2000-07-02, `realism_check.jl`, log `$D/validation/logs/realism_check.log`; all with cutoff 10
+  except the last column):
+
+  | | Ri_c = 1 | Ri_c = 3 | Ri_c = 10, h ≤ 3 km | Ri_c = 10, `max_diffusivity = 100` | Ri_c = 10 (cutoff 1) |
+  |---|---|---|---|---|---|
+  | 183 days | completed | completed | completed | **NaN on day 146** (2000-05-25, no precursor in the 2-hourly records) | completed |
+  | Sensible heat flux, ice-free ocean [W/m²] | +11.4 | +1.9 | +3.8 | – | −15.3 |
+  | Lowest-layer air minus sea surface temperature [K] | −2.5 | −1.5 | −1.4 | – | +0.2 |
+  | Precipitation, global / 20°S–20°N [mm/day] | 2.28 / 3.22 | 2.10 / 2.91 | 1.81 / 2.21 | – | 1.57 / 2.28 |
+  | Convective share of the precipitation | 62 % | 46 % | 25 % | – | 20 % |
+  | Zonal-mean T at σ = 0.13, 45°S / 60°S [°C] | −48 / −61 | −49 / −61 | −48 / −61 | – | −84 / −96 |
+  | Global mean T, lowest layer / σ = 0.45 [°C] | 14.5 / −19.3 | 15.4 / −19.7 | 15.7 / −19.3 | – | 16.8 / −22.7 |
+
+  The cap on h removes the damage aloft (tropopause, mid-troposphere) but not at the surface: with h = 3 km almost
+  everywhere outside the tropics the convective share stays at 25 %, the precipitation is 20 % lower and the
+  ocean's sensible heat flux a third of the Ri_c = 1 value. Ri_c = 3 is the closest to Ri_c = 1 and still loses
+  most of the ocean's sensible heat flux. The cap on K does not prevent the failure. None of the three is a
+  counterweight that keeps Ri_c = 10 and the surface exchange of Ri_c = 1. The position of the jet maximum in
+  these snapshots (30°S with Ri_c = 1, 51–59°S in the others) is from one day each and not robust.
+- Realism of the two values, from the final states (2000-07-02) of the two completed attribution runs,
+  area-weighted (`$D/validation/realism_check.jl`; "observed" from memory, not from a dataset; temperatures and
+  fluxes are one snapshot, precipitation the 183-day mean; the Ri_c = 1 run has cutoff 10, the Ri_c = 10 run
+  cutoff 1):
+
+  | | Ri_c = 1 | Ri_c = 10 | Observed, roughly |
+  |---|---|---|---|
+  | Sensible heat flux, ice-free ocean / global [W/m²] | +11 / +12 | −15 / −5 | +10 to +15 / +20 |
+  | Lowest-layer air minus sea surface temperature [K] | −2.5 | +0.2 | −1 |
+  | Precipitation, global / 20°S–20°N [mm/day] | 2.28 / 3.22 | 1.57 / 2.28 | 2.7 / – |
+  | Convective share of the precipitation | 62 % | 20 % | – |
+  | Zonal-mean T at σ = 0.13, 45°S / 60°S [°C] | −48 / −61 | −84 / −96 | −58 / −70 |
+  | Jet of the southern hemisphere at σ = 0.24 | 29 m/s, 30°S | 33 m/s, 51°S | 40 m/s, 30°S |
+  | Global mean T, lowest layer / σ = 0.45 [°C] | 14.5 / −19.3 | 16.8 / −22.7 | 16 / −25 |
+
+  With Ri_c = 10 the scheme does the vertical transport of the convection, the ocean is heated by the air, and
+  the winter tropopause is 25 K too cold; only the mid-tropospheric mean is closer to the observed one.
+- Is the model stable with Ri_c = 1? Not shown: the only long run with the damped drag failed on day 170 (top
+  layer jet), the three-year run that completed used the undamped drag, and the remedies for the jet were run for
+  two days only. Three 10-year chains on `8fd8d214f` (frozen worktree `$D/validation/tree_8fd8`, `CODE=8fd8`),
+  started 2026-11-23 13:20, about 45 hours each: `t512l24_10y_ric1` (only Ri_c = 1, jobs 3447365–3447372,
+  gpupreempt), `t512l24_10y_ric1_drag1e-4` (Ri_c = 1, `drag = 1e-4`, jobs 3447361–3447364, gpushort),
+  `t512l24_10y_ric1_cut1_drag1e-4` (Ri_c = 1, cutoff 1, `drag = 1e-4`, jobs 3447373–3447380, gpupreempt).
+  **PENDING: all three.**
+- The later commits `edb7675f2` (range form on the CPU) and `8fd8d214f` (merge of main, "always couple") equal
+  `a7d67a165` up to rounding, on CPU and GPU: T32, dry L8, wet L8 and L24, default models, after 1, 5 and 20 steps
+  (`$D/../equal_check_steps.jl`, table in `$D/../tests/equal_check_steps_compare.log`), largest difference over
+  the largest value:
+
+  | After 1 step | `a7d67a165` vs `edb7675f2` / `8fd8d214f`, same device | CPU vs GPU, same commit |
+  |---|---|---|
+  | vorticity | 1–2 · 10⁻⁸ | 5–8 · 10⁻⁶ |
+  | divergence | 0.7–1.3 · 10⁻⁷ | 1–3 · 10⁻³ |
+  | temperature | 10⁻¹¹–10⁻¹⁰ | 1–4 · 10⁻⁷ |
+  | boundary layer height | 2–7 · 10⁻⁷ | 2 · 10⁻⁵–10⁻³ |
+  | conductances | 2 · 10⁻⁷–2 · 10⁻⁶ | 6 · 10⁻⁵–10⁻³ |
+
+  The two later commits give the same numbers as each other in every row. The results are not bit-identical to
+  `a7d67a165` on the GPU either, and the differences grow as between CPU and GPU: after 20 steps in the wet model
+  up to 5 · 10⁻⁴ in vorticity and 15–30 % in the conductance of single points, the size of the CPU–GPU difference
+  of one commit; this is also what the 3-day comparison showed (1–3 % of the largest vorticity coefficient). So a
+  long run on the later code follows another trajectory with, as far as this test can tell, the same statistics.
+  No long run covers `8fd8d214f`.
+
 ### 8.11 Scheme as the default (step 8) and the state of the tests
 
 Changes (committed in `b7bdfdd1`, except docs page and changelog):
@@ -1002,10 +1173,9 @@ the jet) on the jet strength and the T512L24 stability (8.8, 8.10), which was va
 
 ### 8.17 Performance audit (2026-11-21, user request)
 
-> State 2026-11-21 18:00: **audit complete**, no run is left. All measurements are done and the unit tests pass
-> with the bounds-check patches, both with `@inbounds` active and with `--check-bounds=yes` (8.17.5). Nothing is
-> implemented; candidates and recommendation in 8.17.6. Not done: Enzyme, and the Reactant and GPU suites with
-> the patches.
+> State 2026-11-21 20:30: **audit complete**. The bounds-check fixes are implemented (`161719fed`) and, after an
+> Enzyme failure they caused, corrected (`a7d67a165`); verification in 8.17.7. The range form is planned in
+> `2026-11-21-vertical-diffusion-range-form.md` and not implemented; candidates and recommendation in 8.17.6.
 
 Request: audit the vertical diffusion for further optimisations, for both CPU and GPU. Nothing in the source is
 changed by the audit. All variants are prototypes outside the repository, in
@@ -1384,13 +1554,58 @@ Outside the scheme, seen on the way and not followed up: `boundary_layer` costs 
 CPU for a 2D computation (12 % of the time step), and launching a kernel with `vars` and `model` as arguments
 costs 0.11 ms on the H100 node and 0.15 ms on login02 before any work is done.
 
+#### 8.17.7 Bounds-check fixes implemented (2026-11-21 evening, user request)
+
+Request: "first to do boundcheck fixes, then make detailed plan for the range-form rewrite". The three fixes of
+8.17.5 are `161719fed`. The plan for the range form is its own document,
+`2026-11-21-vertical-diffusion-range-form.md`.
+
+**`161719fed` alone breaks Enzyme; `a7d67a165` corrects it.** The patch of 8.17.5 replaced `@propagate_inbounds`
+on `column_parameterization_cpu!` by an `@inbounds` loop and thereby dropped the forced inlining. The
+`SPLIT_COLUMN_LOOPS` workaround calls this function from the non-inlined `_column_parameterization_cpu_by_name!`
+with the parameterization as an argument, and a struct passed to a non-inlined function is what Enzyme cannot
+type (the comment there says so). With `161719fed` the extended tests fail on Julia 1.10.13 in "forward vs
+reverse time_step! (PrimitiveWetModel)" with `EnzymeNoTypeError` in `_column_parameterization_cpu_by_name!`; the
+same test passed the day before with the same Enzyme 0.13.221. `full_diff_CI.jl` passes with either, so the
+quick Enzyme CI would not have shown it. `a7d67a165` puts `@inline` on the function. The unit tests of 8.17.5 do
+not cover Enzyme, which is why the patch looked verified.
+
+Verification on frozen copies of the working tree, `$A/tree_final` (= `161719fed`) and `$A/tree_final2`
+(= `a7d67a165` up to a docstring), scripts `$A/run_final_enzyme.sh`, `run_final_suites.sh`,
+`run_final2_enzyme.sh`, logs `$A/final_*.log` and `final2_*.log`:
+
+| Suite | Julia | Revision | Result |
+|---|---|---|---|
+| Main suite as in CI (`Pkg.test`, `--check-bounds=yes`) | 1.12.2 | `161719fed` | 123060 passed, 0 failed |
+| Main suite without `--check-bounds` (the `@inbounds` active) | 1.12.2 | `161719fed` | 123042 passed, 2 errors, see below |
+| GPU suite (CUDA, A40) | 1.12.2 | `161719fed` | as before the change: all pass up to the known error of `test/GPU/reactant.jl` (8.11) |
+| Enzyme `full_diff_CI.jl` | 1.10.13, 1.11.7 | `161719fed` | pass |
+| Enzyme extended (`test/differentiability/runtests.jl`) | 1.10.13 | `161719fed` | **fails**, see above |
+| Enzyme extended | 1.10.13 | `a7d67a165` | all 23 test sets pass, among them "forward vs reverse time_step! (PrimitiveWetModel)" 9 of 9 |
+| Enzyme `full_diff_CI.jl` | 1.10.13 | `a7d67a165` | pass (not repeated on 1.11.7) |
+| Reactant suite (CPU backend) | 1.12.2 | `161719fed` | all 28 test sets pass (1895 tests, as the day before) |
+
+- The two errors of the run without bounds checks are `parameterizations/numericalradiation.jl` with
+  NumericalRadiation 0.1.3: the local `SpeedyWeather/test/Manifest.toml` is from 2026-10-22 and older than the
+  compat entry (0.2). With 0.2.1 the file passes without bounds checks as well (26 tests,
+  `$A/final_numericalradiation_inbounds.log`).
+- The GPU and Reactant paths do not run `column_parameterization_cpu!`, so `a7d67a165` does not change them.
+- The `@inline` keeps the gain. CPU time step at T32 L8, three alternating rounds (`cpu_baseline.jl`, logs
+  `$A/cpu_baseline_tree_final*`): 12.83 / 12.85 / 12.83 ms with `161719fed` and 12.92 / 12.78 / 12.78 ms with the
+  `@inline`, against 13.8 ms before the fixes.
+
 ### 8.12 Next
 
 0. Fill the item marked PENDING in `PR_bulk_richardson_diffusion.md` (multi-year runs) and set the PR number in
    `CHANGELOG.md`.
 1. Commit the changelog (PR number) and this document.
-2. Follow the four multi-year runs (8.10) to the end; continue preempted ones with `START_RUN_NUMBER`. Decide on
-   the T512L24 setup from them.
+2. (2026-11-23: these three runs failed within 140 days, see the update of 2026-11-23 in 8.10. Open now: a
+   setup with Ri_c = 10 that is stable at T512L24, or another way to the deeper tropical boundary layer; then a
+   new 10-year run on the code of that day.) Previous text: follow the three 10-year runs on the branch head
+   (8.10, update of 2026-11-22) to the end; the chains continue
+   by themselves after a preemption. Decide from them whether the defaults stay (control run) or the
+   speed-limit drag becomes stronger (`drag = 1e-4`) and/or the hyperdiffusion (2 h); this decision is the
+   user's. The first 10-year run (previous code, defaults) failed on day 170 from the top-layer jet.
 3. **To-do: is `HyperDiffusion(time_scale = Hour(2))` really needed?** Evidence so far: it removes the Antarctic
    coastal cold event in two restart tests (8.10), the event occurred once each in two of three multi-year runs
    and never ended a run. To decide: compare the multi-year run with it (`drag1e-5_hyper2`) against the one
@@ -1400,10 +1615,9 @@ costs 0.11 ms on the H100 node and 0.15 ms on login02 before any work is done.
 5. With `critical_Richardson = 10` (8.16): repeat the stability checks that were made with Ri_c = 1, at least the
    T32L24 ensemble (8.13.2) and a T512L24 run, and look at the maximum winds and the jet with the deep
    mid-latitude boundary layer. Compare the `blh` output with the ERA5 boundary layer height climatology.
-6. Performance (8.17.6), to be decided by the user: (a) the three bounds-check fixes as a change of their own
-   (patches `inbounds_fix.patch` and `get_step_fix.patch` in the audit directory; the Enzyme tests including the
-   extended ones and the Reactant and GPU suites have to be run with them first); (b) the scheme in the range
-   form, with a plan section of its own.
+6. Performance (8.17.6): (a) the three bounds-check fixes are in (`161719fed`, corrected for Enzyme by
+   `a7d67a165`, verification in 8.17.7); (b) the scheme in the range form has its plan in
+   `2026-11-21-vertical-diffusion-range-form.md`, which waits for review and three decisions listed at its end.
 
 Slurm: `gpushort` allows two running jobs per user and 24 hours; the multi-year runs other than the first use
 `gpupreempt`, which has no such limit but can be preempted.
