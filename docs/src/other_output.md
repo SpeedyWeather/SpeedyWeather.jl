@@ -96,9 +96,7 @@ add!(model, :progress_txt => progress_txt)
 ## Restart files for variables
 
 `NetCDFOutput` also by default writes a restart file, containing the `simulation.variables.prognostic`
-(see [Prognostic variables](@ref)) that can be read back in with the `StartFromFile` initial conditions.
-The variables are written on the host (as regular arrays), so a restart file can be read back on any architecture,
-e.g. one written by a GPU or Reactant simulation on the CPU and vice versa. Implemented as a callback
+(see [Prognostic variables](@ref)) that can be read back in with the `StartFromFile` initial conditions. Implemented as a callback
 `WriteVariablesRestartFile` can also be created independently of `NetCDFOutput`, e.g.
 
 ```@example output2
