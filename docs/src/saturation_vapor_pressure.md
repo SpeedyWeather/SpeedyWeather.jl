@@ -113,10 +113,12 @@ end
 SpeedyWeather.saturation_vapor_pressure(svp::ConstantSaturation, T, atmosphere) = svp.e₀
 SpeedyWeather.grad(svp::ConstantSaturation, T, atmosphere) = zero(svp.e₀)
 
-atmosphere = EarthAtmosphere(spectral_grid, saturation = ConstantSaturation(spectral_grid))
+atmosphere = EarthAtmosphere(spectral_grid, saturation = ConstantSaturation{spectral_grid.NF}())
 SpeedyWeather.saturation_vapor_pressure(T, atmosphere)
 ```
 
 The `atmosphere` argument provides constants like `atmosphere.latent_heat_condensation` and
-`atmosphere.R_vapor` if a formulation should be consistent with them. Use `ifelse` rather than
+`atmosphere.R_vapor` if a formulation should be consistent with them. A struct with a single
+field (as here) has to be created with its number format, e.g. `ConstantSaturation{Float32}()`,
+as `ConstantSaturation(spectral_grid)` is ambiguous with the struct's positional constructor. Use `ifelse` rather than
 `if` to stay branch-free.
