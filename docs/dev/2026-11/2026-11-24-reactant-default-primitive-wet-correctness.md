@@ -167,4 +167,31 @@ counted with Reactant) differ by design.
 `initialize!` on Reactant: `get_asset` (the high-resolution orography file), `on_architecture`,
 `interpolate!` (jitted, with the Reactant-only branchless `find_rings_kernel_branchless!` locator),
 `transform!` to spectral, `spectral_smoothing!`, `transform!` back, `*gravity`, `spectral_truncation!`.
-Each step compared on identical input: in progress.
+Each step on identical input, Float64: interpolation with a plain `@jit` bitwise identical, transforms
+1.5e-15 and 9.6e-16, smoothing bitwise identical — but the full `initialize!` 4.5e-9. The difference:
+`@maybe_jit` compiles with `reactant_compile_options()` (`raise = true`), the plain `@jit` doesn't.
+
+The interpolation of the orography (`interpolate!` → `_interpolate_kernel!` → `anvil_average`) runs in
+Float32: the file's high-resolution orography is a `Field{Float32}` (FullGaussianGrid, nlat_half = 512)
+and `anvil_average` computes in the type of the data values, three `x + (y - x) * w` per point; only
+the result is stored in the Float64 field. Raised to StableHLO, XLA evaluates these Float32 operations
+differently (e.g. fused multiply-adds). Orography interpolated on the Reactant CPU backend vs the CPU:
+
+| input | compilation | norm-relative | points that differ | max per point |
+|---|---|---|---|---|
+| Float32 (file) | plain `@jit` | 0 | 0/3168 | 0 |
+| Float32 (file) | `reactant_compile_options()` (raised) | 1.2e-8 | 326/3168 | 1.9e-7 rel. (≤ 2 Float32 ulps), 0.24 mm |
+| converted to Float64 | plain `@jit` | 0 | 0/3168 | 0 |
+| converted to Float64 | `reactant_compile_options()` (raised) | 6.8e-22 | 1/3168 | 2.8e-17 m |
+
+Not a Reactant bug: Float32 arithmetic compiled differently, the CPU result is not more accurate.
+But the CPU and the Reactant model get different orographies, also in Float64.
+
+**Fix** (`SpeedyWeather/src/dynamics/orography.jl`): convert the high-resolution orography to the
+model's number format before interpolating (`Field(convert.(NF, field.data), field.grid)` on the CPU,
+then `on_architecture`). Float32 models are unchanged (still interpolated in Float32), Float64 models
+interpolate in Float64.
+
+Same pattern, not fixed (not part of the default model's constants): `interpolate_ignoring_nan!` of
+the Float32 climatologies for SST (`ocean.jl`), soil temperature (`land/soil_temperature.jl`) and
+soil moisture (`land/soil_moisture.jl`) with `@maybe_jit`.
