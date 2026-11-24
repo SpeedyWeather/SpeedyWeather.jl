@@ -1,8 +1,9 @@
 # Reactant correctness of the default PrimitiveWetModel
 
-> Status: **in progress**. Investigation log; the default model already passes the existing
-> correctness test, but a Float64 comparison shows a systematic ~1e-8 difference in divergence that is
-> being tracked down.
+> Status: **in progress**. The default PrimitiveWetModel on Reactant reproduces the CPU to rounding
+> (Float32 and Float64) after fixing the Float32 interpolation of the orography (10052ecf, 99e710f6 on
+> `mg/reactant-tests-all-models`; its regression test not yet committed), test changes committed (not
+> pushed) on `mg/reactant-restart`.
 
 Date of initial draft: 2026-11-24
 
@@ -35,6 +36,12 @@ packages' own compat allows, ≥ 0.2.305), CHANGELOG line. The same `setup.jl` a
 on this branch (replacing the 0.2.309 compat above), so both merge cleanly. Note: the CI differentiation
 test (`test_differentiability_time_steps(PrimitiveWetModel; ...)` in `differentation.jl`) also builds its
 model via `model_kwargs`, so it now differentiates the default model too; not yet checked locally.
+
+> apply the same fix for the climatolgies, and then try to introduce somewhat tighter tolerences for
+> the existing tests to pass
+
+§10 (climatologies, all five file-based climatologies converted to the model's number format before
+interpolating) and §11 (tolerances).
 
 ## Problem description
 
@@ -195,3 +202,106 @@ interpolate in Float64.
 Same pattern, not fixed (not part of the default model's constants): `interpolate_ignoring_nan!` of
 the Float32 climatologies for SST (`ocean.jl`), soil temperature (`land/soil_temperature.jl`) and
 soil moisture (`land/soil_moisture.jl`) with `@maybe_jit`.
+
+### 8. With the fix: Float64 CPU and Reactant agree to rounding
+
+Same comparison as §6 (Float64, default model, 2-day CPU spin-up copied to Reactant), with the
+orography fix:
+
+- Model after `initialize!`: orography 1.9e-15, surface geopotential 1.6e-15 (transform rounding),
+  nothing else differs (apart from transform scratch memory).
+- One step from identical `Variables`: every array ≤ 1.1e-12 (spectral divergence tendency, which
+  cancels heavily), all parameterizations ≤ 5e-14 (convective rain and snow, cloud cover, radiation,
+  boundary layer, land and ocean tendencies), most 1e-15.
+- 100 steps, norm-relative differences of the prognostic variables (§4 in brackets: before the fix;
+  CPU vs CPU+1ulp in braces):
+
+| steps | vorticity | divergence | temperature | humidity | pressure |
+|---|---|---|---|---|---|
+| 2 | 4.8e-16 | 1.7e-13 | 5.5e-17 | 1.3e-16 | 3.3e-18 |
+| 10 | 1.5e-13 | 8.4e-13 | 9.1e-16 | 1.4e-15 | 2.8e-17 |
+| 100 | 2.8e-13 [5.5e-9] {6.6e-14} | 2.2e-12 [1.9e-8] {6.3e-13} | 2.0e-15 [5.9e-11] {9.1e-16} | 6.2e-15 [5.7e-10] {4.0e-15} | 9.8e-17 [2.3e-11] {5.1e-17} |
+
+CPU vs Reactant is now within a factor 2-4 of a 1-ulp perturbation in Float64 too: the default
+PrimitiveWetModel on Reactant (CPU backend) reproduces the CPU to rounding, incl. convection and the
+Byrne-O'Gorman longwave.
+
+Regression test: `test/reactant/test_interpolation.jl`, "EarthOrography on Reactant in Float64",
+orography and surface geopotential of a Float64 model, CPU vs Reactant, `rtol = 1e-12` (4.5e-9
+before the fix).
+
+### 9. Differentiation of the default model
+
+The CI's `test_differentiability_time_steps(PrimitiveWetModel; compare_with_enzyme = false, options =
+((;), (; checkpointing = Reactant.Binomial(2))))` with the default model (via `model_kwargs`): 5/5 pass,
+13m12s locally (Reactant CPU backend, Julia 1.11). The same test with the previous configuration took
+16m10s on CI (`main`, 2026-11-24, Linux runner), not comparable directly but no sign of a large
+compile-time increase.
+
+### 10. The climatologies, same fix
+
+All file-based climatologies interpolated Float32 file data in Float32. Three of them with `@maybe_jit`
+(raised with Reactant), so in Float64 models they differ between CPU and Reactant as the orography
+did: `SeasonalOceanClimatology` (SST), `SeasonalLandTemperature`, `SeasonalSoilMoisture`, all via
+`interpolate_ignoring_nan!`. SST file interpolated ignoring NaNs into Float64, CPU vs raised Reactant:
+Float32 input 1.6e-8 norm-relative (229 of 31104 values differ), converted to Float64 first bitwise
+identical. Two more without `@maybe_jit` (same on both architectures, but Float32 precision in Float64
+models): `VegetationClimatology`, `AlbedoClimatology`. The land-sea mask already converted (`NF.(...)`)
+and averages on the CPU.
+
+Fix: all five convert the file data to the model's number format before interpolating
+(`Field(convert.(NF, field.data), field.grid, field.dims)`, for the soil moisture the combined
+two-layer field is allocated with the model's `NF`).
+
+Test: `test/reactant/test_interpolation.jl`, "Climatologies on Reactant in Float64": the three monthly
+climatologies of a Float64 model (land-sea mask initialized for the masking), CPU vs Reactant,
+`rtol = 1e-12`, 3/3 pass. CPU unit tests of the components (`test/parameterizations/land.jl`,
+`ocean_sea_ice.jl`, `albedo.jl`, `ocean_land_time_stepping.jl`, Julia 1.12, `--check-bounds=yes`) pass.
+
+### 11. Tighter tolerances for the correctness tests
+
+`compare_arrays` also returns the norm-relative difference `norm(cpu - reactant) / max(norm(cpu),
+norm(reactant))` (what `isapprox` compares against `rtol`), printed for every variable
+(`print_comparison`). Measured for all six `test_model` configurations of `test_correctness.jl`: in
+progress.
+
+## Summary of changes
+
+- `SpeedyWeather/test/reactant/setup.jl`: `model_kwargs` is `(;)` for the PrimitiveWetModel, all
+  Reactant tests use the default PrimitiveWetModel (the PrimitiveDryModel keeps `convection = nothing`).
+- `SpeedyWeather/test/reactant/Project.toml`: no `[compat]` for Reactant, resolves to the latest
+  version the packages allow.
+- `SpeedyWeather/src/dynamics/orography.jl`: the high-resolution orography (Float32 file) is converted
+  to the model's number format before it is interpolated, so that Float64 models interpolate in Float64
+  and CPU and Reactant get the same orography.
+- `SpeedyWeather/test/reactant/test_interpolation.jl`: test "EarthOrography on Reactant in Float64".
+- `ocean.jl`, `land/soil_temperature.jl`, `land/soil_moisture.jl`, `land/vegetation.jl`,
+  `radiation/albedo/general.jl`: the climatologies too are interpolated in the model's number format;
+  test "Climatologies on Reactant in Float64".
+
+## Testing and verification
+
+- Default PrimitiveWetModel, `test_model(PrimitiveWetModel)` of `test_correctness.jl`: 24/24 (§2).
+- Float32: CPU vs Reactant differences grow as a 1-ulp perturbation (§3).
+- Float64: CPU vs Reactant within a factor 2-4 of a 1-ulp perturbation over 100 steps, all variables
+  after one step ≤ 1.1e-12 (§8).
+- `test_interpolation.jl` (incl. the new test) passes, CPU `test/dynamics/orography.jl` 4/4 (Julia 1.12),
+  default-model differentiation 5/5 (§9).
+- Not run locally: the full Reactant test suite (`runtests.jl`) with the default model, in particular
+  `test_model(PrimitiveWetModel; Transform = SpectralTransform)`, `test_output.jl`, `test_implicit.jl`.
+
+## Known limitations
+
+- The correctness test's tolerances (`TOLERANCES` in `runtests.jl`) are loose: the `atol`s are in units
+  of the prognostic variables and make the temperature, pressure and humidity tendency checks vacuous;
+  nested namespaces (`ocean`, `land`), `tendencies.grid` and `parameterizations` are not compared.
+- Float32 comparisons over 100 steps are dominated by the amplification of rounding differences
+  (mostly convection switching on/off at a few points), so they can only detect errors well above
+  ~1e-3 (norm-relative) in vorticity/divergence/humidity.
+
+## Future work
+
+- A Float64 CPU-vs-Reactant comparison of the default PrimitiveWetModel in CI (CPU spin-up copied to
+  Reactant, one compiled time step, all variables incl. nested namespaces and parameterizations,
+  tolerance ~1e-10): sensitive to errors that Float32 rounding hides, as the orography here.
+- Comparing nested namespaces (`ocean`, `land`), `tendencies.grid` and `parameterizations`.

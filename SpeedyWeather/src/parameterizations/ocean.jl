@@ -81,8 +81,10 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
         version = ocean.version
     )
 
-    # transfer to architecture of model if needed
-    sst = on_architecture(model.architecture, sst)
+    # transfer to architecture of model if needed, in the model's precision to interpolate in it, not in
+    # that of the file (Float32), see EarthOrography
+    NF = eltype(monthly_temperature)
+    sst = on_architecture(model.architecture, Field(convert.(NF, sst.data), sst.grid, sst.dims))
 
     @boundscheck fields_match(monthly_temperature, sst, vertical_only = true) ||
         throw(DimensionMismatch(monthly_temperature, sst))

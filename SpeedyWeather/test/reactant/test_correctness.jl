@@ -16,7 +16,9 @@ end
 """Compare all array entries in two NamedTuples, skipping non-array entries
 and keys not present in both. Returns a Dict mapping variable names to
 comparison statistics. Tolerances are looked up per-variable from
-`tolerances`; unknown variables get `tolerances.default`."""
+`tolerances`; unknown variables get `tolerances.default`. Arrays are compared
+with `isapprox`, i.e. `norm(cpu - reactant) <= max(atol, rtol * max(norm(cpu), norm(reactant)))`,
+the norm-relative difference is the left-hand side divided by `max(norm(cpu), norm(reactant))`."""
 function compare_arrays(nt_cpu::NamedTuple, nt_reactant::NamedTuple; tolerances::NamedTuple = TOLERANCES)
     results = Dict{Symbol, NamedTuple}()
 
@@ -28,8 +30,10 @@ function compare_arrays(nt_cpu::NamedTuple, nt_reactant::NamedTuple; tolerances:
         arr_reactant = Array(getfield(nt_reactant, key))
         abs_diff = abs.(arr_cpu .- arr_reactant)
         rel_diff = abs_diff ./ max.(abs.(arr_cpu), abs.(arr_reactant), eps(eltype(real(arr_cpu))))
+        max_norm = max(norm(arr_cpu), norm(arr_reactant))
         tol = tolerance_for(key, tolerances)
         results[key] = (
+            norm_rel_diff = iszero(max_norm) ? zero(max_norm) : norm(abs_diff) / max_norm,
             max_abs_diff = maximum(abs_diff),
             mean_abs_diff = mean(abs_diff),
             max_rel_diff = maximum(rel_diff),
@@ -41,6 +45,21 @@ function compare_arrays(nt_cpu::NamedTuple, nt_reactant::NamedTuple; tolerances:
     end
 
     return results
+end
+
+"""Print the statistics of [`compare_arrays`](@ref) for every variable."""
+function print_comparison(title, results)
+    println("\n", title)
+    for (name, r) in results
+        println("  $name:")
+        println("    Norm-relative difference: $(r.norm_rel_diff)")
+        println("    Max absolute difference:  $(r.max_abs_diff)")
+        println("    Mean absolute difference: $(r.mean_abs_diff)")
+        println("    Max relative difference:  $(r.max_rel_diff)")
+        println("    Mean relative difference: $(r.mean_rel_diff)")
+        println("    Tolerance (rtol, atol):   ($(r.rtol), $(r.atol))")
+    end
+    return nothing
 end
 
 """Compare that the clock is running in the same way."""
@@ -101,15 +120,7 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothi
     vars_reactant, _ = SpeedyWeather.unpack(sim_reactant)
     tend_results = compare_arrays(vars_cpu.tendencies, vars_reactant.tendencies; tolerances)
 
-    println("\nTendency comparison:")
-    for (name, r) in tend_results
-        println("  $name:")
-        println("    Max absolute difference:  $(r.max_abs_diff)")
-        println("    Mean absolute difference: $(r.mean_abs_diff)")
-        println("    Max relative difference:  $(r.max_rel_diff)")
-        println("    Mean relative difference: $(r.mean_rel_diff)")
-        println("    Tolerance (rtol, atol):   ($(r.rtol), $(r.atol))")
-    end
+    print_comparison("Tendency comparison:", tend_results)
 
     @testset "$model_name Tendency Comparison" begin
         for (name, r) in tend_results
@@ -151,25 +162,9 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
     progn_results = compare_arrays(vars_cpu.prognostic, vars_reactant.prognostic; tolerances)
     grid_results = compare_arrays(vars_cpu.grid, vars_reactant.grid; tolerances)
 
-    println("\nPrognostic variable comparison after $nsteps steps:")
-    for (name, r) in progn_results
-        println("  $name:")
-        println("    Max absolute difference:  $(r.max_abs_diff)")
-        println("    Mean absolute difference: $(r.mean_abs_diff)")
-        println("    Max relative difference:  $(r.max_rel_diff)")
-        println("    Mean relative difference: $(r.mean_rel_diff)")
-        println("    Tolerance (rtol, atol):   ($(r.rtol), $(r.atol))")
-    end
+    print_comparison("Prognostic variable comparison after $nsteps steps:", progn_results)
 
-    println("\nGrid variable comparison after $nsteps steps:")
-    for (name, r) in grid_results
-        println("  $name:")
-        println("    Max absolute difference:  $(r.max_abs_diff)")
-        println("    Mean absolute difference: $(r.mean_abs_diff)")
-        println("    Max relative difference:  $(r.max_rel_diff)")
-        println("    Mean relative difference: $(r.mean_rel_diff)")
-        println("    Tolerance (rtol, atol):   ($(r.rtol), $(r.atol))")
-    end
+    print_comparison("Grid variable comparison after $nsteps steps:", grid_results)
 
     @testset "$model_name Time Stepping" begin
         @testset "Clock" begin
