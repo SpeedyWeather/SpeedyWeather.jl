@@ -27,7 +27,9 @@ $(TYPEDSIGNATURES)
 A restart file `restart.jld2` with the prognostic variables is written
 to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions.
-Variables in restart file are not scaled."""
+Variables in restart file are not scaled. They are written on the host (`on_architecture(CPU(), ...)`),
+so that a restart file can be read back on any architecture, also one written by a GPU or Reactant
+simulation."""
 function finalize!(
         restart::WriteVariablesRestartFile,
         vars::Variables,
@@ -43,9 +45,10 @@ function finalize!(
     mkpath(path)
     restart.path = path     # update path in case it was empty before
 
+    # on the host: device arrays (and Reactant's clock and scalars) can't be read back in another process
     jldopen(joinpath(path, filename), "w"; compress) do f
-        f["variables.prognostic"] = materialize_views(vars.prognostic)
-        f["variables.output"] = materialize_views(vars.output)
+        f["variables.prognostic"] = materialize_views(on_architecture(CPU(), vars.prognostic))
+        f["variables.output"] = materialize_views(on_architecture(CPU(), vars.output))
         f["version"] = restart.pkg_version
         f["description"] = "Restart file created by SpeedyWeather.jl"
     end

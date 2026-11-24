@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixes a bug that restart files of Reactant simulations could not be read back (`StartFromFile` failed with `buffer.buffer !== C_NULL`): restart files are written on the host, so they can be read on any architecture [#XXXX](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/XXXX)
 - Fixes a bug that NaNs in the output of GPU simulations were written as -0: the NaN that GPU arithmetic produces did not survive the mantissa rounding (`keepbits`), output is now rounded with `round_mantissa!` which keeps NaNs [#1433](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1433)
 - Output writers revised to do all computations except for I/O in `interpolate_output!` which may be compiled by Reactant to accelearted output [#1408](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1408)
 - Fixes a bug in `UpwindVerticalAdvection` that coefficients were in the wrong order [#1425](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1425)
