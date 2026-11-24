@@ -130,6 +130,18 @@ nans_detected(feedback::SpeedyWeather.Feedback) = feedback.nans_detected
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 SpeedyWeather.scalar_ref(::ReactantDevice, x::Number) = Ref(Reactant.ConcreteRNumber(x))
 
+# The clock and the scalar `Ref`s (`scalar_ref`) on the host, with plain dates and numbers instead of Reactant's, e.g.
+# for restart files: stored as Reactant types they can't be read back in another process (their device buffers are
+# gone). `StartFromFile` copies them back into the Reactant variables with `copy!(::Clock, ::Clock)` (which converts)
+# and an assignment into the `Ref`
+function SpeedyWeather.on_architecture(::SpeedyWeather.CPU, clock::SpeedyWeather.Clock{<:ReactantDatesExt.ReactantDateTime})
+    host_clock = SpeedyWeather.Clock()
+    copy!(host_clock, clock)
+    return host_clock
+end
+
+SpeedyWeather.on_architecture(::SpeedyWeather.CPU, x::Base.RefValue{<:Reactant.ConcreteRNumber}) = Ref(Reactant.to_number(x[]))
+
 # TODO: move upstream to Reactant, ReactantDatesExt defines Dates.year(::ReactantDateTime) via
 # Dates.year(days) for which Dates' method branches on the traced month, use yearmonthday instead
 Dates.year(days::Reactant.TracedRNumber) = first(Dates.yearmonthday(days))

@@ -43,9 +43,10 @@ function finalize!(
     mkpath(path)
     restart.path = path     # update path in case it was empty before
 
+    # on the host: device arrays (and Reactant's clock and scalars) can't be read back in another process
     jldopen(joinpath(path, filename), "w"; compress) do f
-        f["variables.prognostic"] = materialize_views(vars.prognostic)
-        f["variables.output"] = materialize_views(vars.output)
+        f["variables.prognostic"] = materialize_views(on_architecture(CPU(), vars.prognostic))
+        f["variables.output"] = materialize_views(on_architecture(CPU(), vars.output))
         f["version"] = restart.pkg_version
         f["description"] = "Restart file created by SpeedyWeather.jl"
     end
