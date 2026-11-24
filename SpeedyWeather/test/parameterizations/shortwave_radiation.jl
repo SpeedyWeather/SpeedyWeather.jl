@@ -98,6 +98,40 @@ end
     end
 end
 
+@testset "Cloud cover with humidity smoothing" begin
+    # relative humidity averaged over a fixed σ window: unchanged for uniform relative humidity,
+    # a single thin saturated layer creates less cloud cover at high vertical resolution
+    function cloud_cover(nlayers, smoothing, rh_profile)
+        spectral_grid = SpectralGrid(truncation = 21; nlayers)
+        clouds = DiagnosticClouds(spectral_grid; humidity_smoothing_thickness = smoothing)
+        sw = TwoBandShortwave(spectral_grid; clouds)
+        model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; shortwave = sw))
+        initialize!(model.radiation, model)
+        vars = Variables(model)
+        init_shortwave_state!(vars, model)
+        humid = SpeedyWeather.get_prognostic_step(vars.grid.humidity, model.time_stepping, clouds)
+        temp = SpeedyWeather.get_prognostic_step(vars.grid.temperature, model.time_stepping, clouds)
+        ij = 1
+        σ = model.geometry.σ_levels_full
+        for k in 1:nlayers
+            pₖ = SpeedyWeather.pressure(k, 1.0e5, model.geometry.vertical_coordinates)
+            humid[ij, k] = rh_profile(σ[k], k, σ) * SpeedyWeather.saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
+        end
+        return SpeedyWeather.clouds!(ij, vars, model.radiation.shortwave.clouds, model).cloud_cover
+    end
+
+    uniform(σₖ, k, σ) = 0.8
+    thin_layer(σₖ, k, σ) = k == argmin(abs.(σ .- 0.5)) ? 1.0 : 0.5     # one saturated layer at σ ≈ 0.5
+
+    @testset for nlayers in (8, 48)
+        @test cloud_cover(nlayers, 1 / 8, uniform) ≈ cloud_cover(nlayers, 0, uniform)
+    end
+    # at L8 the window of 1/8 contains the layer only: unchanged
+    @test cloud_cover(8, 1 / 8, thin_layer) ≈ cloud_cover(8, 0, thin_layer)
+    # at L48 the saturated layer is averaged with its drier neighbours
+    @test cloud_cover(48, 1 / 8, thin_layer) < cloud_cover(48, 0, thin_layer)
+end
+
 @testset "Two-band shortwave transmissivity" begin
     spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
     model = PrimitiveWetModel(spectral_grid; radiation = Radiation(spectral_grid; shortwave = TwoBandShortwave(spectral_grid)))

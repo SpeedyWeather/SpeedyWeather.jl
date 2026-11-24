@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `DiagnosticClouds(humidity_smoothing_thickness = 1/8)` averages relative humidity over a fixed σ window before taking its free-tropospheric maximum, so that cloud cover does not increase with the number of layers (default `0`, unchanged) [#XXXX](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/XXXX)
 - Output writers revised to do all computations except for I/O in `interpolate_output!` which may be compiled by Reactant to accelearted output [#1408](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1408)
 - Fixes a bug in `UpwindVerticalAdvection` that coefficients were in the wrong order [#1425](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1425)
 - New variable group `variables.output` declared via `OutputVariable` for output-only variables, accumulated precipitation and river runoff moved there from `variables.parameterizations`. New `model.diagnostics` with `Accumulate` (parameterizations only write rates), `Maximum` and `Mean`, reset by the output writer so precipitation output is since the last output (rate output variables removed), output variables are written to restart files [#1362](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1362)
