@@ -79,8 +79,8 @@ end
 ExponentialCO2(SG::SpectralGrid; kwargs...) = ExponentialCO2{SG.NF, DateTime}(; kwargs...)
 function (C::ExponentialCO2{NF})(t) where {NF}
 
-    # time since start in seconds, convert from Float64 to NF
-    Δt = convert(NF, Dates.datetime2unix(t) - Dates.datetime2unix(C.start))
-    Δt *= convert(NF, 1 / (365.25f0 * 24 * 3600))    # time in years
+    # time since start in years, kept in Float64 (datetime2unix's type): with Reactant `t` is traced
+    # and a traced Float64 can't be converted to NF, the result is stored into a CO₂ variable of NF
+    Δt = (Dates.datetime2unix(t) - Dates.datetime2unix(C.start)) / (365.25 * 24 * 3600)
     return C.base_concentration + C.a * exp(C.b * Δt)
 end

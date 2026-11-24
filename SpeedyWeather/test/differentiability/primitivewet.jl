@@ -98,8 +98,18 @@ _spinup(model) = initialize_with_spinup!(model, Day(1), Hour(6))
 #
 # GROUP 1 — DYNAMICAL CORE (dynamics_only model, fast)
 #
+# Float64, not the default Float32: in Float32 the directional finite difference is limited by
+# round-off, not by the gradient. FiniteDifferences sizes its step assuming one ULP of error in the
+# scalar, but a whole Float32 tendency evaluation is ~10x noisier, so the FD estimate scatters by ~1%
+# (dynamics_tendencies!: median 7e-3, max 4e-2 over 20 random directions; implicit_correction!'s
+# adjoint identity up to 2e-5) and the outcome flipped between CI runners. In Float64 the same
+# checks agree to ≤ 2e-10 (FD) and ≤ 4e-14 (adjoint identity), so the tolerances below are tight
+# with a margin of > 1000x. Float32 AD is still covered by the parameter-AD testset below and by
+# the Barotropic tests. See docs/dev/2026-11/2026-11-18-extended-diff-fd-noise.md.
+_group1_spectral_grid() = SpectralGrid(; NF = Float64, truncation = 9, nlayers = 4)
+
 @testset "Differentiability: PrimitiveWet dynamics_tendencies!" begin
-    spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
+    spectral_grid = _group1_spectral_grid()
     model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
     simulation = _spinup(model)
     vars0 = deepcopy(simulation.variables)
@@ -107,12 +117,12 @@ _spinup(model) = initialize_with_spinup!(model, Day(1), Hour(6))
 
     _adjoint_check(
         SpeedyWeather.dynamics_tendencies!, vars0, Const(model);
-        ingroup = :grid, outgroup = :tendencies, rtol_ad = 1.0e-5, rtol_fd = 1.0e-2,
+        ingroup = :grid, outgroup = :tendencies, rtol_ad = 1.0e-10, rtol_fd = 1.0e-6,
     )
 end
 
 @testset "Differentiability: PrimitiveWet implicit_correction!" begin
-    spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
+    spectral_grid = _group1_spectral_grid()
     model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
     simulation = _spinup(model)
     vars0 = deepcopy(simulation.variables)
@@ -120,7 +130,7 @@ end
     _adjoint_check(
         SpeedyWeather.implicit_correction!, vars0,
         Const(model.implicit), Const(model.time_stepping), Const(model);
-        ingroup = :prognostic, outgroup = :tendencies, rtol_ad = 1.0e-5, rtol_fd = 1.0e-2,
+        ingroup = :prognostic, outgroup = :tendencies, rtol_ad = 1.0e-10, rtol_fd = 1.0e-6,
     )
 end
 
@@ -156,20 +166,20 @@ end
 end
 
 @testset "Differentiability: PrimitiveWet transform!(::Variables)" begin
-    spectral_grid = SpectralGrid(truncation = 9, nlayers = 4)
+    spectral_grid = _group1_spectral_grid()
     model = PrimitiveWetModel(; spectral_grid, time_stepping = Leapfrog(spectral_grid), dynamics_only = true)
     simulation = _spinup(model)
     vars0 = deepcopy(simulation.variables)
 
     # The finite-difference direction leaves `humidity` out. `transform!` calls `hole_filling!` to
     # remove negative humidity, which is not differentiable: perturbing humidity across that kink
-    # makes FD disagree with AD by ~56%, and the disagreement does NOT shrink with the step size
-    # (5.6e-1 at the default range, 5.7e-1 at max_range=1e-3) — the signature of a genuine kink
-    # rather than truncation error. The adjoint identity below still covers humidity in full, and
-    # forward vs reverse agree there to ~1e-7.
+    # makes FD disagree with AD by 9e-2 at the default step and still by 4e-3 at max_range = 1e-6,
+    # where the same FD without humidity agrees to 3e-7. The error only shrinks as the stencil stops
+    # crossing near-zero humidity values, the signature of a kink rather than truncation error.
+    # The adjoint identity below still covers humidity in full.
     _adjoint_check(
         SpeedyWeather.transform!, vars0, Const(model);
-        ingroup = :prognostic, outgroup = :grid, rtol_ad = 1.0e-5, rtol_fd = 3.0e-2,
+        ingroup = :prognostic, outgroup = :grid, rtol_ad = 1.0e-10, rtol_fd = 1.0e-6,
         fd_only = (:vorticity, :divergence, :temperature, :pressure),
     )
 end

@@ -76,7 +76,7 @@ function ozone_absorption!(vars, ozone::SeasonalOzone, model)
 
     # seasonal cycle synchronized with the solar declination δ, normalized by the axial tilt,
     # 0 for the northern summer half-year, 1 at the northern winter solstice
-    δ = solar_declination(NF, model.solar_zenith, vars.prognostic.clock.orbit_time)
+    δ = solar_declination(NF, model.solar_zenith, vars.prognostic.clock.orbit_time, model.planet)
     δₘₐₓ = abs(deg2rad(convert(NF, model.planet.axial_tilt)))
     # guard against division by zero for an untilted planet, with guarded numerator and denominator
     # (a nested ifelse(c, x / ifelse(c, y, 1), 0) is simplified by LLVM to an unguarded x / y)

@@ -1,7 +1,7 @@
 """$(TYPEDSIGNATURES)
 Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
-@propagate_inbounds function scale_prognostic!(vars::Variables, scale::Real)
+@propagate_inbounds function scale_prognostic!(vars::Variables, scale::Number)
     progn = vars.prognostic             # for convenience
     new_scale = scale / progn.scale[]   # undo previous scale and new scale in one go
     haskey(progn, :vorticity) && (progn.vorticity .*= new_scale)
@@ -92,7 +92,7 @@ end
 
 
 """$(TYPEDSIGNATURES)
-Undo the radius-scaling of vorticity and divergence from `scale_prognostic!(vars, scale::Real)`."""
+Undo the radius-scaling of vorticity and divergence from `scale_prognostic!(vars, scale::Number)`."""
 function unscale!(vars::Variables)
     progn = vars.prognostic             # for convenience
     inv_scale = inv(progn.scale[])

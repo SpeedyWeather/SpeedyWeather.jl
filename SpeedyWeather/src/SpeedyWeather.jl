@@ -45,7 +45,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 
 # UTILITIES
 export Utils
-import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs, set_scalar!
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs, set_scalar!, scalar_ref
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets
@@ -167,9 +167,11 @@ include("dynamics/random_process.jl")
 # TIME STEPPING
 include("time_stepping/time_integration.jl")
 include("time_stepping/steps.jl")
+include("time_stepping/random_process.jl")
 include("time_stepping/steppers/general.jl")
 include("time_stepping/steppers/euler_forward.jl")
 include("time_stepping/steppers/leapfrog.jl")
+include("time_stepping/steppers/stochastic_leapfrog.jl")
 include("time_stepping/steppers/ncycle_lorenz.jl")
 include("time_stepping/transform.jl")
 include("time_stepping/implicit/implicit_shallow_water.jl")
@@ -220,6 +222,7 @@ include("parameterizations/land/rivers.jl")
 
 # OUTPUT
 include("output/callbacks.jl")
+include("output/diagnostics.jl")
 include("output/feedback.jl")
 include("output/vertical_interpolation.jl")
 include("output/writers/general.jl")

@@ -33,8 +33,8 @@ end
             SpeedyWeather.parameterization!(ij, vars, model.radiation.shortwave, model)
         end
 
-        # top of atmosphere radiation down
-        trd = model.planet.solar_constant * vars.parameterizations.cos_zenith
+        # top of atmosphere radiation down, including the Sun-planet distance of the default KeplerOrbit
+        trd = model.planet.solar_constant * SpeedyWeather.solar_distance_factor(vars) * vars.parameterizations.cos_zenith
 
         if !(sw isa Nothing)
             osr = vars.parameterizations.outgoing_shortwave

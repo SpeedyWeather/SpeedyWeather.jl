@@ -40,7 +40,7 @@ SpeedyWeather/src/
 | Type | Purpose |
 |------|---------|
 | `SpectralGrid` | Central config: resolution (`truncation`), grid type, `nlayers`, `NF`, architecture |
-| `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch) |
+| `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, output, scratch) |
 | `Simulation{V,M}` | Top-level container holding model + variables |
 | `Leapfrog` | Time stepper with Robert/Williams filters |
 | `SpectralTransform` | FFT/Legendre transform machinery |
@@ -62,7 +62,7 @@ and `finalize!`.
 
 ### Variables Structure
 
-`Variables` is a unified container with 7 groups, each a NamedTuple:
+`Variables` is a unified container with 8 groups, each a NamedTuple:
 
 | Group | Purpose |
 |-------|---------|
@@ -72,6 +72,7 @@ and `finalize!`.
 | `dynamics` | Working arrays for the dynamical core (pressure gradients, vertical velocity, etc.) |
 | `parameterizations` | Working arrays for parameterizations (fluxes, radiation, cloud properties, etc.) |
 | `particles` | Particle advection variables |
+| `output` | Output-only variables, e.g. accumulated precipitation (write-only for dynamics/parameterizations) |
 | `scratch` | Temporary storage (write-before-read) |
 
 Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
@@ -86,7 +87,7 @@ vars.dynamics.w                                 # Vertical velocity
 
 Model components define their variables via variable type categories:
 `PrognosticVariable`, `GridVariable`, `TendencyVariable`, `DynamicsVariable`,
-`ParameterizationVariable`, `ParticleVariable`, `ScratchVariable`.
+`ParameterizationVariable`, `ParticleVariable`, `OutputVariable`, `ScratchVariable`.
 These are collected and allocated automatically by the `Variables(model)` constructor.
 
 ## Typical Usage
@@ -369,10 +370,7 @@ stored results with just these suites.
 The reverse-mode (AD) benchmarks with Reactant are opt-in,: add the flag
 `--reverse` (e.g. `manual_benchmarking.jl reactant-nvidia-gpu --reverse`). A run without it drops the
 stored reverse-mode results of that architecture. The flag `--hi-res` adds T342 and T512 to the
-PrimitiveWet resolution sweep, on GPU and TPU only. `--SPEEDY` adds a suite of the PrimitiveWet
-model over the same resolutions in a SPEEDY.f90-like configuration (prescribed seasonal climatologies,
-constant surface roughness, wind slowdown and gusts), on every architecture including Reactant. Truncations in the benchmarks are 1-based (T32, …, T256), as in
-the model code.
+PrimitiveWet resolution sweep, on GPU and TPU only. 
 
 For a quick check whether performance regressed, `manual_benchmarking.jl --debug` runs only a
 short PrimitiveWet resolution sweep with the default transform (T32–T128 with 8 layers, T32 and
