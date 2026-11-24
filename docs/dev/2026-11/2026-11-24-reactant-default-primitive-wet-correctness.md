@@ -307,7 +307,10 @@ tendency checks can fail, the one-layer models are checked ~1000x tighter, the p
 temperature 40x, pressure 500x, u 5x, vorticity/v/humidity 2.5x tighter (divergence unchanged).
 `RTOL`/`ATOL` remain for `test_maybe_jit.jl`.
 
-Verification with the new tolerances (all six configurations): in progress.
+Verification with the new tolerances, all six configurations (`test_model` as in `test_correctness.jl`):
+Barotropic 8/8 (both transforms), ShallowWater 14/14, PrimitiveDry 17/17, PrimitiveWet 24/24 (both
+transforms). The primitive models reproduce the measured differences bitwise (deterministic), the
+Barotropic model's vary slightly between runs (random initial conditions, 2.2e-6 vs 2.4e-6 vorticity).
 
 ## Summary of changes
 
@@ -334,8 +337,9 @@ Verification with the new tolerances (all six configurations): in progress.
   after one step ≤ 1.1e-12 (§8).
 - `test_interpolation.jl` (incl. the new test) passes, CPU `test/dynamics/orography.jl` 4/4 (Julia 1.12),
   default-model differentiation 5/5 (§9).
-- Not run locally: the full Reactant test suite (`runtests.jl`) with the default model, in particular
-  `test_model(PrimitiveWetModel; Transform = SpectralTransform)`, `test_output.jl`, `test_implicit.jl`.
+- All six `test_model` configurations with the new tolerances pass (§11).
+- Not run locally as a whole: the full Reactant test suite (`runtests.jl`), e.g. `test_output.jl`,
+  `test_implicit.jl`, `test_time_steps.jl` with the default model.
 
 ## Known limitations
 
