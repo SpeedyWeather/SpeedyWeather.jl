@@ -43,6 +43,11 @@ function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars},
     return integrator.state
 end
 
+# The Terrarium state (`vars.prognostic.land.terrarium`) is moved to the host with Terrarium's own
+# `on_architecture`, e.g. when writing restart files, see `WriteVariablesRestartFile`
+SpeedyWeather.on_architecture(::SpeedyWeather.CPU, state::Terrarium.StateVariables) =
+    Terrarium.on_architecture(Terrarium.CPU(), state)
+
 """$(TYPEDEF)
 
 Abstract base type for SpeedyWeather land components that delegate land
