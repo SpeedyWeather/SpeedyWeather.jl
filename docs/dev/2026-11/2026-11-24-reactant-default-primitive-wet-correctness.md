@@ -262,8 +262,52 @@ climatologies of a Float64 model (land-sea mask initialized for the masking), CP
 
 `compare_arrays` also returns the norm-relative difference `norm(cpu - reactant) / max(norm(cpu),
 norm(reactant))` (what `isapprox` compares against `rtol`), printed for every variable
-(`print_comparison`). Measured for all six `test_model` configurations of `test_correctness.jl`: in
-progress.
+(`print_comparison`). Measured for all six `test_model` configurations of `test_correctness.jl` (default
+models, all orography and climatology fixes, macOS arm64, Julia 1.11, Reactant 0.2.309; Baro = Barotropic,
+SW = ShallowWater, Dry/Wet = PrimitiveDry/Wet, M = MatrixSpectralTransform, S = SpectralTransform):
+
+| variable | Baro M | Baro S | SW M | Dry M | Wet M | Wet S |
+|---|---|---|---|---|---|---|
+| tend. vorticity | 2.9e-6 | 1.8e-6 | 5.6e-6 | 5.7e-6 | 7.1e-6 | 3.5e-6 |
+| tend. divergence | | | 5.8e-5 | 5.6e-4 | 1.8e-3 | 1.1e-3 |
+| tend. η / pressure | | | 3.2e-5 | 3.3e-5 | 1.4e-4 | 9.6e-5 |
+| tend. temperature | | | | 1.1e-4 | 2.4e-4 | 1.5e-4 |
+| tend. humidity | | | | | 8.1e-6 | 7.6e-6 |
+| progn. vorticity | 2.4e-6 | 8.2e-7 | 3.0e-6 | 7.3e-5 | 1.5e-3 | 1.4e-3 |
+| progn. divergence | | | 8.5e-5 | 6.6e-4 | 9.1e-3 | 9.6e-3 |
+| progn. η / pressure | | | 2.6e-6 | 6.7e-8 | 7.6e-7 | 6.4e-7 |
+| progn. temperature | | | | 1.1e-6 | 2.9e-5 | 2.6e-5 |
+| progn. humidity | | | | | 1.6e-3 | 1.4e-3 |
+| grid vorticity | 3.0e-6 | 1.0e-6 | 3.4e-6 | 7.8e-5 | 1.6e-3 | 1.5e-3 |
+| grid divergence | | | 8.8e-5 | 6.0e-4 | 9.4e-3 | 9.9e-3 |
+| grid u | 1.9e-6 | 9.4e-7 | 2.5e-6 | 4.1e-5 | 6.9e-4 | 7.5e-4 |
+| grid v | 2.0e-6 | 8.0e-7 | 5.2e-6 | 1.7e-4 | 1.9e-3 | 1.9e-3 |
+| grid η / pressure | | | 3.1e-6 | 2.7e-7 | 1.2e-6 | 9.2e-7 |
+| grid temperature | | | | 1.4e-6 | 4.1e-5 | 3.7e-5 |
+| grid humidity | | | | | 2.2e-3 | 2.0e-3 |
+
+The one-layer models differ by ~1e-6, the PrimitiveWetModel by up to 1e-2 after 100 steps (§3:
+amplified rounding, convection). One set of tolerances for all models would be set by the
+PrimitiveWetModel, so two sets (`correctness_tolerances(ModelType)` in `runtests.jl`), each for the
+tendencies (one step) and the time stepping (100 steps), norm-relative without `atol`, ~10x
+(9x-17x) the largest measured difference:
+
+| | one-layer: tendencies | one-layer: 100 steps | primitive: tendencies | primitive: 100 steps |
+|---|---|---|---|---|
+| default | 5e-5 | 5e-5 | 1e-4 | 2e-2 (vorticity, v, humidity) |
+| divergence | 5e-4 | 1e-3 | 2e-2 | 1e-1 |
+| η | 5e-4 | (default) | | |
+| temperature | | | 3e-3 | 5e-4 |
+| pressure | | | 2e-3 | 2e-5 |
+| u | | | | 1e-2 |
+
+Previously one set for everything, with `atol`s in units of the variables: e.g. temperature
+`rtol = 2e-2, atol = 5`, pressure `1e-2, 5`, humidity `5e-2, 2e-3`, vorticity `5e-2`, u/v `5e-2`. Now the
+tendency checks can fail, the one-layer models are checked ~1000x tighter, the primitive models'
+temperature 40x, pressure 500x, u 5x, vorticity/v/humidity 2.5x tighter (divergence unchanged).
+`RTOL`/`ATOL` remain for `test_maybe_jit.jl`.
+
+Verification with the new tolerances (all six configurations): in progress.
 
 ## Summary of changes
 
@@ -275,6 +319,9 @@ progress.
   to the model's number format before it is interpolated, so that Float64 models interpolate in Float64
   and CPU and Reactant get the same orography.
 - `SpeedyWeather/test/reactant/test_interpolation.jl`: test "EarthOrography on Reactant in Float64".
+- `SpeedyWeather/test/reactant/runtests.jl`, `test_correctness.jl`: norm-relative tolerances per model
+  family (one-layer, primitive) for the tendencies and the time stepping, the norm-relative difference
+  is printed for every variable (§11).
 - `ocean.jl`, `land/soil_temperature.jl`, `land/soil_moisture.jl`, `land/vegetation.jl`,
   `radiation/albedo/general.jl`: the climatologies too are interpolated in the model's number format;
   test "Climatologies on Reactant in Float64".
@@ -292,9 +339,11 @@ progress.
 
 ## Known limitations
 
-- The correctness test's tolerances (`TOLERANCES` in `runtests.jl`) are loose: the `atol`s are in units
-  of the prognostic variables and make the temperature, pressure and humidity tendency checks vacuous;
+- The correctness tests compare only the top-level arrays of `prognostic`, `grid` and `tendencies`:
   nested namespaces (`ocean`, `land`), `tendencies.grid` and `parameterizations` are not compared.
+- The tolerances are ~10x the differences measured on one machine (macOS arm64); CI (Linux x86, Julia
+  1.12) may round differently, the 100-step differences of the PrimitiveWetModel depend on how many
+  grid points switch convection on or off.
 - Float32 comparisons over 100 steps are dominated by the amplification of rounding differences
   (mostly convection switching on/off at a few points), so they can only detect errors well above
   ~1e-3 (norm-relative) in vorticity/divergence/humidity.
