@@ -17,11 +17,11 @@ import SpeedyWeatherInternals.Architectures: architecture
 import SpeedyWeatherInternals.KernelLaunching: launch!, LinearWorkOrder
 
 # abstract types and generic functions from SpeedyWeather extended or used here
-import ..SpeedyWeather: AbstractOutput, AbstractOutputVariable, AbstractSimulation,
+import ..SpeedyWeather: AbstractField, AbstractOutput, AbstractOutputVariable, AbstractSimulation,
     AbstractVerticalExtrapolation, DryAdiabaticExtrapolation, NetCDFOutput,
     define_variable!, field_view, finalize!, get_prognostic_step,
-    interpolate_output!, on_output_architecture, output!, pressure, pressure_thickness, ConstantExtrapolation,
-    virtual_temperature, write_output!
+    interpolate_output!, output!, pressure, pressure_thickness, ConstantExtrapolation,
+    virtual_temperature
 
 # defaults for output variables that don't define these fields themselves
 const DEFAULT_MISSING_VALUE = NaN
