@@ -215,7 +215,7 @@ are generally allowed to do much more here before or after
 the interpolation.
 
 The last line copies the field onto the CPU, rounds it to `keepbits`
-if the variable defines them, and writes it into the netCDF file at
+if the variable defines them (NaNs stay NaN), and writes it into the netCDF file at
 the current output time step `output.output_counter`, choosing the
 indices from `variable.dims_xyzt`. 2D variables without time you only
 want to write once (because they do not change), so you probably want
