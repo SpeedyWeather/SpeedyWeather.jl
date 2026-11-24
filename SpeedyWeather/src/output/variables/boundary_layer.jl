@@ -37,18 +37,14 @@ path(::MeridionalVelocity10m, simulation) = simulation.variables.grid.v
 
     z_bottom = z_surf + T_bottom * Δp_geopot_bottom / g
 """
-function output!(
+function interpolate_output!(
+        field::AbstractField,
         output::AbstractOutput,
         variable::Union{ZonalVelocity10m, MeridionalVelocity10m},
         simulation::AbstractSimulation,
     )
-    # escape immediately after first call if variable doesn't have a time dimension
-    ~hastime(variable) && output.output_counter > 1 && return nothing
-
     # Retrieve u_bottom
-    var = path_or_nothing(variable, simulation)
-    isnothing(var) && return nothing                # silently escape early if variable is not defined in the simulation
-    u_or_v_grid = get_prognostic_step(var, simulation.model.time_stepping, output)
+    u_or_v_grid = get_prognostic_step(path(variable, simulation), simulation.model.time_stepping, output)
     nlayers = size(u_or_v_grid, 2)
     u_or_v_bottom = field_view(u_or_v_grid, :, nlayers)
 
@@ -78,10 +74,8 @@ function output!(
     # if the max case is hit we divide by zero which yields inf so clearly flagged in any case
     @. u_or_v10 = u_or_v_bottom .* log(10 / z₀) ./ log.(max.(z_bottom, z₀) / z₀)
 
-    # interpolate onto the output grid on the model's architecture, then to host, round and write
-    interpolate_output!(output, output.field2D, u_or_v10)
-    write_output!(output, variable, output.field2D, output.host2D)
-    return nothing
+    # interpolate onto the output grid on the model's architecture
+    return interpolate_output!(output, field, u_or_v10)
 end
 
 # add the height of the bottom layer k above the surface, T_k * R/g * log(pₛ/p_k), to z_bottom
@@ -108,39 +102,42 @@ end
 # not the actual surface temperature but the core variable to read in
 path(::SurfaceTemperature, simulation) = simulation.variables.grid.temperature
 
-function output!(
+function interpolate_output!(
+        field::AbstractField,
         output::AbstractOutput,
         variable::SurfaceTemperature,
         simulation::AbstractSimulation,
     )
-    # escape immediately after first call if variable doesn't have a time dimension
-    ~hastime(variable) && output.output_counter > 1 && return nothing
-
     # reuse scratch array to avoid allocations
     Ts = simulation.variables.scratch.grid.a_2D
-    pN = simulation.variables.scratch.grid.b_2D
 
     # Retrieve T_bottom
-    var = path_or_nothing(variable, simulation)
-    isnothing(var) && return nothing                # silently escape early if variable is not defined in
-    T_grid = get_prognostic_step(var, simulation.model.time_stepping, output)
+    T_grid = get_prognostic_step(path(variable, simulation), simulation.model.time_stepping, output)
     nlayers = size(T_grid, 2)
-    T_bottom = field_view(T_grid, :, nlayers)
 
     # Other parameters
     κ = simulation.model.atmosphere.κ
     coord = simulation.model.geometry.vertical_coordinates
     pₛ = simulation.variables.parameterizations.surface_pressure
-    pN .= pressure.(nlayers, pₛ, coord)
 
     # Compute Ts assuming dry adiabatic profile: T_surf = T_bottom * (pₛ / p_bottom)^κ
+    # in a kernel so that the layer index stays an integer (Reactant traces numbers in broadcasts)
+    launch!(
+        architecture(Ts), LinearWorkOrder, size(Ts), surface_air_temperature_kernel!,
+        Ts, T_grid, pₛ, coord, nlayers, κ
+    )
     (; transform) = variable
-    @. Ts = transform(T_bottom * (pₛ / pN)^κ)   # Convert to °C
+    @. Ts = transform(Ts)   # Convert to °C
 
-    # interpolate onto the output grid on the model's architecture, then to host, round and write
-    interpolate_output!(output, output.field2D, Ts)
-    write_output!(output, variable, output.field2D, output.host2D)
-    return nothing
+    # interpolate onto the output grid on the model's architecture
+    return interpolate_output!(output, field, Ts)
+end
+
+# dry-adiabatic descent from layer k to the surface, T_k * (pₛ/p_k)^κ, at every grid point ij
+@kernel inbounds = true function surface_air_temperature_kernel!(Ts, temperature, surface_pressure, coordinate, k, κ)
+    ij = @index(Global, Linear)
+    pₛ = surface_pressure[ij]
+    Ts[ij] = temperature[ij, k] * (pₛ / pressure(k, pₛ, coordinate))^κ
 end
 
 

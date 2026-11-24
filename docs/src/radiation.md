@@ -232,7 +232,7 @@ longwave = OneBandLongwave(spectral_grid, transmissivity = FriersonLongwaveTrans
 
 ### Humidity- and CO₂-dependent transmissivity
 
-The default `ByrneOGormanLongwaveTransmissivity` follows [Byrne and O'Gorman, 2013](https://doi.org/10.1175/JCLI-D-12-00262.1)
+The default `ByrneOGormanLongwaveTransmissivity` follows [ByrneOGorman2013](@citet)
 (as also used in Isca). The optical depth of layer ``k`` is
 
 ```math

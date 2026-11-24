@@ -152,10 +152,9 @@ function HEALPixOutput(
     # OUTPUT GRID: from `output_grid`, from `nside`/`nlat_half`, or following the model's own
     # grid type and resolution (which is what makes the interpolation skippable by default)
     output_grid = healpix_output_grid(SG.grid; nside, nlat_half, output_grid)
-    # OUTPUT GRID and MODEL GRID on the architecture to interpolate on, the model's (e.g. GPU)
-    arch = SpeedyWeather.output_architecture(SG.architecture)
-    output_grid = on_architecture(arch, output_grid)
-    input_grid = on_architecture(arch, SG.grid)
+    # OUTPUT GRID on the architecture to interpolate on, the model's (e.g. GPU)
+    output_grid = on_architecture(SG.architecture, output_grid)
+    input_grid = SG.grid
 
     # SKIP INTERPOLATION if the model already runs on this very grid: `grids_match`
     # compares the (nonparametric) grid type and nlat_half, which is exactly the condition
@@ -252,17 +251,18 @@ function initialize!(
         SpeedyWeather.interpolate_output!(output, output.land_fraction, model.land_sea_mask.land_fraction)
     end
 
-    # VARIABLES: define every output variable in the Zarr store and write initial
-    # conditions, skipping any that don't exist in the simulation — the same check the
-    # generic `output!` makes at write time, applied here so a skipped variable doesn't
-    # leave an all-fill_value phantom array behind
+    # VARIABLES: define every output variable in the Zarr store, skipping any that don't
+    # exist in the simulation — the same check the generic `output!` makes at write time,
+    # applied here so a skipped variable doesn't leave an all-fill_value phantom array behind
     simulation = Simulation(vars, model)
     warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
         exists_in_simulation(var, simulation) || continue
         define_variable!(g, output, var, n_outputs, eltype(output.field2D))
-        output!(output, var, simulation)
     end
+
+    # write the initial conditions of all variables at once (one compiled program with Reactant)
+    output!(output, output.variables, simulation)
 
     # consolidate the store metadata (.zmetadata) for faster opening with xarray etc.;
     # the schema is complete at this point and all later writes only touch chunk files

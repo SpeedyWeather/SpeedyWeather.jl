@@ -11,9 +11,7 @@
 # Reactant it is a headline number in itself. Compiled with `SpeedyWeather.reactant_compile_options()` (kernels raised, some patterns excluded) as in `time_stepping!`.
 function build_runner(::ReactantDevice, simulation, period)
     (; model) = simulation
-    clock = SpeedyWeather.Clock()       # number of steps of the timed run, incl. spin-up steps
-    initialize!(clock, model.time_stepping, model.planet, period)
-    n_steps = Int(clock.n_steps)
+    n_steps = n_steps_run(model, period)    # number of steps of the timed run, incl. spin-up steps
     compile_time = @elapsed compiled_time_steps! = @compile compile_options = SpeedyWeather.reactant_compile_options() SpeedyWeather.time_steps!(simulation, n_steps)
     @info @sprintf("     compiled the time loop (%d steps) in %.1f s", n_steps, compile_time)
     time_stepping(simulation) = compiled_time_steps!(simulation, n_steps)

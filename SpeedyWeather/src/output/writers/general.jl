@@ -98,14 +98,6 @@ function add_default!(
 end
 
 """$(TYPEDSIGNATURES)
-Architecture that gridded output writers interpolate and post-process on for a model that
-runs on `architecture`: the model's own, so that e.g. a GPU simulation is interpolated on the
-GPU, except for Reactant, I/O has be done outside of the compile context anyway, currently we 
-just use CPU for Reactant simulation output. That may change in the future."""
-output_architecture(architecture::AbstractArchitecture) = architecture
-output_architecture(::ReactantDevice) = CPU()
-
-"""$(TYPEDSIGNATURES)
 Allocate the scratch fields of a gridded output writer on `output_grid`, which is on the
 model's architecture so that interpolation and post-processing run where the model runs:
 `land_fraction`, `field2D`, `field3D` (`nlayers`) and `field3Dland` (`nlayers_soil`), all in
@@ -142,30 +134,20 @@ end
 
 """$(TYPEDSIGNATURES)
 Move `src` (a field on the model grid and the model's architecture) onto the output grid of
-`output`, writing into `dest` (on the [`output_architecture`](@ref), `src` is moved there
-first if that differs from the model's). Interpolates with
+`output`, writing into `dest` (on the model's architecture too). Interpolates with
 `output.interpolator`, or copies straight over when `output.interpolator === nothing`, i.e.
 when the output grid already is the model grid and `output` was constructed without an
 interpolator (see [`HEALPixOutput`](@ref) for a simulation that already runs on the output's
-HEALPix grid)."""
+HEALPix grid). Compiled with Reactant if not already inside compiled code (`@maybe_jit`)."""
 function interpolate_output!(output::AbstractOutput, dest::AbstractField, src::AbstractField)
-    # move the model's field to the output's architecture if they differ (e.g. Reactant)
-    src = on_output_architecture(output, src)
-
-    isnothing(output.interpolator) || return RingGrids.interpolate!(dest, src, output.interpolator)
-
-    # No interpolator: the output grid is the model grid, copy straight over
-    fields_match(dest, src) || throw(DimensionMismatch(dest, src))
-    return copyto!(dest.data, src.data)
-end
-
-"""$(TYPEDSIGNATURES)
-`x` (an array or field of the model) on the architecture of `output`: `x` itself if that's the
-model's architecture, otherwise moved there. For Reactant the output is computed on the CPU, as
-computing with Reactant arrays outside of a compiled program compiles a program for every operation."""
-function on_output_architecture(output::AbstractOutput, x)
-    arch = architecture(output.field2D)
-    return ismatching(arch, architecture(x)) ? x : on_architecture(arch, x)
+    if isnothing(output.interpolator)
+        # No interpolator: the output grid is the model grid, copy straight over
+        fields_match(dest, src) || throw(DimensionMismatch(dest, src))
+        copyto!(dest.data, src.data)
+    else
+        @maybe_jit architecture(dest) RingGrids.interpolate!(dest, src, output.interpolator)
+    end
+    return dest
 end
 
 """$(TYPEDSIGNATURES)
@@ -253,11 +235,35 @@ function output!(
     # escape immediately after first call if variable doesn't have a time dimension
     ~OutputVariables.hastime(variable) && output.output_counter > 1 && return nothing
 
-    # scratch field to interpolate into (on the model's architecture) and its host equivalent
-    var, host = scratch_fields(output, variable)
+    # silently escape early if variable is not defined in the simulation
+    OutputVariables.exists_in_simulation(variable, simulation) || return nothing
 
-    ori = OutputVariables.path_or_nothing(variable, simulation)         # original array as in simulation
-    isnothing(ori) && return nothing                    # silently escape early if variable is not defined in the simulation
+    # scratch field to compute into (on the model's architecture) and its host equivalent
+    field, host = scratch_fields(output, variable)
+
+    # everything but the I/O (write_output!), compiled with Reactant in case it's used
+    # the `@maybe_jit` here is just a fallback in case this is called output of the regular output 
+    @maybe_jit architecture(field) interpolate_output!(field, output, variable, simulation)
+    write_output!(output, variable, field, host)    # to host, round and write
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Compute output `variable` of `simulation` on the output grid of `output` into `field`
+(on the model's architecture): everything to output a variable but the I/O. Picks the
+variable (and its time step) from `simulation` via `OutputVariables.path`, interpolates it
+onto the output's vertical layers and horizontally onto the output grid, then unscales,
+transforms and scales it by the land/ocean fraction if `variable` defines so. Extend this
+for output variables that need a custom computation (e.g. mean sea-level pressure); with
+Reactant all output variables are compiled into one program, so this has to be traceable
+(no I/O, no decisions on the values of arrays). Returns `field`."""
+function interpolate_output!(
+        field::AbstractField,
+        output::AbstractOutput,
+        variable::AbstractOutputVariable,
+        simulation::AbstractSimulation,
+    )
+    ori = OutputVariables.path(variable, simulation)    # original array as in simulation
     ts = simulation.model.time_stepping
 
     # decide on existence of step dimension by comparing dimensionality
@@ -270,30 +276,29 @@ function output!(
     ori = interpolate_layers!(output_layers(output), ori, variable, simulation)
 
     # interpolate onto the output grid, and post-process below, on the model's architecture
-    interpolate_output!(output, var, ori)
+    interpolate_output!(output, field, ori)
 
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)
         if variable.unscale
-            unscale!(var, simulation.variables.prognostic.scale[])
+            unscale!(field, simulation.variables.prognostic.scale[])
         end
     end
 
     if hasproperty(variable, :transform)    # transform (e.g. scale, offset, exp, etc) if defined
-        @. var = variable.transform(var)
+        @. field = variable.transform(field)
     end
 
     # scale variable by ocean/land fraction, e.g. sea ice concentration of 50% in cell that's 50% ocean becomes 25%
     if hasproperty(output, :land_fraction)
         if hasproperty(variable, :ocean_fraction) && variable.ocean_fraction
-            @. var .*= (1 - output.land_fraction)
+            @. field .*= (1 - output.land_fraction)
         elseif hasproperty(variable, :land_fraction) && variable.land_fraction
-            @. var .*= output.land_fraction
+            @. field .*= output.land_fraction
         end
     end
 
-    write_output!(output, variable, var, host)     # to host, round and write
-    return nothing
+    return field
 end
 
 function finalize!(
