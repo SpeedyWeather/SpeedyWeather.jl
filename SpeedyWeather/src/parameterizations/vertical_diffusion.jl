@@ -7,8 +7,9 @@ interfaces that is the maximum of three parts: a boundary-layer profile followin
 with the boundary layer height from a bulk Richardson number, a local Richardson-number-dependent
 diffusivity following Louis et al. 1982 and Holtslag and Boville 1993, and a background diffusivity
 decaying with height. The diffusion is formulated as a flux divergence on the pressure thickness of
-the layers, conserving the mass-weighted column integral, and integrated implicitly (backward Euler)
-so that it is stable for any diffusivity and time step. The boundary-layer profile uses the surface drag
+the layers, conserving the mass-weighted column integral, and integrated implicitly so that it is stable
+for any diffusivity and time step, by default over-implicitly (`implicitness`) as the diffusivity is taken
+from the previous time step. The boundary-layer profile uses the surface drag
 and wind of the boundary layer (`model.boundary_layer`), without one only the local and the background
 diffusivity act. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
@@ -16,10 +17,10 @@ diffusivity act. Fields are $(TYPEDFIELDS)"""
     @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
 
     "[OPTION] Critical bulk Richardson number defining the boundary layer height [1]"
-    @param critical_Richardson::NF = 10 (bounds = Positive,)
+    @param critical_Richardson::NF = 1 (bounds = Positive,)
 
     "[OPTION] Surface bulk Richardson number at and above which the boundary-layer profile is zero [1]"
-    @param Richardson_cutoff::NF = 10 (bounds = Positive,)
+    @param Richardson_cutoff::NF = 1 (bounds = Positive,)
 
     "[OPTION] Fraction of the boundary layer height that is the surface layer [1]"
     @param surface_layer_fraction::NF = 0.1 (bounds = 0 .. 1,)
@@ -47,6 +48,9 @@ diffusivity act. Fields are $(TYPEDFIELDS)"""
 
     "[OPTION] Maximum diffusivity [m²/s]"
     @param max_diffusivity::NF = 1000 (bounds = Positive,)
+
+    "[OPTION] Implicitness factor of the time integration [1]: 1 is backward Euler, larger is over-implicit and damps the oscillations that a large diffusivity from the previous time step can cause (1.5 as in the IFS)"
+    @param implicitness::NF = 1.5 (bounds = Positive,)
 
     "[OPTION] Diffuse dry static energy (i.e. temperature)?"
     diffuse_static_energy::Bool = true
@@ -102,7 +106,15 @@ end
 """$(TYPEDSIGNATURES)
 Vertical diffusion tendencies of u, v, temperature (via dry static energy) and humidity for the range
 `columns` of horizontal grid points, solved implicitly with the conductances from `vertical_conductance!`.
-The variables that share a conductance (u and v, dry static energy and humidity) are solved together."""
+The variables that share a conductance (u and v, dry static energy and humidity) are solved together.
+
+The conductances are those of the state before the time step. With such explicit coefficients backward
+Euler is stable for a given diffusivity, but a diffusivity that grows with the diffused state itself
+(K ∝ u⋆ ∝ |V|, the boundary layer height) makes columns with a large diffusivity oscillate between two
+states and grow (Kalnay and Kanamitsu, 1988). The solve is therefore over-implicit as in the IFS (IFS
+documentation Cy49r1, part IV, section 3.5): with the implicitness factor γ = `diffusion.implicitness`
+the tendency y = (x⁺ - x⁻)/Δt is the flux divergence of the state x̂ = γx⁺ + (1 - γ)x⁻ = x⁻ + γΔt y, which
+is the implicit solve with the time step γΔt. γ = 1 is backward Euler."""
 @propagate_inbounds function vertical_diffusion!(columns::AbstractUnitRange, vars, diffusion::BulkRichardsonDiffusion, model)
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
 
@@ -111,7 +123,9 @@ The variables that share a conductance (u and v, dry static energy and humidity)
 
     vertical_conductance!(columns, vars, diffusion, model)
 
-    Δt = default_time_step(model.time_stepping)     # 2Δt for leapfrog
+    # time step of the implicit solve: the implicitness factor times the time step (2Δt for leapfrog), so
+    # that the tendency is that of the over-implicit state x⁻ + γΔt y. The model steps with Δt as always
+    Δt = diffusion.implicitness * default_time_step(model.time_stepping)
     conductance_momentum = vars.parameterizations.vertical_conductance_momentum
     conductance_heat = vars.parameterizations.vertical_conductance_heat
     solver_arguments = (
@@ -480,6 +494,10 @@ these tendencies are applied first and the result is diffused, which spreads the
 column within the time step. `tendency` is replaced by y. Conserves the mass-weighted column integral
 Σ xₖ Δpₖ exactly, with that of the source.
 
+`Δt` is the time step of the implicit solve. With the time step of the model this is backward Euler. With
+γ times that time step (γ > 1, over-implicit) y is the tendency L x̂ + S of the state x̂ = x⁻ + γΔt y, and a
+model step x⁺ = x⁻ + Δt y with it lies between x⁻ and x̂: x⁺ = (1 - 1/γ) x⁻ + x̂/γ.
+
 The matrix is the same for all variables in `fields`: it is eliminated once, and the right-hand side of every
 variable is stored in its tendency. Layers in the outer, columns in the inner loops: what the elimination of
 layer k needs of the layer above (upper diagonal, right-hand side) is read from the arrays."""
@@ -489,7 +507,7 @@ layer k needs of the layer above (upper diagonal, right-hand side) is read from 
         conductance,                # ρK/Δz [kg/m²/s] at the interface below every layer
         tridiagonal_upper,          # scratch, upper diagonal after forward elimination
         surface_pressure,           # [Pa] of every column
-        Δt,                         # time step [s]
+        Δt,                         # time step [s] of the implicit solve
         g,                          # gravity [m/s²]
         vertical_coordinates,
     )

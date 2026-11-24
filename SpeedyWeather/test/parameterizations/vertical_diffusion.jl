@@ -126,6 +126,25 @@ end
         @test error_10 / error_1 ≈ 10 rtol = 0.1      # first order in Δt
     end
 
+    @testset "Over-implicit step" begin
+        # The solve with γΔt returns the tendency of the over-implicit state x̂ = x⁻ + γΔt y. A step of the model
+        # with it, x⁺ = x⁻ + Δt y, conserves the column integral, creates no new extrema and, where x̂ is well
+        # mixed (stiff limit), keeps the fraction 1 - 1/γ of the deviation from the column mean
+        coordinates = first(coordinate_systems)
+        ρ_Δz = isothermal_density_over_distance(coordinates, nlayers)
+        Δp = [SpeedyWeather.pressure_thickness(k, 1.0e5, coordinates) for k in 1:nlayers]
+        column_mean(x) = sum(Δp .* x) / sum(Δp)
+        x = 280 .+ 10 * randn(Xoshiro(3), nlayers)
+        Δt = 3600.0
+        for γ in (1.0, 1.5, 2.0)
+            tend = diffuse_column(x, fill(1.0e10, nlayers), ρ_Δz, coordinates; Δt = γ * Δt)
+            x_new = x + Δt * tend
+            @test column_mean(x_new) ≈ column_mean(x) rtol = 1.0e-8    # round-off of this very stiff system
+            @test minimum(x) <= minimum(x_new) && maximum(x_new) <= maximum(x)
+            @test x_new .- column_mean(x) ≈ (1 - 1 / γ) * (x .- column_mean(x)) atol = 1.0e-4
+        end
+    end
+
     @testset "Several variables and columns at once" begin
         coordinates = first(coordinate_systems)
         ncolumns = 7
@@ -481,6 +500,28 @@ end
                 end
             end
         end
+    end
+
+    @testset "Implicitness factor" begin
+        @test BulkRichardsonDiffusion(spectral_grid).implicitness == 1.5    # over-implicit by default
+        Δt = SpeedyWeather.default_time_step(model.time_stepping)
+        u = SpeedyWeather.get_prognostic_step(variables.grid.u, model.time_stepping, diffusion).data
+        results = map((1, 1.5, 2)) do implicitness
+            result = diffuse!(BulkRichardsonDiffusion(spectral_grid; implicitness))
+
+            # the scheme is the implicit solve with the implicitness factor times the time step
+            reference = copy(initial[1])
+            SpeedyWeather.implicit_vertical_diffusion!(
+                1:npoints, ((reference, u, nothing),), result.conductance_momentum, similar(reference),
+                p.surface_pressure.data, implicitness * Δt, model.planet.gravity, model.geometry.vertical_coordinates,
+            )
+            @test result.tendencies[1] ≈ reference rtol = 1.0e-5
+            result
+        end
+
+        # the conductances are those of the state, the tendencies depend on the factor
+        @test results[1].conductance_heat == results[2].conductance_heat == results[3].conductance_heat
+        @test results[1].tendencies[3] != results[2].tendencies[3]
     end
 
     @testset "Surface Richardson number stored by the drag" begin

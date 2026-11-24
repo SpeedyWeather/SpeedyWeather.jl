@@ -71,21 +71,51 @@ An adiabatic column with constant dry static energy is therefore not changed by 
 
 The diffusivity near the surface, where layers can be less than 100 m thick, can easily
 exceed the stability limit ``\Delta z^2 / 2K`` of an explicit time step. The diffusion is
-therefore integrated with backward Euler for every column, with ``K`` evaluated
+therefore integrated implicitly for every column, with ``K`` evaluated
 at the previous time step [KalnayKanamitsu1988](@citep). Writing the
-diffusion operator above as ``L``, the new value ``X^+`` follows from the previous ``X^-`` as
+diffusion operator above as ``L``, the tendency ``y = (X^+ - X^-)/\Delta t`` from the previous
+value ``X^-`` to the new one ``X^+`` is the flux divergence of a state ``\hat{X}``
 
 ```math
-(1 - \Delta t L) X^+ = X^- + \Delta t S
+y = L \hat{X} + S, \qquad \hat{X} = \gamma X^+ + (1 - \gamma) X^- = X^- + \gamma \Delta t \, y
 ```
 
-with ``\Delta t`` the time step of the parameterizations (``2\Delta t`` for leapfrog)
-and ``S`` the tendencies of the parameterizations called before the vertical diffusion (see below).
-The tendency ``(X^+ - X^-)/\Delta t`` is then the solution ``y`` of the tridiagonal system
-``(1 - \Delta t L) y = L X^- + S`` which is solved with the Thomas algorithm, a forward elimination
-and a back substitution over the layers. The system is diagonally dominant so that
-the solution is unconditionally stable, does not create new extrema and conserves
-the column integral.
+with ``\Delta t`` the time step of the parameterizations (``2\Delta t`` for leapfrog),
+``S`` the tendencies of the parameterizations called before the vertical diffusion (see below)
+and the implicitness factor ``\gamma`` (option `implicitness`): ``\gamma = 0`` would be an explicit
+step, ``\gamma = 1/2`` Crank-Nicolson, ``\gamma = 1`` is backward Euler and ``\gamma > 1`` is called
+over-implicit. The tendency ``y`` is the solution of the tridiagonal system
+
+```math
+(1 - \gamma \Delta t L) y = L X^- + S
+```
+
+which is solved with the Thomas algorithm, a forward elimination and a back substitution over the
+layers. This is the backward Euler solve with the time step ``\gamma \Delta t``, while the model
+still steps with ``\Delta t``. The system is diagonally dominant so that the solution is
+unconditionally stable for a given diffusivity and conserves the column integral, and for
+``\gamma \geq 1`` the new value ``X^+ = (1 - 1/\gamma) X^- + \hat{X}/\gamma`` lies between ``X^-`` and
+``\hat{X}``, so that the diffusion alone does not create new extrema.
+
+The default is ``\gamma = 1.5``, the value of the IFS, see section 3.5 "Solution of the EDMF equations",
+equations (3.65) and (3.66), of [IFSCycle49r1](@citet): "In the model, ``\alpha = 1.5``, to avoid non-linear
+instability from the K-coefficients", where ``\alpha`` is our ``\gamma``. The reason is that the diffusivity is
+not constant but that of the previous time step and grows with the diffused state itself, e.g.
+``K \propto u_* \propto |\mathbf{u}|`` in the boundary layer. Backward Euler with such an explicit
+coefficient is only stable for a weak dependence [KalnayKanamitsu1988](@citep): for a damping rate
+``\propto X^P`` and a large diffusivity a perturbation of a forced equilibrium is multiplied by
+``(\gamma - 1 - P)/\gamma`` every step, which is ``-P`` for backward Euler, an oscillation between two
+states that grows for ``P > 1``, and stable for ``P < 2\gamma - 1``. With ``\gamma = 1`` this model at
+T512 with 24 layers developed such oscillations (also known as fibrillations) in single columns with
+60 to 75 m/s wind and diffusivities of several hundred m²/s in the lowermost layers, with a period of
+four time steps (two steps of leapfrog), which grew until the simulation failed. For ``\gamma > 1`` the tendencies
+``S`` enter ``\hat{X}`` with the weight ``\gamma`` too, which is why the IFS uses ``\gamma = 1`` for
+tracers, where the combination with a sink can otherwise create negative values (section 3.7 of
+[IFSCycle49r1](@citet)). Here all diffused variables use the same factor. Backward Euler is
+
+```julia
+vertical_diffusion = BulkRichardsonDiffusion(spectral_grid, implicitness = 1)
+```
 
 The source ``S`` are the tendencies of the parameterizations called before the vertical diffusion,
 by default the surface fluxes into the lowermost layer. They are applied first and the result is
@@ -124,11 +154,14 @@ Ri(z) = \frac{gz \left[ s_v(z) - s_v(z_N) \right]}{c_p T_v(z_N) |v(z)|^2}
 between the lowermost layer ``N`` at height ``z_N`` and the layer at height ``z`` above the surface,
 using the virtual dry static energy ``s_v = c_p T_v + \Phi`` and the wind speed ``|v|``, at least
 1 m/s [HoltslagBoville1993](@citep). ``h`` is the height where ``Ri(z)`` first reaches the critical Richardson
-number ``Ri_c = 10`` (option `critical_Richardson`) going upwards from the lowermost layer with
-``Ri(z_N) = 0``, interpolated linearly between the layers. ``Ri_c = 10`` is far above the literature
-values of 0.25–1 [HoltslagBoville1993, Frierson2006](@citep) and an empirical choice: it gives tropical boundary layers of 1–2 km,
-which markedly improves tropical convection and variability in SpeedyWeather, at the cost of very deep
-boundary layers under the mid-latitude jets. Within the boundary layer
+number ``Ri_c = 1`` (option `critical_Richardson`) going upwards from the lowermost layer with
+``Ri(z_N) = 0``, interpolated linearly between the layers. ``Ri_c = 1`` is the value of
+[Frierson2006](@citet) and at the upper end of the literature values of 0.25–1 [HoltslagBoville1993](@citep).
+For a given stratification the height grows like ``\sqrt{Ri_c}`` times the wind speed: a much larger value such
+as ``Ri_c = 10`` gives tropical boundary layers of 1–2 km, but boundary layers that reach the tropopause under
+the mid-latitude jets. At T512 with 24 layers that mixing through the troposphere warmed the lowermost
+layer by 4–6 K, reversed the sensible heat flux over the oceans and reduced the precipitation by 30 %
+within half a year. Within the boundary layer
 
 ```math
 K_{profile}(z) = \begin{cases}
