@@ -130,7 +130,8 @@ large-scale precipitation vertically for output."""
             γ_evap = 1 + Lᵥ_cₚ * sat_humid_k_melted * Lᵥ / (Rᵥ * T^2)   # 1 + Lᵥ/cₚ ∂q*/∂T, evaporative cooling lowers saturation
             max_rain_evaporated = max(dq, 0) / γ_evap * Δp_Δtgρ       # evaporate just enough to bring the layer to saturation
 
-            # Smooth implicit limiter: E = E_trial * C / (E_trial + C)
+            # Smooth limiter: E = E_trial * C / (E_trial + C) with E_trial = rain_evaporated (from above)
+            # and C = max_rain_evaporated, hence the *= below. E < min(E_trial, C) and E ≈ E_trial for E_trial ≪ C
             # Guard against division by zero when both rates are zero
             rain_evaporated *= max_rain_evaporated / max(rain_evaporated + max_rain_evaporated, floatmin(rain_evaporated))
             rain_flux_down -= rain_evaporated                     # remove reevaporated rain

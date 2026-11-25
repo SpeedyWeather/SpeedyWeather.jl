@@ -25,6 +25,10 @@ Base revision: babf64cb33d1fd80c300777c822c5d97d1d7202c
   reevaporation. #1427 uses only the post-melt temperature, in `dqsat_dT`.
 - Copied the unit tests from #1427 (layer-count independence, column water conservation, no
   supersaturation from evaporation).
+- The hard cap was later replaced by the smooth limiter `E = E_trial C / (E_trial + C)`.
+- Review (#1431): docs now describe the smooth limiter, clarify units [m/s] of the rain flux,
+  the meaning of `c` with the layer-thickness scaling, and why reevaporation is limited but not
+  relaxed over `Δt_c`; the water-budget test moved into its own testset, now also with snow melting.
 
 ## Problem description
 

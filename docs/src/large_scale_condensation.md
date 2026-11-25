@@ -41,7 +41,7 @@ humidity calculated from temperature ``T_i`` is
 ```math
 \begin{aligned}
 q_{i+1} - q_i &= q^\star(T_i) - q_i \\
-T_{i+1} - T_i &= -\frac{L_v}{c_p}[ q^\star(T_i) - q_i ]
+T_{i+1} - T_i &= -\frac{L_v}{c_p}[ q^\star(T_i) - q_i ].
 \end{aligned}
 ```
 
@@ -61,20 +61,20 @@ and ``\Delta T = T_{i+1} - T_i`` (and ``\Delta q`` similarly) to first order yie
 
 ```math
 q_{i+1} - q_i = q^\star(T_{i+1}) - q_i = q^\star(T_i) + (T_{i+1} - T_i)
-\frac{\partial q^\star}{\partial T} (T_i) + O(\Delta T^2) - q_i
+\frac{\partial q^\star}{\partial T} (T_i) + O(\Delta T^2) - q_i.
 ```
 
 Now we make a linear approximation to the derivative and drop the ``O(\Delta T^2)`` term.
 Inserting the (explicit) latent heat release yields
 
 ```math
-\Delta q = q^\star(T_i) - \frac{L_v}{c_p} \Delta q \frac{\partial q^\star}{\partial T} (T_i) - q_i
+\Delta q = q^\star(T_i) - \frac{L_v}{c_p} \Delta q \frac{\partial q^\star}{\partial T} (T_i) - q_i,
 ```
 
-And solving for ``\Delta q`` yields
+and solving for ``\Delta q`` yields
 
 ```math
-\left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T} (T^i) \right] \Delta q = q^\star(T_i) - q_i
+\left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T} (T_i) \right] \Delta q = q^\star(T_i) - q_i
 ```
 
 meaning that the implicit immediate condensation can be formulated as (see also
@@ -83,7 +83,7 @@ meaning that the implicit immediate condensation can be formulated as (see also
 ```math
 \begin{aligned}
 q_{i+1} - q_i &= \frac{q^\star(T_i) - q_i}{1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T}(T_i)} \\
-T_{i+1} - T_i &= -\frac{L_v}{c_p}( q_{i+1} - q_i )
+T_{i+1} - T_i &= -\frac{L_v}{c_p}( q_{i+1} - q_i ).
 \end{aligned}
 ```
 
@@ -91,13 +91,13 @@ With Euler forward time stepping this is great, but with our [leapfrog timestepp
 this is very dispersive (see [#445](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/445))
 although the implicit formulation is already much better.
 We therefore introduce a time step ``\Delta t_c`` which makes the implicit condensation not immediate
-any more but over several time steps ``\Delta t`` of the leapfrogging.
+any more but over several time steps ``\Delta t`` of the leapfrogging:
 
 ```math
 \begin{aligned}
 \delta q = \frac{q_{i+1} - q_i}{\Delta t} &= \frac{q^\star(T_i) - q_i}{ \Delta t_c
 \left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right]} \\
-\delta T = \frac{T_{i+1} - T_i}{\Delta t} &= -\frac{L_v}{c_p}( \frac{q_{i+1} - q_i}{\Delta t} )
+\delta T = \frac{T_{i+1} - T_i}{\Delta t} &= -\frac{L_v}{c_p}( \frac{q_{i+1} - q_i}{\Delta t} ).
 \end{aligned}
 ```
 
@@ -121,9 +121,9 @@ as follows
 
 ```math
 \delta q = \frac{q_{i+1} - q_i}{\Delta t} = \frac{rq^\star(T_i) - q_i}{ \Delta t_c
-\left[ 1 + \frac{L_vr}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right]}
+\left[ 1 + \frac{L_vr}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right]},
 ```
-``r`` is a linear scale and therefore can be taken out of the gradient
+where ``r`` is a linear scale and therefore can be taken out of the gradient
 ``\frac{\partial q^\star}{\partial T}`` in the denominator.
 
 ## Re-evaporation
@@ -149,13 +149,14 @@ F_{r, k+1} &= F_{r, k} - F_{e, k}
 ```
 
 So ``F_e`` is the evaporated rain in layer ``k`` as a fraction of ``F_r`` the rain water
-flux into layer ``k`` from above (``k`` increases top to bottom). ``c`` is a proportionality
-constant that effectively parameterizes the effectiveness of reevaporation.
-For ``c=0`` reevaporation is disabled, for ``c = 1/q^*`` (though ``c`` is a global constant)
-and ``q=0`` evaporation would be immediate, i.e. when the humidity in the layer is zero
-but ``c`` is chosen to be on the order of  one over the saturation humidity then all
-rain water would evaporate. The exponential avoids evaporating more rain water
-than is available.
+flux into layer ``k`` from above (``k`` increases top to bottom), both in [m/s]. ``c`` is a
+proportionality constant that effectively parameterizes the effectiveness of reevaporation:
+``1/c`` is the saturation deficit ``q^* - q`` at which the rain water flux is reduced by a
+factor ``e`` when falling through a layer of reference thickness ``\Delta\sigma_{ref}``.
+For ``c=0`` reevaporation is disabled. For ``c = 1/q^*`` (though ``c`` is a global constant)
+and a completely dry layer ``q=0`` of reference thickness a fraction ``1 - e^{-1} \approx 63\%``
+of the rain water flux would evaporate, before the saturation limit described below is applied.
+The exponential avoids evaporating more rain water than is available.
 
 The evaporated fraction is scaled with the layer's mass, i.e. its thickness
 ``\Delta\sigma_k = \Delta p_k/p_s`` relative to a reference thickness ``\Delta\sigma_{ref}``
@@ -163,26 +164,40 @@ The evaporated fraction is scaled with the layer's mass, i.e. its thickness
 without this scaling). The fraction of rain that reaches the ground is then the product
 over layers ``\prod_k \exp(-c(q^* - q)\Delta\sigma_k/\Delta\sigma_{ref})``, which
 for constant ``q^* - q`` only depends on the total ``\sum_k \Delta\sigma_k`` and not on
-the number of layers, see [#1426](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1426).
+the number of layers.
 
-We then convert ``F_e`` into a humidity tendency by division with
-``\Delta p/(\Delta t g \rho)``, layer pressure thickness ``\Delta p`` (see [Sigma coordinates](@ref sigma_coordinates_physics)), gravity ``g``,
-but this depends on the units you use for the rain water flux.
-Reevaporation is not a relaxation towards saturation with time scale ``\Delta t_c``
-but is limited by the rain falling into a layer, so it is not included in the implicit
+We then convert ``F_e`` [m/s] into a humidity tendency [kg/kg/s] by division with
+``\Delta p/(\Delta t g \rho)``, with layer pressure thickness ``\Delta p``
+(see [Sigma coordinates](@ref sigma_coordinates_physics)), time step ``\Delta t``,
+gravity ``g`` and water density ``\rho``.
+
+Reevaporation is limited both by the rain falling into a layer (the exponential above)
+and by the saturation deficit of that layer (see below). But unlike condensation it is
+not a relaxation towards saturation over the time scale ``\Delta t_c``: the rain only
+passes through a layer within the current time step and whatever does not evaporate
+there falls into the layer below. Reevaporation is therefore not included in the implicit
 correction of condensation above. Evaporating ``\delta q_e`` cools the layer by
 ``\tfrac{L_v}{c_p}\delta q_e``, which also lowers its saturation humidity, so that the
 saturation deficit after evaporation is ``(q^* - q) - \gamma\,\delta q_e`` with
-``\gamma = 1 + \tfrac{L_v}{c_p}\tfrac{\partial q^*}{\partial T}``. We therefore cap
-the reevaporation at
+``\gamma = 1 + \tfrac{L_v}{c_p}\tfrac{\partial q^*}{\partial T}``. The reevaporation that
+brings a layer exactly to saturation is therefore
 
 ```math
-\delta q_e \leq \frac{\max(q^* - q, 0)}{\gamma}
+\delta q_{max} = \frac{\max(q^* - q, 0)}{\gamma}.
 ```
 
-so that a layer is never evaporated into beyond saturation. Exactly the evaporated
-amount is removed from the rain flux and added to humidity, so that water is conserved,
-see [#1420](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1420). The
+Instead of a hard cap ``\min(\delta q_e^\text{trial}, \delta q_{max})``, which has a kink,
+we limit the reevaporation ``\delta q_e^\text{trial}`` from the exponential above smoothly with
+
+```math
+\delta q_e = \frac{\delta q_e^\text{trial} \, \delta q_{max}}{\delta q_e^\text{trial} + \delta q_{max}},
+```
+
+which is always smaller than both ``\delta q_e^\text{trial}`` and ``\delta q_{max}``, so that a layer
+is never evaporated into beyond saturation. For little rain, ``\delta q_e^\text{trial} \ll \delta q_{max}``,
+this is ``\delta q_e \approx \delta q_e^\text{trial}``, for lots of rain ``\delta q_e`` approaches
+``\delta q_{max}``. Exactly the evaporated amount is removed from the rain flux and added
+to humidity, so that water is conserved. The
 condensation (negative) and reevaporation (positive) humidity tendencies are then added,
 and the latent heat release (or uptake) is computed from their sum. Only the condensation
 tendency produces new rain in that layer.
@@ -191,7 +206,7 @@ If snow from above melts in a layer, the latent heat for melting cools that laye
 first, and saturation humidity ``q^*`` for both condensation and reevaporation is
 computed at this cooled temperature.
 
-The reevaportation in `ImplicitCondensation` is controlled by `reevaporation` (dimensionless),
+The reevaporation in `ImplicitCondensation` is controlled by `reevaporation` (dimensionless),
 the proportionality constant ``c \geq 0`` here, and `reevaporation_layer_thickness`,
 the reference thickness ``\Delta\sigma_{ref}``.
 
