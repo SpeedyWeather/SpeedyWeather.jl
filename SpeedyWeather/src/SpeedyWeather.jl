@@ -69,9 +69,6 @@ export Spectrum
 export OneBased, ZeroBased
 export eachmatrix, eachharmonic, eachorder
 
-# remove the extra degree lmax+1 of spectral scalar variables, e.g. after set!
-export truncate_extra_degree!
-
 # RingGrids
 using RingGrids
 
