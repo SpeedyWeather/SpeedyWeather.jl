@@ -83,6 +83,26 @@ end
         @test SpeedyWeather.grad_saturation_vapor_pressure(260.0f0, atmosphere) > 0
     end
 
+    # saturation humidity gradient consistent with the formulation, in Float64 vs finite differences
+    for SVP in (ClausiusClapeyronConstantL, ClausiusClapeyronLinearL, IFSMixedPhase, MagnusBolton)
+        atmosphere = EarthAtmosphere(Float64, saturation = SVP(Float64))
+        for T in (240.0, 265.0, 290.0, 305.0), p in (3.0e4, 1.0e5)
+            h = 1.0e-4
+            q⁺ = SpeedyWeather.saturation_humidity(T + h, p, atmosphere)
+            q⁻ = SpeedyWeather.saturation_humidity(T - h, p, atmosphere)
+            @test SpeedyWeather.grad_saturation_humidity(T, p, atmosphere) ≈ (q⁺ - q⁻) / 2h rtol = 1.0e-6
+        end
+    end
+
+    # for the default this is the previously hardcoded Clausius-Clapeyron derivative
+    atmosphere = EarthAtmosphere(Float64)
+    (; latent_heat_condensation, R_vapor) = atmosphere
+    for T in (250.0, 280.0, 300.0)
+        qₛ = SpeedyWeather.saturation_humidity(T, 8.0e4, atmosphere)
+        @test SpeedyWeather.grad_saturation_humidity(T, 8.0e4, atmosphere) ≈
+            qₛ * latent_heat_condensation / (R_vapor * T^2)
+    end
+
     # also through the model constructor
     atmosphere = EarthAtmosphere(spectral_grid, saturation = MagnusBolton(spectral_grid))
     model = PrimitiveWetModel(spectral_grid; atmosphere)
@@ -92,4 +112,5 @@ end
     dry = EarthDryAtmosphere(spectral_grid)
     @test SpeedyWeather.saturation_vapor_pressure(280.0f0, dry) == 0
     @test SpeedyWeather.grad_saturation_vapor_pressure(280.0f0, dry) == 0
+    @test SpeedyWeather.grad_saturation_humidity(280.0f0, 1.0f5, dry) == 0
 end

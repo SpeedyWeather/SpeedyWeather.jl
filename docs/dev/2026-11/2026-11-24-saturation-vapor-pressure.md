@@ -1,6 +1,6 @@
 # Swappable saturation vapor pressure formulations
 
-> Status: **completed**. Four formulations with `grad` implemented as a field of `EarthAtmosphere` in #1441; parameterizations are not yet changed (follow-up).
+> Status: **completed**. Four formulations with `grad` implemented as a field of `EarthAtmosphere` in #1441; large-scale condensation uses `grad`, convection not yet.
 
 Date of initial draft: 2026-11-24
 
@@ -35,7 +35,11 @@ Base revision: 75bf89d9aeac994eb8857a06d136a5ceafec0099
 > - Code moved from `dynamics/` to `parameterizations/thermodynamics.jl` (user suggestion), still
 >   included before `dynamics/atmosphere.jl`; tests in `test/parameterizations/thermodynamics.jl`.
 > - Docs: new page `docs/src/saturation_vapor_pressure.md` under Physics.
-> - Condensation keeps its hardcoded `dq_sat/dT = q_sat Lᵥ/(Rᵥ T²)` for now (follow-up PR).
+> - Condensation initially kept its hardcoded `dq_sat/dT = q_sat Lᵥ/(Rᵥ T²)`.
+> - 2026-11-25, after merging #1431 (reevaporation): "update the condensation code to use the `grad`
+>   function". New `grad_saturation_humidity(T, p, A) = ε/p deₛ/dT`, used for both the implicit
+>   condensation divisor and the reevaporation limiter. Convection's moist adiabat still implicitly
+>   assumes constant L (left for a follow-up).
 
 ## Problem description
 
@@ -69,7 +73,7 @@ ice coefficients with a quadratic blend between -23˚C and 0˚C).
   field `saturation_vapor_pressure` (e₀) removed. Convenience constructors default to
   `ClausiusClapeyronConstantL(NF)`.
 - `saturation_vapor_pressure(T, A)` and `saturation_humidity(T, p, A)` keep their signatures and
-  forward to `A.saturation`. No parameterization changes.
+  forward to `A.saturation`. New `grad_saturation_humidity(T, p, A)` used by `ImplicitCondensation` (implicit divisor and reevaporation limiter) instead of the hardcoded Clausius-Clapeyron derivative.
 - `TetensEquation` kept as is but its `grad` sign error fixed and its docstrings corrected.
 - SpeedyWeather version `0.26.0-DEV` already carries a `-DEV` tag (unreleased minor bump), so no further bump is needed.
 
@@ -91,10 +95,10 @@ interface (`EarthAtmosphere(spectral_grid, saturation = MagnusBolton(spectral_gr
 
 - `ClausiusClapeyronLinearL` and `MagnusBolton` are over liquid only.
 - The formulations are not `@parameterized`, so they are not part of `parameters(model)`.
-- Condensation's derivative remains hardcoded and only consistent with the default.
+- Convection's moist-adiabatic lapse rate still implicitly uses the constant-L derivative.
 
 ## Future work
 
-- Use `grad` (or a fused value-and-log-derivative) in `ImplicitCondensation` and convection.
+- Use `grad` in convection's moist adiabat; possibly a fused value-and-derivative to save an `exp`.
 - Ice branch for Romps; decide on a new default.
 - Consistent latent heat L(T) in the condensation heating.

@@ -157,6 +157,18 @@ with saturation vapor pressure eₛ(T), pressure p [Pa] and ratio of gas constan
     return ϵ * eₛ / p
 end
 
+grad_saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)
+
+"""$(TYPEDSIGNATURES)
+Derivative of the saturation specific humidity with respect to temperature [1/K],
+    ∂qₛ/∂T = ε/p * deₛ/dT,
+using the derivative `grad` of the saturation vapor pressure formulation `A.saturation`."""
+@inline function grad_saturation_humidity(T, p, A::AbstractWetAtmosphere)
+    deₛ_dT = grad_saturation_vapor_pressure(T, A)
+    ϵ = A.mol_ratio
+    return ϵ * deₛ_dT / p
+end
+
 export TetensEquation
 
 """

@@ -94,11 +94,20 @@ evaluate the chosen formulation, which each also provides its derivative via
 `SpeedyWeather.grad(saturation, T, atmosphere)`. The derivative is analytical, cheap and
 branch-free, so it can be used inside kernels and differentiated through.
 
-!!! note "Parameterizations do not yet use the derivative"
-    The implicit large-scale condensation currently uses
-    ``dq_s/dT = q_s L_v/(R_v T^2)``, which is consistent only with the default
-    `ClausiusClapeyronConstantL`. With another formulation the saturation humidity changes
-    but this derivative does not (yet).
+The derivative of the saturation humidity follows from it as
+
+```math
+\frac{\partial q_s}{\partial T} = \frac{\epsilon}{p} \frac{de_s}{dT}
+```
+
+available as `SpeedyWeather.grad_saturation_humidity(T, p, atmosphere)`. The
+[Large-scale condensation](@ref) uses it for its implicit correction and for limiting
+reevaporation, so that both stay consistent with the chosen formulation.
+
+!!! note "Convection still assumes constant latent heat"
+    The moist-adiabatic lapse rate in [Convection](@ref) still uses
+    ``\partial q_s/\partial T = q_s L_v/(R_v T^2)`` implicitly, which is exact only for the
+    default `ClausiusClapeyronConstantL`.
 
 ## Define your own formulation
 
