@@ -21,11 +21,14 @@ restart_spectral_grid(architecture) = SpectralGrid(; architecture, truncation = 
 @testset "Restart files with Reactant" begin
     path = mktempdir(pwd(), prefix = "tmp_reactant_restart_")
 
-    # a Reactant simulation with a state that differs from the initial conditions
+    # a Reactant simulation with a state that differs from the initial conditions, random vorticity
+    # without the extra degree, which initialize! removes from the prognostic variables of the restart
     model = PrimitiveWetModel(restart_spectral_grid(ReactantDevice()); feedback = nothing)
     simulation = initialize!(model)
-    vorticity = rand(ComplexF32, size(simulation.variables.prognostic.vorticity)...)
-    copyto!(simulation.variables.prognostic.vorticity, SpeedyWeather.on_architecture(ReactantDevice(), vorticity))
+    spectrum = restart_spectral_grid(SpeedyWeather.CPU()).spectrum
+    vorticity = rand(ComplexF32, spectrum, size(simulation.variables.prognostic.vorticity)[2:end]...)
+    LowerTriangularArrays.truncate_extra_degree!(vorticity)
+    copyto!(simulation.variables.prognostic.vorticity, SpeedyWeather.on_architecture(ReactantDevice(), vorticity.data))
     simulation.variables.prognostic.clock.time = DateTime(2001, 3, 4, 5, 6)
 
     restart = WriteVariablesRestartFile(path = joinpath(path, "run_0001"), write_only_with_output = false)

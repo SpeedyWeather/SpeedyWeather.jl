@@ -938,58 +938,45 @@ end
     @test LowerTriangularArrays.lta_view(L, :) isa LowerTriangularArray     # this is LTA representable though!
 end
 
-@testset "zero_last_degree!" begin
-    @testset for NF in (Float32, Float64)
-        # Test 1D LowerTriangularMatrix
-        @testset "1D LowerTriangularMatrix" begin
+@testset "truncate_extra_degree!" begin
+    @testset for NF in (Float32, ComplexF64)
+        @testset for nlayers in ((), (3,))
             lmax, mmax = 6, 5
-            L = randn(LowerTriangularMatrix{NF}, lmax, mmax)
-            L_copy = copy(L.data)
+            L = randn(LowerTriangularArray{NF}, lmax, mmax, nlayers...)
+            L_copy = copy(L)
 
-            # Zero the last degree
-            zero_last_degree!(L)    # is exported
-            LowerTriangularArrays.zero_last_degree!(L)
+            @test truncate_extra_degree!(L) === L   # is exported, returns L
 
-            # Check that all elements with l == lmax are zero
-            for m in 1:mmax
-                @test L[lmax, m] == 0
-            end
-
-            # Check that other elements are unchanged
-            for m in 1:mmax
+            # all elements with l == lmax are zero, all others unchanged
+            for k in eachmatrix(L), m in 1:mmax
+                @test L[lmax, m, k] == 0
                 for l in m:(lmax - 1)
-                    @test L[l, m] == L_copy[LowerTriangularArrays.lm2i(l, m, lmax)]
-                end
-            end
-        end
-
-        # Test 2D LowerTriangularArray (with vertical layers)
-        @testset "2D LowerTriangularArray" begin
-            lmax, mmax, nlayers = 6, 5, 3
-            L = randn(LowerTriangularArray{NF}, lmax, mmax, nlayers)
-            L_copy = copy(L.data)
-
-            # Zero the last degree
-            LowerTriangularArrays.zero_last_degree!(L)
-
-            # Check that all elements with l == lmax are zero across all layers
-            for k in 1:nlayers
-                for m in 1:mmax
-                    @test L[lmax, m, k] == 0
+                    @test L[l, m, k] == L_copy[l, m, k]
                 end
             end
 
-            # Check that other elements are unchanged
-            for k in 1:nlayers
-                for m in 1:mmax
-                    for l in m:(lmax - 1)
-                        lm = LowerTriangularArrays.lm2i(l, m, lmax)
-                        @test L[l, m, k] == L_copy[lm, k]
-                    end
-                end
-            end
+            # same as truncate!(L)
+            LowerTriangularArrays.truncate!(L_copy)
+            @test L == L_copy
+
+            # no-op for square LowerTriangularArrays
+            L = randn(LowerTriangularArray{NF}, mmax, mmax, nlayers...)
+            L_copy = copy(L)
+            truncate_extra_degree!(L)
+            @test L == L_copy
         end
     end
+
+    # nested NamedTuples recurse, non-spectral elements are left untouched
+    L1 = randn(LowerTriangularMatrix{Float32}, 6, 5)
+    L2 = randn(LowerTriangularArray{Float32}, 6, 5, 2)
+    A = randn(Float32, 4)
+    vars = (; L1, a = 1, nested = (; L2, A))
+    @test truncate_extra_degree!(vars) === vars
+    @test all(iszero, L1[6, m] for m in 1:5)
+    @test all(iszero, L2[6, m, k] for m in 1:5, k in 1:2)
+    @test vars.a == 1
+    @test truncate_extra_degree!(A) === A
 end
 
 @testset "truncate!" begin

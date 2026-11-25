@@ -51,6 +51,11 @@ function initialize!(vars::Variables, model::AbstractModel)
     # then atmosphere as this may include initial conditions like StartFromFile
     # which would contain ocean/land initial conditions that should overwrite the above if they are included
     initialize!(vars, model.initial_conditions, model)
+
+    # remove the extra degree lmax+1 (1-based) from all spectral prognostic variables (all steps):
+    # these are scalars that don't use it, and it would never change again
+    # In most cases it already is zero, so this is just a safety measure.
+    truncate_extra_degree!(vars.prognostic)
     return nothing
 end
 
