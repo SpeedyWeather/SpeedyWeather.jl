@@ -37,8 +37,9 @@ SpeedyWeather.finalize!(::ExtraDegreeLog, args...) = nothing
         add!(model, log)
         simulation = initialize!(model)
 
-        # a tracer with a sharp edge, which has a large projection onto the extra degree
-        set!(simulation, abc = (λ, φ, σ) -> φ > 0 ? 1 : 0, namespace = :tracers)
+        # a tracer with sharp edges (not symmetric around the equator, which would only project
+        # onto odd degrees) that projects onto the extra degree when transformed from grid space
+        set!(simulation, abc = (λ, φ, σ) -> (0 < φ < 45 && 90 < λ < 180) ? 1 : 0, namespace = :tracers)
 
         run!(simulation, period = Day(1))
         @test !simulation.model.feedback.nans_detected
